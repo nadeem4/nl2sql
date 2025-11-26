@@ -26,7 +26,6 @@ py-modules = [
   "datasource_config",
   "engine_factory",
   "langgraph_pipeline",
-  "langgraph_skeleton",
   "nodes",
   "schemas",
   "llm_registry",
