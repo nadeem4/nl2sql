@@ -69,6 +69,35 @@ Keys are taken from config or `OPENAI_API_KEY` (loaded via Pydantic settings wit
 - `docs/`: plan and goldens
 - `tests/`: pytest goldens
 
+## Agents (LangGraph)
+- **Intent**: normalizes the user query, extracts entities/filters/clarifications. Output: structured intent hints.
+- **Schema**: introspects the datasource (via SQLAlchemy) to list tables/columns for grounding and wildcard expansion.
+- **Planner**: produces a structured query plan (tables, joins, filters, aggregates, order_by, limit) via LLM with Pydantic validation.
+- **SQL Generator**: renders engine-aware SQL from the plan, enforces limits, rejects wildcards, and adds ORDER BY when present.
+- **Validator**: guards against DDL/DML, missing LIMIT, UNION/multi-statements, and missing ORDER BY when requested by the plan.
+- **Executor**: runs the SQL read-only against the datasource, returning row count and a sample for verification.
+
+## Flow (Mermaid)
+```mermaid
+flowchart TD
+  A[User Query] --> B[Intention]
+  B --> C[Schema]
+  C --> D[Planner]
+  D --> E[SQL Generator]
+  E --> F[Validator]
+  F --> G[Executor]
+  G --> H[Answer/Result Sample]
+  subgraph Agents
+    B
+    C
+    D
+    E
+    F
+    G
+  end
+  style A fill:#f6f8fa,stroke:#aaa
+  style H fill:#f6f8fa,stroke:#aaa
+```
 ## Notes
 - Guardrails block DDL/DML, enforce LIMIT, reject UNION/multi-statements, and expand wildcards using schema metadata when possible.
 - Execution is read-only; limits are clamped to datasource `row_limit`.
