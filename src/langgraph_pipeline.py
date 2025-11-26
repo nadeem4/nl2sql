@@ -55,6 +55,20 @@ def _schema_retriever(profile: DatasourceProfile):
                     for table in tables
                 }
                 gs.validation["schema_columns"] = json.dumps(columns_map)
+                fk_map = {}
+                for table in tables:
+                    fks = []
+                    for fk in inspector.get_foreign_keys(table):
+                        if not fk.get("referred_table"):
+                            continue
+                        col = fk.get("constrained_columns", [None])[0]
+                        ref_table = fk.get("referred_table")
+                        ref_col = fk.get("referred_columns", [None])[0]
+                        fks.append({"column": col, "reftable": ref_table, "refcolumn": ref_col})
+                    if fks:
+                        fk_map[table] = fks
+                if fk_map:
+                    gs.validation["schema_fks"] = json.dumps(fk_map)
             except Exception:
                 pass
         return dataclasses.asdict(gs)

@@ -63,12 +63,28 @@ def planner_node(state: GraphState, llm: Optional[LLMCallable] = None) -> GraphS
         state.errors.append("Planner LLM not provided; no plan generated.")
         return state
 
+    allowed_tables = state.validation.get("schema_tables", "")
+    allowed_columns = {}
+    allowed_fks = state.validation.get("schema_fks")
+    if state.validation.get("schema_columns"):
+        try:
+            allowed_columns = json.loads(state.validation["schema_columns"])
+        except Exception:
+            allowed_columns = {}
+    fk_text = ""
+    if allowed_fks:
+        fk_text = f"Foreign keys: {allowed_fks}\n"
+
     parser = PydanticOutputParser(pydantic_object=PlanModel)
     prompt = (
         "You are a SQL planner. Return ONLY a JSON object matching this schema:\n"
         f"{parser.get_format_instructions()}\n"
         "Fill tables, joins, filters, group_by, aggregates, having, order_by, limit based on the user query. "
-        "Do not include extra fields; only those defined in the schema.\n"
+        "Do not include extra fields; only those defined in the schema. "
+        "Use only the allowed tables/columns provided. If the user asks for a table/column not listed, ask for clarification or use the closest match from allowed tables.\n"
+        f"Allowed tables: {allowed_tables}\n"
+        f"Allowed columns by table: {json.dumps(allowed_columns)}\n"
+        f"{fk_text}"
         f'User query: "{state.user_query}"'
     )
     raw = llm(prompt)
@@ -119,9 +135,10 @@ def sql_generator_node(
     prompt = (
         "You are a SQL generator. Given a JSON plan and engine dialect, return ONLY a JSON object matching:\n"
         f"{parser.get_format_instructions()}\n"
-        "Rules: avoid DDL/DML; parameterize literals where possible; quote identifiers using engine rules; "
+        "Rules: avoid DDL/DML; do NOT use parameter placeholders—inline literals from the plan; quote identifiers using engine rules; "
         f"{limit_guidance}; include ORDER BY if provided; avoid SELECT * (project explicit columns). "
-        "Prefer ORDER BY on business-friendly fields when no order is provided. Do not wrap in code fences.\n"
+        "Prefer ORDER BY on business-friendly fields when no order is provided. Do not wrap in code fences. "
+        "Use only the provided tables and columns; reject any not listed.\n"
         f"Engine dialect: {caps.dialect}. Plan JSON:\n{json.dumps(state.plan)}"
     )
     raw = llm(prompt)
@@ -212,15 +229,55 @@ def validator_node(state: GraphState, row_limit: int | None = None) -> GraphStat
         return state
     sql_text = state.sql_draft["sql"]
     sql_lower = sql_text.lower()
+    # Validate plan tables exist in schema listing when available
+    schema_tables = set()
+    if state.validation.get("schema_tables"):
+        schema_tables = {t.strip() for t in state.validation["schema_tables"].split(",")}
+    if state.plan and state.plan.get("tables") and schema_tables:
+        missing = []
+        for tbl in state.plan["tables"]:
+            name = tbl.get("name")
+            if name and name not in schema_tables:
+                missing.append(name)
+        if missing:
+            state.errors.append(f"Plan references missing tables: {', '.join(sorted(missing))}.")
+            state.sql_draft = None
+            return state
+    # Validate columns in SELECT/WHERE/ORDER against schema when available
+    schema_cols = {}
+    if state.validation.get("schema_columns"):
+        try:
+            schema_cols = json.loads(state.validation["schema_columns"])
+        except Exception:
+            schema_cols = {}
+
     if any(term in sql_lower for term in ["insert ", "update ", "delete ", "drop ", "alter "]):
         state.errors.append("Write/DML detected; blocked.")
     if "limit" not in sql_lower:
         state.errors.append("Missing LIMIT in SQL.")
+    if "?" in sql_text:
+        state.errors.append("Parameter placeholders detected; inline literals instead.")
+        state.sql_draft = None
+        return state
     try:
         parsed = sqlglot.parse_one(sql_text)
     except Exception:
         state.errors.append("SQL parse failed; blocked.")
         return state
+    # validate column references
+    if schema_cols:
+        invalid_cols = []
+        for col in parsed.find_all(exp.Column):
+            tbl = col.table
+            col_name = col.name
+            if tbl and tbl in schema_cols:
+                if col_name not in schema_cols[tbl]:
+                    invalid_cols.append(f"{tbl}.{col_name}")
+            # if no table qualifier, skip
+        if invalid_cols:
+            state.errors.append(f"References missing columns: {', '.join(sorted(set(invalid_cols)))}")
+            state.sql_draft = None
+            return state
     # block UNION
     if parsed.find(exp.Union):
         state.errors.append("UNION detected; blocked.")

@@ -80,12 +80,12 @@ Keys are taken from config or `OPENAI_API_KEY` (loaded via Pydantic settings wit
 ## Flow
 ```mermaid
 flowchart TD
-  A[User Query] --> B[Intention]
-  B --> C[Schema]
-  C --> D[Planner]
-  D --> E[SQL Generator]
-  E --> F[Validator]
-  F --> G[Executor]
+  A[User Query] --> B[Intention (AI)]
+  B --> C[Schema (non-AI)]
+  C --> D[Planner (AI)]
+  D --> E[SQL Generator (AI)]
+  E --> F[Validator (non-AI)]
+  F --> G[Executor (non-AI)]
   G --> H[Answer/Result Sample]
   subgraph Agents
     B

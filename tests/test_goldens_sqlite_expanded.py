@@ -110,6 +110,39 @@ GOLDENS = [
         ORDER BY i.warehouse, p.sku;
         """,
     ),
+    (
+        "Average maintenance downtime per factory",
+        """
+        SELECT
+          f.name AS factory,
+          AVG(l.downtime_minutes) AS avg_downtime
+        FROM maintenance_logs l
+        JOIN machines m ON m.id = l.machine_id
+        JOIN factories f ON f.id = m.factory_id
+        WHERE l.downtime_minutes > 30
+        GROUP BY f.name
+        HAVING AVG(l.downtime_minutes) > 0
+        ORDER BY avg_downtime DESC;
+        """,
+    ),
+    (
+        "Production runs for Widget Alpha with machine and factory",
+        """
+        SELECT
+          r.id,
+          p.name AS product,
+          m.name AS machine,
+          f.name AS factory,
+          r.started_at,
+          r.quantity_produced
+        FROM production_runs r
+        JOIN products p ON p.id = r.product_id
+        JOIN machines m ON m.id = r.machine_id
+        JOIN factories f ON f.id = m.factory_id
+        WHERE p.name = 'Widget Alpha'
+        ORDER BY r.started_at DESC;
+        """,
+    ),
 ]
 
 
