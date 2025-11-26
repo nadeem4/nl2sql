@@ -80,23 +80,23 @@ Keys are taken from config or `OPENAI_API_KEY` (loaded via Pydantic settings wit
 ## Flow
 ```mermaid
 flowchart TD
-  A[User Query] --> B[Intention (AI)]
-  B --> C[Schema (non-AI)]
-  C --> D[Planner (AI)]
-  D --> E[SQL Generator (AI)]
-  E --> F[Validator (non-AI)]
-  F --> G[Executor (non-AI)]
-  G --> H[Answer/Result Sample]
+  user[User Query] --> intent[Intention\n(AI)]
+  intent --> schema[Schema\n(non-AI)]
+  schema --> planner[Planner\n(AI)]
+  planner --> generator[SQL Generator\n(AI)]
+  generator --> validator[Validator\n(non-AI)]
+  validator --> executor[Executor\n(non-AI)]
+  executor --> answer[Answer/Result Sample]
   subgraph Agents
-    B
-    C
-    D
-    E
-    F
-    G
+    intent
+    schema
+    planner
+    generator
+    validator
+    executor
   end
-  style A fill:#f6f8fa,stroke:#aaa
-  style H fill:#f6f8fa,stroke:#aaa
+  style user fill:#f6f8fa,stroke:#aaa
+  style answer fill:#f6f8fa,stroke:#aaa
 ```
 ## Notes
 - Guardrails block DDL/DML, enforce LIMIT, reject UNION/multi-statements, and expand wildcards using schema metadata when possible.
