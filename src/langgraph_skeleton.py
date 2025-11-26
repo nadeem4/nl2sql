@@ -8,11 +8,11 @@ from typing import Dict, List, Optional
 
 from sqlalchemy import inspect
 
-from .datasource_config import DatasourceProfile
-from .engine_factory import make_engine
-from .schemas import GraphState
-from .capabilities import get_capabilities
-from .nodes import intent_node, planner_node, sql_generator_node, validator_node
+from capabilities import get_capabilities
+from datasource_config import DatasourceProfile
+from engine_factory import make_engine
+from nodes import intent_node, planner_node, sql_generator_node, validator_node
+from schemas import GraphState
 
 
 def intent_analyst(state: GraphState) -> GraphState:

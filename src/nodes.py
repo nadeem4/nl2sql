@@ -6,9 +6,9 @@ from typing import Any, Callable, Dict, Optional
 from langchain_core.output_parsers import PydanticOutputParser
 from pydantic import BaseModel, Field, ValidationError
 
-from .capabilities import EngineCapabilities, get_capabilities
-from .json_utils import extract_json_object, strip_code_fences
-from .schemas import GeneratedSQL, GraphState, Plan
+from capabilities import EngineCapabilities, get_capabilities
+from json_utils import extract_json_object, strip_code_fences
+from schemas import GeneratedSQL, GraphState, Plan
 
 LLMCallable = Callable[[str], str]
 

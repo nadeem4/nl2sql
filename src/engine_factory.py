@@ -6,7 +6,7 @@ from typing import Any, Dict, TypedDict
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 
-from .datasource_config import DatasourceProfile
+from datasource_config import DatasourceProfile
 
 
 class UnsupportedEngineError(ValueError):

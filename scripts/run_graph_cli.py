@@ -13,12 +13,13 @@ from pprint import pprint
 
 # Allow running without packaging
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-if str(ROOT) not in sys.path:
-    sys.path.append(str(ROOT))
+SRC = ROOT / "src"
+if str(SRC) not in sys.path:
+    sys.path.append(str(SRC))
 
-from src.datasource_config import get_profile, load_profiles
-from src.langgraph_pipeline import run_with_graph
-from src.llm_registry import load_llm_map
+from datasource_config import get_profile, load_profiles
+from langgraph_pipeline import run_with_graph
+from llm_registry import load_llm_map
 
 
 def stub_llm(prompt: str) -> str:

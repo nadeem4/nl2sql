@@ -13,11 +13,11 @@ from typing import Callable, Dict, Optional
 
 from sqlalchemy import inspect
 
-from .capabilities import get_capabilities
-from .datasource_config import DatasourceProfile
-from .engine_factory import make_engine, run_read_query
-from .nodes import intent_node, planner_node, sql_generator_node, validator_node
-from .schemas import GraphState
+from capabilities import get_capabilities
+from datasource_config import DatasourceProfile
+from engine_factory import make_engine, run_read_query
+from nodes import intent_node, planner_node, sql_generator_node, validator_node
+from schemas import GraphState
 
 # Type for an LLM callable: prompt -> string
 LLMCallable = Callable[[str], str]

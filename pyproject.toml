@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nl2sql-agent"
+version = "0.1.0"
+description = "LangGraph-based NL2SQL multi-agent pipeline with SQLite starter"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+  "SQLAlchemy>=2.0",
+  "PyYAML>=6.0",
+  "langgraph>=0.0.29",
+  "langchain>=0.2.0",
+  "langchain-openai>=0.1.0",
+  "pydantic>=1.10",
+]
+
+[project.scripts]
+nl2sql-cli = "cli:main"
+
+[tool.setuptools]
+py-modules = [
+  "capabilities",
+  "datasource_config",
+  "engine_factory",
+  "langgraph_pipeline",
+  "langgraph_skeleton",
+  "nodes",
+  "schemas",
+  "llm_registry",
+  "json_utils",
+]
+package-dir = {"" = "src"}
+
+[tool.setuptools.package-data]
+"*" = ["configs/*.yaml", ".env"]

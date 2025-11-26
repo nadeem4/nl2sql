@@ -1,10 +1,22 @@
 from __future__ import annotations
 
 import dataclasses
-import os
 import pathlib
 from typing import Callable, Dict, Optional
 
+from pydantic import Field
+from pydantic_settings import BaseSettings
+
+
+class Settings(BaseSettings):
+    openai_api_key: Optional[str] = Field(default=None, env="OPENAI_API_KEY")
+
+    class Config:
+        env_file = ".env"
+        env_file_encoding = "utf-8"
+
+
+settings = Settings()
 
 LLMCallable = Callable[[str], str]
 
@@ -84,7 +96,7 @@ def _openai_llm(model: str, api_key: Optional[str] = None) -> LLMCallable:
     except ImportError as exc:
         raise RuntimeError("langchain-openai is required for OpenAI provider") from exc
 
-    key = api_key or os.getenv("OPENAI_API_KEY")
+    key = api_key or settings.openai_api_key
     if not key:
         raise RuntimeError("OPENAI_API_KEY is not set and no api_key provided in config.")
 

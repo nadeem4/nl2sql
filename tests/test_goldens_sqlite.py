@@ -5,11 +5,12 @@ import pytest
 
 # Allow running without packaging
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-if str(ROOT) not in sys.path:
-    sys.path.append(str(ROOT))
+SRC = ROOT / "src"
+if str(SRC) not in sys.path:
+    sys.path.append(str(SRC))
 
-from src.datasource_config import get_profile, load_profiles
-from src.engine_factory import make_engine, run_read_query
+from datasource_config import get_profile, load_profiles
+from engine_factory import make_engine, run_read_query
 
 
 GOLDENS = [
