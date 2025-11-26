@@ -77,7 +77,7 @@ Keys are taken from config or `OPENAI_API_KEY` (loaded via Pydantic settings wit
 - **Validator**: guards against DDL/DML, missing LIMIT, UNION/multi-statements, and missing ORDER BY when requested by the plan.
 - **Executor**: runs the SQL read-only against the datasource, returning row count and a sample for verification.
 
-## Flow (Mermaid)
+## Flow
 ```mermaid
 flowchart TD
   A[User Query] --> B[Intention]
