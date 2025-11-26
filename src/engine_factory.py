@@ -40,12 +40,22 @@ def make_engine(profile: DatasourceProfile) -> Engine:
     raise UnsupportedEngineError(f"Unsupported engine: {profile.engine}")
 
 
-def run_read_query(engine: Engine, sql: str, params: Dict[str, Any] | None = None, row_limit: int = 1000):
+def _normalize_sql(sql: str) -> str:
+    # Strip whitespace and trailing semicolons to avoid sqlite multi-statement errors.
+    return sql.strip().rstrip(";")
+
+
+def run_read_query(
+    engine: Engine, sql: str, params: Dict[str, Any] | None = None, row_limit: int = 1000
+):
     """
-    Execute a read-only query with a row limit safeguard.
+    Execute a read-only query with a row limit safeguard. Removes trailing semicolons before applying LIMIT.
     """
     params = params or {}
-    limited_sql = f"{sql.strip()}\nLIMIT {row_limit}"
+    cleaned = _normalize_sql(sql)
+    limited_sql = cleaned
+    if " limit " not in cleaned.lower():
+        limited_sql = f"{cleaned}\nLIMIT {row_limit}"
     with engine.connect() as conn:
         result = conn.execute(text(limited_sql), params)
         rows = result.fetchall()
