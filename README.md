@@ -65,7 +65,7 @@ Keys are taken from config or `OPENAI_API_KEY` (loaded via Pydantic settings wit
 ## Project Structure
 - `src/`: core modules (`nodes`, `langgraph_pipeline`, `datasource_config`, `llm_registry`, `cli`, etc.)
 - `configs/`: datasource and LLM example configs
-- `scripts/`: utilities (`setup_sqlite_manufacturing.py`, `run_graph_cli.py`)
+- `scripts/`: utilities (`setup_sqlite_manufacturing.py`)
 - `docs/`: plan and goldens
 - `tests/`: pytest goldens
 
