@@ -1,0 +1,18 @@
+# Example datasource profile for SQLite manufacturing DB
+- id: manufacturing_sqlite
+  engine: sqlite
+  sqlalchemy_url: sqlite:///data/manufacturing.db
+  auth: null
+  read_only_role: null
+  statement_timeout_ms: 8000
+  row_limit: 1000
+  max_bytes: 10485760  # 10 MB
+  tags:
+    env: dev
+    pii: false
+  feature_flags:
+    allow_generate_writes: false
+    allow_cross_db: false
+    supports_dry_run: false
+    supports_estimated_cost: false
+    sample_rows_enabled: true
