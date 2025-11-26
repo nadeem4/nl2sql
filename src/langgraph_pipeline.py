@@ -7,6 +7,7 @@ StateGraph. Supply an LLM callable to enable real planning/generation.
 from __future__ import annotations
 
 import dataclasses
+import json
 from functools import partial
 from typing import Callable, Dict, Optional
 
@@ -42,6 +43,14 @@ def _schema_retriever(profile: DatasourceProfile):
         inspector = inspect(engine)
         tables = inspector.get_table_names()
         gs.validation["schema_tables"] = ", ".join(sorted(tables))
+        try:
+            columns_map = {
+                table: [col["name"] for col in inspector.get_columns(table)]
+                for table in tables
+            }
+            gs.validation["schema_columns"] = json.dumps(columns_map)
+        except Exception:
+            pass
         return dataclasses.asdict(gs)
 
     return inner

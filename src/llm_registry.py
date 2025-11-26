@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import dataclasses
+import os
 import pathlib
 from typing import Callable, Dict, Optional
 
@@ -83,7 +84,11 @@ def _openai_llm(model: str, api_key: Optional[str] = None) -> LLMCallable:
     except ImportError as exc:
         raise RuntimeError("langchain-openai is required for OpenAI provider") from exc
 
-    client = ChatOpenAI(model=model, api_key=api_key, temperature=0)
+    key = api_key or os.getenv("OPENAI_API_KEY")
+    if not key:
+        raise RuntimeError("OPENAI_API_KEY is not set and no api_key provided in config.")
+
+    client = ChatOpenAI(model=model, api_key=str(key), temperature=0)
 
     def call(prompt: str) -> str:
         resp = client.invoke(prompt)

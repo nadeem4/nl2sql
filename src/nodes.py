@@ -3,17 +3,38 @@ from __future__ import annotations
 import json
 from typing import Any, Callable, Dict, Optional
 
+from langchain_core.output_parsers import PydanticOutputParser
+from pydantic import BaseModel, Field, ValidationError
+
 from .capabilities import EngineCapabilities, get_capabilities
+from .json_utils import extract_json_object, strip_code_fences
 from .schemas import GeneratedSQL, GraphState, Plan
 
 LLMCallable = Callable[[str], str]
 
 
-def _safe_json_loads(payload: str) -> Dict[str, Any]:
-    try:
-        return json.loads(payload)
-    except json.JSONDecodeError:
-        return {}
+class PlanModel(BaseModel):
+    tables: list[Dict[str, Any]] = Field(default_factory=list)
+    joins: list[Dict[str, Any]] = Field(default_factory=list)
+    filters: list[Dict[str, Any]] = Field(default_factory=list)
+    group_by: list[str] = Field(default_factory=list)
+    aggregates: list[Dict[str, Any]] = Field(default_factory=list)
+    having: list[Dict[str, Any]] = Field(default_factory=list)
+    order_by: list[Dict[str, Any]] = Field(default_factory=list)
+    limit: Optional[int] = None
+
+    class Config:
+        extra = "forbid"
+
+
+class SQLModel(BaseModel):
+    sql: str
+    rationale: Optional[str] = None
+    limit_enforced: Optional[bool] = None
+    draft_only: Optional[bool] = None
+
+    class Config:
+        extra = "forbid"
 
 
 def intent_node(state: GraphState, llm: Optional[LLMCallable] = None) -> GraphState:
@@ -31,7 +52,7 @@ def intent_node(state: GraphState, llm: Optional[LLMCallable] = None) -> GraphSt
         f"User query: {state.user_query}"
     )
     raw = llm(prompt)
-    parsed = _safe_json_loads(raw)
+    parsed = extract_json_object(raw)
     state.validation["intent"] = json.dumps(parsed)
     return state
 
@@ -41,36 +62,26 @@ def planner_node(state: GraphState, llm: Optional[LLMCallable] = None) -> GraphS
     Generates a structured plan. Falls back to a simple products listing if no LLM.
     """
     if not llm:
-        state.plan = {
-            "tables": [{"name": "products", "alias": "p"}],
-            "joins": [],
-            "filters": [],
-            "group_by": [],
-            "aggregates": [],
-            "having": [],
-            "order_by": [{"expr": "p.sku", "direction": "asc"}],
-            "limit": 20,
-        }
+        state.errors.append("Planner LLM not provided; no plan generated.")
         return state
 
+    parser = PydanticOutputParser(pydantic_object=PlanModel)
     prompt = (
-        "You are a SQL planner. Produce ONLY a JSON object with keys: "
-        '"tables" (list of {name, alias}), '
-        '"joins" (list of {left, right, on[], join_type in [inner,left,right,full]}), '
-        '"filters" (list of {column, op, value, logic in [and,or]}), '
-        '"group_by" (list of column expressions), '
-        '"aggregates" (list of {expr, alias}), '
-        '"having" (list of filter objects), '
-        '"order_by" (list of {expr, direction in [asc,desc]}), '
-        '"limit" (integer). '
-        "Do not include SQL, only the JSON plan.\n"
+        "You are a SQL planner. Return ONLY a JSON object matching this schema:\n"
+        f"{parser.get_format_instructions()}\n"
+        "Fill tables, joins, filters, group_by, aggregates, having, order_by, limit based on the user query. "
+        "Do not include extra fields; only those defined in the schema.\n"
         f'User query: "{state.user_query}"'
     )
     raw = llm(prompt)
-    parsed = _safe_json_loads(raw)
-    state.plan = parsed or None
-    if not state.plan:
-        state.errors.append("Planner returned no plan")
+    raw_str = raw.strip() if isinstance(raw, str) else str(raw)
+    state.validation["planner_raw"] = raw_str
+    try:
+        plan_model = parser.parse(strip_code_fences(raw_str))
+        state.plan = plan_model.dict()
+    except ValidationError as exc:
+        state.plan = None
+        state.errors.append(f"Planner parse failed. Error: {exc}")
     return state
 
 
@@ -98,13 +109,7 @@ def sql_generator_node(
         state.plan["limit"] = row_limit
 
     if not llm:
-        sql = "SELECT p.sku, p.name, p.category FROM products p ORDER BY p.sku ASC LIMIT 20;"
-        state.sql_draft = GeneratedSQL(
-            sql=sql,
-            rationale="Default products listing as placeholder.",
-            limit_enforced=True,
-            draft_only=False,
-        )
+        state.errors.append("SQL generator LLM not provided; no SQL generated.")
         return state
 
     limit_guidance = {
@@ -112,20 +117,66 @@ def sql_generator_node(
         "top_fetch": "use 'SELECT TOP {n}' or 'OFFSET/FETCH' as appropriate",
     }.get(caps.limit_syntax, "append a safe LIMIT")
 
+    parser = PydanticOutputParser(pydantic_object=SQLModel)
     prompt = (
-        "You are a SQL generator. Given a JSON plan and engine dialect, output ONLY SQL text with a SAFE LIMIT. "
-        "Rules: avoid DDL/DML; parameterize literals where possible; quote identifiers using the engine rules; "
-        f"{limit_guidance}; include ORDER BY if provided; never include explanatory text.\n"
+        "You are a SQL generator. Given a JSON plan and engine dialect, return ONLY a JSON object matching:\n"
+        f"{parser.get_format_instructions()}\n"
+        "Rules: avoid DDL/DML; parameterize literals where possible; quote identifiers using engine rules; "
+        f"{limit_guidance}; include ORDER BY if provided; avoid SELECT * (project explicit columns). "
+        "Do not wrap in code fences.\n"
         f"Engine dialect: {caps.dialect}. Plan JSON:\n{json.dumps(state.plan)}"
     )
     raw = llm(prompt)
-    sql = raw.strip()
-    state.sql_draft = GeneratedSQL(
-        sql=sql,
-        rationale="LLM-generated SQL",
-        limit_enforced=("limit" in sql.lower()) or (" top " in sql.lower()) or (" fetch " in sql.lower()),
-        draft_only=False,
-    )
+    raw_str = raw.strip() if isinstance(raw, str) else str(raw)
+    try:
+        sql_model = parser.parse(strip_code_fences(raw_str))
+        sql = sql_model.sql
+        if "select *" in sql.lower():
+            # Attempt to expand columns if schema columns are available and a single table is used
+            columns_json = state.validation.get("schema_columns")
+            if columns_json and state.plan and len(state.plan.get("tables", [])) == 1:
+                try:
+                    columns_map = json.loads(columns_json)
+                    table_name = state.plan["tables"][0].get("name")
+                    alias = state.plan["tables"][0].get("alias")
+                    cols = columns_map.get(table_name, [])
+                    quote = caps.identifier_quote or '"'
+                    col_exprs = []
+                    for col in cols:
+                        if alias:
+                            col_exprs.append(f'{alias}.{quote}{col}{quote}')
+                        else:
+                            col_exprs.append(f'{quote}{table_name}{quote}.{quote}{col}{quote}')
+                    if col_exprs:
+                        table_clause = f'{quote}{table_name}{quote}'
+                        if alias:
+                            table_clause += f" AS {alias}"
+                        order_clause = ""
+                        if state.plan.get("order_by"):
+                            ob = state.plan["order_by"][0]
+                            order_clause = f' ORDER BY {ob.get("expr")} {ob.get("direction","asc").upper()}'
+                        sql = f"SELECT {', '.join(col_exprs)} FROM {table_clause}{order_clause} LIMIT {state.plan.get('limit', row_limit)}"
+                    else:
+                        state.errors.append("SELECT * rejected and no columns available to expand.")
+                        state.sql_draft = None
+                        return state
+                except Exception:
+                    state.errors.append("SELECT * rejected and column expansion failed.")
+                    state.sql_draft = None
+                    return state
+            else:
+                state.errors.append("SQL uses SELECT *; rejected.")
+                state.sql_draft = None
+                return state
+        state.sql_draft = GeneratedSQL(
+            sql=sql,
+            rationale=sql_model.rationale or "LLM-generated SQL",
+            limit_enforced=bool(sql_model.limit_enforced or ("limit" in sql.lower()) or (" top " in sql.lower()) or (" fetch " in sql.lower())),
+            draft_only=bool(sql_model.draft_only) if sql_model.draft_only is not None else False,
+        )
+    except ValidationError as exc:
+        state.sql_draft = None
+        state.errors.append(f"SQL generation parse failed: {exc}")
     return state
 
 
