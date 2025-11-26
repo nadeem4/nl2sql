@@ -29,8 +29,15 @@ def make_engine(profile: DatasourceProfile) -> Engine:
         return create_engine(url, future=True)
 
     if engine in {"postgres", "postgresql"}:
-        # Statement timeout can be set via options; keep placeholder for now
-        return create_engine(profile.sqlalchemy_url, future=True, execution_options={})
+        # Apply statement timeout and read-only session defaults via connect args.
+        timeout_ms = max(profile.statement_timeout_ms, 0)
+        opts = f"-c statement_timeout={timeout_ms} -c default_transaction_read_only=on"
+        return create_engine(
+            profile.sqlalchemy_url,
+            future=True,
+            connect_args={"options": opts},
+            execution_options={},
+        )
 
     if engine in {"mysql", "mariadb"}:
         return create_engine(profile.sqlalchemy_url, future=True)

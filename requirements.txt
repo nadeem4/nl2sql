@@ -1,2 +1,4 @@
 SQLAlchemy>=2.0
 PyYAML>=6.0
+langgraph>=0.0.29
+pytest>=7.0

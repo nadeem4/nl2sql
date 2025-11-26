@@ -54,10 +54,17 @@ def planner_node(state: GraphState, llm: Optional[LLMCallable] = None) -> GraphS
         return state
 
     prompt = (
-        "You are a SQL planner. Produce a JSON plan with keys: tables (name, alias), "
-        "joins (left, right, on[], join_type), filters (column, op, value, logic), "
-        "group_by, aggregates (expr, alias), having, order_by (expr, direction), limit. "
-        f"User query: {state.user_query}"
+        "You are a SQL planner. Produce ONLY a JSON object with keys: "
+        '"tables" (list of {name, alias}), '
+        '"joins" (list of {left, right, on[], join_type in [inner,left,right,full]}), '
+        '"filters" (list of {column, op, value, logic in [and,or]}), '
+        '"group_by" (list of column expressions), '
+        '"aggregates" (list of {expr, alias}), '
+        '"having" (list of filter objects), '
+        '"order_by" (list of {expr, direction in [asc,desc]}), '
+        '"limit" (integer). '
+        "Do not include SQL, only the JSON plan.\n"
+        f'User query: "{state.user_query}"'
     )
     raw = llm(prompt)
     parsed = _safe_json_loads(raw)
@@ -88,18 +95,23 @@ def sql_generator_node(
         )
         return state
 
+    limit_guidance = {
+        "limit": "append 'LIMIT {n}'",
+        "top_fetch": "use 'SELECT TOP {n}' or 'OFFSET/FETCH' as appropriate",
+    }.get(caps.limit_syntax, "append a safe LIMIT")
+
     prompt = (
-        "You are a SQL generator. Given a JSON plan and engine dialect, output SQL with a SAFE LIMIT. "
-        "Use parameterization where possible and avoid DDL/DML. "
-        f"Engine dialect: {caps.dialect}, limit syntax: {caps.limit_syntax}. "
-        f"Plan JSON:\n{json.dumps(state.plan)}"
+        "You are a SQL generator. Given a JSON plan and engine dialect, output ONLY SQL text with a SAFE LIMIT. "
+        "Rules: avoid DDL/DML; parameterize literals where possible; quote identifiers using the engine rules; "
+        f"{limit_guidance}; include ORDER BY if provided; never include explanatory text.\n"
+        f"Engine dialect: {caps.dialect}. Plan JSON:\n{json.dumps(state.plan)}"
     )
     raw = llm(prompt)
     sql = raw.strip()
     state.sql_draft = GeneratedSQL(
         sql=sql,
         rationale="LLM-generated SQL",
-        limit_enforced="limit" in sql.lower(),
+        limit_enforced=("limit" in sql.lower()) or (" top " in sql.lower()) or (" fetch " in sql.lower()),
         draft_only=False,
     )
     return state
