@@ -15,7 +15,7 @@ from sqlalchemy import inspect
 
 from .capabilities import get_capabilities
 from .datasource_config import DatasourceProfile
-from .engine_factory import make_engine
+from .engine_factory import make_engine, run_read_query
 from .nodes import intent_node, planner_node, sql_generator_node, validator_node
 from .schemas import GraphState
 
@@ -56,6 +56,30 @@ def _schema_retriever(profile: DatasourceProfile):
     return inner
 
 
+def _executor(profile: DatasourceProfile):
+    def inner(state: Dict) -> Dict:
+        gs = GraphState(**state)
+        if not gs.sql_draft:
+            gs.errors.append("No SQL to execute.")
+            return dataclasses.asdict(gs)
+        engine = make_engine(profile)
+        try:
+            rows = run_read_query(engine, gs.sql_draft["sql"], row_limit=profile.row_limit)
+            samples = []
+            for row in rows[:3]:
+                try:
+                    samples.append(dict(row._mapping))
+                except Exception:
+                    samples.append(tuple(row))
+            gs.execution = {"row_count": len(rows), "sample": samples}
+        except Exception as exc:
+            gs.execution = {"error": str(exc)}
+            gs.errors.append(f"Execution error: {exc}")
+        return dataclasses.asdict(gs)
+
+    return inner
+
+
 def build_graph(profile: DatasourceProfile, llm: Optional[LLMCallable] = None, llm_map: Optional[Dict[str, LLMCallable]] = None):
     try:
         from langgraph.graph import END, StateGraph
@@ -80,13 +104,15 @@ def build_graph(profile: DatasourceProfile, llm: Optional[LLMCallable] = None, l
         ),
     )
     graph.add_node("validator", _wrap_graphstate(validator_node))
+    graph.add_node("executor", _executor(profile))
 
     graph.set_entry_point("intent")
     graph.add_edge("intent", "schema")
     graph.add_edge("schema", "planner")
     graph.add_edge("planner", "sql_generator")
     graph.add_edge("sql_generator", "validator")
-    graph.add_edge("validator", END)
+    graph.add_edge("validator", "executor")
+    graph.add_edge("executor", END)
 
     return graph.compile()
 

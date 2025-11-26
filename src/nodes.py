@@ -123,7 +123,7 @@ def sql_generator_node(
         f"{parser.get_format_instructions()}\n"
         "Rules: avoid DDL/DML; parameterize literals where possible; quote identifiers using engine rules; "
         f"{limit_guidance}; include ORDER BY if provided; avoid SELECT * (project explicit columns). "
-        "Do not wrap in code fences.\n"
+        "Prefer ORDER BY on business-friendly fields when no order is provided. Do not wrap in code fences.\n"
         f"Engine dialect: {caps.dialect}. Plan JSON:\n{json.dumps(state.plan)}"
     )
     raw = llm(prompt)
@@ -131,14 +131,15 @@ def sql_generator_node(
     try:
         sql_model = parser.parse(strip_code_fences(raw_str))
         sql = sql_model.sql
-        if "select *" in sql.lower():
-            # Attempt to expand columns if schema columns are available and a single table is used
+        lower_sql = sql.lower()
+        if "select *" in lower_sql or ".*" in lower_sql:
             columns_json = state.validation.get("schema_columns")
             if columns_json and state.plan and len(state.plan.get("tables", [])) == 1:
                 try:
                     columns_map = json.loads(columns_json)
-                    table_name = state.plan["tables"][0].get("name")
-                    alias = state.plan["tables"][0].get("alias")
+                    table_entry = state.plan["tables"][0]
+                    table_name = table_entry.get("name")
+                    alias = table_entry.get("alias")
                     cols = columns_map.get(table_name, [])
                     quote = caps.identifier_quote or '"'
                     col_exprs = []
@@ -147,27 +148,31 @@ def sql_generator_node(
                             col_exprs.append(f'{alias}.{quote}{col}{quote}')
                         else:
                             col_exprs.append(f'{quote}{table_name}{quote}.{quote}{col}{quote}')
-                    if col_exprs:
-                        table_clause = f'{quote}{table_name}{quote}'
-                        if alias:
-                            table_clause += f" AS {alias}"
-                        order_clause = ""
-                        if state.plan.get("order_by"):
-                            ob = state.plan["order_by"][0]
-                            order_clause = f' ORDER BY {ob.get("expr")} {ob.get("direction","asc").upper()}'
-                        sql = f"SELECT {', '.join(col_exprs)} FROM {table_clause}{order_clause} LIMIT {state.plan.get('limit', row_limit)}"
-                    else:
-                        state.errors.append("SELECT * rejected and no columns available to expand.")
+                    if not col_exprs:
+                        state.errors.append("Wildcard rejected and no columns available to expand.")
                         state.sql_draft = None
                         return state
+                    table_clause = f'{quote}{table_name}{quote}'
+                    if alias:
+                        table_clause += f" AS {alias}"
+                    order_clause = ""
+                    if state.plan.get("order_by"):
+                        ob = state.plan["order_by"][0]
+                        order_clause = f' ORDER BY {ob.get("expr")} {ob.get("direction","asc").upper()}'
+                    sql = f"SELECT {', '.join(col_exprs)} FROM {table_clause}{order_clause} LIMIT {state.plan.get('limit', row_limit)}"
                 except Exception:
-                    state.errors.append("SELECT * rejected and column expansion failed.")
+                    state.errors.append("Wildcard rejected and column expansion failed.")
                     state.sql_draft = None
                     return state
             else:
-                state.errors.append("SQL uses SELECT *; rejected.")
+                state.errors.append("Wildcard select rejected (SELECT * or table.*).")
                 state.sql_draft = None
                 return state
+        # Enforce ORDER BY presence when plan specifies it
+        if state.plan.get("order_by") and "order by" not in lower_sql:
+            ob = state.plan["order_by"][0]
+            dir_val = ob.get("direction", "asc").upper()
+            sql = f"{sql.rstrip(';')} ORDER BY {ob.get('expr')} {dir_val}"
         state.sql_draft = GeneratedSQL(
             sql=sql,
             rationale=sql_model.rationale or "LLM-generated SQL",
@@ -188,8 +193,15 @@ def validator_node(state: GraphState) -> GraphState:
         state.errors.append("No SQL to validate.")
         return state
     sql_lower = state.sql_draft["sql"].lower()
+    sql_trim = state.sql_draft["sql"].strip()
     if any(term in sql_lower for term in ["insert ", "update ", "delete ", "drop ", "alter "]):
         state.errors.append("Write/DML detected; blocked.")
     if "limit" not in sql_lower:
         state.errors.append("Missing LIMIT in SQL.")
+    if " union " in sql_lower:
+        state.errors.append("UNION detected; blocked.")
+    if ";" in sql_trim[:-1]:
+        state.errors.append("Multiple statements detected; blocked.")
+    if state.plan and state.plan.get("order_by") and "order by" not in sql_lower:
+        state.errors.append("Plan requested ORDER BY but SQL missing it.")
     return state

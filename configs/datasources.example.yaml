@@ -5,7 +5,7 @@
   auth: null
   read_only_role: null
   statement_timeout_ms: 8000
-  row_limit: 1000
+  row_limit: 100
   max_bytes: 10485760  # 10 MB
   tags:
     env: dev
@@ -24,7 +24,7 @@
   auth: null
   read_only_role: readonly
   statement_timeout_ms: 8000
-  row_limit: 1000
+  row_limit: 100
   max_bytes: 10485760
   tags:
     env: dev
