@@ -75,7 +75,10 @@ def planner_node(state: GraphState, llm: Optional[LLMCallable] = None) -> GraphS
 
 
 def sql_generator_node(
-    state: GraphState, profile_engine: str, llm: Optional[LLMCallable] = None
+    state: GraphState,
+    profile_engine: str,
+    row_limit: int,
+    llm: Optional[LLMCallable] = None,
 ) -> GraphState:
     """
     Generate SQL from plan with dialect awareness. Falls back if no LLM.
@@ -84,6 +87,15 @@ def sql_generator_node(
     if not state.plan:
         state.errors.append("No plan to generate SQL from.")
         return state
+
+    # Enforce limit cap from profile
+    if "limit" in state.plan:
+        try:
+            state.plan["limit"] = min(int(state.plan["limit"]), row_limit)
+        except Exception:
+            state.plan["limit"] = row_limit
+    else:
+        state.plan["limit"] = row_limit
 
     if not llm:
         sql = "SELECT p.sku, p.name, p.category FROM products p ORDER BY p.sku ASC LIMIT 20;"

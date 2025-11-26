@@ -1,0 +1,14 @@
+default:
+  provider: openai
+  model: gpt-4o-mini
+
+agents:
+  intent:
+    provider: openai
+    model: gpt-4o-mini
+  planner:
+    provider: openai
+    model: gpt-4o-mini
+  generator:
+    provider: openai
+    model: gpt-4o-mini

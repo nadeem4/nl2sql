@@ -18,6 +18,7 @@ if str(ROOT) not in sys.path:
 
 from src.datasource_config import get_profile, load_profiles
 from src.langgraph_pipeline import run_with_graph
+from src.llm_registry import load_llm_map
 
 
 def stub_llm(prompt: str) -> str:
@@ -44,6 +45,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--id", type=str, default="manufacturing_sqlite", help="Datasource profile id")
     parser.add_argument("--query", type=str, required=True, help="User NL query")
     parser.add_argument("--stub-llm", action="store_true", help="Use a stub LLM that returns a fixed plan")
+    parser.add_argument("--llm-config", type=pathlib.Path, help="Path to LLM config YAML (provider/model per agent)")
     return parser.parse_args()
 
 
@@ -52,8 +54,9 @@ def main() -> None:
     profiles = load_profiles(args.config)
     profile = get_profile(profiles, args.id)
     llm = stub_llm if args.stub_llm else None
+    llm_map = load_llm_map(args.llm_config) if args.llm_config else None
 
-    state = run_with_graph(profile, args.query, llm=llm)
+    state = run_with_graph(profile, args.query, llm=llm, llm_map=llm_map)
     pprint(state)
 
 

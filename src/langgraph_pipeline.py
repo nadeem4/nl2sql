@@ -47,7 +47,7 @@ def _schema_retriever(profile: DatasourceProfile):
     return inner
 
 
-def build_graph(profile: DatasourceProfile, llm: Optional[LLMCallable] = None):
+def build_graph(profile: DatasourceProfile, llm: Optional[LLMCallable] = None, llm_map: Optional[Dict[str, LLMCallable]] = None):
     try:
         from langgraph.graph import END, StateGraph
     except ImportError as exc:
@@ -59,12 +59,16 @@ def build_graph(profile: DatasourceProfile, llm: Optional[LLMCallable] = None):
 
     graph = StateGraph(dict)
 
-    graph.add_node("intent", _wrap_graphstate(partial(intent_node, llm=llm)))
+    node_llm = lambda name: (llm_map or {}).get(name, llm) if llm_map else llm
+
+    graph.add_node("intent", _wrap_graphstate(partial(intent_node, llm=node_llm("intent"))))
     graph.add_node("schema", _schema_retriever(profile))
-    graph.add_node("planner", _wrap_graphstate(partial(planner_node, llm=llm)))
+    graph.add_node("planner", _wrap_graphstate(partial(planner_node, llm=node_llm("planner"))))
     graph.add_node(
         "sql_generator",
-        _wrap_graphstate(partial(sql_generator_node, profile_engine=profile.engine, llm=llm)),
+        _wrap_graphstate(
+            partial(sql_generator_node, profile_engine=profile.engine, row_limit=profile.row_limit, llm=node_llm("generator"))
+        ),
     )
     graph.add_node("validator", _wrap_graphstate(validator_node))
 
@@ -78,8 +82,8 @@ def build_graph(profile: DatasourceProfile, llm: Optional[LLMCallable] = None):
     return graph.compile()
 
 
-def run_with_graph(profile: DatasourceProfile, user_query: str, llm: Optional[LLMCallable] = None) -> Dict:
-    g = build_graph(profile, llm=llm)
+def run_with_graph(profile: DatasourceProfile, user_query: str, llm: Optional[LLMCallable] = None, llm_map: Optional[Dict[str, LLMCallable]] = None) -> Dict:
+    g = build_graph(profile, llm=llm, llm_map=llm_map)
     initial_state = dataclasses.asdict(
         GraphState(
             user_query=user_query,

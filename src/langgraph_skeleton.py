@@ -32,7 +32,8 @@ def planner(state: GraphState) -> GraphState:
 
 
 def sql_generator(state: GraphState, draft_only: bool = False) -> GraphState:
-    return sql_generator_node(state, profile_engine="sqlite", llm=None)
+    # draft_only unused here; retained for signature compatibility
+    return sql_generator_node(state, profile_engine="sqlite", row_limit=20, llm=None)
 
 
 def validator(state: GraphState) -> GraphState:
