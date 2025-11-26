@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import dataclasses
 import pathlib
-from typing import Callable, Dict, Optional
+from typing import Callable, Dict, Optional, List
 
 from pydantic import Field
 from pydantic_settings import BaseSettings
@@ -17,6 +17,28 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+# Track token usage per run: list of {agent, model, prompt_tokens, completion_tokens, total_tokens}
+TOKEN_LOG: List[Dict[str, object]] = []
+
+
+def reset_usage() -> None:
+    TOKEN_LOG.clear()
+
+
+def get_usage_summary() -> Dict[str, Dict[str, int]]:
+    totals = {"_all": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}}
+    for entry in TOKEN_LOG:
+        agent = entry.get("agent", "unknown")
+        model = entry.get("model", "unknown")
+        key = f"{agent}:{model}"
+        if key not in totals:
+            totals[key] = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+        for bucket in ("prompt_tokens", "completion_tokens", "total_tokens"):
+            val = int(entry.get(bucket, 0))
+            totals[key][bucket] += val
+            totals["_all"][bucket] += val
+    return totals
 
 LLMCallable = Callable[[str], str]
 
@@ -61,33 +83,39 @@ def load_llm_map(path: pathlib.Path) -> Dict[str, LLMCallable]:
     default_cfg = data.get("default") or {}
     agent_cfgs = data.get("agents") or {}
 
-    default_llm = _build_llm_callable(LLMConfig(
-        provider=default_cfg.get("provider", "openai"),
-        model=default_cfg.get("model", "gpt-4o-mini"),
-        api_key=default_cfg.get("api_key"),
-    ))
+    default_llm = _build_llm_callable(
+        LLMConfig(
+            provider=default_cfg.get("provider", "openai"),
+            model=default_cfg.get("model", "gpt-4o-mini"),
+            api_key=default_cfg.get("api_key"),
+        ),
+        agent_name="_default",
+    )
 
     llm_map: Dict[str, LLMCallable] = {}
     for agent, cfg in agent_cfgs.items():
-        llm_map[agent] = _build_llm_callable(LLMConfig(
-            provider=cfg.get("provider", default_cfg.get("provider", "openai")),
-            model=cfg.get("model", default_cfg.get("model", "gpt-4o-mini")),
-            api_key=cfg.get("api_key", default_cfg.get("api_key")),
-        ))
+        llm_map[agent] = _build_llm_callable(
+            LLMConfig(
+                provider=cfg.get("provider", default_cfg.get("provider", "openai")),
+                model=cfg.get("model", default_cfg.get("model", "gpt-4o-mini")),
+                api_key=cfg.get("api_key", default_cfg.get("api_key")),
+            ),
+            agent_name=agent,
+        )
 
     # Provide fallback for nodes without explicit mapping
     llm_map["_default"] = default_llm
     return llm_map
 
 
-def _build_llm_callable(cfg: LLMConfig) -> LLMCallable:
+def _build_llm_callable(cfg: LLMConfig, agent_name: str = "") -> LLMCallable:
     provider = cfg.provider.lower()
     if provider == "openai":
-        return _openai_llm(model=cfg.model, api_key=cfg.api_key)
+        return _openai_llm(model=cfg.model, api_key=cfg.api_key, agent_name=agent_name)
     raise ValueError(f"Unsupported LLM provider: {cfg.provider}")
 
 
-def _openai_llm(model: str, api_key: Optional[str] = None) -> LLMCallable:
+def _openai_llm(model: str, api_key: Optional[str] = None, agent_name: str = "") -> LLMCallable:
     """
     Build an OpenAI LLM callable using langchain's ChatOpenAI for simplicity.
     """
@@ -104,6 +132,17 @@ def _openai_llm(model: str, api_key: Optional[str] = None) -> LLMCallable:
 
     def call(prompt: str) -> str:
         resp = client.invoke(prompt)
+        usage = getattr(resp, "usage_metadata", None)
+        if usage:
+            TOKEN_LOG.append(
+                {
+                    "model": model,
+                    "agent": agent_name or "unknown",
+                    "prompt_tokens": usage.get("prompt_tokens", 0),
+                    "completion_tokens": usage.get("completion_tokens", 0),
+                    "total_tokens": usage.get("total_tokens", 0),
+                }
+            )
         return resp.content if hasattr(resp, "content") else str(resp)
 
     return call

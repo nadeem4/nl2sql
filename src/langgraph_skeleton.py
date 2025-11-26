@@ -37,7 +37,7 @@ def sql_generator(state: GraphState, draft_only: bool = False) -> GraphState:
 
 
 def validator(state: GraphState) -> GraphState:
-    return validator_node(state)
+    return validator_node(state, row_limit=20)
 
 
 def run_pipeline(profile: DatasourceProfile, user_query: str, llm: Optional = None) -> GraphState:

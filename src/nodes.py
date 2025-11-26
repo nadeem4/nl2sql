@@ -4,7 +4,9 @@ import json
 from typing import Any, Callable, Dict, Optional
 
 from langchain_core.output_parsers import PydanticOutputParser
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field, ValidationError, ConfigDict
+import sqlglot
+from sqlglot import expressions as exp
 
 from capabilities import EngineCapabilities, get_capabilities
 from json_utils import extract_json_object, strip_code_fences
@@ -14,6 +16,7 @@ LLMCallable = Callable[[str], str]
 
 
 class PlanModel(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     tables: list[Dict[str, Any]] = Field(default_factory=list)
     joins: list[Dict[str, Any]] = Field(default_factory=list)
     filters: list[Dict[str, Any]] = Field(default_factory=list)
@@ -23,18 +26,13 @@ class PlanModel(BaseModel):
     order_by: list[Dict[str, Any]] = Field(default_factory=list)
     limit: Optional[int] = None
 
-    class Config:
-        extra = "forbid"
-
 
 class SQLModel(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     sql: str
     rationale: Optional[str] = None
     limit_enforced: Optional[bool] = None
     draft_only: Optional[bool] = None
-
-    class Config:
-        extra = "forbid"
 
 
 def intent_node(state: GraphState, llm: Optional[LLMCallable] = None) -> GraphState:
@@ -173,6 +171,26 @@ def sql_generator_node(
             ob = state.plan["order_by"][0]
             dir_val = ob.get("direction", "asc").upper()
             sql = f"{sql.rstrip(';')} ORDER BY {ob.get('expr')} {dir_val}"
+        # Enforce LIMIT is within row_limit
+        if "limit" in lower_sql:
+            try:
+                # naive parse for LIMIT value
+                parts = lower_sql.split("limit")
+                if len(parts) > 1:
+                    limit_val = parts[-1].strip().split()[0]
+                    lim = int(limit_val)
+                    if lim > row_limit:
+                        state.errors.append(f"Limit {lim} exceeds allowed {row_limit}.")
+                        state.sql_draft = None
+                        return state
+                else:
+                    state.errors.append("Could not parse LIMIT value.")
+                    state.sql_draft = None
+                    return state
+            except Exception:
+                state.errors.append("Could not parse LIMIT value.")
+                state.sql_draft = None
+                return state
         state.sql_draft = GeneratedSQL(
             sql=sql,
             rationale=sql_model.rationale or "LLM-generated SQL",
@@ -185,23 +203,52 @@ def sql_generator_node(
     return state
 
 
-def validator_node(state: GraphState) -> GraphState:
+def validator_node(state: GraphState, row_limit: int | None = None) -> GraphState:
     """
-    Lightweight validation: ensure SQL exists and has a limit; block write verbs.
+    Stricter validation: single statement, LIMIT present and <= row_limit, no DDL/DML, no UNION, no wildcards, ORDER BY honored.
     """
     if not state.sql_draft:
         state.errors.append("No SQL to validate.")
         return state
-    sql_lower = state.sql_draft["sql"].lower()
-    sql_trim = state.sql_draft["sql"].strip()
+    sql_text = state.sql_draft["sql"]
+    sql_lower = sql_text.lower()
     if any(term in sql_lower for term in ["insert ", "update ", "delete ", "drop ", "alter "]):
         state.errors.append("Write/DML detected; blocked.")
     if "limit" not in sql_lower:
         state.errors.append("Missing LIMIT in SQL.")
-    if " union " in sql_lower:
+    try:
+        parsed = sqlglot.parse_one(sql_text)
+    except Exception:
+        state.errors.append("SQL parse failed; blocked.")
+        return state
+    # block UNION
+    if parsed.find(exp.Union):
         state.errors.append("UNION detected; blocked.")
-    if ";" in sql_trim[:-1]:
-        state.errors.append("Multiple statements detected; blocked.")
-    if state.plan and state.plan.get("order_by") and "order by" not in sql_lower:
-        state.errors.append("Plan requested ORDER BY but SQL missing it.")
+    # enforce ORDER BY if plan has it
+    if state.plan and state.plan.get("order_by"):
+        has_order = bool(parsed.args.get("order"))
+        if not has_order:
+            state.errors.append("Plan requested ORDER BY but SQL missing it.")
+    # enforce LIMIT numeric and within row_limit
+    limit_val = _extract_limit(sql_text)
+    if limit_val is None:
+        state.errors.append("Could not parse LIMIT value.")
+    elif row_limit is not None and limit_val > row_limit:
+        state.errors.append(f"Limit {limit_val} exceeds allowed {row_limit}.")
     return state
+
+
+def _extract_limit(sql_text: str) -> int | None:
+    try:
+        parsed = sqlglot.parse_one(sql_text)
+    except Exception:
+        return None
+    limit = parsed.args.get("limit")
+    if not limit:
+        return None
+    try:
+        # limit can be a tuple (this, offset); grab the expression
+        expr = limit.expression if hasattr(limit, "expression") else limit
+        return int(expr.this)
+    except Exception:
+        return None

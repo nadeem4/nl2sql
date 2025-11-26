@@ -9,7 +9,7 @@ from typing import Any, Dict, List
 
 from datasource_config import get_profile, load_profiles
 from langgraph_pipeline import run_with_graph
-from llm_registry import load_llm_map
+from llm_registry import load_llm_map, get_usage_summary, reset_usage
 
 
 def parse_args() -> argparse.Namespace:
@@ -19,6 +19,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--query", type=str, help="User NL query (if omitted, you will be prompted)")
     parser.add_argument("--llm-config", type=pathlib.Path, help="Path to LLM config YAML (provider/model per agent)")
     parser.add_argument("--stub-llm", action="store_true", help="Use a stub LLM that returns a fixed plan")
+    parser.add_argument("--no-exec", action="store_true", help="Skip execution (generate/validate only)")
+    parser.add_argument("--verbose", action="store_true", help="Show raw planner/generator outputs")
     return parser.parse_args()
 
 
@@ -37,7 +39,7 @@ def stub_llm(prompt: str) -> str:
     """
 
 
-def _render_state(state: Dict[str, Any]) -> None:
+def _render_state(state: Dict[str, Any], verbose: bool = False, usage: Dict[str, int] | None = None) -> None:
     errors: List[str] = state.get("errors") or []
     sql_draft = state.get("sql_draft") or {}
     plan = state.get("plan") or {}
@@ -54,6 +56,11 @@ def _render_state(state: Dict[str, Any]) -> None:
     if sql_draft:
         print("\nSQL:")
         print(sql_draft.get("sql", "").strip())
+        if verbose:
+            raw_planner = state.get("validation", {}).get("planner_raw")
+            if raw_planner:
+                print("\nPlanner raw:")
+                print(raw_planner)
 
     if plan:
         print("\nPlan:")
@@ -76,6 +83,11 @@ def _render_state(state: Dict[str, Any]) -> None:
             if sample:
                 print("Sample:")
                 print(_format_table(sample))
+    if usage:
+        print("\nLLM Usage:")
+        for key, val in usage.items():
+            label = "All" if key == "_all" else key
+            print(f"  {label}: prompt={val.get('prompt_tokens', 0)}, completion={val.get('completion_tokens', 0)}, total={val.get('total_tokens', 0)}")
 
 
 def _format_table(rows: List[Any]) -> str:
@@ -107,8 +119,10 @@ def main() -> None:
         print("No query provided.", file=sys.stderr)
         sys.exit(1)
 
-    state = run_with_graph(profile, query, llm=llm, llm_map=llm_map)
-    _render_state(state)
+    reset_usage()
+    state = run_with_graph(profile, query, llm=llm, llm_map=llm_map, execute=not args.no_exec)
+    usage = get_usage_summary()
+    _render_state(state, verbose=args.verbose, usage=usage)
 
 
 if __name__ == "__main__":

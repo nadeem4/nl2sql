@@ -18,6 +18,7 @@ from datasource_config import DatasourceProfile
 from engine_factory import make_engine, run_read_query
 from nodes import intent_node, planner_node, sql_generator_node, validator_node
 from schemas import GraphState
+from tracing import span
 
 # Type for an LLM callable: prompt -> string
 LLMCallable = Callable[[str], str]
@@ -30,7 +31,11 @@ def _wrap_graphstate(fn: Callable[[GraphState], GraphState]):
 
     def wrapped(state: Dict) -> Dict:
         gs = GraphState(**state)
-        gs = fn(gs)
+        name = getattr(fn, "__name__", None)
+        if not name and hasattr(fn, "func"):
+            name = getattr(fn.func, "__name__", "node")
+        with span(name or "node"):
+            gs = fn(gs)
         return dataclasses.asdict(gs)
 
     return wrapped
@@ -39,18 +44,19 @@ def _wrap_graphstate(fn: Callable[[GraphState], GraphState]):
 def _schema_retriever(profile: DatasourceProfile):
     def inner(state: Dict) -> Dict:
         gs = GraphState(**state)
-        engine = make_engine(profile)
-        inspector = inspect(engine)
-        tables = inspector.get_table_names()
-        gs.validation["schema_tables"] = ", ".join(sorted(tables))
-        try:
-            columns_map = {
-                table: [col["name"] for col in inspector.get_columns(table)]
-                for table in tables
-            }
-            gs.validation["schema_columns"] = json.dumps(columns_map)
-        except Exception:
-            pass
+        with span("schema_retriever"):
+            engine = make_engine(profile)
+            inspector = inspect(engine)
+            tables = inspector.get_table_names()
+            gs.validation["schema_tables"] = ", ".join(sorted(tables))
+            try:
+                columns_map = {
+                    table: [col["name"] for col in inspector.get_columns(table)]
+                    for table in tables
+                }
+                gs.validation["schema_columns"] = json.dumps(columns_map)
+            except Exception:
+                pass
         return dataclasses.asdict(gs)
 
     return inner
@@ -63,24 +69,25 @@ def _executor(profile: DatasourceProfile):
             gs.errors.append("No SQL to execute.")
             return dataclasses.asdict(gs)
         engine = make_engine(profile)
-        try:
-            rows = run_read_query(engine, gs.sql_draft["sql"], row_limit=profile.row_limit)
-            samples = []
-            for row in rows[:3]:
-                try:
-                    samples.append(dict(row._mapping))
-                except Exception:
-                    samples.append(tuple(row))
-            gs.execution = {"row_count": len(rows), "sample": samples}
-        except Exception as exc:
-            gs.execution = {"error": str(exc)}
-            gs.errors.append(f"Execution error: {exc}")
+        with span("executor", {"datasource.id": profile.id, "engine": profile.engine}):
+            try:
+                rows = run_read_query(engine, gs.sql_draft["sql"], row_limit=profile.row_limit)
+                samples = []
+                for row in rows[:3]:
+                    try:
+                        samples.append(dict(row._mapping))
+                    except Exception:
+                        samples.append(tuple(row))
+                gs.execution = {"row_count": len(rows), "sample": samples}
+            except Exception as exc:
+                gs.execution = {"error": str(exc)}
+                gs.errors.append(f"Execution error: {exc}")
         return dataclasses.asdict(gs)
 
     return inner
 
 
-def build_graph(profile: DatasourceProfile, llm: Optional[LLMCallable] = None, llm_map: Optional[Dict[str, LLMCallable]] = None):
+def build_graph(profile: DatasourceProfile, llm: Optional[LLMCallable] = None, llm_map: Optional[Dict[str, LLMCallable]] = None, execute: bool = True):
     try:
         from langgraph.graph import END, StateGraph
     except ImportError as exc:
@@ -103,22 +110,26 @@ def build_graph(profile: DatasourceProfile, llm: Optional[LLMCallable] = None, l
             partial(sql_generator_node, profile_engine=profile.engine, row_limit=profile.row_limit, llm=node_llm("generator"))
         ),
     )
-    graph.add_node("validator", _wrap_graphstate(validator_node))
-    graph.add_node("executor", _executor(profile))
+    graph.add_node("validator", _wrap_graphstate(partial(validator_node, row_limit=profile.row_limit)))
+    if execute:
+        graph.add_node("executor", _executor(profile))
 
     graph.set_entry_point("intent")
     graph.add_edge("intent", "schema")
     graph.add_edge("schema", "planner")
     graph.add_edge("planner", "sql_generator")
     graph.add_edge("sql_generator", "validator")
-    graph.add_edge("validator", "executor")
-    graph.add_edge("executor", END)
+    if execute:
+        graph.add_edge("validator", "executor")
+        graph.add_edge("executor", END)
+    else:
+        graph.add_edge("validator", END)
 
     return graph.compile()
 
 
-def run_with_graph(profile: DatasourceProfile, user_query: str, llm: Optional[LLMCallable] = None, llm_map: Optional[Dict[str, LLMCallable]] = None) -> Dict:
-    g = build_graph(profile, llm=llm, llm_map=llm_map)
+def run_with_graph(profile: DatasourceProfile, user_query: str, llm: Optional[LLMCallable] = None, llm_map: Optional[Dict[str, LLMCallable]] = None, execute: bool = True) -> Dict:
+    g = build_graph(profile, llm=llm, llm_map=llm_map, execute=execute)
     initial_state = dataclasses.asdict(
         GraphState(
             user_query=user_query,

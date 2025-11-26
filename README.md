@@ -70,12 +70,12 @@ Keys are taken from config or `OPENAI_API_KEY` (loaded via Pydantic settings wit
 - `tests/`: pytest goldens
 
 ## Agents (LangGraph)
-- **Intent**: normalizes the user query, extracts entities/filters/clarifications. Output: structured intent hints.
-- **Schema**: introspects the datasource (via SQLAlchemy) to list tables/columns for grounding and wildcard expansion.
-- **Planner**: produces a structured query plan (tables, joins, filters, aggregates, order_by, limit) via LLM with Pydantic validation.
-- **SQL Generator**: renders engine-aware SQL from the plan, enforces limits, rejects wildcards, and adds ORDER BY when present.
-- **Validator**: guards against DDL/DML, missing LIMIT, UNION/multi-statements, and missing ORDER BY when requested by the plan.
-- **Executor**: runs the SQL read-only against the datasource, returning row count and a sample for verification.
+- **Intent** (AI): normalizes the user query, extracts entities/filters/clarifications. Output: structured intent hints.
+- **Schema** (non-AI): introspects the datasource (via SQLAlchemy) to list tables/columns for grounding and wildcard expansion.
+- **Planner** (AI): produces a structured query plan (tables, joins, filters, aggregates, order_by, limit) via LLM with Pydantic validation.
+- **SQL Generator** (AI): renders engine-aware SQL from the plan, enforces limits, rejects wildcards, and adds ORDER BY when present.
+- **Validator** (non-AI): guards against DDL/DML, missing LIMIT, UNION/multi-statements, and missing ORDER BY when requested by the plan.
+- **Executor** (non-AI): runs the SQL read-only against the datasource, returning row count and a sample for verification.
 
 ## Flow
 ```mermaid
