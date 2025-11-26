@@ -4,18 +4,19 @@ Replace stubs with real LangGraph nodes and LLM/tool calls.
 """
 from __future__ import annotations
 
-from typing import Dict
+from typing import Dict, List, Optional
 
 from sqlalchemy import inspect
 
 from .datasource_config import DatasourceProfile
 from .engine_factory import make_engine
-from .schemas import GeneratedSQL, GraphState, Plan
+from .schemas import GraphState
+from .capabilities import get_capabilities
+from .nodes import intent_node, planner_node, sql_generator_node, validator_node
 
 
 def intent_analyst(state: GraphState) -> GraphState:
-    # Stub: in a real system, call LLM to extract entities/filters.
-    return state
+    return intent_node(state, llm=None)
 
 
 def schema_retriever(state: GraphState, profile: DatasourceProfile) -> GraphState:
@@ -27,50 +28,37 @@ def schema_retriever(state: GraphState, profile: DatasourceProfile) -> GraphStat
 
 
 def planner(state: GraphState) -> GraphState:
-    # Stub plan: select all products; real planner would be LLM-guided.
-    plan: Plan = {
-        "tables": [{"name": "products", "alias": "p"}],
-        "joins": [],
-        "filters": [],
-        "group_by": [],
-        "aggregates": [],
-        "having": [],
-        "order_by": [{"expr": "p.sku", "direction": "asc"}],
-        "limit": 20,
-    }
-    state.plan = plan
-    return state
+    return planner_node(state, llm=None)
 
 
 def sql_generator(state: GraphState, draft_only: bool = False) -> GraphState:
-    if not state.plan:
-        state.errors.append("No plan to generate SQL from.")
-        return state
-
-    sql = "SELECT p.sku, p.name, p.category FROM products p ORDER BY p.sku ASC LIMIT 20;"
-    state.sql_draft = GeneratedSQL(
-        sql=sql,
-        rationale="Default products listing as placeholder.",
-        limit_enforced=True,
-        draft_only=draft_only,
-    )
-    return state
+    return sql_generator_node(state, profile_engine="sqlite", llm=None)
 
 
 def validator(state: GraphState) -> GraphState:
-    if not state.sql_draft:
-        state.errors.append("No SQL to validate.")
-        return state
-    if "limit" not in state.sql_draft["sql"].lower():
-        state.errors.append("Missing LIMIT in SQL.")
-    return state
+    return validator_node(state)
 
 
-def run_pipeline(profile: DatasourceProfile, user_query: str) -> GraphState:
+def run_pipeline(profile: DatasourceProfile, user_query: str, llm: Optional = None) -> GraphState:
     state = GraphState(user_query=user_query)
-    state = intent_analyst(state)
+    # Attach capabilities in state.validation for visibility
+    caps = get_capabilities(profile.engine)
+    state.validation["capabilities"] = caps.dialect
+    state = intent_node(state, llm=llm)
     state = schema_retriever(state, profile)
-    state = planner(state)
-    state = sql_generator(state, draft_only=profile.feature_flags.allow_generate_writes)
-    state = validator(state)
+    state = planner_node(state, llm=llm)
+    state = sql_generator_node(
+        state, profile_engine=profile.engine, llm=llm
+    )
+    state = validator_node(state)
     return state
+
+
+# Example node registry placeholder for future LangGraph wiring
+NODE_ORDER: List[str] = [
+    "intent_analyst",
+    "schema_retriever",
+    "planner",
+    "sql_generator",
+    "validator",
+]

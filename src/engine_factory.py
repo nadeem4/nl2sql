@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import pathlib
-from typing import Any, Dict
+from typing import Any, Dict, TypedDict
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
@@ -29,7 +29,8 @@ def make_engine(profile: DatasourceProfile) -> Engine:
         return create_engine(url, future=True)
 
     if engine in {"postgres", "postgresql"}:
-        return create_engine(profile.sqlalchemy_url, future=True)
+        # Statement timeout can be set via options; keep placeholder for now
+        return create_engine(profile.sqlalchemy_url, future=True, execution_options={})
 
     if engine in {"mysql", "mariadb"}:
         return create_engine(profile.sqlalchemy_url, future=True)
