@@ -1,4 +1,4 @@
-# NL2SQL Multi-Agent (LangGraph) — SQLite Starter
+# NL2SQL
 
 This project implements a LangGraph-based NL→SQL pipeline with pluggable LLMs and multi-engine support. It ships with a SQLite manufacturing dataset, structured planner/generator outputs, guardrails, and a CLI for interactive queries.
 
