@@ -8,8 +8,8 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.append(str(SRC))
 
-from schemas import GraphState
-from nodes import validator_node
+from nl2sql.schemas import GraphState
+from nl2sql.agents.validator import validator_node
 
 
 def build_state(sql: str, plan=None):

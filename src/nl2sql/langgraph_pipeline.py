@@ -13,12 +13,15 @@ from typing import Callable, Dict, Optional
 
 from sqlalchemy import inspect
 
-from capabilities import get_capabilities
-from datasource_config import DatasourceProfile
-from engine_factory import make_engine, run_read_query
-from nodes import intent_node, planner_node, sql_generator_node, validator_node
-from schemas import GraphState
-from tracing import span
+from nl2sql.capabilities import get_capabilities
+from nl2sql.datasource_config import DatasourceProfile
+from nl2sql.engine_factory import make_engine, run_read_query
+from nl2sql.nodes.intent_node import IntentNode
+from nl2sql.nodes.planner_node import PlannerNode
+from nl2sql.nodes.generator_node import GeneratorNode
+from nl2sql.nodes.validator_node import ValidatorNode
+from nl2sql.schemas import GraphState
+from nl2sql.tracing import span
 
 # Type for an LLM callable: prompt -> string
 LLMCallable = Callable[[str], str]
@@ -115,16 +118,16 @@ def build_graph(profile: DatasourceProfile, llm: Optional[LLMCallable] = None, l
 
     node_llm = lambda name: (llm_map or {}).get(name, llm) if llm_map else llm
 
-    graph.add_node("intent", _wrap_graphstate(partial(intent_node, llm=node_llm("intent"))))
+    intent = IntentNode(llm=node_llm("intent"))
+    planner = PlannerNode(llm=node_llm("planner"))
+    generator = GeneratorNode(profile_engine=profile.engine, row_limit=profile.row_limit, llm=node_llm("generator"))
+    validator = ValidatorNode(row_limit=profile.row_limit)
+
+    graph.add_node("intent", _wrap_graphstate(intent))
     graph.add_node("schema", _schema_retriever(profile))
-    graph.add_node("planner", _wrap_graphstate(partial(planner_node, llm=node_llm("planner"))))
-    graph.add_node(
-        "sql_generator",
-        _wrap_graphstate(
-            partial(sql_generator_node, profile_engine=profile.engine, row_limit=profile.row_limit, llm=node_llm("generator"))
-        ),
-    )
-    graph.add_node("validator", _wrap_graphstate(partial(validator_node, row_limit=profile.row_limit)))
+    graph.add_node("planner", _wrap_graphstate(planner))
+    graph.add_node("sql_generator", _wrap_graphstate(generator))
+    graph.add_node("validator", _wrap_graphstate(validator))
     if execute:
         graph.add_node("executor", _executor(profile))
 
