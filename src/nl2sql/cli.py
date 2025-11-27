@@ -7,9 +7,15 @@ import pathlib
 import sys
 from typing import Any, Dict, List
 
-from datasource_config import get_profile, load_profiles
-from langgraph_pipeline import run_with_graph
-from llm_registry import load_llm_map, get_usage_summary, reset_usage
+from nl2sql.datasource_config import get_profile, load_profiles
+from nl2sql.langgraph_pipeline import run_with_graph
+from nl2sql.llm_registry import (
+    LLMRegistry,
+    get_usage_summary,
+    load_llm_config,
+    reset_usage,
+)
+from nl2sql.engine_factory import make_engine
 
 
 def parse_args() -> argparse.Namespace:
@@ -111,9 +117,24 @@ def main() -> None:
     profiles = load_profiles(args.config)
     profile = get_profile(profiles, args.id)
 
-    llm = stub_llm if args.stub_llm else None
-    llm_map = load_llm_map(args.llm_config) if args.llm_config else None
-
+    llm_map = None
+    llm = None
+    engine = make_engine(profile)
+    if args.stub_llm:
+        llm_map = {
+            "intent": stub_llm,
+            "planner": stub_llm,
+            "generator": stub_llm,
+            "executor": stub_llm,
+            "_default": stub_llm,
+        }
+    else:
+        if not args.llm_config:
+            print("LLM config is required unless using --stub-llm", file=sys.stderr)
+            sys.exit(1)
+        llm_cfg = load_llm_config(args.llm_config)
+        registry = LLMRegistry(llm_cfg, engine=engine, row_limit=profile.row_limit)
+        llm_map = registry.llm_map()
     query = args.query or input("Enter your question: ").strip()
     if not query:
         print("No query provided.", file=sys.stderr)

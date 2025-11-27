@@ -8,8 +8,8 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.append(str(SRC))
 
-from datasource_config import get_profile, load_profiles
-from engine_factory import make_engine, run_read_query
+from nl2sql.datasource_config import get_profile, load_profiles
+from nl2sql.engine_factory import make_engine, run_read_query
 
 
 GOLDENS = [
