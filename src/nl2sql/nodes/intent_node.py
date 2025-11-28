@@ -4,6 +4,7 @@ from typing import Callable, Optional
 
 from nl2sql.schemas import GraphState
 from nl2sql.json_utils import extract_json_object
+import json
 
 
 class IntentNode:

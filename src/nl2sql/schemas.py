@@ -58,4 +58,6 @@ class GraphState:
     sql_draft: Optional[GeneratedSQL] = None
     validation: Dict[str, str] = field(default_factory=dict)
     execution: Dict[str, str] = field(default_factory=dict)
+    retrieved_tables: Optional[List[str]] = None
     errors: List[str] = field(default_factory=list)
+    retry_count: int = 0

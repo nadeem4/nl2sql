@@ -1,0 +1,87 @@
+from __future__ import annotations
+
+import json
+from typing import List, Optional
+
+from langchain_chroma import Chroma
+from langchain_core.documents import Document
+from langchain_core.embeddings import Embeddings
+from langchain_openai import OpenAIEmbeddings
+from sqlalchemy import inspect, Engine
+
+from nl2sql.settings import settings
+
+class SchemaVectorStore:
+    def __init__(self, collection_name: str = "schema_store", embeddings: Optional[Embeddings] = None, persist_directory: str = "./chroma_db"):
+        self.collection_name = collection_name
+        self.embeddings = embeddings or OpenAIEmbeddings(api_key=settings.openai_api_key)
+        self.persist_directory = persist_directory
+        self.vectorstore = Chroma(
+            collection_name=collection_name,
+            embedding_function=self.embeddings,
+            persist_directory=self.persist_directory
+        )
+
+    def is_empty(self) -> bool:
+        """Returns True if the vector store collection is empty."""
+        try:
+            # Access the underlying Chroma collection to get count
+            return self.vectorstore._collection.count() == 0
+        except Exception:
+            # If collection doesn't exist or error, assume empty
+            return True
+
+    def index_schema(self, engine: Engine):
+        """
+        Introspects the database and indexes table schemas into the vector store.
+        """
+        inspector = inspect(engine)
+        tables = inspector.get_table_names()
+        documents = []
+
+        for table in tables:
+            columns = inspector.get_columns(table)
+            # Create a rich text representation of the table
+            col_desc = ", ".join([f"{col['name']} ({col['type']})" for col in columns])
+            
+            # Get foreign keys for context
+            fks = inspector.get_foreign_keys(table)
+            fk_desc = ""
+            if fks:
+                fk_list = []
+                for fk in fks:
+                    ref_table = fk.get("referred_table")
+                    constrained_cols = fk.get("constrained_columns")
+                    if ref_table and constrained_cols:
+                        fk_list.append(f"-> {ref_table} ({', '.join(constrained_cols)})")
+                if fk_list:
+                    fk_desc = f" Foreign Keys: {'; '.join(fk_list)}."
+
+            content = f"Table: {table}. Columns: {col_desc}.{fk_desc}"
+            
+            doc = Document(
+                page_content=content,
+                metadata={"table_name": table}
+            )
+            documents.append(doc)
+
+        if documents:
+            # Clear existing to avoid duplicates (naive approach)
+            try:
+                self.vectorstore.delete_collection()
+                self.vectorstore = Chroma(
+                    collection_name=self.collection_name,
+                    embedding_function=self.embeddings,
+                    persist_directory=self.persist_directory
+                )
+            except Exception:
+                pass # Collection might not exist
+            
+            self.vectorstore.add_documents(documents)
+
+    def retrieve(self, query: str, k: int = 5) -> List[str]:
+        """
+        Returns a list of relevant table names based on the query.
+        """
+        docs = self.vectorstore.similarity_search(query, k=k)
+        return [doc.metadata["table_name"] for doc in docs]

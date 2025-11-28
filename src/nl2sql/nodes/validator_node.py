@@ -21,11 +21,13 @@ class ValidatorNode:
 
     def __call__(self, state: GraphState) -> GraphState:
         if not state.sql_draft:
-            state.errors.append("No SQL to validate.")
+            if not state.errors:
+                state.errors.append("No SQL to validate.")
             return state
+
+        state.errors = []
         sql_text = state.sql_draft["sql"]
         sql_lower = sql_text.lower()
-        # Validate plan tables exist in schema listing when available
         schema_tables = set()
         if state.validation.get("schema_tables"):
             schema_tables = {t.strip() for t in state.validation["schema_tables"].split(",")}
@@ -39,7 +41,6 @@ class ValidatorNode:
                 state.errors.append(f"Plan references missing tables: {', '.join(sorted(missing))}.")
                 state.sql_draft = None
                 return state
-        # Validate columns against schema when available
         schema_cols = {}
         if state.validation.get("schema_columns"):
             try:
@@ -63,12 +64,40 @@ class ValidatorNode:
         # validate column references
         if schema_cols:
             invalid_cols = []
+            # Flatten all valid columns for lookup of unqualified names
+            all_valid_cols = set()
+            for cols in schema_cols.values():
+                all_valid_cols.update(cols)
+            
             for col in parsed.find_all(exp.Column):
                 tbl = col.table
                 col_name = col.name
-                if tbl and tbl in schema_cols:
-                    if col_name not in schema_cols[tbl]:
-                        invalid_cols.append(f"{tbl}.{col_name}")
+                
+                # Skip wildcard
+                if col_name == "*":
+                    continue
+
+                if tbl:
+                    # Qualified column: tbl.col
+                    if tbl in schema_cols:
+                        if col_name not in schema_cols[tbl]:
+                            invalid_cols.append(f"{tbl}.{col_name}")
+                    # If table not in schema_cols, we might have missed it in retrieval or it's an alias
+                    # For now, we only strictly validate if the table is KNOWN in the schema context
+                else:
+                    # Unqualified column: col
+                    # Must exist in at least one of the tables in the context
+                    if col_name not in all_valid_cols:
+                        # Check if it's an alias defined in the query (e.g. SELECT count(*) as cnt ... ORDER BY cnt)
+                        is_alias = False
+                        for expression in parsed.find_all(exp.Alias):
+                            if expression.alias == col_name:
+                                is_alias = True
+                                break
+                        
+                        if not is_alias:
+                             invalid_cols.append(f"{col_name} (unqualified)")
+
             if invalid_cols:
                 state.errors.append(f"References missing columns: {', '.join(sorted(set(invalid_cols)))}")
                 state.sql_draft = None

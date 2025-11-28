@@ -56,6 +56,11 @@ class GeneratorNode:
         }.get(caps.limit_syntax, "append a safe LIMIT")
 
         parser = PydanticOutputParser(pydantic_object=SQLModel)
+        
+        error_context = ""
+        if state.errors:
+            error_context = f"\nPREVIOUS ERRORS (Fix these): {'; '.join(state.errors)}\n"
+
         prompt = (
             "You are a SQL generator. Given a JSON plan and engine dialect, return ONLY a JSON object matching:\n"
             f"{parser.get_format_instructions()}\n"
@@ -64,6 +69,7 @@ class GeneratorNode:
             "Prefer ORDER BY on business-friendly fields when no order is provided. Do not wrap in code fences. "
             "Use only the provided tables and columns; reject any not listed.\n"
             f"Engine dialect: {caps.dialect}. Plan JSON:\n{json.dumps(state.plan)}"
+            f"{error_context}"
         )
         raw = self.llm(prompt)
         raw_str = raw.strip() if isinstance(raw, str) else str(raw)
