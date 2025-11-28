@@ -59,11 +59,11 @@ class TestRefinements(unittest.TestCase):
     def test_intent_utilization_in_planner(self):
         mock_llm = MagicMock()
         
-        # Intent returns specific entities
-        intent_json = json.dumps({"entities": ["User"], "filters": ["active=True"]})
+        # Intent returns specific entities (as dict now)
+        intent_data = {"entities": ["User"], "filters": ["active=True"]}
         
         mock_llm.side_effect = [
-            intent_json, # Intent
+            json.dumps(intent_data), # Intent (LLM returns JSON string, node parses to dict)
             '{"tables": []}', # Planner
             '{"sql": "SELECT 1 LIMIT 1"}' # Generator
         ]

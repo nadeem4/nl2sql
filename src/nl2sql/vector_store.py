@@ -57,7 +57,15 @@ class SchemaVectorStore:
                 if fk_list:
                     fk_desc = f" Foreign Keys: {'; '.join(fk_list)}."
 
-            content = f"Table: {table}. Columns: {col_desc}.{fk_desc}"
+            # Get table comment if available
+            try:
+                table_comment = inspector.get_table_comment(table)
+                comment_text = table_comment.get("text") if table_comment else None
+                comment_desc = f" Comment: {comment_text}." if comment_text else ""
+            except Exception:
+                comment_desc = ""
+
+            content = f"Table: {table}.{comment_desc} Columns: {col_desc}.{fk_desc}"
             
             doc = Document(
                 page_content=content,

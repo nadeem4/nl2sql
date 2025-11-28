@@ -75,6 +75,8 @@ def _render_state(state: Dict[str, Any], verbose: bool = False, usage: Dict[str,
 
     if plan:
         print("\nPlan:")
+        if plan.get("reasoning"):
+            print(f"  Reasoning: {plan['reasoning']}")
         tables = plan.get("tables") or []
         if tables:
             tbl_names = [tbl.get("name") for tbl in tables]

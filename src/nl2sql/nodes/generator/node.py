@@ -1,16 +1,18 @@
 from __future__ import annotations
 
 import json
-from typing import Callable, Optional
+from typing import Callable, Optional, Union
 
 from langchain_core.output_parsers import PydanticOutputParser
+from langchain_core.runnables import Runnable
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from nl2sql.capabilities import EngineCapabilities, get_capabilities
 from nl2sql.json_utils import strip_code_fences
 from nl2sql.schemas import GeneratedSQL, GraphState
+from nl2sql.nodes.generator.prompts import GENERATOR_PROMPT
 
-LLMCallable = Callable[[str], str]
+LLMCallable = Union[Callable[[str], str], Runnable]
 
 
 class SQLModel(BaseModel):
@@ -26,7 +28,7 @@ class GeneratorNode:
     SQL generator node with dialect awareness and guardrails.
     """
 
-    def __init__(self, profile_engine: str, row_limit: int, llm: Optional[Callable[[str], str]] = None):
+    def __init__(self, profile_engine: str, row_limit: int, llm: Optional[LLMCallable] = None):
         self.llm = llm
         self.profile_engine = profile_engine
         self.row_limit = row_limit
@@ -61,18 +63,21 @@ class GeneratorNode:
         if state.errors:
             error_context = f"\nPREVIOUS ERRORS (Fix these): {'; '.join(state.errors)}\n"
 
-        prompt = (
-            "You are a SQL generator. Given a JSON plan and engine dialect, return ONLY a JSON object matching:\n"
-            f"{parser.get_format_instructions()}\n"
-            "Rules: avoid DDL/DML; do NOT use parameter placeholders—inline literals from the plan; quote identifiers using engine rules; "
-            f"{limit_guidance}; include ORDER BY if provided; avoid SELECT * (project explicit columns). "
-            "Prefer ORDER BY on business-friendly fields when no order is provided. Do not wrap in code fences. "
-            "Use only the provided tables and columns; reject any not listed.\n"
-            f"Engine dialect: {caps.dialect}. Plan JSON:\n{json.dumps(state.plan)}"
-            f"{error_context}"
+        prompt = GENERATOR_PROMPT.format(
+            format_instructions=parser.get_format_instructions(),
+            limit_guidance=limit_guidance,
+            dialect=caps.dialect,
+            plan_json=json.dumps(state.plan),
+            error_context=error_context
         )
-        raw = self.llm(prompt)
-        raw_str = raw.strip() if isinstance(raw, str) else str(raw)
+        
+        if isinstance(self.llm, Runnable):
+            raw = self.llm.invoke(prompt)
+        else:
+            raw = self.llm(prompt)
+            
+        raw_str = raw.content if hasattr(raw, "content") else (raw.strip() if isinstance(raw, str) else str(raw))
+        
         try:
             sql_model = parser.parse(strip_code_fences(raw_str))
             sql = sql_model.sql
