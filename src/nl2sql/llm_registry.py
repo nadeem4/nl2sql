@@ -6,21 +6,12 @@ from typing import Callable, Dict, Optional, List
 
 import yaml
 from langchain_openai import ChatOpenAI
-from pydantic import Field
-from pydantic_settings import BaseSettings
+from nl2sql.settings import settings
 
 from nl2sql.tools.sql_tools import SqlTools
 
 
-class Settings(BaseSettings):
-    openai_api_key: Optional[str] = Field(default=None, env="OPENAI_API_KEY")
 
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-
-
-settings = Settings()
 
 # Track token usage per run: list of {agent, model, prompt_tokens, completion_tokens, total_tokens}
 TOKEN_LOG: List[Dict[str, object]] = []

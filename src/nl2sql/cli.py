@@ -16,17 +16,22 @@ from nl2sql.llm_registry import (
     reset_usage,
 )
 from nl2sql.engine_factory import make_engine
+from nl2sql.settings import settings
+from nl2sql.vector_store import SchemaVectorStore
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run the NL2SQL LangGraph pipeline.")
-    parser.add_argument("--config", type=pathlib.Path, default=pathlib.Path("configs/datasources.example.yaml"))
+    parser.add_argument("--config", type=pathlib.Path, default=pathlib.Path(settings.datasource_config_path))
     parser.add_argument("--id", type=str, default="manufacturing_sqlite", help="Datasource profile id")
     parser.add_argument("--query", type=str, help="User NL query (if omitted, you will be prompted)")
-    parser.add_argument("--llm-config", type=pathlib.Path, help="Path to LLM config YAML (provider/model per agent)")
+    parser.add_argument("--llm-config", type=pathlib.Path, default=pathlib.Path(settings.llm_config_path), help="Path to LLM config YAML (provider/model per agent)")
+    parser.add_argument("--vector-store", type=str, default=settings.vector_store_path, help="Path to vector store directory")
+    parser.add_argument("--index", action="store_true", help="Index the schema into the vector store")
     parser.add_argument("--stub-llm", action="store_true", help="Use a stub LLM that returns a fixed plan")
     parser.add_argument("--no-exec", action="store_true", help="Skip execution (generate/validate only)")
     parser.add_argument("--verbose", action="store_true", help="Show raw planner/generator outputs")
+    parser.add_argument("--debug", action="store_true", help="Show output of each node in the graph")
     return parser.parse_args()
 
 
@@ -135,13 +140,35 @@ def main() -> None:
         llm_cfg = load_llm_config(args.llm_config)
         registry = LLMRegistry(llm_cfg, engine=engine, row_limit=profile.row_limit)
         llm_map = registry.llm_map()
-    query = args.query or input("Enter your question: ").strip()
+    if not args.vector_store:
+        print("Error: Vector store path is required (via --vector-store or VECTOR_STORE env var).", file=sys.stderr)
+        sys.exit(1)
+
+    vector_store = SchemaVectorStore(persist_directory=args.vector_store)
+
+    if args.index:
+        print(f"Indexing schema to {args.vector_store}...")
+        vector_store.index_schema(engine)
+        if not args.query:
+            print("Indexing complete.")
+            return
+
+    if vector_store.is_empty():
+        print(f"Error: Vector store at '{args.vector_store}' is empty or not initialized.", file=sys.stderr)
+        print("Please run indexing first:", file=sys.stderr)
+        print(f"  python -m src.nl2sql.cli --index --vector-store {args.vector_store}", file=sys.stderr)
+        sys.exit(1)
+
+    query = args.query
+    if not query:
+        query = input("Enter your question: ").strip()
+    
     if not query:
         print("No query provided.", file=sys.stderr)
         sys.exit(1)
 
     reset_usage()
-    state = run_with_graph(profile, query, llm=llm, llm_map=llm_map, execute=not args.no_exec)
+    state = run_with_graph(profile, query, llm=llm, llm_map=llm_map, execute=not args.no_exec, vector_store=vector_store, debug=args.debug)
     usage = get_usage_summary()
     _render_state(state, verbose=args.verbose, usage=usage)
 

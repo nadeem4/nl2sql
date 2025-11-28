@@ -1,17 +1,7 @@
-"""
-LangGraph wiring for the NL2SQL pipeline.
-
-This wraps the existing node functions and GraphState dataclass into a LangGraph
-StateGraph. Supply an LLM callable to enable real planning/generation.
-"""
-from __future__ import annotations
-
-import dataclasses
-import json
-from functools import partial
 from typing import Callable, Dict, Optional
 
 from sqlalchemy import inspect
+import json
 
 from nl2sql.capabilities import get_capabilities
 from nl2sql.datasource_config import DatasourceProfile
@@ -20,11 +10,17 @@ from nl2sql.nodes.intent_node import IntentNode
 from nl2sql.nodes.planner_node import PlannerNode
 from nl2sql.nodes.generator_node import GeneratorNode
 from nl2sql.nodes.validator_node import ValidatorNode
+from nl2sql.nodes.schema_node import SchemaNode
 from nl2sql.schemas import GraphState
 from nl2sql.tracing import span
+from nl2sql.vector_store import SchemaVectorStore
+from langchain_core.runnables import Runnable
+from typing import Callable, Dict, Optional, Union
+import dataclasses
 
 # Type for an LLM callable: prompt -> string
-LLMCallable = Callable[[str], str]
+LLMCallable = Union[Callable[[str], str], Runnable]
+
 
 
 def _wrap_graphstate(fn: Callable[[GraphState], GraphState]):
@@ -44,39 +40,7 @@ def _wrap_graphstate(fn: Callable[[GraphState], GraphState]):
     return wrapped
 
 
-def _schema_retriever(profile: DatasourceProfile):
-    def inner(state: Dict) -> Dict:
-        gs = GraphState(**state)
-        with span("schema_retriever"):
-            engine = make_engine(profile)
-            inspector = inspect(engine)
-            tables = inspector.get_table_names()
-            gs.validation["schema_tables"] = ", ".join(sorted(tables))
-            try:
-                columns_map = {
-                    table: [col["name"] for col in inspector.get_columns(table)]
-                    for table in tables
-                }
-                gs.validation["schema_columns"] = json.dumps(columns_map)
-                fk_map = {}
-                for table in tables:
-                    fks = []
-                    for fk in inspector.get_foreign_keys(table):
-                        if not fk.get("referred_table"):
-                            continue
-                        col = fk.get("constrained_columns", [None])[0]
-                        ref_table = fk.get("referred_table")
-                        ref_col = fk.get("referred_columns", [None])[0]
-                        fks.append({"column": col, "reftable": ref_table, "refcolumn": ref_col})
-                    if fks:
-                        fk_map[table] = fks
-                if fk_map:
-                    gs.validation["schema_fks"] = json.dumps(fk_map)
-            except Exception:
-                pass
-        return dataclasses.asdict(gs)
 
-    return inner
 
 
 def _executor(profile: DatasourceProfile):
@@ -104,7 +68,7 @@ def _executor(profile: DatasourceProfile):
     return inner
 
 
-def build_graph(profile: DatasourceProfile, llm: Optional[LLMCallable] = None, llm_map: Optional[Dict[str, LLMCallable]] = None, execute: bool = True):
+def build_graph(profile: DatasourceProfile, llm: Optional[LLMCallable] = None, llm_map: Optional[Dict[str, LLMCallable]] = None, execute: bool = True, vector_store: Optional[SchemaVectorStore] = None):
     try:
         from langgraph.graph import END, StateGraph
     except ImportError as exc:
@@ -119,15 +83,32 @@ def build_graph(profile: DatasourceProfile, llm: Optional[LLMCallable] = None, l
     node_llm = lambda name: (llm_map or {}).get(name, llm) if llm_map else llm
 
     intent = IntentNode(llm=node_llm("intent"))
+    schema_node = SchemaNode(profile=profile, vector_store=vector_store)
     planner = PlannerNode(llm=node_llm("planner"))
     generator = GeneratorNode(profile_engine=profile.engine, row_limit=profile.row_limit, llm=node_llm("generator"))
     validator = ValidatorNode(row_limit=profile.row_limit)
 
+    def retry_node(state: Dict) -> Dict:
+        gs = GraphState(**state)
+        gs.retry_count += 1
+        return dataclasses.asdict(gs)
+
+    def check_validation(state: Dict) -> str:
+        gs = GraphState(**state)
+        if gs.errors:
+            if gs.retry_count < 3:
+                return "retry"
+            else:
+                return "end"
+        return "ok"
+
     graph.add_node("intent", _wrap_graphstate(intent))
-    graph.add_node("schema", _schema_retriever(profile))
+    graph.add_node("schema", _wrap_graphstate(schema_node))
     graph.add_node("planner", _wrap_graphstate(planner))
     graph.add_node("sql_generator", _wrap_graphstate(generator))
     graph.add_node("validator", _wrap_graphstate(validator))
+    graph.add_node("retry_handler", retry_node)
+    
     if execute:
         graph.add_node("executor", _executor(profile))
 
@@ -136,22 +117,46 @@ def build_graph(profile: DatasourceProfile, llm: Optional[LLMCallable] = None, l
     graph.add_edge("schema", "planner")
     graph.add_edge("planner", "sql_generator")
     graph.add_edge("sql_generator", "validator")
+    
+    graph.add_conditional_edges(
+        "validator",
+        check_validation,
+        {
+            "retry": "retry_handler",
+            "ok": "executor" if execute else END,
+            "end": END
+        }
+    )
+    graph.add_edge("retry_handler", "sql_generator")
+    
     if execute:
-        graph.add_edge("validator", "executor")
         graph.add_edge("executor", END)
-    else:
-        graph.add_edge("validator", END)
 
     return graph.compile()
 
 
-def run_with_graph(profile: DatasourceProfile, user_query: str, llm: Optional[LLMCallable] = None, llm_map: Optional[Dict[str, LLMCallable]] = None, execute: bool = True) -> Dict:
-    g = build_graph(profile, llm=llm, llm_map=llm_map, execute=execute)
+def run_with_graph(profile: DatasourceProfile, user_query: str, llm: Optional[LLMCallable] = None, llm_map: Optional[Dict[str, LLMCallable]] = None, execute: bool = True, vector_store: Optional[SchemaVectorStore] = None, debug: bool = False) -> Dict:
+    g = build_graph(profile, llm=llm, llm_map=llm_map, execute=execute, vector_store=vector_store)
     initial_state = dataclasses.asdict(
         GraphState(
             user_query=user_query,
             validation={"capabilities": get_capabilities(profile.engine).dialect},
         )
     )
-    result = g.invoke(initial_state)
-    return result
+    
+    if debug:
+        print("\n--- Starting Graph Execution (Debug Mode) ---")
+        final_state = initial_state
+        for step in g.stream(initial_state):
+            for node_name, state_update in step.items():
+                print(f"\n--- Node: {node_name} ---")
+                # Print the full state update (delta) from the node
+                print(json.dumps(state_update, indent=2, default=str))
+                
+                # Update final state
+                final_state.update(state_update)
+        print("\n--- Graph Execution Complete ---\n")
+        return final_state
+    else:
+        result = g.invoke(initial_state)
+        return result

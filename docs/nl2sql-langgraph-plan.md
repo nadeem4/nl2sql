@@ -111,8 +111,3 @@
 4) Add telemetry (OTel), tracing, and evaluation harness with golden cases; prove engine-pluggable by adding Postgres or MySQL adapter.
 5) Harden prompts, add clarifications flow, tune error taxonomy, and expand dialect coverage (SQL Server, Oracle, BigQuery) using capability flags.
 
-## Next Steps
-- Start with SQLite datasource profile for local dev/tests; provide sample schema and NL→SQL golden pairs.
-- Define schema and plan JSON schemas to lock prompts and tests.
-- Wire OpenTelemetry (OTLP collector + chosen APM) and optionally LangSmith export; seed golden NL-SQL pairs for evals.
-- Plan the first non-SQLite adapter to prove pluggability (e.g., Postgres) and its driver/config.

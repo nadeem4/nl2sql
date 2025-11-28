@@ -21,8 +21,12 @@ class ValidatorNode:
 
     def __call__(self, state: GraphState) -> GraphState:
         if not state.sql_draft:
-            state.errors.append("No SQL to validate.")
+            if not state.errors:
+                state.errors.append("No SQL to validate.")
             return state
+
+        # Clear previous validation errors to ensure fresh validation
+        state.errors = []
         sql_text = state.sql_draft["sql"]
         sql_lower = sql_text.lower()
         # Validate plan tables exist in schema listing when available
@@ -63,12 +67,61 @@ class ValidatorNode:
         # validate column references
         if schema_cols:
             invalid_cols = []
+            # Flatten all valid columns for lookup of unqualified names
+            all_valid_cols = set()
+            for cols in schema_cols.values():
+                all_valid_cols.update(cols)
+            
             for col in parsed.find_all(exp.Column):
                 tbl = col.table
                 col_name = col.name
-                if tbl and tbl in schema_cols:
-                    if col_name not in schema_cols[tbl]:
-                        invalid_cols.append(f"{tbl}.{col_name}")
+                
+                # Skip wildcard
+                if col_name == "*":
+                    continue
+
+                if tbl:
+                    # Qualified column: tbl.col
+                    if tbl in schema_cols:
+                        if col_name not in schema_cols[tbl]:
+                            invalid_cols.append(f"{tbl}.{col_name}")
+                    # If table not in schema_cols, we might have missed it in retrieval or it's an alias
+                    # For now, we only strictly validate if the table is KNOWN in the schema context
+                else:
+                    # Unqualified column: col
+                    # Must exist in at least one of the tables in the context
+                    if col_name not in all_valid_cols:
+                        # It might be an alias defined in the query (e.g. SELECT count(*) as cnt ... ORDER BY cnt)
+                        # sqlglot can help, but for now let's be strict on schema columns.
+                        # To avoid false positives on aliases, we could check if it's in the projection aliases?
+                        # But simpler: if it's not in schema, flag it.
+                        # Wait, what about aliases? "SELECT price AS p FROM products ORDER BY p"
+                        # 'p' is not in schema.
+                        # We should check if it's an alias defined in the query.
+                        # For now, let's just check if it's in all_valid_cols.
+                        # If not, we risk false positives on aliases.
+                        # Let's try to exclude aliases.
+                        pass 
+                        # Actually, let's just check against schema for now. 
+                        # If it's a complex query with aliases, this might be too strict.
+                        # But for "SELECT age FROM users", 'age' is definitely wrong.
+                        
+                        # Let's check if it's an alias in the same query scope?
+                        # sqlglot's optimizer.scope.build_scope can help but might be heavy.
+                        # Let's stick to: if it's not in schema, AND it's not an alias...
+                        # How to check alias easily?
+                        # parsed.aliases returns aliases in the SELECT clause.
+                        
+                        is_alias = False
+                        # Check if this column name matches any alias in the SELECT list
+                        for expression in parsed.find_all(exp.Alias):
+                            if expression.alias == col_name:
+                                is_alias = True
+                                break
+                        
+                        if not is_alias and col_name not in all_valid_cols:
+                             invalid_cols.append(f"{col_name} (unqualified)")
+
             if invalid_cols:
                 state.errors.append(f"References missing columns: {', '.join(sorted(set(invalid_cols)))}")
                 state.sql_draft = None

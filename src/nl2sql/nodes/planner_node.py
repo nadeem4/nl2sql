@@ -4,6 +4,7 @@ import json
 from typing import Any, Callable, Dict, Optional
 
 from langchain_core.output_parsers import PydanticOutputParser
+from langchain_core.exceptions import OutputParserException
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from nl2sql.json_utils import strip_code_fences
@@ -43,6 +44,16 @@ class PlannerNode:
                 allowed_columns = {}
         fk_text = f"Foreign keys: {allowed_fks}\n" if allowed_fks else ""
 
+        intent_context = ""
+        if state.validation.get("intent"):
+            try:
+                intent_data = json.loads(state.validation["intent"])
+                entities = intent_data.get("entities", [])
+                filters = intent_data.get("filters", [])
+                intent_context = f"Extracted Intent - Entities: {entities}, Filters: {filters}\n"
+            except Exception:
+                pass
+
         parser = PydanticOutputParser(pydantic_object=PlanModel)
         prompt = (
             "You are a SQL planner. Return ONLY a JSON object matching this schema:\n"
@@ -53,6 +64,7 @@ class PlannerNode:
             f"Allowed tables: {allowed_tables}\n"
             f"Allowed columns by table: {json.dumps(allowed_columns)}\n"
             f"{fk_text}"
+            f"{intent_context}"
             f'User query: "{state.user_query}"'
         )
         raw = self.llm(prompt)
@@ -60,8 +72,8 @@ class PlannerNode:
         state.validation["planner_raw"] = raw_str
         try:
             plan_model = parser.parse(strip_code_fences(raw_str))
-            state.plan = plan_model.dict()
-        except ValidationError as exc:
+            state.plan = plan_model.model_dump()
+        except (ValidationError, OutputParserException) as exc:
             state.plan = None
             state.errors.append(f"Planner parse failed. Error: {exc}")
         return state
