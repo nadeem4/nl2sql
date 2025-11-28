@@ -76,6 +76,8 @@ class PlanModel(BaseModel):
     having: list[Dict[str, Any]] = Field(default_factory=list)
     order_by: list[Dict[str, Any]] = Field(default_factory=list)
     limit: Optional[int] = None
+    needed_columns: list[str] = Field(default_factory=list, description="List of all columns referenced in the plan (e.g., 'table.column')")
+    reasoning: Optional[str] = Field(None, description="Step-by-step reasoning for the plan choices")
 
 
 @dataclass

@@ -119,7 +119,7 @@ class LLMRegistry:
 
     def planner_llm(self) -> LLMCallable:
         llm = self._base_llm("planner")
-        llm = llm.bind_tools([self.sql_tools.list_tables, self.sql_tools.describe_table])
+        # Planner uses prompt-based schema, not tools
         return self._wrap_usage(llm, "planner")
 
     def generator_llm(self) -> LLMCallable:

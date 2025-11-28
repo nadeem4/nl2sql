@@ -6,9 +6,9 @@ import json
 from nl2sql.capabilities import get_capabilities
 from nl2sql.datasource_config import DatasourceProfile
 from nl2sql.engine_factory import make_engine, run_read_query
-from nl2sql.nodes.intent_node import IntentNode
-from nl2sql.nodes.planner_node import PlannerNode
-from nl2sql.nodes.generator_node import GeneratorNode
+from nl2sql.nodes.intent import IntentNode
+from nl2sql.nodes.planner import PlannerNode
+from nl2sql.nodes.generator import GeneratorNode
 from nl2sql.nodes.validator_node import ValidatorNode
 from nl2sql.nodes.schema_node import SchemaNode
 from nl2sql.schemas import GraphState
@@ -93,6 +93,23 @@ def build_graph(profile: DatasourceProfile, llm: Optional[LLMCallable] = None, l
         gs.retry_count += 1
         return dataclasses.asdict(gs)
 
+    def planner_retry_node(state: Dict) -> Dict:
+        gs = GraphState(**state)
+        gs.retry_count += 1
+        # Clear errors to give Planner a fresh start
+        gs.errors = []
+        return dataclasses.asdict(gs)
+
+    def check_planner(state: Dict) -> str:
+        gs = GraphState(**state)
+        # If no plan or planner errors, retry
+        if not gs.plan or any("Planner" in e for e in gs.errors):
+            if gs.retry_count < 3:
+                return "retry"
+            else:
+                return "end"
+        return "ok"
+
     def check_validation(state: Dict) -> str:
         gs = GraphState(**state)
         if gs.errors:
@@ -105,6 +122,7 @@ def build_graph(profile: DatasourceProfile, llm: Optional[LLMCallable] = None, l
     graph.add_node("intent", _wrap_graphstate(intent))
     graph.add_node("schema", _wrap_graphstate(schema_node))
     graph.add_node("planner", _wrap_graphstate(planner))
+    graph.add_node("planner_retry", planner_retry_node)
     graph.add_node("sql_generator", _wrap_graphstate(generator))
     graph.add_node("validator", _wrap_graphstate(validator))
     graph.add_node("retry_handler", retry_node)
@@ -115,7 +133,18 @@ def build_graph(profile: DatasourceProfile, llm: Optional[LLMCallable] = None, l
     graph.set_entry_point("intent")
     graph.add_edge("intent", "schema")
     graph.add_edge("schema", "planner")
-    graph.add_edge("planner", "sql_generator")
+    
+    graph.add_conditional_edges(
+        "planner",
+        check_planner,
+        {
+            "ok": "sql_generator",
+            "retry": "planner_retry",
+            "end": END
+        }
+    )
+    graph.add_edge("planner_retry", "planner")
+
     graph.add_edge("sql_generator", "validator")
     
     graph.add_conditional_edges(
