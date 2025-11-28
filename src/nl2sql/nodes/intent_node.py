@@ -3,13 +3,16 @@ from __future__ import annotations
 from typing import Callable, Optional
 
 from nl2sql.schemas import GraphState
-from nl2sql.json_utils import extract_json_object
+from nl2sql.json_utils import extract_json_object, strip_code_fences
 import json
 
 
+from langchain_core.output_parsers import PydanticOutputParser
+from nl2sql.schemas import GraphState, IntentModel
+
 class IntentNode:
     """
-    Thin wrapper around the intent agent to fit class-based node usage.
+    Intent analysis using Pydantic for structured output.
     """
 
     def __init__(self, llm: Optional[Callable[[str], str]] = None):
@@ -19,13 +22,23 @@ class IntentNode:
         if not self.llm:
             state.validation["intent_stub"] = "No-op intent analysis"
             return state
+            
+        parser = PydanticOutputParser(pydantic_object=IntentModel)
         prompt = (
-            "You are an intent analyst. Extract key entities and filters from the user query. "
-            "Respond as JSON with fields: entities (list of strings), filters (list of strings), "
-            "clarifications (list of questions if needed). "
+            "You are an intent analyst. Extract key entities, filters, and technical keywords from the user query. "
+            "Return ONLY a JSON object matching the following schema:\n"
+            f"{parser.get_format_instructions()}\n"
             f"User query: {state.user_query}"
         )
-        raw = self.llm(prompt)
-        parsed = extract_json_object(raw)
-        state.validation["intent"] = json.dumps(parsed)
+        
+        try:
+            raw = self.llm(prompt)
+            # Handle potential string wrapping if LLM returns it
+            raw_str = raw.strip() if isinstance(raw, str) else str(raw)
+            parsed = parser.parse(strip_code_fences(raw_str))
+            state.validation["intent"] = parsed.model_dump()
+        except Exception as e:
+            # Fallback or log error
+            state.errors.append(f"Intent analysis failed: {e}")
+            
         return state

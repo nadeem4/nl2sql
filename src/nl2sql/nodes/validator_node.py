@@ -29,8 +29,9 @@ class ValidatorNode:
         sql_text = state.sql_draft["sql"]
         sql_lower = sql_text.lower()
         schema_tables = set()
-        if state.validation.get("schema_tables"):
-            schema_tables = {t.strip() for t in state.validation["schema_tables"].split(",")}
+        if state.schema_info:
+            schema_tables = set(state.schema_info.tables)
+            
         if state.plan and state.plan.get("tables") and schema_tables:
             missing = []
             for tbl in state.plan["tables"]:
@@ -42,11 +43,8 @@ class ValidatorNode:
                 state.sql_draft = None
                 return state
         schema_cols = {}
-        if state.validation.get("schema_columns"):
-            try:
-                schema_cols = json.loads(state.validation["schema_columns"])
-            except Exception:
-                schema_cols = {}
+        if state.schema_info:
+            schema_cols = state.schema_info.columns
 
         if any(term in sql_lower for term in ["insert ", "update ", "delete ", "drop ", "alter "]):
             state.errors.append("Write/DML detected; blocked.")

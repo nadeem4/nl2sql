@@ -5,24 +5,10 @@ from typing import Any, Callable, Dict, Optional
 
 from langchain_core.output_parsers import PydanticOutputParser
 from langchain_core.exceptions import OutputParserException
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import ValidationError
 
 from nl2sql.json_utils import strip_code_fences
-from nl2sql.schemas import GraphState, Plan
-
-LLMCallable = Callable[[str], str]
-
-
-class PlanModel(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    tables: list[Dict[str, Any]] = Field(default_factory=list)
-    joins: list[Dict[str, Any]] = Field(default_factory=list)
-    filters: list[Dict[str, Any]] = Field(default_factory=list)
-    group_by: list[str] = Field(default_factory=list)
-    aggregates: list[Dict[str, Any]] = Field(default_factory=list)
-    having: list[Dict[str, Any]] = Field(default_factory=list)
-    order_by: list[Dict[str, Any]] = Field(default_factory=list)
-    limit: Optional[int] = None
+from nl2sql.schemas import GraphState, PlanModel
 
 
 class PlannerNode:
@@ -34,23 +20,25 @@ class PlannerNode:
             state.errors.append("Planner LLM not provided; no plan generated.")
             return state
 
-        allowed_tables = state.validation.get("schema_tables", "")
+        allowed_tables = ""
         allowed_columns: Dict[str, Any] = {}
-        allowed_fks = state.validation.get("schema_fks")
-        if state.validation.get("schema_columns"):
-            try:
-                allowed_columns = json.loads(state.validation["schema_columns"])
-            except Exception:
-                allowed_columns = {}
-        fk_text = f"Foreign keys: {allowed_fks}\n" if allowed_fks else ""
+        fk_text = ""
+        
+        if state.schema_info:
+            allowed_tables = ", ".join(state.schema_info.tables)
+            allowed_columns = state.schema_info.columns
+            if state.schema_info.foreign_keys:
+                fk_text = f"Foreign keys: {json.dumps(state.schema_info.foreign_keys)}\n"
 
         intent_context = ""
         if state.validation.get("intent"):
             try:
-                intent_data = json.loads(state.validation["intent"])
-                entities = intent_data.get("entities", [])
-                filters = intent_data.get("filters", [])
-                intent_context = f"Extracted Intent - Entities: {entities}, Filters: {filters}\n"
+                intent_data = state.validation["intent"]
+                if isinstance(intent_data, str):
+                    intent_data = json.loads(intent_data)
+                    
+                # Use json.dumps to ensure safe string representation
+                intent_context = f"Extracted Intent: {json.dumps(intent_data)}\n"
             except Exception:
                 pass
 

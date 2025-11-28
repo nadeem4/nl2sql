@@ -2,11 +2,14 @@
 import pytest
 import json
 from nl2sql.nodes.validator_node import ValidatorNode
-from nl2sql.schemas import GraphState
+from nl2sql.schemas import GraphState, SchemaInfo
 
 def test_validator_detects_unqualified_hallucinations():
     """Test that validator catches columns not in schema, even if unqualified."""
-    schema_cols = {"users": ["id", "name"]}
+    schema_info = SchemaInfo(
+        tables=["users"],
+        columns={"users": ["id", "name"]}
+    )
     
     # 'age' is not in schema
     sql = "SELECT age FROM users LIMIT 10"
@@ -14,7 +17,7 @@ def test_validator_detects_unqualified_hallucinations():
     state = GraphState(
         user_query="get ages",
         sql_draft={"sql": sql},
-        validation={"schema_columns": json.dumps(schema_cols), "schema_tables": "users"}
+        schema_info=schema_info
     )
     
     validator = ValidatorNode()
@@ -26,13 +29,16 @@ def test_validator_detects_unqualified_hallucinations():
 
 def test_validator_allows_valid_columns():
     """Test that validator allows valid columns."""
-    schema_cols = {"users": ["id", "name"]}
+    schema_info = SchemaInfo(
+        tables=["users"],
+        columns={"users": ["id", "name"]}
+    )
     sql = "SELECT name FROM users LIMIT 10"
     
     state = GraphState(
         user_query="get names",
         sql_draft={"sql": sql},
-        validation={"schema_columns": json.dumps(schema_cols), "schema_tables": "users"}
+        schema_info=schema_info
     )
     
     validator = ValidatorNode()
