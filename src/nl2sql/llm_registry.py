@@ -8,7 +8,7 @@ import yaml
 from langchain_openai import ChatOpenAI
 from nl2sql.settings import settings
 
-from nl2sql.tools.sql_tools import SqlTools
+
 
 
 
@@ -79,7 +79,6 @@ class LLMRegistry:
     def __init__(self, config: LLMConfig, engine, row_limit: int):
         self.config = config
         self.engine = engine
-        self.sql_tools = SqlTools(engine, row_limit=row_limit)
 
     def _agent_cfg(self, agent: str) -> AgentConfig:
         return self.config.agents.get(agent) or self.config.default
@@ -113,29 +112,42 @@ class LLMRegistry:
 
         return call
 
+    def _wrap_structured_usage(self, llm: ChatOpenAI, agent: str, schema: Any) -> LLMCallable:
+        model_name = self._agent_cfg(agent).model
+        structured_llm = llm.with_structured_output(schema)
+
+        def call(prompt: str) -> Any:
+            # Note: with_structured_output returns the object directly
+            resp = structured_llm.invoke(prompt)
+            # We can't easily track tokens here without the raw response, 
+            # but we can at least log that a call happened or try to estimate.
+            # For now, we'll skip detailed token logging for structured calls 
+            # or we could use a callback if needed.
+            return resp
+
+        return call
+
     def intent_llm(self) -> LLMCallable:
+        from nl2sql.schemas import IntentModel
         llm = self._base_llm("intent")
-        return self._wrap_usage(llm, "intent")
+        return self._wrap_structured_usage(llm, "intent", IntentModel)
 
     def planner_llm(self) -> LLMCallable:
+        from nl2sql.schemas import PlanModel
         llm = self._base_llm("planner")
-        # Planner uses prompt-based schema, not tools
-        return self._wrap_usage(llm, "planner")
+        return self._wrap_structured_usage(llm, "planner", PlanModel)
 
     def generator_llm(self) -> LLMCallable:
+        from nl2sql.schemas import SQLModel
         llm = self._base_llm("generator")
-        return self._wrap_usage(llm, "generator")
+        return self._wrap_structured_usage(llm, "generator", SQLModel)
 
-    def executor_llm(self) -> LLMCallable:
-        llm = self._base_llm("executor")
-        llm = llm.bind_tools([self.sql_tools.run_sql])
-        return self._wrap_usage(llm, "executor")
+
 
     def llm_map(self) -> Dict[str, LLMCallable]:
         return {
             "intent": self.intent_llm(),
             "planner": self.planner_llm(),
             "generator": self.generator_llm(),
-            "executor": self.executor_llm(),
             "_default": self.intent_llm(),
         }

@@ -16,6 +16,5 @@ GENERATOR_PROMPT = (
     "- NO DDL or DML statements (INSERT, UPDATE, DELETE, DROP).\n\n"
     "[INPUT]\n"
     "Plan JSON:\n{plan_json}\n"
-    "{error_context}\n\n"
-    "{format_instructions}"
+    "{error_context}"
 )

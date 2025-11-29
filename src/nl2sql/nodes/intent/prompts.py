@@ -9,8 +9,7 @@ INTENT_PROMPT = (
     "4. List technical keywords or potential table names mentioned or implied.\n"
     "5. If the query is ambiguous, list clarifying questions (optional).\n\n"
     "[OUTPUT_FORMAT]\n"
-    "Return ONLY a JSON object matching the following schema:\n"
-    "{format_instructions}\n\n"
+    "Return ONLY a JSON object matching the schema.\n\n"
     "[INPUT]\n"
     "User query: \"{user_query}\""
 )

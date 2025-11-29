@@ -3,24 +3,11 @@ from __future__ import annotations
 import json
 from typing import Callable, Optional, Union
 
-from langchain_core.output_parsers import PydanticOutputParser
 from langchain_core.runnables import Runnable
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from nl2sql.capabilities import EngineCapabilities, get_capabilities
-from nl2sql.json_utils import strip_code_fences
-from nl2sql.schemas import GeneratedSQL, GraphState
+from nl2sql.schemas import GeneratedSQL, GraphState, SQLModel
 from nl2sql.nodes.generator.prompts import GENERATOR_PROMPT
-
-LLMCallable = Union[Callable[[str], str], Runnable]
-
-
-class SQLModel(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    sql: str
-    rationale: Optional[str] = None
-    limit_enforced: Optional[bool] = None
-    draft_only: Optional[bool] = None
 
 
 class GeneratorNode:
@@ -53,33 +40,27 @@ class GeneratorNode:
             return state
 
         limit_guidance = {
-            "limit": "append 'LIMIT {n}'",
+            "limit": "Ensure the query uses 'LIMIT {n}'",
             "top_fetch": "use 'SELECT TOP {n}' or 'OFFSET/FETCH' as appropriate",
-        }.get(caps.limit_syntax, "append a safe LIMIT")
+        }.get(caps.limit_syntax, "Ensure the query uses a safe LIMIT")
 
-        parser = PydanticOutputParser(pydantic_object=SQLModel)
-        
         error_context = ""
         if state.errors:
             error_context = f"\nPREVIOUS ERRORS (Fix these): {'; '.join(state.errors)}\n"
 
         prompt = GENERATOR_PROMPT.format(
-            format_instructions=parser.get_format_instructions(),
             limit_guidance=limit_guidance,
             dialect=caps.dialect,
             plan_json=json.dumps(state.plan),
             error_context=error_context
         )
         
-        if isinstance(self.llm, Runnable):
-            raw = self.llm.invoke(prompt)
-        else:
-            raw = self.llm(prompt)
-            
-        raw_str = raw.content if hasattr(raw, "content") else (raw.strip() if isinstance(raw, str) else str(raw))
-        
         try:
-            sql_model = parser.parse(strip_code_fences(raw_str))
+            if isinstance(self.llm, Runnable):
+                sql_model = self.llm.invoke(prompt)
+            else:
+                sql_model = self.llm(prompt)
+            
             sql = sql_model.sql
             lower_sql = sql.lower()
             if "select *" in lower_sql or ".*" in lower_sql:
@@ -122,7 +103,15 @@ class GeneratorNode:
             if state.plan.get("order_by") and "order by" not in lower_sql:
                 ob = state.plan["order_by"][0]
                 dir_val = ob.get("direction", "asc").upper()
-                sql = f"{sql.rstrip(';')} ORDER BY {ob.get('expr')} {dir_val}"
+                order_clause = f" ORDER BY {ob.get('expr')} {dir_val}"
+                
+                limit_idx = lower_sql.rfind("limit")
+                if limit_idx != -1:
+                    # Insert before LIMIT
+                    # Ensure we don't break the syntax (add space)
+                    sql = sql[:limit_idx] + order_clause + " " + sql[limit_idx:]
+                else:
+                    sql = f"{sql.rstrip(';')} {order_clause}"
             # Enforce LIMIT is within row_limit
             if "limit" in lower_sql:
                 try:
@@ -148,7 +137,7 @@ class GeneratorNode:
                 limit_enforced=bool(sql_model.limit_enforced or ("limit" in sql.lower()) or (" top " in sql.lower()) or (" fetch " in sql.lower())),
                 draft_only=bool(sql_model.draft_only) if sql_model.draft_only is not None else False,
             )
-        except ValidationError as exc:
+        except Exception as exc:
             state.sql_draft = None
-            state.errors.append(f"SQL generation parse failed: {exc}")
+            state.errors.append(f"SQL generation failed: {exc}")
         return state

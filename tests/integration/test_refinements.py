@@ -2,7 +2,7 @@ import unittest
 from unittest.mock import MagicMock, patch
 import json
 from nl2sql.langgraph_pipeline import build_graph
-from nl2sql.schemas import GraphState
+from nl2sql.schemas import GraphState, IntentModel, PlanModel, SQLModel
 
 class TestRefinements(unittest.TestCase):
     def test_error_recovery_loop(self):
@@ -10,15 +10,22 @@ class TestRefinements(unittest.TestCase):
         mock_llm = MagicMock()
         
         # 1. Intent: returns empty json
+        intent_model = IntentModel()
+        
         # 2. Planner: returns valid plan
+        plan_model = PlanModel(tables=[{"name": "t1"}])
+        
         # 3. Generator (1st try): returns SQL without LIMIT (invalid)
+        sql_model_invalid = SQLModel(sql="SELECT col1 FROM t1")
+        
         # 4. Generator (2nd try): returns SQL with LIMIT (valid)
+        sql_model_valid = SQLModel(sql="SELECT col1 FROM t1 LIMIT 10")
         
         mock_llm.side_effect = [
-            '{}', # Intent
-            '{"tables": [{"name": "t1"}]}', # Planner
-            '{"sql": "SELECT col1 FROM t1"}', # Generator 1 (Invalid: no limit)
-            '{"sql": "SELECT col1 FROM t1 LIMIT 10"}' # Generator 2 (Valid)
+            intent_model,
+            plan_model,
+            sql_model_invalid,
+            sql_model_valid
         ]
         
         profile = MagicMock()
@@ -58,33 +65,43 @@ class TestRefinements(unittest.TestCase):
 
     def test_intent_utilization_in_planner(self):
         mock_llm = MagicMock()
-        
-        # Intent returns specific entities (as dict now)
+    
+        # Intent returns specific entities (as object now)
         intent_data = {"entities": ["User"], "filters": ["active=True"]}
+        intent_model = IntentModel(**intent_data)
         
+        # Planner returns empty plan
+        plan_data = {"tables": []}
+        plan_model = PlanModel(**plan_data)
+        
+        # Generator returns valid SQL
+        sql_data = {"sql": "SELECT 1 LIMIT 1"}
+        sql_model = SQLModel(**sql_data)
+    
         mock_llm.side_effect = [
-            json.dumps(intent_data), # Intent (LLM returns JSON string, node parses to dict)
-            '{"tables": []}', # Planner
-            '{"sql": "SELECT 1 LIMIT 1"}' # Generator
+            intent_model, # Intent
+            plan_model,   # Planner
+            sql_model     # Generator
         ]
-        
+    
         profile = MagicMock()
         profile.engine = "sqlite"
         profile.row_limit = 10
-        
+    
         with patch("nl2sql.langgraph_pipeline.get_capabilities") as mock_caps, \
              patch("nl2sql.nodes.schema_node.make_engine"), \
              patch("nl2sql.nodes.schema_node.inspect"):
-            
+    
             mock_caps.return_value.dialect = "sqlite"
-            
+    
             graph = build_graph(profile, llm=mock_llm, execute=False)
             graph.invoke({"user_query": "test", "validation": {}})
-            
+    
             # Check Planner prompt (2nd call)
             planner_call_args = mock_llm.call_args_list[1]
             prompt = planner_call_args[0][0]
             
+            # The prompt format changed, so we check for the intent context string
             self.assertIn("Extracted Intent", prompt)
             self.assertIn("User", prompt)
             self.assertIn("active=True", prompt)

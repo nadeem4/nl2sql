@@ -3,12 +3,8 @@ from __future__ import annotations
 import json
 from typing import Any, Callable, Dict, Optional, Union
 
-from langchain_core.output_parsers import PydanticOutputParser
-from langchain_core.exceptions import OutputParserException
 from langchain_core.runnables import Runnable
-from pydantic import ValidationError
 
-from nl2sql.json_utils import strip_code_fences
 from nl2sql.schemas import GraphState, PlanModel
 from nl2sql.nodes.planner.prompts import PLANNER_PROMPT, PLANNER_EXAMPLES
 
@@ -46,10 +42,8 @@ class PlannerNode:
             except Exception:
                 pass
 
-        parser = PydanticOutputParser(pydantic_object=PlanModel)
-        
+        # No format instructions needed
         prompt = PLANNER_PROMPT.format(
-            format_instructions=parser.get_format_instructions(),
             allowed_tables=allowed_tables,
             allowed_columns=json.dumps(allowed_columns),
             fk_text=fk_text,
@@ -58,30 +52,37 @@ class PlannerNode:
             user_query=state.user_query
         )
         
-      
-        if isinstance(self.llm, Runnable):
-            raw = self.llm.invoke(prompt)
-        else:
-            raw = self.llm(prompt)
-            
-        raw_str = raw.content if hasattr(raw, "content") else (raw.strip() if isinstance(raw, str) else str(raw))
-        state.validation["planner_raw"] = raw_str
         try:
-            plan_model = parser.parse(strip_code_fences(raw_str))
+            if isinstance(self.llm, Runnable):
+                plan_model = self.llm.invoke(prompt)
+            else:
+                plan_model = self.llm(prompt)
             
+            # For debugging/logging, we might want to store the raw plan if possible, 
+            # but with structured output we get the object. We can dump it back to json.
+            state.validation["planner_raw"] = plan_model.model_dump_json()
+
             # Validate needed_columns against schema
             if state.schema_info:
+                # Build alias map
+                alias_map = {}
+                for t in plan_model.tables:
+                    if t.alias:
+                        alias_map[t.alias] = t.name
+                
                 invalid_cols = []
                 for col_ref in plan_model.needed_columns:
                     parts = col_ref.split(".")
                     if len(parts) == 2:
-                        tbl, col = parts
-                        if tbl in state.schema_info.columns:
-                            if col not in state.schema_info.columns[tbl]:
+                        tbl_ref, col = parts
+                        # Resolve alias if present
+                        real_table = alias_map.get(tbl_ref, tbl_ref)
+                        
+                        if real_table in state.schema_info.columns:
+                            if col not in state.schema_info.columns[real_table]:
                                 invalid_cols.append(col_ref)
                         else:
-                            # Table not in schema, technically invalid but maybe alias?
-                            # For strictness, assume invalid if not in schema info
+                            # Table not in schema
                             invalid_cols.append(col_ref)
                     else:
                         # Unqualified or weird format
@@ -93,7 +94,7 @@ class PlannerNode:
                     return state
 
             state.plan = plan_model.model_dump()
-        except (ValidationError, OutputParserException) as exc:
+        except Exception as exc:
             state.plan = None
-            state.errors.append(f"Planner parse failed. Error: {exc}")
+            state.errors.append(f"Planner failed. Error: {exc}")
         return state

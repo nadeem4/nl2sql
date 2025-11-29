@@ -35,19 +35,37 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def stub_llm(prompt: str) -> str:
-    return """
-    {
-      "tables": [{"name": "products", "alias": "p"}],
-      "joins": [],
-      "filters": [],
-      "group_by": [],
-      "aggregates": [],
-      "having": [],
-      "order_by": [{"expr": "p.sku", "direction": "asc"}],
-      "limit": 10
-    }
-    """
+def stub_llm(prompt: str) -> Any:
+ 
+    from nl2sql.schemas import IntentModel, PlanModel, SQLModel, TableRef, OrderSpec
+    
+    if "[ROLE]\nYou are a SQL Planner" in prompt:
+        return PlanModel(
+            tables=[TableRef(name="products", alias="p")],
+            joins=[],
+            filters=[],
+            group_by=[],
+            aggregates=[],
+            having=[],
+            order_by=[OrderSpec(expr="p.sku", direction="asc")],
+            limit=10,
+            needed_columns=["p.sku"],
+            reasoning="Stub plan"
+        )
+    elif "[ROLE]\nYou are an expert SQL Generator" in prompt:
+        return SQLModel(
+            sql="SELECT * FROM products LIMIT 10",
+            rationale="Stub SQL",
+            limit_enforced=True,
+            draft_only=False
+        )
+    # Default to Intent if not Planner/Generator, or check specific Intent keywords
+    return IntentModel(
+        entities=[],
+        filters=[],
+        keywords=["users"],
+        clarifications=[]
+    )
 
 
 def _render_state(state: Dict[str, Any], verbose: bool = False, usage: Dict[str, int] | None = None) -> None:
@@ -101,6 +119,14 @@ def _render_state(state: Dict[str, Any], verbose: bool = False, usage: Dict[str,
         for key, val in usage.items():
             label = "All" if key == "_all" else key
             print(f"  {label}: prompt={val.get('prompt_tokens', 0)}, completion={val.get('completion_tokens', 0)}, total={val.get('total_tokens', 0)}")
+
+    latency = state.get("latency") or {}
+    if latency:
+        print("\nTiming:")
+        total = latency.pop("total", 0)
+        for node, duration in latency.items():
+            print(f"  {node}: {duration:.2f}s")
+        print(f"  Total: {total:.2f}s")
 
 
 def _format_table(rows: List[Any]) -> str:

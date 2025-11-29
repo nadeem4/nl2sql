@@ -23,18 +23,31 @@ LLMCallable = Union[Callable[[str], str], Runnable]
 
 
 
-def _wrap_graphstate(fn: Callable[[GraphState], GraphState]):
+def _wrap_graphstate(fn: Callable[[GraphState], GraphState], name: Optional[str] = None):
     """
     LangGraph expects and returns dict-like state; wrap dataclass functions.
     """
 
     def wrapped(state: Dict) -> Dict:
         gs = GraphState(**state)
-        name = getattr(fn, "__name__", None)
-        if not name and hasattr(fn, "func"):
-            name = getattr(fn.func, "__name__", "node")
-        with span(name or "node"):
+        
+        # Determine node name
+        node_name = name
+        if not node_name:
+            node_name = getattr(fn, "__name__", None)
+        if not node_name and hasattr(fn, "func"):
+            node_name = getattr(fn.func, "__name__", None)
+        if not node_name:
+            node_name = type(fn).__name__ if hasattr(fn, "__class__") else "node"
+            
+        import time
+        start = time.perf_counter()
+        with span(node_name):
             gs = fn(gs)
+        duration = time.perf_counter() - start
+        
+        gs.latency[node_name] = duration
+        
         return dataclasses.asdict(gs)
 
     return wrapped
@@ -43,29 +56,7 @@ def _wrap_graphstate(fn: Callable[[GraphState], GraphState]):
 
 
 
-def _executor(profile: DatasourceProfile):
-    def inner(state: Dict) -> Dict:
-        gs = GraphState(**state)
-        if not gs.sql_draft:
-            gs.errors.append("No SQL to execute.")
-            return dataclasses.asdict(gs)
-        engine = make_engine(profile)
-        with span("executor", {"datasource.id": profile.id, "engine": profile.engine}):
-            try:
-                rows = run_read_query(engine, gs.sql_draft["sql"], row_limit=profile.row_limit)
-                samples = []
-                for row in rows[:3]:
-                    try:
-                        samples.append(dict(row._mapping))
-                    except Exception:
-                        samples.append(tuple(row))
-                gs.execution = {"row_count": len(rows), "sample": samples}
-            except Exception as exc:
-                gs.execution = {"error": str(exc)}
-                gs.errors.append(f"Execution error: {exc}")
-        return dataclasses.asdict(gs)
-
-    return inner
+from nl2sql.nodes.executor_node import ExecutorNode
 
 
 def build_graph(profile: DatasourceProfile, llm: Optional[LLMCallable] = None, llm_map: Optional[Dict[str, LLMCallable]] = None, execute: bool = True, vector_store: Optional[SchemaVectorStore] = None):
@@ -119,16 +110,16 @@ def build_graph(profile: DatasourceProfile, llm: Optional[LLMCallable] = None, l
                 return "end"
         return "ok"
 
-    graph.add_node("intent", _wrap_graphstate(intent))
-    graph.add_node("schema", _wrap_graphstate(schema_node))
-    graph.add_node("planner", _wrap_graphstate(planner))
+    graph.add_node("intent", _wrap_graphstate(intent, "intent"))
+    graph.add_node("schema", _wrap_graphstate(schema_node, "schema"))
+    graph.add_node("planner", _wrap_graphstate(planner, "planner"))
     graph.add_node("planner_retry", planner_retry_node)
-    graph.add_node("sql_generator", _wrap_graphstate(generator))
-    graph.add_node("validator", _wrap_graphstate(validator))
+    graph.add_node("sql_generator", _wrap_graphstate(generator, "sql_generator"))
+    graph.add_node("validator", _wrap_graphstate(validator, "validator"))
     graph.add_node("retry_handler", retry_node)
     
     if execute:
-        graph.add_node("executor", _executor(profile))
+        graph.add_node("executor", _wrap_graphstate(ExecutorNode(profile=profile), "executor"))
 
     graph.set_entry_point("intent")
     graph.add_edge("intent", "schema")
@@ -173,6 +164,8 @@ def run_with_graph(profile: DatasourceProfile, user_query: str, llm: Optional[LL
         )
     )
     
+    import time
+    start_total = time.perf_counter()
     if debug:
         print("\n--- Starting Graph Execution (Debug Mode) ---")
         final_state = initial_state
@@ -185,7 +178,14 @@ def run_with_graph(profile: DatasourceProfile, user_query: str, llm: Optional[LL
                 # Update final state
                 final_state.update(state_update)
         print("\n--- Graph Execution Complete ---\n")
-        return final_state
+        result = final_state
     else:
         result = g.invoke(initial_state)
-        return result
+    
+    total_duration = time.perf_counter() - start_total
+    # Result is a dict, need to update latency inside it
+    if "latency" not in result:
+        result["latency"] = {}
+    result["latency"]["total"] = total_duration
+    
+    return result

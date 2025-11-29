@@ -1,9 +1,8 @@
-
 import unittest
 from unittest.mock import MagicMock, patch
 import json
 from nl2sql.langgraph_pipeline import build_graph
-from nl2sql.schemas import GraphState
+from nl2sql.schemas import IntentModel, PlanModel, SQLModel
 
 class TestPlannerRetry(unittest.TestCase):
     def test_planner_retry_logic(self):
@@ -17,15 +16,26 @@ class TestPlannerRetry(unittest.TestCase):
         # 4. Planner (success)
         # 5. Generator (success)
         
-        intent_resp = json.dumps({"entities": [], "filters": [], "keywords": [], "clarifications": []})
-        planner_fail_1 = "" # Empty string
-        planner_fail_2 = "NOT JSON" # Invalid
-        planner_success = json.dumps({
-            "tables": [{"name": "t1"}], 
-            "needed_columns": ["t1.col1"],
-            "joins": [], "filters": [], "group_by": [], "aggregates": [], "having": [], "order_by": []
-        })
-        generator_success = json.dumps({"sql": "SELECT col1 FROM t1 LIMIT 10"})
+        intent_resp = IntentModel()
+        # Planner failures: The node catches exceptions. 
+        # To trigger retry, we need the node to fail validation or parsing.
+        # Since we use structured output, parsing shouldn't fail unless the LLM returns garbage that Pydantic rejects.
+        # But we mock the LLM to return objects.
+        # So we can simulate failure by having the LLM raise an exception, 
+        # OR by returning an object that fails validation (e.g. invalid columns).
+        
+        # Let's simulate LLM raising exception for the first two calls
+        # Actually, side_effect can be a list of return values OR exceptions.
+        
+        planner_fail_1 = Exception("LLM Error 1")
+        planner_fail_2 = Exception("LLM Error 2")
+        
+        planner_success = PlanModel(
+            tables=[{"name": "t1"}], 
+            needed_columns=["t1.col1"],
+            joins=[], filters=[], group_by=[], aggregates=[], having=[], order_by=[]
+        )
+        generator_success = SQLModel(sql="SELECT col1 FROM t1 LIMIT 10")
         
         mock_llm.side_effect = [
             intent_resp,
