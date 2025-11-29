@@ -1,0 +1,11 @@
+gpt-4o-mini-test:
+  default:
+    provider: openai
+    model: gpt-4o-mini
+    temperature: 0
+
+gpt-3.5-turbo-test:
+  default:
+    provider: openai
+    model: gpt-3.5-turbo
+    temperature: 0

@@ -53,10 +53,7 @@ class LLMConfig:
     agents: Dict[str, AgentConfig]
 
 
-def load_llm_config(path: pathlib.Path) -> LLMConfig:
-    if not path.exists():
-        raise FileNotFoundError(f"LLM config not found: {path}")
-    data = yaml.safe_load(path.read_text()) or {}
+def parse_llm_config(data: Dict) -> LLMConfig:
     default_cfg = data.get("default", {})
     agents_cfg = data.get("agents", {})
 
@@ -73,6 +70,13 @@ def load_llm_config(path: pathlib.Path) -> LLMConfig:
     for name, cfg in agents_cfg.items():
         agents[name] = to_agent(cfg, default_cfg)
     return LLMConfig(default=default, agents=agents)
+
+
+def load_llm_config(path: pathlib.Path) -> LLMConfig:
+    if not path.exists():
+        raise FileNotFoundError(f"LLM config not found: {path}")
+    data = yaml.safe_load(path.read_text()) or {}
+    return parse_llm_config(data)
 
 
 class LLMRegistry:
@@ -114,16 +118,29 @@ class LLMRegistry:
 
     def _wrap_structured_usage(self, llm: ChatOpenAI, agent: str, schema: Any) -> LLMCallable:
         model_name = self._agent_cfg(agent).model
-        structured_llm = llm.with_structured_output(schema)
+        # Use include_raw=True to get usage metadata
+        structured_llm = llm.with_structured_output(schema, include_raw=True)
 
         def call(prompt: str) -> Any:
-            # Note: with_structured_output returns the object directly
+            # resp is now a dict with 'parsed', 'raw', 'parsing_error'
             resp = structured_llm.invoke(prompt)
-            # We can't easily track tokens here without the raw response, 
-            # but we can at least log that a call happened or try to estimate.
-            # For now, we'll skip detailed token logging for structured calls 
-            # or we could use a callback if needed.
-            return resp
+            
+            # Log usage from raw response
+            raw_msg = resp.get("raw")
+            if raw_msg:
+                usage = getattr(raw_msg, "usage_metadata", None)
+                if usage:
+                    TOKEN_LOG.append(
+                        {
+                            "agent": agent,
+                            "model": model_name,
+                            "prompt_tokens": usage.get("prompt_tokens", 0),
+                            "completion_tokens": usage.get("completion_tokens", 0),
+                            "total_tokens": usage.get("total_tokens", 0),
+                        }
+                    )
+            
+            return resp["parsed"]
 
         return call
 

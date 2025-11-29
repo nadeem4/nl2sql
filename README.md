@@ -33,16 +33,16 @@ This project implements a LangGraph-based NL→SQL pipeline with pluggable LLMs 
 ## Running the CLI
 - From source:
   ```bash
-  python -m src.nl2sql.cli --query "list products" --llm-config configs/llm.example.yaml
+  python -m src.nl2sql.cli --query "list products" --llm-config configs/llm.yaml
   ```
 - After install:
   ```bash
-  nl2sql-cli --query "list products" --llm-config configs/llm.example.yaml
+  nl2sql-cli --query "list products" --llm-config configs/llm.yaml
   ```
 Flags:
-- `--config`: datasource YAML (default `configs/datasources.example.yaml` or `DATASOURCE_CONFIG`)
+- `--config`: datasource YAML (default `configs/datasources.yaml` or `DATASOURCE_CONFIG`)
 - `--id`: datasource id (default `manufacturing_sqlite`)
-- `--llm-config`: per-agent LLM mapping (default `configs/llm.example.yaml` or `LLM_CONFIG`)
+- `--llm-config`: per-agent LLM mapping (default `configs/llm.yaml` or `LLM_CONFIG`)
 - `--vector-store`: path to vector store (default `./chroma_db` or `VECTOR_STORE`)
 - `--index`: run schema indexing (use with `--vector-store`)
 - `--stub-llm`: run with a fixed stub plan (no live LLM)
@@ -80,29 +80,48 @@ python -m src.nl2sql.cli --query "Show top 5 products"
 ```
 
 ### 4. Full Customization
-```bash
-python -m src.nl2sql.cli \
-  --query "Analyze scrap rates" \
-  --config configs/custom_datasource.yaml \
-  --id postgres_prod \
-  --vector-store ./prod_index
-```
-
-## Configuration & Environment Variables
-Configuration is handled via Pydantic Settings. You can set defaults in a `.env` file or environment variables:
-- `OPENAI_API_KEY`: OpenAI API Key
-- `VECTOR_STORE`: Path to vector store directory
-- `LLM_CONFIG`: Path to LLM config YAML
 - `DATASOURCE_CONFIG`: Path to datasource config YAML
 
+## Benchmarking
+Compare performance of different LLM configurations (latency, success rate, token usage).
+
+1. **Create a benchmark suite config** (e.g., `configs/benchmark_suite.yaml`):
+   ```yaml
+   gpt-4o-setup:
+     default:
+       provider: openai
+       model: gpt-4o
+   
+   gpt-3.5-setup:
+     default:
+       provider: openai
+       model: gpt-3.5-turbo
+   ```
+
+2. **Run the benchmark**:
+   ```bash
+   python -m src.nl2sql.cli --query "List production runs for Widget Alpha with machine and factory names" --benchmark --bench-config configs/benchmark_suite.yaml --iterations 3
+   ```
+   *Note: `--bench-config` defaults to `configs/benchmark_suite.yaml` if omitted.*
+
+3. **View Results**:
+   The CLI will output a comparison table:
+   ```
+   === Benchmark Results ===
+   Config                    | Success  | Avg Latency  | Avg Tokens
+   -----------------------------------------------------------------
+   gpt-4o-setup              |  100.0% |       2.50s |      150.0
+   gpt-3.5-setup             |   80.0% |       1.20s |      140.0
+   ```
+
 ## Datasource Profiles
-Configure in `configs/datasources.example.yaml`:
+Configure in `configs/datasources.yaml`:
 - `engine`, `sqlalchemy_url/DSN`, `statement_timeout_ms`, `row_limit`, `max_bytes`
 - Feature flags: `allow_generate_writes`, `supports_dry_run`, etc.
 - SQLite starter uses `row_limit: 100`; Postgres example provided (update URL/auth).
 
 ## LLM Configuration
-`configs/llm.example.yaml` shows per-agent mapping. The registry loads:
+`configs/llm.yaml` shows per-agent mapping. The registry loads:
 - `default` provider/model
 - `agents.intent`, `agents.planner`, `agents.generator` (override)
 Keys are taken from config or `OPENAI_API_KEY`.

@@ -5,6 +5,7 @@ CLI entrypoint for the NL2SQL LangGraph pipeline.
 import argparse
 import pathlib
 import sys
+import statistics
 from typing import Any, Dict, List
 
 from nl2sql.datasource_config import get_profile, load_profiles
@@ -32,6 +33,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--no-exec", action="store_true", help="Skip execution (generate/validate only)")
     parser.add_argument("--verbose", action="store_true", help="Show raw planner/generator outputs")
     parser.add_argument("--debug", action="store_true", help="Show output of each node in the graph")
+    
+    # Benchmarking args
+    parser.add_argument("--benchmark", action="store_true", help="Run in benchmark mode")
+    parser.add_argument("--bench-config", type=pathlib.Path, default=pathlib.Path(settings.benchmark_config_path), help="Path to a single YAML file containing multiple named LLM configs (required if --benchmark is set)")
+    parser.add_argument("--iterations", type=int, default=3, help="Number of iterations per config (benchmark mode only)")
+    
     return parser.parse_args()
 
 
@@ -68,7 +75,7 @@ def stub_llm(prompt: str) -> Any:
     )
 
 
-def _render_state(state: Dict[str, Any], verbose: bool = False, usage: Dict[str, int] | None = None) -> None:
+def _render_state(state: Dict[str, Any], registry: LLMRegistry | None = None, verbose: bool = False, usage: Dict[str, int] | None = None) -> None:
     errors: List[str] = state.get("errors") or []
     sql_draft = state.get("sql_draft") or {}
     plan = state.get("plan") or {}
@@ -114,19 +121,74 @@ def _render_state(state: Dict[str, Any], verbose: bool = False, usage: Dict[str,
             if sample:
                 print("Sample:")
                 print(_format_table(sample))
-    if usage:
-        print("\nLLM Usage:")
-        for key, val in usage.items():
-            label = "All" if key == "_all" else key
-            print(f"  {label}: prompt={val.get('prompt_tokens', 0)}, completion={val.get('completion_tokens', 0)}, total={val.get('total_tokens', 0)}")
 
+    # Performance Table
+    print("\nPerformance:")
     latency = state.get("latency") or {}
-    if latency:
-        print("\nTiming:")
-        total = latency.pop("total", 0)
-        for node, duration in latency.items():
-            print(f"  {node}: {duration:.2f}s")
-        print(f"  Total: {total:.2f}s")
+    usage = usage or {}
+    
+    # Define nodes and their types
+    nodes = [
+        ("intent", "AI"),
+        ("schema", "Non-AI"),
+        ("planner", "AI"),
+        ("generator", "AI"),
+        ("validator", "Non-AI"),
+        ("executor", "Non-AI"),
+    ]
+    
+    rows = []
+    total_time = latency.get("total", 0)
+    total_tokens = usage.get("_all", {}).get("total_tokens", 0)
+
+    for node, node_type in nodes:
+        # Time
+        duration = latency.get(node, 0)
+        
+        # Model
+        model = "-"
+        if node_type == "AI":
+            if registry:
+                try:
+                    model = registry._agent_cfg(node).model
+                except:
+                    model = "unknown"
+            else:
+                model = "stub"
+        
+        # Tokens
+        tokens = 0
+        if node_type == "AI":
+            # Usage keys are "agent:model"
+            for key, val in usage.items():
+                if key.startswith(f"{node}:"):
+                    tokens += val.get("total_tokens", 0)
+        
+        rows.append({
+            "Node": node.capitalize(),
+            "Type": node_type,
+            "Model": model,
+            "Tokens": tokens if tokens > 0 else "-",
+            "Time": f"{duration:.2f}s"
+        })
+    
+    # Add Total row
+    rows.append({
+        "Node": "TOTAL",
+        "Type": "-",
+        "Model": "-",
+        "Tokens": total_tokens,
+        "Time": f"{total_time:.2f}s"
+    })
+    
+    print(_format_table(rows))
+
+
+def _print_agent_models(registry: LLMRegistry) -> None:
+    print("Agent Configuration:")
+    for agent in ["intent", "planner", "generator"]:
+        cfg = registry._agent_cfg(agent)
+        print(f"  {agent.capitalize()}: {cfg.model} ({cfg.provider})")
 
 
 def _format_table(rows: List[Any]) -> str:
@@ -149,25 +211,8 @@ def main() -> None:
     args = parse_args()
     profiles = load_profiles(args.config)
     profile = get_profile(profiles, args.id)
-
-    llm_map = None
-    llm = None
     engine = make_engine(profile)
-    if args.stub_llm:
-        llm_map = {
-            "intent": stub_llm,
-            "planner": stub_llm,
-            "generator": stub_llm,
-            "executor": stub_llm,
-            "_default": stub_llm,
-        }
-    else:
-        if not args.llm_config:
-            print("LLM config is required unless using --stub-llm", file=sys.stderr)
-            sys.exit(1)
-        llm_cfg = load_llm_config(args.llm_config)
-        registry = LLMRegistry(llm_cfg, engine=engine, row_limit=profile.row_limit)
-        llm_map = registry.llm_map()
+
     if not args.vector_store:
         print("Error: Vector store path is required (via --vector-store or VECTOR_STORE env var).", file=sys.stderr)
         sys.exit(1)
@@ -195,10 +240,127 @@ def main() -> None:
         print("No query provided.", file=sys.stderr)
         sys.exit(1)
 
+    if args.benchmark:
+        if not args.bench_config:
+            print("Error: --bench-config is required for benchmark mode.", file=sys.stderr)
+            sys.exit(1)
+            
+        if not args.bench_config.exists():
+            print(f"Error: Benchmark config file not found: {args.bench_config}", file=sys.stderr)
+            sys.exit(1)
+
+        import yaml
+        from nl2sql.llm_registry import parse_llm_config
+        
+        try:
+            bench_data = yaml.safe_load(args.bench_config.read_text()) or {}
+        except Exception as e:
+            print(f"Error reading benchmark config: {e}", file=sys.stderr)
+            sys.exit(1)
+            
+        if not isinstance(bench_data, dict):
+            print("Error: Benchmark config must be a dictionary of named configurations.", file=sys.stderr)
+            sys.exit(1)
+
+        print(f"Starting benchmark for query: '{query}'")
+        results = []
+        
+        for name, cfg_data in bench_data.items():
+            print(f"\n--- Benchmarking Config: {name} ---")
+            try:
+                # Validate it looks like a config
+                if not isinstance(cfg_data, dict):
+                    print(f"Skipping {name}: invalid format (expected dict)")
+                    continue
+                    
+                llm_cfg = parse_llm_config(cfg_data)
+            except Exception as e:
+                print(f"Failed to parse config {name}: {e}")
+                continue
+
+            registry = LLMRegistry(llm_cfg, engine=engine, row_limit=profile.row_limit)
+            _print_agent_models(registry)
+            llm_map = registry.llm_map()
+
+            latencies = []
+            success_count = 0
+            total_tokens = 0
+            
+            for i in range(args.iterations):
+                print(f"  Iteration {i+1}/{args.iterations}...", end="", flush=True)
+                reset_usage()
+                
+                try:
+                    state = run_with_graph(
+                        profile, 
+                        query, 
+                        llm_map=llm_map, 
+                        execute=True, 
+                        vector_store=vector_store
+                    )
+                    
+                    latency = state.get("latency", {}).get("total", 0)
+                    latencies.append(latency)
+                    
+                    # Check success: SQL generated and no execution errors
+                    if state.get("sql_draft") and not state.get("execution", {}).get("error") and not state.get("errors"):
+                        success_count += 1
+                        print(f" Success ({latency:.2f}s)")
+                    else:
+                        errs = state.get("errors", [])
+                        exec_err = state.get("execution", {}).get("error")
+                        if exec_err: errs.append(f"Exec: {exec_err}")
+                        print(f" Failed ({latency:.2f}s) - {'; '.join(errs)}")
+                    
+                    usage = get_usage_summary()
+                    total_tokens += usage.get("_all", {}).get("total_tokens", 0)
+                    
+                except Exception as e:
+                    print(f" Error: {e}")
+            
+            avg_latency = statistics.mean(latencies) if latencies else 0
+            avg_tokens = total_tokens / args.iterations if args.iterations > 0 else 0
+            success_rate = (success_count / args.iterations) * 100
+            
+            results.append({
+                "config": name,
+                "avg_latency": avg_latency,
+                "success_rate": success_rate,
+                "avg_tokens": avg_tokens
+            })
+
+        print("\n\n=== Benchmark Results ===")
+        print(f"{'Config':<25} | {'Success':<8} | {'Avg Latency':<12} | {'Avg Tokens':<10}")
+        print("-" * 65)
+        for res in results:
+            print(f"{res['config']:<25} | {res['success_rate']:>6.1f}% | {res['avg_latency']:>10.2f}s | {res['avg_tokens']:>10.1f}")
+        return
+
+    # Normal execution flow
+    llm_map = None
+    llm = None
+    registry = None
+    if args.stub_llm:
+        llm_map = {
+            "intent": stub_llm,
+            "planner": stub_llm,
+            "generator": stub_llm,
+            "executor": stub_llm,
+            "_default": stub_llm,
+        }
+    else:
+        if not args.llm_config:
+            print("LLM config is required unless using --stub-llm", file=sys.stderr)
+            sys.exit(1)
+        llm_cfg = load_llm_config(args.llm_config)
+        registry = LLMRegistry(llm_cfg, engine=engine, row_limit=profile.row_limit)
+        _print_agent_models(registry)
+        llm_map = registry.llm_map()
+
     reset_usage()
     state = run_with_graph(profile, query, llm=llm, llm_map=llm_map, execute=not args.no_exec, vector_store=vector_store, debug=args.debug)
     usage = get_usage_summary()
-    _render_state(state, verbose=args.verbose, usage=usage)
+    _render_state(state, registry=registry, verbose=args.verbose, usage=usage)
 
 
 if __name__ == "__main__":
