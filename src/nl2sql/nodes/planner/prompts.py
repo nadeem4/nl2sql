@@ -9,7 +9,7 @@ Plan:
   "tables": [{"name": "users", "alias": "u"}, {"name": "orders", "alias": "o"}],
   "joins": [{"left": "users", "right": "orders", "on": ["u.id = o.user_id"], "join_type": "inner"}],
   "filters": [{"column": "o.order_date", "op": "BETWEEN", "value": "2023-01-01 AND 2023-12-31"}],
-  "needed_columns": ["users.name", "orders.order_date", "users.id", "orders.user_id"],
+  "needed_columns": ["u.name", "o.order_date", "u.id", "o.user_id"],
   "group_by": [], "aggregates": [], "having": [], "order_by": [], "limit": null
 }
 
@@ -22,7 +22,7 @@ Plan:
   "filters": [],
   "group_by": ["o.user_id"],
   "aggregates": [{"expr": "COUNT(*)", "alias": "total_orders"}],
-  "needed_columns": ["orders.user_id"],
+  "needed_columns": ["o.user_id"],
   "having": [], "order_by": [], "limit": null
 }
 """
@@ -34,7 +34,7 @@ PLANNER_PROMPT = (
     "Follow this algorithm to create the plan:\n"
     "1. Analyze the User Query and Intent to understand the goal.\n"
     "2. Identify the necessary tables from the [SCHEMA].\n"
-    "3. Select the required columns. IMPORTANT: List EVERY column used (in SELECT, WHERE, JOIN, GROUP BY) in the 'needed_columns' field.\n"
+    "3. Select the required columns. IMPORTANT: List EVERY column used (in SELECT, WHERE, JOIN, GROUP BY) in the 'needed_columns' field. Use aliases if defined (e.g. 'u.name').\n"
     "4. Formulate the joins required to connect the tables.\n"
     "5. Construct the final plan JSON.\n\n"
     "[CONSTRAINTS]\n"
@@ -48,6 +48,5 @@ PLANNER_PROMPT = (
     "[INPUT]\n"
     "{intent_context}"
     "{examples}\n"
-    "User query: \"{user_query}\"\n\n"
-    "{format_instructions}"
+    "User query: \"{user_query}\""
 )

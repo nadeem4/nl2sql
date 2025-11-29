@@ -50,6 +50,8 @@ class ValidatorNode:
             state.errors.append("Write/DML detected; blocked.")
         if "limit" not in sql_lower:
             state.errors.append("Missing LIMIT in SQL.")
+        if sql_lower.count("limit") > 1:
+            state.errors.append("Multiple LIMIT clauses detected.")
         if "?" in sql_text:
             state.errors.append("Parameter placeholders detected; inline literals instead.")
             state.sql_draft = None
@@ -80,13 +82,10 @@ class ValidatorNode:
                     if tbl in schema_cols:
                         if col_name not in schema_cols[tbl]:
                             invalid_cols.append(f"{tbl}.{col_name}")
-                    # If table not in schema_cols, we might have missed it in retrieval or it's an alias
-                    # For now, we only strictly validate if the table is KNOWN in the schema context
+                   
                 else:
-                    # Unqualified column: col
-                    # Must exist in at least one of the tables in the context
+                  
                     if col_name not in all_valid_cols:
-                        # Check if it's an alias defined in the query (e.g. SELECT count(*) as cnt ... ORDER BY cnt)
                         is_alias = False
                         for expression in parsed.find_all(exp.Alias):
                             if expression.alias == col_name:

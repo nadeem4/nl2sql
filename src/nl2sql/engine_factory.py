@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pathlib
+import re
 from typing import Any, Dict, TypedDict
 
 from sqlalchemy import create_engine, text
@@ -62,7 +63,8 @@ def run_read_query(
     params = params or {}
     cleaned = _normalize_sql(sql)
     limited_sql = cleaned
-    if " limit " not in cleaned.lower():
+    # Use regex to check for LIMIT word boundary to avoid false positives/negatives
+    if not re.search(r"\blimit\b", cleaned, re.IGNORECASE):
         limited_sql = f"{cleaned}\nLIMIT {row_limit}"
     with engine.connect() as conn:
         result = conn.execute(text(limited_sql), params)

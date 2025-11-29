@@ -1,4 +1,3 @@
-
 import pytest
 from unittest.mock import MagicMock
 import json
@@ -12,13 +11,15 @@ def test_planner_validates_needed_columns():
         columns={"users": ["id", "name"]}
     )
     
-    # Mock LLM to return a plan with a hallucinated column
+    # Mock LLM to return a PlanModel object
     mock_llm = MagicMock()
     plan_data = {
         "tables": [{"name": "users"}],
         "needed_columns": ["users.id", "users.age"] # 'age' is invalid
     }
-    mock_llm.return_value = json.dumps(plan_data)
+    # Create a real PlanModel with the data
+    mock_plan = PlanModel(**plan_data)
+    mock_llm.return_value = mock_plan
     
     node = PlannerNode(llm=mock_llm)
     
@@ -46,7 +47,8 @@ def test_planner_accepts_valid_columns():
         "tables": [{"name": "users"}],
         "needed_columns": ["users.id", "users.name"]
     }
-    mock_llm.return_value = json.dumps(plan_data)
+    mock_plan = PlanModel(**plan_data)
+    mock_llm.return_value = mock_plan
     
     node = PlannerNode(llm=mock_llm)
     
