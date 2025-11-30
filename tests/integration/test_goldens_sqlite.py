@@ -49,7 +49,7 @@ GOLDENS = [
 
 @pytest.fixture(scope="session")
 def profile():
-    profiles = load_profiles(ROOT / "configs" / "datasources.example.yaml")
+    profiles = load_profiles(ROOT / "configs" / "datasources.yaml")
     return get_profile(profiles, "manufacturing_sqlite")
 
 

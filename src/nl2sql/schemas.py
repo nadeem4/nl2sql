@@ -40,20 +40,6 @@ class OrderSpec(BaseModel):
     direction: Literal["asc", "desc"]
 
 
-class Plan(TypedDict, total=False):
-    # Keep Plan as TypedDict for backward compatibility if needed, 
-    # but PlanModel is the one used for LLM. 
-    # Actually, let's just update PlanModel to use the new classes.
-    tables: List[TableRef]
-    joins: List[JoinSpec]
-    filters: List[FilterSpec]
-    group_by: List[str]
-    aggregates: List[AggregateSpec]
-    having: List[FilterSpec]
-    order_by: List[OrderSpec]
-    limit: int
-
-
 class GeneratedSQL(TypedDict):
     sql: str
     rationale: str
@@ -65,6 +51,7 @@ class SchemaInfo(BaseModel):
     tables: List[str] = Field(default_factory=list)
     columns: Dict[str, List[str]] = Field(default_factory=dict)
     foreign_keys: Dict[str, List[Dict[str, Optional[str]]]] = Field(default_factory=dict)
+    aliases: Dict[str, str] = Field(default_factory=dict)
 
 
 class IntentModel(BaseModel):
@@ -85,14 +72,15 @@ class PlanModel(BaseModel):
     having: list[FilterSpec] = Field(default_factory=list)
     order_by: list[OrderSpec] = Field(default_factory=list)
     limit: Optional[int] = None
-    needed_columns: list[str] = Field(default_factory=list, description="List of all columns referenced in the plan (e.g., 'table.column')")
+    select_columns: list[str] = Field(default_factory=list, description="List of columns to be selected in the final result (e.g. 't1.name'). MUST use the alias defined in 'tables'.")
+    needed_columns: list[str] = Field(default_factory=list, description="List of ALL columns referenced anywhere in the plan (SELECT, WHERE, JOIN, etc.). MUST use the alias defined in 'tables'. This is a superset of select_columns.")
     reasoning: Optional[str] = Field(None, description="Step-by-step reasoning for the plan choices")
 
 
 @dataclass
 class GraphState:
     user_query: str
-    plan: Optional[Plan] = None
+    plan: Optional[Dict[str, Any]] = None  # Stores PlanModel.model_dump()
     sql_draft: Optional[GeneratedSQL] = None
     schema_info: Optional[SchemaInfo] = None
     validation: Dict[str, Any] = field(default_factory=dict)

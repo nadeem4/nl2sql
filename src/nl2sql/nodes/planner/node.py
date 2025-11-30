@@ -25,7 +25,16 @@ class PlannerNode:
         fk_text = ""
         
         if state.schema_info:
-            allowed_tables = ", ".join(state.schema_info.tables)
+            # Format tables with aliases: "table_name (alias)"
+            tables_with_aliases = []
+            for tbl in state.schema_info.tables:
+                alias = state.schema_info.aliases.get(tbl, "")
+                if alias:
+                    tables_with_aliases.append(f"{tbl} ({alias})")
+                else:
+                    tables_with_aliases.append(tbl)
+            allowed_tables = ", ".join(tables_with_aliases)
+            
             allowed_columns = state.schema_info.columns
             if state.schema_info.foreign_keys:
                 fk_text = f"Foreign keys: {json.dumps(state.schema_info.foreign_keys)}\n"
@@ -42,6 +51,15 @@ class PlannerNode:
             except Exception:
                 pass
 
+        # Handle feedback from previous validation
+        feedback = ""
+        if state.errors:
+            feedback = f"[FEEDBACK]\nThe previous plan was invalid. Fix the following errors:\n"
+            for err in state.errors:
+                feedback += f"- {err}\n"
+            # Clear errors after consuming them for feedback
+            state.errors = []
+
         # No format instructions needed
         prompt = PLANNER_PROMPT.format(
             allowed_tables=allowed_tables,
@@ -49,6 +67,7 @@ class PlannerNode:
             fk_text=fk_text,
             intent_context=intent_context,
             examples=PLANNER_EXAMPLES,
+            feedback=feedback,
             user_query=state.user_query
         )
         
@@ -58,42 +77,12 @@ class PlannerNode:
             else:
                 plan_model = self.llm(prompt)
             
-            # For debugging/logging, we might want to store the raw plan if possible, 
-            # but with structured output we get the object. We can dump it back to json.
+            # For debugging/logging
             state.validation["planner_raw"] = plan_model.model_dump_json()
 
-            # Validate needed_columns against schema
-            if state.schema_info:
-                # Build alias map
-                alias_map = {}
-                for t in plan_model.tables:
-                    if t.alias:
-                        alias_map[t.alias] = t.name
-                
-                invalid_cols = []
-                for col_ref in plan_model.needed_columns:
-                    parts = col_ref.split(".")
-                    if len(parts) == 2:
-                        tbl_ref, col = parts
-                        # Resolve alias if present
-                        real_table = alias_map.get(tbl_ref, tbl_ref)
-                        
-                        if real_table in state.schema_info.columns:
-                            if col not in state.schema_info.columns[real_table]:
-                                invalid_cols.append(col_ref)
-                        else:
-                            # Table not in schema
-                            invalid_cols.append(col_ref)
-                    else:
-                        # Unqualified or weird format
-                        invalid_cols.append(col_ref)
-                
-                if invalid_cols:
-                    state.errors.append(f"Plan references unknown columns: {', '.join(invalid_cols)}")
-                    state.plan = None
-                    return state
-
+            # Validation is now done by ValidatorNode
             state.plan = plan_model.model_dump()
+            
         except Exception as exc:
             state.plan = None
             state.errors.append(f"Planner failed. Error: {exc}")

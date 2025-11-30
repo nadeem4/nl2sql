@@ -9,6 +9,4 @@ agents:
   planner:
     provider: openai
     model: gpt-4o-mini
-  generator:
-    provider: openai
-    model: gpt-4o-mini
+    temperature: 0

@@ -56,15 +56,9 @@ def stub_llm(prompt: str) -> Any:
             having=[],
             order_by=[OrderSpec(expr="p.sku", direction="asc")],
             limit=10,
+            select_columns=["p.sku"],
             needed_columns=["p.sku"],
             reasoning="Stub plan"
-        )
-    elif "[ROLE]\nYou are an expert SQL Generator" in prompt:
-        return SQLModel(
-            sql="SELECT * FROM products LIMIT 10",
-            rationale="Stub SQL",
-            limit_enforced=True,
-            draft_only=False
         )
     # Default to Intent if not Planner/Generator, or check specific Intent keywords
     return IntentModel(
@@ -132,7 +126,7 @@ def _render_state(state: Dict[str, Any], registry: LLMRegistry | None = None, ve
         ("intent", "AI"),
         ("schema", "Non-AI"),
         ("planner", "AI"),
-        ("generator", "AI"),
+        ("generator", "Non-AI"),
         ("validator", "Non-AI"),
         ("executor", "Non-AI"),
     ]
@@ -186,7 +180,7 @@ def _render_state(state: Dict[str, Any], registry: LLMRegistry | None = None, ve
 
 def _print_agent_models(registry: LLMRegistry) -> None:
     print("Agent Configuration:")
-    for agent in ["intent", "planner", "generator"]:
+    for agent in ["intent", "planner"]:
         cfg = registry._agent_cfg(agent)
         print(f"  {agent.capitalize()}: {cfg.model} ({cfg.provider})")
 
@@ -344,7 +338,6 @@ def main() -> None:
         llm_map = {
             "intent": stub_llm,
             "planner": stub_llm,
-            "generator": stub_llm,
             "executor": stub_llm,
             "_default": stub_llm,
         }

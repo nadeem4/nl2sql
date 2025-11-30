@@ -20,112 +20,75 @@ class ValidatorNode:
         self.row_limit = row_limit
 
     def __call__(self, state: GraphState) -> GraphState:
-        if not state.sql_draft:
-            if not state.errors:
-                state.errors.append("No SQL to validate.")
-            return state
-
+        # Clear errors from previous runs (Planner should have consumed them)
+        # But if we are looping, we want to start fresh validation.
         state.errors = []
-        sql_text = state.sql_draft["sql"]
-        sql_lower = sql_text.lower()
-        schema_tables = set()
-        if state.schema_info:
-            schema_tables = set(state.schema_info.tables)
-            
-        if state.plan and state.plan.get("tables") and schema_tables:
-            missing = []
-            for tbl in state.plan["tables"]:
-                name = tbl.get("name")
-                if name and name not in schema_tables:
-                    missing.append(name)
-            if missing:
-                state.errors.append(f"Plan references missing tables: {', '.join(sorted(missing))}.")
-                state.sql_draft = None
-                return state
-        schema_cols = {}
-        if state.schema_info:
-            schema_cols = state.schema_info.columns
 
-        if any(term in sql_lower for term in ["insert ", "update ", "delete ", "drop ", "alter "]):
-            state.errors.append("Write/DML detected; blocked.")
-        if "limit" not in sql_lower:
-            state.errors.append("Missing LIMIT in SQL.")
-        if sql_lower.count("limit") > 1:
-            state.errors.append("Multiple LIMIT clauses detected.")
-        if "?" in sql_text:
-            state.errors.append("Parameter placeholders detected; inline literals instead.")
-            state.sql_draft = None
+        if not state.plan:
+            state.errors.append("No plan to validate.")
             return state
-        try:
-            parsed = sqlglot.parse_one(sql_text)
-        except Exception:
-            state.errors.append("SQL parse failed; blocked.")
+
+        if not state.schema_info:
             return state
-        # validate column references
-        if schema_cols:
-            invalid_cols = []
-            # Flatten all valid columns for lookup of unqualified names
-            all_valid_cols = set()
-            for cols in schema_cols.values():
-                all_valid_cols.update(cols)
+
+        schema_tables = set(state.schema_info.tables)
+        schema_cols = state.schema_info.columns
+        schema_aliases = state.schema_info.aliases
+
+        # 1. Validate Tables and Aliases
+        plan_aliases = {}
+        for tbl in state.plan.get("tables", []):
+            name = tbl.get("name")
+            alias = tbl.get("alias")
             
-            for col in parsed.find_all(exp.Column):
-                tbl = col.table
-                col_name = col.name
-                
-                # Skip wildcard
-                if col_name == "*":
-                    continue
+            if name not in schema_tables:
+                state.errors.append(f"Table '{name}' does not exist in schema.")
+                continue
+            
+            expected_alias = schema_aliases.get(name)
+            if alias != expected_alias:
+                state.errors.append(f"Table '{name}' must use alias '{expected_alias}', but found '{alias}'.")
+            
+            if alias:
+                plan_aliases[alias] = name
 
-                if tbl:
-                    # Qualified column: tbl.col
-                    if tbl in schema_cols:
-                        if col_name not in schema_cols[tbl]:
-                            invalid_cols.append(f"{tbl}.{col_name}")
-                   
-                else:
-                  
-                    if col_name not in all_valid_cols:
-                        is_alias = False
-                        for expression in parsed.find_all(exp.Alias):
-                            if expression.alias == col_name:
-                                is_alias = True
-                                break
-                        
-                        if not is_alias:
-                             invalid_cols.append(f"{col_name} (unqualified)")
+        # 2. Validate Columns (needed_columns)
+        # We expect columns to be in "alias.column" format
+        for col_ref in state.plan.get("needed_columns", []):
+            parts = col_ref.split(".")
+            if len(parts) != 2:
+                state.errors.append(f"Column '{col_ref}' is not properly qualified (expected 'alias.column').")
+                continue
+            
+            alias, col_name = parts
+            if alias not in plan_aliases:
+                state.errors.append(f"Alias '{alias}' in column '{col_ref}' is not defined in plan tables.")
+                continue
+            
+            table_name = plan_aliases[alias]
+            if table_name in schema_cols:
+                if col_name not in schema_cols[table_name]:
+                    state.errors.append(f"Column '{col_name}' does not exist in table '{table_name}'.")
+            else:
+                # Should have been caught by table validation, but just in case
+                pass
 
-            if invalid_cols:
-                state.errors.append(f"References missing columns: {', '.join(sorted(set(invalid_cols)))}")
-                state.sql_draft = None
-                return state
-        # block UNION
-        if parsed.find(exp.Union):
-            state.errors.append("UNION detected; blocked.")
-        # enforce ORDER BY if plan has it
-        if state.plan and state.plan.get("order_by"):
-            has_order = bool(parsed.args.get("order"))
-            if not has_order:
-                state.errors.append("Plan requested ORDER BY but SQL missing it.")
-        # enforce LIMIT numeric and within row_limit
-        limit_val = _extract_limit(sql_text)
-        if limit_val is None:
-            state.errors.append("Could not parse LIMIT value.")
-        elif self.row_limit is not None and limit_val > self.row_limit:
-            state.errors.append(f"Limit {limit_val} exceeds allowed {self.row_limit}.")
+        # 3. Validate Joins (check on_clause columns if possible, but they might be complex expressions)
+        # For now, we rely on needed_columns covering all used columns.
+        
+        # 4. Validate Filters (check column existence)
+        for flt in state.plan.get("filters", []):
+            col = flt.get("column")
+            if col and col not in state.plan.get("needed_columns", []):
+                 # It's okay if it's not in needed_columns if we don't strictly enforce it, 
+                 # but the prompt says "List EVERY column used".
+                 # Let's warn or error? The prompt says "List EVERY column".
+                 # Let's enforce it to be strict.
+                 state.errors.append(f"Filter column '{col}' missing from 'needed_columns'.")
+
         return state
 
 
 def _extract_limit(sql_text: str) -> int | None:
-    try:
-        parsed = sqlglot.parse_one(sql_text)
-    except Exception:
-        return None
-    limit = parsed.args.get("limit")
-    if not limit:
-        return None
-    try:
-        expr = limit.expression if hasattr(limit, "expression") else limit
-        return int(expr.this)
-    except Exception:
-        return None
+    # Unused now, but keeping for reference or removal
+    return None

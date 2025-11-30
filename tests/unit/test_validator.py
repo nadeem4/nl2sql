@@ -1,22 +1,27 @@
 
 import pytest
-import json
 from nl2sql.nodes.validator_node import ValidatorNode
 from nl2sql.schemas import GraphState, SchemaInfo
 
-def test_validator_detects_unqualified_hallucinations():
-    """Test that validator catches columns not in schema, even if unqualified."""
+def test_validator_detects_missing_columns():
+    """Test that validator catches columns not in schema."""
     schema_info = SchemaInfo(
         tables=["users"],
-        columns={"users": ["id", "name"]}
+        columns={"users": ["id", "name"]},
+        aliases={"users": "u"}
     )
     
     # 'age' is not in schema
-    sql = "SELECT age FROM users LIMIT 10"
+    plan = {
+        "tables": [{"name": "users", "alias": "u"}],
+        "needed_columns": ["u.age"],
+        "select_columns": ["u.age"],
+        "limit": 10
+    }
     
     state = GraphState(
         user_query="get ages",
-        sql_draft={"sql": sql},
+        plan=plan,
         schema_info=schema_info
     )
     
@@ -24,20 +29,26 @@ def test_validator_detects_unqualified_hallucinations():
     new_state = validator(state)
     
     assert new_state.errors
-    assert "age (unqualified)" in new_state.errors[0] or "References missing columns" in new_state.errors[0]
-    assert new_state.sql_draft is None
+    assert "Column 'age' does not exist in table 'users'" in new_state.errors[0]
 
 def test_validator_allows_valid_columns():
     """Test that validator allows valid columns."""
     schema_info = SchemaInfo(
         tables=["users"],
-        columns={"users": ["id", "name"]}
+        columns={"users": ["id", "name"]},
+        aliases={"users": "u"}
     )
-    sql = "SELECT name FROM users LIMIT 10"
+    
+    plan = {
+        "tables": [{"name": "users", "alias": "u"}],
+        "needed_columns": ["u.name"],
+        "select_columns": ["u.name"],
+        "limit": 10
+    }
     
     state = GraphState(
         user_query="get names",
-        sql_draft={"sql": sql},
+        plan=plan,
         schema_info=schema_info
     )
     
@@ -45,4 +56,4 @@ def test_validator_allows_valid_columns():
     new_state = validator(state)
     
     assert not new_state.errors
-    assert new_state.sql_draft is not None
+

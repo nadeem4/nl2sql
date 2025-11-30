@@ -83,10 +83,15 @@ class SchemaNode:
         except Exception:
             pass
             
+        # Assign aliases
+        sorted_tables = sorted(tables)
+        aliases = {table: f"t{i+1}" for i, table in enumerate(sorted_tables)}
+        
         state.schema_info = SchemaInfo(
-            tables=sorted(tables),
+            tables=sorted_tables,
             columns=columns_map,
-            foreign_keys=fk_map
+            foreign_keys=fk_map,
+            aliases=aliases
         )
 
         return state

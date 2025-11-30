@@ -31,18 +31,18 @@ class TestPlannerRetry(unittest.TestCase):
         planner_fail_2 = Exception("LLM Error 2")
         
         planner_success = PlanModel(
-            tables=[{"name": "t1"}], 
+            tables=[{"name": "t1", "alias": "t1"}], 
             needed_columns=["t1.col1"],
+            select_columns=["t1.col1"],
             joins=[], filters=[], group_by=[], aggregates=[], having=[], order_by=[]
         )
-        generator_success = SQLModel(sql="SELECT col1 FROM t1 LIMIT 10")
+        # Generator is non-AI
         
         mock_llm.side_effect = [
             intent_resp,
             planner_fail_1,
             planner_fail_2,
-            planner_success,
-            generator_success
+            planner_success
         ]
         
         profile = MagicMock()
@@ -80,8 +80,8 @@ class TestPlannerRetry(unittest.TestCase):
             # Verify generator ran
             self.assertIsNotNone(result["sql_draft"])
             
-            # Verify LLM call count: 1 intent + 3 planner + 1 generator = 5
-            self.assertEqual(mock_llm.call_count, 5)
+            # Verify LLM call count: 1 intent + 3 planner = 4
+            self.assertEqual(mock_llm.call_count, 4)
 
 if __name__ == "__main__":
     unittest.main()

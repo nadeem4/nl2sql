@@ -10,6 +10,12 @@ This project implements a LangGraph-based NL→SQL pipeline with pluggable LLMs 
 - Guardrails: read-only, limit clamp, wildcard expansion, UNION/multi-statement blocking, ORDER BY enforcement.
 - CLI with formatted output and optional stub LLM for offline testing.
 
+## Token Efficiency
+This pipeline is designed to be highly token-efficient by minimizing LLM usage:
+- **Rule-Based Generation**: The **SQL Generator** uses `sqlglot` to deterministically compile the plan into SQL, costing **0 tokens**.
+- **Logic-Based Validation**: The **Validator** uses Python logic to verify the plan against the schema, avoiding expensive LLM round-trips for syntax checking.
+- **Strategic AI Use**: LLMs are used *only* where reasoning is required (Intent, Planner), while deterministic tasks are handled by code.
+
 ## Setup
 1) Install dependencies:
    ```bash
@@ -141,10 +147,10 @@ Keys are taken from config or `OPENAI_API_KEY`.
 
 ## Agents (LangGraph)
 - **Intent** (AI): normalizes the user query, extracts entities/filters/clarifications. Output: structured intent hints.
-- **Schema** (non-AI): introspects the datasource (via SQLAlchemy) to list tables/columns for grounding and wildcard expansion.
-- **Planner** (AI): produces a structured query plan (tables, joins, filters, aggregates, order_by, limit) via LLM with Pydantic validation.
-- **SQL Generator** (AI): renders engine-aware SQL from the plan, enforces limits, rejects wildcards, and adds ORDER BY when present.
-- **Validator** (non-AI): guards against DDL/DML, missing LIMIT, UNION/multi-statements, and missing ORDER BY when requested by the plan.
+- **Schema** (non-AI): introspects the datasource (via SQLAlchemy) to list tables/columns and **assigns aliases** (e.g., `t1`, `t2`) for the planner.
+- **Planner** (AI): produces a structured query plan (tables, joins, filters, aggregates, order_by, limit) via LLM with Pydantic validation. **Receives feedback** from Validator if the plan is invalid.
+- **Validator** (non-AI): validates the **Plan** (tables, aliases, columns) against the schema. If invalid, triggers a retry loop to the Planner.
+- **SQL Generator** (non-AI): deterministically renders engine-aware SQL from the valid plan using `sqlglot`. Enforces limits and dialect-specific syntax.
 - **Executor** (non-AI): runs the SQL read-only against the datasource, returning row count and a sample for verification.
 
 ## Flow
@@ -153,16 +159,17 @@ flowchart TD
   user["User Query"] --> intent["Intention (AI)"]
   intent --> schema["Schema (non-AI)"]
   schema --> planner["Planner (AI)"]
-  planner --> generator["SQL Generator (AI)"]
-  generator --> validator["Validator (non-AI)"]
-  validator --> executor["Executor (non-AI)"]
+  planner --> validator["Validator (non-AI)"]
+  validator -- Valid --> generator["SQL Generator (non-AI)"]
+  validator -- Invalid --> planner
+  generator --> executor["Executor (non-AI)"]
   executor --> answer["Answer/Result Sample"]
   subgraph Agents
     intent
     schema
     planner
-    generator
     validator
+    generator
     executor
   end
   style user fill:#f6f8fa,stroke:#aaa

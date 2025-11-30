@@ -1,22 +1,20 @@
-from typing import Callable, Dict, Optional
-
-from sqlalchemy import inspect
+from typing import Callable, Dict, Optional, Union
+import dataclasses
 import json
+from sqlalchemy import inspect
+from langchain_core.runnables import Runnable
 
 from nl2sql.capabilities import get_capabilities
 from nl2sql.datasource_config import DatasourceProfile
 from nl2sql.engine_factory import make_engine, run_read_query
-from nl2sql.nodes.intent import IntentNode
-from nl2sql.nodes.planner import PlannerNode
-from nl2sql.nodes.generator import GeneratorNode
+from nl2sql.nodes.intent.node import IntentNode
+from nl2sql.nodes.planner.node import PlannerNode
+from nl2sql.nodes.generator_node import GeneratorNode
 from nl2sql.nodes.validator_node import ValidatorNode
 from nl2sql.nodes.schema_node import SchemaNode
 from nl2sql.schemas import GraphState
 from nl2sql.tracing import span
 from nl2sql.vector_store import SchemaVectorStore
-from langchain_core.runnables import Runnable
-from typing import Callable, Dict, Optional, Union
-import dataclasses
 
 # Type for an LLM callable: prompt -> string
 LLMCallable = Union[Callable[[str], str], Runnable]
@@ -76,7 +74,7 @@ def build_graph(profile: DatasourceProfile, llm: Optional[LLMCallable] = None, l
     intent = IntentNode(llm=node_llm("intent"))
     schema_node = SchemaNode(profile=profile, vector_store=vector_store)
     planner = PlannerNode(llm=node_llm("planner"))
-    generator = GeneratorNode(profile_engine=profile.engine, row_limit=profile.row_limit, llm=node_llm("generator"))
+    generator = GeneratorNode(profile_engine=profile.engine, row_limit=profile.row_limit)
     validator = ValidatorNode(row_limit=profile.row_limit)
 
     def retry_node(state: Dict) -> Dict:
@@ -125,32 +123,36 @@ def build_graph(profile: DatasourceProfile, llm: Optional[LLMCallable] = None, l
     graph.add_edge("intent", "schema")
     graph.add_edge("schema", "planner")
     
+    # Check if Planner produced a plan at all
     graph.add_conditional_edges(
         "planner",
         check_planner,
         {
-            "ok": "sql_generator",
+            "ok": "validator",
             "retry": "planner_retry",
             "end": END
         }
     )
     graph.add_edge("planner_retry", "planner")
 
-    graph.add_edge("sql_generator", "validator")
-    
+    # Validator checks the Plan
     graph.add_conditional_edges(
         "validator",
         check_validation,
         {
             "retry": "retry_handler",
-            "ok": "executor" if execute else END,
+            "ok": "sql_generator",
             "end": END
         }
     )
-    graph.add_edge("retry_handler", "sql_generator")
+    # If validation fails, retry Planner (with feedback in state.errors)
+    graph.add_edge("retry_handler", "planner")
     
     if execute:
+        graph.add_edge("sql_generator", "executor")
         graph.add_edge("executor", END)
+    else:
+        graph.add_edge("sql_generator", END)
 
     return graph.compile()
 
