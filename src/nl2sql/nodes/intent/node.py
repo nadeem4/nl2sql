@@ -31,8 +31,20 @@ class IntentNode:
                 intent_model = self.llm.invoke(prompt)
             else:
                 intent_model = self.llm(prompt)
+            # Store raw output for debugging
+            state.validation["intent"] = intent_model.model_dump_json()
+            
+            # Populate thoughts
+            if "intent" not in state.thoughts:
+                state.thoughts["intent"] = []
+            
+            reasoning = intent_model.reasoning or "No reasoning provided."
+            state.thoughts["intent"].append(f"Reasoning: {reasoning}")
+            state.thoughts["intent"].append(f"Classification: {intent_model.query_type}")
+            state.thoughts["intent"].append(f"Keywords: {', '.join(intent_model.keywords)}")
+            if intent_model.query_expansion:
+                state.thoughts["intent"].append(f"Expansion: {', '.join(intent_model.query_expansion)}")
                 
-            state.validation["intent"] = intent_model.model_dump()
         except Exception as exc:
             state.errors.append(f"Intent extraction failed: {exc}")
             

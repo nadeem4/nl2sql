@@ -33,6 +33,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--no-exec", action="store_true", help="Skip execution (generate/validate only)")
     parser.add_argument("--verbose", action="store_true", help="Show raw planner/generator outputs")
     parser.add_argument("--debug", action="store_true", help="Show output of each node in the graph")
+    parser.add_argument("--show-thoughts", action="store_true", help="Show step-by-step reasoning from AI nodes")
     
     # Benchmarking args
     parser.add_argument("--benchmark", action="store_true", help="Run in benchmark mode")
@@ -54,22 +55,23 @@ def stub_llm(prompt: str) -> Any:
             group_by=[],
             aggregates=[],
             having=[],
-            order_by=[OrderSpec(expr="p.sku", direction="asc")],
+            order_by=[OrderSpec(column={"name": "sku", "alias": "p"}, direction="asc")],
             limit=10,
-            select_columns=["p.sku"],
-            needed_columns=["p.sku"],
-            reasoning="Stub plan"
+            select_columns=[{"name": "sku", "alias": "p"}],
+            reasoning="Stub plan reasoning: Selected products table because user asked for products."
         )
     # Default to Intent if not Planner/Generator, or check specific Intent keywords
     return IntentModel(
         entities=[],
         filters=[],
         keywords=["users"],
-        clarifications=[]
+        clarifications=[],
+        reasoning="Stub intent reasoning: User wants to query users.",
+        query_type="READ"
     )
 
 
-def _render_state(state: Dict[str, Any], registry: LLMRegistry | None = None, verbose: bool = False, usage: Dict[str, int] | None = None) -> None:
+def _render_state(state: Dict[str, Any], registry: LLMRegistry | None = None, verbose: bool = False, show_thoughts: bool = False, usage: Dict[str, int] | None = None) -> None:
     errors: List[str] = state.get("errors") or []
     sql_draft = state.get("sql_draft") or {}
     plan = state.get("plan") or {}
@@ -77,6 +79,16 @@ def _render_state(state: Dict[str, Any], registry: LLMRegistry | None = None, ve
 
     print("\n=== NL2SQL Run ===")
     print(f"Query: {state.get('user_query')}")
+
+    if show_thoughts:
+        thoughts = state.get("thoughts", {})
+        if thoughts:
+            print("\n--- Thought Process ---")
+            for node, logs in thoughts.items():
+                print(f"\n[{node.upper()}]")
+                for log in logs:
+                    print(f"  {log}")
+            print("\n-----------------------")
 
     if errors:
         print("\nErrors:")
@@ -353,7 +365,7 @@ def main() -> None:
     reset_usage()
     state = run_with_graph(profile, query, llm=llm, llm_map=llm_map, execute=not args.no_exec, vector_store=vector_store, debug=args.debug)
     usage = get_usage_summary()
-    _render_state(state, registry=registry, verbose=args.verbose, usage=usage)
+    _render_state(state, registry=registry, verbose=args.verbose, show_thoughts=args.show_thoughts, usage=usage)
 
 
 if __name__ == "__main__":

@@ -36,9 +36,16 @@ class GeneratorNode:
         try:
             final_sql = self._generate_sql_from_plan(state.plan, limit)
             
+            # Populate thoughts
+            if "generator" not in state.thoughts:
+                state.thoughts["generator"] = []
+            
+            state.thoughts["generator"].append(f"Generated SQL: {final_sql}")
+            state.thoughts["generator"].append(f"Rationale: {state.plan.get('reasoning', 'N/A')}")
+            
             state.sql_draft = GeneratedSQL(
                 sql=final_sql,
-                rationale="Rule-based generation via sqlglot",
+                rationale=state.plan.get("reasoning"),
                 limit_enforced=True,
                 draft_only=False
             )

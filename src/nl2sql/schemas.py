@@ -86,6 +86,7 @@ class IntentModel(BaseModel):
     filters: list[str] = Field(default_factory=list, description="List of filters or constraints extracted from the query")
     keywords: list[str] = Field(default_factory=list, description="List of technical keywords, synonyms, or likely table names")
     clarifications: list[str] = Field(default_factory=list, description="List of clarifying questions if the query is ambiguous")
+    reasoning: Optional[str] = Field(None, description="Step-by-step reasoning for the intent classification")
     query_expansion: list[str] = Field(default_factory=list, description="Expanded list of synonyms, related terms, and domain-specific keywords")
     query_type: Literal["READ", "WRITE", "DDL", "UNKNOWN"] = Field("READ", description="Classification of the query intent")
 
@@ -117,6 +118,7 @@ class GraphState:
     latency: Dict[str, float] = field(default_factory=dict)
     errors: List[str] = field(default_factory=list)
     retry_count: int = 0
+    thoughts: Dict[str, List[str]] = field(default_factory=dict)  # Stores reasoning/logs from each node
 
     def __post_init__(self):
         if isinstance(self.schema_info, dict):

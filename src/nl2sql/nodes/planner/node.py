@@ -92,6 +92,15 @@ class PlannerNode:
             
             state.plan = plan_dump
             
+            # Populate thoughts
+            if "planner" not in state.thoughts:
+                state.thoughts["planner"] = []
+            
+            reasoning = plan_model.reasoning or "No reasoning provided."
+            state.thoughts["planner"].append(f"Reasoning: {reasoning}")
+            state.thoughts["planner"].append(f"Query Type: {plan_model.query_type}")
+            state.thoughts["planner"].append(f"Tables: {', '.join([t.name for t in plan_model.tables])}")
+            
         except Exception as exc:
             state.plan = None
             state.errors.append(f"Planner failed. Error: {exc}")

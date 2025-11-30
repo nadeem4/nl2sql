@@ -16,6 +16,24 @@ This pipeline is designed to be highly token-efficient by minimizing LLM usage:
 - **Logic-Based Validation**: The **Validator** uses Python logic to verify the plan against the schema, avoiding expensive LLM round-trips for syntax checking.
 - **Strategic AI Use**: LLMs are used *only* where reasoning is required (Intent, Planner), while deterministic tasks are handled by code.
 
+## Observability
+Gain insight into the AI's decision-making process with the `--show-thoughts` flag. This displays:
+- **Intent**: Reasoning for query classification and entity extraction.
+- **Schema**: Tables retrieved via vector search.
+- **Planner**: Step-by-step reasoning for table selection and query construction.
+- **Validator**: Validation checks and any errors found.
+- **Generator**: Rationale for the generated SQL.
+
+Example output:
+```
+[INTENT]
+  Reasoning: User is asking for aggregate sales data...
+  Classification: READ
+
+[PLANNER]
+  Reasoning: Selected 'sales' table and grouped by 'region'...
+```
+
 ## Setup
 1) Install dependencies:
    ```bash
@@ -53,6 +71,7 @@ Flags:
 - `--index`: run schema indexing (use with `--vector-store`)
 - `--stub-llm`: run with a fixed stub plan (no live LLM)
 - `--debug`: show output of each node in the graph (streaming)
+- `--show-thoughts`: show step-by-step reasoning from AI nodes and logs from non-AI nodes
 
 ## Examples
 
