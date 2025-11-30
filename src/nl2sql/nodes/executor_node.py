@@ -3,6 +3,7 @@ from __future__ import annotations
 from nl2sql.datasource_config import DatasourceProfile
 from nl2sql.engine_factory import make_engine, run_read_query
 from nl2sql.schemas import GraphState
+from nl2sql.security import enforce_read_only
 from nl2sql.tracing import span
 
 
@@ -13,6 +14,11 @@ class ExecutorNode:
     def __call__(self, state: GraphState) -> GraphState:
         if not state.sql_draft:
             state.errors.append("No SQL to execute.")
+            return state
+            
+        if not enforce_read_only(state.sql_draft["sql"]):
+            state.errors.append("Security Violation: SQL query contains forbidden keywords (read-only enforcement).")
+            state.execution = {"error": "Security Violation"}
             return state
             
         engine = make_engine(self.profile)
