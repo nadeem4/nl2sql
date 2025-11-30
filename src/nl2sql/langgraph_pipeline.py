@@ -102,6 +102,10 @@ def build_graph(profile: DatasourceProfile, llm: Optional[LLMCallable] = None, l
     def check_validation(state: Dict) -> str:
         gs = GraphState(**state)
         if gs.errors:
+            # Check for terminal errors (Security Violations)
+            if any("Security Violation" in e for e in gs.errors):
+                return "end"
+                
             if gs.retry_count < 3:
                 return "retry"
             else:

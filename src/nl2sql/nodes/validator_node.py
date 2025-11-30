@@ -30,6 +30,12 @@ class ValidatorNode:
         if not state.schema_info:
             return state
 
+        # 0. Security Check: Query Type
+        query_type = state.plan.get("query_type", "READ")
+        if query_type != "READ":
+            state.errors.append(f"Security Violation: Query type '{query_type}' is not allowed. Only READ queries are permitted.")
+            return state
+
         # Build schema lookup maps
         schema_tables = {t.name for t in state.schema_info.tables}
         schema_cols = {t.name: set(t.columns) for t in state.schema_info.tables}
