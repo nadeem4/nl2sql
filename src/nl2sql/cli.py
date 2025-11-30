@@ -362,10 +362,32 @@ def main() -> None:
         _print_agent_models(registry)
         llm_map = registry.llm_map()
 
-    reset_usage()
-    state = run_with_graph(profile, query, llm=llm, llm_map=llm_map, execute=not args.no_exec, vector_store=vector_store, debug=args.debug)
+    # Define thought streamer
+    def stream_thoughts(node: str, logs: list[str]):
+        print(f"\n[{node.upper()}]")
+        for log in logs:
+            print(f"  {log}")
+
+    if args.show_thoughts:
+        print("\n--- Thought Process ---")
+
+    state = run_with_graph(
+        profile, 
+        query, 
+        llm=llm, 
+        llm_map=llm_map, 
+        execute=not args.no_exec, 
+        vector_store=vector_store, 
+        debug=args.debug,
+        on_thought=stream_thoughts if args.show_thoughts else None
+    )
+    
+    if args.show_thoughts:
+        print("\n-----------------------")
+
     usage = get_usage_summary()
-    _render_state(state, registry=registry, verbose=args.verbose, show_thoughts=args.show_thoughts, usage=usage)
+    # Don't show thoughts again in render_state if we already streamed them
+    _render_state(state, registry=registry, verbose=args.verbose, show_thoughts=False, usage=usage)
 
 
 if __name__ == "__main__":

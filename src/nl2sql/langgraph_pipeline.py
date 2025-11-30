@@ -161,7 +161,7 @@ def build_graph(profile: DatasourceProfile, llm: Optional[LLMCallable] = None, l
     return graph.compile()
 
 
-def run_with_graph(profile: DatasourceProfile, user_query: str, llm: Optional[LLMCallable] = None, llm_map: Optional[Dict[str, LLMCallable]] = None, execute: bool = True, vector_store: Optional[SchemaVectorStore] = None, debug: bool = False) -> Dict:
+def run_with_graph(profile: DatasourceProfile, user_query: str, llm: Optional[LLMCallable] = None, llm_map: Optional[Dict[str, LLMCallable]] = None, execute: bool = True, vector_store: Optional[SchemaVectorStore] = None, debug: bool = False, on_thought: Optional[Callable[[str, list[str]], None]] = None) -> Dict:
     g = build_graph(profile, llm=llm, llm_map=llm_map, execute=execute, vector_store=vector_store)
     initial_state = dataclasses.asdict(
         GraphState(
@@ -172,18 +172,40 @@ def run_with_graph(profile: DatasourceProfile, user_query: str, llm: Optional[LL
     
     import time
     start_total = time.perf_counter()
-    if debug:
-        print("\n--- Starting Graph Execution (Debug Mode) ---")
+    
+    # Map graph node names to thoughts keys
+    node_map = {
+        "intent": "intent",
+        "schema": "schema",
+        "planner": "planner",
+        "validator": "validator",
+        "sql_generator": "generator"
+    }
+
+    if debug or on_thought:
+        if debug:
+            print("\n--- Starting Graph Execution (Debug Mode) ---")
+        
         final_state = initial_state
         for step in g.stream(initial_state):
             for node_name, state_update in step.items():
-                print(f"\n--- Node: {node_name} ---")
-                # Print the full state update (delta) from the node
-                print(json.dumps(state_update, indent=2, default=str))
+                if debug:
+                    print(f"\n--- Node: {node_name} ---")
+                    print(json.dumps(state_update, indent=2, default=str))
+                
+                # Streaming thoughts
+                if on_thought:
+                    thought_key = node_map.get(node_name)
+                    if thought_key:
+                        thoughts = state_update.get("thoughts", {}).get(thought_key)
+                        if thoughts:
+                            on_thought(thought_key, thoughts)
                 
                 # Update final state
                 final_state.update(state_update)
-        print("\n--- Graph Execution Complete ---\n")
+        
+        if debug:
+            print("\n--- Graph Execution Complete ---\n")
         result = final_state
     else:
         result = g.invoke(initial_state)
