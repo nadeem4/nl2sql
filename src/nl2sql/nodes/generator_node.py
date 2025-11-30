@@ -55,32 +55,15 @@ class GeneratorNode:
             raise ValueError("No tables in plan.")
         
         query = exp.select()
-        
-        # 1. SELECT
         query = self._build_select(query, plan)
-
-        # 2. FROM
         query = self._build_from(query, tables[0])
-
-        # 3. JOINS
         query = self._build_joins(query, plan, tables)
-
-        # 4. WHERE
         query = self._build_where(query, plan)
-
-        # 5. GROUP BY
         query = self._build_group_by(query, plan)
-
-        # 6. HAVING
         query = self._build_having(query, plan)
-        
-        # 7. ORDER BY
         query = self._build_order_by(query, plan)
-
-        # 8. LIMIT
         query = query.limit(limit)
 
-        # Transpile
         dialect_map = {
             "postgresql": "postgres",
             "mssql": "tsql",
