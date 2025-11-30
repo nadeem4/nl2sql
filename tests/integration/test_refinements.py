@@ -16,16 +16,24 @@ class TestRefinements(unittest.TestCase):
         # Schema has t1(col1). We ask for col2.
         plan_invalid = PlanModel(
             tables=[{"name": "t1", "alias": "t1"}],
-            needed_columns=["t1.col2"], # Invalid
-            select_columns=["t1.col2"],
+            select_columns=[{"alias": "t1", "name": "col2"}], # Invalid
+            filters=[],
+            joins=[],
+            group_by=[],
+            order_by=[],
+            aggregates=[],
             limit=10
         )
         
         # 3. Planner (2nd try): returns valid plan
         plan_valid = PlanModel(
             tables=[{"name": "t1", "alias": "t1"}],
-            needed_columns=["t1.col1"],
-            select_columns=["t1.col1"],
+            select_columns=[{"alias": "t1", "name": "col1"}],
+            filters=[],
+            joins=[],
+            group_by=[],
+            order_by=[],
+            aggregates=[],
             limit=10
         )
         
@@ -78,10 +86,15 @@ class TestRefinements(unittest.TestCase):
         intent_model = IntentModel(**intent_data)
         
         # Planner returns valid plan
+        # Planner returns valid plan
         plan_data = {
             "tables": [{"name": "t1", "alias": "t"}],
-            "needed_columns": ["t.col1"],
-            "select_columns": ["t.col1"],
+            "select_columns": [{"alias": "t", "name": "col1"}],
+            "filters": [],
+            "joins": [],
+            "group_by": [],
+            "order_by": [],
+            "aggregates": [],
             "limit": 10
         }
         plan_model = PlanModel(**plan_data)

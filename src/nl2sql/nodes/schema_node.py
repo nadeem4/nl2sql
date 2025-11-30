@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 from typing import Dict, Optional, List
 from sqlalchemy import inspect
-from nl2sql.schemas import GraphState, SchemaInfo
+from nl2sql.schemas import GraphState, SchemaInfo, TableInfo, ForeignKey
 from nl2sql.vector_store import SchemaVectorStore
 from nl2sql.datasource_config import DatasourceProfile
 from nl2sql.engine_factory import make_engine
@@ -61,37 +61,41 @@ class SchemaNode:
         else:
             tables = all_tables
 
-        columns_map = {}
-        fk_map = {}
-        try:
-            columns_map = {
-                table: [col["name"] for col in inspector.get_columns(table)]
-                for table in tables
-            }
+        # Assign aliases
+        sorted_tables = sorted(tables)
+        table_infos = []
+        
+        for i, table in enumerate(sorted_tables):
+            alias = f"t{i+1}"
+            columns = []
+            fks = []
             
-            for table in tables:
-                fks = []
+            try:
+                columns = [col["name"] for col in inspector.get_columns(table)]
+                
                 for fk in inspector.get_foreign_keys(table):
                     if not fk.get("referred_table"):
                         continue
                     col = fk.get("constrained_columns", [None])[0]
                     ref_table = fk.get("referred_table")
                     ref_col = fk.get("referred_columns", [None])[0]
-                    fks.append({"column": col, "reftable": ref_table, "refcolumn": ref_col})
-                if fks:
-                    fk_map[table] = fks
-        except Exception:
-            pass
+                    
+                    if col and ref_table and ref_col:
+                        fks.append(ForeignKey(
+                            column=col,
+                            referred_table=ref_table,
+                            referred_column=ref_col
+                        ))
+            except Exception:
+                pass
             
-        # Assign aliases
-        sorted_tables = sorted(tables)
-        aliases = {table: f"t{i+1}" for i, table in enumerate(sorted_tables)}
+            table_infos.append(TableInfo(
+                name=table,
+                alias=alias,
+                columns=columns,
+                foreign_keys=fks
+            ))
         
-        state.schema_info = SchemaInfo(
-            tables=sorted_tables,
-            columns=columns_map,
-            foreign_keys=fk_map,
-            aliases=aliases
-        )
+        state.schema_info = SchemaInfo(tables=table_infos)
 
         return state

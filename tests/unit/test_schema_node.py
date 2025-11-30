@@ -64,6 +64,12 @@ def test_schema_node_retrieval(mock_profile):
         # Result should contain orders AND customers
         assert new_state.schema_info is not None
         tables = new_state.schema_info.tables
-        assert "orders" in tables
-        assert "customers" in tables
-        assert "products" not in tables # Not connected to orders in this mock
+        table_names = [t.name for t in tables]
+        assert "orders" in table_names
+        assert "customers" in table_names
+        assert "products" not in table_names # Not connected to orders in this mock
+        
+        # Verify TableInfo structure
+        orders_info = next(t for t in tables if t.name == "orders")
+        assert orders_info.alias  # Should have an alias
+        assert isinstance(orders_info.columns, list)

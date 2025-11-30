@@ -10,10 +10,13 @@ class TestSyntaxFix(unittest.TestCase):
         # Plan requires ordering
         plan = {
             "tables": [{"name": "users", "alias": "u"}],
-            "order_by": [{"expr": "u.name", "direction": "asc"}],
+            "order_by": [{"column": {"alias": "u", "name": "name"}, "direction": "asc"}],
             "limit": 10,
-            "select_columns": ["u.name"],
-            "needed_columns": ["u.name"]
+            "select_columns": [{"alias": "u", "name": "name"}],
+            "filters": [],
+            "joins": [],
+            "group_by": [],
+            "aggregates": []
         }
     
         state = GraphState(user_query="test", plan=plan)

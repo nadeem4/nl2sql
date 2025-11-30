@@ -6,10 +6,31 @@ from typing import Any, Dict, List, Literal, Optional, TypedDict
 from pydantic import BaseModel, ConfigDict, Field
 
 
+class ColumnRef(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    alias: str
+    name: str
+
+
+class ForeignKey(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    column: str
+    referred_table: str
+    referred_column: str
+
+
+class TableInfo(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    name: str
+    alias: str
+    columns: List[str]
+    foreign_keys: List[ForeignKey] = Field(default_factory=list)
+
+
 class TableRef(BaseModel):
     model_config = ConfigDict(extra="forbid")
     name: str
-    alias: Optional[str] = None
+    alias: str  # Mandatory now
 
 
 class JoinSpec(BaseModel):
@@ -22,7 +43,7 @@ class JoinSpec(BaseModel):
 
 class FilterSpec(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    column: str
+    column: ColumnRef
     op: str
     value: str | int | float | bool
     logic: Optional[Literal["and", "or"]] = None
@@ -34,9 +55,17 @@ class AggregateSpec(BaseModel):
     alias: Optional[str] = None
 
 
-class OrderSpec(BaseModel):
+class HavingSpec(BaseModel):
     model_config = ConfigDict(extra="forbid")
     expr: str
+    op: str
+    value: str | int | float | bool
+    logic: Optional[Literal["and", "or"]] = None
+
+
+class OrderSpec(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    column: ColumnRef
     direction: Literal["asc", "desc"]
 
 
@@ -48,10 +77,7 @@ class GeneratedSQL(TypedDict):
 
 
 class SchemaInfo(BaseModel):
-    tables: List[str] = Field(default_factory=list)
-    columns: Dict[str, List[str]] = Field(default_factory=dict)
-    foreign_keys: Dict[str, List[Dict[str, Optional[str]]]] = Field(default_factory=dict)
-    aliases: Dict[str, str] = Field(default_factory=dict)
+    tables: List[TableInfo] = Field(default_factory=list)
 
 
 class IntentModel(BaseModel):
@@ -67,13 +93,12 @@ class PlanModel(BaseModel):
     tables: list[TableRef] = Field(default_factory=list)
     joins: list[JoinSpec] = Field(default_factory=list)
     filters: list[FilterSpec] = Field(default_factory=list)
-    group_by: list[str] = Field(default_factory=list)
+    group_by: list[ColumnRef] = Field(default_factory=list)
     aggregates: list[AggregateSpec] = Field(default_factory=list)
-    having: list[FilterSpec] = Field(default_factory=list)
+    having: list[HavingSpec] = Field(default_factory=list)
     order_by: list[OrderSpec] = Field(default_factory=list)
     limit: Optional[int] = None
-    select_columns: list[str] = Field(default_factory=list, description="List of columns to be selected in the final result (e.g. 't1.name'). MUST use the alias defined in 'tables'.")
-    needed_columns: list[str] = Field(default_factory=list, description="List of ALL columns referenced anywhere in the plan (SELECT, WHERE, JOIN, etc.). MUST use the alias defined in 'tables'. This is a superset of select_columns.")
+    select_columns: list[ColumnRef] = Field(default_factory=list, description="List of columns to be selected in the final result.")
     reasoning: Optional[str] = Field(None, description="Step-by-step reasoning for the plan choices")
 
 

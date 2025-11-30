@@ -2,21 +2,23 @@ import pytest
 from unittest.mock import MagicMock
 import json
 from nl2sql.nodes.planner import PlannerNode
-from nl2sql.schemas import GraphState, SchemaInfo, PlanModel
-
-
+from nl2sql.schemas import GraphState, SchemaInfo, PlanModel, TableInfo, TableRef, ColumnRef
 
 def test_planner_accepts_valid_columns():
     """Test that PlannerNode accepts valid plans."""
     schema_info = SchemaInfo(
-        tables=["users"],
-        columns={"users": ["id", "name"]}
+        tables=[TableInfo(name="users", alias="u", columns=["id", "name"])]
     )
     
     mock_llm = MagicMock()
     plan_data = {
-        "tables": [{"name": "users"}],
-        "needed_columns": ["users.id", "users.name"]
+        "tables": [{"name": "users", "alias": "u"}],
+        "select_columns": [{"alias": "u", "name": "name"}],
+        "filters": [],
+        "joins": [],
+        "group_by": [],
+        "order_by": [],
+        "aggregates": []
     }
     mock_plan = PlanModel(**plan_data)
     mock_llm.return_value = mock_plan

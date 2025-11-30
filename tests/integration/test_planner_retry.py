@@ -32,8 +32,7 @@ class TestPlannerRetry(unittest.TestCase):
         
         planner_success = PlanModel(
             tables=[{"name": "t1", "alias": "t1"}], 
-            needed_columns=["t1.col1"],
-            select_columns=["t1.col1"],
+            select_columns=[{"alias": "t1", "name": "col1"}],
             joins=[], filters=[], group_by=[], aggregates=[], having=[], order_by=[]
         )
         # Generator is non-AI

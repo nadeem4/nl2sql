@@ -20,24 +20,20 @@ class PlannerNode:
             state.errors.append("Planner LLM not provided; no plan generated.")
             return state
 
-        allowed_tables = ""
-        allowed_columns: Dict[str, Any] = {}
-        fk_text = ""
-        
+        schema_context = ""
         if state.schema_info:
-            # Format tables with aliases: "table_name (alias)"
-            tables_with_aliases = []
+            lines = []
             for tbl in state.schema_info.tables:
-                alias = state.schema_info.aliases.get(tbl, "")
-                if alias:
-                    tables_with_aliases.append(f"{tbl} ({alias})")
-                else:
-                    tables_with_aliases.append(tbl)
-            allowed_tables = ", ".join(tables_with_aliases)
-            
-            allowed_columns = state.schema_info.columns
-            if state.schema_info.foreign_keys:
-                fk_text = f"Foreign keys: {json.dumps(state.schema_info.foreign_keys)}\n"
+                # tbl is TableInfo
+                lines.append(f"Table: {tbl.name} (Alias: {tbl.alias})")
+                lines.append(f"  Columns: {', '.join(tbl.columns)}")
+                if tbl.foreign_keys:
+                    fk_strs = []
+                    for fk in tbl.foreign_keys:
+                        fk_strs.append(f"{fk.column} -> {fk.referred_table}.{fk.referred_column}")
+                    lines.append(f"  Foreign Keys: {', '.join(fk_strs)}")
+                lines.append("")
+            schema_context = "\n".join(lines)
 
         intent_context = ""
         if state.validation.get("intent"):
@@ -62,9 +58,7 @@ class PlannerNode:
 
         # No format instructions needed
         prompt = PLANNER_PROMPT.format(
-            allowed_tables=allowed_tables,
-            allowed_columns=json.dumps(allowed_columns),
-            fk_text=fk_text,
+            schema_context=schema_context,
             intent_context=intent_context,
             examples=PLANNER_EXAMPLES,
             feedback=feedback,

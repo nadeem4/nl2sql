@@ -20,8 +20,7 @@ class ValidatorNode:
         self.row_limit = row_limit
 
     def __call__(self, state: GraphState) -> GraphState:
-        # Clear errors from previous runs (Planner should have consumed them)
-        # But if we are looping, we want to start fresh validation.
+        # Clear errors from previous runs
         state.errors = []
 
         if not state.plan:
@@ -31,10 +30,10 @@ class ValidatorNode:
         if not state.schema_info:
             return state
 
-        schema_tables = set(state.schema_info.tables)
-        schema_cols = state.schema_info.columns
-        schema_aliases = state.schema_info.aliases
-
+        # Build schema lookup maps
+        schema_tables = {t.name for t in state.schema_info.tables}
+        schema_cols = {t.name: set(t.columns) for t in state.schema_info.tables}
+        
         # 1. Validate Tables and Aliases
         plan_aliases = {}
         for tbl in state.plan.get("tables", []):
@@ -45,50 +44,72 @@ class ValidatorNode:
                 state.errors.append(f"Table '{name}' does not exist in schema.")
                 continue
             
-            expected_alias = schema_aliases.get(name)
-            if alias != expected_alias:
-                state.errors.append(f"Table '{name}' must use alias '{expected_alias}', but found '{alias}'.")
-            
-            if alias:
-                plan_aliases[alias] = name
+            if not alias:
+                state.errors.append(f"Table '{name}' must have an alias.")
+                continue
+                
+            plan_aliases[alias] = name
 
-        # 2. Validate Columns (needed_columns)
-        # We expect columns to be in "alias.column" format
-        for col_ref in state.plan.get("needed_columns", []):
-            parts = col_ref.split(".")
-            if len(parts) != 2:
-                state.errors.append(f"Column '{col_ref}' is not properly qualified (expected 'alias.column').")
-                continue
+        # Helper to validate ColumnRef
+        def validate_column_ref(col_ref: dict, context: str):
+            alias = col_ref.get("alias")
+            name = col_ref.get("name")
             
-            alias, col_name = parts
+            if not alias or not name:
+                state.errors.append(f"Invalid column reference in {context}: {col_ref}")
+                return
+
             if alias not in plan_aliases:
-                state.errors.append(f"Alias '{alias}' in column '{col_ref}' is not defined in plan tables.")
-                continue
+                state.errors.append(f"Alias '{alias}' in {context} is not defined in plan tables.")
+                return
             
             table_name = plan_aliases[alias]
             if table_name in schema_cols:
-                if col_name not in schema_cols[table_name]:
-                    state.errors.append(f"Column '{col_name}' does not exist in table '{table_name}'.")
-            else:
-                # Should have been caught by table validation, but just in case
-                pass
+                if name not in schema_cols[table_name]:
+                    state.errors.append(f"Column '{name}' does not exist in table '{table_name}' (alias '{alias}').")
 
-        # 3. Validate Joins (check on_clause columns if possible, but they might be complex expressions)
-        # For now, we rely on needed_columns covering all used columns.
-        
-        # 4. Validate Filters (check column existence)
+        # 2. Validate Select Columns
+        for col in state.plan.get("select_columns", []):
+            validate_column_ref(col, "select_columns")
+
+        # 3. Validate Filters
         for flt in state.plan.get("filters", []):
-            col = flt.get("column")
-            if col and col not in state.plan.get("needed_columns", []):
-                 # It's okay if it's not in needed_columns if we don't strictly enforce it, 
-                 # but the prompt says "List EVERY column used".
-                 # Let's warn or error? The prompt says "List EVERY column".
-                 # Let's enforce it to be strict.
-                 state.errors.append(f"Filter column '{col}' missing from 'needed_columns'.")
+            validate_column_ref(flt.get("column"), "filters")
+
+        # 4. Validate Group By
+        for gb in state.plan.get("group_by", []):
+            validate_column_ref(gb, "group_by")
+
+        # 5. Validate Order By
+        for ob in state.plan.get("order_by", []):
+            validate_column_ref(ob.get("column"), "order_by")
+
+        # 6. Validate Joins
+        for join in state.plan.get("joins", []):
+            left = join.get("left")
+            right = join.get("right")
+            
+            # Check if left/right are valid table names present in the plan
+            plan_table_names = {t.get("name") for t in state.plan.get("tables", [])}
+            
+            if left not in plan_table_names:
+                 state.errors.append(f"Join left table '{left}' is not in plan tables.")
+            if right not in plan_table_names:
+                 state.errors.append(f"Join right table '{right}' is not in plan tables.")
+            
+            # Validate ON clause (skipped for now)
+            pass
+
+        # 7. Validate Aggregates
+        for agg in state.plan.get("aggregates", []):
+            if not agg.get("alias"):
+                state.errors.append(f"Aggregate expression '{agg.get('expr')}' missing alias.")
+
+        # 8. Validate Having
+        for hav in state.plan.get("having", []):
+            if not hav.get("expr"):
+                state.errors.append(f"Having clause missing expression: {hav}")
 
         return state
+            
 
-
-def _extract_limit(sql_text: str) -> int | None:
-    # Unused now, but keeping for reference or removal
-    return None
