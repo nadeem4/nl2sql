@@ -75,7 +75,22 @@ class PlannerNode:
             state.validation["planner_raw"] = plan_model.model_dump_json()
 
             # Validation is now done by ValidatorNode
-            state.plan = plan_model.model_dump()
+            plan_dump = plan_model.model_dump()
+            
+            # Propagate query_type from Intent if available, otherwise trust Planner or default
+            if state.validation.get("intent"):
+                try:
+                    intent_data = state.validation["intent"]
+                    if isinstance(intent_data, str):
+                        intent_data = json.loads(intent_data)
+                    
+                    # Force copy query_type from intent to plan to ensure consistency
+                    if "query_type" in intent_data:
+                        plan_dump["query_type"] = intent_data["query_type"]
+                except Exception:
+                    pass
+            
+            state.plan = plan_dump
             
         except Exception as exc:
             state.plan = None

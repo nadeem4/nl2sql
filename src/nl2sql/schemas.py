@@ -86,6 +86,8 @@ class IntentModel(BaseModel):
     filters: list[str] = Field(default_factory=list, description="List of filters or constraints extracted from the query")
     keywords: list[str] = Field(default_factory=list, description="List of technical keywords, synonyms, or likely table names")
     clarifications: list[str] = Field(default_factory=list, description="List of clarifying questions if the query is ambiguous")
+    query_expansion: list[str] = Field(default_factory=list, description="Expanded list of synonyms, related terms, and domain-specific keywords")
+    query_type: Literal["READ", "WRITE", "DDL", "UNKNOWN"] = Field("READ", description="Classification of the query intent")
 
 
 class PlanModel(BaseModel):
@@ -100,6 +102,7 @@ class PlanModel(BaseModel):
     limit: Optional[int] = None
     select_columns: list[ColumnRef] = Field(default_factory=list, description="List of columns to be selected in the final result.")
     reasoning: Optional[str] = Field(None, description="Step-by-step reasoning for the plan choices")
+    query_type: Literal["READ", "WRITE", "DDL", "UNKNOWN"] = Field("READ", description="Classification of the query intent")
 
 
 @dataclass
