@@ -34,6 +34,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--verbose", action="store_true", help="Show raw planner/generator outputs")
     parser.add_argument("--debug", action="store_true", help="Show output of each node in the graph")
     parser.add_argument("--show-thoughts", action="store_true", help="Show step-by-step reasoning from AI nodes")
+    parser.add_argument("--json-logs", action="store_true", help="Enable structured JSON logging")
+    parser.add_argument("--log-level", type=str, default=None, choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"], help="Set the logging level")
     
     # Benchmarking args
     parser.add_argument("--benchmark", action="store_true", help="Run in benchmark mode")
@@ -187,6 +189,7 @@ def _render_state(state: Dict[str, Any], registry: LLMRegistry | None = None, ve
         "Time": f"{total_time:.2f}s"
     })
     
+    # Fallback to repr
     print(_format_table(rows))
 
 
@@ -215,6 +218,21 @@ def _format_table(rows: List[Any]) -> str:
 
 def main() -> None:
     args = parse_args()
+    
+    # Configure logging
+    from nl2sql.logger import configure_logging
+    
+    level = "CRITICAL" # Default to silent
+    
+    if args.debug:
+        level = "DEBUG"
+    elif args.log_level:
+        level = args.log_level
+    elif args.json_logs:
+        level = "INFO" # Default to INFO if json logging is enabled but no level specified
+        
+    configure_logging(level=level, json_format=args.json_logs)
+
     profiles = load_profiles(args.config)
     profile = get_profile(profiles, args.id)
     engine = make_engine(profile)

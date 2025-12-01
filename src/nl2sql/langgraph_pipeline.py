@@ -39,12 +39,34 @@ def _wrap_graphstate(fn: Callable[[GraphState], GraphState], name: Optional[str]
             node_name = type(fn).__name__ if hasattr(fn, "__class__") else "node"
             
         import time
-        start = time.perf_counter()
-        with span(node_name):
-            gs = fn(gs)
-        duration = time.perf_counter() - start
+        from nl2sql.logger import get_logger
         
-        gs.latency[node_name] = duration
+        logger = get_logger(node_name)
+        
+        start = time.perf_counter()
+        try:
+            with span(node_name):
+                gs = fn(gs)
+            duration = time.perf_counter() - start
+            
+            gs.latency[node_name] = duration
+            
+            # Log success
+            logger.info(f"Node {node_name} completed", extra={
+                "node": node_name,
+                "duration_ms": duration * 1000,
+                "status": "success"
+            })
+            
+        except Exception as e:
+            duration = time.perf_counter() - start
+            logger.error(f"Node {node_name} failed: {e}", extra={
+                "node": node_name,
+                "duration_ms": duration * 1000,
+                "status": "error",
+                "error": str(e)
+            })
+            raise e
         
         return dataclasses.asdict(gs)
 
@@ -85,8 +107,7 @@ def build_graph(profile: DatasourceProfile, llm: Optional[LLMCallable] = None, l
     def planner_retry_node(state: Dict) -> Dict:
         gs = GraphState(**state)
         gs.retry_count += 1
-        # Clear errors to give Planner a fresh start
-        gs.errors = []
+        # Do NOT clear errors here, as they may contain Summarizer feedback
         return dataclasses.asdict(gs)
 
     def check_planner(state: Dict) -> str:
@@ -112,6 +133,9 @@ def build_graph(profile: DatasourceProfile, llm: Optional[LLMCallable] = None, l
                 return "end"
         return "ok"
 
+    from nl2sql.nodes.summarizer.node import SummarizerNode
+    summarizer = SummarizerNode(llm=node_llm("planner")) # Reuse planner LLM for now, or add "summarizer" to llm_map
+
     graph.add_node("intent", _wrap_graphstate(intent, "intent"))
     graph.add_node("schema", _wrap_graphstate(schema_node, "schema"))
     graph.add_node("planner", _wrap_graphstate(planner, "planner"))
@@ -119,6 +143,7 @@ def build_graph(profile: DatasourceProfile, llm: Optional[LLMCallable] = None, l
     graph.add_node("sql_generator", _wrap_graphstate(generator, "sql_generator"))
     graph.add_node("validator", _wrap_graphstate(validator, "validator"))
     graph.add_node("retry_handler", retry_node)
+    graph.add_node("summarizer", _wrap_graphstate(summarizer, "summarizer"))
     
     if execute:
         graph.add_node("executor", _wrap_graphstate(ExecutorNode(profile=profile), "executor"))
@@ -133,10 +158,12 @@ def build_graph(profile: DatasourceProfile, llm: Optional[LLMCallable] = None, l
         check_planner,
         {
             "ok": "validator",
-            "retry": "planner_retry",
+            "retry": "summarizer", # Was planner_retry
             "end": END
         }
     )
+    # Summarizer -> Planner Retry -> Planner
+    graph.add_edge("summarizer", "planner_retry")
     graph.add_edge("planner_retry", "planner")
 
     # Validator checks the Plan
@@ -150,7 +177,8 @@ def build_graph(profile: DatasourceProfile, llm: Optional[LLMCallable] = None, l
         }
     )
     # If validation fails, retry Planner (with feedback in state.errors)
-    graph.add_edge("retry_handler", "planner")
+    # Reroute through Summarizer
+    graph.add_edge("retry_handler", "summarizer")
     
     if execute:
         graph.add_edge("sql_generator", "executor")
@@ -179,7 +207,8 @@ def run_with_graph(profile: DatasourceProfile, user_query: str, llm: Optional[LL
         "schema": "schema",
         "planner": "planner",
         "validator": "validator",
-        "sql_generator": "generator"
+        "sql_generator": "generator",
+        "summarizer": "summarizer"
     }
 
     if debug or on_thought:
