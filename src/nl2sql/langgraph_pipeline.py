@@ -134,7 +134,7 @@ def build_graph(profile: DatasourceProfile, llm: Optional[LLMCallable] = None, l
         return "ok"
 
     from nl2sql.nodes.summarizer.node import SummarizerNode
-    summarizer = SummarizerNode(llm=node_llm("planner")) # Reuse planner LLM for now, or add "summarizer" to llm_map
+    summarizer = SummarizerNode(llm=node_llm("summarizer"))
 
     graph.add_node("intent", _wrap_graphstate(intent, "intent"))
     graph.add_node("schema", _wrap_graphstate(schema_node, "schema"))
@@ -216,22 +216,40 @@ def run_with_graph(profile: DatasourceProfile, user_query: str, llm: Optional[LL
             print("\n--- Starting Graph Execution (Debug Mode) ---")
         
         final_state = initial_state
-        for step in g.stream(initial_state):
-            for node_name, state_update in step.items():
-                if debug:
-                    print(f"\n--- Node: {node_name} ---")
-                    print(json.dumps(state_update, indent=2, default=str))
+        # Use stream_mode=["updates", "messages"] to get node-specific updates and token chunks
+        for mode, payload in g.stream(initial_state, stream_mode=["updates", "messages"]):
+            if mode == "updates":
+                # Payload is {node_name: state_update}
+                # This is much cleaner than "values" mode!
+                for node_name, state_update in payload.items():
+                    if debug:
+                        print(f"\n--- Node: {node_name} ---")
+                        print(json.dumps(state_update, indent=2, default=str))
+                    
+                    # Update final state
+                    final_state.update(state_update)
+
+                    # Trigger on_thought for node completion (logs/reasoning)
+                    # This handles non-streaming nodes or the final block of streaming nodes
+                    if on_thought:
+                        thought_key = node_map.get(node_name)
+                        if thought_key:
+                            thoughts = state_update.get("thoughts", {}).get(thought_key)
+                            if thoughts:
+                                on_thought(thought_key, thoughts)
+
+            elif mode == "messages":
+                # Payload is (chunk, metadata)
+                chunk, metadata = payload
+                # metadata contains "langgraph_node"
+                node_name = metadata.get("langgraph_node", "")
+                thought_key = node_map.get(node_name)
                 
-                # Streaming thoughts
-                if on_thought:
-                    thought_key = node_map.get(node_name)
-                    if thought_key:
-                        thoughts = state_update.get("thoughts", {}).get(thought_key)
-                        if thoughts:
-                            on_thought(thought_key, thoughts)
-                
-                # Update final state
-                final_state.update(state_update)
+                if thought_key and on_thought:
+                    # Check if it's content
+                    if hasattr(chunk, "content") and chunk.content:
+                        # Send token
+                        on_thought(thought_key, [chunk.content], token=True)
         
         if debug:
             print("\n--- Graph Execution Complete ---\n")

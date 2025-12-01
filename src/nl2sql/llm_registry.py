@@ -161,10 +161,17 @@ class LLMRegistry:
 
 
 
+    def summarizer_llm(self) -> LLMCallable:
+        # Summarizer returns raw text, so we use the base LLM wrapped for usage tracking
+        # We reuse the planner config for now, or we could add a specific 'summarizer' agent config
+        llm = self._base_llm("planner") 
+        return self._wrap_usage(llm, "summarizer")
+
     def llm_map(self) -> Dict[str, LLMCallable]:
         return {
             "intent": self.intent_llm(),
             "planner": self.planner_llm(),
             "generator": self.generator_llm(),
+            "summarizer": self.summarizer_llm(),
             "_default": self.intent_llm(),
         }

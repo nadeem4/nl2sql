@@ -381,10 +381,21 @@ def main() -> None:
         llm_map = registry.llm_map()
 
     # Define thought streamer
-    def stream_thoughts(node: str, logs: list[str]):
-        print(f"\n[{node.upper()}]")
-        for log in logs:
-            print(f"  {log}")
+    current_node = None
+    def stream_thoughts(node: str, logs: list[str], token: bool = False):
+        nonlocal current_node
+        if node != current_node:
+            if current_node:
+                print() # Newline after previous node
+            print(f"\n[{node.upper()}]")
+            current_node = node
+        
+        if token:
+            for log in logs:
+                print(log, end="", flush=True)
+        else:
+            for log in logs:
+                print(f"  {log}")
 
     if args.show_thoughts:
         print("\n--- Thought Process ---")
