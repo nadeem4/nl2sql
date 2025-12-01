@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 import json
@@ -9,17 +8,36 @@ from nl2sql.vector_store import SchemaVectorStore
 from nl2sql.datasource_config import DatasourceProfile
 from nl2sql.engine_factory import make_engine
 
+
 class SchemaNode:
     """
     Retrieves schema information (tables, columns, foreign keys) based on the user query.
+    
     Uses vector store for relevant table selection if available, otherwise retrieves all tables.
+    Also handles assigning aliases to tables and columns for the planner.
     """
 
     def __init__(self, profile: DatasourceProfile, vector_store: Optional[SchemaVectorStore] = None):
+        """
+        Initializes the SchemaNode.
+
+        Args:
+            profile: Database connection profile.
+            vector_store: Optional vector store for schema retrieval.
+        """
         self.profile = profile
         self.vector_store = vector_store
 
     def __call__(self, state: GraphState) -> GraphState:
+        """
+        Executes the schema retrieval step.
+
+        Args:
+            state: The current graph state.
+
+        Returns:
+            The updated graph state with schema information.
+        """
         engine = make_engine(self.profile)
         inspector = inspect(engine)
         all_tables = inspector.get_table_names()
@@ -71,7 +89,7 @@ class SchemaNode:
             fks = []
             
             try:
-                columns = [col["name"] for col in inspector.get_columns(table)]
+                columns = [f"{alias}.{col['name']}" for col in inspector.get_columns(table)]
                 
                 for fk in inspector.get_foreign_keys(table):
                     if not fk.get("referred_table"):

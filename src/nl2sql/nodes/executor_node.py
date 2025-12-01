@@ -8,10 +8,31 @@ from nl2sql.tracing import span
 
 
 class ExecutorNode:
+    """
+    Executes the generated SQL query against the target database.
+
+    Enforces read-only security checks before execution.
+    """
+
     def __init__(self, profile: DatasourceProfile):
+        """
+        Initializes the ExecutorNode.
+
+        Args:
+            profile: Database connection profile.
+        """
         self.profile = profile
 
     def __call__(self, state: GraphState) -> GraphState:
+        """
+        Executes the execution step.
+
+        Args:
+            state: The current graph state.
+
+        Returns:
+            The updated graph state with execution results.
+        """
         if not state.sql_draft:
             state.errors.append("No SQL to execute.")
             return state

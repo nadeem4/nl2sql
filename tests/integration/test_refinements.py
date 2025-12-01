@@ -16,30 +16,31 @@ class TestRefinements(unittest.TestCase):
         # Schema has t1(col1). We ask for col2.
         plan_invalid = PlanModel(
             tables=[{"name": "t1", "alias": "t1"}],
-            select_columns=[{"alias": "t1", "name": "col2"}], # Invalid
+            select_columns=[{"expr": "t1.col2"}], # Invalid
             filters=[],
             joins=[],
             group_by=[],
             order_by=[],
-            aggregates=[],
+            having=[],
             limit=10
         )
         
         # 3. Planner (2nd try): returns valid plan
         plan_valid = PlanModel(
             tables=[{"name": "t1", "alias": "t1"}],
-            select_columns=[{"alias": "t1", "name": "col1"}],
+            select_columns=[{"expr": "t1.col1"}],
             filters=[],
             joins=[],
             group_by=[],
             order_by=[],
-            aggregates=[],
+            having=[],
             limit=10
         )
         
         mock_llm.side_effect = [
             intent_model,
             plan_invalid,
+            "Fix the column error.", # Summarizer
             plan_valid
         ]
         
@@ -75,8 +76,8 @@ class TestRefinements(unittest.TestCase):
                 # Verify final SQL is valid
                 self.assertIsNotNone(result["sql_draft"])
                 self.assertIn("LIMIT", result["sql_draft"]["sql"])
-                # Verify LLM calls: Intent + Planner(1) + Planner(2) = 3
-                self.assertEqual(mock_llm.call_count, 3)
+                # Verify LLM calls: Intent + Planner(1) + Summarizer + Planner(2) = 4
+                self.assertEqual(mock_llm.call_count, 4)
 
     def test_intent_utilization_in_planner(self):
         mock_llm = MagicMock()
@@ -88,13 +89,13 @@ class TestRefinements(unittest.TestCase):
         # Planner returns valid plan
         # Planner returns valid plan
         plan_data = {
-            "tables": [{"name": "t1", "alias": "t"}],
-            "select_columns": [{"alias": "t", "name": "col1"}],
+            "tables": [{"name": "t1", "alias": "t1"}],
+            "select_columns": [{"expr": "t1.col1"}],
             "filters": [],
             "joins": [],
             "group_by": [],
             "order_by": [],
-            "aggregates": [],
+            "having": [],
             "limit": 10
         }
         plan_model = PlanModel(**plan_data)

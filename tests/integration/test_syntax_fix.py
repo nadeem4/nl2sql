@@ -10,19 +10,22 @@ class TestSyntaxFix(unittest.TestCase):
         # Plan requires ordering
         plan = {
             "tables": [{"name": "users", "alias": "u"}],
-            "order_by": [{"column": {"alias": "u", "name": "name"}, "direction": "asc"}],
+            "order_by": [{"column": {"expr": "u.name"}, "direction": "asc"}],
             "limit": 10,
-            "select_columns": [{"alias": "u", "name": "name"}],
+            "select_columns": [{"expr": "u.name"}],
             "filters": [],
             "joins": [],
             "group_by": [],
-            "aggregates": []
+            "having": []
         }
     
         state = GraphState(user_query="test", plan=plan)
         node = GeneratorNode(profile_engine="sqlite", row_limit=100)
         
         new_state = node(state)
+        
+        if new_state.errors:
+            print(f"Errors: {new_state.errors}")
         
         sql = new_state.sql_draft["sql"].lower()
         

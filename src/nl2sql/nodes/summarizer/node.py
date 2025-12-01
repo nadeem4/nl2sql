@@ -8,10 +8,31 @@ from nl2sql.nodes.summarizer.prompts import SUMMARIZER_PROMPT
 LLMCallable = Union[Callable[[str], str], Runnable]
 
 class SummarizerNode:
+    """
+    Analyzes validation errors and generates constructive feedback for the Planner.
+
+    Uses an LLM to look at the failed plan, the schema, and the errors to suggest fixes.
+    """
+
     def __init__(self, llm: Optional[LLMCallable] = None):
+        """
+        Initializes the SummarizerNode.
+
+        Args:
+            llm: The language model to use for summarization.
+        """
         self.llm = llm
 
     def __call__(self, state: GraphState) -> GraphState:
+        """
+        Executes the summarization step.
+
+        Args:
+            state: The current graph state.
+
+        Returns:
+            The updated graph state with refined error messages (feedback).
+        """
         if not self.llm:
             state.errors.append("Summarizer LLM not provided.")
             return state
@@ -47,10 +68,8 @@ class SummarizerNode:
             else:
                 feedback = self.llm(prompt)
             
-       
             state.errors = [feedback]
             
-            # Log thought
             if "summarizer" not in state.thoughts:
                 state.thoughts["summarizer"] = []
             state.thoughts["summarizer"].append(feedback)

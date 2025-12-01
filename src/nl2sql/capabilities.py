@@ -6,6 +6,17 @@ from typing import Dict
 
 @dataclass(frozen=True)
 class EngineCapabilities:
+    """
+    Defines the capabilities and dialect specifics of a database engine.
+
+    Attributes:
+        dialect: The SQL dialect name (e.g., "sqlite", "postgres").
+        limit_syntax: Syntax for limiting rows (e.g., "limit", "top", "fetch").
+        supports_ilike: Whether the engine supports ILIKE for case-insensitive matching.
+        identifier_quote: Character used to quote identifiers (e.g., ", `).
+        supports_datetime_funcs: Whether standard datetime functions are supported.
+        supports_dry_run: Whether the engine supports dry-run validation.
+    """
     dialect: str
     limit_syntax: str  # e.g., "limit", "top", "fetch"
     supports_ilike: bool
@@ -51,6 +62,18 @@ DEFAULT_CAPABILITIES: Dict[str, EngineCapabilities] = {
 
 
 def get_capabilities(engine: str) -> EngineCapabilities:
+    """
+    Retrieves capabilities for a given database engine.
+
+    Args:
+        engine: The database engine name (e.g., "postgres", "sqlite").
+
+    Returns:
+        The EngineCapabilities object.
+
+    Raises:
+        KeyError: If the engine is not supported.
+    """
     key = engine.lower()
     if key in {"postgresql"}:
         key = "postgres"

@@ -32,15 +32,20 @@ class TestPlannerRetry(unittest.TestCase):
         
         planner_success = PlanModel(
             tables=[{"name": "t1", "alias": "t1"}], 
-            select_columns=[{"alias": "t1", "name": "col1"}],
-            joins=[], filters=[], group_by=[], aggregates=[], having=[], order_by=[]
+            select_columns=[{"expr": "t1.col1"}],
+            joins=[], filters=[], group_by=[], having=[], order_by=[]
         )
         # Generator is non-AI
         
+        # Summarizer response (mocked string)
+        summarizer_resp = "Fix the errors."
+
         mock_llm.side_effect = [
             intent_resp,
             planner_fail_1,
+            summarizer_resp, # Summarizer consumes this
             planner_fail_2,
+            summarizer_resp, # Summarizer consumes this
             planner_success
         ]
         
@@ -69,6 +74,9 @@ class TestPlannerRetry(unittest.TestCase):
             
             result = graph.invoke(initial_state)
             
+            if result.get("errors"):
+                print(f"Errors: {result['errors']}")
+            
             # Verify retry count increased (failed twice, so retry_count should be 2)
             self.assertEqual(result["retry_count"], 2)
             
@@ -79,8 +87,8 @@ class TestPlannerRetry(unittest.TestCase):
             # Verify generator ran
             self.assertIsNotNone(result["sql_draft"])
             
-            # Verify LLM call count: 1 intent + 3 planner = 4
-            self.assertEqual(mock_llm.call_count, 4)
+            # Verify LLM call count: 1 intent + 3 planner + 2 summarizer = 6
+            self.assertEqual(mock_llm.call_count, 6)
 
 if __name__ == "__main__":
     unittest.main()

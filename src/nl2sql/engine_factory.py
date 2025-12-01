@@ -11,13 +11,22 @@ from nl2sql.datasource_config import DatasourceProfile
 
 
 class UnsupportedEngineError(ValueError):
+    """Raised when the requested database engine is not supported."""
     pass
 
 
 def make_engine(profile: DatasourceProfile) -> Engine:
     """
     Create a SQLAlchemy engine based on the datasource profile.
-    Starts with SQLite; other engines can be added by branching on profile.engine.
+
+    Args:
+        profile: The datasource configuration profile.
+
+    Returns:
+        A SQLAlchemy Engine instance.
+
+    Raises:
+        UnsupportedEngineError: If the engine type is not supported.
     """
     engine = profile.engine.lower()
     if engine == "sqlite":
@@ -50,7 +59,7 @@ def make_engine(profile: DatasourceProfile) -> Engine:
 
 
 def _normalize_sql(sql: str) -> str:
-    # Strip whitespace and trailing semicolons to avoid sqlite multi-statement errors.
+    """Strips whitespace and trailing semicolons."""
     return sql.strip().rstrip(";")
 
 
@@ -58,7 +67,18 @@ def run_read_query(
     engine: Engine, sql: str, params: Dict[str, Any] | None = None, row_limit: int = 1000
 ):
     """
-    Execute a read-only query with a row limit safeguard. Removes trailing semicolons before applying LIMIT.
+    Execute a read-only query with a row limit safeguard.
+
+    Removes trailing semicolons before applying LIMIT to avoid syntax errors.
+
+    Args:
+        engine: The SQLAlchemy engine.
+        sql: The SQL query string.
+        params: Optional query parameters.
+        row_limit: Maximum number of rows to return.
+
+    Returns:
+        A list of result rows.
     """
     params = params or {}
     cleaned = _normalize_sql(sql)

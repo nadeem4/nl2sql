@@ -12,7 +12,22 @@ from sqlalchemy import inspect, Engine
 from nl2sql.settings import settings
 
 class SchemaVectorStore:
+    """
+    Manages vector indexing and retrieval of database schema information.
+
+    Uses ChromaDB to store embeddings of table schemas (columns, comments, foreign keys)
+    to allow semantic search for relevant tables based on user queries.
+    """
+
     def __init__(self, collection_name: str = "schema_store", embeddings: Optional[Embeddings] = None, persist_directory: str = "./chroma_db"):
+        """
+        Initializes the SchemaVectorStore.
+
+        Args:
+            collection_name: Name of the ChromaDB collection.
+            embeddings: Embedding model to use (defaults to OpenAIEmbeddings).
+            persist_directory: Directory to persist the vector store.
+        """
         self.collection_name = collection_name
         self.embeddings = embeddings or OpenAIEmbeddings(api_key=settings.openai_api_key)
         self.persist_directory = persist_directory
@@ -23,7 +38,12 @@ class SchemaVectorStore:
         )
 
     def is_empty(self) -> bool:
-        """Returns True if the vector store collection is empty."""
+        """
+        Checks if the vector store collection is empty.
+
+        Returns:
+            True if empty, False otherwise.
+        """
         try:
             # Access the underlying Chroma collection to get count
             return self.vectorstore._collection.count() == 0
@@ -34,6 +54,11 @@ class SchemaVectorStore:
     def index_schema(self, engine: Engine):
         """
         Introspects the database and indexes table schemas into the vector store.
+
+        This clears the existing collection and rebuilds it from the current database schema.
+
+        Args:
+            engine: SQLAlchemy engine for the database to index.
         """
         inspector = inspect(engine)
         tables = inspector.get_table_names()
@@ -89,7 +114,14 @@ class SchemaVectorStore:
 
     def retrieve(self, query: str, k: int = 5) -> List[str]:
         """
-        Returns a list of relevant table names based on the query.
+        Retrieves relevant table names based on a natural language query.
+
+        Args:
+            query: The user's query string.
+            k: Number of relevant tables to retrieve.
+
+        Returns:
+            List of table names.
         """
         docs = self.vectorstore.similarity_search(query, k=k)
         return [doc.metadata["table_name"] for doc in docs]

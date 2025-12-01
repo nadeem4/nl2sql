@@ -46,9 +46,10 @@ class TestArchRefactor(unittest.TestCase):
         )
         
         # Planner Node Output (should copy query_type)
+        # SchemaNode generates 't1' for the first table 'users'
         plan_out = PlanModel(
-            tables=[TableRef(name="users", alias="u")],
-            select_columns=[ColumnRef(name="id", alias="u")],
+            tables=[TableRef(name="users", alias="t1")],
+            select_columns=[ColumnRef(expr="t1.id")],
             query_type="WRITE" # Planner copies this
         )
         
@@ -65,10 +66,6 @@ class TestArchRefactor(unittest.TestCase):
         # Verify
         self.assertTrue(result["errors"])
         self.assertTrue(any("Security Violation" in e for e in result["errors"]))
-        # Should not have proceeded to generator (sql_draft should be None or empty if validator failed)
-        # Actually validator runs before generator. If validator fails, it goes to check_validation.
-        # check_validation returns "end" for Security Violation.
-        # So sql_generator should NOT be called.
         self.assertIsNone(result.get("sql_draft"))
 
     def test_read_query_allowed(self):
@@ -83,9 +80,10 @@ class TestArchRefactor(unittest.TestCase):
         )
         
         # Planner Node Output
+        # SchemaNode generates 't1' for the first table 'users'
         plan_out = PlanModel(
-            tables=[TableRef(name="users", alias="u")],
-            select_columns=[ColumnRef(name="id", alias="u")],
+            tables=[TableRef(name="users", alias="t1")],
+            select_columns=[ColumnRef(expr="t1.id")],
             query_type="READ"
         )
         

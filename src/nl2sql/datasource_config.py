@@ -7,6 +7,16 @@ from typing import Any, Dict, List, Optional
 
 @dataclasses.dataclass
 class FeatureFlags:
+    """
+    Configuration flags for database capabilities and safety features.
+
+    Attributes:
+        allow_generate_writes: If True, allows generation of DML/DDL (DANGEROUS).
+        allow_cross_db: If True, allows cross-database queries (if supported).
+        supports_dry_run: If True, engine supports dry-run validation.
+        supports_estimated_cost: If True, engine supports cost estimation.
+        sample_rows_enabled: If True, allows fetching sample rows.
+    """
     allow_generate_writes: bool = False
     allow_cross_db: bool = False
     supports_dry_run: bool = False
@@ -16,6 +26,21 @@ class FeatureFlags:
 
 @dataclasses.dataclass
 class DatasourceProfile:
+    """
+    Configuration profile for a data source.
+
+    Attributes:
+        id: Unique identifier for the profile.
+        engine: Database engine type (e.g., "sqlite", "postgres").
+        sqlalchemy_url: SQLAlchemy connection string.
+        auth: Optional authentication details.
+        read_only_role: Optional role to assume for read-only access.
+        statement_timeout_ms: Timeout for queries in milliseconds.
+        row_limit: Maximum number of rows to return.
+        max_bytes: Maximum response size in bytes.
+        tags: Metadata tags.
+        feature_flags: Capability flags.
+    """
     id: str
     engine: str
     sqlalchemy_url: str
@@ -29,6 +54,7 @@ class DatasourceProfile:
 
 
 def _to_feature_flags(raw: Optional[Dict[str, Any]]) -> FeatureFlags:
+    """Parses feature flags from a dictionary."""
     if not raw:
         return FeatureFlags()
     return FeatureFlags(
@@ -41,6 +67,7 @@ def _to_feature_flags(raw: Optional[Dict[str, Any]]) -> FeatureFlags:
 
 
 def _to_profile(raw: Dict[str, Any]) -> DatasourceProfile:
+    """Parses a datasource profile from a dictionary."""
     return DatasourceProfile(
         id=raw["id"],
         engine=raw["engine"],
@@ -57,7 +84,18 @@ def _to_profile(raw: Dict[str, Any]) -> DatasourceProfile:
 
 def load_profiles(path: pathlib.Path) -> Dict[str, DatasourceProfile]:
     """
-    Load datasource profiles from a YAML file. Returns a dict keyed by profile id.
+    Load datasource profiles from a YAML file.
+
+    Args:
+        path: Path to the YAML configuration file.
+
+    Returns:
+        A dictionary mapping profile IDs to DatasourceProfile objects.
+
+    Raises:
+        RuntimeError: If PyYAML is not installed.
+        FileNotFoundError: If the config file does not exist.
+        ValueError: If the config format is invalid.
     """
     try:
         import yaml
@@ -79,6 +117,19 @@ def load_profiles(path: pathlib.Path) -> Dict[str, DatasourceProfile]:
 
 
 def get_profile(profiles: Dict[str, DatasourceProfile], profile_id: str) -> DatasourceProfile:
+    """
+    Retrieves a profile by ID.
+
+    Args:
+        profiles: Dictionary of available profiles.
+        profile_id: ID of the profile to retrieve.
+
+    Returns:
+        The requested DatasourceProfile.
+
+    Raises:
+        KeyError: If the profile ID is not found.
+    """
     try:
         return profiles[profile_id]
     except KeyError as exc:

@@ -9,9 +9,11 @@ class TestGeneratorHaving(unittest.TestCase):
         """
         plan = {
             "tables": [{"name": "orders", "alias": "o"}],
-            "select_columns": [{"alias": "o", "name": "user_id"}],
-            "group_by": [{"alias": "o", "name": "user_id"}],
-            "aggregates": [{"expr": "COUNT(*)", "alias": "cnt"}],
+            "select_columns": [
+                {"expr": "o.user_id"},
+                {"expr": "COUNT(*)", "alias": "cnt", "is_derived": True}
+            ],
+            "group_by": ["o.user_id"],
             "having": [{"expr": "COUNT(*)", "op": ">", "value": 5}],
             "filters": [],
             "joins": [],
@@ -22,6 +24,9 @@ class TestGeneratorHaving(unittest.TestCase):
         node = GeneratorNode(profile_engine="sqlite", row_limit=100)
         
         new_state = node(state)
+        
+        if new_state.errors:
+            print(f"Errors: {new_state.errors}")
         
         sql = new_state.sql_draft["sql"].lower()
         
@@ -34,9 +39,11 @@ class TestGeneratorHaving(unittest.TestCase):
         """
         plan = {
             "tables": [{"name": "orders", "alias": "o"}],
-            "select_columns": [{"alias": "o", "name": "user_id"}],
-            "group_by": [{"alias": "o", "name": "user_id"}],
-            "aggregates": [{"expr": "COUNT(*)", "alias": "cnt"}],
+            "select_columns": [
+                {"expr": "o.user_id"},
+                {"expr": "COUNT(*)", "alias": "cnt", "is_derived": True}
+            ],
+            "group_by": ["o.user_id"],
             "having": [{"expr": "cnt", "op": ">", "value": 10}],
             "filters": [],
             "joins": [],
@@ -47,6 +54,9 @@ class TestGeneratorHaving(unittest.TestCase):
         node = GeneratorNode(profile_engine="sqlite", row_limit=100)
         
         new_state = node(state)
+        
+        if new_state.errors:
+            print(f"Errors: {new_state.errors}")
         
         sql = new_state.sql_draft["sql"].lower()
         

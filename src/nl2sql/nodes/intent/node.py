@@ -9,15 +9,33 @@ from nl2sql.nodes.intent.prompts import INTENT_PROMPT
 
 LLMCallable = Union[Callable[[str], str], Runnable]
 
+
 class IntentNode:
     """
-    Intent analysis using Pydantic for structured output.
+    Analyzes the user's natural language query to extract intent, keywords, and entities.
+
+    Uses an LLM to produce a structured `IntentModel` which guides downstream schema retrieval and planning.
     """
 
     def __init__(self, llm: Optional[LLMCallable] = None):
+        """
+        Initializes the IntentNode.
+
+        Args:
+            llm: The language model to use for intent analysis.
+        """
         self.llm = llm
 
     def __call__(self, state: GraphState) -> GraphState:
+        """
+        Executes the intent analysis step.
+
+        Args:
+            state: The current graph state.
+
+        Returns:
+            The updated graph state with extracted intent information.
+        """
         if not self.llm:
             state.validation["intent_stub"] = "No-op intent analysis"
             return state

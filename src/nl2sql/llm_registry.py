@@ -2,26 +2,28 @@ from __future__ import annotations
 
 import dataclasses
 import pathlib
-from typing import Callable, Dict, Optional, List
+from typing import Callable, Dict, Optional, List, Any
 
 import yaml
 from langchain_openai import ChatOpenAI
 from nl2sql.settings import settings
-
-
-
-
-
 
 # Track token usage per run: list of {agent, model, prompt_tokens, completion_tokens, total_tokens}
 TOKEN_LOG: List[Dict[str, object]] = []
 
 
 def reset_usage() -> None:
+    """Resets the token usage log."""
     TOKEN_LOG.clear()
 
 
 def get_usage_summary() -> Dict[str, Dict[str, int]]:
+    """
+    Aggregates token usage by agent:model.
+
+    Returns:
+        A dictionary mapping "agent:model" keys to token counts.
+    """
     totals = {"_all": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}}
     for entry in TOKEN_LOG:
         agent = entry.get("agent", "unknown")
@@ -41,6 +43,7 @@ LLMCallable = Callable[[str], str]
 
 @dataclasses.dataclass
 class AgentConfig:
+    """Configuration for a specific agent's LLM."""
     provider: str
     model: str
     temperature: float = 0
@@ -49,11 +52,21 @@ class AgentConfig:
 
 @dataclasses.dataclass
 class LLMConfig:
+    """Global LLM configuration."""
     default: AgentConfig
     agents: Dict[str, AgentConfig]
 
 
 def parse_llm_config(data: Dict) -> LLMConfig:
+    """
+    Parses raw dictionary configuration into LLMConfig.
+
+    Args:
+        data: Raw configuration dictionary.
+
+    Returns:
+        LLMConfig object.
+    """
     default_cfg = data.get("default", {})
     agents_cfg = data.get("agents", {})
 
@@ -73,6 +86,15 @@ def parse_llm_config(data: Dict) -> LLMConfig:
 
 
 def load_llm_config(path: pathlib.Path) -> LLMConfig:
+    """
+    Loads LLM configuration from a YAML file.
+
+    Args:
+        path: Path to the YAML config file.
+
+    Returns:
+        LLMConfig object.
+    """
     if not path.exists():
         raise FileNotFoundError(f"LLM config not found: {path}")
     data = yaml.safe_load(path.read_text()) or {}
@@ -80,7 +102,25 @@ def load_llm_config(path: pathlib.Path) -> LLMConfig:
 
 
 class LLMRegistry:
+    """
+    Manages LLM instances and configurations for different agents.
+    
+    Handles:
+    - Loading configuration.
+    - Instantiating LLMs (currently only OpenAI).
+    - Wrapping LLMs for token usage tracking.
+    - Enforcing structured output for specific agents.
+    """
+
     def __init__(self, config: LLMConfig, engine, row_limit: int):
+        """
+        Initializes the LLMRegistry.
+
+        Args:
+            config: LLM configuration.
+            engine: Database engine type (unused here but kept for interface consistency).
+            row_limit: Row limit (unused here but kept for interface consistency).
+        """
         self.config = config
         self.engine = engine
 
@@ -145,29 +185,32 @@ class LLMRegistry:
         return call
 
     def intent_llm(self) -> LLMCallable:
+        """Returns the LLM callable for the Intent agent."""
         from nl2sql.schemas import IntentModel
         llm = self._base_llm("intent")
         return self._wrap_structured_usage(llm, "intent", IntentModel)
 
     def planner_llm(self) -> LLMCallable:
+        """Returns the LLM callable for the Planner agent."""
         from nl2sql.schemas import PlanModel
         llm = self._base_llm("planner")
         return self._wrap_structured_usage(llm, "planner", PlanModel)
 
     def generator_llm(self) -> LLMCallable:
+        """Returns the LLM callable for the Generator agent."""
         from nl2sql.schemas import SQLModel
         llm = self._base_llm("generator")
         return self._wrap_structured_usage(llm, "generator", SQLModel)
 
-
-
     def summarizer_llm(self) -> LLMCallable:
+        """Returns the LLM callable for the Summarizer agent."""
         # Summarizer returns raw text, so we use the base LLM wrapped for usage tracking
         # We reuse the planner config for now, or we could add a specific 'summarizer' agent config
         llm = self._base_llm("planner") 
         return self._wrap_usage(llm, "summarizer")
 
     def llm_map(self) -> Dict[str, LLMCallable]:
+        """Returns a dictionary of all agent LLM callables."""
         return {
             "intent": self.intent_llm(),
             "planner": self.planner_llm(),

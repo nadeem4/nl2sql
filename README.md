@@ -239,22 +239,18 @@ Keys are taken from config or `OPENAI_API_KEY`.
 flowchart TD
   user["User Query"] --> intent["Intention (AI)"]
   intent --> schema["Schema (non-AI)"]
-  schema --> planner["Planner (AI)"]
-  planner --> validator["Validator (non-AI)"]
+  schema --> planning["Planning Subgraph"]
+  
+  subgraph Planning Subgraph
+    planner["Planner (AI)"] --> validator["Validator (non-AI)"]
+    validator -- Invalid --> summarizer["Summarizer (AI)"]
+    summarizer --> planner
+  end
+  
   validator -- Valid --> generator["SQL Generator (non-AI)"]
-  validator -- Invalid --> summarizer["Summarizer (AI)"]
-  summarizer --> planner
   generator --> executor["Executor (non-AI)"]
   executor --> answer["Answer/Result Sample"]
-  subgraph Agents
-    intent
-    schema
-    planner
-    validator
-    summarizer
-    generator
-    executor
-  end
+  
   style user fill:#f6f8fa,stroke:#aaa
   style answer fill:#f6f8fa,stroke:#aaa
 ```

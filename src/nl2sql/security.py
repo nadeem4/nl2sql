@@ -4,14 +4,20 @@ from sqlglot import expressions as exp
 def enforce_read_only(sql: str) -> bool:
     """
     Checks if the SQL query is strictly read-only using sqlglot AST analysis.
-    Returns True if the query contains only SELECT statements (and CTEs), False otherwise.
+
+    Ensures that the query contains only SELECT statements (including CTEs and UNIONs)
+    and does not contain any DML or DDL statements.
+
+    Args:
+        sql: The SQL query string to validate.
+
+    Returns:
+        True if the query is read-only, False otherwise.
     """
     try:
         statements = sqlglot.parse(sql)
         
         for statement in statements:
-    
-            
             # Allow: SELECT, UNION, WITH (CTE) followed by SELECT
             if not isinstance(statement, (exp.Select, exp.Union, exp.Subquery)):
                 return False

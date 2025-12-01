@@ -7,18 +7,18 @@ from nl2sql.schemas import GraphState, SchemaInfo, PlanModel, TableInfo, TableRe
 def test_planner_accepts_valid_columns():
     """Test that PlannerNode accepts valid plans."""
     schema_info = SchemaInfo(
-        tables=[TableInfo(name="users", alias="u", columns=["id", "name"])]
+        tables=[TableInfo(name="users", alias="u", columns=["u.id", "u.name"])]
     )
     
     mock_llm = MagicMock()
     plan_data = {
         "tables": [{"name": "users", "alias": "u"}],
-        "select_columns": [{"alias": "u", "name": "name"}],
+        "select_columns": [{"expr": "u.name"}],
         "filters": [],
         "joins": [],
         "group_by": [],
         "order_by": [],
-        "aggregates": []
+        "having": []
     }
     mock_plan = PlanModel(**plan_data)
     mock_llm.return_value = mock_plan

@@ -13,13 +13,32 @@ from nl2sql.schemas import GeneratedSQL, GraphState, SQLModel
 class GeneratorNode:
     """
     SQL generator node with dialect awareness and guardrails.
+
+    Converts the abstract `PlanModel` into a concrete SQL query string,
+    handling dialect-specific syntax and enforcing row limits.
     """
 
     def __init__(self, profile_engine: str, row_limit: int):
+        """
+        Initializes the GeneratorNode.
+
+        Args:
+            profile_engine: The target database dialect (e.g., "sqlite", "postgres").
+            row_limit: The maximum number of rows to return.
+        """
         self.profile_engine = profile_engine
         self.row_limit = row_limit
 
     def __call__(self, state: GraphState) -> GraphState:
+        """
+        Executes the SQL generation step.
+
+        Args:
+            state: The current graph state.
+
+        Returns:
+            The updated graph state with the generated SQL draft.
+        """
         caps: EngineCapabilities = get_capabilities(self.profile_engine)
         if not state.plan:
             state.errors.append("No plan to generate SQL from.")
@@ -36,7 +55,6 @@ class GeneratorNode:
         try:
             final_sql = self._generate_sql_from_plan(state.plan, limit)
             
-            # Populate thoughts
             if "generator" not in state.thoughts:
                 state.thoughts["generator"] = []
             
@@ -57,6 +75,16 @@ class GeneratorNode:
         return state
 
     def _generate_sql_from_plan(self, plan: dict, limit: int) -> str:
+        """
+        Generates SQL string from the plan dictionary.
+
+        Args:
+            plan: The execution plan.
+            limit: The row limit to enforce.
+
+        Returns:
+            The generated SQL string.
+        """
         tables = plan.get("tables", [])
         if not tables:
             raise ValueError("No tables in plan.")
@@ -80,38 +108,51 @@ class GeneratorNode:
         final_sql = query.sql(dialect=target_dialect)
         return final_sql
 
-    def _to_col(self, col_ref: dict) -> exp.Column:
-        return exp.Column(
-            this=exp.Identifier(this=col_ref["name"], quoted=False),
-            table=exp.Identifier(this=col_ref["alias"], quoted=False)
-        )
+    def _to_col(self, col_ref: dict) -> exp.Column | exp.Expression:
+        """
+        Converts a ColumnRef dictionary to a sqlglot expression.
+
+        Args:
+            col_ref: The column reference dictionary.
+
+        Returns:
+            A sqlglot Column or Expression object.
+        """
+        # col_ref has "expr", "alias" (optional), "is_derived"
+        expr_str = col_ref["expr"]
+        expr = sqlglot.parse_one(expr_str)
+        
+        # If it's a select column and has an alias, we handle it in _build_select usually,
+        # but _to_col is used in other places too.
+        # However, alias is ONLY for select_columns now.
+        # So _to_col just returns the expression object.
+        return expr
 
     def _build_select(self, query: exp.Select, plan: dict) -> exp.Select:
+        """Builds the SELECT clause."""
         select_cols = plan.get("select_columns", [])
-        aggregates = plan.get("aggregates", [])
         
-        if not select_cols and not aggregates:
+        if not select_cols:
             # Fallback if no columns specified (shouldn't happen with valid plan)
             pass
 
         for col in select_cols:
-            query = query.select(self._to_col(col))
-        
-        for agg in aggregates:
-            expr = sqlglot.parse_one(agg["expr"])
-            if agg.get("alias"):
-                expr = exp.Alias(this=expr, alias=exp.Identifier(this=agg["alias"], quoted=False))
+            expr = self._to_col(col)
+            if col.get("alias"):
+                 expr = exp.Alias(this=expr, alias=exp.Identifier(this=col["alias"], quoted=False))
             query = query.select(expr)
         
         return query
 
     def _build_from(self, query: exp.Select, main_table: dict) -> exp.Select:
+        """Builds the FROM clause."""
         main_tbl_exp = sqlglot.to_table(main_table["name"])
         if main_table.get("alias"):
             main_tbl_exp.set("alias", exp.TableAlias(this=exp.Identifier(this=main_table["alias"], quoted=False)))
         return query.from_(main_tbl_exp)
 
     def _build_joins(self, query: exp.Select, plan: dict, tables: list) -> exp.Select:
+        """Builds the JOIN clauses."""
         for join in plan.get("joins", []):
             right_tbl_name = join["right"]
             right_alias = None
@@ -134,6 +175,7 @@ class GeneratorNode:
         return query
 
     def _build_where(self, query: exp.Select, plan: dict) -> exp.Select:
+        """Builds the WHERE clause."""
         filters = plan.get("filters", [])
         if filters:
             where_cond = None
@@ -179,11 +221,18 @@ class GeneratorNode:
         return query
 
     def _build_group_by(self, query: exp.Select, plan: dict) -> exp.Select:
+        """Builds the GROUP BY clause."""
         for gb in plan.get("group_by", []):
-            query = query.group_by(self._to_col(gb))
+            # gb is a ColumnRef dict or string
+            if isinstance(gb, dict):
+                expr = gb["expr"]
+            else:
+                expr = gb
+            query = query.group_by(sqlglot.parse_one(expr))
         return query
 
     def _build_having(self, query: exp.Select, plan: dict) -> exp.Select:
+        """Builds the HAVING clause."""
         having = plan.get("having", [])
         if having:
             having_cond = None
@@ -228,6 +277,7 @@ class GeneratorNode:
         return query
 
     def _build_order_by(self, query: exp.Select, plan: dict) -> exp.Select:
+        """Builds the ORDER BY clause."""
         for ob in plan.get("order_by", []):
             query = query.order_by(self._to_col(ob["column"]), desc=(ob["direction"].lower() == "desc"))
         return query

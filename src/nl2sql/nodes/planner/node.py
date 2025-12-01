@@ -12,10 +12,32 @@ LLMCallable = Union[Callable[[str], str], Runnable]
 
 
 class PlannerNode:
+    """
+    Generates a high-level execution plan from the user query.
+
+    Uses an LLM to interpret the user's intent and map it to the database schema,
+    producing a structured `PlanModel`.
+    """
+
     def __init__(self, llm: Optional[LLMCallable] = None):
+        """
+        Initializes the PlannerNode.
+
+        Args:
+            llm: The language model to use for planning.
+        """
         self.llm = llm
 
     def __call__(self, state: GraphState) -> GraphState:
+        """
+        Executes the planning step.
+
+        Args:
+            state: The current graph state.
+
+        Returns:
+            The updated graph state with the generated plan.
+        """
         if not self.llm:
             state.errors.append("Planner LLM not provided; no plan generated.")
             return state
@@ -24,7 +46,6 @@ class PlannerNode:
         if state.schema_info:
             lines = []
             for tbl in state.schema_info.tables:
-                # tbl is TableInfo
                 lines.append(f"Table: {tbl.name} (Alias: {tbl.alias})")
                 lines.append(f"  Columns: {', '.join(tbl.columns)}")
                 if tbl.foreign_keys:
@@ -42,21 +63,17 @@ class PlannerNode:
                 if isinstance(intent_data, str):
                     intent_data = json.loads(intent_data)
                     
-                # Use json.dumps to ensure safe string representation
                 intent_context = f"Extracted Intent: {json.dumps(intent_data)}\n"
             except Exception:
                 pass
 
-        # Handle feedback from previous validation
         feedback = ""
         if state.errors:
             feedback = f"[FEEDBACK]\nThe previous plan was invalid. Fix the following errors:\n"
             for err in state.errors:
                 feedback += f"- {err}\n"
-            # Clear errors after consuming them for feedback
             state.errors = []
 
-        # No format instructions needed
         prompt = PLANNER_PROMPT.format(
             schema_context=schema_context,
             intent_context=intent_context,
@@ -71,20 +88,16 @@ class PlannerNode:
             else:
                 plan_model = self.llm(prompt)
             
-            # For debugging/logging
             state.validation["planner_raw"] = plan_model.model_dump_json()
 
-            # Validation is now done by ValidatorNode
             plan_dump = plan_model.model_dump()
             
-            # Propagate query_type from Intent if available, otherwise trust Planner or default
             if state.validation.get("intent"):
                 try:
                     intent_data = state.validation["intent"]
                     if isinstance(intent_data, str):
                         intent_data = json.loads(intent_data)
                     
-                    # Force copy query_type from intent to plan to ensure consistency
                     if "query_type" in intent_data:
                         plan_dump["query_type"] = intent_data["query_type"]
                 except Exception:
@@ -92,7 +105,6 @@ class PlannerNode:
             
             state.plan = plan_dump
             
-            # Populate thoughts
             if "planner" not in state.thoughts:
                 state.thoughts["planner"] = []
             
@@ -103,5 +115,5 @@ class PlannerNode:
             
         except Exception as exc:
             state.plan = None
-            state.errors.append(f"Planner failed. Error: {exc}")
+            state.errors.append(f"Planner failed. Error: {repr(exc)}")
         return state
