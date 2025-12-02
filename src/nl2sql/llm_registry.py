@@ -111,17 +111,14 @@ class LLMRegistry:
     - Enforcing structured output for specific agents.
     """
 
-    def __init__(self, config: LLMConfig, engine, row_limit: int):
+    def __init__(self, config: LLMConfig):
         """
         Initializes the LLMRegistry.
 
         Args:
             config: LLM configuration.
-            engine: Database engine type (unused here but kept for interface consistency).
-            row_limit: Row limit (unused here but kept for interface consistency).
         """
         self.config = config
-        self.engine = engine
 
     def _agent_cfg(self, agent: str) -> AgentConfig:
         return self.config.agents.get(agent) or self.config.default

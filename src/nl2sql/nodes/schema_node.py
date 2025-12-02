@@ -5,8 +5,7 @@ from typing import Dict, Optional, List
 from sqlalchemy import inspect
 from nl2sql.schemas import GraphState, SchemaInfo, TableInfo, ForeignKey
 from nl2sql.vector_store import SchemaVectorStore
-from nl2sql.datasource_config import DatasourceProfile
-from nl2sql.engine_factory import make_engine
+from nl2sql.datasource_registry import DatasourceRegistry
 
 
 class SchemaNode:
@@ -17,15 +16,15 @@ class SchemaNode:
     Also handles assigning aliases to tables and columns for the planner.
     """
 
-    def __init__(self, profile: DatasourceProfile, vector_store: Optional[SchemaVectorStore] = None):
+    def __init__(self, registry: DatasourceRegistry, vector_store: Optional[SchemaVectorStore] = None):
         """
         Initializes the SchemaNode.
 
         Args:
-            profile: Database connection profile.
+            registry: Datasource registry for accessing profiles and engines.
             vector_store: Optional vector store for schema retrieval.
         """
-        self.profile = profile
+        self.registry = registry
         self.vector_store = vector_store
 
     def __call__(self, state: GraphState) -> GraphState:
@@ -38,7 +37,10 @@ class SchemaNode:
         Returns:
             The updated graph state with schema information.
         """
-        engine = make_engine(self.profile)
+        if not state.datasource_id:
+            raise ValueError("No datasource_id in state. Router must run before SchemaNode.")
+
+        engine = self.registry.get_engine(state.datasource_id)
         inspector = inspect(engine)
         all_tables = inspector.get_table_names()
         

@@ -5,33 +5,34 @@ from sqlalchemy import inspect
 from langchain_core.runnables import Runnable
 
 from nl2sql.capabilities import get_capabilities
-from nl2sql.datasource_config import DatasourceProfile
-from nl2sql.engine_factory import make_engine, run_read_query
+from nl2sql.datasource_registry import DatasourceRegistry
 from nl2sql.nodes.intent.node import IntentNode
 from nl2sql.nodes.planner.node import PlannerNode
 from nl2sql.nodes.generator_node import GeneratorNode
 from nl2sql.nodes.validator_node import ValidatorNode
 from nl2sql.nodes.schema_node import SchemaNode
+from nl2sql.nodes.router_node import RouterNode
 from nl2sql.schemas import GraphState
 from nl2sql.tracing import span
 from nl2sql.vector_store import SchemaVectorStore
 from nl2sql.graph_utils import wrap_graphstate
 from nl2sql.nodes.executor_node import ExecutorNode
+from nl2sql.llm_registry import LLMRegistry
 
 # Type for an LLM callable: prompt -> string
 LLMCallable = Union[Callable[[str], str], Runnable]
 
 
-def build_graph(profile: DatasourceProfile, llm: Optional[LLMCallable] = None, llm_map: Optional[Dict[str, LLMCallable]] = None, execute: bool = True, vector_store: Optional[SchemaVectorStore] = None):
+def build_graph(registry: DatasourceRegistry, llm_registry: LLMRegistry, execute: bool = True, vector_store: Optional[SchemaVectorStore] = None, vector_store_path: str = ""):
     """
     Builds the LangGraph state graph for the NL2SQL pipeline.
 
     Args:
-        profile: Database connection profile.
-        llm: Default LLM callable.
-        llm_map: Map of node names to specific LLM callables.
+        registry: Datasource registry.
+        llm_registry: LLM registry.
         execute: Whether to include the execution step.
         vector_store: Optional vector store for schema retrieval.
+        vector_store_path: Path to vector store for routing.
 
     Returns:
         Compiled StateGraph.
@@ -42,38 +43,56 @@ def build_graph(profile: DatasourceProfile, llm: Optional[LLMCallable] = None, l
         raise RuntimeError("langgraph is required to build the graph. Install via pip.") from exc
 
     # Attach capabilities marker for downstream routing
+    # NOTE: Capabilities are now dynamic based on selected datasource, so we init with empty
     base_state = dataclasses.asdict(GraphState(user_query=""))
-    base_state["validation"]["capabilities"] = get_capabilities(profile.engine).dialect
-
+    
     graph = StateGraph(dict)
 
-    node_llm = lambda name: (llm_map or {}).get(name, llm) if llm_map else llm
-
-    intent = IntentNode(llm=node_llm("intent"))
-    schema_node = SchemaNode(profile=profile, vector_store=vector_store)
-    generator = GeneratorNode(profile_engine=profile.engine, row_limit=profile.row_limit)
+    # Instantiate Nodes
+    # Router
+    router = RouterNode(llm_registry, registry, vector_store_path)
+    
+    # Intent
+    intent = IntentNode(llm=llm_registry.intent_llm())
+    
+    # Schema (Dynamic)
+    schema_node = SchemaNode(registry=registry, vector_store=vector_store)
+    
+    # Generator (Dynamic)
+    generator = GeneratorNode(registry=registry)
 
     from nl2sql.subgraphs.planning import build_planning_subgraph
     
     # Prepare effective llm_map for subgraph
-    effective_llm_map = (llm_map or {}).copy()
-    if llm:
-        for key in ["planner", "summarizer"]:
-            if key not in effective_llm_map:
-                effective_llm_map[key] = llm
+    # NOTE: We are using LLMRegistry now, so we might need to adjust how we pass LLMs to subgraph
+    # For now, we'll assume the subgraph still takes a map or we pass the registry's base LLM
+    # The current subgraph builder takes llm_map. Let's construct one from registry.
+    effective_llm_map = {
+        "planner": llm_registry.planner_llm(),
+        "summarizer": llm_registry.summarizer_llm()
+    }
 
     # Build the planning subgraph
-    planning_subgraph = build_planning_subgraph(effective_llm_map, row_limit=profile.row_limit)
+    # NOTE: Subgraph builder takes row_limit. This is tricky because row_limit is dynamic now.
+    # We might need to refactor the subgraph builder too, OR pass a default/max limit.
+    # The subgraph uses row_limit for the prompt. 
+    # Let's pass a safe default (e.g. 1000) or refactor. 
+    # Refactoring subgraph is out of scope for this immediate step, let's pass 1000.
+    # Ideally, the planner node should read row_limit from state/profile at runtime.
+    # TODO: Refactor PlannerNode to be dynamic.
+    planning_subgraph = build_planning_subgraph(effective_llm_map, row_limit=1000)
 
+    graph.add_node("router", wrap_graphstate(router, "router"))
     graph.add_node("intent", wrap_graphstate(intent, "intent"))
     graph.add_node("schema", wrap_graphstate(schema_node, "schema"))
     graph.add_node("planning", planning_subgraph)
     graph.add_node("sql_generator", wrap_graphstate(generator, "sql_generator"))
     
     if execute:
-        graph.add_node("executor", wrap_graphstate(ExecutorNode(profile=profile), "executor"))
+        graph.add_node("executor", wrap_graphstate(ExecutorNode(registry=registry), "executor"))
 
-    graph.set_entry_point("intent")
+    graph.set_entry_point("router")
+    graph.add_edge("router", "intent")
     graph.add_edge("intent", "schema")
     graph.add_edge("schema", "planning")
     
@@ -101,28 +120,31 @@ def build_graph(profile: DatasourceProfile, llm: Optional[LLMCallable] = None, l
     return graph.compile()
 
 
-def run_with_graph(profile: DatasourceProfile, user_query: str, llm: Optional[LLMCallable] = None, llm_map: Optional[Dict[str, LLMCallable]] = None, execute: bool = True, vector_store: Optional[SchemaVectorStore] = None, debug: bool = False, on_thought: Optional[Callable[[str, list[str]], None]] = None) -> Dict:
+def run_with_graph(registry: DatasourceRegistry, llm_registry: LLMRegistry, user_query: str, datasource_id: Optional[str] = None, execute: bool = True, vector_store: Optional[SchemaVectorStore] = None, vector_store_path: str = "", debug: bool = False, on_thought: Optional[Callable[[str, list[str]], None]] = None) -> Dict:
     """
     Runs the NL2SQL pipeline using LangGraph.
 
     Args:
-        profile: Database connection profile.
+        registry: Datasource registry.
+        llm_registry: LLM registry.
         user_query: The user's natural language query.
-        llm: Default LLM callable.
-        llm_map: Map of node names to specific LLM callables.
+        datasource_id: Optional ID to force a specific datasource.
         execute: Whether to execute the generated SQL.
         vector_store: Optional vector store for schema retrieval.
+        vector_store_path: Path to vector store for routing.
         debug: Whether to print debug information.
         on_thought: Callback for streaming thoughts/tokens.
 
     Returns:
         The final state dictionary.
     """
-    g = build_graph(profile, llm=llm, llm_map=llm_map, execute=execute, vector_store=vector_store)
+    g = build_graph(registry, llm_registry, execute=execute, vector_store=vector_store, vector_store_path=vector_store_path)
     initial_state = dataclasses.asdict(
         GraphState(
             user_query=user_query,
-            validation={"capabilities": get_capabilities(profile.engine).dialect},
+            datasource_id=datasource_id,
+            # Validation capabilities will be populated dynamically or we can init empty
+            validation={"capabilities": "generic"}, 
         )
     )
     

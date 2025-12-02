@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from nl2sql.datasource_config import DatasourceProfile
-from nl2sql.engine_factory import make_engine, run_read_query
+from nl2sql.datasource_registry import DatasourceRegistry
+from nl2sql.engine_factory import run_read_query
 from nl2sql.schemas import GraphState
 from nl2sql.security import enforce_read_only
 from nl2sql.tracing import span
@@ -14,14 +14,14 @@ class ExecutorNode:
     Enforces read-only security checks before execution.
     """
 
-    def __init__(self, profile: DatasourceProfile):
+    def __init__(self, registry: DatasourceRegistry):
         """
         Initializes the ExecutorNode.
 
         Args:
-            profile: Database connection profile.
+            registry: Datasource registry for accessing profiles and engines.
         """
-        self.profile = profile
+        self.registry = registry
 
     def __call__(self, state: GraphState) -> GraphState:
         """
@@ -42,10 +42,17 @@ class ExecutorNode:
             state.execution = {"error": "Security Violation"}
             return state
             
-        engine = make_engine(self.profile)
-        with span("executor", {"datasource.id": self.profile.id, "engine": self.profile.engine}):
+        if not state.datasource_id:
+            state.errors.append("No datasource_id in state. Router must run before ExecutorNode.")
+            state.execution = {"error": "Missing Datasource ID"}
+            return state
+
+        profile = self.registry.get_profile(state.datasource_id)
+        engine = self.registry.get_engine(state.datasource_id)
+        
+        with span("executor", {"datasource.id": profile.id, "engine": profile.engine}):
             try:
-                rows = run_read_query(engine, state.sql_draft["sql"], row_limit=self.profile.row_limit)
+                rows = run_read_query(engine, state.sql_draft["sql"], row_limit=profile.row_limit)
                 samples = []
                 for row in rows[:3]:
                     try:

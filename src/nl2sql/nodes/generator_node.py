@@ -10,6 +10,9 @@ from nl2sql.capabilities import EngineCapabilities, get_capabilities
 from nl2sql.schemas import GeneratedSQL, GraphState, SQLModel
 
 
+from nl2sql.datasource_registry import DatasourceRegistry
+
+
 class GeneratorNode:
     """
     SQL generator node with dialect awareness and guardrails.
@@ -18,16 +21,14 @@ class GeneratorNode:
     handling dialect-specific syntax and enforcing row limits.
     """
 
-    def __init__(self, profile_engine: str, row_limit: int):
+    def __init__(self, registry: DatasourceRegistry):
         """
         Initializes the GeneratorNode.
 
         Args:
-            profile_engine: The target database dialect (e.g., "sqlite", "postgres").
-            row_limit: The maximum number of rows to return.
+            registry: Datasource registry for accessing profiles.
         """
-        self.profile_engine = profile_engine
-        self.row_limit = row_limit
+        self.registry = registry
 
     def __call__(self, state: GraphState) -> GraphState:
         """
@@ -39,6 +40,14 @@ class GeneratorNode:
         Returns:
             The updated graph state with the generated SQL draft.
         """
+        if not state.datasource_id:
+            state.errors.append("No datasource_id in state. Router must run before GeneratorNode.")
+            return state
+
+        profile = self.registry.get_profile(state.datasource_id)
+        self.profile_engine = profile.engine
+        self.row_limit = profile.row_limit
+
         caps: EngineCapabilities = get_capabilities(self.profile_engine)
         if not state.plan:
             state.errors.append("No plan to generate SQL from.")

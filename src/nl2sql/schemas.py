@@ -250,6 +250,7 @@ class GraphState:
     errors: List[str] = field(default_factory=list)
     retry_count: int = 0
     thoughts: Dict[str, List[str]] = field(default_factory=dict)
+    datasource_id: Optional[str] = None
 
     def __post_init__(self):
         if isinstance(self.schema_info, dict):
