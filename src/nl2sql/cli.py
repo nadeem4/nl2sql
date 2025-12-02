@@ -328,13 +328,24 @@ def main() -> None:
                 # Confidence Gate (Layer 2)
                 # Distance > 0.4 implies similarity < ~0.92 (depending on model)
                 if distance > 0.4:
-                    print(f"  -> Low confidence (distance > 0.4). Triggering Multi-Query Router...")
+                    print(f"  -> Low confidence (distance > 0.4). Triggering Multi-Query Router (Layer 2)...")
                     # Use planner agent (usually gpt-4o-mini) for query generation
                     llm = registry._base_llm("planner") 
                     mq_results = router_store.multi_query_retrieve(query, llm)
+                    
                     if mq_results:
                         target_id = mq_results[0]
                         print(f"  -> Multi-Query selected: {target_id}")
+                    else:
+                        # Layer 3: LLM Fallback
+                        print(f"  -> Multi-Query failed. Triggering LLM Router (Layer 3)...")
+                        l3_result = router_store.llm_route(query, llm, profiles)
+                        if l3_result:
+                            target_id = l3_result
+                            print(f"  -> LLM Router selected: {target_id}")
+                        else:
+                            print("  -> LLM Router uncertain. Using default 'manufacturing_sqlite'.")
+                            target_id = "manufacturing_sqlite"
             else:
                 print("  -> No matching datasource found. Using default 'manufacturing_sqlite'.")
                 target_id = "manufacturing_sqlite"

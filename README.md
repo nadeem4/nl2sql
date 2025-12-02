@@ -220,6 +220,7 @@ To support efficient querying across large or multiple databases, we use a two-t
     - **Strategy**:
         - **Layer 1 (Fast)**: Vector search against database descriptions and 200+ sample questions.
         - **Layer 2 (Robust)**: If confidence is low (distance > 0.4), an LLM generates 3 query variations and votes on the best datasource.
+        - **Layer 3 (Reasoning)**: If Layer 2 fails or remains uncertain, a dedicated LLM Agent analyzes the schema definitions to make a final decision.
 
 2. **Schema Selection**:
     - **What**: Indexes table metadata (columns, foreign keys, comments).
