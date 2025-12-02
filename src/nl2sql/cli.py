@@ -263,7 +263,8 @@ def main() -> None:
         
         # Index Datasource Descriptions
         print("Indexing datasource descriptions...")
-        router_store.index_datasources(profiles)
+        from nl2sql.settings import settings
+        router_store.index_datasources(profiles, examples_path=settings.sample_questions_path)
         
         # Index Schemas for ALL profiles
         for p in profiles.values():
