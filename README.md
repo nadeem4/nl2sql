@@ -145,13 +145,11 @@ LIMIT 100
 
 **Output**:
 
-```text
-id | sku     | name         | category
----+---------+--------------+---------
-1  | SKU-100 | Widget Alpha | Widgets 
-2  | SKU-200 | Widget Beta  | Widgets 
-3  | SKU-300 | Gadget Gamma | Gadgets 
-```
+| id | sku | name | category |
+|---|---|---|---|
+| 1 | SKU-100 | Widget Alpha | Widgets |
+| 2 | SKU-200 | Widget Beta | Widgets |
+| 3 | SKU-300 | Gadget Gamma | Gadgets |
 
 **Query 2: Complex Aggregation**
 > "Average maintenance downtime per factory for events over 30 minutes"
@@ -170,12 +168,10 @@ LIMIT 100
 
 **Output**:
 
-```text
-factory_name | average_downtime
--------------+-----------------
-Plant A      | 90.0            
-Plant B      | 90.0            
-```
+| factory_name | average_downtime |
+|---|---|
+| Plant A | 90.0 |
+| Plant B | 90.0 |
 
 ### 5. Full Customization
 
@@ -208,13 +204,10 @@ Compare performance of different LLM configurations (latency, success rate, toke
 3. **View Results**:
    The CLI will output a comparison table:
 
-   ```text
-   === Benchmark Results ===
-   Config                    | Success  | Avg Latency  | Avg Tokens
-   -----------------------------------------------------------------
-   gpt-4o-mini-test          |  100.0% |       7.54s |     3139.0
-   gpt-3.5-turbo-test        |  100.0% |       5.14s |     6060.3
-   ```
+   | Config | Success | Avg Latency | Avg Tokens |
+   |---|---|---|---|
+   | gpt-4o-mini-test | 100.0% | 7.54s | 3139.0 |
+   | gpt-3.5-turbo-test | 100.0% | 5.14s | 6060.3 |
 
 ## LLM Configuration
 
