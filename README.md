@@ -54,6 +54,65 @@ Example structured log:
 {"timestamp": "2023-10-27 10:00:00,000", "level": "INFO", "name": "intent", "message": "Node intent completed", "node": "intent", "duration_ms": 120.5, "status": "success"}
 ```
 
+## Testing Guide
+
+Follow this step-by-step guide to verify the installation and run your first query.
+
+### Prerequisites
+
+- **Python 3.10+** installed.
+- **Docker & Docker Compose** installed and running.
+- **OpenAI API Key** (for the Planner/Intent agents).
+
+### Step 1: Installation
+
+Clone the repository and install dependencies:
+
+```bash
+git clone <repo-url>
+cd nl2sql
+pip install -r requirements.txt
+```
+
+### Step 2: Infrastructure Setup
+
+Start the database containers (Postgres, MySQL, MSSQL) and seed them with data:
+
+```bash
+# Start containers
+docker-compose up -d
+
+# Seed data (wait for DBs to initialize)
+python scripts/seed_databases.py --wait
+```
+
+### Step 3: Configuration
+
+Create a `.env` file in the root directory with your API key:
+
+```bash
+OPENAI_API_KEY="sk-..."
+```
+
+### Step 4: Run a Test Query
+
+Execute a query against the **Postgres** database to verify the pipeline:
+
+```bash
+python -m src.nl2sql.cli --id manufacturing_ops --query "List 5 machines"
+```
+
+**Expected Output:**
+You should see a structured log of the AI's reasoning (Intent -> Planner) followed by a table of 5 machines.
+
+### Step 5: Run Unit Tests
+
+Verify the core logic using pytest:
+
+```bash
+python -m pytest tests/
+```
+
 ## Setup
 
 1) Install dependencies:
@@ -63,10 +122,11 @@ Example structured log:
    pip install -r requirements.txt
    ```
 
-2) Create the SQLite demo DB (already created if you ran the script):
+2) Create the databases (Postgres, MySQL, MSSQL, SQLite) and seed data:
 
    ```bash
-   python scripts/setup_sqlite_manufacturing.py --db data/manufacturing.db
+   docker-compose up -d
+   python scripts/seed_databases.py --wait
    ```
 
 3) Set your OpenAI key (or add to `.env`):
@@ -209,6 +269,77 @@ Compare performance of different LLM configurations (latency, success rate, toke
    | gpt-4o-mini-test | 100.0% | 7.54s | 3139.0 |
    | gpt-3.5-turbo-test | 100.0% | 5.14s | 6060.3 |
 
+## Multi-Database Setup
+
+This project supports a cross-database demonstration using Docker. The data is distributed across 4 databases to simulate a real-world enterprise environment:
+
+1. **SQLite (`manufacturing_ref`)**: Reference Data
+    - `factories`: Plant locations and details.
+    - `shifts`: Work shift definitions.
+    - `machine_types`: Catalog of machine models.
+
+2. **Postgres (`manufacturing_ops`)**: Operations Data
+    - `machines`: Physical assets linked to factories.
+    - `maintenance_logs`: History of repairs and service events.
+    - `employees`: Plant staff and operators.
+    - `spare_parts`: Parts inventory for machine maintenance.
+
+3. **MySQL (`manufacturing_supply`)**: Supply Chain Data
+    - `products`: Master catalog of items produced.
+    - `inventory`: Current stock levels per warehouse.
+    - `suppliers`: External vendors.
+    - `purchase_orders`: Orders placed to suppliers.
+    - `purchase_order_items`: Line items for POs.
+
+4. **MSSQL (`manufacturing_history`)**: Commercial History
+    - `production_runs`: Historical records of manufacturing batches.
+    - `defects`: Quality control issues logged per run.
+    - `customers`: B2B clients purchasing products.
+    - `sales_orders`: Orders received from customers.
+    - `sales_order_items`: Line items for SOs.
+
+### Setup Instructions
+
+1. **Start Databases**:
+
+    ```bash
+    docker-compose up -d
+    ```
+
+2. **Seed Data**:
+    Populate all databases with synthetic data (~10k rows):
+
+    ```bash
+    python scripts/seed_databases.py --wait
+    ```
+
+3. **Query Examples**:
+    Run the CLI with specific datasource IDs to query different databases:
+
+    **Operations (Postgres)**:
+
+    ```bash
+    python -m src.nl2sql.cli --id manufacturing_ops --query "List 5 machines with their serial numbers"
+    ```
+
+    **Supply Chain (MySQL)**:
+
+    ```bash
+    python -m src.nl2sql.cli --id manufacturing_supply --query "Show me top 3 products by price"
+    ```
+
+    **History (MSSQL)**:
+
+    ```bash
+    python -m src.nl2sql.cli --id manufacturing_history --query "Count total production runs"
+    ```
+
+    **Reference (SQLite)**:
+
+    ```bash
+    python -m src.nl2sql.cli --id manufacturing_ref --query "List all factories and their locations"
+    ```
+
 ## LLM Configuration
 
 `configs/llm.yaml` shows per-agent mapping. The registry loads:
@@ -229,7 +360,7 @@ Keys are taken from config or `OPENAI_API_KEY`.
 
 - `src/`: core modules (`nodes`, `langgraph_pipeline`, `datasource_config`, `llm_registry`, `cli`, etc.)
 - `configs/`: datasource and LLM example configs
-- `scripts/`: utilities (`setup_sqlite_manufacturing.py`)
+- `scripts/`: utilities (`seed_databases.py`)
 - `docs/`: plan and goldens
 - `tests/`: pytest goldens
 

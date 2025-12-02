@@ -17,21 +17,68 @@
     supports_estimated_cost: false
     sample_rows_enabled: true
 
-# Example Postgres profile (update URL/auth before use)
-- id: manufacturing_postgres
-  engine: postgres
-  sqlalchemy_url: postgresql+psycopg2://user:password@localhost:5432/manufacturing
+# --- Multi-Database Setup ---
+
+- id: manufacturing_ref
+  engine: sqlite
+  sqlalchemy_url: sqlite:///data/manufacturing.db
   auth: null
-  read_only_role: readonly
+  read_only_role: null
   statement_timeout_ms: 8000
   row_limit: 100
   max_bytes: 10485760
-  tags:
-    env: dev
-    pii: false
+  tags: {env: dev, domain: reference}
   feature_flags:
     allow_generate_writes: false
-    allow_cross_db: false
+    allow_cross_db: true
+    supports_dry_run: false
+    supports_estimated_cost: false
+    sample_rows_enabled: true
+
+- id: manufacturing_ops
+  engine: postgres
+  sqlalchemy_url: postgresql+psycopg2://user:password@localhost:5432/manufacturing_ops
+  auth: null
+  read_only_role: null
+  statement_timeout_ms: 8000
+  row_limit: 100
+  max_bytes: 10485760
+  tags: {env: dev, domain: operations}
+  feature_flags:
+    allow_generate_writes: false
+    allow_cross_db: true
     supports_dry_run: true
+    supports_estimated_cost: true
+    sample_rows_enabled: true
+
+- id: manufacturing_supply
+  engine: mysql
+  sqlalchemy_url: mysql+pymysql://user:password@localhost:3306/manufacturing_supply
+  auth: null
+  read_only_role: null
+  statement_timeout_ms: 8000
+  row_limit: 100
+  max_bytes: 10485760
+  tags: {env: dev, domain: supply_chain}
+  feature_flags:
+    allow_generate_writes: false
+    allow_cross_db: true
+    supports_dry_run: false
+    supports_estimated_cost: false
+    sample_rows_enabled: true
+
+- id: manufacturing_history
+  engine: mssql
+  sqlalchemy_url: mssql+pymssql://sa:Password123!@localhost:1433/manufacturing_history
+  auth: null
+  read_only_role: null
+  statement_timeout_ms: 8000
+  row_limit: 100
+  max_bytes: 10485760
+  tags: {env: dev, domain: history}
+  feature_flags:
+    allow_generate_writes: false
+    allow_cross_db: true
+    supports_dry_run: false
     supports_estimated_cost: false
     sample_rows_enabled: true
