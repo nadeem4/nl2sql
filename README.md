@@ -103,6 +103,10 @@ manufacturing_ops:
   - "Which machines are offline?"
 ```
 
+```yaml
+manufacturing_supply:
+  - "Show top products by price"
+  - "List all products"
 ```
 
 ---
