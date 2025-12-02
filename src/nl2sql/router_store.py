@@ -39,20 +39,42 @@ class DatasourceRouterStore:
         except Exception:
             pass
 
-    def index_datasources(self, datasources: List[DatasourceProfile]):
+    def index_datasources(self, datasources: List[DatasourceProfile], examples_path: Optional[str] = None):
         """
-        Indexes datasource descriptions.
+        Indexes datasource descriptions and optionally example questions.
         """
         documents = []
+        
+        # Index Descriptions
         for ds in datasources.values() if isinstance(datasources, dict) else datasources:
             if ds.description:
                 content = f"Datasource: {ds.id}. Description: {ds.description}"
                 doc = Document(
                     page_content=content,
-                    metadata={"datasource_id": ds.id}
+                    metadata={"datasource_id": ds.id, "type": "description"}
                 )
                 documents.append(doc)
         
+        # Index Examples (Layer 1)
+        if examples_path:
+            import yaml
+            import pathlib
+            
+            path = pathlib.Path(examples_path)
+            if path.exists():
+                try:
+                    examples = yaml.safe_load(path.read_text()) or {}
+                    for ds_id, questions in examples.items():
+                        for q in questions:
+                            doc = Document(
+                                page_content=q,
+                                metadata={"datasource_id": ds_id, "type": "example"}
+                            )
+                            documents.append(doc)
+                    print(f"Indexed {sum(len(q) for q in examples.values())} example questions.")
+                except Exception as e:
+                    print(f"Failed to load routing examples: {e}")
+
         if documents:
             self.vectorstore.add_documents(documents)
 

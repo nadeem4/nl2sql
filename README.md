@@ -92,6 +92,17 @@ agents:
   planner:
     provider: openai
     model: gpt-4o-mini # Use a cheaper model for planning
+
+### Routing Examples (`configs/sample_questions.yaml`)
+
+Map datasource IDs to lists of sample questions to improve routing accuracy (Layer 1).
+
+```yaml
+manufacturing_ops:
+  - "List all machines"
+  - "Which machines are offline?"
+```
+
 ```
 
 ---
