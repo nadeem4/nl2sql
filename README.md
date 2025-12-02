@@ -217,6 +217,9 @@ To support efficient querying across large or multiple databases, we use a two-t
 1. **Datasource Routing**:
     - **What**: Indexes the `description` of each database.
     - **Why**: Determines *which* database contains the relevant data (e.g., "Sales" vs. "Inventory").
+    - **Strategy**:
+        - **Layer 1 (Fast)**: Vector search against database descriptions and 200+ sample questions.
+        - **Layer 2 (Robust)**: If confidence is low (distance > 0.4), an LLM generates 3 query variations and votes on the best datasource.
 
 2. **Schema Selection**:
     - **What**: Indexes table metadata (columns, foreign keys, comments).

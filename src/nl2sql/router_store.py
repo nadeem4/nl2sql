@@ -84,3 +84,52 @@ class DatasourceRouterStore:
         """
         docs = self.vectorstore.similarity_search(query, k=k)
         return [doc.metadata["datasource_id"] for doc in docs]
+
+    def retrieve_with_score(self, query: str, k: int = 1) -> List[tuple[str, float]]:
+        """
+        Retrieves datasource IDs with their similarity scores.
+        Note: Chroma returns distance (lower is better).
+        """
+        docs_and_scores = self.vectorstore.similarity_search_with_score(query, k=k)
+        return [(doc.metadata["datasource_id"], score) for doc, score in docs_and_scores]
+
+    def multi_query_retrieve(self, query: str, llm, k: int = 1) -> List[str]:
+        """
+        Generates query variations and retrieves the most voted datasource.
+        """
+        from langchain_core.prompts import PromptTemplate
+        from langchain_core.output_parsers import StrOutputParser
+
+        prompt = PromptTemplate(
+            template="""You are an AI language model assistant. Your task is to generate 3 different versions of the given user question to retrieve relevant documents from a vector database. By generating multiple perspectives on the user question, your goal is to help the user overcome some of the limitations of the distance-based similarity search. Provide these alternative questions separated by newlines. Original question: {question}""",
+            input_variables=["question"]
+        )
+
+        chain = prompt | llm | StrOutputParser()
+        
+        try:
+            variations = chain.invoke({"question": query}).split("\n")
+            variations = [v.strip() for v in variations if v.strip()]
+            # Add original query
+            variations.append(query)
+            
+            print(f"  -> Generated {len(variations)-1} variations: {variations[:-1]}")
+            
+            votes = {}
+            for q in variations:
+                results = self.retrieve(q, k=1)
+                if results:
+                    ds_id = results[0]
+                    votes[ds_id] = votes.get(ds_id, 0) + 1
+            
+            if not votes:
+                return []
+                
+            # Return winner
+            winner = max(votes, key=votes.get)
+            print(f"  -> Voting results: {votes}. Winner: {winner}")
+            return [winner]
+            
+        except Exception as e:
+            print(f"  -> Multi-query generation failed: {e}")
+            return self.retrieve(query, k=k)
