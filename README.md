@@ -31,7 +31,7 @@ Gain insight into the AI's decision-making process with the `--show-thoughts` fl
 
 Example output:
 
-```
+```text
 [INTENT]
   Reasoning: User is asking for aggregate sales data...
   Classification: READ
@@ -150,54 +150,54 @@ Then run:
 python -m src.nl2sql.cli --query "Show top 5 products"
 ```
 
-### 4. Full Customization
+### 4. Real-World Examples
 
-- `DATASOURCE_CONFIG`: Path to datasource config YAML
+**Query 1: Simple Listing**
+> "List Products"
 
-## Benchmarking
+**SQL**:
 
-Compare performance of different LLM configurations (latency, success rate, token usage).
+```sql
+SELECT t5.id AS id, t5.sku AS sku, t5.name AS name, t5.category AS category 
+FROM products AS t5 
+LIMIT 100
+```
 
-1. **Create a benchmark suite config** (e.g., `configs/benchmark_suite.yaml`):
+**Output**:
 
-   ```yaml
-   gpt-4o-setup:
-     default:
-       provider: openai
-       model: gpt-4o
-   
-   gpt-3.5-setup:
-     default:
-       provider: openai
-       model: gpt-3.5-turbo
-   ```
+```text
+id | sku     | name         | category
+---+---------+--------------+---------
+1  | SKU-100 | Widget Alpha | Widgets 
+2  | SKU-200 | Widget Beta  | Widgets 
+3  | SKU-300 | Gadget Gamma | Gadgets 
+```
 
-2. **Run the benchmark**:
+**Query 2: Complex Aggregation**
+> "Average maintenance downtime per factory for events over 30 minutes"
 
-   ```bash
-   python -m src.nl2sql.cli --query "List production runs for Widget Alpha with machine and factory names" --benchmark --bench-config configs/benchmark_suite.yaml --iterations 3
-   ```
+**SQL**:
 
-   *Note: `--bench-config` defaults to `configs/benchmark_suite.yaml` if omitted.*
+```sql
+SELECT t2.name AS factory_name, AVG(t4.downtime_minutes) AS average_downtime 
+FROM factories AS t2 
+JOIN machines AS t3 ON t2.id = t3.factory_id 
+JOIN maintenance_logs AS t4 ON t3.id = t4.machine_id 
+WHERE t4.downtime_minutes > 30 
+GROUP BY t2.id 
+LIMIT 100
+```
 
-3. **View Results**:
-   The CLI will output a comparison table:
+**Output**:
 
-   ```
-   === Benchmark Results ===
-   Config                    | Success  | Avg Latency  | Avg Tokens
-   -----------------------------------------------------------------
-   gpt-4o-setup              |  100.0% |       2.50s |      150.0
-   gpt-3.5-setup             |   80.0% |       1.20s |      140.0
-   ```
+```text
+factory_name | average_downtime
+-------------+-----------------
+Plant A      | 90.0            
+Plant B      | 90.0            
+```
 
-## Datasource Profiles
-
-Configure in `configs/datasources.yaml`:
-
-- `engine`, `sqlalchemy_url/DSN`, `statement_timeout_ms`, `row_limit`, `max_bytes`
-- Feature flags: `allow_generate_writes`, `supports_dry_run`, etc.
-- SQLite starter uses `row_limit: 100`; Postgres example provided (update URL/auth).
+### 5. Full Customization
 
 ## LLM Configuration
 
