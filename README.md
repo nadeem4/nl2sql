@@ -116,12 +116,12 @@ manufacturing_supply:
 
 ### CLI Basics
 
-The CLI (`src.nl2sql.cli`) is the main entry point.
+The CLI (`src.nl2sql.cli`) is the main entry point. It uses the **Router Node** to automatically select the correct datasource.
 
 - `--query "..."`: The natural language question.
-- `--id <ID>`: Target datasource (default: `manufacturing_sqlite`).
 - `--show-thoughts`: Display step-by-step AI reasoning.
 - `--vector-store <PATH>`: Use vector search for schema selection (requires indexing).
+- `--id <ID>`: **Optional**. Force a specific datasource, bypassing the router (e.g., `manufacturing_ops`).
 
 ### Multi-Database Support
 
@@ -190,9 +190,12 @@ For large schemas, use vector search to dynamically select relevant tables.
 
 ### The Pipeline (LangGraph)
 
+We use a **Supervisor Architecture** where the graph itself manages routing and state.
+
 ```mermaid
 flowchart TD
-  user["User Query"] --> intent["Intention (AI)"]
+  user["User Query"] --> router["Router (AI)"]
+  router --> intent["Intention (AI)"]
   intent --> schema["Schema (non-AI)"]
   schema --> planning["Planning Subgraph"]
   
@@ -207,6 +210,7 @@ flowchart TD
   executor --> answer["Answer/Result Sample"]
   
   style user fill:#f6f8fa,stroke:#aaa
+  style router fill:#e1f5fe,stroke:#01579b
   style answer fill:#f6f8fa,stroke:#aaa
 ```
 

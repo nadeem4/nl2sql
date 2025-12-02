@@ -20,6 +20,7 @@ from nl2sql.engine_factory import make_engine
 from nl2sql.settings import settings
 from nl2sql.vector_store import SchemaVectorStore
 from nl2sql.router_store import DatasourceRouterStore
+from nl2sql.datasource_registry import DatasourceRegistry
 
 
 def parse_args() -> argparse.Namespace:
@@ -293,70 +294,12 @@ def main() -> None:
         print("No query provided.", file=sys.stderr)
         sys.exit(1)
 
-    # Initialize Registry early for routing (Layer 2 needs LLM)
+    # Initialize Registries
     llm_cfg = load_llm_config(args.llm_config)
-    registry = LLMRegistry(llm_cfg, engine=None, row_limit=100)
-
-    # Routing Logic
-    target_id = args.id
-    router_metrics = {"time": 0.0, "tokens": 0}
+    llm_registry = LLMRegistry(llm_cfg)
+    _print_agent_models(llm_registry)
     
-    if not target_id:
-        print(f"Routing query: '{query}'")
-        import time
-        import tiktoken
-        
-        start_route = time.perf_counter()
-        
-        # Estimate tokens
-        try:
-            enc = tiktoken.encoding_for_model("text-embedding-3-small")
-            router_metrics["tokens"] = len(enc.encode(query))
-        except:
-            router_metrics["tokens"] = 0
-            
-        try:
-            router_store = DatasourceRouterStore(persist_directory=args.vector_store)
-            
-            # Layer 1 & 2: Retrieve with Score
-            results = router_store.retrieve_with_score(query)
-            
-            if results:
-                target_id, distance = results[0]
-                print(f"  -> Initial match: {target_id} (distance: {distance:.4f})")
-                
-                # Confidence Gate (Layer 2)
-                # Distance > 0.4 implies similarity < ~0.92 (depending on model)
-                if distance > 0.4:
-                    print(f"  -> Low confidence (distance > 0.4). Triggering Multi-Query Router (Layer 2)...")
-                    # Use planner agent (usually gpt-4o-mini) for query generation
-                    llm = registry._base_llm("planner") 
-                    mq_results = router_store.multi_query_retrieve(query, llm)
-                    
-                    if mq_results:
-                        target_id = mq_results[0]
-                        print(f"  -> Multi-Query selected: {target_id}")
-                    else:
-                        # Layer 3: LLM Fallback
-                        print(f"  -> Multi-Query failed. Triggering LLM Router (Layer 3)...")
-                        l3_result = router_store.llm_route(query, llm, profiles)
-                        if l3_result:
-                            target_id = l3_result
-                            print(f"  -> LLM Router selected: {target_id}")
-                        else:
-                            print("  -> LLM Router uncertain. Using default 'manufacturing_sqlite'.")
-                            target_id = "manufacturing_sqlite"
-            else:
-                print("  -> No matching datasource found. Using default 'manufacturing_sqlite'.")
-                target_id = "manufacturing_sqlite"
-        except Exception as e:
-            print(f"  -> Routing error: {e}. Using default 'manufacturing_sqlite'.")
-            target_id = "manufacturing_sqlite"
-            
-        router_metrics["time"] = time.perf_counter() - start_route
-
-    profile = get_profile(profiles, target_id)
-    engine = make_engine(profile)
+    datasource_registry = DatasourceRegistry(profiles)
 
     if args.benchmark:
         if not args.bench_config:
@@ -396,9 +339,9 @@ def main() -> None:
                 print(f"Failed to parse config {name}: {e}")
                 continue
 
-            registry = LLMRegistry(llm_cfg, engine=engine, row_limit=profile.row_limit)
-            _print_agent_models(registry)
-            llm_map = registry.llm_map()
+            # Benchmark uses the same datasource registry but different LLM configs
+            bench_llm_registry = LLMRegistry(llm_cfg)
+            _print_agent_models(bench_llm_registry)
 
             latencies = []
             success_count = 0
@@ -410,11 +353,12 @@ def main() -> None:
                 
                 try:
                     state = run_with_graph(
-                        profile, 
-                        query, 
-                        llm_map=llm_map, 
+                        registry=datasource_registry,
+                        llm_registry=bench_llm_registry,
+                        user_query=query,
                         execute=True, 
-                        vector_store=vector_store
+                        vector_store=vector_store,
+                        vector_store_path=args.vector_store
                     )
                     
                     latency = state.get("latency", {}).get("total", 0)
@@ -454,26 +398,6 @@ def main() -> None:
             print(f"{res['config']:<25} | {res['success_rate']:>6.1f}% | {res['avg_latency']:>10.2f}s | {res['avg_tokens']:>10.1f}")
         return
 
-    # Normal execution flow
-    llm_map = None
-    llm = None
-    registry = None
-    if args.stub_llm:
-        llm_map = {
-            "intent": stub_llm,
-            "planner": stub_llm,
-            "executor": stub_llm,
-            "_default": stub_llm,
-        }
-    else:
-        if not args.llm_config:
-            print("LLM config is required unless using --stub-llm", file=sys.stderr)
-            sys.exit(1)
-        llm_cfg = load_llm_config(args.llm_config)
-        registry = LLMRegistry(llm_cfg, engine=engine, row_limit=profile.row_limit)
-        _print_agent_models(registry)
-        llm_map = registry.llm_map()
-
     # Define thought streamer
     current_node = None
     def stream_thoughts(node: str, logs: list[str], token: bool = False):
@@ -495,12 +419,13 @@ def main() -> None:
         print("\n--- Thought Process ---")
 
     state = run_with_graph(
-        profile, 
-        query, 
-        llm=llm, 
-        llm_map=llm_map, 
+        registry=datasource_registry,
+        llm_registry=llm_registry,
+        user_query=query,
+        datasource_id=args.id,
         execute=not args.no_exec, 
-        vector_store=vector_store, 
+        vector_store=vector_store,
+        vector_store_path=args.vector_store,
         debug=args.debug,
         on_thought=stream_thoughts if args.show_thoughts else None
     )
@@ -510,7 +435,7 @@ def main() -> None:
 
     usage = get_usage_summary()
     # Don't show thoughts again in render_state if we already streamed them
-    _render_state(state, registry=registry, verbose=args.verbose, show_thoughts=False, usage=usage, router_metrics=router_metrics)
+    _render_state(state, registry=llm_registry, verbose=args.verbose, show_thoughts=False, usage=usage)
 
 
 if __name__ == "__main__":
