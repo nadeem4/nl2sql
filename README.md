@@ -25,7 +25,7 @@ Follow this guide to set up the environment and run your first query.
 ### 1. Installation
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/nadeem4/nl2sql.git
 cd nl2sql
 pip install -r requirements.txt
 ```
@@ -213,8 +213,27 @@ This allows the system to scale to hundreds of tables without overwhelming the L
 - **Intent (AI)**: Classifies query type and extracts entities.
 - **Planner (AI)**: Generates a database-agnostic structured plan (tables, joins, filters).
 - **Validator (Code)**: Verifies the plan against the schema (column existence, types).
+- **Validator (Code)**: Verifies the plan against the schema (column existence, types).
 - **SQL Generator (Code)**: Deterministically compiles the plan to SQL using `sqlglot` (0 tokens).
 - **Executor (Code)**: Runs the SQL (read-only) and returns results.
+
+### Performance Breakdown
+
+The CLI provides a detailed breakdown of time and token usage per node:
+
+```text
+Performance:
+Node      | Type   | Model                  | Tokens | Time 
+----------+--------+------------------------+--------+------
+Router    | AI     | text-embedding-3-small | 4      | 1.45s
+Intent    | AI     | gpt-4o-mini            | 569    | 1.93s
+Schema    | Non-AI | -                      | -      | 0.35s
+Planner   | AI     | gpt-4o-mini            | 2456   | 4.99s
+Generator | Non-AI | -                      | -      | 0.00s
+Validator | Non-AI | -                      | -      | 0.00s
+Executor  | Non-AI | -                      | -      | 0.00s
+TOTAL     | -      | -                      | 3029   | 8.73s
+```
 
 ### Project Structure
 

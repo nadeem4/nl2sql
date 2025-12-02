@@ -25,7 +25,7 @@ from nl2sql.router_store import DatasourceRouterStore
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run the NL2SQL LangGraph pipeline.")
     parser.add_argument("--config", type=pathlib.Path, default=pathlib.Path(settings.datasource_config_path))
-    parser.add_argument("--id", type=str, default="manufacturing_sqlite", help="Datasource profile id")
+    parser.add_argument("--id", type=str, default=None, help="Datasource profile id (default: auto-route)")
     parser.add_argument("--query", type=str, help="User NL query (if omitted, you will be prompted)")
     parser.add_argument("--llm-config", type=pathlib.Path, default=pathlib.Path(settings.llm_config_path), help="Path to LLM config YAML (provider/model per agent)")
     parser.add_argument("--vector-store", type=str, default=settings.vector_store_path, help="Path to vector store directory")
@@ -74,7 +74,7 @@ def stub_llm(prompt: str) -> Any:
     )
 
 
-def _render_state(state: Dict[str, Any], registry: LLMRegistry | None = None, verbose: bool = False, show_thoughts: bool = False, usage: Dict[str, int] | None = None) -> None:
+def _render_state(state: Dict[str, Any], registry: LLMRegistry | None = None, verbose: bool = False, show_thoughts: bool = False, usage: Dict[str, int] | None = None, router_metrics: Dict[str, Any] | None = None) -> None:
     errors: List[str] = state.get("errors") or []
     sql_draft = state.get("sql_draft") or {}
     plan = state.get("plan") or {}
@@ -135,9 +135,11 @@ def _render_state(state: Dict[str, Any], registry: LLMRegistry | None = None, ve
     print("\nPerformance:")
     latency = state.get("latency") or {}
     usage = usage or {}
+    router_metrics = router_metrics or {"time": 0, "tokens": 0}
     
     # Define nodes and their types
     nodes = [
+        ("router", "AI"),
         ("intent", "AI"),
         ("schema", "Non-AI"),
         ("planner", "AI"),
@@ -147,16 +149,21 @@ def _render_state(state: Dict[str, Any], registry: LLMRegistry | None = None, ve
     ]
     
     rows = []
-    total_time = latency.get("total", 0)
-    total_tokens = usage.get("_all", {}).get("total_tokens", 0)
+    total_time = latency.get("total", 0) + router_metrics.get("time", 0)
+    total_tokens = usage.get("_all", {}).get("total_tokens", 0) + router_metrics.get("tokens", 0)
 
     for node, node_type in nodes:
         # Time
-        duration = latency.get(node, 0)
+        if node == "router":
+            duration = router_metrics.get("time", 0)
+        else:
+            duration = latency.get(node, 0)
         
         # Model
         model = "-"
-        if node_type == "AI":
+        if node == "router":
+            model = "text-embedding-3-small"
+        elif node_type == "AI":
             if registry:
                 try:
                     model = registry._agent_cfg(node).model
@@ -167,7 +174,9 @@ def _render_state(state: Dict[str, Any], registry: LLMRegistry | None = None, ve
         
         # Tokens
         tokens = 0
-        if node_type == "AI":
+        if node == "router":
+            tokens = router_metrics.get("tokens", 0)
+        elif node_type == "AI":
             # Usage keys are "agent:model"
             for key, val in usage.items():
                 if key.startswith(f"{node}:"):
@@ -235,8 +244,6 @@ def main() -> None:
     configure_logging(level=level, json_format=args.json_logs)
 
     profiles = load_profiles(args.config)
-    profile = get_profile(profiles, args.id)
-    engine = make_engine(profile)
 
     if not args.vector_store:
         print("Error: Vector store path is required (via --vector-store or VECTOR_STORE env var).", file=sys.stderr)
@@ -284,6 +291,42 @@ def main() -> None:
     if not query:
         print("No query provided.", file=sys.stderr)
         sys.exit(1)
+
+    # Routing Logic
+    target_id = args.id
+    router_metrics = {"time": 0.0, "tokens": 0}
+    
+    if not target_id:
+        print(f"Routing query: '{query}'")
+        import time
+        import tiktoken
+        
+        start_route = time.perf_counter()
+        
+        # Estimate tokens
+        try:
+            enc = tiktoken.encoding_for_model("text-embedding-3-small")
+            router_metrics["tokens"] = len(enc.encode(query))
+        except:
+            router_metrics["tokens"] = 0
+            
+        try:
+            router_store = DatasourceRouterStore(persist_directory=args.vector_store)
+            target_ids = router_store.retrieve(query)
+            if target_ids:
+                target_id = target_ids[0]
+                print(f"  -> Selected datasource: {target_id}")
+            else:
+                print("  -> No matching datasource found. Using default 'manufacturing_sqlite'.")
+                target_id = "manufacturing_sqlite"
+        except Exception as e:
+            print(f"  -> Routing error: {e}. Using default 'manufacturing_sqlite'.")
+            target_id = "manufacturing_sqlite"
+            
+        router_metrics["time"] = time.perf_counter() - start_route
+
+    profile = get_profile(profiles, target_id)
+    engine = make_engine(profile)
 
     if args.benchmark:
         if not args.bench_config:
@@ -437,7 +480,7 @@ def main() -> None:
 
     usage = get_usage_summary()
     # Don't show thoughts again in render_state if we already streamed them
-    _render_state(state, registry=registry, verbose=args.verbose, show_thoughts=False, usage=usage)
+    _render_state(state, registry=registry, verbose=args.verbose, show_thoughts=False, usage=usage, router_metrics=router_metrics)
 
 
 if __name__ == "__main__":
