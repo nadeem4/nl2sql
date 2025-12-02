@@ -8,7 +8,6 @@ import yaml
 from langchain_openai import ChatOpenAI
 from nl2sql.settings import settings
 
-# Track token usage per run: list of {agent, model, prompt_tokens, completion_tokens, total_tokens}
 TOKEN_LOG: List[Dict[str, object]] = []
 
 
@@ -158,14 +157,11 @@ class LLMRegistry:
 
     def _wrap_structured_usage(self, llm: ChatOpenAI, agent: str, schema: Any) -> LLMCallable:
         model_name = self._agent_cfg(agent).model
-        # Use include_raw=True to get usage metadata
         structured_llm = llm.with_structured_output(schema, include_raw=True)
 
         def call(prompt: str) -> Any:
-            # resp is now a dict with 'parsed', 'raw', 'parsing_error'
             resp = structured_llm.invoke(prompt)
             
-            # Log usage from raw response
             raw_msg = resp.get("raw")
             if raw_msg:
                 usage = getattr(raw_msg, "usage_metadata", None)
@@ -204,8 +200,7 @@ class LLMRegistry:
 
     def summarizer_llm(self) -> LLMCallable:
         """Returns the LLM callable for the Summarizer agent."""
-        # Summarizer returns raw text, so we use the base LLM wrapped for usage tracking
-        # We reuse the planner config for now, or we could add a specific 'summarizer' agent config
+
         llm = self._base_llm("planner") 
         return self._wrap_usage(llm, "summarizer")
 

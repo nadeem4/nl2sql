@@ -32,5 +32,4 @@ def enforce_read_only(sql: str) -> bool:
                 
         return True
     except Exception:
-        # If parsing fails, fail safe (reject)
         return False

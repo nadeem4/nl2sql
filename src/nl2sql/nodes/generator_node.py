@@ -44,7 +44,6 @@ class GeneratorNode:
             state.errors.append("No plan to generate SQL from.")
             return state
 
-        # Enforce limit cap from profile
         limit = self.row_limit
         if state.plan.get("limit"):
             try:
@@ -118,14 +117,10 @@ class GeneratorNode:
         Returns:
             A sqlglot Column or Expression object.
         """
-        # col_ref has "expr", "alias" (optional), "is_derived"
         expr_str = col_ref["expr"]
         expr = sqlglot.parse_one(expr_str)
         
-        # If it's a select column and has an alias, we handle it in _build_select usually,
-        # but _to_col is used in other places too.
-        # However, alias is ONLY for select_columns now.
-        # So _to_col just returns the expression object.
+  
         return expr
 
     def _build_select(self, query: exp.Select, plan: dict) -> exp.Select:
@@ -133,7 +128,6 @@ class GeneratorNode:
         select_cols = plan.get("select_columns", [])
         
         if not select_cols:
-            # Fallback if no columns specified (shouldn't happen with valid plan)
             pass
 
         for col in select_cols:
@@ -184,7 +178,6 @@ class GeneratorNode:
                 val = flt["value"]
                 op = flt["op"].upper()
                 
-                # Handle value literal
                 if isinstance(val, str):
                     val_exp = exp.Literal.string(val)
                 elif isinstance(val, (int, float)):
@@ -194,7 +187,6 @@ class GeneratorNode:
                 else:
                     val_exp = exp.Literal.string(str(val))
 
-                # Construct expression based on op
                 if op == "=": cond = exp.EQ(this=col, expression=val_exp)
                 elif op == "!=" or op == "<>": cond = exp.NEQ(this=col, expression=val_exp)
                 elif op == ">": cond = exp.GT(this=col, expression=val_exp)
@@ -205,7 +197,6 @@ class GeneratorNode:
                 elif "IN" in op: 
                     cond = exp.In(this=col, expression=val_exp)
                 else:
-                    # Fallback for BETWEEN and others
                     cond = sqlglot.parse_one(f"{col.sql()} {op} {val}")
                 
                 if where_cond:
@@ -223,7 +214,6 @@ class GeneratorNode:
     def _build_group_by(self, query: exp.Select, plan: dict) -> exp.Select:
         """Builds the GROUP BY clause."""
         for gb in plan.get("group_by", []):
-            # gb is a ColumnRef dict or string
             if isinstance(gb, dict):
                 expr = gb["expr"]
             else:
@@ -241,7 +231,6 @@ class GeneratorNode:
                 val = hav["value"]
                 op = hav["op"].upper()
                 
-                # Handle value literal
                 if isinstance(val, str):
                     val_exp = exp.Literal.string(val)
                 elif isinstance(val, (int, float)):
@@ -251,7 +240,6 @@ class GeneratorNode:
                 else:
                     val_exp = exp.Literal.string(str(val))
 
-                # Construct expression based on op
                 if op == "=": cond = exp.EQ(this=col, expression=val_exp)
                 elif op == "!=" or op == "<>": cond = exp.NEQ(this=col, expression=val_exp)
                 elif op == ">": cond = exp.GT(this=col, expression=val_exp)

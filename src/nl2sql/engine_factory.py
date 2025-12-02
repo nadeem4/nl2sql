@@ -83,7 +83,6 @@ def run_read_query(
     params = params or {}
     cleaned = _normalize_sql(sql)
     limited_sql = cleaned
-    # Use regex to check for LIMIT word boundary to avoid false positives/negatives
     if not re.search(r"\blimit\b", cleaned, re.IGNORECASE):
         limited_sql = f"{cleaned}\nLIMIT {row_limit}"
     with engine.connect() as conn:

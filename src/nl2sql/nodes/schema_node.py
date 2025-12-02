@@ -79,7 +79,6 @@ class SchemaNode:
         else:
             tables = all_tables
 
-        # Assign aliases
         sorted_tables = sorted(tables)
         table_infos = []
         
