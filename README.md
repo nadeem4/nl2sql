@@ -78,26 +78,6 @@ Example structured log:
 
 4) Optional: install the package (for `nl2sql-cli`):
 
-   ```bash
-   pip install -e .
-   ```
-
-## Running the CLI
-
-- From source:
-
-  ```bash
-  python -m src.nl2sql.cli --query "list products" --llm-config configs/llm.yaml
-  ```
-
-- After install:
-
-  ```bash
-  nl2sql-cli --query "list products" --llm-config configs/llm.yaml
-  ```
-
-Flags:
-
 - `--config`: datasource YAML (default `configs/datasources.yaml` or `DATASOURCE_CONFIG`)
 - `--id`: datasource id (default `manufacturing_sqlite`)
 - `--llm-config`: per-agent LLM mapping (default `configs/llm.yaml` or `LLM_CONFIG`)
