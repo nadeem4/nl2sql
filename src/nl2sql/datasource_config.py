@@ -46,6 +46,7 @@ class DatasourceProfile:
     sqlalchemy_url: str
     auth: Optional[Dict[str, Any]]
     read_only_role: Optional[str]
+    description: Optional[str] = None
     statement_timeout_ms: int = 8000
     row_limit: int = 1000
     max_bytes: int = 10 * 1024 * 1024
@@ -70,6 +71,7 @@ def _to_profile(raw: Dict[str, Any]) -> DatasourceProfile:
     """Parses a datasource profile from a dictionary."""
     return DatasourceProfile(
         id=raw["id"],
+        description=raw.get("description"),
         engine=raw["engine"],
         sqlalchemy_url=raw["sqlalchemy_url"],
         auth=raw.get("auth"),

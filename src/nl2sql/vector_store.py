@@ -51,14 +51,25 @@ class SchemaVectorStore:
             # If collection doesn't exist or error, assume empty
             return True
 
-    def index_schema(self, engine: Engine):
+    def clear(self):
+        """Clears the schema collection."""
+        try:
+            self.vectorstore.delete_collection()
+            self.vectorstore = Chroma(
+                collection_name=self.collection_name,
+                embedding_function=self.embeddings,
+                persist_directory=self.persist_directory
+            )
+        except Exception:
+            pass
+
+    def index_schema(self, engine: Engine, datasource_id: str):
         """
         Introspects the database and indexes table schemas into the vector store.
 
-        This clears the existing collection and rebuilds it from the current database schema.
-
         Args:
             engine: SQLAlchemy engine for the database to index.
+            datasource_id: ID of the datasource (added to metadata).
         """
         inspector = inspect(engine)
         tables = inspector.get_table_names()
@@ -94,22 +105,11 @@ class SchemaVectorStore:
             
             doc = Document(
                 page_content=content,
-                metadata={"table_name": table}
+                metadata={"table_name": table, "datasource_id": datasource_id}
             )
             documents.append(doc)
 
         if documents:
-            # Clear existing to avoid duplicates (naive approach)
-            try:
-                self.vectorstore.delete_collection()
-                self.vectorstore = Chroma(
-                    collection_name=self.collection_name,
-                    embedding_function=self.embeddings,
-                    persist_directory=self.persist_directory
-                )
-            except Exception:
-                pass # Collection might not exist
-            
             self.vectorstore.add_documents(documents)
 
     def retrieve(self, query: str, k: int = 5) -> List[str]:

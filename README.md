@@ -118,10 +118,32 @@ The system simulates a manufacturing enterprise distributed across 4 databases:
 | `manufacturing_history` | **MSSQL** | Production Runs, Sales, Defects | `Count total production runs` |
 | `manufacturing_ref` | **SQLite** | Factories, Shifts, Machine Types | `List all factories and their locations` |
 
-**Example:**
+### Sample Commands
+
+Run these commands to test each database:
+
+**1. Postgres (Operations)**
+
+```bash
+python -m src.nl2sql.cli --id manufacturing_ops --query "List 5 machines with their serial numbers"
+```
+
+**2. MySQL (Supply Chain)**
 
 ```bash
 python -m src.nl2sql.cli --id manufacturing_supply --query "Show me top 3 products by price"
+```
+
+**3. MSSQL (History)**
+
+```bash
+python -m src.nl2sql.cli --id manufacturing_history --query "Count total production runs"
+```
+
+**4. SQLite (Reference)**
+
+```bash
+python -m src.nl2sql.cli --id manufacturing_ref --query "List all factories and their locations"
 ```
 
 ### Vector Search (RAG)
@@ -171,6 +193,20 @@ flowchart TD
   style user fill:#f6f8fa,stroke:#aaa
   style answer fill:#f6f8fa,stroke:#aaa
 ```
+
+### Vectorization Strategy
+
+To support efficient querying across large or multiple databases, we use a two-tiered vectorization approach:
+
+1. **Datasource Routing**:
+    - **What**: Indexes the `description` of each database.
+    - **Why**: Determines *which* database contains the relevant data (e.g., "Sales" vs. "Inventory").
+
+2. **Schema Selection**:
+    - **What**: Indexes table metadata (columns, foreign keys, comments).
+    - **Why**: Determines *which tables* are needed for the query within the selected database.
+
+This allows the system to scale to hundreds of tables without overwhelming the LLM's context window.
 
 ### Core Agents
 

@@ -22,7 +22,8 @@ DATABASES = {
     "manufacturing_ref": "sqlite:///data/manufacturing.db",
     "manufacturing_ops": "postgresql+psycopg2://user:password@localhost:5432/manufacturing_ops",
     "manufacturing_supply": "mysql+pymysql://user:password@localhost:3306/manufacturing_supply",
-    "manufacturing_history": "mssql+pymssql://sa:Password123!@localhost:1433/manufacturing_history",
+    "manufacturing_history": "mssql+pyodbc://sa:StrongPass2023!@127.0.0.1:1433/manufacturing_history?driver=ODBC+Driver+17+for+SQL+Server&TrustServerCertificate=yes",
+    "mssql_master": "mssql+pyodbc://sa:StrongPass2023!@127.0.0.1:1433/master?driver=ODBC+Driver+17+for+SQL+Server&TrustServerCertificate=yes",
 }
 
 # --- Schema Definitions (DDL) ---
@@ -374,6 +375,11 @@ def main():
 
     # 4. MSSQL
     try:
+        # Create DB if not exists
+        engine_master = create_engine(DATABASES["mssql_master"], isolation_level="AUTOCOMMIT")
+        with engine_master.connect() as conn:
+            conn.execute(text("IF NOT EXISTS (SELECT * FROM sys.databases WHERE name = 'manufacturing_history') CREATE DATABASE manufacturing_history"))
+        
         engine_mssql = create_engine(DATABASES["manufacturing_history"])
         with engine_mssql.connect() as conn:
             # MSSQL also prefers single statements usually

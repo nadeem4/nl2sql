@@ -1,5 +1,6 @@
 # Example datasource profile for SQLite manufacturing DB
 - id: manufacturing_sqlite
+  description: "General manufacturing data (SQLite demo)."
   engine: sqlite
   sqlalchemy_url: sqlite:///data/manufacturing.db
   auth: null
@@ -20,6 +21,7 @@
 # --- Multi-Database Setup ---
 
 - id: manufacturing_ref
+  description: "Reference data including factories, shifts, and machine types."
   engine: sqlite
   sqlalchemy_url: sqlite:///data/manufacturing.db
   auth: null
@@ -36,6 +38,7 @@
     sample_rows_enabled: true
 
 - id: manufacturing_ops
+  description: "Operations data including machines, maintenance logs, employees, and spare parts."
   engine: postgres
   sqlalchemy_url: postgresql+psycopg2://user:password@localhost:5432/manufacturing_ops
   auth: null
@@ -52,6 +55,7 @@
     sample_rows_enabled: true
 
 - id: manufacturing_supply
+  description: "Supply chain data including products, inventory, suppliers, and purchase orders."
   engine: mysql
   sqlalchemy_url: mysql+pymysql://user:password@localhost:3306/manufacturing_supply
   auth: null
@@ -68,8 +72,9 @@
     sample_rows_enabled: true
 
 - id: manufacturing_history
+  description: "Historical data including production runs, defects, customers, and sales orders."
   engine: mssql
-  sqlalchemy_url: mssql+pymssql://sa:Password123!@localhost:1433/manufacturing_history
+  sqlalchemy_url: "mssql+pyodbc://sa:StrongPass2023!@127.0.0.1:1433/manufacturing_history?driver=ODBC+Driver+17+for+SQL+Server&TrustServerCertificate=yes"
   auth: null
   read_only_role: null
   statement_timeout_ms: 8000

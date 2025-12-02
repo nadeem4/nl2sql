@@ -19,6 +19,7 @@ from nl2sql.llm_registry import (
 from nl2sql.engine_factory import make_engine
 from nl2sql.settings import settings
 from nl2sql.vector_store import SchemaVectorStore
+from nl2sql.router_store import DatasourceRouterStore
 
 
 def parse_args() -> argparse.Namespace:
@@ -245,7 +246,27 @@ def main() -> None:
 
     if args.index:
         print(f"Indexing schema to {args.vector_store}...")
-        vector_store.index_schema(engine)
+        
+        # Initialize Router Store
+        router_store = DatasourceRouterStore(persist_directory=args.vector_store)
+        
+        # Clear existing data
+        vector_store.clear()
+        router_store.clear()
+        
+        # Index Datasource Descriptions
+        print("Indexing datasource descriptions...")
+        router_store.index_datasources(profiles)
+        
+        # Index Schemas for ALL profiles
+        for p in profiles.values():
+            print(f"Indexing schema for {p.id} ({p.engine})...")
+            try:
+                eng = make_engine(p)
+                vector_store.index_schema(eng, datasource_id=p.id)
+            except Exception as e:
+                print(f"Failed to index {p.id}: {e}", file=sys.stderr)
+
         if not args.query:
             print("Indexing complete.")
             return
