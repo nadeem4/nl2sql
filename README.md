@@ -2,13 +2,15 @@
 
 This project implements a LangGraph-based NL→SQL pipeline with pluggable LLMs and multi-engine support. It ships with a SQLite manufacturing dataset, structured planner/generator outputs, guardrails, and a CLI for interactive queries.
 
-## Features
+## Key Features
 
-- **LangGraph Pipeline**: Intent → Schema → Planner → SQL Generator → Validator → Executor.
-- **Multi-Database**: Supports Postgres, MySQL, MSSQL, and SQLite via Docker.
-- **Structured Outputs**: Pydantic parsers reject wildcards and enforce limits/order.
-- **Token Efficient**: Rule-based SQL generation (sqlglot) and logic-based validation minimize LLM costs.
-- **Observability**: CLI flags to stream reasoning steps and structured JSON logs.
+- **Supervisor Architecture**: Dynamic routing of queries to the appropriate database using a 3-layer routing strategy (Vector, Multi-Query, LLM).
+- **LangGraph Pipeline**: Modular, stateful graph architecture with specialized agents for Intent, Planning, and Validation.
+- **Multi-Database Support**: Seamlessly query across Postgres, MySQL, MSSQL, and SQLite.
+- **Rule-Based SQL Generation**: Deterministic, token-efficient SQL generation using `sqlglot` to prevent syntax hallucinations.
+- **Robust Validation Loop**: Pre-execution validation of plans against the schema to catch errors early.
+- **Observability**: Real-time streaming of agent reasoning steps and structured JSON logging.
+- **Vector Search (RAG)**: Scalable schema retrieval for large databases.
 
 ---
 
