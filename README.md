@@ -4,69 +4,25 @@ This project implements a LangGraph-based NL→SQL pipeline with pluggable LLMs 
 
 ## Features
 
-- LangGraph pipeline: intent → schema → planner → SQL generator → validator → executor.
-- Structured outputs with Pydantic parsers; rejects wildcards and enforces limits/order when specified.
-- Datasource profiles via SQLAlchemy (SQLite starter; Postgres profile example included).
-- LLM registry with per-agent configs (OpenAI via LangChain) and `.env` support for keys.
-- Guardrails: read-only, limit clamp, wildcard expansion, UNION/multi-statement blocking, ORDER BY enforcement.
-- CLI with formatted output and optional stub LLM for offline testing.
+- **LangGraph Pipeline**: Intent → Schema → Planner → SQL Generator → Validator → Executor.
+- **Multi-Database**: Supports Postgres, MySQL, MSSQL, and SQLite via Docker.
+- **Structured Outputs**: Pydantic parsers reject wildcards and enforce limits/order.
+- **Token Efficient**: Rule-based SQL generation (sqlglot) and logic-based validation minimize LLM costs.
+- **Observability**: CLI flags to stream reasoning steps and structured JSON logs.
 
-## Token Efficiency
+---
 
-This pipeline is designed to be highly token-efficient by minimizing LLM usage:
+## Quick Start
 
-- **Rule-Based Generation**: The **SQL Generator** uses `sqlglot` to deterministically compile the plan into SQL, costing **0 tokens**.
-- **Logic-Based Validation**: The **Validator** uses Python logic to verify the plan against the schema, avoiding expensive LLM round-trips for syntax checking.
-- **Strategic AI Use**: LLMs are used *only* where reasoning is required (Intent, Planner), while deterministic tasks are handled by code.
-
-## Observability
-
-Gain insight into the AI's decision-making process with the `--show-thoughts` flag. This displays:
-
-- **Intent**: Reasoning for query classification and entity extraction.
-- **Schema**: Tables retrieved via vector search.
-- **Planner**: Step-by-step reasoning for table selection and query construction.
-- **Validator**: Validation checks and any errors found.
-- **Generator**: Rationale for the generated SQL.
-
-Example output:
-
-```text
-[INTENT]
-  Reasoning: User is asking for aggregate sales data...
-  Classification: READ
-
-[PLANNER]
-  Reasoning: Selected 'sales' table and grouped by 'region'...
-```
-
-## Logging
-
-By default, the CLI is **silent** (no logs). You can control logging with:
-
-- `--log-level <LEVEL>`: Set explicit log level (e.g., `DEBUG`, `INFO`).
-- `--json-logs`: Output logs in structured JSON format (ideal for ingestion).
-- `--debug`: Shortcut for `--log-level DEBUG`.
-
-Example structured log:
-
-```json
-{"timestamp": "2023-10-27 10:00:00,000", "level": "INFO", "name": "intent", "message": "Node intent completed", "node": "intent", "duration_ms": 120.5, "status": "success"}
-```
-
-## Testing Guide
-
-Follow this step-by-step guide to verify the installation and run your first query.
+Follow this guide to set up the environment and run your first query.
 
 ### Prerequisites
 
-- **Python 3.10+** installed.
-- **Docker & Docker Compose** installed and running.
-- **OpenAI API Key** (for the Planner/Intent agents).
+- **Python 3.10+**
+- **Docker & Docker Compose**
+- **OpenAI API Key**
 
-### Step 1: Installation
-
-Clone the repository and install dependencies:
+### 1. Installation
 
 ```bash
 git clone <repo-url>
@@ -74,307 +30,127 @@ cd nl2sql
 pip install -r requirements.txt
 ```
 
-### Step 2: Infrastructure Setup
+### 2. Infrastructure Setup
 
-Start the database containers (Postgres, MySQL, MSSQL) and seed them with data:
+Start the database containers (Postgres, MySQL, MSSQL) and seed them with synthetic manufacturing data:
 
 ```bash
 # Start containers
 docker-compose up -d
 
-# Seed data (wait for DBs to initialize)
+# Seed data (wait ~10s for DBs to initialize)
 python scripts/seed_databases.py --wait
 ```
 
-### Step 3: Configuration
+### 3. Configuration
 
-Create a `.env` file in the root directory with your API key:
+Create a `.env` file in the root directory:
 
 ```bash
 OPENAI_API_KEY="sk-..."
 ```
 
-### Step 4: Run a Test Query
+### 4. Verify Setup
 
-Execute a query against the **Postgres** database to verify the pipeline:
+Run a query against the **Postgres** database to verify the pipeline:
 
 ```bash
 python -m src.nl2sql.cli --id manufacturing_ops --query "List 5 machines"
 ```
 
-**Expected Output:**
-You should see a structured log of the AI's reasoning (Intent -> Planner) followed by a table of 5 machines.
+**Expected Output:** A structured log of the AI's reasoning followed by a table of 5 machines.
 
-### Step 5: Run Unit Tests
+---
 
-Verify the core logic using pytest:
+## Configuration
 
-```bash
-python -m pytest tests/
+### Datasources (`configs/datasources.yaml`)
+
+Define connection strings and settings for each database.
+
+```yaml
+manufacturing_sqlite:
+  engine: sqlite
+  connection_string: sqlite:///data/manufacturing.db
+  tables: [] # Empty list = include all
+
+manufacturing_ops:
+  engine: postgres
+  connection_string: postgresql+psycopg2://user:password@localhost:5432/manufacturing_ops
 ```
 
-## Setup
+### LLM Settings (`configs/llm.yaml`)
 
-1) Install dependencies:
+Map specific agents to different LLM providers/models.
 
-   ```bash
-   pip install --upgrade pip
-   pip install -r requirements.txt
-   ```
+```yaml
+default:
+  provider: openai
+  model: gpt-4o
 
-2) Create the databases (Postgres, MySQL, MSSQL, SQLite) and seed data:
-
-   ```bash
-   docker-compose up -d
-   python scripts/seed_databases.py --wait
-   ```
-
-3) Set your OpenAI key (or add to `.env`):
-
-   ```bash
-   # Create a .env file
-   OPENAI_API_KEY="sk-..."
-   ```
-
-4) Optional: install the package (for `nl2sql-cli`):
-
-- `--config`: datasource YAML (default `configs/datasources.yaml` or `DATASOURCE_CONFIG`)
-- `--id`: datasource id (default `manufacturing_sqlite`)
-- `--llm-config`: per-agent LLM mapping (default `configs/llm.yaml` or `LLM_CONFIG`)
-- `--vector-store`: path to vector store (default `./chroma_db` or `VECTOR_STORE`)
-- `--index`: run schema indexing (use with `--vector-store`)
-- `--stub-llm`: run with a fixed stub plan (no live LLM)
-- `--debug`: show output of each node in the graph (streaming)
-- `--show-thoughts`: show step-by-step reasoning from AI nodes and logs from non-AI nodes
-- `--json-logs`: enable structured JSON logging (defaults to INFO level)
-- `--log-level`: set logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL). Default is silent (CRITICAL) unless flags are used.
-
-## Examples
-
-### 1. Indexing the Schema
-
-Index the database schema into the vector store (default `./chroma_db`):
-
-```bash
-python -m src.nl2sql.cli --index
+agents:
+  planner:
+    provider: openai
+    model: gpt-4o-mini # Use a cheaper model for planning
 ```
 
-Specify a custom vector store path:
+---
 
-```bash
-python -m src.nl2sql.cli --index --vector-store ./my_vector_store
-```
+## Usage Guide
 
-### 2. Querying with Vector Store
+### CLI Basics
 
-Run a query using the indexed schema for context.
-**Note:** You must run indexing (step 1) at least once before querying.
+The CLI (`src.nl2sql.cli`) is the main entry point.
 
-```bash
-python -m src.nl2sql.cli --query "Show top 5 products" --vector-store ./chroma_db
-```
+- `--query "..."`: The natural language question.
+- `--id <ID>`: Target datasource (default: `manufacturing_sqlite`).
+- `--show-thoughts`: Display step-by-step AI reasoning.
+- `--vector-store <PATH>`: Use vector search for schema selection (requires indexing).
 
-### 3. Using Environment Variables
+### Multi-Database Support
 
-Set configuration via a `.env` file (or shell variables) to simplify commands.
-Create a `.env` file:
+The system simulates a manufacturing enterprise distributed across 4 databases:
 
-```bash
-OPENAI_API_KEY="sk-..."
-VECTOR_STORE="./chroma_db"
-```
-
-Then run:
-
-```bash
-python -m src.nl2sql.cli --query "Show top 5 products"
-```
-
-### 4. Real-World Examples
-
-**Query 1: Simple Listing**
-> "List Products"
-
-**SQL**:
-
-```sql
-SELECT t5.id AS id, t5.sku AS sku, t5.name AS name, t5.category AS category 
-FROM products AS t5 
-LIMIT 100
-```
-
-**Output**:
-
-| id | sku | name | category |
+| ID | Engine | Content | Example Query |
 |---|---|---|---|
-| 1 | SKU-100 | Widget Alpha | Widgets |
-| 2 | SKU-200 | Widget Beta | Widgets |
-| 3 | SKU-300 | Gadget Gamma | Gadgets |
+| `manufacturing_ops` | **Postgres** | Machines, Maintenance, Employees | `List 5 machines with their serial numbers` |
+| `manufacturing_supply` | **MySQL** | Products, Inventory, Suppliers | `Show me top 3 products by price` |
+| `manufacturing_history` | **MSSQL** | Production Runs, Sales, Defects | `Count total production runs` |
+| `manufacturing_ref` | **SQLite** | Factories, Shifts, Machine Types | `List all factories and their locations` |
 
-**Query 2: Complex Aggregation**
-> "Average maintenance downtime per factory for events over 30 minutes"
+**Example:**
 
-**SQL**:
-
-```sql
-SELECT t2.name AS factory_name, AVG(t4.downtime_minutes) AS average_downtime 
-FROM factories AS t2 
-JOIN machines AS t3 ON t2.id = t3.factory_id 
-JOIN maintenance_logs AS t4 ON t3.id = t4.machine_id 
-WHERE t4.downtime_minutes > 30 
-GROUP BY t2.id 
-LIMIT 100
+```bash
+python -m src.nl2sql.cli --id manufacturing_supply --query "Show me top 3 products by price"
 ```
 
-**Output**:
+### Vector Search (RAG)
 
-| factory_name | average_downtime |
-|---|---|
-| Plant A | 90.0 |
-| Plant B | 90.0 |
+For large schemas, use vector search to dynamically select relevant tables.
 
-### 5. Full Customization
-
-- `DATASOURCE_CONFIG`: Path to datasource config YAML
-
-## Benchmarking
-
-Compare performance of different LLM configurations (latency, success rate, token usage).
-
-1. **Create a benchmark suite config** (e.g., `configs/benchmark_suite.yaml`):
-
-   ```yaml
-   gpt-4o-setup:
-     default:
-       provider: openai
-       model: gpt-4o
-   
-   gpt-3.5-setup:
-     default:
-       provider: openai
-       model: gpt-3.5-turbo
-   ```
-
-2. **Run the benchmark**:
-
-   ```bash
-   python -m src.nl2sql.cli --query "List Products" --benchmark --bench-config configs/benchmark_suite.yaml --iterations 3
-   ```
-
-3. **View Results**:
-   The CLI will output a comparison table:
-
-   | Config | Success | Avg Latency | Avg Tokens |
-   |---|---|---|---|
-   | gpt-4o-mini-test | 100.0% | 7.54s | 3139.0 |
-   | gpt-3.5-turbo-test | 100.0% | 5.14s | 6060.3 |
-
-## Multi-Database Setup
-
-This project supports a cross-database demonstration using Docker. The data is distributed across 4 databases to simulate a real-world enterprise environment:
-
-1. **SQLite (`manufacturing_ref`)**: Reference Data
-    - `factories`: Plant locations and details.
-    - `shifts`: Work shift definitions.
-    - `machine_types`: Catalog of machine models.
-
-2. **Postgres (`manufacturing_ops`)**: Operations Data
-    - `machines`: Physical assets linked to factories.
-    - `maintenance_logs`: History of repairs and service events.
-    - `employees`: Plant staff and operators.
-    - `spare_parts`: Parts inventory for machine maintenance.
-
-3. **MySQL (`manufacturing_supply`)**: Supply Chain Data
-    - `products`: Master catalog of items produced.
-    - `inventory`: Current stock levels per warehouse.
-    - `suppliers`: External vendors.
-    - `purchase_orders`: Orders placed to suppliers.
-    - `purchase_order_items`: Line items for POs.
-
-4. **MSSQL (`manufacturing_history`)**: Commercial History
-    - `production_runs`: Historical records of manufacturing batches.
-    - `defects`: Quality control issues logged per run.
-    - `customers`: B2B clients purchasing products.
-    - `sales_orders`: Orders received from customers.
-    - `sales_order_items`: Line items for SOs.
-
-### Setup Instructions
-
-1. **Start Databases**:
+1. **Index the Schema**:
 
     ```bash
-    docker-compose up -d
+    python -m src.nl2sql.cli --index --vector-store ./chroma_db
     ```
 
-2. **Seed Data**:
-    Populate all databases with synthetic data (~10k rows):
+2. **Query with Context**:
 
     ```bash
-    python scripts/seed_databases.py --wait
+    python -m src.nl2sql.cli --query "Show top 5 products" --vector-store ./chroma_db
     ```
 
-3. **Query Examples**:
-    Run the CLI with specific datasource IDs to query different databases:
+### Observability & Logging
 
-    **Operations (Postgres)**:
+- **Stream Reasoning**: Use `--show-thoughts` to see the Intent, Planner, and Generator steps.
+- **JSON Logs**: Use `--json-logs` for structured output suitable for log ingestion.
+- **Debug Mode**: Use `--debug` for verbose output.
 
-    ```bash
-    python -m src.nl2sql.cli --id manufacturing_ops --query "List 5 machines with their serial numbers"
-    ```
+---
 
-    **Supply Chain (MySQL)**:
+## Architecture
 
-    ```bash
-    python -m src.nl2sql.cli --id manufacturing_supply --query "Show me top 3 products by price"
-    ```
-
-    **History (MSSQL)**:
-
-    ```bash
-    python -m src.nl2sql.cli --id manufacturing_history --query "Count total production runs"
-    ```
-
-    **Reference (SQLite)**:
-
-    ```bash
-    python -m src.nl2sql.cli --id manufacturing_ref --query "List all factories and their locations"
-    ```
-
-## LLM Configuration
-
-`configs/llm.yaml` shows per-agent mapping. The registry loads:
-
-- `default` provider/model
-- `agents.intent`, `agents.planner`, `agents.generator` (override)
-Keys are taken from config or `OPENAI_API_KEY`.
-
-## Testing
-
-- Run goldens against SQLite:
-
-  ```bash
-  python -m pytest tests/test_goldens_sqlite.py
-  ```
-
-## Project Structure
-
-- `src/`: core modules (`nodes`, `langgraph_pipeline`, `datasource_config`, `llm_registry`, `cli`, etc.)
-- `configs/`: datasource and LLM example configs
-- `scripts/`: utilities (`seed_databases.py`)
-- `docs/`: plan and goldens
-- `tests/`: pytest goldens
-
-## Agents (LangGraph)
-
-- **Intent** (AI): normalizes the user query, extracts entities/filters/clarifications. Output: structured intent hints.
-- **Schema** (non-AI): introspects the datasource (via SQLAlchemy) to list tables/columns and **assigns aliases** (e.g., `t1`, `t2`) for the planner.
-- **Planner** (AI): produces a structured query plan (tables, joins, filters, aggregates, order_by, limit) via LLM with Pydantic validation. **Receives feedback** from Validator or Summarizer if the plan is invalid.
-- **Validator** (non-AI): validates the **Plan** (tables, aliases, columns) against the schema. If invalid, triggers a retry loop to the Summarizer.
-- **Summarizer** (AI): analyzes validation errors and the schema to provide **intelligent feedback** to the Planner, improving self-correction.
-- **SQL Generator** (non-AI): deterministically renders engine-aware SQL from the valid plan using `sqlglot`. Enforces limits and dialect-specific syntax.
-- **Executor** (non-AI): runs the SQL read-only against the datasource, returning row count and a sample for verification.
-
-## Flow
+### The Pipeline (LangGraph)
 
 ```mermaid
 flowchart TD
@@ -396,8 +172,46 @@ flowchart TD
   style answer fill:#f6f8fa,stroke:#aaa
 ```
 
-## Notes
+### Core Agents
 
-- Guardrails block DDL/DML, enforce LIMIT, reject UNION/multi-statements, and expand wildcards using schema metadata when possible.
-- Execution is read-only; limits are clamped to datasource `row_limit`.
-- To add another engine, create a profile and ensure the driver is installed; SQLAlchemy is used as the interface.
+- **Intent (AI)**: Classifies query type and extracts entities.
+- **Planner (AI)**: Generates a database-agnostic structured plan (tables, joins, filters).
+- **Validator (Code)**: Verifies the plan against the schema (column existence, types).
+- **SQL Generator (Code)**: Deterministically compiles the plan to SQL using `sqlglot` (0 tokens).
+- **Executor (Code)**: Runs the SQL (read-only) and returns results.
+
+### Project Structure
+
+- `src/`: Core modules (`nodes`, `langgraph_pipeline`, `datasource_config`, `llm_registry`).
+- `configs/`: YAML configurations for datasources and LLMs.
+- `scripts/`: Utilities (e.g., `seed_databases.py`).
+- `tests/`: Unit and integration tests.
+
+---
+
+## Benchmarking
+
+Compare performance (latency, success rate, tokens) across LLMs.
+
+1. **Configure**: Create `configs/benchmark_suite.yaml`.
+2. **Run**:
+
+    ```bash
+    python -m src.nl2sql.cli --query "List Products" --benchmark --bench-config configs/benchmark_suite.yaml --iterations 3
+    ```
+
+## Development
+
+### Running Tests
+
+Run the test suite using pytest:
+
+```bash
+python -m pytest tests/
+```
+
+### Adding New Engines
+
+1. Add the driver to `requirements.txt`.
+2. Add a connection profile to `configs/datasources.yaml`.
+3. (Optional) Add specific DDL/Seeding logic to `scripts/seed_databases.py`.
