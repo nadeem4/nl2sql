@@ -179,6 +179,43 @@ Plant B      | 90.0
 
 ### 5. Full Customization
 
+- `DATASOURCE_CONFIG`: Path to datasource config YAML
+
+## Benchmarking
+
+Compare performance of different LLM configurations (latency, success rate, token usage).
+
+1. **Create a benchmark suite config** (e.g., `configs/benchmark_suite.yaml`):
+
+   ```yaml
+   gpt-4o-setup:
+     default:
+       provider: openai
+       model: gpt-4o
+   
+   gpt-3.5-setup:
+     default:
+       provider: openai
+       model: gpt-3.5-turbo
+   ```
+
+2. **Run the benchmark**:
+
+   ```bash
+   python -m src.nl2sql.cli --query "List Products" --benchmark --bench-config configs/benchmark_suite.yaml --iterations 3
+   ```
+
+3. **View Results**:
+   The CLI will output a comparison table:
+
+   ```text
+   === Benchmark Results ===
+   Config                    | Success  | Avg Latency  | Avg Tokens
+   -----------------------------------------------------------------
+   gpt-4o-mini-test          |  100.0% |       7.54s |     3139.0
+   gpt-3.5-turbo-test        |  100.0% |       5.14s |     6060.3
+   ```
+
 ## LLM Configuration
 
 `configs/llm.yaml` shows per-agent mapping. The registry loads:
