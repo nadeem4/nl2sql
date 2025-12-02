@@ -293,6 +293,10 @@ def main() -> None:
         print("No query provided.", file=sys.stderr)
         sys.exit(1)
 
+    # Initialize Registry early for routing (Layer 2 needs LLM)
+    llm_cfg = load_llm_config(args.llm_config)
+    registry = LLMRegistry(llm_cfg, engine=None, row_limit=100)
+
     # Routing Logic
     target_id = args.id
     router_metrics = {"time": 0.0, "tokens": 0}
@@ -313,10 +317,24 @@ def main() -> None:
             
         try:
             router_store = DatasourceRouterStore(persist_directory=args.vector_store)
-            target_ids = router_store.retrieve(query)
-            if target_ids:
-                target_id = target_ids[0]
-                print(f"  -> Selected datasource: {target_id}")
+            
+            # Layer 1 & 2: Retrieve with Score
+            results = router_store.retrieve_with_score(query)
+            
+            if results:
+                target_id, distance = results[0]
+                print(f"  -> Initial match: {target_id} (distance: {distance:.4f})")
+                
+                # Confidence Gate (Layer 2)
+                # Distance > 0.4 implies similarity < ~0.92 (depending on model)
+                if distance > 0.4:
+                    print(f"  -> Low confidence (distance > 0.4). Triggering Multi-Query Router...")
+                    # Use planner agent (usually gpt-4o-mini) for query generation
+                    llm = registry._base_llm("planner") 
+                    mq_results = router_store.multi_query_retrieve(query, llm)
+                    if mq_results:
+                        target_id = mq_results[0]
+                        print(f"  -> Multi-Query selected: {target_id}")
             else:
                 print("  -> No matching datasource found. Using default 'manufacturing_sqlite'.")
                 target_id = "manufacturing_sqlite"
