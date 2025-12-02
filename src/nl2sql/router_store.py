@@ -96,6 +96,7 @@ class DatasourceRouterStore:
     def multi_query_retrieve(self, query: str, llm, k: int = 1) -> List[str]:
         """
         Generates query variations and retrieves the most voted datasource.
+        Only counts votes if the match distance is below a threshold (0.5).
         """
         from langchain_core.prompts import PromptTemplate
         from langchain_core.output_parsers import StrOutputParser
@@ -117,12 +118,17 @@ class DatasourceRouterStore:
             
             votes = {}
             for q in variations:
-                results = self.retrieve(q, k=1)
+                # Use retrieve_with_score to check confidence
+                results = self.retrieve_with_score(q, k=1)
                 if results:
-                    ds_id = results[0]
-                    votes[ds_id] = votes.get(ds_id, 0) + 1
+                    ds_id, distance = results[0]
+                    # Only count vote if distance is reasonable (e.g. < 0.5)
+                    # If it's garbage, don't vote.
+                    if distance < 0.5:
+                        votes[ds_id] = votes.get(ds_id, 0) + 1
             
             if not votes:
+                print("  -> No variations met confidence threshold.")
                 return []
                 
             # Return winner
@@ -132,4 +138,48 @@ class DatasourceRouterStore:
             
         except Exception as e:
             print(f"  -> Multi-query generation failed: {e}")
-            return self.retrieve(query, k=k)
+            return []
+
+    def llm_route(self, query: str, llm, datasources: List[DatasourceProfile]) -> Optional[str]:
+        """
+        Layer 3: Uses an LLM to reason about which datasource is best.
+        """
+        from langchain_core.prompts import PromptTemplate
+        from langchain_core.output_parsers import StrOutputParser
+
+        # Format datasource descriptions
+        iterable = datasources.values() if isinstance(datasources, dict) else datasources
+        ds_context = "\n".join([f"- ID: {ds.id}\n  Description: {ds.description}" for ds in iterable])
+
+        prompt = PromptTemplate(
+            template="""You are a database routing expert. Your goal is to select the most relevant database for a user's SQL query.
+
+Available Databases:
+{context}
+
+User Query: "{question}"
+
+Instructions:
+1. Analyze the query and match it to the database descriptions.
+2. Return ONLY the ID of the selected database.
+3. If no database is relevant, return "None".
+
+Selected Database ID:""",
+            input_variables=["context", "question"]
+        )
+
+        chain = prompt | llm | StrOutputParser()
+        
+        try:
+            result = chain.invoke({"context": ds_context, "question": query}).strip()
+            # Clean up potential extra text
+            result = result.split()[0].strip().strip('"').strip("'")
+            
+            iterable = datasources.values() if isinstance(datasources, dict) else datasources
+            valid_ids = {ds.id for ds in iterable}
+            if result in valid_ids:
+                return result
+            return None
+        except Exception as e:
+            print(f"  -> LLM routing failed: {e}")
+            return None
