@@ -92,6 +92,7 @@ agents:
   planner:
     provider: openai
     model: gpt-4o-mini # Use a cheaper model for planning
+```
 
 ### Routing Examples (`configs/sample_questions.yaml`)
 
