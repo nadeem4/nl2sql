@@ -11,6 +11,8 @@ from nl2sql.nodes.planner.prompts import PLANNER_PROMPT, PLANNER_EXAMPLES
 LLMCallable = Union[Callable[[str], str], Runnable]
 
 
+from langchain_core.prompts import ChatPromptTemplate
+
 class PlannerNode:
     """
     Generates a high-level execution plan from the user query.
@@ -27,6 +29,9 @@ class PlannerNode:
             llm: The language model to use for planning.
         """
         self.llm = llm
+        if self.llm:
+            self.prompt = ChatPromptTemplate.from_template(PLANNER_PROMPT)
+            self.chain = self.prompt | self.llm
 
     def __call__(self, state: GraphState) -> GraphState:
         """
@@ -74,19 +79,14 @@ class PlannerNode:
                 feedback += f"- {err}\n"
             state.errors = []
 
-        prompt = PLANNER_PROMPT.format(
-            schema_context=schema_context,
-            intent_context=intent_context,
-            examples=PLANNER_EXAMPLES,
-            feedback=feedback,
-            user_query=state.user_query
-        )
-        
         try:
-            if isinstance(self.llm, Runnable):
-                plan_model = self.llm.invoke(prompt)
-            else:
-                plan_model = self.llm(prompt)
+            plan_model = self.chain.invoke({
+                "schema_context": schema_context,
+                "intent_context": intent_context,
+                "examples": PLANNER_EXAMPLES,
+                "feedback": feedback,
+                "user_query": state.user_query
+            })
             
             state.validation["planner_raw"] = plan_model.model_dump_json()
 

@@ -1,22 +1,20 @@
-from typing import Callable, Dict, Optional, Union
-import dataclasses
+from typing import Callable, Dict, Optional, Union, List
+
 import json
 from sqlalchemy import inspect
 from langchain_core.runnables import Runnable
+from langgraph.graph import END, StateGraph
+from langgraph.types import Send
 
 from nl2sql.capabilities import get_capabilities
 from nl2sql.datasource_registry import DatasourceRegistry
-from nl2sql.nodes.intent.node import IntentNode
-from nl2sql.nodes.planner.node import PlannerNode
-from nl2sql.nodes.generator_node import GeneratorNode
-from nl2sql.nodes.validator_node import ValidatorNode
-from nl2sql.nodes.schema_node import SchemaNode
-from nl2sql.nodes.router_node import RouterNode
-from nl2sql.schemas import GraphState
+from nl2sql.nodes.decomposer import DecomposerNode
+from nl2sql.nodes.aggregator import AggregatorNode
+from nl2sql.subgraphs.execution import build_execution_subgraph
+from nl2sql.schemas import GraphState, DecomposerResponse, AggregatedResponse
 from nl2sql.tracing import span
 from nl2sql.vector_store import SchemaVectorStore
 from nl2sql.graph_utils import wrap_graphstate
-from nl2sql.nodes.executor_node import ExecutorNode
 from nl2sql.llm_registry import LLMRegistry
 
 # Type for an LLM callable: prompt -> string
@@ -37,85 +35,62 @@ def build_graph(registry: DatasourceRegistry, llm_registry: LLMRegistry, execute
     Returns:
         Compiled StateGraph.
     """
-    try:
-        from langgraph.graph import END, StateGraph
-    except ImportError as exc:
-        raise RuntimeError("langgraph is required to build the graph. Install via pip.") from exc
-
-    # Attach capabilities marker for downstream routing
-    # NOTE: Capabilities are now dynamic based on selected datasource, so we init with empty
-    base_state = dataclasses.asdict(GraphState(user_query=""))
     
-    graph = StateGraph(dict)
+    graph = StateGraph(GraphState)
 
     # Instantiate Nodes
-    # Router
-    router = RouterNode(llm_registry, registry, vector_store_path)
+    decomposer_llm = llm_registry.get_structured_llm("decomposer", DecomposerResponse)
+    decomposer = DecomposerNode(decomposer_llm)
     
-    # Intent
-    intent = IntentNode(llm=llm_registry.intent_llm())
+    aggregator_llm = llm_registry.get_structured_llm("aggregator", AggregatedResponse)
+    aggregator = AggregatorNode(aggregator_llm)
     
-    # Schema (Dynamic)
-    schema_node = SchemaNode(registry=registry, vector_store=vector_store)
-    
-    # Generator (Dynamic)
-    generator = GeneratorNode(registry=registry)
+    # Build Execution Subgraph
+    # We pass the same dependencies to the subgraph
+    execution_subgraph = build_execution_subgraph(registry, llm_registry, vector_store, vector_store_path)
 
-    from nl2sql.subgraphs.planning import build_planning_subgraph
-    
-    # Prepare effective llm_map for subgraph
-    # NOTE: We are using LLMRegistry now, so we might need to adjust how we pass LLMs to subgraph
-    # For now, we'll assume the subgraph still takes a map or we pass the registry's base LLM
-    # The current subgraph builder takes llm_map. Let's construct one from registry.
-    effective_llm_map = {
-        "planner": llm_registry.planner_llm(),
-        "summarizer": llm_registry.summarizer_llm()
-    }
+    def execution_wrapper(state: Union[Dict, GraphState]):
+        # Invoke the subgraph
+        # Ensure input is a dict if subgraph expects it, or GraphState
+        # Subgraph is StateGraph(GraphState), so it handles both usually.
+        # But we need to be careful with what we pass.
+        # Send passes a dict {"user_query": ...}.
+        result = execution_subgraph.invoke(state)
+        
+        # Filter output to only return intermediate_results and latency
+        # This prevents conflicts on other fields like user_query
+        return {
+            "intermediate_results": result.get("intermediate_results", []),
+            "latency": result.get("latency", {})
+        }
 
-    # Build the planning subgraph
-    # NOTE: Subgraph builder takes row_limit. This is tricky because row_limit is dynamic now.
-    # We might need to refactor the subgraph builder too, OR pass a default/max limit.
-    # The subgraph uses row_limit for the prompt. 
-    # Let's pass a safe default (e.g. 1000) or refactor. 
-    # Refactoring subgraph is out of scope for this immediate step, let's pass 1000.
-    # Ideally, the planner node should read row_limit from state/profile at runtime.
-    # TODO: Refactor PlannerNode to be dynamic.
-    planning_subgraph = build_planning_subgraph(effective_llm_map, row_limit=1000)
+    # Add Nodes
+    graph.add_node("decomposer", wrap_graphstate(decomposer, "decomposer"))
+    graph.add_node("execution_branch", execution_wrapper)
+    graph.add_node("aggregator", wrap_graphstate(aggregator, "aggregator"))
 
-    graph.add_node("router", wrap_graphstate(router, "router"))
-    graph.add_node("intent", wrap_graphstate(intent, "intent"))
-    graph.add_node("schema", wrap_graphstate(schema_node, "schema"))
-    graph.add_node("planning", planning_subgraph)
-    graph.add_node("sql_generator", wrap_graphstate(generator, "sql_generator"))
+    # Edges
+    graph.set_entry_point("decomposer")
     
-    if execute:
-        graph.add_node("executor", wrap_graphstate(ExecutorNode(registry=registry), "executor"))
-
-    graph.set_entry_point("router")
-    graph.add_edge("router", "intent")
-    graph.add_edge("intent", "schema")
-    graph.add_edge("schema", "planning")
-    
-    def check_planning_result(state: Dict) -> str:
-        gs = GraphState(**state)
-        if gs.plan and not gs.errors:
-            return "ok"
-        return "end"
+    def continue_to_subqueries(state: GraphState):
+        """
+        Determines whether to fan out to parallel branches or proceed with a single branch.
+        """
+        sub_queries = state.sub_queries or [state.user_query]
+        print(f"DEBUG: continue_to_subqueries called with {sub_queries}")
+        
+        # We use Send to create parallel branches for each sub-query
+        # We override 'user_query' for the branch execution
+        return [Send("execution_branch", {"user_query": sq}) for sq in sub_queries]
 
     graph.add_conditional_edges(
-        "planning",
-        check_planning_result,
-        {
-            "ok": "sql_generator",
-            "end": END
-        }
+        "decomposer",
+        continue_to_subqueries,
+        ["execution_branch"]
     )
     
-    if execute:
-        graph.add_edge("sql_generator", "executor")
-        graph.add_edge("executor", END)
-    else:
-        graph.add_edge("sql_generator", END)
+    graph.add_edge("execution_branch", "aggregator")
+    graph.add_edge("aggregator", END)
 
     return graph.compile()
 
@@ -139,44 +114,58 @@ def run_with_graph(registry: DatasourceRegistry, llm_registry: LLMRegistry, user
         The final state dictionary.
     """
     g = build_graph(registry, llm_registry, execute=execute, vector_store=vector_store, vector_store_path=vector_store_path)
-    initial_state = dataclasses.asdict(
-        GraphState(
-            user_query=user_query,
-            datasource_id=datasource_id,
-            # Validation capabilities will be populated dynamically or we can init empty
-            validation={"capabilities": "generic"}, 
-        )
+    
+    # Initialize GraphState
+    initial_state = GraphState(
+        user_query=user_query,
+        datasource_id=datasource_id,
+        validation={"capabilities": "generic"}, 
     )
+    
+    # Convert to dict for LangGraph input if needed, but we are using StateGraph(GraphState) now
+    # Actually, StateGraph(GraphState) expects a dict input that matches the schema? 
+    # Or an object? It usually accepts a dict.
+    initial_state_dict = initial_state.model_dump()
     
     import time
     start_total = time.perf_counter()
     
     node_map = {
+        "decomposer": "decomposer",
+        "router": "router",
         "intent": "intent",
         "schema": "schema",
         "planner": "planner",
         "validator": "validator",
         "sql_generator": "generator",
-        "summarizer": "summarizer"
+        "summarizer": "summarizer",
+        "aggregator": "aggregator"
     }
 
     if debug or on_thought:
         if debug:
             print("\n--- Starting Graph Execution (Debug Mode) ---")
         
-        final_state = initial_state
-        for namespace, mode, payload in g.stream(initial_state, stream_mode=["updates", "messages"], subgraphs=True):
+        final_state = initial_state_dict
+        # We need to handle subgraphs in streaming
+        for namespace, mode, payload in g.stream(initial_state_dict, stream_mode=["updates", "messages"], subgraphs=True):
             if mode == "updates":
            
                 for node_name, state_update in payload.items():
                     if debug:
                         print(f"\n--- Node: {node_name} ---")
-                        print(json.dumps(state_update, indent=2, default=str))
+                        # print(json.dumps(state_update, indent=2, default=str)) # Can be verbose
                     
-                    final_state.update(state_update)
+                    # Update final state (simple merge for top-level, might need care for lists)
+                    if isinstance(state_update, dict):
+                        final_state.update(state_update)
 
                     if on_thought:
-                        thought_key = node_map.get(node_name)
+                        # Map node name (which might be namespaced like "execution_branch:router")
+                        # We need to extract the actual node name
+                        actual_node = node_name.split(":")[-1]
+                        thought_key = node_map.get(actual_node)
+                        
                         if thought_key:
                             thoughts = state_update.get("thoughts", {}).get(thought_key)
                             if thoughts:
@@ -185,7 +174,8 @@ def run_with_graph(registry: DatasourceRegistry, llm_registry: LLMRegistry, user
             elif mode == "messages":
                 chunk, metadata = payload
                 node_name = metadata.get("langgraph_node", "")
-                thought_key = node_map.get(node_name)
+                actual_node = node_name.split(":")[-1]
+                thought_key = node_map.get(actual_node)
                 
                 if thought_key and on_thought:
                     if hasattr(chunk, "content") and chunk.content:
@@ -195,7 +185,7 @@ def run_with_graph(registry: DatasourceRegistry, llm_registry: LLMRegistry, user
             print("\n--- Graph Execution Complete ---\n")
         result = final_state
     else:
-        result = g.invoke(initial_state)
+        result = g.invoke(initial_state_dict)
     
     total_duration = time.perf_counter() - start_total
     if "latency" not in result:

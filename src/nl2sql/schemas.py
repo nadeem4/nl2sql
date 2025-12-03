@@ -1,9 +1,22 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Literal, Optional, TypedDict
+
+from typing import Any, Dict, List, Literal, Optional, TypedDict, Annotated
+import operator
 
 from pydantic import BaseModel, ConfigDict, Field
+
+
+def reduce_latency(left: Dict[str, float], right: Dict[str, float]) -> Dict[str, float]:
+    """Reduces latency dictionaries by summing values for the same key."""
+    if not left:
+        return right
+    if not right:
+        return left
+    new_latency = left.copy()
+    for k, v in right.items():
+        new_latency[k] = new_latency.get(k, 0.0) + v
+    return new_latency
 
 
 class ColumnRef(BaseModel):
@@ -143,7 +156,7 @@ class OrderSpec(BaseModel):
     direction: Literal["asc", "desc"]
 
 
-class GeneratedSQL(TypedDict):
+class GeneratedSQL(BaseModel):
     """
     Represents the generated SQL output.
 
@@ -153,8 +166,9 @@ class GeneratedSQL(TypedDict):
         limit_enforced: Whether the row limit was enforced.
         draft_only: Whether this is a draft or final SQL.
     """
+    model_config = ConfigDict(extra="ignore")
     sql: str
-    rationale: str
+    rationale: Optional[str] = None
     limit_enforced: bool
     draft_only: bool
 
@@ -220,9 +234,7 @@ class PlanModel(BaseModel):
     reasoning: Optional[str] = Field(None)
     query_type: Literal["READ", "WRITE", "DDL", "UNKNOWN"] = Field("READ")
 
-
-@dataclass
-class GraphState:
+class GraphState(BaseModel):
     """
     Represents the state of the LangGraph execution.
 
@@ -238,23 +250,27 @@ class GraphState:
         errors: List of errors encountered during execution.
         retry_count: Number of retries attempted.
         thoughts: Chain of thought logs from each node.
+        datasource_id: The ID of the selected datasource.
+        sub_queries: List of sub-queries for cross-db execution.
+        intermediate_results: List of results from sub-queries.
     """
+    model_config = ConfigDict(extra="ignore", arbitrary_types_allowed=True)
+    
     user_query: str
     plan: Optional[Dict[str, Any]] = None
     sql_draft: Optional[GeneratedSQL] = None
     schema_info: Optional[SchemaInfo] = None
-    validation: Dict[str, Any] = field(default_factory=dict)
-    execution: Dict[str, Any] = field(default_factory=dict)
+    validation: Dict[str, Any] = Field(default_factory=dict)
+    execution: Dict[str, Any] = Field(default_factory=dict)
     retrieved_tables: Optional[List[str]] = None
-    latency: Dict[str, float] = field(default_factory=dict)
-    errors: List[str] = field(default_factory=list)
+    latency: Annotated[Dict[str, float], reduce_latency] = Field(default_factory=dict)
+    errors: List[str] = Field(default_factory=list)
     retry_count: int = 0
-    thoughts: Dict[str, List[str]] = field(default_factory=dict)
+    thoughts: Dict[str, List[str]] = Field(default_factory=dict)
     datasource_id: Optional[str] = None
-
-    def __post_init__(self):
-        if isinstance(self.schema_info, dict):
-            self.schema_info = SchemaInfo(**self.schema_info)
+    sub_queries: Optional[List[str]] = None
+    intermediate_results: Annotated[List[Any], operator.add] = Field(default_factory=list)
+    final_answer: Optional[str] = None
 
 
 class SQLModel(BaseModel):
@@ -272,3 +288,20 @@ class SQLModel(BaseModel):
     rationale: Optional[str] = None
     limit_enforced: Optional[bool] = None
     draft_only: Optional[bool] = None
+
+
+class DecomposerResponse(BaseModel):
+    """Structured response for the query decomposer."""
+    sub_queries: List[str] = Field(
+        description="List of sub-queries. If no decomposition is needed, this list should contain only the original query."
+    )
+    reasoning: str = Field(description="Reasoning for why the query was decomposed (or not).")
+
+
+class AggregatedResponse(BaseModel):
+    """Structured response for the aggregator."""
+    summary: str = Field(description="A concise summary of the aggregated results.")
+    format_type: Literal["table", "list", "text"] = Field(
+        description="The best format to present the data: 'table' for structured data, 'list' for items, 'text' for narrative."
+    )
+    content: str = Field(description="The aggregated content formatted according to format_type (e.g., Markdown table, bullet points, or paragraph).")

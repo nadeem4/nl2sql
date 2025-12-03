@@ -132,6 +132,13 @@ class LLMRegistry:
             raise RuntimeError("OPENAI_API_KEY is not set and no api_key provided in config.")
         return ChatOpenAI(model=cfg.model, temperature=cfg.temperature, api_key=key)
 
+    def get_llm(self, agent: str) -> ChatOpenAI:
+        """
+        Returns the raw ChatOpenAI object for a specific agent.
+        Useful when custom wrapping (e.g., with_structured_output) is needed.
+        """
+        return self._base_llm(agent)
+
     def _wrap_usage(self, llm: ChatOpenAI, agent: str) -> LLMCallable:
         model_name = self._agent_cfg(agent).model
 
@@ -200,6 +207,13 @@ class LLMRegistry:
 
         llm = self._base_llm("planner") 
         return self._wrap_usage(llm, "summarizer")
+
+    def get_structured_llm(self, agent: str, schema: Any) -> LLMCallable:
+        """
+        Returns a structured LLM callable for a specific agent, with usage tracking.
+        """
+        llm = self._base_llm(agent)
+        return self._wrap_structured_usage(llm, agent, schema)
 
     def llm_map(self) -> Dict[str, LLMCallable]:
         """Returns a dictionary of all agent LLM callables."""

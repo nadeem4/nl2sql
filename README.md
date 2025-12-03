@@ -5,6 +5,7 @@ This project implements a LangGraph-based NL→SQL pipeline with pluggable LLMs 
 ## Key Features
 
 - **Supervisor Architecture**: Dynamic routing of queries to the appropriate database using a 3-layer routing strategy (Vector, Multi-Query, LLM).
+- **Cross-Database Support**: Map-Reduce architecture to handle complex queries spanning multiple databases (e.g., "Compare sales from MSSQL and inventory from MySQL").
 - **LangGraph Pipeline**: Modular, stateful graph architecture with specialized agents for Intent, Planning, and Validation.
 - **Multi-Database Support**: Seamlessly query across Postgres, MySQL, MSSQL, and SQLite.
 - **Rule-Based SQL Generation**: Deterministic, token-efficient SQL generation using `sqlglot` to prevent syntax hallucinations.
@@ -164,6 +165,16 @@ python -m src.nl2sql.cli --id manufacturing_history --query "Count total product
 python -m src.nl2sql.cli --id manufacturing_ref --query "List all factories and their locations"
 ```
 
+### 5. Cross-Database Query (Map-Reduce)
+
+The system can automatically decompose complex queries into sub-queries, execute them in parallel, and aggregate the results.
+
+```bash
+python -m src.nl2sql.cli --query "Compare sales from manufacturing_history and inventory from manufacturing_supply"
+```
+
+**Expected Output:** A consolidated answer merging data from MSSQL (History) and MySQL (Supply).
+
 ### Vector Search (RAG)
 
 For large schemas, use vector search to dynamically select relevant tables.
@@ -196,23 +207,33 @@ We use a **Supervisor Architecture** where the graph itself manages routing and 
 
 ```mermaid
 flowchart TD
-  user["User Query"] --> router["Router (AI)"]
-  router --> intent["Intention (AI)"]
-  intent --> schema["Schema (non-AI)"]
-  schema --> planning["Planning Subgraph"]
+  user["User Query"] --> decomposer["Decomposer (AI)"]
+  decomposer -- Single DB --> router["Router (AI)"]
+  decomposer -- Multi DB --> split["Parallel Execution"]
   
-  subgraph Planning Subgraph
-    planner["Planner (AI)"] --> validator["Validator (non-AI)"]
-    validator -- Invalid --> summarizer["Summarizer (AI)"]
-    summarizer --> planner
+  subgraph Execution Pipeline
+    router --> intent["Intention (AI)"]
+    intent --> schema["Schema (non-AI)"]
+    schema --> planning["Planning Subgraph"]
+    
+    subgraph Planning Subgraph
+      planner["Planner (AI)"] --> validator["Validator (non-AI)"]
+      validator -- Invalid --> summarizer["Summarizer (AI)"]
+      summarizer --> planner
+    end
+    
+    validator -- Valid --> generator["SQL Generator (non-AI)"]
+    generator --> executor["Executor (non-AI)"]
   end
   
-  validator -- Valid --> generator["SQL Generator (non-AI)"]
-  generator --> executor["Executor (non-AI)"]
-  executor --> answer["Answer/Result Sample"]
+  split --> router
+  executor --> aggregator["Aggregator (AI)"]
+  aggregator --> answer["Final Answer"]
   
   style user fill:#f6f8fa,stroke:#aaa
+  style decomposer fill:#e1f5fe,stroke:#01579b
   style router fill:#e1f5fe,stroke:#01579b
+  style aggregator fill:#e1f5fe,stroke:#01579b
   style answer fill:#f6f8fa,stroke:#aaa
 ```
 

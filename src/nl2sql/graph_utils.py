@@ -1,5 +1,5 @@
-from typing import Callable, Dict, Optional
-import dataclasses
+from typing import Callable, Dict, Optional, Union
+
 import time
 from nl2sql.schemas import GraphState
 from nl2sql.tracing import span
@@ -23,8 +23,11 @@ def wrap_graphstate(fn: Callable[[GraphState], GraphState], name: Optional[str] 
         A wrapped function that accepts and returns a dictionary.
     """
 
-    def wrapped(state: Dict) -> Dict:
-        gs = GraphState(**state)
+    def wrapped(state: Union[Dict, GraphState]) -> Dict:
+        if isinstance(state, GraphState):
+            gs = state
+        else:
+            gs = GraphState(**state)
         
         # Determine node name
         node_name = name
@@ -40,10 +43,21 @@ def wrap_graphstate(fn: Callable[[GraphState], GraphState], name: Optional[str] 
         start = time.perf_counter()
         try:
             with span(node_name):
-                gs = fn(gs)
-            duration = time.perf_counter() - start
+                result = fn(gs)
             
-            gs.latency[node_name] = duration
+            # If result is a dict, use it as the base for output
+            if isinstance(result, dict):
+                output = result.copy()
+            elif isinstance(result, GraphState):
+                output = result.model_dump()
+            else:
+                output = {}
+                
+            duration = time.perf_counter() - start
+            # print(f"DEBUG: Node {node_name} duration: {duration:.4f}s")
+            
+            # Ensure latency is a delta, not the full history
+            output["latency"] = {node_name: duration}
             
             # Log success
             logger.info(f"Node {node_name} completed", extra={
@@ -62,6 +76,6 @@ def wrap_graphstate(fn: Callable[[GraphState], GraphState], name: Optional[str] 
             })
             raise e
         
-        return dataclasses.asdict(gs)
+        return output
 
     return wrapped

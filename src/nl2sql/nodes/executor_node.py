@@ -37,7 +37,7 @@ class ExecutorNode:
             state.errors.append("No SQL to execute.")
             return state
             
-        if not enforce_read_only(state.sql_draft["sql"]):
+        if not enforce_read_only(state.sql_draft.sql):
             state.errors.append("Security Violation: SQL query contains forbidden keywords (read-only enforcement).")
             state.execution = {"error": "Security Violation"}
             return state
@@ -52,7 +52,7 @@ class ExecutorNode:
         
         with span("executor", {"datasource.id": profile.id, "engine": profile.engine}):
             try:
-                rows = run_read_query(engine, state.sql_draft["sql"], row_limit=profile.row_limit)
+                rows = run_read_query(engine, state.sql_draft.sql, row_limit=profile.row_limit)
                 samples = []
                 for row in rows[:3]:
                     try:

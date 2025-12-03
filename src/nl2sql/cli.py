@@ -132,56 +132,81 @@ def _render_state(state: Dict[str, Any], registry: LLMRegistry | None = None, ve
                 print("Sample:")
                 print(_format_table(sample))
 
+    final_answer = state.get("final_answer")
+    if final_answer:
+        print("\n=== Final Answer ===")
+        print(final_answer)
+
     # Performance Table
     print("\nPerformance:")
     latency = state.get("latency") or {}
     usage = usage or {}
     router_metrics = router_metrics or {"time": 0, "tokens": 0}
     
-    # Define nodes and their types
-    nodes = [
-        ("router", "AI"),
-        ("intent", "AI"),
-        ("schema", "Non-AI"),
-        ("planner", "AI"),
-        ("generator", "Non-AI"),
-        ("validator", "Non-AI"),
-        ("executor", "Non-AI"),
-    ]
+    # Collect all node names from latency and usage
+    node_names = set(latency.keys())
     
+    # Add nodes from usage (keys are "agent:model")
+    for key in usage.keys():
+        if ":" in key and key != "_all":
+            agent = key.split(":")[0]
+            node_names.add(agent)
+            
+    if router_metrics.get("time", 0) > 0 or router_metrics.get("tokens", 0) > 0:
+        node_names.add("router")
+        
+    # Filter out 'total' if present in latency
+    if "total" in node_names:
+        node_names.remove("total")
+        
+    # Sort nodes: router first, then others alphabetically
+    sorted_nodes = sorted(list(node_names))
+    if "router" in sorted_nodes:
+        sorted_nodes.remove("router")
+        sorted_nodes.insert(0, "router")
+        
     rows = []
     total_time = latency.get("total", 0) + router_metrics.get("time", 0)
     total_tokens = usage.get("_all", {}).get("total_tokens", 0) + router_metrics.get("tokens", 0)
 
-    for node, node_type in nodes:
+    for node in sorted_nodes:
         # Time
         if node == "router":
             duration = router_metrics.get("time", 0)
         else:
             duration = latency.get(node, 0)
         
-        # Model
+        # Model & Type
         model = "-"
+        node_type = "Non-AI"
+        
         if node == "router":
             model = "text-embedding-3-small"
-        elif node_type == "AI":
-            if registry:
-                try:
-                    model = registry._agent_cfg(node).model
-                except:
-                    model = "unknown"
-            else:
-                model = "stub"
+            node_type = "AI"
+        elif registry:
+            # Check if it's a known agent in registry
+            try:
+                cfg = registry._agent_cfg(node)
+                if cfg:
+                    model = cfg.model
+                    node_type = "AI"
+            except:
+                # Fallback: check if we have tokens for it
+                pass
         
         # Tokens
         tokens = 0
         if node == "router":
             tokens = router_metrics.get("tokens", 0)
-        elif node_type == "AI":
+        else:
             # Usage keys are "agent:model"
             for key, val in usage.items():
                 if key.startswith(f"{node}:"):
                     tokens += val.get("total_tokens", 0)
+                    # If we found tokens, it's definitely AI (even if not in registry explicitly)
+                    node_type = "AI"
+                    if model == "-":
+                         model = key.split(":")[1]
         
         rows.append({
             "Node": node.capitalize(),

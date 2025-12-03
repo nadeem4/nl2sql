@@ -22,43 +22,37 @@ def build_planning_subgraph(llm_map: Dict[str, LLMCallable], row_limit: int = 10
     Returns:
         Compiled StateGraph for the planning loop.
     """
-    graph = StateGraph(dict)
+    graph = StateGraph(GraphState)
 
     # Nodes
     planner = PlannerNode(llm=llm_map.get("planner"))
     validator = ValidatorNode(row_limit=row_limit)
     summarizer = SummarizerNode(llm=llm_map.get("summarizer"))
 
-    def retry_node(state: Dict) -> Dict:
+    def retry_node(state: GraphState) -> Dict:
         """Increments retry count."""
-        gs = GraphState(**state)
-        gs.retry_count += 1
-        return dataclasses.asdict(gs)
+        return {"retry_count": state.retry_count + 1}
 
-    def planner_retry_node(state: Dict) -> Dict:
+    def planner_retry_node(state: GraphState) -> Dict:
         """Increments retry count for planner retry path."""
-        gs = GraphState(**state)
-        gs.retry_count += 1
-        return dataclasses.asdict(gs)
+        return {"retry_count": state.retry_count + 1}
 
-    def check_planner(state: Dict) -> str:
+    def check_planner(state: GraphState) -> str:
         """Checks if planner succeeded or needs retry/failure."""
-        gs = GraphState(**state)
-        if not gs.plan or any("Planner" in e for e in gs.errors):
-            if gs.retry_count < 3:
+        if not state.plan or any("Planner" in e for e in state.errors):
+            if state.retry_count < 3:
                 return "retry"
             else:
                 return "end"
         return "ok"
 
-    def check_validation(state: Dict) -> str:
+    def check_validation(state: GraphState) -> str:
         """Checks validation results."""
-        gs = GraphState(**state)
-        if gs.errors:
-            if any("Security Violation" in e for e in gs.errors):
+        if state.errors:
+            if any("Security Violation" in e for e in state.errors):
                 return "end"
                 
-            if gs.retry_count < 3:
+            if state.retry_count < 3:
                 return "retry"
             else:
                 return "end"
