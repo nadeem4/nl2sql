@@ -234,6 +234,18 @@ class PlanModel(BaseModel):
     reasoning: Optional[str] = Field(None)
     query_type: Literal["READ", "WRITE", "DDL", "UNKNOWN"] = Field("READ")
 
+class ExecutionModel(BaseModel):
+    """
+    Represents the result of an SQL execution.
+    """
+    row_count: int = Field(description="Number of rows returned")
+    rows: List[Dict[str, Any]] = Field(default_factory=list, description="The actual data rows")
+    columns: List[str] = Field(default_factory=list, description="Column names")
+    error: Optional[str] = Field(None, description="Error message if execution failed")
+
+    model_config = ConfigDict(extra="allow")
+
+
 class GraphState(BaseModel):
     """
     Represents the state of the LangGraph execution.
@@ -261,7 +273,7 @@ class GraphState(BaseModel):
     sql_draft: Optional[GeneratedSQL] = None
     schema_info: Optional[SchemaInfo] = None
     validation: Dict[str, Any] = Field(default_factory=dict)
-    execution: Dict[str, Any] = Field(default_factory=dict)
+    execution: Optional[ExecutionModel] = None
     retrieved_tables: Optional[List[str]] = None
     latency: Annotated[Dict[str, float], reduce_latency] = Field(default_factory=dict)
     errors: List[str] = Field(default_factory=list)

@@ -17,7 +17,6 @@ def format_result(state: GraphState) -> Dict[str, Any]:
     """
     Formats the execution result for the aggregator.
     """
-    # Extract relevant info
     query = state.user_query
     execution = state.execution
     error = state.errors
@@ -25,8 +24,13 @@ def format_result(state: GraphState) -> Dict[str, Any]:
     if error:
         result_str = f"Query: {query}\nStatus: Error\nDetails: {error}"
     elif execution:
-        # Format the execution result (assuming it's a list of dicts or similar)
-        result_data = execution.get("result", "No result returned")
+        # Handle ExecutionModel
+        rows = execution.rows
+        row_count = execution.row_count
+        if rows:
+            result_data = f"{row_count} rows returned. Sample: {rows[:3]}" 
+        else:
+            result_data = "No rows returned."
         result_str = f"Query: {query}\nStatus: Success\nData: {result_data}"
     else:
         result_str = f"Query: {query}\nStatus: No execution occurred."
@@ -39,21 +43,20 @@ def build_execution_subgraph(registry: DatasourceRegistry, llm_registry: LLMRegi
     """
     graph = StateGraph(GraphState)
 
-    # Instantiate Nodes
+    intent_llm = llm_registry.intent_llm()
+
     router = RouterNode(llm_registry, registry, vector_store_path)
-    intent = IntentNode(llm=llm_registry.intent_llm())
+    intent = IntentNode(llm=intent_llm)
     schema_node = SchemaNode(registry=registry, vector_store=vector_store)
     generator = GeneratorNode(registry=registry)
     executor = ExecutorNode(registry=registry)
     
-    # Planning Subgraph
     effective_llm_map = {
         "planner": llm_registry.planner_llm(),
         "summarizer": llm_registry.summarizer_llm()
     }
     planning_subgraph = build_planning_subgraph(effective_llm_map, row_limit=1000)
 
-    # Add Nodes
     graph.add_node("router", wrap_graphstate(router, "router"))
     graph.add_node("intent", wrap_graphstate(intent, "intent"))
     graph.add_node("schema", wrap_graphstate(schema_node, "schema"))
@@ -62,7 +65,6 @@ def build_execution_subgraph(registry: DatasourceRegistry, llm_registry: LLMRegi
     graph.add_node("executor", wrap_graphstate(executor, "executor"))
     graph.add_node("formatter", format_result)
 
-    # Edges
     graph.set_entry_point("router")
     graph.add_edge("router", "intent")
     graph.add_edge("intent", "schema")
@@ -78,7 +80,7 @@ def build_execution_subgraph(registry: DatasourceRegistry, llm_registry: LLMRegi
         check_planning_result,
         {
             "ok": "sql_generator",
-            "end": "formatter" # If planning fails, go to formatter to report error
+            "end": "formatter" 
         }
     )
     

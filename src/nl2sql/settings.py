@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     llm_config_path: str = Field(default="configs/llm.yaml", validation_alias="LLM_CONFIG")
     datasource_config_path: str = Field(default="configs/datasources.yaml", validation_alias="DATASOURCE_CONFIG")
     benchmark_config_path: str = Field(default="configs/benchmark_suite.yaml", validation_alias="BENCHMARK_CONFIG")
+    embedding_model: str = Field(default="text-embedding-3-small", validation_alias="EMBEDDING_MODEL")
     sample_questions_path: str = Field(
         default="configs/sample_questions.yaml", 
         validation_alias="ROUTING_EXAMPLES",

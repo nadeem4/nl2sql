@@ -38,27 +38,17 @@ def build_graph(registry: DatasourceRegistry, llm_registry: LLMRegistry, execute
     
     graph = StateGraph(GraphState)
 
-    # Instantiate Nodes
-    decomposer_llm = llm_registry.get_structured_llm("decomposer", DecomposerResponse)
+    decomposer_llm = llm_registry.decomposer_llm()
     decomposer = DecomposerNode(decomposer_llm)
     
-    aggregator_llm = llm_registry.get_structured_llm("aggregator", AggregatedResponse)
+    aggregator_llm = llm_registry.aggregator_llm()
     aggregator = AggregatorNode(aggregator_llm)
     
-    # Build Execution Subgraph
-    # We pass the same dependencies to the subgraph
+
     execution_subgraph = build_execution_subgraph(registry, llm_registry, vector_store, vector_store_path)
 
     def execution_wrapper(state: Union[Dict, GraphState]):
-        # Invoke the subgraph
-        # Ensure input is a dict if subgraph expects it, or GraphState
-        # Subgraph is StateGraph(GraphState), so it handles both usually.
-        # But we need to be careful with what we pass.
-        # Send passes a dict {"user_query": ...}.
         result = execution_subgraph.invoke(state)
-        
-        # Filter output to only return intermediate_results and latency
-        # This prevents conflicts on other fields like user_query
         return {
             "intermediate_results": result.get("intermediate_results", []),
             "latency": result.get("latency", {})
@@ -80,8 +70,8 @@ def build_graph(registry: DatasourceRegistry, llm_registry: LLMRegistry, execute
         print(f"DEBUG: continue_to_subqueries called with {sub_queries}")
         
         # We use Send to create parallel branches for each sub-query
-        # We override 'user_query' for the branch execution
-        return [Send("execution_branch", {"user_query": sq}) for sq in sub_queries]
+        # We override 'user_query' for the branch execution and propagate datasource_id
+        return [Send("execution_branch", {"user_query": sq, "datasource_id": state.datasource_id}) for sq in sub_queries]
 
     graph.add_conditional_edges(
         "decomposer",
@@ -122,9 +112,7 @@ def run_with_graph(registry: DatasourceRegistry, llm_registry: LLMRegistry, user
         validation={"capabilities": "generic"}, 
     )
     
-    # Convert to dict for LangGraph input if needed, but we are using StateGraph(GraphState) now
-    # Actually, StateGraph(GraphState) expects a dict input that matches the schema? 
-    # Or an object? It usually accepts a dict.
+
     initial_state_dict = initial_state.model_dump()
     
     import time
@@ -147,8 +135,15 @@ def run_with_graph(registry: DatasourceRegistry, llm_registry: LLMRegistry, user
             print("\n--- Starting Graph Execution (Debug Mode) ---")
         
         final_state = initial_state_dict
+        # Track branch names (namespace -> datasource_id)
+        branch_map = {}
+
         # We need to handle subgraphs in streaming
         for namespace, mode, payload in g.stream(initial_state_dict, stream_mode=["updates", "messages"], subgraphs=True):
+            
+            # Determine branch ID (first element of namespace usually identifies the parallel branch)
+            branch_id = namespace[0] if namespace else "main"
+            
             if mode == "updates":
            
                 for node_name, state_update in payload.items():
@@ -159,6 +154,10 @@ def run_with_graph(registry: DatasourceRegistry, llm_registry: LLMRegistry, user
                     # Update final state (simple merge for top-level, might need care for lists)
                     if isinstance(state_update, dict):
                         final_state.update(state_update)
+                        
+                        # Capture datasource_id if present to name the branch
+                        if "datasource_id" in state_update and state_update["datasource_id"]:
+                            branch_map[branch_id] = state_update["datasource_id"]
 
                     if on_thought:
                         # Map node name (which might be namespaced like "execution_branch:router")
@@ -169,7 +168,14 @@ def run_with_graph(registry: DatasourceRegistry, llm_registry: LLMRegistry, user
                         if thought_key:
                             thoughts = state_update.get("thoughts", {}).get(thought_key)
                             if thoughts:
-                                on_thought(thought_key, thoughts)
+                                # Append branch label if available
+                                branch_label = branch_map.get(branch_id)
+                                if not branch_label and branch_id.startswith("execution_branch"):
+                                    # Fallback to short ID
+                                    branch_label = branch_id.split(":")[-1][:4]
+                                
+                                display_node = f"{thought_key} ({branch_label})" if branch_label else thought_key
+                                on_thought(display_node, thoughts)
 
             elif mode == "messages":
                 chunk, metadata = payload
@@ -179,7 +185,13 @@ def run_with_graph(registry: DatasourceRegistry, llm_registry: LLMRegistry, user
                 
                 if thought_key and on_thought:
                     if hasattr(chunk, "content") and chunk.content:
-                        on_thought(thought_key, [chunk.content], token=True)
+                        # Append branch label if available
+                        branch_label = branch_map.get(branch_id)
+                        if not branch_label and branch_id.startswith("execution_branch"):
+                             branch_label = branch_id.split(":")[-1][:4]
+                        
+                        display_node = f"{thought_key} ({branch_label})" if branch_label else thought_key
+                        on_thought(display_node, [chunk.content], token=True)
         
         if debug:
             print("\n--- Graph Execution Complete ---\n")

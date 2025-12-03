@@ -8,6 +8,7 @@ from nl2sql.schemas import GraphState
 from nl2sql.router_store import DatasourceRouterStore
 from nl2sql.llm_registry import LLMRegistry
 from nl2sql.datasource_registry import DatasourceRegistry
+from nl2sql.embeddings import EmbeddingService
 
 
 class RouterNode:
@@ -51,12 +52,9 @@ class RouterNode:
         Returns:
             The updated graph state with the selected `datasource_id`.
         """
-        # If input_query is provided (e.g. from parallel branch), use it.
-        # Otherwise use the main user_query from state.
         user_query = input_query if input_query else state.user_query
         
-        # If datasource_id is already set (e.g. forced via CLI), skip routing
-        # BUT only if we are not processing a sub-query (input_query)
+
         if state.datasource_id and not input_query:
             return state
 
@@ -66,7 +64,8 @@ class RouterNode:
         # Metrics
         start_time = time.perf_counter()
         try:
-            enc = tiktoken.encoding_for_model("text-embedding-3-small")
+            model_name = EmbeddingService.get_model_name()
+            enc = tiktoken.encoding_for_model(model_name)
             tokens = len(enc.encode(user_query))
         except:
             tokens = 0

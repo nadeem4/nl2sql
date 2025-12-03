@@ -204,9 +204,20 @@ class LLMRegistry:
 
     def summarizer_llm(self) -> LLMCallable:
         """Returns the LLM callable for the Summarizer agent."""
-
-        llm = self._base_llm("planner") 
+        llm = self._base_llm("summarizer") 
         return self._wrap_usage(llm, "summarizer")
+
+    def decomposer_llm(self) -> LLMCallable:
+        """Returns the LLM callable for the Decomposer agent."""
+        from nl2sql.schemas import DecomposerResponse
+        llm = self._base_llm("decomposer")
+        return self._wrap_structured_usage(llm, "decomposer", DecomposerResponse)
+
+    def aggregator_llm(self) -> LLMCallable:
+        """Returns the LLM callable for the Aggregator agent."""
+        from nl2sql.schemas import AggregatedResponse
+        llm = self._base_llm("aggregator")
+        return self._wrap_structured_usage(llm, "aggregator", AggregatedResponse)
 
     def get_structured_llm(self, agent: str, schema: Any) -> LLMCallable:
         """
@@ -222,5 +233,7 @@ class LLMRegistry:
             "planner": self.planner_llm(),
             "generator": self.generator_llm(),
             "summarizer": self.summarizer_llm(),
+            "decomposer": self.decomposer_llm(),
+            "aggregator": self.aggregator_llm(),
             "_default": self.intent_llm(),
         }

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from nl2sql.datasource_registry import DatasourceRegistry
 from nl2sql.engine_factory import run_read_query
-from nl2sql.schemas import GraphState
+from nl2sql.schemas import GraphState, ExecutionModel
 from nl2sql.security import enforce_read_only
 from nl2sql.tracing import span
 
@@ -39,12 +39,12 @@ class ExecutorNode:
             
         if not enforce_read_only(state.sql_draft.sql):
             state.errors.append("Security Violation: SQL query contains forbidden keywords (read-only enforcement).")
-            state.execution = {"error": "Security Violation"}
+            state.execution = ExecutionModel(row_count=0, rows=[], error="Security Violation")
             return state
             
         if not state.datasource_id:
             state.errors.append("No datasource_id in state. Router must run before ExecutorNode.")
-            state.execution = {"error": "Missing Datasource ID"}
+            state.execution = ExecutionModel(row_count=0, rows=[], error="Missing Datasource ID")
             return state
 
         profile = self.registry.get_profile(state.datasource_id)
@@ -52,15 +52,27 @@ class ExecutorNode:
         
         with span("executor", {"datasource.id": profile.id, "engine": profile.engine}):
             try:
+                # Remove hardcoded limit, rely on profile.row_limit
                 rows = run_read_query(engine, state.sql_draft.sql, row_limit=profile.row_limit)
-                samples = []
-                for row in rows[:3]:
-                    try:
-                        samples.append(dict(row._mapping))
-                    except Exception:
-                        samples.append(tuple(row))
-                state.execution = {"row_count": len(rows), "sample": samples}
+                
+                # Convert rows to list of dicts
+                result_rows = []
+                columns = []
+                if rows:
+                    columns = list(rows[0]._mapping.keys())
+                    for row in rows:
+                        result_rows.append(dict(row._mapping))
+                
+                state.execution = ExecutionModel(
+                    row_count=len(rows),
+                    rows=result_rows,
+                    columns=columns
+                )
             except Exception as exc:
-                state.execution = {"error": str(exc)}
+                state.execution = ExecutionModel(
+                    row_count=0,
+                    rows=[],
+                    error=str(exc)
+                )
                 state.errors.append(f"Execution error: {exc}")
         return state
