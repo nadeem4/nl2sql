@@ -1,6 +1,10 @@
 # NL2SQL
 
-This project implements a LangGraph-based NL→SQL pipeline with pluggable LLMs and multi-engine support. It ships with a SQLite manufacturing dataset, structured planner/generator outputs, guardrails, and a CLI for interactive queries.
+**NL2SQL** is an enterprise-grade, agentic Natural Language to SQL pipeline built on **LangGraph**.
+
+Unlike simple prompt-to-query solutions, this project employs a **multi-agent supervisor architecture** to handle complex, real-world database interactions. It features dynamic routing across multiple database engines (Postgres, MySQL, MSSQL, SQLite), vector-based schema retrieval for scalability, and a rigorous **Plan-Validate-Execute** loop to ensure query correctness and safety.
+
+Designed for observability and reliability, it provides detailed performance metrics, step-by-step reasoning logs, and deterministic SQL generation, making it suitable for production environments where accuracy is paramount.
 
 ## Key Features
 
@@ -141,25 +145,25 @@ The system simulates a manufacturing enterprise distributed across 4 databases:
 
 Run these commands to test each database:
 
-**1. Postgres (Operations)**
+#### 1. Postgres (Operations)
 
 ```bash
 python -m src.nl2sql.cli --id manufacturing_ops --query "List 5 machines with their serial numbers"
 ```
 
-**2. MySQL (Supply Chain)**
+#### 2. MySQL (Supply Chain)
 
 ```bash
 python -m src.nl2sql.cli --id manufacturing_supply --query "Show me top 3 products by price"
 ```
 
-**3. MSSQL (History)**
+#### 3. MSSQL (History)
 
 ```bash
 python -m src.nl2sql.cli --id manufacturing_history --query "Count total production runs"
 ```
 
-**4. SQLite (Reference)**
+#### 4. SQLite (Reference)
 
 ```bash
 python -m src.nl2sql.cli --id manufacturing_ref --query "List all factories and their locations"
