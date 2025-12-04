@@ -196,6 +196,7 @@ For large schemas, use vector search to dynamically select relevant tables.
 - **Stream Reasoning**: Use `--show-thoughts` to see the Intent, Planner, and Generator steps.
 - **JSON Logs**: Use `--json-logs` for structured output suitable for log ingestion.
 - **Debug Mode**: Use `--debug` for verbose output.
+- **Visualize Graph**: Use `--graph` to print ASCII visualization and Mermaid code for the pipeline.
 
 ---
 
@@ -266,20 +267,29 @@ This allows the system to scale to hundreds of tables without overwhelming the L
 
 ### Performance Breakdown
 
-The CLI provides a detailed breakdown of time and token usage per node:
+The CLI provides a detailed breakdown of time and token usage, including a top-level matrix and per-datasource details:
 
 ```text
-Performance:
-Node      | Type   | Model                  | Tokens | Time 
-----------+--------+------------------------+--------+------
-Router    | AI     | text-embedding-3-small | 4      | 1.45s
-Intent    | AI     | gpt-4o-mini            | 569    | 1.93s
-Schema    | Non-AI | -                      | -      | 0.35s
-Planner   | AI     | gpt-4o-mini            | 2456   | 4.99s
-Generator | Non-AI | -                      | -      | 0.00s
-Validator | Non-AI | -                      | -      | 0.00s
-Executor  | Non-AI | -                      | -      | 0.00s
-TOTAL     | -      | -                      | 3029   | 8.73s
+Performance & Metrics
+╭──────────────────────────────────────────────────────────────────────────────────────────╮
+│ Top Level Performance                                                                    │
+│ ┏━━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━┓ │
+│ ┃ Metric      ┃ Decomposer ┃ Aggregator ┃ Exec (manufacturing_ops) ┃ Total             ┃ │
+│ ┡━━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━┩ │
+│ │ Latency (s) │     0.0000 │     0.0000 │                   7.2700 │            7.2700 │ │
+│ │ Token Usage │          0 │          0 │                     3029 │              3029 │ │
+│ └─────────────┴────────────┴────────────┴──────────────────────────┴───────────────────┘ │
+│                                                                                          │
+│ Performance: manufacturing_ops                                                           │
+│ ┏━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━━┳━━━━━━━━━━━━━┳━━━━━━━━┓                            │
+│ ┃ Node      ┃   Type   ┃    Model    ┃ Latency (s) ┃ Tokens ┃                            │
+│ ┡━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━━╇━━━━━━━━━━━━━╇━━━━━━━━┩                            │
+│ │ Intent    │    AI    │ gpt-4o-mini │      1.9300 │    569 │                            │
+│ │ Planner   │    AI    │ gpt-4o-mini │      4.9900 │   2456 │                            │
+│ │ Generator │  Non-AI  │      -      │      0.0000 │      - │                            │
+│ │ Executor  │  Non-AI  │      -      │      0.3500 │      - │                            │
+│ └───────────┴──────────┴─────────────┴─────────────┴────────┘                            │
+╰──────────────────────────────────────────────────────────────────────────────────────────╯
 ```
 
 ### Project Structure
