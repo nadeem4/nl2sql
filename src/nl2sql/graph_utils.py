@@ -1,5 +1,5 @@
-from typing import Callable, Dict, Optional
-import dataclasses
+from typing import Callable, Dict, Optional, Union
+
 import time
 from nl2sql.schemas import GraphState
 from nl2sql.tracing import span
@@ -23,8 +23,11 @@ def wrap_graphstate(fn: Callable[[GraphState], GraphState], name: Optional[str] 
         A wrapped function that accepts and returns a dictionary.
     """
 
-    def wrapped(state: Dict) -> Dict:
-        gs = GraphState(**state)
+    def wrapped(state: Union[Dict, GraphState]) -> Dict:
+        if isinstance(state, GraphState):
+            gs = state
+        else:
+            gs = GraphState(**state)
         
         # Determine node name
         node_name = name
@@ -38,12 +41,28 @@ def wrap_graphstate(fn: Callable[[GraphState], GraphState], name: Optional[str] 
         logger = get_logger(node_name)
         
         start = time.perf_counter()
+        token = None
         try:
+            from nl2sql.context import current_datasource_id
+            if gs.datasource_id:
+                token = current_datasource_id.set(gs.datasource_id)
+                
             with span(node_name):
-                gs = fn(gs)
+                result = fn(gs)
+                
+            # If result is a dict, use it as the base for output
+            if isinstance(result, dict):
+                output = result.copy()
+            elif isinstance(result, GraphState):
+                output = result.model_dump()
+            else:
+                output = {}
+                
             duration = time.perf_counter() - start
+            # print(f"DEBUG: Node {node_name} duration: {duration:.4f}s")
             
-            gs.latency[node_name] = duration
+            # Ensure latency is a delta, not the full history
+            output["latency"] = {node_name: duration}
             
             # Log success
             logger.info(f"Node {node_name} completed", extra={
@@ -51,7 +70,7 @@ def wrap_graphstate(fn: Callable[[GraphState], GraphState], name: Optional[str] 
                 "duration_ms": duration * 1000,
                 "status": "success"
             })
-            
+
         except Exception as e:
             duration = time.perf_counter() - start
             logger.error(f"Node {node_name} failed: {e}", extra={
@@ -61,7 +80,11 @@ def wrap_graphstate(fn: Callable[[GraphState], GraphState], name: Optional[str] 
                 "error": str(e)
             })
             raise e
+            
+        finally:
+            if token:
+                current_datasource_id.reset(token)
         
-        return dataclasses.asdict(gs)
+        return output
 
     return wrapped

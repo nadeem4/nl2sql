@@ -8,6 +8,7 @@ from nl2sql.schemas import GraphState
 from nl2sql.router_store import DatasourceRouterStore
 from nl2sql.llm_registry import LLMRegistry
 from nl2sql.datasource_registry import DatasourceRegistry
+from nl2sql.embeddings import EmbeddingService
 
 
 class RouterNode:
@@ -40,28 +41,32 @@ class RouterNode:
             self._router_store = DatasourceRouterStore(persist_directory=self.vector_store_path)
         return self._router_store
 
-    def __call__(self, state: GraphState) -> GraphState:
+    def __call__(self, state: GraphState, input_query: Optional[str] = None) -> GraphState:
         """
         Executes the routing logic.
 
         Args:
             state: The current graph state.
+            input_query: Optional query string to route (overrides state.user_query).
 
         Returns:
             The updated graph state with the selected `datasource_id`.
         """
-        # If datasource_id is already set (e.g. forced via CLI), skip routing
-        if state.datasource_id:
+        user_query = input_query if input_query else state.user_query
+        
+
+        if state.datasource_id and not input_query:
             return state
 
-        query = state.user_query
+        print(f"--- Router Node: Routing query '{user_query}' ---")
         router_store = self._get_store()
         
         # Metrics
         start_time = time.perf_counter()
         try:
-            enc = tiktoken.encoding_for_model("text-embedding-3-small")
-            tokens = len(enc.encode(query))
+            model_name = EmbeddingService.get_model_name()
+            enc = tiktoken.encoding_for_model(model_name)
+            tokens = len(enc.encode(user_query))
         except:
             tokens = 0
 
@@ -69,7 +74,7 @@ class RouterNode:
         
         try:
             # Layer 1 & 2: Retrieve with Score
-            results = router_store.retrieve_with_score(query)
+            results = router_store.retrieve_with_score(user_query)
             
             if results:
                 target_id, distance = results[0]
@@ -77,14 +82,14 @@ class RouterNode:
                 # Confidence Gate (Layer 2)
                 if distance > 0.4:
                     llm = self.registry._base_llm("planner") 
-                    mq_results = router_store.multi_query_retrieve(query, llm)
+                    mq_results = router_store.multi_query_retrieve(user_query, llm)
                     
                     if mq_results:
                         target_id = mq_results[0]
                     else:
                         # Layer 3: LLM Fallback
                         profiles = self.datasource_registry.list_profiles()
-                        l3_result = router_store.llm_route(query, llm, profiles)
+                        l3_result = router_store.llm_route(user_query, llm, profiles)
                         if l3_result:
                             target_id = l3_result
         except Exception as e:
@@ -97,7 +102,9 @@ class RouterNode:
         state.datasource_id = target_id
         state.latency["router"] = duration
         
-        # We don't have a structured place for router tokens in GraphState yet,
-        # but we could add it to a generic metrics dict if needed.
+        if "router" not in state.thoughts:
+            state.thoughts["router"] = []
+        state.thoughts["router"].append(f"Selected Datasource: {target_id}")
+        state.thoughts["router"].append(f"Latency: {duration:.4f}s")
         
         return state

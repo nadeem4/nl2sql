@@ -6,10 +6,10 @@ from typing import List, Optional
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
-from langchain_openai import OpenAIEmbeddings
 from sqlalchemy import inspect, Engine
 
 from nl2sql.settings import settings
+from nl2sql.embeddings import EmbeddingService
 
 class SchemaVectorStore:
     """
@@ -25,11 +25,11 @@ class SchemaVectorStore:
 
         Args:
             collection_name: Name of the ChromaDB collection.
-            embeddings: Embedding model to use (defaults to OpenAIEmbeddings).
+            embeddings: Embedding model to use (defaults to EmbeddingService).
             persist_directory: Directory to persist the vector store.
         """
         self.collection_name = collection_name
-        self.embeddings = embeddings or OpenAIEmbeddings(api_key=settings.openai_api_key)
+        self.embeddings = embeddings or EmbeddingService.get_embeddings()
         self.persist_directory = persist_directory
         self.vectorstore = Chroma(
             collection_name=collection_name,

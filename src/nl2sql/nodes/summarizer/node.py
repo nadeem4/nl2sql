@@ -7,6 +7,8 @@ from nl2sql.nodes.summarizer.prompts import SUMMARIZER_PROMPT
 
 LLMCallable = Union[Callable[[str], str], Runnable]
 
+from langchain_core.prompts import ChatPromptTemplate
+
 class SummarizerNode:
     """
     Analyzes validation errors and generates constructive feedback for the Planner.
@@ -22,6 +24,9 @@ class SummarizerNode:
             llm: The language model to use for summarization.
         """
         self.llm = llm
+        if self.llm:
+            self.prompt = ChatPromptTemplate.from_template(SUMMARIZER_PROMPT)
+            self.chain = self.prompt | self.llm
 
     def __call__(self, state: GraphState) -> GraphState:
         """
@@ -55,18 +60,13 @@ class SummarizerNode:
 
         errors_str = "\n".join(f"- {e}" for e in state.errors)
 
-        prompt = SUMMARIZER_PROMPT.format(
-            user_query=state.user_query,
-            schema_context=schema_context,
-            failed_plan=failed_plan_str,
-            errors=errors_str
-        )
-
         try:
-            if isinstance(self.llm, Runnable):
-                feedback = self.llm.invoke(prompt)
-            else:
-                feedback = self.llm(prompt)
+            feedback = self.chain.invoke({
+                "user_query": state.user_query,
+                "schema_context": schema_context,
+                "failed_plan": failed_plan_str,
+                "errors": errors_str
+            })
             
             state.errors = [feedback]
             

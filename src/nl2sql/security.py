@@ -1,7 +1,7 @@
 import sqlglot
 from sqlglot import expressions as exp
 
-def enforce_read_only(sql: str) -> bool:
+def enforce_read_only(sql: str, dialect: str | None = None) -> bool:
     """
     Checks if the SQL query is strictly read-only using sqlglot AST analysis.
 
@@ -10,12 +10,13 @@ def enforce_read_only(sql: str) -> bool:
 
     Args:
         sql: The SQL query string to validate.
+        dialect: Optional SQL dialect (e.g., "tsql", "postgres") for parsing.
 
     Returns:
         True if the query is read-only, False otherwise.
     """
     try:
-        statements = sqlglot.parse(sql)
+        statements = sqlglot.parse(sql, read=dialect)
         
         for statement in statements:
             # Allow: SELECT, UNION, WITH (CTE) followed by SELECT

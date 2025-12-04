@@ -5,6 +5,7 @@ This project implements a LangGraph-based NL→SQL pipeline with pluggable LLMs 
 ## Key Features
 
 - **Supervisor Architecture**: Dynamic routing of queries to the appropriate database using a 3-layer routing strategy (Vector, Multi-Query, LLM).
+- **Cross-Database Support**: Map-Reduce architecture to handle complex queries spanning multiple databases (e.g., "Compare sales from MSSQL and inventory from MySQL").
 - **LangGraph Pipeline**: Modular, stateful graph architecture with specialized agents for Intent, Planning, and Validation.
 - **Multi-Database Support**: Seamlessly query across Postgres, MySQL, MSSQL, and SQLite.
 - **Rule-Based SQL Generation**: Deterministic, token-efficient SQL generation using `sqlglot` to prevent syntax hallucinations.
@@ -164,6 +165,16 @@ python -m src.nl2sql.cli --id manufacturing_history --query "Count total product
 python -m src.nl2sql.cli --id manufacturing_ref --query "List all factories and their locations"
 ```
 
+### 5. Cross-Database Query (Map-Reduce)
+
+The system can automatically decompose complex queries into sub-queries, execute them in parallel, and aggregate the results.
+
+```bash
+python -m src.nl2sql.cli --query "Compare sales from manufacturing_history and inventory from manufacturing_supply"
+```
+
+**Expected Output:** A consolidated answer merging data from MSSQL (History) and MySQL (Supply).
+
 ### Vector Search (RAG)
 
 For large schemas, use vector search to dynamically select relevant tables.
@@ -185,6 +196,7 @@ For large schemas, use vector search to dynamically select relevant tables.
 - **Stream Reasoning**: Use `--show-thoughts` to see the Intent, Planner, and Generator steps.
 - **JSON Logs**: Use `--json-logs` for structured output suitable for log ingestion.
 - **Debug Mode**: Use `--debug` for verbose output.
+- **Visualize Graph**: Use `--graph` to print ASCII visualization and Mermaid code for the pipeline.
 
 ---
 
@@ -196,23 +208,33 @@ We use a **Supervisor Architecture** where the graph itself manages routing and 
 
 ```mermaid
 flowchart TD
-  user["User Query"] --> router["Router (AI)"]
-  router --> intent["Intention (AI)"]
-  intent --> schema["Schema (non-AI)"]
-  schema --> planning["Planning Subgraph"]
+  user["User Query"] --> decomposer["Decomposer (AI)"]
+  decomposer -- Single DB --> router["Router (AI)"]
+  decomposer -- Multi DB --> split["Parallel Execution"]
   
-  subgraph Planning Subgraph
-    planner["Planner (AI)"] --> validator["Validator (non-AI)"]
-    validator -- Invalid --> summarizer["Summarizer (AI)"]
-    summarizer --> planner
+  subgraph Execution Pipeline
+    router --> intent["Intention (AI)"]
+    intent --> schema["Schema (non-AI)"]
+    schema --> planning["Planning Subgraph"]
+    
+    subgraph Planning Subgraph
+      planner["Planner (AI)"] --> validator["Validator (non-AI)"]
+      validator -- Invalid --> summarizer["Summarizer (AI)"]
+      summarizer --> planner
+    end
+    
+    validator -- Valid --> generator["SQL Generator (non-AI)"]
+    generator --> executor["Executor (non-AI)"]
   end
   
-  validator -- Valid --> generator["SQL Generator (non-AI)"]
-  generator --> executor["Executor (non-AI)"]
-  executor --> answer["Answer/Result Sample"]
+  split --> router
+  executor --> aggregator["Aggregator (AI)"]
+  aggregator --> answer["Final Answer"]
   
   style user fill:#f6f8fa,stroke:#aaa
+  style decomposer fill:#e1f5fe,stroke:#01579b
   style router fill:#e1f5fe,stroke:#01579b
+  style aggregator fill:#e1f5fe,stroke:#01579b
   style answer fill:#f6f8fa,stroke:#aaa
 ```
 
@@ -245,20 +267,29 @@ This allows the system to scale to hundreds of tables without overwhelming the L
 
 ### Performance Breakdown
 
-The CLI provides a detailed breakdown of time and token usage per node:
+The CLI provides a detailed breakdown of time and token usage, including a top-level matrix and per-datasource details:
 
 ```text
-Performance:
-Node      | Type   | Model                  | Tokens | Time 
-----------+--------+------------------------+--------+------
-Router    | AI     | text-embedding-3-small | 4      | 1.45s
-Intent    | AI     | gpt-4o-mini            | 569    | 1.93s
-Schema    | Non-AI | -                      | -      | 0.35s
-Planner   | AI     | gpt-4o-mini            | 2456   | 4.99s
-Generator | Non-AI | -                      | -      | 0.00s
-Validator | Non-AI | -                      | -      | 0.00s
-Executor  | Non-AI | -                      | -      | 0.00s
-TOTAL     | -      | -                      | 3029   | 8.73s
+Performance & Metrics
+╭──────────────────────────────────────────────────────────────────────────────────────────╮
+│ Top Level Performance                                                                    │
+│ ┏━━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━┓ │
+│ ┃ Metric      ┃ Decomposer ┃ Aggregator ┃ Exec (manufacturing_ops) ┃ Total             ┃ │
+│ ┡━━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━┩ │
+│ │ Latency (s) │     0.0000 │     0.0000 │                   7.2700 │            7.2700 │ │
+│ │ Token Usage │          0 │          0 │                     3029 │              3029 │ │
+│ └─────────────┴────────────┴────────────┴──────────────────────────┴───────────────────┘ │
+│                                                                                          │
+│ Performance: manufacturing_ops                                                           │
+│ ┏━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━━┳━━━━━━━━━━━━━┳━━━━━━━━┓                            │
+│ ┃ Node      ┃   Type   ┃    Model    ┃ Latency (s) ┃ Tokens ┃                            │
+│ ┡━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━━╇━━━━━━━━━━━━━╇━━━━━━━━┩                            │
+│ │ Intent    │    AI    │ gpt-4o-mini │      1.9300 │    569 │                            │
+│ │ Planner   │    AI    │ gpt-4o-mini │      4.9900 │   2456 │                            │
+│ │ Generator │  Non-AI  │      -      │      0.0000 │      - │                            │
+│ │ Executor  │  Non-AI  │      -      │      0.3500 │      - │                            │
+│ └───────────┴──────────┴─────────────┴─────────────┴────────┘                            │
+╰──────────────────────────────────────────────────────────────────────────────────────────╯
 ```
 
 ### Project Structure

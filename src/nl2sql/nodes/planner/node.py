@@ -11,6 +11,8 @@ from nl2sql.nodes.planner.prompts import PLANNER_PROMPT, PLANNER_EXAMPLES
 LLMCallable = Union[Callable[[str], str], Runnable]
 
 
+from langchain_core.prompts import ChatPromptTemplate
+
 class PlannerNode:
     """
     Generates a high-level execution plan from the user query.
@@ -27,6 +29,9 @@ class PlannerNode:
             llm: The language model to use for planning.
         """
         self.llm = llm
+        if self.llm:
+            self.prompt = ChatPromptTemplate.from_template(PLANNER_PROMPT)
+            self.chain = self.prompt | self.llm
 
     def __call__(self, state: GraphState) -> GraphState:
         """
@@ -44,64 +49,32 @@ class PlannerNode:
 
         schema_context = ""
         if state.schema_info:
-            lines = []
-            for tbl in state.schema_info.tables:
-                lines.append(f"Table: {tbl.name} (Alias: {tbl.alias})")
-                lines.append(f"  Columns: {', '.join(tbl.columns)}")
-                if tbl.foreign_keys:
-                    fk_strs = []
-                    for fk in tbl.foreign_keys:
-                        fk_strs.append(f"{fk.column} -> {fk.referred_table}.{fk.referred_column}")
-                    lines.append(f"  Foreign Keys: {', '.join(fk_strs)}")
-                lines.append("")
-            schema_context = "\n".join(lines)
+            schema_context = state.schema_info.model_dump_json(indent=2)
 
         intent_context = ""
-        if state.validation.get("intent"):
-            try:
-                intent_data = state.validation["intent"]
-                if isinstance(intent_data, str):
-                    intent_data = json.loads(intent_data)
-                    
-                intent_context = f"Extracted Intent: {json.dumps(intent_data)}\n"
-            except Exception:
-                pass
+        if state.intent:
+            intent_context = f"{state.intent.model_dump_json(indent=2)}\n"
 
         feedback = ""
         if state.errors:
-            feedback = f"[FEEDBACK]\nThe previous plan was invalid. Fix the following errors:\n"
-            for err in state.errors:
-                feedback += f"- {err}\n"
+            feedback = f"The previous plan was invalid. Fix the following errors:\n{json.dumps(state.errors, indent=2)}\n"
             state.errors = []
 
-        prompt = PLANNER_PROMPT.format(
-            schema_context=schema_context,
-            intent_context=intent_context,
-            examples=PLANNER_EXAMPLES,
-            feedback=feedback,
-            user_query=state.user_query
-        )
-        
         try:
-            if isinstance(self.llm, Runnable):
-                plan_model = self.llm.invoke(prompt)
-            else:
-                plan_model = self.llm(prompt)
+            plan_model = self.chain.invoke({
+                "schema_context": schema_context,
+                "intent_context": intent_context,
+                "examples": PLANNER_EXAMPLES,
+                "feedback": feedback,
+                "user_query": state.user_query
+            })
             
-            state.validation["planner_raw"] = plan_model.model_dump_json()
+
 
             plan_dump = plan_model.model_dump()
             
-            if state.validation.get("intent"):
-                try:
-                    intent_data = state.validation["intent"]
-                    if isinstance(intent_data, str):
-                        intent_data = json.loads(intent_data)
-                    
-                    if "query_type" in intent_data:
-                        plan_dump["query_type"] = intent_data["query_type"]
-                except Exception:
-                    pass
+            if state.intent and state.intent.query_type:
+                plan_dump["query_type"] = state.intent.query_type
             
             state.plan = plan_dump
             

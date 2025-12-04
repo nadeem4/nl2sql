@@ -1,0 +1,51 @@
+from typing import List, Dict, Any, Literal, Callable, Union
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.runnables import Runnable
+
+from nl2sql.schemas import GraphState, AggregatedResponse
+from nl2sql.nodes.aggregator.prompts import AGGREGATOR_PROMPT
+
+LLMCallable = Union[Callable[[str], Any], Runnable]
+
+class AggregatorNode:
+    """
+    Node responsible for aggregating results from parallel sub-queries.
+    """
+    def __init__(self, llm: LLMCallable):
+        self.llm = llm
+        self.prompt = ChatPromptTemplate.from_template(AGGREGATOR_PROMPT)
+        self.chain = self.prompt | self.llm
+
+    def __call__(self, state: GraphState) -> Dict[str, Any]:
+        user_query = state.user_query
+        intermediate_results = state.intermediate_results or []
+        
+        # Format intermediate results for the prompt
+        formatted_results = ""
+        for i, res in enumerate(intermediate_results):
+            formatted_results += f"--- Result {i+1} ---\n{str(res)}\n\n"
+            
+        try:
+            response: AggregatedResponse = self.chain.invoke({
+                "user_query": user_query,
+                "intermediate_results": formatted_results
+            })
+            
+            # Construct the final answer string
+            final_answer = f"### Summary\n{response.summary}\n\n"
+            if response.format_type == "table":
+                final_answer += f"### Data\n\n{response.content}"
+            elif response.format_type == "list":
+                final_answer += f"### Details\n\n{response.content}"
+            else:
+                final_answer += f"\n{response.content}"
+                
+            return {
+                "final_answer": final_answer,
+                "thoughts": {"aggregator": f"Chosen format: {response.format_type}"}
+            }
+        except Exception as e:
+            return {
+                "final_answer": f"Error during aggregation: {str(e)}",
+                "thoughts": {"aggregator": f"Error: {str(e)}"}
+            }

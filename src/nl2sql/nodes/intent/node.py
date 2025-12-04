@@ -10,6 +10,8 @@ from nl2sql.nodes.intent.prompts import INTENT_PROMPT
 LLMCallable = Union[Callable[[str], str], Runnable]
 
 
+from langchain_core.prompts import ChatPromptTemplate
+
 class IntentNode:
     """
     Analyzes the user's natural language query to extract intent, keywords, and entities.
@@ -25,6 +27,9 @@ class IntentNode:
             llm: The language model to use for intent analysis.
         """
         self.llm = llm
+        if self.llm:
+            self.prompt = ChatPromptTemplate.from_template(INTENT_PROMPT)
+            self.chain = self.prompt | self.llm
 
     def __call__(self, state: GraphState) -> GraphState:
         """
@@ -40,17 +45,12 @@ class IntentNode:
             state.validation["intent_stub"] = "No-op intent analysis"
             return state
             
-        # No format instructions needed for structured output
-        prompt = INTENT_PROMPT.format(user_query=state.user_query)
-        
         try:
-            # LLM returns IntentModel directly
-            if isinstance(self.llm, Runnable):
-                intent_model = self.llm.invoke(prompt)
-            else:
-                intent_model = self.llm(prompt)
-            # Store raw output for debugging
-            state.validation["intent"] = intent_model.model_dump_json()
+            # Invoke the chain
+            intent_model = self.chain.invoke({"user_query": state.user_query})
+            
+            # Store intent model directly
+            state.intent = intent_model
             
             # Populate thoughts
             if "intent" not in state.thoughts:

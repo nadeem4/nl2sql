@@ -28,6 +28,36 @@ class ValidatorNode:
         """
         self.row_limit = row_limit
 
+    def is_aggregation(self, expr: str) -> bool:
+        """Checks if an expression looks like an aggregation."""
+        upper_expr = expr.upper()
+        aggs = ["COUNT(", "SUM(", "AVG(", "MIN(", "MAX("]
+        return any(agg in upper_expr for agg in aggs)
+
+    def validate_aggregations(self, plan: PlanModel, errors: list[str]) -> None:
+        """
+        Validates GROUP BY logic.
+        
+        Rules:
+        1. If there are aggregations in SELECT, all non-aggregated columns must be in GROUP BY.
+        2. If there is a GROUP BY, all non-aggregated columns in SELECT must be in GROUP BY.
+        """
+        has_aggregations = False
+        non_aggregated_cols = []
+        
+        for col in plan.select_columns:
+            if col.is_derived or self.is_aggregation(col.expr):
+                has_aggregations = True
+            else:
+                non_aggregated_cols.append(col)
+                
+        group_by_exprs = {gb.expr for gb in plan.group_by}
+        
+        if has_aggregations or plan.group_by:
+            for col in non_aggregated_cols:
+                if col.expr not in group_by_exprs:
+                    errors.append(f"Column '{col.expr}' is selected but not aggregated or included in GROUP BY.")
+
     def validate_column_ref(self, col: ColumnRef, schema_cols: Set[str], plan_table_aliases: Set[str], context: str, errors: list[str]) -> None:
         """
         Validates a column reference.
@@ -121,6 +151,19 @@ class ValidatorNode:
         for hav in plan.having:
             if not hav.expr:
                 state.errors.append(f"Having clause missing expression: {hav}")
+
+        self.validate_aggregations(plan, state.errors)
+
+        if "validator" not in state.thoughts:
+            state.thoughts["validator"] = []
+            
+        if state.errors:
+            state.thoughts["validator"].append("Validation Failed")
+            for err in state.errors:
+                state.thoughts["validator"].append(f"Error: {err}")
+        else:
+            state.thoughts["validator"].append("Validation Successful")
+            state.thoughts["validator"].append("Plan is valid against schema and security policies.")
 
         return state
             

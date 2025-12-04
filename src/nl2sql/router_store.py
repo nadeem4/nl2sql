@@ -5,10 +5,10 @@ from typing import List, Optional
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
-from langchain_openai import OpenAIEmbeddings
 
 from nl2sql.settings import settings
 from nl2sql.datasource_config import DatasourceProfile
+from nl2sql.embeddings import EmbeddingService
 
 class DatasourceRouterStore:
     """
@@ -19,7 +19,7 @@ class DatasourceRouterStore:
 
     def __init__(self, collection_name: str = "datasource_router", embeddings: Optional[Embeddings] = None, persist_directory: str = "./chroma_db"):
         self.collection_name = collection_name
-        self.embeddings = embeddings or OpenAIEmbeddings(api_key=settings.openai_api_key)
+        self.embeddings = embeddings or EmbeddingService.get_embeddings()
         self.persist_directory = persist_directory
         self.vectorstore = Chroma(
             collection_name=collection_name,
