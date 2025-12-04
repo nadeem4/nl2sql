@@ -270,9 +270,10 @@ class GraphState(BaseModel):
     
     user_query: str
     plan: Optional[Dict[str, Any]] = None
-    sql_draft: Optional[GeneratedSQL] = None
+    sql_draft: Optional[str] = None
     schema_info: Optional[SchemaInfo] = None
     validation: Dict[str, Any] = Field(default_factory=dict)
+    intent: Optional[IntentModel] = None
     execution: Optional[ExecutionModel] = None
     retrieved_tables: Optional[List[str]] = None
     latency: Annotated[Dict[str, float], reduce_latency] = Field(default_factory=dict)
@@ -282,24 +283,11 @@ class GraphState(BaseModel):
     datasource_id: Optional[str] = None
     sub_queries: Optional[List[str]] = None
     intermediate_results: Annotated[List[Any], operator.add] = Field(default_factory=list)
+    query_history: Annotated[List[Dict[str, Any]], operator.add] = Field(default_factory=list)
     final_answer: Optional[str] = None
 
 
-class SQLModel(BaseModel):
-    """
-    Represents the structured output for SQL generation (used by LLM).
 
-    Attributes:
-        sql: The generated SQL.
-        rationale: The rationale behind the SQL.
-        limit_enforced: Whether limit was enforced.
-        draft_only: Whether it is a draft.
-    """
-    model_config = ConfigDict(extra="forbid")
-    sql: str
-    rationale: Optional[str] = None
-    limit_enforced: Optional[bool] = None
-    draft_only: Optional[bool] = None
 
 
 class DecomposerResponse(BaseModel):

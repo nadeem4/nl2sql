@@ -37,7 +37,22 @@ class ExecutorNode:
             state.errors.append("No SQL to execute.")
             return state
             
-        if not enforce_read_only(state.sql_draft.sql):
+        profile = self.registry.get_profile(state.datasource_id)
+        
+        # Map SQLAlchemy engine to sqlglot dialect
+        dialect = None
+        if "mssql" in profile.engine:
+            dialect = "tsql"
+        elif "postgres" in profile.engine:
+            dialect = "postgres"
+        elif "mysql" in profile.engine:
+            dialect = "mysql"
+        elif "sqlite" in profile.engine:
+            dialect = "sqlite"
+        elif "oracle" in profile.engine:
+            dialect = "oracle"
+
+        if not enforce_read_only(state.sql_draft, dialect=dialect):
             state.errors.append("Security Violation: SQL query contains forbidden keywords (read-only enforcement).")
             state.execution = ExecutionModel(row_count=0, rows=[], error="Security Violation")
             return state
@@ -53,7 +68,7 @@ class ExecutorNode:
         with span("executor", {"datasource.id": profile.id, "engine": profile.engine}):
             try:
                 # Remove hardcoded limit, rely on profile.row_limit
-                rows = run_read_query(engine, state.sql_draft.sql, row_limit=profile.row_limit)
+                rows = run_read_query(engine, state.sql_draft)
                 
                 # Convert rows to list of dicts
                 result_rows = []

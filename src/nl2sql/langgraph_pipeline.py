@@ -48,10 +48,46 @@ def build_graph(registry: DatasourceRegistry, llm_registry: LLMRegistry, execute
     execution_subgraph = build_execution_subgraph(registry, llm_registry, vector_store, vector_store_path)
 
     def execution_wrapper(state: Union[Dict, GraphState]):
+        import time
+        start = time.perf_counter()
         result = execution_subgraph.invoke(state)
+        duration = time.perf_counter() - start
+        
+        sql = result.get("sql_draft")
+        
+        execution = result.get("execution")
+        row_count = execution.get("row_count") if isinstance(execution, dict) else getattr(execution, "row_count", 0)
+
+        ds_id = result.get("datasource_id")
+        ds_type = "Unknown"
+        if ds_id:
+            try:
+                profile = registry.get_profile(ds_id)
+                ds_type = profile.engine
+            except Exception:
+                pass
+
+        history_item = {
+            "datasource_id": ds_id,
+            "datasource_type": ds_type,
+            "sql": sql,
+            "row_count": row_count
+        }
+        
+        sub_latency = result.get("latency", {})
+        prefixed_latency = {}
+        if ds_id:
+            for k, v in sub_latency.items():
+                prefixed_latency[f"{ds_id}:{k}"] = v
+            prefixed_latency[f"{ds_id}:total"] = duration
+        else:
+            prefixed_latency = sub_latency.copy()
+            prefixed_latency["execution_branch"] = duration
+        
         return {
             "intermediate_results": result.get("intermediate_results", []),
-            "latency": result.get("latency", {})
+            "query_history": [history_item],
+            "latency": prefixed_latency
         }
 
     # Add Nodes
@@ -68,9 +104,7 @@ def build_graph(registry: DatasourceRegistry, llm_registry: LLMRegistry, execute
         """
         sub_queries = state.sub_queries or [state.user_query]
         print(f"DEBUG: continue_to_subqueries called with {sub_queries}")
-        
-        # We use Send to create parallel branches for each sub-query
-        # We override 'user_query' for the branch execution and propagate datasource_id
+
         return [Send("execution_branch", {"user_query": sq, "datasource_id": state.datasource_id}) for sq in sub_queries]
 
     graph.add_conditional_edges(
@@ -105,7 +139,6 @@ def run_with_graph(registry: DatasourceRegistry, llm_registry: LLMRegistry, user
     """
     g = build_graph(registry, llm_registry, execute=execute, vector_store=vector_store, vector_store_path=vector_store_path)
     
-    # Initialize GraphState
     initial_state = GraphState(
         user_query=user_query,
         datasource_id=datasource_id,
@@ -127,7 +160,8 @@ def run_with_graph(registry: DatasourceRegistry, llm_registry: LLMRegistry, user
         "validator": "validator",
         "sql_generator": "generator",
         "summarizer": "summarizer",
-        "aggregator": "aggregator"
+        "aggregator": "aggregator",
+        "executor": "executor"
     }
 
     if debug or on_thought:
@@ -135,13 +169,10 @@ def run_with_graph(registry: DatasourceRegistry, llm_registry: LLMRegistry, user
             print("\n--- Starting Graph Execution (Debug Mode) ---")
         
         final_state = initial_state_dict
-        # Track branch names (namespace -> datasource_id)
         branch_map = {}
 
-        # We need to handle subgraphs in streaming
         for namespace, mode, payload in g.stream(initial_state_dict, stream_mode=["updates", "messages"], subgraphs=True):
             
-            # Determine branch ID (first element of namespace usually identifies the parallel branch)
             branch_id = namespace[0] if namespace else "main"
             
             if mode == "updates":
@@ -149,33 +180,58 @@ def run_with_graph(registry: DatasourceRegistry, llm_registry: LLMRegistry, user
                 for node_name, state_update in payload.items():
                     if debug:
                         print(f"\n--- Node: {node_name} ---")
-                        # print(json.dumps(state_update, indent=2, default=str)) # Can be verbose
-                    
-                    # Update final state (simple merge for top-level, might need care for lists)
+                       
                     if isinstance(state_update, dict):
                         final_state.update(state_update)
                         
-                        # Capture datasource_id if present to name the branch
                         if "datasource_id" in state_update and state_update["datasource_id"]:
                             branch_map[branch_id] = state_update["datasource_id"]
 
                     if on_thought:
-                        # Map node name (which might be namespaced like "execution_branch:router")
-                        # We need to extract the actual node name
                         actual_node = node_name.split(":")[-1]
                         thought_key = node_map.get(actual_node)
                         
                         if thought_key:
                             thoughts = state_update.get("thoughts", {}).get(thought_key)
                             if thoughts:
-                                # Append branch label if available
                                 branch_label = branch_map.get(branch_id)
                                 if not branch_label and branch_id.startswith("execution_branch"):
-                                    # Fallback to short ID
-                                    branch_label = branch_id.split(":")[-1][:4]
+                                    if "user_query" in state_update:
+                                        query = state_update["user_query"]
+                                        branch_label = (query[:20] + '..') if len(query) > 20 else query
+                                        branch_map[branch_id] = branch_label
+                                    else:
+                                        branch_label = branch_id.split(":")[-1][:4]
                                 
                                 display_node = f"{thought_key} ({branch_label})" if branch_label else thought_key
                                 on_thought(display_node, thoughts)
+                        
+                        if thought_key == "generator" and "sql_draft" in state_update:
+                            draft = state_update["sql_draft"]
+                            if draft:
+                                msg = f"SQL Draft:\n{draft}"
+                                display_node = f"{thought_key} ({branch_label})" if branch_label else thought_key
+                                on_thought(display_node, [msg])
+                                
+                        if thought_key == "executor" and "execution" in state_update:
+                            exec_res = state_update["execution"]
+                            if exec_res:
+                                # Handle both dict and Pydantic model
+                                row_count = exec_res.get("row_count") if isinstance(exec_res, dict) else getattr(exec_res, "row_count", 0)
+                                error = exec_res.get("error") if isinstance(exec_res, dict) else getattr(exec_res, "error", None)
+                                rows = exec_res.get("rows") if isinstance(exec_res, dict) else getattr(exec_res, "rows", [])
+                                
+                                msgs = [f"Execution Result: {row_count} rows returned."]
+                                if error:
+                                    msgs.append(f"Error: {error}")
+                                if rows:
+                                    # Pretty print a sample
+                                    sample = rows[:3]
+                                    msgs.append("Sample Data:")
+                                    msgs.append(json.dumps(sample, indent=2, default=str))
+                                
+                                display_node = f"{thought_key} ({branch_label})" if branch_label else thought_key
+                                on_thought(display_node, msgs)
 
             elif mode == "messages":
                 chunk, metadata = payload

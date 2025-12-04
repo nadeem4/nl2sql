@@ -60,7 +60,10 @@ PLANNER_PROMPT = (
     "{schema_context}\n"
     "[INPUT]\n"
     "{intent_context}"
+    "[EXAMPLES]\n"
     "{examples}\n"
+    "[FEEDBACK]\n"
     "{feedback}\n"
-    "User query: \"{user_query}\""
+    "[USER_QUERY]\n"
+    "{user_query}"
 )

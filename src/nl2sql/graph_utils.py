@@ -41,10 +41,15 @@ def wrap_graphstate(fn: Callable[[GraphState], GraphState], name: Optional[str] 
         logger = get_logger(node_name)
         
         start = time.perf_counter()
+        token = None
         try:
+            from nl2sql.context import current_datasource_id
+            if gs.datasource_id:
+                token = current_datasource_id.set(gs.datasource_id)
+                
             with span(node_name):
                 result = fn(gs)
-            
+                
             # If result is a dict, use it as the base for output
             if isinstance(result, dict):
                 output = result.copy()
@@ -65,7 +70,7 @@ def wrap_graphstate(fn: Callable[[GraphState], GraphState], name: Optional[str] 
                 "duration_ms": duration * 1000,
                 "status": "success"
             })
-            
+
         except Exception as e:
             duration = time.perf_counter() - start
             logger.error(f"Node {node_name} failed: {e}", extra={
@@ -75,6 +80,10 @@ def wrap_graphstate(fn: Callable[[GraphState], GraphState], name: Optional[str] 
                 "error": str(e)
             })
             raise e
+            
+        finally:
+            if token:
+                current_datasource_id.reset(token)
         
         return output
 

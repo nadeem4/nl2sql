@@ -14,7 +14,6 @@ from nl2sql.vector_store import SchemaVectorStore
 from nl2sql.datasource_registry import DatasourceRegistry
 
 # Import commands
-from nl2sql.commands.dashboard import launch_dashboard
 from nl2sql.commands.indexing import run_indexing
 from nl2sql.commands.benchmark import run_benchmark
 from nl2sql.commands.run import run_pipeline
@@ -35,14 +34,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--show-thoughts", action="store_true", help="Show step-by-step reasoning from AI nodes")
     parser.add_argument("--json-logs", action="store_true", help="Enable structured JSON logging")
     parser.add_argument("--log-level", type=str, default=None, choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"], help="Set the logging level")
+    parser.add_argument("--show-perf", action="store_true", help="Show performance metrics (latency)")
     
     # Benchmarking args
     parser.add_argument("--benchmark", action="store_true", help="Run in benchmark mode")
     parser.add_argument("--bench-config", type=pathlib.Path, default=pathlib.Path(settings.benchmark_config_path), help="Path to a single YAML file containing multiple named LLM configs (required if --benchmark is set)")
     parser.add_argument("--iterations", type=int, default=3, help="Number of iterations per config (benchmark mode only)")
-    
-    # Dashboard
-    parser.add_argument("--dashboard", action="store_true", help="Launch the Streamlit Web Dashboard")
 
     return parser.parse_args()
 
@@ -63,10 +60,6 @@ def main() -> None:
         
     configure_logging(level=level, json_format=args.json_logs)
 
-    if args.dashboard:
-        launch_dashboard()
-        return
-
     profiles = load_profiles(args.config)
 
     vector_store = SchemaVectorStore(persist_directory=args.vector_store)
@@ -84,12 +77,16 @@ def main() -> None:
         sys.exit(1)
 
     query = args.query
+
     if not query:
-        query = input("Enter your question: ").strip()
-    
-    if not query:
-        print("No query provided.", file=sys.stderr)
-        sys.exit(1)
+        # Interactive mode
+        print("Enter your query (or 'exit' to quit):")
+        try:
+            query = input("> ")
+            if query.lower() in ["exit", "quit"]:
+                return
+        except KeyboardInterrupt:
+            return
 
     # Initialize Registries
     llm_cfg = load_llm_config(args.llm_config)

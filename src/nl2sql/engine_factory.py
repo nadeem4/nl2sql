@@ -64,7 +64,7 @@ def _normalize_sql(sql: str) -> str:
 
 
 def run_read_query(
-    engine: Engine, sql: str, params: Dict[str, Any] | None = None, row_limit: int = 1000
+    engine: Engine, sql: str, params: Dict[str, Any] | None = None
 ):
     """
     Execute a read-only query with a row limit safeguard.
@@ -82,10 +82,7 @@ def run_read_query(
     """
     params = params or {}
     cleaned = _normalize_sql(sql)
-    limited_sql = cleaned
-    if not re.search(r"\blimit\b", cleaned, re.IGNORECASE):
-        limited_sql = f"{cleaned}\nLIMIT {row_limit}"
     with engine.connect() as conn:
-        result = conn.execute(text(limited_sql), params)
+        result = conn.execute(text(cleaned), params)
         rows = result.fetchall()
         return rows

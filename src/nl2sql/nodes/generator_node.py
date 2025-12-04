@@ -7,7 +7,7 @@ import sqlglot
 from sqlglot import expressions as exp
 
 from nl2sql.capabilities import EngineCapabilities, get_capabilities
-from nl2sql.schemas import GeneratedSQL, GraphState, SQLModel
+from nl2sql.schemas import GraphState
 
 
 from nl2sql.datasource_registry import DatasourceRegistry
@@ -69,12 +69,7 @@ class GeneratorNode:
             state.thoughts["generator"].append(f"Generated SQL: {final_sql}")
             state.thoughts["generator"].append(f"Rationale: {state.plan.get('reasoning', 'N/A')}")
             
-            state.sql_draft = GeneratedSQL(
-                sql=final_sql,
-                rationale=state.plan.get("reasoning"),
-                limit_enforced=True,
-                draft_only=False
-            )
+            state.sql_draft = final_sql
 
         except Exception as exc:
             state.sql_draft = None
@@ -110,6 +105,9 @@ class GeneratorNode:
         dialect_map = {
             "postgresql": "postgres",
             "mssql": "tsql",
+            "mysql": "mysql",
+            "sqlite": "sqlite",
+            "oracle": "oracle",
         }
         target_dialect = dialect_map.get(self.profile_engine, self.profile_engine)
         

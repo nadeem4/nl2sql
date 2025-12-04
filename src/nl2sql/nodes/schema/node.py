@@ -116,5 +116,13 @@ class SchemaNode:
             ))
         
         state.schema_info = SchemaInfo(tables=table_infos)
+        
+        if "schema" not in state.thoughts:
+            state.thoughts["schema"] = []
+            
+        table_names = [t.name for t in table_infos]
+        state.thoughts["schema"].append(f"Retrieved Tables: {', '.join(table_names)}")
+        if self.vector_store:
+             state.thoughts["schema"].append(f"Vector Search: {'Enabled' if self.vector_store else 'Disabled'}")
 
         return state

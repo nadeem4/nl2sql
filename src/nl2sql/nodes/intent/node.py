@@ -49,8 +49,8 @@ class IntentNode:
             # Invoke the chain
             intent_model = self.chain.invoke({"user_query": state.user_query})
             
-            # Store raw output for debugging
-            state.validation["intent"] = intent_model.model_dump_json()
+            # Store intent model directly
+            state.intent = intent_model
             
             # Populate thoughts
             if "intent" not in state.thoughts:

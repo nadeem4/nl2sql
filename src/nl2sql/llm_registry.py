@@ -146,10 +146,12 @@ class LLMRegistry:
             resp = llm.invoke(prompt)
             usage = getattr(resp, "usage_metadata", None)
             if usage:
+                from nl2sql.context import current_datasource_id
                 TOKEN_LOG.append(
                     {
                         "agent": agent,
                         "model": model_name,
+                        "datasource_id": current_datasource_id.get(),
                         "prompt_tokens": usage.get("prompt_tokens", 0),
                         "completion_tokens": usage.get("completion_tokens", 0),
                         "total_tokens": usage.get("total_tokens", 0),
@@ -170,10 +172,12 @@ class LLMRegistry:
             if raw_msg:
                 usage = getattr(raw_msg, "usage_metadata", None)
                 if usage:
+                    from nl2sql.context import current_datasource_id
                     TOKEN_LOG.append(
                         {
                             "agent": agent,
                             "model": model_name,
+                            "datasource_id": current_datasource_id.get(),
                             "prompt_tokens": usage.get("prompt_tokens", 0),
                             "completion_tokens": usage.get("completion_tokens", 0),
                             "total_tokens": usage.get("total_tokens", 0),
@@ -196,11 +200,7 @@ class LLMRegistry:
         llm = self._base_llm("planner")
         return self._wrap_structured_usage(llm, "planner", PlanModel)
 
-    def generator_llm(self) -> LLMCallable:
-        """Returns the LLM callable for the Generator agent."""
-        from nl2sql.schemas import SQLModel
-        llm = self._base_llm("generator")
-        return self._wrap_structured_usage(llm, "generator", SQLModel)
+
 
     def summarizer_llm(self) -> LLMCallable:
         """Returns the LLM callable for the Summarizer agent."""
@@ -231,9 +231,17 @@ class LLMRegistry:
         return {
             "intent": self.intent_llm(),
             "planner": self.planner_llm(),
-            "generator": self.generator_llm(),
+
             "summarizer": self.summarizer_llm(),
             "decomposer": self.decomposer_llm(),
             "aggregator": self.aggregator_llm(),
             "_default": self.intent_llm(),
         }
+
+    def get_usage_summary(self) -> Dict[str, Dict[str, int]]:
+        """Returns the token usage summary."""
+        return get_usage_summary()
+
+    def get_token_log(self) -> List[Dict[str, Any]]:
+        """Returns the raw token usage log."""
+        return TOKEN_LOG

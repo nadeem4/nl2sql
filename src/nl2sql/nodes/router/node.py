@@ -102,4 +102,9 @@ class RouterNode:
         state.datasource_id = target_id
         state.latency["router"] = duration
         
+        if "router" not in state.thoughts:
+            state.thoughts["router"] = []
+        state.thoughts["router"].append(f"Selected Datasource: {target_id}")
+        state.thoughts["router"].append(f"Latency: {duration:.4f}s")
+        
         return state
