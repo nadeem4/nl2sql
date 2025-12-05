@@ -177,11 +177,25 @@ python -m src.nl2sql.cli --id manufacturing_ref --query "List all factories and 
 
 The system can automatically decompose complex queries into sub-queries, execute them in parallel, and aggregate the results.
 
+#### Example 1: Sales vs Inventory (MSSQL + MySQL)
+
 ```bash
 python -m src.nl2sql.cli --query "Compare sales from manufacturing_history and inventory from manufacturing_supply"
 ```
 
-**Expected Output:** A consolidated answer merging data from MSSQL (History) and MySQL (Supply).
+#### Example 2: Production vs Maintenance (MSSQL + Postgres)
+
+```bash
+python -m src.nl2sql.cli --query "Show production runs from manufacturing_history and maintenance logs from manufacturing_ops for 'Machine-1'"
+```
+
+#### Example 3: Employees & Locations (Postgres + SQLite)
+
+```bash
+python -m src.nl2sql.cli --query "List all employees from manufacturing_ops and their factory locations from manufacturing_ref"
+```
+
+**Expected Output:** A consolidated answer merging data from the respective databases.
 
 ### Vector Search (RAG)
 
