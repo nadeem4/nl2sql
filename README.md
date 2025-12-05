@@ -133,6 +133,7 @@ The CLI (`src.nl2sql.cli`) is the main entry point. It uses the **Router Node** 
 - `--no-exec`: Generate and validate SQL without executing it.
 - `--json-logs`: Enable structured JSON logging.
 - `--debug`: Enable debug logging for verbose output.
+- `--visualize`: Visualize the execution trace and save it as a PNG image.
 
 ### Multi-Database Support
 
@@ -218,6 +219,7 @@ For large schemas, use vector search to dynamically select relevant tables.
 - **Stream Reasoning**: Use `--show-thoughts` to see the Intent, Planner, and Generator steps.
 - **JSON Logs**: Use `--json-logs` for structured output suitable for log ingestion.
 - **Debug Mode**: Use `--debug` for verbose output.
+- **Graph Visualization**: Use `--visualize` to generate a visual graph of the execution trace.
 
 ---
 
