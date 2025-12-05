@@ -9,6 +9,7 @@ from nl2sql.langgraph_pipeline import run_with_graph
 from nl2sql.datasource_registry import DatasourceRegistry
 from nl2sql.llm_registry import LLMRegistry
 from nl2sql.vector_store import SchemaVectorStore
+from nl2sql.commands.visualize import draw_execution_trace
 
 def run_pipeline(args: argparse.Namespace, query: Optional[str], datasource_registry: DatasourceRegistry, llm_registry: LLMRegistry, vector_store: SchemaVectorStore) -> None:
     # Always run in simple console mode
@@ -34,6 +35,7 @@ def _run_simple_mode(args: argparse.Namespace, query: str, datasource_registry: 
                 vector_store=vector_store,
                 vector_store_path=args.vector_store,
                 debug=args.debug,
+                visualize=args.visualize,
                 on_thought=None # No thoughts in simple mode
             )
         except Exception as e:
@@ -72,6 +74,15 @@ def _run_simple_mode(args: argparse.Namespace, query: str, datasource_registry: 
     datasource_id = final_state.get("datasource_id")
     if datasource_id:
         console.print(f"[bold blue]Datasource Used:[/bold blue] {datasource_id}")
+
+    # Visualization
+    if args.visualize and "_trace" in final_state:
+        draw_execution_trace(
+            final_state["_trace"],
+            final_state["_graph"],
+            final_state["_execution_subgraph"],
+            final_state["_planning_subgraph"]
+        )
 
     # Display Performance Metrics
     # Display Performance Metrics

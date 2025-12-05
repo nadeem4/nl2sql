@@ -71,4 +71,4 @@ def build_execution_subgraph(registry: DatasourceRegistry, llm_registry: LLMRegi
     graph.add_edge("planning", "formatter")
     graph.add_edge("formatter", END)
 
-    return graph.compile()
+    return graph.compile(), planning_subgraph

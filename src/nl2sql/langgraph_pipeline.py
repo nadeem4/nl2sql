@@ -16,6 +16,8 @@ from nl2sql.tracing import span
 from nl2sql.vector_store import SchemaVectorStore
 from nl2sql.graph_utils import wrap_graphstate
 from nl2sql.llm_registry import LLMRegistry
+from IPython.display import Image, display
+
 
 # Type for an LLM callable: prompt -> string
 LLMCallable = Union[Callable[[str], str], Runnable]
@@ -45,7 +47,7 @@ def build_graph(registry: DatasourceRegistry, llm_registry: LLMRegistry, execute
     aggregator = AggregatorNode(aggregator_llm)
     
 
-    execution_subgraph = build_execution_subgraph(registry, llm_registry, vector_store, vector_store_path)
+    execution_subgraph, planning_subgraph = build_execution_subgraph(registry, llm_registry, vector_store, vector_store_path)
 
     def execution_wrapper(state: Union[Dict, GraphState]):
         import time
@@ -116,10 +118,10 @@ def build_graph(registry: DatasourceRegistry, llm_registry: LLMRegistry, execute
     graph.add_edge("execution_branch", "aggregator")
     graph.add_edge("aggregator", END)
 
-    return graph.compile()
+    graph = graph.compile()
+    return graph, execution_subgraph, planning_subgraph
 
-
-def run_with_graph(registry: DatasourceRegistry, llm_registry: LLMRegistry, user_query: str, datasource_id: Optional[str] = None, execute: bool = True, vector_store: Optional[SchemaVectorStore] = None, vector_store_path: str = "", debug: bool = False, on_thought: Optional[Callable[[str, list[str]], None]] = None) -> Dict:
+def run_with_graph(registry: DatasourceRegistry, llm_registry: LLMRegistry, user_query: str, datasource_id: Optional[str] = None, execute: bool = True, vector_store: Optional[SchemaVectorStore] = None, vector_store_path: str = "", debug: bool = False, visualize: bool = False, on_thought: Optional[Callable[[str, list[str]], None]] = None) -> Dict:
     """
     Runs the NL2SQL pipeline using LangGraph.
 
@@ -132,12 +134,13 @@ def run_with_graph(registry: DatasourceRegistry, llm_registry: LLMRegistry, user
         vector_store: Optional vector store for schema retrieval.
         vector_store_path: Path to vector store for routing.
         debug: Whether to print debug information.
+        visualize: Whether to capture execution trace for visualization.
         on_thought: Callback for streaming thoughts/tokens.
 
     Returns:
         The final state dictionary.
     """
-    g = build_graph(registry, llm_registry, execute=execute, vector_store=vector_store, vector_store_path=vector_store_path)
+    g, execution_subgraph, planning_subgraph = build_graph(registry, llm_registry, execute=execute, vector_store=vector_store, vector_store_path=vector_store_path)
     
     initial_state = GraphState(
         user_query=user_query,
@@ -164,7 +167,8 @@ def run_with_graph(registry: DatasourceRegistry, llm_registry: LLMRegistry, user
         "executor": "executor"
     }
 
-    if debug or on_thought:
+    trace = []
+    if debug or on_thought or visualize:
         if debug:
             print("\n--- Starting Graph Execution (Debug Mode) ---")
         
@@ -178,6 +182,12 @@ def run_with_graph(registry: DatasourceRegistry, llm_registry: LLMRegistry, user
             if mode == "updates":
            
                 for node_name, state_update in payload.items():
+                    if visualize:
+                        trace.append({
+                            "node": node_name,
+                            "state_update": state_update,
+                            "branch": branch_id
+                        })
                     if debug:
                         print(f"\n--- Node: {node_name} ---")
                        
@@ -260,4 +270,10 @@ def run_with_graph(registry: DatasourceRegistry, llm_registry: LLMRegistry, user
         result["latency"] = {}
     result["latency"]["total"] = total_duration
     
+    if visualize:
+        result["_trace"] = trace
+        result["_graph"] = g
+        result["_execution_subgraph"] = execution_subgraph
+        result["_planning_subgraph"] = planning_subgraph
+
     return result
