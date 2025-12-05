@@ -127,8 +127,12 @@ The CLI (`src.nl2sql.cli`) is the main entry point. It uses the **Router Node** 
 
 - `--query "..."`: The natural language question.
 - `--show-thoughts`: Display step-by-step AI reasoning.
+- `--show-perf`: Display detailed performance metrics (latency, tokens).
 - `--vector-store <PATH>`: Use vector search for schema selection (requires indexing).
 - `--id <ID>`: **Optional**. Force a specific datasource, bypassing the router (e.g., `manufacturing_ops`).
+- `--no-exec`: Generate and validate SQL without executing it.
+- `--json-logs`: Enable structured JSON logging.
+- `--debug`: Enable debug logging for verbose output.
 
 ### Multi-Database Support
 
@@ -200,7 +204,6 @@ For large schemas, use vector search to dynamically select relevant tables.
 - **Stream Reasoning**: Use `--show-thoughts` to see the Intent, Planner, and Generator steps.
 - **JSON Logs**: Use `--json-logs` for structured output suitable for log ingestion.
 - **Debug Mode**: Use `--debug` for verbose output.
-- **Visualize Graph**: Use `--graph` to print ASCII visualization and Mermaid code for the pipeline.
 
 ---
 
@@ -264,7 +267,6 @@ This allows the system to scale to hundreds of tables without overwhelming the L
 
 - **Intent (AI)**: Classifies query type and extracts entities.
 - **Planner (AI)**: Generates a database-agnostic structured plan (tables, joins, filters).
-- **Validator (Code)**: Verifies the plan against the schema (column existence, types).
 - **Validator (Code)**: Verifies the plan against the schema (column existence, types).
 - **SQL Generator (Code)**: Deterministically compiles the plan to SQL using `sqlglot` (0 tokens).
 - **Executor (Code)**: Runs the SQL (read-only) and returns results.
