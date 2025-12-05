@@ -7,16 +7,20 @@ from nl2sql.schemas import GraphState
 from nl2sql.nodes.planner.node import PlannerNode
 from nl2sql.nodes.validator_node import ValidatorNode
 from nl2sql.nodes.summarizer.node import SummarizerNode
+from nl2sql.nodes.generator_node import GeneratorNode
+from nl2sql.nodes.executor_node import ExecutorNode
 from nl2sql.graph_utils import wrap_graphstate
+from nl2sql.datasource_registry import DatasourceRegistry
 
 LLMCallable = Union[Callable[[str], str], Runnable]
 
-def build_planning_subgraph(llm_map: Dict[str, LLMCallable], row_limit: int = 100):
+def build_planning_subgraph(llm_map: Dict[str, LLMCallable], registry: DatasourceRegistry, row_limit: int = 100):
     """
-    Builds the planning subgraph: Planner -> Validator -> Summarizer loop.
+    Builds the planning subgraph: Planner -> Validator -> Generator -> Executor -> (Error) -> Summarizer -> Planner.
 
     Args:
         llm_map: Map of node names to LLM callables.
+        registry: Datasource registry.
         row_limit: Row limit for validation context.
 
     Returns:
@@ -28,6 +32,8 @@ def build_planning_subgraph(llm_map: Dict[str, LLMCallable], row_limit: int = 10
     planner = PlannerNode(llm=llm_map.get("planner"))
     validator = ValidatorNode(row_limit=row_limit)
     summarizer = SummarizerNode(llm=llm_map.get("summarizer"))
+    generator = GeneratorNode(registry=registry)
+    executor = ExecutorNode(registry=registry)
 
     def retry_node(state: GraphState) -> Dict:
         """Increments retry count."""
@@ -58,9 +64,21 @@ def build_planning_subgraph(llm_map: Dict[str, LLMCallable], row_limit: int = 10
                 return "end"
         return "ok"
 
+    def check_execution(state: GraphState) -> str:
+        """Checks execution results."""
+        if state.errors or (state.execution and state.execution.error):
+            if state.retry_count < 3:
+                return "retry"
+            else:
+                return "end"
+        return "ok"
+
     graph.add_node("planner", wrap_graphstate(planner, "planner"))
     graph.add_node("validator", wrap_graphstate(validator, "validator"))
     graph.add_node("summarizer", wrap_graphstate(summarizer, "summarizer"))
+    graph.add_node("sql_generator", wrap_graphstate(generator, "sql_generator"))
+    graph.add_node("executor", wrap_graphstate(executor, "executor"))
+    
     graph.add_node("planner_retry", planner_retry_node)
     graph.add_node("retry_handler", retry_node)
 
@@ -79,6 +97,18 @@ def build_planning_subgraph(llm_map: Dict[str, LLMCallable], row_limit: int = 10
     graph.add_conditional_edges(
         "validator",
         check_validation,
+        {
+            "ok": "sql_generator",
+            "retry": "retry_handler",
+            "end": END # Failure
+        }
+    )
+    
+    graph.add_edge("sql_generator", "executor")
+    
+    graph.add_conditional_edges(
+        "executor",
+        check_execution,
         {
             "ok": END, # Success
             "retry": "retry_handler",
