@@ -334,6 +334,27 @@ Compare performance (latency, success rate, tokens) across LLMs.
     python -m src.nl2sql.cli --query "List Products" --benchmark --bench-config configs/benchmark_suite.yaml --iterations 3
     ```
 
+### Evaluation Framework (Accuracy)
+
+Measure **Execution Accuracy** by comparing results against a "Golden Dataset" of ground-truth queries.
+
+1. **Create Dataset**: `tests/golden_dataset.yaml`
+
+    ```yaml
+    - id: "q1"
+      question: "List 5 machines"
+      expected_sql: "SELECT * FROM machines LIMIT 5"
+      datasource: "manufacturing_ops"
+    ```
+
+2. **Run Evaluation**:
+
+    ```bash
+    python -m src.nl2sql.cli --benchmark --dataset tests/golden_dataset.yaml
+    ```
+
+    *Use `--stub-llm` to test the framework without LLM calls.*
+
 ## Development
 
 ### Running Tests
