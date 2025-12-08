@@ -111,6 +111,8 @@ class SchemaVectorStore:
 
         if documents:
             self.vectorstore.add_documents(documents)
+            
+        return tables
 
     def retrieve(self, query: str, k: int = 5) -> List[str]:
         """

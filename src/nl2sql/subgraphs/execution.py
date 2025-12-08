@@ -35,7 +35,14 @@ def format_result(state: GraphState) -> Dict[str, Any]:
     else:
         result_str = f"Query: {query}\nStatus: No execution occurred."
         
-    return {"intermediate_results": [result_str]}
+    return {
+        "intermediate_results": [result_str],
+        "datasource_id": state.datasource_id,
+        "routing_info": state.routing_info,
+        "sql_draft": state.sql_draft,
+        "execution": state.execution,
+        "latency": state.latency
+    }
 
 def build_execution_subgraph(registry: DatasourceRegistry, llm_registry: LLMRegistry, vector_store: Optional[SchemaVectorStore] = None, vector_store_path: str = ""):
     """

@@ -86,10 +86,14 @@ def build_graph(registry: DatasourceRegistry, llm_registry: LLMRegistry, execute
             prefixed_latency = sub_latency.copy()
             prefixed_latency["execution_branch"] = duration
         
+        routing_info = result.get("routing_info", {})
+
         return {
             "intermediate_results": result.get("intermediate_results", []),
             "query_history": [history_item],
-            "latency": prefixed_latency
+            "latency": prefixed_latency,
+            "routing_info": routing_info,
+            "datasource_id": ds_id
         }
 
     # Add Nodes

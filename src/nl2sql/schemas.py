@@ -285,6 +285,7 @@ class GraphState(BaseModel):
     intermediate_results: Annotated[List[Any], operator.add] = Field(default_factory=list)
     query_history: Annotated[List[Dict[str, Any]], operator.add] = Field(default_factory=list)
     final_answer: Optional[str] = None
+    routing_info: Dict[str, Any] = Field(default_factory=dict)
 
 
 

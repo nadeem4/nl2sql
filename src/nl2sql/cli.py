@@ -39,6 +39,8 @@ def parse_args() -> argparse.Namespace:
     
     # Benchmarking args
     parser.add_argument("--benchmark", action="store_true", help="Run in benchmark mode")
+    parser.add_argument("--dataset", type=pathlib.Path, default=None, help="Path to golden dataset YAML for accuracy evaluation")
+    parser.add_argument("--routing-only", action="store_true", help="Benchmark: Verify datasource routing only, skip execution")
     parser.add_argument("--bench-config", type=pathlib.Path, default=pathlib.Path(settings.benchmark_config_path), help="Path to a single YAML file containing multiple named LLM configs (required if --benchmark is set)")
     parser.add_argument("--iterations", type=int, default=3, help="Number of iterations per config (benchmark mode only)")
 
@@ -63,10 +65,16 @@ def main() -> None:
 
     profiles = load_profiles(args.config)
 
+    # Initialize Registries
+    llm_cfg = load_llm_config(args.llm_config)
+    llm_registry = LLMRegistry(llm_cfg)
+    
+    datasource_registry = DatasourceRegistry(profiles)
+
     vector_store = SchemaVectorStore(persist_directory=args.vector_store)
 
     if args.index:
-        run_indexing(profiles, args.vector_store, vector_store)
+        run_indexing(profiles, args.vector_store, vector_store, llm_registry)
         if not args.query:
             print("Indexing complete.")
             return
@@ -76,6 +84,20 @@ def main() -> None:
         print("Please run indexing first:", file=sys.stderr)
         print(f"  python -m src.nl2sql.cli --index --vector-store {args.vector_store}", file=sys.stderr)
         sys.exit(1)
+
+    # Benchmark Mode (Dataset or Config)
+    if args.benchmark:
+        # If dataset is provided, query is not required
+        if args.dataset:
+             run_benchmark(args, None, datasource_registry, vector_store)
+             return
+        # If config is provided, query is required (for single query benchmark)
+        elif args.query:
+             run_benchmark(args, args.query, datasource_registry, vector_store)
+             return
+        else:
+             print("Error: --query is required for config-based benchmark.", file=sys.stderr)
+             sys.exit(1)
 
     query = args.query
 
@@ -89,15 +111,9 @@ def main() -> None:
         except KeyboardInterrupt:
             return
 
-    # Initialize Registries
-    llm_cfg = load_llm_config(args.llm_config)
-    llm_registry = LLMRegistry(llm_cfg)
-    
-    datasource_registry = DatasourceRegistry(profiles)
 
-    if args.benchmark:
-        run_benchmark(args, query, datasource_registry, vector_store)
-        return
+
+
 
     # Run Standard Pipeline
     run_pipeline(args, query, datasource_registry, llm_registry, vector_store)

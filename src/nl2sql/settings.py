@@ -14,6 +14,18 @@ class Settings(BaseSettings):
         validation_alias="ROUTING_EXAMPLES",
         description="Path to the YAML file containing sample questions for routing."
     )
+    
+    # Router Thresholds
+    router_l1_threshold: float = Field(
+        default=0.4, 
+        validation_alias="ROUTER_L1_THRESHOLD",
+        description="Distance threshold for Layer 1 (Vector Search) to be considered a match."
+    )
+    router_l2_threshold: float = Field(
+        default=0.6, 
+        validation_alias="ROUTER_L2_THRESHOLD", 
+        description="relaxed distance threshold for Layer 2 (Multi-Query) voting."
+    )
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
