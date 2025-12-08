@@ -170,16 +170,17 @@ def _run_dataset_evaluation(args: argparse.Namespace, datasource_registry: Datas
         q_id = item.get("id", "unknown")
         question = item.get("question")
         expected_sql = item.get("expected_sql")
-        target_ds = item.get("datasource")
+        expected_ds = item.get("datasource")
+        expected_layer = item.get("expected_routing_layer")
         
-        # 1. Run Pipeline
+        # 1. Run Pipeline (Auto-Routing)
         try:
             state = run_with_graph(
                 registry=datasource_registry,
                 llm_registry=llm_registry,
                 user_query=question,
-                datasource_id=target_ds, # Force routing if specified in dataset
-                execute=True,
+                datasource_id=None, # Use the Router!
+                execute=not args.routing_only,
                 vector_store=vector_store,
                 vector_store_path=args.vector_store
             )
@@ -188,10 +189,50 @@ def _run_dataset_evaluation(args: argparse.Namespace, datasource_registry: Datas
                 "id": q_id,
                 "status": "ERROR",
                 "error": str(e),
-                "match": False
+                "routing_match": False,
+                "sql_match": False
             })
             continue
             
+        # Check Routing
+        actual_ds = state.get("datasource_id")
+        routing_info = state.get("routing_info", {})
+        routing_layer = routing_info.get("layer", "unknown")
+        routing_reasoning = routing_info.get("reasoning", "-")
+        routing_tokens = routing_info.get("tokens", "-")
+        routing_latency = routing_info.get("latency", 0.0)
+        
+        routing_latency = routing_info.get("latency", 0.0)
+        l1_score = routing_info.get("l1_score", 0.0)
+        
+        routing_match = (actual_ds == expected_ds)
+        
+        # Check Layer Match
+        layer_match = True
+        if expected_layer:
+            # Normalize layer names just in case
+            layer_match = (routing_layer == expected_layer)
+        
+        if args.routing_only:
+            results.append({
+                "id": q_id,
+                "status": "PASS" if routing_match else "ROUTE_FAIL",
+                "routing_match": routing_match,
+                "sql_match": None,
+                "actual_ds": actual_ds,
+                "expected_ds": expected_ds,
+                "routing_layer": routing_layer,
+                "routing_reasoning": routing_reasoning,
+                "routing_tokens": routing_tokens,
+                "routing_latency": routing_latency,
+                "l1_score": l1_score,
+                "candidates": routing_info.get("candidates", []),
+                "expected_layer": expected_layer,
+                "layer_match": layer_match
+            })
+            continue
+            
+        # Check SQL/Execution
         generated_sql_data = state.get("sql_draft")
         generated_sql = generated_sql_data.get("sql") if isinstance(generated_sql_data, dict) else getattr(generated_sql_data, "sql", None)
         
@@ -204,7 +245,8 @@ def _run_dataset_evaluation(args: argparse.Namespace, datasource_registry: Datas
                 "id": q_id,
                 "status": "EXEC_FAIL",
                 "error": exec_error,
-                "match": False,
+                "routing_match": routing_match,
+                "sql_match": False,
                 "gen_sql": generated_sql
             })
             continue
@@ -213,29 +255,29 @@ def _run_dataset_evaluation(args: argparse.Namespace, datasource_registry: Datas
              results.append({
                 "id": q_id,
                 "status": "NO_SQL",
-                "match": False
+                "routing_match": routing_match,
+                "sql_match": False
             })
              continue
 
         # 2. Run Expected SQL (Ground Truth)
-        # We need to execute this against the SAME datasource that was used/requested.
-        # If target_ds is set, use it. If not, use the one selected by the pipeline.
-        actual_ds_id = state.get("datasource_id")
+        # We assume the expected SQL is valid for the EXPECTED datasource.
+        # If the router picked the wrong DS, we likely can't run the expected SQL against it easily without error.
+        # But we should try running it against the EXPECTED DS to get the ground truth data.
         
-        if not actual_ds_id:
+        if not expected_ds:
              results.append({
                 "id": q_id,
-                "status": "NO_DS",
-                "match": False,
-                "gen_sql": generated_sql
+                "status": "BAD_CONFIG",
+                "error": "Dataset missing expected datasource",
+                "routing_match": routing_match,
+                "sql_match": False
             })
              continue
              
         try:
-            profile = datasource_registry.get_profile(actual_ds_id)
-            # We need a way to execute raw SQL. The registry doesn't expose a direct execute method easily without an engine.
-            # We can create an engine temporarily or use the one from the profile if cached (not currently cached in registry).
-            # Let's create an engine.
+            # Run Expected SQL on Expected DS
+            profile = datasource_registry.get_profile(expected_ds)
             from sqlalchemy import create_engine
             engine = create_engine(profile.connection_string)
             with engine.connect() as conn:
@@ -246,42 +288,35 @@ def _run_dataset_evaluation(args: argparse.Namespace, datasource_registry: Datas
                 "id": q_id,
                 "status": "GT_FAIL", # Ground Truth Execution Failed
                 "error": str(e),
-                "match": False,
+                "routing_match": routing_match,
+                "sql_match": False,
                 "gen_sql": generated_sql
             })
              continue
              
         # 3. Compare Results
-        # Convert to pandas for easy comparison
         try:
             df_gen = pd.DataFrame(generated_rows)
             df_exp = pd.DataFrame(expected_rows)
             
-            # Normalize: sort by all columns if not empty
             if not df_gen.empty:
                 df_gen = df_gen.sort_values(by=list(df_gen.columns)).reset_index(drop=True)
             if not df_exp.empty:
                 df_exp = df_exp.sort_values(by=list(df_exp.columns)).reset_index(drop=True)
-                
-            # Check equality
-            # We need to be careful about column names if aliases differ. 
-            # Strict comparison: Data and Schema must match.
-            # Relaxed comparison: Data values must match (ignoring column names? Risky).
-            # Let's do strict for now, assuming generated SQL should match schema.
-            
-            # Align column types if possible (e.g. all to string) to avoid type mismatch issues
-            # Or just use equals()
             
             match = df_gen.equals(df_exp)
             
             results.append({
                 "id": q_id,
                 "status": "PASS" if match else "DATA_MISMATCH",
-                "match": match,
+                "routing_match": routing_match,
+                "sql_match": match,
                 "gen_sql": generated_sql,
                 "exp_sql": expected_sql,
                 "gen_rows": len(df_gen),
-                "exp_rows": len(df_exp)
+                "exp_rows": len(df_exp),
+                "expected_layer": expected_layer,
+                "layer_match": layer_match
             })
             
         except Exception as e:
@@ -289,41 +324,114 @@ def _run_dataset_evaluation(args: argparse.Namespace, datasource_registry: Datas
                 "id": q_id,
                 "status": "COMPARE_FAIL",
                 "error": str(e),
-                "match": False,
+                "routing_match": routing_match,
+                "sql_match": False,
                 "gen_sql": generated_sql
             })
 
     # Report
-    table = Table(title="Evaluation Results", show_header=True, header_style="bold magenta")
-    table.add_column("ID", style="cyan")
+    table = Table(title="Evaluation Results", show_header=True, header_style="bold magenta", expand=True)
+    table.add_column("ID", style="cyan", no_wrap=True)
     table.add_column("Status", justify="center")
-    table.add_column("Match", justify="center")
-    table.add_column("Rows (Gen/Exp)", justify="right")
+    table.add_column("Route", justify="center")
+    table.add_column("Layer", justify="center")
     
-    correct_count = 0
+    if not args.routing_only:
+        table.add_column("SQL Match", justify="center")
+        table.add_column("Rows", justify="right")
+    else:
+        table.add_column("Got/Exp DS", justify="left")
+        
+    table.add_column("Reasoning", justify="left", max_width=40, overflow="ellipsis")
+    table.add_column("L1 Score", justify="right")
+    table.add_column("Tokens", justify="right")
+    table.add_column("Latency", justify="right")
+    table.add_column("Candidates", justify="left")
+    
+    correct_routing_count = 0
+    correct_sql_count = 0
     valid_sql_count = 0
     
     for r in results:
         status_style = "green" if r["status"] == "PASS" else "red"
-        match_icon = "YES" if r["match"] else "NO"
+        route_icon = "YES" if r["routing_match"] else "NO"
         
-        if r["match"]: correct_count += 1
-        if r["status"] not in ["EXEC_FAIL", "NO_SQL", "ERROR"]: valid_sql_count += 1
+        # Format Layer
+        layer_raw = r.get("routing_layer", "unknown")
+        layer_map = {"layer_1": "L1", "layer_2": "L2", "layer_3": "L3", "fallback": "FB"}
+        layer_str = layer_map.get(layer_raw, layer_raw)
         
-        rows_info = f"{r.get('gen_rows', '-')} / {r.get('exp_rows', '-')}"
+        # Highlight Layer Mismatch
+        exp_layer = r.get("expected_layer")
+        if exp_layer and not r["layer_match"]:
+             # If mismatch, show: L3(!L1) or similar
+             exp_short = layer_map.get(exp_layer, exp_layer)
+             layer_str = f"[red]{layer_str}[/red] (exp: {exp_short})"
         
-        table.add_row(
+        if r["routing_match"]: correct_routing_count += 1
+        
+        cols = [
             r["id"],
             f"[{status_style}]{r['status']}[/{status_style}]",
-            match_icon,
-            rows_info
-        )
+            route_icon,
+            layer_str
+        ]
+        
+        if not args.routing_only:
+            sql_icon = "YES" if r["sql_match"] else "NO"
+            if r["sql_match"]: correct_sql_count += 1
+            if r["status"] not in ["EXEC_FAIL", "NO_SQL", "ERROR", "ROUTE_FAIL", "BAD_CONFIG", "GT_FAIL"]: valid_sql_count += 1
+            
+            rows_info = f"{r.get('gen_rows', '-')} / {r.get('exp_rows', '-')}"
+            cols.extend([sql_icon, rows_info])
+        else:
+            ds_info = f"{r.get('actual_ds')} / {r.get('expected_ds')}"
+            cols.append(ds_info)
+            
+        # Add Reasoning and Tokens and Latency
+        reasoning = r.get("routing_reasoning", "-")
+        tokens = str(r.get("routing_tokens", "-"))
+        latency_val = r.get("routing_latency", 0)
+        latency_str = f"{latency_val:.2f}s" if isinstance(latency_val, (int, float)) else "-"
+        score_val = r.get("l1_score", 0.0)
+        score_str = f"{score_val:.3f}" if isinstance(score_val, (int, float)) else "-"
+        
+        # Format Candidates
+        candidates = r.get("candidates", [])
+        cand_str = ""
+        if candidates:
+            cand_str = ", ".join([f"{c['id']}({c['score']:.2f})" for c in candidates[:3]]) # Show top 3
+            if len(candidates) > 3:
+                cand_str += "..."
+        
+        cols.extend([reasoning, score_str, tokens, latency_str, cand_str])
+            
+        table.add_row(*cols)
         
     console.print(table)
     
-    accuracy = (correct_count / len(dataset)) * 100
-    valid_sql = (valid_sql_count / len(dataset)) * 100
+    # Calculate Routing Metrics
+    total_queries = len(dataset)
+    layer_counts = {"layer_1": 0, "layer_2": 0, "layer_3": 0, "fallback": 0}
     
-    console.print(f"\n[bold]Execution Accuracy:[/bold] {accuracy:.1f}%")
-    console.print(f"[bold]Valid SQL Rate:[/bold]     {valid_sql:.1f}%")
+    for r in results:
+        layer = r.get("routing_layer", "unknown")
+        if layer in layer_counts:
+            layer_counts[layer] += 1
+            
+    routing_acc = (correct_routing_count / len(dataset)) * 100
+    console.print(f"\n[bold]Routing Accuracy:[/bold]   {routing_acc:.1f}%")
+    
+    # Display Routing Breakdown
+    console.print("\n[bold]Routing Layer Breakdown:[/bold]")
+    for layer, count in layer_counts.items():
+        pct = (count / total_queries) * 100
+        console.print(f"  - {layer.replace('_', ' ').title()}: {count} ({pct:.1f}%)")
+
+    
+    if not args.routing_only:
+        sql_acc = (correct_sql_count / len(dataset)) * 100
+        valid_sql_rate = (valid_sql_count / len(dataset)) * 100
+        console.print(f"\n[bold]Execution Accuracy:[/bold] {sql_acc:.1f}%")
+        console.print(f"[bold]Valid SQL Rate:[/bold]     {valid_sql_rate:.1f}%")
 

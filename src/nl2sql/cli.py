@@ -40,6 +40,7 @@ def parse_args() -> argparse.Namespace:
     # Benchmarking args
     parser.add_argument("--benchmark", action="store_true", help="Run in benchmark mode")
     parser.add_argument("--dataset", type=pathlib.Path, default=None, help="Path to golden dataset YAML for accuracy evaluation")
+    parser.add_argument("--routing-only", action="store_true", help="Benchmark: Verify datasource routing only, skip execution")
     parser.add_argument("--bench-config", type=pathlib.Path, default=pathlib.Path(settings.benchmark_config_path), help="Path to a single YAML file containing multiple named LLM configs (required if --benchmark is set)")
     parser.add_argument("--iterations", type=int, default=3, help="Number of iterations per config (benchmark mode only)")
 
@@ -73,7 +74,7 @@ def main() -> None:
     vector_store = SchemaVectorStore(persist_directory=args.vector_store)
 
     if args.index:
-        run_indexing(profiles, args.vector_store, vector_store)
+        run_indexing(profiles, args.vector_store, vector_store, llm_registry)
         if not args.query:
             print("Indexing complete.")
             return

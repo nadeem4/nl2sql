@@ -200,6 +200,17 @@ class LLMRegistry:
         llm = self._base_llm("planner")
         return self._wrap_structured_usage(llm, "planner", PlanModel)
 
+    def router_llm(self) -> LLMCallable:
+        """
+        Returns the LLM callable for the Router agent.
+        Strictly requires 'router' agent config, does not fallback to default silently 
+        (unless default is explicitly mapped in config, but we request 'router' key).
+        """
+        llm = self._base_llm("router")
+        # Router uses raw string output (reasoning + ID), not structured JSON yet, 
+        # or we might want to enforce structure later. For now, match current usage (text).
+        return self._wrap_usage(llm, "router")
+
 
 
     def summarizer_llm(self) -> LLMCallable:

@@ -71,40 +71,95 @@ class RouterNode:
             tokens = 0
 
         target_id = "manufacturing_sqlite" # Default fallback
+        routing_layer = "fallback"
+        routing_score = 0.0
+        reasoning = "Default fallback used."
+        token_usage = tokens # Initial input tokens
+        
+        # Initial L1 check
+        l1_score = 0.0
+        candidates = []
         
         try:
-            # Layer 1 & 2: Retrieve with Score
-            results = router_store.retrieve_with_score(user_query)
+            # 0. Canonicalize Query (Layer 0 enhancement)
+            llm = self.registry.router_llm()
+            canonical_query = router_store.canonicalize_query(user_query, llm)
+            print(f"  -> Canonicalized: '{user_query}' => '{canonical_query}'")
+            
+            # Layer 1 & 2: Retrieve with Score (Fetch top 5 for info & potential L3 filter)
+            # Use canonical query for retrieval
+            results = router_store.retrieve_with_score(canonical_query, k=5)
+            
+            # Store simple list of (id, score) for debugging/benchmark
+            candidates = [{"id": r[0], "score": r[1]} for r in results]
             
             if results:
                 target_id, distance = results[0]
+                l1_score = distance
+                routing_layer = "layer_1"
+                routing_score = distance
+                reasoning = f"Distance {distance:.3f} <= 0.4 threshold. (Canonical: {canonical_query})"
                 
                 # Confidence Gate (Layer 2)
                 if distance > 0.4:
-                    llm = self.registry._base_llm("planner") 
+                    # Use router_llm (strict or fallback handled in registry)
+                    # llm = self.registry.router_llm() # Already got it above
                     mq_results = router_store.multi_query_retrieve(user_query, llm)
+                    
+                    # Estimate MQ tokens (input + variations output ~500)
+                    token_usage += 500
                     
                     if mq_results:
                         target_id = mq_results[0]
+                        routing_layer = "layer_2"
+                        routing_score = 0.0 # Score n/a for MQ
+                        reasoning = "Multi-query consensus selected this datasource."
                     else:
-                        # Layer 3: LLM Fallback
-                        profiles = self.datasource_registry.list_profiles()
-                        l3_result = router_store.llm_route(user_query, llm, profiles)
-                        if l3_result:
-                            target_id = l3_result
+                        # Layer 3: LLM Fallback (Optimization: Filter Candidates)
+                        # Reuse results from initial fetch
+                        candidate_ids = {r[0] for r in results}
+                        
+                        all_profiles = self.datasource_registry.list_profiles()
+                        # Filter profiles to only include top candidates (reduce context)
+                        profiles = [p for p in all_profiles if p.id in candidate_ids]
+                        
+                        # Fallback: if no candidates found (rare), use all
+                        if not profiles:
+                            profiles = all_profiles
+                        
+                        # Estimate L3 tokens (context + input + output ~1000)
+                        token_usage += 1000
+                        
+                        l3_id, l3_reasoning = router_store.llm_route(user_query, llm, profiles)
+                        if l3_id:
+                            target_id = l3_id
+                            routing_layer = "layer_3"
+                            routing_score = 0.0
+                            reasoning = l3_reasoning
         except Exception as e:
             # Log error but fallback to default
             state.errors.append(f"Routing error: {str(e)}")
+            reasoning = f"Error occurred: {str(e)}"
 
         duration = time.perf_counter() - start_time
         
         # Update state
         state.datasource_id = target_id
+        state.routing_info = {
+            "layer": routing_layer,
+            "score": routing_score,
+            "l1_score": l1_score,
+            "candidates": candidates,
+            "latency": duration,
+            "reasoning": reasoning,
+            "tokens": token_usage
+        }
+        
         state.latency["router"] = duration
         
         if "router" not in state.thoughts:
             state.thoughts["router"] = []
-        state.thoughts["router"].append(f"Selected Datasource: {target_id}")
+        state.thoughts["router"].append(f"Selected Datasource: {target_id} (Layer: {routing_layer})")
         state.thoughts["router"].append(f"Latency: {duration:.4f}s")
         
         return state
