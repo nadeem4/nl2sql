@@ -348,14 +348,14 @@ The benchmark tool captures:
 
 ### 3. Running Benchmarks
 
-**A. Routing-Only Evaluation** (Fast)
+**A. Routing-Only Evaluation**
 Test just the router's ability to pick the right DB.
 
 ```bash
 python -m src.nl2sql.cli --benchmark --dataset tests/golden_dataset.yaml --routing-only
 ```
 
-**B. End-to-End Evaluation** (Slow)
+**B. End-to-End Evaluation**
 Test routing + SQL generation + execution correctness.
 
 ```bash
