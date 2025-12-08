@@ -323,37 +323,51 @@ Performance & Metrics
 
 ---
 
-## Benchmarking
+## Evaluation Framework
 
-Compare performance (latency, success rate, tokens) across LLMs.
+We employ a rigorous evaluation framework to ensure the pipeline's reliability across different complexity levels.
 
-1. **Configure**: Create `configs/benchmark_suite.yaml`.
-2. **Run**:
+### 1. The Golden Dataset (`tests/golden_dataset.yaml`)
 
-    ```bash
-    python -m src.nl2sql.cli --query "List Products" --benchmark --bench-config configs/benchmark_suite.yaml --iterations 3
-    ```
+A curated suite of 20 test cases designed to stress-test the **Router** and **SQL Generation**.
 
-### Evaluation Framework (Accuracy)
+| Tier | Complexity | Goal | Target Layer |
+| :--- | :--- | :--- | :--- |
+| **Easy** | Keyword Match | Test speed & exact retrieval | Layer 1 (Vector) |
+| **Medium** | Ambiguous/Slang | Test enrichment & multi-query | Layer 2 (Multi-Query) |
+| **Hard** | Reasoning Required | Test intent understanding | Layer 3 (LLM) |
 
-Measure **Execution Accuracy** by comparing results against a "Golden Dataset" of ground-truth queries.
+### 2. Metrics Measured
 
-1. **Create Dataset**: `tests/golden_dataset.yaml`
+The benchmark tool captures:
 
-    ```yaml
-    - id: "q1"
-      question: "List 5 machines"
-      expected_sql: "SELECT * FROM machines LIMIT 5"
-      datasource: "manufacturing_ops"
-    ```
+- **Routing Accuracy**: % of queries routed to the correct datasource.
+- **Execution Accuracy**: % of generated SQL returning the correct rows (compared to ground truth).
+- **Latency**: End-to-end time (aiming for < 1s for L1, < 3s for L2).
+- **Token Usage**: Cost efficiency (aiming for 0 tokens for L1 cache hits).
 
-2. **Run Evaluation**:
+### 3. Running Benchmarks
 
-    ```bash
-    python -m src.nl2sql.cli --benchmark --dataset tests/golden_dataset.yaml
-    ```
+**A. Routing-Only Evaluation** (Fast)
+Test just the router's ability to pick the right DB.
 
-    *Use `--stub-llm` to test the framework without LLM calls.*
+```bash
+python -m src.nl2sql.cli --benchmark --dataset tests/golden_dataset.yaml --routing-only
+```
+
+**B. End-to-End Evaluation** (Slow)
+Test routing + SQL generation + execution correctness.
+
+```bash
+python -m src.nl2sql.cli --benchmark --dataset tests/golden_dataset.yaml
+```
+
+**C. Regression Testing**
+Use the stub LLM to test the harness itself without API costs.
+
+```bash
+python -m src.nl2sql.cli --benchmark --dataset tests/golden_dataset.yaml --stub-llm
+```
 
 ## Development
 

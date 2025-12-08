@@ -9,6 +9,7 @@ from nl2sql.router_store import DatasourceRouterStore
 from nl2sql.llm_registry import LLMRegistry
 from nl2sql.datasource_registry import DatasourceRegistry
 from nl2sql.embeddings import EmbeddingService
+from nl2sql.settings import settings
 
 
 class RouterNode:
@@ -98,10 +99,10 @@ class RouterNode:
                 l1_score = distance
                 routing_layer = "layer_1"
                 routing_score = distance
-                reasoning = f"Distance {distance:.3f} <= 0.4 threshold. (Canonical: {canonical_query})"
+                reasoning = f"Distance {distance:.3f} <= {settings.router_l1_threshold} threshold. (Canonical: {canonical_query})"
                 
                 # Confidence Gate (Layer 2)
-                if distance > 0.4:
+                if distance > settings.router_l1_threshold:
                     # Use router_llm (strict or fallback handled in registry)
                     # llm = self.registry.router_llm() # Already got it above
                     mq_results = router_store.multi_query_retrieve(user_query, llm)
@@ -116,18 +117,14 @@ class RouterNode:
                         reasoning = "Multi-query consensus selected this datasource."
                     else:
                         # Layer 3: LLM Fallback (Optimization: Filter Candidates)
-                        # Reuse results from initial fetch
                         candidate_ids = {r[0] for r in results}
                         
                         all_profiles = self.datasource_registry.list_profiles()
-                        # Filter profiles to only include top candidates (reduce context)
                         profiles = [p for p in all_profiles if p.id in candidate_ids]
                         
-                        # Fallback: if no candidates found (rare), use all
                         if not profiles:
                             profiles = all_profiles
                         
-                        # Estimate L3 tokens (context + input + output ~1000)
                         token_usage += 1000
                         
                         l3_id, l3_reasoning = router_store.llm_route(user_query, llm, profiles)

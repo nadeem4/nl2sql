@@ -1,1 +1,10 @@
-MULTI_QUERY_PROMPT = """You are an AI language model assistant. Your task is to generate 3 different versions of the given user question to retrieve relevant documents from a vector database. By generating multiple perspectives on the user question, your goal is to help the user overcome some of the limitations of the distance-based similarity search. Provide these alternative questions separated by newlines. Original question: {question}"""
+MULTI_QUERY_PROMPT = """You are an AI search assistant. Your task is to generate 3 DISTINCT versions of the user question to maximize retrieval coverage.
+You must generate queries from different perspectives:
+
+1. **Specific/Technical**: Use precise terms (e.g., "inventory count", "schema definition").
+2. **Broad/Intent**: Focus on the user's goal (e.g., "stock availability", "find table").
+3. **Hypothetical/Edge-case**: Ask about related entities or conditions.
+
+Return *only* the 3 questions, separated by newlines.
+
+Original question: {question}"""

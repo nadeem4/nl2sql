@@ -41,12 +41,6 @@ class DatasourceRouterStore:
         except Exception:
             pass
 
-    # Expose canonicalize_query as a convenience method if needed by Node, 
-    # but strictly it comes from agents.py. 
-    # To maintain API compatibility with the Node (which calls router_store.canonicalize_query),
-    # we can proxy it or simpler: The Node can import it from agents or call it here.
-    # Let's keep it here as a proxy for now to minimize Node changes, or just refactor Node too?
-    # Task says "Check src/nl2sql/nodes/router/node.py" - let's make it compatible.
     
     def canonicalize_query(self, query: str, llm) -> str:
         return canonicalize_query(query, llm)
@@ -166,9 +160,9 @@ class DatasourceRouterStore:
             results = self.retrieve_with_score(q, k=1)
             if results:
                 ds_id, distance = results[0]
-                # Only count vote if distance is reasonable (e.g. < 0.5)
+                # Only count vote if distance is reasonable
                 # If it's garbage, don't vote.
-                if distance < 0.4:
+                if distance < settings.router_l2_threshold:
                     votes[ds_id] = votes.get(ds_id, 0) + 1
         
         if not votes:

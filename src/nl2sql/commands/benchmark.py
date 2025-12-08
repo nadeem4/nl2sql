@@ -361,13 +361,6 @@ def _run_dataset_evaluation(args: argparse.Namespace, datasource_registry: Datas
         layer_map = {"layer_1": "L1", "layer_2": "L2", "layer_3": "L3", "fallback": "FB"}
         layer_str = layer_map.get(layer_raw, layer_raw)
         
-        # Highlight Layer Mismatch
-        exp_layer = r.get("expected_layer")
-        if exp_layer and not r["layer_match"]:
-             # If mismatch, show: L3(!L1) or similar
-             exp_short = layer_map.get(exp_layer, exp_layer)
-             layer_str = f"[red]{layer_str}[/red] (exp: {exp_short})"
-        
         if r["routing_match"]: correct_routing_count += 1
         
         cols = [
