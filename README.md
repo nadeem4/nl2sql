@@ -134,6 +134,8 @@ The CLI (`src.nl2sql.cli`) is the main entry point. It uses the **Router Node** 
 - `--json-logs`: Enable structured JSON logging.
 - `--debug`: Enable debug logging for verbose output.
 - `--visualize`: Visualize the execution trace and save it as a PNG image.
+- `--node <NAME>`: Run a specific node in isolation (e.g., `router`, `planner`).
+- `--include-ids <ID>...`: Benchmark only specific test case IDs.
 
 ### Multi-Database Support
 
@@ -344,7 +346,7 @@ The benchmark tool currently focuses on routing performance:
 - **Routing Accuracy**: % of queries routed to the correct datasource.
 - **Routing Layer Distribution**: Breakdown of how many queries were solved by each layer (L1: Vector, L2: Multi-Query, L3: LLM).
 - **Latency**: End-to-end time for routing decisions.
-- **Execution Accuracy**: % of generated SQL matches (Exact Match only).
+- **Execution Accuracy**: % of queries yielding correct results (Fuzzy Data Match & Semantic SQL).
 
 #### Current Performance (Sample)
 
@@ -379,6 +381,13 @@ Use the stub LLM to test the harness itself without API costs.
 
 ```bash
 python -m src.nl2sql.cli --benchmark --dataset tests/golden_dataset.yaml --stub-llm
+```
+
+**D. Targeted Testing**
+Run specific test cases by ID (useful for debugging regression):
+
+```bash
+python -m src.nl2sql.cli --benchmark --dataset tests/golden_dataset.yaml --include-ids ops_001 supply_003
 ```
 
 ## Development
