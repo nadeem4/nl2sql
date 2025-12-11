@@ -132,6 +132,7 @@ The CLI (`src.nl2sql.cli`) is the main entry point. It uses the **Router Node** 
 - `--id <ID>`: **Optional**. Force a specific datasource, bypassing the router (e.g., `manufacturing_ops`).
 - `--no-exec`: Generate and validate SQL without executing it.
 - `--json-logs`: Enable structured JSON logging.
+- `--log-request`: Log raw request/response data to a dedicated folder for each request ID.
 - `--debug`: Enable debug logging for verbose output.
 - `--visualize`: Visualize the execution trace and save it as a PNG image.
 - `--node <NAME>`: Run a specific node in isolation (e.g., `router`, `planner`).
@@ -286,10 +287,6 @@ python -m src.nl2sql.cli --query "Show production runs from manufacturing_histor
 <details>
 <summary><b>Click to see Sample Output</b></summary>
 
-```text
-<details>
-<summary><b>Click to see Sample Output</b></summary>
-
 > **Summary**
 > The production runs for 'Machine-1' show a total of 98 records with various quantities produced and scrap counts.
 
@@ -303,8 +300,6 @@ python -m src.nl2sql.cli --query "Show production runs from manufacturing_histor
 **Datasource Used:** `['manufacturing_ops', 'manufacturing_history']`
 </details>
 
-</details>
-
 #### Example 3: Employees & Locations (Postgres + SQLite)
 
 ```bash
@@ -312,9 +307,6 @@ python -m src.nl2sql.cli --query "List all employees from manufacturing_ops and 
 ```
 
 **Sample Output:**
-
-<details>
-<summary><b>Click to see Sample Output</b></summary>
 
 <details>
 <summary><b>Click to see Sample Output</b></summary>
@@ -331,8 +323,6 @@ python -m src.nl2sql.cli --query "List all employees from manufacturing_ops and 
 | Brian Russell | Operator | 1 | Austin, TX | 2023-06-13 | <mlopez@example.com> |
 
 **Datasource Used:** `['manufacturing_ops', 'manufacturing_ref']`
-</details>
-
 </details>
 
 ### Vector Search (RAG)
@@ -354,6 +344,7 @@ For large schemas, use vector search to dynamically select relevant tables.
 ### Observability & Logging
 
 - **Stream Reasoning**: Use `--show-thoughts` to see the Intent, Planner, and Generator steps.
+- **Request Logging**: Use `--log-request` to save raw request input/output to a unique folder.
 - **JSON Logs**: Use `--json-logs` for structured output suitable for log ingestion.
 - **Debug Mode**: Use `--debug` for verbose output.
 - **Graph Visualization**: Use `--visualize` to generate a visual graph of the execution trace.
