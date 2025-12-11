@@ -186,6 +186,26 @@ The system can automatically decompose complex queries into sub-queries, execute
 python -m src.nl2sql.cli --query "Compare sales from manufacturing_history and inventory from manufacturing_supply"
 ```
 
+**Sample Output:**
+
+```text
+╭──────────────────────────────────────────────────────── Final Answer ─────────────────────────────────────────────────────────╮
+│                                                           Summary                                                             │
+│ The sales data shows total sales and quantities sold by customer, while the inventory data provides quantities on hand for    │
+│ various products in different locations. A comparison reveals potential stock issues for high-selling products.               │
+│                                                                                                                               │
+│                                                             Data                                                              │
+│                                                                                                                               │
+│   Customer ID   Total Quantity Sold   Total Sales     Product ID   Warehouse Location   Quantity on Hand                      │
+│  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━                     │
+│   23            1035                  $915,361.36     326          WH-C                 1                                     │
+│   46            1692                  $1,696,801.35   295          WH-C                 2180                                  │
+│   69            2052                  $1,918,153.05   223          WH-A                 3005                                  │
+│                                                                                                                               │
+╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+Datasource Used: ['manufacturing_history', 'manufacturing_supply']
+```
+
 #### Example 2: Production vs Maintenance (MSSQL + Postgres)
 
 ```bash
