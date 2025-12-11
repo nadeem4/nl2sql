@@ -85,7 +85,7 @@ class RouterNode:
         
         try:
             # 0. Canonicalize Query (Layer 0 enhancement)
-            llm = self.registry.router_llm()
+            llm = self.registry.get_llm("router")
             canonical_query = router_store.canonicalize_query(user_query, llm)
             print(f"  -> Canonicalized: '{user_query}' => '{canonical_query}'")
             
@@ -93,7 +93,6 @@ class RouterNode:
             # Use canonical query for retrieval
             results = router_store.retrieve_with_score(canonical_query, k=5)
             
-            # Store simple list of (id, score) for debugging/benchmark
             candidates = [{"id": r[0], "score": r[1]} for r in results]
             
             if results:

@@ -339,12 +339,24 @@ A curated suite of 20 test cases designed to stress-test the **Router** and **SQ
 
 ### 2. Metrics Measured
 
-The benchmark tool captures:
+The benchmark tool currently focuses on routing performance:
 
 - **Routing Accuracy**: % of queries routed to the correct datasource.
-- **Execution Accuracy**: % of generated SQL returning the correct rows (compared to ground truth).
-- **Latency**: End-to-end time (aiming for < 1s for L1, < 3s for L2).
-- **Token Usage**: Cost efficiency (aiming for 0 tokens for L1 cache hits).
+- **Routing Layer Distribution**: Breakdown of how many queries were solved by each layer (L1: Vector, L2: Multi-Query, L3: LLM).
+- **Latency**: End-to-end time for routing decisions.
+- **Execution Accuracy**: % of generated SQL matches (Exact Match only).
+
+#### Current Performance (Sample)
+
+```text
+Routing Accuracy:   100.0%
+
+Routing Layer Breakdown:
+  - Layer 1: 10 (50.0%)
+  - Layer 2: 2 (10.0%)
+  - Layer 3: 8 (40.0%)
+  - Fallback: 0 (0.0%)
+```
 
 ### 3. Running Benchmarks
 

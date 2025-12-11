@@ -10,6 +10,7 @@ from nl2sql.llm_registry import parse_llm_config, LLMRegistry, reset_usage, get_
 from nl2sql.datasource_registry import DatasourceRegistry
 from nl2sql.vector_store import SchemaVectorStore
 from nl2sql.langgraph_pipeline import run_with_graph
+from nl2sql.evaluation.evaluator import ModelEvaluator
 
 def run_benchmark(args: argparse.Namespace, query: str, datasource_registry: DatasourceRegistry, vector_store: SchemaVectorStore) -> None:
     console = Console()
@@ -146,6 +147,12 @@ def _run_dataset_evaluation(args: argparse.Namespace, datasource_registry: Datas
         console.print("[bold red]Error:[/bold red] Dataset must be a list of test cases.", file=sys.stderr)
         sys.exit(1)
         
+    if args.include_ids:
+        dataset = [item for item in dataset if item.get("id") in args.include_ids]
+        if not dataset:
+            console.print(f"[bold red]Error:[/bold red] No test cases found matching IDs: {args.include_ids}", file=sys.stderr)
+            sys.exit(1)
+            
     console.print(f"[bold blue]Starting evaluation on {len(dataset)} test cases...[/bold blue]")
     
     # Load default LLM config if not provided
@@ -247,7 +254,7 @@ def _run_dataset_evaluation(args: argparse.Namespace, datasource_registry: Datas
                 "routing_tokens": routing_tokens,
                 "routing_latency": routing_latency,
                 "l1_score": l1_score,
-                "candidates": routing_info.get("candidates", []),
+                "candidates": candidates,
                 "expected_layer": expected_layer,
                 "layer_match": layer_match
             })
@@ -317,25 +324,24 @@ def _run_dataset_evaluation(args: argparse.Namespace, datasource_registry: Datas
              
         # 3. Compare Results
         try:
-            df_gen = pd.DataFrame(generated_rows)
-            df_exp = pd.DataFrame(expected_rows)
+            # Data Match (Robust)
+            # Default order_matters=False unless expected query explicitly implies order.
+            # Ideally dataset should dictate this, but for now we assume False.
+            data_match = ModelEvaluator.compare_results(generated_rows, expected_rows, order_matters=False)
             
-            if not df_gen.empty:
-                df_gen = df_gen.sort_values(by=list(df_gen.columns)).reset_index(drop=True)
-            if not df_exp.empty:
-                df_exp = df_exp.sort_values(by=list(df_exp.columns)).reset_index(drop=True)
-            
-            match = df_gen.equals(df_exp)
-            
+            # Semantic SQL Match (for reporting)
+            semantic_sql_match = ModelEvaluator.compare_sql_semantic(generated_sql, expected_sql)
+
             results.append({
                 "id": q_id,
-                "status": "PASS" if match else "DATA_MISMATCH",
+                "status": "PASS" if data_match else "DATA_MISMATCH",
                 "routing_match": routing_match,
-                "sql_match": match,
+                "sql_match": data_match, # Status is defined by data correctness
+                "semantic_sql_match": semantic_sql_match, # Extra metric
                 "gen_sql": generated_sql,
                 "exp_sql": expected_sql,
-                "gen_rows": len(df_gen),
-                "exp_rows": len(df_exp),
+                "gen_rows": len(generated_rows),
+                "exp_rows": len(expected_rows),
                 "expected_layer": expected_layer,
                 "layer_match": layer_match
             })
@@ -369,10 +375,6 @@ def _run_dataset_evaluation(args: argparse.Namespace, datasource_registry: Datas
     table.add_column("Latency", justify="right")
     table.add_column("Candidates", justify="left")
     
-    correct_routing_count = 0
-    correct_sql_count = 0
-    valid_sql_count = 0
-    
     for r in results:
         status_style = "green" if r["status"] == "PASS" else "red"
         route_icon = "YES" if r["routing_match"] else "NO"
@@ -381,8 +383,6 @@ def _run_dataset_evaluation(args: argparse.Namespace, datasource_registry: Datas
         layer_raw = r.get("routing_layer", "unknown")
         layer_map = {"layer_1": "L1", "layer_2": "L2", "layer_3": "L3", "fallback": "FB"}
         layer_str = layer_map.get(layer_raw, layer_raw)
-        
-        if r["routing_match"]: correct_routing_count += 1
         
         cols = [
             r["id"],
@@ -393,8 +393,6 @@ def _run_dataset_evaluation(args: argparse.Namespace, datasource_registry: Datas
         
         if not args.routing_only:
             sql_icon = "YES" if r["sql_match"] else "NO"
-            if r["sql_match"]: correct_sql_count += 1
-            if r["status"] not in ["EXEC_FAIL", "NO_SQL", "ERROR", "ROUTE_FAIL", "BAD_CONFIG", "GT_FAIL"]: valid_sql_count += 1
             
             rows_info = f"{r.get('gen_rows', '-')} / {r.get('exp_rows', '-')}"
             cols.extend([sql_icon, rows_info])
@@ -424,28 +422,31 @@ def _run_dataset_evaluation(args: argparse.Namespace, datasource_registry: Datas
         
     console.print(table)
     
-    # Calculate Routing Metrics
-    total_queries = len(dataset)
-    layer_counts = {"layer_1": 0, "layer_2": 0, "layer_3": 0, "fallback": 0}
+    # Calculate Routing Metrics via Evaluator
+    metrics = ModelEvaluator.calculate_aggregate_metrics(results, len(dataset))
     
-    for r in results:
-        layer = r.get("routing_layer", "unknown")
-        if layer in layer_counts:
-            layer_counts[layer] += 1
-            
-    routing_acc = (correct_routing_count / len(dataset)) * 100
+    routing_acc = metrics.get("routing_accuracy", 0.0)
     console.print(f"\n[bold]Routing Accuracy:[/bold]   {routing_acc:.1f}%")
     
     # Display Routing Breakdown
     console.print("\n[bold]Routing Layer Breakdown:[/bold]")
+    layer_counts = metrics.get("layer_distribution", {})
+    layer_pcts = metrics.get("layer_percentages", {})
+    
     for layer, count in layer_counts.items():
-        pct = (count / total_queries) * 100
+        pct = layer_pcts.get(layer, 0.0)
         console.print(f"  - {layer.replace('_', ' ').title()}: {count} ({pct:.1f}%)")
 
     
     if not args.routing_only:
-        sql_acc = (correct_sql_count / len(dataset)) * 100
-        valid_sql_rate = (valid_sql_count / len(dataset)) * 100
+        sql_acc = metrics.get("execution_accuracy", 0.0)
+        valid_sql_rate = metrics.get("valid_sql_rate", 0.0)
         console.print(f"\n[bold]Execution Accuracy:[/bold] {sql_acc:.1f}%")
         console.print(f"[bold]Valid SQL Rate:[/bold]     {valid_sql_rate:.1f}%")
+
+    errors = [r for r in results if r["status"] == "ERROR"]
+    if errors:
+        console.print("\n[bold red]Top Errors:[/bold red]")
+        for e in errors[:5]:
+            console.print(f"{e['id']}: {e.get('error')}")
 
