@@ -52,7 +52,6 @@ class DatasourceRouterStore:
         """
         documents = []
         
-        # Index Descriptions
         for ds in datasources.values() if isinstance(datasources, dict) else datasources:
             if ds.description:
                 content = f"Datasource: {ds.id}. Description: {ds.description}"
@@ -62,12 +61,9 @@ class DatasourceRouterStore:
                 )
                 documents.append(doc)
                 
-        # Index Schema Summaries (Synthetic Examples)
         if schemas:
             for ds_id, tables in schemas.items():
                 for table in tables:
-                     # Generate synthetic questions likely to match this table
-                     # e.g. "machines" -> "machines", "table machines", "show machines"
                      synonyms = [
                          f"{table}",
                          f"table {table}",
@@ -83,7 +79,6 @@ class DatasourceRouterStore:
                          documents.append(doc)
             print(f"Indexed schema summaries for {len(schemas)} datasources.")
         
-        # Index Examples (Layer 1)
         if examples_path:
             import yaml
             import pathlib
@@ -96,21 +91,17 @@ class DatasourceRouterStore:
                     for ds_id, questions in examples.items():
                         print(f"Processing examples for {ds_id}...")
                         for q in questions:
-                            # 1. Canonicalize (if LLM available)
                             canonical_q = q
                             if llm:
-                                # We canonicalize the *stored* question too, so it matches the *canonicalized* input query
                                 canonical_q = canonicalize_query(q, llm)
                             
-                            # 2. Enrich (Generate variants of the canonical form)
-                            variants = [canonical_q] # Always include the canonical form
+                            variants = [canonical_q] 
                             if llm:
                                 generated_variants = enrich_question(canonical_q, llm)
                                 variants.extend(generated_variants)
                             else:
-                                variants.append(q) # Fallback to just raw if no LLM
+                                variants.append(q)
 
-                            # Deduplicate
                             variants = list(set(variants))
                             total_variants += len(variants)
 
@@ -149,19 +140,15 @@ class DatasourceRouterStore:
         """
         variations = generate_query_variations(query, llm)
         
-        # Add original query
         variations.append(query)
         
-        print(f"  -> Generated {len(variations)-1} variations (last one is original).")
+        print(f"  -> Generated {len(variations)-1} variations")
         
         votes = {}
         for q in variations:
-            # Use retrieve_with_score to check confidence
             results = self.retrieve_with_score(q, k=1)
             if results:
                 ds_id, distance = results[0]
-                # Only count vote if distance is reasonable
-                # If it's garbage, don't vote.
                 if distance < settings.router_l2_threshold:
                     votes[ds_id] = votes.get(ds_id, 0) + 1
         

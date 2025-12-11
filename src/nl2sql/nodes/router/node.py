@@ -143,13 +143,15 @@ class RouterNode:
         # Update state
         state.datasource_id = target_id
         state.routing_info = {
-            "layer": routing_layer,
-            "score": routing_score,
-            "l1_score": l1_score,
-            "candidates": candidates,
-            "latency": duration,
-            "reasoning": reasoning,
-            "tokens": token_usage
+            target_id: {
+                "layer": routing_layer,
+                "score": routing_score,
+                "l1_score": l1_score,
+                "candidates": candidates,
+                "latency": duration,
+                "reasoning": reasoning,
+                "tokens": token_usage
+            }
         }
         
         state.latency["router"] = duration

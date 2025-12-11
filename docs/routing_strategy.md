@@ -28,6 +28,8 @@ We employ a "Waterfall" approach. We want to solve 90% of queries with the faste
 * **Success Condition**: Consensus (majority vote) from variations with distance < `ROUTER_L2_THRESHOLD` (0.6).
 * **Why**: Users often use slang or vague terms. Generating variations "triangulates" the true intent.
 
+> **Technical Note on Thresholds**: The **L2 threshold (0.6)** is deliberately set higher (more relaxed) than **L1 (0.4)**. This is because generated variations (e.g., hypothetical questions) may drift slightly in vector space compared to precise canonical examples. Relaxing the threshold ensures these valid semantic signals are counted in the voting process rather than being filtered out purely for distance reasons. The "consensus" mechanism (voting) acts as the filter for noise.
+
 ### Layer 3: LLM Reasoning (The "Smart Fallback")
 
 * **Mechanism**: Full "Reasoning Agent" analyzing descriptions + query.
@@ -110,3 +112,26 @@ The "Canonicalization + Enrichment" strategy has fundamentally shifted our perfo
 
 * **`ROUTER_L1_THRESHOLD`** (`0.4`): strict.
 * **`ROUTER_L2_THRESHOLD`** (`0.6`): relaxed for voting.
+
+---
+
+## 4. Technical Details
+
+### Semantic Similarity Implementation
+
+The system relies on **Semantic Similarity** via vector embeddings as the primary mechanism for Layer 1 and Layer 2.
+
+* **Technology**: We use `ChromaDB` as the vector store.
+* **Embeddings**: Queries and descriptions are converted into dense vectors (using models like OpenAI `text-embedding-3-small` or `huggingface/all-MiniLM-L6-v2`).
+* **Measurement**: Similarity is measured using **Cosine Similarity** or **Euclidean Distance** in the embedding space.
+  * **Low Distance (< 0.4)** implies high semantic similarity (direct match).
+  * **High Distance (> 0.6)** implies weak semantic similarity (ambiguity).
+
+### Voting Logic (Why k=1?)
+
+In **Layer 2 (Multi-Query Retrieval)**, we use a specific voting strategy:
+
+1. **Variations**: We generate ~5 distinct variations of the user's query.
+2. **Strict Voting (`k=1`)**: For *each* variation, we retrieve only the **single best match** (`k=1`).
+3. **Rationale**: We treat each variation as an independent "voter". We want to know its absolute best guess, not its 2nd or 3rd vague guess. If we allowed `k=5` for each variation, the "long tail" of weak matches from 5 variations would dilute the signal.
+4. **Consensus**: The datasource that receives the most "first place" votes wins. This ensures that the chosen datasource is the consistently top-ranked choice across multiple phrasings of the intent.

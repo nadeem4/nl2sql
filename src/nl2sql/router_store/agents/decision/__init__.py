@@ -1,8 +1,8 @@
 from typing import List, Optional, Tuple
 from langchain_core.prompts import PromptTemplate
-from langchain_core.output_parsers import StrOutputParser
 from nl2sql.datasource_config import DatasourceProfile
 from .prompts import ROUTER_PROMPT
+from .schemas import RouterDecision
 
 def decided_best_datasource(query: str, llm, datasources: List[DatasourceProfile]) -> Tuple[Optional[str], str]:
     """
@@ -14,37 +14,34 @@ def decided_best_datasource(query: str, llm, datasources: List[DatasourceProfile
     ds_context = "\n".join([f"- ID: {ds.id}\n  Description: {ds.description}" for ds in iterable])
 
     prompt = PromptTemplate(template=ROUTER_PROMPT, input_variables=["context", "question"])
-    chain = prompt | llm | StrOutputParser()
+    
+    # Use Structured Output
+    structured_llm = llm.with_structured_output(RouterDecision)
+    chain = prompt | structured_llm
     
     try:
-        result = chain.invoke({"context": ds_context, "question": query}).strip()
-        lines = result.split("\n")
-        reasoning = "No reasoning extracted."
-        ds_id = None
+        decision: RouterDecision = chain.invoke({"context": ds_context, "question": query})
         
-        for line in lines:
-            if line.startswith("Reasoning:"):
-                reasoning = line.replace("Reasoning:", "").strip()
-            elif line.startswith("ID:"):
-                ds_id_raw = line.replace("ID:", "").strip()
-                # Clean up
-                ds_id = ds_id_raw.split()[0].strip().strip('"').strip("'")
+        ds_id = decision.datasource_id
+        reasoning = decision.reasoning
         
-        # Fallback simple parse if format missed
-        if not ds_id and not result.startswith("Reasoning"):
-                ds_id = result.split()[0].strip().strip('"').strip("'")
+        # Normalize "None" string or actual None
+        if ds_id and ds_id.lower() == "none":
+            ds_id = None
 
-        iterable = datasources.values() if isinstance(datasources, dict) else datasources
+        # Validate ID exists
         valid_ids = {ds.id for ds in iterable}
         
-        if ds_id in valid_ids:
+        if ds_id and ds_id in valid_ids:
             return ds_id, reasoning
-            
+        
+        if ds_id is None:
+             return None, reasoning
+
         return None, f"Invalid ID generated: {ds_id}. Reasoning: {reasoning}"
         
     except Exception as e:
         print(f"  -> LLM routing failed: {e}")
-        print(f"Error: {e}")
         return None, f"Error: {str(e)}"
 
 __all__ = ["decided_best_datasource"]

@@ -193,24 +193,6 @@ def _run_dataset_evaluation(args: argparse.Namespace, datasource_registry: Datas
                 "sql_match": False
             })
             continue
-            
-        # Check Routing
-        actual_ds = state.get("datasource_id")
-        routing_info = state.get("routing_info", {})
-        routing_layer = routing_info.get("layer", "unknown")
-        routing_reasoning = routing_info.get("reasoning", "-")
-        routing_tokens = routing_info.get("tokens", "-")
-        routing_latency = routing_info.get("latency", 0.0)
-        
-        routing_latency = routing_info.get("latency", 0.0)
-        l1_score = routing_info.get("l1_score", 0.0)
-        
-        routing_match = (actual_ds == expected_ds)
-        
-        # Check Layer Match
-        layer_match = True
-        if expected_layer:
-            # Normalize layer names just in case
             layer_match = (routing_layer == expected_layer)
         
         if args.routing_only:

@@ -4,6 +4,7 @@ from langchain_core.runnables import Runnable
 
 from nl2sql.schemas import GraphState, DecomposerResponse
 from nl2sql.nodes.decomposer.prompts import DECOMPOSER_PROMPT
+from nl2sql.datasource_registry import DatasourceRegistry
 
 LLMCallable = Union[Callable[[str], Any], Runnable]
 
@@ -11,8 +12,9 @@ class DecomposerNode:
     """
     Node responsible for decomposing a complex query into sub-queries.
     """
-    def __init__(self, llm: LLMCallable):
+    def __init__(self, llm: LLMCallable, registry: DatasourceRegistry):
         self.llm = llm
+        self.registry = registry
         self.prompt = ChatPromptTemplate.from_template(DECOMPOSER_PROMPT)
         self.chain = self.prompt | self.llm
 
@@ -20,7 +22,14 @@ class DecomposerNode:
         user_query = state.user_query
         
         try:
-            response: DecomposerResponse = self.chain.invoke({"user_query": user_query})
+            # Format datasource descriptions
+            profiles = self.registry.list_profiles()
+            datasources_str = "\n".join([f"- {p.id}: {p.description}" for p in profiles])
+
+            response: DecomposerResponse = self.chain.invoke({
+                "user_query": user_query,
+                "datasources": datasources_str
+            })
             return {
                 "sub_queries": response.sub_queries,
                 "thoughts": {"decomposer": [response.reasoning]}

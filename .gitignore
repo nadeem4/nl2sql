@@ -18,3 +18,5 @@ venv/
 # SQLite databases (generated locally)
 data/*.db
 chroma_db
+
+logs

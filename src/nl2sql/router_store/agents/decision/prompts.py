@@ -13,8 +13,7 @@ Instructions:
 5. **Fallback**: If the query is off-topic (e.g., "hello", "weather") or no database matches, return "None".
 
 Format:
-Reasoning: <Think step-by-step. Identify entities and match to description.>
-ID: <datasource_id> (or "None")
+(Handled by structured output schema)
 
 Examples:
 Query: "Who is operating the stamping press?"

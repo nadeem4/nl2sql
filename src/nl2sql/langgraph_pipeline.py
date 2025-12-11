@@ -1,4 +1,6 @@
 from typing import Callable, Dict, Optional, Union, List
+import uuid
+import pathlib
 
 import json
 from sqlalchemy import inspect
@@ -41,7 +43,7 @@ def build_graph(registry: DatasourceRegistry, llm_registry: LLMRegistry, execute
     graph = StateGraph(GraphState)
 
     decomposer_llm = llm_registry.decomposer_llm()
-    decomposer = DecomposerNode(decomposer_llm)
+    decomposer = DecomposerNode(decomposer_llm, registry)
     
     aggregator_llm = llm_registry.aggregator_llm()
     aggregator = AggregatorNode(aggregator_llm)
@@ -125,7 +127,7 @@ def build_graph(registry: DatasourceRegistry, llm_registry: LLMRegistry, execute
     graph = graph.compile()
     return graph, execution_subgraph, planning_subgraph
 
-def run_with_graph(registry: DatasourceRegistry, llm_registry: LLMRegistry, user_query: str, datasource_id: Optional[str] = None, execute: bool = True, vector_store: Optional[SchemaVectorStore] = None, vector_store_path: str = "", debug: bool = False, visualize: bool = False, on_thought: Optional[Callable[[str, list[str]], None]] = None) -> Dict:
+def run_with_graph(registry: DatasourceRegistry, llm_registry: LLMRegistry, user_query: str, datasource_id: Optional[str] = None, execute: bool = True, vector_store: Optional[SchemaVectorStore] = None, vector_store_path: str = "", debug: bool = False, visualize: bool = False, show_outputs: bool = False, log_requests: bool = False, on_thought: Optional[Callable[[str, list[str]], None]] = None) -> Dict:
     """
     Runs the NL2SQL pipeline using LangGraph.
 
@@ -139,6 +141,8 @@ def run_with_graph(registry: DatasourceRegistry, llm_registry: LLMRegistry, user
         vector_store_path: Path to vector store for routing.
         debug: Whether to print debug information.
         visualize: Whether to capture execution trace for visualization.
+        show_outputs: Whether to print the full output of each node.
+        log_requests: Whether to save node outputs to JSON files.
         on_thought: Callback for streaming thoughts/tokens.
 
     Returns:
@@ -172,20 +176,42 @@ def run_with_graph(registry: DatasourceRegistry, llm_registry: LLMRegistry, user
     }
 
     trace = []
-    if debug or on_thought or visualize:
+    if debug or on_thought or visualize or show_outputs or log_requests:
         if debug:
             print("\n--- Starting Graph Execution (Debug Mode) ---")
         
         final_state = initial_state_dict
         branch_map = {}
 
+        # Request Logging Setup
+        log_dir = None
+        current_step = 1
+        if log_requests:
+            request_id = str(uuid.uuid4())
+            log_dir = pathlib.Path("logs") / request_id
+            log_dir.mkdir(parents=True, exist_ok=True)
+            if debug:
+                print(f"[Request Logger] Logging to: {log_dir}")
+
         for namespace, mode, payload in g.stream(initial_state_dict, stream_mode=["updates", "messages"], subgraphs=True):
             
             branch_id = namespace[0] if namespace else "main"
             
             if mode == "updates":
-           
+
                 for node_name, state_update in payload.items():
+                    if log_requests and log_dir:
+                        try:
+                            # Sanitize node name just in case
+                            safe_name = node_name.replace(":", "_")
+                            filename = f"{current_step:03d}_{safe_name}.json"
+                            log_path = log_dir / filename
+                            with open(log_path, "w", encoding="utf-8") as f:
+                                json.dump(state_update, f, indent=2, default=str)
+                            current_step += 1
+                        except Exception as e:
+                            print(f"[Request Logger] Failed to write log for {node_name}: {e}")
+
                     if visualize:
                         trace.append({
                             "node": node_name,
@@ -194,7 +220,12 @@ def run_with_graph(registry: DatasourceRegistry, llm_registry: LLMRegistry, user
                         })
                     if debug:
                         print(f"\n--- Node: {node_name} ---")
-                       
+                    
+                    if show_outputs:
+                        print(f"\n--- Output: {node_name} ---")
+                        # Use default=str to handle non-serializable objects like Pydantic models
+                        print(json.dumps(state_update, indent=2, default=str))
+
                     if isinstance(state_update, dict):
                         final_state.update(state_update)
                         

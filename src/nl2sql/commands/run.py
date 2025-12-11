@@ -1,5 +1,6 @@
 import sys
 import argparse
+import json
 from typing import Optional
 from rich.console import Console
 from rich.panel import Panel
@@ -10,12 +11,91 @@ from nl2sql.datasource_registry import DatasourceRegistry
 from nl2sql.llm_registry import LLMRegistry
 from nl2sql.vector_store import SchemaVectorStore
 from nl2sql.commands.visualize import draw_execution_trace
+from nl2sql.schemas import GraphState
+from nl2sql.nodes.decomposer import DecomposerNode
+from nl2sql.nodes.router import RouterNode
+from nl2sql.nodes.intent import IntentNode
 
 def run_pipeline(args: argparse.Namespace, query: Optional[str], datasource_registry: DatasourceRegistry, llm_registry: LLMRegistry, vector_store: SchemaVectorStore) -> None:
     # Always run in simple console mode
+    # Always run in simple console mode
     if not query:
         return
-    _run_simple_mode(args, query, datasource_registry, llm_registry, vector_store)
+        
+    if args.node:
+        _run_node_mode(args, query, datasource_registry, llm_registry)
+    else:
+        _run_simple_mode(args, query, datasource_registry, llm_registry, vector_store)
+
+
+def _run_node_mode(args: argparse.Namespace, query: str, datasource_registry: DatasourceRegistry, llm_registry: LLMRegistry) -> None:
+    console = Console()
+    node_name = args.node.lower()
+    console.print(f"[bold blue]Running Single Node:[/bold blue] {node_name}")
+    console.print(f"[bold blue]Query:[/bold blue] {query}")
+
+    try:
+        if node_name == "decomposer":
+            llm = llm_registry.decomposer_llm()
+            node = DecomposerNode(llm, datasource_registry)
+            state = GraphState(user_query=query)
+            
+            with console.status("[bold green]Decomposing...[/bold green]", spinner="dots"):
+                result = node(state)
+            
+            console.print(Panel(json.dumps(result, indent=2), title="Decomposer Output", border_style="green"))
+            
+        elif node_name == "router":
+            node = RouterNode(llm_registry, datasource_registry, args.vector_store)
+            state = GraphState(user_query=query)
+            
+            with console.status("[bold green]Routing...[/bold green]", spinner="dots"):
+                state = node(state)
+            
+            # Extract nested routing info
+            full_routing = state.routing_info
+            ds_ids = state.datasource_id
+            
+            ds_routing = {}
+            if isinstance(ds_ids, list):
+                # If multiple, show a dict of them
+                for ds in ds_ids:
+                    ds_routing[ds] = full_routing.get(ds, {})
+            elif isinstance(ds_ids, str):
+                ds_routing = full_routing.get(ds_ids, {})
+            else:
+                ds_routing = full_routing
+
+            output = {
+                "datasource_id": state.datasource_id,
+                "routing_info": ds_routing,
+                "thoughts": state.thoughts.get("router", [])
+            }
+            console.print(Panel(json.dumps(output, indent=2, default=str), title="Router Output", border_style="green"))
+
+        elif node_name == "intent":
+            llm = llm_registry.intent_llm()
+            node = IntentNode(llm)
+            state = GraphState(user_query=query)
+            
+            with console.status("[bold green]Analyzing Intent...[/bold green]", spinner="dots"):
+                state = node(state)
+            
+            # Convert Pydantic model to dict for JSON serialization
+            intent_data = state.intent.model_dump() if state.intent else None
+            
+            output = {
+                "intent": intent_data,
+                "thoughts": state.thoughts.get("intent", [])
+            }
+            console.print(Panel(json.dumps(output, indent=2, default=str), title="Intent Output", border_style="green"))
+            
+        else:
+            console.print(f"[bold red]Error:[/bold red] Node '{node_name}' execution is not yet supported in isolation.")
+            return
+
+    except Exception as e:
+        console.print(f"[bold red]Error executing node:[/bold red] {e}")
 
 
 def _run_simple_mode(args: argparse.Namespace, query: str, datasource_registry: DatasourceRegistry, llm_registry: LLMRegistry, vector_store: SchemaVectorStore) -> None:
@@ -36,6 +116,8 @@ def _run_simple_mode(args: argparse.Namespace, query: str, datasource_registry: 
                 vector_store_path=args.vector_store,
                 debug=args.debug,
                 visualize=args.visualize,
+                show_outputs=args.show_outputs,
+                log_requests=args.log_requests,
                 on_thought=None # No thoughts in simple mode
             )
         except Exception as e:
@@ -67,7 +149,7 @@ def _run_simple_mode(args: argparse.Namespace, query: str, datasource_registry: 
     # Display Execution Result Summary
     execution = final_state.get("execution")
     if execution:
-        row_count = execution.get("row_count", 0)
+        row_count = execution.get("row_count", 0) if isinstance(execution, dict) else getattr(execution, "row_count", 0)
         console.print(f"[dim]Rows returned: {row_count}[/dim]")
 
     # Display Used Datasources

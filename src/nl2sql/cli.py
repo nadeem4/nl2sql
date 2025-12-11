@@ -36,6 +36,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--log-level", type=str, default=None, choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"], help="Set the logging level")
     parser.add_argument("--show-perf", action="store_true", help="Show performance metrics (latency)")
     parser.add_argument("--visualize", action="store_true", help="Visualize execution trace (dynamic)")
+    parser.add_argument("--node", type=str, default=None, help="Run a specific node in isolation (e.g., 'decomposer', 'planner')")
+    parser.add_argument("--show-outputs", action="store_true", help="Show full state output of each node")
+    parser.add_argument("--log-requests", action="store_true", help="Save individual node outputs to JSON logs in a request folder")
     
     # Benchmarking args
     parser.add_argument("--benchmark", action="store_true", help="Run in benchmark mode")

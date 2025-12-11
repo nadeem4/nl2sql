@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 
-from typing import Any, Dict, List, Literal, Optional, TypedDict, Annotated
+from typing import Any, Dict, List, Literal, Optional, TypedDict, Annotated, Union
 import operator
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -246,6 +246,29 @@ class ExecutionModel(BaseModel):
     model_config = ConfigDict(extra="allow")
 
 
+def merge_dicts(left: Dict[str, Any], right: Dict[str, Any]) -> Dict[str, Any]:
+    """Reduces dictionaries by merging them."""
+    if not left:
+        return right
+    if not right:
+        return left
+    return {**left, **right}
+
+
+def merge_ids(left: Any, right: Any) -> Any:
+    """Reduces datasource IDs by merging them into a list."""
+    if not left:
+        return right
+    if not right:
+        return left
+    
+    l_list = left if isinstance(left, list) else [left]
+    r_list = right if isinstance(right, list) else [right]
+    
+    res = list(set(l_list + r_list))
+    return res[0] if len(res) == 1 else res
+
+
 class GraphState(BaseModel):
     """
     Represents the state of the LangGraph execution.
@@ -280,12 +303,12 @@ class GraphState(BaseModel):
     errors: List[str] = Field(default_factory=list)
     retry_count: int = 0
     thoughts: Dict[str, List[str]] = Field(default_factory=dict)
-    datasource_id: Optional[str] = None
+    datasource_id: Annotated[Optional[Union[str, List[str]]], merge_ids] = None
     sub_queries: Optional[List[str]] = None
     intermediate_results: Annotated[List[Any], operator.add] = Field(default_factory=list)
     query_history: Annotated[List[Dict[str, Any]], operator.add] = Field(default_factory=list)
     final_answer: Optional[str] = None
-    routing_info: Dict[str, Any] = Field(default_factory=dict)
+    routing_info: Annotated[Dict[str, Any], merge_dicts] = Field(default_factory=dict)
 
 
 
