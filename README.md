@@ -158,10 +158,49 @@ Run these commands to test each database:
 python -m src.nl2sql.cli --id manufacturing_ops --query "List 5 machines with their serial numbers"
 ```
 
+**Sample Output:**
+
+```text
++------------------------------- Final Answer --------------------------------+
+|                                   Summary                                   |
+| The query successfully retrieved a list of 5 machines along with their      |
+| serial numbers.                                                             |
+|                                                                             |
+|                                    Data                                     |
+| +-----------------------------------------------------+                     |
+| | Machine Name | Serial Number                        |                     |
+| |--------------+--------------------------------------|                     |
+| | Machine-0    | 54402ab7-f674-4856-8129-3bd0b82c0171 |                     |
+| | Machine-1    | 46eb37fc-f2c2-4c76-809c-a7d94e8c0605 |                     |
+| | Machine-2    | 736e945f-f356-4d2f-abf3-541bbf5ccb3c |                     |
+| +-----------------------------------------------------+                     |
++-----------------------------------------------------------------------------+
+Datasource Used: manufacturing_ops
+```
+
 #### 2. MySQL (Supply Chain)
 
 ```bash
 python -m src.nl2sql.cli --id manufacturing_supply --query "Show me top 3 products by price"
+```
+
+**Sample Output:**
+
+```text
++------------------------------- Final Answer --------------------------------+
+|                                   Summary                                   |
+| The top 3 products by price have been successfully retrieved.               |
+|                                                                             |
+|                                    Data                                     |
+| +------------------------------------------------------------------------+  |
+| | Product ID | SKU           | Product Name                      | Price |  |
+| |------------+---------------+-----------------------------------+-------|  |
+| | 30         | 3026430016128 | Harness Cross-Media Relationships | 10.91 |  |
+| | 117        | 9624973332824 | Enable Vertical Bandwidth         | 12.80 |  |
+| | 339        | 5303716685598 | Deploy Magnetic Channels          | 16.39 |  |
+| +------------------------------------------------------------------------+  |
++-----------------------------------------------------------------------------+
+Datasource Used: manufacturing_supply
 ```
 
 #### 3. MSSQL (History)
@@ -170,10 +209,40 @@ python -m src.nl2sql.cli --id manufacturing_supply --query "Show me top 3 produc
 python -m src.nl2sql.cli --id manufacturing_history --query "Count total production runs"
 ```
 
+**Sample Output:**
+
+```text
++------------------------------- Final Answer --------------------------------+
+|                                   Summary                                   |
+| The total number of production runs is 5000.                                |
++-----------------------------------------------------------------------------+
+Datasource Used: manufacturing_history
+```
+
 #### 4. SQLite (Reference)
 
 ```bash
 python -m src.nl2sql.cli --id manufacturing_ref --query "List all factories and their locations"
+```
+
+**Sample Output:**
+
+```text
++------------------------------- Final Answer --------------------------------+
+|                                   Summary                                   |
+| The query retrieved 3 factories: Plant Austin (TX), Plant Berlin (DE),      |
+| and Plant Tokyo (JP).                                                       |
+|                                                                             |
+|                                    Data                                     |
+| +---------------------------+                                               |
+| | Factory Name | Location   |                                               |
+| |--------------+------------|                                               |
+| | Plant Austin | Austin, TX |                                               |
+| | Plant Berlin | Berlin, DE |                                               |
+| | Plant Tokyo  | Tokyo, JP  |                                               |
+| +---------------------------+                                               |
++-----------------------------------------------------------------------------+
+Datasource Used: manufacturing_ref
 ```
 
 ### 5. Cross-Database Query (Map-Reduce)
@@ -212,13 +281,57 @@ Datasource Used: ['manufacturing_history', 'manufacturing_supply']
 python -m src.nl2sql.cli --query "Show production runs from manufacturing_history and maintenance logs from manufacturing_ops for 'Machine-1'"
 ```
 
+**Sample Output:**
+
+```text
++--------------------------------- Final Answer ---------------------------------+
+|                                    Summary                                     |
+| The production runs for 'Machine-1' show a total of 98 records with various    |
+| quantities produced and scrap counts.                                          |
+|                                                                                |
+|                                      Data                                      |
+| +----------------------------------------------------------------------------+ |
+| | Product…   Product    Machine    Start                 Quantity   Scrap    | |
+| | Run ID     ID         ID         Time       End Time   Produced   Count    | |
+| |----------------------------------------------------------------------------| |
+| | 19         447        1          2025-08…   2025-08…   4698       30       | |
+| |                                  11:03:37   12:03:37                       | |
+| | 29         33         1          2025-05…   2025-05…   8386       41       | |
+| |                                  04:13:56   08:13:56                       | |
+| +----------------------------------------------------------------------------+ |
++--------------------------------------------------------------------------------+
+Datasource Used: ['manufacturing_ops', 'manufacturing_history']
+```
+
 #### Example 3: Employees & Locations (Postgres + SQLite)
 
 ```bash
 python -m src.nl2sql.cli --query "List all employees from manufacturing_ops and their factory locations from manufacturing_ref"
 ```
 
-**Expected Output:** A consolidated answer merging data from the respective databases.
+**Sample Output:**
+
+```text
++--------------------------------- Final Answer ---------------------------------+
+|                                    Summary                                     |
+| The combined data lists all employees from the manufacturing operations along  |
+| with their corresponding factory locations.                                    |
+|                                                                                |
+|                                      Data                                      |
+| +----------------------------------------------------------------------------+ |
+| | Employee                               Factory                               | |
+| | Name         Role         Factory ID   Location     Hired Date   Email       | |
+| |----------------------------------------------------------------------------| |
+| | James        Technician   1            Austin, TX   2024-09-19   masonkyl…   | |
+| | Fitzpatri…                                                                   | |
+| | James        Operator     3            Berlin, DE   2023-07-04   sgarcia@…   | |
+| | Colon                                                                        | |
+| | Brian        Operator     1            Austin, TX   2023-06-13   mlopez@e…   | |
+| | Russell                                                                      | |
+| +----------------------------------------------------------------------------+ |
++--------------------------------------------------------------------------------+
+Datasource Used: ['manufacturing_ops', 'manufacturing_ref']
+```
 
 ### Vector Search (RAG)
 
