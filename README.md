@@ -160,6 +160,9 @@ python -m src.nl2sql.cli --id manufacturing_ops --query "List 5 machines with th
 
 **Sample Output:**
 
+<details>
+<summary><b>Click to see Sample Output</b></summary>
+
 ```text
 +------------------------------- Final Answer --------------------------------+
 |                                   Summary                                   |
@@ -178,6 +181,8 @@ python -m src.nl2sql.cli --id manufacturing_ops --query "List 5 machines with th
 Datasource Used: manufacturing_ops
 ```
 
+</details>
+
 #### 2. MySQL (Supply Chain)
 
 ```bash
@@ -185,6 +190,9 @@ python -m src.nl2sql.cli --id manufacturing_supply --query "Show me top 3 produc
 ```
 
 **Sample Output:**
+
+<details>
+<summary><b>Click to see Sample Output</b></summary>
 
 ```text
 +------------------------------- Final Answer --------------------------------+
@@ -203,6 +211,8 @@ python -m src.nl2sql.cli --id manufacturing_supply --query "Show me top 3 produc
 Datasource Used: manufacturing_supply
 ```
 
+</details>
+
 #### 3. MSSQL (History)
 
 ```bash
@@ -210,6 +220,9 @@ python -m src.nl2sql.cli --id manufacturing_history --query "Count total product
 ```
 
 **Sample Output:**
+
+<details>
+<summary><b>Click to see Sample Output</b></summary>
 
 ```text
 +------------------------------- Final Answer --------------------------------+
@@ -219,6 +232,8 @@ python -m src.nl2sql.cli --id manufacturing_history --query "Count total product
 Datasource Used: manufacturing_history
 ```
 
+</details>
+
 #### 4. SQLite (Reference)
 
 ```bash
@@ -226,6 +241,9 @@ python -m src.nl2sql.cli --id manufacturing_ref --query "List all factories and 
 ```
 
 **Sample Output:**
+
+<details>
+<summary><b>Click to see Sample Output</b></summary>
 
 ```text
 +------------------------------- Final Answer --------------------------------+
@@ -245,6 +263,8 @@ python -m src.nl2sql.cli --id manufacturing_ref --query "List all factories and 
 Datasource Used: manufacturing_ref
 ```
 
+</details>
+
 ### 5. Cross-Database Query (Map-Reduce)
 
 The system can automatically decompose complex queries into sub-queries, execute them in parallel, and aggregate the results.
@@ -256,6 +276,9 @@ python -m src.nl2sql.cli --query "Compare sales from manufacturing_history and i
 ```
 
 **Sample Output:**
+
+<details>
+<summary><b>Click to see Sample Output</b></summary>
 
 ```text
 ╭──────────────────────────────────────────────────────── Final Answer ─────────────────────────────────────────────────────────╮
@@ -275,6 +298,8 @@ python -m src.nl2sql.cli --query "Compare sales from manufacturing_history and i
 Datasource Used: ['manufacturing_history', 'manufacturing_supply']
 ```
 
+</details>
+
 #### Example 2: Production vs Maintenance (MSSQL + Postgres)
 
 ```bash
@@ -282,6 +307,9 @@ python -m src.nl2sql.cli --query "Show production runs from manufacturing_histor
 ```
 
 **Sample Output:**
+
+<details>
+<summary><b>Click to see Sample Output</b></summary>
 
 ```text
 +--------------------------------- Final Answer ---------------------------------+
@@ -303,6 +331,8 @@ python -m src.nl2sql.cli --query "Show production runs from manufacturing_histor
 Datasource Used: ['manufacturing_ops', 'manufacturing_history']
 ```
 
+</details>
+
 #### Example 3: Employees & Locations (Postgres + SQLite)
 
 ```bash
@@ -310,6 +340,9 @@ python -m src.nl2sql.cli --query "List all employees from manufacturing_ops and 
 ```
 
 **Sample Output:**
+
+<details>
+<summary><b>Click to see Sample Output</b></summary>
 
 ```text
 +--------------------------------- Final Answer ---------------------------------+
@@ -332,6 +365,8 @@ python -m src.nl2sql.cli --query "List all employees from manufacturing_ops and 
 +--------------------------------------------------------------------------------+
 Datasource Used: ['manufacturing_ops', 'manufacturing_ref']
 ```
+
+</details>
 
 ### Vector Search (RAG)
 
