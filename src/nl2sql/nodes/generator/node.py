@@ -4,10 +4,13 @@ import json
 from typing import Optional
 
 import sqlglot
+from typing import Optional, TYPE_CHECKING
 from sqlglot import expressions as exp
 
 from nl2sql.capabilities import EngineCapabilities, get_capabilities
-from nl2sql.schemas import GraphState
+
+if TYPE_CHECKING:
+    from nl2sql.schemas import GraphState
 
 
 from nl2sql.datasource_registry import DatasourceRegistry

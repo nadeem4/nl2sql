@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import json
-from typing import Any, Callable, Dict, Optional, Union
+from typing import Any, Callable, Dict, Optional, Union, TYPE_CHECKING
 
 from langchain_core.runnables import Runnable
 
-from nl2sql.schemas import GraphState, PlanModel
+if TYPE_CHECKING:
+    from nl2sql.schemas import GraphState
+
+from .schemas import PlanModel
 from nl2sql.nodes.planner.prompts import PLANNER_PROMPT, PLANNER_EXAMPLES
 
 LLMCallable = Union[Callable[[str], str], Runnable]

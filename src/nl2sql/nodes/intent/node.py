@@ -1,10 +1,13 @@
 from __future__ import annotations
 
-from typing import Callable, Optional, Union
+from typing import Callable, Optional, Union, TYPE_CHECKING
 
 from langchain_core.runnables import Runnable
 
-from nl2sql.schemas import GraphState, IntentModel
+if TYPE_CHECKING:
+    from nl2sql.schemas import GraphState
+
+from .schemas import IntentModel
 from nl2sql.nodes.intent.prompts import INTENT_PROMPT
 
 LLMCallable = Union[Callable[[str], str], Runnable]

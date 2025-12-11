@@ -193,7 +193,46 @@ def _run_dataset_evaluation(args: argparse.Namespace, datasource_registry: Datas
                 "sql_match": False
             })
             continue
-            layer_match = (routing_layer == expected_layer)
+        # Validate Routing
+        actual_ds = state.get("datasource_id")
+        # Handle list of IDs (take first or all? Benchmark implies single Expected DS usually)
+        if isinstance(actual_ds, list): 
+            actual_ds = actual_ds[0] if actual_ds else None
+            
+        routing_match = (actual_ds == expected_ds)
+        
+        # Extract metadata
+        all_routing_info = state.get("routing_info", {})
+        # all_routing_info is now Dict[str, RoutingInfo]
+        
+        # Get info for the selected datasource
+        routing_info = all_routing_info.get(actual_ds)
+        
+        # Helper to safely get attr/key
+        def get_val(obj, key, default=None):
+            if isinstance(obj, dict): return obj.get(key, default)
+            return getattr(obj, key, default)
+
+        if routing_info:
+            routing_layer = get_val(routing_info, "layer", "unknown")
+            routing_reasoning = get_val(routing_info, "reasoning", "")
+            routing_tokens = get_val(routing_info, "tokens", 0)
+            # Latency is confusing in state, let's use routing_info latency
+            routing_latency = get_val(routing_info, "latency", 0)
+            l1_score = get_val(routing_info, "l1_score", 0.0)
+            candidates = get_val(routing_info, "candidates", [])
+            # Convert candidates if they are objects
+            if candidates and not isinstance(candidates[0], dict):
+                candidates = [{"id": c.id, "score": c.score} for c in candidates]
+        else:
+            routing_layer = "unknown"
+            routing_reasoning = "No routing info"
+            routing_tokens = 0
+            routing_latency = 0
+            l1_score = 0.0
+            candidates = []
+
+        layer_match = (routing_layer == expected_layer)
         
         if args.routing_only:
             results.append({

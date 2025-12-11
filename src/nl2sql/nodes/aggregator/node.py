@@ -1,8 +1,12 @@
-from typing import List, Dict, Any, Literal, Callable, Union
+from __future__ import annotations
+from typing import List, Dict, Any, Literal, Callable, Union, TYPE_CHECKING
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import Runnable
 
-from nl2sql.schemas import GraphState, AggregatedResponse
+if TYPE_CHECKING:
+    from nl2sql.schemas import GraphState
+
+from .schemas import AggregatedResponse
 from nl2sql.nodes.aggregator.prompts import AGGREGATOR_PROMPT
 
 LLMCallable = Union[Callable[[str], Any], Runnable]

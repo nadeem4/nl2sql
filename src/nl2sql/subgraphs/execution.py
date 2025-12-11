@@ -5,8 +5,8 @@ from nl2sql.schemas import GraphState
 from nl2sql.nodes.router import RouterNode
 from nl2sql.nodes.intent.node import IntentNode
 from nl2sql.nodes.schema import SchemaNode
-from nl2sql.nodes.generator_node import GeneratorNode
-from nl2sql.nodes.executor_node import ExecutorNode
+from nl2sql.nodes.generator import GeneratorNode
+from nl2sql.nodes.executor import ExecutorNode
 from nl2sql.subgraphs.planning import build_planning_subgraph
 from nl2sql.graph_utils import wrap_graphstate
 from nl2sql.datasource_registry import DatasourceRegistry

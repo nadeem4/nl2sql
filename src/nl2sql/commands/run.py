@@ -60,11 +60,13 @@ def _run_node_mode(args: argparse.Namespace, query: str, datasource_registry: Da
             if isinstance(ds_ids, list):
                 # If multiple, show a dict of them
                 for ds in ds_ids:
-                    ds_routing[ds] = full_routing.get(ds, {})
+                    info = full_routing.get(ds)
+                    ds_routing[ds] = info.model_dump() if hasattr(info, "model_dump") else info
             elif isinstance(ds_ids, str):
-                ds_routing = full_routing.get(ds_ids, {})
+                info = full_routing.get(ds_ids)
+                ds_routing = info.model_dump() if hasattr(info, "model_dump") else info
             else:
-                ds_routing = full_routing
+                ds_routing = {k: v.model_dump() if hasattr(v, "model_dump") else v for k, v in full_routing.items()}
 
             output = {
                 "datasource_id": state.datasource_id,

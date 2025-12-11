@@ -2,13 +2,15 @@ from __future__ import annotations
 
 import time
 import tiktoken
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
-from nl2sql.schemas import GraphState
+if TYPE_CHECKING:
+    from nl2sql.schemas import GraphState
 from nl2sql.router_store import DatasourceRouterStore
 from nl2sql.llm_registry import LLMRegistry
 from nl2sql.datasource_registry import DatasourceRegistry
 from nl2sql.embeddings import EmbeddingService
+from nl2sql.nodes.router.schemas import RoutingInfo, CandidateInfo
 from nl2sql.settings import settings
 
 
@@ -143,15 +145,15 @@ class RouterNode:
         # Update state
         state.datasource_id = target_id
         state.routing_info = {
-            target_id: {
-                "layer": routing_layer,
-                "score": routing_score,
-                "l1_score": l1_score,
-                "candidates": candidates,
-                "latency": duration,
-                "reasoning": reasoning,
-                "tokens": token_usage
-            }
+            target_id: RoutingInfo(
+                layer=routing_layer,
+                score=routing_score,
+                l1_score=l1_score,
+                candidates=[CandidateInfo(id=c["id"], score=c["score"]) for c in candidates],
+                latency=duration,
+                reasoning=reasoning,
+                tokens=token_usage
+            )
         }
         
         state.latency["router"] = duration

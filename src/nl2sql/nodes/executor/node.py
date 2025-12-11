@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
 from nl2sql.datasource_registry import DatasourceRegistry
 from nl2sql.engine_factory import run_read_query
-from nl2sql.schemas import GraphState, ExecutionModel
+from .schemas import ExecutionModel
+
+if TYPE_CHECKING:
+    from nl2sql.schemas import GraphState
 from nl2sql.security import enforce_read_only
 from nl2sql.tracing import span
 

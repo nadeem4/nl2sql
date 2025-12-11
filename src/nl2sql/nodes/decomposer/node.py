@@ -1,8 +1,12 @@
-from typing import List, Dict, Any, Callable, Union
+from __future__ import annotations
+from typing import List, Dict, Any, Callable, Union, TYPE_CHECKING
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import Runnable
 
-from nl2sql.schemas import GraphState, DecomposerResponse
+if TYPE_CHECKING:
+    from nl2sql.schemas import GraphState
+
+from .schemas import DecomposerResponse
 from nl2sql.nodes.decomposer.prompts import DECOMPOSER_PROMPT
 from nl2sql.datasource_registry import DatasourceRegistry
 

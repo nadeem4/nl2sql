@@ -1,9 +1,13 @@
 from __future__ import annotations
 
 import json
-from typing import Callable, Optional, Set, Dict
+from typing import Callable, Optional, Set, Dict, TYPE_CHECKING
 
-from nl2sql.schemas import GraphState, ColumnRef, PlanModel, SchemaInfo
+if TYPE_CHECKING:
+    from nl2sql.schemas import GraphState
+
+from nl2sql.nodes.planner.schemas import ColumnRef, PlanModel
+from nl2sql.nodes.schema.schemas import SchemaInfo
 
 LLMCallable = Callable[[str], str]
 

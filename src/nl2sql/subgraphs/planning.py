@@ -4,11 +4,13 @@ from langchain_core.runnables import Runnable
 from langgraph.graph import END, StateGraph
 
 from nl2sql.schemas import GraphState
-from nl2sql.nodes.planner.node import PlannerNode
-from nl2sql.nodes.validator_node import ValidatorNode
+from nl2sql.nodes.intent import IntentNode
+from nl2sql.nodes.schema import SchemaNode
+from nl2sql.nodes.planner import PlannerNode
+from nl2sql.nodes.validator import ValidatorNode
 from nl2sql.nodes.summarizer.node import SummarizerNode
-from nl2sql.nodes.generator_node import GeneratorNode
-from nl2sql.nodes.executor_node import ExecutorNode
+from nl2sql.nodes.generator import GeneratorNode
+from nl2sql.nodes.executor import ExecutorNode
 from nl2sql.graph_utils import wrap_graphstate
 from nl2sql.datasource_registry import DatasourceRegistry
 

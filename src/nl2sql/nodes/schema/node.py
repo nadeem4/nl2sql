@@ -1,9 +1,13 @@
 from __future__ import annotations
 
 import json
-from typing import Dict, Optional, List
+from typing import Dict, Optional, List, TYPE_CHECKING
 from sqlalchemy import inspect
-from nl2sql.schemas import GraphState, SchemaInfo, TableInfo, ForeignKey
+
+if TYPE_CHECKING:
+    from nl2sql.schemas import GraphState
+
+from .schemas import SchemaInfo, TableInfo, ForeignKey
 from nl2sql.vector_store import SchemaVectorStore
 from nl2sql.datasource_registry import DatasourceRegistry
 
