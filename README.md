@@ -431,28 +431,28 @@ This allows the system to scale to hundreds of tables without overwhelming the L
 
 The CLI provides a detailed breakdown of time and token usage, including a top-level matrix and per-datasource details:
 
-```text
-Performance & Metrics
-╭──────────────────────────────────────────────────────────────────────────────────────────╮
-│ Top Level Performance                                                                    │
-│ ┏━━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━┓ │
-│ ┃ Metric      ┃ Decomposer ┃ Aggregator ┃ Exec (manufacturing_ops) ┃ Total             ┃ │
-│ ┡━━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━┩ │
-│ │ Latency (s) │     0.0000 │     0.0000 │                   7.2700 │            7.2700 │ │
-│ │ Token Usage │          0 │          0 │                     3029 │              3029 │ │
-│ └─────────────┴────────────┴────────────┴──────────────────────────┴───────────────────┘ │
-│                                                                                          │
-│ Performance: manufacturing_ops                                                           │
-│ ┏━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━━┳━━━━━━━━━━━━━┳━━━━━━━━┓                            │
-│ ┃ Node      ┃   Type   ┃    Model    ┃ Latency (s) ┃ Tokens ┃                            │
-│ ┡━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━━╇━━━━━━━━━━━━━╇━━━━━━━━┩                            │
-│ │ Intent    │    AI    │ gpt-4o-mini │      1.9300 │    569 │                            │
-│ │ Planner   │    AI    │ gpt-4o-mini │      4.9900 │   2456 │                            │
-│ │ Generator │  Non-AI  │      -      │      0.0000 │      - │                            │
-│ │ Executor  │  Non-AI  │      -      │      0.3500 │      - │                            │
-│ └───────────┴──────────┴─────────────┴─────────────┴────────┘                            │
-╰──────────────────────────────────────────────────────────────────────────────────────────╯
-```
+Enable this detailed view by adding the `--show-perf` flag.
+
+<details>
+<summary><b>Click to see Sample Performance Output</b></summary>
+
+**Top Level Performance**
+
+| Metric | Decomposer | Aggregator | Exec (manufacturing_ops) | Total |
+| :--- | :--- | :--- | :--- | :--- |
+| Latency (s) | 0.0000 | 0.0000 | 7.2700 | 7.2700 |
+| Token Usage | 0 | 0 | 3029 | 3029 |
+
+**Performance: manufacturing_ops**
+
+| Node | Type | Model | Latency (s) | Tokens |
+| :--- | :--- | :--- | :--- | :--- |
+| Intent | AI | gpt-4o-mini | 1.9300 | 569 |
+| Planner | AI | gpt-4o-mini | 4.9900 | 2456 |
+| Generator | Non-AI | - | 0.0000 | - |
+| Executor | Non-AI | - | 0.3500 | - |
+
+</details>
 
 ### Project Structure
 
