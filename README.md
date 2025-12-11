@@ -163,24 +163,20 @@ python -m src.nl2sql.cli --id manufacturing_ops --query "List 5 machines with th
 <details>
 <summary><b>Click to see Sample Output</b></summary>
 
-```text
-+------------------------------- Final Answer --------------------------------+
-|                                   Summary                                   |
-| The query successfully retrieved a list of 5 machines along with their      |
-| serial numbers.                                                             |
-|                                                                             |
-|                                    Data                                     |
-| +-----------------------------------------------------+                     |
-| | Machine Name | Serial Number                        |                     |
-| |--------------+--------------------------------------|                     |
-| | Machine-0    | 54402ab7-f674-4856-8129-3bd0b82c0171 |                     |
-| | Machine-1    | 46eb37fc-f2c2-4c76-809c-a7d94e8c0605 |                     |
-| | Machine-2    | 736e945f-f356-4d2f-abf3-541bbf5ccb3c |                     |
-| +-----------------------------------------------------+                     |
-+-----------------------------------------------------------------------------+
-Datasource Used: manufacturing_ops
-```
+> **Summary**
+> The query successfully retrieved a list of 5 machines along with their serial numbers.
 
+**Data**
+
+| Machine Name | Serial Number |
+| :--- | :--- |
+| Machine-0 | 54402ab7-f674-4856-8129-3bd0b82c0171 |
+| Machine-1 | 46eb37fc-f2c2-4c76-809c-a7d94e8c0605 |
+| Machine-2 | 736e945f-f356-4d2f-abf3-541bbf5ccb3c |
+| Machine-3 | a1b2c3d4-e5f6-7890-1234-56789abcdef0 |
+| Machine-4 | b2c3d4e5-f6a7-8901-2345-67890bcdef12 |
+
+**Datasource Used:** `manufacturing_ops`
 </details>
 
 #### 2. MySQL (Supply Chain)
@@ -194,23 +190,18 @@ python -m src.nl2sql.cli --id manufacturing_supply --query "Show me top 3 produc
 <details>
 <summary><b>Click to see Sample Output</b></summary>
 
-```text
-+------------------------------- Final Answer --------------------------------+
-|                                   Summary                                   |
-| The top 3 products by price have been successfully retrieved.               |
-|                                                                             |
-|                                    Data                                     |
-| +------------------------------------------------------------------------+  |
-| | Product ID | SKU           | Product Name                      | Price |  |
-| |------------+---------------+-----------------------------------+-------|  |
-| | 30         | 3026430016128 | Harness Cross-Media Relationships | 10.91 |  |
-| | 117        | 9624973332824 | Enable Vertical Bandwidth         | 12.80 |  |
-| | 339        | 5303716685598 | Deploy Magnetic Channels          | 16.39 |  |
-| +------------------------------------------------------------------------+  |
-+-----------------------------------------------------------------------------+
-Datasource Used: manufacturing_supply
-```
+> **Summary**
+> The top 3 products by price have been successfully retrieved.
 
+**Data**
+
+| Product ID | SKU | Product Name | Price |
+| :--- | :--- | :--- | :--- |
+| 30 | 3026430016128 | Harness Cross-Media Relationships | 10.91 |
+| 117 | 9624973332824 | Enable Vertical Bandwidth | 12.80 |
+| 339 | 5303716685598 | Deploy Magnetic Channels | 16.39 |
+
+**Datasource Used:** `manufacturing_supply`
 </details>
 
 #### 3. MSSQL (History)
@@ -224,14 +215,10 @@ python -m src.nl2sql.cli --id manufacturing_history --query "Count total product
 <details>
 <summary><b>Click to see Sample Output</b></summary>
 
-```text
-+------------------------------- Final Answer --------------------------------+
-|                                   Summary                                   |
-| The total number of production runs is 5000.                                |
-+-----------------------------------------------------------------------------+
-Datasource Used: manufacturing_history
-```
+> **Summary**
+> The total number of production runs is 5000.
 
+**Datasource Used:** `manufacturing_history`
 </details>
 
 #### 4. SQLite (Reference)
@@ -245,24 +232,18 @@ python -m src.nl2sql.cli --id manufacturing_ref --query "List all factories and 
 <details>
 <summary><b>Click to see Sample Output</b></summary>
 
-```text
-+------------------------------- Final Answer --------------------------------+
-|                                   Summary                                   |
-| The query retrieved 3 factories: Plant Austin (TX), Plant Berlin (DE),      |
-| and Plant Tokyo (JP).                                                       |
-|                                                                             |
-|                                    Data                                     |
-| +---------------------------+                                               |
-| | Factory Name | Location   |                                               |
-| |--------------+------------|                                               |
-| | Plant Austin | Austin, TX |                                               |
-| | Plant Berlin | Berlin, DE |                                               |
-| | Plant Tokyo  | Tokyo, JP  |                                               |
-| +---------------------------+                                               |
-+-----------------------------------------------------------------------------+
-Datasource Used: manufacturing_ref
-```
+> **Summary**
+> The query retrieved 3 factories: Plant Austin (TX), Plant Berlin (DE), and Plant Tokyo (JP).
 
+**Data**
+
+| Factory Name | Location |
+| :--- | :--- |
+| Plant Austin | Austin, TX |
+| Plant Berlin | Berlin, DE |
+| Plant Tokyo | Tokyo, JP |
+
+**Datasource Used:** `manufacturing_ref`
 </details>
 
 ### 5. Cross-Database Query (Map-Reduce)
@@ -280,24 +261,18 @@ python -m src.nl2sql.cli --query "Compare sales from manufacturing_history and i
 <details>
 <summary><b>Click to see Sample Output</b></summary>
 
-```text
-╭──────────────────────────────────────────────────────── Final Answer ─────────────────────────────────────────────────────────╮
-│                                                           Summary                                                             │
-│ The sales data shows total sales and quantities sold by customer, while the inventory data provides quantities on hand for    │
-│ various products in different locations. A comparison reveals potential stock issues for high-selling products.               │
-│                                                                                                                               │
-│                                                             Data                                                              │
-│                                                                                                                               │
-│   Customer ID   Total Quantity Sold   Total Sales     Product ID   Warehouse Location   Quantity on Hand                      │
-│  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━                     │
-│   23            1035                  $915,361.36     326          WH-C                 1                                     │
-│   46            1692                  $1,696,801.35   295          WH-C                 2180                                  │
-│   69            2052                  $1,918,153.05   223          WH-A                 3005                                  │
-│                                                                                                                               │
-╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-Datasource Used: ['manufacturing_history', 'manufacturing_supply']
-```
+> **Summary**
+> The sales data shows total sales and quantities sold by customer, while the inventory data provides quantities on hand for various products in different locations. A comparison reveals potential stock issues for high-selling products.
 
+**Data**
+
+| Customer ID | Total Qty Sold | Total Sales | Product ID | Location | Qty on Hand |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| 23 | 1035 | $915,361.36 | 326 | WH-C | 1 |
+| 46 | 1692 | $1,696,801.35 | 295 | WH-C | 2180 |
+| 69 | 2052 | $1,918,153.05 | 223 | WH-A | 3005 |
+
+**Datasource Used:** `['manufacturing_history', 'manufacturing_supply']`
 </details>
 
 #### Example 2: Production vs Maintenance (MSSQL + Postgres)
@@ -312,24 +287,21 @@ python -m src.nl2sql.cli --query "Show production runs from manufacturing_histor
 <summary><b>Click to see Sample Output</b></summary>
 
 ```text
-+--------------------------------- Final Answer ---------------------------------+
-|                                    Summary                                     |
-| The production runs for 'Machine-1' show a total of 98 records with various    |
-| quantities produced and scrap counts.                                          |
-|                                                                                |
-|                                      Data                                      |
-| +----------------------------------------------------------------------------+ |
-| | Product…   Product    Machine    Start                 Quantity   Scrap    | |
-| | Run ID     ID         ID         Time       End Time   Produced   Count    | |
-| |----------------------------------------------------------------------------| |
-| | 19         447        1          2025-08…   2025-08…   4698       30       | |
-| |                                  11:03:37   12:03:37                       | |
-| | 29         33         1          2025-05…   2025-05…   8386       41       | |
-| |                                  04:13:56   08:13:56                       | |
-| +----------------------------------------------------------------------------+ |
-+--------------------------------------------------------------------------------+
-Datasource Used: ['manufacturing_ops', 'manufacturing_history']
-```
+<details>
+<summary><b>Click to see Sample Output</b></summary>
+
+> **Summary**
+> The production runs for 'Machine-1' show a total of 98 records with various quantities produced and scrap counts.
+
+**Data**
+
+| Product Run ID | Product ID | Machine ID | Start Time | End Time | Qty Produced | Scrap Count |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| 19 | 447 | 1 | 2025-08-01 11:03:37 | 2025-08-01 12:03:37 | 4698 | 30 |
+| 29 | 33 | 1 | 2025-05-15 04:13:56 | 2025-05-15 08:13:56 | 8386 | 41 |
+
+**Datasource Used:** `['manufacturing_ops', 'manufacturing_history']`
+</details>
 
 </details>
 
@@ -344,27 +316,22 @@ python -m src.nl2sql.cli --query "List all employees from manufacturing_ops and 
 <details>
 <summary><b>Click to see Sample Output</b></summary>
 
-```text
-+--------------------------------- Final Answer ---------------------------------+
-|                                    Summary                                     |
-| The combined data lists all employees from the manufacturing operations along  |
-| with their corresponding factory locations.                                    |
-|                                                                                |
-|                                      Data                                      |
-| +----------------------------------------------------------------------------+ |
-| | Employee                               Factory                               | |
-| | Name         Role         Factory ID   Location     Hired Date   Email       | |
-| |----------------------------------------------------------------------------| |
-| | James        Technician   1            Austin, TX   2024-09-19   masonkyl…   | |
-| | Fitzpatri…                                                                   | |
-| | James        Operator     3            Berlin, DE   2023-07-04   sgarcia@…   | |
-| | Colon                                                                        | |
-| | Brian        Operator     1            Austin, TX   2023-06-13   mlopez@e…   | |
-| | Russell                                                                      | |
-| +----------------------------------------------------------------------------+ |
-+--------------------------------------------------------------------------------+
-Datasource Used: ['manufacturing_ops', 'manufacturing_ref']
-```
+<details>
+<summary><b>Click to see Sample Output</b></summary>
+
+> **Summary**
+> The combined data lists all employees from the manufacturing operations along with their corresponding factory locations.
+
+**Data**
+
+| Employee Name | Role | Factory ID | Location | Hired Date | Email |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| James Fitzpatrick | Technician | 1 | Austin, TX | 2024-09-19 | <masonkyle@example.com> |
+| James Colon | Operator | 3 | Berlin, DE | 2023-07-04 | <sgarcia@example.com> |
+| Brian Russell | Operator | 1 | Austin, TX | 2023-06-13 | <mlopez@example.com> |
+
+**Datasource Used:** `['manufacturing_ops', 'manufacturing_ref']`
+</details>
 
 </details>
 
