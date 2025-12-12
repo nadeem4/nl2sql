@@ -95,7 +95,9 @@ def build_graph(registry: DatasourceRegistry, llm_registry: LLMRegistry, execute
             "query_history": [history_item],
             "latency": prefixed_latency,
             "routing_info": routing_info,
-            "datasource_id": ds_id
+            "datasource_id": ds_id,
+            "sql_draft": result.get("sql_draft"),
+            "execution": result.get("execution")
         }
 
     # Add Nodes

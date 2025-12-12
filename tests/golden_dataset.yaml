@@ -4,6 +4,7 @@
   datasource: "manufacturing_ops"
   difficulty: "easy"
   expected_routing_layer: "layer_1"
+  expected_sql: "SELECT name, serial_number, machine_type_id, status FROM machines"
 
 - id: "ops_002"
   question: "Which machines are currently offline?"
@@ -16,6 +17,7 @@
   datasource: "manufacturing_ops"
   difficulty: "medium"
   expected_routing_layer: "layer_2"
+  expected_sql: "SELECT name, serial_number, status FROM machines WHERE status != 'Active'"
 
 - id: "ops_004"
   question: "Who is staffing the stamping press right now?"
@@ -34,6 +36,7 @@
   datasource: "manufacturing_supply"
   difficulty: "easy"
   expected_routing_layer: "layer_1"
+  expected_sql: "SELECT name, unit_price FROM products"
 
 - id: "supply_002"
   question: "What is the price of Widget A?"

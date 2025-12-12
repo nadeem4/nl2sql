@@ -106,7 +106,8 @@ class ModelEvaluator:
 
         correct_routing = sum(1 for r in results if r.get("routing_match"))
         correct_sql = sum(1 for r in results if r.get("sql_match"))
-        valid_sql = sum(1 for r in results if r.get("status") not in ["EXEC_FAIL", "NO_SQL", "ERROR", "ROUTE_FAIL", "BAD_CONFIG", "GT_FAIL"])
+        correct_semantic = sum(1 for r in results if r.get("semantic_sql_match"))
+        valid_sql = sum(1 for r in results if r.get("status") not in ["EXEC_FAIL", "NO_SQL", "ERROR", "ROUTE_FAIL", "BAD_CONFIG", "GT_FAIL", "NO_GT"])
         
         # Layer Distribution
         layer_counts = {"layer_1": 0, "layer_2": 0, "layer_3": 0, "fallback": 0}
@@ -116,9 +117,13 @@ class ModelEvaluator:
                 layer_counts[layer] += 1
         
         # Calculate percentages
+        # Filter for samples that actually had ground truth for SQL accuracy
+        total_with_gt = sum(1 for r in results if r.get("status") != "NO_GT")
+        
         metrics = {
             "routing_accuracy": (correct_routing / total_samples) * 100,
-            "execution_accuracy": (correct_sql / total_samples) * 100,
+            "execution_accuracy": (correct_sql / total_with_gt) * 100 if total_with_gt > 0 else 0.0,
+            "semantic_sql_accuracy": (correct_semantic / total_with_gt) * 100 if total_with_gt > 0 else 0.0,
             "valid_sql_rate": (valid_sql / total_samples) * 100,
             "layer_distribution": layer_counts,
             "layer_percentages": {k: (v / total_samples) * 100 for k, v in layer_counts.items()}

@@ -47,6 +47,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--bench-config", type=pathlib.Path, default=pathlib.Path(settings.benchmark_config_path), help="Path to a single YAML file containing multiple named LLM configs (required if --benchmark is set)")
     parser.add_argument("--iterations", type=int, default=3, help="Number of iterations per config (benchmark mode only)")
     parser.add_argument("--include-ids", nargs="+", default=None, help="Benchmark: List of specific test IDs to run (space separated)")
+    parser.add_argument("--export-path", type=pathlib.Path, default=None, help="Benchmark: Export results to file (.json or .csv)")
 
     return parser.parse_args()
 

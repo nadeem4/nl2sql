@@ -456,67 +456,28 @@ Enable this detailed view by adding the `--show-perf` flag.
 
 ## Evaluation Framework
 
-We employ a rigorous evaluation framework to ensure the pipeline's reliability across different complexity levels.
+We employ a rigorous evaluation framework to ensure the pipeline's correctness and stability.
 
-### 1. The Golden Dataset (`tests/golden_dataset.yaml`)
+For detailed documentation on metrics, architecture, and usage, see [**EVALUATION.md**](EVALUATION.md).
 
-A curated suite of 20 test cases designed to stress-test the **Router** and **SQL Generation**.
+### Key Metrics
 
-| Tier | Complexity | Goal | Target Layer |
-| :--- | :--- | :--- | :--- |
-| **Easy** | Keyword Match | Test speed & exact retrieval | Layer 1 (Vector) |
-| **Medium** | Ambiguous/Slang | Test enrichment & multi-query | Layer 2 (Multi-Query) |
-| **Hard** | Reasoning Required | Test intent understanding | Layer 3 (LLM) |
+- **Execution Accuracy**: Verifies that generated SQL returns the correct data (not just string matching).
+- **Stability (Pass@K)**: Measures pipeline reliability and routing consistency over multiple iterations.
+- **Routing Accuracy**: Tracks the performance of the 3-layer routing system.
 
-### 2. Metrics Measured
+### Quick Benchmark
 
-The benchmark tool currently focuses on routing performance:
-
-- **Routing Accuracy**: % of queries routed to the correct datasource.
-- **Routing Layer Distribution**: Breakdown of how many queries were solved by each layer (L1: Vector, L2: Multi-Query, L3: LLM).
-- **Latency**: End-to-end time for routing decisions.
-- **Execution Accuracy**: % of queries yielding correct results (Fuzzy Data Match & Semantic SQL).
-
-#### Current Performance (Sample)
-
-```text
-Routing Accuracy:   100.0%
-
-Routing Layer Breakdown:
-  - Layer 1: 10 (50.0%)
-  - Layer 2: 2 (10.0%)
-  - Layer 3: 8 (40.0%)
-  - Fallback: 0 (0.0%)
-```
-
-### 3. Running Benchmarks
-
-**A. Routing-Only Evaluation**
-Test just the router's ability to pick the right DB.
-
-```bash
-python -m src.nl2sql.cli --benchmark --dataset tests/golden_dataset.yaml --routing-only
-```
-
-**B. End-to-End Evaluation**
-Test routing + SQL generation + execution correctness.
+Run the full test suite with parallel execution:
 
 ```bash
 python -m src.nl2sql.cli --benchmark --dataset tests/golden_dataset.yaml
 ```
 
-**C. Regression Testing**
-Use the stub LLM to test the harness itself without API costs.
+To test stability (run each question 5 times):
 
 ```bash
-python -m src.nl2sql.cli --benchmark --dataset tests/golden_dataset.yaml --stub-llm
-```
-
-**D. Targeted Testing**
-Run specific test cases by ID (useful for debugging regression):
-
-```bash
-python -m src.nl2sql.cli --benchmark --dataset tests/golden_dataset.yaml --include-ids ops_001 supply_003
+python -m src.nl2sql.cli --benchmark --dataset tests/golden_dataset.yaml --iterations 5
 ```
 
 ## Development
