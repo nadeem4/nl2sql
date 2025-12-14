@@ -44,7 +44,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--benchmark", action="store_true", help="Run in benchmark mode")
     parser.add_argument("--dataset", type=pathlib.Path, default=None, help="Path to golden dataset YAML for accuracy evaluation")
     parser.add_argument("--routing-only", action="store_true", help="Benchmark: Verify datasource routing only, skip execution")
-    parser.add_argument("--bench-config", type=pathlib.Path, default=pathlib.Path(settings.benchmark_config_path), help="Path to a single YAML file containing multiple named LLM configs (required if --benchmark is set)")
+    parser.add_argument("--matrix", action="store_true", help="Benchmark: Run with multiple LLMs (uses defaults from benchmark_suite.yaml if --bench-config is not provided)")
+    parser.add_argument("--bench-config", type=pathlib.Path, default=None, help="Path to a single YAML file containing multiple named LLM configs (optional)")
     parser.add_argument("--iterations", type=int, default=3, help="Number of iterations per config (benchmark mode only)")
     parser.add_argument("--include-ids", nargs="+", default=None, help="Benchmark: List of specific test IDs to run (space separated)")
     parser.add_argument("--export-path", type=pathlib.Path, default=None, help="Benchmark: Export results to file (.json or .csv)")
@@ -90,19 +91,18 @@ def main() -> None:
         print(f"  python -m src.nl2sql.cli --index --vector-store {args.vector_store}", file=sys.stderr)
         sys.exit(1)
 
-    # Benchmark Mode (Dataset or Config)
+    # Benchmark Mode
     if args.benchmark:
-        # If dataset is provided, query is not required
-        if args.dataset:
-             run_benchmark(args, None, datasource_registry, vector_store)
-             return
-        # If config is provided, query is required (for single query benchmark)
-        elif args.query:
-             run_benchmark(args, args.query, datasource_registry, vector_store)
-             return
-        else:
-             print("Error: --query is required for config-based benchmark.", file=sys.stderr)
+        if not args.dataset:
+             print("Error: --dataset is required for benchmarking.", file=sys.stderr)
+             print("To benchmark a single query, add it to a dataset and use --include-ids.", file=sys.stderr)
              sys.exit(1)
+             
+        if args.matrix and not args.bench_config:
+            args.bench_config = pathlib.Path(settings.benchmark_config_path)
+
+        run_benchmark(args, datasource_registry, vector_store)
+        return
 
     query = args.query
 

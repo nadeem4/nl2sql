@@ -11,7 +11,6 @@ from nl2sql.nodes.validator import ValidatorNode
 from nl2sql.nodes.summarizer.node import SummarizerNode
 from nl2sql.nodes.generator import GeneratorNode
 from nl2sql.nodes.executor import ExecutorNode
-from nl2sql.graph_utils import wrap_graphstate
 from nl2sql.datasource_registry import DatasourceRegistry
 
 LLMCallable = Union[Callable[[str], str], Runnable]
@@ -75,11 +74,11 @@ def build_planning_subgraph(llm_map: Dict[str, LLMCallable], registry: Datasourc
                 return "end"
         return "ok"
 
-    graph.add_node("planner", wrap_graphstate(planner, "planner"))
-    graph.add_node("validator", wrap_graphstate(validator, "validator"))
-    graph.add_node("summarizer", wrap_graphstate(summarizer, "summarizer"))
-    graph.add_node("sql_generator", wrap_graphstate(generator, "sql_generator"))
-    graph.add_node("executor", wrap_graphstate(executor, "executor"))
+    graph.add_node("planner", planner)
+    graph.add_node("validator", validator)
+    graph.add_node("summarizer", summarizer)
+    graph.add_node("sql_generator", generator)
+    graph.add_node("executor", executor)
     
     graph.add_node("planner_retry", planner_retry_node)
     graph.add_node("retry_handler", retry_node)

@@ -7,7 +7,12 @@ if TYPE_CHECKING:
     from nl2sql.schemas import GraphState
 
 from .schemas import AggregatedResponse
+from .schemas import AggregatedResponse
 from nl2sql.nodes.aggregator.prompts import AGGREGATOR_PROMPT
+
+from nl2sql.logger import get_logger
+
+logger = get_logger("aggregator")
 
 LLMCallable = Union[Callable[[str], Any], Runnable]
 
@@ -23,13 +28,14 @@ class AggregatorNode:
     def __call__(self, state: GraphState) -> Dict[str, Any]:
         user_query = state.user_query
         intermediate_results = state.intermediate_results or []
+        node_name = "aggregator"
         
-        # Format intermediate results for the prompt
-        formatted_results = ""
-        for i, res in enumerate(intermediate_results):
-            formatted_results += f"--- Result {i+1} ---\n{str(res)}\n\n"
-            
         try:
+            # Format intermediate results for the prompt
+            formatted_results = ""
+            for i, res in enumerate(intermediate_results):
+                formatted_results += f"--- Result {i+1} ---\n{str(res)}\n\n"
+                
             response: AggregatedResponse = self.chain.invoke({
                 "user_query": user_query,
                 "intermediate_results": formatted_results
@@ -43,12 +49,13 @@ class AggregatorNode:
                 final_answer += f"### Details\n\n{response.content}"
             else:
                 final_answer += f"\n{response.content}"
-                
+            
             return {
                 "final_answer": final_answer,
                 "thoughts": {"aggregator": f"Chosen format: {response.format_type}"}
             }
         except Exception as e:
+            logger.error(f"Node {node_name} failed: {e}")
             return {
                 "final_answer": f"Error during aggregation: {str(e)}",
                 "thoughts": {"aggregator": f"Error: {str(e)}"}

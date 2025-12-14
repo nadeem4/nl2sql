@@ -21,7 +21,7 @@ We employ a "Waterfall" approach. We want to solve 90% of queries with the faste
 
 ### Layer 2: Multi-Query Retrieval (The "Ambiguity Solver")
 
-* **Mechanism**: LLM generates 3 variations (Technical, Broad, Hypothetical) -> Retrieval -> Voting.
+* **Mechanism**: LLM generates 3 variations + Original Query (Total 4) -> Retrieval -> Voting.
 * **Cost**: Medium (1 LLM Call + 3 Embeddings).
 * **Latency**: ~1-2s.
 * **Trigger**: When L1 confidence is low.
@@ -37,6 +37,9 @@ We employ a "Waterfall" approach. We want to solve 90% of queries with the faste
 * **Latency**: ~3-5s.
 * **Trigger**: When L2 fails to reach consensus.
 * **Why**: Some queries require logical deduction (e.g., "Compare X and Y"), which vector search cannot handle.
+* **Optimization (Candidate Filtering)**:
+  * Instead of scanning the entire registry (which could be 100+ datasources), L3 **only** considers the top candidates returned by L1 (typically the top 5).
+  * **Rationale**: L1 is excellent at finding the "right neighborhood" (High Recall) even if it misses the exact winner (Precision). By restricting L3 to L1's top findings, we get the reasoning power of an LLM without the latency/cost of scanning the full database list.
 
 ---
 
@@ -131,7 +134,7 @@ The system relies on **Semantic Similarity** via vector embeddings as the primar
 
 In **Layer 2 (Multi-Query Retrieval)**, we use a specific voting strategy:
 
-1. **Variations**: We generate ~5 distinct variations of the user's query.
+1. **Variations**: We use the original query + 3 LLM-generated variations (4 total "voters").
 2. **Strict Voting (`k=1`)**: For *each* variation, we retrieve only the **single best match** (`k=1`).
 3. **Rationale**: We treat each variation as an independent "voter". We want to know its absolute best guess, not its 2nd or 3rd vague guess. If we allowed `k=5` for each variation, the "long tail" of weak matches from 5 variations would dilute the signal.
 4. **Consensus**: The datasource that receives the most "first place" votes wins. This ensures that the chosen datasource is the consistently top-ranked choice across multiple phrasings of the intent.

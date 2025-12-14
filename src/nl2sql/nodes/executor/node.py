@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Dict, Any
 from nl2sql.datasource_registry import DatasourceRegistry
 from nl2sql.engine_factory import run_read_query
 from .schemas import ExecutionModel
@@ -8,8 +8,9 @@ from .schemas import ExecutionModel
 if TYPE_CHECKING:
     from nl2sql.schemas import GraphState
 from nl2sql.security import enforce_read_only
-from nl2sql.tracing import span
+from nl2sql.logger import get_logger
 
+logger = get_logger("executor")
 
 class ExecutorNode:
     """
@@ -27,7 +28,7 @@ class ExecutorNode:
         """
         self.registry = registry
 
-    def __call__(self, state: GraphState) -> GraphState:
+    def __call__(self, state: GraphState) -> Dict[str, Any]:
         """
         Executes the execution step.
 
@@ -35,41 +36,62 @@ class ExecutorNode:
             state: The current graph state.
 
         Returns:
-            The updated graph state with execution results.
+            Dictionary updates for the graph state with execution results.
         """
-        if not state.sql_draft:
-            state.errors.append("No SQL to execute.")
-            return state
-            
-        profile = self.registry.get_profile(state.datasource_id)
-        
-        # Map SQLAlchemy engine to sqlglot dialect
-        dialect = None
-        if "mssql" in profile.engine:
-            dialect = "tsql"
-        elif "postgres" in profile.engine:
-            dialect = "postgres"
-        elif "mysql" in profile.engine:
-            dialect = "mysql"
-        elif "sqlite" in profile.engine:
-            dialect = "sqlite"
-        elif "oracle" in profile.engine:
-            dialect = "oracle"
+        node_name = "executor"
 
-        if not enforce_read_only(state.sql_draft, dialect=dialect):
-            state.errors.append("Security Violation: SQL query contains forbidden keywords (read-only enforcement).")
-            state.execution = ExecutionModel(row_count=0, rows=[], error="Security Violation")
-            return state
-            
-        if not state.datasource_id:
-            state.errors.append("No datasource_id in state. Router must run before ExecutorNode.")
-            state.execution = ExecutionModel(row_count=0, rows=[], error="Missing Datasource ID")
-            return state
+        try:
+            errors = []
+            if not state.sql_draft:
+                errors.append("No SQL to execute.")
+                return {"errors": errors}
+                
+            if not state.datasource_id:
+                errors.append("No datasource_id in state. Router must run before ExecutorNode.")
+                return {
+                    "errors": errors,
+                    "execution": ExecutionModel(row_count=0, rows=[], error="Missing Datasource ID")
+                }
 
-        profile = self.registry.get_profile(state.datasource_id)
-        engine = self.registry.get_engine(state.datasource_id)
-        
-        with span("executor", {"datasource.id": profile.id, "engine": profile.engine}):
+            # Handle Set[str] -> Pick sorted first for deterministic execution
+            ds_ids = state.datasource_id if isinstance(state.datasource_id, (set, list)) else {state.datasource_id}
+            if not ds_ids:
+                # Should be caught by check above but for type safety
+                errors.append("Empty datasource_id set.")
+                return {"errors": errors}
+                
+            target_ds_id = sorted(list(ds_ids))[0]
+            
+            if len(ds_ids) > 1:
+                errors.append(f"Warning: Multiple datasources selected {ds_ids}, executing on primary: {target_ds_id}")
+
+            profile = self.registry.get_profile(target_ds_id)
+            
+            # Map SQLAlchemy engine to sqlglot dialect
+            dialect = None
+            if "mssql" in profile.engine:
+                dialect = "tsql"
+            elif "postgres" in profile.engine:
+                dialect = "postgres"
+            elif "mysql" in profile.engine:
+                dialect = "mysql"
+            elif "sqlite" in profile.engine:
+                dialect = "sqlite"
+            elif "oracle" in profile.engine:
+                dialect = "oracle"
+
+            if not enforce_read_only(state.sql_draft, dialect=dialect):
+                errors.append("Security Violation: SQL query contains forbidden keywords (read-only enforcement).")
+                return {
+                    "errors": errors,
+                    "execution": ExecutionModel(row_count=0, rows=[], error="Security Violation")
+                }
+                
+            profile = self.registry.get_profile(target_ds_id)
+            engine = self.registry.get_engine(target_ds_id)
+            
+            execution_result = None
+            
             try:
                 # Remove hardcoded limit, rely on profile.row_limit
                 rows = run_read_query(engine, state.sql_draft)
@@ -82,16 +104,27 @@ class ExecutorNode:
                     for row in rows:
                         result_rows.append(dict(row._mapping))
                 
-                state.execution = ExecutionModel(
+                execution_result = ExecutionModel(
                     row_count=len(rows),
                     rows=result_rows,
                     columns=columns
                 )
             except Exception as exc:
-                state.execution = ExecutionModel(
+                execution_result = ExecutionModel(
                     row_count=0,
                     rows=[],
                     error=str(exc)
                 )
-                state.errors.append(f"Execution error: {exc}")
-        return state
+                errors.append(f"Execution error: {exc}")
+            
+            return {
+                "execution": execution_result,
+                "errors": errors
+            }
+
+        except Exception as exc:
+            logger.error(f"Node {node_name} failed: {exc}")
+            return {
+                "execution": None,
+                "errors": [f"Executor failed: {exc}"]
+            }

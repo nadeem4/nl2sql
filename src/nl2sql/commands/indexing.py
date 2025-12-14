@@ -1,26 +1,18 @@
 import sys
 from typing import Dict, Any
-from rich.console import Console
-from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn
-
+from nl2sql.reporting import ConsolePresenter
 from nl2sql.vector_store import SchemaVectorStore
 from nl2sql.router_store import DatasourceRouterStore
 from nl2sql.engine_factory import make_engine
 
 def run_indexing(profiles: Dict[str, Any], vector_store_path: str, vector_store: SchemaVectorStore, llm_registry: Any = None) -> None:
-    console = Console()
-    console.print(f"[bold blue]Indexing schema to:[/bold blue] {vector_store_path}")
+    presenter = ConsolePresenter()
+    presenter.print_indexing_start(vector_store_path)
     
     # Initialize Router Store
     router_store = DatasourceRouterStore(persist_directory=vector_store_path)
     
-    with Progress(
-        SpinnerColumn(),
-        TextColumn("[progress.description]{task.description}"),
-        BarColumn(),
-        TaskProgressColumn(),
-        console=console
-    ) as progress:
+    with presenter.create_progress() as progress:
         
         # Clear existing data
         task_clear = progress.add_task("[cyan]Clearing existing data...", total=2)
@@ -40,7 +32,7 @@ def run_indexing(profiles: Dict[str, Any], vector_store_path: str, vector_store:
                 tables = vector_store.index_schema(eng, datasource_id=p.id)
                 schema_summaries[p.id] = tables
             except Exception as e:
-                console.print(f"[red]Failed to index {p.id}: {e}[/red]")
+                presenter.print_indexing_error(p.id, str(e))
             progress.advance(task_schema)
             
         # Index Datasource Descriptions AND Summaries
@@ -53,10 +45,10 @@ def run_indexing(profiles: Dict[str, Any], vector_store_path: str, vector_store:
             try:
                 llm = llm_registry.router_llm()
             except Exception as e:
-                console.print(f"[yellow]Warning: Could not load router LLM: {e}[/yellow]")
+                presenter.print_warning(f"Could not load router LLM: {e}")
         
         if not llm:
-             console.print("[yellow]Warning: Indexing without enrichment (No LLM provided).[/yellow]")
+             presenter.print_warning("Indexing without enrichment (No LLM provided).")
 
         router_store.index_datasources(
             profiles, 
@@ -66,4 +58,4 @@ def run_indexing(profiles: Dict[str, Any], vector_store_path: str, vector_store:
         )
         progress.advance(task_desc)
             
-    console.print("[bold green]Indexing complete![/bold green]")
+    presenter.print_indexing_complete()

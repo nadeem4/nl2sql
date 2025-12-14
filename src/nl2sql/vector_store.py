@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from typing import List, Optional
+from typing import List, Optional, Union
 
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
@@ -114,16 +114,28 @@ class SchemaVectorStore:
             
         return tables
 
-    def retrieve(self, query: str, k: int = 5) -> List[str]:
+    def retrieve(self, query: str, k: int = 5, datasource_id: Optional[Union[str, List[str]]] = None) -> List[str]:
         """
         Retrieves relevant table names based on a natural language query.
 
         Args:
             query: The user's query string.
             k: Number of relevant tables to retrieve.
+            datasource_id: Optional datasource ID(s) to filter by.
 
         Returns:
             List of table names.
         """
-        docs = self.vectorstore.similarity_search(query, k=k)
+        filter_arg = None
+        if datasource_id:
+            if isinstance(datasource_id, str):
+                filter_arg = {"datasource_id": datasource_id}
+            elif isinstance(datasource_id, list):
+                if len(datasource_id) == 1:
+                    filter_arg = {"datasource_id": datasource_id[0]}
+                else:
+                    filter_arg = {"datasource_id": {"$in": datasource_id}}
+        
+        # Pass filter to Chroma
+        docs = self.vectorstore.similarity_search(query, k=k, filter=filter_arg)
         return [doc.metadata["table_name"] for doc in docs]

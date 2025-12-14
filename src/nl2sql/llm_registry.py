@@ -1,19 +1,19 @@
 from __future__ import annotations
 
 import dataclasses
+import time
 import pathlib
 from typing import Callable, Dict, Optional, List, Any
 
 import yaml
 from langchain_openai import ChatOpenAI
+from langchain_core.callbacks import BaseCallbackHandler
+from langchain_core.outputs import LLMResult
 from nl2sql.settings import settings
 
-TOKEN_LOG: List[Dict[str, object]] = []
 
 
-def reset_usage() -> None:
-    """Resets the token usage log."""
-    TOKEN_LOG.clear()
+from nl2sql.callbacks.token_usage import TokenUsageCallback
 
 
 def get_usage_summary() -> Dict[str, Dict[str, int]]:
@@ -23,6 +23,7 @@ def get_usage_summary() -> Dict[str, Dict[str, int]]:
     Returns:
         A dictionary mapping "agent:model" keys to token counts.
     """
+    from nl2sql.metrics import TOKEN_LOG
     totals = {"_all": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}}
     for entry in TOKEN_LOG:
         agent = entry.get("agent", "unknown")
@@ -130,7 +131,9 @@ class LLMRegistry:
         key = cfg.api_key or settings.openai_api_key
         if not key:
             raise RuntimeError("OPENAI_API_KEY is not set and no api_key provided in config.")
-        return ChatOpenAI(model=cfg.model, temperature=cfg.temperature, api_key=key)
+            
+        callback = TokenUsageCallback(agent, cfg.model)
+        return ChatOpenAI(model=cfg.model, temperature=cfg.temperature, api_key=key, callbacks=[callback])
 
     def get_llm(self, agent: str) -> ChatOpenAI:
         """
@@ -139,52 +142,11 @@ class LLMRegistry:
         """
         return self._base_llm(agent)
 
-    def _wrap_usage(self, llm: ChatOpenAI, agent: str) -> LLMCallable:
-        model_name = self._agent_cfg(agent).model
-
-        def call(prompt: str) -> str:
-            resp = llm.invoke(prompt)
-            usage = getattr(resp, "usage_metadata", None)
-            if usage:
-                from nl2sql.context import current_datasource_id
-                TOKEN_LOG.append(
-                    {
-                        "agent": agent,
-                        "model": model_name,
-                        "datasource_id": current_datasource_id.get(),
-                        "prompt_tokens": usage.get("prompt_tokens", 0),
-                        "completion_tokens": usage.get("completion_tokens", 0),
-                        "total_tokens": usage.get("total_tokens", 0),
-                    }
-                )
-            return resp.content if hasattr(resp, "content") else str(resp)
-
-        return call
-
-    def _wrap_structured_usage(self, llm: ChatOpenAI, agent: str, schema: Any) -> LLMCallable:
-        model_name = self._agent_cfg(agent).model
-        structured_llm = llm.with_structured_output(schema, include_raw=True)
+    def _wrap_structured_usage(self, llm: ChatOpenAI, agent: str, schema: Any) -> LLMCallable:    
+        structured_llm = llm.with_structured_output(schema)
 
         def call(prompt: str) -> Any:
-            resp = structured_llm.invoke(prompt)
-            
-            raw_msg = resp.get("raw")
-            if raw_msg:
-                usage = getattr(raw_msg, "usage_metadata", None)
-                if usage:
-                    from nl2sql.context import current_datasource_id
-                    TOKEN_LOG.append(
-                        {
-                            "agent": agent,
-                            "model": model_name,
-                            "datasource_id": current_datasource_id.get(),
-                            "prompt_tokens": usage.get("prompt_tokens", 0),
-                            "completion_tokens": usage.get("completion_tokens", 0),
-                            "total_tokens": usage.get("total_tokens", 0),
-                        }
-                    )
-            
-            return resp["parsed"]
+            return structured_llm.invoke(prompt)
 
         return call
 
@@ -201,22 +163,27 @@ class LLMRegistry:
         return self._wrap_structured_usage(llm, "planner", PlanModel)
 
     def router_llm(self) -> LLMCallable:
-        """
-        Returns the LLM callable for the Router agent.
-        Strictly requires 'router' agent config, does not fallback to default silently 
-        (unless default is explicitly mapped in config, but we request 'router' key).
-        """
         llm = self._base_llm("router")
-        # Router uses raw string output (reasoning + ID), not structured JSON yet, 
-        # or we might want to enforce structure later. For now, match current usage (text).
-        return self._wrap_usage(llm, "router")
+        return llm.invoke
+
+    def router_canonicalizer_llm(self) -> LLMCallable:
+        llm = self._base_llm("router_canonicalizer")
+        return llm.invoke
+
+    def router_multi_query_llm(self) -> LLMCallable:
+        llm = self._base_llm("router_multi_query")
+        return llm.invoke
+
+    def router_decision_llm(self) -> LLMCallable:
+        llm = self._base_llm("router_decision")
+        return llm.invoke
 
 
 
     def summarizer_llm(self) -> LLMCallable:
         """Returns the LLM callable for the Summarizer agent."""
         llm = self._base_llm("summarizer") 
-        return self._wrap_usage(llm, "summarizer")
+        return llm.invoke
 
     def decomposer_llm(self) -> LLMCallable:
         """Returns the LLM callable for the Decomposer agent."""
@@ -242,7 +209,6 @@ class LLMRegistry:
         return {
             "intent": self.intent_llm(),
             "planner": self.planner_llm(),
-
             "summarizer": self.summarizer_llm(),
             "decomposer": self.decomposer_llm(),
             "aggregator": self.aggregator_llm(),

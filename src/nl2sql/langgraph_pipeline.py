@@ -16,7 +16,6 @@ from nl2sql.subgraphs.execution import build_execution_subgraph
 from nl2sql.schemas import GraphState, DecomposerResponse, AggregatedResponse
 from nl2sql.tracing import span
 from nl2sql.vector_store import SchemaVectorStore
-from nl2sql.graph_utils import wrap_graphstate
 from nl2sql.llm_registry import LLMRegistry
 from IPython.display import Image, display
 
@@ -62,48 +61,41 @@ def build_graph(registry: DatasourceRegistry, llm_registry: LLMRegistry, execute
         execution = result.get("execution")
         row_count = execution.get("row_count") if isinstance(execution, dict) else getattr(execution, "row_count", 0)
 
-        ds_id = result.get("datasource_id")
+        ds_ids = result.get("datasource_id") or set()
+        ds_id_list = list(ds_ids)
+        
+        primary_ds_id = ds_id_list[0] if ds_id_list else None
+        
         ds_type = "Unknown"
-        if ds_id:
+        if primary_ds_id:
             try:
-                profile = registry.get_profile(ds_id)
+                profile = registry.get_profile(primary_ds_id)
                 ds_type = profile.engine
             except Exception:
                 pass
 
         history_item = {
-            "datasource_id": ds_id,
+            "datasource_id": primary_ds_id, # Keeping single for now to avoid breaking UI/Logs expectation
             "datasource_type": ds_type,
             "sql": sql,
             "row_count": row_count
         }
-        
-        sub_latency = result.get("latency", {})
-        prefixed_latency = {}
-        if ds_id:
-            for k, v in sub_latency.items():
-                prefixed_latency[f"{ds_id}:{k}"] = v
-            prefixed_latency[f"{ds_id}:total"] = duration
-        else:
-            prefixed_latency = sub_latency.copy()
-            prefixed_latency["execution_branch"] = duration
         
         routing_info = result.get("routing_info", {})
 
         return {
             "intermediate_results": result.get("intermediate_results", []),
             "query_history": [history_item],
-            "latency": prefixed_latency,
             "routing_info": routing_info,
-            "datasource_id": ds_id,
+            "datasource_id": ds_ids,
             "sql_draft": result.get("sql_draft"),
             "execution": result.get("execution")
         }
 
     # Add Nodes
-    graph.add_node("decomposer", wrap_graphstate(decomposer, "decomposer"))
+    graph.add_node("decomposer", decomposer)
     graph.add_node("execution_branch", execution_wrapper)
-    graph.add_node("aggregator", wrap_graphstate(aggregator, "aggregator"))
+    graph.add_node("aggregator", aggregator)
 
     # Edges
     graph.set_entry_point("decomposer")
@@ -115,7 +107,8 @@ def build_graph(registry: DatasourceRegistry, llm_registry: LLMRegistry, execute
         sub_queries = state.sub_queries or [state.user_query]
         print(f"DEBUG: continue_to_subqueries called with {sub_queries}")
 
-        return [Send("execution_branch", {"user_query": sq, "datasource_id": state.datasource_id}) for sq in sub_queries]
+        ds_ids_list = sorted(list(state.datasource_id)) if state.datasource_id else []
+        return [Send("execution_branch", {"user_query": sq, "datasource_id": ds_ids_list}) for sq in sub_queries]
 
     graph.add_conditional_edges(
         "decomposer",
@@ -152,9 +145,13 @@ def run_with_graph(registry: DatasourceRegistry, llm_registry: LLMRegistry, user
     """
     g, execution_subgraph, planning_subgraph = build_graph(registry, llm_registry, execute=execute, vector_store=vector_store, vector_store_path=vector_store_path)
     
+    ds_id_init = set()
+    if datasource_id:
+        ds_id_init = {datasource_id}
+
     initial_state = GraphState(
         user_query=user_query,
-        datasource_id=datasource_id,
+        datasource_id=ds_id_init,
         validation={"capabilities": "generic"}, 
     )
     
@@ -195,7 +192,11 @@ def run_with_graph(registry: DatasourceRegistry, llm_registry: LLMRegistry, user
             if debug:
                 print(f"[Request Logger] Logging to: {log_dir}")
 
-        for namespace, mode, payload in g.stream(initial_state_dict, stream_mode=["updates", "messages"], subgraphs=True):
+        
+        from nl2sql.callbacks.observability import ObservabilityCallback
+        cbs = [ObservabilityCallback()]
+
+        for namespace, mode, payload in g.stream(initial_state_dict, stream_mode=["updates", "messages"], subgraphs=True, config={"callbacks": cbs}):
             
             branch_id = namespace[0] if namespace else "main"
             
@@ -299,13 +300,16 @@ def run_with_graph(registry: DatasourceRegistry, llm_registry: LLMRegistry, user
         if debug:
             print("\n--- Graph Execution Complete ---\n")
         result = final_state
+        if debug:
+            print("\n--- Graph Execution Complete ---\n")
+        result = final_state
     else:
-        result = g.invoke(initial_state_dict)
+        from nl2sql.callbacks.observability import ObservabilityCallback
+        callbacks = [ObservabilityCallback()]
+        result = g.invoke(initial_state_dict, config={"callbacks": callbacks})
     
     total_duration = time.perf_counter() - start_total
-    if "latency" not in result:
-        result["latency"] = {}
-    result["latency"]["total"] = total_duration
+    
     
     if visualize:
         result["_trace"] = trace

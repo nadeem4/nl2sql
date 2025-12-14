@@ -1,10 +1,8 @@
 from __future__ import annotations
 
 import json
-from typing import Optional
-
+from typing import Optional, Dict, Any, TYPE_CHECKING
 import sqlglot
-from typing import Optional, TYPE_CHECKING
 from sqlglot import expressions as exp
 
 from nl2sql.capabilities import EngineCapabilities, get_capabilities
@@ -12,9 +10,10 @@ from nl2sql.capabilities import EngineCapabilities, get_capabilities
 if TYPE_CHECKING:
     from nl2sql.schemas import GraphState
 
-
 from nl2sql.datasource_registry import DatasourceRegistry
+from nl2sql.logger import get_logger
 
+logger = get_logger("generator")
 
 class GeneratorNode:
     """
@@ -33,7 +32,7 @@ class GeneratorNode:
         """
         self.registry = registry
 
-    def __call__(self, state: GraphState) -> GraphState:
+    def __call__(self, state: GraphState) -> Dict[str, Any]:
         """
         Executes the SQL generation step.
 
@@ -41,44 +40,47 @@ class GeneratorNode:
             state: The current graph state.
 
         Returns:
-            The updated graph state with the generated SQL draft.
+            Dictionary updates for the graph state with the generated SQL draft.
         """
-        if not state.datasource_id:
-            state.errors.append("No datasource_id in state. Router must run before GeneratorNode.")
-            return state
+        node_name = "generator"
 
-        profile = self.registry.get_profile(state.datasource_id)
-        self.profile_engine = profile.engine
-        self.row_limit = profile.row_limit
-
-        caps: EngineCapabilities = get_capabilities(self.profile_engine)
-        if not state.plan:
-            state.errors.append("No plan to generate SQL from.")
-            return state
-
-        limit = self.row_limit
-        if state.plan.get("limit"):
-            try:
-                limit = min(int(state.plan["limit"]), self.row_limit)
-            except Exception:
-                pass
-        
         try:
+            if not state.datasource_id:
+                return {"errors": ["No datasource_id in state. Router must run before GeneratorNode."]}
+
+            profile = self.registry.get_profile(state.datasource_id if isinstance(state.datasource_id, str) else next(iter(state.datasource_id)))
+            self.profile_engine = profile.engine
+            self.row_limit = profile.row_limit
+
+            caps: EngineCapabilities = get_capabilities(self.profile_engine)
+            if not state.plan:
+                return {"errors": ["No plan to generate SQL from."]}
+
+            limit = self.row_limit
+            if state.plan.get("limit"):
+                try:
+                    limit = min(int(state.plan["limit"]), self.row_limit)
+                except Exception:
+                    pass
+            
             final_sql = self._generate_sql_from_plan(state.plan, limit)
             
-            if "generator" not in state.thoughts:
-                state.thoughts["generator"] = []
+            generator_thoughts = [
+                f"Generated SQL: {final_sql}",
+                f"Rationale: {state.plan.get('reasoning', 'N/A')}"
+            ]
             
-            state.thoughts["generator"].append(f"Generated SQL: {final_sql}")
-            state.thoughts["generator"].append(f"Rationale: {state.plan.get('reasoning', 'N/A')}")
-            
-            state.sql_draft = final_sql
+            return {
+                "sql_draft": final_sql,
+                "thoughts": {"generator": generator_thoughts}
+            }
 
         except Exception as exc:
-            state.sql_draft = None
-            state.errors.append(f"SQL generation failed: {exc}")
-        
-        return state
+            logger.error(f"Node {node_name} failed: {exc}")
+            return {
+                "sql_draft": None,
+                "errors": [f"SQL generation failed: {exc}"]
+            }
 
     def _generate_sql_from_plan(self, plan: dict, limit: int) -> str:
         """

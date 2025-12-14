@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Callable, Optional, Union, TYPE_CHECKING
+
+from typing import Callable, Optional, Union, TYPE_CHECKING, Dict, Any
 
 from langchain_core.runnables import Runnable
 
@@ -9,6 +10,9 @@ if TYPE_CHECKING:
 
 from .schemas import IntentModel
 from nl2sql.nodes.intent.prompts import INTENT_PROMPT
+from nl2sql.logger import get_logger
+
+logger = get_logger("intent")
 
 LLMCallable = Union[Callable[[str], str], Runnable]
 
@@ -34,7 +38,7 @@ class IntentNode:
             self.prompt = ChatPromptTemplate.from_template(INTENT_PROMPT)
             self.chain = self.prompt | self.llm
 
-    def __call__(self, state: GraphState) -> GraphState:
+    def __call__(self, state: GraphState) -> Dict[str, Any]:
         """
         Executes the intent analysis step.
 
@@ -42,31 +46,31 @@ class IntentNode:
             state: The current graph state.
 
         Returns:
-            The updated graph state with extracted intent information.
+            Dictionary updates for the graph state with extracted intent information.
         """
-        if not self.llm:
-            state.validation["intent_stub"] = "No-op intent analysis"
-            return state
-            
+        node_name = "intent"
+
         try:
-            # Invoke the chain
+            if not self.llm:
+                return {"validation": {"intent_stub": "No-op intent analysis"}}
+                
             intent_model = self.chain.invoke({"user_query": state.user_query})
             
-            # Store intent model directly
-            state.intent = intent_model
-            
-            # Populate thoughts
-            if "intent" not in state.thoughts:
-                state.thoughts["intent"] = []
-            
             reasoning = intent_model.reasoning or "No reasoning provided."
-            state.thoughts["intent"].append(f"Reasoning: {reasoning}")
-            state.thoughts["intent"].append(f"Classification: {intent_model.query_type}")
-            state.thoughts["intent"].append(f"Keywords: {', '.join(intent_model.keywords)}")
+            
+            intent_thoughts = [
+                f"Reasoning: {reasoning}",
+                f"Classification: {intent_model.query_type}",
+                f"Keywords: {', '.join(intent_model.keywords)}"
+            ]
+            
             if intent_model.query_expansion:
-                state.thoughts["intent"].append(f"Expansion: {', '.join(intent_model.query_expansion)}")
+                intent_thoughts.append(f"Expansion: {', '.join(intent_model.query_expansion)}")
+            
+            return {
+                "intent": intent_model,
+                "thoughts": {"intent": intent_thoughts}
+            }
                 
         except Exception as exc:
-            state.errors.append(f"Intent extraction failed: {exc}")
-            
-        return state
+            return {"errors": [f"Intent extraction failed: {exc}"]}

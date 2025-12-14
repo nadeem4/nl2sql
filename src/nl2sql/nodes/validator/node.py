@@ -1,13 +1,17 @@
 from __future__ import annotations
 
 import json
-from typing import Callable, Optional, Set, Dict, TYPE_CHECKING
+from typing import Callable, Optional, Set, Dict, TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from nl2sql.schemas import GraphState
 
 from nl2sql.nodes.planner.schemas import ColumnRef, PlanModel
 from nl2sql.nodes.schema.schemas import SchemaInfo
+
+from nl2sql.logger import get_logger
+
+logger = get_logger("validator")
 
 LLMCallable = Callable[[str], str]
 
@@ -82,7 +86,7 @@ class ValidatorNode:
             if col.expr not in schema_cols:
                 errors.append(f"Column '{col.expr}' not found in schema. Ensure you are using the pre-aliased name (e.g., 't1.col').")
 
-    def __call__(self, state: GraphState) -> GraphState:
+    def __call__(self, state: GraphState) -> Dict[str, Any]:
         """
         Executes the validation step.
 
@@ -90,85 +94,96 @@ class ValidatorNode:
             state: The current graph state.
 
         Returns:
-            The updated graph state with validation errors (if any).
+            Dictionary updates for the graph state with validation errors (if any).
         """
-        # Clear errors from previous runs
-        state.errors = []
-
-        if not state.plan:
-            state.errors.append("No plan to validate.")
-            return state
-
-        if not state.schema_info:
-            return state
-
-        query_type = state.plan.get("query_type", "READ")
-        if query_type != "READ":
-            state.errors.append(f"Security Violation: Query type '{query_type}' is not allowed. Only READ queries are permitted.")
-            return state
+        node_name = "validator"
 
         try:
-            plan = PlanModel(**state.plan)
-        except Exception as e:
-            state.errors.append(f"Invalid plan structure: {e}")
-            return state
+            # Clear errors from previous runs effectively by returning a new list
+            errors = []
 
-        schema_cols = set()
-        
-        plan_table_aliases = set()
-        plan_table_names = set()
-        for t in plan.tables:
-            plan_table_aliases.add(t.alias)
-            plan_table_names.add(t.name)
+            if not state.plan:
+                errors.append("No plan to validate.")
+                return {"errors": errors}
+
+            if not state.schema_info:
+                return {} # No schema, skip validation
+
+            query_type = state.plan.get("query_type", "READ")
+            if query_type != "READ":
+                errors.append(f"Security Violation: Query type '{query_type}' is not allowed. Only READ queries are permitted.")
+                return {"errors": errors}
+
+            try:
+                plan = PlanModel(**state.plan)
+            except Exception as e:
+                errors.append(f"Invalid plan structure: {e}")
+                return {"errors": errors}
+
+            schema_cols = set()
             
-            found = False
-            for st in state.schema_info.tables:
-                if st.name == t.name and st.alias == t.alias:
-                    schema_cols.update(st.columns) 
-                    found = True
-                    break
+            plan_table_aliases = set()
+            plan_table_names = set()
+            for t in plan.tables:
+                plan_table_aliases.add(t.alias)
+                plan_table_names.add(t.name)
+                
+                found = False
+                for st in state.schema_info.tables:
+                    if st.name == t.name and st.alias == t.alias:
+                        schema_cols.update(st.columns) 
+                        found = True
+                        break
+                
+                if not found:
+                        errors.append(f"Table '{t.name}' with alias '{t.alias}' not found in schema or alias mismatch.")
+
+            for col in plan.select_columns:
+                self.validate_column_ref(col, schema_cols, plan_table_aliases, "select_columns", errors)
+
+            for flt in plan.filters:
+                self.validate_column_ref(flt.column, schema_cols, plan_table_aliases, "filters", errors)
+
+            for gb in plan.group_by:
+                self.validate_column_ref(gb, schema_cols, plan_table_aliases, "group_by", errors)
+
+            for ob in plan.order_by:
+                self.validate_column_ref(ob.column, schema_cols, plan_table_aliases, "order_by", errors)
+
+            for join in plan.joins:
+                if join.left not in plan_table_names:
+                        errors.append(f"Join left table '{join.left}' is not in plan tables.")
+                if join.right not in plan_table_names:
+                        errors.append(f"Join right table '{join.right}' is not in plan tables.")
+                
+                if not join.on:
+                    errors.append(f"Join between '{join.left}' and '{join.right}' has no ON clause.")
+
+            for hav in plan.having:
+                if not hav.expr:
+                    errors.append(f"Having clause missing expression: {hav}")
+
+            self.validate_aggregations(plan, errors)
+
+            validator_thoughts = []
+            if errors:
+                validator_thoughts.append("Validation Failed")
+                for err in errors:
+                    validator_thoughts.append(f"Error: {err}")
+            else:
+                validator_thoughts.append("Validation Successful")
+                validator_thoughts.append("Plan is valid against schema and security policies.")
             
-            if not found:
-                 state.errors.append(f"Table '{t.name}' with alias '{t.alias}' not found in schema or alias mismatch.")
-
-        for col in plan.select_columns:
-            self.validate_column_ref(col, schema_cols, plan_table_aliases, "select_columns", state.errors)
-
-        for flt in plan.filters:
-            self.validate_column_ref(flt.column, schema_cols, plan_table_aliases, "filters", state.errors)
-
-        for gb in plan.group_by:
-            self.validate_column_ref(gb, schema_cols, plan_table_aliases, "group_by", state.errors)
-
-        for ob in plan.order_by:
-            self.validate_column_ref(ob.column, schema_cols, plan_table_aliases, "order_by", state.errors)
-
-        for join in plan.joins:
-            if join.left not in plan_table_names:
-                 state.errors.append(f"Join left table '{join.left}' is not in plan tables.")
-            if join.right not in plan_table_names:
-                 state.errors.append(f"Join right table '{join.right}' is not in plan tables.")
+                validator_thoughts.append("Plan is valid against schema and security policies.")
             
-            if not join.on:
-                state.errors.append(f"Join between '{join.left}' and '{join.right}' has no ON clause.")
+            return {
+                "errors": errors,
+                "thoughts": {"validator": validator_thoughts}
+            }
 
-        for hav in plan.having:
-            if not hav.expr:
-                state.errors.append(f"Having clause missing expression: {hav}")
-
-        self.validate_aggregations(plan, state.errors)
-
-        if "validator" not in state.thoughts:
-            state.thoughts["validator"] = []
-            
-        if state.errors:
-            state.thoughts["validator"].append("Validation Failed")
-            for err in state.errors:
-                state.thoughts["validator"].append(f"Error: {err}")
-        else:
-            state.thoughts["validator"].append("Validation Successful")
-            state.thoughts["validator"].append("Plan is valid against schema and security policies.")
-
-        return state
-            
-
+        except Exception as exc:
+            logger.error(f"Node {node_name} failed: {exc}")
+            return {
+                "errors": [f"Validation exception: {exc}"],
+                "thoughts": {"validator": [f"Exception: {exc}"]}
+            }

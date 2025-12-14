@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import json
 from typing import Any, Callable, Dict, Optional, Union, TYPE_CHECKING
 
 from langchain_core.runnables import Runnable
@@ -10,6 +11,10 @@ if TYPE_CHECKING:
 
 from .schemas import PlanModel
 from nl2sql.nodes.planner.prompts import PLANNER_PROMPT, PLANNER_EXAMPLES
+
+from nl2sql.logger import get_logger
+
+logger = get_logger("planner")
 
 LLMCallable = Union[Callable[[str], str], Runnable]
 
@@ -36,7 +41,7 @@ class PlannerNode:
             self.prompt = ChatPromptTemplate.from_template(PLANNER_PROMPT)
             self.chain = self.prompt | self.llm
 
-    def __call__(self, state: GraphState) -> GraphState:
+    def __call__(self, state: GraphState) -> Dict[str, Any]:
         """
         Executes the planning step.
 
@@ -44,26 +49,26 @@ class PlannerNode:
             state: The current graph state.
 
         Returns:
-            The updated graph state with the generated plan.
+            Dictionary updates for the graph state with the generated plan.
         """
-        if not self.llm:
-            state.errors.append("Planner LLM not provided; no plan generated.")
-            return state
-
-        schema_context = ""
-        if state.schema_info:
-            schema_context = state.schema_info.model_dump_json(indent=2)
-
-        intent_context = ""
-        if state.intent:
-            intent_context = f"{state.intent.model_dump_json(indent=2)}\n"
-
-        feedback = ""
-        if state.errors:
-            feedback = f"The previous plan was invalid. Fix the following errors:\n{json.dumps(state.errors, indent=2)}\n"
-            state.errors = []
+        node_name = "planner"
 
         try:
+            if not self.llm:
+                return {"errors": ["Planner LLM not provided; no plan generated."]}
+
+            schema_context = ""
+            if state.schema_info:
+                schema_context = state.schema_info.model_dump_json(indent=2)
+
+            intent_context = ""
+            if state.intent:
+                intent_context = f"{state.intent.model_dump_json(indent=2)}\n"
+
+            feedback = ""
+            if state.errors:
+                feedback = f"The previous plan was invalid. Fix the following errors:\n{json.dumps(state.errors, indent=2)}\n"
+                
             plan_model = self.chain.invoke({
                 "schema_context": schema_context,
                 "intent_context": intent_context,
@@ -72,24 +77,26 @@ class PlannerNode:
                 "user_query": state.user_query
             })
             
-
-
             plan_dump = plan_model.model_dump()
             
             if state.intent and state.intent.query_type:
                 plan_dump["query_type"] = state.intent.query_type
             
-            state.plan = plan_dump
-            
-            if "planner" not in state.thoughts:
-                state.thoughts["planner"] = []
-            
             reasoning = plan_model.reasoning or "No reasoning provided."
-            state.thoughts["planner"].append(f"Reasoning: {reasoning}")
-            state.thoughts["planner"].append(f"Query Type: {plan_model.query_type}")
-            state.thoughts["planner"].append(f"Tables: {', '.join([t.name for t in plan_model.tables])}")
+            planner_thoughts = [
+                f"Reasoning: {reasoning}",
+                f"Query Type: {plan_model.query_type}",
+                f"Tables: {', '.join([t.name for t in plan_model.tables])}"
+            ]
+            
+            return {
+                "plan": plan_dump,
+                "thoughts": {"planner": planner_thoughts},
+                "errors": [] 
+            }
             
         except Exception as exc:
-            state.plan = None
-            state.errors.append(f"Planner failed. Error: {repr(exc)}")
-        return state
+            return {
+                "plan": None,
+                "errors": [f"Planner failed. Error: {repr(exc)}"]
+            }

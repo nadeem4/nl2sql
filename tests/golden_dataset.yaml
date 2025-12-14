@@ -1,123 +1,139 @@
 
 - id: "ops_001"
   question: "List all machines"
-  datasource: "manufacturing_ops"
+  datasource: ["manufacturing_ops"]
   difficulty: "easy"
   expected_routing_layer: "layer_1"
   expected_sql: "SELECT name, serial_number, machine_type_id, status FROM machines"
 
 - id: "ops_002"
   question: "Which machines are currently offline?"
-  datasource: "manufacturing_ops"
+  datasource: ["manufacturing_ops"]
   difficulty: "easy"
   expected_routing_layer: "layer_1"
 
 - id: "ops_003"
   question: "Show me the equipment currently down"
-  datasource: "manufacturing_ops"
+  datasource: ["manufacturing_ops"]
   difficulty: "medium"
   expected_routing_layer: "layer_2"
   expected_sql: "SELECT name, serial_number, status FROM machines WHERE status != 'Active'"
 
 - id: "ops_004"
   question: "Who is staffing the stamping press right now?"
-  datasource: "manufacturing_ops"
+  datasource: ["manufacturing_ops"]
   difficulty: "medium"
   expected_routing_layer: "layer_2"
 
 - id: "ops_005"
   question: "Find a technician qualified to fix the welding robot"
-  datasource: "manufacturing_ops"
+  datasource: ["manufacturing_ops"]
   difficulty: "hard"
   expected_routing_layer: "layer_3"
 
 - id: "supply_001"
   question: "List all products"
-  datasource: "manufacturing_supply"
+  datasource: ["manufacturing_supply"]
   difficulty: "easy"
   expected_routing_layer: "layer_1"
   expected_sql: "SELECT name, unit_price FROM products"
 
 - id: "supply_002"
   question: "What is the price of Widget A?"
-  datasource: "manufacturing_supply"
+  datasource: ["manufacturing_supply"]
   difficulty: "easy"
   expected_routing_layer: "layer_1"
 
 - id: "supply_003"
   question: "Show me the catalog of electronics"
-  datasource: "manufacturing_supply"
+  datasource: ["manufacturing_supply"]
   difficulty: "medium"
   expected_routing_layer: "layer_2"
 
 - id: "supply_004"
   question: "Do we have enough raw materials for the next run?"
-  datasource: "manufacturing_supply"
+  datasource: ["manufacturing_supply"]
   difficulty: "hard"
   expected_routing_layer: "layer_3"
 
 - id: "supply_005"
   question: "Which vendor gives us the best payment terms for steel?"
-  datasource: "manufacturing_supply"
+  datasource: ["manufacturing_supply"]
   difficulty: "hard"
   expected_routing_layer: "layer_3"
 
 - id: "hist_001"
   question: "Count total production runs"
-  datasource: "manufacturing_history"
+  datasource: ["manufacturing_history"]
   difficulty: "easy"
   expected_routing_layer: "layer_1"
 
 - id: "hist_002"
   question: "Show defect rates"
-  datasource: "manufacturing_history"
+  datasource: ["manufacturing_history"]
   difficulty: "easy"
   expected_routing_layer: "layer_1"
 
 - id: "hist_003"
   question: "What was the output from last night?"
-  datasource: "manufacturing_history"
+  datasource: ["manufacturing_history"]
   difficulty: "medium"
   expected_routing_layer: "layer_2"
 
 - id: "hist_004"
   question: "Analyze the trend of defects over the last quarter"
-  datasource: "manufacturing_history"
+  datasource: ["manufacturing_history"]
   difficulty: "medium"
   expected_routing_layer: "layer_2"
 
 - id: "hist_005"
   question: "Compare the efficiency of the morning shift vs night shift historically"
-  datasource: "manufacturing_history"
+  datasource: ["manufacturing_history"]
   difficulty: "hard"
   expected_routing_layer: "layer_3"
 
 - id: "sqlite_001"
   question: "Show all work orders"
-  datasource: "manufacturing_sqlite"
+  datasource: ["manufacturing_sqlite"]
   difficulty: "easy"
   expected_routing_layer: "layer_1"
 
 - id: "sqlite_002"
   question: "List active work orders"
-  datasource: "manufacturing_sqlite"
+  datasource: ["manufacturing_sqlite"]
   difficulty: "easy"
   expected_routing_layer: "layer_1"
 
 - id: "sqlite_003"
   question: "List tickets waiting for parts"
-  datasource: "manufacturing_sqlite"
+  datasource: ["manufacturing_sqlite"]
   difficulty: "medium"
   expected_routing_layer: "layer_2"
 
 - id: "sqlite_004"
   question: "Which users have been accessing the system logs recently?"
-  datasource: "manufacturing_sqlite"
+  datasource: ["manufacturing_sqlite"]
   difficulty: "hard"
   expected_routing_layer: "layer_3"
 
 - id: "sqlite_005"
   question: "Are there any security alerts I should be aware of?"
-  datasource: "manufacturing_sqlite"
+  datasource: ["manufacturing_sqlite"]
+  difficulty: "hard"
+  expected_routing_layer: "layer_3"
+
+- id: "multi_001"
+  question: "List all machines in Plant Austin"
+  datasource: 
+    - "manufacturing_ops"
+    - "manufacturing_sqlite"
+  difficulty: "hard"
+  expected_routing_layer: "layer_3"
+
+- id: "multi_002"
+  question: "Show production runs for product 'Widget A'"
+  datasource: 
+    - "manufacturing_history"
+    - "manufacturing_supply"
   difficulty: "hard"
   expected_routing_layer: "layer_3"

@@ -10,6 +10,12 @@ from .schemas import DecomposerResponse
 from nl2sql.nodes.decomposer.prompts import DECOMPOSER_PROMPT
 from nl2sql.datasource_registry import DatasourceRegistry
 
+from nl2sql.logger import get_logger
+
+
+
+logger = get_logger("decomposer")
+
 LLMCallable = Union[Callable[[str], Any], Runnable]
 
 class DecomposerNode:
@@ -24,9 +30,9 @@ class DecomposerNode:
 
     def __call__(self, state: GraphState) -> Dict[str, Any]:
         user_query = state.user_query
-        
+        node_name = "decomposer"
+
         try:
-            # Format datasource descriptions
             profiles = self.registry.list_profiles()
             datasources_str = "\n".join([f"- {p.id}: {p.description}" for p in profiles])
 
@@ -34,12 +40,12 @@ class DecomposerNode:
                 "user_query": user_query,
                 "datasources": datasources_str
             })
+
             return {
                 "sub_queries": response.sub_queries,
                 "thoughts": {"decomposer": [response.reasoning]}
             }
         except Exception as e:
-            # Fallback: return original query
             return {
                 "sub_queries": [user_query],
                 "thoughts": {"decomposer": [f"Error during decomposition: {str(e)}. Proceeding with original query."]}

@@ -8,7 +8,6 @@ from nl2sql.nodes.schema import SchemaNode
 from nl2sql.nodes.generator import GeneratorNode
 from nl2sql.nodes.executor import ExecutorNode
 from nl2sql.subgraphs.planning import build_planning_subgraph
-from nl2sql.graph_utils import wrap_graphstate
 from nl2sql.datasource_registry import DatasourceRegistry
 from nl2sql.llm_registry import LLMRegistry
 from nl2sql.vector_store import SchemaVectorStore
@@ -41,7 +40,7 @@ def format_result(state: GraphState) -> Dict[str, Any]:
         "routing_info": state.routing_info,
         "sql_draft": state.sql_draft,
         "execution": state.execution,
-        "latency": state.latency
+        "execution": state.execution
     }
 
 def build_execution_subgraph(registry: DatasourceRegistry, llm_registry: LLMRegistry, vector_store: Optional[SchemaVectorStore] = None, vector_store_path: str = ""):
@@ -60,12 +59,11 @@ def build_execution_subgraph(registry: DatasourceRegistry, llm_registry: LLMRegi
         "planner": llm_registry.planner_llm(),
         "summarizer": llm_registry.summarizer_llm()
     }
-    # Pass registry to planning subgraph for the ReAct loop
     planning_subgraph = build_planning_subgraph(effective_llm_map, registry=registry, row_limit=1000)
 
-    graph.add_node("router", wrap_graphstate(router, "router"))
-    graph.add_node("intent", wrap_graphstate(intent, "intent"))
-    graph.add_node("schema", wrap_graphstate(schema_node, "schema"))
+    graph.add_node("router", router)
+    graph.add_node("intent", intent)
+    graph.add_node("schema", schema_node)
     graph.add_node("planning", planning_subgraph)
     graph.add_node("formatter", format_result)
 
