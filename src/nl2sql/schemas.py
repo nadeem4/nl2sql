@@ -74,6 +74,7 @@ class GraphState(BaseModel):
     retry_count: int = 0
     thoughts: Annotated[Dict[str, List[str]], reduce_thoughts] = Field(default_factory=dict)
     datasource_id: Annotated[Set[str], merge_ids_set] = Field(default_factory=set)
+    selected_datasource_id: Optional[str] = None
     sub_queries: Optional[List[str]] = None
     intermediate_results: Annotated[List[Any], operator.add] = Field(default_factory=list)
     query_history: Annotated[List[Dict[str, Any]], operator.add] = Field(default_factory=list)

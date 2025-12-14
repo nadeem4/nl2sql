@@ -51,12 +51,14 @@ class SchemaNode:
             if state.errors:
                 return {}
 
-            if not state.datasource_id:
-                raise ValueError("No datasource_id in state. Router must run before SchemaNode.")
+            if not state.selected_datasource_id:
+                logger.warning(f"SchemaNode: No selected_datasource_id found. IDs present: {state.datasource_id}. Requesting Router retry.")
+                return {"validation": {"retry_routing": True}}
 
-            ds_ids = state.datasource_id
+            target_ds_id = state.selected_datasource_id
             
-            # 1. Determine Search Query (Once)
+            ds_ids = {target_ds_id}
+            
             search_candidates = None
             retrieved_tables_update = None
             
@@ -69,7 +71,7 @@ class SchemaNode:
                          extras = " ".join(intent.get("entities", []) + intent.get("keywords", []))
                          if extras: search_q = f"{state.user_query} {extras}"
                     
-                    ds_filter = list(ds_ids) 
+                    ds_filter = [target_ds_id]
                     search_candidates = self.vector_store.retrieve(search_q, datasource_id=ds_filter)
                     retrieved_tables_update = search_candidates
                  except:
@@ -77,69 +79,62 @@ class SchemaNode:
 
             final_table_infos = []
 
-            for ds_id in ds_ids:
-                try:
-                    engine = self.registry.get_engine(ds_id)
-                    inspector = inspect(engine)
-                    ds_tables = inspector.get_table_names()
-                    
-                    # Filter
-                    if search_candidates:
-                        relevant_tables = [t for t in search_candidates if t in ds_tables]
-                        # Expand with FKs (simple 1-hop)
-                        if relevant_tables:
-                             expanded = set(relevant_tables)
-                             for t in relevant_tables:
-                                 try:
-                                     for fk in inspector.get_foreign_keys(t):
-                                         ref = fk.get("referred_table")
-                                         if ref and ref in ds_tables:
-                                             expanded.add(ref)
-                                 except: pass
-                             ds_tables = list(expanded)
-                        else:
-                            # Decision: If search candidates exist, ONLY return matching. 
-                            # If search candidates is empty/failed, return ALL.
-                            if not relevant_tables: 
-                                 # If NO GLOBAL retrieval hits, maybe return all?
-                                 if not search_candidates:
-                                     pass # Keep all
-                                 else:
-                                     # Retrieval worked but this DS has none. don't include any.
-                                     ds_tables = [] 
-                    
-                    # Inspect Columns & FKs
-                    ds_tables.sort()
-                    for i, table in enumerate(ds_tables):
-                        try:
-                            columns = [col["name"] for col in inspector.get_columns(table)]
-                            fks = [
-                                ForeignKey(
-                                    constrained_columns=fk["constrained_columns"],
-                                    referred_table=fk["referred_table"],
-                                    referred_columns=fk["referred_columns"]
-                                )
-                                for fk in inspector.get_foreign_keys(table)
-                            ]
-                            
+            ds_id = target_ds_id
+            try:
+                engine = self.registry.get_engine(ds_id)
+                inspector = inspect(engine)
+                ds_tables = inspector.get_table_names()
+                
+                # Filter
+                if search_candidates:
+                    relevant_tables = [t for t in search_candidates if t in ds_tables]
+                    if relevant_tables:
+                        expanded = set(relevant_tables)
+                        for t in relevant_tables:
+                            try:
+                                for fk in inspector.get_foreign_keys(t):
+                                    ref = fk.get("referred_table")
+                                    if ref and ref in ds_tables:
+                                        expanded.add(ref)
+                            except: pass
+                        ds_tables = list(expanded)
+                    else:
+                        if not relevant_tables: 
+                            if not search_candidates:
+                                pass
+                            else:
+                                ds_tables = [] 
+                
+                for i, table in enumerate(ds_tables):
+                    try:
+                        alias =  f"t{i+1}" 
+                        columns = [f"{alias}.{col['name']}" for col in inspector.get_columns(table)]
+                        fks = [
+                            ForeignKey(
+                                constrained_columns=fk["constrained_columns"],
+                                referred_table=fk["referred_table"],
+                                referred_columns=fk["referred_columns"]
+                            )
+                            for fk in inspector.get_foreign_keys(table)
+                        ]
                         
-                            alias = table 
-                            
-                            final_table_infos.append(TableInfo(
-                                name=table,
-                                alias=alias,
-                                columns=columns,
-                                foreign_keys=fks
-                            ))
-                        except Exception:
-                            continue
-                except Exception:
-                    continue
+                        table_info =  TableInfo(
+                            name=table,
+                            alias=alias,
+                            columns=columns,
+                            foreign_keys=fks
+                        )
+                        final_table_infos.append(table_info)
+                    except Exception:
+                        pass # continue
+            except Exception:
+                pass # continue
                 
             
             return {
                 "schema_info": SchemaInfo(tables=final_table_infos),
-                "retrieved_tables": retrieved_tables_update
+                "retrieved_tables": retrieved_tables_update,
+                "selected_datasource_id": target_ds_id
             }
 
         except Exception as e:

@@ -87,9 +87,7 @@ def build_graph(registry: DatasourceRegistry, llm_registry: LLMRegistry, execute
             "intermediate_results": result.get("intermediate_results", []),
             "query_history": [history_item],
             "routing_info": routing_info,
-            "datasource_id": ds_ids,
-            "sql_draft": result.get("sql_draft"),
-            "execution": result.get("execution")
+            "datasource_id": ds_ids
         }
 
     # Add Nodes
@@ -108,7 +106,11 @@ def build_graph(registry: DatasourceRegistry, llm_registry: LLMRegistry, execute
         print(f"DEBUG: continue_to_subqueries called with {sub_queries}")
 
         ds_ids_list = sorted(list(state.datasource_id)) if state.datasource_id else []
-        return [Send("execution_branch", {"user_query": sq, "datasource_id": ds_ids_list}) for sq in sub_queries]
+        selected_id = state.selected_datasource_id
+        if not selected_id and len(ds_ids_list) == 1:
+            selected_id = ds_ids_list[0]
+            
+        return [Send("execution_branch", {"user_query": sq, "datasource_id": ds_ids_list, "selected_datasource_id": selected_id}) for sq in sub_queries]
 
     graph.add_conditional_edges(
         "decomposer",
@@ -148,10 +150,11 @@ def run_with_graph(registry: DatasourceRegistry, llm_registry: LLMRegistry, user
     ds_id_init = set()
     if datasource_id:
         ds_id_init = {datasource_id}
-
+        
     initial_state = GraphState(
         user_query=user_query,
         datasource_id=ds_id_init,
+        selected_datasource_id=datasource_id,  # Explicitly set selected ID if provided
         validation={"capabilities": "generic"}, 
     )
     

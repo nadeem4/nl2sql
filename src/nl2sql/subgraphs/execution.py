@@ -70,7 +70,22 @@ def build_execution_subgraph(registry: DatasourceRegistry, llm_registry: LLMRegi
     graph.set_entry_point("router")
     graph.add_edge("router", "intent")
     graph.add_edge("intent", "schema")
-    graph.add_edge("schema", "planning")
+
+    
+    def check_schema_retry(state: GraphState) -> str:
+        """Checks if SchemaNode requested a routing retry."""
+        if state.validation.get("retry_routing"):
+            return "retry"
+        return "ok"
+
+    graph.add_conditional_edges(
+        "schema",
+        check_schema_retry,
+        {
+            "ok": "planning",
+            "retry": "router"
+        }
+    )
     
     # Planning subgraph now includes execution. If it returns, we just format the result.
     graph.add_edge("planning", "formatter")

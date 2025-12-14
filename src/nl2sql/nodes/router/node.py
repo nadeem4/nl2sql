@@ -63,14 +63,11 @@ class RouterNode:
             user_query = input_query if input_query else state.user_query
             
 
-            if state.datasource_id and not input_query:
+            if state.selected_datasource_id and not input_query:
                 return {}
 
             print(f"--- Router Node: Routing query '{user_query}' ---")
-            router_store = self._get_store()
-            
-
-            
+            router_store = self._get_store()            
             target_id = None
             routing_layer = None
             reasoning = "" 
@@ -128,6 +125,7 @@ class RouterNode:
             
             output = {
                 "datasource_id": {target_id},
+                "selected_datasource_id": target_id,
                 "routing_info": {
                     target_id: RoutingInfo(
                         layer=routing_layer,
