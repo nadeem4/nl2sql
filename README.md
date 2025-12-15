@@ -126,7 +126,7 @@ manufacturing_supply:
 The CLI (`src.nl2sql.cli`) is the main entry point. It uses the **Router Node** to automatically select the correct datasource.
 
 - `--query "..."`: The natural language question.
-- `--show-thoughts`: Display step-by-step AI reasoning.
+- `--verbose`: Display step-by-step AI reasoning.
 - `--show-perf`: Display detailed performance metrics (latency, tokens).
 - `--vector-store <PATH>`: Use vector search for schema selection (requires indexing).
 - `--id <ID>`: **Optional**. Force a specific datasource, bypassing the router (e.g., `manufacturing_ops`).
@@ -135,7 +135,6 @@ The CLI (`src.nl2sql.cli`) is the main entry point. It uses the **Router Node** 
 - `--log-request`: Log raw request/response data to a dedicated folder for each request ID.
 - `--debug`: Enable debug logging for verbose output.
 - `--visualize`: Visualize the execution trace and save it as a PNG image.
-- `--node <NAME>`: Run a specific node in isolation (e.g., `router`, `planner`).
 - `--include-ids <ID>...`: Benchmark only specific test case IDs.
 
 ### Multi-Database Support
@@ -167,6 +166,18 @@ python -m src.nl2sql.cli --id manufacturing_ops --query "List 5 machines with th
 > **Summary**
 > The query successfully retrieved a list of 5 machines along with their serial numbers.
 
+<details>
+<summary><b>Execution Trace</b></summary>
+<br>
+
+- **Router**: Layer 1 Distance 0.25 (Matched "List all machines")
+- **Intent**: Classification: READ, Keywords: machines, serial numbers
+- **Planner**: Plan: Select name, serial_number from machines limit 5
+- **Generator**: SELECT name, serial_number FROM machines LIMIT 5
+- **Executor**: Executed SQL on manufacturing_ops. Rows returned: 5.
+
+</details>
+
 **Data**
 
 | Machine Name | Serial Number |
@@ -194,6 +205,18 @@ python -m src.nl2sql.cli --id manufacturing_supply --query "Show me top 3 produc
 > **Summary**
 > The top 3 products by price have been successfully retrieved.
 
+<details>
+<summary><b>Execution Trace</b></summary>
+<br>
+
+- **Router**: Layer 1 Distance 0.32 (Matched "Show top products by price")
+- **Intent**: Classification: READ, Keywords: products, price
+- **Planner**: Plan: Select name, sku, price from products order by price desc limit 3
+- **Generator**: SELECT name, sku, unit_price FROM products ORDER BY unit_price DESC LIMIT 3
+- **Executor**: Executed SQL on manufacturing_supply. Rows returned: 3.
+
+</details>
+
 **Data**
 
 | Product ID | SKU | Product Name | Price |
@@ -219,6 +242,18 @@ python -m src.nl2sql.cli --id manufacturing_history --query "Count total product
 > **Summary**
 > The total number of production runs is 5000.
 
+<details>
+<summary><b>Execution Trace</b></summary>
+<br>
+
+- **Router**: Layer 1 Distance 0.18 (Matched "Count total production runs")
+- **Intent**: Classification: AGGREGATE, Keywords: count, production runs
+- **Planner**: Plan: Select count(*) from production_runs
+- **Generator**: SELECT COUNT(*) FROM production_runs
+- **Executor**: Executed SQL on manufacturing_history. Rows returned: 1.
+
+</details>
+
 **Datasource Used:** `manufacturing_history`
 </details>
 
@@ -235,6 +270,18 @@ python -m src.nl2sql.cli --id manufacturing_ref --query "List all factories and 
 
 > **Summary**
 > The query retrieved 3 factories: Plant Austin (TX), Plant Berlin (DE), and Plant Tokyo (JP).
+
+<details>
+<summary><b>Execution Trace</b></summary>
+<br>
+
+- **Router**: Layer 1 Distance 0.22 (Matched "List all factories")
+- **Intent**: Classification: READ, Keywords: factories, locations
+- **Planner**: Plan: Select name, location from factories
+- **Generator**: SELECT name, location FROM factories
+- **Executor**: Executed SQL on manufacturing_ref. Rows returned: 3.
+
+</details>
 
 **Data**
 
@@ -264,6 +311,17 @@ python -m src.nl2sql.cli --query "Compare sales from manufacturing_history and i
 
 > **Summary**
 > The sales data shows total sales and quantities sold by customer, while the inventory data provides quantities on hand for various products in different locations. A comparison reveals potential stock issues for high-selling products.
+
+<details>
+<summary><b>Execution Trace</b></summary>
+<br>
+
+- **Decomposer**: Strategy: PARALLEL (Sales, Inventory) based on keyword overlap.
+- **Branch 1 (History)**: "Get sales data" -> Router: MSSQL -> SQL: SELECT ... FROM sales_orders ...
+- **Branch 2 (Supply)**: "Get inventory interactions" -> Router: MySQL -> SQL: SELECT ... FROM inventory ...
+- **Aggregator**: Combined results from 2 branches into final comparison analysis.
+
+</details>
 
 **Data**
 
@@ -355,7 +413,7 @@ For large schemas, use vector search to dynamically select relevant tables.
 
 ### The Pipeline (LangGraph)
 
-We use a **Supervisor Architecture** where the graph itself manages routing and state.
+We use a **Supervisor Architecture** where the graph itself manages routing and state. For a deep dive into the Map-Reduce pattern used for cross-database queries, see [**docs/ARCHITECTURE_MAP_REDUCE.md**](docs/ARCHITECTURE_MAP_REDUCE.md). For general architecture details, see [**docs/architecture.md**](docs/architecture.md).
 
 ```mermaid
 flowchart TD
