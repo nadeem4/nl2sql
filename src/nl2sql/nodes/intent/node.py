@@ -69,7 +69,7 @@ class IntentNode:
             
             return {
                 "intent": intent_model,
-                "reasoning": {"intent": intent_reasoning}
+                "reasoning": [{"node": "intent", "content": intent_reasoning}]
             }
                 
         except Exception as exc:

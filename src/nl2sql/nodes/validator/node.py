@@ -251,7 +251,7 @@ class ValidatorNode:
             
             return {
                 "errors": errors,
-                "reasoning": {"validator": validator_thoughts}
+                "reasoning": [{"node": "validator", "content": validator_thoughts}]
             }
 
         except Exception as exc:
@@ -260,5 +260,5 @@ class ValidatorNode:
             logger.error(traceback.format_exc())
             return {
                 "errors": [f"Validation exception: {exc}"],
-                "reasoning": {"validator": [f"Exception: {exc}"]}
+                "reasoning": [{"node": "validator", "content": f"Exception: {exc}", "type": "error"}]
             }

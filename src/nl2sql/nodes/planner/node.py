@@ -97,14 +97,14 @@ class PlannerNode:
             
             reasoning = plan_model.reasoning or "No reasoning provided."
             planner_thoughts = [
-                f"Reasoning: {reasoning}",
-                f"Query Type: {plan_model.query_type}",
-                f"Tables: {', '.join([t.name for t in plan_model.tables])}"
+                f"Reasoning: {reasoning}\n",
+                f"Query Type: {plan_model.query_type}\n"
+                f"Tables: {', '.join([t.name for t in plan_model.tables])}\n"
             ]
             
             return {
                 "plan": plan_dump,
-                "reasoning": {"planner": planner_thoughts},
+                "reasoning": [{"node": "planner", "content": planner_thoughts}],
                 "errors": [] 
             }
             

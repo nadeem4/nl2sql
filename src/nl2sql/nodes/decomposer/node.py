@@ -43,10 +43,10 @@ class DecomposerNode:
 
             return {
                 "sub_queries": response.sub_queries,
-                "reasoning": {"decomposer": [response.reasoning]}
+                "reasoning": [{"node": "decomposer", "content": response.reasoning}]
             }
         except Exception as e:
             return {
                 "sub_queries": [user_query],
-                "reasoning": {"decomposer": [f"Error during decomposition: {str(e)}. Proceeding with original query."]}
+                "reasoning": [{"node": "decomposer", "content": f"Error during decomposition: {str(e)}. Proceeding with original query.", "type": "error"}]
             }

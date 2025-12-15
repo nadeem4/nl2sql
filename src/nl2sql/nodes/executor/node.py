@@ -124,7 +124,7 @@ class ExecutorNode:
             return {
                 "execution": execution_result,
                 "errors": errors,
-                "reasoning": {"executor": [exec_msg]}
+                "reasoning": [{"node": "executor", "content": exec_msg}]
             }
 
         except Exception as exc:
@@ -132,5 +132,5 @@ class ExecutorNode:
             return {
                 "execution": None,
                 "errors": [f"Executor failed: {exc}"],
-                "reasoning": {"executor": [f"Execution exception: {exc}"]}
+                "reasoning": [{"node": "executor", "content": f"Execution exception: {exc}", "type": "error"}]
             }

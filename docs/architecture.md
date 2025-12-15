@@ -1,0 +1,121 @@
+# NL2SQL System Architecture
+
+This document provides a comprehensive technical overview of the NL2SQL system components, observability, registry, and guardrails.
+
+## 1. High-Level Architecture
+
+The system operates on a **Map-Reduce** paradigm to handle complex or ambiguous user queries.
+
+> **Deep Dive**: For detailed information on the Map-Reduce flow, parallel execution, and state reduction strategies, please refer to:
+> [**Map-Reduce Architecture**](ARCHITECTURE_MAP_REDUCE.md)
+
+### Summary
+
+1. **Decomposition (Map)**: Breaks queries into independent sub-queries.
+2. **Parallel Execution**: Runs independent execution subgraphs for each sub-query.
+3. **Aggregation (Reduce)**: Synthesizes results into a final answer.
+
+---
+
+## 2. Core Components: The Execution Subgraph
+
+Each branch runs a dedicated LangGraph `StateMachine` responsible for converting a natural language query into executed SQL.
+
+### 2.1 Nodes
+
+| Node | Responsibility | Key Inputs | Key Outputs |
+| :--- | :--- | :--- | :--- |
+| **RouterNode** | Identifies the correct datasource (e.g., SQLite, Postgres) using a 3-Layer logic (Vector -> Multi-Query -> LLM). | `user_query` | `datasource_id` |
+| **IntentNode** | Classifies the query intent (e.g., `READ`, `WRITE`) and filters. | `user_query` | `intent` (IntentModel) |
+| **SchemaNode** | Retrieves relevant table schemas. Uses `SchemaVectorStore` for large schemas. | `datasource_id`, `intent` | `schema_info` |
+| **PlannerNode** | Generates an abstract execution plan (joins, filters) using chain-of-thought. Injects custom `date_format`. | `schema_info`, `intent` | `plan` (PlanModel) |
+| **ValidatorNode** | **Guardrails**. Checks column existence, validates data types (int vs string), and enforces date formats. | `plan`, `schema_info` | `errors` (if any) |
+| **GeneratorNode** | Converts the abstract plan into dialect-specific SQL (e.g., T-SQL, PostgreSQL). | `plan`, `profile` | `sql_draft` |
+| **ExecutorNode** | Executes the SQL against the target database. Handles operational errors. | `sql_draft`, `datasource_id` | `execution` (rows) |
+| **SummarizerNode** | (Error Loop) Analyze failures from Validator/Executor and suggests fixes to the Planner. | `errors`, `failed_plan` | `reasoning` (feedback) |
+
+### 2.2 State Management (`GraphState`)
+
+State is managed via a Pydantic model (`src/nl2sql/schemas.py`), ensuring strict typing across nodes.
+
+```python
+class GraphState(BaseModel):
+    user_query: str
+    datasource_id: Set[str]        # Candidates
+    selected_datasource_id: str    # Chosen one
+    plan: Optional[Dict]           # Abstract Plan
+    sql_draft: Optional[str]       # Generated SQL
+    execution: Optional[ExecutionResult]
+    reasoning: Dict[str, List[str]] # Chain-of-Thought logs
+    # ...
+```
+
+---
+
+## 3. Observability & Callbacks
+
+The system emphasizes "glass-box" execution, providing deep visibility into the AI's decision-making process through a robust Callback system.
+
+### 3.1 `ObservabilityCallback` (`src/nl2sql/callbacks/observability.py`)
+
+* **Purpose**: The primary tracing engine.
+* **Function**: Hooks into LangChain's `on_chain_start`, `on_chain_end`, and `on_llm_end`.
+* **Capture**:
+  * Captures inputs/outputs of every node.
+  * Extracts "reasoning" (thoughts) from AI nodes.
+  * accumulates token usage.
+  * Updates the global `LATENCY_LOG` and `TOKEN_LOG`.
+
+### 3.2 `StatusCallback` (`src/nl2sql/callbacks/status.py`)
+
+* **Purpose**: Real-time CLI feedback (UX).
+* **Function**: Controls the usage of `rich` spinners and status messages.
+* **Behavior**:
+  * `on_chain_start`: "Thinking... [Node Name]"
+  * `on_chain_end`: "✔ [Node Name] Completed (0.45s)"
+  * `on_chain_error`: "❌ [Node Name] Failed"
+
+### 3.3 `TokenUsageCallback`
+
+* **Purpose**: Cost tracking.
+* **Function**: Standardizes token counting across different LLM providers (OpenAI, Anthropic, Gemini).
+
+---
+
+## 4. Registry Pattern
+
+To support dynamic configuration and dependency injection, we use registries:
+
+### 4.1 `DatasourceRegistry`
+
+* Manages database connection profiles (`DatasourceProfile`).
+* **New Feature**: Supports `date_format` configuration (e.g., "DD-MM-YYYY") per profile, which is dynamically injected into the Planner and Validator.
+* Handles `SQLAlchemy` engine creation and connection pooling.
+
+### 4.2 `LLMRegistry`
+
+* Manages LLM instances (Planner LLM, Router LLM, etc.).
+* Allows swapping models (e.g., GPT-4 for Planning, GPT-3.5 for Summarization) via configuration.
+
+---
+
+## 5. Reporting & CLI
+
+The CLI (`src/nl2sql/reporting.py`) is decoupled from the logic.
+
+* **`ConsolePresenter`**: A facade for the `rich` library.
+  * `print_execution_tree`: Renders the hierarchical Map-Reduce execution logic.
+  * `print_performance_report`: Renders detailed tables for latency and token costs.
+  * `print_sql`: Syntax-highlighted SQL blocks.
+
+## 6. Validation & Guardrails Strategy
+
+We employ a **Defense-in-Depth** strategy:
+
+1. **Planner Constraints**: Prompt engineering ensures the LLM is aware of schema types.
+2. **Validator Logic**:
+    * **Structure**: Group By/Aggregation validity.
+    * **Schema**: Column/Table existence checks.
+    * **Data Types**: Checks if a string literal is used for an `INTEGER` column.
+    * **Formats**: Checks if a date literal matches the configured `date_format` (e.g. `2023-12-31` vs `31/12/2023`).
+3. **Generator Safety**: Only specific SQL dialects allowed; read-only enforcement capabilities.

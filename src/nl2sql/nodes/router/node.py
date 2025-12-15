@@ -113,7 +113,7 @@ class RouterNode:
                         candidates=[CandidateInfo(id=c["id"], score=c["score"]) for c in candidates]
                     )
                 },
-                "reasoning": {"router": router_reasoning}
+                "reasoning": [{"node": "router", "content": r} for r in router_reasoning]
             }
             
             return output
@@ -121,7 +121,7 @@ class RouterNode:
         except Exception as e:
             return {
                 "errors": [f"Routing error: {str(e)}"],
-                "reasoning": {"router": [f"Error occurred: {str(e)}"]}
+                "reasoning": [{"node": "router", "content": f"Error occurred: {str(e)}", "type": "error"}]
             }
 
     def _run_l1(self, store: DatasourceRouterStore, query: str, canonical_query: str) -> Dict[str, Any]:

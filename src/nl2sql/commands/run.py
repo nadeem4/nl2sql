@@ -58,7 +58,7 @@ def _run_simple_mode(args: argparse.Namespace, query: str, datasource_registry: 
     query_history = final_state.get("query_history", [])
     
     if args.verbose:
-        reasoning = final_state.get("reasoning", {})
+        reasoning = final_state.get("reasoning", [])
         presenter.print_execution_tree(query, query_history, top_level_reasoning=reasoning)
         
         # Save detailed trace

@@ -142,7 +142,7 @@ class LLMRegistry:
         """
         return self._base_llm(agent)
 
-    def _wrap_structured_usage(self, llm: ChatOpenAI, agent: str, schema: Any) -> LLMCallable:    
+    def _wrap_structured_usage(self, llm: ChatOpenAI, schema: Any) -> LLMCallable:    
         structured_llm = llm.with_structured_output(schema)
 
         def call(prompt: str) -> Any:
@@ -154,13 +154,13 @@ class LLMRegistry:
         """Returns the LLM callable for the Intent agent."""
         from nl2sql.schemas import IntentModel
         llm = self._base_llm("intent")
-        return self._wrap_structured_usage(llm, "intent", IntentModel)
+        return self._wrap_structured_usage(llm, IntentModel)
 
     def planner_llm(self) -> LLMCallable:
         """Returns the LLM callable for the Planner agent."""
         from nl2sql.schemas import PlanModel
         llm = self._base_llm("planner")
-        return self._wrap_structured_usage(llm, "planner", PlanModel)
+        return self._wrap_structured_usage(llm, PlanModel)
 
     def router_llm(self) -> LLMCallable:
         llm = self._base_llm("router")
@@ -189,20 +189,20 @@ class LLMRegistry:
         """Returns the LLM callable for the Decomposer agent."""
         from nl2sql.schemas import DecomposerResponse
         llm = self._base_llm("decomposer")
-        return self._wrap_structured_usage(llm, "decomposer", DecomposerResponse)
+        return self._wrap_structured_usage(llm, DecomposerResponse)
 
     def aggregator_llm(self) -> LLMCallable:
         """Returns the LLM callable for the Aggregator agent."""
         from nl2sql.schemas import AggregatedResponse
         llm = self._base_llm("aggregator")
-        return self._wrap_structured_usage(llm, "aggregator", AggregatedResponse)
+        return self._wrap_structured_usage(llm,  AggregatedResponse)
 
     def get_structured_llm(self, agent: str, schema: Any) -> LLMCallable:
         """
         Returns a structured LLM callable for a specific agent, with usage tracking.
         """
         llm = self._base_llm(agent)
-        return self._wrap_structured_usage(llm, agent, schema)
+        return self._wrap_structured_usage(llm, schema)
 
     def llm_map(self) -> Dict[str, LLMCallable]:
         """Returns a dictionary of all agent LLM callables."""

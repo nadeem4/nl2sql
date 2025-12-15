@@ -56,6 +56,7 @@ class SchemaNode:
                 return {"validation": {"retry_routing": True}}
 
             target_ds_id = state.selected_datasource_id
+            print(f"DEBUG: SchemaNode running. selected_datasource_id={target_ds_id}, datasource_id={state.datasource_id}")
             
             ds_ids = {target_ds_id}
             
@@ -140,7 +141,7 @@ class SchemaNode:
             return {
                 "schema_info": SchemaInfo(tables=final_table_infos),
                 "selected_datasource_id": target_ds_id,
-                "reasoning": {"schema": [f"Retrieved {len(final_table_infos)} tables from {target_ds_id}."]}
+                "reasoning": [{"node": "schema", "content": f"Retrieved {len(final_table_infos)} tables from {target_ds_id}."}]
             }
 
         except Exception as e:

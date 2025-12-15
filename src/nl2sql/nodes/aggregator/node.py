@@ -52,11 +52,11 @@ class AggregatorNode:
             
             return {
                 "final_answer": final_answer,
-                "reasoning": {"aggregator": [f"Chosen format: {response.format_type}"]}
+                "reasoning": [{"node": "aggregator", "content": f"Chosen format: {response.format_type}"}]
             }
         except Exception as e:
             logger.error(f"Node {node_name} failed: {e}")
             return {
                 "final_answer": f"Error during aggregation: {str(e)}",
-                "reasoning": {"aggregator": [f"Error: {str(e)}"]}
+                "reasoning": [{"node": "aggregator", "content": f"Error: {str(e)}", "type": "error"}]
             }

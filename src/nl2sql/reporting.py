@@ -203,81 +203,77 @@ class ConsolePresenter:
         if renderables:
             self.print_panel(Group(*renderables), title="Performance & Metrics", style="magenta")
 
-    def print_execution_tree(self, user_query: str, query_history: List[Dict[str, Any]], top_level_reasoning: Dict[str, Any] = {}) -> None:
+    def print_execution_tree(self, user_query: str, query_history: List[Dict[str, Any]], top_level_reasoning: List[Dict[str, Any]] = []) -> None:
         """Renders a tree view of the execution history and reasoning."""
         tree = Tree(f"[bold blue]Root Query: {user_query}[/bold blue]")
         
-        # Top-Level Reasoning (Decomposer / Aggregator)
-        if "decomposer" in top_level_reasoning:
-             decomp_branch = tree.add("[bold magenta]Decomposer[/bold magenta]")
-             for r in top_level_reasoning["decomposer"]:
-                 decomp_branch.add(str(r))
+        # Color mapping for nodes
+        node_styles = {
+            "decomposer": "bold magenta",
+            "router": "bold cyan",
+            "intent": "bold magenta",
+            "schema": "bold yellow",
+            "planner": "bold blue",
+            "validator": "bold red",
+            "summarizer": "bold orange1",
+            "generator": "bold green",
+            "executor": "bold white",
+            "aggregator": "bold magenta"
+        }
 
+        def add_reasoning_steps(parent_tree: Tree, reasoning_list: List[Dict[str, Any]]) -> None:
+            if not isinstance(reasoning_list, list):
+                return
+                
+            for step in reasoning_list:
+                node = step.get("node", "unknown")
+                content = step.get("content")
+                msg_type = step.get("type", "info")
+                
+                style = node_styles.get(node, "bold")
+                
+                node_label = f"[{style}]{node.capitalize()}[/{style}]"
+                if msg_type == "error":
+                    node_label += " [bold red](Error)[/bold red]"
+                
+                step_branch = parent_tree.add(node_label)
+                
+                if isinstance(content, list):
+                    for line in content:
+                        step_branch.add(str(line))
+                else:
+                    step_branch.add(str(content))
+
+        # 1. Top-Level Decomposer
+        if top_level_reasoning:
+            # Filter for pure decomposer steps usually at start
+            decomp_steps = [r for r in top_level_reasoning if r.get("node") == "decomposer"]
+            if decomp_steps:
+                 add_reasoning_steps(tree, decomp_steps)
+
+        # 2. Execution Branches
         for i, item in enumerate(query_history):
             sub_query = item.get("sub_query") or "Main Branch"
             ds_id = item.get("datasource_id") or "Unknown"
-            reasoning = item.get("reasoning", {})
+            reasoning = item.get("reasoning", [])
             
             branch = tree.add(f"[bold green]Branch {i+1}:[/bold green] {sub_query} [dim]({ds_id})[/dim]")
             
-            # Router
-            if "router" in reasoning:
-                router_branch = branch.add("[bold cyan]Router[/bold cyan]")
-                for r in reasoning["router"]:
-                    router_branch.add(str(r))
-                    
-            # Intent
-            if "intent" in reasoning:
-                intent_branch = branch.add("[bold magenta]Intent[/bold magenta]")
-                for r in reasoning["intent"]:
-                    intent_branch.add(str(r))
-                    
-            # Schema (usually verbose, maybe summary?)
-            if "schema" in reasoning:
-                schema_branch = branch.add("[bold yellow]Schema[/bold yellow]")
-                for r in reasoning["schema"]:
-                    schema_branch.add(str(r))
-            
-            # Planner
-            if "planner" in reasoning:
-                planner_branch = branch.add("[bold blue]Planner[/bold blue]")
-                for r in reasoning["planner"]:
-                    planner_branch.add(str(r))
-            
-            # Validator
-            if "validator" in reasoning:
-                val_branch = branch.add("[bold red]Validator[/bold red]")
-                for r in reasoning["validator"]:
-                    val_branch.add(str(r))
-            
-            # Summarizer (Recap)
-            if "summarizer" in reasoning:
-                summ_branch = branch.add("[bold orange1]Summarizer[/bold orange1]")
-                for r in reasoning["summarizer"]:
-                    summ_branch.add(str(r))
+            add_reasoning_steps(branch, reasoning)
 
-            # Generator
-            if "generator" in reasoning:
-                gen_branch = branch.add("[bold green]Generator[/bold green]")
-                for r in reasoning["generator"]:
-                    gen_branch.add(str(r))
-
-            # Executor
-            if "executor" in reasoning:
-                exec_branch = branch.add("[bold white]Executor[/bold white]")
-                for r in reasoning["executor"]:
-                    exec_branch.add(str(r))
-
-            # SQL Result
-            sql = item.get("sql")
+            # SQL Result (if not already covered in reasoning, strictly it's usually in GraphState separate field)
+            sql = item.get("sql_draft") # It might be stored as string or just 'sql' key in history dict depending on construction
+            # Fallback checking common keys
+            if not sql: sql = item.get("sql")
+            
             if sql:
                 branch.add(f"[bold]SQL:[/bold] {sql}")
         
-        # Aggregator (runs after branches)
-        if "aggregator" in top_level_reasoning:
-             agg_branch = tree.add("[bold magenta]Aggregator[/bold magenta]")
-             for r in top_level_reasoning["aggregator"]:
-                 agg_branch.add(str(r))
+        # 3. Top-Level Aggregator
+        if top_level_reasoning:
+            agg_steps = [r for r in top_level_reasoning if r.get("node") == "aggregator"]
+            if agg_steps:
+                 add_reasoning_steps(tree, agg_steps)
 
         self.console.print("\n")
         self.console.print(tree)

@@ -81,7 +81,7 @@ class SummarizerNode:
                 
                 return {
                     "errors": [feedback],
-                    "reasoning": {"summarizer": [feedback]}
+                    "reasoning": [{"node": "summarizer", "content": feedback}]
                 }
             except Exception as e:
                     raise e
@@ -89,5 +89,5 @@ class SummarizerNode:
         except Exception as e:
             logger.error(f"Node {node_name} failed: {e}")
             return {
-                "reasoning": {"summarizer": [f"Summarizer failed: {e}"]}
+                "reasoning": [{"node": "summarizer", "content": f"Summarizer failed: {e}", "type": "error"}]
             }

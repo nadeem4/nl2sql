@@ -19,33 +19,6 @@ from nl2sql.nodes.aggregator.schemas import AggregatedResponse
 from nl2sql.nodes.router.schemas import RoutingInfo
 
 
-
-
-def reduce_reasoning(left: Dict[str, List[str]], right: Dict[str, List[str]]) -> Dict[str, List[str]]:
-    """Reduces reasoning dictionaries by extending lists for the same key, preventing duplicates."""
-    if not left:
-        return right
-    if not right:
-        return left
-    
-    new_reasoning = left.copy()
-    for k, v in right.items():
-        if k in new_reasoning:
-             # Merge and dedup while preserving order
-             existing = new_reasoning[k]
-             combined = existing + v
-             seen = set()
-             deduped = []
-             for item in combined:
-                 if item not in seen:
-                     deduped.append(item)
-                     seen.add(item)
-             new_reasoning[k] = deduped
-        else:
-             new_reasoning[k] = v
-    return new_reasoning
-
-
 def merge_dicts(left: Dict[str, Any], right: Dict[str, Any]) -> Dict[str, Any]:
     """Reduces dictionaries by merging them."""
     if not left:
@@ -81,10 +54,9 @@ class GraphState(BaseModel):
         validation (Dict[str, Any]): Validation results and capabilities.
         intent (Optional[IntentModel]): The classified intent of the query.
         execution (Optional[ExecutionModel]): The result of SQL execution.
-        retrieved_tables (Optional[List[str]]): List of tables retrieved for context.
         errors (List[str]): List of errors encountered during execution.
         retry_count (int): Counter for retry attempts.
-        reasoning (Dict[str, List[str]]): Accumulated reasoning steps from nodes.
+        reasoning (List[Dict[str, Any]]): Accumulated reasoning steps from nodes.
         datasource_id (Set[str]): Set of potential datasource IDs.
         selected_datasource_id (Optional[str]): The ID of the specifically selected datasource.
         sub_queries (Optional[List[str]]): List of sub-queries when decomposing complex queries.
@@ -104,7 +76,7 @@ class GraphState(BaseModel):
     execution: Optional[ExecutionModel] = None
     errors: List[str] = Field(default_factory=list)
     retry_count: int = 0
-    reasoning: Annotated[Dict[str, List[str]], reduce_reasoning] = Field(default_factory=dict)
+    reasoning: Annotated[List[Dict[str, Any]], operator.add] = Field(default_factory=list)
     datasource_id: Annotated[Set[str], merge_ids_set] = Field(default_factory=set)
     selected_datasource_id: Optional[str] = None
     sub_queries: Optional[List[str]] = None
