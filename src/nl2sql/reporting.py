@@ -203,13 +203,16 @@ class ConsolePresenter:
         if renderables:
             self.print_panel(Group(*renderables), title="Performance & Metrics", style="magenta")
 
-    def print_execution_tree(self, user_query: str, query_history: List[Dict[str, Any]]) -> None:
+    def print_execution_tree(self, user_query: str, query_history: List[Dict[str, Any]], top_level_reasoning: Dict[str, Any] = {}) -> None:
         """Renders a tree view of the execution history and reasoning."""
         tree = Tree(f"[bold blue]Root Query: {user_query}[/bold blue]")
         
-        # If decomposer reasoning is available at top level (unlikely with current structure if generic), could add here.
-        # But mostly we focus on branches.
-        
+        # Top-Level Reasoning (Decomposer / Aggregator)
+        if "decomposer" in top_level_reasoning:
+             decomp_branch = tree.add("[bold magenta]Decomposer[/bold magenta]")
+             for r in top_level_reasoning["decomposer"]:
+                 decomp_branch.add(str(r))
+
         for i, item in enumerate(query_history):
             sub_query = item.get("sub_query") or "Main Branch"
             ds_id = item.get("datasource_id") or "Unknown"
@@ -246,12 +249,36 @@ class ConsolePresenter:
                 val_branch = branch.add("[bold red]Validator[/bold red]")
                 for r in reasoning["validator"]:
                     val_branch.add(str(r))
-                    
+            
+            # Summarizer (Recap)
+            if "summarizer" in reasoning:
+                summ_branch = branch.add("[bold orange1]Summarizer[/bold orange1]")
+                for r in reasoning["summarizer"]:
+                    summ_branch.add(str(r))
+
+            # Generator
+            if "generator" in reasoning:
+                gen_branch = branch.add("[bold green]Generator[/bold green]")
+                for r in reasoning["generator"]:
+                    gen_branch.add(str(r))
+
+            # Executor
+            if "executor" in reasoning:
+                exec_branch = branch.add("[bold white]Executor[/bold white]")
+                for r in reasoning["executor"]:
+                    exec_branch.add(str(r))
+
             # SQL Result
             sql = item.get("sql")
             if sql:
                 branch.add(f"[bold]SQL:[/bold] {sql}")
         
+        # Aggregator (runs after branches)
+        if "aggregator" in top_level_reasoning:
+             agg_branch = tree.add("[bold magenta]Aggregator[/bold magenta]")
+             for r in top_level_reasoning["aggregator"]:
+                 agg_branch.add(str(r))
+
         self.console.print("\n")
         self.console.print(tree)
 
