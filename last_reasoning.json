@@ -1,68 +1,50 @@
 [
   {
-    "datasource_id": "manufacturing_history",
-    "datasource_type": "mssql",
-    "sub_query": "Show production runs for product 'Widget A'",
-    "sql": "SELECT TOP 100 t4.id AS production_run_id, t4.start_time AS start_time, t4.end_time AS end_time, t4.quantity_produced AS quantity_produced, t4.scrap_count AS scrap_count FROM production_runs AS t4 JOIN sales_order_items AS t1 ON t4.product_id = t1.product_id",
-    "row_count": 100,
+    "datasource_id": "manufacturing_ops",
+    "datasource_type": "postgres",
+    "sub_query": "List all machines",
+    "sql": "SELECT t4.id AS id, t4.name AS name, t4.serial_number AS serial_number, t4.commissioned_on AS commissioned_on, t4.status AS status FROM machines AS t4 LIMIT 100",
+    "row_count": 50,
     "reasoning": [
       {
         "node": "router",
-        "content": "Layer 1: Vector Search\n\t ->Distance 0.366 <= 0.4 threshold. (Canonical: \"List production runs for product 'Widget A'\")"
+        "content": "Layer 1: Vector Search\n\t ->Distance 0.000 <= 0.4 threshold. (Canonical: \"List all machines\")"
       },
       {
         "node": "intent",
         "content": [
-          "Reasoning: The user is requesting to retrieve information about production runs associated with a specific product, which indicates a READ operation. The named entity 'Widget A' specifies the product of interest.",
+          "Reasoning: The user is requesting to retrieve information about machines, which indicates a read operation. There are no specific filters or constraints provided, and the intent is clear as a request to list data.",
           "Classification: READ",
-          "Keywords: production runs, product",
-          "Expansion: production data, manufacturing runs, product details"
+          "Keywords: machines",
+          "Expansion: equipment, devices, tools, machinery"
         ]
       },
       {
         "node": "schema",
-        "content": "Retrieved 5 tables from manufacturing_history."
+        "content": "Retrieved 4 tables from manufacturing_ops."
       },
       {
         "node": "router",
-        "content": "Layer 1: Vector Search\n\t ->Distance 0.366 <= 0.4 threshold. (Canonical: \"List production runs for product 'Widget A'\")"
+        "content": "Layer 1: Vector Search\n\t ->Distance 0.000 <= 0.4 threshold. (Canonical: \"List all machines\")"
       },
       {
         "node": "intent",
         "content": [
-          "Reasoning: The user is requesting to retrieve information about production runs associated with a specific product, which indicates a READ operation. The named entity 'Widget A' specifies the product of interest.",
+          "Reasoning: The user is requesting to retrieve information about machines, which indicates a read operation. There are no specific filters or constraints provided, and the intent is clear as a request to list data.",
           "Classification: READ",
-          "Keywords: production runs, product",
-          "Expansion: production data, manufacturing runs, product details"
+          "Keywords: machines",
+          "Expansion: equipment, devices, tools, machinery"
         ]
       },
       {
         "node": "schema",
-        "content": "Retrieved 5 tables from manufacturing_history."
+        "content": "Retrieved 4 tables from manufacturing_ops."
       },
       {
         "node": "planner",
         "content": [
-          "Reasoning: The user is requesting to retrieve information about production runs associated with a specific product, 'Widget A'. To achieve this, we need to join the 'production_runs' table with the 'sales_order_items' table on the product_id. We will select relevant columns from the 'production_runs' table and filter the results based on the product name 'Widget A'.\n",
-          "Query Type: READ\nTables: production_runs, sales_order_items\n"
-        ]
-      },
-      {
-        "node": "validator",
-        "content": [
-          "Validation Failed",
-          "Error: Invalid numeric value for 't1.product_id' (INTEGER): Widget A"
-        ]
-      },
-      {
-        "node": "summarizer",
-        "content": "1. **Error Analysis**: The error \"Invalid numeric value for 't1.product_id' (INTEGER): Widget A\" indicates that the query is attempting to filter on `t1.product_id` using a string value ('Widget A'), while `t1.product_id` is defined as an INTEGER in the schema. This mismatch between data types is causing the execution error.\n\n2. **Correcting the Filter**: The user query is asking for production runs for a specific product ('Widget A'), but the filtering is incorrectly applied to `t1.product_id`. Instead, the product name should be matched against a product name column, which is not present in the provided schema. To resolve this, we need to identify the correct way to filter by product name.\n\n3. **Identifying the Missing Link**: The `sales_order_items` table does not contain a product name column. To filter by product name, we need to join with a table that contains product information. However, the current schema does not provide a direct link to a product name. If there is a separate `products` table that includes product names and IDs, it should be included in the plan.\n\n4. **Suggested Fixes**:\n   - **Add a Join with a Products Table**: If a `products` table exists, include it in the joins to filter by product name. The join should be on the `product_id` column.\n   - **Change the Filter Condition**: Instead of filtering on `t1.product_id`, filter on the product name from the `products` table (e.g., `products.name = 'Widget A'`).\n   - **Review Schema for Product Information**: If there is no `products` table, clarify with the user how to identify products by name, as the current schema does not support this directly.\n\nBy implementing these changes, the SQL generation attempt will be more aligned with the user query and the database schema."
-      },
-      {
-        "node": "planner",
-        "content": [
-          "Reasoning: The user is requesting to show production runs for a specific product, 'Widget A'. However, the schema does not provide a direct way to filter by product name. To retrieve the relevant production runs, we will join the 'production_runs' table (t4) with the 'sales_order_items' table (t1) on the product_id. This allows us to access the production runs associated with the product. Since there is no product name column in the schema, we cannot filter directly by 'Widget A'. Instead, we will retrieve all production runs for the product IDs associated with sales order items.\n",
-          "Query Type: READ\nTables: production_runs, sales_order_items\n"
+          "Reasoning: The user is requesting to list all machines, which indicates a read operation. Since there are no specific filters or constraints provided, I will select all relevant columns from the 'machines' table.\n",
+          "Query Type: READ\nTables: machines\n"
         ]
       },
       {
@@ -75,13 +57,13 @@
       {
         "node": "generator",
         "content": [
-          "Generated SQL: SELECT TOP 100 t4.id AS production_run_id, t4.start_time AS start_time, t4.end_time AS end_time, t4.quantity_produced AS quantity_produced, t4.scrap_count AS scrap_count FROM production_runs AS t4 JOIN sales_order_items AS t1 ON t4.product_id = t1.product_id",
-          "Rationale: The user is requesting to show production runs for a specific product, 'Widget A'. However, the schema does not provide a direct way to filter by product name. To retrieve the relevant production runs, we will join the 'production_runs' table (t4) with the 'sales_order_items' table (t1) on the product_id. This allows us to access the production runs associated with the product. Since there is no product name column in the schema, we cannot filter directly by 'Widget A'. Instead, we will retrieve all production runs for the product IDs associated with sales order items."
+          "Generated SQL: SELECT t4.id AS id, t4.name AS name, t4.serial_number AS serial_number, t4.commissioned_on AS commissioned_on, t4.status AS status FROM machines AS t4 LIMIT 100",
+          "Rationale: The user is requesting to list all machines, which indicates a read operation. Since there are no specific filters or constraints provided, I will select all relevant columns from the 'machines' table."
         ]
       },
       {
         "node": "executor",
-        "content": "Executed SQL on manufacturing_history. Rows returned: 100."
+        "content": "Executed SQL on manufacturing_ops. Rows returned: 50."
       }
     ]
   }
