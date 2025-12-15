@@ -37,9 +37,9 @@ def format_result(state: GraphState) -> Dict[str, Any]:
     return {
         "intermediate_results": [result_str],
         "datasource_id": state.datasource_id,
+        "selected_datasource_id": state.selected_datasource_id,
         "routing_info": state.routing_info,
         "sql_draft": state.sql_draft,
-        "execution": state.execution,
         "execution": state.execution
     }
 

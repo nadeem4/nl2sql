@@ -9,6 +9,7 @@ from rich.panel import Panel
 from rich.markdown import Markdown
 from rich.columns import Columns
 from rich.console import Group
+from rich.tree import Tree
 
 class ConsolePresenter:
     """
@@ -16,6 +17,28 @@ class ConsolePresenter:
     """
     def __init__(self, console: Optional[Console] = None):
         self.console = console or Console()
+        self.status = None
+
+    def start_interactive_status(self, message: str) -> None:
+        """Starts a persistent status spinner."""
+        if self.status:
+            self.status.stop()
+        self.status = self.console.status(message, spinner="dots")
+        self.status.start()
+
+    def update_interactive_status(self, message: str) -> None:
+        """Updates the current status spinner message."""
+        if self.status:
+            self.status.update(message)
+        else:
+            self.start_interactive_status(message)
+
+    def stop_interactive_status(self) -> None:
+        """Stops the status spinner."""
+        if self.status:
+            self.status.stop()
+            self.status = None
+
 
     # -------------------------------------------------------------------------
     # Generic Helpers
@@ -179,6 +202,65 @@ class ConsolePresenter:
 
         if renderables:
             self.print_panel(Group(*renderables), title="Performance & Metrics", style="magenta")
+
+    def print_execution_tree(self, user_query: str, query_history: List[Dict[str, Any]]) -> None:
+        """Renders a tree view of the execution history and reasoning."""
+        tree = Tree(f"[bold blue]Root Query: {user_query}[/bold blue]")
+        
+        # If decomposer reasoning is available at top level (unlikely with current structure if generic), could add here.
+        # But mostly we focus on branches.
+        
+        for i, item in enumerate(query_history):
+            sub_query = item.get("sub_query") or "Main Branch"
+            ds_id = item.get("datasource_id") or "Unknown"
+            reasoning = item.get("reasoning", {})
+            
+            branch = tree.add(f"[bold green]Branch {i+1}:[/bold green] {sub_query} [dim]({ds_id})[/dim]")
+            
+            # Router
+            if "router" in reasoning:
+                router_branch = branch.add("[bold cyan]Router[/bold cyan]")
+                for r in reasoning["router"]:
+                    router_branch.add(str(r))
+                    
+            # Intent
+            if "intent" in reasoning:
+                intent_branch = branch.add("[bold magenta]Intent[/bold magenta]")
+                for r in reasoning["intent"]:
+                    intent_branch.add(str(r))
+                    
+            # Schema (usually verbose, maybe summary?)
+            if "schema" in reasoning:
+                schema_branch = branch.add("[bold yellow]Schema[/bold yellow]")
+                for r in reasoning["schema"]:
+                    schema_branch.add(str(r))
+            
+            # Planner
+            if "planner" in reasoning:
+                planner_branch = branch.add("[bold blue]Planner[/bold blue]")
+                for r in reasoning["planner"]:
+                    planner_branch.add(str(r))
+            
+            # Validator
+            if "validator" in reasoning:
+                val_branch = branch.add("[bold red]Validator[/bold red]")
+                for r in reasoning["validator"]:
+                    val_branch.add(str(r))
+                    
+            # SQL Result
+            sql = item.get("sql")
+            if sql:
+                branch.add(f"[bold]SQL:[/bold] {sql}")
+        
+        self.console.print("\n")
+        self.console.print(tree)
+
+
+    def print_cost_summary(self, total_duration: float, token_log: List[Dict[str, Any]]) -> None:
+        """Prints a concise summary of total cost (time and tokens)."""
+        total_tokens = sum(entry["total_tokens"] for entry in token_log)
+        self.console.print(f"[dim]Total Duration: {total_duration:.2f}s | Total Tokens: {total_tokens}[/dim]")
+
 
     # -------------------------------------------------------------------------
     # Benchmarking (benchmark.py)

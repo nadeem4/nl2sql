@@ -58,18 +58,18 @@ class IntentNode:
             
             reasoning = intent_model.reasoning or "No reasoning provided."
             
-            intent_thoughts = [
+            intent_reasoning = [
                 f"Reasoning: {reasoning}",
                 f"Classification: {intent_model.query_type}",
                 f"Keywords: {', '.join(intent_model.keywords)}"
             ]
             
             if intent_model.query_expansion:
-                intent_thoughts.append(f"Expansion: {', '.join(intent_model.query_expansion)}")
+                intent_reasoning.append(f"Expansion: {', '.join(intent_model.query_expansion)}")
             
             return {
                 "intent": intent_model,
-                "thoughts": {"intent": intent_thoughts}
+                "reasoning": {"intent": intent_reasoning}
             }
                 
         except Exception as exc:

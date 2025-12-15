@@ -32,7 +32,14 @@ class ObservabilityCallback(BaseCallbackHandler):
             self.starts[str(run_id)] = time.perf_counter()
             
             # Handle Context
-            ds_id = inputs.get("datasource_id")
+            ds_id = None
+            if isinstance(inputs, dict):
+                ds_id = inputs.get("datasource_id")
+            elif hasattr(inputs, "datasource_id"):
+                ds_id = getattr(inputs, "datasource_id")
+            elif hasattr(inputs, "get"): # Fallback for other dict-likes
+                ds_id = inputs.get("datasource_id")
+
             if ds_id:
                 # Handle set/list/str variations commonly found in our state
                 if isinstance(ds_id, (set, list)) and len(ds_id) > 0:

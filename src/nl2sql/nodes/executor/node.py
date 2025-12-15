@@ -117,14 +117,20 @@ class ExecutorNode:
                 )
                 errors.append(f"Execution error: {exc}")
             
+            exec_msg = f"Executed SQL on {target_ds_id}. Rows returned: {execution_result.row_count}."
+            if execution_result.error:
+                 exec_msg += f" Error: {execution_result.error}"
+            
             return {
                 "execution": execution_result,
-                "errors": errors
+                "errors": errors,
+                "reasoning": {"executor": [exec_msg]}
             }
 
         except Exception as exc:
             logger.error(f"Node {node_name} failed: {exc}")
             return {
                 "execution": None,
-                "errors": [f"Executor failed: {exc}"]
+                "errors": [f"Executor failed: {exc}"],
+                "reasoning": {"executor": [f"Execution exception: {exc}"]}
             }

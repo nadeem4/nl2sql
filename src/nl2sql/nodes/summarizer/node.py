@@ -58,7 +58,7 @@ class SummarizerNode:
                 lines = []
                 for tbl in state.schema_info.tables:
                     lines.append(f"Table: {tbl.name} (Alias: {tbl.alias})")
-                    lines.append(f"  Columns: {', '.join(tbl.columns)}")
+                    lines.append(f"  Columns: {', '.join([f'{c.name} ({c.type})' for c in tbl.columns])}")
                     lines.append("")
                 schema_context = "\n".join(lines)
 
@@ -81,7 +81,7 @@ class SummarizerNode:
                 
                 return {
                     "errors": [feedback],
-                    "thoughts": {"summarizer": [feedback]}
+                    "reasoning": {"summarizer": [feedback]}
                 }
             except Exception as e:
                     raise e
@@ -89,5 +89,5 @@ class SummarizerNode:
         except Exception as e:
             logger.error(f"Node {node_name} failed: {e}")
             return {
-                "thoughts": {"summarizer": [f"Summarizer failed: {e}"]}
+                "reasoning": {"summarizer": [f"Summarizer failed: {e}"]}
             }

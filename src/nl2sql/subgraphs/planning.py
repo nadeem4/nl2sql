@@ -30,8 +30,8 @@ def build_planning_subgraph(llm_map: Dict[str, LLMCallable], registry: Datasourc
     graph = StateGraph(GraphState)
 
     # Nodes
-    planner = PlannerNode(llm=llm_map.get("planner"))
-    validator = ValidatorNode(row_limit=row_limit)
+    planner = PlannerNode(registry=registry, llm=llm_map.get("planner"))
+    validator = ValidatorNode(registry=registry, row_limit=row_limit)
     summarizer = SummarizerNode(llm=llm_map.get("summarizer"))
     generator = GeneratorNode(registry=registry)
     executor = ExecutorNode(registry=registry)
@@ -40,9 +40,7 @@ def build_planning_subgraph(llm_map: Dict[str, LLMCallable], registry: Datasourc
         """Increments retry count."""
         return {"retry_count": state.retry_count + 1}
 
-    def planner_retry_node(state: GraphState) -> Dict:
-        """Increments retry count for planner retry path."""
-        return {"retry_count": state.retry_count + 1}
+
 
     def check_planner(state: GraphState) -> str:
         """Checks if planner succeeded or needs retry/failure."""
@@ -79,8 +77,6 @@ def build_planning_subgraph(llm_map: Dict[str, LLMCallable], registry: Datasourc
     graph.add_node("summarizer", summarizer)
     graph.add_node("sql_generator", generator)
     graph.add_node("executor", executor)
-    
-    graph.add_node("planner_retry", planner_retry_node)
     graph.add_node("retry_handler", retry_node)
 
     graph.set_entry_point("planner")
@@ -90,8 +86,8 @@ def build_planning_subgraph(llm_map: Dict[str, LLMCallable], registry: Datasourc
         check_planner,
         {
             "ok": "validator",
-            "retry": "summarizer",
-            "end": END # Failure
+            "retry": "retry_handler", 
+            "end": END 
         }
     )
 
@@ -101,7 +97,7 @@ def build_planning_subgraph(llm_map: Dict[str, LLMCallable], registry: Datasourc
         {
             "ok": "sql_generator",
             "retry": "retry_handler",
-            "end": END # Failure
+            "end": END 
         }
     )
     
@@ -111,17 +107,13 @@ def build_planning_subgraph(llm_map: Dict[str, LLMCallable], registry: Datasourc
         "executor",
         check_execution,
         {
-            "ok": END, # Success
+            "ok": END, 
             "retry": "retry_handler",
-            "end": END # Failure
+            "end": END 
         }
     )
 
-    # Retry Handler -> Summarizer
     graph.add_edge("retry_handler", "summarizer")
-
-    # Summarizer -> Planner Retry -> Planner
-    graph.add_edge("summarizer", "planner_retry")
-    graph.add_edge("planner_retry", "planner")
+    graph.add_edge("summarizer", "planner")
 
     return graph.compile()

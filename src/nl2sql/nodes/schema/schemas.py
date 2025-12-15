@@ -16,6 +16,16 @@ class ForeignKey(BaseModel):
     referred_column: str
 
 
+class ColumnInfo(BaseModel):
+    """
+    Represents a column in a table with its type.
+    """
+    model_config = ConfigDict(extra="forbid")
+    name: str # Pre-aliased name, e.g. "t1.id"
+    original_name: str # Original name, e.g. "id"
+    type: str # SQL Type, e.g. "INTEGER", "VARCHAR"
+
+
 class TableInfo(BaseModel):
     """
     Represents schema information for a single table.
@@ -23,13 +33,13 @@ class TableInfo(BaseModel):
     Attributes:
         name: The actual name of the table in the database.
         alias: The alias assigned to the table (e.g., "t1").
-        columns: List of column names (pre-aliased, e.g., "t1.id").
+        columns: List of column information.
         foreign_keys: List of foreign keys defined on this table.
     """
     model_config = ConfigDict(extra="forbid")
     name: str
     alias: str
-    columns: List[str]
+    columns: List[ColumnInfo]
     foreign_keys: List[ForeignKey] = Field(default_factory=list)
 
 

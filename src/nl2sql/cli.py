@@ -29,16 +29,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--index", action="store_true", help="Index the schema into the vector store")
     parser.add_argument("--stub-llm", action="store_true", help="Use a stub LLM that returns a fixed plan")
     parser.add_argument("--no-exec", action="store_true", help="Skip execution (generate/validate only)")
-    parser.add_argument("--verbose", action="store_true", help="Show raw planner/generator outputs")
-    parser.add_argument("--debug", action="store_true", help="Show output of each node in the graph")
-    parser.add_argument("--show-thoughts", action="store_true", help="Show step-by-step reasoning from AI nodes")
-    parser.add_argument("--json-logs", action="store_true", help="Enable structured JSON logging")
-    parser.add_argument("--log-level", type=str, default=None, choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"], help="Set the logging level")
-    parser.add_argument("--show-perf", action="store_true", help="Show performance metrics (latency)")
-    parser.add_argument("--visualize", action="store_true", help="Visualize execution trace (dynamic)")
-    parser.add_argument("--node", type=str, default=None, help="Run a specific node in isolation (e.g., 'decomposer', 'planner')")
-    parser.add_argument("--show-outputs", action="store_true", help="Show full state output of each node")
-    parser.add_argument("--log-requests", action="store_true", help="Save individual node outputs to JSON logs in a request folder")
+    parser.add_argument("--verbose", action="store_true", help="Show reasoning thoughts and step-by-step info")
+    parser.add_argument("--debug", action="store_true", help="Enable full debug mode (outputs, logs, traces)")
+    parser.add_argument("--show-perf", action="store_true", help="Display performance metrics (tokens/latency)")
+
     
     # Benchmarking args
     parser.add_argument("--benchmark", action="store_true", help="Run in benchmark mode")
@@ -55,19 +49,17 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
-    
+
     from nl2sql.logger import configure_logging
     
     level = "CRITICAL" 
     
     if args.debug:
         level = "DEBUG"
-    elif args.log_level:
-        level = args.log_level
-    elif args.json_logs:
-        level = "INFO" 
+    elif args.verbose:
+        level = "INFO"
         
-    configure_logging(level=level, json_format=args.json_logs)
+    configure_logging(level=level, json_format=False)
 
     profiles = load_profiles(args.config)
 
@@ -116,11 +108,6 @@ def main() -> None:
         except KeyboardInterrupt:
             return
 
-
-
-
-
-    # Run Standard Pipeline
     run_pipeline(args, query, datasource_registry, llm_registry, vector_store)
 
 if __name__ == "__main__":

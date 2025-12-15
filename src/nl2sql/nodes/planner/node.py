@@ -11,6 +11,7 @@ if TYPE_CHECKING:
 
 from .schemas import PlanModel
 from nl2sql.nodes.planner.prompts import PLANNER_PROMPT, PLANNER_EXAMPLES
+from nl2sql.datasource_registry import DatasourceRegistry
 
 from nl2sql.logger import get_logger
 
@@ -29,13 +30,15 @@ class PlannerNode:
     producing a structured `PlanModel`.
     """
 
-    def __init__(self, llm: Optional[LLMCallable] = None):
+    def __init__(self, registry: DatasourceRegistry, llm: Optional[LLMCallable] = None):
         """
         Initializes the PlannerNode.
 
         Args:
+            registry: Datasource registry for accessing profiles.
             llm: The language model to use for planning.
         """
+        self.registry = registry
         self.llm = llm
         if self.llm:
             self.prompt = ChatPromptTemplate.from_template(PLANNER_PROMPT)
@@ -68,13 +71,23 @@ class PlannerNode:
             feedback = ""
             if state.errors:
                 feedback = f"The previous plan was invalid. Fix the following errors:\n{json.dumps(state.errors, indent=2)}\n"
+            
+            # Get date format from profile
+            date_format = "ISO 8601 (YYYY-MM-DD)"
+            try:
+                if state.selected_datasource_id:
+                     profile = self.registry.get_profile(state.selected_datasource_id)
+                     date_format = profile.date_format
+            except Exception:
+                pass
                 
             plan_model = self.chain.invoke({
                 "schema_context": schema_context,
                 "intent_context": intent_context,
                 "examples": PLANNER_EXAMPLES,
                 "feedback": feedback,
-                "user_query": state.user_query
+                "user_query": state.user_query,
+                "date_format": date_format
             })
             
             plan_dump = plan_model.model_dump()
@@ -91,7 +104,7 @@ class PlannerNode:
             
             return {
                 "plan": plan_dump,
-                "thoughts": {"planner": planner_thoughts},
+                "reasoning": {"planner": planner_thoughts},
                 "errors": [] 
             }
             

@@ -72,7 +72,7 @@ class GeneratorNode:
             
             return {
                 "sql_draft": final_sql,
-                "thoughts": {"generator": generator_thoughts}
+                "reasoning": {"generator": generator_thoughts}
             }
 
         except Exception as exc:

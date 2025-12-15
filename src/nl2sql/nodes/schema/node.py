@@ -7,7 +7,7 @@ from sqlalchemy import inspect
 if TYPE_CHECKING:
     from nl2sql.schemas import GraphState
 
-from .schemas import SchemaInfo, TableInfo, ForeignKey
+from .schemas import SchemaInfo, TableInfo, ForeignKey, ColumnInfo
 from nl2sql.vector_store import SchemaVectorStore
 from nl2sql.datasource_registry import DatasourceRegistry
 
@@ -65,15 +65,12 @@ class SchemaNode:
             if self.vector_store:
                  try:
                     search_q = state.user_query
-                    if state.validation.get("intent"):
-                         intent = state.validation["intent"]
-                         if isinstance(intent, str): intent = json.loads(intent)
-                         extras = " ".join(intent.get("entities", []) + intent.get("keywords", []))
+                    if state.intent:
+                         extras = " ".join(state.intent.entities + state.intent.keywords)
                          if extras: search_q = f"{state.user_query} {extras}"
                     
                     ds_filter = [target_ds_id]
                     search_candidates = self.vector_store.retrieve(search_q, datasource_id=ds_filter)
-                    retrieved_tables_update = search_candidates
                  except:
                      pass
 
@@ -108,7 +105,16 @@ class SchemaNode:
                 for i, table in enumerate(ds_tables):
                     try:
                         alias =  f"t{i+1}" 
-                        columns = [f"{alias}.{col['name']}" for col in inspector.get_columns(table)]
+                        columns = []
+                        for col in inspector.get_columns(table):
+                            col_name = col["name"]
+                            col_type = str(col["type"])
+                            columns.append(ColumnInfo(
+                                name=f"{alias}.{col_name}",
+                                original_name=col_name,
+                                type=col_type
+                            ))
+                        
                         fks = [
                             ForeignKey(
                                 constrained_columns=fk["constrained_columns"],
@@ -126,17 +132,16 @@ class SchemaNode:
                         )
                         final_table_infos.append(table_info)
                     except Exception:
-                        pass # continue
+                        pass 
             except Exception:
-                pass # continue
+                pass 
                 
             
             return {
                 "schema_info": SchemaInfo(tables=final_table_infos),
-                "retrieved_tables": retrieved_tables_update,
-                "selected_datasource_id": target_ds_id
+                "selected_datasource_id": target_ds_id,
+                "reasoning": {"schema": [f"Retrieved {len(final_table_infos)} tables from {target_ds_id}."]}
             }
 
         except Exception as e:
-            logger.error(f"Node {node_name} failed: {e}")
             raise e
