@@ -52,6 +52,7 @@ class DatasourceProfile:
     max_bytes: int = 10 * 1024 * 1024
     tags: Dict[str, Any] = dataclasses.field(default_factory=dict)
     feature_flags: FeatureFlags = dataclasses.field(default_factory=FeatureFlags)
+    date_format: str = "ISO 8601"
 
 
 def _to_feature_flags(raw: Optional[Dict[str, Any]]) -> FeatureFlags:
@@ -81,6 +82,7 @@ def _to_profile(raw: Dict[str, Any]) -> DatasourceProfile:
         max_bytes=int(raw.get("max_bytes", 10 * 1024 * 1024)),
         tags=raw.get("tags", {}) or {},
         feature_flags=_to_feature_flags(raw.get("feature_flags") or {}),
+        date_format=raw.get("date_format", "ISO 8601"),
     )
 
 

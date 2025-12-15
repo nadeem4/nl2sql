@@ -8,7 +8,7 @@ The benchmarking suite is built into the CLI (`src.nl2sql.cli`) and orchestrated
 
 **Components:**
 
-- **Benchmark Driver**: Iterates through test cases, handles parallel execution (`ThreadPoolExecutor`), and aggregates results.
+- **Benchmark Driver**: Iterates through test cases, handles parallel execution, and aggregates results.
 - **Model Evaluator** (`evaluation/evaluator.py`): Pure functions for calculating metrics (e.g., `compare_results`, `evaluate_sql_semantic`).
 - **Graph Pipeline**: The core LangGraph application is invoked largely without modification, ensuring we test the exact production code path.
 
@@ -21,7 +21,7 @@ This measures whether the *data* returned by the generated SQL matches the *data
 - **Method**: Run `Generated SQL` on `Actual Datasource`. Run `Expected SQL` on `Expected Datasource`. Compare row sets.
 - **Column Normalization**: Ignores case and whitespace in header names.
 - **Value Matching**: List-of-Dictionary comparison. Order is ignored by default (`order_matters=False`).
-- **Status**: `PASS` (Match), `DATA_MISMATCH` (Execution successful, data differs).
+- **Status**: `PASS` (Match), `DATA_MISMATCH` (Execution successful, data differs), `INVALID_GT` (Ground Truth SQL is unparseable), `INVALID_SQL` (Generated SQL unparseable).
 
 ### Semantic SQL Accuracy
 

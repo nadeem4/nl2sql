@@ -29,9 +29,5 @@ class RoutingInfo(BaseModel):
     """
     model_config = ConfigDict(extra="ignore")
     layer: str
-    score: float
     l1_score: float
     candidates: List[CandidateInfo]
-    latency: float
-    reasoning: str
-    tokens: int

@@ -29,22 +29,17 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--index", action="store_true", help="Index the schema into the vector store")
     parser.add_argument("--stub-llm", action="store_true", help="Use a stub LLM that returns a fixed plan")
     parser.add_argument("--no-exec", action="store_true", help="Skip execution (generate/validate only)")
-    parser.add_argument("--verbose", action="store_true", help="Show raw planner/generator outputs")
-    parser.add_argument("--debug", action="store_true", help="Show output of each node in the graph")
-    parser.add_argument("--show-thoughts", action="store_true", help="Show step-by-step reasoning from AI nodes")
-    parser.add_argument("--json-logs", action="store_true", help="Enable structured JSON logging")
-    parser.add_argument("--log-level", type=str, default=None, choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"], help="Set the logging level")
-    parser.add_argument("--show-perf", action="store_true", help="Show performance metrics (latency)")
-    parser.add_argument("--visualize", action="store_true", help="Visualize execution trace (dynamic)")
-    parser.add_argument("--node", type=str, default=None, help="Run a specific node in isolation (e.g., 'decomposer', 'planner')")
-    parser.add_argument("--show-outputs", action="store_true", help="Show full state output of each node")
-    parser.add_argument("--log-requests", action="store_true", help="Save individual node outputs to JSON logs in a request folder")
+    parser.add_argument("--verbose", action="store_true", help="Show reasoning thoughts and step-by-step info")
+    parser.add_argument("--debug", action="store_true", help="Enable full debug mode (outputs, logs, traces)")
+    parser.add_argument("--show-perf", action="store_true", help="Display performance metrics (tokens/latency)")
+
     
     # Benchmarking args
     parser.add_argument("--benchmark", action="store_true", help="Run in benchmark mode")
     parser.add_argument("--dataset", type=pathlib.Path, default=None, help="Path to golden dataset YAML for accuracy evaluation")
     parser.add_argument("--routing-only", action="store_true", help="Benchmark: Verify datasource routing only, skip execution")
-    parser.add_argument("--bench-config", type=pathlib.Path, default=pathlib.Path(settings.benchmark_config_path), help="Path to a single YAML file containing multiple named LLM configs (required if --benchmark is set)")
+    parser.add_argument("--matrix", action="store_true", help="Benchmark: Run with multiple LLMs (uses defaults from benchmark_suite.yaml if --bench-config is not provided)")
+    parser.add_argument("--bench-config", type=pathlib.Path, default=None, help="Path to a single YAML file containing multiple named LLM configs (optional)")
     parser.add_argument("--iterations", type=int, default=3, help="Number of iterations per config (benchmark mode only)")
     parser.add_argument("--include-ids", nargs="+", default=None, help="Benchmark: List of specific test IDs to run (space separated)")
     parser.add_argument("--export-path", type=pathlib.Path, default=None, help="Benchmark: Export results to file (.json or .csv)")
@@ -54,19 +49,17 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
-    
+
     from nl2sql.logger import configure_logging
     
     level = "CRITICAL" 
     
     if args.debug:
         level = "DEBUG"
-    elif args.log_level:
-        level = args.log_level
-    elif args.json_logs:
-        level = "INFO" 
+    elif args.verbose:
+        level = "INFO"
         
-    configure_logging(level=level, json_format=args.json_logs)
+    configure_logging(level=level, json_format=False)
 
     profiles = load_profiles(args.config)
 
@@ -90,19 +83,18 @@ def main() -> None:
         print(f"  python -m src.nl2sql.cli --index --vector-store {args.vector_store}", file=sys.stderr)
         sys.exit(1)
 
-    # Benchmark Mode (Dataset or Config)
+    # Benchmark Mode
     if args.benchmark:
-        # If dataset is provided, query is not required
-        if args.dataset:
-             run_benchmark(args, None, datasource_registry, vector_store)
-             return
-        # If config is provided, query is required (for single query benchmark)
-        elif args.query:
-             run_benchmark(args, args.query, datasource_registry, vector_store)
-             return
-        else:
-             print("Error: --query is required for config-based benchmark.", file=sys.stderr)
+        if not args.dataset:
+             print("Error: --dataset is required for benchmarking.", file=sys.stderr)
+             print("To benchmark a single query, add it to a dataset and use --include-ids.", file=sys.stderr)
              sys.exit(1)
+             
+        if args.matrix and not args.bench_config:
+            args.bench_config = pathlib.Path(settings.benchmark_config_path)
+
+        run_benchmark(args, datasource_registry, vector_store)
+        return
 
     query = args.query
 
@@ -116,11 +108,6 @@ def main() -> None:
         except KeyboardInterrupt:
             return
 
-
-
-
-
-    # Run Standard Pipeline
     run_pipeline(args, query, datasource_registry, llm_registry, vector_store)
 
 if __name__ == "__main__":

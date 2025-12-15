@@ -133,33 +133,42 @@ class DatasourceRouterStore:
         docs_and_scores = self.vectorstore.similarity_search_with_score(query, k=k)
         return [(doc.metadata["datasource_id"], score) for doc, score in docs_and_scores]
 
-    def multi_query_retrieve(self, query: str, llm, k: int = 1) -> List[str]:
+    def multi_query_retrieve(self, query: str, llm, k: int = 1) -> tuple[List[str], Dict[str, Any]]:
         """
         Generates query variations and retrieves the most voted datasource.
         Only counts votes if the match distance is below a threshold (0.5).
+        
+        Returns:
+            ([winner_id], metadata_dict)
         """
         variations = generate_query_variations(query, llm)
         
-        variations.append(query)
+        # Keep original logic of appending original query
+        all_queries = variations + [query]
         
-        print(f"  -> Generated {len(variations)-1} variations")
+        print(f"  -> Generated {len(variations)} variations")
         
         votes = {}
-        for q in variations:
+        for q in all_queries:
             results = self.retrieve_with_score(q, k=1)
             if results:
                 ds_id, distance = results[0]
                 if distance < settings.router_l2_threshold:
                     votes[ds_id] = votes.get(ds_id, 0) + 1
         
+        metadata = {
+            "variations": variations,
+            "votes": votes
+        }
+
         if not votes:
             print("  -> No variations met confidence threshold.")
-            return []
+            return [], metadata
             
         # Return winner
         winner = max(votes, key=votes.get)
         print(f"  -> Voting results: {votes}. Winner: {winner}")
-        return [winner]
+        return [winner], metadata
 
     def llm_route(self, query: str, llm, datasources: List[DatasourceProfile]) -> tuple[Optional[str], str]:
         """

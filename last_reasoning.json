@@ -1,0 +1,70 @@
+[
+  {
+    "datasource_id": "manufacturing_ops",
+    "datasource_type": "postgres",
+    "sub_query": "List all machines",
+    "sql": "SELECT t4.id AS id, t4.name AS name, t4.serial_number AS serial_number, t4.commissioned_on AS commissioned_on, t4.status AS status FROM machines AS t4 LIMIT 100",
+    "row_count": 50,
+    "reasoning": [
+      {
+        "node": "router",
+        "content": "Layer 1: Vector Search\n\t ->Distance 0.000 <= 0.4 threshold. (Canonical: \"List all machines\")"
+      },
+      {
+        "node": "intent",
+        "content": [
+          "Reasoning: The user is requesting to retrieve information about machines, which indicates a read operation. There are no specific filters or constraints provided, and the intent is clear as a request to list data.",
+          "Classification: READ",
+          "Keywords: machines",
+          "Expansion: equipment, devices, tools, machinery"
+        ]
+      },
+      {
+        "node": "schema",
+        "content": "Retrieved 4 tables from manufacturing_ops."
+      },
+      {
+        "node": "router",
+        "content": "Layer 1: Vector Search\n\t ->Distance 0.000 <= 0.4 threshold. (Canonical: \"List all machines\")"
+      },
+      {
+        "node": "intent",
+        "content": [
+          "Reasoning: The user is requesting to retrieve information about machines, which indicates a read operation. There are no specific filters or constraints provided, and the intent is clear as a request to list data.",
+          "Classification: READ",
+          "Keywords: machines",
+          "Expansion: equipment, devices, tools, machinery"
+        ]
+      },
+      {
+        "node": "schema",
+        "content": "Retrieved 4 tables from manufacturing_ops."
+      },
+      {
+        "node": "planner",
+        "content": [
+          "Reasoning: The user is requesting to list all machines, which indicates a read operation. Since there are no specific filters or constraints provided, I will select all relevant columns from the 'machines' table.\n",
+          "Query Type: READ\nTables: machines\n"
+        ]
+      },
+      {
+        "node": "validator",
+        "content": [
+          "Validation Successful",
+          "Plan is valid against schema and security policies."
+        ]
+      },
+      {
+        "node": "generator",
+        "content": [
+          "Generated SQL: SELECT t4.id AS id, t4.name AS name, t4.serial_number AS serial_number, t4.commissioned_on AS commissioned_on, t4.status AS status FROM machines AS t4 LIMIT 100",
+          "Rationale: The user is requesting to list all machines, which indicates a read operation. Since there are no specific filters or constraints provided, I will select all relevant columns from the 'machines' table."
+        ]
+      },
+      {
+        "node": "executor",
+        "content": "Executed SQL on manufacturing_ops. Rows returned: 50."
+      }
+    ]
+  }
+]

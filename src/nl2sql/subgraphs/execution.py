@@ -8,7 +8,6 @@ from nl2sql.nodes.schema import SchemaNode
 from nl2sql.nodes.generator import GeneratorNode
 from nl2sql.nodes.executor import ExecutorNode
 from nl2sql.subgraphs.planning import build_planning_subgraph
-from nl2sql.graph_utils import wrap_graphstate
 from nl2sql.datasource_registry import DatasourceRegistry
 from nl2sql.llm_registry import LLMRegistry
 from nl2sql.vector_store import SchemaVectorStore
@@ -38,10 +37,10 @@ def format_result(state: GraphState) -> Dict[str, Any]:
     return {
         "intermediate_results": [result_str],
         "datasource_id": state.datasource_id,
+        "selected_datasource_id": state.selected_datasource_id,
         "routing_info": state.routing_info,
         "sql_draft": state.sql_draft,
-        "execution": state.execution,
-        "latency": state.latency
+        "execution": state.execution
     }
 
 def build_execution_subgraph(registry: DatasourceRegistry, llm_registry: LLMRegistry, vector_store: Optional[SchemaVectorStore] = None, vector_store_path: str = ""):
@@ -60,19 +59,34 @@ def build_execution_subgraph(registry: DatasourceRegistry, llm_registry: LLMRegi
         "planner": llm_registry.planner_llm(),
         "summarizer": llm_registry.summarizer_llm()
     }
-    # Pass registry to planning subgraph for the ReAct loop
     planning_subgraph = build_planning_subgraph(effective_llm_map, registry=registry, row_limit=1000)
 
-    graph.add_node("router", wrap_graphstate(router, "router"))
-    graph.add_node("intent", wrap_graphstate(intent, "intent"))
-    graph.add_node("schema", wrap_graphstate(schema_node, "schema"))
+    graph.add_node("router", router)
+    graph.add_node("intent", intent)
+    graph.add_node("schema", schema_node)
     graph.add_node("planning", planning_subgraph)
     graph.add_node("formatter", format_result)
 
     graph.set_entry_point("router")
     graph.add_edge("router", "intent")
     graph.add_edge("intent", "schema")
-    graph.add_edge("schema", "planning")
+
+    
+    def check_schema_retry(state: GraphState) -> str:
+        """Checks if SchemaNode requested a routing retry."""
+        print(f"DEBUG: check_schema_retry validation={state.validation}")
+        if state.validation.get("retry_routing"):
+            return "retry"
+        return "ok"
+
+    graph.add_conditional_edges(
+        "schema",
+        check_schema_retry,
+        {
+            "ok": "planning",
+            "retry": "router"
+        }
+    )
     
     # Planning subgraph now includes execution. If it returns, we just format the result.
     graph.add_edge("planning", "formatter")

@@ -1,15 +1,12 @@
 from typing import List, Dict, Any
-from rich.tree import Tree
-from rich.console import Console
-from rich.panel import Panel
 from langgraph.graph.state import CompiledStateGraph
+from nl2sql.reporting import ConsolePresenter
 
 def draw_execution_trace(trace: List[Dict[str, Any]], graph: CompiledStateGraph, execution_subgraph: CompiledStateGraph, planning_subgraph: CompiledStateGraph):
     """
     Visualizes the execution trace in the CLI and saves the graph structure.
     """
-    console = Console()
-    
+    presenter = ConsolePresenter()
 
     try:
         png_bytes = graph.get_graph(xray=True).draw_mermaid_png()
@@ -19,7 +16,6 @@ def draw_execution_trace(trace: List[Dict[str, Any]], graph: CompiledStateGraph,
         with open(output_path, "wb") as f:
             f.write(png_bytes)
 
-        console.print(f"Graph visualization saved to: [bold underline][link=file:///{abs_path}]{abs_path}[/link][/bold underline]")
+        presenter.print_graph_saved(abs_path)
     except Exception as e:
-        console.print(f"[bold red]Failed to save graph image:[/bold red] {e}")
-
+        presenter.print_graph_save_error(str(e))
