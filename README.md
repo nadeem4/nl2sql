@@ -2,19 +2,19 @@
 
 **NL2SQL** is an enterprise-grade, agentic Natural Language to SQL pipeline built on **LangGraph**.
 
-Unlike simple prompt-to-query solutions, this project employs a **multi-agent supervisor architecture** to handle complex, real-world database interactions. It features dynamic routing across multiple database engines (Postgres, MySQL, MSSQL, SQLite), vector-based schema retrieval for scalability, and a rigorous **Plan-Validate-Execute** loop to ensure query correctness and safety.
+Unlike simple prompt-to-query solutions, this project employs a **Map-Reduce Supervisor Architecture** to handle complex, real-world database interactions. It features dynamic routing across multiple database engines (Postgres, MySQL, MSSQL, SQLite), vector-based schema retrieval for scalability, and a rigorous **Plan-Validate-Execute** loop to ensure query correctness and safety.
 
 Designed for observability and reliability, it provides detailed performance metrics, step-by-step reasoning logs, and deterministic SQL generation, making it suitable for production environments where accuracy is paramount.
 
 ## Key Features
 
-- **Supervisor Architecture**: Dynamic routing of queries to the appropriate database using a 3-layer routing strategy (Vector, Multi-Query, LLM).
-- **Cross-Database Support**: Map-Reduce architecture to handle complex queries spanning multiple databases (e.g., "Compare sales from MSSQL and inventory from MySQL").
+- **Supervisor Architecture**: Centralized dynamic routing using a 3-layer strategy (Vector, Multi-Query, LLM) to dispatch tasks.
+- **Map-Reduce Strategy**: Handles complex cross-database queries by decomposing them into parallel sub-tasks and aggregating results.
 - **LangGraph Pipeline**: Modular, stateful graph architecture with specialized agents for Intent, Planning, and Validation.
 - **Multi-Database Support**: Seamlessly query across Postgres, MySQL, MSSQL, and SQLite.
 - **Rule-Based SQL Generation**: Deterministic, token-efficient SQL generation using `sqlglot` to prevent syntax hallucinations.
 - **Robust Validation Loop**: Pre-execution validation of plans against the schema to catch errors early.
-- **Observability**: Real-time streaming of agent reasoning steps and structured JSON logging.
+- **Observability**: Real-time streaming of agent reasoning steps.
 - **Vector Search (RAG)**: Scalable schema retrieval for large databases.
 
 ---
@@ -131,10 +131,7 @@ The CLI (`src.nl2sql.cli`) is the main entry point. It uses the **Router Node** 
 - `--vector-store <PATH>`: Use vector search for schema selection (requires indexing).
 - `--id <ID>`: **Optional**. Force a specific datasource, bypassing the router (e.g., `manufacturing_ops`).
 - `--no-exec`: Generate and validate SQL without executing it.
-- `--json-logs`: Enable structured JSON logging.
-- `--log-request`: Log raw request/response data to a dedicated folder for each request ID.
 - `--debug`: Enable debug logging for verbose output.
-- `--visualize`: Visualize the execution trace and save it as a PNG image.
 - `--include-ids <ID>...`: Benchmark only specific test case IDs.
 
 ### Multi-Database Support
@@ -401,11 +398,8 @@ For large schemas, use vector search to dynamically select relevant tables.
 
 ### Observability & Logging
 
-- **Stream Reasoning**: Use `--show-thoughts` to see the Intent, Planner, and Generator steps.
-- **Request Logging**: Use `--log-request` to save raw request input/output to a unique folder.
-- **JSON Logs**: Use `--json-logs` for structured output suitable for log ingestion.
+- **Stream Reasoning**: Use `--verbose` to see the Intent, Planner, and Generator steps.
 - **Debug Mode**: Use `--debug` for verbose output.
-- **Graph Visualization**: Use `--visualize` to generate a visual graph of the execution trace.
 
 ---
 
@@ -413,7 +407,14 @@ For large schemas, use vector search to dynamically select relevant tables.
 
 ### The Pipeline (LangGraph)
 
-We use a **Supervisor Architecture** where the graph itself manages routing and state. For a deep dive into the Map-Reduce pattern used for cross-database queries, see [**docs/ARCHITECTURE_MAP_REDUCE.md**](docs/ARCHITECTURE_MAP_REDUCE.md). For general architecture details, see [**docs/architecture.md**](docs/architecture.md).
+We use a hybrid **Supervisor + Map-Reduce Architecture**:
+
+1. **Supervisor (The Brain)**: The `DecomposerNode` acts as the supervisor, analyzing every query to decide if it requires a single datasource or multiple.
+2. **Map-Reduce (The Strategy)**: When the supervisor detects a complex query (e.g., "Compare X and Y"), it triggers a **Map-Reduce** flow:
+    - **Map**: Fans out sub-queries to parallel execution branches.
+    - **Reduce**: Aggregates results from all branches into a final answer.
+
+For a deep dive into the Map-Reduce pattern, see [**docs/ARCHITECTURE_MAP_REDUCE.md**](docs/ARCHITECTURE_MAP_REDUCE.md).
 
 ```mermaid
 flowchart TD
@@ -467,7 +468,7 @@ This allows the system to scale to hundreds of tables without overwhelming the L
 
 ### Core Agents
 
-- **Decomposer (AI)**: Breaks down complex queries into sub-tasks (Single vs Multi-DB).
+- **Decomposer (Supervisor)**: The system brain. Analyzes queries to determine strategy (Single vs Multi-DB) and manages the Map-Reduce flow.
 - **Router (AI)**: Selects the appropriate database based on vector/reasoning alignment.
 - **Intent (AI)**: Classifies query type and extracts entities.
 - **Planner (AI)**: Generates a database-agnostic structured plan (tables, joins, filters).
