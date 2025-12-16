@@ -74,7 +74,6 @@ def build_execution_subgraph(registry: DatasourceRegistry, llm_registry: LLMRegi
     
     def check_schema_retry(state: GraphState) -> str:
         """Checks if SchemaNode requested a routing retry."""
-        print(f"DEBUG: check_schema_retry validation={state.validation}")
         if state.validation.get("retry_routing"):
             return "retry"
         return "ok"

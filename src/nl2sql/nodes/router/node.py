@@ -57,8 +57,6 @@ class RouterNode:
             
             if state.selected_datasource_id and not input_query:
                 return {}
-
-            print(f"--- Router Node: Routing query '{user_query}' ---")
             
             router_reasoning = []
             target_id = None
@@ -69,7 +67,6 @@ class RouterNode:
             
             canonical_llm = self.registry.router_canonicalizer_llm()
             canonical_query = router_store.canonicalize_query(user_query, canonical_llm)
-            print(f"  -> Canonicalized: '{user_query}' => '{canonical_query}'")
             
             l1_result = self._run_l1(router_store, user_query, canonical_query)
             target_id = l1_result.get("target_id")

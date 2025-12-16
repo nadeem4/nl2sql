@@ -278,6 +278,125 @@ class ConsolePresenter:
         self.console.print("\n")
         self.console.print(tree)
 
+    def print_status_tree(self, tree_data: Dict[str, List[str]], durations: Dict[str, float], node_order: List[str] = []) -> None:
+        """Renders the static execution status tree."""
+        if not tree_data:
+            return
+
+        root_tree = Tree("Graph")
+        
+        # Helper to recursively build tree
+        def build_branch(parent_name: str, tree_node: Tree):
+            children = tree_data.get(parent_name, [])
+            for child in children:
+                # Add child
+                duration = durations.get(child, 0.0)
+                label = f"{child} [dim]({duration:.2f}s)[/dim]"
+                branch = tree_node.add(label)
+                # Recurse
+                build_branch(child, branch)
+
+        # Find roots (nodes that are not children of any other node)
+        all_children = set()
+        for kids in tree_data.values():
+            all_children.update(kids)
+            
+        all_nodes = set(durations.keys())
+        roots = list(all_nodes - all_children)
+        
+        # Sort roots by execution order if provided
+        if node_order:
+            roots.sort(key=lambda x: node_order.index(x) if x in node_order else 9999)
+        else:
+            roots.sort()
+            
+        for r in roots:
+            duration = durations.get(r, 0.0)
+            label = f"{r} [dim]({duration:.2f}s)[/dim]"
+            branch = root_tree.add(label)
+            build_branch(r, branch)
+            
+    def print_performance_tree(
+    self,
+    tree_data: Dict[str, List[str]],
+    metrics_data: Dict[str, Any],
+    node_map: Dict[str, str] = {},
+    ) -> None:
+        if not tree_data:
+            return
+
+        root_tree = Tree("[bold magenta]Performance Execution Tree[/bold magenta]")
+
+        def get_dur_style(dur):
+            if dur > 5.0:
+                return "bold red"
+            if dur > 2.0:
+                return "yellow"
+            return "green"
+
+        def build_branch(parent_id: str, tree_node: Tree, path: set):
+            for child_id in tree_data.get(parent_id, []):
+                if child_id in path:
+                    name = node_map.get(child_id, child_id)
+                    tree_node.add(f"[dim]{name} (recursive)[/dim]")
+                    continue
+
+                meta = metrics_data.get(child_id)
+                name = node_map.get(child_id, child_id)
+
+                label = f"[bold]{name}[/bold]"
+
+                if meta:
+                    dur = meta.duration
+                    dur_style = get_dur_style(dur)
+                    label += f" [dim]in[/dim] [{dur_style}]{dur:.2f}s[/{dur_style}]"
+
+                    if meta.total_tokens > 0:
+                        label += f" | [cyan]{meta.total_tokens} tok[/cyan]"
+
+                    if meta.error:
+                        label += f" [bold red]FAILED: {meta.error}[/bold red]"
+
+                branch = tree_node.add(label)
+
+                new_path = set(path)
+                new_path.add(child_id)
+                build_branch(child_id, branch, new_path)
+
+        all_children = set()
+        for parent, kids in tree_data.items():
+            for k in kids:
+                if k != parent:
+                    all_children.add(k)
+
+        all_nodes = set(tree_data.keys())
+        roots = [n for n in all_nodes if n not in all_children]
+
+        roots.sort(
+            key=lambda r: metrics_data[r].duration if r in metrics_data else 0,
+            reverse=True,
+        )
+
+        for r_id in roots:
+            meta = metrics_data.get(r_id)
+            name = node_map.get(r_id, r_id)
+
+            label = f"[bold]{name}[/bold]"
+            if meta:
+                dur = meta.duration
+                dur_style = get_dur_style(dur)
+                label += f" [dim]in[/dim] [{dur_style}]{dur:.2f}s[/{dur_style}]"
+                if meta.total_tokens > 0:
+                    label += f" | [cyan]{meta.total_tokens} tok[/cyan]"
+
+            branch = root_tree.add(label)
+            build_branch(r_id, branch, {r_id})
+
+        self.console.print("\n")
+        self.console.print(Panel(root_tree, title="Trace Metrics", border_style="magenta"))
+        self.console.print("\n")
+
+
 
     def print_cost_summary(self, total_duration: float, token_log: List[Dict[str, Any]]) -> None:
         """Prints a concise summary of total cost (time and tokens)."""
@@ -544,3 +663,5 @@ class ConsolePresenter:
         """Wraps rich.progress.track for progress bars."""
         from rich.progress import track
         return track(sequence, description=description, total=total, console=self.console)
+
+

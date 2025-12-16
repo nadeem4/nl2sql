@@ -45,18 +45,15 @@ class SchemaNode:
         Returns:
             Dictionary updates for the graph state with schema information.
         """
-        node_name = "schema"
         
         try:
             if state.errors:
                 return {}
 
             if not state.selected_datasource_id:
-                logger.warning(f"SchemaNode: No selected_datasource_id found. IDs present: {state.datasource_id}. Requesting Router retry.")
                 return {"validation": {"retry_routing": True}}
 
             target_ds_id = state.selected_datasource_id
-            print(f"DEBUG: SchemaNode running. selected_datasource_id={target_ds_id}, datasource_id={state.datasource_id}")
             
             ds_ids = {target_ds_id}
             
@@ -83,7 +80,6 @@ class SchemaNode:
                 inspector = inspect(engine)
                 ds_tables = inspector.get_table_names()
                 
-                # Filter
                 if search_candidates:
                     relevant_tables = [t for t in search_candidates if t in ds_tables]
                     if relevant_tables:

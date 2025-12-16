@@ -25,9 +25,9 @@ def _run_simple_mode(args: argparse.Namespace, query: str, datasource_registry: 
     final_state = {}
     
     import time
-    from nl2sql.callbacks.status import StatusCallback
+    from nl2sql.callbacks.monitor import PipelineMonitorCallback
     
-    status_callback = StatusCallback(presenter)
+    monitor = PipelineMonitorCallback(presenter)
     presenter.start_interactive_status("[bold green]Thinking...[/bold green]")
     
     start_time = time.perf_counter()
@@ -40,7 +40,7 @@ def _run_simple_mode(args: argparse.Namespace, query: str, datasource_registry: 
             execute=not args.no_exec, 
             vector_store=vector_store,
             vector_store_path=args.vector_store,
-            callbacks=[status_callback]
+            callbacks=[monitor]
         )
     except Exception as e:
         import traceback
@@ -52,8 +52,9 @@ def _run_simple_mode(args: argparse.Namespace, query: str, datasource_registry: 
         presenter.stop_interactive_status()
     
     duration = time.perf_counter() - start_time
-
-
+    
+    # Print Static Status Tree
+    #monitor.get_status_tree()
 
     query_history = final_state.get("query_history", [])
     
@@ -100,11 +101,9 @@ def _run_simple_mode(args: argparse.Namespace, query: str, datasource_registry: 
 
 
     if args.show_perf:
-        from nl2sql.metrics import LATENCY_LOG, TOKEN_LOG
-        presenter.print_performance_report(
-            LATENCY_LOG,
-            TOKEN_LOG
-        )
+        tree, metrics, node_map = monitor.get_performance_tree()
+        presenter.print_performance_tree(tree, metrics, node_map)
+    
     
     from nl2sql.metrics import TOKEN_LOG
     presenter.print_cost_summary(duration, TOKEN_LOG)

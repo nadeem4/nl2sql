@@ -112,7 +112,6 @@ def build_graph(registry: DatasourceRegistry, llm_registry: LLMRegistry, execute
         Determines whether to fan out to parallel branches or proceed with a single branch.
         """
         sub_queries = state.sub_queries or [state.user_query]
-        print(f"continue_to_subqueries called with {sub_queries}")
 
         ds_ids_list = sorted(list(state.datasource_id)) if state.datasource_id else []
         selected_id = state.selected_datasource_id
@@ -164,14 +163,8 @@ def run_with_graph(registry: DatasourceRegistry, llm_registry: LLMRegistry, user
     )
 
     initial_state_dict = initial_state.model_dump()
-        
-    from nl2sql.callbacks.observability import ObservabilityCallback
-    
-    final_callbacks = [ObservabilityCallback()]
-    if callbacks:
-        final_callbacks.extend(callbacks)
-    
+            
     # Run graph
-    result = g.invoke(initial_state_dict, config={"callbacks": final_callbacks})
+    result = g.invoke(initial_state_dict, config={"callbacks": callbacks})
     
     return result

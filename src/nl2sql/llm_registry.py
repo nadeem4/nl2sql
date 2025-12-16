@@ -13,9 +13,6 @@ from nl2sql.settings import settings
 
 
 
-from nl2sql.callbacks.token_usage import TokenUsageCallback
-
-
 def get_usage_summary() -> Dict[str, Dict[str, int]]:
     """
     Aggregates token usage by agent:model.
@@ -132,8 +129,8 @@ class LLMRegistry:
         if not key:
             raise RuntimeError("OPENAI_API_KEY is not set and no api_key provided in config.")
             
-        callback = TokenUsageCallback(agent, cfg.model)
-        return ChatOpenAI(model=cfg.model, temperature=cfg.temperature, api_key=key, callbacks=[callback])
+        # We use tags to identifying agent in the global PipelineMonitor
+        return ChatOpenAI(model=cfg.model, temperature=cfg.temperature, api_key=key, tags=[agent])
 
     def get_llm(self, agent: str) -> ChatOpenAI:
         """
