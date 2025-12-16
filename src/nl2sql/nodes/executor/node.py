@@ -7,6 +7,7 @@ from .schemas import ExecutionModel
 
 if TYPE_CHECKING:
     from nl2sql.schemas import GraphState
+from nl2sql.errors import PipelineError, ErrorSeverity
 from nl2sql.security import enforce_read_only
 from nl2sql.logger import get_logger
 
@@ -43,11 +44,21 @@ class ExecutorNode:
         try:
             errors = []
             if not state.sql_draft:
-                errors.append("No SQL to execute.")
+                errors.append(PipelineError(
+                    node=node_name,
+                    message="No SQL to execute.",
+                    severity=ErrorSeverity.ERROR,
+                    error_code="MISSING_SQL"
+                ))
                 return {"errors": errors}
                 
             if not state.datasource_id:
-                errors.append("No datasource_id in state. Router must run before ExecutorNode.")
+                errors.append(PipelineError(
+                    node=node_name,
+                    message="No datasource_id in state. Router must run before ExecutorNode.",
+                    severity=ErrorSeverity.ERROR,
+                    error_code="MISSING_DATASOURCE_ID"
+                ))
                 return {
                     "errors": errors,
                     "execution": ExecutionModel(row_count=0, rows=[], error="Missing Datasource ID")
@@ -56,14 +67,23 @@ class ExecutorNode:
             # Handle Set[str] -> Pick sorted first for deterministic execution
             ds_ids = state.datasource_id if isinstance(state.datasource_id, (set, list)) else {state.datasource_id}
             if not ds_ids:
-                # Should be caught by check above but for type safety
-                errors.append("Empty datasource_id set.")
+                errors.append(PipelineError(
+                    node=node_name,
+                    message="Empty datasource_id set.",
+                    severity=ErrorSeverity.ERROR,
+                    error_code="EMPTY_DATASOURCE_SET"
+                ))
                 return {"errors": errors}
                 
             target_ds_id = sorted(list(ds_ids))[0]
             
             if len(ds_ids) > 1:
-                errors.append(f"Warning: Multiple datasources selected {ds_ids}, executing on primary: {target_ds_id}")
+                errors.append(PipelineError(
+                    node=node_name,
+                    message=f"Warning: Multiple datasources selected {ds_ids}, executing on primary: {target_ds_id}",
+                    severity=ErrorSeverity.WARNING,
+                    error_code="MULTIPLE_DATASOURCES_WARNING"
+                ))
 
             profile = self.registry.get_profile(target_ds_id)
             
@@ -81,7 +101,12 @@ class ExecutorNode:
                 dialect = "oracle"
 
             if not enforce_read_only(state.sql_draft, dialect=dialect):
-                errors.append("Security Violation: SQL query contains forbidden keywords (read-only enforcement).")
+                errors.append(PipelineError(
+                    node=node_name,
+                    message="Security Violation: SQL query contains forbidden keywords (read-only enforcement).",
+                    severity=ErrorSeverity.CRITICAL,
+                    error_code="SECURITY_VIOLATION"
+                ))
                 return {
                     "errors": errors,
                     "execution": ExecutionModel(row_count=0, rows=[], error="Security Violation")
@@ -115,7 +140,13 @@ class ExecutorNode:
                     rows=[],
                     error=str(exc)
                 )
-                errors.append(f"Execution error: {exc}")
+                errors.append(PipelineError(
+                    node=node_name,
+                    message=f"Execution error: {exc}",
+                    severity=ErrorSeverity.ERROR,
+                    error_code="DB_EXECUTION_ERROR",
+                    stack_trace=str(exc)
+                ))
             
             exec_msg = f"Executed SQL on {target_ds_id}. Rows returned: {execution_result.row_count}."
             if execution_result.error:
@@ -129,8 +160,15 @@ class ExecutorNode:
 
         except Exception as exc:
             logger.error(f"Node {node_name} failed: {exc}")
+            err = PipelineError(
+                node=node_name,
+                message=f"Executor failed: {exc}",
+                severity=ErrorSeverity.CRITICAL,
+                error_code="EXECUTOR_CRASH",
+                stack_trace=str(exc)
+            )
             return {
                 "execution": None,
-                "errors": [f"Executor failed: {exc}"],
+                "errors": [err],
                 "reasoning": [{"node": "executor", "content": f"Execution exception: {exc}", "type": "error"}]
             }

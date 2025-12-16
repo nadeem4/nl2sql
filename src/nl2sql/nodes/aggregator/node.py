@@ -7,8 +7,8 @@ if TYPE_CHECKING:
     from nl2sql.schemas import GraphState
 
 from .schemas import AggregatedResponse
-from .schemas import AggregatedResponse
 from nl2sql.nodes.aggregator.prompts import AGGREGATOR_PROMPT
+from nl2sql.errors import PipelineError, ErrorSeverity
 
 from nl2sql.logger import get_logger
 
@@ -35,6 +35,12 @@ class AggregatorNode:
             formatted_results = ""
             for i, res in enumerate(intermediate_results):
                 formatted_results += f"--- Result {i+1} ---\n{str(res)}\n\n"
+            
+            # Append aggregated errors if any, to inform the aggregator of partial failures
+            if state.errors:
+                formatted_results += "\n--- Errors Encountered ---\n"
+                for err in state.errors:
+                    formatted_results += f"Error from {err.node}: {err.message}\n"
                 
             response: AggregatedResponse = self.chain.invoke({
                 "user_query": user_query,
@@ -58,5 +64,14 @@ class AggregatorNode:
             logger.error(f"Node {node_name} failed: {e}")
             return {
                 "final_answer": f"Error during aggregation: {str(e)}",
-                "reasoning": [{"node": "aggregator", "content": f"Error: {str(e)}", "type": "error"}]
+                "reasoning": [{"node": "aggregator", "content": f"Error: {str(e)}", "type": "error"}],
+                "errors": [
+                    PipelineError(
+                        node=node_name,
+                        message=f"Aggregator failed: {str(e)}",
+                        severity=ErrorSeverity.ERROR,
+                        error_code="AGGREGATOR_FAILED",
+                        stack_trace=str(e)
+                    )
+                ]
             }

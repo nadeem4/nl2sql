@@ -9,6 +9,7 @@ if TYPE_CHECKING:
 from .schemas import DecomposerResponse
 from nl2sql.nodes.decomposer.prompts import DECOMPOSER_PROMPT
 from nl2sql.datasource_registry import DatasourceRegistry
+from nl2sql.errors import PipelineError, ErrorSeverity
 
 from nl2sql.logger import get_logger
 
@@ -48,5 +49,14 @@ class DecomposerNode:
         except Exception as e:
             return {
                 "sub_queries": [user_query],
-                "reasoning": [{"node": "decomposer", "content": f"Error during decomposition: {str(e)}. Proceeding with original query.", "type": "error"}]
+                "reasoning": [{"node": "decomposer", "content": f"Error during decomposition: {str(e)}. Proceeding with original query.", "type": "error"}],
+                "errors": [
+                    PipelineError(
+                        node=node_name,
+                        message=f"Decomposition failed: {str(e)}. Fallback to original query.",
+                        severity=ErrorSeverity.WARNING,
+                        error_code="DECOMPOSITION_FAILED",
+                        stack_trace=str(e)
+                    )
+                ]
             }

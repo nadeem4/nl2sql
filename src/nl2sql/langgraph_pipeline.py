@@ -96,7 +96,8 @@ def build_graph(registry: DatasourceRegistry, llm_registry: LLMRegistry, execute
             "intermediate_results": result.get("intermediate_results", []),
             "query_history": [history_item],
             "routing_info": routing_info,
-            "datasource_id": final_ds_ids
+            "datasource_id": final_ds_ids,
+            "errors": result.get("errors", [])
         }
 
     # Add Nodes

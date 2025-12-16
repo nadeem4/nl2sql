@@ -10,6 +10,7 @@ if TYPE_CHECKING:
 
 from .schemas import IntentModel
 from nl2sql.nodes.intent.prompts import INTENT_PROMPT
+from nl2sql.errors import PipelineError, ErrorSeverity
 from nl2sql.logger import get_logger
 
 logger = get_logger("intent")
@@ -72,5 +73,16 @@ class IntentNode:
                 "reasoning": [{"node": "intent", "content": intent_reasoning}]
             }
                 
+
         except Exception as exc:
-            return {"errors": [f"Intent extraction failed: {exc}"]}
+            return {
+                "errors": [
+                    PipelineError(
+                        node=node_name,
+                        message=f"Intent extraction failed: {exc}",
+                        severity=ErrorSeverity.ERROR,
+                        error_code="INTENT_EXTRACTION_FAILED",
+                        stack_trace=str(exc)
+                    )
+                ]
+            }

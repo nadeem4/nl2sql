@@ -63,6 +63,49 @@ class ConsolePresenter:
     # -------------------------------------------------------------------------
     # Pipeline Execution (run.py)
     # -------------------------------------------------------------------------
+    def print_pipeline_errors(self, errors: List[Any]) -> None:
+        """
+        Renders structured PipelineError objects in a table.
+        Args:
+            errors: List of PipelineError objects (typed as Any to avoid circular deps if needed).
+        """
+        if not errors:
+            return
+
+        table = Table(title="Pipeline Errors", show_header=True, header_style="bold red", expand=True)
+        table.add_column("Node", style="cyan")
+        table.add_column("Severity", justify="center")
+        table.add_column("Code", justify="center")
+        table.add_column("Message", style="white")
+
+        for e in errors:
+            # Handle both object and dict (just in case serialization happened)
+            if isinstance(e, dict):
+                 severity = e.get("severity", "ERROR")
+                 node = e.get("node", "unknown")
+                 code = e.get("error_code", "-")
+                 msg = e.get("message", "-")
+            else:
+                 severity = e.severity.name if hasattr(e.severity, 'name') else str(e.severity)
+                 node = e.node
+                 code = e.error_code
+                 msg = e.message
+
+            sev_style = "red" 
+            if "WARNING" in severity: sev_style = "yellow"
+            if "CRITICAL" in severity: sev_style = "bold red"
+            
+            table.add_row(
+                node.upper(),
+                f"[{sev_style}]{severity}[/{sev_style}]",
+                code,
+                msg
+            )
+        
+        self.console.print("\n")
+        self.console.print(table)
+        self.console.print("\n")
+
     def print_query(self, query: str) -> None:
         self.console.print(f"[bold blue]Query:[/bold blue] {query}")
 

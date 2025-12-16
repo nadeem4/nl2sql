@@ -11,6 +11,7 @@ from nl2sql.datasource_registry import DatasourceRegistry
 from nl2sql.embeddings import EmbeddingService
 from nl2sql.nodes.router.schemas import RoutingInfo, CandidateInfo
 from nl2sql.settings import settings
+from nl2sql.errors import PipelineError, ErrorSeverity
 
 from nl2sql.logger import get_logger
 
@@ -46,17 +47,14 @@ class RouterNode:
             self._router_store = DatasourceRouterStore(persist_directory=self.vector_store_path)
         return self._router_store
 
-    def __call__(self, state: GraphState, input_query: Optional[str] = None) -> Dict[str, Any]:
+    def __call__(self, state: GraphState) -> Dict[str, Any]:
         """
         Executes the routing logic.
         """
         node_name = "router"
         
         try:
-            user_query = input_query if input_query else state.user_query
-            
-            if state.selected_datasource_id and not input_query:
-                return {}
+            user_query = state.user_query
             
             router_reasoning = []
             target_id = None
@@ -115,9 +113,30 @@ class RouterNode:
             
             return output
 
+        except ValueError as ve:
+             # Explicit routing failure
+             return {
+                "errors": [
+                    PipelineError(
+                        node=node_name,
+                        message=str(ve),
+                        severity=ErrorSeverity.ERROR,
+                        error_code="ROUTING_FAILED"
+                    )
+                ],
+                "reasoning": [{"node": "router", "content": f"Routing failed: {str(ve)}", "type": "error"}]
+             }
         except Exception as e:
             return {
-                "errors": [f"Routing error: {str(e)}"],
+                "errors": [
+                    PipelineError(
+                        node=node_name,
+                        message=f"Routing exception: {str(e)}",
+                        severity=ErrorSeverity.CRITICAL,
+                        error_code="ROUTING_CRASH",
+                        stack_trace=str(e)
+                    )
+                ],
                 "reasoning": [{"node": "router", "content": f"Error occurred: {str(e)}", "type": "error"}]
             }
 

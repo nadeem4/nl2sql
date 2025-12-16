@@ -12,6 +12,7 @@ if TYPE_CHECKING:
 from .schemas import PlanModel
 from nl2sql.nodes.planner.prompts import PLANNER_PROMPT, PLANNER_EXAMPLES
 from nl2sql.datasource_registry import DatasourceRegistry
+from nl2sql.errors import PipelineError, ErrorSeverity
 
 from nl2sql.logger import get_logger
 
@@ -58,7 +59,16 @@ class PlannerNode:
 
         try:
             if not self.llm:
-                return {"errors": ["Planner LLM not provided; no plan generated."]}
+                return {
+                    "errors": [
+                        PipelineError(
+                            node=node_name,
+                            message="Planner LLM not provided; no plan generated.",
+                            severity=ErrorSeverity.CRITICAL,
+                            error_code="MISSING_LLM"
+                        )
+                    ]
+                }
 
             schema_context = ""
             if state.schema_info:
@@ -70,7 +80,9 @@ class PlannerNode:
 
             feedback = ""
             if state.errors:
-                feedback = f"The previous plan was invalid. Fix the following errors:\n{json.dumps(state.errors, indent=2)}\n"
+                # Serialize PipelineError objects to readable strings for LLM
+                error_msgs = [e.message for e in state.errors]
+                feedback = f"The previous plan was invalid. Fix the following errors:\n{json.dumps(error_msgs, indent=2)}\n"
             
             # Get date format from profile
             date_format = "ISO 8601 (YYYY-MM-DD)"
@@ -111,5 +123,13 @@ class PlannerNode:
         except Exception as exc:
             return {
                 "plan": None,
-                "errors": [f"Planner failed. Error: {repr(exc)}"]
+                "errors": [
+                    PipelineError(
+                        node=node_name,
+                        message=f"Planner failed. Error: {repr(exc)}",
+                        severity=ErrorSeverity.ERROR,
+                        error_code="PLANNER_FAILED",
+                        stack_trace=str(exc)
+                    )
+                ]
             }

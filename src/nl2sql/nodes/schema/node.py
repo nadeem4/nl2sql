@@ -10,6 +10,7 @@ if TYPE_CHECKING:
 from .schemas import SchemaInfo, TableInfo, ForeignKey, ColumnInfo
 from nl2sql.vector_store import SchemaVectorStore
 from nl2sql.datasource_registry import DatasourceRegistry
+from nl2sql.errors import PipelineError, ErrorSeverity
 
 from nl2sql.logger import get_logger
 
@@ -141,4 +142,14 @@ class SchemaNode:
             }
 
         except Exception as e:
-            raise e
+            return {
+                "errors": [
+                    PipelineError(
+                        node="schema",
+                        message=f"Schema retrieval failed: {e}",
+                        severity=ErrorSeverity.CRITICAL,
+                        error_code="SCHEMA_RETRIEVAL_FAILED",
+                        stack_trace=str(e)
+                    )
+                ]
+            }

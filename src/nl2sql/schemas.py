@@ -42,6 +42,8 @@ def merge_ids_set(left: Optional[Set[str]], right: Optional[Set[str]]) -> Set[st
         
     return left | right
 
+from nl2sql.errors import PipelineError
+
 class GraphState(BaseModel):
     """
     State definition for the NL2SQL LangGraph pipeline.
@@ -54,7 +56,7 @@ class GraphState(BaseModel):
         validation (Dict[str, Any]): Validation results and capabilities.
         intent (Optional[IntentModel]): The classified intent of the query.
         execution (Optional[ExecutionModel]): The result of SQL execution.
-        errors (List[str]): List of errors encountered during execution.
+        errors (List[PipelineError]): List of structured errors encountered.
         retry_count (int): Counter for retry attempts.
         reasoning (List[Dict[str, Any]]): Accumulated reasoning steps from nodes.
         datasource_id (Set[str]): Set of potential datasource IDs.
@@ -74,7 +76,7 @@ class GraphState(BaseModel):
     validation: Dict[str, Any] = Field(default_factory=dict)
     intent: Optional[IntentModel] = None
     execution: Optional[ExecutionModel] = None
-    errors: List[str] = Field(default_factory=list)
+    errors: Annotated[List[PipelineError], operator.add] = Field(default_factory=list)
     retry_count: int = 0
     reasoning: Annotated[List[Dict[str, Any]], operator.add] = Field(default_factory=list)
     datasource_id: Annotated[Set[str], merge_ids_set] = Field(default_factory=set)

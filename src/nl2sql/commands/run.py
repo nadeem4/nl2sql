@@ -90,6 +90,11 @@ def _run_simple_mode(args: argparse.Namespace, query: str, datasource_registry: 
         if sql_draft:
              presenter.print_sql(f"[bold]SQL Generated:[/bold]\n{sql_draft}")
 
+    # Print Pipeline Errors
+    errors = final_state.get("errors")
+    if errors:
+        presenter.print_pipeline_errors(errors)
+
     final_answer = final_state.get("final_answer")
     if final_answer:
         presenter.print_final_answer(final_answer)

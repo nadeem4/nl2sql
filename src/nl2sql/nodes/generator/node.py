@@ -10,6 +10,7 @@ from nl2sql.capabilities import EngineCapabilities, get_capabilities
 if TYPE_CHECKING:
     from nl2sql.schemas import GraphState
 
+from nl2sql.errors import PipelineError, ErrorSeverity
 from nl2sql.datasource_registry import DatasourceRegistry
 from nl2sql.logger import get_logger
 
@@ -40,13 +41,22 @@ class GeneratorNode:
             state: The current graph state.
 
         Returns:
-            Dictionary updates for the graph state with the generated SQL draft.
+            Dictionary updates for the graph state with the generated SQL Draft.
         """
         node_name = "generator"
 
         try:
             if not state.datasource_id:
-                return {"errors": ["No datasource_id in state. Router must run before GeneratorNode."]}
+                return {
+                    "errors": [
+                        PipelineError(
+                            node=node_name,
+                            message="No datasource_id in state. Router must run before GeneratorNode.",
+                            severity=ErrorSeverity.ERROR,
+                            error_code="MISSING_DATASOURCE_ID"
+                        )
+                    ]
+                }
 
             profile = self.registry.get_profile(state.datasource_id if isinstance(state.datasource_id, str) else next(iter(state.datasource_id)))
             self.profile_engine = profile.engine
@@ -54,7 +64,16 @@ class GeneratorNode:
 
             caps: EngineCapabilities = get_capabilities(self.profile_engine)
             if not state.plan:
-                return {"errors": ["No plan to generate SQL from."]}
+                return {
+                    "errors": [
+                         PipelineError(
+                            node=node_name,
+                            message="No plan to generate SQL from.",
+                            severity=ErrorSeverity.ERROR,
+                            error_code="MISSING_PLAN"
+                        )
+                    ]
+                }
 
             limit = self.row_limit
             if state.plan.get("limit"):
@@ -79,7 +98,15 @@ class GeneratorNode:
             logger.error(f"Node {node_name} failed: {exc}")
             return {
                 "sql_draft": None,
-                "errors": [f"SQL generation failed: {exc}"]
+                "errors": [
+                    PipelineError(
+                        node=node_name,
+                        message=f"SQL generation failed: {exc}",
+                        severity=ErrorSeverity.ERROR,
+                        error_code="SQL_GEN_FAILED",
+                        stack_trace=str(exc)
+                    )
+                ]
             }
 
     def _generate_sql_from_plan(self, plan: dict, limit: int) -> str:

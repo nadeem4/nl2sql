@@ -7,10 +7,10 @@ from datetime import datetime
 if TYPE_CHECKING:
     from nl2sql.schemas import GraphState
 
+from nl2sql.errors import PipelineError, ErrorSeverity
 from nl2sql.nodes.planner.schemas import ColumnRef, PlanModel
 from nl2sql.nodes.schema.schemas import SchemaInfo
 from nl2sql.datasource_registry import DatasourceRegistry
-
 from nl2sql.logger import get_logger
 
 logger = get_logger("validator")
@@ -47,7 +47,7 @@ class ValidatorNode:
         aggs = ["COUNT(", "SUM(", "AVG(", "MIN(", "MAX("]
         return any(agg in upper_expr for agg in aggs)
     
-    def validate_data_types(self, plan: PlanModel, schema_info: SchemaInfo, profile_id: str, errors: list[str]) -> None:
+    def validate_data_types(self, plan: PlanModel, schema_info: SchemaInfo, profile_id: str, errors: list[PipelineError]) -> None:
         """
         Validates that literals in filters match the column types and date formats.
         """
@@ -88,21 +88,36 @@ class ValidatorNode:
                              except ValueError:
                                  continue
                          if not valid:
-                             errors.append(f"Invalid date format for '{col_expr}' ({sql_type}). Value '{val_str}' does not match ISO 8601 (YYYY-MM-DD).")
+                             errors.append(PipelineError(
+                                 node="validator",
+                                 message=f"Invalid date format for '{col_expr}' ({sql_type}). Value '{val_str}' does not match ISO 8601 (YYYY-MM-DD).",
+                                 severity=ErrorSeverity.WARNING,
+                                 error_code="INVALID_DATE_FORMAT"
+                             ))
                     else:
                         # Specific format check
                         try:
                             if "%" in date_format: 
                                 datetime.strptime(val_str, date_format)
                         except ValueError:
-                             errors.append(f"Invalid date format for '{col_expr}'. Value '{val_str}' does not match required format '{date_format}'.")
+                             errors.append(PipelineError(
+                                 node="validator",
+                                 message=f"Invalid date format for '{col_expr}'. Value '{val_str}' does not match required format '{date_format}'.",
+                                 severity=ErrorSeverity.WARNING,
+                                 error_code="INVALID_DATE_FORMAT"
+                             ))
             
             # Numeric Validation
             elif "INT" in sql_type or "DECIMAL" in sql_type or "FLOAT" in sql_type:
                 if isinstance(value, str) and not value.replace('.', '', 1).isdigit():
                      val_str = value.strip("'").strip('"')
                      if not val_str.replace('.', '', 1).isdigit():
-                          errors.append(f"Invalid numeric value for '{col_expr}' ({sql_type}): {value}")
+                          errors.append(PipelineError(
+                                node="validator",
+                                message=f"Invalid numeric value for '{col_expr}' ({sql_type}): {value}",
+                                severity=ErrorSeverity.WARNING,
+                                error_code="INVALID_NUMERIC_VALUE"
+                          ))
 
         for flt in plan.filters:
              check_value(flt.column.expr, flt.value, flt.op)
@@ -111,7 +126,7 @@ class ValidatorNode:
              check_value(hav.expr, hav.value, hav.op)
 
 
-    def validate_aggregations(self, plan: PlanModel, errors: list[str]) -> None:
+    def validate_aggregations(self, plan: PlanModel, errors: list[PipelineError]) -> None:
         """
         Validates GROUP BY logic.
         
@@ -133,9 +148,14 @@ class ValidatorNode:
         if has_aggregations or plan.group_by:
             for col in non_aggregated_cols:
                 if col.expr not in group_by_exprs:
-                    errors.append(f"Column '{col.expr}' is selected but not aggregated or included in GROUP BY.")
+                    errors.append(PipelineError(
+                        node="validator",
+                        message=f"Column '{col.expr}' is selected but not aggregated or included in GROUP BY.",
+                        severity=ErrorSeverity.WARNING,
+                        error_code="MISSING_GROUP_BY"
+                    ))
 
-    def validate_column_ref(self, col: ColumnRef, schema_cols: Set[str], plan_table_aliases: Set[str], context: str, errors: list[str]) -> None:
+    def validate_column_ref(self, col: ColumnRef, schema_cols: Set[str], plan_table_aliases: Set[str], context: str, errors: list[PipelineError]) -> None:
         """
         Validates a column reference.
 
@@ -147,13 +167,23 @@ class ValidatorNode:
             errors: List to append error messages to.
         """
         if col.alias and context != "select_columns":
-            errors.append(f"Column alias '{col.alias}' used in '{context}'. Aliases are only allowed in 'select_columns'.")
+            errors.append(PipelineError(
+                node="validator",
+                message=f"Column alias '{col.alias}' used in '{context}'. Aliases are only allowed in 'select_columns'.",
+                severity=ErrorSeverity.WARNING,
+                error_code="INVALID_ALIAS_USAGE"
+            ))
 
         if col.is_derived:
             pass
         else:
             if col.expr not in schema_cols:
-                errors.append(f"Column '{col.expr}' not found in schema. Ensure you are using the pre-aliased name (e.g., 't1.col').")
+                errors.append(PipelineError(
+                    node="validator",
+                    message=f"Column '{col.expr}' not found in schema. Ensure you are using the pre-aliased name (e.g., 't1.col').",
+                    severity=ErrorSeverity.WARNING,
+                    error_code="COLUMN_NOT_FOUND"
+                ))
 
     def __call__(self, state: GraphState) -> Dict[str, Any]:
         """
@@ -172,7 +202,12 @@ class ValidatorNode:
             errors = []
 
             if not state.plan:
-                errors.append("No plan to validate.")
+                errors.append(PipelineError(
+                    node=node_name,
+                    message="No plan to validate.",
+                    severity=ErrorSeverity.ERROR, # Blocking
+                    error_code="MISSING_PLAN"
+                ))
                 return {"errors": errors}
 
             if not state.schema_info:
@@ -180,13 +215,23 @@ class ValidatorNode:
 
             query_type = state.plan.get("query_type", "READ")
             if query_type != "READ":
-                errors.append(f"Security Violation: Query type '{query_type}' is not allowed. Only READ queries are permitted.")
+                errors.append(PipelineError(
+                    node=node_name,
+                    message=f"Security Violation: Query type '{query_type}' is not allowed. Only READ queries are permitted.",
+                    severity=ErrorSeverity.CRITICAL,
+                    error_code="SECURITY_VIOLATION"
+                ))
                 return {"errors": errors}
 
             try:
                 plan = PlanModel(**state.plan)
             except Exception as e:
-                errors.append(f"Invalid plan structure: {e}")
+                errors.append(PipelineError(
+                    node=node_name,
+                    message=f"Invalid plan structure: {e}",
+                    severity=ErrorSeverity.ERROR,
+                    error_code="INVALID_PLAN_STRUCTURE"
+                ))
                 return {"errors": errors}
 
             schema_cols = set()
@@ -207,7 +252,12 @@ class ValidatorNode:
                         break
                 
                 if not found:
-                        errors.append(f"Table '{t.name}' with alias '{t.alias}' not found in schema or alias mismatch.")
+                        errors.append(PipelineError(
+                            node=node_name,
+                            message=f"Table '{t.name}' with alias '{t.alias}' not found in schema or alias mismatch.",
+                            severity=ErrorSeverity.ERROR,
+                            error_code="TABLE_NOT_FOUND"
+                        ))
 
             for col in plan.select_columns:
                 self.validate_column_ref(col, schema_cols, plan_table_aliases, "select_columns", errors)
@@ -223,16 +273,36 @@ class ValidatorNode:
 
             for join in plan.joins:
                 if join.left not in plan_table_names:
-                        errors.append(f"Join left table '{join.left}' is not in plan tables.")
+                        errors.append(PipelineError(
+                            node=node_name,
+                            message=f"Join left table '{join.left}' is not in plan tables.",
+                            severity=ErrorSeverity.WARNING,
+                            error_code="JOIN_TABLE_NOT_IN_PLAN"
+                        ))
                 if join.right not in plan_table_names:
-                        errors.append(f"Join right table '{join.right}' is not in plan tables.")
+                        errors.append(PipelineError(
+                            node=node_name,
+                            message=f"Join right table '{join.right}' is not in plan tables.",
+                            severity=ErrorSeverity.WARNING,
+                            error_code="JOIN_TABLE_NOT_IN_PLAN"
+                        ))
                 
                 if not join.on:
-                    errors.append(f"Join between '{join.left}' and '{join.right}' has no ON clause.")
+                    errors.append(PipelineError(
+                        node=node_name,
+                        message=f"Join between '{join.left}' and '{join.right}' has no ON clause.",
+                        severity=ErrorSeverity.WARNING,
+                        error_code="JOIN_MISSING_ON_CLAUSE"
+                    ))
 
             for hav in plan.having:
                 if not hav.expr:
-                    errors.append(f"Having clause missing expression: {hav}")
+                    errors.append(PipelineError(
+                        node=node_name,
+                        message=f"Having clause missing expression: {hav}",
+                        severity=ErrorSeverity.WARNING,
+                        error_code="HAVING_MISSING_EXPRESSION"
+                    ))
 
             self.validate_aggregations(plan, errors)
             
@@ -243,7 +313,7 @@ class ValidatorNode:
             if errors:
                 validator_thoughts.append("Validation Failed")
                 for err in errors:
-                    validator_thoughts.append(f"Error: {err}")
+                    validator_thoughts.append(f"Error: {err.message}") # Use message from PipelineError
             else:
                 validator_thoughts.append("Validation Successful")
                 validator_thoughts.append("Plan is valid against schema and security policies.")
@@ -255,10 +325,17 @@ class ValidatorNode:
             }
 
         except Exception as exc:
+            err = PipelineError(
+                node=node_name,
+                message=f"Validator exception: {exc}",
+                severity=ErrorSeverity.ERROR,
+                error_code="VALIDATOR_CRASH",
+                stack_trace=str(exc)
+            )
             logger.error(f"Node {node_name} failed: {exc}")
             import traceback
             logger.error(traceback.format_exc())
             return {
-                "errors": [f"Validation exception: {exc}"],
+                "errors": [err],
                 "reasoning": [{"node": "validator", "content": f"Exception: {exc}", "type": "error"}]
             }
