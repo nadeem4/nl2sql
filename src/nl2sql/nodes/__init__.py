@@ -6,8 +6,6 @@ from nl2sql.nodes.schema import SchemaNode
 from nl2sql.nodes.executor import ExecutorNode
 from nl2sql.nodes.decomposer import DecomposerNode
 from nl2sql.nodes.aggregator import AggregatorNode
-from nl2sql.nodes.router import RouterNode
-
 __all__ = [
     "IntentNode", 
     "PlannerNode", 
@@ -16,6 +14,5 @@ __all__ = [
     "SchemaNode", 
     "ExecutorNode",
     "DecomposerNode",
-    "AggregatorNode",
-    "RouterNode"
+    "AggregatorNode"
 ]

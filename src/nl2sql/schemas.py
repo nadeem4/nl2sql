@@ -16,7 +16,6 @@ from nl2sql.nodes.executor.schemas import ExecutionModel
 
 from nl2sql.nodes.decomposer.schemas import DecomposerResponse
 from nl2sql.nodes.aggregator.schemas import AggregatedResponse
-from nl2sql.nodes.router.schemas import RoutingInfo
 
 
 def merge_dicts(left: Dict[str, Any], right: Dict[str, Any]) -> Dict[str, Any]:
@@ -44,6 +43,12 @@ def merge_ids_set(left: Optional[Set[str]], right: Optional[Set[str]]) -> Set[st
 
 from nl2sql.errors import PipelineError
 
+class SubQuery(BaseModel):
+    query: str
+    datasource_id: str
+    candidate_tables: Optional[List[str]] = None
+    reasoning: Optional[str] = None
+
 class GraphState(BaseModel):
     """
     State definition for the NL2SQL LangGraph pipeline.
@@ -61,11 +66,10 @@ class GraphState(BaseModel):
         reasoning (List[Dict[str, Any]]): Accumulated reasoning steps from nodes.
         datasource_id (Set[str]): Set of potential datasource IDs.
         selected_datasource_id (Optional[str]): The ID of the specifically selected datasource.
-        sub_queries (Optional[List[str]]): List of sub-queries when decomposing complex queries.
+        sub_queries (Optional[List[SubQuery]]): List of structured sub-queries.
         intermediate_results (List[Any]): Results accumulated from parallel branches.
         query_history (List[Dict[str, Any]]): History of executed queries and results.
         final_answer (Optional[str]): The final synthesized answer returned to the user.
-        routing_info (Dict[str, RoutingInfo]): Detailed routing metadata and scores.
     """
     model_config = ConfigDict(extra="ignore", arbitrary_types_allowed=True)
     
@@ -81,8 +85,7 @@ class GraphState(BaseModel):
     reasoning: Annotated[List[Dict[str, Any]], operator.add] = Field(default_factory=list)
     datasource_id: Annotated[Set[str], merge_ids_set] = Field(default_factory=set)
     selected_datasource_id: Optional[str] = None
-    sub_queries: Optional[List[str]] = None
+    sub_queries: Optional[List[SubQuery]] = None
     intermediate_results: Annotated[List[Any], operator.add] = Field(default_factory=list)
     query_history: Annotated[List[Dict[str, Any]], operator.add] = Field(default_factory=list)
     final_answer: Optional[str] = None
-    routing_info: Annotated[Dict[str, RoutingInfo], merge_dicts] = Field(default_factory=dict)

@@ -153,3 +153,29 @@ To ensure reliability, we implement a **Hybrid Strategy**:
 * **Simplicity**: Linear execution branches. No conditional routing logic downstream.
 
 This architecture provides the **speed of a search engine** with the **intelligence of an LLM**.
+
+---
+
+## 8. Retrieval Optimization: Handling Dominant Intents
+
+### 8.1 The Problem: "Example Flooding"
+
+When routing relies on vector similarity, a common failure mode is **Dominant Intent Masking**.
+If a user asks a query that strongly resembles a specific cluster of examples (e.g., "Sales"), the top-k results might be **100% Sales Examples**, pushing other potentially relevant datasources (e.g., "Inventory") out of the context window.
+
+This forces the Decomposer to route based on incomplete information, often missing secondary datasources or failing to pre-route tables, triggering a fallback search.
+
+### 8.2 The Solution: Partitioned MMR Strategy
+
+To guarantee robustness, the `OrchestratorVectorStore` implements a **Partitioned Retrieval Protocol**:
+
+1. **Partitioned Search**:
+    * **Search A (Tables)**: Fetches `k=5` matches specifically where `type="table"`.
+    * **Search B (Examples)**: Fetches `k=5` matches specifically where `type="example"`.
+    * *Effect*: We strictly separate "Physical Schema Matches" from "Semantic Intent Matches". One cannot crowd out the other.
+
+2. **Maximal Marginal Relevance (MMR)**:
+    * Instead of pure similarity, we use MMR (with `lambda=0.7`).
+    * *Effect*: If the top 3 matches are identical "Sales" tables, MMR penalizes the duplicates to let a slightly less similar "Inventory" table bubble up into the top 5.
+
+3. **Result**: The Orchestrator receives a balanced context containing the **Best Physical Tables** AND the **Best Semantic Examples** across the entire ecosystem, ensuring accurate routing even for ambiguous queries.

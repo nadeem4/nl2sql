@@ -8,7 +8,7 @@ if TYPE_CHECKING:
     from nl2sql.schemas import GraphState
 
 from .schemas import SchemaInfo, TableInfo, ForeignKey, ColumnInfo
-from nl2sql.vector_store import SchemaVectorStore
+from nl2sql.vector_store import OrchestratorVectorStore
 from nl2sql.datasource_registry import DatasourceRegistry
 from nl2sql.errors import PipelineError, ErrorSeverity
 
@@ -25,7 +25,7 @@ class SchemaNode:
     Also handles assigning aliases to tables and columns for the planner.
     """
 
-    def __init__(self, registry: DatasourceRegistry, vector_store: Optional[SchemaVectorStore] = None):
+    def __init__(self, registry: DatasourceRegistry, vector_store: Optional[OrchestratorVectorStore] = None):
         """
         Initializes the SchemaNode.
 
@@ -59,9 +59,22 @@ class SchemaNode:
             ds_ids = {target_ds_id}
             
             search_candidates = None
-            retrieved_tables_update = None
             
-            if self.vector_store:
+            # Check for Pre-Routed Candidate Tables (from Orchestrator/Decomposer)
+            # Find the SubQuery corresponding to this datasource_id
+            pre_routed_tables = None
+            if state.sub_queries:
+                 for sq in state.sub_queries:
+                     if hasattr(sq, "datasource_id") and sq.datasource_id == target_ds_id:
+                         if sq.candidate_tables:
+                             pre_routed_tables = sq.candidate_tables
+                             break
+            
+            if pre_routed_tables:
+                search_candidates = pre_routed_tables
+                logger.info(f"Using pre-routed tables for {target_ds_id}: {pre_routed_tables}")
+            elif self.vector_store:
+                 # Fallback to local vector search if no pre-routed tables (L3 Case)
                  try:
                     search_q = state.user_query
                     if state.intent:
@@ -69,7 +82,7 @@ class SchemaNode:
                          if extras: search_q = f"{state.user_query} {extras}"
                     
                     ds_filter = [target_ds_id]
-                    search_candidates = self.vector_store.retrieve(search_q, datasource_id=ds_filter)
+                    search_candidates = self.vector_store.retrieve_table_names(search_q, datasource_id=ds_filter)
                  except:
                      pass
 

@@ -6,19 +6,19 @@ from typing import Optional
 from nl2sql.langgraph_pipeline import run_with_graph
 from nl2sql.datasource_registry import DatasourceRegistry
 from nl2sql.llm_registry import LLMRegistry
-from nl2sql.vector_store import SchemaVectorStore
+from nl2sql.vector_store import OrchestratorVectorStore
 from nl2sql.commands.visualize import draw_execution_trace
 from nl2sql.schemas import GraphState
 from nl2sql.reporting import ConsolePresenter
 
-def run_pipeline(args: argparse.Namespace, query: Optional[str], datasource_registry: DatasourceRegistry, llm_registry: LLMRegistry, vector_store: SchemaVectorStore) -> None:
+def run_pipeline(args: argparse.Namespace, query: Optional[str], datasource_registry: DatasourceRegistry, llm_registry: LLMRegistry, vector_store: OrchestratorVectorStore) -> None:
     if not query:
         return
         
     _run_simple_mode(args, query, datasource_registry, llm_registry, vector_store)
 
 
-def _run_simple_mode(args: argparse.Namespace, query: str, datasource_registry: DatasourceRegistry, llm_registry: LLMRegistry, vector_store: SchemaVectorStore) -> None:
+def _run_simple_mode(args: argparse.Namespace, query: str, datasource_registry: DatasourceRegistry, llm_registry: LLMRegistry, vector_store: OrchestratorVectorStore) -> None:
     presenter = ConsolePresenter()
     presenter.print_query(query)
     
