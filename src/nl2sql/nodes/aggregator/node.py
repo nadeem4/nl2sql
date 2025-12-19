@@ -67,7 +67,7 @@ class AggregatorNode:
         node_name = "aggregator"
         
         try:
-            if len(intermediate_results) == 1 and not state.errors and state.complexity == "simple":
+            if len(intermediate_results) == 1 and not state.errors and state.sub_queries[0].complexity == "simple":
                 # Fast path: Skip LLM, return None for final_answer so run.py uses execution result
                 return {
                     "final_answer": None,
