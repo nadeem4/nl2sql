@@ -27,7 +27,7 @@ Each branch runs a dedicated LangGraph `StateMachine` responsible for converting
 | :--- | :--- | :--- | :--- |
 | **RouterNode** | Identifies the correct datasource (e.g., SQLite, Postgres) using a 3-Layer logic (Vector -> Multi-Query -> LLM). | `user_query` | `datasource_id` |
 | **IntentNode** | Classifies the query intent (e.g., `READ`, `WRITE`) and filters. | `user_query` | `intent` (IntentModel) |
-| **SchemaNode** | Retrieves relevant table schemas. Uses `SchemaVectorStore` for large schemas. | `datasource_id`, `intent` | `schema_info` |
+| **SchemaNode** | Retrieves relevant table schemas. Uses `OrchestratorVectorStore` for large schemas. | `datasource_id`, `intent` | `schema_info` |
 | **PlannerNode** | Generates an abstract execution plan (joins, filters) using chain-of-thought. Injects custom `date_format`. | `schema_info`, `intent` | `plan` (PlanModel) |
 | **ValidatorNode** | **Guardrails**. Checks column existence, validates data types (int vs string), and enforces date formats. | `plan`, `schema_info` | `errors` (if any) |
 | **GeneratorNode** | Converts the abstract plan into dialect-specific SQL (e.g., T-SQL, PostgreSQL). | `plan`, `profile` | `sql_draft` |

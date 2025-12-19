@@ -51,7 +51,7 @@ We propose merging the **Decomposition** and **Routing** responsibilities into a
 Instead of thinking *then* looking, the Orchestrator **looks *then* thinks**.
 
 1. **Phase 1: Retrieval (L1 & L2)**
-    * **Vector Search**: The node queries the `SchemaVectorStore` with the raw user query.
+    * **Vector Search**: The node queries the `OrchestratorVectorStore` with the raw user query.
     * **Multi-Query**: If low confidence, it generates keyword variations to maximize recall.
     * *Output*: A set of **Candidate Tables** and their host **Datasources**.
 

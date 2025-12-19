@@ -1,7 +1,7 @@
 
 import pytest
 from unittest.mock import MagicMock, patch
-from nl2sql.vector_store import SchemaVectorStore
+from nl2sql.vector_store import OrchestratorVectorStore
 from langchain_core.documents import Document
 
 def test_index_schema():
@@ -19,8 +19,8 @@ def test_index_schema():
         mock_inspector.get_columns.return_value = [{"name": "col1", "type": "INTEGER"}]
         mock_inspector.get_foreign_keys.return_value = []
         
-        store = SchemaVectorStore(embeddings=mock_embeddings)
-        store.index_schema(mock_engine)
+        store = OrchestratorVectorStore(embeddings=mock_embeddings)
+        store.index_schema(mock_engine, datasource_id="test_ds")
         
         # Verify documents added
         mock_chroma.add_documents.assert_called_once()
@@ -28,6 +28,7 @@ def test_index_schema():
         assert len(docs) == 1
         assert "table1" in docs[0].page_content
         assert docs[0].metadata["table_name"] == "table1"
+        assert docs[0].metadata["datasource_id"] == "test_ds"
 
 def test_retrieve():
     """Test retrieving tables from vector store."""
@@ -36,10 +37,10 @@ def test_retrieve():
     with patch("nl2sql.vector_store.Chroma", return_value=mock_chroma), \
          patch("nl2sql.vector_store.OpenAIEmbeddings"):
         
-        store = SchemaVectorStore()
+        store = OrchestratorVectorStore()
         mock_chroma.similarity_search.return_value = [
             Document(page_content="...", metadata={"table_name": "table1"})
         ]
         
-        results = store.retrieve("query")
+        results = store.retrieve_table_names("query")
         assert results == ["table1"]

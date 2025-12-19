@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 from .schemas import PlanModel
 from nl2sql.nodes.planner.prompts import PLANNER_PROMPT, PLANNER_EXAMPLES
 from nl2sql.datasource_registry import DatasourceRegistry
-from nl2sql.errors import PipelineError, ErrorSeverity
+from nl2sql.errors import PipelineError, ErrorSeverity, ErrorCode
 
 from nl2sql.logger import get_logger
 
@@ -65,7 +65,7 @@ class PlannerNode:
                             node=node_name,
                             message="Planner LLM not provided; no plan generated.",
                             severity=ErrorSeverity.CRITICAL,
-                            error_code="MISSING_LLM"
+                            error_code=ErrorCode.MISSING_LLM
                         )
                     ]
                 }
@@ -80,7 +80,6 @@ class PlannerNode:
 
             feedback = ""
             if state.errors:
-                # Serialize PipelineError objects to readable strings for LLM
                 error_msgs = [e.message for e in state.errors]
                 feedback = f"The previous plan was invalid. Fix the following errors:\n{json.dumps(error_msgs, indent=2)}\n"
             
@@ -128,7 +127,7 @@ class PlannerNode:
                         node=node_name,
                         message=f"Planner failed. Error: {repr(exc)}",
                         severity=ErrorSeverity.ERROR,
-                        error_code="PLANNER_FAILED",
+                        error_code=ErrorCode.PLANNING_FAILURE,
                         stack_trace=str(exc)
                     )
                 ]

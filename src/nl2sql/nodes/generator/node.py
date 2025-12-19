@@ -10,7 +10,7 @@ from nl2sql.capabilities import EngineCapabilities, get_capabilities
 if TYPE_CHECKING:
     from nl2sql.schemas import GraphState
 
-from nl2sql.errors import PipelineError, ErrorSeverity
+from nl2sql.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.datasource_registry import DatasourceRegistry
 from nl2sql.logger import get_logger
 
@@ -46,19 +46,19 @@ class GeneratorNode:
         node_name = "generator"
 
         try:
-            if not state.datasource_id:
+            if not state.selected_datasource_id:
                 return {
                     "errors": [
                         PipelineError(
                             node=node_name,
                             message="No datasource_id in state. Router must run before GeneratorNode.",
                             severity=ErrorSeverity.ERROR,
-                            error_code="MISSING_DATASOURCE_ID"
+                            error_code=ErrorCode.MISSING_DATASOURCE_ID
                         )
                     ]
                 }
 
-            profile = self.registry.get_profile(state.datasource_id if isinstance(state.datasource_id, str) else next(iter(state.datasource_id)))
+            profile = self.registry.get_profile(state.selected_datasource_id)
             self.profile_engine = profile.engine
             self.row_limit = profile.row_limit
 
@@ -70,7 +70,7 @@ class GeneratorNode:
                             node=node_name,
                             message="No plan to generate SQL from.",
                             severity=ErrorSeverity.ERROR,
-                            error_code="MISSING_PLAN"
+                            error_code=ErrorCode.MISSING_PLAN
                         )
                     ]
                 }
@@ -103,7 +103,7 @@ class GeneratorNode:
                         node=node_name,
                         message=f"SQL generation failed: {exc}",
                         severity=ErrorSeverity.ERROR,
-                        error_code="SQL_GEN_FAILED",
+                        error_code=ErrorCode.SQL_GEN_FAILED,
                         stack_trace=str(exc)
                     )
                 ]

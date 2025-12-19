@@ -7,7 +7,7 @@ from .schemas import ExecutionModel
 
 if TYPE_CHECKING:
     from nl2sql.schemas import GraphState
-from nl2sql.errors import PipelineError, ErrorSeverity
+from nl2sql.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.security import enforce_read_only
 from nl2sql.logger import get_logger
 
@@ -43,51 +43,32 @@ class ExecutorNode:
 
         try:
             errors = []
-            if not state.sql_draft:
+            ds_id = state.selected_datasource_id
+            sql = state.sql_draft
+            
+            if not sql:
                 errors.append(PipelineError(
                     node=node_name,
                     message="No SQL to execute.",
                     severity=ErrorSeverity.ERROR,
-                    error_code="MISSING_SQL"
+                    error_code=ErrorCode.MISSING_SQL
                 ))
-                return {"errors": errors}
+                return {"errors": errors, "execution": ExecutionModel(row_count=0, rows=[], error="No SQL to execute")}
                 
-            if not state.datasource_id:
+            if not ds_id:
                 errors.append(PipelineError(
                     node=node_name,
                     message="No datasource_id in state. Router must run before ExecutorNode.",
                     severity=ErrorSeverity.ERROR,
-                    error_code="MISSING_DATASOURCE_ID"
+                    error_code=ErrorCode.MISSING_DATASOURCE_ID
                 ))
                 return {
                     "errors": errors,
                     "execution": ExecutionModel(row_count=0, rows=[], error="Missing Datasource ID")
                 }
 
-            # Handle Set[str] -> Pick sorted first for deterministic execution
-            ds_ids = state.datasource_id if isinstance(state.datasource_id, (set, list)) else {state.datasource_id}
-            if not ds_ids:
-                errors.append(PipelineError(
-                    node=node_name,
-                    message="Empty datasource_id set.",
-                    severity=ErrorSeverity.ERROR,
-                    error_code="EMPTY_DATASOURCE_SET"
-                ))
-                return {"errors": errors}
-                
-            target_ds_id = sorted(list(ds_ids))[0]
+            profile = self.registry.get_profile(ds_id)
             
-            if len(ds_ids) > 1:
-                errors.append(PipelineError(
-                    node=node_name,
-                    message=f"Warning: Multiple datasources selected {ds_ids}, executing on primary: {target_ds_id}",
-                    severity=ErrorSeverity.WARNING,
-                    error_code="MULTIPLE_DATASOURCES_WARNING"
-                ))
-
-            profile = self.registry.get_profile(target_ds_id)
-            
-            # Map SQLAlchemy engine to sqlglot dialect
             dialect = None
             if "mssql" in profile.engine:
                 dialect = "tsql"
@@ -105,23 +86,21 @@ class ExecutorNode:
                     node=node_name,
                     message="Security Violation: SQL query contains forbidden keywords (read-only enforcement).",
                     severity=ErrorSeverity.CRITICAL,
-                    error_code="SECURITY_VIOLATION"
+                    error_code=ErrorCode.SECURITY_VIOLATION
                 ))
                 return {
                     "errors": errors,
                     "execution": ExecutionModel(row_count=0, rows=[], error="Security Violation")
                 }
                 
-            profile = self.registry.get_profile(target_ds_id)
-            engine = self.registry.get_engine(target_ds_id)
+            profile = self.registry.get_profile(ds_id)
+            engine = self.registry.get_engine(ds_id)
             
             execution_result = None
             
             try:
-                # Remove hardcoded limit, rely on profile.row_limit
-                rows = run_read_query(engine, state.sql_draft)
+                rows = run_read_query(engine, sql)
                 
-                # Convert rows to list of dicts
                 result_rows = []
                 columns = []
                 if rows:
@@ -144,11 +123,11 @@ class ExecutorNode:
                     node=node_name,
                     message=f"Execution error: {exc}",
                     severity=ErrorSeverity.ERROR,
-                    error_code="DB_EXECUTION_ERROR",
+                    error_code=ErrorCode.DB_EXECUTION_ERROR,
                     stack_trace=str(exc)
                 ))
             
-            exec_msg = f"Executed SQL on {target_ds_id}. Rows returned: {execution_result.row_count}."
+            exec_msg = f"Executed SQL on {ds_id}. Rows returned: {execution_result.row_count}."
             if execution_result.error:
                  exec_msg += f" Error: {execution_result.error}"
             
@@ -164,7 +143,7 @@ class ExecutorNode:
                 node=node_name,
                 message=f"Executor failed: {exc}",
                 severity=ErrorSeverity.CRITICAL,
-                error_code="EXECUTOR_CRASH",
+                error_code=ErrorCode.EXECUTOR_CRASH,
                 stack_trace=str(exc)
             )
             return {

@@ -30,17 +30,17 @@ Instructions:
 7. Prefer stable, minimal, and deterministic decompositions.
 
 Output Format (JSON only):
-{
+{{
   "reasoning": "<high-level explanation>",
   "sub_queries": [
-    {
+    {{
       "query": "<rewritten sub-query>",
       "datasource_id": "<datasource>",
       "candidate_tables": ["<table1>", "<table2>"],
       "reasoning": "<why this datasource and tables were chosen>"
-    }
+    }}
   ]
-}
+}}
 
 User Query:
 {user_query}

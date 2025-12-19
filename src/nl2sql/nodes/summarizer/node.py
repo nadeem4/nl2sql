@@ -7,7 +7,7 @@ from langchain_core.runnables import Runnable
 
 from nl2sql.schemas import GraphState
 from nl2sql.nodes.summarizer.prompts import SUMMARIZER_PROMPT
-from nl2sql.errors import PipelineError, ErrorSeverity
+from nl2sql.errors import PipelineError, ErrorSeverity, ErrorCode
 
 from nl2sql.logger import get_logger
 
@@ -58,7 +58,7 @@ class SummarizerNode:
                             node=node_name,
                             message="Summarizer LLM not provided.",
                             severity=ErrorSeverity.CRITICAL,
-                            error_code="MISSING_LLM"
+                            error_code=ErrorCode.MISSING_LLM
                         )
                     ]
                 }
@@ -96,7 +96,7 @@ class SummarizerNode:
                             node=node_name,
                             message=feedback,
                             severity=ErrorSeverity.WARNING, # Feedback for retry
-                            error_code="PLAN_FEEDBACK"
+                            error_code=ErrorCode.PLAN_FEEDBACK
                         )
                     ],
                     "reasoning": [{"node": "summarizer", "content": feedback}]
@@ -113,7 +113,7 @@ class SummarizerNode:
                         node=node_name,
                         message=f"Summarizer failed: {e}",
                         severity=ErrorSeverity.ERROR,
-                        error_code="SUMMARIZER_FAILED",
+                        error_code=ErrorCode.SUMMARIZER_FAILED,
                         stack_trace=str(e)
                     )
                 ]

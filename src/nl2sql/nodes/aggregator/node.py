@@ -8,7 +8,7 @@ if TYPE_CHECKING:
 
 from .schemas import AggregatedResponse
 from nl2sql.nodes.aggregator.prompts import AGGREGATOR_PROMPT
-from nl2sql.errors import PipelineError, ErrorSeverity
+from nl2sql.errors import PipelineError, ErrorSeverity, ErrorCode
 
 from nl2sql.logger import get_logger
 
@@ -31,12 +31,10 @@ class AggregatorNode:
         node_name = "aggregator"
         
         try:
-            # Format intermediate results for the prompt
             formatted_results = ""
             for i, res in enumerate(intermediate_results):
                 formatted_results += f"--- Result {i+1} ---\n{str(res)}\n\n"
             
-            # Append aggregated errors if any, to inform the aggregator of partial failures
             if state.errors:
                 formatted_results += "\n--- Errors Encountered ---\n"
                 for err in state.errors:
@@ -47,7 +45,6 @@ class AggregatorNode:
                 "intermediate_results": formatted_results
             })
             
-            # Construct the final answer string
             final_answer = f"### Summary\n{response.summary}\n\n"
             if response.format_type == "table":
                 final_answer += f"### Data\n\n{response.content}"
@@ -70,7 +67,7 @@ class AggregatorNode:
                         node=node_name,
                         message=f"Aggregator failed: {str(e)}",
                         severity=ErrorSeverity.ERROR,
-                        error_code="AGGREGATOR_FAILED",
+                        error_code=ErrorCode.AGGREGATOR_FAILED,
                         stack_trace=str(e)
                     )
                 ]

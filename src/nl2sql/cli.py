@@ -10,7 +10,7 @@ from typing import Any, Dict, List
 from nl2sql.datasource_config import load_profiles
 from nl2sql.llm_registry import LLMRegistry, load_llm_config
 from nl2sql.settings import settings
-from nl2sql.vector_store import SchemaVectorStore
+from nl2sql.vector_store import OrchestratorVectorStore
 from nl2sql.datasource_registry import DatasourceRegistry
 
 # Import commands
@@ -69,7 +69,7 @@ def main() -> None:
     
     datasource_registry = DatasourceRegistry(profiles)
 
-    vector_store = SchemaVectorStore(persist_directory=args.vector_store)
+    vector_store = OrchestratorVectorStore(persist_directory=args.vector_store)
 
     if args.index:
         run_indexing(profiles, args.vector_store, vector_store, llm_registry)

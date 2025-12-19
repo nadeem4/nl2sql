@@ -159,22 +159,10 @@ class LLMRegistry:
         llm = self._base_llm("planner")
         return self._wrap_structured_usage(llm, PlanModel)
 
-    def router_llm(self) -> LLMCallable:
-        llm = self._base_llm("router")
-        return llm.invoke
 
-    def router_canonicalizer_llm(self) -> LLMCallable:
-        llm = self._base_llm("router_canonicalizer")
+    def canonicalizer_llm(self) -> LLMCallable:
+        llm = self._base_llm("canonicalizer")
         return llm.invoke
-
-    def router_multi_query_llm(self) -> LLMCallable:
-        llm = self._base_llm("router_multi_query")
-        return llm.invoke
-
-    def router_decision_llm(self) -> LLMCallable:
-        llm = self._base_llm("router_decision")
-        return llm.invoke
-
 
 
     def summarizer_llm(self) -> LLMCallable:
@@ -190,7 +178,7 @@ class LLMRegistry:
 
     def aggregator_llm(self) -> LLMCallable:
         """Returns the LLM callable for the Aggregator agent."""
-        from nl2sql.schemas import AggregatedResponse
+        from nl2sql.nodes.aggregator.schemas import AggregatedResponse
         llm = self._base_llm("aggregator")
         return self._wrap_structured_usage(llm,  AggregatedResponse)
 

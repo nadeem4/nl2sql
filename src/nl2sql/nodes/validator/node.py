@@ -7,7 +7,7 @@ from datetime import datetime
 if TYPE_CHECKING:
     from nl2sql.schemas import GraphState
 
-from nl2sql.errors import PipelineError, ErrorSeverity
+from nl2sql.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.nodes.planner.schemas import ColumnRef, PlanModel
 from nl2sql.nodes.schema.schemas import SchemaInfo
 from nl2sql.datasource_registry import DatasourceRegistry
@@ -92,7 +92,7 @@ class ValidatorNode:
                                  node="validator",
                                  message=f"Invalid date format for '{col_expr}' ({sql_type}). Value '{val_str}' does not match ISO 8601 (YYYY-MM-DD).",
                                  severity=ErrorSeverity.WARNING,
-                                 error_code="INVALID_DATE_FORMAT"
+                                 error_code=ErrorCode.INVALID_DATE_FORMAT
                              ))
                     else:
                         # Specific format check
@@ -104,7 +104,7 @@ class ValidatorNode:
                                  node="validator",
                                  message=f"Invalid date format for '{col_expr}'. Value '{val_str}' does not match required format '{date_format}'.",
                                  severity=ErrorSeverity.WARNING,
-                                 error_code="INVALID_DATE_FORMAT"
+                                 error_code=ErrorCode.INVALID_DATE_FORMAT
                              ))
             
             # Numeric Validation
@@ -116,7 +116,7 @@ class ValidatorNode:
                                 node="validator",
                                 message=f"Invalid numeric value for '{col_expr}' ({sql_type}): {value}",
                                 severity=ErrorSeverity.WARNING,
-                                error_code="INVALID_NUMERIC_VALUE"
+                                error_code=ErrorCode.INVALID_NUMERIC_VALUE
                           ))
 
         for flt in plan.filters:
@@ -152,7 +152,7 @@ class ValidatorNode:
                         node="validator",
                         message=f"Column '{col.expr}' is selected but not aggregated or included in GROUP BY.",
                         severity=ErrorSeverity.WARNING,
-                        error_code="MISSING_GROUP_BY"
+                        error_code=ErrorCode.MISSING_GROUP_BY
                     ))
 
     def validate_column_ref(self, col: ColumnRef, schema_cols: Set[str], plan_table_aliases: Set[str], context: str, errors: list[PipelineError]) -> None:
@@ -171,7 +171,7 @@ class ValidatorNode:
                 node="validator",
                 message=f"Column alias '{col.alias}' used in '{context}'. Aliases are only allowed in 'select_columns'.",
                 severity=ErrorSeverity.WARNING,
-                error_code="INVALID_ALIAS_USAGE"
+                error_code=ErrorCode.INVALID_ALIAS_USAGE
             ))
 
         if col.is_derived:
@@ -182,7 +182,7 @@ class ValidatorNode:
                     node="validator",
                     message=f"Column '{col.expr}' not found in schema. Ensure you are using the pre-aliased name (e.g., 't1.col').",
                     severity=ErrorSeverity.WARNING,
-                    error_code="COLUMN_NOT_FOUND"
+                    error_code=ErrorCode.COLUMN_NOT_FOUND
                 ))
 
     def __call__(self, state: GraphState) -> Dict[str, Any]:
@@ -206,7 +206,7 @@ class ValidatorNode:
                     node=node_name,
                     message="No plan to validate.",
                     severity=ErrorSeverity.ERROR, # Blocking
-                    error_code="MISSING_PLAN"
+                    error_code=ErrorCode.MISSING_PLAN
                 ))
                 return {"errors": errors}
 
@@ -219,7 +219,7 @@ class ValidatorNode:
                     node=node_name,
                     message=f"Security Violation: Query type '{query_type}' is not allowed. Only READ queries are permitted.",
                     severity=ErrorSeverity.CRITICAL,
-                    error_code="SECURITY_VIOLATION"
+                    error_code=ErrorCode.SECURITY_VIOLATION
                 ))
                 return {"errors": errors}
 
@@ -230,7 +230,7 @@ class ValidatorNode:
                     node=node_name,
                     message=f"Invalid plan structure: {e}",
                     severity=ErrorSeverity.ERROR,
-                    error_code="INVALID_PLAN_STRUCTURE"
+                    error_code=ErrorCode.INVALID_PLAN_STRUCTURE
                 ))
                 return {"errors": errors}
 
@@ -256,7 +256,7 @@ class ValidatorNode:
                             node=node_name,
                             message=f"Table '{t.name}' with alias '{t.alias}' not found in schema or alias mismatch.",
                             severity=ErrorSeverity.ERROR,
-                            error_code="TABLE_NOT_FOUND"
+                            error_code=ErrorCode.TABLE_NOT_FOUND
                         ))
 
             for col in plan.select_columns:
@@ -277,14 +277,14 @@ class ValidatorNode:
                             node=node_name,
                             message=f"Join left table '{join.left}' is not in plan tables.",
                             severity=ErrorSeverity.WARNING,
-                            error_code="JOIN_TABLE_NOT_IN_PLAN"
+                            error_code=ErrorCode.JOIN_TABLE_NOT_IN_PLAN
                         ))
                 if join.right not in plan_table_names:
                         errors.append(PipelineError(
                             node=node_name,
                             message=f"Join right table '{join.right}' is not in plan tables.",
                             severity=ErrorSeverity.WARNING,
-                            error_code="JOIN_TABLE_NOT_IN_PLAN"
+                            error_code=ErrorCode.JOIN_TABLE_NOT_IN_PLAN
                         ))
                 
                 if not join.on:
@@ -292,7 +292,7 @@ class ValidatorNode:
                         node=node_name,
                         message=f"Join between '{join.left}' and '{join.right}' has no ON clause.",
                         severity=ErrorSeverity.WARNING,
-                        error_code="JOIN_MISSING_ON_CLAUSE"
+                        error_code=ErrorCode.JOIN_MISSING_ON_CLAUSE
                     ))
 
             for hav in plan.having:
@@ -301,7 +301,7 @@ class ValidatorNode:
                         node=node_name,
                         message=f"Having clause missing expression: {hav}",
                         severity=ErrorSeverity.WARNING,
-                        error_code="HAVING_MISSING_EXPRESSION"
+                        error_code=ErrorCode.HAVING_MISSING_EXPRESSION
                     ))
 
             self.validate_aggregations(plan, errors)
@@ -329,7 +329,7 @@ class ValidatorNode:
                 node=node_name,
                 message=f"Validator exception: {exc}",
                 severity=ErrorSeverity.ERROR,
-                error_code="VALIDATOR_CRASH",
+                error_code=ErrorCode.VALIDATOR_CRASH,
                 stack_trace=str(exc)
             )
             logger.error(f"Node {node_name} failed: {exc}")

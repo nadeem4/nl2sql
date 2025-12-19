@@ -11,11 +11,12 @@ if TYPE_CHECKING:
 from .schemas import DecomposerResponse
 from nl2sql.nodes.decomposer.prompts import DECOMPOSER_PROMPT
 from nl2sql.datasource_registry import DatasourceRegistry
-from nl2sql.errors import PipelineError, ErrorSeverity
+from nl2sql.errors import PipelineError, ErrorSeverity, ErrorCode
 
 from nl2sql.logger import get_logger
 from nl2sql.agents import canonicalize_query
-from nl2sql.schemas import SubQuery
+from nl2sql.nodes.decomposer.schemas import SubQuery
+from nl2sql.llm_registry import LLMRegistry
 
 logger = get_logger("decomposer")
 
@@ -25,12 +26,12 @@ class DecomposerNode:
     """
     Node responsible for decomposing a complex query into sub-queries.
     """
-    def __init__(self, llm: LLMCallable, registry: DatasourceRegistry, vector_store: Optional[OrchestratorVectorStore] = None):
-        self.llm = llm
+    def __init__(self, llm_map: dict[str, LLMCallable], registry: DatasourceRegistry, vector_store: Optional[OrchestratorVectorStore] = None):
+        self.llm_map = llm_map
         self.registry = registry
         self.vector_store = vector_store
         self.prompt = ChatPromptTemplate.from_template(DECOMPOSER_PROMPT)
-        self.chain = self.prompt | self.llm.with_structured_output(DecomposerResponse)
+        self.chain = self.prompt | self.llm_map["decomposer"]
 
     def _retrieve_context(self, query: str) -> str:
         """
@@ -70,8 +71,33 @@ class DecomposerNode:
         node_name = "decomposer"
 
         try:
-            canonical_query = canonicalize_query(user_query, self.llm)
+            canonical_query = canonicalize_query(user_query, self.llm_map["canonicalizer"])
             logger.info(f"Canonicalized: {user_query} -> {canonical_query}")
+
+            if state.selected_datasource_id:
+                logger.info(f"Direct execution requested for datasource: {state.selected_datasource_id}")
+                
+                candidate_tables = []
+                if self.vector_store:
+                    try:
+                        candidate_tables = self.vector_store.retrieve_table_names(
+                            canonical_query, 
+                            datasource_id=[state.selected_datasource_id]
+                        )
+                    except Exception as e:
+                        logger.warning(f"Direct vector search failed: {e}")
+                 
+                sq = SubQuery(
+                    query=canonical_query,
+                    datasource_id=state.selected_datasource_id,
+                    candidate_tables=candidate_tables or [],
+                    reasoning=f"Direct execution for {state.selected_datasource_id}. Skipped LLM decomposition."
+                )
+                
+                return {
+                    "sub_queries": [sq],
+                    "reasoning": [{"node": "decomposer", "content": sq.reasoning}]
+                }
 
             context_str = self._retrieve_context(canonical_query)
             
@@ -84,19 +110,8 @@ class DecomposerNode:
                 "schema_context": context_str
             })
 
-            
-            
-            final_subqueries = []
-            for sq in response.sub_queries:
-                final_subqueries.append(SubQuery(
-                    query=sq.query,
-                    datasource_id=sq.datasource_id,
-                    candidate_tables=sq.candidate_tables,
-                    reasoning=sq.reasoning
-                ))
-
             return {
-                "sub_queries": final_subqueries, 
+                "sub_queries": response.sub_queries, 
                 "reasoning": [{"node": "decomposer", "content": response.reasoning}]
             }
         except Exception as e:
@@ -108,7 +123,7 @@ class DecomposerNode:
                         node=node_name,
                         message=f"Decomposition/Orchestration failed: {str(e)}",
                         severity=ErrorSeverity.CRITICAL, 
-                        error_code="ORCHESTRATOR_CRASH",
+                        error_code=ErrorCode.ORCHESTRATOR_CRASH,
                         stack_trace=str(e)
                     )
                 ]

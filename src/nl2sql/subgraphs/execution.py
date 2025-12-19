@@ -2,15 +2,15 @@ from typing import Dict, Any, Optional
 from langgraph.graph import StateGraph, END
 
 from nl2sql.schemas import GraphState
-from nl2sql.nodes.router import RouterNode
+
 from nl2sql.nodes.intent.node import IntentNode
 from nl2sql.nodes.schema import SchemaNode
 from nl2sql.nodes.generator import GeneratorNode
 from nl2sql.nodes.executor import ExecutorNode
-from nl2sql.subgraphs.planning import build_planning_subgraph
+from nl2sql.subgraphs.agentic_execution_loop import build_agentic_execution_loop
 from nl2sql.datasource_registry import DatasourceRegistry
 from nl2sql.llm_registry import LLMRegistry
-from nl2sql.vector_store import SchemaVectorStore
+from nl2sql.vector_store import OrchestratorVectorStore
 
 def format_result(state: GraphState) -> Dict[str, Any]:
     """
@@ -36,22 +36,19 @@ def format_result(state: GraphState) -> Dict[str, Any]:
         
     return {
         "intermediate_results": [result_str],
-        "datasource_id": state.datasource_id,
         "selected_datasource_id": state.selected_datasource_id,
-        "routing_info": state.routing_info,
         "sql_draft": state.sql_draft,
         "execution": state.execution
     }
 
-def build_execution_subgraph(registry: DatasourceRegistry, llm_registry: LLMRegistry, vector_store: Optional[SchemaVectorStore] = None, vector_store_path: str = ""):
+def build_execution_subgraph(registry: DatasourceRegistry, llm_registry: LLMRegistry, vector_store: Optional[OrchestratorVectorStore] = None, vector_store_path: str = ""):
     """
-    Builds the execution subgraph (Router -> Intent -> Schema -> Planning/Reasoning Loop).
+    Builds the execution subgraph (Intent -> Schema -> Planning/Reasoning Loop).
     """
     graph = StateGraph(GraphState)
 
     intent_llm = llm_registry.intent_llm()
 
-    router = RouterNode(llm_registry, registry, vector_store_path)
     intent = IntentNode(llm=intent_llm)
     schema_node = SchemaNode(registry=registry, vector_store=vector_store)
     
@@ -59,36 +56,34 @@ def build_execution_subgraph(registry: DatasourceRegistry, llm_registry: LLMRegi
         "planner": llm_registry.planner_llm(),
         "summarizer": llm_registry.summarizer_llm()
     }
-    planning_subgraph = build_planning_subgraph(effective_llm_map, registry=registry, row_limit=1000)
+    agentic_execution_loop = build_agentic_execution_loop(effective_llm_map, registry=registry, row_limit=1000)
 
-    graph.add_node("router", router)
     graph.add_node("intent", intent)
     graph.add_node("schema", schema_node)
-    graph.add_node("planning", planning_subgraph)
+    graph.add_node("agentic_execution_loop", agentic_execution_loop)
     graph.add_node("formatter", format_result)
 
-    graph.set_entry_point("router")
-    graph.add_edge("router", "intent")
+    def check_entry_condition(state: GraphState) -> str:
+        """
+        Determines the entry point based on whether candidate tables are already known.
+        """
+        if state.candidate_tables:
+            return "schema"
+        return "intent"
+
+    graph.set_conditional_entry_point(
+        check_entry_condition,
+        {
+            "intent": "intent",
+            "schema": "schema"
+        }
+    )
     graph.add_edge("intent", "schema")
 
     
-    def check_schema_retry(state: GraphState) -> str:
-        """Checks if SchemaNode requested a routing retry."""
-        if state.validation.get("retry_routing"):
-            return "retry"
-        return "ok"
-
-    graph.add_conditional_edges(
-        "schema",
-        check_schema_retry,
-        {
-            "ok": "planning",
-            "retry": "router"
-        }
-    )
+    graph.add_edge("schema", "agentic_execution_loop")
     
-    # Planning subgraph now includes execution. If it returns, we just format the result.
-    graph.add_edge("planning", "formatter")
+    graph.add_edge("agentic_execution_loop", "formatter")
     graph.add_edge("formatter", END)
 
-    return graph.compile(), planning_subgraph
+    return graph.compile(), agentic_execution_loop

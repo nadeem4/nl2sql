@@ -12,10 +12,11 @@ from nl2sql.nodes.summarizer.node import SummarizerNode
 from nl2sql.nodes.generator import GeneratorNode
 from nl2sql.nodes.executor import ExecutorNode
 from nl2sql.datasource_registry import DatasourceRegistry
+from nl2sql.errors import ErrorCode
 
 LLMCallable = Union[Callable[[str], str], Runnable]
 
-def build_planning_subgraph(llm_map: Dict[str, LLMCallable], registry: DatasourceRegistry, row_limit: int = 100):
+def build_agentic_execution_loop(llm_map: Dict[str, LLMCallable], registry: DatasourceRegistry, row_limit: int = 100):
     """
     Builds the planning subgraph: Planner -> Validator -> Generator -> Executor -> (Error) -> Summarizer -> Planner.
 
@@ -44,7 +45,7 @@ def build_planning_subgraph(llm_map: Dict[str, LLMCallable], registry: Datasourc
 
     def check_planner(state: GraphState) -> str:
         """Checks if planner succeeded or needs retry/failure."""
-        if not state.plan or any("Planner" in e for e in state.errors):
+        if not state.plan:
             if state.retry_count < 3:
                 return "retry"
             else:
@@ -54,7 +55,8 @@ def build_planning_subgraph(llm_map: Dict[str, LLMCallable], registry: Datasourc
     def check_validation(state: GraphState) -> str:
         """Checks validation results."""
         if state.errors:
-            if any("Security Violation" in e for e in state.errors):
+            # Check for critical security violations using ErrorCode
+            if any(e.error_code == ErrorCode.SECURITY_VIOLATION for e in state.errors):
                 return "end"
                 
             if state.retry_count < 3:

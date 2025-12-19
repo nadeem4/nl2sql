@@ -5,12 +5,12 @@ import yaml
 from nl2sql.llm_registry import parse_llm_config, LLMRegistry, get_usage_summary
 from nl2sql.metrics import reset_usage
 from nl2sql.datasource_registry import DatasourceRegistry
-from nl2sql.vector_store import SchemaVectorStore
+from nl2sql.vector_store import OrchestratorVectorStore
 from nl2sql.langgraph_pipeline import run_with_graph
 from nl2sql.evaluation.evaluator import ModelEvaluator
 from nl2sql.reporting import ConsolePresenter
 
-def run_benchmark(args: argparse.Namespace, datasource_registry: DatasourceRegistry, vector_store: SchemaVectorStore) -> None:
+def run_benchmark(args: argparse.Namespace, datasource_registry: DatasourceRegistry, vector_store: OrchestratorVectorStore) -> None:
     presenter = ConsolePresenter()
     
     # Matrix Benchmarking
@@ -55,7 +55,7 @@ def run_benchmark(args: argparse.Namespace, datasource_registry: DatasourceRegis
 def _run_dataset_evaluation(
     args: argparse.Namespace, 
     datasource_registry: DatasourceRegistry, 
-    vector_store: SchemaVectorStore,
+    vector_store: OrchestratorVectorStore,
     llm_registry: LLMRegistry,
     config_name: str = "default"
 ) -> None:

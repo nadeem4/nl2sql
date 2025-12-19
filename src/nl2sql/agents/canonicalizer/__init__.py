@@ -11,7 +11,6 @@ def canonicalize_query(query: str, llm) -> str:
     try:
         return chain.invoke({"question": query}).strip()
     except Exception as e:
-        print(f"  -> Canonicalization failed: {e}")
         return query
 
 __all__ = ["canonicalize_query"]
