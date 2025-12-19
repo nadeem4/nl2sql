@@ -3,9 +3,8 @@ from langgraph.graph import StateGraph, END
 
 from nl2sql.schemas import GraphState
 
-from nl2sql.nodes.intent.node import IntentNode
+from nl2sql.nodes.direct_sql.node import DirectSQLNode
 from nl2sql.nodes.schema import SchemaNode
-from nl2sql.nodes.generator import GeneratorNode
 from nl2sql.nodes.executor import ExecutorNode
 from nl2sql.subgraphs.agentic_execution_loop import build_agentic_execution_loop
 from nl2sql.datasource_registry import DatasourceRegistry
@@ -43,47 +42,57 @@ def format_result(state: GraphState) -> Dict[str, Any]:
 
 def build_execution_subgraph(registry: DatasourceRegistry, llm_registry: LLMRegistry, vector_store: Optional[OrchestratorVectorStore] = None, vector_store_path: str = ""):
     """
-    Builds the execution subgraph (Intent -> Schema -> Planning/Reasoning Loop).
+    Builds the execution subgraph.
+    Routes between Fast Lane (Direct SQL) and Agentic Loop (Reasoning) based on complexity.
     """
     graph = StateGraph(GraphState)
 
-    intent_llm = llm_registry.intent_llm()
-
-    intent = IntentNode(llm=intent_llm)
+    # Nodes
     schema_node = SchemaNode(registry=registry, vector_store=vector_store)
+    direct_sql = DirectSQLNode(llm_registry.llm_map(), registry=registry)
     
+    # Executor for Fast Lane
+    executor = ExecutorNode(registry=registry) 
+    
+    # Standard Agentic Loop
     effective_llm_map = {
         "planner": llm_registry.planner_llm(),
         "summarizer": llm_registry.summarizer_llm()
     }
     agentic_execution_loop = build_agentic_execution_loop(effective_llm_map, registry=registry, row_limit=1000)
 
-    graph.add_node("intent", intent)
     graph.add_node("schema", schema_node)
+    graph.add_node("direct_sql", direct_sql)
+    graph.add_node("fast_executor", executor) # Separate executor instance for fast lane
     graph.add_node("agentic_execution_loop", agentic_execution_loop)
     graph.add_node("formatter", format_result)
 
-    def check_entry_condition(state: GraphState) -> str:
-        """
-        Determines the entry point based on whether candidate tables are already known.
-        """
-        if state.candidate_tables:
-            return "schema"
-        return "intent"
+    # Conditional Routing Logic
+    def route_based_on_complexity(state: GraphState) -> str:
+        if state.complexity == "simple":
+            return "direct_sql"
+        return "agentic_execution_loop"
 
-    graph.set_conditional_entry_point(
-        check_entry_condition,
+    # Edges
+    graph.set_entry_point("schema")
+    
+    graph.add_conditional_edges(
+        "schema",
+        route_based_on_complexity,
         {
-            "intent": "intent",
-            "schema": "schema"
+            "direct_sql": "direct_sql",
+            "agentic_execution_loop": "agentic_execution_loop"
         }
     )
-    graph.add_edge("intent", "schema")
 
-    
-    graph.add_edge("schema", "agentic_execution_loop")
-    
+    # Fast Lane Flow
+    graph.add_edge("direct_sql", "fast_executor")
+    graph.add_edge("fast_executor", "formatter")
+
+    # Standard Lane Flow
     graph.add_edge("agentic_execution_loop", "formatter")
+    
+    # End
     graph.add_edge("formatter", END)
 
     return graph.compile(), agentic_execution_loop

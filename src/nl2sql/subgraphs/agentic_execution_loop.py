@@ -4,7 +4,7 @@ from langchain_core.runnables import Runnable
 from langgraph.graph import END, StateGraph
 
 from nl2sql.schemas import GraphState
-from nl2sql.nodes.intent import IntentNode
+
 from nl2sql.nodes.schema import SchemaNode
 from nl2sql.nodes.planner import PlannerNode
 from nl2sql.nodes.validator import ValidatorNode

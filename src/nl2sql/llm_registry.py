@@ -147,23 +147,15 @@ class LLMRegistry:
 
         return call
 
-    def intent_llm(self) -> LLMCallable:
-        """Returns the LLM callable for the Intent agent."""
-        from nl2sql.schemas import IntentModel
-        llm = self._base_llm("intent")
-        return self._wrap_structured_usage(llm, IntentModel)
-
     def planner_llm(self) -> LLMCallable:
         """Returns the LLM callable for the Planner agent."""
         from nl2sql.schemas import PlanModel
         llm = self._base_llm("planner")
         return self._wrap_structured_usage(llm, PlanModel)
 
-
     def canonicalizer_llm(self) -> LLMCallable:
         llm = self._base_llm("canonicalizer")
         return llm.invoke
-
 
     def summarizer_llm(self) -> LLMCallable:
         """Returns the LLM callable for the Summarizer agent."""
@@ -182,22 +174,27 @@ class LLMRegistry:
         llm = self._base_llm("aggregator")
         return self._wrap_structured_usage(llm,  AggregatedResponse)
 
-    def get_structured_llm(self, agent: str, schema: Any) -> LLMCallable:
-        """
-        Returns a structured LLM callable for a specific agent, with usage tracking.
-        """
-        llm = self._base_llm(agent)
-        return self._wrap_structured_usage(llm, schema)
+    def intent_enricher_llm(self) -> LLMCallable:
+        """Returns the LLM callable for the Intent Enricher (parallel) agent."""
+        from nl2sql.nodes.decomposer.schemas import EnrichedIntent
+        llm = self._base_llm("intent_enricher")
+        return self._wrap_structured_usage(llm, EnrichedIntent)
+
+    def direct_sql_llm(self) -> LLMCallable:
+        """Returns the LLM callable for the Direct SQL agent."""
+        llm = self._base_llm("direct_sql")
+        return llm.invoke
 
     def llm_map(self) -> Dict[str, LLMCallable]:
         """Returns a dictionary of all agent LLM callables."""
         return {
-            "intent": self.intent_llm(),
             "planner": self.planner_llm(),
             "summarizer": self.summarizer_llm(),
             "decomposer": self.decomposer_llm(),
             "aggregator": self.aggregator_llm(),
-            "_default": self.intent_llm(),
+            "intent_enricher": self.intent_enricher_llm(),
+            "direct_sql": self.direct_sql_llm(),
+            "_default": self.decomposer_llm(),
         }
 
     def get_usage_summary(self) -> Dict[str, Dict[str, int]]:

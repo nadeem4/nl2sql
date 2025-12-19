@@ -45,6 +45,7 @@ def build_graph(registry: DatasourceRegistry, llm_registry: LLMRegistry, execute
     llm_map = {
         "canonicalizer": llm_registry.canonicalizer_llm(),
         "decomposer": llm_registry.decomposer_llm(),
+        "intent_enricher": llm_registry.intent_enricher_llm(),
     }
 
     decomposer = DecomposerNode(llm_map, registry, vector_store)
@@ -90,6 +91,7 @@ def build_graph(registry: DatasourceRegistry, llm_registry: LLMRegistry, execute
         return {
             "intermediate_results": result.get("intermediate_results", []),
             "query_history": [history_item],
+            "execution": execution,
             "errors": result.get("errors", [])
         }
 
@@ -147,6 +149,7 @@ def build_graph(registry: DatasourceRegistry, llm_registry: LLMRegistry, execute
                 "user_query": sq_text, 
                 "selected_datasource_id": ds_id,
                 "candidate_tables": candidate_tables,
+                "complexity": getattr(sq, "complexity", "complex"),
                 "reasoning": [{"node": f"agentic_execution_loop_{ds_id} ({sq_text})", "content": reasoning}] 
             }
             

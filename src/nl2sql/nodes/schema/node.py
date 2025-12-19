@@ -82,47 +82,23 @@ class SchemaNode:
         self.vector_store = vector_store
 
     def _get_search_candidates(self, state: GraphState) -> Optional[List[str]]:
-        """Retrieves potential table candidates using vector search or pre-routed context.
-
-        Args:
-            state: The current graph state.
-
-        Returns:
-            A list of candidate table names, or None if no candidates found.
+        """Retrieves potential table candidates.
+        
+        Now strictly relies on what the Decomposer provides. 
         """
         pre_routed_tables = state.candidate_tables
         ds_id = state.selected_datasource_id
-        search_candidates = None
         
         if pre_routed_tables:
             logger.info(f"Using pre-routed tables for {ds_id}: {pre_routed_tables}")
-            search_candidates = pre_routed_tables
-        elif self.vector_store:
-            try:
-                search_q = state.user_query
-                if state.intent:
-                    extras = " ".join(state.intent.entities + state.intent.keywords)
-                    if extras: 
-                        search_q = f"{state.user_query} {extras}"
-                
-                ds_filter = [ds_id]
-                search_candidates = self.vector_store.retrieve_table_names(search_q, datasource_id=ds_filter)
-            except Exception:
-                pass
-        return search_candidates
+            return pre_routed_tables
+            
+        return None
 
     def _get_tables_and_related_tables(self, search_candidates: Optional[List[str]], inspector: SafeInspector, state: GraphState) -> Tuple[List[str], bool]:
-        """Determines the final list of tables to include using selection and fallback logic.
-
-        Args:
-            search_candidates: Initial list of table candidates from vector search.
-            inspector: SafeInspector instance for database introspection.
-            state: The current graph state (used for query context in fallback).
-
-        Returns:
-            A tuple containing:
-                - List of unique table names to include in the schema context.
-                - Boolean indicating if schema drift was detected (fallback triggered).
+        """Determines the final list of tables to include.
+        
+        If no candidates provided by Decomposer, falls back to semantic search using raw user query.
         """
         all_tables = inspector.get_table_names()
         drift_detected = False
@@ -130,12 +106,8 @@ class SchemaNode:
         candidates_to_use = search_candidates
         
         if not candidates_to_use:
-            search_q = state.user_query
-            if state.intent:
-                extras = " ".join(state.intent.entities + state.intent.keywords)
-                if extras: search_q = f"{state.user_query} {extras}"
-            
-            candidates_to_use = self._semantic_filter_fallback(all_tables, search_q)
+            logger.info("No candidates from Decomposer. Falling back to semantic search on raw query.")
+            candidates_to_use = self._semantic_filter_fallback(all_tables, state.user_query)
             drift_detected = True 
         
         valid_candidates = [t for t in candidates_to_use if t in all_tables]

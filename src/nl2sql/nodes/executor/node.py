@@ -70,7 +70,7 @@ class ExecutorNode:
             profile = self.registry.get_profile(ds_id)
             
             dialect = None
-            if "mssql" in profile.engine:
+            if "mssql" in profile.engine or "sqlserver" in profile.engine:
                 dialect = "tsql"
             elif "postgres" in profile.engine:
                 dialect = "postgres"

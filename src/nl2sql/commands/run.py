@@ -98,6 +98,11 @@ def _run_simple_mode(args: argparse.Namespace, query: str, datasource_registry: 
     final_answer = final_state.get("final_answer")
     if final_answer:
         presenter.print_final_answer(final_answer)
+    else:
+        # Fallback to presenting raw execution result if no LLM summary
+        execution = final_state.get("execution")
+        if execution:
+            presenter.print_execution_result(execution)
         
     execution = final_state.get("execution")
     if execution:
