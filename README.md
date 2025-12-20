@@ -230,13 +230,13 @@ For a deep dive into the Map-Reduce pattern, see [**docs/ARCHITECTURE_MAP_REDUCE
 flowchart TD
   user["User Query"] --> intent["Intent Node"]
   intent --> decomposer["Decomposer (AI)"]
-  decomposer -- Single DB --> execution["Execution Lane"]
+  decomposer -- Single DB --> schema
   decomposer -- Multi DB --> splits["Splits (Map)"]
   
-  splits --> execution
+  splits --> schema
   
   subgraph Execution Lane
-    lane_logic{Fast or Slow?}
+    schema["Schema Node"] --> lane_logic{Fast or Slow?}
     lane_logic -- Fast --> directSQL["DirectSQL (AI)"]
     lane_logic -- Slow --> planner["Planner (AI)"]
     planner --> validator
