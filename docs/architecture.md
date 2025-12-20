@@ -4,35 +4,36 @@ This document provides a comprehensive technical overview of the NL2SQL system c
 
 ## 1. High-Level Architecture
 
-The system operates on a **Map-Reduce** paradigm to handle complex or ambiguous user queries.
-
-> **Deep Dive**: For detailed information on the Map-Reduce flow, parallel execution, and state reduction strategies, please refer to:
-> [**Map-Reduce Architecture**](ARCHITECTURE_MAP_REDUCE.md)
+The system operates on an **Intent-Driven Map-Reduce** paradigm to handle complex user queries efficiently.
 
 ### Summary
 
-1. **Decomposition (Map)**: Breaks queries into independent sub-queries.
-2. **Parallel Execution**: Runs independent execution subgraphs for each sub-query.
-3. **Aggregation (Reduce)**: Synthesizes results into a final answer.
+1. **Intent Classification**: The **Intent Node** classifies the query as `TABLE` (raw data), `KPI` (single metric), or `SUMMARY` (analysis).
+2. **Decomposition (Map)**: The **Decomposer Node** breaks complex queries into sub-queries per datasource.
+3. **Parallel Execution**: Independent execution subgraphs run for each sub-query.
+    * **Fast Lane**: For `TABLE`/`KPI` intents, simple SQL is executed directly.
+    * **Agentic Loop**: For `SUMMARY` intents, a complex Planner/Validator loop is used.
+4. **Aggregation (Reduce)**: The **Aggregator Node** synthesizes results. It skips LLM processing for Fast Lane queries.
 
 ---
 
-## 2. Core Components: The Execution Subgraph
+## 2. Core Components: The Pipeline nodes
 
-Each branch runs a dedicated LangGraph `StateMachine` responsible for converting a natural language query into executed SQL.
+Each branch runs a dedicated LangGraph `StateMachine`.
 
 ### 2.1 Nodes
 
 | Node | Responsibility | Key Inputs | Key Outputs |
 | :--- | :--- | :--- | :--- |
-| **RouterNode** | Identifies the correct datasource (e.g., SQLite, Postgres) using a 3-Layer logic (Vector -> Multi-Query -> LLM). | `user_query` | `datasource_id` |
-| **IntentNode** | Classifies the query intent (e.g., `READ`, `WRITE`) and filters. | `user_query` | `intent` (IntentModel) |
-| **SchemaNode** | Retrieves relevant table schemas. Uses `SchemaVectorStore` for large schemas. | `datasource_id`, `intent` | `schema_info` |
-| **PlannerNode** | Generates an abstract execution plan (joins, filters) using chain-of-thought. Injects custom `date_format`. | `schema_info`, `intent` | `plan` (PlanModel) |
-| **ValidatorNode** | **Guardrails**. Checks column existence, validates data types (int vs string), and enforces date formats. | `plan`, `schema_info` | `errors` (if any) |
-| **GeneratorNode** | Converts the abstract plan into dialect-specific SQL (e.g., T-SQL, PostgreSQL). | `plan`, `profile` | `sql_draft` |
-| **ExecutorNode** | Executes the SQL against the target database. Handles operational errors. | `sql_draft`, `datasource_id` | `execution` (rows) |
-| **SummarizerNode** | (Error Loop) Analyze failures from Validator/Executor and suggests fixes to the Planner. | `errors`, `failed_plan` | `reasoning` (feedback) |
+| **IntentNode** | **Entry Point**. Classifies intent (`tabular`, `kpi`, `summary`), canonicalizes queries, and extracts entities. | `user_query` | `response_type`, `enriched_terms` |
+| **DecomposerNode** | Breaks down queries into sub-queries. Uses `enriched_terms` for context retrieval. | `user_query`, `enriched_terms` | `sub_queries` |
+| **DirectSQLNode** | (Fast Lane) Generates SQL for simple queries without a plan. | `user_query` | `sql_draft` |
+| **SchemaNode** | Retrieves relevant table schemas. | `datasource_id` | `schema_info` |
+| **PlannerNode** | (Agentic Lane) Generates an abstract execution plan. | `schema_info` | `plan` |
+| **ValidatorNode** | (Agentic Lane) Guardrails. Checks column existence and types. | `plan`, `schema_info` | `errors` |
+| **GeneratorNode** | Converts abstract plan into dialect-specific SQL. | `plan` | `sql_draft` |
+| **ExecutorNode** | Executes SQL. | `sql_draft` | `execution` |
+| **AggregatorNode** | Synthesizes results. Returns raw data for Fast Lane or LLM summary for Slow Lane. | `intermediate_results`, `response_type` | `final_answer` |
 
 ### 2.2 State Management (`GraphState`)
 
@@ -41,12 +42,12 @@ State is managed via a Pydantic model (`src/nl2sql/schemas.py`), ensuring strict
 ```python
 class GraphState(BaseModel):
     user_query: str
-    datasource_id: Set[str]        # Candidates
-    selected_datasource_id: str    # Chosen one
-    plan: Optional[Dict]           # Abstract Plan
-    sql_draft: Optional[str]       # Generated SQL
-    execution: Optional[ExecutionResult]
-    reasoning: Dict[str, List[str]] # Chain-of-Thought logs
+    response_type: Literal["tabular", "kpi", "summary"]
+    enriched_terms: List[str]
+    sub_queries: Optional[List[SubQuery]]
+    selected_datasource_id: Optional[str]
+    execution: Optional[ExecutionModel]
+    intermediate_results: List[Any]
     # ...
 ```
 

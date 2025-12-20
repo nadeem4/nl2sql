@@ -1,52 +1,112 @@
 from __future__ import annotations
-from typing import List, Dict, Any, Callable, Union, TYPE_CHECKING
+from typing import Dict, Any, Callable, Union, TYPE_CHECKING, Optional
+import json
+
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import Runnable
 
 if TYPE_CHECKING:
     from nl2sql.schemas import GraphState
+    from nl2sql.vector_store import OrchestratorVectorStore
 
 from .schemas import DecomposerResponse
 from nl2sql.nodes.decomposer.prompts import DECOMPOSER_PROMPT
 from nl2sql.datasource_registry import DatasourceRegistry
-
+from nl2sql.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.logger import get_logger
-
-
 
 logger = get_logger("decomposer")
 
 LLMCallable = Union[Callable[[str], Any], Runnable]
 
+
 class DecomposerNode:
-    """
-    Node responsible for decomposing a complex query into sub-queries.
-    """
-    def __init__(self, llm: LLMCallable, registry: DatasourceRegistry):
+    def __init__(
+        self,
+        llm: LLMCallable,
+        registry: DatasourceRegistry,
+        vector_store: Optional[OrchestratorVectorStore] = None,
+    ):
         self.llm = llm
         self.registry = registry
+        self.vector_store = vector_store
         self.prompt = ChatPromptTemplate.from_template(DECOMPOSER_PROMPT)
         self.chain = self.prompt | self.llm
 
     def __call__(self, state: GraphState) -> Dict[str, Any]:
-        user_query = state.user_query
         node_name = "decomposer"
 
         try:
-            profiles = self.registry.list_profiles()
-            datasources_str = "\n".join([f"- {p.id}: {p.description}" for p in profiles])
+            if not state.entities:
+                raise ValueError("Missing entities from Intent node")
 
-            response: DecomposerResponse = self.chain.invoke({
-                "user_query": user_query,
-                "datasources": datasources_str
-            })
+            entity_matches: Dict[str, Any] = {}
+
+            if self.vector_store:
+                for entity in state.entities:
+                    search_terms = " ".join(
+                        [entity.name] + entity.required_attributes
+                    )
+
+                    results = self.vector_store.retrieve_routing_context(
+                        search_terms, k=10
+                    )
+
+                    matches = []
+                    for res in results:
+                        ds = res.metadata.get("datasource_id")
+                        if not ds:
+                            continue
+                        matches.append(
+                            {
+                                "datasource_id": ds,
+                                "table": res.metadata.get("table_name"),
+                                "type": res.metadata.get("type", "table"),
+                            }
+                        )
+
+                    entity_matches[entity.entity_id] = matches
+
+            response: DecomposerResponse = self.chain.invoke(
+                {
+                    "user_query": state.user_query,
+                    "entities": json.dumps(
+                        [e.model_dump() for e in state.entities]
+                    ),
+                    "entity_datasource_matches": json.dumps(entity_matches),
+                }
+            )
 
             return {
                 "sub_queries": response.sub_queries,
-                "reasoning": [{"node": "decomposer", "content": response.reasoning}]
+                "entity_mapping": response.entity_mapping,
+                "confidence": response.confidence,
+                "reasoning": [
+                    {"node": node_name, "content": response.reasoning}
+                ],
             }
+
         except Exception as e:
+            logger.error(f"Node {node_name} failed: {e}")
+
             return {
-                "sub_queries": [user_query],
-                "reasoning": [{"node": "decomposer", "content": f"Error during decomposition: {str(e)}. Proceeding with original query.", "type": "error"}]
+                "sub_queries": [],
+                "entity_mapping": [],
+                "confidence": 0.0,
+                "reasoning": [
+                    {
+                        "node": node_name,
+                        "content": f"Decomposition failed: {str(e)}",
+                        "type": "error",
+                    }
+                ],
+                "errors": [
+                    PipelineError(
+                        node=node_name,
+                        message=f"Decomposition failed: {str(e)}",
+                        severity=ErrorSeverity.CRITICAL,
+                        error_code=ErrorCode.ORCHESTRATOR_CRASH,
+                        stack_trace=str(e),
+                    )
+                ],
             }

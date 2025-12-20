@@ -1,32 +1,78 @@
 from __future__ import annotations
 
 import json
-from typing import Dict, Optional, List, Any, TYPE_CHECKING
-from sqlalchemy import inspect
+import math
+from typing import Dict, Optional, List, Any, TYPE_CHECKING, Tuple
+from sqlalchemy import inspect as sqlalchemy_inspect
+from sqlalchemy.engine import Engine
 
 if TYPE_CHECKING:
     from nl2sql.schemas import GraphState
 
 from .schemas import SchemaInfo, TableInfo, ForeignKey, ColumnInfo
-from nl2sql.vector_store import SchemaVectorStore
+from nl2sql.vector_store import OrchestratorVectorStore
 from nl2sql.datasource_registry import DatasourceRegistry
-
+from nl2sql.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.logger import get_logger
 
 logger = get_logger("schema_node")
 
+class SafeInspector:
+    """Wrapper around SQLAlchemy inspector to handle errors gracefully."""
+
+    def __init__(self, engine: Engine):
+        """Initializes the SafeInspector.
+
+        Args:
+            engine: The SQLAlchemy engine to inspect.
+        """
+        self._inspector = sqlalchemy_inspect(engine)
+
+    def get_table_names(self) -> List[str]:
+        """Retrieves table names from the database.
+
+        Returns:
+            A list of table names, or an empty list if retrieval fails.
+        """
+        try:
+            return self._inspector.get_table_names()
+        except Exception as e:
+            logger.warning(f"Failed to get table names: {e}")
+            return []
+
+    def get_columns(self, table_name: str) -> List[Dict[str, Any]]:
+        """Retrieves columns for a specific table.
+
+        Args:
+            table_name: The name of the table.
+
+        Returns:
+            A list of column definitions, or an empty list if retrieval fails.
+        """
+        try:
+            return self._inspector.get_columns(table_name)
+        except Exception:
+            return []
+
+    def get_foreign_keys(self, table_name: str) -> List[Dict[str, Any]]:
+        """Retrieves foreign keys for a specific table.
+
+        Args:
+            table_name: The name of the table.
+
+        Returns:
+            A list of foreign key definitions, or an empty list if retrieval fails.
+        """
+        try:
+            return self._inspector.get_foreign_keys(table_name)
+        except Exception:
+            return []
 
 class SchemaNode:
-    """
-    Retrieves schema information (tables, columns, foreign keys) based on the user query.
-    
-    Uses vector store for relevant table selection if available, otherwise retrieves all tables.
-    Also handles assigning aliases to tables and columns for the planner.
-    """
+    """Retrieves schema information based on the user query."""
 
-    def __init__(self, registry: DatasourceRegistry, vector_store: Optional[SchemaVectorStore] = None):
-        """
-        Initializes the SchemaNode.
+    def __init__(self, registry: DatasourceRegistry, vector_store: Optional[OrchestratorVectorStore] = None):
+        """Initializes the SchemaNode.
 
         Args:
             registry: Datasource registry for accessing profiles and engines.
@@ -35,110 +81,203 @@ class SchemaNode:
         self.registry = registry
         self.vector_store = vector_store
 
-    def __call__(self, state: GraphState) -> Dict[str, Any]:
+    def _get_search_candidates(self, state: GraphState) -> Optional[List[str]]:
+        """Retrieves potential table candidates.
+        
+        Uses entity_mapping from Decomposer to identify relevant tables.
         """
-        Executes the schema retrieval step.
+        mapping = state.entity_mapping
+        ds_id = state.selected_datasource_id
+        
+        if mapping and ds_id:
+            # Extract tables mapped to this datasource
+            tables = set()
+            for m in mapping:
+                if m.datasource_id == ds_id and m.candidate_tables:
+                    tables.update(m.candidate_tables)
+            
+            if tables:
+                logger.info(f"Using mapped tables for {ds_id}: {tables}")
+                return list(tables)
+            
+        return None
+
+    def _get_tables_and_related_tables(self, search_candidates: Optional[List[str]], inspector: SafeInspector, state: GraphState) -> Tuple[List[str], bool]:
+        """Determines the final list of tables to include.
+        
+        If no candidates provided by Decomposer, falls back to semantic search using raw user query.
+        """
+        all_tables = inspector.get_table_names()
+        drift_detected = False
+        
+        candidates_to_use = search_candidates
+        
+        if not candidates_to_use:
+            logger.info("No candidates from Decomposer. Falling back to semantic search on raw query.")
+            candidates_to_use = self._semantic_filter_fallback(all_tables, state.user_query)
+            drift_detected = True 
+        
+        valid_candidates = [t for t in candidates_to_use if t in all_tables]
+        if not valid_candidates:
+             return [], drift_detected
+
+        expanded = set(valid_candidates)
+        all_tables_set = set(all_tables)
+
+        for t in valid_candidates:
+            fks = inspector.get_foreign_keys(t)
+            for fk in fks:
+                ref = fk.get("referred_table")
+                if ref and ref in all_tables_set:
+                    expanded.add(ref)
+
+        return list(expanded), drift_detected
+
+    def _cosine_similarity(self, v1: List[float], v2: List[float]) -> float:
+        """Computes cosine similarity between two vectors.
+
+        Args:
+            v1: First vector.
+            v2: Second vector.
+
+        Returns:
+            Cosine similarity score between -1.0 and 1.0.
+        """
+        dot_product = sum(a * b for a, b in zip(v1, v2))
+        norm_v1 = math.sqrt(sum(a * a for a in v1))
+        norm_v2 = math.sqrt(sum(b * b for b in v2))
+        return dot_product / (norm_v1 * norm_v2) if norm_v1 > 0 and norm_v2 > 0 else 0.0
+
+    def _semantic_filter_fallback(self, all_tables: List[str], query: str, top_k: int = 10) -> List[str]:
+        """Filters tables closer to the query using semantic embeddings.
+
+        Used as a fallback when vector search fails to account for schema drift or missing index.
+
+        Args:
+            all_tables: List of all table names in the database.
+            query: The user query to match against.
+            top_k: Number of top matches to return.
+
+        Returns:
+            A list of the top k semantically relevant table names.
+        """
+        if not self.vector_store or not self.vector_store.embeddings:
+            logger.warning("No embeddings model available for semantic fallback.")
+            return all_tables[:top_k]
+
+        try:
+            query_embedding = self.vector_store.embeddings.embed_query(query)
+            table_embeddings = self.vector_store.embeddings.embed_documents(all_tables)
+            
+            scores = []
+            for i, tbl_emb in enumerate(table_embeddings):
+                score = self._cosine_similarity(query_embedding, tbl_emb)
+                scores.append((score, all_tables[i]))
+            
+            scores.sort(key=lambda x: x[0], reverse=True)
+            top_matches = [t for s, t in scores[:top_k]]
+            
+            logger.info(f"Semantic fallback selected: {top_matches}")
+            return top_matches
+            
+        except Exception as e:
+            logger.error(f"Semantic fallback failed: {e}")
+            return all_tables[:top_k]
+
+    def _extract_schema_info(self, state: GraphState, tables: List[str], inspector: SafeInspector) -> List[TableInfo]:
+        """Extracts detailed schema information for the selected list of tables.
+
+        Args:
+            state: The current graph state.
+            tables: List of table names to extract info for.
+            inspector: SafeInspector instance.
+
+        Returns:
+            A list of TableInfo objects containing columns and foreign keys.
+        """
+        table_infos = []
+        
+        for i, table in enumerate(tables):
+            alias = f"t{i+1}"
+            
+            columns = []
+            bs_columns = inspector.get_columns(table)
+            for col in bs_columns:
+                col_name = col.get("name")
+                if not col_name: continue
+                
+                columns.append(ColumnInfo(
+                    name=f"{alias}.{col_name}",
+                    original_name=col_name,
+                    type=str(col.get("type", "UNKNOWN"))
+                ))
+            
+            fks = []
+            bs_fks = inspector.get_foreign_keys(table)
+            for fk in bs_fks:
+                constrained = fk.get("constrained_columns", [])
+                referred = fk.get("referred_columns", [])
+                referred_tbl = fk.get("referred_table", "")
+                
+                if constrained and referred and referred_tbl:
+                    fks.append(ForeignKey(
+                        column=constrained[0],
+                        referred_table=referred_tbl,
+                        referred_column=referred[0]
+                    ))
+            
+            table_infos.append(TableInfo(
+                name=table,
+                alias=alias,
+                columns=columns,
+                foreign_keys=fks
+            ))
+        return table_infos
+
+    def __call__(self, state: GraphState) -> Dict[str, Any]:
+        """Executes the schema retrieval step.
 
         Args:
             state: The current graph state.
 
         Returns:
-            Dictionary updates for the graph state with schema information.
+            Dictionary updates for the graph state, including schema_info and system_events.
         """
-        
         try:
-            if state.errors:
-                return {}
-
-            if not state.selected_datasource_id:
-                return {"validation": {"retry_routing": True}}
-
-            target_ds_id = state.selected_datasource_id
+            ds_id = state.selected_datasource_id
             
-            ds_ids = {target_ds_id}
-            
-            search_candidates = None
-            retrieved_tables_update = None
-            
-            if self.vector_store:
-                 try:
-                    search_q = state.user_query
-                    if state.intent:
-                         extras = " ".join(state.intent.entities + state.intent.keywords)
-                         if extras: search_q = f"{state.user_query} {extras}"
-                    
-                    ds_filter = [target_ds_id]
-                    search_candidates = self.vector_store.retrieve(search_q, datasource_id=ds_filter)
-                 except:
-                     pass
+            search_candidates = self._get_search_candidates(state)
 
-            final_table_infos = []
+            engine = self.registry.get_engine(ds_id)
+            inspector = SafeInspector(engine)
 
-            ds_id = target_ds_id
-            try:
-                engine = self.registry.get_engine(ds_id)
-                inspector = inspect(engine)
-                ds_tables = inspector.get_table_names()
-                
-                if search_candidates:
-                    relevant_tables = [t for t in search_candidates if t in ds_tables]
-                    if relevant_tables:
-                        expanded = set(relevant_tables)
-                        for t in relevant_tables:
-                            try:
-                                for fk in inspector.get_foreign_keys(t):
-                                    ref = fk.get("referred_table")
-                                    if ref and ref in ds_tables:
-                                        expanded.add(ref)
-                            except: pass
-                        ds_tables = list(expanded)
-                    else:
-                        if not relevant_tables: 
-                            if not search_candidates:
-                                pass
-                            else:
-                                ds_tables = [] 
-                
-                for i, table in enumerate(ds_tables):
-                    try:
-                        alias =  f"t{i+1}" 
-                        columns = []
-                        for col in inspector.get_columns(table):
-                            col_name = col["name"]
-                            col_type = str(col["type"])
-                            columns.append(ColumnInfo(
-                                name=f"{alias}.{col_name}",
-                                original_name=col_name,
-                                type=col_type
-                            ))
-                        
-                        fks = [
-                            ForeignKey(
-                                constrained_columns=fk["constrained_columns"],
-                                referred_table=fk["referred_table"],
-                                referred_columns=fk["referred_columns"]
-                            )
-                            for fk in inspector.get_foreign_keys(table)
-                        ]
-                        
-                        table_info =  TableInfo(
-                            name=table,
-                            alias=alias,
-                            columns=columns,
-                            foreign_keys=fks
-                        )
-                        final_table_infos.append(table_info)
-                    except Exception:
-                        pass 
-            except Exception:
-                pass 
-                
+            ds_tables, drift_detected = self._get_tables_and_related_tables(search_candidates, inspector, state)
             
-            return {
-                "schema_info": SchemaInfo(tables=final_table_infos),
-                "selected_datasource_id": target_ds_id,
-                "reasoning": [{"node": "schema", "content": f"Retrieved {len(final_table_infos)} tables from {target_ds_id}."}]
+            table_infos = self._extract_schema_info(state, ds_tables, inspector)
+            
+            result = {
+                "schema_info": SchemaInfo(tables=table_infos),
+                "selected_datasource_id": ds_id,
+                "reasoning": [{"node": "schema", "content": f"Retrieved {len(table_infos)} tables from {ds_id}."}],
+                "system_events": []
             }
+            
+            if drift_detected:
+                logger.warning(f"Schema Drift Detected for datasource {ds_id}. Triggering re-index recommendation.")
+                result["system_events"].append("DRIFT_DETECTED")
+                result["reasoning"].append({"node": "schema", "content": "Schema Drift Detected: Used semantic fallback.", "type": "warning"})
+            
+            return result
 
         except Exception as e:
-            raise e
+            return {
+                "errors": [
+                    PipelineError(
+                        node="schema",
+                        message=f"Schema retrieval failed: {e}",
+                        severity=ErrorSeverity.CRITICAL,
+                        error_code=ErrorCode.SCHEMA_RETRIEVAL_FAILED,
+                        stack_trace=str(e)
+                    )
+                ]
+            }

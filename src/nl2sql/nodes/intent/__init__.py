@@ -1,3 +1,4 @@
-from nl2sql.nodes.intent.node import IntentNode
+from .node import IntentNode
+from .schemas import IntentResponse
 
-__all__ = ["IntentNode"]
+__all__ = ["IntentNode", "IntentResponse"]

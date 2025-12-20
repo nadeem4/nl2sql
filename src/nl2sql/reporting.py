@@ -63,6 +63,49 @@ class ConsolePresenter:
     # -------------------------------------------------------------------------
     # Pipeline Execution (run.py)
     # -------------------------------------------------------------------------
+    def print_pipeline_errors(self, errors: List[Any]) -> None:
+        """
+        Renders structured PipelineError objects in a table.
+        Args:
+            errors: List of PipelineError objects (typed as Any to avoid circular deps if needed).
+        """
+        if not errors:
+            return
+
+        table = Table(title="Pipeline Errors", show_header=True, header_style="bold red", expand=True)
+        table.add_column("Node", style="cyan")
+        table.add_column("Severity", justify="center")
+        table.add_column("Code", justify="center")
+        table.add_column("Message", style="white")
+
+        for e in errors:
+            # Handle both object and dict (just in case serialization happened)
+            if isinstance(e, dict):
+                 severity = e.get("severity", "ERROR")
+                 node = e.get("node", "unknown")
+                 code = e.get("error_code", "-")
+                 msg = e.get("message", "-")
+            else:
+                 severity = e.severity.name if hasattr(e.severity, 'name') else str(e.severity)
+                 node = e.node
+                 code = e.error_code
+                 msg = e.message
+
+            sev_style = "red" 
+            if "WARNING" in severity: sev_style = "yellow"
+            if "CRITICAL" in severity: sev_style = "bold red"
+            
+            table.add_row(
+                node.upper(),
+                f"[{sev_style}]{severity}[/{sev_style}]",
+                code,
+                msg
+            )
+        
+        self.console.print("\n")
+        self.console.print(table)
+        self.console.print("\n")
+
     def print_query(self, query: str) -> None:
         self.console.print(f"[bold blue]Query:[/bold blue] {query}")
 
@@ -78,6 +121,40 @@ class ConsolePresenter:
 
     def print_rows_returned(self, count: int) -> None:
          self.console.print(f"[dim]Rows returned: {count}[/dim]")
+
+    def print_execution_result(self, execution: Any) -> None:
+        """Renders the ExecutionModel as a table."""
+        if not execution:
+            return
+
+        if isinstance(execution, list):
+            rows = execution
+            columns = list(rows[0].keys()) if rows and isinstance(rows[0], dict) else []
+        else:
+            rows = execution.get("rows", []) if isinstance(execution, dict) else getattr(execution, "rows", [])
+            columns = execution.get("columns", []) if isinstance(execution, dict) else getattr(execution, "columns", [])
+
+        if not rows:
+            self.console.print("[dim]No rows returned.[/dim]")
+            return
+
+        table = Table(title="Result Data", show_header=True, header_style="bold cyan", border_style="blue")
+        
+        # Add columns
+        for col in columns:
+            table.add_column(col)
+            
+        # Add rows (limit to 100 for display safety if needed, but for now show all)
+        for row in rows:
+            row_vals = []
+            for col in columns:
+                 val = row.get(col, "") if isinstance(row, dict) else getattr(row, col, "")
+                 row_vals.append(str(val))
+            table.add_row(*row_vals)
+            
+        self.console.print("\n")
+        self.console.print(table)
+        self.console.print("\n")
 
     def print_datasource_used(self, ds_id: str) -> None:
         self.console.print(f"[bold blue]Datasource Used:[/bold blue] {ds_id}")

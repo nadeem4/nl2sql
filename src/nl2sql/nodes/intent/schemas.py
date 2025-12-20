@@ -1,24 +1,55 @@
-from typing import Optional, Literal
-from pydantic import BaseModel, Field, ConfigDict
+from enum import Enum
+from typing import List, Dict, Literal
+from pydantic import BaseModel, Field
 
-class IntentModel(BaseModel):
-    """
-    Represents the analyzed intent of the user query.
 
-    Attributes:
-        entities: Named entities extracted from the query.
-        filters: Filters or constraints extracted from the query.
-        keywords: Technical keywords or table names.
-        clarifications: Clarifying questions if ambiguous.
-        reasoning: Step-by-step reasoning for intent classification.
-        query_expansion: Synonyms and related terms.
-        query_type: Classification of the query intent (READ, WRITE, DDL).
-    """
-    model_config = ConfigDict(extra="forbid")
-    entities: list[str] = Field(default_factory=list)
-    filters: list[str] = Field(default_factory=list)
-    keywords: list[str] = Field(default_factory=list)
-    clarifications: list[str] = Field(default_factory=list)
-    reasoning: Optional[str] = Field(None)
-    query_expansion: list[str] = Field(default_factory=list)
-    query_type: Literal["READ", "WRITE", "DDL", "UNKNOWN"] = Field("READ")
+class EntityRole(str, Enum):
+    FACT = "fact"
+    STATE = "state"
+    REFERENCE = "reference"
+
+
+class TimeScope(str, Enum):
+    CURRENT_STATE = "current_state"
+    POINT_IN_TIME = "point_in_time"
+    RANGE = "range"
+    ALL_TIME = "all_time"
+
+
+
+class EntityGroup(BaseModel):
+    role: EntityRole
+    entity_ids: List[str]
+
+class Entity(BaseModel):
+    entity_id: str
+    name: str
+    role: EntityRole
+    required_attributes: List[str] = Field(default_factory=list)
+
+
+class IntentResponse(BaseModel):
+    canonical_query: str = Field(description="Canonical, database-centric rewrite of the user query.")
+
+    response_type: Literal["tabular", "kpi", "summary"]
+
+    analysis_intent: Literal[
+        "lookup",
+        "aggregation",
+        "comparison",
+        "trend",
+        "diagnostic",
+        "validation"
+    ]
+
+    time_scope: TimeScope
+
+    keywords: List[str] = Field(default_factory=list)
+
+    entities: List[Entity]
+
+    entity_roles: List[EntityGroup]
+
+    synonyms: List[str] = Field(default_factory=list)
+
+    ambiguity_level: Literal["low", "medium", "high"]

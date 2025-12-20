@@ -1,170 +1,179 @@
 from typing import Callable, Dict, Optional, Union, List
-import uuid
-import pathlib
-
 import json
-from sqlalchemy import inspect
+
 from langchain_core.runnables import Runnable
 from langgraph.graph import END, StateGraph
 from langgraph.types import Send
 
-from nl2sql.capabilities import get_capabilities
 from nl2sql.datasource_registry import DatasourceRegistry
 from nl2sql.nodes.decomposer import DecomposerNode
+from nl2sql.nodes.intent import IntentNode
 from nl2sql.nodes.aggregator import AggregatorNode
 from nl2sql.subgraphs.execution import build_execution_subgraph
-from nl2sql.schemas import GraphState, DecomposerResponse, AggregatedResponse
-from nl2sql.tracing import span
-from nl2sql.vector_store import SchemaVectorStore
+from nl2sql.schemas import GraphState
+from nl2sql.vector_store import OrchestratorVectorStore
 from nl2sql.llm_registry import LLMRegistry
-from IPython.display import Image, display
+from nl2sql.errors import PipelineError, ErrorSeverity, ErrorCode
 
 
-# Type for an LLM callable: prompt -> string
 LLMCallable = Union[Callable[[str], str], Runnable]
 
 
-def build_graph(registry: DatasourceRegistry, llm_registry: LLMRegistry, execute: bool = True, vector_store: Optional[SchemaVectorStore] = None, vector_store_path: str = ""):
-    """
-    Builds the LangGraph state graph for the NL2SQL pipeline.
-
-    Args:
-        registry: Datasource registry.
-        llm_registry: LLM registry.
-        execute: Whether to include the execution step.
-        vector_store: Optional vector store for schema retrieval.
-        vector_store_path: Path to vector store for routing.
-
-    Returns:
-        Compiled StateGraph.
-    """
-    
+def build_graph(
+    registry: DatasourceRegistry,
+    llm_registry: LLMRegistry,
+    execute: bool = True,
+    vector_store: Optional[OrchestratorVectorStore] = None,
+    vector_store_path: str = "",
+):
     graph = StateGraph(GraphState)
 
-    decomposer_llm = llm_registry.decomposer_llm()
-    decomposer = DecomposerNode(decomposer_llm, registry)
-    
-    aggregator_llm = llm_registry.aggregator_llm()
-    aggregator = AggregatorNode(aggregator_llm)
-    
+    intent_node = IntentNode(llm_registry.intent_classifier_llm())
+    decomposer_node = DecomposerNode(
+        llm_registry.decomposer_llm(), registry, vector_store
+    )
+    aggregator_node = AggregatorNode(llm_registry.aggregator_llm())
 
-    execution_subgraph, planning_subgraph = build_execution_subgraph(registry, llm_registry, vector_store, vector_store_path)
+    execution_subgraph, agentic_execution_loop = build_execution_subgraph(
+        registry, llm_registry, vector_store, vector_store_path
+    )
 
-    def execution_wrapper(state: Union[Dict, GraphState]):
-        import time
-        start = time.perf_counter()
+    def execution_wrapper(state: Dict):
         result = execution_subgraph.invoke(state)
-        duration = time.perf_counter() - start
-        
-        sql = result.get("sql_draft")
-        
-        execution = result.get("execution")
-        row_count = execution.get("row_count") if isinstance(execution, dict) else getattr(execution, "row_count", 0)
 
-        # Prioritize explicitly selected ID
         selected_id = result.get("selected_datasource_id")
-        
-        
-        ds_type = "Unknown"
-        if selected_id:
-            try:
-                profile = registry.get_profile(selected_id)
-                ds_type = profile.engine
-            except Exception:
-                pass
+        execution = result.get("execution")
+        row_count = 0
 
-        # Ensure valid Set[str] for datasource_id
-        ds_ids = result.get("datasource_id")
-        if selected_id:
-            final_ds_ids = {selected_id}
-        else:
-            # Filter out None and ensure strings
-            final_ds_ids = {str(d) for d in ds_ids if d is not None} if ds_ids else set()
+        if execution:
+            row_count = (
+                execution.get("row_count")
+                if isinstance(execution, dict)
+                else getattr(execution, "row_count", 0)
+            )
 
         history_item = {
             "datasource_id": selected_id,
-            "datasource_type": ds_type,
             "sub_query": result.get("user_query"),
-            "sql": sql,
+            "sql": result.get("sql_draft"),
             "row_count": row_count,
-            "reasoning": result.get("reasoning", {})
+            "entity_ids": result.get("entity_ids", []),
+            "reasoning": result.get("reasoning", {}),
         }
-        
-        routing_info = result.get("routing_info", {})
 
         return {
             "intermediate_results": result.get("intermediate_results", []),
             "query_history": [history_item],
-            "routing_info": routing_info,
-            "datasource_id": final_ds_ids
+            "errors": result.get("errors", []),
         }
 
-    # Add Nodes
-    graph.add_node("decomposer", decomposer)
+    def report_missing_datasource(state: Dict):
+        query = state.get("user_query", "Unknown Query")
+        entity_ids = state.get("entity_ids", [])
+
+        message = (
+            f"Execution skipped for query '{query}'. "
+            f"Missing datasource for entity_ids={entity_ids}"
+        )
+
+        return {
+            "errors": [
+                PipelineError(
+                    node="router",
+                    message=message,
+                    severity=ErrorSeverity.WARNING,
+                    error_code=ErrorCode.MISSING_DATASOURCE_ID,
+                )
+            ],
+            "intermediate_results": [message],
+        }
+
+    graph.add_node("intent", intent_node)
+    graph.add_node("decomposer", decomposer_node)
     graph.add_node("execution_branch", execution_wrapper)
-    graph.add_node("aggregator", aggregator)
+    graph.add_node("report_missing_datasource", report_missing_datasource)
+    graph.add_node("aggregator", aggregator_node)
 
-    # Edges
-    graph.set_entry_point("decomposer")
-    
+    graph.set_entry_point("intent")
+    graph.add_edge("intent", "decomposer")
+
     def continue_to_subqueries(state: GraphState):
-        """
-        Determines whether to fan out to parallel branches or proceed with a single branch.
-        """
-        sub_queries = state.sub_queries or [state.user_query]
+        branches = []
 
-        ds_ids_list = sorted(list(state.datasource_id)) if state.datasource_id else []
-        selected_id = state.selected_datasource_id
-        if not selected_id and len(ds_ids_list) == 1:
-            selected_id = ds_ids_list[0]
-            
-        return [Send("execution_branch", {"user_query": sq, "datasource_id": ds_ids_list, "selected_datasource_id": selected_id}) for sq in sub_queries]
+        if not state.sub_queries:
+            return []
+
+        entities_by_id = {}
+        if state.entities:
+            entities_by_id = {e.entity_id: e for e in state.entities}
+
+        for sq in state.sub_queries:
+            entity_ids = sq.entity_ids
+            scoped_entities = [
+                entities_by_id[eid]
+                for eid in entity_ids
+                if eid in entities_by_id
+            ]
+
+            payload = {
+                "user_query": sq.query,
+                "selected_datasource_id": sq.datasource_id,
+                "entity_ids": entity_ids,
+                "entities": scoped_entities,
+                "complexity": sq.complexity,
+                "reasoning": [
+                    {
+                        "node": f"execution_{sq.datasource_id}",
+                        "content": f"Executing for entity_ids={entity_ids}",
+                    }
+                ],
+            }
+
+            if sq.datasource_id:
+                branches.append(Send("execution_branch", payload))
+            else:
+                branches.append(Send("report_missing_datasource", payload))
+
+        return branches
 
     graph.add_conditional_edges(
         "decomposer",
         continue_to_subqueries,
-        ["execution_branch"]
+        ["execution_branch", "report_missing_datasource"],
     )
-    
+
     graph.add_edge("execution_branch", "aggregator")
+    graph.add_edge("report_missing_datasource", "aggregator")
     graph.add_edge("aggregator", END)
 
-    graph = graph.compile()
-    return graph, execution_subgraph, planning_subgraph
+    return graph.compile(), execution_subgraph, agentic_execution_loop
 
-def run_with_graph(registry: DatasourceRegistry, llm_registry: LLMRegistry, user_query: str, datasource_id: Optional[str] = None, execute: bool = True, vector_store: Optional[SchemaVectorStore] = None, vector_store_path: str = "", callbacks: Optional[List] = None) -> Dict:
-    """
-    Runs the NL2SQL pipeline using LangGraph.
 
-    Args:
-        registry: Datasource registry.
-        llm_registry: LLM registry.
-        user_query: The user's natural language query.
-        datasource_id: Optional ID to force a specific datasource.
-        execute: Whether to execute the generated SQL.
-        vector_store: Optional vector store for schema retrieval.
-        vector_store_path: Path to vector store for routing.
-        callbacks: Optional list of LangChain callbacks.
-
-    Returns:
-        The final state dictionary.
-    """
-    g, execution_subgraph, planning_subgraph = build_graph(registry, llm_registry, execute=execute, vector_store=vector_store, vector_store_path=vector_store_path)
-    
-    ds_id_init = set()
-    if datasource_id:
-        ds_id_init = {datasource_id}
-        
-    initial_state = GraphState(
-        user_query=user_query,
-        datasource_id=ds_id_init,
-        selected_datasource_id=datasource_id,  # Explicitly set selected ID if provided
-        validation={"capabilities": "generic"}, 
+def run_with_graph(
+    registry: DatasourceRegistry,
+    llm_registry: LLMRegistry,
+    user_query: str,
+    datasource_id: Optional[str] = None,
+    execute: bool = True,
+    vector_store: Optional[OrchestratorVectorStore] = None,
+    vector_store_path: str = "",
+    callbacks: Optional[List] = None,
+) -> Dict:
+    graph, _, _ = build_graph(
+        registry,
+        llm_registry,
+        execute=execute,
+        vector_store=vector_store,
+        vector_store_path=vector_store_path,
     )
 
-    initial_state_dict = initial_state.model_dump()
-            
-    # Run graph
-    result = g.invoke(initial_state_dict, config={"callbacks": callbacks})
-    
-    return result
+    initial_state = GraphState(
+        user_query=user_query,
+        selected_datasource_id=datasource_id,
+        validation={"capabilities": "generic"},
+    )
+
+    return graph.invoke(
+        initial_state.model_dump(),
+        config={"callbacks": callbacks},
+    )

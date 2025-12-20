@@ -7,6 +7,7 @@ from langchain_core.runnables import Runnable
 
 from nl2sql.schemas import GraphState
 from nl2sql.nodes.summarizer.prompts import SUMMARIZER_PROMPT
+from nl2sql.errors import PipelineError, ErrorSeverity, ErrorCode
 
 from nl2sql.logger import get_logger
 
@@ -51,7 +52,16 @@ class SummarizerNode:
 
         try:
             if not self.llm:
-                return {"errors": ["Summarizer LLM not provided."]}
+                return {
+                    "errors": [
+                        PipelineError(
+                            node=node_name,
+                            message="Summarizer LLM not provided.",
+                            severity=ErrorSeverity.CRITICAL,
+                            error_code=ErrorCode.MISSING_LLM
+                        )
+                    ]
+                }
 
             schema_context = ""
             if state.schema_info:
@@ -69,7 +79,8 @@ class SummarizerNode:
                 except:
                     failed_plan_str = str(state.plan)
 
-            errors_str = "\n".join(f"- {e}" for e in state.errors)
+            # Extract messages from PipelineError objects
+            errors_str = "\n".join(f"- {e.message}" for e in state.errors)
 
             try:
                 feedback = self.chain.invoke({
@@ -80,7 +91,14 @@ class SummarizerNode:
                 })
                 
                 return {
-                    "errors": [feedback],
+                    "errors": [
+                        PipelineError(
+                            node=node_name,
+                            message=feedback,
+                            severity=ErrorSeverity.WARNING, # Feedback for retry
+                            error_code=ErrorCode.PLAN_FEEDBACK
+                        )
+                    ],
                     "reasoning": [{"node": "summarizer", "content": feedback}]
                 }
             except Exception as e:
@@ -89,5 +107,14 @@ class SummarizerNode:
         except Exception as e:
             logger.error(f"Node {node_name} failed: {e}")
             return {
-                "reasoning": [{"node": "summarizer", "content": f"Summarizer failed: {e}", "type": "error"}]
+                "reasoning": [{"node": "summarizer", "content": f"Summarizer failed: {e}", "type": "error"}],
+                "errors": [
+                    PipelineError(
+                        node=node_name,
+                        message=f"Summarizer failed: {e}",
+                        severity=ErrorSeverity.ERROR,
+                        error_code=ErrorCode.SUMMARIZER_FAILED,
+                        stack_trace=str(e)
+                    )
+                ]
             }

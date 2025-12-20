@@ -8,12 +8,15 @@ Designed for observability and reliability, it provides detailed performance met
 
 ## Key Features
 
-- **Supervisor Architecture**: Centralized dynamic routing using a 3-layer strategy (Vector, Multi-Query, LLM) to dispatch tasks.
-- **Map-Reduce Strategy**: Handles complex cross-database queries by decomposing them into parallel sub-tasks and aggregating results.
-- **LangGraph Pipeline**: Modular, stateful graph architecture with specialized agents for Intent, Planning, and Validation.
+- **Intent-Driven Architecture**: Uses a specialized **Intent Node** to classify queries as `TABULAR`, `KPI` (Fast Path), or `SUMMARY` (Slow Path).
+- **Hybrid Execution Lanes**:
+  - **Fast Lane**: Zero-shot SQL generation for simple lookups (< 2s latency).
+  - **Slow Lane**: Full Plan-Validate-Execute agentic loop for complex analysis.
+- **Supervisor Architecture**: Centralized dynamic routing via `DecomposerNode` using vector search.
+- **Map-Reduce Strategy**: Handles complex cross-database queries by decomposing them into parallel sub-tasks.
+- **LangGraph Pipeline**: Modular, stateful graph architecture.
 - **Multi-Database Support**: Seamlessly query across Postgres, MySQL, MSSQL, and SQLite.
-- **Rule-Based SQL Generation**: Deterministic, token-efficient SQL generation using `sqlglot` to prevent syntax hallucinations.
-- **Robust Validation Loop**: Pre-execution validation of plans against the schema to catch errors early.
+- **Robust Validation Loop**: Pre-execution validation of plans (Slow Lane only).
 - **Observability**: Real-time streaming of agent reasoning steps.
 - **Vector Search (RAG)**: Scalable schema retrieval for large databases.
 
@@ -123,7 +126,7 @@ manufacturing_supply:
 
 ### CLI Basics
 
-The CLI (`src.nl2sql.cli`) is the main entry point. It uses the **Router Node** to automatically select the correct datasource.
+The CLI (`src.nl2sql.cli`) is the main entry point.
 
 - `--query "..."`: The natural language question.
 - `--verbose`: Display step-by-step AI reasoning.
@@ -155,75 +158,11 @@ Run these commands to test each database:
 python -m src.nl2sql.cli --id manufacturing_ops --query "List 5 machines with their serial numbers"
 ```
 
-**Sample Output:**
-
-<details>
-<summary><b>Click to see Sample Output</b></summary>
-
-> **Summary**
-> The query successfully retrieved a list of 5 machines along with their serial numbers.
-
-<details>
-<summary><b>Execution Trace</b></summary>
-<br>
-
-- **Router**: Layer 1 Distance 0.25 (Matched "List all machines")
-- **Intent**: Classification: READ, Keywords: machines, serial numbers
-- **Planner**: Plan: Select name, serial_number from machines limit 5
-- **Generator**: SELECT name, serial_number FROM machines LIMIT 5
-- **Executor**: Executed SQL on manufacturing_ops. Rows returned: 5.
-
-</details>
-
-**Data**
-
-| Machine Name | Serial Number |
-| :--- | :--- |
-| Machine-0 | 54402ab7-f674-4856-8129-3bd0b82c0171 |
-| Machine-1 | 46eb37fc-f2c2-4c76-809c-a7d94e8c0605 |
-| Machine-2 | 736e945f-f356-4d2f-abf3-541bbf5ccb3c |
-| Machine-3 | a1b2c3d4-e5f6-7890-1234-56789abcdef0 |
-| Machine-4 | b2c3d4e5-f6a7-8901-2345-67890bcdef12 |
-
-**Datasource Used:** `manufacturing_ops`
-</details>
-
 #### 2. MySQL (Supply Chain)
 
 ```bash
 python -m src.nl2sql.cli --id manufacturing_supply --query "Show me top 3 products by price"
 ```
-
-**Sample Output:**
-
-<details>
-<summary><b>Click to see Sample Output</b></summary>
-
-> **Summary**
-> The top 3 products by price have been successfully retrieved.
-
-<details>
-<summary><b>Execution Trace</b></summary>
-<br>
-
-- **Router**: Layer 1 Distance 0.32 (Matched "Show top products by price")
-- **Intent**: Classification: READ, Keywords: products, price
-- **Planner**: Plan: Select name, sku, price from products order by price desc limit 3
-- **Generator**: SELECT name, sku, unit_price FROM products ORDER BY unit_price DESC LIMIT 3
-- **Executor**: Executed SQL on manufacturing_supply. Rows returned: 3.
-
-</details>
-
-**Data**
-
-| Product ID | SKU | Product Name | Price |
-| :--- | :--- | :--- | :--- |
-| 30 | 3026430016128 | Harness Cross-Media Relationships | 10.91 |
-| 117 | 9624973332824 | Enable Vertical Bandwidth | 12.80 |
-| 339 | 5303716685598 | Deploy Magnetic Channels | 16.39 |
-
-**Datasource Used:** `manufacturing_supply`
-</details>
 
 #### 3. MSSQL (History)
 
@@ -231,65 +170,11 @@ python -m src.nl2sql.cli --id manufacturing_supply --query "Show me top 3 produc
 python -m src.nl2sql.cli --id manufacturing_history --query "Count total production runs"
 ```
 
-**Sample Output:**
-
-<details>
-<summary><b>Click to see Sample Output</b></summary>
-
-> **Summary**
-> The total number of production runs is 5000.
-
-<details>
-<summary><b>Execution Trace</b></summary>
-<br>
-
-- **Router**: Layer 1 Distance 0.18 (Matched "Count total production runs")
-- **Intent**: Classification: AGGREGATE, Keywords: count, production runs
-- **Planner**: Plan: Select count(*) from production_runs
-- **Generator**: SELECT COUNT(*) FROM production_runs
-- **Executor**: Executed SQL on manufacturing_history. Rows returned: 1.
-
-</details>
-
-**Datasource Used:** `manufacturing_history`
-</details>
-
 #### 4. SQLite (Reference)
 
 ```bash
 python -m src.nl2sql.cli --id manufacturing_ref --query "List all factories and their locations"
 ```
-
-**Sample Output:**
-
-<details>
-<summary><b>Click to see Sample Output</b></summary>
-
-> **Summary**
-> The query retrieved 3 factories: Plant Austin (TX), Plant Berlin (DE), and Plant Tokyo (JP).
-
-<details>
-<summary><b>Execution Trace</b></summary>
-<br>
-
-- **Router**: Layer 1 Distance 0.22 (Matched "List all factories")
-- **Intent**: Classification: READ, Keywords: factories, locations
-- **Planner**: Plan: Select name, location from factories
-- **Generator**: SELECT name, location FROM factories
-- **Executor**: Executed SQL on manufacturing_ref. Rows returned: 3.
-
-</details>
-
-**Data**
-
-| Factory Name | Location |
-| :--- | :--- |
-| Plant Austin | Austin, TX |
-| Plant Berlin | Berlin, DE |
-| Plant Tokyo | Tokyo, JP |
-
-**Datasource Used:** `manufacturing_ref`
-</details>
 
 ### 5. Cross-Database Query (Map-Reduce)
 
@@ -300,85 +185,6 @@ The system can automatically decompose complex queries into sub-queries, execute
 ```bash
 python -m src.nl2sql.cli --query "Compare sales from manufacturing_history and inventory from manufacturing_supply"
 ```
-
-**Sample Output:**
-
-<details>
-<summary><b>Click to see Sample Output</b></summary>
-
-> **Summary**
-> The sales data shows total sales and quantities sold by customer, while the inventory data provides quantities on hand for various products in different locations. A comparison reveals potential stock issues for high-selling products.
-
-<details>
-<summary><b>Execution Trace</b></summary>
-<br>
-
-- **Decomposer**: Strategy: PARALLEL (Sales, Inventory) based on keyword overlap.
-- **Branch 1 (History)**: "Get sales data" -> Router: MSSQL -> SQL: SELECT ... FROM sales_orders ...
-- **Branch 2 (Supply)**: "Get inventory interactions" -> Router: MySQL -> SQL: SELECT ... FROM inventory ...
-- **Aggregator**: Combined results from 2 branches into final comparison analysis.
-
-</details>
-
-**Data**
-
-| Customer ID | Total Qty Sold | Total Sales | Product ID | Location | Qty on Hand |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| 23 | 1035 | $915,361.36 | 326 | WH-C | 1 |
-| 46 | 1692 | $1,696,801.35 | 295 | WH-C | 2180 |
-| 69 | 2052 | $1,918,153.05 | 223 | WH-A | 3005 |
-
-**Datasource Used:** `['manufacturing_history', 'manufacturing_supply']`
-</details>
-
-#### Example 2: Production vs Maintenance (MSSQL + Postgres)
-
-```bash
-python -m src.nl2sql.cli --query "Show production runs from manufacturing_history and maintenance logs from manufacturing_ops for 'Machine-1'"
-```
-
-**Sample Output:**
-
-<details>
-<summary><b>Click to see Sample Output</b></summary>
-
-> **Summary**
-> The production runs for 'Machine-1' show a total of 98 records with various quantities produced and scrap counts.
-
-**Data**
-
-| Product Run ID | Product ID | Machine ID | Start Time | End Time | Qty Produced | Scrap Count |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| 19 | 447 | 1 | 2025-08-01 11:03:37 | 2025-08-01 12:03:37 | 4698 | 30 |
-| 29 | 33 | 1 | 2025-05-15 04:13:56 | 2025-05-15 08:13:56 | 8386 | 41 |
-
-**Datasource Used:** `['manufacturing_ops', 'manufacturing_history']`
-</details>
-
-#### Example 3: Employees & Locations (Postgres + SQLite)
-
-```bash
-python -m src.nl2sql.cli --query "List all employees from manufacturing_ops and their factory locations from manufacturing_ref"
-```
-
-**Sample Output:**
-
-<details>
-<summary><b>Click to see Sample Output</b></summary>
-
-> **Summary**
-> The combined data lists all employees from the manufacturing operations along with their corresponding factory locations.
-
-**Data**
-
-| Employee Name | Role | Factory ID | Location | Hired Date | Email |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| James Fitzpatrick | Technician | 1 | Austin, TX | 2024-09-19 | <masonkyle@example.com> |
-| James Colon | Operator | 3 | Berlin, DE | 2023-07-04 | <sgarcia@example.com> |
-| Brian Russell | Operator | 1 | Austin, TX | 2023-06-13 | <mlopez@example.com> |
-
-**Datasource Used:** `['manufacturing_ops', 'manufacturing_ref']`
-</details>
 
 ### Vector Search (RAG)
 
@@ -407,43 +213,44 @@ For large schemas, use vector search to dynamically select relevant tables.
 
 ### The Pipeline (LangGraph)
 
-We use a hybrid **Supervisor + Map-Reduce Architecture**:
+We use a hybrid **Intent-Driven + Map-Reduce Architecture**:
 
-1. **Supervisor (The Brain)**: The `DecomposerNode` acts as the supervisor, analyzing every query to decide if it requires a single datasource or multiple.
-2. **Map-Reduce (The Strategy)**: When the supervisor detects a complex query (e.g., "Compare X and Y"), it triggers a **Map-Reduce** flow:
-    - **Map**: Fans out sub-queries to parallel execution branches.
-    - **Reduce**: Aggregates results from all branches into a final answer.
+1. **Intent & Routing**:
+    - **Intent Node**: Classifies user goal and standardizes the query.
+    - **Decomposer (Supervisor)**: Uses vector search to find the right data source(s). If multiple are needed, it triggers Map-Reduce.
+2. **Execution Lanes**:
+    - **Fast Lane**: Direct SQL generation (`DirectSQLNode`) for simple tabular data.
+    - **Slow Lane**: Reasoning loop (`Planner` -> `Validator` -> `Generator`) for complex requests.
+3. **Aggregation**:
+    - The `AggregatorNode` stitches results together, using an LLM only if necessary (Summary Mode).
 
 For a deep dive into the Map-Reduce pattern, see [**docs/ARCHITECTURE_MAP_REDUCE.md**](docs/ARCHITECTURE_MAP_REDUCE.md).
 
 ```mermaid
 flowchart TD
-  user["User Query"] --> decomposer["Decomposer (AI)"]
-  decomposer -- Single DB --> router["Router (AI)"]
-  decomposer -- Multi DB --> split["Parallel Execution"]
+  user["User Query"] --> intent["Intent Node"]
+  intent --> decomposer["Decomposer (AI)"]
+  decomposer -- Single DB --> schema
+  decomposer -- Multi DB --> splits["Splits (Map)"]
   
-  subgraph Execution Pipeline
-    router --> intent["Intention (AI)"]
-    intent --> schema["Schema (non-AI)"]
-    schema --> planning["Planning Subgraph"]
+  splits --> schema
+  
+  subgraph Execution Lane
+    schema["Schema Node"] --> lane_logic{Fast or Slow?}
+    lane_logic -- Fast --> directSQL["DirectSQL (AI)"]
+    lane_logic -- Slow --> planner["Planner (AI)"]
+    planner --> validator
+    validator --> generator
     
-    subgraph Planning Subgraph
-      planner["Planner (AI)"] --> validator["Validator (non-AI)"]
-      validator -- Invalid --> summarizer["Summarizer (AI)"]
-      summarizer --> planner
-    end
-    
-    validator -- Valid --> generator["SQL Generator (non-AI)"]
-    generator --> executor["Executor (non-AI)"]
+    directSQL --> executor
+    generator --> executor["Executor"]
   end
   
-  split --> router
-  executor --> aggregator["Aggregator (AI)"]
+  executor --> aggregator["Aggregator"]
   aggregator --> answer["Final Answer"]
   
   style user fill:#f6f8fa,stroke:#aaa
   style decomposer fill:#e1f5fe,stroke:#01579b
-  style router fill:#e1f5fe,stroke:#01579b
   style aggregator fill:#e1f5fe,stroke:#01579b
   style answer fill:#f6f8fa,stroke:#aaa
 ```
@@ -457,8 +264,7 @@ To support efficient querying across large or multiple databases, we use a two-t
     - **Why**: Determines *which* database contains the relevant data (e.g., "Sales" vs. "Inventory").
     - **Strategy**:
         - **Layer 1 (Fast)**: Vector search against database descriptions and 200+ sample questions.
-        - **Layer 2 (Robust)**: If confidence is low (distance > 0.4), an LLM generates 3 query variations and votes on the best datasource.
-        - **Layer 3 (Reasoning)**: If Layer 2 fails or remains uncertain, a dedicated LLM Agent analyzes the datasource descriptions to make a final decision.
+        - **Layer 2 (Robust)**: Decomposer LLM uses retrieved context to form sub-queries.
 
 2. **Schema Selection**:
     - **What**: Indexes table metadata (columns, foreign keys, comments).
@@ -468,14 +274,14 @@ This allows the system to scale to hundreds of tables without overwhelming the L
 
 ### Core Agents
 
-- **Decomposer (Supervisor)**: The system brain. Analyzes queries to determine strategy (Single vs Multi-DB) and manages the Map-Reduce flow.
-- **Router (AI)**: Selects the appropriate database based on vector/reasoning alignment.
-- **Intent (AI)**: Classifies query type and extracts entities.
-- **Planner (AI)**: Generates a database-agnostic structured plan (tables, joins, filters).
-- **Validator (Code)**: Verifies the plan against the schema (column existence, types).
-- **SQL Generator (Code)**: Deterministically compiles the plan to SQL using `sqlglot` (0 tokens).
-- **Executor (Code)**: Runs the SQL (read-only) and returns results.
-- **Aggregator (AI)**: Combines results from parallel sub-queries into a final natural language answer.
+- **Intent (AI)**: Entry point. Classifies intent (Table vs Summary) and standardizes query.
+- **Decomposer (Supervisor)**: Orchestrates routing and query splitting.
+- **DirectSQL (AI)**: **Fast Lane**. Generates SQL for simple queries without planning.
+- **Planner (AI)**: **Slow Lane**. Generates a structured plan.
+- **Validator (Code)**: **Slow Lane**. Verifies the plan against schema.
+- **Generator (Code)**: Compiles plan to SQL.
+- **Executor (Code)**: Runs the SQL.
+- **Aggregator (AI)**: Synthesizes final results. Skips AI for simple table outputs.
 
 ### Performance Breakdown
 

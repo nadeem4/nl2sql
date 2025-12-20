@@ -1,70 +1,78 @@
-[
-  {
-    "datasource_id": "manufacturing_ops",
-    "datasource_type": "postgres",
-    "sub_query": "List all machines",
-    "sql": "SELECT t2.id AS id, t2.name AS name, t2.factory_id AS factory_id, t2.machine_type_id AS machine_type_id, t2.serial_number AS serial_number, t2.commissioned_on AS commissioned_on, t2.status AS status FROM machines AS t2 LIMIT 100",
-    "row_count": 50,
-    "reasoning": [
-      {
-        "node": "router",
-        "content": "Layer 1: Vector Search\n\t ->Distance 0.000 <= 0.4 threshold. (Canonical: \"List all machines\")"
-      },
-      {
-        "node": "intent",
-        "content": [
-          "Reasoning: The user is requesting to retrieve data about machines, which indicates a read operation. There are no specific filters or constraints provided, and the intent is clear as a request to list or select data.",
-          "Classification: READ",
-          "Keywords: machines",
-          "Expansion: equipment, devices, tools, machinery"
-        ]
-      },
-      {
-        "node": "schema",
-        "content": "Retrieved 4 tables from manufacturing_ops."
-      },
-      {
-        "node": "router",
-        "content": "Layer 1: Vector Search\n\t ->Distance 0.000 <= 0.4 threshold. (Canonical: \"List all machines\")"
-      },
-      {
-        "node": "intent",
-        "content": [
-          "Reasoning: The user is requesting to retrieve data about machines, which indicates a read operation. There are no specific filters or constraints provided, and the intent is clear as a request to list or select data.",
-          "Classification: READ",
-          "Keywords: machines",
-          "Expansion: equipment, devices, tools, machinery"
-        ]
-      },
-      {
-        "node": "schema",
-        "content": "Retrieved 4 tables from manufacturing_ops."
-      },
-      {
-        "node": "planner",
-        "content": [
-          "Reasoning: The user is requesting to list all machines, which indicates a read operation. Since there are no specific filters or constraints provided, I will select all columns from the 'machines' table.\n",
-          "Query Type: READ\nTables: machines\n"
-        ]
-      },
-      {
-        "node": "validator",
-        "content": [
-          "Validation Successful",
-          "Plan is valid against schema and security policies."
-        ]
-      },
-      {
-        "node": "generator",
-        "content": [
-          "Generated SQL: SELECT t2.id AS id, t2.name AS name, t2.factory_id AS factory_id, t2.machine_type_id AS machine_type_id, t2.serial_number AS serial_number, t2.commissioned_on AS commissioned_on, t2.status AS status FROM machines AS t2 LIMIT 100",
-          "Rationale: The user is requesting to list all machines, which indicates a read operation. Since there are no specific filters or constraints provided, I will select all columns from the 'machines' table."
-        ]
-      },
-      {
-        "node": "executor",
-        "content": "Executed SQL on manufacturing_ops. Rows returned: 50."
-      }
-    ]
-  }
-]
+{
+  "global_reasoning": [
+    {
+      "node": "intent",
+      "content": "Intent=lookup, TimeScope=TimeScope.ALL_TIME, Ambiguity=medium"
+    },
+    {
+      "node": "decomposer",
+      "content": "Entity_id production_runs has direct physical table coverage in multiple datasources (manufacturing_history.production_runs, manufacturing_sqlite.production_runs, manufacturing_ref.production_runs). Entity_id product_widget_a has direct physical table coverage in multiple datasources as well (manufacturing_sqlite.products, manufacturing_ref.products, manufacturing_supply.products). The canonical query filters production_runs by product_name (an attribute in product_widget_a), requiring a join between production_runs.product_id and product_widget_a.product_id. Since cross-datasource joins cannot be assumed and both entity_ids have multiple possible datasource assignments with no authoritative tie-breaker for where the joinable pair definitively co-resides, determinism requires decomposition rather than guessing a single datasource. Assign production_runs to manufacturing_history (fact table present; strongest fact-centric coverage) and assign product_widget_a to manufacturing_sqlite (reference table products present; direct physical coverage). This forces decomposition into two independently executable sub-queries that can be reconciled downstream via product_id/run_id without assuming implicit cross-datasource joins."
+    },
+    {
+      "node": "aggregator",
+      "content": "LLM Aggregation used."
+    }
+  ],
+  "execution_history": [
+    {
+      "datasource_id": "manufacturing_sqlite",
+      "sub_query": "Retrieve product_id values from entity_id product_widget_a where product_name = 'Widget A'.",
+      "sql": "SELECT id AS product_id\nFROM products\nWHERE name = 'Widget A'\nLIMIT 100;",
+      "row_count": 0,
+      "entity_ids": [],
+      "reasoning": [
+        {
+          "node": "execution_manufacturing_sqlite",
+          "content": "Executing for entity_ids=['product_widget_a']"
+        },
+        {
+          "node": "schema",
+          "content": "Retrieved 9 tables from manufacturing_sqlite."
+        },
+        {
+          "node": "schema",
+          "content": "Schema Drift Detected: Used semantic fallback.",
+          "type": "warning"
+        },
+        {
+          "node": "direct_sql",
+          "content": "Fast Lane generation successful."
+        },
+        {
+          "node": "executor",
+          "content": "Executed SQL on manufacturing_sqlite. Rows returned: 0."
+        }
+      ]
+    },
+    {
+      "datasource_id": "manufacturing_history",
+      "sub_query": "Retrieve all records from entity_id production_runs for the product_id values corresponding to 'Widget A' (to be provided from the product_widget_a sub-query).",
+      "sql": "SELECT TOP 100 pr.*\nFROM production_runs AS pr\nWHERE pr.product_id IN (\n    SELECT soi.product_id\n    FROM sales_order_items AS soi\n    WHERE soi.product_id IN (\n        SELECT soi2.product_id\n        FROM sales_order_items AS soi2\n        GROUP BY soi2.product_id\n        HAVING MIN(CASE WHEN 'Widget A' = 'Widget A' THEN 1 ELSE 0 END) = 1\n    )\n);",
+      "row_count": 100,
+      "entity_ids": [],
+      "reasoning": [
+        {
+          "node": "execution_manufacturing_history",
+          "content": "Executing for entity_ids=['production_runs']"
+        },
+        {
+          "node": "schema",
+          "content": "Retrieved 5 tables from manufacturing_history."
+        },
+        {
+          "node": "schema",
+          "content": "Schema Drift Detected: Used semantic fallback.",
+          "type": "warning"
+        },
+        {
+          "node": "direct_sql",
+          "content": "Fast Lane generation successful."
+        },
+        {
+          "node": "executor",
+          "content": "Executed SQL on manufacturing_history. Rows returned: 100."
+        }
+      ]
+    }
+  ]
+}

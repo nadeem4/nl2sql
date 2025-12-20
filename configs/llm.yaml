@@ -1,12 +1,4 @@
 default:
   provider: openai
-  model: gpt-4o-mini
+  model: gpt-5.2
 
-agents:
-  intent:
-    provider: openai
-    model: gpt-4o-mini
-  planner:
-    provider: openai
-    model: gpt-4o-mini
-    temperature: 0

@@ -147,35 +147,15 @@ class LLMRegistry:
 
         return call
 
-    def intent_llm(self) -> LLMCallable:
-        """Returns the LLM callable for the Intent agent."""
-        from nl2sql.schemas import IntentModel
-        llm = self._base_llm("intent")
-        return self._wrap_structured_usage(llm, IntentModel)
-
     def planner_llm(self) -> LLMCallable:
         """Returns the LLM callable for the Planner agent."""
-        from nl2sql.schemas import PlanModel
+        from nl2sql.nodes.planner.schemas import PlanModel
         llm = self._base_llm("planner")
         return self._wrap_structured_usage(llm, PlanModel)
 
-    def router_llm(self) -> LLMCallable:
-        llm = self._base_llm("router")
+    def canonicalizer_llm(self) -> LLMCallable:
+        llm = self._base_llm("canonicalizer")
         return llm.invoke
-
-    def router_canonicalizer_llm(self) -> LLMCallable:
-        llm = self._base_llm("router_canonicalizer")
-        return llm.invoke
-
-    def router_multi_query_llm(self) -> LLMCallable:
-        llm = self._base_llm("router_multi_query")
-        return llm.invoke
-
-    def router_decision_llm(self) -> LLMCallable:
-        llm = self._base_llm("router_decision")
-        return llm.invoke
-
-
 
     def summarizer_llm(self) -> LLMCallable:
         """Returns the LLM callable for the Summarizer agent."""
@@ -184,32 +164,38 @@ class LLMRegistry:
 
     def decomposer_llm(self) -> LLMCallable:
         """Returns the LLM callable for the Decomposer agent."""
-        from nl2sql.schemas import DecomposerResponse
+        from nl2sql.nodes.decomposer.schemas import DecomposerResponse
         llm = self._base_llm("decomposer")
         return self._wrap_structured_usage(llm, DecomposerResponse)
 
     def aggregator_llm(self) -> LLMCallable:
         """Returns the LLM callable for the Aggregator agent."""
-        from nl2sql.schemas import AggregatedResponse
+        from nl2sql.nodes.aggregator.schemas import AggregatedResponse
         llm = self._base_llm("aggregator")
         return self._wrap_structured_usage(llm,  AggregatedResponse)
 
-    def get_structured_llm(self, agent: str, schema: Any) -> LLMCallable:
-        """
-        Returns a structured LLM callable for a specific agent, with usage tracking.
-        """
-        llm = self._base_llm(agent)
-        return self._wrap_structured_usage(llm, schema)
+    def intent_classifier_llm(self) -> LLMCallable:
+        """Returns the LLM callable for the Intent Classifier."""
+        from nl2sql.nodes.intent.schemas import IntentResponse
+        llm = self._base_llm("intent_classifier")
+        return llm.with_structured_output(IntentResponse)
+
+    def direct_sql_llm(self) -> LLMCallable:
+        """Returns the LLM callable for the Direct SQL agent."""
+        llm = self._base_llm("direct_sql")
+        return llm.invoke
 
     def llm_map(self) -> Dict[str, LLMCallable]:
         """Returns a dictionary of all agent LLM callables."""
         return {
-            "intent": self.intent_llm(),
             "planner": self.planner_llm(),
             "summarizer": self.summarizer_llm(),
             "decomposer": self.decomposer_llm(),
             "aggregator": self.aggregator_llm(),
-            "_default": self.intent_llm(),
+            "intent_classifier": self.intent_classifier_llm(),
+            "direct_sql": self.direct_sql_llm(),
+            "direct_sql": self.direct_sql_llm(),
+            "_default": self.decomposer_llm(),
         }
 
     def get_usage_summary(self) -> Dict[str, Dict[str, int]]:
