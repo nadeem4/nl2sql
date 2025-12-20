@@ -84,14 +84,21 @@ class SchemaNode:
     def _get_search_candidates(self, state: GraphState) -> Optional[List[str]]:
         """Retrieves potential table candidates.
         
-        Now strictly relies on what the Decomposer provides. 
+        Uses entity_mapping from Decomposer to identify relevant tables.
         """
-        pre_routed_tables = state.candidate_tables
+        mapping = state.entity_mapping
         ds_id = state.selected_datasource_id
         
-        if pre_routed_tables:
-            logger.info(f"Using pre-routed tables for {ds_id}: {pre_routed_tables}")
-            return pre_routed_tables
+        if mapping and ds_id:
+            # Extract tables mapped to this datasource
+            tables = set()
+            for m in mapping:
+                if m.datasource_id == ds_id and m.candidate_tables:
+                    tables.update(m.candidate_tables)
+            
+            if tables:
+                logger.info(f"Using mapped tables for {ds_id}: {tables}")
+                return list(tables)
             
         return None
 

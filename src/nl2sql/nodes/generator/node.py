@@ -1,48 +1,22 @@
 from __future__ import annotations
 
-import json
-from typing import Optional, Dict, Any, TYPE_CHECKING
 import sqlglot
 from sqlglot import expressions as exp
+from typing import Dict, Any
 
-from nl2sql.capabilities import EngineCapabilities, get_capabilities
-
-if TYPE_CHECKING:
-    from nl2sql.schemas import GraphState
-
+from nl2sql.schemas import GraphState
 from nl2sql.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.datasource_registry import DatasourceRegistry
 from nl2sql.logger import get_logger
 
 logger = get_logger("generator")
 
+
 class GeneratorNode:
-    """
-    SQL generator node with dialect awareness and guardrails.
-
-    Converts the abstract `PlanModel` into a concrete SQL query string,
-    handling dialect-specific syntax and enforcing row limits.
-    """
-
     def __init__(self, registry: DatasourceRegistry):
-        """
-        Initializes the GeneratorNode.
-
-        Args:
-            registry: Datasource registry for accessing profiles.
-        """
         self.registry = registry
 
     def __call__(self, state: GraphState) -> Dict[str, Any]:
-        """
-        Executes the SQL generation step.
-
-        Args:
-            state: The current graph state.
-
-        Returns:
-            Dictionary updates for the graph state with the generated SQL Draft.
-        """
         node_name = "generator"
 
         try:
@@ -51,9 +25,21 @@ class GeneratorNode:
                     "errors": [
                         PipelineError(
                             node=node_name,
-                            message="No datasource_id in state. Router must run before GeneratorNode.",
+                            message="No datasource_id present before SQL generation.",
                             severity=ErrorSeverity.ERROR,
-                            error_code=ErrorCode.MISSING_DATASOURCE_ID
+                            error_code=ErrorCode.MISSING_DATASOURCE_ID,
+                        )
+                    ]
+                }
+
+            if not state.plan:
+                return {
+                    "errors": [
+                        PipelineError(
+                            node=node_name,
+                            message="No plan provided for SQL generation.",
+                            severity=ErrorSeverity.ERROR,
+                            error_code=ErrorCode.MISSING_PLAN,
                         )
                     ]
                 }
@@ -62,40 +48,28 @@ class GeneratorNode:
             self.profile_engine = profile.engine
             self.row_limit = profile.row_limit
 
-            caps: EngineCapabilities = get_capabilities(self.profile_engine)
-            if not state.plan:
-                return {
-                    "errors": [
-                         PipelineError(
-                            node=node_name,
-                            message="No plan to generate SQL from.",
-                            severity=ErrorSeverity.ERROR,
-                            error_code=ErrorCode.MISSING_PLAN
-                        )
-                    ]
-                }
+            limit = min(
+                int(state.plan.get("limit", self.row_limit)),
+                self.row_limit,
+            )
 
-            limit = self.row_limit
-            if state.plan.get("limit"):
-                try:
-                    limit = min(int(state.plan["limit"]), self.row_limit)
-                except Exception:
-                    pass
-            
-            final_sql = self._generate_sql_from_plan(state.plan, limit)
-            
-            generator_thoughts = [
-                f"Generated SQL: {final_sql}",
-                f"Rationale: {state.plan.get('reasoning', 'N/A')}"
-            ]
-            
+            sql = self._generate_sql_from_plan(state.plan, limit)
+
             return {
-                "sql_draft": final_sql,
-                "reasoning": [{"node": "generator", "content": generator_thoughts}]
+                "sql_draft": sql,
+                "reasoning": [
+                    {
+                        "node": node_name,
+                        "content": [
+                            f"Generated SQL for datasource={state.selected_datasource_id}",
+                            sql,
+                        ],
+                    }
+                ],
             }
 
         except Exception as exc:
-            logger.error(f"Node {node_name} failed: {exc}")
+            logger.exception(exc)
             return {
                 "sql_draft": None,
                 "errors": [
@@ -104,30 +78,16 @@ class GeneratorNode:
                         message=f"SQL generation failed: {exc}",
                         severity=ErrorSeverity.ERROR,
                         error_code=ErrorCode.SQL_GEN_FAILED,
-                        stack_trace=str(exc)
+                        stack_trace=str(exc),
                     )
-                ]
+                ],
             }
 
     def _generate_sql_from_plan(self, plan: dict, limit: int) -> str:
-        """
-        Generates SQL string from the plan dictionary.
-
-        Args:
-            plan: The execution plan.
-            limit: The row limit to enforce.
-
-        Returns:
-            The generated SQL string.
-        """
-        tables = plan.get("tables", [])
-        if not tables:
-            raise ValueError("No tables in plan.")
-        
         query = exp.select()
         query = self._build_select(query, plan)
-        query = self._build_from(query, tables[0])
-        query = self._build_joins(query, plan, tables)
+        query = self._build_from(query, plan["tables"][0])
+        query = self._build_joins(query, plan)
         query = self._build_where(query, plan)
         query = self._build_group_by(query, plan)
         query = self._build_having(query, plan)
@@ -141,170 +101,114 @@ class GeneratorNode:
             "sqlite": "sqlite",
             "oracle": "oracle",
         }
-        target_dialect = dialect_map.get(self.profile_engine, self.profile_engine)
-        
-        final_sql = query.sql(dialect=target_dialect)
-        return final_sql
 
-    def _to_col(self, col_ref: dict) -> exp.Column | exp.Expression:
-        """
-        Converts a ColumnRef dictionary to a sqlglot expression.
+        return query.sql(dialect=dialect_map.get(self.profile_engine, self.profile_engine))
 
-        Args:
-            col_ref: The column reference dictionary.
-
-        Returns:
-            A sqlglot Column or Expression object.
-        """
-        expr_str = col_ref["expr"]
-        expr = sqlglot.parse_one(expr_str)
-        
-  
-        return expr
+    def _to_expr(self, expr_str: str) -> exp.Expression:
+        return sqlglot.parse_one(expr_str)
 
     def _build_select(self, query: exp.Select, plan: dict) -> exp.Select:
-        """Builds the SELECT clause."""
-        select_cols = plan.get("select_columns", [])
-        
-        if not select_cols:
-            pass
-
-        for col in select_cols:
-            expr = self._to_col(col)
+        for col in plan.get("select_columns", []):
+            expr = self._to_expr(col["expr"])
             if col.get("alias"):
-                 expr = exp.Alias(this=expr, alias=exp.Identifier(this=col["alias"], quoted=False))
+                expr = exp.Alias(this=expr, alias=exp.Identifier(this=col["alias"]))
             query = query.select(expr)
-        
         return query
 
-    def _build_from(self, query: exp.Select, main_table: dict) -> exp.Select:
-        """Builds the FROM clause."""
-        main_tbl_exp = sqlglot.to_table(main_table["name"])
-        if main_table.get("alias"):
-            main_tbl_exp.set("alias", exp.TableAlias(this=exp.Identifier(this=main_table["alias"], quoted=False)))
-        return query.from_(main_tbl_exp)
+    def _build_from(self, query: exp.Select, table: dict) -> exp.Select:
+        tbl = exp.Table(this=exp.Identifier(this=table["name"]))
+        if table.get("alias"):
+            tbl.set("alias", exp.TableAlias(this=exp.Identifier(this=table["alias"])))
+        return query.from_(tbl)
 
-    def _build_joins(self, query: exp.Select, plan: dict, tables: list) -> exp.Select:
-        """Builds the JOIN clauses."""
-        for join in plan.get("joins", []):
-            right_tbl_name = join["right"]
-            right_alias = None
-            for t in tables:
-                if t["name"] == right_tbl_name:
-                    right_alias = t.get("alias")
-                    break
-            
-            join_tbl_exp = sqlglot.to_table(right_tbl_name)
-            if right_alias:
-                join_tbl_exp.set("alias", exp.TableAlias(this=exp.Identifier(this=right_alias, quoted=False)))
-            
+    def _build_joins(self, query: exp.Select, plan: dict) -> exp.Select:
+        table_map = {t["name"]: t.get("alias") for t in plan.get("tables", [])}
+
+        for j in plan.get("joins", []):
+            tbl = exp.Table(this=exp.Identifier(this=j["right"]))
+            alias = table_map.get(j["right"])
+            if alias:
+                tbl.set("alias", exp.TableAlias(this=exp.Identifier(this=alias)))
+
             on_cond = None
-            if join.get("on"):
-                on_cond = sqlglot.parse_one(join["on"][0])
-                for extra_on in join["on"][1:]:
-                    on_cond = exp.And(this=on_cond, expression=sqlglot.parse_one(extra_on))
-            
-            query = query.join(join_tbl_exp, on=on_cond, kind=join.get("join_type", "inner"))
+            for cond in j.get("on", []):
+                parsed = self._to_expr(cond)
+                on_cond = parsed if on_cond is None else exp.And(this=on_cond, expression=parsed)
+
+            query = query.join(tbl, on=on_cond, kind=j.get("join_type", "inner"))
         return query
 
     def _build_where(self, query: exp.Select, plan: dict) -> exp.Select:
-        """Builds the WHERE clause."""
-        filters = plan.get("filters", [])
-        if filters:
-            where_cond = None
-            for flt in filters:
-                col = self._to_col(flt["column"])
-                val = flt["value"]
-                op = flt["op"].upper()
-                
-                if isinstance(val, str):
-                    val_exp = exp.Literal.string(val)
-                elif isinstance(val, (int, float)):
-                    val_exp = exp.Literal.number(val)
-                elif isinstance(val, bool):
-                    val_exp = exp.Boolean(this=val)
-                else:
-                    val_exp = exp.Literal.string(str(val))
+        cond = None
 
-                if op == "=": cond = exp.EQ(this=col, expression=val_exp)
-                elif op == "!=" or op == "<>": cond = exp.NEQ(this=col, expression=val_exp)
-                elif op == ">": cond = exp.GT(this=col, expression=val_exp)
-                elif op == "<": cond = exp.LT(this=col, expression=val_exp)
-                elif op == ">=": cond = exp.GTE(this=col, expression=val_exp)
-                elif op == "<=": cond = exp.LTE(this=col, expression=val_exp)
-                elif "LIKE" in op: cond = exp.Like(this=col, expression=val_exp)
-                elif "IN" in op: 
-                    cond = exp.In(this=col, expression=val_exp)
-                else:
-                    cond = sqlglot.parse_one(f"{col.sql()} {op} {val}")
-                
-                if where_cond:
-                    logic = flt.get("logic", "and").lower()
-                    if logic == "or":
-                        where_cond = exp.Or(this=where_cond, expression=cond)
-                    else:
-                        where_cond = exp.And(this=where_cond, expression=cond)
-                else:
-                    where_cond = cond
-            
-            query = query.where(where_cond)
-        return query
+        for flt in plan.get("filters", []):
+            left = self._to_expr(flt["column"]["expr"])
+            op = flt["op"].upper()
+            value = flt["value"]
+
+            right = self._literal(value)
+
+            if op == "=":
+                expr = exp.EQ(this=left, expression=right)
+            elif op in ("!=", "<>"):
+                expr = exp.NEQ(this=left, expression=right)
+            elif op == ">":
+                expr = exp.GT(this=left, expression=right)
+            elif op == "<":
+                expr = exp.LT(this=left, expression=right)
+            elif op == ">=":
+                expr = exp.GTE(this=left, expression=right)
+            elif op == "<=":
+                expr = exp.LTE(this=left, expression=right)
+            elif op == "BETWEEN":
+                low, high = map(str.strip, str(value).split("AND"))
+                expr = exp.Between(
+                    this=left,
+                    low=self._literal(low),
+                    high=self._literal(high),
+                )
+            elif op == "IN":
+                items = [self._literal(v) for v in value]
+                expr = exp.In(this=left, expressions=items)
+            else:
+                expr = self._to_expr(f"{flt['column']['expr']} {op} {value}")
+
+            if cond is None:
+                cond = expr
+            else:
+                logic = flt.get("logic", "and").lower()
+                cond = exp.Or(this=cond, expression=expr) if logic == "or" else exp.And(this=cond, expression=expr)
+
+        return query.where(cond) if cond else query
 
     def _build_group_by(self, query: exp.Select, plan: dict) -> exp.Select:
-        """Builds the GROUP BY clause."""
-        for gb in plan.get("group_by", []):
-            if isinstance(gb, dict):
-                expr = gb["expr"]
-            else:
-                expr = gb
-            query = query.group_by(sqlglot.parse_one(expr))
+        for g in plan.get("group_by", []):
+            query = query.group_by(self._to_expr(g["expr"]))
         return query
 
     def _build_having(self, query: exp.Select, plan: dict) -> exp.Select:
-        """Builds the HAVING clause."""
-        having = plan.get("having", [])
-        if having:
-            having_cond = None
-            for hav in having:
-                col = sqlglot.parse_one(hav["expr"])
-                val = hav["value"]
-                op = hav["op"].upper()
-                
-                if isinstance(val, str):
-                    val_exp = exp.Literal.string(val)
-                elif isinstance(val, (int, float)):
-                    val_exp = exp.Literal.number(val)
-                elif isinstance(val, bool):
-                    val_exp = exp.Boolean(this=val)
-                else:
-                    val_exp = exp.Literal.string(str(val))
+        cond = None
+        for h in plan.get("having", []):
+            left = self._to_expr(h["expr"])
+            right = self._literal(h["value"])
+            op = h["op"]
 
-                if op == "=": cond = exp.EQ(this=col, expression=val_exp)
-                elif op == "!=" or op == "<>": cond = exp.NEQ(this=col, expression=val_exp)
-                elif op == ">": cond = exp.GT(this=col, expression=val_exp)
-                elif op == "<": cond = exp.LT(this=col, expression=val_exp)
-                elif op == ">=": cond = exp.GTE(this=col, expression=val_exp)
-                elif op == "<=": cond = exp.LTE(this=col, expression=val_exp)
-                elif "LIKE" in op: cond = exp.Like(this=col, expression=val_exp)
-                elif "IN" in op: 
-                    cond = exp.In(this=col, expression=val_exp)
-                else:
-                    cond = sqlglot.parse_one(f"{hav['expr']} {op} {hav['value']}")
-                
-                if having_cond:
-                    logic = hav.get("logic", "and").lower()
-                    if logic == "or":
-                        having_cond = exp.Or(this=having_cond, expression=cond)
-                    else:
-                        having_cond = exp.And(this=having_cond, expression=cond)
-                else:
-                    having_cond = cond
-            
-            query = query.having(having_cond)
-        return query
+            expr = self._to_expr(f"{h['expr']} {op} {h['value']}")
+
+            cond = expr if cond is None else exp.And(this=cond, expression=expr)
+        return query.having(cond) if cond else query
 
     def _build_order_by(self, query: exp.Select, plan: dict) -> exp.Select:
-        """Builds the ORDER BY clause."""
-        for ob in plan.get("order_by", []):
-            query = query.order_by(self._to_col(ob["column"]), desc=(ob["direction"].lower() == "desc"))
+        for o in plan.get("order_by", []):
+            query = query.order_by(
+                self._to_expr(o["column"]["expr"]),
+                desc=o["direction"].lower() == "desc",
+            )
         return query
+
+    def _literal(self, value):
+        if isinstance(value, bool):
+            return exp.Boolean(this=value)
+        if isinstance(value, (int, float)):
+            return exp.Literal.number(value)
+        return exp.Literal.string(str(value).strip("'").strip('"'))

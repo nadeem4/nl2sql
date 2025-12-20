@@ -34,8 +34,8 @@ def run_indexing(profiles: Dict[str, Any], vector_store_path: str, vector_store:
         llm = None
         if llm_registry:
             try:
-                # Reuse router_llm or generic llm? Router LLM was fine.
-                llm = llm_registry.router_llm()
+                # Reuse intent_classifier_llm for enrichment prompts
+                llm = llm_registry.intent_classifier_llm()
             except Exception as e:
                 presenter.print_warning(f"Could not load LLM for enrichment: {e}")
         

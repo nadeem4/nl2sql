@@ -1,6 +1,7 @@
 from __future__ import annotations
-from typing import List, Dict, Any, Callable, Union, TYPE_CHECKING, Optional
+from typing import Dict, Any, Callable, Union, TYPE_CHECKING, Optional
 import json
+
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import Runnable
 
@@ -10,162 +11,102 @@ if TYPE_CHECKING:
 
 from .schemas import DecomposerResponse
 from nl2sql.nodes.decomposer.prompts import DECOMPOSER_PROMPT
-
 from nl2sql.datasource_registry import DatasourceRegistry
 from nl2sql.errors import PipelineError, ErrorSeverity, ErrorCode
-
 from nl2sql.logger import get_logger
-from nl2sql.nodes.decomposer.schemas import SubQuery
-from nl2sql.llm_registry import LLMRegistry
 
 logger = get_logger("decomposer")
 
 LLMCallable = Union[Callable[[str], Any], Runnable]
 
 
-
 class DecomposerNode:
-    """Node responsible for decomposing a complex query into sub-queries.
-
-    This node uses an LLM to break down a natural language query into independent
-    sub-queries mapped to specific datasources. It also handles retrieving schema
-    context to aid the decomposition process.
-
-    Attributes:
-        llm_map: Dictionary of available LLM callables.
-        registry: The datasource registry.
-        vector_store: Optional vector store for schema retrieval.
-        prompt: The prompt template used for decomposition.
-        chain: The LangChain runnable sequence.
-    """
-
-    def __init__(self, llm_map: dict[str, LLMCallable], registry: DatasourceRegistry, vector_store: Optional[OrchestratorVectorStore] = None):
-        """Initializes the DecomposerNode.
-
-        Args:
-            llm_map: Dictionary mapping agent names to LLM callables.
-            registry: The datasource registry.
-            vector_store: Optional vector store.
-        """
-        self.llm_map = llm_map
+    def __init__(
+        self,
+        llm: LLMCallable,
+        registry: DatasourceRegistry,
+        vector_store: Optional[OrchestratorVectorStore] = None,
+    ):
+        self.llm = llm
         self.registry = registry
         self.vector_store = vector_store
-
         self.prompt = ChatPromptTemplate.from_template(DECOMPOSER_PROMPT)
-        self.chain = self.prompt | self.llm_map["decomposer"]
-
-    def _retrieve_context(self, query: str, enriched_terms: List[str] = []) -> str:
-        """Retrieves relevant context (tables/schemas) using vector search.
-
-        Combines the user query with enriched terms to improve recall.
-
-        Args:
-            query: The canonical user query.
-            enriched_terms: List of keywords/synonyms/entities.
-
-        Returns:
-            A formatted string containing schema context for the prompt.
-        """
-        if not self.vector_store:
-            return "No schema vector store available. Rely on general descriptions."
-
-        search_query = query
-        if enriched_terms:
-            search_query += " " + " ".join(enriched_terms)
-
-        try:
-            results = self.vector_store.retrieve_routing_context(search_query, k=10)
-        except Exception:
-            return "Vector search failed. Rely on general descriptions."
-
-        if not results:
-            return "No specific tables found in vector index."
-
-        cands = {}
-        for res in results:
-            ds = res.metadata.get("datasource_id")
-            if not ds: continue
-
-            if ds not in cands:
-                cands[ds] = {"datasource_id": ds, "tables": [], "examples": []}
-
-            if tbl := res.metadata.get("table_name"):
-                 if tbl not in cands[ds]["tables"]:
-                     cands[ds]["tables"].append(tbl)
-            elif res.metadata.get("type", "table") == "example":
-                 if res.page_content not in cands[ds]["examples"]:
-                     cands[ds]["examples"].append(res.page_content)
-
-        return json.dumps(list(cands.values()), indent=2)
+        self.chain = self.prompt | self.llm
 
     def __call__(self, state: GraphState) -> Dict[str, Any]:
-        """Executes the decomposition logic.
-
-        Args:
-            state: The current graph state.
-
-        Returns:
-            A dictionary containing the generated sub-queries and reasoning.
-        """
-        user_query = state.user_query
         node_name = "decomposer"
-        enriched_terms = state.enriched_terms or []
 
         try:
-            if state.selected_datasource_id:
-                logger.info(f"Direct execution requested for datasource: {state.selected_datasource_id}")
+            if not state.entities:
+                raise ValueError("Missing entities from Intent node")
 
-                candidate_tables = []
-                if self.vector_store:
-                    try:
-                        search_q = user_query + " " + " ".join(enriched_terms)
-                        candidate_tables = self.vector_store.retrieve_table_names(
-                            search_q,
-                            datasource_id=[state.selected_datasource_id]
+            entity_matches: Dict[str, Any] = {}
+
+            if self.vector_store:
+                for entity in state.entities:
+                    search_terms = " ".join(
+                        [entity.name] + entity.required_attributes
+                    )
+
+                    results = self.vector_store.retrieve_routing_context(
+                        search_terms, k=10
+                    )
+
+                    matches = []
+                    for res in results:
+                        ds = res.metadata.get("datasource_id")
+                        if not ds:
+                            continue
+                        matches.append(
+                            {
+                                "datasource_id": ds,
+                                "table": res.metadata.get("table_name"),
+                                "type": res.metadata.get("type", "table"),
+                            }
                         )
-                    except Exception as e:
-                        logger.warning(f"Direct vector search failed: {e}")
 
-                sq = SubQuery(
-                    query=user_query,
-                    datasource_id=state.selected_datasource_id,
-                    candidate_tables=candidate_tables or [],
-                    complexity="complex",
-                    reasoning=f"Direct execution for {state.selected_datasource_id}. Skipped decomposition."
-                )
+                    entity_matches[entity.entity_id] = matches
 
-                return {
-                    "sub_queries": [sq],
-                    "reasoning": [{"node": "decomposer", "content": sq.reasoning}]
+            response: DecomposerResponse = self.chain.invoke(
+                {
+                    "user_query": state.user_query,
+                    "entities": json.dumps(
+                        [e.model_dump() for e in state.entities]
+                    ),
+                    "entity_datasource_matches": json.dumps(entity_matches),
                 }
-
-            context_str = self._retrieve_context(user_query, enriched_terms)
-
-            profiles = self.registry.list_profiles()
-            datasources_str = "\n".join([f"- {p.id}: {p.description}" for p in profiles])
-
-            response: DecomposerResponse = self.chain.invoke({
-                "user_query": user_query,
-                "datasources": datasources_str,
-                "schema_context": context_str
-            })
+            )
 
             return {
                 "sub_queries": response.sub_queries,
-                "reasoning": [{"node": "decomposer", "content": response.reasoning}]
+                "entity_mapping": response.entity_mapping,
+                "confidence": response.confidence,
+                "reasoning": [
+                    {"node": node_name, "content": response.reasoning}
+                ],
             }
+
         except Exception as e:
             logger.error(f"Node {node_name} failed: {e}")
+
             return {
                 "sub_queries": [],
-                "reasoning": [{"node": "decomposer", "content": f"Decomposition Crash: {str(e)}", "type": "error"}],
+                "entity_mapping": [],
+                "confidence": 0.0,
+                "reasoning": [
+                    {
+                        "node": node_name,
+                        "content": f"Decomposition failed: {str(e)}",
+                        "type": "error",
+                    }
+                ],
                 "errors": [
                     PipelineError(
                         node=node_name,
-                        message=f"Decomposition/Orchestration failed: {str(e)}",
+                        message=f"Decomposition failed: {str(e)}",
                         severity=ErrorSeverity.CRITICAL,
                         error_code=ErrorCode.ORCHESTRATOR_CRASH,
-                        stack_trace=str(e)
+                        stack_trace=str(e),
                     )
-                ]
+                ],
             }

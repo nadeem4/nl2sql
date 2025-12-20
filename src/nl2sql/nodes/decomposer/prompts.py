@@ -1,96 +1,101 @@
 DECOMPOSER_PROMPT = """
-You are an expert SQL query analyzer responsible for decomposing a user’s natural language query
-by **data source boundaries**, not by sentence structure.
+You are an expert Query Decomposition Agent.
 
-Your goal is to determine whether the query requires information from multiple distinct business
-domains or databases and, if so, split it into the **minimum number of independent sub-queries**,
-each mapped to a specific datasource.
+You are given an AUTHORITATIVE entity graph produced by the Intent node.
+These entities, their IDs, roles, and time scopes are FIXED.
+You MUST NOT invent, remove, rename, merge, or reinterpret entities.
 
-You must also classify the **Complexity** of each sub-query:
-- **simple**: Direct retrieval, simple filtering (WHERE), or basic aggregation (COUNT *) on a single table. No joins or complex logic.
-- **complex**: Multi-table joins, subqueries, complex aggregations (GROUP BY), abstract reasoning, or derived metrics.
+Your task is to perform COVERAGE-BASED decomposition by datasource boundaries.
 
-Available Databases:
-{datasources}
+--------------------------------------------------------------------
+AUTHORITATIVE INPUT
+--------------------------------------------------------------------
 
-Schema Context (Vector Search Results):
-{schema_context}
+Entities (immutable):
+{entities}
 
-Instructions:
-1. Analyze the full user query holistically before decomposing.
-2. **PRIORITY RULE**: If the Schema Context contains relevant tables for any part of the query,
-   you MUST use the corresponding `datasource_id` and include the relevant table names.
-3. If only part of the query has Schema Context matches, decompose:
-   - matched parts → use Schema Context datasource
-   - unmatched parts → fallback to datasource descriptions
-4. Only fallback to general datasource descriptions if Schema Context is empty or irrelevant
-   for that specific information need.
-5. Decompose **only when required by distinct datasource boundaries**.
-   - If multiple query parts map to the same datasource, keep them in a single sub-query.
-6. For each sub-query:
-   - Assign exactly one `datasource_id`
-   - Include 1–3 most relevant `candidate_tables` if available
-   - **Determine Complexity** (simple/complex) based on the criteria above.
-   - Provide brief reasoning for the mapping
-7. Prefer stable, minimal, and deterministic decompositions.
+Entity-Scoped Datasource Matches:
+{entity_datasource_matches}
 
-Output Format (JSON only):
+User Query (canonical):
+{user_query}
+
+--------------------------------------------------------------------
+MANDATORY RULES
+--------------------------------------------------------------------
+
+1. Entity Locking
+- You MUST operate ONLY on the provided entity_ids.
+- You MUST NOT infer new entities from text or schema.
+- All reasoning must reference entity_ids explicitly.
+
+2. Coverage Validation
+For EACH entity_id:
+- Verify physical schema coverage using datasource matches.
+- Assign the entity to EXACTLY ONE datasource.
+- Prefer schema matches over examples or descriptions.
+- Prefer fact tables over reference tables.
+- Prefer higher schema coverage and specificity.
+
+3. Mandatory Decomposition
+- If entity_ids map to more than one datasource,
+  decomposition is REQUIRED.
+- Do NOT collapse entities into a single datasource
+  based on semantic similarity or examples.
+
+4. No Assumptions
+You MUST NOT assume:
+- Replicated tables across datasources
+- Implicit joins
+- Historical tables represent current state
+- Example similarity implies schema availability
+
+5. Determinism Over Compression
+- If ambiguity remains after coverage checks,
+  DECOMPOSE rather than guess.
+- Lower confidence when decomposition is forced.
+
+--------------------------------------------------------------------
+SUB-QUERY CONSTRUCTION
+--------------------------------------------------------------------
+
+- Group entity_ids by assigned datasource.
+- Emit exactly one sub-query per datasource group.
+- Each sub-query MUST list the entity_ids it covers.
+- Sub-queries MUST be independently executable.
+
+--------------------------------------------------------------------
+OUTPUT FORMAT (JSON ONLY)
+--------------------------------------------------------------------
+
 {{
-  "reasoning": "<high-level explanation>",
+  "reasoning": "<coverage-based explanation referencing entity_ids>",
+  "confidence": 0.0-1.0,
+  "entity_mapping": [
+    {{
+      "entity_id": "E1",
+      "datasource_id": "",
+      "candidate_tables": [],
+      "coverage_reasoning": ""
+    }}
+  ],
   "sub_queries": [
     {{
-      "query": "<rewritten sub-query>",
-      "datasource_id": "<datasource>",
-      "candidate_tables": ["<table1>", "<table2>"],
-      "complexity": "simple|complex",
-      "reasoning": "<why this datasource and tables were chosen>"
+      "entity_ids": ["E1", "E2"],
+      "query": "<natural language question>",
+      "datasource_id": "",
+      "complexity": "simple|complex"
     }}
   ]
 }}
 
-User Query:
-{user_query}
+--------------------------------------------------------------------
+IMPORTANT
+--------------------------------------------------------------------
+
+- Sub-queries MUST reference entity_ids, not entity names.
+- Confidence should be HIGH only when schema coverage is complete and unambiguous.
+- This node performs planning, not intent interpretation.
+
 """
 
-INTENT_ENRICHER_PROMPT = """
-You are a specialized query enrichment assistant.
-Your goal is to extract key terms to improve vector search recall for database tables.
-
-Input: "{user_query}"
-
-Instructions:
-1. Extract **Keywords**: core technical terms (e.g., "utilization", "latency", "error rate").
-2. Extract **Entities**: named objects (e.g., "Machine-123", "User-A").
-3. Generate **Synonyms**: related database terms (e.g., "usage" -> "utilization, load, capacity").
-4. **Classify Complexity**:
-   - "simple": Direct retrieval (e.g., "Show me list of...", "Find X where Y=Z"). Single domain.
-   - "complex": Requires aggregation, joins across multiple domains, or abstract reasoning.
-
-Output specific JSON matching the EnrichedIntent schema.
-"""
-
-
-CANONICALIZATION_PROMPT = """You are an AI assistant that normalizes natural language queries for database retrieval.
-Your goal is to rewrite the incoming query into a standard, concise, and explicit form that captures the core intent.
-
-Rules:
-1. Remove conversational filler ("Show me", "I want to know", "Can you tell me").
-2. Standardize terminology (e.g., "guys" -> "operators", "gear" -> "machines").
-3. Preserve specific filters like dates, IDs, and names exactly.
-4. If the query implies a time range (e.g., "last month"), convert it to a standard relative format if possible, or keep it explicit.
-
-Examples:
-Input: "How many widgets do we have in stock?"
-Canonical: "Count inventory of widgets"
-
-Input: "Show me the list of all the guys working on the night shift."
-Canonical: "List operators on night shift"
-
-Input: "Any issues with machine X-101 yesterday?"
-Canonical: "Show defects for machine X-101 date yesterday"
-
-Input: "Who fixed the broken arm on the robot?"
-Canonical: "List maintenance logs for robot repair"
-
-Input: "{question}"
-Canonical:"""

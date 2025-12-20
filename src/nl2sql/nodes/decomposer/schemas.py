@@ -1,26 +1,49 @@
 from typing import List, Optional, Literal
 from pydantic import BaseModel, Field
 
+
+class EntityMapping(BaseModel):
+    entity_id: str = Field(description="Stable entity ID from the Intent node.")
+    datasource_id: str = Field(description="Datasource assigned based on schema coverage.")
+    candidate_tables: Optional[List[str]] = Field(
+        default=None,
+        description="Tables providing physical coverage for this entity."
+    )
+    coverage_reasoning: str = Field(
+        description="Why this datasource was selected for the entity."
+    )
+
+
 class SubQuery(BaseModel):
-    query: str = Field(description="The individual sub-query.")
-    datasource_id: str = Field(description="The target datasource ID for this query.")
-    candidate_tables: Optional[List[str]] = Field(default=None, description="Optional list of table names if known from context.")
-    complexity: Literal["simple", "complex"] = Field(default="complex", description="Complexity of the query. 'simple' = direct retrieval/filtering. 'complex' = aggregation, multi-step, or abstract reasoning.")
-    reasoning: Optional[str] = Field(default=None, description="Reasoning for this specific split and datasource selection.")
+    entity_ids: List[str] = Field(
+        description="Entity IDs covered by this sub-query."
+    )
+    query: str = Field(
+        description="Natural language question scoped strictly to the listed entity IDs."
+    )
+    datasource_id: str = Field(
+        description="Target datasource for executing this sub-query."
+    )
+    complexity: Literal["simple", "complex"] = Field(
+        default="complex",
+        description="Complexity classification."
+    )
+
 
 class DecomposerResponse(BaseModel):
-    """Structured response for the query decomposer."""
-    sub_queries: List[SubQuery] = Field(
-        description="List of sub-queries. If no decomposition is needed, this list should contain only the original query (with its determined datasource)."
+    reasoning: str = Field(
+        description="Coverage-based explanation referencing entity IDs."
     )
-    reasoning: str = Field(description="Global reasoning for why the query was decomposed (or not).")
+    confidence: float = Field(
+        default=1.0,
+        description="Confidence score based on schema coverage and ambiguity."
+    )
+    entity_mapping: List[EntityMapping] = Field(
+        description="Mapping of each entity ID to its assigned datasource."
+    )
+    sub_queries: List[SubQuery] = Field(
+        description="One sub-query per datasource group."
+    )
 
-class EnrichedIntent(BaseModel):
-    """
-    Extracted intent information to enrich vector search.
-    """
-    keywords: List[str] = Field(default_factory=list, description="Technical keywords or table names implied.")
-    entities: List[str] = Field(default_factory=list, description="Named entities (people, products, locations).")
-    synonyms: List[str] = Field(default_factory=list, description="Synonyms or related domain terms to aid retrieval.")
-    complexity: Literal["simple", "complex"] = Field(default="complex", description="Estimated query complexity. 'simple' implies single-table or basic multi-table retrieval.")
+
 

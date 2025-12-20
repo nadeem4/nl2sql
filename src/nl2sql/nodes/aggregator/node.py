@@ -94,7 +94,7 @@ class AggregatorNode:
 
             if len(intermediate_results) == 1 and not state.errors and is_fast_path_type:
                 return {
-                    "final_answer": None,
+                    "final_answer": intermediate_results[0],
                     "reasoning": [{"node": "aggregator", "content": f"Fast path: {state.response_type} result used directly."}]
                 }
 

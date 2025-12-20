@@ -124,7 +124,7 @@ manufacturing_history:
   - "Show start and end times for run #101"
   - "List runs that were delayed"
   - "What was the output of the night shift?"
-  - "Show production runs for Product X"
+  - "Show production runs for Product ID X"
   - "List runs with high yield"
   - "Show average run duration"
   - "Count runs by machine"

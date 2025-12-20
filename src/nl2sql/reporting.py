@@ -127,8 +127,12 @@ class ConsolePresenter:
         if not execution:
             return
 
-        rows = execution.get("rows", []) if isinstance(execution, dict) else getattr(execution, "rows", [])
-        columns = execution.get("columns", []) if isinstance(execution, dict) else getattr(execution, "columns", [])
+        if isinstance(execution, list):
+            rows = execution
+            columns = list(rows[0].keys()) if rows and isinstance(rows[0], dict) else []
+        else:
+            rows = execution.get("rows", []) if isinstance(execution, dict) else getattr(execution, "rows", [])
+            columns = execution.get("columns", []) if isinstance(execution, dict) else getattr(execution, "columns", [])
 
         if not rows:
             self.console.print("[dim]No rows returned.[/dim]")

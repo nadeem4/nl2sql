@@ -65,7 +65,11 @@ def _run_simple_mode(args: argparse.Namespace, query: str, datasource_registry: 
         # Save detailed trace
         try:
             with open("last_reasoning.json", "w") as f:
-                json.dump(query_history, f, indent=2, default=str)
+                dump_data = {
+                    "global_reasoning": reasoning,
+                    "execution_history": query_history
+                }
+                json.dump(dump_data, f, indent=2, default=str)
             presenter.console.print("[dim]Detailed reasoning trace saved to last_reasoning.json[/dim]")
         except Exception:
             pass
@@ -96,13 +100,12 @@ def _run_simple_mode(args: argparse.Namespace, query: str, datasource_registry: 
         presenter.print_pipeline_errors(errors)
 
     final_answer = final_state.get("final_answer")
-    if final_answer:
+    if type(final_answer) == str and final_answer:
         presenter.print_final_answer(final_answer)
+    elif type(final_answer) == list and final_answer:
+        presenter.print_execution_result(final_answer)
     else:
-        # Fallback to presenting raw execution result if no LLM summary
-        execution = final_state.get("execution")
-        if execution:
-            presenter.print_execution_result(execution)
+        return
         
     execution = final_state.get("execution")
     if execution:

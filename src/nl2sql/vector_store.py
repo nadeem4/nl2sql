@@ -144,7 +144,7 @@ class OrchestratorVectorStore:
         """
         import yaml
         import pathlib
-        from nl2sql.agents import canonicalize_query, enrich_question
+        from nl2sql.indexing_agents import canonicalize_query, enrich_question
         
         path = pathlib.Path(examples_path)
         if not path.exists():

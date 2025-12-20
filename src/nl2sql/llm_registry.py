@@ -149,7 +149,7 @@ class LLMRegistry:
 
     def planner_llm(self) -> LLMCallable:
         """Returns the LLM callable for the Planner agent."""
-        from nl2sql.schemas import PlanModel
+        from nl2sql.nodes.planner.schemas import PlanModel
         llm = self._base_llm("planner")
         return self._wrap_structured_usage(llm, PlanModel)
 
@@ -164,7 +164,7 @@ class LLMRegistry:
 
     def decomposer_llm(self) -> LLMCallable:
         """Returns the LLM callable for the Decomposer agent."""
-        from nl2sql.schemas import DecomposerResponse
+        from nl2sql.nodes.decomposer.schemas import DecomposerResponse
         llm = self._base_llm("decomposer")
         return self._wrap_structured_usage(llm, DecomposerResponse)
 
@@ -174,17 +174,11 @@ class LLMRegistry:
         llm = self._base_llm("aggregator")
         return self._wrap_structured_usage(llm,  AggregatedResponse)
 
-    def intent_enricher_llm(self) -> LLMCallable:
-        """Returns the LLM callable for the Intent Enricher (parallel) agent."""
-        from nl2sql.nodes.decomposer.schemas import EnrichedIntent
-        llm = self._base_llm("intent_enricher")
-        return self._wrap_structured_usage(llm, EnrichedIntent)
-
     def intent_classifier_llm(self) -> LLMCallable:
         """Returns the LLM callable for the Intent Classifier."""
-        # Use get_llm to return raw chat model for node to wrap with structured output
-        # to avoid circular imports or flexible usage
-        return self._base_llm("intent_classifier")
+        from nl2sql.nodes.intent.schemas import IntentResponse
+        llm = self._base_llm("intent_classifier")
+        return llm.with_structured_output(IntentResponse)
 
     def direct_sql_llm(self) -> LLMCallable:
         """Returns the LLM callable for the Direct SQL agent."""
@@ -198,7 +192,6 @@ class LLMRegistry:
             "summarizer": self.summarizer_llm(),
             "decomposer": self.decomposer_llm(),
             "aggregator": self.aggregator_llm(),
-            "intent_enricher": self.intent_enricher_llm(),
             "intent_classifier": self.intent_classifier_llm(),
             "direct_sql": self.direct_sql_llm(),
             "direct_sql": self.direct_sql_llm(),
