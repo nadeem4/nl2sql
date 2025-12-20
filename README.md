@@ -6,19 +6,35 @@ Unlike simple prompt-to-query solutions, this project employs a **Map-Reduce Sup
 
 Designed for observability and reliability, it provides detailed performance metrics, step-by-step reasoning logs, and deterministic SQL generation, making it suitable for production environments where accuracy is paramount.
 
-## Key Features
+## Feature Catalog
 
-- **Intent-Driven Architecture**: Uses a specialized **Intent Node** to classify queries as `TABULAR`, `KPI` (Fast Path), or `SUMMARY` (Slow Path).
+The system implements a sophisticated **Agentic Architecture** designed for enterprise scale.
+
+### Core Architecture
+
+- **LangGraph Orchestration**: Uses a stateful graph architecture (`StateGraph`) to manage complex agentic workflows, ensuring predictable control flow and state validation.
 - **Hybrid Execution Lanes**:
-  - **Fast Lane**: Zero-shot SQL generation for simple lookups (< 2s latency).
-  - **Slow Lane**: Full Plan-Validate-Execute agentic loop for complex analysis.
-- **Supervisor Architecture**: Centralized dynamic routing via `DecomposerNode` using vector search.
-- **Map-Reduce Strategy**: Handles complex cross-database queries by decomposing them into parallel sub-tasks.
-- **LangGraph Pipeline**: Modular, stateful graph architecture.
-- **Multi-Database Support**: Seamlessly query across Postgres, MySQL, MSSQL, and SQLite.
-- **Robust Validation Loop**: Pre-execution validation of plans (Slow Lane only).
-- **Observability**: Real-time streaming of agent reasoning steps.
-- **Vector Search (RAG)**: Scalable schema retrieval for large databases.
+  - **Fast Lane (Direct SQL)**: Optimizes for low latency (< 2s) on simple queries (e.g., "List 10 machines") by skipping complex planning.
+  - **Slow Lane (Agentic Loop)**: Engages a robust Plan-Validate-Execute-Refine loop for complex analytical queries requiring reasoning.
+- **Map-Reduce Supervisor**:
+  - **Supervisor (Decomposer)**: Intelligently breaks down complex user queries into sub-tasks (Map).
+  - **Parallel Execution**: Executes sub-tasks dynamically across distributed workers (LangGraph branches).
+  - **Reducer (Aggregator)**: Synthesizes results from multiple branches into a coherent final answer.
+
+### Intelligent Routing & Retrieval
+
+- **Vector-Based Routing (RAG)**:
+  - **Datasource Discovery**: Uses vector search to match user queries to the correct database(s) from a registry of available connections.
+  - **Schema Retrieval**: Dynamically fetches only relevant table schemas for the LLM context window, enabling support for databases with thousands of tables.
+- **Intent Classification**:
+  - Determines query intent (`TABULAR`, `KPI`, `SUMMARY`) to select the optimal execution lane.
+  - Enriches user queries with domain-specific synonyms and entity extraction.
+
+### Resilience & Reliability
+
+- **Self-Correcting Agents**: The "Slow Lane" implements a **Reflection** pattern. If generated SQL fails validation or execution, the system captures the error, summarizes it, and feeds it back to the Planner for correction (Retries).
+- **Structured Output Enforcement**: Uses OpenAI generic 'Tools' (Function Calling) to enforce strict JSON schemas for critical nodes (`Planner`, `Decomposer`), preventing parsing errors.
+- **Pre-Execution Validation**: A dedicated `ValidatorNode` performs static analysis on generated SQL to catch schema violations (e.g., non-existent columns) before execution.
 
 ---
 
@@ -228,31 +244,50 @@ For a deep dive into the Map-Reduce pattern, see [**docs/ARCHITECTURE_MAP_REDUCE
 
 ```mermaid
 flowchart TD
+  %% Nodes
   user["User Query"] --> intent["Intent Node"]
-  intent --> decomposer["Decomposer (AI)"]
-  decomposer -- Single DB --> schema
-  decomposer -- Multi DB --> splits["Splits (Map)"]
+  intent --> decomposer["Decomposer (Supervisor)"]
   
-  splits --> schema
-  
-  subgraph Execution Lane
-    schema["Schema Node"] --> lane_logic{Fast or Slow?}
-    lane_logic -- Fast --> directSQL["DirectSQL (AI)"]
-    lane_logic -- Slow --> planner["Planner (AI)"]
-    planner --> validator
-    validator --> generator
+  subgraph Routing Layer
+    decomposer -- Lookups --> vector_store[("Vector Store")]
+    vector_store -. Context .-> decomposer
+  end
+
+  decomposer -- Single DB --> branch["Execution Branch"]
+  decomposer -- "Map (Multi-DB)" --> parallel["Parallel Execution Branches"]
+  parallel --> branch
+
+  subgraph Worker Lane ["Worker Lane (Per Datasource)"]
+    branch --> schema["Schema Node"]
+    schema --> lane_logic{Fast or Slow?}
     
-    directSQL --> executor
-    generator --> executor["Executor"]
+    %% Fast Lane
+    lane_logic -- Fast --> directSQL["DirectSQL (AI)"]
+    directSQL --> executor["Executor"]
+
+    %% Slow Lane (ReAct Loop)
+    lane_logic -- Slow --> planner["Planner (AI)"]
+    planner --> validator["Validator"]
+    
+    validator -- "Pass" --> generator["Generator"]
+    validator -- "Fail" --> summarizer["Summarizer (Reflect)"]
+    
+    generator --> executor
+    executor -- "Error" --> summarizer
+    
+    summarizer -. "Feedback" .-> planner
   end
   
-  executor --> aggregator["Aggregator"]
+  executor -- "Success" --> aggregator["Aggregator (Reducer)"]
   aggregator --> answer["Final Answer"]
   
-  style user fill:#f6f8fa,stroke:#aaa
+  %% Styling
+  style user fill:#f6f8fa,stroke:#333
   style decomposer fill:#e1f5fe,stroke:#01579b
   style aggregator fill:#e1f5fe,stroke:#01579b
-  style answer fill:#f6f8fa,stroke:#aaa
+  style answer fill:#f6f8fa,stroke:#333
+  style vector_store fill:#fff3e0,stroke:#e65100
+  style summarizer fill:#fff9c4,stroke:#fbc02d
 ```
 
 ### Vectorization Strategy
