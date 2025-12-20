@@ -180,6 +180,12 @@ class LLMRegistry:
         llm = self._base_llm("intent_enricher")
         return self._wrap_structured_usage(llm, EnrichedIntent)
 
+    def intent_classifier_llm(self) -> LLMCallable:
+        """Returns the LLM callable for the Intent Classifier."""
+        # Use get_llm to return raw chat model for node to wrap with structured output
+        # to avoid circular imports or flexible usage
+        return self._base_llm("intent_classifier")
+
     def direct_sql_llm(self) -> LLMCallable:
         """Returns the LLM callable for the Direct SQL agent."""
         llm = self._base_llm("direct_sql")
@@ -193,6 +199,8 @@ class LLMRegistry:
             "decomposer": self.decomposer_llm(),
             "aggregator": self.aggregator_llm(),
             "intent_enricher": self.intent_enricher_llm(),
+            "intent_classifier": self.intent_classifier_llm(),
+            "direct_sql": self.direct_sql_llm(),
             "direct_sql": self.direct_sql_llm(),
             "_default": self.decomposer_llm(),
         }

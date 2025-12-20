@@ -56,5 +56,6 @@ class GraphState(BaseModel):
     intermediate_results: Annotated[List[Any], operator.add] = Field(default_factory=list, description="Results accumulated from parallel branches.")
     query_history: Annotated[List[Dict[str, Any]], operator.add] = Field(default_factory=list, description="History of executed queries and results.")
     final_answer: Optional[str] = Field(default=None, description="The final synthesized answer returned to the user.")
-    complexity: Literal["simple", "complex"] = Field(default="complex", description="Complexity of the query routed to this execution branch.")
+    response_type: Literal["tabular", "kpi", "summary"] = Field(default="tabular", description="The determined intent/response type for the query.")
+    enriched_terms: Annotated[List[str], operator.add] = Field(default_factory=list, description="Enriched terms (keywords, entities, synonyms) for context retrieval.")
     system_events: Annotated[List[str], operator.add] = Field(default_factory=list, description="List of system events triggered (e.g. DRIFT_DETECTED).")

@@ -11,12 +11,10 @@ The `SchemaNode` is responsible for retrieving and formatting the database schem
 
 ## Inputs
 
-The node reads the following fields from `GraphState`:
-
 - `state.selected_datasource_id`: The ID of the database to query.
 - `state.user_query`: The natural language query from the user.
-- `state.candidate_tables` (Optional): A pre-selected list of tables from the `DecomposerNode` or `Orchestrator`.
-- `state.intent` (Optional): Used to enrich the search query with keywords and entities.
+- `state.candidate_tables` (Optional): A pre-selected list of tables from the `DecomposerNode`.
+- `state.enriched_terms` (Optional): Keywords and entities used to aid in table scoring.
 
 ## Outputs
 

@@ -8,19 +8,24 @@ The pipeline uses a dynamic branching strategy powered by `LangGraph`'s `Send` A
 
 ```mermaid
 graph TD
-    UserQuery[User Query] --> Decomposer
+    UserQuery[User Query] --> Intent[Intent Node]
+    Intent --> Decomposer[Decomposer Node]
     Decomposer -- "Splits Query" --> MapBranching[Fan Out (Map)]
-    
+
     subgraph "Execution Branch (Parallel)"
-        MapBranching --> Router
-        Router --> Intent
-        Intent --> Schema
-        Schema --> Planner
-        Planner --> Generator
+        MapBranching --> Schema[Schema Node]
+        Schema --> RouteLogic{Route Logic}
+        RouteLogic -- "Fast Lane" --> DirectSQL[DirectSQL Node]
+        DirectSQL --> FastExecutor[Executor]
+        
+        RouteLogic -- "Slow Lane" --> Planner[Planner Node]
+        Planner --> Validator
+        Validator --> Generator
         Generator --> Executor
     end
 
-    Executor -- "Appends Result" --> StateAggregation[State Reducers]
+    FastExecutor -- "Appends Result" --> StateAggregation[State Reducers]
+    Executor -- "Appends Result" --> StateAggregation
     StateAggregation --> Aggregator[Aggregator (Reduce)]
     Aggregator --> FinalAnswer
 ```
@@ -29,23 +34,22 @@ graph TD
 
 **Node**: `DecomposerNode` (`src/nl2sql/nodes/decomposer`)
 
-1. **Input**: The raw `user_query`.
-2. **Process**: An LLM analyzes the query to determine if it needs to be split.
+1. **Input**: The canonicalized `user_query` and `enriched_terms` from the **IntentNode**.
+2. **Process**: An LLM analyzes the query to determine if it needs to be split, using vector context.
     * *Simple Query*: Returns original query (Single branch).
     * *Complex Query*: Returns list of independent `sub_queries` (e.g., "Sales in 2023" and "Sales in 2022").
 3. **Fan-Out Mechanism**:
     * The `continue_to_subqueries` conditional edge in `langgraph_pipeline.py` iterates over `state.sub_queries`.
     * It generates a `Send("execution_branch", payload)` event for each sub-query.
     * **Payload**: `{"user_query": sub_query, "datasource_id": ..., "selected_datasource_id": ...}`.
-    * The `selected_datasource_id` is propagated to ensure efficient routing in the parallel branches.
 
 ## 3. Parallel Processing: Independent Branches
 
-Each sub-query triggers an isolated run of the `execution_subgraph`. These run in parallel (or concurrently depending on the runner).
+Each sub-query triggers an isolated run of the `execution_subgraph`. These run in parallel.
 
-* **RouterNode**: Determines the best datasource for the *specific sub-query*.
+* **Routing**: The branch routes to either **DirectSQL** (Fast Lane) or **Agentic Loop** (Slow Lane) based on `response_type`.
 * **SchemaNode**: Fetches relevant schema for that datasource.
-* **Planner/Generator/Executor**: Generates and executes SQL for that sub-query.
+* **Execution**: Generates and executes SQL.
 
 ## 4. State Reduction: Collecting Results
 

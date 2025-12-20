@@ -27,12 +27,16 @@ The node updates the following fields in `GraphState`:
 
 ## Logic Flow
 
-1. **Context Preparation**: Formats all `intermediate_results` into a single text block for the LLM. Includes any error messages to provide transparency about partial failures.
-2. **LLM Invocation**: Calls the LLM with the context to produce an `AggregatedResponse`.
+1. **Fast Path Check**:
+    - Checks if `state.response_type` is `TABULAR` or `KPI`.
+    - If true, and there is a single successful result, returns `final_answer=None`.
+    - This signals the Presentation Layer (CLI) to display the raw `ExecutionModel` directly.
+2. **Slow Path (LLM)**:
+    - If `state.response_type` is `SUMMARY` or multiple results exist.
+    - Formats all `intermediate_results` into a single text block.
+    - Invokes the LLM to synthesize an answer (`AggregatedResponse`).
 3. **Formatting**:
-    - Extracts the `summary` and `content`.
-    - Formats the output based on `format_type` (table vs list vs text).
-    - Constructs the final markdown string.
+    - Constructs a markdown string combining the summary and content.
 
 ## Error Handling
 

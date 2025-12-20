@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The `DecomposerNode` acts as the **Router** and **Orchestrator** of the pipeline. It parses the user's complex natural language query and breaks it down into independent sub-queries, each targeted at a specific datasource. This is crucial for handling multi-datasource requests or complex analytical questions.
+The `DecomposerNode` acts as the **Router** and **Orchestrator** of the pipeline. It parses the canonicalized user query and breaks it down into independent sub-queries, each targeted at a specific datasource. This is crucial for handling multi-datasource requests or complex analytical questions.
 
 ## Components
 
@@ -14,8 +14,9 @@ The `DecomposerNode` acts as the **Router** and **Orchestrator** of the pipeline
 
 The node reads the following fields from `GraphState`:
 
-- `state.user_query`: The original natural language query.
-- `state.selected_datasource_id`: (Optional) If set, the node acts in "Pass-through" mode, targeting only this datasource.
+- `state.user_query`: The **canonicalized** natural language query (from IntentNode).
+- `state.enriched_terms`: List of specific keywords/entities to aid vector search context retrieval.
+- `state.selected_datasource_id`: (Optional) If set, the node acts in "Pass-through" mode.
 
 ## Outputs
 
@@ -30,17 +31,14 @@ The node updates the following fields in `GraphState`:
 
 ## Logic Flow
 
-1. **Canonicalization**: Standadizes the user query (e.g., resolving temporal references).
-2. **Direct Execution Check**:
-    - If `state.selected_datasource_id` is already present (e.g., from UI selection), it bypasses detailed decomposition.
-    - It creates a single `SubQuery` targeting that datasource.
-    - It optionally queries the `VectorStore` to pre-fill `candidate_tables`.
-3. **Context Retrieval**:
-    - If no direct selection, it queries the `VectorStore` (Level 1/2 Search) to find relevant tables and schemas across *all* datasources.
-4. **LLM Decomposition**:
+1. **Direct Execution Check**:
+    - If `state.selected_datasource_id` is already present, it creates a single `SubQuery` targeting that datasource.
+2. **Context Retrieval**:
+    - Uses `state.user_query` + `state.enriched_terms` to query the `VectorStore`.
+3. **LLM Decomposition**:
     - Prompts the LLM with the query, available datasources, and retrieved schema context.
     - The LLM generates a plan (`DecomposerResponse`) consisting of one or more sub-queries.
-5. **State Update**: The resulting `sub_queries` are stored in the state, which triggers parallel execution branches.
+4. **State Update**: The resulting `sub_queries` are stored in the state, which triggers parallel execution branches.
 
 ## Error Handling
 
@@ -48,5 +46,4 @@ The node updates the following fields in `GraphState`:
 
 ## Dependencies
 
-- `nl2sql.agents.canonicalize_query`
 - `nl2sql.nodes.decomposer.schemas.DecomposerResponse`

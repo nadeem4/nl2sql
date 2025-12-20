@@ -1,45 +1,39 @@
-# Intelligent Query Routing Strategy
+# Intelligent Query Routing & Decomposition Strategy
 
 > **Core Philosophy**: "Align the vector space of the user's query with the vector space of the system's knowledge *before* they meet."
 
-This document details the multi-layered routing architecture used to direct natural language queries to the correct database. It relies on a "mirror" strategy where both the **stored data** (at index time) and the **incoming query** (at run time) are processed to maximize semantic overlap.
+This document details the architecture used to direct natural language queries to the correct database. It relies on a "mirror" strategy where both the **stored data** (at index time) and the **incoming query** (at run time) are processed to maximize semantic overlap.
 
 ---
 
-## 1. The 3-Layer Setup (The "Efficiency Funnel")
+## 1. Intent-Driven Architecture
 
-We employ a "Waterfall" approach. We want to solve 90% of queries with the fastest, cheapest method (Layer 1), reserved strictly for when clarity is high. We fallback to more expensive methods only when ambiguity rises.
+The pipeline now employs a dedicated **Intent Node** at the entrance.
 
-### Layer 1: Augmented Vector Search (The "Fast Path")
+1. **Intent Classification**:
+    * **Tabular/KPI**: Queries like "List all machines" or "Total count" are flagged for the **Fast Lane**.
+    * **Summary**: Queries like "Analyze performance" are flagged for the **Slow Lane** (Agentic Loop).
 
-* **Mechanism**: Canonicalized Query vs. Enriched Index.
-* **Cost**: Low (Simple Embedding).
-* **Latency**: < 100ms.
+2. **Context Retrieval (Routing)**:
+    * The `DecomposerNode` uses vector search to identify relevant datasources and tables.
+    * It uses the **Canonicalized Query** + **Enriched Terms** (from Intent Node) to query the `OrchestratorVectorStore`.
+
+---
+
+## 2. Vector Search Layers (The "Efficiency Funnel")
+
+Within the `DecomposerNode`, we employ a layered approach to context retrieval:
+
+### Layer 1: Augmented Vector Search
+
+* **Mechanism**: Canonicalized Query + Enriched Terms vs. Enriched Index.
 * **Trigger**: Always runs first.
-* **Success Condition**: Top match distance < `ROUTER_L1_THRESHOLD` (0.4).
-* **Why**: Vector search is incredibly fast. By "fixing" the query (Canonicalization) and "expanding" the index (Enrichment), we force most queries to hit this layer.
+* **Why**: By "fixing" the query (Canonicalization) and "expanding" the index (Enrichment), we force most queries to hit this layer accurately.
 
-### Layer 2: Multi-Query Retrieval (The "Ambiguity Solver")
+### Layer 2: LLM Reasoning (Decomposition)
 
-* **Mechanism**: LLM generates 3 variations + Original Query (Total 4) -> Retrieval -> Voting.
-* **Cost**: Medium (1 LLM Call + 3 Embeddings).
-* **Latency**: ~1-2s.
-* **Trigger**: When L1 confidence is low.
-* **Success Condition**: Consensus (majority vote) from variations with distance < `ROUTER_L2_THRESHOLD` (0.6).
-* **Why**: Users often use slang or vague terms. Generating variations "triangulates" the true intent.
-
-> **Technical Note on Thresholds**: The **L2 threshold (0.6)** is deliberately set higher (more relaxed) than **L1 (0.4)**. This is because generated variations (e.g., hypothetical questions) may drift slightly in vector space compared to precise canonical examples. Relaxing the threshold ensures these valid semantic signals are counted in the voting process rather than being filtered out purely for distance reasons. The "consensus" mechanism (voting) acts as the filter for noise.
-
-### Layer 3: LLM Reasoning (The "Smart Fallback")
-
-* **Mechanism**: Full "Reasoning Agent" analyzing descriptions + query.
-* **Cost**: High (Full Context LLM Call).
-* **Latency**: ~3-5s.
-* **Trigger**: When L2 fails to reach consensus.
-* **Why**: Some queries require logical deduction (e.g., "Compare X and Y"), which vector search cannot handle.
-* **Optimization (Candidate Filtering)**:
-  * Instead of scanning the entire registry (which could be 100+ datasources), L3 **only** considers the top candidates returned by L1 (typically the top 5).
-  * **Rationale**: L1 is excellent at finding the "right neighborhood" (High Recall) even if it misses the exact winner (Precision). By restricting L3 to L1's top findings, we get the reasoning power of an LLM without the latency/cost of scanning the full database list.
+* **Mechanism**: Full LLM call analyzing available datasources + Layer 1 Context.
+* **Why**: If vector search finds candidates, the LLM uses that context to formulate precise sub-queries. If vector search is ambiguous, the LLM uses general datasource descriptions.
 
 ---
 
