@@ -57,29 +57,29 @@ class GraphState(BaseModel):
 
 The system emphasizes "glass-box" execution, providing deep visibility into the AI's decision-making process through a robust Callback system.
 
-### 3.1 `ObservabilityCallback` (`src/nl2sql/callbacks/observability.py`)
+### 3.1 `PipelineMonitorCallback` (`src/nl2sql/callbacks/monitor.py`)
 
-* **Purpose**: The primary tracing engine.
-* **Function**: Hooks into LangChain's `on_chain_start`, `on_chain_end`, and `on_llm_end`.
-* **Capture**:
-  * Captures inputs/outputs of every node.
-  * Extracts "reasoning" (thoughts) from AI nodes.
-  * accumulates token usage.
-  * Updates the global `LATENCY_LOG` and `TOKEN_LOG`.
+* **Purpose**: The primary entry point for tracing.
+* **Function**: Orchestrates specialized handlers for nodes and tokens.
+* **Components**:
+  * `NodeHandler`: Tracks node start/end times and hierarchical execution tree.
+  * `TokenHandler`: Extracts token usage from LLM results.
 
-### 3.2 `StatusCallback` (`src/nl2sql/callbacks/status.py`)
+### 3.2 `NodeHandler` (`src/nl2sql/callbacks/node_handlers.py`)
 
-* **Purpose**: Real-time CLI feedback (UX).
-* **Function**: Controls the usage of `rich` spinners and status messages.
-* **Behavior**:
-  * `on_chain_start`: "Thinking... [Node Name]"
-  * `on_chain_end`: "✔ [Node Name] Completed (0.45s)"
-  * `on_chain_error`: "❌ [Node Name] Failed"
+* **Purpose**: Managing execution state and UX feedback.
+* **Function**:
+  * Maintains the `primary_run_id` mapping to group LangChain sub-runs into logical "Nodes".
+  * Updates the `ConsolePresenter` to show "Thinking..." spinners.
+  * Logs performance metrics to `LATENCY_LOG`.
+* **Behavior (UX)**:
+  * `on_chain_start`: Status -> "Working: [Node Name]"
+  * `on_chain_end`: Console -> "✔ [Node Name] Completed (1.2s | 350 tok)"
 
-### 3.3 `TokenUsageCallback`
+### 3.3 `TokenHandler` (`src/nl2sql/callbacks/token_handler.py`)
 
 * **Purpose**: Cost tracking.
-* **Function**: Standardizes token counting across different LLM providers (OpenAI, Anthropic, Gemini).
+* **Function**: Standardizes token counting across different LLM providers (OpenAI, Anthropic, Gemini) and attributes costs to specific `datasource_id` and `agent_name`.
 
 ---
 
