@@ -2,12 +2,19 @@ import sys
 from typing import Dict, Any
 from nl2sql.reporting import ConsolePresenter
 from nl2sql.vector_store import OrchestratorVectorStore
-from nl2sql.engine_factory import make_engine
+from nl2sql.datasource_registry import DatasourceRegistry
+from nl2sql.datasource_config import DatasourceProfile
 
 def run_indexing(profiles: Dict[str, Any], vector_store_path: str, vector_store: OrchestratorVectorStore, llm_registry: Any = None) -> None:
     presenter = ConsolePresenter()
     presenter.print_indexing_start(vector_store_path)
     
+    # Initialize Registry
+    # Note: In CLI context we assume profiles are dicts or objects. 
+    # If they are dicts, we might need to convert. 
+    # But usually profiles passed here are from config loader.
+    registry = DatasourceRegistry(profiles)
+
     with presenter.create_progress() as progress:
         
         # Clear existing data
@@ -21,8 +28,8 @@ def run_indexing(profiles: Dict[str, Any], vector_store_path: str, vector_store:
         for p in profiles.values():
             progress.update(task_schema, description=f"[green]Indexing schema: {p.id} ({p.engine})...")
             try:
-                eng = make_engine(p)
-                vector_store.index_schema(eng, datasource_id=p.id)
+                adapter = registry.get_adapter(p.id)
+                vector_store.index_schema(adapter, datasource_id=p.id)
             except Exception as e:
                 presenter.print_indexing_error(p.id, str(e))
             progress.advance(task_schema)

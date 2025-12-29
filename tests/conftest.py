@@ -1,8 +1,7 @@
-
 import pytest
 from unittest.mock import MagicMock
 from nl2sql.datasource_config import DatasourceProfile
-from nl2sql.engine_factory import make_engine
+from nl2sql.adapters.sql_generic import SqlGenericAdapter
 
 @pytest.fixture
 def mock_profile():
@@ -19,7 +18,8 @@ def mock_profile():
 @pytest.fixture
 def mock_engine(mock_profile):
     """Returns an in-memory SQLite engine."""
-    return make_engine(mock_profile)
+    adapter = SqlGenericAdapter(mock_profile.sqlalchemy_url)
+    return adapter.engine
 
 @pytest.fixture
 def mock_vector_store():

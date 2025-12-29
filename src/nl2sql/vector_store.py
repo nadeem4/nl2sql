@@ -6,7 +6,6 @@ from typing import List, Optional, Union
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
-from sqlalchemy import inspect, Engine
 
 from nl2sql.settings import settings
 from nl2sql.embeddings import EmbeddingService
@@ -64,53 +63,45 @@ class OrchestratorVectorStore:
         except Exception:
             pass
 
-    def index_schema(self, engine: Engine, datasource_id: str):
+    from nl2sql.adapter_sdk import DataSourceAdapter
+
+    def index_schema(self, adapter: DataSourceAdapter, datasource_id: str):
         """
         Introspects the database and indexes table schemas into the vector store.
 
         Args:
-            engine: SQLAlchemy engine for the database to index.
+            adapter: The DataSourceAdapter to inspect.
             datasource_id: ID of the datasource (added to metadata).
         """
-        inspector = inspect(engine)
-        tables = inspector.get_table_names()
+        # Get standardized schema from Adapter
+        schema_def = adapter.get_schema()
         documents = []
 
-        for table in tables:
-            columns = inspector.get_columns(table)
-            col_desc = ", ".join([f"{col['name']} ({col['type']})" for col in columns])
+        for table in schema_def.tables:
+            # Build column description string
+            col_desc = ", ".join([f"{col.name} ({col.data_type})" for col in table.columns])
             
-            fks = inspector.get_foreign_keys(table)
+            # Identify Primary Keys
+            pks = [col.name for col in table.columns if col.is_primary_key]
+            pk_desc = f" Primary Key: {', '.join(pks)}." if pks else ""
+
+            # TODO: Add Foreign Keys when SDK supports them in models.py
             fk_desc = ""
-            if fks:
-                fk_list = []
-                for fk in fks:
-                    ref_table = fk.get("referred_table")
-                    constrained_cols = fk.get("constrained_columns")
-                    if ref_table and constrained_cols:
-                        fk_list.append(f"-> {ref_table} ({', '.join(constrained_cols)})")
-                if fk_list:
-                    fk_desc = f" Foreign Keys: {'; '.join(fk_list)}."
 
-            try:
-                table_comment = inspector.get_table_comment(table)
-                comment_text = table_comment.get("text") if table_comment else None
-                comment_desc = f" Comment: {comment_text}." if comment_text else ""
-            except Exception:
-                comment_desc = ""
+            comment_desc = f" Comment: {table.description}." if table.description else ""
 
-            content = f"Table: {table}.{comment_desc} Columns: {col_desc}.{fk_desc}"
+            content = f"Table: {table.name}.{comment_desc} Columns: {col_desc}.{pk_desc}{fk_desc}"
             
             doc = Document(
                 page_content=content,
-                metadata={"table_name": table, "datasource_id": datasource_id, "type": "table"}
+                metadata={"table_name": table.name, "datasource_id": datasource_id, "type": "table"}
             )
             documents.append(doc)
 
         if documents:
             self.vectorstore.add_documents(documents)
             
-        return tables
+        return [t.name for t in schema_def.tables]
 
     def retrieve_table_names(self, query: str, k: int = 5, datasource_id: Optional[Union[str, List[str]]] = None) -> List[str]:
         """

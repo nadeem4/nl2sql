@@ -2,11 +2,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Dict, Any
 from nl2sql.datasource_registry import DatasourceRegistry
-from nl2sql.engine_factory import run_read_query
-from .schemas import ExecutionModel
+from nl2sql.adapter_sdk import ExecutionResult as SdkExecutionResult
 
 if TYPE_CHECKING:
     from nl2sql.schemas import GraphState
+
+from .schemas import ExecutionModel
 from nl2sql.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.security import enforce_read_only
 from nl2sql.logger import get_logger
@@ -15,30 +16,13 @@ logger = get_logger("executor")
 
 class ExecutorNode:
     """
-    Executes the generated SQL query against the target database.
-
-    Enforces read-only security checks before execution.
+    Executes the generated SQL query via the Datasource Adapter.
     """
 
     def __init__(self, registry: DatasourceRegistry):
-        """
-        Initializes the ExecutorNode.
-
-        Args:
-            registry: Datasource registry for accessing profiles and engines.
-        """
         self.registry = registry
 
     def __call__(self, state: GraphState) -> Dict[str, Any]:
-        """
-        Executes the execution step.
-
-        Args:
-            state: The current graph state.
-
-        Returns:
-            Dictionary updates for the graph state with execution results.
-        """
         node_name = "executor"
 
         try:
@@ -58,7 +42,7 @@ class ExecutorNode:
             if not ds_id:
                 errors.append(PipelineError(
                     node=node_name,
-                    message="No datasource_id in state. Router must run before ExecutorNode.",
+                    message="No datasource_id in state.",
                     severity=ErrorSeverity.ERROR,
                     error_code=ErrorCode.MISSING_DATASOURCE_ID
                 ))
@@ -67,58 +51,44 @@ class ExecutorNode:
                     "execution": ExecutionModel(row_count=0, rows=[], error="Missing Datasource ID")
                 }
 
-            profile = self.registry.get_profile(ds_id)
-            
-            dialect = None
-            if "mssql" in profile.engine or "sqlserver" in profile.engine:
-                dialect = "tsql"
-            elif "postgres" in profile.engine:
-                dialect = "postgres"
-            elif "mysql" in profile.engine:
-                dialect = "mysql"
-            elif "sqlite" in profile.engine:
-                dialect = "sqlite"
-            elif "oracle" in profile.engine:
-                dialect = "oracle"
+            # 1. Get Adapter
+            adapter = self.registry.get_adapter(ds_id)
+            capabilities = adapter.get_capabilities()
 
-            if not enforce_read_only(state.sql_draft, dialect=dialect):
+             # 1a. Security Check (Core Layer Defense)
+            # Default to generic if dialect not specified
+            dialect = capabilities.supported_dialects[0] if capabilities.supported_dialects else "generic"
+            
+            if not enforce_read_only(sql, dialect=dialect):
                 errors.append(PipelineError(
                     node=node_name,
-                    message="Security Violation: SQL query contains forbidden keywords (read-only enforcement).",
+                    message="Security Violation: SQL query contains forbidden keywords.",
                     severity=ErrorSeverity.CRITICAL,
                     error_code=ErrorCode.SECURITY_VIOLATION
                 ))
                 return {
-                    "errors": errors,
-                    "execution": ExecutionModel(row_count=0, rows=[], error="Security Violation")
-                }
-                
-            profile = self.registry.get_profile(ds_id)
-            engine = self.registry.get_engine(ds_id)
-            
-            execution_result = None
-            
+                     "errors": errors,
+                     "execution": ExecutionModel(row_count=0, rows=[], error="Security Violation")
+                 }
+
+            # 2. Execute via Adapter
             try:
-                rows = run_read_query(engine, sql)
+                sdk_result = adapter.execute(sql)
                 
-                result_rows = []
-                columns = []
-                if rows:
-                    columns = list(rows[0]._mapping.keys())
-                    for row in rows:
-                        result_rows.append(dict(row._mapping))
-                
+                # 3. Map SDK Result -> Graph Result
                 execution_result = ExecutionModel(
-                    row_count=len(rows),
-                    rows=result_rows,
-                    columns=columns
+                    row_count=sdk_result.row_count,
+                    rows=sdk_result.rows,
+                    columns=sdk_result.column_names,
+                    error=sdk_result.error
                 )
+                
+                if sdk_result.error:
+                     # Log the error but don't crash pipeline, let Aggregator handle
+                     logger.warning(f"Execution Error: {sdk_result.error}")
+                     
             except Exception as exc:
-                execution_result = ExecutionModel(
-                    row_count=0,
-                    rows=[],
-                    error=str(exc)
-                )
+                execution_result = ExecutionModel(row_count=0, rows=[], error=str(exc))
                 errors.append(PipelineError(
                     node=node_name,
                     message=f"Execution error: {exc}",
@@ -127,7 +97,7 @@ class ExecutorNode:
                     stack_trace=str(exc)
                 ))
             
-            exec_msg = f"Executed SQL on {ds_id}. Rows returned: {execution_result.row_count}."
+            exec_msg = f"Executed on {ds_id}. Rows: {execution_result.row_count}."
             if execution_result.error:
                  exec_msg += f" Error: {execution_result.error}"
             
@@ -139,15 +109,10 @@ class ExecutorNode:
 
         except Exception as exc:
             logger.error(f"Node {node_name} failed: {exc}")
-            err = PipelineError(
-                node=node_name,
-                message=f"Executor failed: {exc}",
-                severity=ErrorSeverity.CRITICAL,
-                error_code=ErrorCode.EXECUTOR_CRASH,
-                stack_trace=str(exc)
-            )
             return {
                 "execution": None,
-                "errors": [err],
-                "reasoning": [{"node": "executor", "content": f"Execution exception: {exc}", "type": "error"}]
+                "errors": [PipelineError(
+                    node=node_name, message=f"Executor crash: {exc}", 
+                    severity=ErrorSeverity.CRITICAL, error_code=ErrorCode.EXECUTOR_CRASH
+                )]
             }

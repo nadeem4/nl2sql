@@ -44,8 +44,27 @@ class GeneratorNode:
                     ]
                 }
 
+            # 1. Get Adapter Capabilities
+            adapter = self.registry.get_adapter(state.selected_datasource_id)
+            capabilities = adapter.get_capabilities()
+            
+            # 2. Determine Dialect
+            # Try to match supported dialects to sqlglot dialects
+            # Default to first supported, or generic
+            dialect = "postgres" # Default safe
+            if capabilities.supported_dialects:
+                # Map adapter dialect names to sqlglot names if needed
+                # For now assume they match (postgres, tsql, mysql, sqlite)
+                candidate = capabilities.supported_dialects[0]
+                if candidate in ["mssql", "sqlserver"]: 
+                    dialect = "tsql"
+                elif candidate == "postgresql":
+                    dialect = "postgres"
+                else:
+                    dialect = candidate
+
+            # 3. Get Row Limit (still from profile config for now, or capability if we add it)
             profile = self.registry.get_profile(state.selected_datasource_id)
-            self.profile_engine = profile.engine
             self.row_limit = profile.row_limit
 
             limit = min(
@@ -53,7 +72,8 @@ class GeneratorNode:
                 self.row_limit,
             )
 
-            sql = self._generate_sql_from_plan(state.plan, limit)
+            # 4. Generate SQL
+            sql = self._generate_sql_from_plan(state.plan, limit, dialect)
 
             return {
                 "sql_draft": sql,
@@ -61,7 +81,7 @@ class GeneratorNode:
                     {
                         "node": node_name,
                         "content": [
-                            f"Generated SQL for datasource={state.selected_datasource_id}",
+                            f"Generated SQL for datasource={state.selected_datasource_id} (Dialect: {dialect})",
                             sql,
                         ],
                     }
@@ -83,7 +103,7 @@ class GeneratorNode:
                 ],
             }
 
-    def _generate_sql_from_plan(self, plan: dict, limit: int) -> str:
+    def _generate_sql_from_plan(self, plan: dict, limit: int, dialect: str) -> str:
         query = exp.select()
         query = self._build_select(query, plan)
         query = self._build_from(query, plan["tables"][0])
@@ -94,15 +114,7 @@ class GeneratorNode:
         query = self._build_order_by(query, plan)
         query = query.limit(limit)
 
-        dialect_map = {
-            "postgresql": "postgres",
-            "mssql": "tsql",
-            "mysql": "mysql",
-            "sqlite": "sqlite",
-            "oracle": "oracle",
-        }
-
-        return query.sql(dialect=dialect_map.get(self.profile_engine, self.profile_engine))
+        return query.sql(dialect=dialect)
 
     def _to_expr(self, expr_str: str) -> exp.Expression:
         return sqlglot.parse_one(expr_str)
