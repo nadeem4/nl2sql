@@ -1,122 +1,123 @@
 # NL2SQL System Architecture
 
-This document provides a comprehensive technical overview of the NL2SQL system components, observability, registry, and guardrails.
+This document provides a comprehensive technical overview of the NL2SQL system components, its pluggable adapter architecture, and the monorepo structure.
 
 ## 1. High-Level Architecture
 
-The system operates on an **Intent-Driven Map-Reduce** paradigm to handle complex user queries efficiently.
+The system operates on an **Intent-Driven Map-Reduce** paradigm, now enhanced with a **modular plugin system** for database connectivity.
 
-### Summary
+```mermaid
+graph TD
+    UserQuery["User Query"] --> Intent["Intent Node"]
+    Intent --> Decomposer["Decomposer Node"]
+    Decomposer -- "Splits Query" --> MapBranching["Fan Out (Map)"]
 
-1. **Intent Classification**: The **Intent Node** classifies the query as `TABLE` (raw data), `KPI` (single metric), or `SUMMARY` (analysis).
-2. **Decomposition (Map)**: The **Decomposer Node** breaks complex queries into sub-queries per datasource.
-3. **Parallel Execution**: Independent execution subgraphs run for each sub-query.
-    * **Fast Lane**: For `TABLE`/`KPI` intents, simple SQL is executed directly.
-    * **Agentic Loop**: For `SUMMARY` intents, a complex Planner/Validator loop is used.
-4. **Aggregation (Reduce)**: The **Aggregator Node** synthesizes results. It skips LLM processing for Fast Lane queries.
+    subgraph ExecutionBranch ["Execution Branch (Parallel)"]
+        MapBranching --> Schema["Schema Node"]
+        Schema --> RouteLogic{"Route Logic"}
+        RouteLogic -- "Fast Lane" --> DirectSQL["DirectSQL Node"]
+        DirectSQL --> FastExecutor["Executor"]
+        
+        RouteLogic -- "Slow Lane" --> Planner["Planner Node"]
+        Planner --> Validator
+        Validator --> Generator
+        Generator --> Executor
+    end
 
----
-
-## 2. Core Components: The Pipeline nodes
-
-Each branch runs a dedicated LangGraph `StateMachine`.
-
-### 2.1 Nodes
-
-| Node | Responsibility | Key Inputs | Key Outputs |
-| :--- | :--- | :--- | :--- |
-| **IntentNode** | **Entry Point**. Classifies intent (`tabular`, `kpi`, `summary`), canonicalizes queries, and extracts entities. | `user_query` | `response_type`, `enriched_terms` |
-| **DecomposerNode** | Breaks down queries into sub-queries. Uses `enriched_terms` for context retrieval. | `user_query`, `enriched_terms` | `sub_queries` |
-| **DirectSQLNode** | (Fast Lane) Generates SQL for simple queries without a plan. | `user_query` | `sql_draft` |
-| **SchemaNode** | Retrieves relevant table schemas. | `datasource_id` | `schema_info` |
-| **PlannerNode** | (Agentic Lane) Generates an abstract execution plan. | `schema_info` | `plan` |
-| **ValidatorNode** | (Agentic Lane) Guardrails. Checks column existence and types. | `plan`, `schema_info` | `errors` |
-| **GeneratorNode** | Converts abstract plan into dialect-specific SQL. | `plan` | `sql_draft` |
-| **ExecutorNode** | Executes SQL. | `sql_draft` | `execution` |
-| **AggregatorNode** | Synthesizes results. Returns raw data for Fast Lane or LLM summary for Slow Lane. | `intermediate_results`, `response_type` | `final_answer` |
-
-### 2.2 State Management (`GraphState`)
-
-State is managed via a Pydantic model (`src/nl2sql/schemas.py`), ensuring strict typing across nodes.
-
-```python
-class GraphState(BaseModel):
-    user_query: str
-    response_type: Literal["tabular", "kpi", "summary"]
-    enriched_terms: List[str]
-    sub_queries: Optional[List[SubQuery]]
-    selected_datasource_id: Optional[str]
-    execution: Optional[ExecutionModel]
-    intermediate_results: List[Any]
-    # ...
+    FastExecutor -- "Appends Result" --> StateAggregation["State Reducers"]
+    Executor -- "Appends Result" --> StateAggregation
+    StateAggregation --> Aggregator["Aggregator (Reduce)"]
+    Aggregator --> FinalAnswer
 ```
 
----
+### Monorepo Structure
 
-## 3. Observability & Callbacks
+The codebase is organized into independently versioned packages:
 
-The system emphasizes "glass-box" execution, providing deep visibility into the AI's decision-making process through a robust Callback system.
-
-### 3.1 `PipelineMonitorCallback` (`src/nl2sql/callbacks/monitor.py`)
-
-* **Purpose**: The primary entry point for tracing.
-* **Function**: Orchestrates specialized handlers for nodes and tokens.
-* **Components**:
-  * `NodeHandler`: Tracks node start/end times and hierarchical execution tree.
-  * `TokenHandler`: Extracts token usage from LLM results.
-
-### 3.2 `NodeHandler` (`src/nl2sql/callbacks/node_handlers.py`)
-
-* **Purpose**: Managing execution state and UX feedback.
-* **Function**:
-  * Maintains the `primary_run_id` mapping to group LangChain sub-runs into logical "Nodes".
-  * Updates the `ConsolePresenter` to show "Thinking..." spinners.
-  * Logs performance metrics to `LATENCY_LOG`.
-* **Behavior (UX)**:
-  * `on_chain_start`: Status -> "Working: [Node Name]"
-  * `on_chain_end`: Console -> "✔ [Node Name] Completed (1.2s | 350 tok)"
-
-### 3.3 `TokenHandler` (`src/nl2sql/callbacks/token_handler.py`)
-
-* **Purpose**: Cost tracking.
-* **Function**: Standardizes token counting across different LLM providers (OpenAI, Anthropic, Gemini) and attributes costs to specific `datasource_id` and `agent_name`.
+| Package | Path | Responsibility |
+| :--- | :--- | :--- |
+| **nl2sql-core** | `packages/core` | The main orchestration engine, LangGraph nodes, CLI, and business logic. |
+| **nl2sql-adapter-sdk** | `packages/adapter-sdk` | Defines the `DatasourceAdapter` abstract base class and Pydantic models (`SchemaMetadata`, `CapabilitySet`). |
+| **nl2sql-postgres** | `packages/adapters/postgres` | Implementation for PostgreSQL. |
+| **nl2sql-mssql** | `packages/adapters/mssql` | Implementation for Microsoft SQL Server. |
+| **nl2sql-mysql** | `packages/adapters/mysql` | Implementation for MySQL. |
+| **nl2sql-sqlite** | `packages/adapters/sqlite` | Implementation for SQLite. |
 
 ---
 
-## 4. Registry Pattern
+## 2. Adapter Pattern (Database Connectivity)
 
-To support dynamic configuration and dependency injection, we use registries:
+Connectivity is decoupled from the Core engine. The Core knows *nothing* about specific SQL drivers.
 
-### 4.1 `DatasourceRegistry`
+### 2.1 The Contract (`nl2sql-adapter-sdk`)
 
-* Manages database connection profiles (`DatasourceProfile`).
-* **New Feature**: Supports `date_format` configuration (e.g., "DD-MM-YYYY") per profile, which is dynamically injected into the Planner and Validator.
-* Handles `SQLAlchemy` engine creation and connection pooling.
+Every adapter must implement the `DatasourceAdapter` interface:
 
-### 4.2 `LLMRegistry`
+```python
+class DatasourceAdapter(ABC):
+    @abstractmethod
+    def capabilities(self) -> CapabilitySet: ...
+    
+    @abstractmethod
+    def fetch_schema(self) -> SchemaMetadata: ...
+    
+    @abstractmethod
+    def execute(self, sql: str) -> QueryResult: ...
+    
+    @abstractmethod
+    def cost_estimate(self, sql: str) -> CostEstimate: ...
+```
 
-* Manages LLM instances (Planner LLM, Router LLM, etc.).
-* Allows swapping models (e.g., GPT-4 for Planning, GPT-3.5 for Summarization) via configuration.
+### 2.2 Discovery Mechanism
+
+Adapters are discovered at runtime using Python's `importlib.metadata` entry points group `nl2sql.adapters`.
+
+* **Registration**: Each adapter's `pyproject.toml` registers itself:
+
+  ```toml
+  [project.entry-points."nl2sql.adapters"]
+  postgres = "nl2sql_postgres.adapter:PostgresAdapter"
+  ```
+
+* **Loading**: `DatasourceRegistry` in Core loads these entry points dynamically when a datasource profile requests a specific `type`.
 
 ---
 
-## 5. Reporting & CLI
+## 3. Core Components (The Pipeline)
 
-The CLI (`src/nl2sql/reporting.py`) is decoupled from the logic.
+Each branch runs a dedicated LangGraph `StateMachine` inside `nl2sql-core`.
 
-* **`ConsolePresenter`**: A facade for the `rich` library.
-  * `print_execution_tree`: Renders the hierarchical Map-Reduce execution logic.
-  * `print_performance_report`: Renders detailed tables for latency and token costs.
-  * `print_sql`: Syntax-highlighted SQL blocks.
+### 3.1 Nodes
 
-## 6. Validation & Guardrails Strategy
+| Node | Responsibility | Key Interactions |
+| :--- | :--- | :--- |
+| **IntentNode** | Classifies query intent (`tabular`, `kpi`, `summary`). | |
+| **DecomposerNode** | Breaks down queries into sub-queries. | |
+| **SchemaNode** | Retrieves schema info. | Calls `adapter.fetch_schema()` |
+| **GeneratorNode** | Generates dialect-specific SQL. | Calls `adapter.capabilities()` to decide SQL features. |
+| **ExecutorNode** | Executes SQL. | Calls `adapter.execute()` |
+| **ValidatorNode** | Checks validity. | |
+
+### 3.2 State Management
+
+State is managed via `GraphState` (Pydantic), ensuring strictly typed context passing between nodes.
+
+---
+
+## 4. Observability
+
+The system uses a "glass-box" callback system (`nl2sql.callbacks`) to provide visibility into the AI's decision-making.
+
+* **PipelineMonitorCallback**: Traces execution.
+* **TokenHandler**: Tracks LLM token usage/cost.
+* **ConsolePresenter**: Renders rich UI in the CLI.
+
+---
+
+## 5. Validation & Guardrails
 
 We employ a **Defense-in-Depth** strategy:
 
 1. **Planner Constraints**: Prompt engineering ensures the LLM is aware of schema types.
-2. **Validator Logic**:
-    * **Structure**: Group By/Aggregation validity.
-    * **Schema**: Column/Table existence checks.
-    * **Data Types**: Checks if a string literal is used for an `INTEGER` column.
-    * **Formats**: Checks if a date literal matches the configured `date_format` (e.g. `2023-12-31` vs `31/12/2023`).
-3. **Generator Safety**: Only specific SQL dialects allowed; read-only enforcement capabilities.
+2. **Validator Logic**: Checks column existence and types against the `SchemaMetadata` returned by the adapter.
+3. **Adapter Capabilities**: The `GeneratorNode` respects `CapabilitySet` (e.g. `supports_limit_offset`), preventing generation of invalid SQL features for a given dialect.

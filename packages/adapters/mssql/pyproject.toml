@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nl2sql-mssql"
+version = "0.1.0"
+description = "MSSQL Adapter for NL2SQL using PyODBC"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "nl2sql-adapter-sdk",
+    "SQLAlchemy>=2.0",
+    "pyodbc>=4.0.0",
+    "pymssql>=2.2.0; platform_system=='Linux'" # Optional fallback
+]
+
+[project.entry-points."nl2sql.adapters"]
+mssql = "nl2sql_mssql.adapter:MssqlAdapter"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["nl2sql_mssql*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

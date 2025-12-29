@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nl2sql-postgres"
+version = "0.1.0"
+description = "Postgres adapter for NL2SQL"
+requires-python = ">=3.9"
+dependencies = [
+    "nl2sql-adapter-sdk",
+    "SQLAlchemy>=2.0",
+    "psycopg2-binary>=2.9",
+]
+
+[project.entry-points."nl2sql.adapters"]
+postgres = "nl2sql_postgres.adapter:PostgresAdapter"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["nl2sql_postgres*"]

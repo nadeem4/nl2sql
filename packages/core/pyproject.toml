@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nl2sql-core"
+version = "0.1.0"
+description = "Core orchestration engine for NL2SQL"
+requires-python = ">=3.9"
+dependencies = [
+    "nl2sql-adapter-sdk",
+    "SQLAlchemy>=2.0",
+    "PyYAML>=6.0",
+    "langgraph>=0.0.29",
+    "langchain>=0.2.0",
+    "langchain-openai>=0.1.0",
+    "pydantic>=1.10",
+    "opentelemetry-api>=1.20.0",
+    "opentelemetry-sdk>=1.20.0",
+    "sqlglot>=23.0.0",
+    "pydantic-settings>=2.0.0",
+    "pandas>=1.5.0", # For metrics/evals
+    "rich>=10.0.0",  # For TUI/Reporting
+]
+
+[project.scripts]
+nl2sql = "nl2sql.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["nl2sql*"]
+
+[tool.setuptools.package-data]
+"*" = ["configs/*.yaml", ".env"]

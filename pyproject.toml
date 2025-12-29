@@ -3,33 +3,15 @@ requires = ["setuptools>=64", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "nl2sql-agent"
+name = "nl2sql-monorepo"
 version = "0.1.0"
-description = "LangGraph-based NL2SQL multi-agent pipeline with SQLite starter"
+description = "Monorepo for NL2SQL Agent"
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
-  "SQLAlchemy>=2.0",
-  "PyYAML>=6.0",
-  "langgraph>=0.0.29",
-  "langchain>=0.2.0",
-  "langchain-openai>=0.1.0",
-  "pydantic>=1.10",
-  "opentelemetry-api>=1.20.0",
-  "opentelemetry-sdk>=1.20.0",
-  "sqlglot>=23.0.0",
-  "pydantic-settings>=2.0.0",
+  # Core dependencies are in packages/core
 ]
 
-[project.scripts]
-nl2sql-cli = "nl2sql.cli:main"
-
-[tool.setuptools]
-package-dir = {"" = "src"}
-
-[tool.setuptools.packages.find]
-where = ["src"]
-include = ["nl2sql*"]
-
-[tool.setuptools.package-data]
-"*" = ["configs/*.yaml", ".env"]
+[tool.pytest.ini_options]
+testpaths = ["packages/core/tests", "packages/adapter-sdk/tests", "packages/adapters/postgres/tests"]
+pythonpath = ["packages/core/src", "packages/adapter-sdk/src", "packages/adapters/postgres/src"]

@@ -6,6 +6,15 @@
 
 To transition this system from a high-quality MVP to a mission-critical Production service, the following gaps must be addressed.
 
+### Phase 0: The "Missing Link" (Architecture)
+
+* [ ] **API Layer (FastAPI)**:
+  * **Current**: System is CLI-only.
+  * **Target**: Build `packages/api` exposing REST endpoints (`POST /query`) for the Frontend to consume.
+* [ ] **Async Concurrency**:
+  * **Current**: Synchronous execution (`invoke`) limits throughput.
+  * **Target**: Refactor Core to `ainvoke` and use async DB drivers (`asyncpg`, `aioodbc`).
+
 ### Phase 1: Security & Governance (Critical)
 
 * [ ] **Secret Management**:
