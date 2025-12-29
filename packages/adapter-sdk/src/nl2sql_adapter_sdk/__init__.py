@@ -9,7 +9,8 @@ from .models import (
     ExecutionMetrics,
     AdapterError,
     Table,
-    Column
+    Column,
+    ForeignKey
 )
 
 __all__ = [
@@ -23,5 +24,6 @@ __all__ = [
     "ExecutionMetrics",
     "AdapterError",
     "Table",
-    "Column"
+    "Column",
+    "ForeignKey"
 ]

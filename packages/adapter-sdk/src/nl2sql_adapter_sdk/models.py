@@ -6,11 +6,20 @@ class Column(BaseModel):
     type: str
     is_nullable: bool = True
     is_primary_key: bool = False
+    description: Optional[str] = None
+
+class ForeignKey(BaseModel):
+    constrained_columns: List[str]
+    referred_table: str
+    referred_columns: List[str]
+    referred_schema: Optional[str] = None
 
 class Table(BaseModel):
     name: str
     schema_name: Optional[str] = None
     columns: List[Column]
+    foreign_keys: List[ForeignKey] = []
+    description: Optional[str] = None
 
 class SchemaMetadata(BaseModel):
     datasource_id: str

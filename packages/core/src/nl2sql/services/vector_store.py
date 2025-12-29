@@ -9,8 +9,9 @@ from langchain_core.embeddings import Embeddings
 
 from nl2sql.common.settings import settings
 from nl2sql.services.embeddings import EmbeddingService
-from nl2sql_adapter_sdk import SchemaMetadata, Table, Column
+from nl2sql_adapter_sdk import SchemaMetadata, Table, Column, DatasourceAdapter
 from nl2sql.datasources import DatasourceProfile, load_profiles
+
 
 class OrchestratorVectorStore:
     """
@@ -65,7 +66,6 @@ class OrchestratorVectorStore:
         except Exception:
             pass
 
-    from nl2sql_adapter_sdk import DatasourceAdapter
 
     def index_schema(self, adapter: DatasourceAdapter, datasource_id: str):
         """
@@ -75,23 +75,32 @@ class OrchestratorVectorStore:
             adapter: The DataSourceAdapter to inspect.
             datasource_id: ID of the datasource (added to metadata).
         """
-        # Get standardized schema from Adapter
         schema_def = adapter.fetch_schema()
         documents = []
 
         for table in schema_def.tables:
             # Build column description string
-            col_desc = ", ".join([f"{col.name} ({col.type})" for col in table.columns])
+            col_strs = []
+            for col in table.columns:
+                c_str = f"{col.name} ({col.type})"
+                if col.description:
+                    c_str += f" '{col.description}'"
+                col_strs.append(c_str)
+            col_desc = ", ".join(col_strs)
             
             # Identify Primary Keys
             pks = [col.name for col in table.columns if col.is_primary_key]
             pk_desc = f" Primary Key: {', '.join(pks)}." if pks else ""
 
-            # TODO: Add Foreign Keys when SDK supports them in models.py
-            fk_desc = ""
+            # Foreign Keys
+            fk_strs = []
+            for fk in table.foreign_keys:
+                ref = f"{fk.referred_table}.{','.join(fk.referred_columns)}"
+                src = f"{','.join(fk.constrained_columns)}"
+                fk_strs.append(f"{src} -> {ref}")
+            fk_desc = f" Foreign Keys: {'; '.join(fk_strs)}." if fk_strs else ""
 
-            # comment_desc = f" Comment: {table.description}." if table.description else ""
-            comment_desc = "" 
+            comment_desc = f" Comment: {table.description}." if table.description else ""
 
             content = f"Table: {table.name}.{comment_desc} Columns: {col_desc}.{pk_desc}{fk_desc}"
             

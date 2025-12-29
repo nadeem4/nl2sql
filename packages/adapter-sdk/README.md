@@ -24,6 +24,15 @@ class DatasourceAdapter(Protocol):
 pip install -e packages/adapter-sdk
 ```
 
+## 🏗️ Architecture: Why Separate SDK?
+
+We distinguish between the **Contract** (`adapter-sdk`) and the **Implementation** (`adapter-sqlalchemy`).
+
+* **`adapter-sdk`**: Lightweight, zero-dependency. Defines *WHAT* an adapter must do. Use this for non-SQL sources (APIs, CSVs, Mongo).
+* **`adapter-sqlalchemy`**: Heavy implementation logic. Defines *HOW* to do it for SQL databases (Postgres, MySQL, etc.).
+
+This allows the core system to support diverse backend types without being tied to Relational Logic.
+
 ## 🧪 Compliance Testing
 
 This package includes a standard compliance suite (`AdapterComplianceSuite`) that adapters can inherit from to ensure they met the spec.
