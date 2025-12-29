@@ -55,7 +55,7 @@ class ExecutorNode:
             adapter = self.registry.get_adapter(ds_id)
             capabilities = adapter.get_capabilities()
 
-             # 1a. Security Check (Core Layer Defense)
+            # 1a. Security Check (Core Layer Defense)
             # Default to generic if dialect not specified
             dialect = capabilities.supported_dialects[0] if capabilities.supported_dialects else "generic"
             
@@ -70,6 +70,38 @@ class ExecutorNode:
                      "errors": errors,
                      "execution": ExecutionModel(row_count=0, rows=[], error="Security Violation")
                  }
+
+            # 1b. Pre-flight Safeguard (Data Flood Protection)
+            # Prevent aggregator OOM by rejecting massive result sets
+            SAFEGUARD_ROW_LIMIT = 10000 
+            
+            if capabilities.supports_hueristic_estimation:
+                try:
+                    estimate = adapter.estimate(sql)
+                    if estimate.will_succeed and estimate.estimated_row_count > SAFEGUARD_ROW_LIMIT:
+                        msg = f"Safeguard Triggered: Query estimated to return {estimate.estimated_row_count} rows, exceeding limit of {SAFEGUARD_ROW_LIMIT}."
+                        logger.warning(msg)
+                        
+                        errors.append(PipelineError(
+                            node=node_name,
+                            message=msg,
+                            severity=ErrorSeverity.ERROR,
+                            error_code=ErrorCode.SAFEGUARD_VIOLATION
+                        ))
+                        return {
+                            "errors": errors,
+                            "execution": ExecutionModel(
+                                row_count=0, 
+                                rows=[], 
+                                error=f"SAFEGUARD: Too many rows ({estimate.estimated_row_count})"
+                            ),
+                            "reasoning": [{"node": "executor", "content": msg, "type": "warning"}]
+                        }
+                    elif not estimate.will_succeed:
+                        logger.warning(f"Estimation failed: {estimate.reason}. Proceeding with caution.")
+                        
+                except Exception as e:
+                    logger.warning(f"Safeguard estimation check failed: {e}. Proceeding execution.")
 
             # 2. Execute via Adapter
             try:
