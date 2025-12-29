@@ -6,7 +6,7 @@ from nl2sql.core.nodes.direct_sql.node import DirectSQLNode
 from nl2sql.core.nodes.schema import SchemaNode
 from nl2sql.core.nodes.executor import ExecutorNode
 from nl2sql.core.subgraphs.agentic_execution_loop import build_agentic_execution_loop
-from nl2sql.datasource_registry import DatasourceRegistry
+from nl2sql.core.datasource_registry import DatasourceRegistry
 from nl2sql.core.llm_registry import LLMRegistry
 from nl2sql.core.vector_store import OrchestratorVectorStore
 

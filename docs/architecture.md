@@ -6,6 +6,30 @@ This document provides a comprehensive technical overview of the NL2SQL system c
 
 The system operates on an **Intent-Driven Map-Reduce** paradigm, now enhanced with a **modular plugin system** for database connectivity.
 
+```mermaid
+graph TD
+    UserQuery[User Query] --> Intent[Intent Node]
+    Intent --> Decomposer[Decomposer Node]
+    Decomposer -- "Splits Query" --> MapBranching[Fan Out (Map)]
+
+    subgraph "Execution Branch (Parallel)"
+        MapBranching --> Schema[Schema Node]
+        Schema --> RouteLogic{Route Logic}
+        RouteLogic -- "Fast Lane" --> DirectSQL[DirectSQL Node]
+        DirectSQL --> FastExecutor[Executor]
+        
+        RouteLogic -- "Slow Lane" --> Planner[Planner Node]
+        Planner --> Validator
+        Validator --> Generator
+        Generator --> Executor
+    end
+
+    FastExecutor -- "Appends Result" --> StateAggregation[State Reducers]
+    Executor -- "Appends Result" --> StateAggregation
+    StateAggregation --> Aggregator[Aggregator (Reduce)]
+    Aggregator --> FinalAnswer
+```
+
 ### Monorepo Structure
 
 The codebase is organized into independently versioned packages:

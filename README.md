@@ -63,3 +63,29 @@ We usage Docker Compose to spin up real database instances for verification.
 ## Architecture
 
 The system uses a pluggable architecture where `core` interacts with databases solely through the `DatasourceAdapter` interface defined in `adapter-sdk`. Adapters are discovered dynamically at runtime via `importlib.metadata` entry points (`nl2sql.adapters`).
+
+### Execution Flow
+
+```mermaid
+graph TD
+    UserQuery[User Query] --> Intent[Intent Node]
+    Intent --> Decomposer[Decomposer Node]
+    Decomposer -- "Splits Query" --> MapBranching[Fan Out (Map)]
+
+    subgraph "Execution Branch (Parallel)"
+        MapBranching --> Schema[Schema Node]
+        Schema --> RouteLogic{Route Logic}
+        RouteLogic -- "Fast Lane" --> DirectSQL[DirectSQL Node]
+        DirectSQL --> FastExecutor[Executor]
+        
+        RouteLogic -- "Slow Lane" --> Planner[Planner Node]
+        Planner --> Validator
+        Validator --> Generator
+        Generator --> Executor
+    end
+
+    FastExecutor -- "Appends Result" --> StateAggregation[State Reducers]
+    Executor -- "Appends Result" --> StateAggregation
+    StateAggregation --> Aggregator[Aggregator (Reduce)]
+    Aggregator --> FinalAnswer
+```

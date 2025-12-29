@@ -1,0 +1,48 @@
+{
+  "global_reasoning": [
+    {
+      "node": "intent",
+      "content": "Intent=lookup, TimeScope=TimeScope.ALL_TIME, Ambiguity=low"
+    },
+    {
+      "node": "decomposer",
+      "content": "Entity_id 'machine' requires attributes [machine_id, machine_name]. Physical schema coverage exists via a concrete table match 'machines' in multiple datasources (manufacturing_ops, manufacturing_sqlite, manufacturing_ref). Because the entity_id must be assigned to exactly one datasource and the canonical query selects directly from 'machines' (a base table) without needing auxiliary tables, choose a datasource where 'machines' is a primary operational table match rather than relying on examples. 'manufacturing_ops' provides a direct table match to 'machines' and represents the most specific operational source among the candidates; no decomposition is required because only entity_id 'machine' is present and it is assigned to a single datasource."
+    },
+    {
+      "node": "aggregator",
+      "content": "Fast path: tabular result used directly."
+    }
+  ],
+  "execution_history": [
+    {
+      "datasource_id": "manufacturing_ops",
+      "sub_query": "Return machine_id and machine_name for all records from the machines table, ordered by machine_name.",
+      "sql": "SELECT\n  id AS machine_id,\n  name AS machine_name\nFROM machines\nORDER BY machine_name\nLIMIT 100;",
+      "row_count": 50,
+      "entity_ids": [],
+      "reasoning": [
+        {
+          "node": "execution_manufacturing_ops",
+          "content": "Executing for entity_ids=['machine']"
+        },
+        {
+          "node": "schema",
+          "content": "Retrieved 4 tables via Adapter."
+        },
+        {
+          "node": "schema",
+          "content": "Schema Drift Detected: Used semantic fallback.",
+          "type": "warning"
+        },
+        {
+          "node": "direct_sql",
+          "content": "Fast Lane generation successful."
+        },
+        {
+          "node": "executor",
+          "content": "Executed on manufacturing_ops. Rows: 50."
+        }
+      ]
+    }
+  ]
+}

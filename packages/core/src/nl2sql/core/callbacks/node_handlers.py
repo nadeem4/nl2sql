@@ -1,11 +1,11 @@
 import time
 from typing import Dict, Any, List, Optional
 
-from nl2sql.context import current_datasource_id
-from nl2sql.metrics import LATENCY_LOG
+from nl2sql.core.context import current_datasource_id
+from nl2sql.core.metrics import LATENCY_LOG
 from nl2sql.reporting import ConsolePresenter
-from nl2sql.callbacks.node_context import current_node_run_id
-from nl2sql.callbacks.node_metrics import NodeMetrics
+from nl2sql.core.callbacks.node_context import current_node_run_id
+from nl2sql.core.callbacks.node_metrics import NodeMetrics
 
 
 class NodeHandler:
@@ -119,7 +119,7 @@ class NodeHandler:
         if self.node_active_count[node] == 0:
             tok_str = f" | {metrics.total_tokens} tok" if metrics.total_tokens else ""
             self.presenter.console.print(
-                f"[green]✔[/green] [bold]{node}[/bold] Completed ({metrics.duration:.2f}s{tok_str})"
+                f"[green]OK[/green] [bold]{node}[/bold] Completed ({metrics.duration:.2f}s{tok_str})"
             )
             self.presenter.update_interactive_status("Thinking...")
 
@@ -144,7 +144,7 @@ class NodeHandler:
             metrics.error = str(error)
 
             self.presenter.console.print(
-                f"[red]✘[/red] [bold]{node}[/bold] Failed: {error}"
+                f"[red]X[/red] [bold]{node}[/bold] Failed: {error}"
             )
             self.presenter.update_interactive_status("Error encountered...")
 

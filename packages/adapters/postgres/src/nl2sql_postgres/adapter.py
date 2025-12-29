@@ -14,8 +14,10 @@ from nl2sql_adapter_sdk import (
 )
 
 class PostgresAdapter(DatasourceAdapter):
-    def __init__(self):
+    def __init__(self, connection_string: str = None):
         self.engine = None
+        if connection_string:
+            self.connect({"connection_string": connection_string})
         
     def connect(self, config: Dict[str, Any]) -> None:
         """

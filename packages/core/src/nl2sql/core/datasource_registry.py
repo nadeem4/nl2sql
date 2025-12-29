@@ -56,20 +56,38 @@ class DatasourceRegistry:
     def _create_adapter(self, profile: DatasourceProfile) -> DataSourceAdapter:
         """
         Factory method to instantiate the correct adapter based on profile engine.
+        Now uses dynamic discovery via entry points.
         """
-        # 1. Naive Mapping (simulating Entry Points for V1)
-        # In the future, this dict can be populated via entry_points
+        from nl2sql.registry.discovery import discover_adapters
+        
+        available_adapters = discover_adapters()
         engine_type = profile.engine.lower()
         
-        # SQL Family
-        if engine_type in ["postgres", "postgresql", "sqlite", "mysql", "mssql", "sqlserver", "oracle"]:
-             # return SqlGenericAdapter(profile.sqlalchemy_url)
-             raise NotImplementedError("Adapters are being refactored. Please install nl2sql-adapters-sql-generic.")
-            
-        # Future:
-        # if engine_type == "adls": return AdlsAdapter(...)
+        # Normalize engine type (handle aliases if needed, though adapters register specific keys)
+        # e.g. 'postgresql' -> 'postgres' if that's what the adapter registered
         
-        raise ValueError(f"No adapter found for engine type: {engine_type}")
+        # Direct lookup
+        if engine_type in available_adapters:
+             AdapterCls = available_adapters[engine_type]
+             # Instantiate with connection string
+             # Note: Adapter __init__ might vary? The contract implies __init__(connection_string)
+             return AdapterCls(profile.sqlalchemy_url)
+
+        # Fallback aliases
+        aliases = {
+            "postgresql": "postgres",
+            "sqlserver": "mssql"
+        }
+        if engine_type in aliases:
+            mapped = aliases[engine_type]
+            if mapped in available_adapters:
+                 return available_adapters[mapped](profile.sqlalchemy_url)
+
+        raise ValueError(
+            f"No adapter found for engine type: '{engine_type}'. "
+            f"Available: {list(available_adapters.keys())}. "
+            f"Please install the appropriate nl2sql-adapter package."
+        )
 
     def list_profiles(self) -> list[DatasourceProfile]:
         """Returns a list of all registered profiles."""

@@ -123,6 +123,15 @@ class LLMRegistry:
 
     def _base_llm(self, agent: str) -> ChatOpenAI:
         cfg = self._agent_cfg(agent)
+        if cfg.provider == "stub":
+            from langchain_community.llms import FakeListLLM
+            # Basic stub responses
+            return FakeListLLM(responses=[
+                "SELECT * FROM machines LIMIT 10", # For Direct SQL
+                "PLAN: ...",
+                "{'response_type': 'tabular', 'canonical_query': 'List all machines'}", # For Intent
+            ])
+
         if cfg.provider != "openai":
             raise ValueError(f"Unsupported LLM provider: {cfg.provider}")
         key = cfg.api_key or settings.openai_api_key
@@ -153,7 +162,11 @@ class LLMRegistry:
         llm = self._base_llm("planner")
         return self._wrap_structured_usage(llm, PlanModel)
 
-# ...
+    def summarizer_llm(self) -> LLMCallable:
+        """Returns the LLM callable for the Summarizer agent."""
+        llm = self._base_llm("summarizer")
+        return llm.invoke
+
 
     def decomposer_llm(self) -> LLMCallable:
         """Returns the LLM callable for the Decomposer agent."""
