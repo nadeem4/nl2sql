@@ -7,11 +7,10 @@ import pathlib
 import sys
 from typing import Any, Dict, List
 
-from nl2sql.core.datasource_config import load_profiles
-from nl2sql.core.llm_registry import LLMRegistry, load_llm_config
-from nl2sql.core.settings import settings
-from nl2sql.core.vector_store import OrchestratorVectorStore
-from nl2sql.core.datasource_registry import DatasourceRegistry
+from nl2sql.datasources import load_profiles, DatasourceRegistry
+from nl2sql.services.llm import LLMRegistry, load_llm_config
+from nl2sql.common.settings import settings
+from nl2sql.services.vector_store import OrchestratorVectorStore
 
 # Import commands
 from nl2sql.commands.indexing import run_indexing
@@ -44,13 +43,21 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--include-ids", nargs="+", default=None, help="Benchmark: List of specific test IDs to run (space separated)")
     parser.add_argument("--export-path", type=pathlib.Path, default=None, help="Benchmark: Export results to file (.json or .csv)")
 
+    parser.add_argument("--list-adapters", action="store_true", help="List all installed datasource adapters")
+
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
 
-    from nl2sql.core.logger import configure_logging
+    # Immediate actions that don't need full config loading
+    if args.list_adapters:
+        from nl2sql.commands.info import list_available_adapters
+        list_available_adapters()
+        return
+
+    from nl2sql.common.logger import configure_logging
     
     level = "CRITICAL" 
     

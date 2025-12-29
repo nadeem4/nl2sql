@@ -2,11 +2,11 @@ import sys
 import argparse
 import statistics
 import yaml
-from nl2sql.core.llm_registry import parse_llm_config, LLMRegistry, get_usage_summary
-from nl2sql.core.metrics import reset_usage
-from nl2sql.core.datasource_registry import DatasourceRegistry
-from nl2sql.core.vector_store import OrchestratorVectorStore
-from nl2sql.core.graph import run_with_graph
+from nl2sql.services.llm import parse_llm_config, LLMRegistry, get_usage_summary
+from nl2sql.common.metrics import reset_usage
+from nl2sql.datasources import DatasourceRegistry
+from nl2sql.services.vector_store import OrchestratorVectorStore
+from nl2sql.pipeline.graph import run_with_graph
 from nl2sql.evaluation.evaluator import ModelEvaluator
 from nl2sql.reporting import ConsolePresenter
 
@@ -29,7 +29,7 @@ def run_benchmark(args: argparse.Namespace, datasource_registry: DatasourceRegis
     if not llm_configs:
         llm_cfg = parse_llm_config({"default": {"provider": "openai", "model": "gpt-4o"}}) # Fallback
         if args.llm_config and args.llm_config.exists():
-            from nl2sql.core.llm_registry import load_llm_config
+            from nl2sql.services.llm import load_llm_config
             llm_cfg = load_llm_config(args.llm_config)
             
         if getattr(args, "stub_llm", False):

@@ -3,12 +3,12 @@ import argparse
 import json
 from typing import Optional
 
-from nl2sql.core.graph import run_with_graph
-from nl2sql.core.datasource_registry import DatasourceRegistry
-from nl2sql.core.llm_registry import LLMRegistry
-from nl2sql.core.vector_store import OrchestratorVectorStore
+from nl2sql.pipeline.graph import run_with_graph
+from nl2sql.datasources import DatasourceRegistry
+from nl2sql.services.llm import LLMRegistry
+from nl2sql.services.vector_store import OrchestratorVectorStore
 from nl2sql.commands.visualize import draw_execution_trace
-from nl2sql.core.schemas import GraphState
+from nl2sql.pipeline.state import GraphState
 from nl2sql.reporting import ConsolePresenter
 
 def run_pipeline(args: argparse.Namespace, query: Optional[str], datasource_registry: DatasourceRegistry, llm_registry: LLMRegistry, vector_store: OrchestratorVectorStore) -> None:
@@ -25,7 +25,7 @@ def _run_simple_mode(args: argparse.Namespace, query: str, datasource_registry: 
     final_state = {}
     
     import time
-    from nl2sql.core.callbacks.monitor import PipelineMonitorCallback
+    from nl2sql.services.callbacks.monitor import PipelineMonitorCallback
     
     monitor = PipelineMonitorCallback(presenter)
     presenter.start_interactive_status("[bold green]Thinking...[/bold green]")
@@ -118,5 +118,5 @@ def _run_simple_mode(args: argparse.Namespace, query: str, datasource_registry: 
         presenter.print_performance_tree(tree, metrics, node_map)
     
     
-    from nl2sql.core.metrics import TOKEN_LOG
+    from nl2sql.common.metrics import TOKEN_LOG
     presenter.print_cost_summary(duration, TOKEN_LOG)

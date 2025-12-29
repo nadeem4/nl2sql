@@ -1,10 +1,10 @@
 import unittest
 from unittest.mock import MagicMock
-from nl2sql.core.nodes.generator.node import GeneratorNode
-from nl2sql.core.schemas import GraphState
-from nl2sql.core.datasource_registry import DatasourceRegistry
+from nl2sql.pipeline.nodes.generator.node import GeneratorNode
+from nl2sql.pipeline.state import GraphState
+from nl2sql.datasources import DatasourceRegistry
 from nl2sql_adapter_sdk import DatasourceAdapter, CapabilitySet
-from nl2sql.core.datasource_config import DatasourceProfile
+from nl2sql.datasources import DatasourceProfile
 
 class TestGeneratorHaving(unittest.TestCase):
     def setUp(self):

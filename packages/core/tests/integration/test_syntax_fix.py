@@ -1,6 +1,6 @@
 import unittest
-from nl2sql.core.nodes.generator.node import GeneratorNode
-from nl2sql.core.schemas import GraphState
+from nl2sql.pipeline.nodes.generator.node import GeneratorNode
+from nl2sql.pipeline.state import GraphState
 
 class TestSyntaxFix(unittest.TestCase):
     def test_order_by_generated_correctly(self):

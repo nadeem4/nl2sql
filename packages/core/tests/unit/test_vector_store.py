@@ -1,7 +1,7 @@
 
 import pytest
 from unittest.mock import MagicMock, patch
-from nl2sql.core.vector_store import OrchestratorVectorStore
+from nl2sql.services.vector_store import OrchestratorVectorStore
 from langchain_core.documents import Document
 from nl2sql_adapter_sdk import DatasourceAdapter, SchemaMetadata, Table, Column
 
@@ -10,7 +10,7 @@ def test_index_schema():
     mock_embeddings = MagicMock()
     mock_chroma = MagicMock()
     
-    with patch("nl2sql.core.vector_store.Chroma", return_value=mock_chroma):
+    with patch("nl2sql.services.vector_store.Chroma", return_value=mock_chroma):
         
         # Mock Adapter
         mock_adapter = MagicMock(spec=DatasourceAdapter)
@@ -40,7 +40,7 @@ def test_retrieve():
     mock_chroma = MagicMock()
     mock_embeddings = MagicMock()
     
-    with patch("nl2sql.core.vector_store.Chroma", return_value=mock_chroma):
+    with patch("nl2sql.services.vector_store.Chroma", return_value=mock_chroma):
         
         # Pass mock embeddings to avoid calling EmbeddingService.get_embeddings()
         store = OrchestratorVectorStore(embeddings=mock_embeddings)

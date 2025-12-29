@@ -1,10 +1,10 @@
 import pytest
 from unittest.mock import MagicMock
-from nl2sql.core.graph import run_with_graph, build_execution_subgraph
-from nl2sql.core.datasource_registry import DatasourceRegistry
-from nl2sql.core.llm_registry import LLMRegistry
-from nl2sql.core.nodes.decomposer.schemas import DecomposerResponse
-from nl2sql.core.nodes.aggregator.schemas import AggregatedResponse
+from nl2sql.pipeline.graph import run_with_graph, build_execution_subgraph
+from nl2sql.datasources import DatasourceRegistry
+from nl2sql.services.llm import LLMRegistry
+from nl2sql.pipeline.nodes.decomposer.schemas import DecomposerResponse
+from nl2sql.pipeline.nodes.aggregator.schemas import AggregatedResponse
 
 @pytest.fixture
 def mock_registries():
@@ -23,11 +23,11 @@ def mock_registries():
 
 from unittest.mock import patch
 from langgraph.graph import StateGraph, END
-from nl2sql.core.schemas import GraphState
+from nl2sql.pipeline.state import GraphState
 
 @pytest.fixture
 def mock_execution_subgraph():
-    with patch("nl2sql.core.subgraphs.execution.build_execution_subgraph") as mock_build:
+    with patch("nl2sql.pipeline.subgraphs.execution.build_execution_subgraph") as mock_build:
         # Create a dummy subgraph that just appends a result
         def dummy_node(state: GraphState):
             return {"intermediate_results": [f"Result for {state.user_query}"]}

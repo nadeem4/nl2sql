@@ -1,12 +1,12 @@
 
 import pytest
 from unittest.mock import MagicMock
-from nl2sql.core.nodes.schema.node import SchemaNode
-from nl2sql.core.schemas import GraphState
-from nl2sql.core.datasource_registry import DatasourceRegistry
+from nl2sql.pipeline.nodes.schema.node import SchemaNode
+from nl2sql.pipeline.state import GraphState
+from nl2sql.datasources import DatasourceRegistry
 from nl2sql_adapter_sdk import DatasourceAdapter, SchemaMetadata, Table, Column
-from nl2sql.core.vector_store import OrchestratorVectorStore
-from nl2sql.core.nodes.schema.schemas import SchemaInfo
+from nl2sql.services.vector_store import OrchestratorVectorStore
+from nl2sql.pipeline.nodes.schema.schemas import SchemaInfo
 
 def test_schema_node_initialization():
     """Test that SchemaNode initializes correctly."""
@@ -86,7 +86,7 @@ def test_schema_node_uses_candidates_from_mapping():
     node = SchemaNode(registry=mock_registry)
     
     # Mock Entity Mapping
-    from nl2sql.core.nodes.decomposer.schemas import EntityMapping
+    from nl2sql.pipeline.nodes.decomposer.schemas import EntityMapping
     mapping = EntityMapping(
         entity_id="e1", 
         datasource_id="ds1", 

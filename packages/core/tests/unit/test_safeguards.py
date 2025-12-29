@@ -1,9 +1,9 @@
 import pytest
 from unittest.mock import MagicMock
-from nl2sql.core.nodes.executor.node import ExecutorNode
-from nl2sql.core.schemas import GraphState
+from nl2sql.pipeline.nodes.executor.node import ExecutorNode
+from nl2sql.pipeline.state import GraphState
 from nl2sql_adapter_sdk import CapabilitySet, CostEstimate as EstimationResult, QueryResult as ExecutionResult
-from nl2sql.core.errors import ErrorCode
+from nl2sql.common.errors import ErrorCode
 
 class TestSafeguards:
     

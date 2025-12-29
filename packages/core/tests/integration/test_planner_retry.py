@@ -1,9 +1,9 @@
 import unittest
 from unittest.mock import MagicMock, patch
 import json
-from nl2sql.core.graph import build_graph
-from nl2sql.core.nodes.intent.schemas import IntentResponse as IntentModel
-from nl2sql.core.nodes.planner.schemas import PlanModel
+from nl2sql.pipeline.graph import build_graph
+from nl2sql.pipeline.nodes.intent.schemas import IntentResponse as IntentModel
+from nl2sql.pipeline.nodes.planner.schemas import PlanModel
 # SQLModel was removed/renamed? Assuming string output for SQL.
 # But keeping imports if they existed. 
 # PlanModel is in core.nodes.planner.schemas
@@ -58,7 +58,7 @@ class TestPlannerRetry(unittest.TestCase):
         profile.engine = "sqlite"
         profile.row_limit = 10
         
-        with patch("nl2sql.core.nodes.generator.node.GeneratorNode._generate_sql_from_plan"):
+        with patch("nl2sql.pipeline.nodes.generator.node.GeneratorNode._generate_sql_from_plan"):
              # Adapting this test to the new structure
              # We need to ensure the graph can be built.
              

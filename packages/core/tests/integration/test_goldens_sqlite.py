@@ -9,7 +9,7 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.append(str(SRC))
 
-from nl2sql.core.datasource_config import get_profile, load_profiles
+from nl2sql.datasources import get_profile, load_profiles
 from nl2sql.engine_factory import make_engine, run_read_query
 
 

@@ -1,10 +1,10 @@
 import unittest
 from unittest.mock import MagicMock, patch
 import json
-from nl2sql.core.graph import build_graph
-from nl2sql.core.schemas import GraphState
-from nl2sql.core.nodes.intent.schemas import IntentResponse as IntentModel
-from nl2sql.core.nodes.planner.schemas import PlanModel
+from nl2sql.pipeline.graph import build_graph
+from nl2sql.pipeline.state import GraphState
+from nl2sql.pipeline.nodes.intent.schemas import IntentResponse as IntentModel
+from nl2sql.pipeline.nodes.planner.schemas import PlanModel
 
 class TestRefinements(unittest.TestCase):
     def test_error_recovery_loop(self):

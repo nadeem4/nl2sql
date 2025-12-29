@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import MagicMock
-from nl2sql.core.datasource_config import DatasourceProfile
+from nl2sql.datasources import DatasourceProfile
 # from nl2sql.adapters.sql_generic import SqlGenericAdapter
 # TODO: Update tests to usage discovery or mock adapter
 

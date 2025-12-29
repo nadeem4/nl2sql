@@ -1,11 +1,11 @@
 
 import pytest
 from unittest.mock import MagicMock
-from nl2sql.core.nodes.validator.node import ValidatorNode
-from nl2sql.core.schemas import GraphState
-from nl2sql.core.nodes.schema.schemas import SchemaInfo, TableInfo, ColumnInfo
-from nl2sql.core.nodes.planner.schemas import PlanModel, TableRef, ColumnRef
-from nl2sql.core.datasource_registry import DatasourceRegistry
+from nl2sql.pipeline.nodes.validator.node import ValidatorNode
+from nl2sql.pipeline.state import GraphState
+from nl2sql.pipeline.nodes.schema.schemas import SchemaInfo, TableInfo, ColumnInfo
+from nl2sql.pipeline.nodes.planner.schemas import PlanModel, TableRef, ColumnRef
+from nl2sql.datasources import DatasourceRegistry
 from nl2sql_adapter_sdk import DatasourceAdapter, CapabilitySet
 
 @pytest.fixture

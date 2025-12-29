@@ -2,10 +2,10 @@
 import unittest
 from unittest.mock import MagicMock
 import json
-from nl2sql.core.nodes.planner.node import PlannerNode
-from nl2sql.core.nodes.schema.schemas import SchemaInfo, TableInfo, ColumnInfo
-from nl2sql.core.nodes.planner.schemas import PlanModel
-from nl2sql.core.schemas import GraphState
+from nl2sql.pipeline.nodes.planner.node import PlannerNode
+from nl2sql.pipeline.nodes.schema.schemas import SchemaInfo, TableInfo, ColumnInfo
+from nl2sql.pipeline.nodes.planner.schemas import PlanModel
+from nl2sql.pipeline.state import GraphState
 
 def test_planner_accepts_valid_columns():
     """Test that PlannerNode accepts valid plans."""
@@ -35,13 +35,13 @@ def test_planner_accepts_valid_columns():
     mock_llm.return_value = mock_plan
     
     # Needs registry mock now
-    from nl2sql.core.datasource_registry import DatasourceRegistry
+    from nl2sql.datasources import DatasourceRegistry
     mock_registry = MagicMock(spec=DatasourceRegistry)
     
     node = PlannerNode(registry=mock_registry, llm=mock_llm)
     
     # Mock Entity
-    from nl2sql.core.nodes.intent.schemas import Entity, EntityRole
+    from nl2sql.pipeline.nodes.intent.schemas import Entity, EntityRole
     entity = Entity(entity_id="e1", name="users", role=EntityRole.REFERENCE)
     
     state = GraphState(

@@ -60,6 +60,38 @@ We usage Docker Compose to spin up real database instances for verification.
    powershell -File scripts/test_integration.ps1
    ```
 
+## Usage
+
+### 1. Adapter Management
+
+Check which adapters are installed and active:
+
+```bash
+python -m nl2sql.cli --list-adapters
+```
+
+### 2. Indexing (Vector Store)
+
+Before running queries, you must index your datasources definitions. This populates the vector store with schema metadata and few-shot examples.
+
+```bash
+python -m nl2sql.cli --index --config configs/datasources.yaml
+```
+
+**Note**: Re-run this command whenever `configs/datasources.yaml` changes.
+
+### 2. Running Queries
+
+Execute a natural language query against the pipeline:
+
+```bash
+# Auto-route to the best datasource
+python -m nl2sql.cli --query "Show me all users"
+
+# Force a specific datasource
+python -m nl2sql.cli --id manufacturing_ops --query "List all machines"
+```
+
 ## Architecture
 
 The system uses a pluggable architecture where `core` interacts with databases solely through the `DatasourceAdapter` interface defined in `adapter-sdk`. Adapters are discovered dynamically at runtime via `importlib.metadata` entry points (`nl2sql.adapters`).
