@@ -4,14 +4,10 @@ from nl2sql.reporting import ConsolePresenter
 from nl2sql.services.vector_store import OrchestratorVectorStore
 from nl2sql.datasources import DatasourceRegistry, DatasourceProfile
 
-def run_indexing(profiles: Dict[str, Any], vector_store_path: str, vector_store: OrchestratorVectorStore, llm_registry: Any = None) -> None:
+def run_indexing(profiles: Dict[str, DatasourceProfile], vector_store_path: str, vector_store: OrchestratorVectorStore, llm_registry: Any = None) -> None:
     presenter = ConsolePresenter()
     presenter.print_indexing_start(vector_store_path)
     
-    # Initialize Registry
-    # Note: In CLI context we assume profiles are dicts or objects. 
-    # If they are dicts, we might need to convert. 
-    # But usually profiles passed here are from config loader.
     registry = DatasourceRegistry(profiles)
 
     with presenter.create_progress() as progress:
@@ -40,7 +36,6 @@ def run_indexing(profiles: Dict[str, Any], vector_store_path: str, vector_store:
         llm = None
         if llm_registry:
             try:
-                # Reuse intent_classifier_llm for enrichment prompts
                 llm = llm_registry.intent_classifier_llm()
             except Exception as e:
                 presenter.print_warning(f"Could not load LLM for enrichment: {e}")
