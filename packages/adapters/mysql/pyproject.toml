@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nl2sql-mysql"
+version = "0.1.0"
+description = "MySQL Adapter for NL2SQL using PyMySQL"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "nl2sql-adapter-sdk",
+    "SQLAlchemy>=2.0",
+    "pymysql>=1.1.0"
+]
+
+[project.entry-points."nl2sql.adapters"]
+mysql = "nl2sql_mysql.adapter:MysqlAdapter"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["nl2sql_mysql*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
