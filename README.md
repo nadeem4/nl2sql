@@ -10,6 +10,7 @@ This repository contains the `nl2sql` platform, a modular natural language to SQ
 
 - **[nl2sql-core](packages/core)**: The main orchestration engine, CLI, and LangGraph nodes.
 - **[nl2sql-adapter-sdk](packages/adapter-sdk)**: The public interface contract for database adapters.
+- **[nl2sql-adapter-sqlalchemy](packages/adapter-sqlalchemy)**: Base implementation for SQL-based adapters.
 
 ### Adapters
 
@@ -27,6 +28,7 @@ To install the core engine and specific adapters in editable mode:
 ```bash
 # Core & SDK
 pip install -e packages/adapter-sdk
+pip install -e packages/adapter-sqlalchemy
 pip install -e packages/core
 
 # Adapters (Install as needed)
