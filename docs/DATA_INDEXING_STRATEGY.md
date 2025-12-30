@@ -4,6 +4,23 @@
 
 Move beyond schema-only understanding by indexing structured knowledge about data to improve grounding, routing accuracy, hallucination prevention, and SQL planning — without exploding cost, latency, or security risk.
 
+---
+
+## CURRENT STATE vs. PROBLEM
+
+**Current Capability**: "Schema Awareness"
+
+- We index: Table Names, Column Names, Types, Nullability, Descriptions (Comments), Foreign Keys.
+- **Gap**: The model knows *structure* but is blind to *content*.
+
+**Why Change? (The "Data Blindness" Problem)**
+
+1. **Hallucinated Values**: User asks for "Gold Customers". Model queries `WHERE tier='Gold'`. Real data is `tier='premium_level_1'`. Query returns 0 rows.
+2. **Inefficient Routing**: Model searches `sales_archive` for "recent orders" because it doesn't know the table range ended in 2019.
+3. **Invalid Assumptions**: Model assumes a column is populated when it's actually 100% NULL in production.
+
+---
+
 ## Core Principle
 
 **Do NOT index full raw data blindly.**
