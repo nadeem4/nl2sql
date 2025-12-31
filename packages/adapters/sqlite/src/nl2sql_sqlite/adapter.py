@@ -5,8 +5,7 @@ from nl2sql_adapter_sdk import (
     QueryResult, 
     CostEstimate,
     DryRunResult,
-    QueryPlan,
-    ExecutionMetrics
+    QueryPlan
 )
 from nl2sql_sqlalchemy_adapter import BaseSQLAlchemyAdapter
 
@@ -22,9 +21,6 @@ class SqliteAdapter(BaseSQLAlchemyAdapter):
     def explain(self, query: str) -> QueryPlan:
          return QueryPlan(original_query=query, plan="EXPLAIN QUERY PLAN not fully parsed")
 
-    def metrics(self) -> ExecutionMetrics:
-        return ExecutionMetrics(execution_time_ms=0.0, rows_returned=0)
-
     def capabilities(self) -> CapabilitySet:
         return CapabilitySet(
             supports_cte=True,
@@ -34,15 +30,10 @@ class SqliteAdapter(BaseSQLAlchemyAdapter):
             supports_dry_run=False
         )
     
-    # fetch_schema, execute are handled by BaseSQLAlchemyAdapter
-
     def cost_estimate(self, query: str) -> CostEstimate:
-        # EXPLAIN QUERY PLAN is available but parsing is complex.
-        # Check if EXPLAIN is available
         try:
-             with self.engine.connect() as conn:
-                 conn.execute(text(f"EXPLAIN QUERY PLAN {query}"))
-             # If successful, at least syntax is valid
-             return CostEstimate(estimated_cost=1.0, estimated_rows=10) # Stub
+            with self.engine.connect() as conn:
+                conn.execute(text(f"EXPLAIN QUERY PLAN {query}"))
+            return CostEstimate(estimated_cost=1.0, estimated_rows=10) # Stub
         except Exception:
-             return CostEstimate(estimated_cost=-1.0, estimated_rows=0)
+            return CostEstimate(estimated_cost=-1.0, estimated_rows=0)

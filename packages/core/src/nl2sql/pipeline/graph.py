@@ -1,4 +1,4 @@
-from typing import Callable, Dict, Optional, Union, List
+from typing import Callable, Dict, Optional, Union, List, Any
 import json
 
 from langchain_core.runnables import Runnable
@@ -7,7 +7,7 @@ from langgraph.types import Send
 
 from nl2sql.datasources import DatasourceRegistry
 from nl2sql.pipeline.nodes.decomposer import DecomposerNode
-from nl2sql.pipeline.nodes.intent import IntentNode
+from nl2sql.pipeline.nodes.decomposer import DecomposerNode
 from nl2sql.pipeline.nodes.aggregator import AggregatorNode
 from nl2sql.pipeline.subgraphs.execution import build_execution_subgraph
 from nl2sql.pipeline.state import GraphState
@@ -28,13 +28,12 @@ def build_graph(
 ):
     graph = StateGraph(GraphState)
 
-    intent_node = IntentNode(llm_registry.intent_classifier_llm())
     decomposer_node = DecomposerNode(
         llm_registry.decomposer_llm(), registry, vector_store
     )
     aggregator_node = AggregatorNode(llm_registry.aggregator_llm())
 
-    execution_subgraph, agentic_execution_loop = build_execution_subgraph(
+    execution_subgraph = build_execution_subgraph(
         registry, llm_registry, vector_store, vector_store_path
     )
 
@@ -56,9 +55,8 @@ def build_graph(
             "datasource_id": selected_id,
             "sub_query": result.get("user_query"),
             "sql": result.get("sql_draft"),
-            "row_count": row_count,
-            "entity_ids": result.get("entity_ids", []),
             "reasoning": result.get("reasoning", {}),
+            "row_count": row_count,
         }
 
         return {
@@ -69,11 +67,10 @@ def build_graph(
 
     def report_missing_datasource(state: Dict):
         query = state.get("user_query", "Unknown Query")
-        entity_ids = state.get("entity_ids", [])
 
         message = (
             f"Execution skipped for query '{query}'. "
-            f"Missing datasource for entity_ids={entity_ids}"
+            f"Missing datasource assignment."
         )
 
         return {
@@ -88,14 +85,12 @@ def build_graph(
             "intermediate_results": [message],
         }
 
-    graph.add_node("intent", intent_node)
     graph.add_node("decomposer", decomposer_node)
     graph.add_node("execution_branch", execution_wrapper)
     graph.add_node("report_missing_datasource", report_missing_datasource)
     graph.add_node("aggregator", aggregator_node)
 
-    graph.set_entry_point("intent")
-    graph.add_edge("intent", "decomposer")
+    graph.set_entry_point("decomposer")
 
     def continue_to_subqueries(state: GraphState):
         branches = []
@@ -103,36 +98,24 @@ def build_graph(
         if not state.sub_queries:
             return []
 
-        entities_by_id = {}
-        if state.entities:
-            entities_by_id = {e.entity_id: e for e in state.entities}
-
         for sq in state.sub_queries:
-            entity_ids = sq.entity_ids
-            scoped_entities = [
-                entities_by_id[eid]
-                for eid in entity_ids
-                if eid in entities_by_id
-            ]
-
+            if sq.datasource_id is None:
+                branches.append(Send("report_missing_datasource", {"user_query": sq.query}))
+            
             payload = {
                 "user_query": sq.query,
                 "selected_datasource_id": sq.datasource_id,
-                "entity_ids": entity_ids,
-                "entities": scoped_entities,
                 "complexity": sq.complexity,
+                "relevant_tables": sq.relevant_tables,
                 "reasoning": [
                     {
-                        "node": f"execution_{sq.datasource_id}",
-                        "content": f"Executing for entity_ids={entity_ids}",
+                        "node": f"execution_{sq.datasource_id}_({sq.query})",
+                        "content": f"Executing sub-query ({sq.query}) for {sq.datasource_id}",
                     }
                 ],
             }
 
-            if sq.datasource_id:
-                branches.append(Send("execution_branch", payload))
-            else:
-                branches.append(Send("report_missing_datasource", payload))
+            branches.append(Send("execution_branch", payload))
 
         return branches
 
@@ -146,7 +129,7 @@ def build_graph(
     graph.add_edge("report_missing_datasource", "aggregator")
     graph.add_edge("aggregator", END)
 
-    return graph.compile(), execution_subgraph, agentic_execution_loop
+    return graph.compile()
 
 
 def run_with_graph(
@@ -158,8 +141,9 @@ def run_with_graph(
     vector_store: Optional[OrchestratorVectorStore] = None,
     vector_store_path: str = "",
     callbacks: Optional[List] = None,
+    user_context: Optional[Dict[str, Any]] = None,
 ) -> Dict:
-    graph, _, _ = build_graph(
+    graph = build_graph(
         registry,
         llm_registry,
         execute=execute,
@@ -171,6 +155,7 @@ def run_with_graph(
         user_query=user_query,
         selected_datasource_id=datasource_id,
         validation={"capabilities": "generic"},
+        user_context=user_context or {},
     )
 
     return graph.invoke(

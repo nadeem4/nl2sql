@@ -1,4 +1,4 @@
-# NL2SQL Monorepo
+# NL2SQL
 
 ## Overview
 
@@ -43,7 +43,7 @@ pip install -e packages/adapters/sqlite
 #### Unit Tests (Core)
 
 ```bash
-pytest packages/core/tests/unit
+python -m pytest packages/core/tests/unit
 ```
 
 #### Integration Tests (Docker)
@@ -123,3 +123,16 @@ graph TD
     StateAggregation --> Aggregator["Aggregator (Reduce)"]
     Aggregator --> FinalAnswer
 ```
+
+## Security & Authorization
+
+The system implements a "Defense in Depth" strategy for RBAC (Role-Based Access Control):
+
+1. **Metadata Filtering (Retrieval Layer)**:
+    - The retrieval engine filters the vector search space based on the user's `allowed_datasources`.
+    - *Result*: The LLM never sees schema tokens for unauthorized databases, preventing hallucinations.
+
+2. **Policy Validation (Validator Node)**:
+    - Fine-grained table-level access control.
+    - The Validator checks every table in the generated plan against the user's `allowed_tables` whitelist.
+    - *Result*: Even if a query is generated, execution is blocked if it touches restricted data.

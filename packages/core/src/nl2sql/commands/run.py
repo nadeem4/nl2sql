@@ -31,6 +31,21 @@ def _run_simple_mode(args: argparse.Namespace, query: str, datasource_registry: 
     presenter.start_interactive_status("[bold green]Thinking...[/bold green]")
     
     start_time = time.perf_counter()
+    
+    # Load User Context
+    user_context = {}
+    try:
+        import pathlib
+        users_path = pathlib.Path("users.json")
+        if users_path.exists():
+            with open(users_path, "r") as f:
+                users_db = json.load(f)
+                user_context = users_db.get(args.user, {})
+                if not user_context and args.user != "admin":
+                    presenter.print_error(f"User '{args.user}' not found in users.json. Using empty context.")
+    except Exception as e:
+        presenter.print_error(f"Failed to load user context: {e}")
+
     try:
         final_state = run_with_graph(
             registry=datasource_registry,
@@ -40,7 +55,8 @@ def _run_simple_mode(args: argparse.Namespace, query: str, datasource_registry: 
             execute=not args.no_exec, 
             vector_store=vector_store,
             vector_store_path=args.vector_store,
-            callbacks=[monitor]
+            callbacks=[monitor],
+            user_context=user_context
         )
     except Exception as e:
         import traceback

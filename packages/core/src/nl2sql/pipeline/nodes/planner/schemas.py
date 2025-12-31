@@ -53,10 +53,6 @@ class GroupBySpec(BaseModel):
 class PlanModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    entity_ids: List[str] = Field(
-        description="Entity IDs from the Intent node that this plan satisfies."
-    )
-
     tables: List[TableRef] = Field(default_factory=list)
     joins: List[JoinSpec] = Field(default_factory=list)
     filters: List[FilterSpec] = Field(default_factory=list)

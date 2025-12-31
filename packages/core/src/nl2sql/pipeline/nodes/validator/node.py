@@ -7,7 +7,6 @@ from datetime import datetime
 from nl2sql.pipeline.state import GraphState
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.pipeline.nodes.planner.schemas import PlanModel
-from nl2sql.pipeline.nodes.schema.schemas import SchemaInfo
 from nl2sql.datasources import DatasourceRegistry
 from nl2sql.common.logger import get_logger
 
@@ -147,6 +146,235 @@ class ValidatorNode:
         for h in plan.having:
             check(h.expr, h.value)
 
+    def _validate_policy(self, state: GraphState, plan: PlanModel) -> list[PipelineError]:
+        """
+        Layer 1.5: Policy/AuthZ checks.
+        Validates if the user is allowed to access the tables in the plan.
+        """
+        node_name = "validator"
+        errors: list[PipelineError] = []
+        
+        user_ctx = state.user_context or {}
+        allowed_tables = user_ctx.get("allowed_tables", [])
+        
+        # If Wildcard "*", allow everything (Admin)
+        if "*" in allowed_tables:
+            return []
+            
+        # Check every table in the plan
+        for t in plan.tables:
+            # We check strict equality for now. 
+            # In future, might need more robust matching (schema.table vs table).
+            if t.name not in allowed_tables:
+                 user_role = user_ctx.get("role", "unknown")
+                 errors.append(
+                    PipelineError(
+                        node=node_name,
+                        message=f"Access Denied: User role '{user_role}' is not authorized to access table '{t.name}'.",
+                        severity=ErrorSeverity.CRITICAL,
+                        error_code=ErrorCode.SECURITY_VIOLATION,
+                    )
+                )
+        return errors
+
+    def _validate_static_analysis(self, state: GraphState, plan: PlanModel) -> list[PipelineError]:
+        """
+        Layer 1: Static checks (Schema existence, Aliases, Types, SQL Logic).
+        """
+        node_name = "validator"
+        errors: list[PipelineError] = []
+
+        if plan.query_type != "READ":
+            errors.append(
+                PipelineError(
+                    node=node_name,
+                    message=f"Query type '{plan.query_type}' not allowed.",
+                    severity=ErrorSeverity.CRITICAL,
+                    error_code=ErrorCode.SECURITY_VIOLATION,
+                )
+            )
+            return errors
+
+        schema_cols: Set[str] = set()
+        plan_aliases: Set[str] = set()
+        plan_tables: Set[str] = set()
+
+        for t in plan.tables:
+            plan_aliases.add(t.alias)
+            plan_tables.add(t.name)
+
+            found = False
+            for st in state.schema_info.tables:
+                if st.name == t.name and st.alias == t.alias:
+                    for c in st.columns:
+                        schema_cols.add(c.name)
+                    found = True
+                    break
+
+            if not found:
+                errors.append(
+                    PipelineError(
+                        node=node_name,
+                        message=f"Table '{t.name}' with alias '{t.alias}' not found in schema.",
+                        severity=ErrorSeverity.ERROR,
+                        error_code=ErrorCode.TABLE_NOT_FOUND,
+                    )
+                )
+
+        for col in plan.select_columns:
+            self.validate_expr_ref(
+                col.expr,
+                schema_cols,
+                plan_aliases,
+                errors,
+                allow_derived=bool(col.is_derived or self.is_aggregation(col.expr)),
+            )
+
+        for flt in plan.filters:
+            if flt.column.alias:
+                 errors.append(
+                    PipelineError(
+                        node=node_name,
+                        message=f"Aliases are only allowed in 'select_columns', not in filters (found '{flt.column.alias}').",
+                        severity=ErrorSeverity.WARNING,
+                        error_code=ErrorCode.INVALID_ALIAS_USAGE,
+                    )
+                )
+            self.validate_expr_ref(
+                flt.column.expr,
+                schema_cols,
+                plan_aliases,
+                errors,
+                allow_derived=False,
+            )
+
+        for gb in plan.group_by:
+            if gb.alias:
+                 errors.append(
+                    PipelineError(
+                        node=node_name,
+                        message=f"Aliases are only allowed in 'select_columns', not in group_by (found '{gb.alias}').",
+                        severity=ErrorSeverity.WARNING,
+                        error_code=ErrorCode.INVALID_ALIAS_USAGE,
+                    )
+                )
+            self.validate_expr_ref(
+                gb.expr,
+                schema_cols,
+                plan_aliases,
+                errors,
+                allow_derived=False,
+            )
+
+        for ob in plan.order_by:
+            if ob.column.alias:
+                 errors.append(
+                    PipelineError(
+                        node=node_name,
+                        message=f"Aliases are only allowed in 'select_columns', not in order_by (found '{ob.column.alias}').",
+                        severity=ErrorSeverity.WARNING,
+                        error_code=ErrorCode.INVALID_ALIAS_USAGE,
+                    )
+                )
+            self.validate_expr_ref(
+                ob.column.expr,
+                schema_cols,
+                plan_aliases,
+                errors,
+                allow_derived=False,
+            )
+
+        for j in plan.joins:
+            if j.left not in plan_tables and j.left not in plan_aliases:
+                errors.append(
+                    PipelineError(
+                        node=node_name,
+                        message=f"Join left '{j.left}' not declared in plan tables.",
+                        severity=ErrorSeverity.WARNING,
+                        error_code=ErrorCode.JOIN_TABLE_NOT_IN_PLAN,
+                    )
+                )
+            if j.right not in plan_tables and j.right not in plan_aliases:
+                errors.append(
+                    PipelineError(
+                        node=node_name,
+                        message=f"Join right '{j.right}' not declared in plan tables.",
+                        severity=ErrorSeverity.WARNING,
+                        error_code=ErrorCode.JOIN_TABLE_NOT_IN_PLAN,
+                    )
+                )
+            if not j.on:
+                errors.append(
+                    PipelineError(
+                        node=node_name,
+                        message=f"Join between '{j.left}' and '{j.right}' missing ON clause.",
+                        severity=ErrorSeverity.WARNING,
+                        error_code=ErrorCode.JOIN_MISSING_ON_CLAUSE,
+                    )
+                )
+
+        self.validate_aggregations(plan, errors)
+
+        if state.selected_datasource_id:
+            self.validate_data_types(
+                plan,
+                state.schema_info,
+                state.selected_datasource_id,
+                errors,
+            )
+
+        return errors
+
+    def _validate_semantic_correctness(self, state: GraphState) -> list[PipelineError]:
+        """
+        Layer 2: Semantic checks (Dry Run against DB).
+        """
+        errors = []
+        if hasattr(state, "generated_sql") and state.generated_sql:
+             try:
+                 adapter = self.registry.get_adapter(state.selected_datasource_id)
+                 dry_result = adapter.dry_run(state.generated_sql)
+                 if not dry_result.is_valid:
+                     errors.append(
+                         PipelineError(
+                             node="validator",
+                             message=f"Dry Run Failed: {dry_result.error_message}",
+                             severity=ErrorSeverity.ERROR,
+                             error_code=ErrorCode.EXECUTION_ERROR
+                         )
+                     )
+             except Exception as e:
+                 logger.warning(f"Dry run skipped or failed: {e}")
+        return errors
+
+    def _validate_performance(self, state: GraphState) -> list[PipelineError]:
+        """
+        Layer 3: Performance checks (Cost Estimate & Explain).
+        """
+        errors = []
+        if hasattr(state, "generated_sql") and state.generated_sql:
+             try:
+                 adapter = self.registry.get_adapter(state.selected_datasource_id)
+                 
+                 # Cost Check
+                 cost = adapter.cost_estimate(state.generated_sql)
+                 if cost.estimated_rows > 1_000_000:
+                     # Fetch Explain plan for context
+                     plan = adapter.explain(state.generated_sql)
+                     plan_snippet = plan.plan_text[:500] + "..." if len(plan.plan_text) > 500 else plan.plan_text
+                     
+                     errors.append(
+                         PipelineError(
+                             node="validator",
+                             message=f"Performance Warning: Query estimated to scan {cost.estimated_rows} rows (> 1M limit). Plan: {plan_snippet}",
+                             severity=ErrorSeverity.WARNING, # Soft fail
+                             error_code=ErrorCode.PERFORMANCE_WARNING
+                         )
+                     )
+             except Exception as e:
+                 logger.warning(f"Performance check skipped or failed: {e}")
+        return errors
+
     def __call__(self, state: GraphState) -> Dict[str, Any]:
         node_name = "validator"
         errors: list[PipelineError] = []
@@ -168,164 +396,29 @@ class ValidatorNode:
 
             plan = PlanModel(**state.plan)
 
-            state_entity_ids = []
-            if getattr(state, "entity_ids", None):
-                state_entity_ids = list(state.entity_ids)
-            elif getattr(state, "entities", None):
-                state_entity_ids = [e.entity_id for e in state.entities]
+            # 1. Static Analysis
+            static_errors = self._validate_static_analysis(state, plan)
+            errors.extend(static_errors)
+            
+            # 1.5 Policy Check (AuthZ)
+            policy_errors = self._validate_policy(state, plan)
+            errors.extend(policy_errors)
 
-            if state_entity_ids:
-                missing = [e for e in state_entity_ids if e not in plan.entity_ids]
-                if missing:
-                    errors.append(
-                        PipelineError(
-                            node=node_name,
-                            message=f"Plan missing required entity_ids={missing}.",
-                            severity=ErrorSeverity.ERROR,
-                            error_code=ErrorCode.INVALID_PLAN_STRUCTURE,
-                        )
-                    )
+            # Only proceed if NO Critical/Error issues
+            has_blocking_errors = any(e.severity in (ErrorSeverity.CRITICAL, ErrorSeverity.ERROR) for e in errors)
+            
+            if not has_blocking_errors:
+                # 2. Semantic Analysis (Dry Run)
+                semantic_errors = self._validate_semantic_correctness(state)
+                errors.extend(semantic_errors)
+                
+                # Re-check blocking errors after dry run
+                has_blocking_errors = any(e.severity in (ErrorSeverity.CRITICAL, ErrorSeverity.ERROR) for e in errors)
 
-            if plan.query_type != "READ":
-                errors.append(
-                    PipelineError(
-                        node=node_name,
-                        message=f"Query type '{plan.query_type}' not allowed.",
-                        severity=ErrorSeverity.CRITICAL,
-                        error_code=ErrorCode.SECURITY_VIOLATION,
-                    )
-                )
-                return {"errors": errors}
-
-            schema_cols: Set[str] = set()
-            plan_aliases: Set[str] = set()
-            plan_tables: Set[str] = set()
-
-            for t in plan.tables:
-                plan_aliases.add(t.alias)
-                plan_tables.add(t.name)
-
-                found = False
-                for st in state.schema_info.tables:
-                    if st.name == t.name and st.alias == t.alias:
-                        for c in st.columns:
-                            schema_cols.add(c.name)
-                        found = True
-                        break
-
-                if not found:
-                    errors.append(
-                        PipelineError(
-                            node=node_name,
-                            message=f"Table '{t.name}' with alias '{t.alias}' not found in schema.",
-                            severity=ErrorSeverity.ERROR,
-                            error_code=ErrorCode.TABLE_NOT_FOUND,
-                        )
-                    )
-
-            for col in plan.select_columns:
-                self.validate_expr_ref(
-                    col.expr,
-                    schema_cols,
-                    plan_aliases,
-                    errors,
-                    allow_derived=bool(col.is_derived or self.is_aggregation(col.expr)),
-                )
-
-            for flt in plan.filters:
-                if flt.column.alias:
-                     errors.append(
-                        PipelineError(
-                            node=node_name,
-                            message=f"Aliases are only allowed in 'select_columns', not in filters (found '{flt.column.alias}').",
-                            severity=ErrorSeverity.WARNING,
-                            error_code=ErrorCode.INVALID_ALIAS_USAGE,
-                        )
-                    )
-                self.validate_expr_ref(
-                    flt.column.expr,
-                    schema_cols,
-                    plan_aliases,
-                    errors,
-                    allow_derived=False,
-                )
-
-            for gb in plan.group_by:
-                # Group By expressions usually shouldn't define new aliases, but referencing select aliases is DB dependent.
-                # Here we assume strict: no defining aliases.
-                if gb.alias:
-                     errors.append(
-                        PipelineError(
-                            node=node_name,
-                            message=f"Aliases are only allowed in 'select_columns', not in group_by (found '{gb.alias}').",
-                            severity=ErrorSeverity.WARNING,
-                            error_code=ErrorCode.INVALID_ALIAS_USAGE,
-                        )
-                    )
-                self.validate_expr_ref(
-                    gb.expr,
-                    schema_cols,
-                    plan_aliases,
-                    errors,
-                    allow_derived=False,
-                )
-
-            for ob in plan.order_by:
-                if ob.column.alias:
-                     errors.append(
-                        PipelineError(
-                            node=node_name,
-                            message=f"Aliases are only allowed in 'select_columns', not in order_by (found '{ob.column.alias}').",
-                            severity=ErrorSeverity.WARNING,
-                            error_code=ErrorCode.INVALID_ALIAS_USAGE,
-                        )
-                    )
-                self.validate_expr_ref(
-                    ob.column.expr,
-                    schema_cols,
-                    plan_aliases,
-                    errors,
-                    allow_derived=False,
-                )
-
-            for j in plan.joins:
-                if j.left not in plan_tables and j.left not in plan_aliases:
-                    errors.append(
-                        PipelineError(
-                            node=node_name,
-                            message=f"Join left '{j.left}' not declared in plan tables.",
-                            severity=ErrorSeverity.WARNING,
-                            error_code=ErrorCode.JOIN_TABLE_NOT_IN_PLAN,
-                        )
-                    )
-                if j.right not in plan_tables and j.right not in plan_aliases:
-                    errors.append(
-                        PipelineError(
-                            node=node_name,
-                            message=f"Join right '{j.right}' not declared in plan tables.",
-                            severity=ErrorSeverity.WARNING,
-                            error_code=ErrorCode.JOIN_TABLE_NOT_IN_PLAN,
-                        )
-                    )
-                if not j.on:
-                    errors.append(
-                        PipelineError(
-                            node=node_name,
-                            message=f"Join between '{j.left}' and '{j.right}' missing ON clause.",
-                            severity=ErrorSeverity.WARNING,
-                            error_code=ErrorCode.JOIN_MISSING_ON_CLAUSE,
-                        )
-                    )
-
-            self.validate_aggregations(plan, errors)
-
-            if state.selected_datasource_id:
-                self.validate_data_types(
-                    plan,
-                    state.schema_info,
-                    state.selected_datasource_id,
-                    errors,
-                )
+                if not has_blocking_errors:
+                    # 3. Performance Analysis (Cost)
+                    perf_errors = self._validate_performance(state)
+                    errors.extend(perf_errors)
 
             if errors:
                 return {
@@ -343,7 +436,7 @@ class ValidatorNode:
                 "reasoning": [
                     {
                         "node": node_name,
-                        "content": "Validation successful. Plan is schema-safe and entity-complete.",
+                        "content": "Validation successful. Plan is Valid, Safe, and Optimized.",
                     }
                 ],
             }

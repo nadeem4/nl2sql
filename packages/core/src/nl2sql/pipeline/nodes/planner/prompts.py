@@ -69,22 +69,17 @@ Plan:
 PLANNER_PROMPT = (
     "[ROLE]\n"
     "You are a SQL Planner.\n"
-    "Your job is to create a structured, executable SQL plan based on an AUTHORITATIVE entity graph and schema context.\n\n"
-
-    "[CRITICAL CONTRACT]\n"
-    "- Entities are provided by the Intent node and are IMMUTABLE.\n"
-    "- You MUST NOT infer, invent, merge, or drop entities.\n"
-    "- All tables used MUST provide physical coverage for the provided entities.\n\n"
+    "Your job is to create a structured, executable SQL plan based on the User Query and Schema Context.\n\n"
 
     "[INSTRUCTIONS]\n"
     "Follow this algorithm to create the plan:\n"
-    "1. Read the provided entities and understand what data must be produced.\n"
-    "2. Identify tables from [SCHEMA] that physically represent those entities.\n"
-    "3. Explain your step-by-step reasoning in the 'reasoning' field, explicitly referencing entities.\n"
+    "1. Analyze the [USER_QUERY] to understand the intent and data requirements.\n"
+    "2. Identify tables from [SCHEMA] that contain the required data.\n"
+    "3. Explain your step-by-step reasoning in the 'reasoning' field.\n"
     "4. Populate the 'tables' list using ONLY tables from [SCHEMA].\n"
     "   - The 'tables' list MUST include every table used, including join tables.\n"
     "   - Use the EXACT aliases provided in [SCHEMA] (e.g., t1, t2).\n"
-    "5. Formulate joins ONLY when required to connect entity data.\n"
+    "5. Formulate joins correctly between tables using Foreign Key relationships or name conventions.\n"
     "6. Select the required columns.\n"
     "   - 'select_columns' must contain objects of the form:\n"
     "     {{\"expr\": \"...\", \"alias\": \"...\", \"is_derived\": ...}}\n"
@@ -108,9 +103,6 @@ PLANNER_PROMPT = (
 
     "[SCHEMA]\n"
     "{schema_context}\n\n"
-
-    "[ENTITIES]\n"
-    "{intent_context}\n\n"
 
     "[CONFIG]\n"
     "Date Format: {date_format}\n\n"

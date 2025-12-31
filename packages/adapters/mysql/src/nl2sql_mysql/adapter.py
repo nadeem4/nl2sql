@@ -6,40 +6,53 @@ from nl2sql_adapter_sdk import (
     CostEstimate,
     DryRunResult,
     QueryPlan,
-    ExecutionMetrics
+    QueryPlan,
+    Capability
 )
 from nl2sql_sqlalchemy_adapter import BaseSQLAlchemyAdapter
 
 class MysqlAdapter(BaseSQLAlchemyAdapter):
-    def dry_run(self, query: str) -> DryRunResult:
+
+    def dry_run(self, sql: str) -> DryRunResult:
         try:
             with self.engine.connect() as conn:
-                conn.execute(text(f"EXPLAIN {query}"))
-            return DryRunResult(valid=True, error=None)
+                trans = conn.begin()
+                conn.execute(text(sql))
+                trans.rollback()
+            return DryRunResult(is_valid=True)
         except Exception as e:
-            return DryRunResult(valid=False, error=str(e))
+            return DryRunResult(is_valid=False, error_message=str(e))
 
-    def explain(self, query: str) -> QueryPlan:
-         try:
-             with self.engine.connect() as conn:
-                 # MySQL JSON format
-                 res = conn.execute(text(f"EXPLAIN FORMAT=JSON {query}"))
-                 return QueryPlan(original_query=query, plan=str(res.fetchone()[0]))
-         except Exception:
-             return QueryPlan(original_query=query, plan="Could not retrieve plan")
+    def explain(self, sql: str) -> QueryPlan:
+        try:
+            with self.engine.connect() as conn:
+                res = conn.execute(text(f"EXPLAIN FORMAT=JSON {sql}")).scalar()
+                return QueryPlan(plan_text=str(res))
+        except Exception as e:
+            return QueryPlan(plan_text=f"Error: {e}")
 
-    def metrics(self) -> ExecutionMetrics:
-        return ExecutionMetrics(execution_time_ms=0.0, rows_returned=0)
+
 
     def capabilities(self) -> CapabilitySet:
-        return CapabilitySet(
-            supports_cte=True,
-            supports_window_functions=True,
-            supports_limit_offset=True,
-            supports_multi_db_join=False,
-            supports_dry_run=False
-        )
+        return CapabilitySet({
+            Capability.CTE,
+            Capability.WINDOW_FUNCTIONS,
+            Capability.EXPLAIN
+        })
 
-    def cost_estimate(self, query: str) -> CostEstimate:
-        # EXPLAIN FORMAT=JSON could work for MySQL
-        return CostEstimate(estimated_cost=10.0, estimated_rows=100) # Stub
+    def cost_estimate(self, sql: str) -> CostEstimate:
+        import json
+        try:
+            with self.engine.connect() as conn:
+                res = conn.execute(text(f"EXPLAIN FORMAT=JSON {sql}")).scalar()
+                if res:
+                    data = json.loads(res)
+                    # structure: { "query_block": { "cost_info": { "query_cost": "1.00" } } }
+                    cost_info = data.get('query_block', {}).get('cost_info', {})
+                    return CostEstimate(
+                        estimated_cost=float(cost_info.get('query_cost', 0.0)),
+                        estimated_rows=0 # MySQL doesn't give a single total rows estimate easily
+                    )
+        except Exception:
+             pass
+        return CostEstimate(estimated_cost=0.0, estimated_rows=0)

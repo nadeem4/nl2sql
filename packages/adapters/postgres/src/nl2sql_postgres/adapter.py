@@ -5,8 +5,8 @@ from nl2sql_adapter_sdk import (
     DryRunResult,
     QueryPlan,
     CostEstimate,
-    ExecutionMetrics,
-    ForeignKey
+    ForeignKey,
+    Capability # Added Capability import
 )
 from nl2sql_sqlalchemy_adapter import BaseSQLAlchemyAdapter
 
@@ -14,15 +14,14 @@ class PostgresAdapter(BaseSQLAlchemyAdapter):
 
 
     def capabilities(self) -> CapabilitySet:
-        return CapabilitySet(
-            supports_cte=True,
-            supports_window_functions=True,
-            supports_limit_offset=True,
-            supports_dry_run=True  # via EXPLAIN
-        )
+        return CapabilitySet({
+            Capability.CTE,
+            Capability.WINDOW_FUNCTIONS,
+            Capability.RETURNING,
+            Capability.EXPLAIN
+        })
 
     def dry_run(self, sql: str) -> DryRunResult:
-        # Simple dry run via EXPLAIN
         try:
             self.execute(f"EXPLAIN {sql}")
             return DryRunResult(is_valid=True)
@@ -33,12 +32,22 @@ class PostgresAdapter(BaseSQLAlchemyAdapter):
         try:
             res = self.execute(f"EXPLAIN (FORMAT JSON) {sql}")
             return QueryPlan(plan_text=str(res.rows))
-        except Exception:
-            # Fallback
+        except Exception:            # Fallback
             return QueryPlan(plan_text="Could not retrieve plan")
 
     def cost_estimate(self, sql: str) -> CostEstimate:
-        return CostEstimate(estimated_cost=0.0, estimated_rows=0)
+        try:
+            res = self.execute(f"EXPLAIN (FORMAT JSON) {sql}")
+            if res.rows and res.rows[0]:
+                plan_data = res.rows[0][0] # The JSON object/list
+                if isinstance(plan_data, list) and len(plan_data) > 0:
+                    root = plan_data[0].get('Plan', {})
+                    return CostEstimate(
+                        estimated_cost=float(root.get('Total Cost', 0.0)),
+                        estimated_rows=int(root.get('Plan Rows', 0))
+                    )
+            return CostEstimate(estimated_cost=0.0, estimated_rows=0)
+        except Exception:
+            return CostEstimate(estimated_cost=0.0, estimated_rows=0)
 
-    def metrics(self) -> ExecutionMetrics:
-        return ExecutionMetrics(execution_ms=0, rows_returned=0, engine="postgres")
+

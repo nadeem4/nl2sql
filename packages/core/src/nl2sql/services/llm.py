@@ -180,11 +180,6 @@ class LLMRegistry:
         llm = self._base_llm("aggregator")
         return self._wrap_structured_usage(llm,  AggregatedResponse)
 
-    def intent_classifier_llm(self) -> LLMCallable:
-        """Returns the LLM callable for the Intent Classifier."""
-        from nl2sql.pipeline.nodes.intent.schemas import IntentResponse
-        llm = self._base_llm("intent_classifier")
-        return llm.with_structured_output(IntentResponse)
 
     def direct_sql_llm(self) -> LLMCallable:
         """Returns the LLM callable for the Direct SQL agent."""
@@ -198,7 +193,6 @@ class LLMRegistry:
             "summarizer": self.summarizer_llm(),
             "decomposer": self.decomposer_llm(),
             "aggregator": self.aggregator_llm(),
-            "intent_classifier": self.intent_classifier_llm(),
             "direct_sql": self.direct_sql_llm(),
             "direct_sql": self.direct_sql_llm(),
             "_default": self.decomposer_llm(),

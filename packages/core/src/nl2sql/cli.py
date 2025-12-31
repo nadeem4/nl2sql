@@ -31,6 +31,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--verbose", action="store_true", help="Show reasoning thoughts and step-by-step info")
     parser.add_argument("--debug", action="store_true", help="Enable full debug mode (outputs, logs, traces)")
     parser.add_argument("--show-perf", action="store_true", help="Display performance metrics (tokens/latency)")
+    parser.add_argument("--user", type=str, default="admin", help="User persona for AuthZ (default: admin)")
 
     
     # Benchmarking args

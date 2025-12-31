@@ -49,26 +49,10 @@ class PlannerNode:
                     ]
                 }
 
-            if not state.entities:
-                return {
-                    "errors": [
-                        PipelineError(
-                            node=node_name,
-                            message="Missing entities from Intent node.",
-                            severity=ErrorSeverity.CRITICAL,
-                            error_code=ErrorCode.INVALID_STATE,
-                        )
-                    ]
-                }
-
             schema_context = ""
             if state.schema_info:
                 schema_context = state.schema_info.model_dump_json(indent=2)
-
-            intent_context = json.dumps(
-                [e.model_dump() for e in state.entities], indent=2
-            )
-
+            
             feedback = ""
             if state.errors:
                 error_msgs = [e.message for e in state.errors]
@@ -88,7 +72,6 @@ class PlannerNode:
             plan_model: PlanModel = self.chain.invoke(
                 {
                     "schema_context": schema_context,
-                    "intent_context": intent_context,
                     "examples": PLANNER_EXAMPLES,
                     "feedback": feedback,
                     "user_query": state.user_query,
@@ -101,7 +84,6 @@ class PlannerNode:
             reasoning = plan_model.reasoning or "No reasoning provided."
             planner_thoughts = [
                 f"Reasoning: {reasoning}",
-                f"Entities: {plan_model.entity_ids}",
                 f"Tables: {', '.join([t.name for t in plan_model.tables])}",
             ]
 

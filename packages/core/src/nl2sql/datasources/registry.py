@@ -61,8 +61,8 @@ class DatasourceRegistry:
         engine_type = profile.engine.lower()
         
         if engine_type in available_adapters:
-             AdapterCls = available_adapters[engine_type]
-             return AdapterCls(profile.sqlalchemy_url)
+            AdapterCls = available_adapters[engine_type]
+            return AdapterCls(profile.sqlalchemy_url, datasource_id=profile.id, datasource_engine_type=profile.engine)
 
         raise ValueError(
             f"No adapter found for engine type: '{engine_type}'. "

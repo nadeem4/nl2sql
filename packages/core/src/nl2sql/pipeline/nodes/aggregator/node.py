@@ -90,12 +90,18 @@ class AggregatorNode:
         intermediate_results = state.intermediate_results or []
         node_name = "aggregator"
         try:
-            is_fast_path_type = state.response_type in ["tabular", "kpi"]
+            # Fast Path Logic: 
+            # If user wants raw 'data' AND there's only one result -> Pass through.
+            # If user wants 'synthesis' -> Use LLM.
+            
+            output_mode = getattr(state, "output_mode", "synthesis")
+            is_simple_retrieval = getattr(state, "complexity", "complex") == "simple"
 
-            if len(intermediate_results) == 1 and not state.errors and is_fast_path_type:
+            # True Fast Lane: Simple retrieval + Data output requested = No LLM needed
+            if len(intermediate_results) == 1 and not state.errors and output_mode == "data":
                 return {
                     "final_answer": intermediate_results[0],
-                    "reasoning": [{"node": "aggregator", "content": f"Fast path: {state.response_type} result used directly."}]
+                    "reasoning": [{"node": "aggregator", "content": "Fast path: Raw data result passed through (output_mode='data')."}]
                 }
 
             final_answer = self._display_result_with_llm(state)

@@ -6,7 +6,7 @@ from .generator.node import GeneratorNode
 from .executor.node import ExecutorNode
 from .summarizer.node import SummarizerNode
 from .validator.node import ValidatorNode
-from .schema.node import SchemaNode
+
 
 __all__ = [
     "PlannerNode", 
@@ -15,7 +15,7 @@ __all__ = [
     "SummarizerNode", 
     "DecomposerNode", 
     "ValidatorNode",
-    "SchemaNode",
+
     "AggregatorNode",
     "DirectSQLNode"
 ]
