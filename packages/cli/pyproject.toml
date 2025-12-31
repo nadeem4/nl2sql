@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nl2sql-cli"
+version = "0.1.0"
+description = "Unified CLI for the NL2SQL Ecosystem"
+authors = [{name = "Antigravity Team"}]
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "typer[all]>=0.9.0",
+    "rich>=13.0.0",
+    "shellingham>=1.5.0",
+    "shellingham>=1.5.0",
+]
+
+[project.scripts]
+nl2sql = "nl2sql_cli.main:app"
+
+[tool.setuptools.packages.find]
+where = ["src"]
