@@ -123,6 +123,62 @@ graph TD
     Aggregator --> FinalAnswer
 ```
 
+## Configuration Reference
+
+The system behavior is controlled by three primary YAML/JSON files.
+
+### 1. `datasources.yaml`
+
+Defines the database connections and their capabilities.
+
+```yaml
+- id: manufacturing_ops
+  engine: postgres
+  sqlalchemy_url: "postgresql+psycopg2://user:pass@localhost:5432/ops"
+  description: "Operational data for tracking employees and machines."
+  feature_flags:
+    supports_dry_run: true
+    supports_estimated_cost: true
+
+- id: manufacturing_ref
+  engine: sqlite
+  sqlalchemy_url: "sqlite:///./data/manufacturing.db"
+```
+
+### 2. `llm_config.yaml`
+
+Configures the Large Language Model providers for each agent.
+
+```yaml
+default:
+  provider: openai
+  model: gpt-4o-mini
+  temperature: 0.0
+
+agents:
+  planner:
+    model: gpt-4o
+    temperature: 0.1
+  
+  decomposer:
+    model: gpt-4o
+    temperature: 0.0
+```
+
+### 3. `users.json`
+
+Defines user context and RBAC permissions.
+
+```json
+{
+  "default_user": {
+    "id": "u_123",
+    "role": "analyst",
+    "allowed_datasources": ["manufacturing_ops", "manufacturing_ref"]
+  }
+}
+```
+
 ## Security & Authorization
 
 The system implements a "Defense in Depth" strategy for RBAC (Role-Based Access Control):

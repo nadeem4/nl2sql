@@ -204,7 +204,7 @@ class ValidatorNode:
             plan_tables.add(t.name)
 
             found = False
-            for st in state.schema_info.tables:
+            for st in state.relevant_tables:
                 if st.name == t.name and st.alias == t.alias:
                     for c in st.columns:
                         schema_cols.add(c.name)
@@ -318,7 +318,7 @@ class ValidatorNode:
         if state.selected_datasource_id:
             self.validate_data_types(
                 plan,
-                state.schema_info,
+                state.relevant_tables,
                 state.selected_datasource_id,
                 errors,
             )
@@ -391,7 +391,7 @@ class ValidatorNode:
                 )
                 return {"errors": errors}
 
-            if not state.schema_info:
+            if not state.relevant_tables:
                 return {}
 
             plan = PlanModel(**state.plan)
