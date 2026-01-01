@@ -14,6 +14,25 @@ This package (`nl2sql-mssql`) provides Microsoft SQL Server support for the NL2S
 pip install -e packages/adapters/mssql
 ```
 
+## ⚠️ Prerequisites (ODBC Driver)
+
+This adapter requires the **ODBC Driver 17 for SQL Server**.
+
+### Windows
+
+Download and install from [Microsoft](https://learn.microsoft.com/en-us/sql/connect/odbc/download-odbc-driver-for-sql-server).
+
+### Linux (Ubuntu/Debian)
+
+```bash
+sudo su
+curl https://packages.microsoft.com/keys/microsoft.asc | apt-key add -
+curl https://packages.microsoft.com/config/ubuntu/$(lsb_release -rs)/prod.list > /etc/apt/sources.list.d/mssql-release.list
+exit
+sudo apt-get update
+sudo ACCEPT_EULA=Y apt-get install -y msodbcsql17
+```
+
 ## ⚙️ Configuration
 
 In your `datasources.yaml`:

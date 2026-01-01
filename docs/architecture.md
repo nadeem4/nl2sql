@@ -4,17 +4,16 @@ This document provides a comprehensive technical overview of the NL2SQL system c
 
 ## 1. High-Level Architecture
 
-The system operates on an **Intent-Driven Map-Reduce** paradigm, now enhanced with a **modular plugin system** for database connectivity.
+The system operates on an **Semantic-Driven Map-Reduce** paradigm, now enhanced with a **modular plugin system** for database connectivity.
 
 ```mermaid
 graph TD
-    UserQuery["User Query"] --> Intent["Intent Node"]
-    Intent --> Decomposer["Decomposer Node"]
+    UserQuery["User Query"] --> Semantic["Semantic Analysis Node"]
+    Semantic --> Decomposer["Decomposer Node"]
     Decomposer -- "Splits Query" --> MapBranching["Fan Out (Map)"]
 
     subgraph ExecutionBranch ["Execution Branch (Parallel)"]
-        MapBranching --> Schema["Schema Node"]
-        Schema --> RouteLogic{"Route Logic"}
+        MapBranching --> RouteLogic{"Route Logic"}
         RouteLogic -- "Fast Lane" --> DirectSQL["DirectSQL Node"]
         DirectSQL --> FastExecutor["Executor"]
         
@@ -37,7 +36,7 @@ The codebase is organized into independently versioned packages:
 | Package | Path | Responsibility |
 | :--- | :--- | :--- |
 | **nl2sql-core** | `packages/core` | The main orchestration engine, LangGraph nodes, CLI, and business logic. |
-| **nl2sql-adapter-sdk** | `packages/adapter-sdk` | Defines the `DatasourceAdapter` abstract base class and Pydantic models (`SchemaMetadata`, `CapabilitySet`). |
+| **nl2sql-adapter-sdk** | `packages/adapter-sdk` | Defines the `DatasourceAdapter` interface and strictly typed Pydantic models (e.g., `Table`, `Scalar`). |
 | **nl2sql-postgres** | `packages/adapters/postgres` | Implementation for PostgreSQL. |
 | **nl2sql-mssql** | `packages/adapters/mssql` | Implementation for Microsoft SQL Server. |
 | **nl2sql-mysql** | `packages/adapters/mysql` | Implementation for MySQL. |
@@ -91,9 +90,9 @@ Each branch runs a dedicated LangGraph `StateMachine` inside `nl2sql-core`.
 
 | Node | Responsibility | Key Interactions |
 | :--- | :--- | :--- |
-| **IntentNode** | Classifies query intent (`tabular`, `kpi`, `summary`). | |
-| **DecomposerNode** | Breaks down queries into sub-queries. | |
-| **SchemaNode** | Retrieves schema info. | Calls `adapter.fetch_schema()` |
+| **SemanticAnalysisNode** | Canonicalizes query and extracts entities/synonyms. | Entry point. Enriches `state.semantic_analysis`. |
+| **DecomposerNode** | Breaks down queries using Semantic Analysis and Vector Search. | Maps Names -> Table Objects. |
+| **PlannerNode** | Hydrates schema context and creates execution plan. | Calls `adapter.fetch_schema()` |
 | **GeneratorNode** | Generates dialect-specific SQL. | Calls `adapter.capabilities()` to decide SQL features. |
 | **ExecutorNode** | Executes SQL. | Calls `adapter.execute()` |
 | **ValidatorNode** | Checks validity. | |

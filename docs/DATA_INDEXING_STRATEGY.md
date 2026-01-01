@@ -8,10 +8,17 @@ Move beyond schema-only understanding by indexing structured knowledge about dat
 
 ## CURRENT STATE vs. PROBLEM
 
-**Current Capability**: "Schema Awareness"
+## 1. Intent-Driven Architecture
 
-- We index: Table Names, Column Names, Types, Nullability, Descriptions (Comments), Foreign Keys.
-- **Gap**: The model knows *structure* but is blind to *content*.
+The pipeline now employs a dedicated **Semantic Analysis Node** at the entrance.
+
+1. **Refinement**:
+    * **Canonicalization**: Rewrites the query to be explicit and entity-centric.
+    * **Enrichment**: Extracts keywords and generates synonyms for improved retrieval.
+
+2. **Context Retrieval (Routing)**:
+    * The `DecomposerNode` utilizes the **Expanded Query** (Canonical + Synonyms) from the Semantic Node.
+    * It queries the `OrchestratorVectorStore` to identify relevant tables across datasources.
 
 **Why Change? (The "Data Blindness" Problem)**
 
@@ -36,21 +43,21 @@ Index *representative knowledge* that helps the model reason about what data exi
 
 For every table maintain:
 
-- row_count
-- distinct counts per column
-- null percentage per column
-- min / max / range values
-- top N frequent values
-- time coverage window
-- data freshness indicator
-- approximate cardinality
+* row_count
+* distinct counts per column
+* null percentage per column
+* min / max / range values
+* top N frequent values
+* time coverage window
+* data freshness indicator
+* approximate cardinality
 
 **Benefits**:
 
-- Improves datasource routing
-- Prevents hallucinated queries
-- Validates feasibility ("does this exist?")
-- Enhances planner cost awareness
+* Improves datasource routing
+* Prevents hallucinated queries
+* Validates feasibility ("does this exist?")
+* Enhances planner cost awareness
 
 ---
 
@@ -60,16 +67,16 @@ For every table maintain:
 
 **Recommended**:
 
-- 100–500 rows per table max
-- stratified sampling, not random
-- include frequent + rare + recent slices
-- anonymize / mask sensitive values
+* 100–500 rows per table max
+* stratified sampling, not random
+* include frequent + rare + recent slices
+* anonymize / mask sensitive values
 
 **Indexing**:
 
-- Vector embedding for semantic reasoning
-- BM25 for literal matching
-- MMR / hybrid retrieval to balance relevance and diversity
+* Vector embedding for semantic reasoning
+* BM25 for literal matching
+* MMR / hybrid retrieval to balance relevance and diversity
 
 ---
 
@@ -79,22 +86,22 @@ For every table maintain:
 
 **Store per Entity**:
 
-- canonical name
-- synonyms
-- entity identifiers
-- owning datasource
-- backup datasource if exists
-- relationship hints
-- confidence score
+* canonical name
+* synonyms
+* entity identifiers
+* owning datasource
+* backup datasource if exists
+* relationship hints
+* confidence score
 
 **Examples**:
 Customer / Product / Vendor / Region / Plant / Project
 
 **Benefits**:
 
-- Solves naming ambiguity
-- Improves intent grounding
-- Enables reliable routing
+* Solves naming ambiguity
+* Improves intent grounding
+* Enables reliable routing
 
 ---
 
@@ -104,10 +111,10 @@ Customer / Product / Vendor / Region / Plant / Project
 
 **Graph Captures**:
 
-- Table relationships
-- Column semantic links
-- Fact-dimension relationships
-- Temporal alignment constraints
+* Table relationships
+* Column semantic links
+* Fact-dimension relationships
+* Temporal alignment constraints
 
 ---
 
@@ -127,9 +134,9 @@ When a query arrives:
 
 ## FRESHNESS MODEL
 
-- **statistical index** → daily or per ETL completion
-- **sample index** → rolling refresh
-- **entity index** → schema-change triggered
+* **statistical index** → daily or per ETL completion
+* **sample index** → rolling refresh
+* **entity index** → schema-change triggered
 
 Prefer incremental refresh over full rebuilds.
 
@@ -139,9 +146,9 @@ Prefer incremental refresh over full rebuilds.
 
 **ABSOLUTELY DO NOT INDEX**:
 
-- PII without masking
-- financial identifiers
-- unbounded raw historical data
+* PII without masking
+* financial identifiers
+* unbounded raw historical data
 
 Mask, hash, anonymize wherever needed.
 Separate tenant indexes.
@@ -153,11 +160,11 @@ Encrypt embeddings where required.
 
 Measure improvements:
 
-- routing accuracy
-- hallucination reduction
-- SQL validity
-- retries reduced
-- latency + cost impact
+* routing accuracy
+* hallucination reduction
+* SQL validity
+* retries reduced
+* latency + cost impact
 
 Use deterministic SQL validator loop.
 
@@ -165,9 +172,9 @@ Use deterministic SQL validator loop.
 
 ## FINAL ROLL OUT STRATEGY
 
-- **Phase 1** — Implement statistics + entity index
-- **Phase 2** — Introduce controlled sample indexing
-- **Phase 3** — Evolve to knowledge graph + intelligent planner
+* **Phase 1** — Implement statistics + entity index
+* **Phase 2** — Introduce controlled sample indexing
+* **Phase 3** — Evolve to knowledge graph + intelligent planner
 
 ---
 
@@ -175,10 +182,10 @@ Use deterministic SQL validator loop.
 
 This strategy gives:
 
-- grounding
-- correctness
-- scalability
-- security
-- predictable cost
+* grounding
+* correctness
+* scalability
+* security
+* predictable cost
 
 Without drowning in unnecessary data.

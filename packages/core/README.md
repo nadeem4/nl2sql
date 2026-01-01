@@ -26,8 +26,9 @@ python -m nl2sql.cli --query "Show me all users" --id my_postgres_db
 
 The pipeline consists of the following nodes:
 
-1. **Intent Node**: Classifies query (Tabular, Plot, Generic).
-2. **Decomposer Node**: Splits complex queries or identifies required tables.
-3. **Schema Node**: Retrieves the exact table schema from the adapter.
-4. **Generator Node**: Writes the SQL query.
-5. **Executor Node**: executing the query via the adapter.
+1. **Semantic Analysis Node**: Entry point. Canonicalizes query and expands synonyms for better grounding.
+2. **Decomposer Node**: Deconstructs complex queries using the enriched semantic context.
+3. **Planner Node**: Hydrates schema for relevant tables and generates the SQL execution plan.
+4. **Generator Node**: Writes dialect-specific SQL (T-SQL, PL/pgSQL, etc.).
+5. **Executor Node**: Executes the query via the adapter.
+6. **Validator Node**: Ensures safety and compliance against the schema.

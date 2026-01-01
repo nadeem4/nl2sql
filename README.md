@@ -102,13 +102,12 @@ The system uses a pluggable architecture where `core` interacts with databases s
 
 ```mermaid
 graph TD
-    UserQuery["User Query"] --> Intent["Intent Node"]
-    Intent --> Decomposer["Decomposer Node"]
+    UserQuery["User Query"] --> Semantic["Semantic Analysis Node"]
+    Semantic --> Decomposer["Decomposer Node"]
     Decomposer -- "Splits Query" --> MapBranching["Fan Out (Map)"]
 
     subgraph ExecutionBranch ["Execution Branch (Parallel)"]
-        MapBranching --> Schema["Schema Node"]
-        Schema --> RouteLogic{"Route Logic"}
+        MapBranching --> RouteLogic{"Route Logic"}
         RouteLogic -- "Fast Lane" --> DirectSQL["DirectSQL Node"]
         DirectSQL --> FastExecutor["Executor"]
         
