@@ -2,11 +2,12 @@ PLANNER_EXAMPLES = """
 Examples:
 
 User Query: "Show me the names of users who placed orders in 2023"
-Entities:
-[
-  {"entity_id": "E1", "name": "users"},
-  {"entity_id": "E2", "name": "orders"}
-]
+Semantic Context:
+{
+  "canonical_query": "List names of users with orders in 2023",
+  "keywords": ["users", "orders"],
+  "synonyms": ["clients", "purchases"]
+}
 
 Plan:
 {
@@ -40,10 +41,11 @@ Plan:
 }
 
 User Query: "Count total orders per user, show only those with more than 5 orders"
-Entities:
-[
-  {"entity_id": "E1", "name": "orders"}
-]
+Semantic Context:
+{
+  "keywords": ["orders", "total count"],
+  "synonyms": []
+}
 
 Plan:
 {
@@ -57,7 +59,7 @@ Plan:
     {"expr": "t1.user_id", "alias": "user_id", "is_derived": false},
     {"expr": "COUNT(*)", "alias": "total_orders", "is_derived": true}
   ],
-  "group_by": ["t1.user_id"],
+  "group_by": [{"expr": "t1.user_id"}],
   "having": [
     {"expr": "COUNT(*)", "op": ">", "value": 5}
   ],
@@ -74,18 +76,19 @@ PLANNER_PROMPT = (
     "[INSTRUCTIONS]\n"
     "Follow this algorithm to create the plan:\n"
     "1. Analyze the [USER_QUERY] to understand the intent and data requirements.\n"
-    "2. Identify tables from [SCHEMA] that contain the required data.\n"
+    "2. Identify tables from [RELEVANT_TABLES] that contain the required data.\n"
     "3. Explain your step-by-step reasoning in the 'reasoning' field.\n"
-    "4. Populate the 'tables' list using ONLY tables from [SCHEMA].\n"
+    "4. Populate the 'tables' list using ONLY tables from [RELEVANT_TABLES].\n"
     "   - The 'tables' list MUST include every table used, including join tables.\n"
-    "   - Use the EXACT aliases provided in [SCHEMA] (e.g., t1, t2).\n"
+    "   - Assign a short alias to each table (e.g., t1, t2).\n"
     "5. Formulate joins correctly between tables using Foreign Key relationships or name conventions.\n"
     "6. Select the required columns.\n"
     "   - 'select_columns' must contain objects of the form:\n"
     "     {{\"expr\": \"...\", \"alias\": \"...\", \"is_derived\": ...}}\n"
-    "   - Use pre-aliased column names from schema (e.g., t1.name).\n"
+    "   - Use aliases defined in step 4 (e.g., t1.name).\n"
     "   - Set is_derived=true for aggregates or expressions.\n"
-    "7. Apply filters, grouping, having, ordering, and limits as required.\n\n"
+    "7. Apply filters, grouping, having, ordering, and limits as required.\n"
+    "   - 'group_by' MUST be a list of objects: [{{\"expr\": \"t1.col\"}}].\n\n"
 
     "[DATATYPE RULES]\n"
     "- Dates must follow this format: '{date_format}'.\n"
@@ -94,15 +97,18 @@ PLANNER_PROMPT = (
 
     "[CONSTRAINTS]\n"
     "- Return ONLY a JSON object matching the expected plan schema.\n"
-    "- Use ONLY tables and columns defined in [SCHEMA].\n"
+    "- Use ONLY tables and columns defined in [RELEVANT_TABLES].\n"
     "- Do NOT hallucinate tables, columns, or joins.\n"
     "- The 'tables' list MUST contain all tables referenced in joins.\n"
     "- All column references MUST use 'expr'.\n"
-    "- Use 'alias' ONLY in 'select_columns'.\n"
+    "- Use 'alias' ONLY in 'select_columns' definition (not in expr).\n"
     "- Derived expressions MUST set is_derived=true.\n\n"
 
-    "[CONTEXT]\n"
-    "{context}\n\n"
+    "[RELEVANT_TABLES]\n"
+    "{relevant_tables}\n\n"
+  
+    "[SEMANTIC_CONTEXT]\n"
+    "{semantic_context}\n\n"
 
     "[CONFIG]\n"
     "Date Format: {date_format}\n\n"

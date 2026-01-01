@@ -37,7 +37,7 @@ graph TD
   * `_validate_static_analysis(plan)`: Syntax, Schema existence, Type safety.
 * **Checks**:
   * **Access**: Is the user allowed to query 'salary_data'?
-  * **Schema**: Do tables/columns exist in `state.schema_info`?
+  * **Schema**: Do tables/columns exist in `state.relevant_tables`?
   * **Logic**: Are aliases valid? Aggregations correct?
   * **Types**: Do literals match column types (e.g. Date formats)?
 * **Outcome**: `CRITICAL` or `ERROR` (Hard Fail).
@@ -59,7 +59,7 @@ graph TD
 ## Components
 
 * **`DatasourceRegistry`**: To fetch the active adapter for Dry Run/Explain.
-* **`SchemaInfo`**: Source of truth for static checks.
+* **`state.relevant_tables`**: Source of truth for static checks.
 
 ## Key Errors & Warnings
 

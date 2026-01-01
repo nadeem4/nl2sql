@@ -15,9 +15,9 @@ The `PlannerNode` is the cognitive core of the SQL generation process. It synthe
 The node reads the following fields from `GraphState`:
 
 - `state.user_query`: The original question.
-- `state.schema_info`: The list of available tables and columns (from `SchemaNode`).
-- `state.intent`: Analysis of keywords and entities (from `IntentNode`).
-- `state.errors` (Optional): Previous errors, if re-planning is triggered by the Validator or Executor.
+- `state.relevant_tables`: The list of available table schemas (from DecomposerNode).
+- `state.semantic_analysis`: Enriched context (keywords/entities) to guide planning.
+- `state.errors` (Optional): Previous errors, if re-planning is triggered.
 - `state.selected_datasource_id`: ID of the target database (for date format context).
 
 ## Outputs

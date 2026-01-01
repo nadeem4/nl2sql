@@ -6,6 +6,7 @@ import operator
 from pydantic import BaseModel, ConfigDict, Field
 
 from nl2sql.pipeline.nodes.decomposer.schemas import SubQuery
+from nl2sql.pipeline.nodes.planner.schemas import PlanModel
 from nl2sql.pipeline.nodes.executor.schemas import ExecutionModel
 from nl2sql.pipeline.nodes.semantic.schemas import SemanticAnalysisResponse
 from nl2sql.common.errors import PipelineError
@@ -24,7 +25,7 @@ class GraphState(BaseModel):
         default="synthesis",
         description="Desired output format: 'data' (raw results) or 'synthesis' (natural language answer)."
     )
-    plan: Optional[Dict[str, Any]] = Field(default=None)
+    plan: Optional[PlanModel] = Field(default=None)
     sql_draft: Optional[str] = Field(default=None)
     relevant_tables: Optional[List[Table]] = Field(default=None)
     validation: Dict[str, Any] = Field(default_factory=dict)

@@ -47,7 +47,7 @@ class OrderSpec(BaseModel):
 
 class GroupBySpec(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    expr: str
+    column: ColumnRef
 
 
 class PlanModel(BaseModel):

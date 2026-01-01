@@ -49,24 +49,15 @@ class PlannerNode:
                     ]
                 }
 
-            context = []
-            if state.relevant_tables:
-                try:
-                    for table in state.relevant_tables:
-                        context.append(table.model_dump_json(indent=2))
-                except Exception as e:
-                    logger.warning(f"Error formatting table context: {e}")
-            
-            context = "\n".join(context)
-            
-            feedback = ""
-            if state.errors:
-                error_msgs = [e.message for e in state.errors]
-                feedback = (
-                    "The previous plan was invalid. Fix the following errors:\n"
-                    f"{json.dumps(error_msgs, indent=2)}\n"
-                )
+            relevant_tables = '\n'.join([table.model_dump_json(indent=2) for table in state.relevant_tables])
 
+            errors = '\n'.join([ error.model_dump_json(indent=2) for error in state.errors])
+
+            if errors:
+                feedback = f"The previous plan was invalid. Fix the following errors:\n {errors}"
+            else:
+                feedback = ""
+        
             date_format = "ISO 8601 (YYYY-MM-DD)"
             try:
                 if state.selected_datasource_id:
@@ -75,18 +66,20 @@ class PlannerNode:
             except Exception:
                 pass
 
+            semantic_context = "No semantic context available."
+            if state.semantic_analysis:
+                semantic_context = state.semantic_analysis.model_dump_json(indent=2)
+
             plan_model: PlanModel = self.chain.invoke(
                 {
-                    "context": context,
+                    "relevant_tables": relevant_tables,
                     "examples": PLANNER_EXAMPLES,
                     "feedback": feedback,
                     "user_query": state.user_query,
                     "date_format": date_format,
+                    "semantic_context": semantic_context,
                 }
             )
-
-            plan_dump = plan_model.model_dump()
-
             reasoning = plan_model.reasoning or "No reasoning provided."
             planner_thoughts = [
                 f"Reasoning: {reasoning}",
@@ -94,7 +87,7 @@ class PlannerNode:
             ]
 
             return {
-                "plan": plan_dump,
+                "plan": plan_model,
                 "reasoning": [
                     {"node": node_name, "content": planner_thoughts}
                 ],

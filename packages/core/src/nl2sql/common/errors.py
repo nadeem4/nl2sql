@@ -1,6 +1,6 @@
 from enum import Enum, auto
-from dataclasses import dataclass
 from typing import Optional, Any
+from pydantic import BaseModel, ConfigDict
 
 class ErrorSeverity(str, Enum):
     INFO = "INFO"
@@ -39,8 +39,9 @@ class ErrorCode(str, Enum):
     EXECUTION_ERROR = "EXECUTION_ERROR"
     ORCHESTRATOR_CRASH = "ORCHESTRATOR_CRASH"
 
-@dataclass
-class PipelineError:
+class PipelineError(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    
     node: str
     message: str
     severity: ErrorSeverity

@@ -41,7 +41,7 @@ class ValidatorNode:
         if expr not in schema_cols:
             errors.append(
                 PipelineError(
-                    node="validator",
+                    node=self.__class__.__name__,
                     message=f"Column '{expr}' not found in schema.",
                     severity=ErrorSeverity.WARNING,
                     error_code=ErrorCode.COLUMN_NOT_FOUND,
@@ -54,7 +54,7 @@ class ValidatorNode:
             if alias not in plan_aliases:
                 errors.append(
                     PipelineError(
-                        node="validator",
+                        node=self.__class__.__name__,
                         message=f"Column '{expr}' uses undeclared alias '{alias}'.",
                         severity=ErrorSeverity.WARNING,
                         error_code=ErrorCode.INVALID_ALIAS_USAGE,
@@ -78,7 +78,7 @@ class ValidatorNode:
                 if expr not in group_exprs:
                     errors.append(
                         PipelineError(
-                            node="validator",
+                            node=self.__class__.__name__,
                             message=f"Column '{expr}' must appear in GROUP BY or be aggregated.",
                             severity=ErrorSeverity.WARNING,
                             error_code=ErrorCode.MISSING_GROUP_BY,
@@ -120,7 +120,7 @@ class ValidatorNode:
                     except Exception:
                         errors.append(
                             PipelineError(
-                                node="validator",
+                                node=self.__class__.__name__,
                                 message=f"Invalid date literal '{value}' for column '{expr}'.",
                                 severity=ErrorSeverity.WARNING,
                                 error_code=ErrorCode.INVALID_DATE_FORMAT,
@@ -133,7 +133,7 @@ class ValidatorNode:
                     if not raw.replace(".", "", 1).isdigit():
                         errors.append(
                             PipelineError(
-                                node="validator",
+                                node=self.__class__.__name__,
                                 message=f"Invalid numeric literal '{value}' for column '{expr}'.",
                                 severity=ErrorSeverity.WARNING,
                                 error_code=ErrorCode.INVALID_NUMERIC_VALUE,
@@ -169,7 +169,7 @@ class ValidatorNode:
                  user_role = user_ctx.get("role", "unknown")
                  errors.append(
                     PipelineError(
-                        node=node_name,
+                        node=self.__class__.__name__,
                         message=f"Access Denied: User role '{user_role}' is not authorized to access table '{t.name}'.",
                         severity=ErrorSeverity.CRITICAL,
                         error_code=ErrorCode.SECURITY_VIOLATION,
@@ -177,17 +177,18 @@ class ValidatorNode:
                 )
         return errors
 
-    def _validate_static_analysis(self, state: GraphState, plan: PlanModel) -> list[PipelineError]:
+    def _validate_static_analysis(self, state: GraphState) -> list[PipelineError]:
         """
         Layer 1: Static checks (Schema existence, Aliases, Types, SQL Logic).
         """
-        node_name = "validator"
+        plan = state.plan
+
         errors: list[PipelineError] = []
 
         if plan.query_type != "READ":
             errors.append(
                 PipelineError(
-                    node=node_name,
+                    node=self.__class__.__name__,
                     message=f"Query type '{plan.query_type}' not allowed.",
                     severity=ErrorSeverity.CRITICAL,
                     error_code=ErrorCode.SECURITY_VIOLATION,
@@ -214,8 +215,8 @@ class ValidatorNode:
             if not found:
                 errors.append(
                     PipelineError(
-                        node=node_name,
-                        message=f"Table '{t.name}' with alias '{t.alias}' not found in schema.",
+                        node=self.__class__.__name__,
+                        message=f"Table '{t.name}' with alias '{t.alias}' not found in relevant tables.",
                         severity=ErrorSeverity.ERROR,
                         error_code=ErrorCode.TABLE_NOT_FOUND,
                     )
@@ -231,15 +232,6 @@ class ValidatorNode:
             )
 
         for flt in plan.filters:
-            if flt.column.alias:
-                 errors.append(
-                    PipelineError(
-                        node=node_name,
-                        message=f"Aliases are only allowed in 'select_columns', not in filters (found '{flt.column.alias}').",
-                        severity=ErrorSeverity.WARNING,
-                        error_code=ErrorCode.INVALID_ALIAS_USAGE,
-                    )
-                )
             self.validate_expr_ref(
                 flt.column.expr,
                 schema_cols,
@@ -249,17 +241,8 @@ class ValidatorNode:
             )
 
         for gb in plan.group_by:
-            if gb.alias:
-                 errors.append(
-                    PipelineError(
-                        node=node_name,
-                        message=f"Aliases are only allowed in 'select_columns', not in group_by (found '{gb.alias}').",
-                        severity=ErrorSeverity.WARNING,
-                        error_code=ErrorCode.INVALID_ALIAS_USAGE,
-                    )
-                )
             self.validate_expr_ref(
-                gb.expr,
+                gb.column.expr,
                 schema_cols,
                 plan_aliases,
                 errors,
@@ -267,15 +250,6 @@ class ValidatorNode:
             )
 
         for ob in plan.order_by:
-            if ob.column.alias:
-                 errors.append(
-                    PipelineError(
-                        node=node_name,
-                        message=f"Aliases are only allowed in 'select_columns', not in order_by (found '{ob.column.alias}').",
-                        severity=ErrorSeverity.WARNING,
-                        error_code=ErrorCode.INVALID_ALIAS_USAGE,
-                    )
-                )
             self.validate_expr_ref(
                 ob.column.expr,
                 schema_cols,
@@ -288,7 +262,7 @@ class ValidatorNode:
             if j.left not in plan_tables and j.left not in plan_aliases:
                 errors.append(
                     PipelineError(
-                        node=node_name,
+                        node=self.__class__.__name__,
                         message=f"Join left '{j.left}' not declared in plan tables.",
                         severity=ErrorSeverity.WARNING,
                         error_code=ErrorCode.JOIN_TABLE_NOT_IN_PLAN,
@@ -297,7 +271,7 @@ class ValidatorNode:
             if j.right not in plan_tables and j.right not in plan_aliases:
                 errors.append(
                     PipelineError(
-                        node=node_name,
+                        node=self.__class__.__name__,
                         message=f"Join right '{j.right}' not declared in plan tables.",
                         severity=ErrorSeverity.WARNING,
                         error_code=ErrorCode.JOIN_TABLE_NOT_IN_PLAN,
@@ -306,7 +280,7 @@ class ValidatorNode:
             if not j.on:
                 errors.append(
                     PipelineError(
-                        node=node_name,
+                        node=self.__class__.__name__,
                         message=f"Join between '{j.left}' and '{j.right}' missing ON clause.",
                         severity=ErrorSeverity.WARNING,
                         error_code=ErrorCode.JOIN_MISSING_ON_CLAUSE,
@@ -380,23 +354,9 @@ class ValidatorNode:
         errors: list[PipelineError] = []
 
         try:
-            if not state.plan:
-                errors.append(
-                    PipelineError(
-                        node=node_name,
-                        message="No plan to validate.",
-                        severity=ErrorSeverity.ERROR,
-                        error_code=ErrorCode.MISSING_PLAN,
-                    )
-                )
-                return {"errors": errors}
-
-            if not state.relevant_tables:
-                return {}
-
             plan = PlanModel(**state.plan)
 
-            static_errors = self._validate_static_analysis(state, plan)
+            static_errors = self._validate_static_analysis(state)
             errors.extend(static_errors)
             
             policy_errors = self._validate_policy(state, plan)
