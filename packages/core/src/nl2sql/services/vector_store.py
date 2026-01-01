@@ -26,17 +26,11 @@ class OrchestratorVectorStore:
     """
 
     def _initialize_vector_store(self):
-        try:
-            if self.is_empty():
-                self.vectorstore = Chroma(
-                    collection_name=self.collection_name,
-                    embedding_function=self.embeddings,
-                    persist_directory=self.persist_directory
-                )
-            else:
-                logger.info("Vector store already initialized.")
-        except Exception as e:
-            logger.error(f"Failed to initialize vector store: {e}")
+        self.vectorstore = Chroma(
+            collection_name=self.collection_name,
+            embedding_function=self.embeddings,
+            persist_directory=self.persist_directory
+        )
 
     def __init__(self, collection_name: str = "nl2sql_store", embeddings: Optional[Embeddings] = None, persist_directory: str = "./chroma_db"):
         """
@@ -59,6 +53,8 @@ class OrchestratorVectorStore:
         Returns:
             True if empty, False otherwise.
         """
+        if not self.vectorstore:
+            return True
         try:
             return self.vectorstore._collection.count() == 0
         except Exception as e:
@@ -184,13 +180,13 @@ class OrchestratorVectorStore:
         docs = self.vectorstore.similarity_search(query, k=k, filter=filter_arg)
         return [doc.metadata.get("table_name", "Unknown") for doc in docs]
 
-    def index_examples(self, examples_path: str, llm=None):
+    def index_examples(self, examples_path: str, llm_registry=None):
         """
         Indexes example questions from a YAML file to aid in routing.
         """
         import yaml
         import pathlib
-        from nl2sql.pipeline.indexing import canonicalize_query, enrich_question
+        from nl2sql.pipeline.nodes.semantic.node import SemanticAnalysisNode
         
         path = pathlib.Path(examples_path)
         if not path.exists():
@@ -200,17 +196,27 @@ class OrchestratorVectorStore:
         try:
             examples = yaml.safe_load(path.read_text()) or {}
             
+            enricher = None
+            if llm_registry:
+                try:
+                    enricher = SemanticAnalysisNode(llm_registry.semantic_llm())
+                except Exception as e:
+                    logger.warning(f"Could not load SemanticNode: {e}")
+
             for ds_id, questions in examples.items():
                 print(f"Processing examples for {ds_id}...")
                 for q in questions:
                     variants = [q]
-                    if llm:
+                    if enricher:
                         try:
-                            canonical_q = canonicalize_query(q, llm) 
-                            variants.append(canonical_q)
+                            analysis = enricher.invoke(q)
+                            if analysis.canonical_query:
+                                variants.append(analysis.canonical_query)
                             
-                            enrichments = enrich_question(q, llm)
-                            variants.extend(enrichments)
+                            if analysis.keywords or analysis.synonyms:
+                                meta_text = " ".join(analysis.keywords + analysis.synonyms)
+                                variants.append(meta_text)
+                                
                         except Exception as e:
                             print(f"Warning: Enrichment failed for '{q}': {e}")
                             

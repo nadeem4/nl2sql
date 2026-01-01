@@ -9,6 +9,7 @@ from nl2sql.datasources import DatasourceRegistry
 from nl2sql.pipeline.nodes.decomposer import DecomposerNode
 from nl2sql.pipeline.nodes.decomposer import DecomposerNode
 from nl2sql.pipeline.nodes.aggregator import AggregatorNode
+from nl2sql.pipeline.nodes.semantic import SemanticAnalysisNode
 from nl2sql.pipeline.subgraphs.execution import build_execution_subgraph
 from nl2sql.pipeline.state import GraphState
 from nl2sql.services.vector_store import OrchestratorVectorStore
@@ -29,13 +30,16 @@ def build_graph(
     graph = StateGraph(GraphState)
 
     decomposer_node = DecomposerNode(
-        llm_registry.decomposer_llm(), registry, vector_store
+        llm_registry.decomposer_llm(), 
+        registry, 
+        vector_store
     )
     aggregator_node = AggregatorNode(llm_registry.aggregator_llm())
 
     execution_subgraph = build_execution_subgraph(
         registry, llm_registry, vector_store, vector_store_path
     )
+    semantic_node = SemanticAnalysisNode(llm_registry.semantic_llm())
 
     def execution_wrapper(state: Dict):
         result = execution_subgraph.invoke(state)
@@ -85,12 +89,14 @@ def build_graph(
             "intermediate_results": [message],
         }
 
+    graph.add_node("semantic_analysis", semantic_node)
     graph.add_node("decomposer", decomposer_node)
     graph.add_node("execution_branch", execution_wrapper)
     graph.add_node("report_missing_datasource", report_missing_datasource)
     graph.add_node("aggregator", aggregator_node)
 
-    graph.set_entry_point("decomposer")
+    graph.set_entry_point("semantic_analysis")
+    graph.add_edge("semantic_analysis", "decomposer")
 
     def continue_to_subqueries(state: GraphState):
         branches = []

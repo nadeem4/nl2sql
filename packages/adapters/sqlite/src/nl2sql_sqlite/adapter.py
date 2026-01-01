@@ -1,7 +1,7 @@
 from typing import Any, List
 from sqlalchemy import create_engine, text, inspect
 from nl2sql_adapter_sdk import (
-    CapabilitySet, 
+ 
     QueryResult, 
     CostEstimate,
     DryRunResult,
@@ -21,14 +21,7 @@ class SqliteAdapter(BaseSQLAlchemyAdapter):
     def explain(self, query: str) -> QueryPlan:
          return QueryPlan(original_query=query, plan="EXPLAIN QUERY PLAN not fully parsed")
 
-    def capabilities(self) -> CapabilitySet:
-        return CapabilitySet(
-            supports_cte=True,
-            supports_window_functions=True,
-            supports_limit_offset=True,
-            supports_multi_db_join=True,
-            supports_dry_run=False
-        )
+
     
     def cost_estimate(self, query: str) -> CostEstimate:
         try:

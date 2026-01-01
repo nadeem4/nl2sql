@@ -33,19 +33,12 @@ def run_indexing(profiles: Dict[str, DatasourceProfile], vector_store_path: str,
         task_desc = progress.add_task("[magenta]Indexing examples...", total=1)
         from nl2sql.common.settings import settings
         
-        llm = None
-        if llm_registry:
-            try:
-                llm = llm_registry.intent_classifier_llm()
-            except Exception as e:
-                presenter.print_warning(f"Could not load LLM for enrichment: {e}")
-        
-        if not llm:
-             presenter.print_warning("Indexing examples without enrichment (No LLM provided).")
+        if not llm_registry:
+             presenter.print_warning("Indexing examples without enrichment (No LLM Registry provided).")
         
         vector_store.index_examples(
             settings.sample_questions_path,
-            llm=llm
+            llm_registry=llm_registry
         )
         progress.advance(task_desc)
             

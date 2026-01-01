@@ -8,8 +8,9 @@ from langchain_core.runnables import Runnable
 if TYPE_CHECKING:
     from nl2sql.pipeline.state import GraphState
     from nl2sql.services.vector_store import OrchestratorVectorStore
+    from nl2sql.pipeline.nodes.semantic.node import SemanticAnalysisNode
 
-from .schemas import DecomposerResponse
+from .schemas import DecomposerResponse, SubQuery
 from .prompts import DECOMPOSER_PROMPT
 from nl2sql.datasources import DatasourceRegistry
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
@@ -34,7 +35,7 @@ class DecomposerNode:
         self.chain = self.prompt | self.llm
 
 
-    def _get_relevant_docs(self, state: GraphState) -> list:
+    def _get_relevant_docs(self, state: GraphState, override_query: str = None) -> list:
         """
         Helper to retrieve relevant docs from Vector Store based on user_context.
         Returns a list of documents.
@@ -45,14 +46,16 @@ class DecomposerNode:
 
         user_ctx = state.user_context or {}
         allowed_ds = user_ctx.get("allowed_datasources") or []
+        
+        query_text = override_query or state.user_query
 
         if "*" in allowed_ds:
             return self.vector_store.retrieve_routing_context(
-                state.user_query, k=20
+                query_text, k=20
             )
         elif allowed_ds:
             return self.vector_store.retrieve_routing_context(
-                state.user_query, k=20, datasource_id=allowed_ds
+                query_text, k=20, datasource_id=allowed_ds
             )
         else:
             logger.warning("AuthZ: No allowed_datasources found in user_context. Skipping retrieval.")
@@ -83,17 +86,28 @@ class DecomposerNode:
                     )
                 ]
             }
+            
+            # Semantic Analysis / Query Expansion (from Upstream Node)
+            expanded_query = state.user_query
+            analysis_reasoning = ""
+            
+            if state.semantic_analysis:
+                analysis = state.semantic_analysis
+                if analysis.keywords or analysis.synonyms:
+                    # Construct a search blob: Canonical + Keywords + Synonyms
+                    expanded_query = f"{analysis.canonical_query} {' '.join(analysis.keywords)} {' '.join(analysis.synonyms)}"
+                    analysis_reasoning = f"Query Expanded: {expanded_query} (derived from: {analysis.thought_process})"
 
             retrieved_context = ""            
-            docs = self._get_relevant_docs(state)
+            docs = self._get_relevant_docs(state, override_query=expanded_query)
             
             if not docs:
-                logger.warning("No relevant docs found for query: %s", state.user_query)
+                logger.warning("No relevant docs found for query: %s", expanded_query)
                 return {
                     "sub_queries": [],
                     "confidence": 0.0,
                     "reasoning": [
-                        {"node": node_name, "content": "Retrieval returned 0 documents. Unable to generate SQL without schema context."}
+                         {"node": node_name, "content": f"Retrieval returned 0 documents for search query: '{expanded_query}'."}
                     ],
                     "errors": [
                         PipelineError(
@@ -104,6 +118,7 @@ class DecomposerNode:
                         )
                     ]
                 }
+
                 
             context_lines = []
             ds_tables: Dict[str, list] = {}
@@ -156,13 +171,17 @@ class DecomposerNode:
                 
                 final_sub_queries.append(sq)
 
+            reasoning_list = []
+            if analysis_reasoning:
+                reasoning_list.append({"node": node_name, "content": analysis_reasoning})
+            
+            reasoning_list.append({"node": node_name, "content": llm_response.reasoning})
+
             return {
                 "sub_queries": final_sub_queries,
                 "confidence": llm_response.confidence,
                 "output_mode": llm_response.output_mode, 
-                "reasoning": [
-                    {"node": node_name, "content": llm_response.reasoning}
-                ],
+                "reasoning": reasoning_list,
             }
 
         except Exception as e:

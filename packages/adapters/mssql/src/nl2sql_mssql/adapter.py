@@ -1,13 +1,11 @@
 from typing import Any, List
 from sqlalchemy import create_engine, text, inspect
 from nl2sql_adapter_sdk import (
-    CapabilitySet, 
+ 
     QueryResult, 
     CostEstimate,
     DryRunResult,
-    QueryPlan,
-    QueryPlan,
-    Capability
+    QueryPlan
 )
 from nl2sql_sqlalchemy_adapter import BaseSQLAlchemyAdapter
 
@@ -42,13 +40,7 @@ class MssqlAdapter(BaseSQLAlchemyAdapter):
 
 
 
-    def capabilities(self) -> CapabilitySet:
-        return CapabilitySet({
-            Capability.CTE,
-            Capability.WINDOW_FUNCTIONS,
-            Capability.EXPLAIN,
-            Capability.DRY_RUN
-        })
+
 
     def cost_estimate(self, sql: str) -> CostEstimate:
         import re

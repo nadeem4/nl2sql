@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from nl2sql.pipeline.nodes.decomposer.schemas import SubQuery
 from nl2sql.pipeline.nodes.executor.schemas import ExecutionModel
+from nl2sql.pipeline.nodes.semantic.schemas import SemanticAnalysisResponse
 from nl2sql.common.errors import PipelineError
 
 
@@ -42,3 +43,4 @@ class GraphState(BaseModel):
     final_answer: Optional[str] = Field(default=None)
     system_events: Annotated[List[str], operator.add] = Field(default_factory=list)
     user_context: Optional[Dict[str, Any]] = Field(default_factory=dict, description="User identity and permissions context.")
+    semantic_analysis: Optional[SemanticAnalysisResponse] = Field(default=None, description="Enriched query metadata (canonical form, keywords).")

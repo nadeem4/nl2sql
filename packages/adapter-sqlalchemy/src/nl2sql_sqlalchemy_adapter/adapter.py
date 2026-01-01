@@ -111,7 +111,6 @@ class BaseSQLAlchemyAdapter(DatasourceAdapter):
             try:
                 tbl_comment = inspector.get_table_comment(table_name).get("text")
             except Exception:
-                logger.warning(f"Failed to fetch table comment for {self}")
                 tbl_comment = None
 
             table_obj = Table(
@@ -142,16 +141,28 @@ class BaseSQLAlchemyAdapter(DatasourceAdapter):
         """
         Fetches statistics for a specific column.
         """
+        if any(x in column_type.lower() for x in ['json', 'blob', 'binary', 'bytea', 'xml', 'array']):
+             return ColumnStatistics(
+                null_percentage=0.0,
+                distinct_count=0,
+                min_value=None,
+                max_value=None,
+                sample_values=[]
+            )
+
         with self.engine.connect() as conn:
             t = table(table_name)
             c = column(column_name)
             
-            stmt = select(
-                func.count(case((c == None, 1))),
-                func.min(c),
-                func.max(c),
-                func.count(func.distinct(c))
-            ).select_from(t)
+            stmt = (
+                select(
+                    func.count(case((c == None, 1))),
+                    func.min(c),
+                    func.max(c),
+                    func.count(func.distinct(c))
+                )
+                .select_from(t)
+            )
             
             result = conn.execute(stmt).fetchone()
             null_count, min_val, max_val, distinct_count = result

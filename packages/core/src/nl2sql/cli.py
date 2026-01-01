@@ -48,7 +48,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--json", action="store_true", help="Output results as JSON (suppress logs)")
     parser.add_argument("--diagnose", action="store_true", help="Run diagnostics and output status")
     parser.add_argument("--chat", action="store_true", help="Launch interactive TUI")
-    # parser.add_argument("--query") -- Already defined above
 
     return parser.parse_args()
 
@@ -56,17 +55,11 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
     
-    # Handle JSON Mode (Suppress Logging to Stdout)
     if args.json:
-        # Reconfigure logging to stderr so stdout is clean for JSON
         from nl2sql.common.logger import configure_logging
-        configure_logging(level="ERROR", json_format=True) # Or just suppress console handler?
-        # For simplicity, we rely on nodes not printing to stdout directly.
+        configure_logging(level="ERROR", json_format=True)
     
-    # Diagnostic Protocol
     if args.diagnose:
-        # Load necessary modules lazily
-        from nl2sql.datasources import load_profiles
         from nl2sql.diagnostics import check_connectivity
         
         try:
@@ -75,7 +68,6 @@ def main() -> None:
             
             connectivity = check_connectivity(profiles)
             
-            # Convert to JSON-serializable structure
             output = {
                 "connectivity": {
                     ds_id: {"ok": ok, "details": msg} 
@@ -91,7 +83,6 @@ def main() -> None:
             print(json.dumps(error_out))
             sys.exit(1)
 
-    # Interactive TUI
     if args.chat:
         try:
             from nl2sql.tui import app
@@ -101,20 +92,12 @@ def main() -> None:
             print("Error: TUI dependencies (textual) not installed or TUI module missing.")
             sys.exit(1)
 
-    # Single Query Execution
     if args.query:
-        from nl2sql.commands.run import run_pipeline
-        from nl2sql.datasources import load_profiles, DatasourceRegistry
-        from nl2sql.services.llm import LLMRegistry, load_llm_config
-        from nl2sql.services.vector_store import OrchestratorVectorStore
-        from nl2sql.common.settings import settings
-        
-        # Bootstrap Runtime
-        profiles = load_profiles(settings.datasource_config_path)
+        profiles = load_profiles(args.config)
         ds_registry = DatasourceRegistry(profiles)
         
         try:
-            llm_cfg = load_llm_config(settings.llm_config_path)
+            llm_cfg = load_llm_config(args.llm_config)
             llm_registry = LLMRegistry(llm_cfg)
         except Exception:
             # Fallback if config issues, though likely fatal for query
@@ -125,26 +108,13 @@ def main() -> None:
         run_pipeline(args, args.query, ds_registry, llm_registry, vector_store)
         sys.exit(0)
 
-    # Immediate actions that don't need full config loading
     if args.list_adapters:
         from nl2sql.commands.info import list_available_adapters
         list_available_adapters()
         return
 
-    from nl2sql.common.logger import configure_logging
-    
-    level = "CRITICAL" 
-    
-    if args.debug:
-        level = "DEBUG"
-    elif args.verbose:
-        level = "INFO"
-        
-    configure_logging(level=level, json_format=False)
-
     profiles = load_profiles(args.config)
 
-    # Initialize Registries
     llm_cfg = load_llm_config(args.llm_config)
     llm_registry = LLMRegistry(llm_cfg)
     

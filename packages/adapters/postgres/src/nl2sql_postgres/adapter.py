@@ -1,25 +1,17 @@
 from typing import Dict, Any
 from sqlalchemy import create_engine, inspect, text
 from nl2sql_adapter_sdk import (
-    CapabilitySet,
     DryRunResult,
     QueryPlan,
     CostEstimate,
-    ForeignKey,
-    Capability # Added Capability import
+    ForeignKey
 )
 from nl2sql_sqlalchemy_adapter import BaseSQLAlchemyAdapter
 
 class PostgresAdapter(BaseSQLAlchemyAdapter):
 
 
-    def capabilities(self) -> CapabilitySet:
-        return CapabilitySet({
-            Capability.CTE,
-            Capability.WINDOW_FUNCTIONS,
-            Capability.RETURNING,
-            Capability.EXPLAIN
-        })
+
 
     def dry_run(self, sql: str) -> DryRunResult:
         try:
