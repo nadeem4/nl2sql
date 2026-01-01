@@ -44,4 +44,17 @@ class SemanticAnalysisNode:
         LangGraph entry point.
         """
         response = self.invoke(state.user_query)
-        return {"semantic_analysis": response}
+        
+        reasoning_step = {
+            "node": "semantic_analysis",
+            "content": response.reasoning,
+            "metadata": {
+                "keywords": response.keywords,
+                "synonyms": response.synonyms
+            }
+        }
+        
+        return {
+            "semantic_analysis": response,
+            "reasoning": [reasoning_step]
+        }

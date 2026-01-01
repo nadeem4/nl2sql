@@ -5,8 +5,8 @@ Your goal is to write a valid SQL query to answer the user's question.
 
 Target Database Dialect: {dialect}
 
-[SCHEMA INFORMATION]
-{schema_info}
+[RELEVANT TABLES]
+{relevant_tables}
 
 [INSTRUCTIONS]
 1. Write a SQL query using ONLY the provided tables and columns.

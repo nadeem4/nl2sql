@@ -49,9 +49,15 @@ class PlannerNode:
                     ]
                 }
 
-            schema_context = ""
-            if state.schema_info:
-                schema_context = state.schema_info.model_dump_json(indent=2)
+            context = []
+            if state.relevant_tables:
+                try:
+                    for table in state.relevant_tables:
+                        context.append(table.model_dump_json(indent=2))
+                except Exception as e:
+                    logger.warning(f"Error formatting table context: {e}")
+            
+            context = "\n".join(context)
             
             feedback = ""
             if state.errors:
@@ -71,7 +77,7 @@ class PlannerNode:
 
             plan_model: PlanModel = self.chain.invoke(
                 {
-                    "schema_context": schema_context,
+                    "context": context,
                     "examples": PLANNER_EXAMPLES,
                     "feedback": feedback,
                     "user_query": state.user_query,

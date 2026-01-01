@@ -22,22 +22,18 @@ class DirectSQLNode:
 
     def _format_schema(self, state: GraphState) -> str:
         """Formats the retrieved schema info into a string."""
-        if not state.schema_info:
+        if not state.relevant_tables:
             return "No schema information available."
         
         lines = []
-        for table in state.schema_info.tables:
-            cols = ", ".join([f"{c.original_name} ({c.type})" for c in table.columns])
-            lines.append(f"Table: {table.name}\nColumns: {cols}")
-            if table.foreign_keys:
-                fks = [f"{fk.column} -> {fk.referred_table}.{fk.referred_column}" for fk in table.foreign_keys]
-                lines.append(f"Foreign Keys: {', '.join(fks)}")
+        for table in state.relevant_tables:
+            lines.append(table.model_dump_json(indent=2))
             lines.append("---")
         return "\n".join(lines)
 
     def __call__(self, state: GraphState) -> Dict[str, Any]:
         try:
-            schema_str = self._format_schema(state)
+            relevant_tables = self._format_schema(state)
             dialect = "TSQL" # Default
             
             if state.selected_datasource_id:
@@ -56,7 +52,7 @@ class DirectSQLNode:
             
             response = self.chain.invoke({
                 "dialect": dialect,
-                "schema_info": schema_str,
+                "relevant_tables": relevant_tables,
                 "user_query": state.user_query
             })
 

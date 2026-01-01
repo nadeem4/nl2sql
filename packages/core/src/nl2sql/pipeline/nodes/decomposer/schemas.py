@@ -23,11 +23,9 @@ class DecomposerResponse(BaseModel):
         description="Explanation of why the query was split (or not) and how datasources were selected."
     )
     confidence: float = Field(
-        default=1.0,
-        description="Confidence score based on vector store matches."
+        description="Confidence score (0.0 to 1.0) based on vector store matches."
     )
     output_mode: Literal["data", "synthesis"] = Field(
-        default="synthesis",
         description="Desired output format: 'data' or 'synthesis'."
     )
     sub_queries: List[SubQuery] = Field(

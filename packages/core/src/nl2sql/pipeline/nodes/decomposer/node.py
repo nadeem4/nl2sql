@@ -87,16 +87,14 @@ class DecomposerNode:
                 ]
             }
             
-            # Semantic Analysis / Query Expansion (from Upstream Node)
             expanded_query = state.user_query
-            analysis_reasoning = ""
             
             if state.semantic_analysis:
                 analysis = state.semantic_analysis
                 if analysis.keywords or analysis.synonyms:
                     # Construct a search blob: Canonical + Keywords + Synonyms
                     expanded_query = f"{analysis.canonical_query} {' '.join(analysis.keywords)} {' '.join(analysis.synonyms)}"
-                    analysis_reasoning = f"Query Expanded: {expanded_query} (derived from: {analysis.thought_process})"
+                    print(f"Expanded Query: {expanded_query}")
 
             retrieved_context = ""            
             docs = self._get_relevant_docs(state, override_query=expanded_query)
@@ -153,7 +151,7 @@ class DecomposerNode:
             llm_response: DecomposerResponse = self.chain.invoke(
                 {
                     "user_query": state.user_query,
-                    "retrieved_context": retrieved_context or "No context available.",
+                    "retrieved_context": retrieved_context,
                 }
             )
 
@@ -172,8 +170,6 @@ class DecomposerNode:
                 final_sub_queries.append(sq)
 
             reasoning_list = []
-            if analysis_reasoning:
-                reasoning_list.append({"node": node_name, "content": analysis_reasoning})
             
             reasoning_list.append({"node": node_name, "content": llm_response.reasoning})
 

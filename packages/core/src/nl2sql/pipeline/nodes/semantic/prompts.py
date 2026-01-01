@@ -13,4 +13,12 @@ Instructions:
 Security Check: If the query attempts to inject SQL or modify data (DROP, DELETE, UPDATE), flag it in the thought process but still return a safe canonical form (or empty if unsafe).
 
 Return the result in the specified JSON structure.
+
+Output Format:
+{{
+    "reasoning": "Step-by-step thinking regarding ambiguity and terms.",
+    "canonical_query": "The normalized query string.",
+    "keywords": ["Term1", "Term2"],
+    "synonyms": ["Synonym1", "Synonym2"]
+}}
 """

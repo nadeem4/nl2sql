@@ -88,7 +88,7 @@ class ValidatorNode:
     def validate_data_types(
         self,
         plan: PlanModel,
-        schema_info: SchemaInfo,
+        relevant_tables: list[TableModel],
         profile_id: str,
         errors: list[PipelineError],
     ) -> None:
@@ -99,7 +99,7 @@ class ValidatorNode:
             date_format = "ISO 8601"
 
         col_types: Dict[str, str] = {}
-        for table in schema_info.tables:
+        for table in relevant_tables:
             for col in table.columns:
                 col_types[col.name] = col.type.upper()
 
@@ -396,27 +396,21 @@ class ValidatorNode:
 
             plan = PlanModel(**state.plan)
 
-            # 1. Static Analysis
             static_errors = self._validate_static_analysis(state, plan)
             errors.extend(static_errors)
             
-            # 1.5 Policy Check (AuthZ)
             policy_errors = self._validate_policy(state, plan)
             errors.extend(policy_errors)
 
-            # Only proceed if NO Critical/Error issues
             has_blocking_errors = any(e.severity in (ErrorSeverity.CRITICAL, ErrorSeverity.ERROR) for e in errors)
             
             if not has_blocking_errors:
-                # 2. Semantic Analysis (Dry Run)
                 semantic_errors = self._validate_semantic_correctness(state)
                 errors.extend(semantic_errors)
                 
-                # Re-check blocking errors after dry run
                 has_blocking_errors = any(e.severity in (ErrorSeverity.CRITICAL, ErrorSeverity.ERROR) for e in errors)
 
                 if not has_blocking_errors:
-                    # 3. Performance Analysis (Cost)
                     perf_errors = self._validate_performance(state)
                     errors.extend(perf_errors)
 

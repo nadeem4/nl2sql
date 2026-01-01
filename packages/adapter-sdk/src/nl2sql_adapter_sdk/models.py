@@ -1,12 +1,15 @@
-from typing import List, Any, Dict, Optional
+from typing import List, Any, Dict, Optional, Union
 from pydantic import BaseModel
+
+Scalar = Union[str, int, float, bool, None]
+JsonValue = Union[Scalar, List[Scalar], Dict[str, Scalar]]
 
 class ColumnStatistics(BaseModel):
     null_percentage: float
     distinct_count: int
-    min_value: Optional[Any] = None
-    max_value: Optional[Any] = None
-    sample_values: List[Any] = []
+    min_value: Optional[Scalar] = None
+    max_value: Optional[Scalar] = None
+    sample_values: List[JsonValue] = []
 
 class Column(BaseModel):
     name: str

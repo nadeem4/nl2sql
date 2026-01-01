@@ -101,8 +101,8 @@ PLANNER_PROMPT = (
     "- Use 'alias' ONLY in 'select_columns'.\n"
     "- Derived expressions MUST set is_derived=true.\n\n"
 
-    "[SCHEMA]\n"
-    "{schema_context}\n\n"
+    "[CONTEXT]\n"
+    "{context}\n\n"
 
     "[CONFIG]\n"
     "Date Format: {date_format}\n\n"

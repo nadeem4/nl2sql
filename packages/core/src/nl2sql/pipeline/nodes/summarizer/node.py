@@ -63,14 +63,13 @@ class SummarizerNode:
                     ]
                 }
 
-            schema_context = ""
-            if state.schema_info:
+            relevant_tables = ""
+            if state.relevant_tables:
                 lines = []
-                for tbl in state.schema_info.tables:
-                    lines.append(f"Table: {tbl.name} (Alias: {tbl.alias})")
-                    lines.append(f"  Columns: {', '.join([f'{c.name} ({c.type})' for c in tbl.columns])}")
-                    lines.append("")
-                schema_context = "\n".join(lines)
+                for tbl in state.relevant_tables:
+                    lines.append(tbl.model_dump_json(indent=2))
+                    lines.append("---")
+                relevant_tables = "\n".join(lines)
 
             failed_plan_str = "No plan generated."
             if state.plan:
@@ -85,7 +84,7 @@ class SummarizerNode:
             try:
                 feedback = self.chain.invoke({
                     "user_query": state.user_query,
-                    "schema_context": schema_context,
+                    "relevant_tables": relevant_tables,
                     "failed_plan": failed_plan_str,
                     "errors": errors_str
                 })
