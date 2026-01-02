@@ -1,3 +1,5 @@
+"""Prompts for the Query Decomposer node."""
+
 DECOMPOSER_PROMPT = """
 You are an expert Query Routing & Decomposition Agent.
 

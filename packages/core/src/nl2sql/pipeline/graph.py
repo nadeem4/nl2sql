@@ -7,7 +7,6 @@ from langgraph.types import Send
 
 from nl2sql.datasources import DatasourceRegistry
 from nl2sql.pipeline.nodes.decomposer import DecomposerNode
-from nl2sql.pipeline.nodes.decomposer import DecomposerNode
 from nl2sql.pipeline.nodes.aggregator import AggregatorNode
 from nl2sql.pipeline.nodes.semantic import SemanticAnalysisNode
 from nl2sql.pipeline.subgraphs.execution import build_execution_subgraph
@@ -26,7 +25,22 @@ def build_graph(
     execute: bool = True,
     vector_store: Optional[OrchestratorVectorStore] = None,
     vector_store_path: str = "",
-):
+) -> StateGraph:
+    """Builds the main LangGraph pipeline.
+
+    Constructs the graph with Semantic Analysis, Decomposer, Execution branches,
+    and Aggregator.
+
+    Args:
+        registry (DatasourceRegistry): Registry of datasources.
+        llm_registry (LLMRegistry): Registry of LLM providers.
+        execute (bool): Whether to allow execution against real databases.
+        vector_store (Optional[OrchestratorVectorStore]): RAG vector store.
+        vector_store_path (str): Path to local vector store if needed.
+
+    Returns:
+        StateGraph: The compiled LangGraph runnable.
+    """
     graph = StateGraph(GraphState)
 
     decomposer_node = DecomposerNode(
@@ -122,7 +136,6 @@ def build_graph(
                 "user_context": state.user_context
             }
 
-
             branches.append(Send("execution_branch", payload))
 
         return branches
@@ -151,6 +164,22 @@ def run_with_graph(
     callbacks: Optional[List] = None,
     user_context: Optional[Dict[str, Any]] = None,
 ) -> Dict:
+    """Convenience function to run the full pipeline.
+
+    Args:
+        registry (DatasourceRegistry): Registry of datasources.
+        llm_registry (LLMRegistry): Registry of LLM providers.
+        user_query (str): The user's question.
+        datasource_id (Optional[str]): specific datasource to target (optional).
+        execute (bool): Whether to execute against real databases.
+        vector_store (Optional[OrchestratorVectorStore]): RAG vector store.
+        vector_store_path (str): Path to local vector store.
+        callbacks (Optional[List]): LangChain callbacks.
+        user_context (Optional[Dict[str, Any]]): User identity/permissions.
+
+    Returns:
+        Dict: Final execution result.
+    """
     graph = build_graph(
         registry,
         llm_registry,

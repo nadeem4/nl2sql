@@ -3,9 +3,7 @@ from rich.table import Table
 from nl2sql.datasources.discovery import discover_adapters
 
 def list_available_adapters() -> None:
-    """
-    Discovers and displays all installed Datasource Adapters.
-    """
+    """Discovers and displays all installed Datasource Adapters."""
     console = Console()
     adapters = discover_adapters()
 

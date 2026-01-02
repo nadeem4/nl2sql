@@ -17,12 +17,24 @@ logger = get_logger("planner")
 
 
 class PlannerNode:
-    """
-    Generates a structured SQL execution plan (PlanModel)
-    using LLM + deterministic AST validation.
+    """Generates a structured SQL execution plan (PlanModel).
+
+    Uses an LLM to interpret the user query and semantic context, producing a
+    deterministic Abstract Syntax Tree (AST) that represents the SQL query.
+
+    Attributes:
+        registry (DatasourceRegistry): The registry of datasources.
+        llm (Optional[Runnable]): The Language Model executable.
+        chain (Optional[Runnable]): The langchain chain for planning.
     """
 
     def __init__(self, registry: DatasourceRegistry, llm: Optional[Runnable] = None):
+        """Initializes the PlannerNode.
+
+        Args:
+            registry (DatasourceRegistry): The registry of datasources.
+            llm (Optional[Runnable]): The Language Model to use for planning.
+        """
         self.registry = registry
         self.llm = llm
 
@@ -31,6 +43,15 @@ class PlannerNode:
             self.chain = prompt | self.llm
 
     def __call__(self, state: GraphState) -> Dict[str, Any]:
+        """Executes the planning node.
+
+        Args:
+           state (GraphState): The current state of the execution graph.
+
+        Returns:
+            Dict[str, Any]: A dictionary containing the generated 'plan', 'reasoning',
+                and any 'errors' encountered.
+        """
         node_name = "planner"
 
         if not self.llm:

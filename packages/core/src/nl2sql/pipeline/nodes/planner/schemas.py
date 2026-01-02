@@ -3,11 +3,14 @@ from typing import List, Optional, Literal, Union
 from pydantic import BaseModel, ConfigDict, Field
 
 
-# =========================
-# CASE WHEN SUPPORT
-# =========================
-
 class CaseWhen(BaseModel):
+    """Represents a single WHEN ... THEN ... clause in a CASE expression.
+
+    Attributes:
+        condition (Expr): The condition expression to evaluate.
+        result (Expr): The result expression if the condition is true.
+        ordinal (int): The position of this clause in the CASE statement.
+    """
     model_config = ConfigDict(extra="forbid")
 
     condition: "Expr"
@@ -15,15 +18,27 @@ class CaseWhen(BaseModel):
     ordinal: int
 
 
-# =========================
-# Unified Expression AST
-# =========================
-
 class Expr(BaseModel):
-    """
-    Unified AST for deterministic SQL.
-    'kind' determines which fields must / may be populated.
-    Strict validation rules enforced in model_post_init.
+    """Unified AST for deterministic SQL expressions.
+
+    The 'kind' attribute determines which fields must or may be populated.
+    Strict validation rules are enforced in `model_post_init`.
+
+    Attributes:
+        kind (Literal): The type of expression (literal, column, func, binary, unary, case).
+        value (Optional[Union[str, int, float, bool]]): Value for literal expressions.
+        is_null (bool): Whether the literal is a NULL value.
+        alias (Optional[str]): Table alias for column expressions.
+        column_name (Optional[str]): Name of the column.
+        func_name (Optional[str]): Name of the function.
+        args (List[Expr]): Arguments for function expressions.
+        is_aggregate (bool): Whether the function is an aggregate function.
+        op (Optional[str]): Operator for binary or unary expressions.
+        left (Optional[Expr]): Left operand for binary expressions.
+        right (Optional[Expr]): Right operand for binary expressions.
+        expr (Optional[Expr]): Operand for unary expressions.
+        whens (List[CaseWhen]): List of WHEN clauses for CASE expressions.
+        else_expr (Optional[Expr]): The ELSE expression for CASE expressions.
     """
     model_config = ConfigDict(extra="forbid")
 
@@ -47,7 +62,8 @@ class Expr(BaseModel):
         Literal[
             "=", "!=", ">", "<", ">=", "<=",
             "+", "-", "*", "/", "%",
-            "AND", "OR", "LIKE", "IN"
+            "AND", "OR", "LIKE", "IN",
+            "NOT", "IS", "IS NOT"
         ]
     ] = None
 
@@ -61,10 +77,8 @@ class Expr(BaseModel):
     whens: List[CaseWhen] = Field(default_factory=list)
     else_expr: Optional["Expr"] = None
 
-    # =========================
-    # Validation
-    # =========================
     def model_post_init(self, *_):
+        """Validates the expression based on its `kind`."""
         k = self.kind
 
         if k == "literal":
@@ -93,11 +107,16 @@ class Expr(BaseModel):
             raise ValueError("CASE expression must have at least one WHEN")
 
 
-# =========================
-# Relational Structure
-# =========================
-
 class TableRef(BaseModel):
+    """Represents a reference to a database table.
+
+    Attributes:
+        name (str): The name of the table.
+        schema_name (Optional[str]): The schema of the table.
+        database (Optional[str]): The database name.
+        alias (str): The alias used for the table in the query.
+        ordinal (int): The strict ordinal position of the table.
+    """
     model_config = ConfigDict(extra="forbid")
 
     name: str
@@ -108,6 +127,15 @@ class TableRef(BaseModel):
 
 
 class JoinSpec(BaseModel):
+    """Specification for a table join.
+
+    Attributes:
+        left_alias (str): Alias of the left table.
+        right_alias (str): Alias of the right table.
+        join_type (Literal): Type of join (inner, left, right, full).
+        condition (Expr): The join condition expression.
+        ordinal (int): The strict ordinal position of the join.
+    """
     model_config = ConfigDict(extra="forbid")
 
     left_alias: str
@@ -117,11 +145,14 @@ class JoinSpec(BaseModel):
     ordinal: int
 
 
-# =========================
-# Projection / Grouping / Ordering
-# =========================
-
 class SelectItem(BaseModel):
+    """Represents an item in the SELECT clause.
+
+    Attributes:
+        expr (Expr): The expression to select.
+        alias (Optional[str]): The alias for the selected expression.
+        ordinal (int): The strict ordinal position of the select item.
+    """
     model_config = ConfigDict(extra="forbid")
 
     expr: Expr
@@ -130,6 +161,13 @@ class SelectItem(BaseModel):
 
 
 class OrderItem(BaseModel):
+    """Represents an item in the ORDER BY clause.
+
+    Attributes:
+        expr (Expr): The expression to order by.
+        direction (Literal): The sort direction (asc, desc).
+        ordinal (int): The strict ordinal position of the order item.
+    """
     model_config = ConfigDict(extra="forbid")
 
     expr: Expr
@@ -138,17 +176,35 @@ class OrderItem(BaseModel):
 
 
 class GroupByItem(BaseModel):
+    """Represents an item in the GROUP BY clause.
+
+    Attributes:
+        expr (Expr): The expression to group by.
+        ordinal (int): The strict ordinal position of the group by item.
+    """
     model_config = ConfigDict(extra="forbid")
 
     expr: Expr
     ordinal: int
 
 
-# =========================
-# PLAN MODEL
-# =========================
-
 class PlanModel(BaseModel):
+    """Standardized representation of a SQL execution plan.
+
+    Attributes:
+        query_type (Literal): The type of query (default: READ).
+        distinct (bool): Whether to select distinct rows.
+        tables (List[TableRef]): List of tables involved in the query.
+        joins (List[JoinSpec]): List of join specifications.
+        select_items (List[SelectItem]): List of items to select.
+        where (Optional[Expr]): The WHERE clause expression.
+        group_by (List[GroupByItem]): List of GROUP BY items.
+        having (Optional[Expr]): The HAVING clause expression.
+        order_by (List[OrderItem]): List of ORDER BY items.
+        limit (Optional[int]): The LIMIT count.
+        offset (Optional[int]): The OFFSET count.
+        reasoning (Optional[str]): Explanatory text for the plan generation.
+    """
     model_config = ConfigDict(extra="forbid")
 
     query_type: Literal["READ"] = "READ"

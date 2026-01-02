@@ -18,11 +18,11 @@ def test_expr_literal_validation():
 def test_expr_column_validation():
     """Test strict validation for Column kind."""
     # Valid
-    Expr(kind="column", column_name="id", table="users")
+    Expr(kind="column", column_name="id", alias="users")
     
     # Invalid: Missing column_name
     with pytest.raises(ValidationError) as exc:
-        Expr(kind="column", table="users")
+        Expr(kind="column", alias="users")
     assert "column_name is required" in str(exc.value)
 
 def test_expr_func_validation():

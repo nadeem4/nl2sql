@@ -3,11 +3,19 @@ import json
 import time
 from typing import Any, Dict
 
+
 class JsonFormatter(logging.Formatter):
-    """
-    Formatter that outputs JSON strings after parsing the LogRecord.
-    """
+    """Formatter that outputs JSON strings after parsing the LogRecord."""
+
     def format(self, record: logging.LogRecord) -> str:
+        """Formats the log record as a JSON string.
+
+        Args:
+           record (logging.LogRecord): The log record to format.
+
+        Returns:
+            str: The JSON-formatted log string.
+        """
         log_record = {
             "timestamp": self.formatTime(record, self.datefmt),
             "level": record.levelname,
@@ -30,9 +38,13 @@ class JsonFormatter(logging.Formatter):
             
         return json.dumps(log_record)
 
+
 def configure_logging(level: str = "INFO", json_format: bool = False):
-    """
-    Configure the root logger.
+    """Configures the root logger.
+
+    Args:
+        level (str): The logging level (default: INFO).
+        json_format (bool): Whether to use JSON formatting (default: False).
     """
     root_logger = logging.getLogger()
     root_logger.setLevel(level)
@@ -54,5 +66,14 @@ def configure_logging(level: str = "INFO", json_format: bool = False):
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("httpcore").setLevel(logging.WARNING)
 
+
 def get_logger(name: str) -> logging.Logger:
+    """Gets a named logger.
+
+    Args:
+        name (str): The name of the logger.
+
+    Returns:
+        logging.Logger: The logger instance.
+    """
     return logging.getLogger(name)

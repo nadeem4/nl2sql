@@ -1,7 +1,13 @@
 from pydantic import BaseModel, Field
 
+
 class DirectSQLResponse(BaseModel):
-    """Structured response for Direct SQL generation."""
+    """Structured response for Direct SQL generation.
+
+    Attributes:
+        reasoning (str): Explanation of query construction and alias choices.
+        sql (str): The valid SQL query to execute.
+    """
     
     reasoning: str = Field(
         description="Brief explanation of how the query was constructed, including schema choices and aliases used."

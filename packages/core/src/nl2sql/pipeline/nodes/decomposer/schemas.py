@@ -2,7 +2,16 @@ from typing import List, Optional, Literal, Dict, Any
 from pydantic import BaseModel, Field
 from nl2sql_adapter_sdk import Table
 
+
 class SubQuery(BaseModel):
+    """Represents a decomposed query targeting a specific datasource.
+
+    Attributes:
+        query (str): Natural language question to be executed against the datasource.
+        datasource_id (str): Target datasource for executing this sub-query.
+        complexity (Literal): Complexity classification (simple or complex).
+        relevant_tables (Optional[List[Table]]): Relevant table schemas for this sub-query.
+    """
     query: str = Field(
         description="Natural language question to be executed against the datasource."
     )
@@ -18,7 +27,16 @@ class SubQuery(BaseModel):
         description="Relevant table schemas for this sub-query. Leave empty."
     )
 
+
 class DecomposerResponse(BaseModel):
+    """Structured response from the Decomposer LLM.
+
+    Attributes:
+        reasoning (str): Explanation of the routing decision.
+        confidence (float): Confidence score (0.0 to 1.0).
+        output_mode (Literal): Desired output format (data or synthesis).
+        sub_queries (List[SubQuery]): List of sub-queries generated.
+    """
     reasoning: str = Field(
         description="Explanation of why the query was split (or not) and how datasources were selected."
     )
@@ -31,6 +49,3 @@ class DecomposerResponse(BaseModel):
     sub_queries: List[SubQuery] = Field(
         description="List of sub-queries (one per datasource)."
     )
-
-
-

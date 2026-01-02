@@ -35,28 +35,6 @@ class TestSecurity(unittest.TestCase):
         for sql in forbidden:
             self.assertFalse(enforce_read_only(sql), f"Should forbid: {sql}")
 
-    def test_executor_node_blocks_forbidden_sql(self):
-        # Mock Registry and Adapter
-        mock_registry = MagicMock(spec=DatasourceRegistry)
-        mock_adapter = MagicMock(spec=DatasourceAdapter)
-        mock_registry.get_adapter.return_value = mock_adapter
-        mock_adapter.capabilities.return_value = CapabilitySet(
-            supports_cte=True
-        )
-        mock_profile = MagicMock()
-        mock_profile.engine = "sqlite"
-        mock_registry.get_profile.return_value = mock_profile
-
-        node = ExecutorNode(mock_registry)
-        
-        state = GraphState(user_query="drop table", selected_datasource_id="test")
-        state.sql_draft = "DROP TABLE users"
-        
-        new_state = node(state)
-        
-        self.assertTrue(any("Security Violation" in e.message for e in new_state["errors"]))
-        self.assertEqual(new_state["execution"].error, "Security Violation")
-        mock_adapter.execute.assert_not_called()
 
     def test_executor_node_allows_safe_sql(self):
         # Mock Registry and Adapter

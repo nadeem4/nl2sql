@@ -10,7 +10,19 @@ from nl2sql.pipeline.graph import run_with_graph
 from nl2sql.evaluation.evaluator import ModelEvaluator
 from nl2sql.reporting import ConsolePresenter
 
-def run_benchmark(args: argparse.Namespace, datasource_registry: DatasourceRegistry, vector_store: OrchestratorVectorStore) -> None:
+
+def run_benchmark(
+    args: argparse.Namespace, 
+    datasource_registry: DatasourceRegistry, 
+    vector_store: OrchestratorVectorStore
+) -> None:
+    """Runs the benchmark suite based on provided arguments.
+
+    Args:
+        args (argparse.Namespace): Command-line arguments.
+        datasource_registry (DatasourceRegistry): Datasource registry.
+        vector_store (OrchestratorVectorStore): Vector store instance.
+    """
     presenter = ConsolePresenter()
     
     # Matrix Benchmarking
@@ -51,7 +63,6 @@ def run_benchmark(args: argparse.Namespace, datasource_registry: DatasourceRegis
         )
 
 
-
 def _run_dataset_evaluation(
     args: argparse.Namespace, 
     datasource_registry: DatasourceRegistry, 
@@ -59,8 +70,14 @@ def _run_dataset_evaluation(
     llm_registry: LLMRegistry,
     config_name: str = "default"
 ) -> None:
-    """
-    Runs evaluation against a golden dataset.
+    """Runs evaluation against a golden dataset for a specific config.
+
+    Args:
+        args (argparse.Namespace): CLI arguments.
+        datasource_registry (DatasourceRegistry): Registry of datasources.
+        vector_store (OrchestratorVectorStore): Vector store.
+        llm_registry (LLMRegistry): LLM registry.
+        config_name (str): Name of the configuration being tested.
     """
     import pandas as pd
     from sqlalchemy import text
@@ -132,20 +149,6 @@ def _run_dataset_evaluation(
             for ds_id in actual_ds:
                 if ds_id in all_routing_info:
                     combined_routing_info.append(all_routing_info[ds_id])
-        
-        # Use the first one for "Layer" stats, or define a rule (e.g. max layer)
-        # For strict compatibility, we can keep primary_id logic for the *single* returned routing_info 
-        # but ideally we'd update metrics to be multi-aware.
-        
-        # For now, let's just pick the "best" one or sum them up?
-        # Actually, if we have multiple, we might want to know if *any* used fallback?
-        
-        # Let's keep the primary_id logic for now but add a comment, 
-        # AND if the user wants *full* info, we should probably update how validation works.
-        # But to answer "why", I will change it to attempt to find the "worst" or "most significant" one?
-        # Or just return the primary one as before but acknowledge it?
-        
-        # User asked "Why". I should just fix it to be representative.
         
         primary_id = None
         if actual_ds:
@@ -350,4 +353,3 @@ def _run_dataset_evaluation(
 
     if args.export_path:
         presenter.export_results(results, args.export_path)
-

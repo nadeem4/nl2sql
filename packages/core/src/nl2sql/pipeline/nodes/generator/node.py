@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import sqlglot
 from sqlglot import expressions as exp
-from typing import Dict, Any
+from typing import Dict, Any, List, Union
 from nl2sql.pipeline.state import GraphState
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.datasources import DatasourceRegistry
@@ -13,7 +13,25 @@ logger = get_logger("generator")
 
 
 class SqlVisitor:
+    """Visits the PlanModel AST and converts it to sqlglot expressions.
+
+    This visitor traverses the deterministic AST (Expr) produced by the Planner
+    and builds a corresponding sqlglot expression tree, which can then be
+    transpiled to the target dialect.
+    """
+
     def visit(self, expr: Expr) -> exp.Expression:
+        """Dispatches the visit to the appropriate method based on expression kind.
+
+        Args:
+            expr (Expr): The expression node to visit.
+
+        Returns:
+            exp.Expression: The corresponding sqlglot expression.
+
+        Raises:
+            ValueError: If the expression kind is unknown.
+        """
         if expr.kind == "literal":
             return self._visit_literal(expr)
         elif expr.kind == "column":
@@ -29,6 +47,7 @@ class SqlVisitor:
         raise ValueError(f"Unknown expression kind: {expr.kind}")
 
     def _visit_literal(self, expr: Expr) -> exp.Expression:
+        """Converts a literal expression to sqlglot."""
         val = expr.value
         if val is None:
             return exp.Null()
@@ -39,12 +58,14 @@ class SqlVisitor:
         return exp.Literal.string(str(val))
 
     def _visit_column(self, expr: Expr) -> exp.Column:
+        """Converts a column expression to sqlglot."""
         ident = exp.Identifier(this=expr.column_name, quoted=False)
         if expr.alias:
             return exp.Column(this=ident, table=exp.Identifier(this=expr.alias, quoted=False))
         return exp.Column(this=ident)
 
     def _visit_func(self, expr: Expr) -> exp.Expression:
+        """Converts a function call expression to sqlglot."""
         if str(expr.func_name).upper() in ("TUPLE", "LIST"):
             return exp.Tuple(expressions=[self.visit(arg) for arg in expr.args])
 
@@ -54,6 +75,7 @@ class SqlVisitor:
         )
 
     def _visit_binary(self, expr: Expr) -> exp.Expression:
+        """Converts a binary operation expression to sqlglot."""
         if not expr.left or not expr.right:
             raise ValueError("Binary expression missing operands")
 
@@ -67,7 +89,10 @@ class SqlVisitor:
         if op == "<": return exp.LT(this=left, expression=right)
         if op == ">=": return exp.GTE(this=left, expression=right)
         if op == "<=": return exp.LTE(this=left, expression=right)
-        if op == "AND": return exp.And(this=left, expression=right)
+        if op == "AND":
+            if isinstance(left, exp.Or): left = exp.Paren(this=left)
+            if isinstance(right, exp.Or): right = exp.Paren(this=right)
+            return exp.And(this=left, expression=right)
         if op == "OR": return exp.Or(this=left, expression=right)
         if op == "LIKE": return exp.Like(this=left, expression=right)
         if op == "IN":
@@ -77,6 +102,7 @@ class SqlVisitor:
         return exp.Anonymous(this=op, expressions=[left, right])
 
     def _visit_unary(self, expr: Expr) -> exp.Expression:
+        """Converts a unary operation expression to sqlglot."""
         target = expr.expr
         if not target:
             raise ValueError("Unary expression missing target")
@@ -92,6 +118,7 @@ class SqlVisitor:
         return exp.Paren(this=node)
 
     def _visit_case(self, expr: Expr) -> exp.Case:
+        """Converts a CASE expression to sqlglot."""
         when_list = []
 
         if expr.whens:
@@ -108,10 +135,32 @@ class SqlVisitor:
 
 
 class GeneratorNode:
+    """Generates the final SQL string from the PlanModel using sqlglot.
+
+    Attributes:
+        registry (DatasourceRegistry): The registry to fetch datasource dialects.
+    """
+
     def __init__(self, registry: DatasourceRegistry):
+        """Initializes the GeneratorNode.
+
+        Args:
+            registry (DatasourceRegistry): The registry of datasources.
+        """
         self.registry = registry
 
     def __call__(self, state: GraphState) -> Dict[str, Any]:
+        """Executes the generator node.
+
+        Converts the PlanModel into a SQL string tailored for the target
+        datasource's dialect.
+
+        Args:
+            state (GraphState): The current state containing the execution plan.
+
+        Returns:
+            Dict[str, Any]: A dictionary with the generated 'sql_draft' and reasoning.
+        """
         node_name = "generator"
 
         try:
@@ -151,6 +200,7 @@ class GeneratorNode:
             }
 
     def _generate_sql(self, plan: PlanModel, limit: int, dialect: str) -> str:
+        """Internal helper to build and optimize the SQL query."""
         visitor = SqlVisitor()
         query = exp.select()
 

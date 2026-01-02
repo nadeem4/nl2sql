@@ -1,3 +1,5 @@
+"""Prompts for the Semantic Analysis node."""
+
 SEMANTIC_ANALYSIS_PROMPT = """You are a Semantic Analysis Expert for an NL2SQL system.
 Your goal is to normalize and enrich the user's natural language query to improve retrieval accuracy.
 

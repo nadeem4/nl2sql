@@ -12,14 +12,45 @@ from nl2sql.pipeline.state import GraphState
 from nl2sql.reporting import ConsolePresenter
 from nl2sql.common.settings import settings
 
-def run_pipeline(args: argparse.Namespace, query: Optional[str], datasource_registry: DatasourceRegistry, llm_registry: LLMRegistry, vector_store: OrchestratorVectorStore) -> None:
+
+def run_pipeline(
+    args: argparse.Namespace, 
+    query: Optional[str], 
+    datasource_registry: DatasourceRegistry, 
+    llm_registry: LLMRegistry, 
+    vector_store: OrchestratorVectorStore
+) -> None:
+    """Executes the NL2SQL pipeline.
+
+    Args:
+        args (argparse.Namespace): Command-line arguments.
+        query (Optional[str]): The user query.
+        datasource_registry (DatasourceRegistry): Registry of datasources.
+        llm_registry (LLMRegistry): Registry of LLMs.
+        vector_store (OrchestratorVectorStore): Vector store instance.
+    """
     if not query:
         return
         
     _run_simple_mode(args, query, datasource_registry, llm_registry, vector_store)
 
 
-def _run_simple_mode(args: argparse.Namespace, query: str, datasource_registry: DatasourceRegistry, llm_registry: LLMRegistry, vector_store: OrchestratorVectorStore) -> None:
+def _run_simple_mode(
+    args: argparse.Namespace, 
+    query: str, 
+    datasource_registry: DatasourceRegistry, 
+    llm_registry: LLMRegistry, 
+    vector_store: OrchestratorVectorStore
+) -> None:
+    """Invokes the pipeline in simple (non-benchmark) mode.
+
+    Args:
+        args (argparse.Namespace): Command-line arguments.
+        query (str): The user query.
+        datasource_registry (DatasourceRegistry): Registry of datasources.
+        llm_registry (LLMRegistry): Registry of LLMs.
+        vector_store (OrchestratorVectorStore): Vector store instance.
+    """
     presenter = ConsolePresenter()
     presenter.print_query(query)
     

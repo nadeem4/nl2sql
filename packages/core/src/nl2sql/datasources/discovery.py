@@ -7,11 +7,11 @@ from nl2sql.common.logger import get_logger
 logger = get_logger(__name__)
 
 def discover_adapters() -> Dict[str, Type[DatasourceAdapter]]:
-    """
-    Discovers installed adapters via 'nl2sql.adapters' entry points.
+    """Discovers installed adapters via 'nl2sql.adapters' entry points.
     
     Returns:
-        Dict mapping adapter name (e.g., 'postgres') to the Adapter Class.
+        Dict[str, Type[DatasourceAdapter]]: Dict mapping adapter name (e.g., 'postgres')
+            to the Adapter Class.
     """
     adapters = {}
     try:

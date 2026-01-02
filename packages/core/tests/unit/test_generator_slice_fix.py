@@ -15,6 +15,7 @@ class TestSliceErrorReproduction(unittest.TestCase):
         
         self.mock_registry.get_adapter.return_value = self.mock_adapter
         self.mock_registry.get_profile.return_value = self.mock_profile
+        self.mock_registry.get_dialect.return_value = "sqlite"
         
         self.mock_adapter.capabilities.return_value = CapabilitySet(
             supports_cte=True
@@ -30,13 +31,14 @@ class TestSliceErrorReproduction(unittest.TestCase):
         in _build_group_by.
         """
         # Plan with group_by as ColumnRef dicts (new schema)
+        # Plan with group_by as ColumnRef dicts (new schema)
         plan = {
-            "tables": [{"name": "users", "alias": "u"}],
-            "select_columns": [{"expr": "u.id"}],
-            "group_by": [{"expr": "u.id", "is_derived": False}], # This is a dict!
-            "filters": [],
+            "tables": [{"name": "users", "alias": "u", "ordinal": 0}],
+            "select_items": [{"expr": {"kind": "column", "column_name": "id", "alias": "u"}, "ordinal": 0}],
+            "group_by": [{"expr": {"kind": "column", "column_name": "id", "alias": "u"}, "ordinal": 0}], 
+            "where": None,
             "joins": [],
-            "having": [],
+            "having": None,
             "order_by": []
         }
     

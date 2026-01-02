@@ -1,8 +1,16 @@
 from typing import List, Optional
 from pydantic import BaseModel, Field
 
+
 class SemanticAnalysisResponse(BaseModel):
-    """Output for the Semantic Analysis Node."""
+    """Output for the Semantic Analysis Node.
+
+    Attributes:
+        canonical_query (str): The normalized query string.
+        keywords (List[str]): Domain-specific keywords extracted from the query.
+        synonyms (List[str]): Synonyms for the extracted keywords.
+        reasoning (str): Reasoning behind the analysis.
+    """
     
     canonical_query: str = Field(
         ..., 

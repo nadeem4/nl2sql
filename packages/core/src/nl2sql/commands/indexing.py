@@ -4,7 +4,20 @@ from nl2sql.reporting import ConsolePresenter
 from nl2sql.services.vector_store import OrchestratorVectorStore
 from nl2sql.datasources import DatasourceRegistry, DatasourceProfile
 
-def run_indexing(profiles: Dict[str, DatasourceProfile], vector_store_path: str, vector_store: OrchestratorVectorStore, llm_registry: Any = None) -> None:
+def run_indexing(
+    profiles: Dict[str, DatasourceProfile], 
+    vector_store_path: str, 
+    vector_store: OrchestratorVectorStore, 
+    llm_registry: Any = None
+) -> None:
+    """Runs the indexing process for schemas and examples.
+
+    Args:
+        profiles (Dict[str, DatasourceProfile]): Dictionary of datasource profiles.
+        vector_store_path (str): Path to the vector store.
+        vector_store (OrchestratorVectorStore): The vector store instance.
+        llm_registry (Any, optional): Registry of LLMs for enrichment.
+    """
     presenter = ConsolePresenter()
     presenter.print_indexing_start(vector_store_path)
     

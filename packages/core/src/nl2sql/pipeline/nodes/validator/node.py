@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Set, Dict, Any, List, Optional
+from typing import Set, Dict, Any, List, Optional, Tuple
 import traceback
 
 from nl2sql.pipeline.state import GraphState
@@ -14,11 +14,28 @@ logger = get_logger("validator")
 
 
 class ValidatorVisitor:
+    """Traverses the Expr AST to validate column existence and scoping.
+
+    Attributes:
+        alias_to_cols (Dict[str, Set[str]]): Map of table aliases to their column names.
+        errors (List[str]): List of validation error messages collected during traversal.
+    """
+
     def __init__(self, alias_to_cols: Dict[str, Set[str]]):
+        """Initializes the ValidatorVisitor.
+
+        Args:
+            alias_to_cols (Dict[str, Set[str]]): Mapping of aliases to available columns.
+        """
         self.alias_to_cols = alias_to_cols
         self.errors: List[str] = []
 
     def visit(self, expr: Expr) -> None:
+        """Recursively visits an expression node to check for column errors.
+
+        Args:
+            expr (Expr): The expression to validate.
+        """
         kind = expr.kind
 
         if kind == "column":
@@ -50,6 +67,7 @@ class ValidatorVisitor:
             return
 
     def _visit_column(self, col: Expr):
+        """Validates a column expression against the known alias map."""
         if not col.column_name:
             return
 
@@ -87,14 +105,44 @@ class ValidatorVisitor:
 
 
 class ValidatorNode:
+    """Validates the generated AST (PlanModel).
+
+    Performs multiple layers of validation:
+    1. Static Validation: Structure, ordinals, required fields.
+    2. Policy Validation: Checks if the user role allows access to requested tables.
+    3. Semantic Validation: Checks for column existence and ambiguity using the schema.
+    4. Performance Validation: Estimates query cost and warns if too expensive.
+
+    Attributes:
+        registry (DatasourceRegistry): Registry to fetch schemas and profiles.
+        row_limit (int | None): Configured maximum row limit for performance warnings.
+    """
+
     def __init__(self, registry: DatasourceRegistry, row_limit: int | None = None):
+        """Initializes the ValidatorNode.
+
+        Args:
+            registry (DatasourceRegistry): The registry of datasources.
+            row_limit (int | None): Optional row limit for performance validation.
+        """
         self.registry = registry
         self.row_limit = row_limit
 
     def _build_alias_map(
         self, state: GraphState, plan: PlanModel
-    ) -> tuple[Dict[str, Set[str]], Set[str], List[PipelineError]]:
+    ) -> Tuple[Dict[str, Set[str]], Set[str], List[PipelineError]]:
+        """Constructs a map of table aliases to column sets from the schema.
 
+        Args:
+            state (GraphState): Current execution state containing relevant_tables.
+            plan (PlanModel): The plan containing table references.
+
+        Returns:
+            Tuple containing:
+            - alias_to_cols (Dict[str, Set[str]]): Map of alias to column names.
+            - plan_aliases (Set[str]): Set of aliases defined in the plan.
+            - errors (List[PipelineError]): List of errors if tables are missing.
+        """
         alias_to_cols: Dict[str, Set[str]] = {}
         plan_aliases: Set[str] = set()
         errors: List[PipelineError] = []
@@ -131,6 +179,7 @@ class ValidatorNode:
         return alias_to_cols, plan_aliases, errors
 
     def _validate_ordinals(self, items: List[Any], label: str) -> Optional[PipelineError]:
+        """Checks if ordinals in a list of items are contiguous starting from 0."""
         if not items:
             return None
 
@@ -147,6 +196,7 @@ class ValidatorNode:
         return None
 
     def _alias_collision(self, plan: PlanModel) -> Optional[PipelineError]:
+        """Checks for duplicate table aliases in the plan."""
         seen = set()
         for t in plan.tables:
             if t.alias in seen:
@@ -160,6 +210,14 @@ class ValidatorNode:
         return None
 
     def _validate_policy(self, state: GraphState) -> list[PipelineError]:
+        """Validates that the query adheres to access control policies.
+
+        Args:
+            state (GraphState): Execution state containing user_context.
+
+        Returns:
+            list[PipelineError]: Errors if unauthorized tables are accessed.
+        """
         plan = state.plan
         errors: list[PipelineError] = []
 
@@ -186,6 +244,15 @@ class ValidatorNode:
         return errors
 
     def _validate_static(self, state: GraphState) -> list[PipelineError]:
+        """Performs static structure validation on the plan.
+
+        Checks:
+        - Query type allowed (READ only).
+        - Ordinal integrity.
+        - Alias uniqueness.
+        - Join alias validity.
+        - Column existence (via ValidatorVisitor).
+        """
         plan: PlanModel = state.plan
         errors: list[PipelineError] = []
 
@@ -271,6 +338,7 @@ class ValidatorNode:
         return errors
 
     def _validate_semantic(self, state: GraphState) -> list[PipelineError]:
+        """Performs semantic validation (e.g., dry-run) if supported by adapter."""
         errors: list[PipelineError] = []
 
         sql = getattr(state, "generated_sql", None)
@@ -302,6 +370,7 @@ class ValidatorNode:
         return errors
 
     def _validate_perf(self, state: GraphState) -> list[PipelineError]:
+        """Performs performance validation (cost estimation)."""
         errors: list[PipelineError] = []
 
         sql = getattr(state, "generated_sql", None)
@@ -343,6 +412,14 @@ class ValidatorNode:
         return errors
 
     def __call__(self, state: GraphState) -> Dict[str, Any]:
+        """Executes the validation node.
+
+        Args:
+            state (GraphState): Current execution state.
+
+        Returns:
+            Dict[str, Any]: Validation results, including errors and reasoning.
+        """
         node_name = "validator"
         errors: list[PipelineError] = []
 

@@ -7,15 +7,14 @@ from typing import Any, Dict, List, Optional
 
 @dataclasses.dataclass
 class FeatureFlags:
-    """
-    Configuration flags for database capabilities and safety features.
+    """Configuration flags for database capabilities and safety features.
 
     Attributes:
-        allow_generate_writes: If True, allows generation of DML/DDL (DANGEROUS).
-        allow_cross_db: If True, allows cross-database queries (if supported).
-        supports_dry_run: If True, engine supports dry-run validation.
-        supports_estimated_cost: If True, engine supports cost estimation.
-        sample_rows_enabled: If True, allows fetching sample rows.
+        allow_generate_writes (bool): If True, allows generation of DML/DDL (DANGEROUS).
+        allow_cross_db (bool): If True, allows cross-database queries (if supported).
+        supports_dry_run (bool): If True, engine supports dry-run validation.
+        supports_estimated_cost (bool): If True, engine supports cost estimation.
+        sample_rows_enabled (bool): If True, allows fetching sample rows.
     """
     allow_generate_writes: bool = False
     allow_cross_db: bool = False
@@ -26,20 +25,21 @@ class FeatureFlags:
 
 @dataclasses.dataclass
 class DatasourceProfile:
-    """
-    Configuration profile for a data source.
+    """Configuration profile for a data source.
 
     Attributes:
-        id: Unique identifier for the profile.
-        engine: Database engine type (e.g., "sqlite", "postgres"). Optional if implied by URL.
-        sqlalchemy_url: SQLAlchemy connection string.
-        auth: Optional authentication details.
-        read_only_role: Optional role to assume for read-only access.
-        statement_timeout_ms: Timeout for queries in milliseconds.
-        row_limit: Maximum number of rows to return.
-        max_bytes: Maximum response size in bytes.
-        tags: Metadata tags.
-        feature_flags: Capability flags.
+        id (str): Unique identifier for the profile.
+        sqlalchemy_url (str): SQLAlchemy connection string.
+        engine (Optional[str]): Database engine type (e.g., "sqlite", "postgres").
+        auth (Optional[Dict[str, Any]]): Optional authentication details.
+        read_only_role (Optional[str]): Optional role to assume for read-only access.
+        description (Optional[str]): Optional description of the datasource.
+        statement_timeout_ms (int): Timeout for queries in milliseconds.
+        row_limit (int): Maximum number of rows to return.
+        max_bytes (int): Maximum response size in bytes.
+        tags (Dict[str, Any]): Metadata tags.
+        feature_flags (FeatureFlags): Capability flags.
+        date_format (str): Date format string.
     """
     id: str
     sqlalchemy_url: str
@@ -79,6 +79,7 @@ def _normalize_engine_id(backend: str) -> str:
     if backend == "oracle": return "oracle"
     return backend
 
+
 def _infer_engine(url: str) -> str:
     """Infers the engine type from the SQLAlchemy URL."""
     try:
@@ -117,14 +118,13 @@ def _to_profile(raw: Dict[str, Any]) -> DatasourceProfile:
 
 
 def load_profiles(path: pathlib.Path) -> Dict[str, DatasourceProfile]:
-    """
-    Load datasource profiles from a YAML file.
+    """Loads datasource profiles from a YAML file.
 
     Args:
-        path: Path to the YAML configuration file.
+        path (pathlib.Path): Path to the YAML configuration file.
 
     Returns:
-        A dictionary mapping profile IDs to DatasourceProfile objects.
+        Dict[str, DatasourceProfile]: A dictionary mapping profile IDs to DatasourceProfile objects.
 
     Raises:
         RuntimeError: If PyYAML is not installed.
@@ -151,15 +151,14 @@ def load_profiles(path: pathlib.Path) -> Dict[str, DatasourceProfile]:
 
 
 def get_profile(profiles: Dict[str, DatasourceProfile], profile_id: str) -> DatasourceProfile:
-    """
-    Retrieves a profile by ID.
+    """Retrieves a profile by ID.
 
     Args:
-        profiles: Dictionary of available profiles.
-        profile_id: ID of the profile to retrieve.
+        profiles (Dict[str, DatasourceProfile]): Dictionary of available profiles.
+        profile_id (str): ID of the profile to retrieve.
 
     Returns:
-        The requested DatasourceProfile.
+        DatasourceProfile: The requested DatasourceProfile.
 
     Raises:
         KeyError: If the profile ID is not found.

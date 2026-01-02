@@ -1,3 +1,5 @@
+"""Prompts and examples for the SQL Planner node."""
+
 PLANNER_EXAMPLES = """
 Examples:
 

@@ -1,3 +1,5 @@
+"""Prompts for the Aggregator node."""
+
 AGGREGATOR_PROMPT = """You are an expert data analyst. Your task is to synthesize results from multiple database queries into a single, coherent answer for the user.
 
 User Query: {user_query}

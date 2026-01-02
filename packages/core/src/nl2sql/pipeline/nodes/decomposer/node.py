@@ -23,23 +23,47 @@ LLMCallable = Union[Callable[[str], Any], Runnable]
 
 
 class DecomposerNode:
+    """Orchestrates query decomposition and routing.
+
+    Analyzes the user query and retrieved context to determine which datasource(s)
+    should handle the request. Splits complex multi-source queries into sub-queries.
+
+    Attributes:
+        llm (LLMCallable): The language model to use.
+        registry (DatasourceRegistry): Registry of datasources.
+        vector_store (Optional[OrchestratorVectorStore]): Store for retrieving context.
+        prompt (ChatPromptTemplate): The prompt template.
+        chain (Runnable): The execution chain.
+    """
+
     def __init__(
         self,
         llm: LLMCallable,
         registry: DatasourceRegistry,
         vector_store: Optional[OrchestratorVectorStore] = None,
     ):
+        """Initializes the DecomposerNode.
+
+        Args:
+            llm (LLMCallable): The LLM instance or runnable.
+            registry (DatasourceRegistry): The datasource registry.
+            vector_store (Optional[OrchestratorVectorStore]): Vector store for RAG.
+        """
         self.llm = llm
         self.registry = registry
         self.vector_store = vector_store
         self.prompt = ChatPromptTemplate.from_template(DECOMPOSER_PROMPT)
         self.chain = self.prompt | self.llm
 
-
     def _get_relevant_docs(self, state: GraphState, override_query: str = None) -> list:
-        """
-        Helper to retrieve relevant docs from Vector Store based on user_context.
-        Returns a list of documents.
+        """Helper to retrieve relevant docs from Vector Store based on user_context.
+
+        Args:
+            state (GraphState): Current execution state.
+            override_query (str): Optional query string to use instead of state.user_query.
+
+        Returns:
+            list: A list of relevant documents.
         """
 
         if not self.vector_store:
@@ -47,7 +71,7 @@ class DecomposerNode:
 
         user_ctx = state.user_context or {}
         allowed_ds = user_ctx.get("allowed_datasources") or []
-        
+
         query_text = override_query or state.user_query
 
         if "*" in allowed_ds:
@@ -63,11 +87,29 @@ class DecomposerNode:
             return []
 
     def _check_user_access(self, state: GraphState) -> bool:
+        """Checks if the user has access to any datasources.
+
+        Args:
+           state (GraphState): Current execution state.
+
+        Returns:
+            bool: True if access is allowed, False otherwise.
+        """
         user_ctx = state.user_context or {}
         allowed_ds = user_ctx.get("allowed_datasources") or []
         return bool(allowed_ds)
 
     def __call__(self, state: GraphState) -> Dict[str, Any]:
+        """Executes the decomposer node.
+
+        Retrieves context, invokes the LLM, and produces a routing decision.
+
+        Args:
+            state (GraphState): The current execution state.
+
+        Returns:
+            Dict[str, Any]: Dictionary containing 'sub_queries', confidence, reasoning, etc.
+        """
         node_name = "decomposer"
 
         try:
@@ -79,17 +121,17 @@ class DecomposerNode:
                         {"node": node_name, "content": "AuthZ: Request rejected. No allowed_datasources found in user_context."}
                     ],
                     "errors": [
-                    PipelineError(
-                        node=node_name,
-                        message="Access Denied: User has no allowed datasources.",
-                        severity=ErrorSeverity.CRITICAL,
-                        error_code=ErrorCode.SECURITY_VIOLATION
-                    )
-                ]
-            }
-            
+                        PipelineError(
+                            node=node_name,
+                            message="Access Denied: User has no allowed datasources.",
+                            severity=ErrorSeverity.CRITICAL,
+                            error_code=ErrorCode.SECURITY_VIOLATION
+                        )
+                    ]
+                }
+
             expanded_query = state.user_query
-            
+
             if state.semantic_analysis:
                 analysis = state.semantic_analysis
                 if analysis.keywords or analysis.synonyms:
@@ -97,16 +139,16 @@ class DecomposerNode:
                     expanded_query = f"{analysis.canonical_query} {' '.join(analysis.keywords)} {' '.join(analysis.synonyms)}"
                     print(f"Expanded Query: {expanded_query}")
 
-            retrieved_context = ""            
+            retrieved_context = ""
             docs = self._get_relevant_docs(state, override_query=expanded_query)
-            
+
             if not docs:
                 logger.warning("No relevant docs found for query: %s", expanded_query)
                 return {
                     "sub_queries": [],
                     "confidence": 0.0,
                     "reasoning": [
-                         {"node": node_name, "content": f"Retrieval returned 0 documents for search query: '{expanded_query}'."}
+                        {"node": node_name, "content": f"Retrieval returned 0 documents for search query: '{expanded_query}'."}
                     ],
                     "errors": [
                         PipelineError(
@@ -118,27 +160,26 @@ class DecomposerNode:
                     ]
                 }
 
-                
             context_lines = []
             ds_tables: Dict[str, list] = {}
-            
+
             for doc in docs:
                 d_type = doc.metadata.get("type", "table")
                 d_id = doc.metadata.get("datasource_id", "unknown")
                 name = doc.metadata.get("table_name", "unknown")
-                
+
                 if d_type == "table":
                     schema_json_str = doc.metadata.get("schema_json")
                     content_block = schema_json_str
-                    
+
                     if d_id not in ds_tables:
                         ds_tables[d_id] = []
                     ds_tables[d_id].append(Table.model_validate_json(schema_json_str))
-                            
+
                     context_lines.append(f"[Table] {name} (DS: {d_id}):\n{content_block}")
                 elif d_type == "example":
-                        context_lines.append(f"[Example] (DS: {d_id}): {doc.page_content}")
-            
+                    context_lines.append(f"[Example] (DS: {d_id}): {doc.page_content}")
+
             retrieved_context = "\n\n".join(context_lines)
 
             llm_response: DecomposerResponse = self.chain.invoke(
@@ -149,7 +190,7 @@ class DecomposerNode:
             )
 
             final_sub_queries = []
-           
+
             for llm_sq in llm_response.sub_queries:
                 sq = SubQuery(
                     query=llm_sq.query,
@@ -159,17 +200,17 @@ class DecomposerNode:
 
                 if sq.datasource_id in ds_tables:
                     sq.relevant_tables = ds_tables[sq.datasource_id]
-                
+
                 final_sub_queries.append(sq)
 
             reasoning_list = []
-            
+
             reasoning_list.append({"node": node_name, "content": llm_response.reasoning})
 
             return {
                 "sub_queries": final_sub_queries,
                 "confidence": llm_response.confidence,
-                "output_mode": llm_response.output_mode, 
+                "output_mode": llm_response.output_mode,
                 "reasoning": reasoning_list,
             }
 

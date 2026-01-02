@@ -1,3 +1,5 @@
+"""Prompts and examples for the Direct SQL generation node."""
+
 DIRECT_SQL_EXAMPLES = """
 [EXAMPLE 1]
 User Query: "List active machines"

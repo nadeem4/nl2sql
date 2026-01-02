@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
-"""
-CLI entrypoint for the NL2SQL LangGraph pipeline.
-"""
+"""CLI entrypoint for the NL2SQL LangGraph pipeline."""
 import argparse
 import pathlib
 import sys
@@ -19,6 +17,11 @@ from nl2sql.commands.run import run_pipeline
 
 
 def parse_args() -> argparse.Namespace:
+    """Parses command-line arguments.
+
+    Returns:
+        argparse.Namespace: The parsed arguments.
+    """
     parser = argparse.ArgumentParser(description="Run the NL2SQL LangGraph pipeline.")
     parser.add_argument("--config", type=pathlib.Path, default=pathlib.Path(settings.datasource_config_path))
     parser.add_argument("--id", type=str, default=None, help="Datasource profile id (default: auto-route)")
@@ -53,6 +56,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
+    """Main entry point for the CLI."""
     args = parse_args()
     
     if args.json:

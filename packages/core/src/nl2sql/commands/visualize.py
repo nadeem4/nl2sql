@@ -2,9 +2,19 @@ from typing import List, Dict, Any
 from langgraph.graph.state import CompiledStateGraph
 from nl2sql.reporting import ConsolePresenter
 
-def draw_execution_trace(trace: List[Dict[str, Any]], graph: CompiledStateGraph, execution_subgraph: CompiledStateGraph, agentic_execution_loop: CompiledStateGraph):
-    """
-    Visualizes the execution trace in the CLI and saves the graph structure.
+def draw_execution_trace(
+    trace: List[Dict[str, Any]], 
+    graph: CompiledStateGraph, 
+    execution_subgraph: CompiledStateGraph, 
+    agentic_execution_loop: CompiledStateGraph
+):
+    """Visualizes the execution trace in the CLI and saves the graph structure.
+
+    Args:
+        trace (List[Dict[str, Any]]): The execution trace.
+        graph (CompiledStateGraph): The main graph.
+        execution_subgraph (CompiledStateGraph): The execution subgraph.
+        agentic_execution_loop (CompiledStateGraph): The agentic loop subgraph.
     """
     presenter = ConsolePresenter()
 

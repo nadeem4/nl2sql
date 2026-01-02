@@ -11,6 +11,9 @@ class MockRegistry(DatasourceRegistry):
     def __init__(self):
         super().__init__({})
         
+    def get_dialect(self, id):
+        return "postgres"
+        
     def get_profile(self, id):
         from types import SimpleNamespace
         return SimpleNamespace(engine="postgres", row_limit=1000)
@@ -36,20 +39,20 @@ def test_deep_recursion(generator):
             left=Expr(
                 kind="binary",
                 op=">",
-                left=Expr(kind="column", name="col1", table="t1"),
+                left=Expr(kind="column", column_name="col1", alias="t1"),
                 right=Expr(kind="literal", value=10)
             ),
             right=Expr(
                 kind="binary",
                 op="<",
-                left=Expr(kind="column", name="col2", table="t1"),
+                left=Expr(kind="column", column_name="col2", alias="t1"),
                 right=Expr(kind="literal", value=5)
             )
         ),
         right=Expr(
             kind="binary",
             op="=",
-            left=Expr(kind="column", name="col3", table="t1"),
+            left=Expr(kind="column", column_name="col3", alias="t1"),
             right=Expr(kind="literal", value="test")
         )
     )
@@ -58,8 +61,8 @@ def test_deep_recursion(generator):
         query_type="READ",
         tables=[TableRef(name="users", alias="t1", ordinal=0)],
         select_items=[
-            SelectItem(expr=Expr(kind="column", name="id", table="t1"), ordinal=0),
-            SelectItem(expr=Expr(kind="column", name="name", table="t1"), ordinal=1)
+            SelectItem(expr=Expr(kind="column", column_name="id", alias="t1"), ordinal=0),
+            SelectItem(expr=Expr(kind="column", column_name="name", alias="t1"), ordinal=1)
         ],
         where=where_clause
     )
@@ -94,19 +97,19 @@ def test_ordinal_sorting(generator):
         tables=[t2, t1], 
         joins=[
             JoinSpec(
-                left_table="users", right_table="orders", join_type="inner",
+                left_alias="u", right_alias="o", join_type="inner",
                 ordinal=0,
                 condition=Expr(
                     kind="binary",
                     op="=",
-                    left=Expr(kind="column", name="id", table="u"),
-                    right=Expr(kind="column", name="user_id", table="o")
+                    left=Expr(kind="column", column_name="id", alias="u"),
+                    right=Expr(kind="column", column_name="user_id", alias="o")
                 )
             )
         ],
         select_items=[
-            SelectItem(expr=Expr(kind="column", name="id", table="u"), ordinal=1, alias="id_second"),
-            SelectItem(expr=Expr(kind="column", name="date", table="o"), ordinal=0, alias="date_first")
+            SelectItem(expr=Expr(kind="column", column_name="id", alias="u"), ordinal=1, alias="id_second"),
+            SelectItem(expr=Expr(kind="column", column_name="date", alias="o"), ordinal=0, alias="date_first")
         ]
     )
     

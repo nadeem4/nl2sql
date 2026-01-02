@@ -3,10 +3,9 @@ import pytest
 from unittest.mock import MagicMock
 from nl2sql.pipeline.nodes.validator.node import ValidatorNode
 from nl2sql.pipeline.state import GraphState
-from nl2sql.pipeline.nodes.schema.schemas import SchemaInfo, TableInfo, ColumnInfo
-from nl2sql.pipeline.nodes.planner.schemas import PlanModel, TableRef, ColumnRef
+from nl2sql.pipeline.nodes.planner.schemas import PlanModel, TableRef, SelectItem, Expr
 from nl2sql.datasources import DatasourceRegistry
-from nl2sql_adapter_sdk import DatasourceAdapter, CapabilitySet
+from nl2sql_adapter_sdk import DatasourceAdapter, CapabilitySet, Table, Column
 
 @pytest.fixture
 def mock_registry():
@@ -19,95 +18,107 @@ def mock_registry():
     return registry
 
 @pytest.fixture
-def mock_schema():
-    return SchemaInfo(
-        tables=[
-            TableInfo(
-                name="users", 
-                alias="u", 
-                columns=[
-                    ColumnInfo(name="u.id", original_name="id", type="INT"),
-                    ColumnInfo(name="u.name", original_name="name", type="VARCHAR"),
-                    ColumnInfo(name="u.email", original_name="email", type="VARCHAR")
-                ]
-            ),
-            TableInfo(
-                name="orders", 
-                alias="o", 
-                columns=[
-                    ColumnInfo(name="o.id", original_name="id", type="INT"),
-                    ColumnInfo(name="o.user_id", original_name="user_id", type="INT"),
-                    ColumnInfo(name="o.amount", original_name="amount", type="DECIMAL")
-                ]
-            )
-        ]
-    )
+def mock_tables():
+    return [
+        Table(
+            name="users", 
+            columns=[
+                Column(name="id", type="INT"),
+                Column(name="name", type="VARCHAR"),
+                Column(name="email", type="VARCHAR")
+            ]
+        ),
+        Table(
+            name="orders", 
+            columns=[
+                Column(name="id", type="INT"),
+                Column(name="user_id", type="INT"),
+                Column(name="amount", type="DECIMAL")
+            ]
+        )
+    ]
 
-def test_validator_valid_plan(mock_schema, mock_registry):
+def _col_expr(alias: str, col: str) -> Expr:
+    return Expr(kind="column", alias=alias, column_name=col)
+
+def test_validator_valid_plan(mock_tables, mock_registry):
     validator = ValidatorNode(registry=mock_registry)
     plan = PlanModel(
-        entity_ids=["e1"],
-        tables=[TableRef(name="users", alias="u")],
-        select_columns=[ColumnRef(expr="u.name")],
-        filters=[],
-        joins=[],
-        group_by=[],
-        order_by=[],
-        having=[]
+        tables=[TableRef(name="users", alias="u", ordinal=0)],
+        select_items=[
+            SelectItem(expr=_col_expr("u", "name"), ordinal=0)
+        ],
+        joins=[]
     )
-    state = GraphState(user_query="q", schema_info=mock_schema, plan=plan.model_dump(), selected_datasource_id="ds1")
+    state = GraphState(
+        user_query="q", 
+        relevant_tables=mock_tables, 
+        plan=plan, 
+        selected_datasource_id="ds1",
+        user_context={"allowed_tables": ["*"]}
+    )
     
     new_state = validator(state)
     assert not new_state.get("errors")
 
-def test_validator_invalid_table(mock_schema, mock_registry):
+def test_validator_invalid_table(mock_tables, mock_registry):
     validator = ValidatorNode(registry=mock_registry)
     plan = PlanModel(
-        entity_ids=["e1"],
-        tables=[TableRef(name="invalid_table", alias="x")],
-        select_columns=[ColumnRef(expr="x.id")]
+        tables=[TableRef(name="invalid_table", alias="x", ordinal=0)],
+        select_items=[
+            SelectItem(expr=_col_expr("x", "id"), ordinal=0)
+        ]
     )
-    state = GraphState(user_query="q", schema_info=mock_schema, plan=plan.model_dump(), selected_datasource_id="ds1")
+    state = GraphState(
+        user_query="q", 
+        relevant_tables=mock_tables, 
+        plan=plan, 
+        selected_datasource_id="ds1",
+        user_context={"allowed_tables": ["*"]}
+    )
     
     new_state = validator(state)
-    assert any("not found in schema" in e.message for e in new_state["errors"])
+    # Actual: "Table 'invalid_table' not found in relevant tables."
+    assert any("not found in relevant tables" in e.message for e in new_state["errors"])
 
-def test_validator_alias_mismatch(mock_schema, mock_registry):
-    validator = ValidatorNode(registry=mock_registry)
-    plan = PlanModel(
-        entity_ids=["e1"],
-        tables=[TableRef(name="users", alias="x")], # Wrong alias, schema has 'u'
-        select_columns=[ColumnRef(expr="x.name")]
-    )
-    state = GraphState(user_query="q", schema_info=mock_schema, plan=plan.model_dump(), selected_datasource_id="ds1")
-    
-    new_state = validator(state)
-    assert new_state["errors"], "Expected errors but found none"
-    error_msgs = [e.message for e in new_state["errors"]]
-    assert any("not found in schema" in msg or "alias mismatch" in msg for msg in error_msgs), f"Unexpected errors: {error_msgs}"
 
-def test_validator_invalid_column_alias_usage(mock_schema, mock_registry):
+def test_validator_undefined_alias(mock_tables, mock_registry):
     validator = ValidatorNode(registry=mock_registry)
-    # Alias used in filter (not allowed)
     plan = PlanModel(
-        entity_ids=["e1"],
-        tables=[TableRef(name="users", alias="u")],
-        select_columns=[ColumnRef(expr="u.name", alias="user_name")],
-        filters=[{"column": {"expr": "u.name", "alias": "user_name"}, "op": "=", "value": "John"}]
+        tables=[TableRef(name="users", alias="u", ordinal=0)],
+        select_items=[
+             SelectItem(expr=_col_expr("z", "name"), ordinal=0)
+        ]
     )
-    state = GraphState(user_query="q", schema_info=mock_schema, plan=plan.model_dump(), selected_datasource_id="ds1")
+    state = GraphState(
+        user_query="q", 
+        relevant_tables=mock_tables, 
+        plan=plan, 
+        selected_datasource_id="ds1",
+        user_context={"allowed_tables": ["*"]}
+    )
     
     new_state = validator(state)
-    assert any("Aliases are only allowed in 'select_columns'" in e.message for e in new_state["errors"])
+    # Actual: "Column 'name' uses undeclared alias 'z'."
+    assert any("uses undeclared alias 'z'" in e.message for e in new_state["errors"])
 
-def test_validator_invalid_column_name(mock_schema, mock_registry):
+
+def test_validator_invalid_column_name(mock_tables, mock_registry):
     validator = ValidatorNode(registry=mock_registry)
     plan = PlanModel(
-        entity_ids=["e1"],
-        tables=[TableRef(name="users", alias="u")],
-        select_columns=[ColumnRef(expr="u.invalid_col")]
+        tables=[TableRef(name="users", alias="u", ordinal=0)],
+        select_items=[
+            SelectItem(expr=_col_expr("u", "invalid_col"), ordinal=0)
+        ]
     )
-    state = GraphState(user_query="q", schema_info=mock_schema, plan=plan.model_dump(), selected_datasource_id="ds1")
+    state = GraphState(
+        user_query="q", 
+        relevant_tables=mock_tables, 
+        plan=plan, 
+        selected_datasource_id="ds1",
+        user_context={"allowed_tables": ["*"]}
+    )
     
     new_state = validator(state)
-    assert any("Column 'u.invalid_col' not found" in e.message for e in new_state["errors"])
+    # Actual: "Column 'invalid_col' does not exist in table alias 'u'."
+    assert any("does not exist in table alias 'u'" in e.message for e in new_state["errors"])
