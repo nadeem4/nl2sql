@@ -10,6 +10,7 @@ from nl2sql.services.vector_store import OrchestratorVectorStore
 from nl2sql.commands.visualize import draw_execution_trace
 from nl2sql.pipeline.state import GraphState
 from nl2sql.reporting import ConsolePresenter
+from nl2sql.common.settings import settings
 
 def run_pipeline(args: argparse.Namespace, query: Optional[str], datasource_registry: DatasourceRegistry, llm_registry: LLMRegistry, vector_store: OrchestratorVectorStore) -> None:
     if not query:
@@ -36,17 +37,25 @@ def _run_simple_mode(args: argparse.Namespace, query: str, datasource_registry: 
     user_context = {}
     try:
         import pathlib
-        users_path = pathlib.Path("users.json")
+        users_path = pathlib.Path(settings.users_config_path)            
         if users_path.exists():
             with open(users_path, "r") as f:
                 users_db = json.load(f)
-                user_context = users_db.get(args.user, {})
-                if not user_context and args.user != "admin":
-                    presenter.print_error(f"User '{args.user}' not found in users.json. Using empty context.")
+                user_context = users_db.get(args.user)
+                
+                if not user_context:
+                    presenter.print_error(f"Critical: User '{args.user}' not found in '{users_path.resolve()}'. Cannot execute without context.")
+                    sys.exit(1)
+        else:
+            presenter.print_error(f"Critical: User config file not found at '{users_path}'. Cannot load context.")
+            sys.exit(1)
+
     except Exception as e:
         presenter.print_error(f"Failed to load user context: {e}")
+        sys.exit(1)
 
     try:
+        print(f"User Context: {user_context}")
         final_state = run_with_graph(
             registry=datasource_registry,
             llm_registry=llm_registry,

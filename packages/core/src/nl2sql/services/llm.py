@@ -174,8 +174,9 @@ class LLMRegistry:
 
     def direct_sql_llm(self) -> LLMCallable:
         """Returns the LLM callable for the Direct SQL agent."""
+        from nl2sql.pipeline.nodes.direct_sql.schemas import DirectSQLResponse
         llm = self._base_llm("direct_sql")
-        return llm.invoke
+        return self._wrap_structured_usage(llm, DirectSQLResponse)
 
     def semantic_llm(self) -> LLMCallable:
         """Returns the LLM callable for the Semantic Analysis agent."""

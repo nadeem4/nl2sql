@@ -32,14 +32,13 @@ graph TD
 
 ### 1. Static Analysis & Policy Check
 
-* **Methods**:
-  * `_validate_policy(plan)`: Checks `plan.tables` against `user_context.allowed_tables`.
-  * `_validate_static_analysis(plan)`: Syntax, Schema existence, Type safety.
+* **Method**: `_validate_static_analysis(plan)`
+* **Visitor Pattern**: Implements a `ValidatorVisitor` to recursively check the AST.
 * **Checks**:
-  * **Access**: Is the user allowed to query 'salary_data'?
-  * **Schema**: Do tables/columns exist in `state.relevant_tables`?
-  * **Logic**: Are aliases valid? Aggregations correct?
-  * **Types**: Do literals match column types (e.g. Date formats)?
+  * **Access**: Checks `user_context` before visitation.
+  * **Schema**: `visit_column` validates existence in `state.relevant_tables`.
+  * **Types**: `visit_binary` checks operation compatibility (e.g. `date` vs `string`).
+  * **Recursion**: deeply validates `plan.where` and `plan.having` trees.
 * **Outcome**: `CRITICAL` or `ERROR` (Hard Fail).
 
 ### 2. Semantic Verification (Dry Run)

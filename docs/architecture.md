@@ -92,10 +92,10 @@ Each branch runs a dedicated LangGraph `StateMachine` inside `nl2sql-core`.
 | :--- | :--- | :--- |
 | **SemanticAnalysisNode** | Canonicalizes query and extracts entities/synonyms. | Entry point. Enriches `state.semantic_analysis`. |
 | **DecomposerNode** | Breaks down queries using Semantic Analysis and Vector Search. | Maps Names -> Table Objects. |
-| **PlannerNode** | Hydrates schema context and creates execution plan. | Calls `adapter.fetch_schema()` |
-| **GeneratorNode** | Generates dialect-specific SQL. | Calls `adapter.capabilities()` to decide SQL features. |
+| **PlannerNode** | Hydrates schema context and creates a **Recursive AST Plan**. | Output: Nested `PlanModel` (AST). |
+| **GeneratorNode** | Compiles AST to SQL using **Visitor Pattern**. | Deterministic compilation. |
 | **ExecutorNode** | Executes SQL. | Calls `adapter.execute()` |
-| **ValidatorNode** | Checks validity. | |
+| **ValidatorNode** | Static Analysis via **ValidatorVisitor**. | Checks validity via AST traversal. |
 
 ### 3.2 State Management
 

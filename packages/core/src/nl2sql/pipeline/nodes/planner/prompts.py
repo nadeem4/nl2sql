@@ -5,108 +5,121 @@ User Query: "Show me the names of users who placed orders in 2023"
 Semantic Context:
 {
   "canonical_query": "List names of users with orders in 2023",
-  "keywords": ["users", "orders"],
-  "synonyms": ["clients", "purchases"]
+  "keywords": ["users", "orders"]
 }
 
 Plan:
 {
-  "reasoning": "Orders contain transactional data filtered by year. Users provide names. Join orders to users on user_id and select user names for matching orders in 2023.",
+  "reasoning": "Filter orders by year 2023. Join users. Select user name.",
   "tables": [
-    {"name": "users", "alias": "t1"},
-    {"name": "orders", "alias": "t2"}
+    {"name": "users", "alias": "t1", "ordinal": 0},
+    {"name": "orders", "alias": "t2", "ordinal": 1}
   ],
   "joins": [
     {
-      "left": "users",
-      "right": "orders",
-      "on": ["t1.id = t2.user_id"],
-      "join_type": "inner"
+      "left_alias": "t1",
+      "right_alias": "t2",
+      "join_type": "inner",
+      "ordinal": 0,
+      "condition": {
+        "kind": "binary",
+        "op": "=",
+        "left": {"kind": "column", "alias": "t1", "column_name": "id"},
+        "right": {"kind": "column", "alias": "t2", "column_name": "user_id"}
+      }
     }
   ],
-  "filters": [
+  "where": {
+    "kind": "binary",
+    "op": "AND",
+    "left": {
+      "kind": "binary",
+      "op": ">=",
+      "left": {"kind": "column", "alias": "t2", "column_name": "order_date"},
+      "right": {"kind": "literal", "value": "2023-01-01"}
+    },
+    "right": {
+      "kind": "binary",
+      "op": "<=",
+      "left": {"kind": "column", "alias": "t2", "column_name": "order_date"},
+      "right": {"kind": "literal", "value": "2023-12-31"}
+    }
+  },
+  "select_items": [
     {
-      "column": {"expr": "t2.order_date"},
-      "op": "BETWEEN",
-      "value": "'2023-01-01' AND '2023-12-31'"
+      "ordinal": 0,
+      "expr": {"kind": "column", "alias": "t1", "column_name": "name"},
+      "alias": "user_name"
     }
-  ],
-  "select_columns": [
-    {"expr": "t1.name", "alias": "name", "is_derived": false}
   ],
   "group_by": [],
-  "having": [],
+  "having": null,
   "order_by": [],
   "limit": null
 }
 
 User Query: "Count total orders per user, show only those with more than 5 orders"
-Semantic Context:
-{
-  "keywords": ["orders", "total count"],
-  "synonyms": []
-}
 
 Plan:
 {
-  "reasoning": "Orders are grouped by user_id and counted. Filter groups where total count exceeds 5.",
+  "reasoning": "Group orders by user_id and count. Filter groups > 5.",
   "tables": [
-    {"name": "orders", "alias": "t1"}
+    {"name": "orders", "alias": "t1", "ordinal": 0}
   ],
   "joins": [],
-  "filters": [],
-  "select_columns": [
-    {"expr": "t1.user_id", "alias": "user_id", "is_derived": false},
-    {"expr": "COUNT(*)", "alias": "total_orders", "is_derived": true}
+  "select_items": [
+    {
+      "ordinal": 0,
+      "expr": {"kind": "column", "alias": "t1", "column_name": "user_id"},
+      "alias": "user_id"
+    },
+    {
+      "ordinal": 1,
+      "expr": {"kind": "func", "func_name": "COUNT", "args": [{"kind": "column", "alias": "t1", "column_name": "id"}]},
+      "alias": "total_orders"
+    }
   ],
-  "group_by": [{"expr": "t1.user_id"}],
-  "having": [
-    {"expr": "COUNT(*)", "op": ">", "value": 5}
+  "where": null,
+  "group_by": [
+    {
+      "ordinal": 0,
+      "expr": {"kind": "column", "alias": "t1", "column_name": "user_id"}
+    }
   ],
-  "order_by": [],
-  "limit": null
+  "having": {
+    "kind": "binary",
+    "op": ">",
+    "left": {"kind": "func", "func_name": "COUNT", "args": [{"kind": "column", "alias": "t1", "column_name": "id"}]},
+    "right": {"kind": "literal", "value": 5}
+  },
+  "order_by": []
 }
 """
 
 PLANNER_PROMPT = (
     "[ROLE]\n"
-    "You are a SQL Planner.\n"
-    "Your job is to create a structured, executable SQL plan based on the User Query and Schema Context.\n\n"
+    "You are a SQL Planner. Your job is to create a structured, executable SQL plan in the form of a Abstract Syntax Tree (AST).\n\n"
 
     "[INSTRUCTIONS]\n"
-    "Follow this algorithm to create the plan:\n"
-    "1. Analyze the [USER_QUERY] to understand the intent and data requirements.\n"
-    "2. Identify tables from [RELEVANT_TABLES] that contain the required data.\n"
-    "3. Explain your step-by-step reasoning in the 'reasoning' field.\n"
-    "4. Populate the 'tables' list using ONLY tables from [RELEVANT_TABLES].\n"
-    "   - The 'tables' list MUST include every table used, including join tables.\n"
-    "   - Assign a short alias to each table (e.g., t1, t2).\n"
-    "5. Formulate joins correctly between tables using Foreign Key relationships or name conventions.\n"
-    "6. Select the required columns.\n"
-    "   - 'select_columns' must contain objects of the form:\n"
-    "     {{\"expr\": \"...\", \"alias\": \"...\", \"is_derived\": ...}}\n"
-    "   - Use aliases defined in step 4 (e.g., t1.name).\n"
-    "   - Set is_derived=true for aggregates or expressions.\n"
-    "7. Apply filters, grouping, having, ordering, and limits as required.\n"
-    "   - 'group_by' MUST be a list of objects: [{{\"expr\": \"t1.col\"}}].\n\n"
-
-    "[DATATYPE RULES]\n"
-    "- Dates must follow this format: '{date_format}'.\n"
-    "- Strings and dates must use single quotes.\n"
-    "- Numbers must NOT be quoted unless the column type is string.\n\n"
+    "1. Analyze [USER_QUERY] and [SEMANTIC_CONTEXT].\n"
+    "2. Select tables from [RELEVANT_TABLES]. Assign them strict 'ordinal' positions (0, 1, 2...).\n"
+    "3. Define joins using exact table ALIASES (not names) for `left_alias` and `right_alias`.\n"
+    "4. Construct the query logic using Recursive 'Expr' objects:\n"
+    "   - kind='column': {{\"kind\": \"column\", \"alias\": \"t1\", \"column_name\": \"col\"}}\n"
+    "   - kind='literal': {{\"kind\": \"literal\", \"value\": 100}}\n"
+    "   - kind='binary': {{\"kind\": \"binary\", \"op\": \">\", \"left\": {{...}}, \"right\": {{...}}}}\n"
+    "   - kind='func': {{\"kind\": \"func\", \"func_name\": \"COUNT\", \"args\": [{{...}}]}}\n"
+    "5. Populate 'select_items', 'group_by', 'order_by' lists with explicit 'ordinal' integers to guarantee output order.\n\n"
 
     "[CONSTRAINTS]\n"
-    "- Return ONLY a JSON object matching the expected plan schema.\n"
-    "- Use ONLY tables and columns defined in [RELEVANT_TABLES].\n"
-    "- Do NOT hallucinate tables, columns, or joins.\n"
-    "- The 'tables' list MUST contain all tables referenced in joins.\n"
-    "- All column references MUST use 'expr'.\n"
-    "- Use 'alias' ONLY in 'select_columns' definition (not in expr).\n"
-    "- Derived expressions MUST set is_derived=true.\n\n"
+    "- Return ONLY the JSON object matching the PlanModel schema.\n"
+    "- Do NOT hallucinate tables. Use [RELEVANT_TABLES] only.\n"
+    "- All lists MUST have 'ordinal' fields starting at 0.\n"
+    "- Use ISO 8601 for dates in 'literal' values.\n\n"
 
     "[RELEVANT_TABLES]\n"
     "{relevant_tables}\n\n"
-  
+
     "[SEMANTIC_CONTEXT]\n"
     "{semantic_context}\n\n"
 

@@ -3,7 +3,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from nl2sql.pipeline.state import GraphState
 from nl2sql.services.llm import LLMCallable
 from nl2sql.datasources import DatasourceRegistry
-from .prompts import DIRECT_SQL_PROMPT
+from .prompts import DIRECT_SQL_PROMPT, DIRECT_SQL_EXAMPLES
 from nl2sql.common.logger import get_logger
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 
@@ -20,53 +20,33 @@ class DirectSQLNode:
         self.chain = self.prompt | self.llm
         self.registry = registry
 
-    def _format_schema(self, state: GraphState) -> str:
-        """Formats the retrieved schema info into a string."""
-        if not state.relevant_tables:
-            return "No schema information available."
-        
-        lines = []
-        for table in state.relevant_tables:
-            lines.append(table.model_dump_json(indent=2))
-            lines.append("---")
-        return "\n".join(lines)
-
     def __call__(self, state: GraphState) -> Dict[str, Any]:
         try:
-            relevant_tables = self._format_schema(state)
+            relevant_tables = '\n'.join([table.model_dump_json(indent=2) for table in state.relevant_tables])
             dialect = "TSQL" # Default
             
             if state.selected_datasource_id:
                 try:
-                    profile = self.registry.get_profile(state.selected_datasource_id)
-                    if "postgres" in profile.engine:
-                        dialect = "PostgreSQL"
-                    elif "mysql" in profile.engine:
-                        dialect = "MySQL"
-                    elif "sqlite" in profile.engine:
-                        dialect = "SQLite"
-                    elif "oracle" in profile.engine:
-                        dialect = "Oracle"
+                    dialect = self.registry.get_dialect(state.selected_datasource_id)
                 except Exception:
                     logger.warning(f"Could not resolve dialect for {state.selected_datasource_id}, defaulting to TSQL")
             
+            # response is now a DirectSQLResponse object
             response = self.chain.invoke({
                 "dialect": dialect,
                 "relevant_tables": relevant_tables,
-                "user_query": state.user_query
+                "user_query": state.user_query,
+                "examples": DIRECT_SQL_EXAMPLES
             })
 
-            # Extract content from AIMessage if needed
-            response_content = response.content if hasattr(response, "content") else str(response)
+            sql = response.sql.strip()
+            reasoning = response.reasoning
 
-            # Clean output (remove markdown if model hallucinates it despite instructions)
-            sql = response_content.replace("```sql", "").replace("```", "").strip()
-            
-            logger.info(f"Direct SQL Generated: {sql}")
+            logger.info(f"Direct SQL Generated: {sql} | Reasoning: {reasoning}")
 
             return {
                 "sql_draft": sql,
-                "reasoning": [{"node": "direct_sql", "content": "Fast Lane generation successful."}]
+                "reasoning": [{"node": "direct_sql", "content": reasoning}]
             }
 
         except Exception as e:

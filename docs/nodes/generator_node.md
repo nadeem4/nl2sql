@@ -31,15 +31,12 @@ The node updates the following fields in `GraphState`:
     - Retrieves the correct dialect capability (e.g., "postgres", "tsql") from the registry.
     - Determines the row limit (minimum of system limit or plan limit).
 
-2. **AST Construction**:
-    - Iteratively builds a `sqlglot.expressions.Select` object.
-    - **SELECT**: specific columns or aggregates, handling aliases.
-    - **FROM**: primary table.
-    - **JOINs**: secondary tables with ON conditions.
-    - **WHERE**: filters, handling distinct operators (`=`, `>`, `LIKE`, `IN`, etc.).
-    - **GROUP BY / HAVING**: aggregation logic.
-    - **ORDER BY**: sorting.
-    - **LIMIT**: appends the row limit.
+2. **Visitor Compilation**:
+    - Instantiates a `SqlVisitor` class to traverse the Recursive AST.
+    - **Recursion**: Calls `visit(expr)` for every node in the tree.
+    - **Dispatch**: Routes checks to `visit_binary`, `visit_literal`, `visit_func`, etc.
+    - **Strict Ordering**: Sorts all lists (`tables`, `select_items`) by `ordinal` before visiting.
+    - **Compilation**: Returns pure `sqlglot` expression objects (no string parsing).
 
 3. **Transpilation**:
     - Calls `query.sql(dialect=target_dialect)` to generate the final string string matching the target database's syntax.

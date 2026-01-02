@@ -23,7 +23,7 @@ class ExecutorNode:
         self.registry = registry
 
     def __call__(self, state: GraphState) -> Dict[str, Any]:
-        node_name = "executor"
+        node_name = f"{self.__class__.__name__} ({state.selected_datasource_id}) ({state.user_query})"
 
         try:
             errors = []
@@ -56,10 +56,8 @@ class ExecutorNode:
             capabilities = adapter.capabilities()
             profile = self.registry.get_profile(ds_id)
 
-            # 1a. Security Check (Core Layer Defense)
-            # Default to generic if dialect not specified
-            dialect = profile.engine if profile and profile.engine else "generic"
-            
+            dialect = self.registry.get_dialect(ds_id)
+                    
             if not enforce_read_only(sql, dialect=dialect):
                 errors.append(PipelineError(
                     node=node_name,
@@ -72,8 +70,6 @@ class ExecutorNode:
                      "execution": ExecutionModel(row_count=0, rows=[], error="Security Violation")
                  }
 
-            # 1b. Pre-flight Safeguard (Data Flood Protection)
-            # Prevent aggregator OOM by rejecting massive result sets
             SAFEGUARD_ROW_LIMIT = 10000 
             
             if hasattr(capabilities, "supports_cost_estimation") or True: # assume true/check
@@ -108,8 +104,6 @@ class ExecutorNode:
             try:
                 sdk_result = adapter.execute(sql)
                 
-                # 3. Map SDK Result -> Graph Result
-                # Convert List[List] to List[Dict]
                 rows_as_dicts = [dict(zip(sdk_result.columns, row)) for row in sdk_result.rows]
                 
                 execution_result = ExecutionModel(
@@ -118,10 +112,6 @@ class ExecutorNode:
                     columns=sdk_result.columns,
                     error=None 
                 )
-                
-                # if sdk_result.error:
-                #      # Log the error but don't crash pipeline, let Aggregator handle
-                #      logger.warning(f"Execution Error: {sdk_result.error}")
                      
             except Exception as exc:
                 execution_result = ExecutionModel(row_count=0, rows=[], error=str(exc))

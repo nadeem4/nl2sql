@@ -14,8 +14,12 @@ class Settings(BaseSettings):
         validation_alias="ROUTING_EXAMPLES",
         description="Path to the YAML file containing sample questions for routing."
     )
+    users_config_path: str = Field(
+        default="users.json",
+        validation_alias="USERS_CONFIG",
+        description="Path to the JSON file containing user profiles and permissions."
+    )
     
-    # Router Thresholds
     router_l1_threshold: float = Field(
         default=0.4, 
         validation_alias="ROUTER_L1_THRESHOLD",

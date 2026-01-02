@@ -119,7 +119,9 @@ def build_graph(
                         "content": f"Executing sub-query ({sq.query}) for {sq.datasource_id}",
                     }
                 ],
+                "user_context": state.user_context
             }
+
 
             branches.append(Send("execution_branch", payload))
 

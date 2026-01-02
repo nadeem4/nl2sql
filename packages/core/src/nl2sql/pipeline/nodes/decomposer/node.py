@@ -15,6 +15,7 @@ from .prompts import DECOMPOSER_PROMPT
 from nl2sql.datasources import DatasourceRegistry
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.common.logger import get_logger
+from nl2sql_adapter_sdk import Table
 
 logger = get_logger("decomposer")
 
@@ -128,19 +129,11 @@ class DecomposerNode:
                 
                 if d_type == "table":
                     schema_json_str = doc.metadata.get("schema_json")
-                    content_block = doc.page_content
+                    content_block = schema_json_str
                     
-                    if schema_json_str:
-                        try:
-                            schema_obj = json.loads(schema_json_str)
-                            content_block = json.dumps(schema_obj, indent=2)
-                            
-                            if d_id not in ds_tables:
-                                ds_tables[d_id] = []
-                            ds_tables[d_id].append(Table(**schema_obj))
-                            
-                        except Exception:
-                            pass
+                    if d_id not in ds_tables:
+                        ds_tables[d_id] = []
+                    ds_tables[d_id].append(Table.model_validate_json(schema_json_str))
                             
                     context_lines.append(f"[Table] {name} (DS: {d_id}):\n{content_block}")
                 elif d_type == "example":
@@ -156,7 +149,7 @@ class DecomposerNode:
             )
 
             final_sub_queries = []
-            
+           
             for llm_sq in llm_response.sub_queries:
                 sq = SubQuery(
                     query=llm_sq.query,

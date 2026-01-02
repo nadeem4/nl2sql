@@ -70,6 +70,33 @@ class DatasourceRegistry:
             f"Please install the appropriate nl2sql-adapter package."
         )
 
+    def get_dialect(self, datasource_id: str) -> str:
+        """
+        Returns a normalized dialect string suitable for LLMs and SqlGlot.
+        
+        Normalization rules:
+        - mssql, sqlserver -> tsql
+        - postgresql -> postgres
+        - mysql -> mysql
+        - sqlite -> sqlite
+        - oracle -> oracle
+        """
+        profile = self.get_profile(datasource_id)
+        engine = profile.engine.lower()
+        
+        if "postgres" in engine:
+            return "postgres"
+        if "mysql" in engine:
+            return "mysql"
+        if "sqlite" in engine:
+            return "sqlite"
+        if "oracle" in engine:
+            return "oracle"
+        if "mssql" in engine or "sqlserver" in engine:
+            return "tsql"
+        
+        return "tsql" # Default fallback
+
     def list_profiles(self) -> list[DatasourceProfile]:
         """Returns a list of all registered profiles."""
         return list(self._profiles.values())

@@ -34,7 +34,7 @@ class PlannerNode:
             self.chain = self.prompt | self.llm
 
     def __call__(self, state: GraphState) -> Dict[str, Any]:
-        node_name = "planner"
+        node_name = self.__class__.__name__.lower()
 
         try:
             if not self.llm:
@@ -50,6 +50,7 @@ class PlannerNode:
                 }
 
             relevant_tables = '\n'.join([table.model_dump_json(indent=2) for table in state.relevant_tables])
+            
 
             errors = '\n'.join([ error.model_dump_json(indent=2) for error in state.errors])
 

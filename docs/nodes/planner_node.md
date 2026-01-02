@@ -24,12 +24,14 @@ The node reads the following fields from `GraphState`:
 
 The node updates the following fields in `GraphState`:
 
-- `state.plan`: A `PlanModel` dictionary containing:
-  - `tables`: List of tables to query.
-  - `joins`: Join conditions between tables.
-  - `select_columns`: Columns to retrieve.
-  - `filters`: Where clauses.
-  - `group_by`, `having`, `order_by`: Aggregation and sorting logic.
+- `state.plan`: A `PlanModel` dictionary representing a Recursive Abstract Syntax Tree (AST):
+  - `tables`: List of tables + `ordinal`.
+  - `joins`: List of join specs + `ordinal` + `condition` (Expr).
+  - `select_items`: Projections + `ordinal` + `expr` (Expr).
+  - `where`: Recursive `Expr` tree (BinaryOp, Func, Literal, etc.).
+  - `group_by`: Grouping expressions + `ordinal`.
+  - `having`: Recursive `Expr` tree.
+  - `order_by`: Sorting expressions + `ordinal`.
   - `limit`: Row limit.
 - `state.reasoning`: Log entry explaining the planning decisions.
 - `state.errors`: Appends `PipelineError` if LLM fails usage.
