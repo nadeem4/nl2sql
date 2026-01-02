@@ -4,7 +4,20 @@ from nl2sql.reporting import ConsolePresenter
 from nl2sql.services.vector_store import OrchestratorVectorStore
 from nl2sql.datasources import DatasourceRegistry, DatasourceProfile
 
-def run_indexing(profiles: Dict[str, DatasourceProfile], vector_store_path: str, vector_store: OrchestratorVectorStore, llm_registry: Any = None) -> None:
+def run_indexing(
+    profiles: Dict[str, DatasourceProfile], 
+    vector_store_path: str, 
+    vector_store: OrchestratorVectorStore, 
+    llm_registry: Any = None
+) -> None:
+    """Runs the indexing process for schemas and examples.
+
+    Args:
+        profiles (Dict[str, DatasourceProfile]): Dictionary of datasource profiles.
+        vector_store_path (str): Path to the vector store.
+        vector_store (OrchestratorVectorStore): The vector store instance.
+        llm_registry (Any, optional): Registry of LLMs for enrichment.
+    """
     presenter = ConsolePresenter()
     presenter.print_indexing_start(vector_store_path)
     
@@ -33,19 +46,12 @@ def run_indexing(profiles: Dict[str, DatasourceProfile], vector_store_path: str,
         task_desc = progress.add_task("[magenta]Indexing examples...", total=1)
         from nl2sql.common.settings import settings
         
-        llm = None
-        if llm_registry:
-            try:
-                llm = llm_registry.intent_classifier_llm()
-            except Exception as e:
-                presenter.print_warning(f"Could not load LLM for enrichment: {e}")
-        
-        if not llm:
-             presenter.print_warning("Indexing examples without enrichment (No LLM provided).")
+        if not llm_registry:
+             presenter.print_warning("Indexing examples without enrichment (No LLM Registry provided).")
         
         vector_store.index_examples(
             settings.sample_questions_path,
-            llm=llm
+            llm_registry=llm_registry
         )
         progress.advance(task_desc)
             

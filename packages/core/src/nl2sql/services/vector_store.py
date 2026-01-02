@@ -11,6 +11,9 @@ from nl2sql.common.settings import settings
 from nl2sql.services.embeddings import EmbeddingService
 from nl2sql_adapter_sdk import SchemaMetadata, Table, Column, DatasourceAdapter
 from nl2sql.datasources import DatasourceProfile, load_profiles
+from nl2sql.common.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class OrchestratorVectorStore:
@@ -22,7 +25,14 @@ class OrchestratorVectorStore:
     2. Example Questions -> L2 Routing
     """
 
-    def __init__(self, collection_name: str = "orchestrator_store", embeddings: Optional[Embeddings] = None, persist_directory: str = "./chroma_db"):
+    def _initialize_vector_store(self):
+        self.vectorstore = Chroma(
+            collection_name=self.collection_name,
+            embedding_function=self.embeddings,
+            persist_directory=self.persist_directory
+        )
+
+    def __init__(self, collection_name: str = "nl2sql_store", embeddings: Optional[Embeddings] = None, persist_directory: str = "./chroma_db"):
         """
         Initializes the OrchestratorVectorStore.
 
@@ -34,11 +44,7 @@ class OrchestratorVectorStore:
         self.collection_name = collection_name
         self.embeddings = embeddings or EmbeddingService.get_embeddings()
         self.persist_directory = persist_directory
-        self.vectorstore = Chroma(
-            collection_name=collection_name,
-            embedding_function=self.embeddings,
-            persist_directory=self.persist_directory
-        )
+        self._initialize_vector_store()
 
     def is_empty(self) -> bool:
         """
@@ -47,52 +53,80 @@ class OrchestratorVectorStore:
         Returns:
             True if empty, False otherwise.
         """
+        if not self.vectorstore:
+            return True
         try:
-            # Access the underlying Chroma collection to get count
             return self.vectorstore._collection.count() == 0
-        except Exception:
-            # If collection doesn't exist or error, assume empty
+        except Exception as e:
+            logger.error(f"Failed to check if vector store is empty: {e}")
             return True
 
     def clear(self):
         """Clears the schema collection."""
         try:
             self.vectorstore.delete_collection()
-            self.vectorstore = Chroma(
-                collection_name=self.collection_name,
-                embedding_function=self.embeddings,
-                persist_directory=self.persist_directory
-            )
-        except Exception:
-            pass
+            self._initialize_vector_store()
+        except Exception as e:
+            logger.error(f"Failed to clear vector store: {e}")
 
 
     def index_schema(self, adapter: DatasourceAdapter, datasource_id: str):
         """
         Introspects the database and indexes table schemas into the vector store.
-
-        Args:
-            adapter: The DataSourceAdapter to inspect.
-            datasource_id: ID of the datasource (added to metadata).
+        Applies Offline Aliasing:
+        - Assigns context-independent aliases (e.g. {ds_id}_t1)
+        - Prefixes column names with aliases (e.g. {ds_id}_t1.id)
+        - Updates Foreign Keys to use aliased names.
         """
         schema_def = adapter.fetch_schema()
         documents = []
 
+        alias_map = {}
+        for i, table in enumerate(schema_def.tables):
+            alias = f"{datasource_id}_t{i+1}"
+            alias_map[table.name] = alias
+            table.alias = alias
+
         for table in schema_def.tables:
-            # Build column description string
+            current_alias = table.alias 
+            
+            for col in table.columns:
+                col.name = f"{current_alias}.{col.name}"
+
+            for fk in table.foreign_keys:
+                fk.constrained_columns = [f"{current_alias}.{c}" for c in fk.constrained_columns]
+                
+                target_alias = alias_map.get(fk.referred_table)
+                if target_alias:
+                    fk.referred_table = target_alias
+                    fk.referred_columns = [f"{target_alias}.{c}" for c in fk.referred_columns]
+
             col_strs = []
             for col in table.columns:
                 c_str = f"{col.name} ({col.type})"
+                
                 if col.description:
                     c_str += f" '{col.description}'"
+                
+                if col.statistics:
+                    stats = col.statistics
+                    extras = []
+                    
+                    if stats.sample_values:
+                        formatted_samples = [str(v) for v in stats.sample_values[:5]] 
+                        extras.append(f"Samples: {formatted_samples}")
+                    
+                    if stats.min_value is not None and stats.max_value is not None:
+                        extras.append(f"Range: {stats.min_value}..{stats.max_value}")
+                        
+                    if extras:
+                        c_str += f" [{'; '.join(extras)}]"
                 col_strs.append(c_str)
             col_desc = ", ".join(col_strs)
             
-            # Identify Primary Keys
             pks = [col.name for col in table.columns if col.is_primary_key]
             pk_desc = f" Primary Key: {', '.join(pks)}." if pks else ""
 
-            # Foreign Keys
             fk_strs = []
             for fk in table.foreign_keys:
                 ref = f"{fk.referred_table}.{','.join(fk.referred_columns)}"
@@ -102,11 +136,16 @@ class OrchestratorVectorStore:
 
             comment_desc = f" Comment: {table.description}." if table.description else ""
 
-            content = f"Table: {table.name}.{comment_desc} Columns: {col_desc}.{pk_desc}{fk_desc}"
+            content = f"Table: {table.name} (Alias: {current_alias}).{comment_desc} Columns: {col_desc}.{pk_desc}{fk_desc}"
             
             doc = Document(
                 page_content=content,
-                metadata={"table_name": table.name, "datasource_id": datasource_id, "type": "table"}
+                metadata={
+                    "table_name": table.name, 
+                    "datasource_id": datasource_id, 
+                    "type": "table",
+                    "schema_json": table.model_dump_json()
+                }
             )
             documents.append(doc)
 
@@ -141,13 +180,13 @@ class OrchestratorVectorStore:
         docs = self.vectorstore.similarity_search(query, k=k, filter=filter_arg)
         return [doc.metadata.get("table_name", "Unknown") for doc in docs]
 
-    def index_examples(self, examples_path: str, llm=None):
+    def index_examples(self, examples_path: str, llm_registry=None):
         """
         Indexes example questions from a YAML file to aid in routing.
         """
         import yaml
         import pathlib
-        from nl2sql.pipeline.indexing import canonicalize_query, enrich_question
+        from nl2sql.pipeline.nodes.semantic.node import SemanticAnalysisNode
         
         path = pathlib.Path(examples_path)
         if not path.exists():
@@ -157,17 +196,27 @@ class OrchestratorVectorStore:
         try:
             examples = yaml.safe_load(path.read_text()) or {}
             
+            enricher = None
+            if llm_registry:
+                try:
+                    enricher = SemanticAnalysisNode(llm_registry.semantic_llm())
+                except Exception as e:
+                    logger.warning(f"Could not load SemanticNode: {e}")
+
             for ds_id, questions in examples.items():
                 print(f"Processing examples for {ds_id}...")
                 for q in questions:
                     variants = [q]
-                    if llm:
+                    if enricher:
                         try:
-                            canonical_q = canonicalize_query(q, llm) 
-                            variants.append(canonical_q)
+                            analysis = enricher.invoke(q)
+                            if analysis.canonical_query:
+                                variants.append(analysis.canonical_query)
                             
-                            enrichments = enrich_question(q, llm)
-                            variants.extend(enrichments)
+                            if analysis.keywords or analysis.synonyms:
+                                meta_text = " ".join(analysis.keywords + analysis.synonyms)
+                                variants.append(meta_text)
+                                
                         except Exception as e:
                             print(f"Warning: Enrichment failed for '{q}': {e}")
                             
@@ -187,7 +236,7 @@ class OrchestratorVectorStore:
         except Exception as e:
             print(f"Failed to load examples: {e}")
 
-    def retrieve_routing_context(self, query: str, k: int = 5, datasource_id: Optional[Union[str, List[str]]] = None) -> List[Document]:
+    def retrieve_routing_context(self, query: str, k: int = 5, datasource_id: Optional[List[str]] = None) -> List[Document]:
         """
         Retrieves routing context using Partitioned MMR (Maximal Marginal Relevance).
         
@@ -198,13 +247,8 @@ class OrchestratorVectorStore:
         """
         filter_base = None
         if datasource_id:
-            if isinstance(datasource_id, str):
-                filter_base = {"datasource_id": datasource_id}
-            elif isinstance(datasource_id, list):
-                if len(datasource_id) == 1:
-                    filter_base = {"datasource_id": datasource_id[0]}
-                else:
-                    filter_base = {"datasource_id": {"$in": datasource_id}}
+            filter_base = {"datasource_id": {"$in": datasource_id}}
+                    
         
         filter_tables = filter_base.copy() if filter_base else {}
         filter_tables["type"] = "table"

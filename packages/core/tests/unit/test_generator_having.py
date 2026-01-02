@@ -4,6 +4,7 @@ from nl2sql.pipeline.nodes.generator.node import GeneratorNode
 from nl2sql.pipeline.state import GraphState
 from nl2sql.datasources import DatasourceRegistry
 from nl2sql_adapter_sdk import DatasourceAdapter, CapabilitySet
+from nl2sql.pipeline.nodes.planner.schemas import PlanModel
 from nl2sql.datasources import DatasourceProfile
 
 class TestGeneratorHaving(unittest.TestCase):
@@ -14,6 +15,7 @@ class TestGeneratorHaving(unittest.TestCase):
         
         self.mock_registry.get_adapter.return_value = self.mock_adapter
         self.mock_registry.get_profile.return_value = self.mock_profile
+        self.mock_registry.get_dialect.return_value = "sqlite"
         
         self.mock_adapter.capabilities.return_value = CapabilitySet(
             supports_cte=True
@@ -28,19 +30,24 @@ class TestGeneratorHaving(unittest.TestCase):
         Test that GeneratorNode generates HAVING correctly from the plan.
         """
         plan = {
-            "tables": [{"name": "orders", "alias": "o"}],
-            "select_columns": [
-                {"expr": "o.user_id"},
-                {"expr": "COUNT(*)", "alias": "cnt", "is_derived": True}
+            "tables": [{"name": "orders", "alias": "o", "ordinal": 0}],
+            "select_items": [
+                {"expr": {"kind": "column", "column_name": "user_id", "alias": "o"}, "ordinal": 0},
+                {"expr": {"kind": "func", "func_name": "COUNT", "args": [{"kind": "column", "column_name": "*"}], "is_aggregate": True}, "alias": "cnt", "ordinal": 1}
             ],
-            "group_by": [{"expr": "o.user_id"}],
-            "having": [{"expr": "COUNT(*)", "op": ">", "value": 5}],
-            "filters": [],
+            "group_by": [{"expr": {"kind": "column", "column_name": "user_id", "alias": "o"}, "ordinal": 0}],
+            "having": {
+                "kind": "binary",
+                "op": ">",
+                "left": {"kind": "func", "func_name": "COUNT", "args": [{"kind": "column", "column_name": "*"}]},
+                "right": {"kind": "literal", "value": 5}
+            },
+            "where": None,
             "joins": [],
             "order_by": []
         }
     
-        state = GraphState(user_query="test", plan=plan, selected_datasource_id="test_ds")
+        state = GraphState(user_query="test", plan=PlanModel(**plan).model_dump(), selected_datasource_id="test_ds")
         
         new_state = self.node(state)
         
@@ -57,14 +64,19 @@ class TestGeneratorHaving(unittest.TestCase):
         Test HAVING with alias if supported (or just expression).
         """
         plan = {
-            "tables": [{"name": "orders", "alias": "o"}],
-            "select_columns": [
-                {"expr": "o.user_id"},
-                {"expr": "COUNT(*)", "alias": "cnt", "is_derived": True}
+            "tables": [{"name": "orders", "alias": "o", "ordinal": 0}],
+            "select_items": [
+                {"expr": {"kind": "column", "column_name": "user_id", "alias": "o"}, "ordinal": 0},
+                {"expr": {"kind": "func", "func_name": "COUNT", "args": [{"kind": "column", "column_name": "*"}], "is_aggregate": True}, "alias": "cnt", "ordinal": 1}
             ],
-            "group_by": [{"expr": "o.user_id"}],
-            "having": [{"expr": "cnt", "op": ">", "value": 10}],
-            "filters": [],
+            "group_by": [{"expr": {"kind": "column", "column_name": "user_id", "alias": "o"}, "ordinal": 0}],
+            "having": {
+                "kind": "binary",
+                "op": ">",
+                "left": {"kind": "column", "column_name": "cnt"},
+                "right": {"kind": "literal", "value": 10}
+            },
+            "where": None,
             "joins": [],
             "order_by": []
         }

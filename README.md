@@ -1,4 +1,4 @@
-# NL2SQL Monorepo
+# NL2SQL
 
 ## Overview
 
@@ -10,6 +10,7 @@ This repository contains the `nl2sql` platform, a modular natural language to SQ
 
 - **[nl2sql-core](packages/core)**: The main orchestration engine, CLI, and LangGraph nodes.
 - **[nl2sql-adapter-sdk](packages/adapter-sdk)**: The public interface contract for database adapters.
+- **[nl2sql-adapter-sqlalchemy](packages/adapter-sqlalchemy)**: Base implementation for SQL-based adapters.
 
 ### Adapters
 
@@ -27,6 +28,7 @@ To install the core engine and specific adapters in editable mode:
 ```bash
 # Core & SDK
 pip install -e packages/adapter-sdk
+pip install -e packages/adapter-sqlalchemy
 pip install -e packages/core
 
 # Adapters (Install as needed)
@@ -41,7 +43,7 @@ pip install -e packages/adapters/sqlite
 #### Unit Tests (Core)
 
 ```bash
-pytest packages/core/tests/unit
+python -m pytest packages/core/tests/unit
 ```
 
 #### Integration Tests (Docker)
@@ -100,13 +102,12 @@ The system uses a pluggable architecture where `core` interacts with databases s
 
 ```mermaid
 graph TD
-    UserQuery["User Query"] --> Intent["Intent Node"]
-    Intent --> Decomposer["Decomposer Node"]
+    UserQuery["User Query"] --> Semantic["Semantic Analysis Node"]
+    Semantic --> Decomposer["Decomposer Node"]
     Decomposer -- "Splits Query" --> MapBranching["Fan Out (Map)"]
 
     subgraph ExecutionBranch ["Execution Branch (Parallel)"]
-        MapBranching --> Schema["Schema Node"]
-        Schema --> RouteLogic{"Route Logic"}
+        MapBranching --> RouteLogic{"Route Logic"}
         RouteLogic -- "Fast Lane" --> DirectSQL["DirectSQL Node"]
         DirectSQL --> FastExecutor["Executor"]
         
@@ -121,3 +122,72 @@ graph TD
     StateAggregation --> Aggregator["Aggregator (Reduce)"]
     Aggregator --> FinalAnswer
 ```
+
+## Configuration Reference
+
+The system behavior is controlled by three primary YAML/JSON files.
+
+### 1. `datasources.yaml`
+
+Defines the database connections and their capabilities.
+
+```yaml
+- id: manufacturing_ops
+  engine: postgres
+  sqlalchemy_url: "postgresql+psycopg2://user:pass@localhost:5432/ops"
+  description: "Operational data for tracking employees and machines."
+  feature_flags:
+    supports_dry_run: true
+    supports_estimated_cost: true
+
+- id: manufacturing_ref
+  engine: sqlite
+  sqlalchemy_url: "sqlite:///./data/manufacturing.db"
+```
+
+### 2. `llm_config.yaml`
+
+Configures the Large Language Model providers for each agent.
+
+```yaml
+default:
+  provider: openai
+  model: gpt-4o-mini
+  temperature: 0.0
+
+agents:
+  planner:
+    model: gpt-4o
+    temperature: 0.1
+  
+  decomposer:
+    model: gpt-4o
+    temperature: 0.0
+```
+
+### 3. `users.json`
+
+Defines user context and RBAC permissions.
+
+```json
+{
+  "default_user": {
+    "id": "u_123",
+    "role": "analyst",
+    "allowed_datasources": ["manufacturing_ops", "manufacturing_ref"]
+  }
+}
+```
+
+## Security & Authorization
+
+The system implements a "Defense in Depth" strategy for RBAC (Role-Based Access Control):
+
+1. **Metadata Filtering (Retrieval Layer)**:
+    - The retrieval engine filters the vector search space based on the user's `allowed_datasources`.
+    - *Result*: The LLM never sees schema tokens for unauthorized databases, preventing hallucinations.
+
+2. **Policy Validation (Validator Node)**:
+    - Fine-grained table-level access control.
+    - The Validator checks every table in the generated plan against the user's `allowed_tables` whitelist.
+    - *Result*: Even if a query is generated, execution is blocked if it touches restricted data.

@@ -123,15 +123,6 @@ class LLMRegistry:
 
     def _base_llm(self, agent: str) -> ChatOpenAI:
         cfg = self._agent_cfg(agent)
-        if cfg.provider == "stub":
-            from langchain_community.llms import FakeListLLM
-            # Basic stub responses
-            return FakeListLLM(responses=[
-                "SELECT * FROM machines LIMIT 10", # For Direct SQL
-                "PLAN: ...",
-                "{'response_type': 'tabular', 'canonical_query': 'List all machines'}", # For Intent
-            ])
-
         if cfg.provider != "openai":
             raise ValueError(f"Unsupported LLM provider: {cfg.provider}")
         key = cfg.api_key or settings.openai_api_key
@@ -180,16 +171,18 @@ class LLMRegistry:
         llm = self._base_llm("aggregator")
         return self._wrap_structured_usage(llm,  AggregatedResponse)
 
-    def intent_classifier_llm(self) -> LLMCallable:
-        """Returns the LLM callable for the Intent Classifier."""
-        from nl2sql.pipeline.nodes.intent.schemas import IntentResponse
-        llm = self._base_llm("intent_classifier")
-        return llm.with_structured_output(IntentResponse)
 
     def direct_sql_llm(self) -> LLMCallable:
         """Returns the LLM callable for the Direct SQL agent."""
+        from nl2sql.pipeline.nodes.direct_sql.schemas import DirectSQLResponse
         llm = self._base_llm("direct_sql")
-        return llm.invoke
+        return self._wrap_structured_usage(llm, DirectSQLResponse)
+
+    def semantic_llm(self) -> LLMCallable:
+        """Returns the LLM callable for the Semantic Analysis agent."""
+        from nl2sql.pipeline.nodes.semantic.schemas import SemanticAnalysisResponse
+        llm = self._base_llm("semantic_analysis")
+        return self._wrap_structured_usage(llm, SemanticAnalysisResponse)
 
     def llm_map(self) -> Dict[str, LLMCallable]:
         """Returns a dictionary of all agent LLM callables."""
@@ -198,10 +191,8 @@ class LLMRegistry:
             "summarizer": self.summarizer_llm(),
             "decomposer": self.decomposer_llm(),
             "aggregator": self.aggregator_llm(),
-            "intent_classifier": self.intent_classifier_llm(),
             "direct_sql": self.direct_sql_llm(),
-            "direct_sql": self.direct_sql_llm(),
-            "_default": self.decomposer_llm(),
+            "semantic_analysis": self.semantic_llm()
         }
 
     def get_usage_summary(self) -> Dict[str, Dict[str, int]]:

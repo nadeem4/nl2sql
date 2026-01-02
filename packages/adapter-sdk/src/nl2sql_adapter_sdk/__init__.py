@@ -6,11 +6,11 @@ from .models import (
     QueryPlan,
     CostEstimate,
     CapabilitySet,
-    ExecutionMetrics,
     AdapterError,
     Table,
     Column,
-    ForeignKey
+    ForeignKey,
+    ColumnStatistics
 )
 
 __all__ = [
@@ -21,9 +21,9 @@ __all__ = [
     "QueryPlan",
     "CostEstimate",
     "CapabilitySet",
-    "ExecutionMetrics",
     "AdapterError",
     "Table",
     "Column",
-    "ForeignKey"
+    "ForeignKey",
+    "ColumnStatistics"
 ]

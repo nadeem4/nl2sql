@@ -1,5 +1,15 @@
-from typing import List, Any, Dict, Optional
+from typing import List, Any, Dict, Optional, Union
 from pydantic import BaseModel
+
+Scalar = Union[str, int, float, bool, None]
+JsonValue = Union[Scalar, List[Scalar], Dict[str, Scalar]]
+
+class ColumnStatistics(BaseModel):
+    null_percentage: float
+    distinct_count: int
+    min_value: Optional[Scalar] = None
+    max_value: Optional[Scalar] = None
+    sample_values: List[JsonValue] = []
 
 class Column(BaseModel):
     name: str
@@ -7,6 +17,7 @@ class Column(BaseModel):
     is_nullable: bool = True
     is_primary_key: bool = False
     description: Optional[str] = None
+    statistics: Optional[ColumnStatistics] = None
 
 class ForeignKey(BaseModel):
     constrained_columns: List[str]
@@ -15,21 +26,26 @@ class ForeignKey(BaseModel):
     referred_schema: Optional[str] = None
 
 class Table(BaseModel):
+    
     name: str
+    alias: Optional[str] = None
     schema_name: Optional[str] = None
+    row_count: Optional[int] = None
     columns: List[Column]
     foreign_keys: List[ForeignKey] = []
     description: Optional[str] = None
 
 class SchemaMetadata(BaseModel):
     datasource_id: str
+    datasource_engine_type: str
     tables: List[Table]
 
 class QueryResult(BaseModel):
     columns: List[str]
     rows: List[List[Any]]
     row_count: int
-    raw: Optional[Any] = None  # engine-native result for debugging
+    raw: Optional[Any] = None
+    execution_time_ms: Optional[float] = None
 
 class DryRunResult(BaseModel):
     is_valid: bool
@@ -52,13 +68,6 @@ class CapabilitySet(BaseModel):
     supports_multi_db_join: bool = False
     supports_vector: bool = False
     supports_dry_run: bool = False
-
-class ExecutionMetrics(BaseModel):
-    execution_ms: float
-    rows_returned: int
-    retries: int = 0
-    engine: str
-    extra: Dict[str, Any] = {}
 
 class AdapterError(BaseModel):
     code: str

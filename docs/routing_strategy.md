@@ -6,17 +6,17 @@ This document details the architecture used to direct natural language queries t
 
 ---
 
-## 1. Intent-Driven Architecture
+## 1. Semantic-Driven Architecture
 
-The pipeline now employs a dedicated **Intent Node** at the entrance.
+The pipeline now employs a dedicated **Semantic Analysis Node** at the entrance.
 
-1. **Intent Classification**:
-    * **Tabular/KPI**: Queries like "List all machines" or "Total count" are flagged for the **Fast Lane**.
-    * **Summary**: Queries like "Analyze performance" are flagged for the **Slow Lane** (Agentic Loop).
+1. **Refinement**:
+    * **Canonicalization**: Rewrites the query to be explicit and entity-centric.
+    * **Enrichment**: Extracts keywords and generates synonyms for improved retrieval.
 
 2. **Context Retrieval (Routing)**:
-    * The `DecomposerNode` uses vector search to identify relevant datasources and tables.
-    * It uses the **Canonicalized Query** + **Enriched Terms** (from Intent Node) to query the `OrchestratorVectorStore`.
+    * The `DecomposerNode` utilizes the **Expanded Query** (Canonical + Synonyms) from the Semantic Node.
+    * It queries the `OrchestratorVectorStore` to identify relevant tables across datasources.
 
 ---
 
@@ -59,23 +59,20 @@ flowchart LR
 
 We don't just index raw questions. We expand them to cover the "semantic neighborhood".
 
+### A. Indexing Workflow (Offline)
+
 1. **Input**: *"List all machines"* (from `sample_questions.yaml`).
-2. **Canonicalize**: *"List all machines"* (Standardize).
-3. **Enrich (The Magic)**: The Enricher Agent generates 5 variations using **domain knowledge**:
+2. **Semantic Analysis**: The Node canonicalizes the query and generates 5 domain variations (keywords/synonyms).
     * *"Show all equipment"*
     * *"List active machinery"*
-    * *"Enumerate manufacturing assets"*
-    * *"View production units - CNC"*
-4. **Store**: We embed ALL of these.
+3. **Store**: We embed ALL of these variants to maximize retrieval coverage.
 
 ### B. Querying Workflow (Online)
 
-We don't trust the raw user query. We clean it up.
-
 1. **Input**: *"How many guys are working on the floor?"* (Slang/Noise).
-2. **Canonicalize**: The Canonicalizer Agent rewrites it:
-    * *"Count operators on active shift"* (Standardized Entities).
-3. **Search**: This clean query now easily matches the "operators/shifts" vectors we created during enrichment.
+2. **Semantic Analysis**: The Node rewrites it to:
+    * *"Count operators on active shift"* (Canonical).
+3. **Search**: This clean query + generated synonyms matches the index efficiently.
 
 ---
 

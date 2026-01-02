@@ -14,8 +14,7 @@ The `DecomposerNode` acts as the **Router** and **Orchestrator** of the pipeline
 
 The node reads the following fields from `GraphState`:
 
-- `state.user_query`: The **canonicalized** natural language query (from IntentNode).
-- `state.enriched_terms`: List of specific keywords/entities to aid vector search context retrieval.
+- `state.semantic_analysis`: The **enriched** query context containing canonical query and synonyms (from SemanticAnalysisNode).
 - `state.selected_datasource_id`: (Optional) If set, the node acts in "Pass-through" mode.
 
 ## Outputs

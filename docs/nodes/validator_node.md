@@ -2,50 +2,66 @@
 
 ## Purpose
 
-The `ValidatorNode` acts as an automated quality assurance check between the `PlannerNode` and the `GeneratorNode`. It performs static analysis on the proposed `PlanModel` to catch logical errors, hallucinations (references to non-existent columns), and potential runtime issues (e.g., date format mismatch) *before* any SQL is generated or executed.
+The `ValidatorNode` acts as an automated "Quality Assurance" engine. It validates the proposed SQL plan through three progressively deeper layers of checks:
 
-## Components
+1. **Static Analysis**: Syntax, Schema existence, Type safety.
+2. **Semantic Verification**: "Dry Run" against the real database.
+3. **Performance Auditing**: Cost estimation and Query Plan analysis.
 
-- **`DatasourceRegistry`**: To fetch profile settings (like date formats) for type validation.
-- **`SchemaInfo`**: used to verify table and column existence.
-
-## Inputs
-
-The node reads the following fields from `GraphState`:
-
-- `state.plan`: The execution plan to validate.
-- `state.schema_info`: The source of truth for database structure.
-- `state.selected_datasource_id`: Context for data type rules.
-
-## Outputs
-
-The node updates the following fields in `GraphState`:
-
-- `state.errors`: Appends `PipelineError` objects for any violations found.
-  - If errors are present, the pipeline usually loops back to the Planner for correction.
-- `state.reasoning`: Log entry summarizing validation pass/fail status.
+This ensures that the Executor only receives queries that are Valid, Safe, and Optimized.
 
 ## Logic Flow
 
-1. **Security Check**: Verifies `query_type` is "READ".
-2. **Schema Verification**:
-    - Checks that all tables in the plan exist in `schema_info`.
-    - Checks that all column references (SELECT, WHERE, JOIN keys) exist in the mapped tables.
-3. **Logical Validation**:
-    - **Joins**: Ensures joined tables are part of the plan and have ON conditions.
-    - **Aggregations**: Enforces SQL rules (e.g., non-aggregated columns in SELECT must be in GROUP BY).
-    - **Aliases**: Ensures aliases are used correctly.
-4. **Type & Format Validation**:
-    - Checks literal values in Filters/Having clauses against column types (e.g., ensuring a string matches `ISO 8601` if compared to a DATE column).
+```mermaid
+graph TD
+    A[Input State] --> B{1. Static Analysis?}
+    B -- Errors --> Z[Return Errors]
+    B -- Pass --> C{2. Dry Run?}
+    C -- Errors --> Z
+    C -- Pass --> D{3. Performance?}
+    D -- > 1M Rows --> E[Add Performance Warning]
+    D -- Pass --> F[Success]
+    E --> F
+```
 
-## Error Handling
+1. **Static Analysis**: Verifies schemas and logical consistency (e.g. aliasing rules).
+2. **Semantic Verification**: Sends SQL to the database (transaction rollback) to catch deep errors.
+3. **Performance Auditing**: Estimates rows; if high, analyzes the Explain Plan and warns.
 
-- **`MISSING_PLAN`**: Blocking error.
-- **`SECURITY_VIOLATION`**: If WRITE/DDL intent slipped through.
-- **`TABLE_NOT_FOUND` / `COLUMN_NOT_FOUND`**: Hallucinations.
-- **`INVALID_DATE_FORMAT` / `INVALID_NUMERIC_VALUE`**: Type mismatches.
-- **`MISSING_GROUP_BY`**: SQL logic error.
+## Validation Layers
 
-## Dependencies
+### 1. Static Analysis & Policy Check
 
-- `nl2sql.nodes.planner.schemas.PlanModel`
+* **Method**: `_validate_static_analysis(plan)`
+* **Visitor Pattern**: Implements a `ValidatorVisitor` to recursively check the AST.
+* **Checks**:
+  * **Access**: Checks `user_context` before visitation.
+  * **Schema**: `visit_column` validates existence in `state.relevant_tables`.
+  * **Types**: `visit_binary` checks operation compatibility (e.g. `date` vs `string`).
+  * **Recursion**: deeply validates `plan.where` and `plan.having` trees.
+* **Outcome**: `CRITICAL` or `ERROR` (Hard Fail).
+
+### 2. Semantic Verification (Dry Run)
+
+* **Outcome**: `ERROR` (Hard Fail).
+
+### 3. Performance Auditing
+
+* **Method**: `_validate_performance(sql)`
+* **Checks**:
+  * `adapter.cost_estimate(sql)`: Checks `estimated_rows`.
+  * `adapter.explain(sql)`: Analyzes execution plan.
+* **Outcome**: `WARNING` (Soft Fail).
+  * If `estimated_rows > 1,000,000`, generates a Performance Warning.
+  * The Planner receives this feedback and decides whether to Optimize (add filter/limit) or Proceed.
+
+## Components
+
+* **`DatasourceRegistry`**: To fetch the active adapter for Dry Run/Explain.
+* **`state.relevant_tables`**: Source of truth for static checks.
+
+## Key Errors & Warnings
+
+* **`TABLE_NOT_FOUND`**: Static check failed.
+* **`EXECUTION_ERROR`**: Dry Run failed (e.g. invalid object name).
+* **`PERFORMANCE_WARNING`**: Query is expensive (`> 1M rows`).

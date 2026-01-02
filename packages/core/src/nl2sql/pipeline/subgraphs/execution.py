@@ -3,7 +3,7 @@ from langgraph.graph import StateGraph, END
 
 from nl2sql.pipeline.state import GraphState
 from nl2sql.pipeline.nodes.direct_sql.node import DirectSQLNode
-from nl2sql.pipeline.nodes.schema import SchemaNode
+
 from nl2sql.pipeline.nodes.executor import ExecutorNode
 from nl2sql.pipeline.subgraphs.agentic_execution_loop import build_agentic_execution_loop
 from nl2sql.datasources import DatasourceRegistry
@@ -16,29 +16,18 @@ def format_result(state: GraphState) -> Dict[str, Any]:
     execution = state.execution
     error = state.errors
 
-    if state.response_type == "tabular":
-        result_str = execution.rows
-    else:
-        if error:
-            result_str = f"Query: {query}\nStatus: Error\nDetails: {error}"
-        elif execution:
-            rows = execution.rows
-            row_count = execution.row_count
-            if rows:
-                result_data = f"{row_count} rows returned. Sample: {rows[:3]}"
-            else:
-                result_data = "No rows returned."
-            result_str = f"Query: {query}\nStatus: Success\nData: {result_data}"
-        else:
-            result_str = f"Query: {query}\nStatus: No execution occurred."
-
-    return {
-        "intermediate_results": [result_str],
-        "selected_datasource_id": state.selected_datasource_id,
-        "sql_draft": state.sql_draft,
-        "execution": execution,
-        "entity_ids": getattr(state, "entity_ids", []),
-    }
+    # Default formatting logic
+    if error:
+        result_str = f"Query: {query}\nStatus: Error\nDetails: {error}"
+    elif execution:
+        rows = execution.rows
+        return {
+            "intermediate_results": [rows], 
+            "selected_datasource_id": state.selected_datasource_id,
+            "sql_draft": state.sql_draft,
+            "execution": execution,
+            "entity_ids": getattr(state, "entity_ids", []),
+        }
 
 
 def build_execution_subgraph(
@@ -48,8 +37,7 @@ def build_execution_subgraph(
     vector_store_path: str = "",
 ):
     graph = StateGraph(GraphState)
-
-    schema_node = SchemaNode(registry=registry, vector_store=vector_store)
+    
     direct_sql = DirectSQLNode(llm_registry.llm_map(), registry=registry)
     executor = ExecutorNode(registry=registry)
 
@@ -62,14 +50,13 @@ def build_execution_subgraph(
         effective_llm_map, registry=registry, row_limit=1000
     )
 
-    graph.add_node("schema", schema_node)
     graph.add_node("direct_sql", direct_sql)
     graph.add_node("fast_executor", executor)
     graph.add_node("agentic_execution_loop", agentic_execution_loop)
     graph.add_node("formatter", format_result)
 
-    def route_based_on_response_type(state: GraphState) -> str:
-        if state.response_type in ["tabular", "kpi"]:
+    def route_based_on_complexity(state: GraphState) -> str:
+        if state.complexity == "simple":
             return "direct_sql"
         return "agentic_execution_loop"
 
@@ -80,11 +67,8 @@ def build_execution_subgraph(
             return "agentic_execution_loop"
         return "formatter"
 
-    graph.set_entry_point("schema")
-
-    graph.add_conditional_edges(
-        "schema",
-        route_based_on_response_type,
+    graph.set_conditional_entry_point(
+        route_based_on_complexity,
         {
             "direct_sql": "direct_sql",
             "agentic_execution_loop": "agentic_execution_loop",
@@ -105,4 +89,4 @@ def build_execution_subgraph(
     graph.add_edge("agentic_execution_loop", "formatter")
     graph.add_edge("formatter", END)
 
-    return graph.compile(), agentic_execution_loop
+    return graph.compile()

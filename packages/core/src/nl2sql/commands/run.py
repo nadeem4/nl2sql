@@ -10,15 +10,47 @@ from nl2sql.services.vector_store import OrchestratorVectorStore
 from nl2sql.commands.visualize import draw_execution_trace
 from nl2sql.pipeline.state import GraphState
 from nl2sql.reporting import ConsolePresenter
+from nl2sql.common.settings import settings
 
-def run_pipeline(args: argparse.Namespace, query: Optional[str], datasource_registry: DatasourceRegistry, llm_registry: LLMRegistry, vector_store: OrchestratorVectorStore) -> None:
+
+def run_pipeline(
+    args: argparse.Namespace, 
+    query: Optional[str], 
+    datasource_registry: DatasourceRegistry, 
+    llm_registry: LLMRegistry, 
+    vector_store: OrchestratorVectorStore
+) -> None:
+    """Executes the NL2SQL pipeline.
+
+    Args:
+        args (argparse.Namespace): Command-line arguments.
+        query (Optional[str]): The user query.
+        datasource_registry (DatasourceRegistry): Registry of datasources.
+        llm_registry (LLMRegistry): Registry of LLMs.
+        vector_store (OrchestratorVectorStore): Vector store instance.
+    """
     if not query:
         return
         
     _run_simple_mode(args, query, datasource_registry, llm_registry, vector_store)
 
 
-def _run_simple_mode(args: argparse.Namespace, query: str, datasource_registry: DatasourceRegistry, llm_registry: LLMRegistry, vector_store: OrchestratorVectorStore) -> None:
+def _run_simple_mode(
+    args: argparse.Namespace, 
+    query: str, 
+    datasource_registry: DatasourceRegistry, 
+    llm_registry: LLMRegistry, 
+    vector_store: OrchestratorVectorStore
+) -> None:
+    """Invokes the pipeline in simple (non-benchmark) mode.
+
+    Args:
+        args (argparse.Namespace): Command-line arguments.
+        query (str): The user query.
+        datasource_registry (DatasourceRegistry): Registry of datasources.
+        llm_registry (LLMRegistry): Registry of LLMs.
+        vector_store (OrchestratorVectorStore): Vector store instance.
+    """
     presenter = ConsolePresenter()
     presenter.print_query(query)
     
@@ -31,7 +63,30 @@ def _run_simple_mode(args: argparse.Namespace, query: str, datasource_registry: 
     presenter.start_interactive_status("[bold green]Thinking...[/bold green]")
     
     start_time = time.perf_counter()
+    
+    # Load User Context
+    user_context = {}
     try:
+        import pathlib
+        users_path = pathlib.Path(settings.users_config_path)            
+        if users_path.exists():
+            with open(users_path, "r") as f:
+                users_db = json.load(f)
+                user_context = users_db.get(args.user)
+                
+                if not user_context:
+                    presenter.print_error(f"Critical: User '{args.user}' not found in '{users_path.resolve()}'. Cannot execute without context.")
+                    sys.exit(1)
+        else:
+            presenter.print_error(f"Critical: User config file not found at '{users_path}'. Cannot load context.")
+            sys.exit(1)
+
+    except Exception as e:
+        presenter.print_error(f"Failed to load user context: {e}")
+        sys.exit(1)
+
+    try:
+        print(f"User Context: {user_context}")
         final_state = run_with_graph(
             registry=datasource_registry,
             llm_registry=llm_registry,
@@ -40,7 +95,8 @@ def _run_simple_mode(args: argparse.Namespace, query: str, datasource_registry: 
             execute=not args.no_exec, 
             vector_store=vector_store,
             vector_store_path=args.vector_store,
-            callbacks=[monitor]
+            callbacks=[monitor],
+            user_context=user_context
         )
     except Exception as e:
         import traceback

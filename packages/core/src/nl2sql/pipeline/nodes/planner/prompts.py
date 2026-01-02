@@ -1,126 +1,86 @@
+"""Prompts and examples for the SQL Planner node."""
+
 PLANNER_EXAMPLES = """
 Examples:
 
 User Query: "Show me the names of users who placed orders in 2023"
-Entities:
-[
-  {"entity_id": "E1", "name": "users"},
-  {"entity_id": "E2", "name": "orders"}
-]
+Semantic Context:
+{
+  "canonical_query": "List names of users with orders in 2023",
+  "keywords": ["users", "orders"]
+}
 
 Plan:
 {
-  "reasoning": "Orders contain transactional data filtered by year. Users provide names. Join orders to users on user_id and select user names for matching orders in 2023.",
+  "reasoning": "Filter orders by year 2023. Join users. Select user name.",
   "tables": [
-    {"name": "users", "alias": "t1"},
-    {"name": "orders", "alias": "t2"}
+    {"name": "users", "alias": "t1", "ordinal": 0},
+    {"name": "orders", "alias": "t2", "ordinal": 1}
   ],
   "joins": [
     {
-      "left": "users",
-      "right": "orders",
-      "on": ["t1.id = t2.user_id"],
-      "join_type": "inner"
+      "left_alias": "t1",
+      "right_alias": "t2",
+      "join_type": "inner",
+      "ordinal": 0,
+      "condition": {
+        "kind": "binary",
+        "op": "=",
+        "left": {"kind": "column", "alias": "t1", "column_name": "id"},
+        "right": {"kind": "column", "alias": "t2", "column_name": "user_id"}
+      }
     }
   ],
-  "filters": [
+  "where": {
+    "kind": "binary",
+    "op": "AND",
+    "left": {
+      "kind": "binary",
+      "op": ">=",
+      "left": {"kind": "column", "alias": "t2", "column_name": "order_date"},
+      "right": {"kind": "literal", "value": "2023-01-01"}
+    },
+    "right": {
+      "kind": "binary",
+      "op": "<=",
+      "left": {"kind": "column", "alias": "t2", "column_name": "order_date"},
+      "right": {"kind": "literal", "value": "2023-12-31"}
+    }
+  },
+  "select_items": [
     {
-      "column": {"expr": "t2.order_date"},
-      "op": "BETWEEN",
-      "value": "'2023-01-01' AND '2023-12-31'"
+      "ordinal": 0,
+      "expr": {"kind": "column", "alias": "t1", "column_name": "name"},
+      "alias": "user_name"
     }
-  ],
-  "select_columns": [
-    {"expr": "t1.name", "alias": "name", "is_derived": false}
-  ],
-  "group_by": [],
-  "having": [],
-  "order_by": [],
-  "limit": null
-}
-
-User Query: "Count total orders per user, show only those with more than 5 orders"
-Entities:
-[
-  {"entity_id": "E1", "name": "orders"}
-]
-
-Plan:
-{
-  "reasoning": "Orders are grouped by user_id and counted. Filter groups where total count exceeds 5.",
-  "tables": [
-    {"name": "orders", "alias": "t1"}
-  ],
-  "joins": [],
-  "filters": [],
-  "select_columns": [
-    {"expr": "t1.user_id", "alias": "user_id", "is_derived": false},
-    {"expr": "COUNT(*)", "alias": "total_orders", "is_derived": true}
-  ],
-  "group_by": ["t1.user_id"],
-  "having": [
-    {"expr": "COUNT(*)", "op": ">", "value": 5}
-  ],
-  "order_by": [],
-  "limit": null
+  ]
 }
 """
 
 PLANNER_PROMPT = (
     "[ROLE]\n"
-    "You are a SQL Planner.\n"
-    "Your job is to create a structured, executable SQL plan based on an AUTHORITATIVE entity graph and schema context.\n\n"
-
-    "[CRITICAL CONTRACT]\n"
-    "- Entities are provided by the Intent node and are IMMUTABLE.\n"
-    "- You MUST NOT infer, invent, merge, or drop entities.\n"
-    "- All tables used MUST provide physical coverage for the provided entities.\n\n"
+    "You are a SQL Planner. Your job is to create a structured, executable SQL plan"
+    " in the form of a deterministic Abstract Syntax Tree (AST).\n\n"
 
     "[INSTRUCTIONS]\n"
-    "Follow this algorithm to create the plan:\n"
-    "1. Read the provided entities and understand what data must be produced.\n"
-    "2. Identify tables from [SCHEMA] that physically represent those entities.\n"
-    "3. Explain your step-by-step reasoning in the 'reasoning' field, explicitly referencing entities.\n"
-    "4. Populate the 'tables' list using ONLY tables from [SCHEMA].\n"
-    "   - The 'tables' list MUST include every table used, including join tables.\n"
-    "   - Use the EXACT aliases provided in [SCHEMA] (e.g., t1, t2).\n"
-    "5. Formulate joins ONLY when required to connect entity data.\n"
-    "6. Select the required columns.\n"
-    "   - 'select_columns' must contain objects of the form:\n"
-    "     {{\"expr\": \"...\", \"alias\": \"...\", \"is_derived\": ...}}\n"
-    "   - Use pre-aliased column names from schema (e.g., t1.name).\n"
-    "   - Set is_derived=true for aggregates or expressions.\n"
-    "7. Apply filters, grouping, having, ordering, and limits as required.\n\n"
-
-    "[DATATYPE RULES]\n"
-    "- Dates must follow this format: '{date_format}'.\n"
-    "- Strings and dates must use single quotes.\n"
-    "- Numbers must NOT be quoted unless the column type is string.\n\n"
+    "1. Analyze [USER_QUERY] and [SEMANTIC_CONTEXT].\n"
+    "2. Select tables from [RELEVANT_TABLES]. Assign strict 'ordinal' positions 0..N.\n"
+    "3. Define joins using ONLY table aliases (left_alias/right_alias).\n"
+    "4. Build Expr trees using:\n"
+    "   literal | column | func | binary | unary | case\n"
+    "5. Every list MUST contain `ordinal` fields in ascending order starting at 0.\n\n"
 
     "[CONSTRAINTS]\n"
-    "- Return ONLY a JSON object matching the expected plan schema.\n"
-    "- Use ONLY tables and columns defined in [SCHEMA].\n"
-    "- Do NOT hallucinate tables, columns, or joins.\n"
-    "- The 'tables' list MUST contain all tables referenced in joins.\n"
-    "- All column references MUST use 'expr'.\n"
-    "- Use 'alias' ONLY in 'select_columns'.\n"
-    "- Derived expressions MUST set is_derived=true.\n\n"
+    "- STRICTLY follow PlanModel schema.\n"
+    "- Do NOT hallucinate tables or columns.\n"
+    "- Do NOT output text, ONLY the JSON object.\n"
+    "- Use ISO 8601 dates.\n"
+    "- No extra keys beyond the schema.\n\n"
 
-    "[SCHEMA]\n"
-    "{schema_context}\n\n"
-
-    "[ENTITIES]\n"
-    "{intent_context}\n\n"
-
-    "[CONFIG]\n"
-    "Date Format: {date_format}\n\n"
-
-    "[EXAMPLES]\n"
-    "{examples}\n\n"
-
-    "[FEEDBACK]\n"
-    "{feedback}\n\n"
-
-    "[USER_QUERY]\n"
-    "{user_query}"
+    "[RELEVANT_TABLES]\n{relevant_tables}\n\n"
+    "[SEMANTIC_CONTEXT]\n{semantic_context}\n\n"
+    "[CONFIG]\nDate Format: {date_format}\n\n"
+    "[EXAMPLES]\n{examples}\n\n"
+    "[FEEDBACK]\n{feedback}\n\n"
+    "[USER_QUERY]\n{user_query}"
 )

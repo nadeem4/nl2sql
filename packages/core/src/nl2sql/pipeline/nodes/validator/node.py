@@ -1,363 +1,472 @@
 from __future__ import annotations
 
-import json
-from typing import Set, Dict, Any
-from datetime import datetime
+from typing import Set, Dict, Any, List, Optional, Tuple
+import traceback
 
 from nl2sql.pipeline.state import GraphState
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
-from nl2sql.pipeline.nodes.planner.schemas import PlanModel
-from nl2sql.pipeline.nodes.schema.schemas import SchemaInfo
+from nl2sql.pipeline.nodes.planner.schemas import PlanModel, Expr
 from nl2sql.datasources import DatasourceRegistry
 from nl2sql.common.logger import get_logger
+
 
 logger = get_logger("validator")
 
 
-class ValidatorNode:
+class ValidatorVisitor:
+    """Traverses the Expr AST to validate column existence and scoping.
+
+    Attributes:
+        alias_to_cols (Dict[str, Set[str]]): Map of table aliases to their column names.
+        errors (List[str]): List of validation error messages collected during traversal.
     """
-    Validates the generated execution plan against schema, entity coverage,
-    and security policies.
+
+    def __init__(self, alias_to_cols: Dict[str, Set[str]]):
+        """Initializes the ValidatorVisitor.
+
+        Args:
+            alias_to_cols (Dict[str, Set[str]]): Mapping of aliases to available columns.
+        """
+        self.alias_to_cols = alias_to_cols
+        self.errors: List[str] = []
+
+    def visit(self, expr: Expr) -> None:
+        """Recursively visits an expression node to check for column errors.
+
+        Args:
+            expr (Expr): The expression to validate.
+        """
+        kind = expr.kind
+
+        if kind == "column":
+            self._visit_column(expr)
+
+        elif kind == "func":
+            for arg in expr.args:
+                self.visit(arg)
+
+        elif kind == "binary":
+            if expr.left:
+                self.visit(expr.left)
+            if expr.right:
+                self.visit(expr.right)
+
+        elif kind == "unary":
+            if expr.expr:
+                self.visit(expr.expr)
+
+        elif kind == "case":
+            if expr.whens:
+                for when in expr.whens:
+                    self.visit(when.condition)
+                    self.visit(when.result)
+            if expr.else_expr:
+                self.visit(expr.else_expr)
+
+        elif kind == "literal":
+            return
+
+    def _visit_column(self, col: Expr):
+        """Validates a column expression against the known alias map."""
+        if not col.column_name:
+            return
+
+        col_name = col.column_name.lower()
+
+        if col.alias:
+            alias = col.alias
+            if alias not in self.alias_to_cols:
+                self.errors.append(
+                    f"Column '{col.column_name}' uses undeclared alias '{alias}'."
+                )
+                return
+
+            allowed = self.alias_to_cols[alias]
+
+            if col_name != "*" and col_name not in allowed:
+                self.errors.append(
+                    f"Column '{col.column_name}' does not exist in table alias '{alias}'."
+                )
+            return
+
+        if col_name == "*":
+            return
+
+        matches = [alias for alias, cols in self.alias_to_cols.items() if col_name in cols]
+
+        if not matches:
+            self.errors.append(
+                f"Column '{col.column_name}' not found in any relevant table."
+            )
+        elif len(matches) > 1:
+            self.errors.append(
+                f"Ambiguous column '{col.column_name}' referenced without alias."
+            )
+
+
+class ValidatorNode:
+    """Validates the generated AST (PlanModel).
+
+    Performs multiple layers of validation:
+    1. Static Validation: Structure, ordinals, required fields.
+    2. Policy Validation: Checks if the user role allows access to requested tables.
+    3. Semantic Validation: Checks for column existence and ambiguity using the schema.
+    4. Performance Validation: Estimates query cost and warns if too expensive.
+
+    Attributes:
+        registry (DatasourceRegistry): Registry to fetch schemas and profiles.
+        row_limit (int | None): Configured maximum row limit for performance warnings.
     """
 
     def __init__(self, registry: DatasourceRegistry, row_limit: int | None = None):
+        """Initializes the ValidatorNode.
+
+        Args:
+            registry (DatasourceRegistry): The registry of datasources.
+            row_limit (int | None): Optional row limit for performance validation.
+        """
         self.registry = registry
         self.row_limit = row_limit
 
-    def is_aggregation(self, expr: str) -> bool:
-        expr = expr.upper()
-        return any(fn in expr for fn in ("COUNT(", "SUM(", "AVG(", "MIN(", "MAX("))
+    def _build_alias_map(
+        self, state: GraphState, plan: PlanModel
+    ) -> Tuple[Dict[str, Set[str]], Set[str], List[PipelineError]]:
+        """Constructs a map of table aliases to column sets from the schema.
 
-    def validate_expr_ref(
-        self,
-        expr: str,
-        schema_cols: Set[str],
-        plan_aliases: Set[str],
-        errors: list[PipelineError],
-        allow_derived: bool = False,
-    ) -> None:
-        if allow_derived:
-            return
+        Args:
+            state (GraphState): Current execution state containing relevant_tables.
+            plan (PlanModel): The plan containing table references.
 
-        if expr not in schema_cols:
-            errors.append(
-                PipelineError(
-                    node="validator",
-                    message=f"Column '{expr}' not found in schema.",
-                    severity=ErrorSeverity.WARNING,
-                    error_code=ErrorCode.COLUMN_NOT_FOUND,
-                )
+        Returns:
+            Tuple containing:
+            - alias_to_cols (Dict[str, Set[str]]): Map of alias to column names.
+            - plan_aliases (Set[str]): Set of aliases defined in the plan.
+            - errors (List[PipelineError]): List of errors if tables are missing.
+        """
+        alias_to_cols: Dict[str, Set[str]] = {}
+        plan_aliases: Set[str] = set()
+        errors: List[PipelineError] = []
+
+        for t in plan.tables:
+            plan_aliases.add(t.alias)
+
+            found_table = next(
+                (rt for rt in state.relevant_tables if rt.name == t.name),
+                None
             )
-            return
 
-        if "." in expr:
-            alias = expr.split(".", 1)[0]
-            if alias not in plan_aliases:
+            if not found_table:
                 errors.append(
                     PipelineError(
                         node="validator",
-                        message=f"Column '{expr}' uses undeclared alias '{alias}'.",
-                        severity=ErrorSeverity.WARNING,
-                        error_code=ErrorCode.INVALID_ALIAS_USAGE,
+                        message=f"Table '{t.name}' not found in relevant tables.",
+                        severity=ErrorSeverity.ERROR,
+                        error_code=ErrorCode.TABLE_NOT_FOUND
                     )
                 )
+                continue
 
-    def validate_aggregations(self, plan: PlanModel, errors: list[PipelineError]) -> None:
-        has_agg = False
-        non_agg = []
+            cols: Set[str] = set()
+            for c in found_table.columns:
+                name = c.name.lower()
+                if "." in name:
+                    name = name.split(".")[-1]
+                cols.add(name)
 
-        for col in plan.select_columns:
-            if col.is_derived or self.is_aggregation(col.expr):
-                has_agg = True
-            else:
-                non_agg.append(col.expr)
+            alias_to_cols[t.alias] = cols
 
-        group_exprs = {g.expr for g in plan.group_by}
+        logger.debug("Validator alias map: %s", alias_to_cols)
+        return alias_to_cols, plan_aliases, errors
 
-        if has_agg or plan.group_by:
-            for expr in non_agg:
-                if expr not in group_exprs:
-                    errors.append(
-                        PipelineError(
-                            node="validator",
-                            message=f"Column '{expr}' must appear in GROUP BY or be aggregated.",
-                            severity=ErrorSeverity.WARNING,
-                            error_code=ErrorCode.MISSING_GROUP_BY,
-                        )
-                    )
+    def _validate_ordinals(self, items: List[Any], label: str) -> Optional[PipelineError]:
+        """Checks if ordinals in a list of items are contiguous starting from 0."""
+        if not items:
+            return None
 
-    def validate_data_types(
-        self,
-        plan: PlanModel,
-        schema_info: SchemaInfo,
-        profile_id: str,
-        errors: list[PipelineError],
-    ) -> None:
-        try:
-            profile = self.registry.get_profile(profile_id)
-            date_format = profile.date_format or "ISO 8601"
-        except Exception:
-            date_format = "ISO 8601"
+        ords = [x.ordinal for x in items]
+        expected = list(range(len(items)))
 
-        col_types: Dict[str, str] = {}
-        for table in schema_info.tables:
-            for col in table.columns:
-                col_types[col.name] = col.type.upper()
+        if ords != expected:
+            return PipelineError(
+                node="validator",
+                message=f"{label} ordinals must be contiguous 0..{len(items)-1}, found {ords}",
+                severity=ErrorSeverity.ERROR,
+                error_code=ErrorCode.INVALID_PLAN_STRUCTURE,
+            )
+        return None
 
-        def check(expr: str, value: Any):
-            if expr not in col_types:
-                return
+    def _alias_collision(self, plan: PlanModel) -> Optional[PipelineError]:
+        """Checks for duplicate table aliases in the plan."""
+        seen = set()
+        for t in plan.tables:
+            if t.alias in seen:
+                return PipelineError(
+                    node="validator",
+                    message=f"Duplicate table alias '{t.alias}' in plan.",
+                    severity=ErrorSeverity.ERROR,
+                    error_code=ErrorCode.INVALID_PLAN_STRUCTURE,
+                )
+            seen.add(t.alias)
+        return None
 
-            sql_type = col_types[expr]
+    def _validate_policy(self, state: GraphState) -> list[PipelineError]:
+        """Validates that the query adheres to access control policies.
 
-            if "DATE" in sql_type or "TIME" in sql_type:
-                if isinstance(value, str):
-                    raw = value.strip("'").strip('"')
-                    try:
-                        if "ISO" in date_format:
-                            datetime.strptime(raw, "%Y-%m-%d")
-                        else:
-                            datetime.strptime(raw, date_format)
-                    except Exception:
-                        errors.append(
-                            PipelineError(
-                                node="validator",
-                                message=f"Invalid date literal '{value}' for column '{expr}'.",
-                                severity=ErrorSeverity.WARNING,
-                                error_code=ErrorCode.INVALID_DATE_FORMAT,
-                            )
-                        )
+        Args:
+            state (GraphState): Execution state containing user_context.
 
-            if any(t in sql_type for t in ("INT", "DECIMAL", "FLOAT")):
-                if isinstance(value, str):
-                    raw = value.strip("'").strip('"')
-                    if not raw.replace(".", "", 1).isdigit():
-                        errors.append(
-                            PipelineError(
-                                node="validator",
-                                message=f"Invalid numeric literal '{value}' for column '{expr}'.",
-                                severity=ErrorSeverity.WARNING,
-                                error_code=ErrorCode.INVALID_NUMERIC_VALUE,
-                            )
-                        )
-
-        for f in plan.filters:
-            check(f.column.expr, f.value)
-
-        for h in plan.having:
-            check(h.expr, h.value)
-
-    def __call__(self, state: GraphState) -> Dict[str, Any]:
-        node_name = "validator"
+        Returns:
+            list[PipelineError]: Errors if unauthorized tables are accessed.
+        """
+        plan = state.plan
         errors: list[PipelineError] = []
 
-        try:
-            if not state.plan:
+        user_ctx = state.user_context or {}
+        allowed_tables = user_ctx.get("allowed_tables", [])
+        role = user_ctx.get("role", "unknown")
+
+        logger.debug("Policy validation context: %s", user_ctx)
+
+        if "*" in allowed_tables:
+            return []
+
+        for t in plan.tables:
+            if t.name not in allowed_tables:
                 errors.append(
                     PipelineError(
-                        node=node_name,
-                        message="No plan to validate.",
-                        severity=ErrorSeverity.ERROR,
-                        error_code=ErrorCode.MISSING_PLAN,
-                    )
-                )
-                return {"errors": errors}
-
-            if not state.schema_info:
-                return {}
-
-            plan = PlanModel(**state.plan)
-
-            state_entity_ids = []
-            if getattr(state, "entity_ids", None):
-                state_entity_ids = list(state.entity_ids)
-            elif getattr(state, "entities", None):
-                state_entity_ids = [e.entity_id for e in state.entities]
-
-            if state_entity_ids:
-                missing = [e for e in state_entity_ids if e not in plan.entity_ids]
-                if missing:
-                    errors.append(
-                        PipelineError(
-                            node=node_name,
-                            message=f"Plan missing required entity_ids={missing}.",
-                            severity=ErrorSeverity.ERROR,
-                            error_code=ErrorCode.INVALID_PLAN_STRUCTURE,
-                        )
-                    )
-
-            if plan.query_type != "READ":
-                errors.append(
-                    PipelineError(
-                        node=node_name,
-                        message=f"Query type '{plan.query_type}' not allowed.",
+                        node="validator",
+                        message=f"Role '{role}' not authorized to access '{t.name}'.",
                         severity=ErrorSeverity.CRITICAL,
                         error_code=ErrorCode.SECURITY_VIOLATION,
                     )
                 )
-                return {"errors": errors}
 
-            schema_cols: Set[str] = set()
-            plan_aliases: Set[str] = set()
-            plan_tables: Set[str] = set()
+        return errors
 
-            for t in plan.tables:
-                plan_aliases.add(t.alias)
-                plan_tables.add(t.name)
+    def _validate_static(self, state: GraphState) -> list[PipelineError]:
+        """Performs static structure validation on the plan.
 
-                found = False
-                for st in state.schema_info.tables:
-                    if st.name == t.name and st.alias == t.alias:
-                        for c in st.columns:
-                            schema_cols.add(c.name)
-                        found = True
-                        break
+        Checks:
+        - Query type allowed (READ only).
+        - Ordinal integrity.
+        - Alias uniqueness.
+        - Join alias validity.
+        - Column existence (via ValidatorVisitor).
+        """
+        plan: PlanModel = state.plan
+        errors: list[PipelineError] = []
 
-                if not found:
+        if plan.query_type != "READ":
+            return [
+                PipelineError(
+                    node="validator",
+                    message=f"Query type '{plan.query_type}' not allowed.",
+                    severity=ErrorSeverity.CRITICAL,
+                    error_code=ErrorCode.SECURITY_VIOLATION,
+                )
+            ]
+
+        for label, group in [
+            ("tables", plan.tables),
+            ("joins", plan.joins),
+            ("select_items", plan.select_items),
+            ("group_by", plan.group_by),
+            ("order_by", plan.order_by),
+        ]:
+            err = self._validate_ordinals(group, label)
+            if err:
+                errors.append(err)
+
+        alias_err = self._alias_collision(plan)
+        if alias_err:
+            errors.append(alias_err)
+
+        alias_to_cols, plan_aliases, alias_errors = self._build_alias_map(state, plan)
+        errors.extend(alias_errors)
+
+        for j in plan.joins:
+            if j.left_alias not in plan_aliases:
+                errors.append(
+                    PipelineError(
+                        node="validator",
+                        message=f"Join left alias '{j.left_alias}' not in plan tables.",
+                        severity=ErrorSeverity.ERROR,
+                        error_code=ErrorCode.JOIN_TABLE_NOT_IN_PLAN,
+                    )
+                )
+
+            if j.right_alias not in plan_aliases:
+                errors.append(
+                    PipelineError(
+                        node="validator",
+                        message=f"Join right alias '{j.right_alias}' not in plan tables.",
+                        severity=ErrorSeverity.ERROR,
+                        error_code=ErrorCode.JOIN_TABLE_NOT_IN_PLAN,
+                    )
+                )
+
+        visitor = ValidatorVisitor(alias_to_cols)
+
+        if plan.where:
+            visitor.visit(plan.where)
+
+        if plan.having:
+            visitor.visit(plan.having)
+
+        for s in plan.select_items:
+            visitor.visit(s.expr)
+
+        for g in plan.group_by:
+            visitor.visit(g.expr)
+
+        for o in plan.order_by:
+            visitor.visit(o.expr)
+
+        for j in plan.joins:
+            visitor.visit(j.condition)
+
+        for msg in visitor.errors:
+            errors.append(
+                PipelineError(
+                    node="validator",
+                    message=msg,
+                    severity=ErrorSeverity.WARNING,
+                    error_code=ErrorCode.COLUMN_NOT_FOUND,
+                )
+            )
+
+        return errors
+
+    def _validate_semantic(self, state: GraphState) -> list[PipelineError]:
+        """Performs semantic validation (e.g., dry-run) if supported by adapter."""
+        errors: list[PipelineError] = []
+
+        sql = getattr(state, "generated_sql", None)
+        if not sql:
+            return errors
+
+        try:
+            adapter = self.registry.get_adapter(state.selected_datasource_id)
+        except Exception as e:
+            logger.warning("Semantic validation skipped: %s", e)
+            return errors
+
+        try:
+            caps = adapter.capabilities()
+            if caps.supports_dry_run:
+                res = adapter.dry_run(sql)
+                if not res.is_valid:
                     errors.append(
                         PipelineError(
-                            node=node_name,
-                            message=f"Table '{t.name}' with alias '{t.alias}' not found in schema.",
+                            node="validator",
+                            message=f"Dry Run Failed: {res.error_message}",
                             severity=ErrorSeverity.ERROR,
-                            error_code=ErrorCode.TABLE_NOT_FOUND,
+                            error_code=ErrorCode.EXECUTION_ERROR,
                         )
                     )
+        except Exception as e:
+            logger.warning("Dry run skipped: %s", e)
 
-            for col in plan.select_columns:
-                self.validate_expr_ref(
-                    col.expr,
-                    schema_cols,
-                    plan_aliases,
-                    errors,
-                    allow_derived=bool(col.is_derived or self.is_aggregation(col.expr)),
+        return errors
+
+    def _validate_perf(self, state: GraphState) -> list[PipelineError]:
+        """Performs performance validation (cost estimation)."""
+        errors: list[PipelineError] = []
+
+        sql = getattr(state, "generated_sql", None)
+        if not sql:
+            return errors
+
+        try:
+            adapter = self.registry.get_adapter(state.selected_datasource_id)
+        except Exception:
+            return errors
+
+        try:
+            cost = adapter.cost_estimate(sql)
+
+            if self.row_limit and cost.estimated_rows > self.row_limit:
+                errors.append(
+                    PipelineError(
+                        node="validator",
+                        message=f"Estimated {cost.estimated_rows} rows exceeds configured limit {self.row_limit}",
+                        severity=ErrorSeverity.WARNING,
+                        error_code=ErrorCode.PERFORMANCE_WARNING,
+                    )
                 )
 
-            for flt in plan.filters:
-                if flt.column.alias:
-                     errors.append(
-                        PipelineError(
-                            node=node_name,
-                            message=f"Aliases are only allowed in 'select_columns', not in filters (found '{flt.column.alias}').",
-                            severity=ErrorSeverity.WARNING,
-                            error_code=ErrorCode.INVALID_ALIAS_USAGE,
-                        )
+            if cost.estimated_rows > 1_000_000:
+                plan = adapter.explain(sql)
+                errors.append(
+                    PipelineError(
+                        node="validator",
+                        message=f"Potential heavy query: {cost.estimated_rows} rows. Plan: {plan.plan_text[:250]}",
+                        severity=ErrorSeverity.WARNING,
+                        error_code=ErrorCode.PERFORMANCE_WARNING,
                     )
-                self.validate_expr_ref(
-                    flt.column.expr,
-                    schema_cols,
-                    plan_aliases,
-                    errors,
-                    allow_derived=False,
                 )
 
-            for gb in plan.group_by:
-                # Group By expressions usually shouldn't define new aliases, but referencing select aliases is DB dependent.
-                # Here we assume strict: no defining aliases.
-                if gb.alias:
-                     errors.append(
-                        PipelineError(
-                            node=node_name,
-                            message=f"Aliases are only allowed in 'select_columns', not in group_by (found '{gb.alias}').",
-                            severity=ErrorSeverity.WARNING,
-                            error_code=ErrorCode.INVALID_ALIAS_USAGE,
-                        )
-                    )
-                self.validate_expr_ref(
-                    gb.expr,
-                    schema_cols,
-                    plan_aliases,
-                    errors,
-                    allow_derived=False,
-                )
+        except Exception as e:
+            logger.warning("Perf validation skipped: %s", e)
 
-            for ob in plan.order_by:
-                if ob.column.alias:
-                     errors.append(
-                        PipelineError(
-                            node=node_name,
-                            message=f"Aliases are only allowed in 'select_columns', not in order_by (found '{ob.column.alias}').",
-                            severity=ErrorSeverity.WARNING,
-                            error_code=ErrorCode.INVALID_ALIAS_USAGE,
-                        )
-                    )
-                self.validate_expr_ref(
-                    ob.column.expr,
-                    schema_cols,
-                    plan_aliases,
-                    errors,
-                    allow_derived=False,
-                )
+        return errors
 
-            for j in plan.joins:
-                if j.left not in plan_tables and j.left not in plan_aliases:
-                    errors.append(
-                        PipelineError(
-                            node=node_name,
-                            message=f"Join left '{j.left}' not declared in plan tables.",
-                            severity=ErrorSeverity.WARNING,
-                            error_code=ErrorCode.JOIN_TABLE_NOT_IN_PLAN,
-                        )
-                    )
-                if j.right not in plan_tables and j.right not in plan_aliases:
-                    errors.append(
-                        PipelineError(
-                            node=node_name,
-                            message=f"Join right '{j.right}' not declared in plan tables.",
-                            severity=ErrorSeverity.WARNING,
-                            error_code=ErrorCode.JOIN_TABLE_NOT_IN_PLAN,
-                        )
-                    )
-                if not j.on:
-                    errors.append(
-                        PipelineError(
-                            node=node_name,
-                            message=f"Join between '{j.left}' and '{j.right}' missing ON clause.",
-                            severity=ErrorSeverity.WARNING,
-                            error_code=ErrorCode.JOIN_MISSING_ON_CLAUSE,
-                        )
-                    )
+    def __call__(self, state: GraphState) -> Dict[str, Any]:
+        """Executes the validation node.
 
-            self.validate_aggregations(plan, errors)
+        Args:
+            state (GraphState): Current execution state.
 
-            if state.selected_datasource_id:
-                self.validate_data_types(
-                    plan,
-                    state.schema_info,
-                    state.selected_datasource_id,
-                    errors,
-                )
+        Returns:
+            Dict[str, Any]: Validation results, including errors and reasoning.
+        """
+        node_name = "validator"
+        errors: list[PipelineError] = []
 
-            if errors:
+        try:
+            logger.debug("Validator received plan:")
+            logger.debug(state.plan.model_dump_json(indent=2))
+
+            errors.extend(self._validate_static(state))
+            errors.extend(self._validate_policy(state))
+
+            if any(e.severity in (ErrorSeverity.CRITICAL, ErrorSeverity.ERROR) for e in errors):
                 return {
                     "errors": errors,
-                    "reasoning": [
-                        {
-                            "node": node_name,
-                            "content": [e.message for e in errors],
-                        }
-                    ],
+                    "reasoning": [{"node": node_name, "content": [e.message for e in errors]}],
                 }
 
+            errors.extend(self._validate_semantic(state))
+
+            if any(e.severity in (ErrorSeverity.CRITICAL, ErrorSeverity.ERROR) for e in errors):
+                return {
+                    "errors": errors,
+                    "reasoning": [{"node": node_name, "content": [e.message for e in errors]}],
+                }
+
+            errors.extend(self._validate_perf(state))
+
+            reasoning = (
+                "Validation successful."
+                if not errors
+                else [e.message for e in errors]
+            )
+
             return {
-                "errors": [],
-                "reasoning": [
-                    {
-                        "node": node_name,
-                        "content": "Validation successful. Plan is schema-safe and entity-complete.",
-                    }
-                ],
+                "errors": errors,
+                "reasoning": [{"node": node_name, "content": reasoning}],
             }
 
         except Exception as exc:
-            logger.error(exc)
+            logger.exception("Validator crashed")
             return {
                 "errors": [
                     PipelineError(
                         node=node_name,
-                        message=f"Validator crash: {exc}",
+                        message=f"Validator crashed: {exc}",
                         severity=ErrorSeverity.ERROR,
                         error_code=ErrorCode.VALIDATOR_CRASH,
-                        stack_trace=str(exc),
+                        stack_trace=traceback.format_exc(),
                     )
                 ]
             }

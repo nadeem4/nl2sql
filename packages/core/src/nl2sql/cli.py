@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
-"""
-CLI entrypoint for the NL2SQL LangGraph pipeline.
-"""
+"""CLI entrypoint for the NL2SQL LangGraph pipeline."""
 import argparse
 import pathlib
 import sys
@@ -19,6 +17,11 @@ from nl2sql.commands.run import run_pipeline
 
 
 def parse_args() -> argparse.Namespace:
+    """Parses command-line arguments.
+
+    Returns:
+        argparse.Namespace: The parsed arguments.
+    """
     parser = argparse.ArgumentParser(description="Run the NL2SQL LangGraph pipeline.")
     parser.add_argument("--config", type=pathlib.Path, default=pathlib.Path(settings.datasource_config_path))
     parser.add_argument("--id", type=str, default=None, help="Datasource profile id (default: auto-route)")
@@ -31,6 +34,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--verbose", action="store_true", help="Show reasoning thoughts and step-by-step info")
     parser.add_argument("--debug", action="store_true", help="Enable full debug mode (outputs, logs, traces)")
     parser.add_argument("--show-perf", action="store_true", help="Display performance metrics (tokens/latency)")
+    parser.add_argument("--user", type=str, default="admin", help="User persona for AuthZ (default: admin)")
 
     
     # Benchmarking args
@@ -44,33 +48,77 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--export-path", type=pathlib.Path, default=None, help="Benchmark: Export results to file (.json or .csv)")
 
     parser.add_argument("--list-adapters", action="store_true", help="List all installed datasource adapters")
+    parser.add_argument("--json", action="store_true", help="Output results as JSON (suppress logs)")
+    parser.add_argument("--diagnose", action="store_true", help="Run diagnostics and output status")
+    parser.add_argument("--chat", action="store_true", help="Launch interactive TUI")
 
     return parser.parse_args()
 
 
 def main() -> None:
+    """Main entry point for the CLI."""
     args = parse_args()
+    
+    if args.json:
+        from nl2sql.common.logger import configure_logging
+        configure_logging(level="ERROR", json_format=True)
+    
+    if args.diagnose:
+        from nl2sql.diagnostics import check_connectivity
+        
+        try:
+            profiles_map = load_profiles(args.config)
+            profiles = list(profiles_map.values()) if profiles_map else []
+            
+            connectivity = check_connectivity(profiles)
+            
+            output = {
+                "connectivity": {
+                    ds_id: {"ok": ok, "details": msg} 
+                    for ds_id, (ok, msg) in connectivity.items()
+                },
+                "profiles_loaded": len(profiles),
+                "config_path": str(args.config)
+            }
+            print(json.dumps(output))
+            sys.exit(0)
+        except Exception as e:
+            error_out = {"error": str(e)}
+            print(json.dumps(error_out))
+            sys.exit(1)
 
-    # Immediate actions that don't need full config loading
+    if args.chat:
+        try:
+            from nl2sql.tui import app
+            app.run()
+            sys.exit(0)
+        except ImportError:
+            print("Error: TUI dependencies (textual) not installed or TUI module missing.")
+            sys.exit(1)
+
+    if args.query:
+        profiles = load_profiles(args.config)
+        ds_registry = DatasourceRegistry(profiles)
+        
+        try:
+            llm_cfg = load_llm_config(args.llm_config)
+            llm_registry = LLMRegistry(llm_cfg)
+        except Exception:
+            # Fallback if config issues, though likely fatal for query
+            llm_registry = LLMRegistry(None) 
+
+        vector_store = OrchestratorVectorStore(persist_directory=settings.vector_store_path)
+        
+        run_pipeline(args, args.query, ds_registry, llm_registry, vector_store)
+        sys.exit(0)
+
     if args.list_adapters:
         from nl2sql.commands.info import list_available_adapters
         list_available_adapters()
         return
 
-    from nl2sql.common.logger import configure_logging
-    
-    level = "CRITICAL" 
-    
-    if args.debug:
-        level = "DEBUG"
-    elif args.verbose:
-        level = "INFO"
-        
-    configure_logging(level=level, json_format=False)
-
     profiles = load_profiles(args.config)
 
-    # Initialize Registries
     llm_cfg = load_llm_config(args.llm_config)
     llm_registry = LLMRegistry(llm_cfg)
     

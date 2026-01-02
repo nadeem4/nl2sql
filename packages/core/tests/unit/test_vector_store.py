@@ -16,6 +16,7 @@ def test_index_schema():
         mock_adapter = MagicMock(spec=DatasourceAdapter)
         mock_adapter.fetch_schema.return_value = SchemaMetadata(
             datasource_id="test_ds",
+            datasource_engine_type="sqlite",
             tables=[
                 Table(
                     name="table1",

@@ -7,20 +7,16 @@ from .models import (
     QueryPlan,
     CostEstimate,
     CapabilitySet,
-    ExecutionMetrics,
+    CapabilitySet,
 )
 
 class DatasourceAdapter(ABC):
     """Canonical interface every adapter must implement."""
 
-    @abstractmethod
-    def connect(self, config: Dict[str, Any]) -> None:
-        """Initialize connections / clients based on config."""
-        pass
 
     @abstractmethod
-    def validate_connection(self) -> bool:
-        """Check connectivity and credentials."""
+    def connect(self) -> None:
+        """Initialize connections / clients based on config."""
         pass
 
     @abstractmethod
@@ -51,9 +47,4 @@ class DatasourceAdapter(ABC):
     @abstractmethod
     def execute(self, sql: str) -> QueryResult:
         """Execute query and return normalized results."""
-        pass
-    
-    @abstractmethod
-    def metrics(self) -> ExecutionMetrics:
-        """Return adapter-side metrics: retries, latency, etc."""
         pass

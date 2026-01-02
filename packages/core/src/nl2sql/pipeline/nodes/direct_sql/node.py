@@ -3,74 +3,72 @@ from langchain_core.prompts import ChatPromptTemplate
 from nl2sql.pipeline.state import GraphState
 from nl2sql.services.llm import LLMCallable
 from nl2sql.datasources import DatasourceRegistry
-from .prompts import DIRECT_SQL_PROMPT
+from .prompts import DIRECT_SQL_PROMPT, DIRECT_SQL_EXAMPLES
 from nl2sql.common.logger import get_logger
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 
 logger = get_logger("direct_sql_node")
 
+
 class DirectSQLNode:
-    """
-    Fast Lane Node: Converts User Query + Schema directly to SQL.
+    """Fast Lane Node: Converts User Query + Schema directly to SQL.
+
     Bypasses Planner/Generator standard loop for simple queries.
+
+    Attributes:
+        llm (LLMCallable): The language model to use.
+        prompt (ChatPromptTemplate): The prompt template.
+        chain (Runnable): The execution chain.
+        registry (DatasourceRegistry): The datasource registry.
     """
+
     def __init__(self, llm_map: dict[str, LLMCallable], registry: DatasourceRegistry):
+        """Initializes the DirectSQLNode.
+
+        Args:
+            llm_map (dict[str, LLMCallable]): Map of LLMs by name.
+            registry (DatasourceRegistry): The datasource registry.
+        """
         self.llm = llm_map["direct_sql"]
         self.prompt = ChatPromptTemplate.from_template(DIRECT_SQL_PROMPT)
         self.chain = self.prompt | self.llm
         self.registry = registry
 
-    def _format_schema(self, state: GraphState) -> str:
-        """Formats the retrieved schema info into a string."""
-        if not state.schema_info:
-            return "No schema information available."
-        
-        lines = []
-        for table in state.schema_info.tables:
-            cols = ", ".join([f"{c.original_name} ({c.type})" for c in table.columns])
-            lines.append(f"Table: {table.name}\nColumns: {cols}")
-            if table.foreign_keys:
-                fks = [f"{fk.column} -> {fk.referred_table}.{fk.referred_column}" for fk in table.foreign_keys]
-                lines.append(f"Foreign Keys: {', '.join(fks)}")
-            lines.append("---")
-        return "\n".join(lines)
-
     def __call__(self, state: GraphState) -> Dict[str, Any]:
+        """Executes the Direct SQL generation.
+
+        Args:
+            state (GraphState): The current graph state.
+
+        Returns:
+            Dict[str, Any]: Dictionary containing 'sql_draft' and 'reasoning'.
+        """
         try:
-            schema_str = self._format_schema(state)
-            dialect = "TSQL" # Default
-            
+            relevant_tables = '\n'.join([table.model_dump_json(indent=2) for table in state.relevant_tables])
+            dialect = "TSQL"  # Default
+
             if state.selected_datasource_id:
                 try:
-                    profile = self.registry.get_profile(state.selected_datasource_id)
-                    if "postgres" in profile.engine:
-                        dialect = "PostgreSQL"
-                    elif "mysql" in profile.engine:
-                        dialect = "MySQL"
-                    elif "sqlite" in profile.engine:
-                        dialect = "SQLite"
-                    elif "oracle" in profile.engine:
-                        dialect = "Oracle"
+                    dialect = self.registry.get_dialect(state.selected_datasource_id)
                 except Exception:
                     logger.warning(f"Could not resolve dialect for {state.selected_datasource_id}, defaulting to TSQL")
-            
+
+            # response is now a DirectSQLResponse object
             response = self.chain.invoke({
                 "dialect": dialect,
-                "schema_info": schema_str,
-                "user_query": state.user_query
+                "relevant_tables": relevant_tables,
+                "user_query": state.user_query,
+                "examples": DIRECT_SQL_EXAMPLES
             })
 
-            # Extract content from AIMessage if needed
-            response_content = response.content if hasattr(response, "content") else str(response)
+            sql = response.sql.strip()
+            reasoning = response.reasoning
 
-            # Clean output (remove markdown if model hallucinates it despite instructions)
-            sql = response_content.replace("```sql", "").replace("```", "").strip()
-            
-            logger.info(f"Direct SQL Generated: {sql}")
+            logger.info(f"Direct SQL Generated: {sql} | Reasoning: {reasoning}")
 
             return {
                 "sql_draft": sql,
-                "reasoning": [{"node": "direct_sql", "content": "Fast Lane generation successful."}]
+                "reasoning": [{"node": "direct_sql", "content": reasoning}]
             }
 
         except Exception as e:

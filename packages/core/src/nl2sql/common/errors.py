@@ -1,14 +1,18 @@
 from enum import Enum, auto
-from dataclasses import dataclass
 from typing import Optional, Any
+from pydantic import BaseModel, ConfigDict
+
 
 class ErrorSeverity(str, Enum):
+    """Severity levels for pipeline errors."""
     INFO = "INFO"
     WARNING = "WARNING"
     ERROR = "ERROR"
     CRITICAL = "CRITICAL"
 
+
 class ErrorCode(str, Enum):
+    """Standardized error codes for the pipeline."""
     MISSING_LLM = "MISSING_LLM"
     MISSING_SQL = "MISSING_SQL"
     MISSING_DATASOURCE_ID = "MISSING_DATASOURCE_ID"
@@ -31,10 +35,28 @@ class ErrorCode(str, Enum):
     EXECUTOR_CRASH = "EXECUTOR_CRASH"
     PLANNING_FAILURE = "PLANNING_FAILURE"
     VALIDATOR_CRASH = "VALIDATOR_CRASH"
+    SUMMARIZER_FAILED = "SUMMARIZER_FAILED"
+    PLAN_FEEDBACK = "PLAN_FEEDBACK"
     UNKNOWN_ERROR = "UNKNOWN_ERROR"
+    AGGREGATOR_FAILED = "AGGREGATOR_FAILED"
+    PERFORMANCE_WARNING = "PERFORMANCE_WARNING"
+    EXECUTION_ERROR = "EXECUTION_ERROR"
+    ORCHESTRATOR_CRASH = "ORCHESTRATOR_CRASH"
 
-@dataclass
-class PipelineError:
+
+class PipelineError(BaseModel):
+    """Represents a structured error within the pipeline.
+
+    Attributes:
+        node (str): The node where the error occurred.
+        message (str): A human-readable error message.
+        severity (ErrorSeverity): The severity of the error.
+        error_code (ErrorCode): The standardized error code.
+        stack_trace (Optional[str]): Stack trace if applicable.
+        details (Optional[Any]): Additional context or metadata.
+    """
+    model_config = ConfigDict(extra="ignore")
+    
     node: str
     message: str
     severity: ErrorSeverity

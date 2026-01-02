@@ -5,7 +5,7 @@ Your goal is to analyze a failed SQL generation attempt and provide actionable, 
 User Query: "{user_query}"
 
 ### Database Schema
-{schema_context}
+{relevant_tables}
 
 ### Failed Plan
 {failed_plan}

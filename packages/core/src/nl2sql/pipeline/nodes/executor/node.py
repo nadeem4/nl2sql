@@ -14,22 +14,46 @@ from nl2sql.common.logger import get_logger
 
 logger = get_logger("executor")
 
+
 class ExecutorNode:
-    """
-    Executes the generated SQL query via the Datasource Adapter.
+    """Executes the generated SQL query via the Datasource Adapter.
+
+    Attributes:
+        registry (DatasourceRegistry): The registry of datasources.
     """
 
     def __init__(self, registry: DatasourceRegistry):
+        """Initializes the ExecutorNode.
+
+        Args:
+            registry (DatasourceRegistry): The registry of datasources.
+        """
         self.registry = registry
 
     def __call__(self, state: GraphState) -> Dict[str, Any]:
-        node_name = "executor"
+        """Executes the generated SQL against the selected datasource.
+
+        This method performs the following steps:
+        1. Validates presence of SQL and datasource ID.
+        2. Retrieves the appropriate adapter.
+        3. optionally performs cost estimation checks (safeguards).
+        4. Executes the SQL query.
+        5. Formats the results into an ExecutionModel.
+
+        Args:
+            state (GraphState): The current state of the execution graph.
+
+        Returns:
+            Dict[str, Any]: A dictionary containing the 'execution' result,
+                any 'errors', and 'reasoning' logs.
+        """
+        node_name = f"{self.__class__.__name__} ({state.selected_datasource_id}) ({state.user_query})"
 
         try:
             errors = []
             ds_id = state.selected_datasource_id
             sql = state.sql_draft
-            
+
             if not sql:
                 errors.append(PipelineError(
                     node=node_name,
@@ -38,7 +62,8 @@ class ExecutorNode:
                     error_code=ErrorCode.MISSING_SQL
                 ))
                 return {"errors": errors, "execution": ExecutionModel(row_count=0, rows=[], error="No SQL to execute")}
-                
+
+
             if not ds_id:
                 errors.append(PipelineError(
                     node=node_name,
@@ -56,33 +81,17 @@ class ExecutorNode:
             capabilities = adapter.capabilities()
             profile = self.registry.get_profile(ds_id)
 
-            # 1a. Security Check (Core Layer Defense)
-            # Default to generic if dialect not specified
-            dialect = profile.engine if profile and profile.engine else "generic"
-            
-            if not enforce_read_only(sql, dialect=dialect):
-                errors.append(PipelineError(
-                    node=node_name,
-                    message="Security Violation: SQL query contains forbidden keywords.",
-                    severity=ErrorSeverity.CRITICAL,
-                    error_code=ErrorCode.SECURITY_VIOLATION
-                ))
-                return {
-                     "errors": errors,
-                     "execution": ExecutionModel(row_count=0, rows=[], error="Security Violation")
-                 }
+            dialect = self.registry.get_dialect(ds_id)
 
-            # 1b. Pre-flight Safeguard (Data Flood Protection)
-            # Prevent aggregator OOM by rejecting massive result sets
-            SAFEGUARD_ROW_LIMIT = 10000 
-            
-            if hasattr(capabilities, "supports_cost_estimation") or True: # assume true/check
+            SAFEGUARD_ROW_LIMIT = 10000
+
+            if hasattr(capabilities, "supports_cost_estimation") or True:  # assume true/check
                 try:
                     estimate = adapter.cost_estimate(sql)
                     if estimate.estimated_rows > SAFEGUARD_ROW_LIMIT:
                         msg = f"Safeguard Triggered: Query estimated to return {estimate.estimated_rows} rows, exceeding limit of {SAFEGUARD_ROW_LIMIT}."
                         logger.warning(msg)
-                        
+
                         errors.append(PipelineError(
                             node=node_name,
                             message=msg,
@@ -92,37 +101,31 @@ class ExecutorNode:
                         return {
                             "errors": errors,
                             "execution": ExecutionModel(
-                                row_count=0, 
-                                rows=[], 
+                                row_count=0,
+                                rows=[],
                                 error=f"SAFEGUARD: Too many rows ({estimate.estimated_rows})"
                             ),
                             "reasoning": [{"node": "executor", "content": msg, "type": "warning"}]
                         }
-                    elif estimate.estimated_cost == -1: # or some other check
+                    elif estimate.estimated_cost == -1:  # or some other check
                         logger.warning(f"Estimation failed. Proceeding with caution.")
-                        
+
                 except Exception as e:
                     logger.warning(f"Safeguard estimation check failed: {e}. Proceeding execution.")
 
             # 2. Execute via Adapter
             try:
                 sdk_result = adapter.execute(sql)
-                
-                # 3. Map SDK Result -> Graph Result
-                # Convert List[List] to List[Dict]
+
                 rows_as_dicts = [dict(zip(sdk_result.columns, row)) for row in sdk_result.rows]
-                
+
                 execution_result = ExecutionModel(
                     row_count=sdk_result.row_count,
                     rows=rows_as_dicts,
                     columns=sdk_result.columns,
-                    error=None 
+                    error=None
                 )
-                
-                # if sdk_result.error:
-                #      # Log the error but don't crash pipeline, let Aggregator handle
-                #      logger.warning(f"Execution Error: {sdk_result.error}")
-                     
+
             except Exception as exc:
                 execution_result = ExecutionModel(row_count=0, rows=[], error=str(exc))
                 errors.append(PipelineError(
@@ -132,11 +135,11 @@ class ExecutorNode:
                     error_code=ErrorCode.DB_EXECUTION_ERROR,
                     stack_trace=str(exc)
                 ))
-            
+
             exec_msg = f"Executed on {ds_id}. Rows: {execution_result.row_count}."
             if execution_result.error:
-                 exec_msg += f" Error: {execution_result.error}"
-            
+                exec_msg += f" Error: {execution_result.error}"
+
             return {
                 "execution": execution_result,
                 "errors": errors,
@@ -148,7 +151,7 @@ class ExecutorNode:
             return {
                 "execution": None,
                 "errors": [PipelineError(
-                    node=node_name, message=f"Executor crash: {exc}", 
+                    node=node_name, message=f"Executor crash: {exc}",
                     severity=ErrorSeverity.CRITICAL, error_code=ErrorCode.EXECUTOR_CRASH
                 )]
             }

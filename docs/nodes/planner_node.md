@@ -15,21 +15,23 @@ The `PlannerNode` is the cognitive core of the SQL generation process. It synthe
 The node reads the following fields from `GraphState`:
 
 - `state.user_query`: The original question.
-- `state.schema_info`: The list of available tables and columns (from `SchemaNode`).
-- `state.intent`: Analysis of keywords and entities (from `IntentNode`).
-- `state.errors` (Optional): Previous errors, if re-planning is triggered by the Validator or Executor.
+- `state.relevant_tables`: The list of available table schemas (from DecomposerNode).
+- `state.semantic_analysis`: Enriched context (keywords/entities) to guide planning.
+- `state.errors` (Optional): Previous errors, if re-planning is triggered.
 - `state.selected_datasource_id`: ID of the target database (for date format context).
 
 ## Outputs
 
 The node updates the following fields in `GraphState`:
 
-- `state.plan`: A `PlanModel` dictionary containing:
-  - `tables`: List of tables to query.
-  - `joins`: Join conditions between tables.
-  - `select_columns`: Columns to retrieve.
-  - `filters`: Where clauses.
-  - `group_by`, `having`, `order_by`: Aggregation and sorting logic.
+- `state.plan`: A `PlanModel` dictionary representing a Recursive Abstract Syntax Tree (AST):
+  - `tables`: List of tables + `ordinal`.
+  - `joins`: List of join specs + `ordinal` + `condition` (Expr).
+  - `select_items`: Projections + `ordinal` + `expr` (Expr).
+  - `where`: Recursive `Expr` tree (BinaryOp, Func, Literal, etc.).
+  - `group_by`: Grouping expressions + `ordinal`.
+  - `having`: Recursive `Expr` tree.
+  - `order_by`: Sorting expressions + `ordinal`.
   - `limit`: Row limit.
 - `state.reasoning`: Log entry explaining the planning decisions.
 - `state.errors`: Appends `PipelineError` if LLM fails usage.

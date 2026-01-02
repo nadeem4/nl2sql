@@ -17,8 +17,6 @@ logger = get_logger("aggregator")
 LLMCallable = Union[Callable[[str], Any], Runnable]
 
 
-    
-
 class AggregatorNode:
     """Node responsible for aggregating results from parallel sub-queries.
 
@@ -27,16 +25,16 @@ class AggregatorNode:
     to generate a summary (Slow Path).
 
     Attributes:
-        llm: The language model callable used for aggregation.
-        prompt: The prompt template used for aggregation.
-        chain: The LangChain runnable sequence.
+        llm (LLMCallable): The language model callable used for aggregation.
+        prompt (ChatPromptTemplate): The prompt template used for aggregation.
+        chain (Runnable): The LangChain runnable sequence.
     """
 
     def __init__(self, llm: LLMCallable):
         """Initializes the AggregatorNode.
 
         Args:
-            llm: The language model callable.
+            llm (LLMCallable): The language model callable.
         """
         self.llm = llm
         self.prompt = ChatPromptTemplate.from_template(AGGREGATOR_PROMPT)
@@ -46,10 +44,10 @@ class AggregatorNode:
         """Generates a text summary using the LLM.
 
         Args:
-            state: The current graph state containing intermediate results.
+            state (GraphState): The current graph state containing intermediate results.
 
         Returns:
-            A string containing the aggregated final answer.
+            str: A string containing the aggregated final answer.
         """
         user_query = state.user_query
         intermediate_results = state.intermediate_results or []
@@ -80,22 +78,30 @@ class AggregatorNode:
     def __call__(self, state: GraphState) -> Dict[str, Any]:
         """Executes the aggregation logic.
 
+        Determines whether to use the fast path (direct data return) or slow
+        path (LLM synthesis) based on complexity and output mode.
+
         Args:
-            state: The current graph state.
+            state (GraphState): The current graph state.
 
         Returns:
-            A dictionary containing the final answer and reasoning.
+            Dict[str, Any]: A dictionary containing the final answer and reasoning.
         """
         user_query = state.user_query
         intermediate_results = state.intermediate_results or []
         node_name = "aggregator"
         try:
-            is_fast_path_type = state.response_type in ["tabular", "kpi"]
+            # Fast Path Logic:
+            # If user wants raw 'data' AND there's only one result -> Pass through.
+            # If user wants 'synthesis' -> Use LLM.
 
-            if len(intermediate_results) == 1 and not state.errors and is_fast_path_type:
+            output_mode = getattr(state, "output_mode", "synthesis")
+
+            # True Fast Lane: Simple retrieval + Data output requested = No LLM needed
+            if len(intermediate_results) == 1 and not state.errors and output_mode == "data":
                 return {
                     "final_answer": intermediate_results[0],
-                    "reasoning": [{"node": "aggregator", "content": f"Fast path: {state.response_type} result used directly."}]
+                    "reasoning": [{"node": "aggregator", "content": "Fast path: Raw data result passed through (output_mode='data')."}]
                 }
 
             final_answer = self._display_result_with_llm(state)
