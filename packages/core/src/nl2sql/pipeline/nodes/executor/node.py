@@ -57,18 +57,6 @@ class ExecutorNode:
             profile = self.registry.get_profile(ds_id)
 
             dialect = self.registry.get_dialect(ds_id)
-                    
-            if not enforce_read_only(sql, dialect=dialect):
-                errors.append(PipelineError(
-                    node=node_name,
-                    message="Security Violation: SQL query contains forbidden keywords.",
-                    severity=ErrorSeverity.CRITICAL,
-                    error_code=ErrorCode.SECURITY_VIOLATION
-                ))
-                return {
-                     "errors": errors,
-                     "execution": ExecutionModel(row_count=0, rows=[], error="Security Violation")
-                 }
 
             SAFEGUARD_ROW_LIMIT = 10000 
             

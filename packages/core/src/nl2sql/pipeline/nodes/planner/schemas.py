@@ -47,8 +47,7 @@ class Expr(BaseModel):
         Literal[
             "=", "!=", ">", "<", ">=", "<=",
             "+", "-", "*", "/", "%",
-            "AND", "OR", "LIKE", "IN",
-            "NOT"
+            "AND", "OR", "LIKE", "IN"
         ]
     ] = None
 
@@ -62,9 +61,8 @@ class Expr(BaseModel):
     whens: List[CaseWhen] = Field(default_factory=list)
     else_expr: Optional["Expr"] = None
 
-
     # =========================
-    # Semantic Deterministic Validation
+    # Validation
     # =========================
     def model_post_init(self, *_):
         k = self.kind
@@ -73,13 +71,11 @@ class Expr(BaseModel):
             if self.value is None and not self.is_null:
                 raise ValueError("Literal must have value or is_null=True")
 
-        if k == "column":
-            if not self.column_name:
-                raise ValueError("column_name is required for column expression")
+        if k == "column" and not self.column_name:
+            raise ValueError("column_name is required for column expression")
 
-        if k == "func":
-            if not self.func_name:
-                raise ValueError("func_name is required for func expression")
+        if k == "func" and not self.func_name:
+            raise ValueError("func_name is required for func expression")
 
         if k == "binary":
             if not (self.left and self.right):
@@ -93,9 +89,8 @@ class Expr(BaseModel):
             if self.op not in ("NOT", "+", "-"):
                 raise ValueError("Unary op must be NOT, +, or -")
 
-        if k == "case":
-            if not self.whens or len(self.whens) == 0:
-                raise ValueError("CASE expression must have at least one WHEN")
+        if k == "case" and not self.whens:
+            raise ValueError("CASE expression must have at least one WHEN")
 
 
 # =========================
