@@ -6,12 +6,12 @@ from typing import Callable, Optional, Union, Dict, Any
 from langchain_core.runnables import Runnable
 
 from nl2sql.pipeline.state import GraphState
-from .prompts import SUMMARIZER_PROMPT
+from .prompts import REFINER_PROMPT
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 
 from nl2sql.common.logger import get_logger
 
-logger = get_logger("summarizer")
+logger = get_logger("refiner")
 
 LLMCallable = Union[Callable[[str], str], Runnable]
 
@@ -19,7 +19,7 @@ from langchain_core.prompts import ChatPromptTemplate
 
 from langchain_core.output_parsers import StrOutputParser
 
-class SummarizerNode:
+class RefinerNode:
     """
     Analyzes validation errors and generates constructive feedback for the Planner.
 
@@ -28,14 +28,14 @@ class SummarizerNode:
 
     def __init__(self, llm: Optional[LLMCallable] = None):
         """
-        Initializes the SummarizerNode.
+        Initializes the RefinerNode.
 
         Args:
-            llm: The language model to use for summarization.
+            llm: The language model to use for refinement.
         """
         self.llm = llm
         if self.llm:
-            self.prompt = ChatPromptTemplate.from_template(SUMMARIZER_PROMPT)
+            self.prompt = ChatPromptTemplate.from_template(REFINER_PROMPT)
             self.chain = self.prompt | self.llm | StrOutputParser()
 
     def __call__(self, state: GraphState) -> Dict[str, Any]:
@@ -48,7 +48,7 @@ class SummarizerNode:
         Returns:
             Dictionary updates for the graph state with refined error messages (feedback).
         """
-        node_name = "summarizer"
+        node_name = "refiner"
 
         try:
             if not self.llm:
@@ -56,7 +56,7 @@ class SummarizerNode:
                     "errors": [
                         PipelineError(
                             node=node_name,
-                            message="Summarizer LLM not provided.",
+                            message="Refiner LLM not provided.",
                             severity=ErrorSeverity.CRITICAL,
                             error_code=ErrorCode.MISSING_LLM
                         )
@@ -98,7 +98,7 @@ class SummarizerNode:
                             error_code=ErrorCode.PLAN_FEEDBACK
                         )
                     ],
-                    "reasoning": [{"node": "summarizer", "content": feedback}]
+                    "reasoning": [{"node": "refiner", "content": feedback}]
                 }
             except Exception as e:
                     raise e
@@ -106,13 +106,13 @@ class SummarizerNode:
         except Exception as e:
             logger.error(f"Node {node_name} failed: {e}")
             return {
-                "reasoning": [{"node": "summarizer", "content": f"Summarizer failed: {e}", "type": "error"}],
+                "reasoning": [{"node": "refiner", "content": f"Refiner failed: {e}", "type": "error"}],
                 "errors": [
                     PipelineError(
                         node=node_name,
-                        message=f"Summarizer failed: {e}",
+                        message=f"Refiner failed: {e}",
                         severity=ErrorSeverity.ERROR,
-                        error_code=ErrorCode.SUMMARIZER_FAILED,
+                        error_code=ErrorCode.REFINER_FAILED,
                         stack_trace=str(e)
                     )
                 ]

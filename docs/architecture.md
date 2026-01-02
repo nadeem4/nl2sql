@@ -13,18 +13,20 @@ graph TD
     Decomposer -- "Splits Query" --> MapBranching["Fan Out (Map)"]
 
     subgraph ExecutionBranch ["Execution Branch (Parallel)"]
-        MapBranching --> RouteLogic{"Route Logic"}
-        RouteLogic -- "Fast Lane" --> DirectSQL["DirectSQL Node"]
-        DirectSQL --> FastExecutor["Executor"]
+        MapBranching --> Planner["Planner Node"]
         
-        RouteLogic -- "Slow Lane" --> Planner["Planner Node"]
-        Planner --> Validator
-        Validator --> Generator
-        Generator --> Executor
+        Planner --> LogicalValidator["Logical Validator"]
+        LogicalValidator -- "OK" --> Generator["Generator Node"]
+        LogicalValidator -- "Error" --> Refiner["Refiner Node"]
+        
+        Generator --> PhysicalValidator["Physical Validator"]
+        PhysicalValidator -- "OK" --> Executor["Executor Node"]
+        PhysicalValidator -- "Error" --> Refiner
+
+        Refiner -- "Feedback" --> Planner
     end
 
-    FastExecutor -- "Appends Result" --> StateAggregation["State Reducers"]
-    Executor -- "Appends Result" --> StateAggregation
+    Executor -- "Appends Result" --> StateAggregation["State Reducers"]
     StateAggregation --> Aggregator["Aggregator (Reduce)"]
     Aggregator --> FinalAnswer
 ```
@@ -94,8 +96,10 @@ Each branch runs a dedicated LangGraph `StateMachine` inside `nl2sql-core`.
 | **DecomposerNode** | Breaks down queries using Semantic Analysis and Vector Search. | Maps Names -> Table Objects. |
 | **PlannerNode** | Hydrates schema context and creates a **Recursive AST Plan**. | Output: Nested `PlanModel` (AST). |
 | **GeneratorNode** | Compiles AST to SQL using **Visitor Pattern**. | Deterministic compilation. |
+| **PhysicalValidatorNode** | **Performance & Validity Check**. | Enforces Dry-Run (semantics) and Cost Estimation. |
 | **ExecutorNode** | Executes SQL. | Calls `adapter.execute()` |
-| **ValidatorNode** | Static Analysis via **ValidatorVisitor**. | Checks validity via AST traversal. |
+| **LogicalValidatorNode** | Static Analysis via **ValidatorVisitor**. | Checks validity via AST traversal. |
+| **RefinerNode** | Analyzes validation errors. | Provides feedback loop to Planner. |
 
 ### 3.2 State Management
 

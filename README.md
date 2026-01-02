@@ -107,18 +107,17 @@ graph TD
     Decomposer -- "Splits Query" --> MapBranching["Fan Out (Map)"]
 
     subgraph ExecutionBranch ["Execution Branch (Parallel)"]
-        MapBranching --> RouteLogic{"Route Logic"}
-        RouteLogic -- "Fast Lane" --> DirectSQL["DirectSQL Node"]
-        DirectSQL --> FastExecutor["Executor"]
+        MapBranching --> Planner["Planner Node"]
+        Planner --> LogicalValidator
+        LogicalValidator --> Generator
+        Generator --> PhysicalValidator
+        PhysicalValidator --> Executor
         
-        RouteLogic -- "Slow Lane" --> Planner["Planner Node"]
-        Planner --> Validator
-        Validator --> Generator
-        Generator --> Executor
+        PhysicalValidator -. "Feedback" .-> Refiner["Refiner"]
+        Refiner --> Planner
     end
 
-    FastExecutor -- "Appends Result" --> StateAggregation["State Reducers"]
-    Executor -- "Appends Result" --> StateAggregation
+    Executor -- "Appends Result" --> StateAggregation["State Reducers"]
     StateAggregation --> Aggregator["Aggregator (Reduce)"]
     Aggregator --> FinalAnswer
 ```
@@ -189,5 +188,6 @@ The system implements a "Defense in Depth" strategy for RBAC (Role-Based Access 
 
 2. **Policy Validation (Validator Node)**:
     - Fine-grained table-level access control.
-    - The Validator checks every table in the generated plan against the user's `allowed_tables` whitelist.
+    - The `LogicalValidator` checks AST table references.
+    - The `PhysicalValidator` checks SQL table references (double-check).
     - *Result*: Even if a query is generated, execution is blocked if it touches restricted data.

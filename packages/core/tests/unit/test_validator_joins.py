@@ -96,8 +96,8 @@ class TestMissingTablesReproduction(unittest.TestCase):
         new_state = GraphState(**state_dict)
         
         # Now run Validator
-        from nl2sql.pipeline.nodes.validator.node import ValidatorNode
-        validator = ValidatorNode(registry=mock_registry)
+        from nl2sql.pipeline.nodes.validator.node import LogicalValidatorNode
+        validator = LogicalValidatorNode(registry=mock_registry)
         
         # Validator returns DICT
         validation_updates = validator(new_state)

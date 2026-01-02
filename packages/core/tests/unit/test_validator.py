@@ -1,7 +1,7 @@
 
 import pytest
 from unittest.mock import MagicMock
-from nl2sql.pipeline.nodes.validator.node import ValidatorNode
+from nl2sql.pipeline.nodes.validator.node import LogicalValidatorNode
 from nl2sql.pipeline.state import GraphState
 from nl2sql.pipeline.nodes.planner.schemas import PlanModel, TableRef, SelectItem, Expr
 from nl2sql.datasources import DatasourceRegistry
@@ -42,7 +42,7 @@ def _col_expr(alias: str, col: str) -> Expr:
     return Expr(kind="column", alias=alias, column_name=col)
 
 def test_validator_valid_plan(mock_tables, mock_registry):
-    validator = ValidatorNode(registry=mock_registry)
+    validator = LogicalValidatorNode(registry=mock_registry)
     plan = PlanModel(
         tables=[TableRef(name="users", alias="u", ordinal=0)],
         select_items=[
@@ -62,7 +62,7 @@ def test_validator_valid_plan(mock_tables, mock_registry):
     assert not new_state.get("errors")
 
 def test_validator_invalid_table(mock_tables, mock_registry):
-    validator = ValidatorNode(registry=mock_registry)
+    validator = LogicalValidatorNode(registry=mock_registry)
     plan = PlanModel(
         tables=[TableRef(name="invalid_table", alias="x", ordinal=0)],
         select_items=[
@@ -83,7 +83,7 @@ def test_validator_invalid_table(mock_tables, mock_registry):
 
 
 def test_validator_undefined_alias(mock_tables, mock_registry):
-    validator = ValidatorNode(registry=mock_registry)
+    validator = LogicalValidatorNode(registry=mock_registry)
     plan = PlanModel(
         tables=[TableRef(name="users", alias="u", ordinal=0)],
         select_items=[
@@ -104,7 +104,7 @@ def test_validator_undefined_alias(mock_tables, mock_registry):
 
 
 def test_validator_invalid_column_name(mock_tables, mock_registry):
-    validator = ValidatorNode(registry=mock_registry)
+    validator = LogicalValidatorNode(registry=mock_registry)
     plan = PlanModel(
         tables=[TableRef(name="users", alias="u", ordinal=0)],
         select_items=[

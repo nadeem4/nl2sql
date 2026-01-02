@@ -91,13 +91,8 @@ class AggregatorNode:
         intermediate_results = state.intermediate_results or []
         node_name = "aggregator"
         try:
-            # Fast Path Logic:
-            # If user wants raw 'data' AND there's only one result -> Pass through.
-            # If user wants 'synthesis' -> Use LLM.
+            output_mode = state.output_mode
 
-            output_mode = getattr(state, "output_mode", "synthesis")
-
-            # True Fast Lane: Simple retrieval + Data output requested = No LLM needed
             if len(intermediate_results) == 1 and not state.errors and output_mode == "data":
                 return {
                     "final_answer": intermediate_results[0],

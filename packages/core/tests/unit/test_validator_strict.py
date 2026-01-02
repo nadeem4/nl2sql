@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import MagicMock
-from nl2sql.pipeline.nodes.validator.node import ValidatorNode
+from nl2sql.pipeline.nodes.validator.node import LogicalValidatorNode
 from nl2sql.pipeline.state import GraphState
 from nl2sql.pipeline.nodes.planner.schemas import PlanModel, TableRef, SelectItem, Expr, JoinSpec
 from nl2sql_adapter_sdk.models import Table, Column, ColumnStatistics
@@ -26,7 +26,7 @@ def test_validator_strict_aliasing_success():
     """Test that correct alias usage passes."""
     state = create_mock_state()
     registry = MagicMock()
-    validator = ValidatorNode(registry)
+    validator = LogicalValidatorNode(registry)
     
     # Plan: SELECT t1.name FROM users t1
     state.plan = PlanModel(
@@ -46,7 +46,7 @@ def test_validator_strict_aliasing_fail():
     """Test that accessing a column via wrong alias fails."""
     state = create_mock_state()
     registry = MagicMock()
-    validator = ValidatorNode(registry)
+    validator = LogicalValidatorNode(registry)
     
     # Plan: SELECT t1.user_id FROM users t1 (user_id is in orders, not users)
     state.plan = PlanModel(
@@ -68,7 +68,7 @@ def test_validator_implicit_success():
     """Test matching column without alias."""
     state = create_mock_state()
     registry = MagicMock()
-    validator = ValidatorNode(registry)
+    validator = LogicalValidatorNode(registry)
     
     state.plan = PlanModel(
         tables=[TableRef(name="users", alias="t1", ordinal=0)],
@@ -87,7 +87,7 @@ def test_validator_crash_fix():
     """Verify that using column_name does not crash due to AttributeError."""
     state = create_mock_state()
     registry = MagicMock()
-    validator = ValidatorNode(registry)
+    validator = LogicalValidatorNode(registry)
     
     state.plan = PlanModel(
         tables=[TableRef(name="users", alias="t1", ordinal=0)],
@@ -107,7 +107,7 @@ def test_validator_join_alias_check():
     """Test that join aliases must exist in table list."""
     state = create_mock_state()
     registry = MagicMock()
-    validator = ValidatorNode(registry)
+    validator = LogicalValidatorNode(registry)
     
     state.plan = PlanModel(
         tables=[
@@ -145,7 +145,7 @@ def test_validator_case_insensitivity():
     state.relevant_tables = [t1]
     
     registry = MagicMock()
-    validator = ValidatorNode(registry)
+    validator = LogicalValidatorNode(registry)
     
     state.plan = PlanModel(
         tables=[TableRef(name="users", alias="t1", ordinal=0)],

@@ -33,26 +33,14 @@ class AdapterComplianceSuite:
 
     def test_execution_failure_handling(self, adapter):
         """Verify that invalid queries return error object, not raise exception."""
-        # Use a clearly invalid query
-        # Note: Some adapters might raise exceptions. The contract should clarify.
-        # Assuming V1 prefers returning Error in result OR raising standard AdapterError.
-        # If the adapter raises standard exception, test should catch it.
-        # But SDK `execute` returns `QueryResult`.
-        # If it raises, we catch.
         try:
             res = adapter.execute("SELECT * FROM NON_EXISTENT_TABLE_XYZ_123")
-            # If it returns result, check row_count 0 or error field?
-            # models.py QueryResult removed `error` field in my last edits?
-            # If `error` field gone, then it MUST raise exception or return empty with 0 rows.
-            # Let's assume it raises Exception for now.
             pass 
         except Exception:
             pass # Acceptable behavior
 
     def test_estimation_contract(self, adapter):
         """Verify estimation returns valid object."""
-        # Optional, but if implemented, must return EstimationResult
-        # Only test if capability claims support
         caps = adapter.capabilities()
         if hasattr(caps, "supports_cost_estimation") and caps.supports_cost_estimation: # check model definition
              res = adapter.cost_estimate("SELECT 1")

@@ -1,3 +1,4 @@
-from .node import ValidatorNode
+from .node import LogicalValidatorNode
+from .physical_node import PhysicalValidatorNode
 
-__all__ = ["ValidatorNode"]
+__all__ = ["LogicalValidatorNode", "PhysicalValidatorNode"]

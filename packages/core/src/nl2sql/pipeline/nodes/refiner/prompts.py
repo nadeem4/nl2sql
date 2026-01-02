@@ -1,4 +1,4 @@
-SUMMARIZER_PROMPT = """You are an expert SQL debugger and schema analyst.
+REFINER_PROMPT = """You are an expert SQL debugger and schema analyst.
 Your goal is to analyze a failed SQL generation attempt and provide actionable, schema-aware feedback to the Planner.
 
 ### Context

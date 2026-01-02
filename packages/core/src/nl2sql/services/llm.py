@@ -153,9 +153,9 @@ class LLMRegistry:
         llm = self._base_llm("planner")
         return self._wrap_structured_usage(llm, PlanModel)
 
-    def summarizer_llm(self) -> LLMCallable:
-        """Returns the LLM callable for the Summarizer agent."""
-        llm = self._base_llm("summarizer")
+    def refiner_llm(self) -> LLMCallable:
+        """Returns the LLM callable for the Refiner agent."""
+        llm = self._base_llm("refiner")
         return llm.invoke
 
 
@@ -188,7 +188,7 @@ class LLMRegistry:
         """Returns a dictionary of all agent LLM callables."""
         return {
             "planner": self.planner_llm(),
-            "summarizer": self.summarizer_llm(),
+            "refiner": self.refiner_llm(),
             "decomposer": self.decomposer_llm(),
             "aggregator": self.aggregator_llm(),
             "direct_sql": self.direct_sql_llm(),
