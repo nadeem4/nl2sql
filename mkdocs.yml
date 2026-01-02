@@ -1,0 +1,73 @@
+site_name: NL2SQL Platform
+site_description: Production-grade Natural Language to SQL engine.
+theme:
+  name: material
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - search.suggest
+    - search.highlight
+    - toc.follow
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  icon:
+    repo: fontawesome/brands/git-alt
+
+repo_url: https://github.com/your-org/nl2sql
+repo_name: nl2sql
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - admonition
+  - pymdownx.details
+  - attr_list
+  - md_in_html
+
+nav:
+  - Home: index.md
+  - Architecture:
+    - Overview: architecture/overview.md
+    - SQL Agent (Pipeline): architecture/sql_agent.md
+    - Routing Strategy: architecture/routing.md
+    - Adapter Plugins: architecture/adapters.md
+  - Guides:
+    - Getting Started: guides/getting_started.md
+    - Configuration: guides/configuration.md
+    - Deployment: guides/deployment.md
+    - Development: guides/development.md
+  - Reference:
+    - CLI: reference/cli.md
+    - API:
+      - GraphState: reference/api/graph_state.md
+      - Adapter SDK: reference/api/adapter_sdk.md
+    - Nodes:
+      - Planner: reference/nodes/planner.md
+      - Logical Validator: reference/nodes/logical_validator.md
+      - Generator: reference/nodes/generator.md
+      - Physical Validator: reference/nodes/physical_validator.md
+      - Executor: reference/nodes/executor.md
+      - Refiner: reference/nodes/refiner.md
