@@ -1,193 +1,93 @@
-# NL2SQL
+# NL2SQL Platform
 
-## Overview
+**Production-Grade Natural Language to SQL Engine.**
 
-This repository contains the `nl2sql` platform, a modular natural language to SQL engine designed with a pluggable adapter architecture.
+[![Documentation](https://img.shields.io/badge/docs-mkdocs-blue.svg)](docs/index.md)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-## Packages
+The **NL2SQL Platform** is a modular, agentic system designed to convert natural language questions into accurate, authorized SQL queries across multiple database engines (Postgres, MySQL, MSSQL, SQLite).
 
-### Core
+It features:
 
-- **[nl2sql-core](packages/core)**: The main orchestration engine, CLI, and LangGraph nodes.
-- **[nl2sql-adapter-sdk](packages/adapter-sdk)**: The public interface contract for database adapters.
-- **[nl2sql-adapter-sqlalchemy](packages/adapter-sqlalchemy)**: Base implementation for SQL-based adapters.
+* **Defense-in-Depth Security**: RBAC and Read-Only enforcement at multiple layers.
+* **Multi-Database Routing**: Federated queries across silos.
+* **Agentic Reasoning**: Iterative planning, self-correction, and validation.
 
-### Adapters
+---
 
-- **[nl2sql-postgres](packages/adapters/postgres)**: Adapter for PostgreSQL (uses `psycopg2`).
-- **[nl2sql-mysql](packages/adapters/mysql)**: Adapter for MySQL (uses `pymysql`).
-- **[nl2sql-mssql](packages/adapters/mssql)**: Adapter for Microsoft SQL Server (uses `pyodbc`).
-- **[nl2sql-sqlite](packages/adapters/sqlite)**: Adapter for SQLite (built-in).
+## 📚 Documentation
 
-## Development
+Detailed documentation is available in the `docs/` directory.
 
-### Installation
+* [**Architecture**](docs/architecture/overview.md): Understand the SQL Agent, Map-Reduce routing, and Plugins.
+* [**Guides**](docs/guides.md): Installation, Configuration, and Benchmarking.
+* [**Reference**](docs/reference.md): CLI arguments and API specs.
 
-To install the core engine and specific adapters in editable mode:
+---
+
+## 🚀 Quick Start
+
+### 1. Installation
+
+The platform is a monorepo. Install the core engine:
 
 ```bash
 # Core & SDK
 pip install -e packages/adapter-sdk
-pip install -e packages/adapter-sqlalchemy
 pip install -e packages/core
 
-# Adapters (Install as needed)
+# Database Adapters (install as needed)
 pip install -e packages/adapters/postgres
-pip install -e packages/adapters/mysql
-pip install -e packages/adapters/mssql
-pip install -e packages/adapters/sqlite
 ```
 
-### Running Tests
+### 2. Configuration
 
-#### Unit Tests (Core)
+Create a `datasources.yaml` file defining your connections:
+
+```yaml
+- id: my_db
+  engine: sqlite
+  sqlalchemy_url: "sqlite:///./example.db"
+```
+
+### 3. Usage
+
+**a. Indexing** (Required once)
 
 ```bash
-python -m pytest packages/core/tests/unit
+python -m nl2sql.cli --index --config datasources.yaml
 ```
 
-#### Integration Tests (Docker)
-
-We usage Docker Compose to spin up real database instances for verification.
-
-1. Start containers:
-
-   ```bash
-   docker compose up -d
-   ```
-
-2. Run the integration test suite (Windows PowerShell):
-
-   ```powershell
-   powershell -File scripts/test_integration.ps1
-   ```
-
-## Usage
-
-### 1. Adapter Management
-
-Check which adapters are installed and active:
+**b. Querying**
 
 ```bash
-python -m nl2sql.cli --list-adapters
+python -m nl2sql.cli --query "Show me the top 5 users by sales"
 ```
 
-### 2. Indexing (Vector Store)
+---
 
-Before running queries, you must index your datasources definitions. This populates the vector store with schema metadata and few-shot examples.
+## 🏗️ Architecture
 
-```bash
-python -m nl2sql.cli --index --config configs/datasources.yaml
-```
-
-**Note**: Re-run this command whenever `configs/datasources.yaml` changes.
-
-### 2. Running Queries
-
-Execute a natural language query against the pipeline:
-
-```bash
-# Auto-route to the best datasource
-python -m nl2sql.cli --query "Show me all users"
-
-# Force a specific datasource
-python -m nl2sql.cli --id manufacturing_ops --query "List all machines"
-```
-
-## Architecture
-
-The system uses a pluggable architecture where `core` interacts with databases solely through the `DatasourceAdapter` interface defined in `adapter-sdk`. Adapters are discovered dynamically at runtime via `importlib.metadata` entry points (`nl2sql.adapters`).
-
-### Execution Flow
+The system uses a directed graph of AI Agents (`Planner` -> `Validator` -> `Generator`).
 
 ```mermaid
 graph TD
-    UserQuery["User Query"] --> Semantic["Semantic Analysis Node"]
+    UserQuery["User Query"] --> Semantic["Semantic Analysis"]
     Semantic --> Decomposer["Decomposer Node"]
     Decomposer -- "Splits Query" --> MapBranching["Fan Out (Map)"]
 
-    subgraph ExecutionBranch ["Execution Branch (Parallel)"]
-        MapBranching --> Planner["Planner Node"]
-        Planner --> LogicalValidator
-        LogicalValidator --> Generator
-        Generator --> PhysicalValidator
-        PhysicalValidator --> Executor
-        
-        PhysicalValidator -. "Feedback" .-> Refiner["Refiner"]
-        Refiner --> Planner
+    subgraph Execution_Layer ["Execution Layer (Parallel)"]
+        MapBranching --> SQL_Agent["SQL Agent (Planner + Validator + Executor)"]
     end
 
-    Executor -- "Appends Result" --> StateAggregation["State Reducers"]
-    StateAggregation --> Aggregator["Aggregator (Reduce)"]
-    Aggregator --> FinalAnswer
+    SQL_Agent -- "Result Set" --> Reducer["State Aggregation"]
+    Reducer --> Aggregator["Aggregator Node"]
 ```
 
-## Configuration Reference
+[Read more in the Architecture Overview](docs/architecture/overview.md).
 
-The system behavior is controlled by three primary YAML/JSON files.
+---
 
-### 1. `datasources.yaml`
+## 🤝 Contributing
 
-Defines the database connections and their capabilities.
-
-```yaml
-- id: manufacturing_ops
-  engine: postgres
-  sqlalchemy_url: "postgresql+psycopg2://user:pass@localhost:5432/ops"
-  description: "Operational data for tracking employees and machines."
-  feature_flags:
-    supports_dry_run: true
-    supports_estimated_cost: true
-
-- id: manufacturing_ref
-  engine: sqlite
-  sqlalchemy_url: "sqlite:///./data/manufacturing.db"
-```
-
-### 2. `llm_config.yaml`
-
-Configures the Large Language Model providers for each agent.
-
-```yaml
-default:
-  provider: openai
-  model: gpt-4o-mini
-  temperature: 0.0
-
-agents:
-  planner:
-    model: gpt-4o
-    temperature: 0.1
-  
-  decomposer:
-    model: gpt-4o
-    temperature: 0.0
-```
-
-### 3. `users.json`
-
-Defines user context and RBAC permissions.
-
-```json
-{
-  "default_user": {
-    "id": "u_123",
-    "role": "analyst",
-    "allowed_datasources": ["manufacturing_ops", "manufacturing_ref"]
-  }
-}
-```
-
-## Security & Authorization
-
-The system implements a "Defense in Depth" strategy for RBAC (Role-Based Access Control):
-
-1. **Metadata Filtering (Retrieval Layer)**:
-    - The retrieval engine filters the vector search space based on the user's `allowed_datasources`.
-    - *Result*: The LLM never sees schema tokens for unauthorized databases, preventing hallucinations.
-
-2. **Policy Validation (Validator Node)**:
-    - Fine-grained table-level access control.
-    - The `LogicalValidator` checks AST table references.
-    - The `PhysicalValidator` checks SQL table references (double-check).
-    - *Result*: Even if a query is generated, execution is blocked if it touches restricted data.
+See [Development Guide](docs/guides/development.md).
