@@ -13,7 +13,7 @@ The platform is designed as a monorepo. You should install the core and the adap
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-org/nl2sql.git
+git clone https://github.com/nadeem4/nl2sql.git
 cd nl2sql
 
 # Install Core

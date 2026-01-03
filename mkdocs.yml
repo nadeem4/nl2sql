@@ -26,8 +26,28 @@ theme:
   icon:
     repo: fontawesome/brands/git-alt
 
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/nadeem4/nl2sql
+
+copyright: Copyright &copy; 2024 NL2SQL Contributors
+
+
 repo_url: https://github.com/nadeem4/nl2sql
-repo_name: nl2sql   
+repo_name: nl2sql
+edit_uri: edit/main/docs/
+
+# Validation settings (Strict Mode equivalent)
+validation:
+  omitted_files: warn
+  absolute_links: warn
+  unrecognized_links: warn
+
+plugins:
+  - search
+
 
 markdown_extensions:
   - pymdownx.highlight:
