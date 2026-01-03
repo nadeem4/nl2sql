@@ -26,8 +26,8 @@ theme:
   icon:
     repo: fontawesome/brands/git-alt
 
-repo_url: https://github.com/your-org/nl2sql
-repo_name: nl2sql
+repo_url: https://github.com/nadeem4/nl2sql
+repo_name: nl2sql   
 
 markdown_extensions:
   - pymdownx.highlight:
