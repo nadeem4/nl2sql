@@ -52,15 +52,19 @@ nav:
   - Architecture:
     - Overview: architecture/overview.md
     - SQL Agent (Pipeline): architecture/sql_agent.md
+    - Data Indexing: architecture/indexing.md
     - Routing Strategy: architecture/routing.md
     - Adapter Plugins: architecture/adapters.md
   - Guides:
     - Getting Started: guides/getting_started.md
     - Configuration: guides/configuration.md
     - Deployment: guides/deployment.md
+    - Benchmarking: guides/benchmarking.md
+    - Production Roadmap: guides/production_roadmap.md
     - Development: guides/development.md
   - Reference:
     - CLI: reference/cli.md
+    - Lessons Learned: reference/lessons_learned.md
     - API:
       - GraphState: reference/api/graph_state.md
       - Adapter SDK: reference/api/adapter_sdk.md
