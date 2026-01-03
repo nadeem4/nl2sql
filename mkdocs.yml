@@ -1,5 +1,6 @@
 site_name: NL2SQL Platform
 site_description: Production-grade Natural Language to SQL engine.
+site_url: https://nadeem4.github.io/nl2sql/
 theme:
   name: material
   features:
