@@ -20,3 +20,5 @@ data/*.db
 chroma_db
 
 logs
+
+site

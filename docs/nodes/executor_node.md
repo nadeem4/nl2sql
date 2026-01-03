@@ -2,55 +2,43 @@
 
 ## Purpose
 
-The `ExecutorNode` is responsible for waiting for a SQL query (draft) and executing it against the actual database engine. It acts as the final "Effector" in the pipeline. It strictly enforces security protocols to prevent mutation or data loss.
+The `ExecutorNode` is responsible for executing the generated SQL query against the target datasource. It handles connection management via the `DatasourceRegistry` adapters, safeguards against massive result sets, and formats the output.
 
-## Components
+## Class Reference
 
-- **`DatasourceRegistry`**: To obtain the database engine/connection.
-- **`enforce_read_only`**: Security utility to scan for forbidden SQL keywords (INSERT, UPDATE, DROP, etc.).
-- **`engine_factory.run_read_query`**: Helper to execute the query.
+- **Class**: `ExecutorNode`
+- **Path**: `packages/core/src/nl2sql/pipeline/nodes/executor/node.py`
 
 ## Inputs
 
 The node reads the following fields from `GraphState`:
 
-- `state.sql_draft`: The SQL query string to execute.
-- `state.datasource_id`: ID of the target datasource.
+- `state.sql_draft` (str): The SQL query to execute.
+- `state.selected_datasource_id` (str): The target database ID.
 
 ## Outputs
 
 The node updates the following fields in `GraphState`:
 
-- `state.execution`: A structured `ExecutionModel` containing:
-  - `row_count`: Number of rows returned.
-  - `rows`: List of dictionaries representing the result set.
-  - `columns`: List of column names.
-  - `error`: String description of any database error.
-- `state.reasoning`: Log entry summarizing the execution stats.
-- `state.errors`: Appends `PipelineError` if security check fails or DB throws an error.
+- `state.execution` (`ExecutionModel`): The result of the query.
+  - `columns` (List[str]): Column names.
+  - `rows` (List[Dict]): The data returned.
+  - `row_count` (int): Number of rows.
+- `state.errors` (List[PipelineError]): Errors during execution.
 
 ## Logic Flow
 
-1. **Validation**: Checks if `sql_draft` and `datasource_id` are present.
-2. **Datasource Resolution**: Identifies the primary datasource if a list was provided.
-3. **Security Check**:
-    - Detects the dialect based on the profile.
-    - Calls `enforce_read_only` to validate the SQL.
-    - If violation is found, returns `SECURITY_VIOLATION` critical error.
+1. **Validation**: Ensures `sql_draft` and `datasource_id` are present.
+2. **Adapter Retrieval**: Fetches the correct adapter (e.g., PostgresAdapter) from the registry.
+3. **Cost Estimation (Safeguard)**:
+    - If supported by the adapter, estimates the query cost.
+    - If the estimated row count exceeds `SAFEGUARD_ROW_LIMIT` (10,000), aborts execution and raises `SAFEGUARD_VIOLATION`.
 4. **Execution**:
-    - Uses SQLAlchemy engine to run the query.
-    - Fetches all results and maps them to a list of dictionaries.
-    - Captures metadata (column names).
-5. **Result Packaging**: Wraps results or exceptions into the `ExecutionModel`.
+    - Runs `adapter.execute(sql)`.
+    - Captures the result set.
+5. **Formatting**: Converts the results into the standard `ExecutionModel`.
 
 ## Error Handling
 
-- **`MISSING_SQL`**: If generator failed to produce output.
-- **`SECURITY_VIOLATION`**: If DML/DDL keywords are detected.
-- **`DB_EXECUTION_ERROR`**: Runtime errors from the database (e.g., syntax error, invalid table).
-- **`EXECUTOR_CRASH`**: Unhandled python exceptions.
-
-## Dependencies
-
-- `nl2sql.security`
-- `nl2sql.engine_factory`
+- **`SAFEGUARD_VIOLATION`**: If the query is predicted to return too many rows.
+- **`DB_EXECUTION_ERROR`**: If the database raises an exception (e.g., timeout, syntax error not caught by validator).

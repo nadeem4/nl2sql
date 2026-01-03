@@ -64,15 +64,18 @@ nav:
     - Production Roadmap: guides/production_roadmap.md
     - Development: guides/development.md
   - Reference:
+    - Test Data: reference/test_data.md
     - CLI: reference/cli.md
     - Lessons Learned: reference/lessons_learned.md
     - API:
       - GraphState: reference/api/graph_state.md
       - Adapter SDK: reference/api/adapter_sdk.md
     - Nodes:
-      - Planner: reference/nodes/planner.md
-      - Logical Validator: reference/nodes/logical_validator.md
-      - Generator: reference/nodes/generator.md
-      - Physical Validator: reference/nodes/physical_validator.md
-      - Executor: reference/nodes/executor.md
-      - Refiner: reference/nodes/refiner.md
+      - Aggregator: nodes/aggregator_node.md
+      - Decomposer: nodes/decomposer_node.md
+      - Executor: nodes/executor_node.md
+      - Generator: nodes/generator_node.md
+      - Planner: nodes/planner_node.md
+      - Refiner: nodes/refiner_node.md
+      - Semantic Analysis: nodes/semantic_analysis_node.md
+      - Logical Validator: nodes/validator_node.md

@@ -2,47 +2,45 @@
 
 ## Purpose
 
-The `DecomposerNode` acts as the **Router** and **Orchestrator** of the pipeline. It parses the canonicalized user query and breaks it down into independent sub-queries, each targeted at a specific datasource. This is crucial for handling multi-datasource requests or complex analytical questions.
+The `DecomposerNode` acts as the entry point and router for the pipeline. It is responsible for analyzing the user's query to determine which datasource(s) should handle the request. For complex requests, it can break the query down into sub-queries (though simple routing is the primary function). It also checks user authorization before proceeding.
 
-## Components
+## Class Reference
 
-- **`LLM`**: Used to perform the decomposition and reasoning.
-- **`OrchestratorVectorStore`**: Provides relevant schema context for the LLM to make informed routing decisions.
-- **`DatasourceRegistry`**: Provides metadata (descriptions) about available data sources.
+- **Class**: `DecomposerNode`
+- **Path**: `packages/core/src/nl2sql/pipeline/nodes/decomposer/node.py`
 
 ## Inputs
 
 The node reads the following fields from `GraphState`:
 
-- `state.semantic_analysis`: The **enriched** query context containing canonical query and synonyms (from SemanticAnalysisNode).
-- `state.selected_datasource_id`: (Optional) If set, the node acts in "Pass-through" mode.
+- `state.user_query` (str): The initial user question.
+- `state.user_context` (Dict): User session data, specifically `allowed_datasources` for authorization.
+- `state.semantic_analysis` (SemanticAnalysisResponse): Used to expand the query with keywords/synonyms for better vector retrieval.
 
 ## Outputs
 
 The node updates the following fields in `GraphState`:
 
-- `state.sub_queries`: A list of `SubQuery` objects, each containing:
-  - `datasource_id`: Target database.
-  - `query`: The specific question for that database.
-  - `candidate_tables`: (Optional) Pre-identified tables.
-- `state.reasoning`: Log entry explaining the decomposition logic.
-- `state.errors`: Appends `PipelineError` if orchestration fails.
+- `state.sub_queries` (List[SubQuery]): A list of routed queries. Each `SubQuery` contains:
+  - `question`: The specific question for the datasource.
+  - `datasource_id`: The ID of the chosen datasource.
+- `state.confidence` (float): The confidence score of the routing decision.
+- `state.reasoning` (List[Dict]): Explanation of why a specific datasource was selected.
+- `state.errors` (List[PipelineError]): `SECURITY_VIOLATION` if the user lacks access.
 
 ## Logic Flow
 
-1. **Direct Execution Check**:
-    - If `state.selected_datasource_id` is already present, it creates a single `SubQuery` targeting that datasource.
-2. **Context Retrieval**:
-    - Uses `state.user_query` + `state.enriched_terms` to query the `VectorStore`.
-3. **LLM Decomposition**:
-    - Prompts the LLM with the query, available datasources, and retrieved schema context.
-    - The LLM generates a plan (`DecomposerResponse`) consisting of one or more sub-queries.
-4. **State Update**: The resulting `sub_queries` are stored in the state, which triggers parallel execution branches.
+1. **Authorization Check**: Verifies if `state.user_context` contains accessible datasources. If not, returns `SECURITY_VIOLATION`.
+2. **Query Expansion**: If `state.semantic_analysis` is present, it augments the query with keywords and synonyms to improve retrieval recall.
+3. **Context Retrieval**:
+    - Queries the `OrchestratorVectorStore` using the expanded query.
+    - Retrieves relevant table schemas and datasource descriptions.
+4. **LLM Routing**:
+    - Uses the LLM to analyze the retrieved context and the user query.
+    - Decides which datasource is best suited to answer the question.
+5. **Output Generation**: Returns the routing decision (datasource selection) and confidence score.
 
 ## Error Handling
 
-- **`ORCHESTRATOR_CRASH`**: Critical failure in the decomposition process (e.g., LLM error, context retrieval failure).
-
-## Dependencies
-
-- `nl2sql.nodes.decomposer.schemas.DecomposerResponse`
+- **`SECURITY_VIOLATION`**: Critical error if the user has no allowed datasources.
+- **Retrieval Warnings**: Logs warnings if no relevant documents are found in the vector store.

@@ -2,46 +2,40 @@
 
 ## Purpose
 
-The `AggregatorNode` is responsible for consolidating results from multiple parallel execution branches (triggered by the `DecomposerNode`) into a single, coherent response. It handles data merging, de-duplication, and formatting (e.g., combining two partial tables into one).
+The `AggregatorNode` combines results from the execution phase and prepares the final response. It implements a "Fast Path" for direct data streaming and a "Slow Path" for LLM-based summarization or answer synthesis.
 
-## Components
+## Class Reference
 
-- **`LLM`**: Used to synthesize the final answer and decide the best presentation format.
-- **`AggregatedResponse`**: Structured output schema.
+- **Class**: `AggregatorNode`
+- **Path**: `packages/core/src/nl2sql/pipeline/nodes/aggregator/node.py`
 
 ## Inputs
 
 The node reads the following fields from `GraphState`:
 
-- `state.intermediate_results`: A list of results collected from all parallel branches (each containing execution data or errors).
-- `state.user_query`: The original global query.
-- `state.errors`: List of errors encountered in the branches (to report partial failures).
+- `state.user_query` (str): The user's question.
+- `state.intermediate_results` (List): Results from the executor(s).
+- `state.output_mode` (str): "data" (Fast Path) or "summary"/"verbose" (Slow Path).
+- `state.errors` (List[PipelineError]): Any errors to include in the summary.
 
 ## Outputs
 
 The node updates the following fields in `GraphState`:
 
-- `state.final_answer`: A markdown-formatted string containing the summary and combined data.
-- `state.reasoning`: Log entry describing the chosen format.
-- `state.errors`: Appends `PipelineError` if aggregation fails.
+- `state.final_answer` (Any): The final text entry or data payload.
+- `state.reasoning` (List[Dict]): Log of which path was taken.
 
 ## Logic Flow
 
 1. **Fast Path Check**:
-    - Checks if `state.response_type` is `TABULAR` or `KPI`.
-    - If true, and there is a single successful result, returns `final_answer=None`.
-    - This signals the Presentation Layer (CLI) to display the raw `ExecutionModel` directly.
-2. **Slow Path (LLM)**:
-    - If `state.response_type` is `SUMMARY` or multiple results exist.
-    - Formats all `intermediate_results` into a single text block.
-    - Invokes the LLM to synthesize an answer (`AggregatedResponse`).
-3. **Formatting**:
-    - Constructs a markdown string combining the summary and content.
+    - If there is exactly one result, no errors, and `output_mode` is "data":
+    - Returns the raw data directly.
+2. **Slow Path (LLM Aggregation)**:
+    - Formats all `intermediate_results` (and errors) into a string.
+    - Prompts the LLM to synthesize an answer to the `user_query` using the provided data.
+    - Formats the LLM output (Table/List/Text).
+    - Returns the generated summary.
 
 ## Error Handling
 
-- **`AGGREGATOR_FAILED`**: If the LLM output is malformed or processing fails.
-
-## Dependencies
-
-- `nl2sql.nodes.aggregator.schemas.AggregatedResponse`
+- **`AGGREGATOR_FAILED`**: If the LLM summarization fails.

@@ -2,44 +2,38 @@
 
 ## Purpose
 
-The `SemanticAnalysisNode` is the **Entry Point** of the pipeline. It acts as the "Receptionist" that refines the raw user query before any routing or planning occurs. Its goal is to maximize retrieval accuracy by translating vague user requests into precise, domain-specific terminology.
+The `SemanticAnalysisNode` is a preprocessing step that normalizes the user query and extracts metadata such as keywords and synonyms. This enriched context supports both the `DecomposerNode` (by expanding the search query for better retrieval) and the `PlannerNode` (by resolving ambiguity).
 
-## Key Logic
+## Class Reference
 
-1. **Canonicalization**:
-    * Transforms slang/ambiguity into standard English.
-    * Example: "How many guys on the floor?" -> "Count count of operators on active shift".
-2. **Enrichment**:
-    * Generates list of synonymous keywords and entities.
-    * Example: "Machine" -> ["Equipment", "CNC", "Asset", "Device"].
-
-## Components
-
-* **`LLM`**: Used to perform the text-to-JSON analysis.
-* **`SemanticAnalysisResponse`**: The structured output schema.
+- **Class**: `SemanticAnalysisNode`
+- **Path**: `packages/core/src/nl2sql/pipeline/nodes/semantic/node.py`
 
 ## Inputs
 
-* **`state.user_query`**: The raw natural language string from the user.
+The node reads the following fields from `GraphState`:
+
+- `state.user_query` (str): The raw user input.
 
 ## Outputs
 
 The node updates the following fields in `GraphState`:
 
-* **`state.semantic_analysis`**: A dictionary containing:
-  * `canonical_query`: The rewritten query.
-  * `entities`: Extracted named entities.
-  * `keywords`: Search terms for vector retrieval.
-  * `intent`: High-level classification (Tabular vs Summary).
-  * `reasoning`: Chain-of-thought explanation.
+- `state.semantic_analysis` (`SemanticAnalysisResponse`):
+  - `canonical_query`: Normalized form of the question.
+  - `keywords`: Extracted domain keywords.
+  - `synonyms`: List of potential synonyms for columns/tables.
+  - `reasoning`: The analysis thought process.
 
 ## Logic Flow
 
-1. **Receive Query**: Accepts `state.user_query`.
-2. **LLM Call**: Invokes the `semantic_analysis` agent (e.g., GPT-4o-mini).
-3. **Parses Output**: Validates the JSON response against the Pydantic schema.
-4. **State Update**: Populates `state.semantic_analysis`.
+1. **LLM Invocation**:
+    - Prompts the LLM with the `user_query`.
+    - Requests an analysis including canonicalization and keyword extraction.
+2. **Result Storage**:
+    - Stores the structured response in `state.semantic_analysis`.
+    - Logs the reasoning and keywords.
 
-## Dependencies
+## Error Handling
 
-* `nl2sql.nodes.semantic.schemas.SemanticAnalysisResponse`
+- **Fallback**: If the LLM call fails, it defaults to returning the raw query with empty keywords to prevent pipeline blockage.
