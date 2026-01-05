@@ -9,7 +9,7 @@ The **NL2SQL Platform** is a modular, agentic system designed to convert natural
 
 It features:
 
-* **Defense-in-Depth Security**: RBAC and Read-Only enforcement at multiple layers.
+* **Defense-in-Depth Security**: RBAC and Read-Only enforcement at multiple layers. [Learn more](docs/architecture/security.md).
 * **Multi-Database Routing**: Federated queries across silos.
 * **Agentic Reasoning**: Iterative planning, self-correction, and validation.
 
@@ -20,6 +20,7 @@ It features:
 Detailed documentation is available in the `docs/` directory.
 
 * [**Architecture**](docs/architecture/overview.md): Understand the SQL Agent, Map-Reduce routing, and Plugins.
+* [**Security**](docs/architecture/security.md): Authentication, RBAC, and Validation.
 * [**Guides**](docs/guides.md): Installation, Configuration, and Benchmarking.
 * [**Reference**](docs/reference.md): CLI arguments and API specs.
 

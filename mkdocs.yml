@@ -72,6 +72,7 @@ nav:
   - Home: index.md
   - Architecture:
     - Overview: architecture/overview.md
+    - Security Model: architecture/security.md
     - SQL Agent (Pipeline): architecture/sql_agent.md
     - Data Indexing: architecture/indexing.md
     - Routing Strategy: architecture/routing.md
