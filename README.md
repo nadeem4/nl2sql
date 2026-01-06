@@ -37,33 +37,33 @@ The platform is a monorepo. Install the CLI application:
 pip install -e packages/adapter-sdk
 pip install -e packages/cli  # Installs 'nl2sql' command
 
-# Database Adapters (install as needed)
-pip install -e packages/adapters/postgres
+# Database Adapters (install as needed, or let setup wizard handle it)
+# pip install -e packages/adapters/postgres
 ```
 
-### 2. Configuration
+### 2. Setup
 
-Create a `datasources.yaml` file defining your connections:
+Run the interactive wizard to configure your database and LLM:
 
-```yaml
-- id: my_db
-  engine: sqlite
-  sqlalchemy_url: "sqlite:///./example.db"
+```bash
+nl2sql setup
 ```
+
+*This will create your configuration files and index your schema.*
 
 ### 3. Usage
 
-**a. Indexing** (Required once)
+**Querying**
 
 ```bash
-nl2sql --index --config datasources.yaml
+nl2sql run "Show me the top 5 users by sales"
 ```
 
-**b. Querying**
+**Other Commands**
 
-```bash
-nl2sql --query "Show me the top 5 users by sales"
-```
+* `nl2sql doctor` - Diagnose environment issues.
+* `nl2sql list-adapters` - Show installed database adapters.
+* `nl2sql benchmark` - Run evaluation suite.
 
 ---
 

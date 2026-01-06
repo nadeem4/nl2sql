@@ -24,35 +24,31 @@ pip install -e packages/cli # Installs 'nl2sql' command
 pip install -e packages/adapters/postgres
 ```
 
-## 2. Configuration
+## 2. Setup
 
-Create a `datasources.yaml` file. This tells the system how to connect to your databases.
-
-```yaml
-- id: my_db
-  engine: sqlite
-  sqlalchemy_url: "sqlite:///./example.db"
-```
-
-## 3. Indexing
-
-Before the AI can understand your schema, you must index it. Additional indexing strategies are discussed in the [Configuration Guide](configuration.md).
+Run the interactive setup wizard. This will inspect your environment, guide you through creating a configuration, and index your database schema.
 
 ```bash
-nl2sql --index --config datasources.yaml
+nl2sql setup
 ```
 
-## 4. Run a Query
+The wizard will ask for:
+
+1. **Database Details** (Host, Port, User, Password).
+2. **LLM Provider** (OpenAI, Gemini, Ollama).
+3. Confirmation to install required **Adapters** (e.g. `nl2sql-postgres`).
+
+## 3. Run a Query
 
 Now you are ready to ask questions!
 
 ```bash
-nl2sql --query "Show me the top 5 users by sales"
+nl2sql run "Show me the top 5 users by sales"
 ```
 
 The system will:
 
 1. Plan the query.
-2. Route it to `my_db`.
+2. Route it to the correct database.
 3. Generate and Validate SQL.
 4. Execute and display the results.

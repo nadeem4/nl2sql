@@ -1,33 +1,70 @@
 # CLI Reference
 
-The Command Line Interface (CLI) is the primary way to interact with the platform.
+The **NL2SQL** command line interface uses a subcommand structure.
 
-**Command**: `nl2sql`
+**Command**: `nl2sql [COMMAND] [OPTIONS]`
 
-## Common Arguments
+## Commands
 
-| Argument | Description | Default |
-| :--- | :--- | :--- |
-| `--query` | The natural language query to run. | Interactive mode |
-| `--config` | Path to datasources YAML. | `configs/datasources.yaml` |
-| `--id` | Target specific datasource (bypass routing). | auto-route |
-| `--index` | Index the datasources in the vector store. | |
-| `--vector-store` | Path to vector DB persistence dir. | `.chroma_db` |
+### `setup`
 
-## Advanced Arguments
+Interactively configure the environment, create config files, and index schemas.
 
-| Argument | Description | Default |
-| :--- | :--- | :--- |
-| `--llm-config` | Path to LLM configuration. | `configs/llm_config.yaml` |
-| `--user` | Context user ID for RBAC checks. | `admin` |
-| `--json` | Output result as raw JSON (no logs). | |
-| `--no-exec` | Generate and Validate SQL only (no execution). | |
-| `--list-adapters` | List installed plugins. | |
-
-## Benchmarking
-
-| Argument | Description |
+| Option | Description |
 | :--- | :--- |
-| `--benchmark` | Activate benchmark mode. |
-| `--dataset` | Path to Golden Set YAML. |
-| `--export-path` | Save results to file. |
+| `None` | Runs the interactive wizard. |
+
+---
+
+### `run`
+
+Execute natural language queries against your datasources.
+
+**Usage**: `nl2sql run "Your query here"`
+
+| Option | Description | Default |
+| :--- | :--- | :--- |
+| `--config` | Path to datasources YAML. | `configs/datasources.yaml` |
+| `--llm-config` | Path to LLM configuration. | `configs/llm.yaml` |
+| `--id` | Target specific datasource ID (bypass routing). | auto-route |
+| `--json` | Output result as raw JSON only. | `False` |
+| `--no-exec` | Generate and Validate SQL only (skip execution). | `False` |
+| `--user` | Context user ID for RBAC checks. | `admin` |
+
+---
+
+### `doctor`
+
+Diagnose environment issues, check dependencies, and verify connectivity.
+
+| Option | Description |
+| :--- | :--- |
+| `None` | Runs diagnositc checks. |
+
+---
+
+### `index`
+
+Manually trigger the schema indexing process.
+
+| Option | Description | Default |
+| :--- | :--- | :--- |
+| `--config` | Path to datasources YAML. | `configs/datasources.yaml` |
+| `--llm-config` | Path to LLM configuration. | `configs/llm.yaml` |
+
+---
+
+### `list-adapters`
+
+List all currently installed database adapter packages.
+
+---
+
+### `benchmark`
+
+Run the evaluation suite.
+
+| Option | Description | Default |
+| :--- | :--- | :--- |
+| `--config` | Path to benchmark suite YAML. | `configs/benchmark.yaml` |
+| `--output` | Directory to save report artifacts. | `benchmarks/` |
