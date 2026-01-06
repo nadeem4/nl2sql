@@ -1,75 +1,267 @@
-from rich.prompt import Confirm
+import os
+import yaml
+import pathlib
+from rich.prompt import Confirm, Prompt
+from rich.panel import Panel
 from nl2sql_cli.console import console, print_success, print_step, print_error
 from nl2sql_cli.config import KNOWN_ADAPTERS, CORE_PACKAGE
-from nl2sql_cli.commands.doctor import check_package
 from nl2sql_cli.commands.install import install_package
+from nl2sql_cli.checks import check_package, verify_connectivity
+
+CONFIG_DIR = pathlib.Path("configs")
+DATASOURCE_CONFIG = CONFIG_DIR / "datasources.yaml"
+LLM_CONFIG = CONFIG_DIR / "llm.yaml"
+
+def _ensure_directories():
+    if not CONFIG_DIR.exists():
+        CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+        console.print("[dim]Created configs directory.[/dim]")
+
+from rich.table import Table
+
+def _configure_datasource():
+    if DATASOURCE_CONFIG.exists():
+        console.print(Panel("[bold]1. Datasource Configuration[/bold]", border_style="cyan"))
+        try:
+             with open(DATASOURCE_CONFIG, "r") as f:
+                data = yaml.safe_load(f) or {}
+             
+             table = Table(show_header=True, header_style="bold cyan", title="Existing Datasources", box=None)
+             table.add_column("ID", style="cyan")
+             table.add_column("Engine", style="green")
+             table.add_column("Connection", style="dim")
+             
+             # Support List or Dict
+             if isinstance(data, list):
+                 for d in data:
+                     table.add_row(d.get('id', 'unknown'), d.get('engine', '?'), d.get('connection_string', '***'))
+             else:
+                 for k, v in data.items():
+                     table.add_row(k, v.get('engine', '?'), v.get('connection_string', '***'))
+             
+             console.print(table)
+        except Exception:
+             console.print("[dim]Existing configuration found (could not parse).[/dim]")
+        return
+        
+    console.print(Panel("[bold]1. Datasource Configuration[/bold]", border_style="cyan"))
+    console.print("No datasource configuration found. Let's create one.")
+    
+    db_type = Prompt.ask("Select Database Type", choices=["postgres", "mysql", "mssql", "sqlite"], default="postgres")
+    
+    config_data = {}
+    
+    if db_type == "sqlite":
+        db_path = Prompt.ask("Database Path", default="./my_database.db")
+        config_data = {
+            "my_sqlite_db": {
+                "engine": "sqlite",
+                "connection_string": f"sqlite:///{db_path}",
+                "description": "Main application database"
+            }
+        }
+    else:
+        host = Prompt.ask("Host", default="localhost")
+        
+        default_ports = {"postgres": "5432", "mysql": "3306", "mssql": "1433"}
+        port = Prompt.ask("Port", default=default_ports.get(db_type, "5432"))
+        user = Prompt.ask("Username", default="postgres" if db_type == "postgres" else "root")
+        password = Prompt.ask("Password", password=True)
+        dbname = Prompt.ask("Database Name")
+        
+        # Construct SQLAlchemy URL
+        if db_type == "postgres":
+            url = f"postgresql://{user}:{password}@{host}:{port}/{dbname}"
+        elif db_type == "mysql":
+            url = f"mysql+pymysql://{user}:{password}@{host}:{port}/{dbname}"
+        elif db_type == "mssql":
+            url = f"mssql+pyodbc://{user}:{password}@{host}:{port}/{dbname}?driver=ODBC+Driver+17+for+SQL+Server"
+        
+        config_data = {
+            "main_db": {
+                "engine": db_type,
+                "connection_string": url,
+                "description": "Primary database"
+            }
+        }
+
+    with open(DATASOURCE_CONFIG, "w") as f:
+        yaml.dump(config_data, f, sort_keys=False)
+    
+    print_success(f"Created {DATASOURCE_CONFIG}")
+
+def _configure_llm():
+    if LLM_CONFIG.exists():
+        console.print(Panel("[bold]2. LLM Configuration[/bold]", border_style="magenta"))
+        try:
+             with open(LLM_CONFIG, "r") as f:
+                data = yaml.safe_load(f) or {}
+             
+             table = Table(show_header=True, header_style="bold magenta", title="Existing LLMs", box=None)
+             table.add_column("ID", style="magenta")
+             table.add_column("Provider", style="green")
+             table.add_column("Model", style="yellow")
+
+             for k, v in data.items():
+                 table.add_row(k, v.get('provider', '?'), v.get('model', '?'))
+                 
+             console.print(table)
+        except Exception:
+             console.print("[dim]Existing configuration found (could not parse).[/dim]")
+        return
+        
+    console.print(Panel("[bold]2. LLM Configuration[/bold]", border_style="magenta"))
+    console.print("No LLM configuration found. Let's configure one.")
+    
+    provider = Prompt.ask("Select Provider", choices=["openai", "gemini", "ollama"], default="openai")
+    
+    llm_data = {}
+    
+    if provider == "openai":
+        api_key = Prompt.ask("OpenAI API Key", password=True)
+        llm_data = {
+            "main_llm": {
+                "provider": "openai",
+                "model": "gpt-4o",
+                "api_key": api_key,
+                "temperature": 0.0
+            }
+        }
+    elif provider == "gemini":
+        api_key = Prompt.ask("Gemini API Key", password=True)
+        llm_data = {
+            "main_llm": {
+                "provider": "google_genai",
+                "model": "gemini-1.5-pro",
+                "api_key": api_key,
+                "temperature": 0.0
+            }
+        }
+    elif provider == "ollama":
+        base_url = Prompt.ask("Base URL", default="http://localhost:11434")
+        model = Prompt.ask("Model Name", default="llama3")
+        llm_data = {
+            "main_llm": {
+                "provider": "ollama",
+                "model": model,
+                "base_url": base_url,
+                "temperature": 0.0
+            }
+        }
+
+    with open(LLM_CONFIG, "w") as f:
+        yaml.dump(llm_data, f, sort_keys=False)
+        
+    print_success(f"Created {LLM_CONFIG}")
+
+def _install_required_adapters():
+    """Reads config and installs necessary adapters."""
+    if not DATASOURCE_CONFIG.exists():
+        return
+
+    try:
+        from nl2sql.datasources import load_profiles
+        try:
+            profiles = load_profiles(DATASOURCE_CONFIG)
+            # profiles is Dict[str, DatasourceProfile]
+            profile_list = list(profiles.values())
+        except Exception:
+             with open(DATASOURCE_CONFIG, "r") as f:
+                data = yaml.safe_load(f)
+             
+             if isinstance(data, list):
+                 profile_list = data
+             elif isinstance(data, dict):
+                 profile_list = list(data.values())
+             else:
+                 profile_list = []
+
+        required_pkgs = set()
+        for profile in profile_list:
+            # profile might be a Dict (if raw yaml) or object (if loaded)
+            if hasattr(profile, "engine"):
+                engine = profile.engine.lower()
+            else:
+                engine = profile.get("engine", "").lower()
+
+            # Map engine to package
+            for name, pkg in KNOWN_ADAPTERS.items():
+                if name in engine: # quick fuzzy match e.g. 'postgres' in 'postgresql'
+                    required_pkgs.add(pkg)
+                    break
+        
+        if required_pkgs:
+            print_step("Checking Adapters...")
+            for pkg in required_pkgs:
+                import_name = pkg.replace("-", "_")
+                if not check_package(import_name):
+                    if Confirm.ask(f"Required adapter [bold]{pkg}[/bold] is missing. Install now?"):
+                        console.print(f"[yellow]Installing {pkg}...[/yellow]")
+                        install_package(pkg)
+                else:
+                    console.print(f"[dim]Adapter {pkg} is installed.[/dim]")
+                    
+    except Exception as e:
+        console.print(f"[red]Failed to check adapters: {e}[/red]")
 
 def setup_command():
     console.print("[bold cyan]NL2SQL Setup Wizard[/bold cyan]\n")
-
-    # 1. Dependency Check
-    if not check_package(CORE_PACKAGE):
-        console.print("[yellow]Core package missing.[/yellow]")
-        if Confirm.ask(f"Install {CORE_PACKAGE}?"):
-            if install_package(CORE_PACKAGE):
-                print_success("Core installed.")
-            else:
-                print_error("Failed to install Core.")
-                return # Exit or continue? Better to return if core is critical logic later.
-    else:
-        print_success("Environment OK.")
-
-    # 2. Adapters
-    print_step("Checking Adapters...")
-    missing = []
-    for name, pkg in KNOWN_ADAPTERS.items():
-        import_name = pkg.replace("-", "_")
-        if not check_package(import_name):
-            missing.append((name, pkg))
     
-    if missing:
-        console.print(f"[yellow]Found {len(missing)} missing adapters.[/yellow]")
-        if Confirm.ask("Install missing adapters?"):
-            for name, pkg in missing:
-                if Confirm.ask(f"Install {name}?"):
-                    install_package(pkg)
-    else:
-        print_success("All known adapters installed.")
+    _ensure_directories()
+    
+    # 1. Datasource
+    _configure_datasource()
+    
+    # 2. LLM
+    _configure_llm()
+    
+    # 3. Adapters
+    _install_required_adapters()
 
-    # 3. Connectivity Check
+    # 4. Connectivity Check
     print_step("Checking Database Connectivity...")
-    
-    from nl2sql_cli.commands.utils import run_core_command
-    
-    data = run_core_command(["--diagnose", "--json"], capture_json=True)
-    
-    if data and "connectivity" in data:
-        results = data["connectivity"]
-        all_ok = True
-        
-        for ds_id, info in results.items():
-            success = info.get("ok", False)
-            msg = info.get("details", "")
-            
-            if success:
-                console.print(f"[green]✔ {ds_id}: OK[/green]")
-            else:
-                console.print(f"[red]✘ {ds_id}: Failed ({msg})[/red]")
-                all_ok = False
-        
-        if not all_ok:
-            console.print("[yellow]Warning: Some datasources are failing validation.[/yellow]")
-            if not Confirm.ask("Continue anyway?"):
-                return
-    else:
-         console.print("[yellow]Connectivity check incomplete (Core offline or no output).[/yellow]")
+    if not verify_connectivity(print_table=True):
+        console.print("[yellow]Warning: Some datasources are failing validation.[/yellow]")
+        if not Confirm.ask("Continue anyway?"):
+            return
 
-    # 4. Indexing
+    # 5. Indexing
     console.print("")
-    if Confirm.ask("Run Schema Indexing now?"):
-        print_step("Starting Indexer...")
-        from nl2sql_cli.commands.utils import run_core_command
+    
+    from nl2sql.services.vector_store import OrchestratorVectorStore
+    from nl2sql.services.llm import LLMRegistry, load_llm_config
+    from nl2sql.common.settings import settings
+    from nl2sql.datasources import load_profiles
+    from nl2sql_cli.commands.indexing import run_indexing
+    
+    try:
+        # Load configs to pass to indexing
+        profiles = load_profiles(pathlib.Path(settings.datasource_config_path))
         
-        # Stream the output so user sees progress
-        run_core_command(["--index"], stream=True)
-        print_success("Indexing process finished.")
+        v_store = OrchestratorVectorStore(persist_directory=settings.vector_store_path)
+        
+        should_index = False
+        if not v_store.is_empty():
+            console.print("[yellow]Vector Store already contains data.[/yellow]")
+            if Confirm.ask("Do you want to clear and re-index?"):
+                should_index = True
+        else:
+            if Confirm.ask("Vector Store is empty. Run Schema Indexing now?"):
+                should_index = True
+
+        if should_index:
+            print_step("Starting Indexer...")
+            try:
+                llm_cfg = load_llm_config(pathlib.Path(settings.llm_config_path))
+                llm_registry = LLMRegistry(llm_cfg)
+            except Exception:
+                llm_registry = None
+
+            run_indexing(profiles, settings.vector_store_path, v_store, llm_registry)
+            print_success("Indexing process finished.")
+            
+    except Exception as e:
+        console.print(f"[red]Indexing setup failed: {e}[/red]")
+        
+    console.print("\n[bold green]Setup Complete![/bold green]")
+    console.print("Try running a query: [cyan]nl2sql run \"Show me all tables\"[/cyan]")

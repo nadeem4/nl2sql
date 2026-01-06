@@ -30,12 +30,12 @@ Detailed documentation is available in the `docs/` directory.
 
 ### 1. Installation
 
-The platform is a monorepo. Install the core engine:
+The platform is a monorepo. Install the CLI application:
 
 ```bash
 # Core & SDK
 pip install -e packages/adapter-sdk
-pip install -e packages/core
+pip install -e packages/cli  # Installs 'nl2sql' command
 
 # Database Adapters (install as needed)
 pip install -e packages/adapters/postgres
@@ -56,13 +56,13 @@ Create a `datasources.yaml` file defining your connections:
 **a. Indexing** (Required once)
 
 ```bash
-python -m nl2sql.cli --index --config datasources.yaml
+nl2sql --index --config datasources.yaml
 ```
 
 **b. Querying**
 
 ```bash
-python -m nl2sql.cli --query "Show me the top 5 users by sales"
+nl2sql --query "Show me the top 5 users by sales"
 ```
 
 ---

@@ -1,5 +1,4 @@
 import sys
-import argparse
 import statistics
 import yaml
 from nl2sql.services.llm import parse_llm_config, LLMRegistry, get_usage_summary
@@ -9,17 +8,18 @@ from nl2sql.services.vector_store import OrchestratorVectorStore
 from nl2sql.pipeline.graph import run_with_graph
 from nl2sql.evaluation.evaluator import ModelEvaluator
 from nl2sql.reporting import ConsolePresenter
+from nl2sql_cli.types import BenchmarkConfig
 
 
 def run_benchmark(
-    args: argparse.Namespace, 
+    config: BenchmarkConfig, 
     datasource_registry: DatasourceRegistry, 
     vector_store: OrchestratorVectorStore
 ) -> None:
     """Runs the benchmark suite based on provided arguments.
 
     Args:
-        args (argparse.Namespace): Command-line arguments.
+        config (BenchmarkConfig): Benchmark run configuration.
         datasource_registry (DatasourceRegistry): Datasource registry.
         vector_store (OrchestratorVectorStore): Vector store instance.
     """
@@ -28,9 +28,9 @@ def run_benchmark(
     # Matrix Benchmarking
     llm_configs = {}
 
-    if args.bench_config and args.bench_config.exists():
+    if config.bench_config_path and config.bench_config_path.exists():
         try:
-            bench_data = yaml.safe_load(args.bench_config.read_text()) or {}
+            bench_data = yaml.safe_load(config.bench_config_path.read_text()) or {}
             for name, cfg_data in bench_data.items():
                 if isinstance(cfg_data, dict):
                      llm_configs[name] = parse_llm_config(cfg_data)
@@ -40,11 +40,11 @@ def run_benchmark(
     
     if not llm_configs:
         llm_cfg = parse_llm_config({"default": {"provider": "openai", "model": "gpt-4o"}}) # Fallback
-        if args.llm_config and args.llm_config.exists():
+        if config.llm_config_path and config.llm_config_path.exists():
             from nl2sql.services.llm import load_llm_config
-            llm_cfg = load_llm_config(args.llm_config)
+            llm_cfg = load_llm_config(config.llm_config_path)
             
-        if getattr(args, "stub_llm", False):
+        if config.stub_llm:
             llm_cfg.default.provider = "stub"
             for agent_cfg in llm_cfg.agents.values():
                 agent_cfg.provider = "stub"
@@ -55,7 +55,7 @@ def run_benchmark(
     for name, llm_cfg in llm_configs.items():
         llm_registry = LLMRegistry(llm_cfg)
         _run_dataset_evaluation(
-            args, 
+            config, 
             datasource_registry, 
             vector_store, 
             llm_registry, 
@@ -64,7 +64,7 @@ def run_benchmark(
 
 
 def _run_dataset_evaluation(
-    args: argparse.Namespace, 
+    config: BenchmarkConfig, 
     datasource_registry: DatasourceRegistry, 
     vector_store: OrchestratorVectorStore,
     llm_registry: LLMRegistry,
@@ -73,7 +73,7 @@ def _run_dataset_evaluation(
     """Runs evaluation against a golden dataset for a specific config.
 
     Args:
-        args (argparse.Namespace): CLI arguments.
+        config (BenchmarkConfig): CLI arguments.
         datasource_registry (DatasourceRegistry): Registry of datasources.
         vector_store (OrchestratorVectorStore): Vector store.
         llm_registry (LLMRegistry): LLM registry.
@@ -84,7 +84,7 @@ def _run_dataset_evaluation(
     
     presenter = ConsolePresenter()
         
-    dataset_path = args.dataset
+    dataset_path = config.dataset_path
     if not dataset_path.exists():
         presenter.print_error(f"Dataset file not found: {dataset_path}")
         sys.exit(1)
@@ -99,10 +99,10 @@ def _run_dataset_evaluation(
         presenter.print_error("Dataset must be a list of test cases.")
         sys.exit(1)
         
-    if args.include_ids:
-        dataset = [item for item in dataset if item.get("id") in args.include_ids]
+    if config.include_ids:
+        dataset = [item for item in dataset if item.get("id") in config.include_ids]
         if not dataset:
-            presenter.print_error(f"No test cases found matching IDs: {args.include_ids}")
+            presenter.print_error(f"No test cases found matching IDs: {config.include_ids}")
             sys.exit(1)
             
     presenter.print_header(f"Evaluating Config: {config_name}")
@@ -122,9 +122,9 @@ def _run_dataset_evaluation(
                 llm_registry=llm_registry,
                 user_query=question,
                 datasource_id=None, 
-                execute=not args.routing_only,
+                execute=not config.routing_only,
                 vector_store=vector_store,
-                vector_store_path=args.vector_store
+                vector_store_path=config.vector_store_path
             )
         except Exception as e:
             return {
@@ -181,7 +181,7 @@ def _run_dataset_evaluation(
 
         layer_match = (routing_layer == expected_layer)
         
-        if args.routing_only:
+        if config.routing_only:
             return {
                 "id": q_id,
                 "question": question,
@@ -329,7 +329,7 @@ def _run_dataset_evaluation(
     
     import concurrent.futures
     workers = 5 
-    iterations = args.iterations if args.iterations else 1
+    iterations = config.iterations if config.iterations else 1
     
     with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
         futures = []
@@ -345,11 +345,11 @@ def _run_dataset_evaluation(
     results.sort(key=lambda x: x["id"])
     
     # Delegate Reporting
-    presenter.print_dataset_benchmark_results(results, iterations=iterations, routing_only=args.routing_only)
+    presenter.print_dataset_benchmark_results(results, iterations=iterations, routing_only=config.routing_only)
     
     # Calculate Metrics and Print Summary
     metrics = ModelEvaluator.calculate_aggregate_metrics(results, len(results))
-    presenter.print_metrics_summary(metrics, results, routing_only=args.routing_only)
+    presenter.print_metrics_summary(metrics, results, routing_only=config.routing_only)
 
-    if args.export_path:
-        presenter.export_results(results, args.export_path)
+    if config.export_path:
+        presenter.export_results(results, config.export_path)

@@ -20,11 +20,9 @@ dependencies = [
     "sqlglot>=23.0.0",
     "pydantic-settings>=2.0.0",
     "pandas>=1.5.0", # For metrics/evals
-    "rich>=10.0.0",  # For TUI/Reporting
 ]
 
-[project.scripts]
-nl2sql = "nl2sql.cli:main"
+# Scripts section removed as moved to CLI package
 
 [tool.setuptools.packages.find]
 where = ["src"]

@@ -2,7 +2,7 @@
 
 The Command Line Interface (CLI) is the primary way to interact with the platform.
 
-**Command**: `python -m nl2sql.cli`
+**Command**: `nl2sql`
 
 ## Common Arguments
 

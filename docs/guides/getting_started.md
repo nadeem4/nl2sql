@@ -18,8 +18,7 @@ cd nl2sql
 
 # Install Core
 pip install -e packages/adapter-sdk
-pip install -e packages/adapter-sqlalchemy
-pip install -e packages/core
+pip install -e packages/cli # Installs 'nl2sql' command
 
 # Install Adapters (e.g. Postgres)
 pip install -e packages/adapters/postgres
@@ -40,7 +39,7 @@ Create a `datasources.yaml` file. This tells the system how to connect to your d
 Before the AI can understand your schema, you must index it. Additional indexing strategies are discussed in the [Configuration Guide](configuration.md).
 
 ```bash
-python -m nl2sql.cli --index --config datasources.yaml
+nl2sql --index --config datasources.yaml
 ```
 
 ## 4. Run a Query
@@ -48,7 +47,7 @@ python -m nl2sql.cli --index --config datasources.yaml
 Now you are ready to ask questions!
 
 ```bash
-python -m nl2sql.cli --query "Show me the top 5 users by sales"
+nl2sql --query "Show me the top 5 users by sales"
 ```
 
 The system will:
