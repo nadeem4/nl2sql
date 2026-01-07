@@ -1,4 +1,4 @@
-from typing import Any, List
+from typing import Any, List, Dict
 from sqlalchemy import create_engine, text, inspect
 from nl2sql_adapter_sdk import (
  
@@ -10,6 +10,36 @@ from nl2sql_adapter_sdk import (
 from nl2sql_sqlalchemy_adapter import BaseSQLAlchemyAdapter
 
 class MssqlAdapter(BaseSQLAlchemyAdapter):
+
+    def construct_uri(self, args: Dict[str, Any]) -> str:
+        """
+        Constructs a MSSQL SQLAlchemy URL with support for Drivers and Trusted Connections.
+        """
+        user = args.get("user", "")
+        password = args.get("password", "")
+        host = args.get("host", "localhost")
+        port = args.get("port", "1433")
+        database = args.get("database", "")
+        driver = args.get("driver", "ODBC Driver 17 for SQL Server")
+        
+        # Merging connection 'extra' params via options
+        options = args.get("options", {}).copy()
+        options["driver"] = driver
+        
+        # Windows Auth / Integrated Security
+        if args.get("trusted_connection"):
+            options["Trusted_Connection"] = "yes"
+            
+        # Creds
+        creds = f"{user}:{password}@" if user or password else ""
+        # MSSQL standard port handling
+        netloc = f"{host}:{port}" if port else host
+        
+        from urllib.parse import urlencode
+        query_str = "?" + urlencode(options)
+        
+        # Use pyodbc as default driver
+        return f"mssql+pyodbc://{creds}{netloc}/{database}{query_str}"
 
     def dry_run(self, sql: str) -> DryRunResult:
         try:
@@ -32,11 +62,12 @@ class MssqlAdapter(BaseSQLAlchemyAdapter):
         try:
             with self.engine.connect() as conn:
                 conn.execute(text("SET SHOWPLAN_XML ON"))
-                res = conn.execute(text(sql)).fetchall()
-                conn.execute(text("SET SHOWPLAN_XML OFF"))
-                return QueryPlan(plan_text="\n".join([str(r[0]) for r in res]))
         except Exception as e:
             return QueryPlan(plan_text=f"Error: {e}")
+
+    def get_dialect(self) -> str:
+        """MSSQL uses T-SQL dialect."""
+        return "tsql"
 
 
 

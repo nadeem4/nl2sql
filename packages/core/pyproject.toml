@@ -22,6 +22,11 @@ dependencies = [
     "pandas>=1.5.0", # For metrics/evals
 ]
 
+[project.optional-dependencies]
+aws = ["boto3"]
+azure = ["azure-identity", "azure-keyvault-secrets"]
+hashicorp = ["hvac"]
+
 # Scripts section removed as moved to CLI package
 
 [tool.setuptools.packages.find]

@@ -21,23 +21,93 @@ class BaseSQLAlchemyAdapter(DatasourceAdapter):
     Base class for all SQLAlchemy-based adapters.
     Implements common logic for connection, execution, and schema fetching.
     """
-    def __init__(self, connection_string: str = None, datasource_id: str = None, datasource_engine_type: str = None):
-        self.connection_string = connection_string
-        self.datasource_id = datasource_id
+    def __init__(self, connection_string: str = None, datasource_id: str = None, datasource_engine_type: str = None, connection_args: Dict[str, Any] = None, **kwargs):
+        self._datasource_id = datasource_id
         self.datasource_engine_type = datasource_engine_type
+        self._row_limit = kwargs.get("row_limit")
+        self._max_bytes = kwargs.get("max_bytes")
+        
+        # Handle Timeout
+        self.statement_timeout_ms = kwargs.get("statement_timeout_ms")
+        self.execution_options = {}
+        
+        if self.statement_timeout_ms:
+            self.execution_options["timeout"] = self.statement_timeout_ms / 1000.0
+
+        # Construct URI if not provided but args are
+        if not connection_string and connection_args:
+            self.connection_string = self.construct_uri(connection_args)
+        else:
+            self.connection_string = connection_string
+
         self.engine: Engine = None
-        if connection_string:
+        if self.connection_string:
             self.connect()
+
+    @property
+    def datasource_id(self) -> str:
+        return self._datasource_id
+
+    @property
+    def row_limit(self) -> int:
+        return self._row_limit
+
+    @property
+    def max_bytes(self) -> int:
+        return self._max_bytes
 
     def __str__(self):
         return f"{self.datasource_id} ({self.datasource_engine_type})"
+
+    def construct_uri(self, args: Dict[str, Any]) -> str:
+        """
+        Constructs a SQLAlchemy URL from a connection dictionary.
+        Can be overridden by subclasses for specific logic.
+        """
+        user = args.get("user", "")
+        password = args.get("password", "")
+        host = args.get("host", "localhost")
+        port = args.get("port", "")
+        database = args.get("database", "")
+        
+        # Merging connection 'extra' params via options
+        options = args.get("options", {}).copy()
+        
+        # SQLite
+        engine_type = self.datasource_engine_type.lower() if self.datasource_engine_type else "sqlite"
+        if "sqlite" in engine_type:
+            return f"sqlite:///{database}"
+
+        # Creds
+        creds = f"{user}:{password}@" if user or password else ""
+        netloc = f"{host}:{port}" if port else host
+        
+        # Query String
+        query_str = ""
+        if options:
+            from urllib.parse import urlencode
+            query_str = "?" + urlencode(options)
+            
+        # Standard Drivers
+        if "postgres" in engine_type:
+            return f"postgresql://{creds}{netloc}/{database}{query_str}"
+            
+        if "mysql" in engine_type:
+            return f"mysql+pymysql://{creds}{netloc}/{database}{query_str}"
+            
+        # Generic Fallback
+        return f"{engine_type}://{creds}{netloc}/{database}{query_str}"
 
     def connect(self) -> None:
         conn_str = self.connection_string
         if not conn_str:
              raise ValueError(f"Connection string is required for {self}")
         try:
-            self.engine = create_engine(conn_str, pool_pre_ping=True)
+            self.engine = create_engine(
+                conn_str, 
+                pool_pre_ping=True,
+                execution_options=self.execution_options
+            )
         except Exception as e:
             logger.error(f"Failed to connect to database: {e}")
             raise
@@ -215,6 +285,10 @@ class BaseSQLAlchemyAdapter(DatasourceAdapter):
 
     def explain(self, sql: str) -> QueryPlan:
         return QueryPlan(plan_text="Not implemented")
+    
+    def get_dialect(self) -> str:
+        """Returns the dialect name. Defaults to engine type."""
+        return (self.datasource_engine_type or "unknown").lower()
 
     def cost_estimate(self, sql: str) -> CostEstimate:
         return CostEstimate(estimated_cost=0.0, estimated_rows=0)

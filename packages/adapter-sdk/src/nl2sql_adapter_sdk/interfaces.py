@@ -14,6 +14,24 @@ class DatasourceAdapter(ABC):
     """Canonical interface every adapter must implement."""
 
 
+    @property
+    @abstractmethod
+    def datasource_id(self) -> str:
+        """Unique identifier for this datasource instance."""
+        pass
+    
+    @property
+    @abstractmethod
+    def max_bytes(self) -> Optional[int]:
+        """Safety limit for maximum bytes to return."""
+        pass
+
+    @property
+    @abstractmethod
+    def row_limit(self) -> Optional[int]:
+        """Safety limit for maximum rows to return."""
+        pass
+
     @abstractmethod
     def connect(self) -> None:
         """Initialize connections / clients based on config."""
@@ -47,4 +65,9 @@ class DatasourceAdapter(ABC):
     @abstractmethod
     def execute(self, sql: str) -> QueryResult:
         """Execute query and return normalized results."""
+        pass
+
+    @abstractmethod
+    def get_dialect(self) -> str:
+        """Return the normalized dialect string (e.g. 'postgres', 'tsql')."""
         pass

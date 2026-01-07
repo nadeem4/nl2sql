@@ -10,6 +10,29 @@ from nl2sql_sqlalchemy_adapter import BaseSQLAlchemyAdapter
 
 class PostgresAdapter(BaseSQLAlchemyAdapter):
 
+    def connect(self) -> None:
+        """Postgres-specific connection with Native Server-Side Timeout."""
+        if not self.connection_string:
+             raise ValueError(f"Connection string is required for {self}")
+             
+        connect_args = {}
+        if self.statement_timeout_ms:
+            # Native Postgres Timeout (server-side)
+            # -c statement_timeout={ms}
+            connect_args["options"] = f"-c statement_timeout={self.statement_timeout_ms}"
+
+        try:
+            self.engine = create_engine(
+                self.connection_string, 
+                pool_pre_ping=True,
+                execution_options=self.execution_options, # Pass standard options too
+                connect_args=connect_args
+            )
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"Failed to connect to Postgres: {e}")
+            raise
+
 
 
 

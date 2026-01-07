@@ -64,8 +64,8 @@ def run(
     )
     
     # Load Registry
-    profiles = load_profiles(config)
-    ds_registry = DatasourceRegistry(profiles)
+    configs = load_configs(config)
+    ds_registry = DatasourceRegistry(configs)
     
     try:
         llm_cfg = load_llm_config(llm_config)
@@ -87,7 +87,7 @@ def index(
     """
     Index schemas and examples into the Vector Store.
     """
-    profiles = load_profiles(config)
+    configs = load_configs(config)
     
     try:
         llm_cfg = load_llm_config(llm_config)
@@ -97,7 +97,7 @@ def index(
 
     v_store = OrchestratorVectorStore(persist_directory=vector_store)
     
-    run_indexing(profiles, vector_store, v_store, llm_registry)
+    run_indexing(configs, vector_store, v_store, llm_registry)
 
 
 @app.command()
@@ -159,8 +159,9 @@ def benchmark(
         stub_llm=False
     )
     
-    profiles = load_profiles(config)
-    ds_registry = DatasourceRegistry(profiles)
+    # Load Registry (Configs -> Eager Adapters)
+    configs = load_configs(config)
+    ds_registry = DatasourceRegistry(configs)
     v_store = OrchestratorVectorStore(persist_directory=vector_store)
     
     exec_benchmark(bench_run_config, ds_registry, v_store)

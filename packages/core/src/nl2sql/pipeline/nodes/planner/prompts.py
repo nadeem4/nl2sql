@@ -79,7 +79,6 @@ PLANNER_PROMPT = (
 
     "[RELEVANT_TABLES]\n{relevant_tables}\n\n"
     "[SEMANTIC_CONTEXT]\n{semantic_context}\n\n"
-    "[CONFIG]\nDate Format: {date_format}\n\n"
     "[EXAMPLES]\n{examples}\n\n"
     "[FEEDBACK]\n{feedback}\n\n"
     "[USER_QUERY]\n{user_query}"

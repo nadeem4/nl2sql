@@ -10,6 +10,29 @@ from nl2sql_sqlalchemy_adapter import BaseSQLAlchemyAdapter
 
 class MysqlAdapter(BaseSQLAlchemyAdapter):
 
+    def connect(self) -> None:
+        """MySQL-specific connection with Native Server-Side Timeout."""
+        if not self.connection_string:
+             raise ValueError(f"Connection string is required for {self}")
+             
+        connect_args = {}
+        if self.statement_timeout_ms:
+            # Native MySQL Timeout (server-side)
+            # SET MAX_EXECUTION_TIME={ms}
+            connect_args["init_command"] = f"SET MAX_EXECUTION_TIME={self.statement_timeout_ms}"
+
+        try:
+            self.engine = create_engine(
+                self.connection_string, 
+                pool_pre_ping=True,
+                execution_options=self.execution_options,
+                connect_args=connect_args
+            )
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"Failed to connect to MySQL: {e}")
+            raise
+
     def dry_run(self, sql: str) -> DryRunResult:
         try:
             with self.engine.connect() as conn:

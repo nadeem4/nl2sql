@@ -83,13 +83,14 @@ class ExecutorNode:
 
             dialect = self.registry.get_dialect(ds_id)
 
-            SAFEGUARD_ROW_LIMIT = 10000
+            # Use profile limit (default 1000)
+            safeguard_limit = getattr(profile, 'row_limit', 10000)
 
             if hasattr(capabilities, "supports_cost_estimation") or True:  # assume true/check
                 try:
                     estimate = adapter.cost_estimate(sql)
-                    if estimate.estimated_rows > SAFEGUARD_ROW_LIMIT:
-                        msg = f"Safeguard Triggered: Query estimated to return {estimate.estimated_rows} rows, exceeding limit of {SAFEGUARD_ROW_LIMIT}."
+                    if estimate.estimated_rows > safeguard_limit:
+                        msg = f"Safeguard Triggered: Query estimated to return {estimate.estimated_rows} rows, exceeding limit of {safeguard_limit}."
                         logger.warning(msg)
 
                         errors.append(PipelineError(
@@ -114,10 +115,32 @@ class ExecutorNode:
                     logger.warning(f"Safeguard estimation check failed: {e}. Proceeding execution.")
 
             # 2. Execute via Adapter
+            total_bytes = 0
             try:
                 sdk_result = adapter.execute(sql)
 
                 rows_as_dicts = [dict(zip(sdk_result.columns, row)) for row in sdk_result.rows]
+                
+                # SAFEGUARD: Results Size Limit
+                from nl2sql.common.utils import estimate_size_bytes
+                
+                total_bytes = estimate_size_bytes(rows_as_dicts)
+                
+                # Check profile limit (default 10MB)
+                # profile.max_bytes is ensured by Pydantic model default if missing
+                if total_bytes > profile.max_bytes:
+                    err_msg = (f"Result size ({total_bytes} bytes) exceeds configured limit "
+                               f"({profile.max_bytes} bytes). Check 'max_bytes' in datasource config.")
+                    logger.error(err_msg)
+                    return {
+                        "errors": [PipelineError(
+                            node=node_name,
+                            message=err_msg,
+                            severity=ErrorSeverity.ERROR,
+                            error_code=ErrorCode.SAFEGUARD_VIOLATION
+                        )],
+                        "execution": ExecutionModel(row_count=0, rows=[], error=err_msg)
+                    }
 
                 execution_result = ExecutionModel(
                     row_count=sdk_result.row_count,
@@ -136,7 +159,7 @@ class ExecutorNode:
                     stack_trace=str(exc)
                 ))
 
-            exec_msg = f"Executed on {ds_id}. Rows: {execution_result.row_count}."
+            exec_msg = f"Executed on {ds_id}. Rows: {execution_result.row_count}. Size: {total_bytes}b."
             if execution_result.error:
                 exec_msg += f" Error: {execution_result.error}"
 

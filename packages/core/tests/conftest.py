@@ -9,20 +9,19 @@ def mock_profile():
     """Returns a standard SQLite datasource profile for testing."""
     return DatasourceProfile(
         id="test_sqlite",
-        engine="sqlite",
-        sqlalchemy_url="sqlite:///:memory:",
+        type="sqlite",
+        connection={"database": ":memory:"},
         row_limit=100,
-        auth=None,
-        read_only_role=None
+        options={}
     )
 
 @pytest.fixture
 def mock_engine(mock_profile):
     """Returns an in-memory SQLite engine."""
-    # adapter = SqlGenericAdapter(mock_profile.sqlalchemy_url)
-    # return adapter.engine
     from sqlalchemy import create_engine
-    return create_engine(mock_profile.sqlalchemy_url)
+    from nl2sql.datasources.url_builder import UrlBuilder
+    url = UrlBuilder.build(mock_profile.type, mock_profile.connection)
+    return create_engine(url)
 
 @pytest.fixture
 def mock_vector_store():

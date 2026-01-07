@@ -77,15 +77,41 @@ This separation ensures that "Prompt Injection" attacks cannot easily force the 
 
 To prevent Denial of Service (DoS) attacks or run-away queries, the system implements resource safeguards in the `ExecutorNode`.
 
-* **Cost Estimation Safeguard**: Before execution, the system requests a cost estimate from the database adapter. If the estimated rows exceed `SAFEGUARD_ROW_LIMIT` (default: 10,000), execution is aborted with a `SAFEGUARD_VIOLATION`.
-* **Timeouts**: Datasource configurations (`datasources.yaml`) support `statement_timeout_ms` to kill long-running queries at the driver level.
+* **Cost Estimation Safeguard**: Before execution, the system requests a cost estimate from the database adapter. If the estimated rows exceed `row_limit` (configured in `datasources.yaml`, default: 1000), execution is aborted with a `SAFEGUARD_VIOLATION`.
+* **Timeouts**: Datasource configurations (`datasources.yaml`) support `statement_timeout_ms` to kill long-running queries at the driver level (Native enforcement for Postgres/MySQL).
+* **Payload Size Limit**: The system enforces a strict memory limit (`max_bytes`) on the serialized result set. If the data returned by the adapter exceeds this limit (default: 10MB), the execution is halted to prevent OOM (Out Of Memory) crashes.
 
-## 5. Deployment Security
+## 5. Secret Management
 
-* **Environment Variables**: Sensitive keys (like `OPENAI_API_KEY`) are loaded strictly from environment variables via `settings.py`, following 12-Factor App best practices. They are never hardcoded in the source.
-* **Docker Container**: The application runs in a containerized environment, isolating the runtime from the host system.
+The platform employs a **Pluggable Secret Management** system (`nl2sql.secrets`) to handle sensitive credentials securely.
 
-## 6. Configuration
+### Mechanism
+
+* **Template Hydration**: Secrets are referenced in configuration files using the syntax `${scheme:key}`.
+* **Resolution**: The `SecretManager` resolves these references *before* the configuration is parsed, ensuring that sensitive values are never hardcoded in YAML files or committed to version control.
+
+### Providers
+
+The system supports extensible providers via the `SecretProvider` protocol:
+
+1. **Environment (`env`)**: Standard lookup (e.g., `${env:DB_PASS}`).
+2. **AWS Secrets Manager (`aws`)**: Fetches from AWS (e.g., `${aws:prod/db/pass}`).
+3. **Azure Key Vault (`azure`)**: Fetches from Azure (e.g., `${azure:db-secret}`).
+4. **HashiCorp Vault (`hashi`)**: Fetches from Vault (e.g., `${hashi:secret/data/db:pass}`).
+
+Dependencies for cloud providers are optional (`nl2sql-core[aws]`, etc.) to keep the core lightweight.
+
+## 6. Configuration Security
+
+### Strict Validation (V3)
+
+Datasource configurations are validated using Pydantic V3 models (`DatasourceProfile`). This ensures:
+
+* **Type Safety**: Malformed integers or booleans are rejected.
+* **Field Constraints**: Unknown fields are forbidden, preventing "config injection" or typos.
+* **Sanitization**: Passwords and sensitive fields are masked in logs (via `__repr__` overrides).
+
+### User Authorization Config
 
 User roles and permissions are defined in `users.json` (pointed to by `USERS_CONFIG` setting).
 
