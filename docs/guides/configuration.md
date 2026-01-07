@@ -12,14 +12,24 @@ nl2sql setup
 
 ## 2. Secrets Management
 
-Sensitive credentials should never be stored in plaintext. We support environment variable expansion using the `${env:VAR_NAME}` syntax.
+Sensitive credentials should never be stored in plaintext. We support **strict** variable expansion using the `${scheme:key}` syntax.
+
+> [!IMPORTANT]
+>
+> - **Strict Syntax**: Format must be exactly `${scheme:key}` (e.g., `${env:DB_PASS}`). Partial strings like `prefix-${env:VAR}` are **not** supported.
+> - **Supported Schemes**:
+>   - `env`: Environment Variables (e.g., `${env:PG_PASSWORD}`)
+>   - `aws`: AWS Secrets Manager (e.g., `${aws:production/db/password}`)
+>   - `gcp`: Google Cloud Secret Manager (e.g., `${gcp:my-secret}`)
+>   - `azure`: Azure Key Vault (e.g., `${azure:my-db-pass}`)
 
 **Example**:
 
 ```yaml
 connection:
   host: localhost
-  password: ${env:DB_PASSWORD}  # Reads OS environment variable 'DB_PASSWORD'
+  password: ${env:DB_PASSWORD}  # Valid
+  # invalid_host: my-db-${env:ID}.com  <-- Partial interpolation is NOT supported
 ```
 
 ## 3. Supported Databases
@@ -92,6 +102,9 @@ Supports Standard, Windows, and Azure Authentication.
     database: /abs/path/to/db.sqlite
 ```
 
+> [!NOTE]
+> The `connection.type` field determines which **Adapter** loads the datasource. For standard SQL databases, this matches the **SQLAlchemy Dialect** (e.g., `postgres`, `mysql`, `mssql`, `sqlite`). Custom adapters may define their own types.
+
 ## 4. Safety Limits
 
 To prevent "Out of Memory" (OOM) crashes and protect the LLM context window, we enforce strict limits on query results.
@@ -99,7 +112,7 @@ To prevent "Out of Memory" (OOM) crashes and protect the LLM context window, we 
 | Field | Default | Description |
 | :--- | :--- | :--- |
 | `row_limit` | 1000 | Max rows returned by a query. |
-| `max_bytes` | 10MB | **Hard Limit** on payload size. Calculated via strict JSON serialization size. Queries exceeding this will fail safely. |
+| `max_bytes` | 10MB | **Hard Limit** on payload size. Calculated via efficient row sampling (avg of first 50 rows). Queries exceeding this will fail safely. |
 
 **Example**:
 

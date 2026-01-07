@@ -1,23 +1,7 @@
-import re
-import os
-import pathlib
 from typing import Any, Dict, List, Optional, Union
-from nl2sql.secrets import secret_manager
-from nl2sql.secrets import secret_manager
+import pathlib
 
 
-
-def _resolve_secrets(obj: Any) -> Any:
-    """Recursively resolves secrets in a dictionary or list."""
-    if isinstance(obj, dict):
-        return {k: _resolve_secrets(v) for k, v in obj.items()}
-    elif isinstance(obj, list):
-        return [_resolve_secrets(i) for i in obj]
-    elif isinstance(obj, str):
-        # Using regex-based resolution from secret manager for ${key}
-        # Note: secret_manager.resolve might already handle full strings
-        return secret_manager.resolve(obj)
-    return obj
 
 def load_configs(path: pathlib.Path) -> List[Dict[str, Any]]:
     """Loads datasource configurations from a YAML file.
@@ -42,10 +26,7 @@ def load_configs(path: pathlib.Path) -> List[Dict[str, Any]]:
     if not isinstance(raw, list):
         raise ValueError(f"Invalid config structure in {path}. Expected 'datasources' list.")
 
-    # Resolve Secrets Recursively
-    resolved_configs = _resolve_secrets(raw)
-    
-    return resolved_configs
+    return raw
 
 
 

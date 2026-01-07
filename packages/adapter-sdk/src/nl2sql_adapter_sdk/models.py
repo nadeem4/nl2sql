@@ -46,6 +46,7 @@ class QueryResult(BaseModel):
     row_count: int
     raw: Optional[Any] = None
     execution_time_ms: Optional[float] = None
+    bytes_returned: Optional[int] = None
 
 class DryRunResult(BaseModel):
     is_valid: bool

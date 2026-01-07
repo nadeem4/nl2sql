@@ -1,4 +1,4 @@
-from typing import Any, List
+from typing import Any, List, Dict
 from sqlalchemy import create_engine, text, inspect
 from nl2sql_adapter_sdk import (
  
@@ -10,6 +10,10 @@ from nl2sql_adapter_sdk import (
 from nl2sql_sqlalchemy_adapter import BaseSQLAlchemyAdapter
 
 class SqliteAdapter(BaseSQLAlchemyAdapter):
+
+    def construct_uri(self, args: Dict[str, Any]) -> str:
+        database = args.get("database", ":memory:")
+        return f"sqlite:///{database}"
 
     def connect(self) -> None:
         """Sqlite-specific connection with Locking Timeout."""

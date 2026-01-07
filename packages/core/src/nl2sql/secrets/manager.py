@@ -21,41 +21,29 @@ class SecretManager:
     def resolve(self, secret_ref: str) -> str:
         """
         Resolves a secret reference string.
-        Format: ${scheme:key} or ${key} (uses default provider).
+        Format: ${scheme:key}
         Examples:
             '${env:DB_PASS}' -> fetches DB_PASS from env
-            '${DB_PASS}' -> fetches DB_PASS from default (env)
-            'literal_value' -> returns 'literal_value'
+            '${azure:my-secret}' -> fetches my-secret from azure keyvault
+            '${gcp:my-secret}' -> fetches my-secret from gcp secret manager
+            '${aws:my-secret}' -> fetches my-secret from aws secret manager
+            '${hvac:my-secret}' -> fetches my-secret from hvac
         """
-        # Match pattern ${scheme:key} or ${key}
-        # Updated to support lowercase, slashes, dashes in keys
-        pattern = re.compile(r'\$\{(?:([a-z]+):)?([a-zA-Z0-9_./-]+)(?::-(.*?))?\}')
+        cleaned_ref = secret_ref.replace('${', '').replace('}', '')
         
-        def replace(match):
-            scheme = match.group(1) or self._default_provider
-            key = match.group(2)
-            default_val = match.group(3)
+        parts = cleaned_ref.split(':', 1)
+        if len(parts) != 2:
+            raise ValueError(f"Invalid secret format '{secret_ref}'. Expected '${{scheme:key}}'.")
             
-            provider = self._providers.get(scheme)
-            if not provider:
-                raise ValueError(f"Unknown secret provider scheme: '{scheme}'")
-                
-            val = provider.get_secret(key)
-            if val is not None:
-                return val
+        scheme, key = parts
+        provider = self._providers.get(scheme)
+        if not provider:
+            raise ValueError(f"Unknown secret provider scheme: '{scheme}'")
             
-            if default_val is not None:
-                return default_val
-                
-            raise ValueError(f"Secret not found: {secret_ref}")
+        val = provider.get_secret(key)
+        if val is not None:
+            return val
+        
+        raise ValueError(f"Secret not found: {secret_ref}")
 
-        if pattern.fullmatch(secret_ref):
-            return pattern.sub(replace, secret_ref)
-            
-        # Also support embedding ${var} inside a string? 
-        # For strict security, maybe we only want full string replacement for passwords?
-        # But for connection strings like "host=${HOST}", we need partial.
-        return pattern.sub(replace, secret_ref)
-
-# Global instance
 secret_manager = SecretManager()

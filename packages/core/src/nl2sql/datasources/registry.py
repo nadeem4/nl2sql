@@ -2,12 +2,42 @@ from typing import Dict, Type, List, Any
 import importlib
 from nl2sql_adapter_sdk import DatasourceAdapter
 from nl2sql.datasources.discovery import discover_adapters
+from nl2sql.secrets import secret_manager
 
 class DatasourceRegistry:
     """Manages a collection of active DatasourceAdapters.
     
     Acts as the factory and cache for DataSourceAdapter instances.
     """
+
+    def find_and_resolve_secret(self, key: str) -> str:
+        """Attempts to resolve a secret using the secret manager.
+
+        Args:
+            key (str): The name of the secret to resolve.
+
+        Returns:
+            str: The resolved secret value.
+
+        Raises:
+            ValueError: If the secret cannot be resolved.
+        """
+        return secret_manager.resolve(key)
+
+    def resolved_connection(self, unresolved_connection: dict) -> dict:
+        """Resolves all secrets in a connection dictionary.
+
+        Args:
+            unresolved_connection (dict): The connection dictionary with potential secrets.
+
+        Returns:
+            dict: The connection dictionary with resolved secrets.
+        """
+        resolved_connection = unresolved_connection.copy()
+        for key, value in unresolved_connection.items():
+            if isinstance(value, str) and value.startswith("${") and value.endswith("}"):
+                resolved_connection[key] = self.find_and_resolve_secret(value[2:-1])
+        return resolved_connection
 
     def __init__(self, configs: List[Dict[str, Any]]):
         """Initializes the registry by eagerly creating adapters for all configs.
@@ -22,36 +52,28 @@ class DatasourceRegistry:
             try:
                 ds_id = config.get("id")
                 if not ds_id:
-                    continue # Skip invalid configs without ID
+                    raise ValueError("Datasource ID is required. Please check your configuration.")
                 
-                # Extract Connection Info
                 connection = config.get("connection", {})
                 conn_type = connection.get("type", "").lower()
-                
-                if not conn_type and "type" in config:
-                    # Legacy fallback if type is at root
-                    conn_type = config["type"].lower()
+                resolved_connection = self.resolved_connection(connection)
 
                 if conn_type in available_adapters:
                     AdapterCls = available_adapters[conn_type]
                     
-                    # Instantiate Adapter (Eagerly)
                     adapter = AdapterCls(
                         datasource_id=ds_id,
                         datasource_engine_type=conn_type,
-                        connection_args=connection,
+                        connection_args=resolved_connection,
                         statement_timeout_ms=config.get("statement_timeout_ms"),
                         row_limit=config.get("row_limit"),
                         max_bytes=config.get("max_bytes")
                     )
                     self._adapters[ds_id] = adapter
                 else:
-                    # Log warning or error? For now, we skip unknown adapters or raise?
-                    # Raising strict error to match previous behavior
                     raise ValueError(f"No adapter found for engine type: '{conn_type}' in datasource '{ds_id}'")
             
             except Exception as e:
-                # In eager loading, one bad apple crashes the start.
                 raise ValueError(f"Failed to initialize adapter for '{config.get('id', 'unknown')}': {e}") from e
 
     def get_adapter(self, datasource_id: str) -> DatasourceAdapter:

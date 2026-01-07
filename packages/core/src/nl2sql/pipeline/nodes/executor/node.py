@@ -76,21 +76,19 @@ class ExecutorNode:
                     "execution": ExecutionModel(row_count=0, rows=[], error="Missing Datasource ID")
                 }
 
-            # 1. Get Adapter
+            # 1. Get Adapter/Dialect
             adapter = self.registry.get_adapter(ds_id)
             capabilities = adapter.capabilities()
-            profile = self.registry.get_profile(ds_id)
+            
+            # Use adapter limits (default to safeties if None)
+            safeguard_row_limit = adapter.row_limit or 10000
+            safeguard_max_bytes = adapter.max_bytes or 10485760 # 10 MB
 
-            dialect = self.registry.get_dialect(ds_id)
-
-            # Use profile limit (default 1000)
-            safeguard_limit = getattr(profile, 'row_limit', 10000)
-
-            if hasattr(capabilities, "supports_cost_estimation") or True:  # assume true/check
+            if hasattr(capabilities, "supports_cost_estimation") or True: # assume true/check
                 try:
                     estimate = adapter.cost_estimate(sql)
-                    if estimate.estimated_rows > safeguard_limit:
-                        msg = f"Safeguard Triggered: Query estimated to return {estimate.estimated_rows} rows, exceeding limit of {safeguard_limit}."
+                    if estimate.estimated_rows > safeguard_row_limit:
+                        msg = f"Safeguard Triggered: Query estimated to return {estimate.estimated_rows} rows, exceeding limit of {safeguard_row_limit}."
                         logger.warning(msg)
 
                         errors.append(PipelineError(
@@ -108,9 +106,8 @@ class ExecutorNode:
                             ),
                             "reasoning": [{"node": "executor", "content": msg, "type": "warning"}]
                         }
-                    elif estimate.estimated_cost == -1:  # or some other check
-                        logger.warning(f"Estimation failed. Proceeding with caution.")
-
+                    elif estimate.estimated_cost == -1:
+                         logger.warning(f"Estimation failed. Proceeding with caution.")
                 except Exception as e:
                     logger.warning(f"Safeguard estimation check failed: {e}. Proceeding execution.")
 
@@ -122,15 +119,11 @@ class ExecutorNode:
                 rows_as_dicts = [dict(zip(sdk_result.columns, row)) for row in sdk_result.rows]
                 
                 # SAFEGUARD: Results Size Limit
-                from nl2sql.common.utils import estimate_size_bytes
+                total_bytes = sdk_result.bytes_returned or 0
                 
-                total_bytes = estimate_size_bytes(rows_as_dicts)
-                
-                # Check profile limit (default 10MB)
-                # profile.max_bytes is ensured by Pydantic model default if missing
-                if total_bytes > profile.max_bytes:
+                if total_bytes > safeguard_max_bytes:
                     err_msg = (f"Result size ({total_bytes} bytes) exceeds configured limit "
-                               f"({profile.max_bytes} bytes). Check 'max_bytes' in datasource config.")
+                               f"({safeguard_max_bytes} bytes). Check 'max_bytes' in datasource config.")
                     logger.error(err_msg)
                     return {
                         "errors": [PipelineError(
