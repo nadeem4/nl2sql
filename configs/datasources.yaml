@@ -18,8 +18,8 @@ datasources:
       type: postgres
       host: localhost
       port: 5432
-      user: user
-      password: password
+      user: "${env:POSTGRES_USER}"
+      password: "${env:POSTGRES_PASSWORD}"
       database: manufacturing_ops
     statement_timeout_ms: 8000
     row_limit: 100
@@ -32,8 +32,8 @@ datasources:
       type: mysql
       host: localhost
       port: 3306
-      user: user
-      password: password
+      user: "${env:MYSQL_USER}"
+      password: "${env:MYSQL_PASSWORD}"
       database: manufacturing_supply
     statement_timeout_ms: 8000
     row_limit: 100
@@ -46,8 +46,8 @@ datasources:
       type: mssql
       host: 127.0.0.1
       port: 1433
-      user: sa
-      password: "StrongPass2023!"
+      user: "${env:MSSQL_USER}"
+      password: "${env:MSSQL_PASSWORD}"
       database: manufacturing_history
       driver: "ODBC Driver 17 for SQL Server"
     statement_timeout_ms: 8000
