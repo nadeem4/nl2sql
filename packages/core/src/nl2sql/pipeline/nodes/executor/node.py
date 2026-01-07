@@ -9,7 +9,7 @@ if TYPE_CHECKING:
 
 from .schemas import ExecutionModel
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
-from nl2sql.common.security import enforce_read_only
+
 from nl2sql.common.logger import get_logger
 
 logger = get_logger("executor")

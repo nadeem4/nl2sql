@@ -7,8 +7,7 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.append(str(SRC))
 
-from nl2sql.datasources import get_profile, load_profiles
-from nl2sql.engine_factory import make_engine, run_read_query
+
 
 
 GOLDENS = [
@@ -145,18 +144,19 @@ GOLDENS = [
 ]
 
 
-@pytest.fixture(scope="session")
-def profile():
-    profiles = load_profiles(ROOT / "configs" / "datasources.yaml")
-    return get_profile(profiles, "manufacturing_sqlite")
-
+from nl2sql.datasources import load_configs, DatasourceRegistry
 
 @pytest.fixture(scope="session")
-def engine(profile):
-    return make_engine(profile)
+def registry():
+    configs = load_configs(ROOT / "configs" / "datasources.yaml")
+    return DatasourceRegistry(configs)
 
+@pytest.fixture(scope="session")
+def adapter(registry):
+    # 'manufacturing_ref' is the SQLite datasource in datasources.yaml
+    return registry.get_adapter("manufacturing_ref")
 
 @pytest.mark.parametrize("label, sql", GOLDENS)
-def test_expanded_goldens(engine, profile, label, sql):
-    rows = run_read_query(engine, sql, row_limit=profile.row_limit)
-    assert len(rows) > 0, f"No rows returned for: {label}"
+def test_expanded_goldens(adapter, label, sql):
+    result = adapter.execute(sql)
+    assert result.row_count > 0, f"No rows returned for: {label}"

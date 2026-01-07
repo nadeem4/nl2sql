@@ -1,40 +1,49 @@
+
 import pytest
-from unittest.mock import MagicMock, patch
-import pytest
-from unittest.mock import MagicMock, patch
 import sys
 import os
-
-# We need to patch before importing the providers if they did top-level imports.
-# But mine do lazy imports inside __init__.
+from unittest.mock import MagicMock, patch
 
 from nl2sql.secrets.manager import SecretManager
 from nl2sql.secrets.providers.aws import AwsSecretProvider
 from nl2sql.secrets.providers.azure import AzureSecretProvider
 
 def test_secret_manager_routing():
-    """Test that SecretManager routes ${scheme:key} to the correct provider."""
+    """Verifies that SecretManager correctly routes secrets to registered providers.
+    
+    Ensures that a secret reference in the format '${scheme:key}' is parsed
+    and the 'key' is passed to the provider registered under 'scheme'.
+    """
     mgr = SecretManager()
     mock_provider = MagicMock()
     mock_provider.get_secret.return_value = "routed_secret"
     
     mgr.register_provider("mock", mock_provider)
     
-    result = mgr.resolve("password: ${mock:db_pass}")
-    assert result == "password: routed_secret"
+    result = mgr.resolve("${mock:db_pass}")
+    assert result == "routed_secret"
     mock_provider.get_secret.assert_called_with("db_pass")
 
 def test_default_env_provider():
-    """Test that default 'env' provider matches os.environ."""
+    """Verifies that the default environment provider resolves secrets from os.environ.
+    
+    Tests that '${env:VAR}' effectively retrieves the value of VAR from the
+    environment variables. Also asserts that the legacy implicit syntax is
+    no longer supported.
+    """
     with patch.dict(os.environ, {"TEST_VAR": "env_value"}):
         mgr = SecretManager()
-        # Test direct resolution
         assert mgr.resolve("${env:TEST_VAR}") == "env_value"
-        # Test default provider inference
-        assert mgr.resolve("${TEST_VAR}") == "env_value"
+        
+        with pytest.raises(ValueError):
+             mgr.resolve("${TEST_VAR}")
 
 def test_aws_provider_success():
-    """Test AWS Provider fetches secret when boto3 is present."""
+    """Verifies that AwsSecretProvider fetches secrets when dependencies are met.
+    
+    Mocks 'boto3' to simulate a successful connection and secret retrieval
+    from AWS Secrets Manager.
+    """
     mock_boto = MagicMock()
     mock_client = MagicMock()
     mock_boto.client.return_value = mock_client
@@ -48,29 +57,32 @@ def test_aws_provider_success():
         mock_client.get_secret_value.assert_called_with(SecretId="prod/db")
 
 def test_aws_provider_missing_dep():
-    """Test AWS Provider handles missing boto3 gracefully."""
+    """Verifies that AwsSecretProvider handles missing dependencies gracefully.
+    
+    Ensures that the provider initializes without error even if 'boto3' is
+    missing, but raises an ImportError when a secret fetch is attempted.
+    """
     with patch.dict(sys.modules, {"boto3": None}):
-        # Simulate ImportError
-        with patch("builtins.__import__", side_effect=ImportError("No module named 'boto3'")):
-            # Note: builtins patch is tricky for import. 
-            # Easier way: The class code attempts import. 
-            # If we ensure sys.modules has no boto3 and we assume environment doesn't have it...
-            # But the environment might have it. 
-            pass
-
-    # Better approach: Just verify that if initialization fails/import fails, self.client is None
-    # forcing ImportError inside __init__ is hard if 'boto3' is actually installed in the test env.
-    pass 
+        provider = AwsSecretProvider()
+        
+        assert provider.client is None
+        
+        with pytest.raises(ImportError) as exc:
+            provider.get_secret("foo")
+        assert "'boto3' is not installed" in str(exc.value)
 
 def test_azure_provider_success():
-    """Test Azure Provider logic."""
+    """Verifies that AzureSecretProvider successfully retrieves secrets.
+    
+    Mocks 'azure.identity' and 'azure.keyvault.secrets' to simulate 
+    successful secret retrieval from Azure Key Vault.
+    """
     mock_identity = MagicMock()
     mock_secrets = MagicMock()
     mock_client_cls = MagicMock()
     mock_client_instance = MagicMock()
     
-    mock_secrets.SecretClient = mock_client_cls
-    mock_client_cls.return_value = mock_client_instance
+    mock_secrets.SecretClient.return_value = mock_client_instance
     mock_client_instance.get_secret.return_value.value = "azure_val"
     
     with patch.dict(sys.modules, {
