@@ -4,7 +4,7 @@ from nl2sql.common.security import enforce_read_only
 from nl2sql.pipeline.nodes.executor.node import ExecutorNode
 from nl2sql.pipeline.state import GraphState
 from nl2sql.datasources import DatasourceRegistry
-from nl2sql_adapter_sdk import DatasourceAdapter, QueryResult as ExecutionResult, CapabilitySet, CostEstimate as EstimationResult
+from nl2sql_adapter_sdk import DatasourceAdapter, QueryResult as ExecutionResult, CostEstimate as EstimationResult
 
 class TestSecurity(unittest.TestCase):
     def test_enforce_read_only_allowed(self):
@@ -41,9 +41,7 @@ class TestSecurity(unittest.TestCase):
         mock_registry = MagicMock(spec=DatasourceRegistry)
         mock_adapter = MagicMock(spec=DatasourceAdapter)
         mock_registry.get_adapter.return_value = mock_adapter
-        mock_adapter.capabilities.return_value = CapabilitySet(
-            supports_cte=True
-        )
+
         mock_profile = MagicMock()
         mock_profile.engine = "sqlite"
         mock_registry.get_profile.return_value = mock_profile

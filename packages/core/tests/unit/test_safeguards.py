@@ -2,7 +2,7 @@ import pytest
 from unittest.mock import MagicMock
 from nl2sql.pipeline.nodes.executor.node import ExecutorNode
 from nl2sql.pipeline.state import GraphState
-from nl2sql_adapter_sdk import CapabilitySet, CostEstimate as EstimationResult, QueryResult as ExecutionResult
+from nl2sql_adapter_sdk import CostEstimate as EstimationResult, QueryResult as ExecutionResult
 from nl2sql.common.errors import ErrorCode
 
 class TestSafeguards:
@@ -18,10 +18,6 @@ class TestSafeguards:
     @pytest.fixture
     def mock_adapter(self):
         adapter = MagicMock()
-        # Default capabilities
-        adapter.capabilities.return_value = CapabilitySet(
-            supports_cte=True
-        )
         return adapter
 
     def test_executor_rejects_expensive_query(self, mock_registry, mock_adapter):

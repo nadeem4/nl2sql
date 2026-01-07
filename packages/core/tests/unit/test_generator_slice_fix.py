@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 from nl2sql.pipeline.nodes.generator.node import GeneratorNode
 from nl2sql.pipeline.state import GraphState
 from nl2sql.datasources import DatasourceRegistry
-from nl2sql_adapter_sdk import DatasourceAdapter, CapabilitySet
+from nl2sql_adapter_sdk import DatasourceAdapter
 from nl2sql.datasources import DatasourceProfile
 
 class TestSliceErrorReproduction(unittest.TestCase):
@@ -17,9 +17,6 @@ class TestSliceErrorReproduction(unittest.TestCase):
         self.mock_registry.get_profile.return_value = self.mock_profile
         self.mock_registry.get_dialect.return_value = "sqlite"
         
-        self.mock_adapter.capabilities.return_value = CapabilitySet(
-            supports_cte=True
-        )
         self.mock_profile.row_limit = 100
         self.mock_profile.engine = "sqlite"
         

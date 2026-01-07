@@ -20,14 +20,10 @@ Inherit from `BaseSQLAlchemyAdapter` when creating a new SQL adapter:
 
 ```python
 from nl2sql_sqlalchemy_adapter import BaseSQLAlchemyAdapter
-from nl2sql_adapter_sdk import CapabilitySet
 
 class MyPostgresAdapter(BaseSQLAlchemyAdapter):
-    def capabilities(self) -> CapabilitySet:
-        return CapabilitySet(
-            supports_cte=True,
-            supports_window_functions=True
-        )
+    def construct_uri(self, args):
+        return f"postgresql://{args['user']}:{args['password']}@{args['host']}/{args['database']}"
 ```
 
 ## 🔌 Adapter Interface Explained
@@ -46,9 +42,8 @@ Each method in the `DatasourceAdapter` plays a specific role in the **Plan-Valid
 
 These methods turn a "dumb" runner into a "smart" agent.
 
-| Method | Purpose | Why it matters? |
+| Method | Description | Usage |
 | :--- | :--- | :--- |
-| `capabilities()` | Returns a set of supported features (CTE, Window Functions, Returning, etc.). | **Planner Node** uses this to avoid generating SQL syntax that the specific DB doesn't support. |
-| `dry_run(sql)` | Checks if the SQL is valid **without running it** (usually via `EXPLAIN` or Transaction Rollback). | **Validator Node** calls this to verify the query against the *real* schema/permissions before attempting execution. |
+| `cost_estimate(sql)` | Returns `CostEstimate` (rows, cost, time). | **Safeguards** use this to block expensive queries (e.g. > 1M rows). |
+| `dry_run(sql)` | Returns `DryRunResult` (valid, error). | **Validator Node** uses this to check if SQL is executable before running it. |
 | `explain(sql)` | Returns the query execution plan (JSON/XML). | **Optimizer Agent** can use this to detect full table scans or inefficient joins. |
-| `cost_estimate(sql)` | Returns predicted resource usage (`cpu_cost`, `estimated_rows`). | **Safety Layer** uses this to block expensive queries (e.g. > 1M rows) before they crash the DB. |

@@ -7,7 +7,6 @@ from nl2sql_adapter_sdk import (
     Column, 
     ForeignKey,
     QueryResult, 
-    CapabilitySet,
     DryRunResult,
     QueryPlan,
     CostEstimate,
@@ -295,9 +294,6 @@ class BaseSQLAlchemyAdapter(DatasourceAdapter):
         with self.engine.connect() as conn:
             return [row[0] for row in conn.execute(stmt).fetchall()]
 
-
-    def capabilities(self) -> CapabilitySet:
-        return CapabilitySet()
     
     def dry_run(self, sql: str) -> DryRunResult:
         """

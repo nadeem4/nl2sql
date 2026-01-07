@@ -8,7 +8,6 @@ from nl2sql.common.errors import ErrorCode
 def test_physical_validator_dry_run():
     registry = MagicMock(spec=DatasourceRegistry)
     adapter = MagicMock()
-    adapter.capabilities.return_value.supports_dry_run = True
     
     # Mock invalid dry run
     mock_res = MagicMock()
@@ -33,8 +32,6 @@ def test_physical_validator_dry_run():
 def test_physical_validator_perf_check():
     registry = MagicMock(spec=DatasourceRegistry)
     adapter = MagicMock()
-    adapter.capabilities.return_value.supports_dry_run = False
-    adapter.capabilities.return_value.supports_cost_estimation = True
     
     cost_mock = MagicMock()
     cost_mock.estimated_rows = 5000

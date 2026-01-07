@@ -6,8 +6,7 @@ from .models import (
     DryRunResult,
     QueryPlan,
     CostEstimate,
-    CapabilitySet,
-    CapabilitySet,
+    CostEstimate,
 )
 
 class DatasourceAdapter(ABC):
@@ -35,11 +34,6 @@ class DatasourceAdapter(ABC):
     @abstractmethod
     def connect(self) -> None:
         """Initialize connections / clients based on config."""
-        pass
-
-    @abstractmethod
-    def capabilities(self) -> CapabilitySet:
-        """Return what this engine supports (CTEs, window functions, etc.)."""
         pass
 
     @abstractmethod

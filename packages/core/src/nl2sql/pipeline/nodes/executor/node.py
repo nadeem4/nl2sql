@@ -78,38 +78,36 @@ class ExecutorNode:
 
             # 1. Get Adapter/Dialect
             adapter = self.registry.get_adapter(ds_id)
-            capabilities = adapter.capabilities()
             
             # Use adapter limits (default to safeties if None)
             safeguard_row_limit = adapter.row_limit or 10000
             safeguard_max_bytes = adapter.max_bytes or 10485760 # 10 MB
 
-            if hasattr(capabilities, "supports_cost_estimation") or True: # assume true/check
-                try:
-                    estimate = adapter.cost_estimate(sql)
-                    if estimate.estimated_rows > safeguard_row_limit:
-                        msg = f"Safeguard Triggered: Query estimated to return {estimate.estimated_rows} rows, exceeding limit of {safeguard_row_limit}."
-                        logger.warning(msg)
+            try:
+                estimate = adapter.cost_estimate(sql)
+                if estimate.estimated_rows > safeguard_row_limit:
+                    msg = f"Safeguard Triggered: Query estimated to return {estimate.estimated_rows} rows, exceeding limit of {safeguard_row_limit}."
+                    logger.warning(msg)
 
-                        errors.append(PipelineError(
-                            node=node_name,
-                            message=msg,
-                            severity=ErrorSeverity.ERROR,
-                            error_code=ErrorCode.SAFEGUARD_VIOLATION
-                        ))
-                        return {
-                            "errors": errors,
-                            "execution": ExecutionModel(
-                                row_count=0,
-                                rows=[],
-                                error=f"SAFEGUARD: Too many rows ({estimate.estimated_rows})"
-                            ),
-                            "reasoning": [{"node": "executor", "content": msg, "type": "warning"}]
-                        }
-                    elif estimate.estimated_cost == -1:
-                         logger.warning(f"Estimation failed. Proceeding with caution.")
-                except Exception as e:
-                    logger.warning(f"Safeguard estimation check failed: {e}. Proceeding execution.")
+                    errors.append(PipelineError(
+                        node=node_name,
+                        message=msg,
+                        severity=ErrorSeverity.ERROR,
+                        error_code=ErrorCode.SAFEGUARD_VIOLATION
+                    ))
+                    return {
+                        "errors": errors,
+                        "execution": ExecutionModel(
+                            row_count=0,
+                            rows=[],
+                            error=f"SAFEGUARD: Too many rows ({estimate.estimated_rows})"
+                        ),
+                        "reasoning": [{"node": "executor", "content": msg, "type": "warning"}]
+                    }
+                elif estimate.estimated_cost == -1:
+                     logger.warning(f"Estimation failed. Proceeding with caution.")
+            except Exception as e:
+                logger.warning(f"Safeguard estimation check failed: {e}. Proceeding execution.")
 
             # 2. Execute via Adapter
             total_bytes = 0

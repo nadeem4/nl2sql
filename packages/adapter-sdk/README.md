@@ -13,9 +13,6 @@ class DatasourceAdapter(Protocol):
     
     def execute(self, sql: str) -> QueryResult:
         ...
-        
-    def capabilities(self) -> CapabilitySet:
-        ...
 ```
 
 ## 📦 Installation

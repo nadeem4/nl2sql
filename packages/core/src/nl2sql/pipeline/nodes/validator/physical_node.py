@@ -36,16 +36,14 @@ class PhysicalValidatorNode:
     def _validate_semantic(self, sql: str, adapter) -> Optional[PipelineError]:
         """Performs a dry run to check for execution errors."""
         try:
-            caps = adapter.capabilities()
-            if caps.supports_dry_run:
-                res = adapter.dry_run(sql)
-                if not res.is_valid:
-                    return PipelineError(
-                        node="physical_validator",
-                        message=f"Dry Run Failed: {res.error_message}",
-                        severity=ErrorSeverity.ERROR,
-                        error_code=ErrorCode.EXECUTION_ERROR
-                    )
+            res = adapter.dry_run(sql)
+            if not res.is_valid:
+                return PipelineError(
+                    node="physical_validator",
+                    message=f"Dry Run Failed: {res.error_message}",
+                    severity=ErrorSeverity.ERROR,
+                    error_code=ErrorCode.EXECUTION_ERROR
+                )
         except Exception as e:
             logger.warning(f"Dry run skipped or failed: {e}")
         return None
@@ -54,16 +52,14 @@ class PhysicalValidatorNode:
         """Checks query cost estimation."""
         errors = []
         try:
-            caps = adapter.capabilities()
-            if hasattr(caps, "supports_cost_estimation") and caps.supports_cost_estimation:
-                 cost = adapter.cost_estimate(sql)
-                 if self.row_limit and cost.estimated_rows > self.row_limit:
-                     errors.append(PipelineError(
-                         node="physical_validator",
-                         message=f"Estimated {cost.estimated_rows} rows exceeds limit {self.row_limit}",
-                         severity=ErrorSeverity.WARNING,
-                         error_code=ErrorCode.PERFORMANCE_WARNING
-                     ))
+            cost = adapter.cost_estimate(sql)
+            if self.row_limit and cost.estimated_rows > self.row_limit:
+                 errors.append(PipelineError(
+                     node="physical_validator",
+                     message=f"Estimated {cost.estimated_rows} rows exceeds limit {self.row_limit}",
+                     severity=ErrorSeverity.WARNING,
+                     error_code=ErrorCode.PERFORMANCE_WARNING
+                 ))
         except Exception as e:
             logger.warning(f"Performance check skipped: {e}")
         return errors

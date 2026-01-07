@@ -16,7 +16,7 @@ sequenceDiagram
     Registry->>Plugin: Load Entry Point
     Plugin-->>Registry: Return Adapter Instance
     
-    Core->>Plugin: capabilities()
+
     Plugin-->>Core: { dry_run: true, limit: true }
     
     Core->>Plugin: execute("SELECT 1")
@@ -29,7 +29,7 @@ Every adapter adheres to the contract defined in `nl2sql-adapter-sdk`.
 
 | Method | Purpose |
 | :--- | :--- |
-| `capabilities()` | Returns flags (e.g. `supports_ilike`) used by the Generator. |
+
 | `fetch_schema()` | Returns `SchemaMetadata` (Tables, Columns, Types). |
 | `execute(sql)` | Runs the query and returns normalized `QueryResult`. |
 | `cost_estimate(sql)` | Returns estimated rows/cost (optional). |

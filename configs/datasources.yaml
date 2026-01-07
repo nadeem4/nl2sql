@@ -1,3 +1,5 @@
+# yaml-language-server: $schema=./datasources.schema.json
+
 version: 2
 datasources:
   - id: manufacturing_ref
@@ -9,12 +11,6 @@ datasources:
     row_limit: 100
     max_bytes: 10485760
     tags: {env: dev, domain: reference}
-    feature_flags:
-      allow_generate_writes: false
-      allow_cross_db: true
-      supports_dry_run: false
-      supports_estimated_cost: false
-      sample_rows_enabled: true
 
   - id: manufacturing_ops
     description: "Operations data including machines, maintenance logs, employees, and spare parts."
@@ -29,12 +25,6 @@ datasources:
     row_limit: 100
     max_bytes: 10485760
     tags: {env: dev, domain: operations}
-    feature_flags:
-      allow_generate_writes: false
-      allow_cross_db: true
-      supports_dry_run: true
-      supports_estimated_cost: true
-      sample_rows_enabled: true
 
   - id: manufacturing_supply
     description: "Supply chain data including products, inventory, suppliers, and purchase orders."
@@ -49,12 +39,6 @@ datasources:
     row_limit: 100
     max_bytes: 10485760
     tags: {env: dev, domain: supply_chain}
-    feature_flags:
-      allow_generate_writes: false
-      allow_cross_db: true
-      supports_dry_run: false
-      supports_estimated_cost: false
-      sample_rows_enabled: true
 
   - id: manufacturing_history
     description: "Historical data including production runs, defects, customers, and sales orders."
@@ -70,9 +54,3 @@ datasources:
     row_limit: 100
     max_bytes: 10485760
     tags: {env: dev, domain: history}
-    feature_flags:
-      allow_generate_writes: false
-      allow_cross_db: true
-      supports_dry_run: false
-      supports_estimated_cost: false
-      sample_rows_enabled: true

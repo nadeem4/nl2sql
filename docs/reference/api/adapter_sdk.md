@@ -8,7 +8,6 @@ The `nl2sql-adapter-sdk` defines the contract for new plugins.
 
 The main entry point. Implementations must provide:
 
-- `capabilities()`
 - `fetch_schema()`
 - `execute(sql)`
 - `cost_estimate(sql)`
@@ -22,8 +21,6 @@ name: str
 columns: List[Column]
 foreign_keys: List[ForeignKey]
 ```
-
-### `CapabilitySet`
 
 Flags that control the `GeneratorNode`.
 

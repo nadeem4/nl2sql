@@ -5,15 +5,13 @@ from nl2sql.pipeline.nodes.validator.node import LogicalValidatorNode
 from nl2sql.pipeline.state import GraphState
 from nl2sql.pipeline.nodes.planner.schemas import PlanModel, TableRef, SelectItem, Expr
 from nl2sql.datasources import DatasourceRegistry
-from nl2sql_adapter_sdk import DatasourceAdapter, CapabilitySet, Table, Column
+from nl2sql_adapter_sdk import DatasourceAdapter, Table, Column
 
 @pytest.fixture
 def mock_registry():
     registry = MagicMock(spec=DatasourceRegistry)
     adapter = MagicMock(spec=DatasourceAdapter)
-    adapter.capabilities.return_value = CapabilitySet(
-        supports_cte=True
-    )
+    adapter.fetch_schema.return_value.tables = []
     registry.get_adapter.return_value = adapter
     return registry
 

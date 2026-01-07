@@ -62,14 +62,6 @@ class CostEstimate(BaseModel):
     estimated_rows: int
     estimated_time_ms: Optional[float] = None
 
-class CapabilitySet(BaseModel):
-    supports_cte: bool = True
-    supports_window_functions: bool = True
-    supports_limit_offset: bool = True
-    supports_multi_db_join: bool = False
-    supports_vector: bool = False
-    supports_dry_run: bool = False
-
 class AdapterError(BaseModel):
     code: str
     message: str

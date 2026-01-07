@@ -11,16 +11,13 @@ class MockRegistry(DatasourceRegistry):
     def __init__(self):
         super().__init__({})
         
-    def get_dialect(self, id):
-        return "postgres"
-        
-    def get_profile(self, id):
-        from types import SimpleNamespace
-        return SimpleNamespace(engine="postgres", row_limit=1000)
     
     def get_adapter(self, id):
         from types import SimpleNamespace
-        return SimpleNamespace(capabilities=lambda: SimpleNamespace())
+        return SimpleNamespace(
+            row_limit=1000,
+            get_dialect=lambda: "postgres"
+        )
 
 @pytest.fixture
 def generator():
