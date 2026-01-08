@@ -27,7 +27,7 @@ def load_secret_configs(path: pathlib.Path) -> List[SecretProviderConfig]:
         return []
     
     if isinstance(raw, dict) and "providers" in raw:
-        raw = raw["providers"]
+        raw = raw["providers"] or []
 
     if not isinstance(raw, list):
         raise ValueError(f"Invalid config structure in {path}. Expected 'providers' list.")

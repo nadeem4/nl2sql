@@ -9,6 +9,7 @@ from typing_extensions import Annotated
 
 # Core Library Imports
 from nl2sql.datasources import DatasourceRegistry
+from nl2sql.datasources.config import load_configs
 from nl2sql.services.llm import LLMRegistry, load_llm_config
 from nl2sql.common.settings import settings
 from nl2sql.services.vector_store import OrchestratorVectorStore

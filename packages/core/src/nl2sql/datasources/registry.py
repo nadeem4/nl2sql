@@ -36,7 +36,7 @@ class DatasourceRegistry:
         resolved_connection = unresolved_connection.copy()
         for key, value in unresolved_connection.items():
             if isinstance(value, str) and value.startswith("${") and value.endswith("}"):
-                resolved_connection[key] = self.find_and_resolve_secret(value[2:-1])
+                resolved_connection[key] = self.find_and_resolve_secret(value)
         return resolved_connection
 
     def __init__(self, configs: List[Dict[str, Any]]):
