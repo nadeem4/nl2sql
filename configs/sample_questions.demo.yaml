@@ -1,0 +1,22 @@
+manufacturing_ref:
+- List all factories in the US
+- Show me the capacity of Berlin Plant
+- What shifts are available?
+- List all machine types produced by TechCorp
+manufacturing_ops:
+- Show me active employees in the Austin Gigafactory
+- Which machines have error logs in the last 7 days?
+- Who is the operator for machine 5?
+- Count the number of active machines per factory
+- List maintenance logs for Vibration sensor alerts
+manufacturing_supply:
+- Total sales amount for 'Industrial Controller'
+- Find suppliers for high value components
+- Check inventory levels for 'Bolt M5' in Berlin
+- List products with base cost greater than 500
+- Show me suppliers from Germany
+manufacturing_history:
+- Show total sales orders in Q4
+- Calculate average production output per run
+- Summarize sales by customer for last year
+- List the top 5 largest orders

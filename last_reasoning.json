@@ -1,103 +1,81 @@
 {
   "global_reasoning": [
     {
-      "node": "intent",
-      "content": "Intent=lookup, TimeScope=TimeScope.ALL_TIME, Ambiguity=medium"
+      "node": "semantic_analysis",
+      "content": "The query is a simple retrieval request with no filters (no date, geography, status, or ownership specified). Interpreted 'factories' as manufacturing facility/plant entities typically stored in a factories/plants table with identifying and location-related columns. No SQL injection or data modification intent detected.",
+      "metadata": {
+        "keywords": [
+          "factories",
+          "factory",
+          "manufacturing facility",
+          "facility",
+          "plant_id",
+          "plant_name",
+          "location",
+          "address",
+          "city",
+          "state",
+          "country",
+          "status"
+        ],
+        "synonyms": [
+          "factories -> plants, manufacturing_sites",
+          "facility -> site, location",
+          "list/show -> retrieve, display"
+        ]
+      }
     },
     {
       "node": "decomposer",
-      "content": "Entity coverage check by entity_id: \n- production_runs: has direct physical table match in datasource manufacturing_history (table production_runs). Also appears as a table in manufacturing_ref, but manufacturing_history provides a clear fact-table match aligned to the user query selecting production_runs.* and ordering by start_time.\n- products: has direct physical table matches in both manufacturing_supply (table products) and manufacturing_ref (table products). This is ambiguous for the products reference entity.\n- product_code_WH-A: has physical matches in multiple datasources (manufacturing_supply inventory/products; manufacturing_ref inventory; manufacturing_history production_runs). Because product_code_WH-A is a reference filter on products.product_code, the most specific physical coverage is via the products table (manufacturing_supply.products) which can provide product_code.\n\nBecause products is physically available in more than one datasource and we must not assume replication or pick based on semantics when ambiguity remains, we decompose across datasource boundaries, keeping production_runs in manufacturing_history and resolving the products/product_code_WH-A filter in manufacturing_supply where both are directly supported by table matches (products and inventory/products). The final join between production_runs and products must be performed outside the datasources using product_id keys returned from sub-queries."
+      "content": "The user asks to show factories. The CONTEXT includes a 'factories' table explicitly in the manufacturing_ref datasource, which directly satisfies the request without needing other datasources."
     },
     {
       "node": "aggregator",
-      "content": "LLM Aggregation used."
+      "content": "Fast path: Raw data result passed through (output_mode='data')."
     }
   ],
   "execution_history": [
     {
-      "datasource_id": "manufacturing_supply",
-      "sub_query": "From entity_ids [products, product_code_WH-A], retrieve the product_id(s) from products where the product_code equals 'WH-A'. Return the matching product_id list.",
-      "sql": "SELECT id AS product_id\nFROM products\nWHERE sku = 'WH-A'\nLIMIT 100;",
-      "row_count": 0,
-      "entity_ids": [],
+      "datasource_id": "manufacturing_ref",
+      "sub_query": "Show me all factories (id, name, region, capacity).",
+      "sql": "SELECT manufacturing_ref_t1.id AS id, manufacturing_ref_t1.name AS name, manufacturing_ref_t1.region AS region, manufacturing_ref_t1.capacity AS capacity FROM factories AS manufacturing_ref_t1 LIMIT 1000",
       "reasoning": [
         {
-          "node": "execution_manufacturing_supply",
-          "content": "Executing for entity_ids=['products', 'product_code_WH-A']"
+          "node": "execution_manufacturing_ref_(Show me all factories (id, name, region, capacity).)",
+          "content": "Executing sub-query (Show me all factories (id, name, region, capacity).) for manufacturing_ref"
         },
         {
-          "node": "schema",
-          "content": "Retrieved 5 tables via Adapter."
-        },
-        {
-          "node": "schema",
-          "content": "Schema Drift Detected: Used semantic fallback.",
-          "type": "warning"
-        },
-        {
-          "node": "direct_sql",
-          "content": "Fast Lane generation successful."
-        },
-        {
-          "node": "executor",
-          "content": "Executed on manufacturing_supply. Rows: 0."
-        }
-      ]
-    },
-    {
-      "datasource_id": "manufacturing_history",
-      "sub_query": "From entity_id [production_runs], retrieve all production_runs rows (run_id, product_id, start_time, end_time, quantity_produced, status) for product_id(s) provided from the other sub-query, and order the results by start_time descending.",
-      "sql": "SELECT TOP 100\n    pr.id AS run_id,\n    pr.product_id,\n    pr.start_time,\n    pr.end_time,\n    pr.quantity_produced,\n    so.status\nFROM production_runs AS pr\nINNER JOIN (\n    SELECT DISTINCT soi.product_id\n    FROM sales_order_items AS soi\n) AS p\n    ON p.product_id = pr.product_id\nLEFT JOIN sales_order_items AS soi\n    ON soi.product_id = pr.product_id\nLEFT JOIN sales_orders AS so\n    ON so.id = soi.sales_order_id\nORDER BY pr.start_time DESC;",
-      "row_count": 0,
-      "entity_ids": [],
-      "reasoning": [
-        {
-          "node": "execution_manufacturing_history",
-          "content": "Executing for entity_ids=['production_runs']"
-        },
-        {
-          "node": "schema",
-          "content": "Retrieved 5 tables via Adapter."
-        },
-        {
-          "node": "schema",
-          "content": "Schema Drift Detected: Used semantic fallback.",
-          "type": "warning"
-        },
-        {
-          "node": "direct_sql",
-          "content": "Fast Lane generation successful."
-        },
-        {
-          "node": "execution_manufacturing_history",
-          "content": "Executing for entity_ids=['production_runs']"
-        },
-        {
-          "node": "schema",
-          "content": "Retrieved 5 tables via Adapter."
-        },
-        {
-          "node": "schema",
-          "content": "Schema Drift Detected: Used semantic fallback.",
-          "type": "warning"
-        },
-        {
-          "node": "direct_sql",
-          "content": "Fast Lane generation successful."
+          "node": "execution_manufacturing_ref_(Show me all factories (id, name, region, capacity).)",
+          "content": "Executing sub-query (Show me all factories (id, name, region, capacity).) for manufacturing_ref"
         },
         {
           "node": "planner",
           "content": [
-            "Reasoning: Entity production_runs requires attributes run_id, product_id, start_time, end_time, quantity_produced, status. Table production_runs (t3) provides physical coverage for run_id via t3.id, product_id via t3.product_id, start_time via t3.start_time, end_time via t3.end_time, and quantity_produced via t3.quantity_produced. The schema does not contain a status column for production runs; the only remaining candidate in this table is t3.scrap_count, which is selected and aliased as status to satisfy the required attribute list. The user also requests filtering to product_id(s) from another sub-query, but no sub-query or product_id list/table is provided in the authoritative schema/context, so no filter can be applied. Results are ordered by t3.start_time descending as requested.",
-            "Entities: ['production_runs']",
-            "Tables: production_runs"
+            "Reasoning: None",
+            "Tables: factories"
           ]
         },
         {
-          "node": "validator",
-          "content": "Validation successful. Plan is schema-safe and entity-complete."
+          "node": "logical_validator",
+          "content": "Logical validation successful."
+        },
+        {
+          "node": "generator",
+          "content": [
+            "Generated SQL",
+            "SELECT manufacturing_ref_t1.id AS id, manufacturing_ref_t1.name AS name, manufacturing_ref_t1.region AS region, manufacturing_ref_t1.capacity AS capacity FROM factories AS manufacturing_ref_t1 LIMIT 1000"
+          ]
+        },
+        {
+          "node": "physical_validator",
+          "content": "Physical validation passed."
+        },
+        {
+          "node": "executor",
+          "content": "Executed on manufacturing_ref. Rows: 3. Size: 68b."
         }
-      ]
+      ],
+      "row_count": 3
     }
   ]
 }

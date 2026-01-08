@@ -12,51 +12,101 @@ def run_indexing(
 ) -> None:
     """Runs the indexing process for schemas and examples.
 
+    This function orchestrates the full indexing workflow:
+    1. Clears existing data from the vector store.
+    2. Indexes database schemas (tables, columns, foreign keys) for all configured adapters.
+    3. Indexes example questions from the sample questions file, optionally enriching them 
+       with synthetic variants using the Semantic Analysis Node.
+    4. Displays a comprehensive summary table of indexed content.
+
     Args:
         configs (List[Dict[str, Any]]): List of datasource configuration dicts.
-        vector_store_path (str): Path to the vector store.
-        vector_store (OrchestratorVectorStore): The vector store instance.
-        llm_registry (Any, optional): Registry of LLMs for enrichment.
+        vector_store_path (str): Path to the vector store directory.
+        vector_store (OrchestratorVectorStore): The initialized vector store instance.
+        llm_registry (Any, optional): Registry of LLMs used for semantic enrichment of examples.
     """
     presenter = ConsolePresenter()
     presenter.print_indexing_start(vector_store_path)
     
-    # Registry now eager loads adapters from configs
     registry = DatasourceRegistry(configs)
-    
-    # Get all active adapters
     adapters = registry.list_adapters()
+    stats = []
 
-    with presenter.create_progress() as progress:
-        
-        # Clear existing data
-        task_clear = progress.add_task("[cyan]Clearing existing data...", total=1)
+    with presenter.console.status("[bold cyan]Clearing existing data...[/bold cyan]"):
         vector_store.clear()
-        progress.advance(task_clear)
+    presenter.print_step("[green]✔[/green] Cleared existing data.")
+
+    presenter.console.print("\n[bold]Indexing Schemas...[/bold]")
+    for adapter in adapters:
+        ds_id = adapter.datasource_id
         
-        # Index Schemas for ALL active adapters
-        task_schema = progress.add_task("[green]Indexing schemas...", total=len(adapters))
-        
-        for adapter in adapters:
-            ds_id = adapter.datasource_id
-            progress.update(task_schema, description=f"[green]Indexing schema: {ds_id}...")
+        with presenter.console.status(f"[cyan]Indexing schema: {ds_id}...[/cyan]"):
             try:
-                vector_store.index_schema(adapter, datasource_id=ds_id)
+                schema_stats = vector_store.index_schema(adapter, datasource_id=ds_id)
+                schema_stats['id'] = ds_id
+                stats.append(schema_stats)
+                
+                t_count = schema_stats['tables']
+                c_count = schema_stats['columns']
+                presenter.console.print(f"  [green]✔[/green] {ds_id} [dim]({t_count} Tables, {c_count} Columns)[/dim]")
+                
             except Exception as e:
-                presenter.print_indexing_error(ds_id, str(e))
-            progress.advance(task_schema)
+                presenter.console.print(f"  [red]✘[/red] {ds_id} [red]Failed: {e}[/red]")
+                stats.append({'id': ds_id, 'tables': 0, 'columns': 0, 'examples': 0, 'error': str(e)})
+
+    from nl2sql.common.settings import settings
+    import yaml
+    import pathlib
+    
+    presenter.console.print("\n[bold]Indexing Examples...[/bold]")
+    
+    total_examples = 0
+    path = pathlib.Path(settings.sample_questions_path)
+    
+    if path.exists():
+        try:
+            examples_data = yaml.safe_load(path.read_text()) or {}
             
-        # Index Examples (with enrichment if LLM available)
-        task_desc = progress.add_task("[magenta]Indexing examples...", total=1)
-        from nl2sql.common.settings import settings
-        
-        if not llm_registry:
-             presenter.print_warning("Indexing examples without enrichment (No LLM Registry provided).")
-        
-        vector_store.index_examples(
-            settings.sample_questions_path,
-            llm_registry=llm_registry
-        )
-        progress.advance(task_desc)
+            def get_stat_entry(ds_id):
+                for s in stats:
+                    if s['id'] == ds_id: return s
+                # Create if not exists (e.g. schema failed but examples exist? unlikely but safe)
+                new_s = {'id': ds_id, 'tables': 0, 'columns': 0, 'examples': 0}
+                stats.append(new_s)
+                return new_s
+
+            enricher = None
+            if llm_registry:
+                try:
+                    from nl2sql.pipeline.nodes.semantic.node import SemanticAnalysisNode
+                    enricher = SemanticAnalysisNode(llm_registry.semantic_llm())
+                except Exception as e:
+                    presenter.print_warning(f"Could not load SemanticNode: {e}")
+            else:
+                 presenter.console.print("  [yellow]![/yellow] [dim]Skipping enrichment (No LLM config)[/dim]")
+
+            for ds_id, questions in examples_data.items():
+                with presenter.console.status(f"[cyan]Indexing examples for {ds_id}...[/cyan]"):
+                    try:
+                        docs = vector_store.prepare_examples_for_datasource(ds_id, questions, enricher)
+                        vector_store.add_documents(docs)
+                        
+                        count = len(docs)
+                        total_examples += count
+                        
+                        # Update stats
+                        entry = get_stat_entry(ds_id)
+                        entry['examples'] = count
+                        
+                        presenter.console.print(f"  [green]✔[/green] {ds_id} [dim]({count} examples)[/dim]")
+                        
+                    except Exception as e:
+                        presenter.console.print(f"  [red]✘[/red] {ds_id} [red]Failed: {e}[/red]")
+                        
+        except Exception as e:
+             presenter.console.print(f"  [red]✘[/red] Failed to load {path}: {e}")
+    else:
+        presenter.console.print(f"  [yellow]![/yellow] [dim]No examples file found at {path}[/dim]")
             
+    presenter.print_indexing_summary(stats)
     presenter.print_indexing_complete()

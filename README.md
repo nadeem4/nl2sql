@@ -27,7 +27,21 @@ Detailed documentation is available in the `docs/` directory.
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Try it Now (Demo)
+
+The fastest way to experience the platform is the interactive demo. This sets up a "Manufacturing" environment with 4 SQLite databases and sample data.
+
+```bash
+# 1. Setup Demo Environment
+nl2sql setup --demo
+
+# 2. Run a Query
+nl2sql --env demo run "Show me broken machines in Austin"
+```
+
+---
+
+## 🛠️ Installation & Setup
 
 ### 1. Installation
 
@@ -42,15 +56,15 @@ pip install -e packages/cli  # Installs 'nl2sql' command
 # pip install -e packages/adapters/postgres
 ```
 
-### 2. Setup
+### 2. Setup (Production)
 
-Run the interactive wizard to configure your database and LLM:
+Run the interactive wizard to configure your own database connections (Postgres, MySQL, etc.) and LLM:
 
 ```bash
 nl2sql setup
 ```
 
-*This will create your configuration files and index your schema.*
+*This will inspect your schema and index it into the vector store.*
 
 ### 3. Usage
 
@@ -60,11 +74,13 @@ nl2sql setup
 nl2sql run "Show me the top 5 users by sales"
 ```
 
-**Other Commands**
+**Common Commands**
 
-* `nl2sql doctor` - Diagnose environment issues.
+* `nl2sql index` - Re-index schemas and examples.
 * `nl2sql list-adapters` - Show installed database adapters.
-* `nl2sql benchmark` - Run evaluation suite.
+* `nl2sql doctor` - Diagnose environment issues.
+
+> See [**CLI Reference**](docs/guides/cli_reference.md) for full documentation on flags like `--env` and `--role`.
 
 ---
 

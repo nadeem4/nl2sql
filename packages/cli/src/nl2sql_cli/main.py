@@ -38,20 +38,32 @@ app.add_typer(policy_app, name="policy", help="Manage RBAC policies and security
 
 # Shared Options
 # Shared Options
-ConfigOption = Annotated[pathlib.Path, typer.Option("--config", help="Path to datasource config YAML")]
-SecretsConfigOption = Annotated[pathlib.Path, typer.Option("--secrets-config", help="Path to secrets config YAML")]
-LLMConfigOption = Annotated[pathlib.Path, typer.Option("--llm-config", help="Path to LLM config YAML")]
-VectorStoreOption = Annotated[str, typer.Option("--vector-store", help="Path to vector store directory")]
+ConfigOption = Annotated[Optional[pathlib.Path], typer.Option("--config", help="Path to datasource config YAML")]
+SecretsConfigOption = Annotated[Optional[pathlib.Path], typer.Option("--secrets-config", help="Path to secrets config YAML")]
+LLMConfigOption = Annotated[Optional[pathlib.Path], typer.Option("--llm-config", help="Path to LLM config YAML")]
+VectorStoreOption = Annotated[Optional[str], typer.Option("--vector-store", help="Path to vector store directory")]
+
+
+@app.callback()
+def global_callback(
+    ctx: typer.Context,
+    env: Annotated[Optional[str], typer.Option("--env", "-e", help="Environment name (e.g. dev, prod). Isolation for configs/data.")] = None,
+):
+    """
+    NL2SQL CLI Entry Point.
+    """
+    if env:
+        settings.configure_env(env)
 
 
 @app.command()
 def run(
     query: Annotated[str, typer.Argument(help="Natural language query")],
-    config: ConfigOption = pathlib.Path(settings.datasource_config_path),
-    secrets_config: SecretsConfigOption = pathlib.Path(settings.secrets_config_path),
+    config: ConfigOption = None,
+    secrets_config: SecretsConfigOption = None,
     id: Annotated[Optional[str], typer.Option(help="Target specific datasource ID")] = None,
-    llm_config: LLMConfigOption = pathlib.Path(settings.llm_config_path),
-    vector_store: VectorStoreOption = settings.vector_store_path,
+    llm_config: LLMConfigOption = None,
+    vector_store: VectorStoreOption = None,
     role: Annotated[str, typer.Option(help="Role ID for RBAC policies")] = "admin",
     no_exec: Annotated[bool, typer.Option("--no-exec", help="Skip execution (plan & validate only)")] = False,
     verbose: Annotated[bool, typer.Option("--verbose", "-v", help="Show detailed reasoning")] = False,
@@ -60,6 +72,16 @@ def run(
     """
     Execute a query against the knowledge graph.
     """
+    # Resolve Paths (Callback may have updated settings)
+    if config is None:
+        config = pathlib.Path(settings.datasource_config_path)
+    if secrets_config is None:
+        secrets_config = pathlib.Path(settings.secrets_config_path)
+    if llm_config is None:
+        llm_config = pathlib.Path(settings.llm_config_path)
+    if vector_store is None:
+        vector_store = settings.vector_store_path
+
     run_config = RunConfig(
         query=query,
         config_path=config,
@@ -70,8 +92,6 @@ def run(
         show_perf=show_perf,
         vector_store_path=vector_store
     )
-    
-    # Load Registry
     
     # Load Registry
     
@@ -96,14 +116,24 @@ def run(
 
 @app.command()
 def index(
-    config: ConfigOption = pathlib.Path(settings.datasource_config_path),
-    secrets_config: SecretsConfigOption = pathlib.Path(settings.secrets_config_path),
-    vector_store: VectorStoreOption = settings.vector_store_path,
-    llm_config: LLMConfigOption = pathlib.Path(settings.llm_config_path),
+    config: ConfigOption = None,
+    secrets_config: SecretsConfigOption = None,
+    vector_store: VectorStoreOption = None,
+    llm_config: LLMConfigOption = None,
 ):
     """
     Index schemas and examples into the Vector Store.
     """
+    # Resolve Paths
+    if config is None:
+        config = pathlib.Path(settings.datasource_config_path)
+    if secrets_config is None:
+        secrets_config = pathlib.Path(settings.secrets_config_path)
+    if llm_config is None:
+        llm_config = pathlib.Path(settings.llm_config_path)
+    if vector_store is None:
+        vector_store = settings.vector_store_path
+
     # Load Secrets FIRST
     secret_configs = load_secret_configs(secrets_config)
     secret_manager.configure(secret_configs)
@@ -130,11 +160,16 @@ def doctor():
 
 
 @app.command()
-def setup():
+def setup(
+    demo: Annotated[bool, typer.Option("--demo", help="Quickstart specific demo environment")] = False,
+    docker: Annotated[bool, typer.Option("--docker", help="Use Docker for demo (Full fidelity)")] = False,
+):
     """
     Interactive setup wizard for first-time users.
     """
-    setup_command()
+    # If Docker provided, lite is False. If not provided, lite is True (default).
+    lite = not docker
+    setup_command(demo=demo, lite=lite, docker=docker)
 
 
 @app.command()
@@ -156,9 +191,9 @@ def list_adapters():
 @app.command()
 def benchmark(
     dataset: Annotated[pathlib.Path, typer.Option(help="Path to golden dataset YAML")],
-    config: ConfigOption = pathlib.Path(settings.datasource_config_path),
-    secrets_config: SecretsConfigOption = pathlib.Path(settings.secrets_config_path),
-    vector_store: VectorStoreOption = settings.vector_store_path,
+    config: ConfigOption = None,
+    secrets_config: SecretsConfigOption = None,
+    vector_store: VectorStoreOption = None,
     bench_config: Annotated[Optional[pathlib.Path], typer.Option(help="Path to LLM matrix config")] = None,
     iterations: Annotated[int, typer.Option(help="Iterations per test case")] = 3,
     routing_only: Annotated[bool, typer.Option(help="Verify routing only, skip SQL execution")] = False,
@@ -168,6 +203,14 @@ def benchmark(
     """
     Run accuracy benchmarks against a golden dataset.
     """
+    # Resolve Paths
+    if config is None:
+        config = pathlib.Path(settings.datasource_config_path)
+    if secrets_config is None:
+        secrets_config = pathlib.Path(settings.secrets_config_path)
+    if vector_store is None:
+        vector_store = settings.vector_store_path
+
     bench_run_config = BenchmarkConfig(
         dataset_path=dataset,
         config_path=config,
