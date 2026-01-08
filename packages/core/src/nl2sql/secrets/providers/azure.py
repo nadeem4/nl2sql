@@ -7,17 +7,25 @@ logger = logging.getLogger(__name__)
 class AzureSecretProvider:
     """Fetches secrets from Azure Key Vault."""
     
-    def __init__(self):
+    def __init__(self, vault_url: Optional[str] = None, client_id: Optional[str] = None, client_secret: Optional[str] = None, tenant_id: Optional[str] = None):
         try:
-            from azure.identity import DefaultAzureCredential
+            from azure.identity import DefaultAzureCredential, ClientSecretCredential
             from azure.keyvault.secrets import SecretClient
             
-            vault_url = os.environ.get("AZURE_KEYVAULT_URL")
-            if not vault_url:
-                raise ValueError("Environment variable 'AZURE_KEYVAULT_URL' is required for Azure Secret Provider.")
+            self.vault_url = vault_url or os.environ.get("AZURE_KEYVAULT_URL")
+            if not self.vault_url:
+                raise ValueError("Vault URL is required. specific via config or 'AZURE_KEYVAULT_URL'.")
                 
-            credential = DefaultAzureCredential()
-            self.client = SecretClient(vault_url=vault_url, credential=credential)
+            if client_id and client_secret and tenant_id:
+                credential = ClientSecretCredential(
+                    tenant_id=tenant_id,
+                    client_id=client_id,
+                    client_secret=client_secret
+                )
+            else:
+                credential = DefaultAzureCredential()
+
+            self.client = SecretClient(vault_url=self.vault_url, credential=credential)
             self._available = True
         except ImportError:
             self.client = None

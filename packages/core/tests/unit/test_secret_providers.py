@@ -45,15 +45,21 @@ def test_aws_provider_success():
     from AWS Secrets Manager.
     """
     mock_boto = MagicMock()
+    mock_session = MagicMock()
     mock_client = MagicMock()
-    mock_boto.client.return_value = mock_client
+    
+    # Mock Session constructor to return our mock session
+    mock_boto.Session.return_value = mock_session
+    # Mock session.client() to return our mock client
+    mock_session.client.return_value = mock_client
+    
     mock_client.get_secret_value.return_value = {"SecretString": "aws_secret_val"}
     
     with patch.dict(sys.modules, {"boto3": mock_boto}):
         provider = AwsSecretProvider()
         val = provider.get_secret("prod/db")
         assert val == "aws_secret_val"
-        mock_boto.client.assert_called_with("secretsmanager")
+        mock_session.client.assert_called_with("secretsmanager")
         mock_client.get_secret_value.assert_called_with(SecretId="prod/db")
 
 def test_aws_provider_missing_dep():

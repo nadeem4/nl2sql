@@ -8,11 +8,12 @@ from typing import Optional, List
 from typing_extensions import Annotated
 
 # Core Library Imports
-from nl2sql.datasources import load_profiles, DatasourceRegistry
+from nl2sql.datasources import DatasourceRegistry
 from nl2sql.services.llm import LLMRegistry, load_llm_config
 from nl2sql.common.settings import settings
 from nl2sql.services.vector_store import OrchestratorVectorStore
 from nl2sql.common.logger import configure_logging
+from nl2sql.secrets import secret_manager, load_secret_configs, SecretManager
 
 # Local CLI Imports
 from nl2sql_cli.commands.indexing import run_indexing
@@ -32,7 +33,9 @@ app = typer.Typer(
 )
 
 # Shared Options
+# Shared Options
 ConfigOption = Annotated[pathlib.Path, typer.Option("--config", help="Path to datasource config YAML")]
+SecretsConfigOption = Annotated[pathlib.Path, typer.Option("--secrets-config", help="Path to secrets config YAML")]
 LLMConfigOption = Annotated[pathlib.Path, typer.Option("--llm-config", help="Path to LLM config YAML")]
 VectorStoreOption = Annotated[str, typer.Option("--vector-store", help="Path to vector store directory")]
 
@@ -41,6 +44,7 @@ VectorStoreOption = Annotated[str, typer.Option("--vector-store", help="Path to 
 def run(
     query: Annotated[str, typer.Argument(help="Natural language query")],
     config: ConfigOption = pathlib.Path(settings.datasource_config_path),
+    secrets_config: SecretsConfigOption = pathlib.Path(settings.secrets_config_path),
     id: Annotated[Optional[str], typer.Option(help="Target specific datasource ID")] = None,
     llm_config: LLMConfigOption = pathlib.Path(settings.llm_config_path),
     vector_store: VectorStoreOption = settings.vector_store_path,
@@ -64,6 +68,14 @@ def run(
     )
     
     # Load Registry
+    
+    # Load Registry
+    
+    # 1. Load Secrets FIRST (Datasources depend on them)
+    secret_configs = load_secret_configs(secrets_config)
+    secret_manager.configure(secret_configs)
+    
+    # 2. Load Datasources
     configs = load_configs(config)
     ds_registry = DatasourceRegistry(configs)
     
@@ -81,12 +93,17 @@ def run(
 @app.command()
 def index(
     config: ConfigOption = pathlib.Path(settings.datasource_config_path),
+    secrets_config: SecretsConfigOption = pathlib.Path(settings.secrets_config_path),
     vector_store: VectorStoreOption = settings.vector_store_path,
     llm_config: LLMConfigOption = pathlib.Path(settings.llm_config_path),
 ):
     """
     Index schemas and examples into the Vector Store.
     """
+    # Load Secrets FIRST
+    secret_configs = load_secret_configs(secrets_config)
+    secret_manager.configure(secret_configs)
+
     configs = load_configs(config)
     
     try:
@@ -136,6 +153,7 @@ def list_adapters():
 def benchmark(
     dataset: Annotated[pathlib.Path, typer.Option(help="Path to golden dataset YAML")],
     config: ConfigOption = pathlib.Path(settings.datasource_config_path),
+    secrets_config: SecretsConfigOption = pathlib.Path(settings.secrets_config_path),
     vector_store: VectorStoreOption = settings.vector_store_path,
     bench_config: Annotated[Optional[pathlib.Path], typer.Option(help="Path to LLM matrix config")] = None,
     iterations: Annotated[int, typer.Option(help="Iterations per test case")] = 3,
@@ -160,6 +178,9 @@ def benchmark(
     )
     
     # Load Registry (Configs -> Eager Adapters)
+    secret_configs = load_secret_configs(secrets_config)
+    secret_manager.configure(secret_configs)
+
     configs = load_configs(config)
     ds_registry = DatasourceRegistry(configs)
     v_store = OrchestratorVectorStore(persist_directory=vector_store)

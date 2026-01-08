@@ -87,19 +87,20 @@ The platform employs a **Pluggable Secret Management** system (`nl2sql.secrets`)
 
 ### Mechanism
 
-* **Template Hydration**: Secrets are referenced in configuration files using the syntax `${scheme:key}`.
+* **Configuration**: Secrets providers are defined in `secrets.yaml`.
+* **Template Hydration**: Secrets are referenced in other config files (like `datasources.yaml`) using the syntax `${provider_id:key}`.
 * **Resolution**: The `SecretManager` resolves these references *before* the configuration is parsed, ensuring that sensitive values are never hardcoded in YAML files or committed to version control.
 
 ### Providers
 
-The system supports extensible providers via the `SecretProvider` protocol:
+The system supports extensible providers via the `SecretProvider` protocol. You configure them in `secrets.yaml` with a unique `id`.
 
-1. **Environment (`env`)**: Standard lookup (e.g., `${env:DB_PASS}`).
-2. **AWS Secrets Manager (`aws`)**: Fetches from AWS (e.g., `${aws:prod/db/pass}`).
-3. **Azure Key Vault (`azure`)**: Fetches from Azure (e.g., `${azure:db-secret}`).
-4. **HashiCorp Vault (`hashi`)**: Fetches from Vault (e.g., `${hashi:secret/data/db:pass}`).
+1. **Environment (`env`)**: Standard lookup (e.g., `${env:DB_PASS}`). Always available.
+2. **AWS Secrets Manager**: Defined by type `aws`. (e.g., `${aws-prod:db/pass}`).
+3. **Azure Key Vault**: Defined by type `azure`. (e.g., `${azure-main:db-secret}`).
+4. **HashiCorp Vault**: Defined by type `hashi`. (e.g., `${vault-internal:secret/data/db:pass}`).
 
-Dependencies for cloud providers are optional (`nl2sql-core[aws]`, etc.) to keep the core lightweight.
+**Dependencies**: Cloud providers require optional extras (`nl2sql-core[aws]`, `nl2sql-core[azure]`, etc.) to keep the core lightweight.
 
 ## 6. Configuration Security
 

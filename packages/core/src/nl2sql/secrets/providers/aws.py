@@ -6,10 +6,11 @@ logger = logging.getLogger(__name__)
 class AwsSecretProvider:
     """Fetches secrets from AWS Secrets Manager."""
     
-    def __init__(self):
+    def __init__(self, region_name: Optional[str] = None, profile_name: Optional[str] = None):
         try:
             import boto3
-            self.client = boto3.client('secretsmanager')
+            session = boto3.Session(profile_name=profile_name, region_name=region_name)
+            self.client = session.client('secretsmanager')
         except ImportError:
             self.client = None
             logger.warning("AWS Secret Provider initialized but 'boto3' is missing. Please install 'nl2sql-core[aws]' to use AWS secrets.")

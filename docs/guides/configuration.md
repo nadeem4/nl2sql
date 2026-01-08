@@ -12,16 +12,46 @@ nl2sql setup
 
 ## 2. Secrets Management
 
-Sensitive credentials should never be stored in plaintext. We support **strict** variable expansion using the `${scheme:key}` syntax.
+Sensitive credentials should never be stored in plaintext. We support **strict** variable expansion using the `${provider_id:key}` syntax, powered by `secrets.yaml`.
+
+### 2.1 Configuration (`secrets.yaml`)
+
+Define your secret providers in a `secrets.yaml` file (or `configs/secrets.yaml`).
+
+```yaml
+version: 1
+providers:
+  - id: azure-main
+    type: azure
+    vault_url: "https://my-vault.vault.azure.net/"
+    # You can resolve credentials from ENV here (Two-Phase Loading)
+    client_secret: "${env:AZURE_CLIENT_SECRET}"
+    
+  - id: aws-prod
+    type: aws
+    region_name: us-east-1
+```
+
+### 2.2 Usage (`datasources.yaml`)
+
+Reference the secrets using the `id` defined above.
 
 > [!IMPORTANT]
 >
-> - **Strict Syntax**: Format must be exactly `${scheme:key}` (e.g., `${env:DB_PASS}`). Partial strings like `prefix-${env:VAR}` are **not** supported.
-> - **Supported Schemes**:
->   - `env`: Environment Variables (e.g., `${env:PG_PASSWORD}`)
->   - `aws`: AWS Secrets Manager (e.g., `${aws:production/db/password}`)
->   - `gcp`: Google Cloud Secret Manager (e.g., `${gcp:my-secret}`)
->   - `azure`: Azure Key Vault (e.g., `${azure:my-db-pass}`)
+> - **Strict Syntax**: Format must be exactly `${provider_id:key}`.
+> - **Provider ID**: Matches the `id` field in `secrets.yaml`.
+> - **Environment**: `${env:VAR}` is always available without config.
+
+**Example**:
+
+```yaml
+connection:
+  host: localhost
+  # Uses 'aws-prod' provider defined in secrets.yaml
+  password: ${aws-prod:db/password}
+  # Uses built-in env provider
+  user: ${env:DB_USER}
+```
 
 **Example**:
 
@@ -131,3 +161,21 @@ Your `datasources.yaml` includes a header that enables **Autocomplete** and **Va
 ```
 
 Do not remove this line. It ensures your configuration matches the strict Pydantic models used by the engine.
+
+## 6. Environment Variables
+
+You can configure the application using the following environment variables (defined in `.env` or system environment).
+
+| Variable | Default | Description |
+| :--- | :--- | :--- |
+| `OPENAI_API_KEY` | - | **Required** for LLM and Embedding services. |
+| `DATASOURCE_CONFIG` | `configs/datasources.yaml` | Path to the datasource configuration file. |
+| `SECRETS_CONFIG` | `configs/secrets.yaml` | Path to the secrets configuration file. |
+| `LLM_CONFIG` | `configs/llm.yaml` | Path to the LLM model configuration file. |
+| `USERS_CONFIG` | `users.json` | Path to the user permissions file. |
+| `VECTOR_STORE` | `./chroma_db` | Path (directory) to persist the vector store. |
+| `EMBEDDING_MODEL` | `text-embedding-3-small` | OpenAI embedding model name. |
+| `BENCHMARK_CONFIG` | `configs/benchmark_suite.yaml` | Path to accurate testing suite configuration. |
+| `ROUTING_EXAMPLES` | `configs/sample_questions.yaml` | Path to examples used for few-shot routing. |
+| `ROUTER_L1_THRESHOLD` | `0.4` | Threshold for Vector Search relevance. |
+| `ROUTER_L2_THRESHOLD` | `0.6` | Threshold for Multi-Query voting agreement. |
