@@ -170,8 +170,8 @@ class BaseSQLAlchemyAdapter(DatasourceAdapter):
                 columns.append(Column(
                     name=col_info["name"],
                     type=str(col_info["type"]),
-                    is_nullable=col_info["nullable"],
-                    is_primary_key=col_info.get("primary_key", False),
+                    is_nullable=bool(col_info["nullable"]),
+                    is_primary_key=bool(col_info.get("primary_key", False)),
                     description=col_info.get("comment"),
                     statistics=self._get_column_stats(table_name, col_info["name"], row_count, str(col_info["type"]))
                 ))

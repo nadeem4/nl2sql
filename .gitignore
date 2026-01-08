@@ -22,3 +22,7 @@ chroma_db
 logs
 
 site
+
+data
+
+last_reasoning.json

@@ -1,0 +1,12 @@
+{
+  "admin": {
+    "description": "Demo Admin",
+    "role": "admin",
+    "allowed_datasources": [
+      "*"
+    ],
+    "allowed_tables": [
+      "*"
+    ]
+  }
+}

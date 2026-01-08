@@ -1,6 +1,7 @@
 import typer
 import pathlib
 import sys
+from typing import Optional
 from typing_extensions import Annotated
 from rich.console import Console
 from rich.table import Table
@@ -17,13 +18,21 @@ console = Console()
 
 @app.command("validate")
 def validate(
-    config: Annotated[pathlib.Path, typer.Option("--config", help="Path to datasource config")] = pathlib.Path(settings.datasource_config_path),
-    policies: Annotated[pathlib.Path, typer.Option("--policies", help="Path to policies.json")] = pathlib.Path(settings.policies_config_path),
-    secrets: Annotated[pathlib.Path, typer.Option("--secrets", help="Path to secrets config")] = pathlib.Path(settings.secrets_config_path),
+    config: Annotated[Optional[pathlib.Path], typer.Option("--config", help="Path to datasource config")] = None,
+    policies: Annotated[Optional[pathlib.Path], typer.Option("--policies", help="Path to policies.json")] = None,
+    secrets: Annotated[Optional[pathlib.Path], typer.Option("--secrets", help="Path to secrets config")] = None,
 ):
     """
     Validate policy syntax and integrity against defined datasources.
     """
+    # Resolve paths (Global callback may have updated settings)
+    if config is None:
+        config = pathlib.Path(settings.datasource_config_path)
+    if policies is None:
+        policies = pathlib.Path(settings.policies_config_path)
+    if secrets is None:
+        secrets = pathlib.Path(settings.secrets_config_path)
+
     console.print(f"[bold blue]Validating Policies from:[/bold blue] {policies}")
     
     # 1. Load Policies (Schema Check)

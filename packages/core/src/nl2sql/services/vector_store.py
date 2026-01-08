@@ -133,7 +133,6 @@ class OrchestratorVectorStore:
                 cols_str = ",".join(fk.referred_columns)
                 table_prefix = f"{fk.referred_table}."
                 
-                # Check if columns are already prefixed (aliased) to avoid double prefixing
                 if fk.referred_columns and fk.referred_columns[0].startswith(table_prefix):
                     ref = cols_str
                 else:
@@ -161,7 +160,11 @@ class OrchestratorVectorStore:
         if documents:
             self.vectorstore.add_documents(documents)
             
-        return [t.name for t in schema_def.tables]
+        return {
+            "tables": len(schema_def.tables),
+            "columns": sum(len(t.columns) for t in schema_def.tables),
+            "fks": sum(len(t.foreign_keys) for t in schema_def.tables)
+        }
 
     def retrieve_table_names(self, query: str, k: int = 5, datasource_id: Optional[Union[str, List[str]]] = None) -> List[str]:
         """
@@ -214,36 +217,50 @@ class OrchestratorVectorStore:
 
             for ds_id, questions in examples.items():
                 print(f"Processing examples for {ds_id}...")
-                for q in questions:
-                    variants = [q]
-                    if enricher:
-                        try:
-                            analysis = enricher.invoke(q)
-                            if analysis.canonical_query:
-                                variants.append(analysis.canonical_query)
-                            
-                            if analysis.keywords or analysis.synonyms:
-                                meta_text = " ".join(analysis.keywords + analysis.synonyms)
-                                variants.append(meta_text)
-                                
-                        except Exception as e:
-                            print(f"Warning: Enrichment failed for '{q}': {e}")
-                            
-                    variants = list(set(variants))
-
-                    for v in variants:
-                        doc = Document(
-                            page_content=v,
-                            metadata={"datasource_id": ds_id, "type": "example", "original": q}
-                        )
-                        documents.append(doc)
+                docs_for_ds = self.prepare_examples_for_datasource(ds_id, questions, enricher)
+                documents.extend(docs_for_ds)
             
             if documents:
                 self.vectorstore.add_documents(documents)
-                print(f"Indexed {len(documents)} example questions (with variants).")
+            
+            return len(documents)
                 
         except Exception as e:
             print(f"Failed to load examples: {e}")
+            return 0
+
+    def prepare_examples_for_datasource(self, ds_id: str, questions: List[str], enricher=None) -> List[Document]:
+        """Prepares example documents for a specific datasource."""
+        documents = []
+        for q in questions:
+            variants = [q]
+            if enricher:
+                try:
+                    analysis = enricher.invoke(q)
+                    if analysis.canonical_query:
+                        variants.append(analysis.canonical_query)
+                    
+                    if analysis.keywords or analysis.synonyms:
+                        meta_text = " ".join(analysis.keywords + analysis.synonyms)
+                        variants.append(meta_text)
+                        
+                except Exception as e:
+                    print(f"Warning: Enrichment failed for '{q}': {e}")
+                    
+            variants = list(set(variants))
+
+            for v in variants:
+                doc = Document(
+                    page_content=v,
+                    metadata={"datasource_id": ds_id, "type": "example", "original": q}
+                )
+                documents.append(doc)
+        return documents
+
+    def add_documents(self, documents: List[Document]):
+        """Directly adds documents to the vector store."""
+        if documents:
+            self.vectorstore.add_documents(documents)
 
     def retrieve_routing_context(self, query: str, k: int = 5, datasource_id: Optional[List[str]] = None) -> List[Document]:
         """

@@ -1,0 +1,21 @@
+datasources:
+- id: manufacturing_ref
+  connection:
+    type: sqlite
+    database: data\demo_lite\manufacturing_ref.db
+  description: Master Data (Factories)
+- id: manufacturing_ops
+  connection:
+    type: sqlite
+    database: data\demo_lite\manufacturing_ops.db
+  description: Operational Data (Employees, Machines)
+- id: manufacturing_supply
+  connection:
+    type: sqlite
+    database: data\demo_lite\manufacturing_supply.db
+  description: Supply Chain (Inventory)
+- id: manufacturing_history
+  connection:
+    type: sqlite
+    database: data\demo_lite\manufacturing_history.db
+  description: Historical Data (Sales)

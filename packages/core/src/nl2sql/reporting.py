@@ -712,7 +712,50 @@ class ConsolePresenter:
         self.console.print(f"[red]Failed to index {ds_id}: {error}[/red]")
 
     def print_indexing_complete(self) -> None:
-        self.console.print("[bold green]Indexing complete![/bold green]")
+        self.console.print("\n[bold green]Indexing complete![/bold green]")
+
+    def print_indexing_summary(self, stats: List[Dict[str, Any]]) -> None:
+        """Prints a summary table of indexed content."""
+        if not stats:
+            return
+            
+        table = Table(title="Indexing Summary", show_header=True, header_style="bold magenta", expand=True)
+        table.add_column("Datasource", style="cyan")
+        table.add_column("Tables", justify="right")
+        table.add_column("Columns", justify="right")
+        table.add_column("Examples", justify="right")
+        
+        total_tables = 0
+        total_cols = 0
+        total_examples = 0
+        
+        for s in stats:
+            t = s.get('tables', 0)
+            c = s.get('columns', 0)
+            e = s.get('examples', 0)
+            
+            total_tables += t
+            total_cols += c
+            total_examples += e
+            
+            table.add_row(
+                s.get('id', 'Unknown'),
+                str(t),
+                str(c),
+                str(e)
+            )
+            
+        # Total Row
+        table.add_row(
+            "[bold]TOTAL[/bold]",
+            f"[bold]{total_tables}[/bold]",
+            f"[bold]{total_cols}[/bold]",
+            f"[bold]{total_examples}[/bold]",
+            style="green"
+        )
+        
+        self.console.print("\n")
+        self.console.print(table)
         
     def create_progress(self):
         """Returns a configured Progress object."""

@@ -41,5 +41,34 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
+    def configure_env(self, env: str) -> None:
+        """
+        Updates configuration paths based on the environment name.
+        
+        Args:
+            env (str): Environment name (e.g., 'dev', 'prod', 'demo').
+        """
+        if not env:
+            return
+
+        import os
+        
+        # Helper to construct path with fallback
+        # If configs/datasources.{env}.yaml exists, use it.
+        # But for 'demo', we force the generation/usage of it.
+        # Actually, the logic is: If --env is passed, we EXPECT the file to exist or be created.
+        
+        self.datasource_config_path = f"configs/datasources.{env}.yaml"
+        self.policies_config_path = f"configs/policies.{env}.json"
+        
+        # Secrets might be shared or isolated. Let's isolate by default.
+        self.secrets_config_path = f"configs/secrets.{env}.yaml"
+        
+        # Vector Store is CRITICAL to isolate
+        # e.g. data/vector_store_dev
+        self.vector_store_path = f"data/vector_store_{env}"
+        
+        # Isolation for Sample Questions (Indexing & Routing)
+        self.sample_questions_path = f"configs/sample_questions.{env}.yaml"
 
 settings = Settings()

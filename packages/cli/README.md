@@ -63,6 +63,31 @@ Execute a query and see the result (JSON or Text streaming).
 nl2sql run "Show me the top 5 customers by revenue" --role sales_analyst
 ```
 
+### 3. Quickstart (Demo Mode) 🧪
+
+Try NL2SQL immediately without configuring your own database.
+
+```bash
+# 1. Generate Demo Environment (SQLite databases)
+nl2sql setup --demo
+
+# 2. Run a query against the demo env
+nl2sql --env demo run "Show me broken machines in Austin"
+```
+
+### 4. Environment Isolation 🌍
+
+Manage multiple environments (Dev, Prod, Demo) safely with the `--env` flag.
+**Note**: The `--env` flag must be placed *before* the command (run/index/setup).
+
+```bash
+# Uses configs/datasources.dev.yaml and data/vector_store_dev/
+nl2sql --env dev run "..."
+
+# Uses configs/datasources.prod.yaml and data/vector_store_prod/
+nl2sql --env prod run "..."
+```
+
 ## Architecture
 
 The CLI follows a **Subprocess Control Plane** pattern. It does not import `nl2sql.core` directly into its own process space. Instead, it invokes the core module (`python -m nl2sql.cli`) via `subprocess`.
