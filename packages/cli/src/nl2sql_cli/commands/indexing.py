@@ -2,10 +2,10 @@ import sys
 from typing import Dict, Any
 from nl2sql.reporting import ConsolePresenter
 from nl2sql.services.vector_store import OrchestratorVectorStore
-from nl2sql.datasources import DatasourceRegistry, DatasourceProfile
+from nl2sql.datasources import DatasourceRegistry
 
 def run_indexing(
-    profiles: Dict[str, DatasourceProfile], 
+    configs: Any, # List[Dict[str, Any]]
     vector_store_path: str, 
     vector_store: OrchestratorVectorStore, 
     llm_registry: Any = None
@@ -13,7 +13,7 @@ def run_indexing(
     """Runs the indexing process for schemas and examples.
 
     Args:
-        profiles (Dict[str, DatasourceProfile]): Dictionary of datasource profiles.
+        configs (List[Dict[str, Any]]): List of datasource configuration dicts.
         vector_store_path (str): Path to the vector store.
         vector_store (OrchestratorVectorStore): The vector store instance.
         llm_registry (Any, optional): Registry of LLMs for enrichment.
@@ -21,7 +21,11 @@ def run_indexing(
     presenter = ConsolePresenter()
     presenter.print_indexing_start(vector_store_path)
     
-    registry = DatasourceRegistry(profiles)
+    # Registry now eager loads adapters from configs
+    registry = DatasourceRegistry(configs)
+    
+    # Get all active adapters
+    adapters = registry.list_adapters()
 
     with presenter.create_progress() as progress:
         
@@ -30,16 +34,16 @@ def run_indexing(
         vector_store.clear()
         progress.advance(task_clear)
         
-        # Index Schemas for ALL profiles and collect summaries
-        task_schema = progress.add_task("[green]Indexing schemas...", total=len(profiles))
+        # Index Schemas for ALL active adapters
+        task_schema = progress.add_task("[green]Indexing schemas...", total=len(adapters))
         
-        for p in profiles.values():
-            progress.update(task_schema, description=f"[green]Indexing schema: {p.id} ({p.engine})...")
+        for adapter in adapters:
+            ds_id = adapter.datasource_id
+            progress.update(task_schema, description=f"[green]Indexing schema: {ds_id}...")
             try:
-                adapter = registry.get_adapter(p.id)
-                vector_store.index_schema(adapter, datasource_id=p.id)
+                vector_store.index_schema(adapter, datasource_id=ds_id)
             except Exception as e:
-                presenter.print_indexing_error(p.id, str(e))
+                presenter.print_indexing_error(ds_id, str(e))
             progress.advance(task_schema)
             
         # Index Examples (with enrichment if LLM available)

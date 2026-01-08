@@ -1,4 +1,4 @@
-from typing import Any, List
+from typing import Any, List, Dict
 from sqlalchemy import create_engine, text, inspect
 from nl2sql_adapter_sdk import (
     QueryResult, 
@@ -9,6 +9,48 @@ from nl2sql_adapter_sdk import (
 from nl2sql_sqlalchemy_adapter import BaseSQLAlchemyAdapter
 
 class MysqlAdapter(BaseSQLAlchemyAdapter):
+
+    def construct_uri(self, args: Dict[str, Any]) -> str:
+        user = args.get("user", "")
+        password = args.get("password", "")
+        host = args.get("host", "localhost")
+        port = args.get("port", "")
+        database = args.get("database", "")
+        
+        options = args.get("options", {}).copy()
+        
+        creds = f"{user}:{password}@" if user or password else ""
+        netloc = f"{host}:{port}" if port else host
+        
+        query_str = ""
+        if options:
+            from urllib.parse import urlencode
+            query_str = "?" + urlencode(options)
+            
+        return f"mysql+pymysql://{creds}{netloc}/{database}{query_str}"
+
+    def connect(self) -> None:
+        """MySQL-specific connection with Native Server-Side Timeout."""
+        if not self.connection_string:
+             raise ValueError(f"Connection string is required for {self}")
+             
+        connect_args = {}
+        if self.statement_timeout_ms:
+            # Native MySQL Timeout (server-side)
+            # SET MAX_EXECUTION_TIME={ms}
+            connect_args["init_command"] = f"SET MAX_EXECUTION_TIME={self.statement_timeout_ms}"
+
+        try:
+            self.engine = create_engine(
+                self.connection_string, 
+                pool_pre_ping=True,
+                execution_options=self.execution_options,
+                connect_args=connect_args
+            )
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"Failed to connect to MySQL: {e}")
+            raise
 
     def dry_run(self, sql: str) -> DryRunResult:
         try:

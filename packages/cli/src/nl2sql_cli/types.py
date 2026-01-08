@@ -7,7 +7,7 @@ class RunConfig(BaseModel):
     query: str
     config_path: pathlib.Path
     datasource_id: Optional[str] = None
-    user: str = "admin"
+    role: str = "admin"
     no_exec: bool = False
     verbose: bool = False
     show_perf: bool = False

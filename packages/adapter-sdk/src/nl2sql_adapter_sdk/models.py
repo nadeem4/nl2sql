@@ -46,6 +46,7 @@ class QueryResult(BaseModel):
     row_count: int
     raw: Optional[Any] = None
     execution_time_ms: Optional[float] = None
+    bytes_returned: Optional[int] = None
 
 class DryRunResult(BaseModel):
     is_valid: bool
@@ -60,14 +61,6 @@ class CostEstimate(BaseModel):
     estimated_cost: float
     estimated_rows: int
     estimated_time_ms: Optional[float] = None
-
-class CapabilitySet(BaseModel):
-    supports_cte: bool = True
-    supports_window_functions: bool = True
-    supports_limit_offset: bool = True
-    supports_multi_db_join: bool = False
-    supports_vector: bool = False
-    supports_dry_run: bool = False
 
 class AdapterError(BaseModel):
     code: str

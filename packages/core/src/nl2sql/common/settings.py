@@ -1,6 +1,10 @@
 from typing import Optional
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from dotenv import load_dotenv
+
+# Load environment variables from .env into os.environ
+load_dotenv()
 
 
 class Settings(BaseSettings):
@@ -11,16 +15,17 @@ class Settings(BaseSettings):
     llm_config_path: str = Field(default="configs/llm.yaml", validation_alias="LLM_CONFIG")
     datasource_config_path: str = Field(default="configs/datasources.yaml", validation_alias="DATASOURCE_CONFIG")
     benchmark_config_path: str = Field(default="configs/benchmark_suite.yaml", validation_alias="BENCHMARK_CONFIG")
+    secrets_config_path: str = Field(default="configs/secrets.yaml", validation_alias="SECRETS_CONFIG")
     embedding_model: str = Field(default="text-embedding-3-small", validation_alias="EMBEDDING_MODEL")
     sample_questions_path: str = Field(
         default="configs/sample_questions.yaml", 
         validation_alias="ROUTING_EXAMPLES",
         description="Path to the YAML file containing sample questions for routing."
     )
-    users_config_path: str = Field(
-        default="users.json",
-        validation_alias="USERS_CONFIG",
-        description="Path to the JSON file containing user profiles and permissions."
+    policies_config_path: str = Field(
+        default="configs/policies.json",
+        validation_alias="POLICIES_CONFIG",
+        description="Path to the JSON file containing RBAC policies and permissions."
     )
     
     router_l1_threshold: float = Field(

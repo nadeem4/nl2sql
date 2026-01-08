@@ -3,7 +3,7 @@ Standard Compliance Test Suite for NL2SQL Adapters.
 Any new adapter MUST pass these tests to be certified.
 """
 import pytest
-from nl2sql_adapter_sdk import DatasourceAdapter, CapabilitySet, SchemaMetadata, CostEstimate
+from nl2sql_adapter_sdk import DatasourceAdapter, SchemaMetadata, CostEstimate
 
 class AdapterComplianceSuite:
     @pytest.fixture
@@ -11,13 +11,6 @@ class AdapterComplianceSuite:
         """Override this fixture in subclass to return the adapter under test."""
         raise NotImplementedError
         
-    def test_capabilities_contract(self, adapter):
-        """Verify that capabilities property returns valid object."""
-        caps = adapter.capabilities()
-        assert isinstance(caps, CapabilitySet)
-        # Must support at least one thing
-        assert caps.supports_cte is not None
-
     def test_schema_contract(self, adapter):
         """Verify fetch_schema structure."""
         schema = adapter.fetch_schema()

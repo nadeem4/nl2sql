@@ -10,6 +10,48 @@ from nl2sql_sqlalchemy_adapter import BaseSQLAlchemyAdapter
 
 class PostgresAdapter(BaseSQLAlchemyAdapter):
 
+    def construct_uri(self, args: Dict[str, Any]) -> str:
+        user = args.get("user", "")
+        password = args.get("password", "")
+        host = args.get("host", "localhost")
+        port = args.get("port", "")
+        database = args.get("database", "")
+        
+        options = args.get("options", {}).copy()
+        
+        creds = f"{user}:{password}@" if user or password else ""
+        netloc = f"{host}:{port}" if port else host
+        
+        query_str = ""
+        if options:
+            from urllib.parse import urlencode
+            query_str = "?" + urlencode(options)
+            
+        return f"postgresql://{creds}{netloc}/{database}{query_str}"
+
+    def connect(self) -> None:
+        """Postgres-specific connection with Native Server-Side Timeout."""
+        if not self.connection_string:
+             raise ValueError(f"Connection string is required for {self}")
+             
+        connect_args = {}
+        if self.statement_timeout_ms:
+            # Native Postgres Timeout (server-side)
+            # -c statement_timeout={ms}
+            connect_args["options"] = f"-c statement_timeout={self.statement_timeout_ms}"
+
+        try:
+            self.engine = create_engine(
+                self.connection_string, 
+                pool_pre_ping=True,
+                execution_options=self.execution_options, # Pass standard options too
+                connect_args=connect_args
+            )
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"Failed to connect to Postgres: {e}")
+            raise
+
 
 
 

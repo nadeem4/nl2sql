@@ -61,29 +61,45 @@ def _run_simple_mode(
     
     start_time = time.perf_counter()
     
-    # Load User Context
-    user_context = {}
+    # Load Role Context (RBAC)
+    policy_context = {}
     try:
         import pathlib
-        users_path = pathlib.Path(settings.users_config_path)            
-        if users_path.exists():
-            with open(users_path, "r") as f:
-                users_db = json.load(f)
-                user_context = users_db.get(config.user)
+        from nl2sql.security.policies import PolicyConfig
+        from pydantic import ValidationError
+        
+        policies_path = pathlib.Path(settings.policies_config_path)            
+        if policies_path.exists():
+            with open(policies_path, "r") as f:
+                raw_json = f.read()
                 
-                if not user_context:
-                    presenter.print_error(f"Critical: User '{config.user}' not found in '{users_path.resolve()}'. Cannot execute without context.")
+            try:
+                # 1. Strict Schema Validation
+                policy_cfg = PolicyConfig.model_validate_json(raw_json)
+                
+                # 2. Look up by Role ID
+                role_policy = policy_cfg.get_role(config.role)
+                
+                if not role_policy:
+                    presenter.print_error(f"Critical: Role '{config.role}' not defined in '{policies_path.resolve()}'. Available roles: {list(policy_cfg.root.keys())}")
                     sys.exit(1)
+                    
+                # 3. Convert to Dict for Pipeline
+                policy_context = role_policy.model_dump()
+                
+            except ValidationError as ve:
+                presenter.print_error(f"Policy Configuration Error in '{policies_path}':\n{ve}")
+                sys.exit(1)
         else:
-            presenter.print_error(f"Critical: User config file not found at '{users_path}'. Cannot load context.")
+            presenter.print_error(f"Critical: Policy config file not found at '{policies_path}'. Cannot load context.")
             sys.exit(1)
 
     except Exception as e:
-        presenter.print_error(f"Failed to load user context: {e}")
+        presenter.print_error(f"Failed to load policy context: {e}")
         sys.exit(1)
 
     try:
-        print(f"User Context: {user_context}")
+        print(f"Policy Context: {policy_context}")
         final_state = run_with_graph(
             registry=datasource_registry,
             llm_registry=llm_registry,
@@ -93,7 +109,7 @@ def _run_simple_mode(
             vector_store=vector_store,
             vector_store_path=config.vector_store_path,
             callbacks=[monitor],
-            user_context=user_context
+            user_context=policy_context
         )
     except Exception as e:
         import traceback

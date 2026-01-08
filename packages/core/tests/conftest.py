@@ -1,28 +1,24 @@
 import pytest
 from unittest.mock import MagicMock
-from nl2sql.datasources import DatasourceProfile
-# from nl2sql.adapters.sql_generic import SqlGenericAdapter
-# TODO: Update tests to usage discovery or mock adapter
+
+
 
 @pytest.fixture
 def mock_profile():
     """Returns a standard SQLite datasource profile for testing."""
-    return DatasourceProfile(
+    from types import SimpleNamespace
+    return SimpleNamespace(
         id="test_sqlite",
-        engine="sqlite",
-        sqlalchemy_url="sqlite:///:memory:",
-        row_limit=100,
-        auth=None,
-        read_only_role=None
+        type="sqlite",
+        connection={"database": ":memory:"},
+        row_limit=100
     )
 
 @pytest.fixture
 def mock_engine(mock_profile):
     """Returns an in-memory SQLite engine."""
-    # adapter = SqlGenericAdapter(mock_profile.sqlalchemy_url)
-    # return adapter.engine
     from sqlalchemy import create_engine
-    return create_engine(mock_profile.sqlalchemy_url)
+    return create_engine("sqlite:///:memory:")
 
 @pytest.fixture
 def mock_vector_store():

@@ -34,7 +34,7 @@ services:
 
 ## Production Checklist
 
-1. [ ] **Security**: Ensure `users.json` is mapped to your identity provider (e.g. OAuth) to dynamically enforce `allowed_tables`.
+1. [ ] **Security**: Ensure `configs/policies.json` is mapped to your identity provider (e.g. OAuth) to dynamically enforce `allowed_tables`.
 2. [ ] **Read-Only**: Configure the database users in `datasources.yaml` to have READ-ONLY permissions at the database level.
     > The PhysicalValidator provides a safety net, but deep defense requires DB-level grants.
 3. [ ] **Monitoring**: Enable the `PipelineMonitorCallback` to log all traces to your observability stack (e.g. LangSmith).

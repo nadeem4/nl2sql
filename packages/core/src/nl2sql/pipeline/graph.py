@@ -191,7 +191,6 @@ def run_with_graph(
     initial_state = GraphState(
         user_query=user_query,
         selected_datasource_id=datasource_id,
-        validation={"capabilities": "generic"},
         user_context=user_context or {},
     )
 

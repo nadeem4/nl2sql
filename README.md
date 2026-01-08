@@ -21,7 +21,8 @@ Detailed documentation is available in the `docs/` directory.
 
 * [**Architecture**](docs/architecture/overview.md): Understand the SQL Agent, Map-Reduce routing, and Plugins.
 * [**Security**](docs/architecture/security.md): Authentication, RBAC, and Validation.
-* [**Guides**](docs/guides.md): Installation, Configuration, and Benchmarking.
+* [**Configuration**](docs/guides/configuration.md): Secrets, Cloud Auth, and Safety Limits.
+* [**Guides**](docs/guides.md): Installation and Benchmarking.
 * [**Reference**](docs/reference.md): CLI arguments and API specs.
 
 ---

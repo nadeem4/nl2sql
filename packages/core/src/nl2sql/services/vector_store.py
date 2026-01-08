@@ -10,7 +10,7 @@ from langchain_core.embeddings import Embeddings
 from nl2sql.common.settings import settings
 from nl2sql.services.embeddings import EmbeddingService
 from nl2sql_adapter_sdk import SchemaMetadata, Table, Column, DatasourceAdapter
-from nl2sql.datasources import DatasourceProfile, load_profiles
+
 from nl2sql.common.logger import get_logger
 
 logger = get_logger(__name__)
@@ -26,6 +26,7 @@ class OrchestratorVectorStore:
     """
 
     def _initialize_vector_store(self):
+        """Initializes the Chroma vector store client with the configured settings."""
         self.vectorstore = Chroma(
             collection_name=self.collection_name,
             embedding_function=self.embeddings,
@@ -129,7 +130,15 @@ class OrchestratorVectorStore:
 
             fk_strs = []
             for fk in table.foreign_keys:
-                ref = f"{fk.referred_table}.{','.join(fk.referred_columns)}"
+                cols_str = ",".join(fk.referred_columns)
+                table_prefix = f"{fk.referred_table}."
+                
+                # Check if columns are already prefixed (aliased) to avoid double prefixing
+                if fk.referred_columns and fk.referred_columns[0].startswith(table_prefix):
+                    ref = cols_str
+                else:
+                    ref = f"{fk.referred_table}.{cols_str}"
+
                 src = f"{','.join(fk.constrained_columns)}"
                 fk_strs.append(f"{src} -> {ref}")
             fk_desc = f" Foreign Keys: {'; '.join(fk_strs)}." if fk_strs else ""

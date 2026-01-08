@@ -170,10 +170,12 @@ class GeneratorNode:
                 raise ValueError("No plan provided")
 
             plan: PlanModel = state.plan
-            profile = self.registry.get_profile(state.selected_datasource_id)
-            dialect = self.registry.get_dialect(state.selected_datasource_id)
+            
+            # Fix: Use adapter directly since get_profile is removed
+            adapter = self.registry.get_adapter(state.selected_datasource_id)
+            dialect = adapter.get_dialect()
 
-            row_limit = profile.row_limit if profile else 1000
+            row_limit = adapter.row_limit or 1000
             limit = min(int(plan.limit or row_limit), row_limit)
 
             sql = self._generate_sql(plan, limit, dialect)

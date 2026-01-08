@@ -60,7 +60,7 @@ nl2sql chat
 Execute a query and see the result (JSON or Text streaming).
 
 ```bash
-nl2sql run "Show me the top 5 customers by revenue"
+nl2sql run "Show me the top 5 customers by revenue" --role sales_analyst
 ```
 
 ## Architecture
@@ -79,7 +79,7 @@ The CLI relies on the standard NL2SQL configuration files:
 
 - `datasources.yaml`: Connection profiles.
 - `llm_config.yaml`: LLM provider settings.
-- `users.json`: User context and permissions.
+- `configs/policies.json`: RBAC policies and permissions.
 
 Run `nl2sql doctor` to see where it expects these files to be.
 

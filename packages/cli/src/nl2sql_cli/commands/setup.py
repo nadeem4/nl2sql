@@ -11,11 +11,38 @@ from nl2sql_cli.checks import check_package, verify_connectivity
 CONFIG_DIR = pathlib.Path("configs")
 DATASOURCE_CONFIG = CONFIG_DIR / "datasources.yaml"
 LLM_CONFIG = CONFIG_DIR / "llm.yaml"
+POLICIES_CONFIG = CONFIG_DIR / "policies.json"
 
 def _ensure_directories():
     if not CONFIG_DIR.exists():
         CONFIG_DIR.mkdir(parents=True, exist_ok=True)
         console.print("[dim]Created configs directory.[/dim]")
+
+def _configure_policies():
+    """Generates a default policies.json if missing."""
+    if POLICIES_CONFIG.exists():
+        console.print(Panel("[bold]3. Policy Configuration[/bold]", border_style="yellow"))
+        console.print("[dim]Existing policies configuration found.[/dim]")
+        return
+
+    console.print(Panel("[bold]3. Policy Configuration[/bold]", border_style="yellow"))
+    console.print("Generating default RBAC policies...")
+    
+    default_policies = {
+        "admin": {
+            "description": "System Administrator",
+            "role": "admin",
+            "allowed_datasources": ["*"],
+            "allowed_tables": ["*"]
+        }
+    }
+    
+    with open(POLICIES_CONFIG, "w") as f:
+        # Use json dump
+        import json
+        json.dump(default_policies, f, indent=2)
+        
+    print_success(f"Created {POLICIES_CONFIG}")
 
 from rich.table import Table
 
@@ -25,19 +52,28 @@ def _configure_datasource():
         try:
              with open(DATASOURCE_CONFIG, "r") as f:
                 data = yaml.safe_load(f) or {}
+
+             # Handle V2 root
+             if isinstance(data, dict) and "datasources" in data:
+                 data = data["datasources"]
              
              table = Table(show_header=True, header_style="bold cyan", title="Existing Datasources", box=None)
              table.add_column("ID", style="cyan")
-             table.add_column("Engine", style="green")
-             table.add_column("Connection", style="dim")
+             table.add_column("Type", style="green")
+             table.add_column("Details", style="dim")
              
              # Support List or Dict
              if isinstance(data, list):
                  for d in data:
-                     table.add_row(d.get('id', 'unknown'), d.get('engine', '?'), d.get('connection_string', '***'))
+                     conn = d.get('connection', {})
+                     host = conn.get('host', 'local')
+                     user = conn.get('user', '')
+                     details = f"{user}@{host}" if user else host
+                     table.add_row(d.get('id', 'unknown'), d.get('type', d.get('engine', '?')), details)
              else:
+                 # Legacy dict support
                  for k, v in data.items():
-                     table.add_row(k, v.get('engine', '?'), v.get('connection_string', '***'))
+                     table.add_row(k, v.get('engine', '?'), "Legacy Config")
              
              console.print(table)
         except Exception:
@@ -50,15 +86,17 @@ def _configure_datasource():
     db_type = Prompt.ask("Select Database Type", choices=["postgres", "mysql", "mssql", "sqlite"], default="postgres")
     
     config_data = {}
+    profile = {}
     
     if db_type == "sqlite":
         db_path = Prompt.ask("Database Path", default="./my_database.db")
-        config_data = {
-            "my_sqlite_db": {
-                "engine": "sqlite",
-                "connection_string": f"sqlite:///{db_path}",
-                "description": "Main application database"
-            }
+        profile = {
+            "id": "my_sqlite_db",
+            "type": "sqlite",
+            "connection": {
+                "database": db_path
+            },
+            "description": "Main application database"
         }
     else:
         host = Prompt.ask("Host", default="localhost")
@@ -66,27 +104,43 @@ def _configure_datasource():
         default_ports = {"postgres": "5432", "mysql": "3306", "mssql": "1433"}
         port = Prompt.ask("Port", default=default_ports.get(db_type, "5432"))
         user = Prompt.ask("Username", default="postgres" if db_type == "postgres" else "root")
-        password = Prompt.ask("Password", password=True)
         dbname = Prompt.ask("Database Name")
         
-        # Construct SQLAlchemy URL
-        if db_type == "postgres":
-            url = f"postgresql://{user}:{password}@{host}:{port}/{dbname}"
-        elif db_type == "mysql":
-            url = f"mysql+pymysql://{user}:{password}@{host}:{port}/{dbname}"
-        elif db_type == "mssql":
-            url = f"mssql+pyodbc://{user}:{password}@{host}:{port}/{dbname}?driver=ODBC+Driver+17+for+SQL+Server"
+        # Password & Secrets
+        password = Prompt.ask("Password", password=True)
+        final_password = password
         
-        config_data = {
-            "main_db": {
-                "engine": db_type,
-                "connection_string": url,
-                "description": "Primary database"
-            }
+        if Confirm.ask("Secure this password with an Environment Variable?"):
+             env_var = Prompt.ask("Environment Variable Name", default="DB_PASSWORD")
+             final_password = f"${{env:{env_var}}}"
+             console.print(f"[dim]Will save as: {final_password}[/dim]")
+             os.environ[env_var] = password # Set it for current session so validation passes
+        
+        profile = {
+            "id": "main_db",
+            "type": db_type,
+            "connection": {
+                "host": host,
+                "port": int(port),
+                "user": user,
+                "password": final_password,
+                "database": dbname
+            },
+            "options": {} 
         }
+        
+        # Add driver for MSSQL default
+        if db_type == "mssql":
+            profile["connection"]["driver"] = "ODBC Driver 17 for SQL Server"
+
+    # Write V2 Structure
+    output_data = {
+        "version": 2,
+        "datasources": [profile]
+    }
 
     with open(DATASOURCE_CONFIG, "w") as f:
-        yaml.dump(config_data, f, sort_keys=False)
+        yaml.dump(output_data, f, sort_keys=False)
     
     print_success(f"Created {DATASOURCE_CONFIG}")
 
@@ -160,29 +214,37 @@ def _install_required_adapters():
         return
 
     try:
-        from nl2sql.datasources import load_profiles
+        from nl2sql.datasources import load_configs
         try:
-            profiles = load_profiles(DATASOURCE_CONFIG)
-            # profiles is Dict[str, DatasourceProfile]
-            profile_list = list(profiles.values())
+            # configs is List[Dict[str, Any]]
+            config_list = load_configs(DATASOURCE_CONFIG)
         except Exception:
+             # Fallback manual read
              with open(DATASOURCE_CONFIG, "r") as f:
                 data = yaml.safe_load(f)
              
              if isinstance(data, list):
-                 profile_list = data
+                 config_list = data
              elif isinstance(data, dict):
-                 profile_list = list(data.values())
+                 # Handle legacy root or datasources key
+                 if "datasources" in data:
+                     config_list = data["datasources"]
+                 else:
+                     config_list = list(data.values())
              else:
-                 profile_list = []
+                 config_list = []
 
         required_pkgs = set()
-        for profile in profile_list:
-            # profile might be a Dict (if raw yaml) or object (if loaded)
-            if hasattr(profile, "engine"):
-                engine = profile.engine.lower()
-            else:
-                engine = profile.get("engine", "").lower()
+        for config in config_list:
+            if not isinstance(config, dict):
+                continue
+                
+            # Extract engine/type
+            connection = config.get("connection", {})
+            engine = connection.get("type", "").lower()
+            
+            if not engine:
+                engine = config.get("type", "").lower()
 
             # Map engine to package
             for name, pkg in KNOWN_ADAPTERS.items():
@@ -214,29 +276,32 @@ def setup_command():
     
     # 2. LLM
     _configure_llm()
+
+    # 3. Policies
+    _configure_policies()
     
-    # 3. Adapters
+    # 4. Adapters
     _install_required_adapters()
 
-    # 4. Connectivity Check
+    # 5. Connectivity Check
     print_step("Checking Database Connectivity...")
     if not verify_connectivity(print_table=True):
         console.print("[yellow]Warning: Some datasources are failing validation.[/yellow]")
         if not Confirm.ask("Continue anyway?"):
             return
 
-    # 5. Indexing
+    # 6. Indexing
     console.print("")
     
     from nl2sql.services.vector_store import OrchestratorVectorStore
     from nl2sql.services.llm import LLMRegistry, load_llm_config
     from nl2sql.common.settings import settings
-    from nl2sql.datasources import load_profiles
+    from nl2sql.datasources import load_configs
     from nl2sql_cli.commands.indexing import run_indexing
     
     try:
         # Load configs to pass to indexing
-        profiles = load_profiles(pathlib.Path(settings.datasource_config_path))
+        configs = load_configs(pathlib.Path(settings.datasource_config_path))
         
         v_store = OrchestratorVectorStore(persist_directory=settings.vector_store_path)
         
@@ -257,7 +322,7 @@ def setup_command():
             except Exception:
                 llm_registry = None
 
-            run_indexing(profiles, settings.vector_store_path, v_store, llm_registry)
+            run_indexing(configs, settings.vector_store_path, v_store, llm_registry)
             print_success("Indexing process finished.")
             
     except Exception as e:

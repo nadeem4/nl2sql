@@ -77,31 +77,95 @@ This separation ensures that "Prompt Injection" attacks cannot easily force the 
 
 To prevent Denial of Service (DoS) attacks or run-away queries, the system implements resource safeguards in the `ExecutorNode`.
 
-* **Cost Estimation Safeguard**: Before execution, the system requests a cost estimate from the database adapter. If the estimated rows exceed `SAFEGUARD_ROW_LIMIT` (default: 10,000), execution is aborted with a `SAFEGUARD_VIOLATION`.
-* **Timeouts**: Datasource configurations (`datasources.yaml`) support `statement_timeout_ms` to kill long-running queries at the driver level.
+* **Cost Estimation Safeguard**: Before execution, the system requests a cost estimate from the database adapter. If the estimated rows exceed `row_limit` (configured in `datasources.yaml`, default: 1000), execution is aborted with a `SAFEGUARD_VIOLATION`.
+* **Timeouts**: Datasource configurations (`datasources.yaml`) support `statement_timeout_ms` to kill long-running queries at the driver level (Native enforcement for Postgres/MySQL).
+* **Payload Size Limit**: The system enforces a strict memory limit (`max_bytes`) on the serialized result set. If the data returned by the adapter exceeds this limit (default: 10MB), the execution is halted to prevent OOM (Out Of Memory) crashes.
 
-## 5. Deployment Security
+## 5. Secret Management
 
-* **Environment Variables**: Sensitive keys (like `OPENAI_API_KEY`) are loaded strictly from environment variables via `settings.py`, following 12-Factor App best practices. They are never hardcoded in the source.
-* **Docker Container**: The application runs in a containerized environment, isolating the runtime from the host system.
+The platform employs a **Pluggable Secret Management** system (`nl2sql.secrets`) to handle sensitive credentials securely.
 
-## 6. Configuration
+### Mechanism
 
-User roles and permissions are defined in `users.json` (pointed to by `USERS_CONFIG` setting).
+* **Configuration**: Secrets providers are defined in `secrets.yaml`.
+* **Template Hydration**: Secrets are referenced in other config files (like `datasources.yaml`) using the syntax `${provider_id:key}`.
+* **Resolution**: The `SecretManager` resolves these references *before* the configuration is parsed, ensuring that sensitive values are never hardcoded in YAML files or committed to version control.
 
-**Example Configuration**:
+### Providers
+
+The system supports extensible providers via the `SecretProvider` protocol. You configure them in `secrets.yaml` with a unique `id`.
+
+1. **Environment (`env`)**: Standard lookup (e.g., `${env:DB_PASS}`). Always available.
+2. **AWS Secrets Manager**: Defined by type `aws`. (e.g., `${aws-prod:db/pass}`).
+3. **Azure Key Vault**: Defined by type `azure`. (e.g., `${azure-main:db-secret}`).
+4. **HashiCorp Vault**: Defined by type `hashi`. (e.g., `${vault-internal:secret/data/db:pass}`).
+
+**Dependencies**: Cloud providers require optional extras (`nl2sql-core[aws]`, `nl2sql-core[azure]`, etc.) to keep the core lightweight.
+
+## 6. Configuration Security
+
+### Strict Validation (V3)
+
+Datasource configurations are validated strictly at load time. This ensures:
+
+* **Type Safety**: Malformed integers or booleans are rejected.
+* **Field Constraints**: Unknown fields are forbidden, preventing "config injection" or typos.
+* **Sanitization**: Passwords and sensitive fields are masked in logs.
+* **Adapter Specifics**: Each adapter (e.g., `PostgresAdapter`) defines and validates its own configuration schema requirements.
+
+### 6.1 Policy Definition (`configs/policies.json`)
+
+The application uses **Role-Based Access Control (RBAC)**. The `policies.json` file defines policies keyed by **Role ID** (e.g., `admin`, `analyst`).
+
+**Strict Namespacing Rule**: To prevent namespace collisions, `allowed_tables` MUST use the format `datasource_id.table_name`. Simple table names are not supported.
+
+#### Example
 
 ```json
 {
-  "guest": {
-    "role": "guest",
-    "allowed_datasources": ["public_data"],
-    "allowed_tables": ["products", "store_locations"]
+  "sales_analyst": {
+    "description": "Access to Sales DB only",
+    "role": "analyst",
+    "allowed_datasources": ["sales_db"],
+    "allowed_tables": [
+      // Exact Match
+      "sales_db.orders",
+      
+      // Datasource Wildcard
+      "sales_db.customers_*"
+    ]
   },
   "admin": {
+    "description": "Super Admin",
     "role": "admin",
-    "allowed_datasources": ["*"],
     "allowed_tables": ["*"]
   }
 }
 ```
+
+In CLI execution: `nl2sql run ... --role sales_analyst`.
+The application assumes the identity provider has already authenticated the user and assigned this role.
+
+### 6.2 Policy Schema & Validation
+
+Policies are treated as **Configuration Code**. To prevent misconfiguration (e.g., typos, invalid types), the system validates `policies.json` against a strict **Pydantic Schema** at startup.
+
+**Schema (`nl2sql.security.policies`)**:
+
+1. **Strict Typing**: Fields like `allowed_datasources` MUST be lists of strings.
+2. **Syntax Enforcement**: `allowed_tables` values are validated ensuring they match the `datasource_id.table_name` or wildcard format.
+3. **Fail Fast**: If the configuration is invalid, the application refuses to start, printing a clear error message describing the violation.
+
+### 6.3 Policy Management CLI
+
+You can validate your policy file without running a query using the CLI.
+
+```bash
+# Validate Syntax & Integrity
+nl2sql policy validate
+```
+
+This command performs two checks:
+
+1. **Schema Check**: Validates syntax against the Pydantic model.
+2. **Integrity Check**: Verifies that referenced `datasources` and `tables` actually exist in `datasources.yaml`. Users often typo table names; this catches those errors before runtime.

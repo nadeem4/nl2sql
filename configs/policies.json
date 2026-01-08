@@ -1,0 +1,59 @@
+{
+  "admin": {
+    "description": "System Administrator",
+    "role": "admin",
+    "allowed_datasources": [
+      "*"
+    ],
+    "allowed_tables": [
+      "*"
+    ]
+  },
+  "ops_manager": {
+    "description": "Operations Manager",
+    "role": "manager",
+    "allowed_datasources": [
+      "manufacturing_ops",
+      "manufacturing_ref"
+    ],
+    "allowed_tables": [
+      "manufacturing_ops.employees",
+      "manufacturing_ops.machines",
+      "manufacturing_ops.maintenance_logs",
+      "manufacturing_ops.spare_parts",
+      "manufacturing_ref.factories",
+      "manufacturing_ref.machine_types",
+      "manufacturing_ref.shifts"
+    ]
+  },
+  "sales_analyst": {
+    "description": "Sales & Supply Chain Analyst",
+    "role": "analyst",
+    "allowed_datasources": [
+      "manufacturing_history",
+      "manufacturing_supply"
+    ],
+    "allowed_tables": [
+      "manufacturing_history.customers",
+      "manufacturing_history.sales_orders",
+      "manufacturing_history.sales_order_items",
+      "manufacturing_history.production_runs",
+      "manufacturing_history.defects",
+      "manufacturing_supply.products",
+      "manufacturing_supply.inventory",
+      "manufacturing_supply.suppliers",
+      "manufacturing_supply.purchase_orders",
+      "manufacturing_supply.purchase_order_items"
+    ]
+  },
+  "guest": {
+    "description": "Guest User",
+    "role": "guest",
+    "allowed_datasources": [
+      "manufacturing_supply"
+    ],
+    "allowed_tables": [
+      "manufacturing_supply.products"
+    ]
+  }
+}

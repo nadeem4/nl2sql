@@ -76,14 +76,6 @@ class PlannerNode:
             if state.errors:
                 feedback = "\n".join(e.model_dump_json(indent=2) for e in state.errors)
 
-            date_format = "ISO 8601 (YYYY-MM-DD)"
-            try:
-                if state.selected_datasource_id:
-                    profile = self.registry.get_profile(state.selected_datasource_id)
-                    date_format = profile.date_format
-            except Exception as e:
-                logger.debug(f"Failed to fetch datasource profile: {e}")
-
             semantic_context = (
                 state.semantic_analysis.model_dump_json(indent=2)
                 if state.semantic_analysis
@@ -96,7 +88,7 @@ class PlannerNode:
                     "examples": PLANNER_EXAMPLES,
                     "feedback": feedback,
                     "user_query": state.user_query,
-                    "date_format": date_format,
+                    # date_format removed
                     "semantic_context": semantic_context,
                 }
             )

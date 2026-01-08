@@ -1,67 +1,56 @@
-- id: manufacturing_ref
-  description: "Reference data including factories, shifts, and machine types."
-  engine: sqlite
-  sqlalchemy_url: sqlite:///data/manufacturing.db
-  auth: null
-  read_only_role: null
-  statement_timeout_ms: 8000
-  row_limit: 100
-  max_bytes: 10485760
-  tags: {env: dev, domain: reference}
-  feature_flags:
-    allow_generate_writes: false
-    allow_cross_db: true
-    supports_dry_run: false
-    supports_estimated_cost: false
-    sample_rows_enabled: true
+# yaml-language-server: $schema=./datasources.schema.json
 
-- id: manufacturing_ops
-  description: "Operations data including machines, maintenance logs, employees, and spare parts."
-  engine: postgres
-  sqlalchemy_url: postgresql+psycopg2://user:password@localhost:5432/manufacturing_ops
-  auth: null
-  read_only_role: null
-  statement_timeout_ms: 8000
-  row_limit: 100
-  max_bytes: 10485760
-  tags: {env: dev, domain: operations}
-  feature_flags:
-    allow_generate_writes: false
-    allow_cross_db: true
-    supports_dry_run: true
-    supports_estimated_cost: true
-    sample_rows_enabled: true
+version: 2
+datasources:
+  - id: manufacturing_ref
+    description: "Reference data including factories, shifts, and machine types."
+    connection:
+      type: sqlite
+      database: "data/manufacturing.db"
+    statement_timeout_ms: 8000
+    row_limit: 100
+    max_bytes: 10485760
+    tags: {env: dev, domain: reference}
 
-- id: manufacturing_supply
-  description: "Supply chain data including products, inventory, suppliers, and purchase orders."
-  engine: mysql
-  sqlalchemy_url: mysql+pymysql://user:password@localhost:3306/manufacturing_supply
-  auth: null
-  read_only_role: null
-  statement_timeout_ms: 8000
-  row_limit: 100
-  max_bytes: 10485760
-  tags: {env: dev, domain: supply_chain}
-  feature_flags:
-    allow_generate_writes: false
-    allow_cross_db: true
-    supports_dry_run: false
-    supports_estimated_cost: false
-    sample_rows_enabled: true
+  - id: manufacturing_ops
+    description: "Operations data including machines, maintenance logs, employees, and spare parts."
+    connection:
+      type: postgres
+      host: localhost
+      port: 5432
+      user: "${env:POSTGRES_USER}"
+      password: "${env:POSTGRES_PASSWORD}"
+      database: manufacturing_ops
+    statement_timeout_ms: 8000
+    row_limit: 100
+    max_bytes: 10485760
+    tags: {env: dev, domain: operations}
 
-- id: manufacturing_history
-  description: "Historical data including production runs, defects, customers, and sales orders."
-  engine: mssql
-  sqlalchemy_url: "mssql+pyodbc://sa:StrongPass2023!@127.0.0.1:1433/manufacturing_history?driver=ODBC+Driver+17+for+SQL+Server&TrustServerCertificate=yes"
-  auth: null
-  read_only_role: null
-  statement_timeout_ms: 8000
-  row_limit: 100
-  max_bytes: 10485760
-  tags: {env: dev, domain: history}
-  feature_flags:
-    allow_generate_writes: false
-    allow_cross_db: true
-    supports_dry_run: false
-    supports_estimated_cost: false
-    sample_rows_enabled: true
+  - id: manufacturing_supply
+    description: "Supply chain data including products, inventory, suppliers, and purchase orders."
+    connection:
+      type: mysql
+      host: localhost
+      port: 3306
+      user: "${env:MYSQL_USER}"
+      password: "${env:MYSQL_PASSWORD}"
+      database: manufacturing_supply
+    statement_timeout_ms: 8000
+    row_limit: 100
+    max_bytes: 10485760
+    tags: {env: dev, domain: supply_chain}
+
+  - id: manufacturing_history
+    description: "Historical data including production runs, defects, customers, and sales orders."
+    connection:
+      type: mssql
+      host: 127.0.0.1
+      port: 1433
+      user: "${env:MSSQL_USER}"
+      password: "${env:MSSQL_PASSWORD}"
+      database: manufacturing_history
+      driver: "ODBC Driver 17 for SQL Server"
+    statement_timeout_ms: 8000
+    row_limit: 100
+    max_bytes: 10485760
+    tags: {env: dev, domain: history}
