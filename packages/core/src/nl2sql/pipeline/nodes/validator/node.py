@@ -218,22 +218,47 @@ class LogicalValidatorNode:
         user_ctx = state.user_context or {}
         allowed_tables = user_ctx.get("allowed_tables", [])
         role = user_ctx.get("role", "unknown")
+        
+        # Resolve Datasource ID for Namespacing
+        ds_id = state.selected_datasource_id
+        if not ds_id:
+             # Fail Closed if we don't know the datasource (cannot enforce namespace)
+             return [
+                 PipelineError(
+                    node="logical_validator",
+                    message="Security Enforcement Failed: No 'selected_datasource_id' in state.",
+                    severity=ErrorSeverity.CRITICAL,
+                    error_code=ErrorCode.SECURITY_VIOLATION
+                 )
+             ]
 
-        logger.debug("Policy validation context: %s", user_ctx)
+        logger.debug("Policy validation context: Role=%s, Allowed=%s", role, allowed_tables)
 
         if "*" in allowed_tables:
             return []
 
         for t in plan.tables:
-            if t.name not in allowed_tables:
-                errors.append(
-                    PipelineError(
-                        node="logical_validator",
-                        message=f"Role '{role}' not authorized to access '{t.name}'.",
-                        severity=ErrorSeverity.CRITICAL,
-                        error_code=ErrorCode.SECURITY_VIOLATION,
-                    )
+            # STRICT Namespacing Logic
+            namespaced_name = f"{ds_id}.{t.name}"
+            ds_wildcard = f"{ds_id}.*"
+            
+            # Check 1: Exact Match (e.g. "sales_db.orders")
+            if namespaced_name in allowed_tables:
+                continue
+                
+            # Check 2: Datasource Wildcard (e.g. "sales_db.*")
+            if ds_wildcard in allowed_tables:
+                continue
+                
+            # If no match -> Violation
+            errors.append(
+                PipelineError(
+                    node="logical_validator",
+                    message=f"Role '{role}' denied access to '{namespaced_name}'. Policy requires explicit 'datasource.table' allow.",
+                    severity=ErrorSeverity.CRITICAL,
+                    error_code=ErrorCode.SECURITY_VIOLATION,
                 )
+            )
 
         return errors
 

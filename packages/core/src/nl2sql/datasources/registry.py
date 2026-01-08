@@ -99,3 +99,7 @@ class DatasourceRegistry:
     def list_adapters(self) -> List[DatasourceAdapter]:
         """Returns a list of all registered adapters."""
         return list(self._adapters.values())
+
+    def list_ids(self) -> List[str]:
+        """Returns a list of all registered datasource IDs."""
+        return list(self._adapters.keys())

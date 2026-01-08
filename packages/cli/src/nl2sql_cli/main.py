@@ -24,6 +24,7 @@ from nl2sql_cli.commands.info import list_available_adapters
 from nl2sql_cli.commands.doctor import doctor_command
 from nl2sql_cli.commands.setup import setup_command
 from nl2sql_cli.commands.install import install_command
+from nl2sql_cli.commands.policy import app as policy_app
 from nl2sql_cli.types import RunConfig, BenchmarkConfig
 
 app = typer.Typer(
@@ -32,6 +33,8 @@ app = typer.Typer(
     no_args_is_help=True,
     add_completion=False,
 )
+
+app.add_typer(policy_app, name="policy", help="Manage RBAC policies and security.")
 
 # Shared Options
 # Shared Options
@@ -49,7 +52,7 @@ def run(
     id: Annotated[Optional[str], typer.Option(help="Target specific datasource ID")] = None,
     llm_config: LLMConfigOption = pathlib.Path(settings.llm_config_path),
     vector_store: VectorStoreOption = settings.vector_store_path,
-    user: Annotated[str, typer.Option(help="User persona for AuthZ")] = "admin",
+    role: Annotated[str, typer.Option(help="Role ID for RBAC policies")] = "admin",
     no_exec: Annotated[bool, typer.Option("--no-exec", help="Skip execution (plan & validate only)")] = False,
     verbose: Annotated[bool, typer.Option("--verbose", "-v", help="Show detailed reasoning")] = False,
     show_perf: Annotated[bool, typer.Option("--show-perf", help="Show performance metrics")] = False,
@@ -61,7 +64,7 @@ def run(
         query=query,
         config_path=config,
         datasource_id=id,
-        user=user,
+        role=role,
         no_exec=no_exec,
         verbose=verbose,
         show_perf=show_perf,

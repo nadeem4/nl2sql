@@ -172,7 +172,7 @@ You can configure the application using the following environment variables (def
 | `DATASOURCE_CONFIG` | `configs/datasources.yaml` | Path to the datasource configuration file. |
 | `SECRETS_CONFIG` | `configs/secrets.yaml` | Path to the secrets configuration file. |
 | `LLM_CONFIG` | `configs/llm.yaml` | Path to the LLM model configuration file. |
-| `USERS_CONFIG` | `users.json` | Path to the user permissions file. |
+| `POLICIES_CONFIG` | `configs/policies.json` | Path to the RBAC policies file. |
 | `VECTOR_STORE` | `./chroma_db` | Path (directory) to persist the vector store. |
 | `EMBEDDING_MODEL` | `text-embedding-3-small` | OpenAI embedding model name. |
 | `BENCHMARK_CONFIG` | `configs/benchmark_suite.yaml` | Path to accurate testing suite configuration. |

@@ -11,11 +11,38 @@ from nl2sql_cli.checks import check_package, verify_connectivity
 CONFIG_DIR = pathlib.Path("configs")
 DATASOURCE_CONFIG = CONFIG_DIR / "datasources.yaml"
 LLM_CONFIG = CONFIG_DIR / "llm.yaml"
+POLICIES_CONFIG = CONFIG_DIR / "policies.json"
 
 def _ensure_directories():
     if not CONFIG_DIR.exists():
         CONFIG_DIR.mkdir(parents=True, exist_ok=True)
         console.print("[dim]Created configs directory.[/dim]")
+
+def _configure_policies():
+    """Generates a default policies.json if missing."""
+    if POLICIES_CONFIG.exists():
+        console.print(Panel("[bold]3. Policy Configuration[/bold]", border_style="yellow"))
+        console.print("[dim]Existing policies configuration found.[/dim]")
+        return
+
+    console.print(Panel("[bold]3. Policy Configuration[/bold]", border_style="yellow"))
+    console.print("Generating default RBAC policies...")
+    
+    default_policies = {
+        "admin": {
+            "description": "System Administrator",
+            "role": "admin",
+            "allowed_datasources": ["*"],
+            "allowed_tables": ["*"]
+        }
+    }
+    
+    with open(POLICIES_CONFIG, "w") as f:
+        # Use json dump
+        import json
+        json.dump(default_policies, f, indent=2)
+        
+    print_success(f"Created {POLICIES_CONFIG}")
 
 from rich.table import Table
 
@@ -249,18 +276,21 @@ def setup_command():
     
     # 2. LLM
     _configure_llm()
+
+    # 3. Policies
+    _configure_policies()
     
-    # 3. Adapters
+    # 4. Adapters
     _install_required_adapters()
 
-    # 4. Connectivity Check
+    # 5. Connectivity Check
     print_step("Checking Database Connectivity...")
     if not verify_connectivity(print_table=True):
         console.print("[yellow]Warning: Some datasources are failing validation.[/yellow]")
         if not Confirm.ask("Continue anyway?"):
             return
 
-    # 5. Indexing
+    # 6. Indexing
     console.print("")
     
     from nl2sql.services.vector_store import OrchestratorVectorStore

@@ -106,29 +106,66 @@ The system supports extensible providers via the `SecretProvider` protocol. You 
 
 ### Strict Validation (V3)
 
-Datasource configurations are validated using Pydantic V3 models (`DatasourceProfile`). This ensures:
+Datasource configurations are validated strictly at load time. This ensures:
 
 * **Type Safety**: Malformed integers or booleans are rejected.
 * **Field Constraints**: Unknown fields are forbidden, preventing "config injection" or typos.
-* **Sanitization**: Passwords and sensitive fields are masked in logs (via `__repr__` overrides).
+* **Sanitization**: Passwords and sensitive fields are masked in logs.
+* **Adapter Specifics**: Each adapter (e.g., `PostgresAdapter`) defines and validates its own configuration schema requirements.
 
-### User Authorization Config
+### 6.1 Policy Definition (`configs/policies.json`)
 
-User roles and permissions are defined in `users.json` (pointed to by `USERS_CONFIG` setting).
+The application uses **Role-Based Access Control (RBAC)**. The `policies.json` file defines policies keyed by **Role ID** (e.g., `admin`, `analyst`).
 
-**Example Configuration**:
+**Strict Namespacing Rule**: To prevent namespace collisions, `allowed_tables` MUST use the format `datasource_id.table_name`. Simple table names are not supported.
+
+#### Example
 
 ```json
 {
-  "guest": {
-    "role": "guest",
-    "allowed_datasources": ["public_data"],
-    "allowed_tables": ["products", "store_locations"]
+  "sales_analyst": {
+    "description": "Access to Sales DB only",
+    "role": "analyst",
+    "allowed_datasources": ["sales_db"],
+    "allowed_tables": [
+      // Exact Match
+      "sales_db.orders",
+      
+      // Datasource Wildcard
+      "sales_db.customers_*"
+    ]
   },
   "admin": {
+    "description": "Super Admin",
     "role": "admin",
-    "allowed_datasources": ["*"],
     "allowed_tables": ["*"]
   }
 }
 ```
+
+In CLI execution: `nl2sql run ... --role sales_analyst`.
+The application assumes the identity provider has already authenticated the user and assigned this role.
+
+### 6.2 Policy Schema & Validation
+
+Policies are treated as **Configuration Code**. To prevent misconfiguration (e.g., typos, invalid types), the system validates `policies.json` against a strict **Pydantic Schema** at startup.
+
+**Schema (`nl2sql.security.policies`)**:
+
+1. **Strict Typing**: Fields like `allowed_datasources` MUST be lists of strings.
+2. **Syntax Enforcement**: `allowed_tables` values are validated ensuring they match the `datasource_id.table_name` or wildcard format.
+3. **Fail Fast**: If the configuration is invalid, the application refuses to start, printing a clear error message describing the violation.
+
+### 6.3 Policy Management CLI
+
+You can validate your policy file without running a query using the CLI.
+
+```bash
+# Validate Syntax & Integrity
+nl2sql policy validate
+```
+
+This command performs two checks:
+
+1. **Schema Check**: Validates syntax against the Pydantic model.
+2. **Integrity Check**: Verifies that referenced `datasources` and `tables` actually exist in `datasources.yaml`. Users often typo table names; this catches those errors before runtime.
