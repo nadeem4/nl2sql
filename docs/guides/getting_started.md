@@ -52,3 +52,10 @@ The system will:
 2. Route it to the correct database.
 3. Generate and Validate SQL.
 4. Execute and display the results.
+
+## Next Steps
+
+Explore the full capabilities of the CLI:
+
+* [CLI Reference](cli_reference.md) - Learn about `--env`, `--role`, and `index` options.
+* [Configuration](configuration.md) - Connect to your own databases.
