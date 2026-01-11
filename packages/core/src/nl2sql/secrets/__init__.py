@@ -1,9 +1,6 @@
 from .manager import secret_manager, SecretManager
 from .interfaces import SecretProvider
 
-
-# Auto-register available cloud providers
-from .config import load_secret_configs
 from pathlib import Path
 import os
 import logging

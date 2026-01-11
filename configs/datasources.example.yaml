@@ -1,6 +1,4 @@
-# yaml-language-server: $schema=./datasources.schema.json
-
-version: 2
+version: 1
 datasources:
   - id: manufacturing_ref
     description: "Reference data including factories, shifts, and machine types."

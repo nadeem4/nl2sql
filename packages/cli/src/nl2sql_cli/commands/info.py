@@ -2,6 +2,9 @@ from rich.console import Console
 from rich.table import Table
 from nl2sql.datasources.discovery import discover_adapters
 
+from nl2sql_cli.common.decorators import handle_cli_errors
+
+@handle_cli_errors
 def list_available_adapters() -> None:
     """Discovers and displays all installed Datasource Adapters."""
     console = Console()

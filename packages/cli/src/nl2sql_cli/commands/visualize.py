@@ -2,6 +2,9 @@ from typing import List, Dict, Any
 from langgraph.graph.state import CompiledStateGraph
 from nl2sql.reporting import ConsolePresenter
 
+from nl2sql_cli.common.decorators import handle_cli_errors
+
+@handle_cli_errors
 def draw_execution_trace(
     trace: List[Dict[str, Any]], 
     graph: CompiledStateGraph, 

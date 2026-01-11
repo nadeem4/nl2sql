@@ -6,6 +6,9 @@ from nl2sql_cli.console import console, print_success, print_error
 from nl2sql_cli.config import KNOWN_ADAPTERS
 from nl2sql_cli.checks import check_package, verify_connectivity
 
+from nl2sql_cli.common.decorators import handle_cli_errors
+
+@handle_cli_errors
 def doctor_command():
     console.print(Panel("[bold cyan]NL2SQL Doctor[/bold cyan]"))
 

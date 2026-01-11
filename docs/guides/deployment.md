@@ -16,7 +16,7 @@ graph TD
 
 ## Docker Compose
 
-We provide a production-ready `docker-compose.yml`.
+Here is an example `docker-compose.yml` for deploying the API service:
 
 ```yaml
 version: '3.8'

@@ -15,7 +15,7 @@ def print_step(message: str) -> None:
     console.print(f"[bold blue]Step:[/bold blue] {message}")
 
 def print_success(message: str) -> None:
-    console.print(f"[success]✔ {message}[/success]")
+    console.print(f"[success][OK] {message}[/success]")
 
 def print_error(message: str) -> None:
-    console.print(f"[error]✘ {message}[/error]")
+    console.print(f"[error][ERROR] {message}[/error]")

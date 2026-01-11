@@ -4,6 +4,9 @@ from nl2sql.reporting import ConsolePresenter
 from nl2sql.services.vector_store import OrchestratorVectorStore
 from nl2sql.datasources import DatasourceRegistry
 
+from nl2sql_cli.common.decorators import handle_cli_errors
+
+@handle_cli_errors
 def run_indexing(
     configs: Any, # List[Dict[str, Any]]
     vector_store_path: str, 
@@ -20,7 +23,7 @@ def run_indexing(
     4. Displays a comprehensive summary table of indexed content.
 
     Args:
-        configs (List[Dict[str, Any]]): List of datasource configuration dicts.
+        configs (List[Any]): List of datasource configuration objects.
         vector_store_path (str): Path to the vector store directory.
         vector_store (OrchestratorVectorStore): The initialized vector store instance.
         llm_registry (Any, optional): Registry of LLMs used for semantic enrichment of examples.
@@ -34,7 +37,7 @@ def run_indexing(
 
     with presenter.console.status("[bold cyan]Clearing existing data...[/bold cyan]"):
         vector_store.clear()
-    presenter.print_step("[green]✔[/green] Cleared existing data.")
+    presenter.print_step("[green][OK][/green] Cleared existing data.")
 
     presenter.console.print("\n[bold]Indexing Schemas...[/bold]")
     for adapter in adapters:
@@ -48,10 +51,10 @@ def run_indexing(
                 
                 t_count = schema_stats['tables']
                 c_count = schema_stats['columns']
-                presenter.console.print(f"  [green]✔[/green] {ds_id} [dim]({t_count} Tables, {c_count} Columns)[/dim]")
+                presenter.console.print(f"  [green][OK][/green] {ds_id} [dim]({t_count} Tables, {c_count} Columns)[/dim]")
                 
             except Exception as e:
-                presenter.console.print(f"  [red]✘[/red] {ds_id} [red]Failed: {e}[/red]")
+                presenter.console.print(f"  [red][FAIL][/red] {ds_id} [red]Failed: {e}[/red]")
                 stats.append({'id': ds_id, 'tables': 0, 'columns': 0, 'examples': 0, 'error': str(e)})
 
     from nl2sql.common.settings import settings
@@ -70,7 +73,6 @@ def run_indexing(
             def get_stat_entry(ds_id):
                 for s in stats:
                     if s['id'] == ds_id: return s
-                # Create if not exists (e.g. schema failed but examples exist? unlikely but safe)
                 new_s = {'id': ds_id, 'tables': 0, 'columns': 0, 'examples': 0}
                 stats.append(new_s)
                 return new_s
@@ -83,7 +85,7 @@ def run_indexing(
                 except Exception as e:
                     presenter.print_warning(f"Could not load SemanticNode: {e}")
             else:
-                 presenter.console.print("  [yellow]![/yellow] [dim]Skipping enrichment (No LLM config)[/dim]")
+                presenter.console.print("  [yellow]![/yellow] [dim]Skipping enrichment (No LLM config)[/dim]")
 
             for ds_id, questions in examples_data.items():
                 with presenter.console.status(f"[cyan]Indexing examples for {ds_id}...[/cyan]"):
@@ -98,13 +100,13 @@ def run_indexing(
                         entry = get_stat_entry(ds_id)
                         entry['examples'] = count
                         
-                        presenter.console.print(f"  [green]✔[/green] {ds_id} [dim]({count} examples)[/dim]")
+                        presenter.console.print(f"  [green][OK][/green] {ds_id} [dim]({count} examples)[/dim]")
                         
                     except Exception as e:
-                        presenter.console.print(f"  [red]✘[/red] {ds_id} [red]Failed: {e}[/red]")
+                        presenter.console.print(f"  [red][FAIL][/red] {ds_id} [red]Failed: {e}[/red]")
                         
         except Exception as e:
-             presenter.console.print(f"  [red]✘[/red] Failed to load {path}: {e}")
+             presenter.console.print(f"  [red][FAIL][/red] Failed to load {path}: {e}")
     else:
         presenter.console.print(f"  [yellow]![/yellow] [dim]No examples file found at {path}[/dim]")
             
