@@ -144,11 +144,15 @@ GOLDENS = [
 ]
 
 
-from nl2sql.datasources import load_configs, DatasourceRegistry
+from nl2sql.configs import ConfigManager
+from nl2sql.datasources import DatasourceRegistry
 
 @pytest.fixture(scope="session")
 def registry():
-    configs = load_configs(ROOT / "configs" / "datasources.yaml")
+    cm = ConfigManager()
+    repo_root = ROOT.parents[1]
+    config_path = repo_root / "configs" / "datasources.example.yaml"
+    configs = cm.load_datasources(config_path)
     return DatasourceRegistry(configs)
 
 @pytest.fixture(scope="session")

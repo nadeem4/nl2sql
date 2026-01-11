@@ -2,7 +2,7 @@ import pathlib
 import os
 import pytest
 from unittest.mock import MagicMock, patch
-from nl2sql.datasources.config import load_configs
+from nl2sql.configs import ConfigManager
 from nl2sql.datasources.registry import DatasourceRegistry
 from nl2sql_adapter_sdk import DatasourceAdapter
 
@@ -62,26 +62,29 @@ def test_load_configs_success(mock_path):
           type: "sqlite"
     """
     
-    configs = load_configs(mock_path)
+    manager = ConfigManager()
+    configs = manager.load_datasources(mock_path)
     
     assert isinstance(configs, list)
     assert len(configs) == 1
-    assert configs[0]["id"] == "test_ds"
+    assert configs[0].id == "test_ds"
 
 def test_load_configs_file_not_found(mock_path):
     """Verifies that load_configs raises FileNotFoundError when path is invalid."""
     mock_path.exists.return_value = False
     
+    manager = ConfigManager()
     with pytest.raises(FileNotFoundError):
-        load_configs(mock_path)
+        manager.load_datasources(mock_path)
 
 def test_load_configs_invalid_structure(mock_path):
     """Verifies that load_configs raises ValueError if YAML structure is incorrect."""
     mock_path.exists.return_value = True
     mock_path.read_text.return_value = "invalid_key: value"
     
+    manager = ConfigManager()
     with pytest.raises(ValueError):
-        load_configs(mock_path)
+        manager.load_datasources(mock_path)
 
 def test_registry_resolves_env_secrets():
     """Verifies that DatasourceRegistry resolves ${env:VAR} secrets during initialization."""
@@ -130,7 +133,7 @@ def test_registry_missing_secret_error():
     with patch("nl2sql.datasources.registry.discover_adapters", return_value={"mock_db": MockAdapter}):
         with pytest.raises(ValueError) as exc:
             DatasourceRegistry([config])
-        assert "Secret not found: env:MISSING_VAR" in str(exc.value)
+        assert "Secret not found: ${env:MISSING_VAR}" in str(exc.value)
 
 def test_registry_init_success():
     """Verifies successful adapter initialization with all configuration parameters."""

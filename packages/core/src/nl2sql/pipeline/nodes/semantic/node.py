@@ -49,7 +49,6 @@ class SemanticAnalysisNode:
             return self.chain.invoke({"user_query": query})
         except Exception as e:
             logger.error(f"Semantic Analysis failed: {e}")
-            # Fallback for resilience
             return SemanticAnalysisResponse(
                 canonical_query=query,
                 thought_process="Analysis failed, returning raw query.",

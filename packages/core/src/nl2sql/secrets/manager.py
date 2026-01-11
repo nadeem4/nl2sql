@@ -5,7 +5,7 @@ import re
 from typing import Optional, Dict, Type, List, Any
 from .interfaces import SecretProvider
 from .providers.env import EnvironmentSecretProvider
-from .schemas import SecretProviderConfig
+from nl2sql.configs.secrets import SecretProviderConfig
 import logging
 
 logger = logging.getLogger(__name__)
@@ -81,5 +81,43 @@ class SecretManager:
             return val
         
         raise ValueError(f"Secret not found: {secret_ref}")
+
+    def resolve_object(self, obj: Any) -> Any:
+        """
+        Recursively resolves secret references in a generic object (Pydantic model, dict, list, str).
+        Returns a new object with secrets resolved.
+        """
+        from pydantic import BaseModel
+
+        # Base case: String
+        if isinstance(obj, str):
+            if obj.startswith("${") and obj.endswith("}"):
+                return self.resolve(obj)
+            return obj
+        
+        # Pydantic Model
+        if isinstance(obj, BaseModel):
+            # Recursively resolve fields
+            updates = {}
+            for field_name in obj.model_fields.keys():
+                val = getattr(obj, field_name)
+                resolved = self.resolve_object(val)
+                # Only update if changed (optimization)
+                if resolved != val:
+                    updates[field_name] = resolved
+            
+            if updates:
+                return obj.model_copy(update=updates)
+            return obj
+            
+        # Lists
+        if isinstance(obj, list):
+            return [self.resolve_object(item) for item in obj]
+            
+        # Dicts
+        if isinstance(obj, dict):
+             return {k: self.resolve_object(v) for k, v in obj.items()}
+             
+        return obj
 
 secret_manager = SecretManager()

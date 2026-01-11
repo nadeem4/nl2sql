@@ -8,19 +8,47 @@ from nl2sql_adapter_sdk import (
 )
 from nl2sql_sqlalchemy_adapter import BaseSQLAlchemyAdapter
 
+from pydantic import BaseModel, Field
+from typing import Optional
+
+class PostgresConnectionConfig(BaseModel):
+    """Strict configuration schema for Postgres adapter."""
+    type: str
+    host: str = Field(..., description="Postgres server hostname")
+    user: str = Field(..., description="Username")
+    password: str = Field(..., description="Password")
+    port: int = 5432
+    database: str = Field(..., description="Database name")
+    options: Dict[str, Any] = Field(default_factory=dict)
+    
+    # Allow extra fields (handled by Base/Registry, but ignored here unless mapped)
+    model_config = {"extra": "ignore"}
+
 class PostgresAdapter(BaseSQLAlchemyAdapter):
 
     def construct_uri(self, args: Dict[str, Any]) -> str:
-        user = args.get("user", "")
-        password = args.get("password", "")
-        host = args.get("host", "localhost")
-        port = args.get("port", "")
-        database = args.get("database", "")
+        """Constructs the Postgres connection URI.
+
+        Args:
+            args: The raw connection arguments dictionary.
+
+        Returns:
+            str: The fully constructed SQLAlchemy connection URI.
         
-        options = args.get("options", {}).copy()
+        Raises:
+            ValidationError: If the configuration is invalid.
+        """
+        config = PostgresConnectionConfig(**args)
+        
+        user = config.user
+        password = config.password
+        host = config.host
+        port = config.port
+        database = config.database
+        options = config.options.copy()
         
         creds = f"{user}:{password}@" if user or password else ""
-        netloc = f"{host}:{port}" if port else host
+        netloc = f"{host}:{port}"
         
         query_str = ""
         if options:

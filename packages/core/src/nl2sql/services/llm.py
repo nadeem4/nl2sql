@@ -38,51 +38,37 @@ def get_usage_summary() -> Dict[str, Dict[str, int]]:
 LLMCallable = Callable[[str], str]
 
 
-@dataclasses.dataclass
-class AgentConfig:
-    """Configuration for a specific agent's LLM."""
-    provider: str
-    model: str
-    temperature: float = 0
-    api_key: Optional[str] = None
+from nl2sql.configs import LLMFileConfig, AgentConfig
 
-
-@dataclasses.dataclass
-class LLMConfig:
-    """Global LLM configuration."""
-    default: AgentConfig
-    agents: Dict[str, AgentConfig]
-
-
-def parse_llm_config(data: Dict) -> LLMConfig:
+def parse_llm_config(data: Dict) -> LLMFileConfig:
     """
-    Parses raw dictionary configuration into LLMConfig.
+    Parses raw dictionary configuration into LLMFileConfig using Pydantic.
 
     Args:
         data: Raw configuration dictionary.
 
     Returns:
-        LLMConfig object.
+        LLMFileConfig object.
     """
-    default_cfg = data.get("default", {})
-    agents_cfg = data.get("agents", {})
+    try:
+        return LLMFileConfig.model_validate(data)
+    except Exception as e:
+        # Fallback for older flat structure if necessary or just re-raise
+        # Attempt to reconstruct if 'default' key is missing but likely 
+        # the Pydantic model structure should match the YAML 1:1.
+        # If the input is raw dict from legacy parse, we might need to map it.
+        # But ConfigManager takes care of loading YAML. `parse_llm_config` is mostly used for testing or manual dicts.
+        
+        # Backward compat for legacy 'parse_llm_config' internal logic if mostly used for transformation:
+        # Pydantic's model_validate handles strict structure. 
+        # If existing code calls this with flat dicts, we might need manual mapping.
+        # But looking at previous code, it constructed AgentConfig manually.
+        
+        # Let's trust Pydantic validation here.
+        raise ValueError(f"Invalid LLM Config: {e}")
 
-    def to_agent(cfg: Dict, fallback: Dict) -> AgentConfig:
-        return AgentConfig(
-            provider=cfg.get("provider", fallback.get("provider", "openai")),
-            model=cfg.get("model", fallback.get("model", "gpt-4o-mini")),
-            temperature=float(cfg.get("temperature", fallback.get("temperature", 0))),
-            api_key=cfg.get("api_key", fallback.get("api_key")),
-        )
 
-    default = to_agent(default_cfg, {})
-    agents: Dict[str, AgentConfig] = {}
-    for name, cfg in agents_cfg.items():
-        agents[name] = to_agent(cfg, default_cfg)
-    return LLMConfig(default=default, agents=agents)
-
-
-def load_llm_config(path: pathlib.Path) -> LLMConfig:
+def load_llm_config(path: pathlib.Path) -> LLMFileConfig:
     """
     Loads LLM configuration from a YAML file.
 
@@ -90,12 +76,12 @@ def load_llm_config(path: pathlib.Path) -> LLMConfig:
         path: Path to the YAML config file.
 
     Returns:
-        LLMConfig object.
+        LLMFileConfig object.
     """
-    if not path.exists():
-        raise FileNotFoundError(f"LLM config not found: {path}")
-    data = yaml.safe_load(path.read_text()) or {}
-    return parse_llm_config(data)
+    from nl2sql.configs import ConfigManager
+    
+    manager = ConfigManager()
+    return manager.load_llm(path)
 
 
 class LLMRegistry:
@@ -109,7 +95,7 @@ class LLMRegistry:
     - Enforcing structured output for specific agents.
     """
 
-    def __init__(self, config: LLMConfig):
+    def __init__(self, config: LLMFileConfig):
         """
         Initializes the LLMRegistry.
 
@@ -119,7 +105,7 @@ class LLMRegistry:
         self.config = config
 
     def _agent_cfg(self, agent: str) -> AgentConfig:
-        return self.config.agents.get(agent) or self.config.default
+        return (self.config.agents or {}).get(agent) or self.config.default
 
     def _base_llm(self, agent: str) -> ChatOpenAI:
         cfg = self._agent_cfg(agent)

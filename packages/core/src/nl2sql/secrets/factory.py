@@ -1,7 +1,7 @@
 from typing import Optional, Any, Dict, Type
 import logging
 from .interfaces import SecretProvider
-from .schemas import SecretProviderConfig, AwsSecretConfig, AzureSecretConfig, HashiCorpSecretConfig
+from nl2sql.configs.secrets import SecretProviderConfig, AwsSecretConfig, AzureSecretConfig, HashiCorpSecretConfig
 
 logger = logging.getLogger(__name__)
 

@@ -1,21 +1,28 @@
+# NL2SQL Datasource Configuration
+
+version: 1
 datasources:
 - id: manufacturing_ref
-  connection:
-    type: sqlite
-    database: data\demo_lite\manufacturing_ref.db
   description: Master Data (Factories)
+  connection:
+    type: sqlite
+    database: data/demo_lite/manufacturing_ref.db
+  options: {}
 - id: manufacturing_ops
-  connection:
-    type: sqlite
-    database: data\demo_lite\manufacturing_ops.db
   description: Operational Data (Employees, Machines)
+  connection:
+    type: sqlite
+    database: data/demo_lite/manufacturing_ops.db
+  options: {}
 - id: manufacturing_supply
-  connection:
-    type: sqlite
-    database: data\demo_lite\manufacturing_supply.db
   description: Supply Chain (Inventory)
-- id: manufacturing_history
   connection:
     type: sqlite
-    database: data\demo_lite\manufacturing_history.db
+    database: data/demo_lite/manufacturing_supply.db
+  options: {}
+- id: manufacturing_history
   description: Historical Data (Sales)
+  connection:
+    type: sqlite
+    database: data/demo_lite/manufacturing_history.db
+  options: {}

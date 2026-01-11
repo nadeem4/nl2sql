@@ -14,6 +14,9 @@ def install_package(package_name: str) -> bool:
         print_error(f"Failed to install {package_name}")
         return False
 
+from nl2sql_cli.common.decorators import handle_cli_errors
+
+@handle_cli_errors
 def install_command(adapter_name: str):
     target_pkg = adapter_name
     if adapter_name in KNOWN_ADAPTERS:

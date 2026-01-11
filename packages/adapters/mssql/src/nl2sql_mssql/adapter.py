@@ -9,36 +9,58 @@ from nl2sql_adapter_sdk import (
 )
 from nl2sql_sqlalchemy_adapter import BaseSQLAlchemyAdapter
 
+from pydantic import BaseModel, Field
+from typing import Optional
+
+class MssqlConnectionConfig(BaseModel):
+    """Strict configuration schema for MSSQL adapter."""
+    type: str
+    host: str = Field(..., description="Server hostname")
+    user: Optional[str] = None
+    password: Optional[str] = None
+    port: int = 1433
+    database: str = Field(..., description="Database name")
+    driver: str = "ODBC Driver 17 for SQL Server"
+    trusted_connection: bool = False
+    options: Dict[str, Any] = Field(default_factory=dict)
+    
+    model_config = {"extra": "ignore"}
+
 class MssqlAdapter(BaseSQLAlchemyAdapter):
 
     def construct_uri(self, args: Dict[str, Any]) -> str:
-        """
-        Constructs a MSSQL SQLAlchemy URL with support for Drivers and Trusted Connections.
-        """
-        user = args.get("user", "")
-        password = args.get("password", "")
-        host = args.get("host", "localhost")
-        port = args.get("port", "1433")
-        database = args.get("database", "")
-        driver = args.get("driver", "ODBC Driver 17 for SQL Server")
+        """Constructs the MSSQL connection URI.
+
+        Args:
+            args: The raw connection arguments dictionary.
+
+        Returns:
+            str: The fully constructed SQLAlchemy connection URI.
         
-        # Merging connection 'extra' params via options
-        options = args.get("options", {}).copy()
+        Raises:
+            ValidationError: If the configuration is invalid.
+        """
+        config = MssqlConnectionConfig(**args)
+        
+        user = config.user or ""
+        password = config.password or ""
+        host = config.host
+        port = config.port
+        database = config.database
+        driver = config.driver
+        
+        options = config.options.copy()
         options["driver"] = driver
         
-        # Windows Auth / Integrated Security
-        if args.get("trusted_connection"):
+        if config.trusted_connection:
             options["Trusted_Connection"] = "yes"
             
-        # Creds
         creds = f"{user}:{password}@" if user or password else ""
-        # MSSQL standard port handling
-        netloc = f"{host}:{port}" if port else host
+        netloc = f"{host}:{port}"
         
         from urllib.parse import urlencode
         query_str = "?" + urlencode(options)
         
-        # Use pyodbc as default driver
         return f"mssql+pyodbc://{creds}{netloc}/{database}{query_str}"
 
     def dry_run(self, sql: str) -> DryRunResult:

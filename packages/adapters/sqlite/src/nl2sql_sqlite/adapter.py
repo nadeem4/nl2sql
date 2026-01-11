@@ -9,11 +9,33 @@ from nl2sql_adapter_sdk import (
 )
 from nl2sql_sqlalchemy_adapter import BaseSQLAlchemyAdapter
 
+from pydantic import BaseModel, Field
+from typing import Optional
+
+class SqliteConnectionConfig(BaseModel):
+    """Strict configuration schema for SQLite adapter."""
+    type: str
+    database: str = Field(..., description="Path to SQLite database file")
+    options: Dict[str, Any] = Field(default_factory=dict)
+    
+    model_config = {"extra": "ignore"}
+
 class SqliteAdapter(BaseSQLAlchemyAdapter):
 
     def construct_uri(self, args: Dict[str, Any]) -> str:
-        database = args.get("database", ":memory:")
-        return f"sqlite:///{database}"
+        """Constructs the SQLite connection URI.
+
+        Args:
+            args: The raw connection arguments dictionary.
+
+        Returns:
+            str: The fully constructed SQLAlchemy connection URI.
+        
+        Raises:
+            ValidationError: If the configuration is invalid.
+        """
+        config = SqliteConnectionConfig(**args)
+        return f"sqlite:///{config.database}"
 
     def connect(self) -> None:
         """Sqlite-specific connection with Locking Timeout."""

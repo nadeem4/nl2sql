@@ -3,7 +3,7 @@ import pathlib
 import os
 import pytest
 from unittest.mock import MagicMock, patch
-from nl2sql.services.llm import load_llm_config, LLMRegistry, LLMConfig
+from nl2sql.services.llm import load_llm_config, LLMRegistry, LLMFileConfig
 from nl2sql.common.settings import settings
 
 @pytest.fixture
@@ -12,7 +12,7 @@ def mock_path():
     return MagicMock(spec=pathlib.Path)
 
 def test_load_llm_config_success(mock_path):
-    """Verifies that load_llm_config correctly parses a valid YAML file into an LLMConfig object."""
+    """Verifies that load_llm_config correctly parses a valid YAML file into an LLMFileConfig object."""
     mock_path.exists.return_value = True
     mock_path.read_text.return_value = """
     default:
@@ -26,7 +26,7 @@ def test_load_llm_config_success(mock_path):
     
     config = load_llm_config(mock_path)
     
-    assert isinstance(config, LLMConfig)
+    assert isinstance(config, LLMFileConfig)
     assert config.default.model == "gpt-4o"
     assert config.default.temperature == 0.1
     assert "planner" in config.agents

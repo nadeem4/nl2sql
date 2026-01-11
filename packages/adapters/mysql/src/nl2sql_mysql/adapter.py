@@ -8,19 +8,46 @@ from nl2sql_adapter_sdk import (
 )
 from nl2sql_sqlalchemy_adapter import BaseSQLAlchemyAdapter
 
+from pydantic import BaseModel, Field
+from typing import Optional
+
+class MysqlConnectionConfig(BaseModel):
+    """Strict configuration schema for MySQL adapter."""
+    type: str
+    host: str = Field(..., description="MySQL server hostname")
+    user: str = Field(..., description="Username")
+    password: str = Field(..., description="Password")
+    port: int = 3306
+    database: str = Field(..., description="Database name")
+    options: Dict[str, Any] = Field(default_factory=dict)
+    
+    model_config = {"extra": "ignore"}
+
 class MysqlAdapter(BaseSQLAlchemyAdapter):
 
     def construct_uri(self, args: Dict[str, Any]) -> str:
-        user = args.get("user", "")
-        password = args.get("password", "")
-        host = args.get("host", "localhost")
-        port = args.get("port", "")
-        database = args.get("database", "")
+        """Constructs the MySQL connection URI.
+
+        Args:
+            args: The raw connection arguments dictionary.
+
+        Returns:
+            str: The fully constructed SQLAlchemy connection URI.
         
-        options = args.get("options", {}).copy()
+        Raises:
+            ValidationError: If the configuration is invalid.
+        """
+        config = MysqlConnectionConfig(**args)
+        
+        user = config.user
+        password = config.password
+        host = config.host
+        port = config.port
+        database = config.database
+        options = config.options.copy()
         
         creds = f"{user}:{password}@" if user or password else ""
-        netloc = f"{host}:{port}" if port else host
+        netloc = f"{host}:{port}"
         
         query_str = ""
         if options:

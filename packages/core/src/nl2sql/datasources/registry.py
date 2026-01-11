@@ -43,13 +43,17 @@ class DatasourceRegistry:
         """Initializes the registry by eagerly creating adapters for all configs.
 
         Args:
-            configs (List[Dict[str, Any]]): List of datasource configuration dictionaries.
+            configs (List[Any]): List of datasource configuration objects (Dict or DatasourceConfig).
         """
         self._adapters: Dict[str, DatasourceAdapter] = {}
         available_adapters = discover_adapters()
 
         for config in configs:
             try:
+                # Normalize Pydantic Model to Dict
+                if hasattr(config, "model_dump"):
+                    config = config.model_dump()
+
                 ds_id = config.get("id")
                 if not ds_id:
                     raise ValueError("Datasource ID is required. Please check your configuration.")

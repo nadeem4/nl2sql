@@ -54,3 +54,10 @@ SecretProviderConfig = Union[
     HashiCorpSecretConfig,
     EnvSecretConfig
 ]
+
+from typing import List
+class SecretsFileConfig(BaseModel):
+    """File-level schema for secrets.yaml."""
+    version: int = Field(1, description="Schema version")
+    providers: List[SecretProviderConfig]
+
