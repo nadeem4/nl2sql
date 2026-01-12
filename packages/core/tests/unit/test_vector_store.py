@@ -47,7 +47,7 @@ def test_index_schema_fk_aliasing(store, mock_chroma):
         ]
     )
     
-    store.index_schema(mock_adapter, datasource_id="test_ds")
+    store.refresh_schema(mock_adapter, datasource_id="test_ds")
     
     mock_chroma.add_documents.assert_called_once()
     docs = mock_chroma.add_documents.call_args[0][0]
@@ -99,7 +99,7 @@ def test_index_schema_orphaned_fk(store, mock_chroma):
         ]
     )
     
-    store.index_schema(mock_adapter, datasource_id="test_ds")
+    store.refresh_schema(mock_adapter, datasource_id="test_ds")
     
     docs = mock_chroma.add_documents.call_args[0][0]
     orders_doc = docs[0]
@@ -133,34 +133,22 @@ def test_retrieve_no_filter(store, mock_chroma):
         "q", k=5, filter=None
     )
 
-def test_index_examples_enrichment_failure(store, mock_chroma):
+def test_refresh_examples_enrichment_failure(store, mock_chroma):
     """
     Verifies system resilience when the LLM enrichment step fails (e.g. API error).
     The system should fallback to indexing the original question rather than crashing.
     """
-    mock_registry = MagicMock()
     mock_enricher = MagicMock()
     mock_enricher.invoke.side_effect = Exception("API Down")
     
-    import tempfile
-    import os
-    import yaml
+    examples = ["How many users?"]
     
-    with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix=".yaml") as tmp:
-        yaml.dump({"ds1": ["How many users?"]}, tmp)
-        tmp_name = tmp.name
+    store.refresh_examples(datasource_id="ds1", examples=examples, enricher=mock_enricher)
         
-    try:
-        with patch("nl2sql.pipeline.nodes.semantic.node.SemanticAnalysisNode", return_value=mock_enricher):
-            store.index_examples(tmp_name, llm_registry=mock_registry)
-            
-        mock_chroma.add_documents.assert_called()
-        docs = mock_chroma.add_documents.call_args[0][0]
-        assert len(docs) == 1
-        assert docs[0].page_content == "How many users?"
-        
-    finally:
-        os.remove(tmp_name)
+    mock_chroma.add_documents.assert_called()
+    docs = mock_chroma.add_documents.call_args[0][0]
+    assert len(docs) == 1
+    assert docs[0].page_content == "How many users?"
 
 def test_is_empty_resilience(store, mock_chroma):
     """Verifies that is_empty() safely returns True if the underlying store is uninitialized or errors."""

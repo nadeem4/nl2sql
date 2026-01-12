@@ -128,7 +128,7 @@ def index(
         vector_store_path=vector_store
     )
     
-    run_indexing(ctx.registry.get_all(), vector_store, ctx.vector_store, ctx.llm_registry)
+    run_indexing(ctx.registry, vector_store, ctx.vector_store, ctx.llm_registry)
 
 @app.command()
 def doctor():

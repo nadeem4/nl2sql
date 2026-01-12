@@ -1,4 +1,4 @@
-from typing import Dict, Type, List, Any
+from typing import Dict, Type, List, Any, Union
 import importlib
 from nl2sql_adapter_sdk import DatasourceAdapter
 from nl2sql.datasources.discovery import discover_adapters
@@ -43,52 +43,88 @@ class DatasourceRegistry:
         """Initializes the registry by eagerly creating adapters for all configs.
 
         Args:
-            configs (List[Any]): List of datasource configuration objects (Dict or DatasourceConfig).
+            configs: List of datasource configuration objects (Dict or DatasourceConfig).
         """
         self._adapters: Dict[str, DatasourceAdapter] = {}
-        available_adapters = discover_adapters()
+        self._available_adapters = discover_adapters()
 
         for config in configs:
             try:
-                # Normalize Pydantic Model to Dict
-                if hasattr(config, "model_dump"):
-                    config = config.model_dump()
-
-                ds_id = config.get("id")
-                if not ds_id:
-                    raise ValueError("Datasource ID is required. Please check your configuration.")
-                
-                connection = config.get("connection", {})
-                conn_type = connection.get("type", "").lower()
-                resolved_connection = self.resolved_connection(connection)
-
-                if conn_type in available_adapters:
-                    AdapterCls = available_adapters[conn_type]
-                    
-                    adapter = AdapterCls(
-                        datasource_id=ds_id,
-                        datasource_engine_type=conn_type,
-                        connection_args=resolved_connection,
-                        statement_timeout_ms=config.get("statement_timeout_ms"),
-                        row_limit=config.get("row_limit"),
-                        max_bytes=config.get("max_bytes")
-                    )
-                    self._adapters[ds_id] = adapter
-                else:
-                    raise ValueError(f"No adapter found for engine type: '{conn_type}' in datasource '{ds_id}'")
-            
+                self.register_datasource(config)
             except Exception as e:
+                # Log usage would be better here, but we raise to stop startup on bad config
                 raise ValueError(f"Failed to initialize adapter for '{config.get('id', 'unknown')}': {e}") from e
+
+    def register_datasource(self, config: Union[Dict[str, Any], Any]) -> DatasourceAdapter:
+        """Registers a new datasource dynamically.
+
+        Args:
+            config: The datasource configuration dictionary or object.
+
+        Returns:
+            DatasourceAdapter: The created and registered adapter.
+
+        Raises:
+            ValueError: If configuration is invalid or adapter type is unknown.
+        """
+        # Normalize Pydantic Model to Dict
+        if hasattr(config, "model_dump"):
+            config = config.model_dump()
+
+        ds_id = config.get("id")
+        if not ds_id:
+            raise ValueError("Datasource ID is required. Please check your configuration.")
+
+        connection = config.get("connection", {})
+        conn_type = connection.get("type", "").lower()
+        resolved_connection = self.resolved_connection(connection)
+
+        if conn_type in self._available_adapters:
+            adapter_cls = self._available_adapters[conn_type]
+
+            adapter = adapter_cls(
+                datasource_id=ds_id,
+                datasource_engine_type=conn_type,
+                connection_args=resolved_connection,
+                statement_timeout_ms=config.get("statement_timeout_ms"),
+                row_limit=config.get("row_limit"),
+                max_bytes=config.get("max_bytes"),
+            )
+            self._adapters[ds_id] = adapter
+            return adapter
+        else:
+            raise ValueError(
+                f"No adapter found for engine type: '{conn_type}' in datasource '{ds_id}'"
+            )
+
+    def refresh_schema(self, datasource_id: str, vector_store: Any) -> Dict[str, int]:
+        """Refreshes the schema for a specific datasource.
+        
+        This triggers a fresh intrusion of the database schema via the adapter
+        and updates the vector store index.
+
+        Args:
+            datasource_id: The ID of the datasource to refresh.
+            vector_store: The OrchestratorVectorStore instance.
+
+        Returns:
+            Dict[str, int]: Statistics of the refreshed components.
+
+        Raises:
+            ValueError: If the datasource ID is unknown.
+        """
+        adapter = self.get_adapter(datasource_id)
+        return vector_store.refresh_schema(adapter, datasource_id)
 
     def get_adapter(self, datasource_id: str) -> DatasourceAdapter:
         """Retrieves the DataSourceAdapter for a datasource.
 
         Args:
-            datasource_id (str): The ID of the datasource.
+            datasource_id: The ID of the datasource.
 
         Returns:
             DatasourceAdapter: The active adapter instance.
-        
+
         Raises:
             ValueError: If the datasource ID is unknown.
         """
@@ -97,13 +133,28 @@ class DatasourceRegistry:
         return self._adapters[datasource_id]
 
     def get_dialect(self, datasource_id: str) -> str:
-        """Returns a normalized dialect string from the adapter."""
+        """Returns a normalized dialect string from the adapter.
+
+        Args:
+            datasource_id: The ID of the datasource.
+
+        Returns:
+            str: The dialect string (e.g., 'postgres').
+        """
         return self.get_adapter(datasource_id).get_dialect()
 
     def list_adapters(self) -> List[DatasourceAdapter]:
-        """Returns a list of all registered adapters."""
+        """Returns a list of all registered adapters.
+
+        Returns:
+            List[DatasourceAdapter]: All active adapters.
+        """
         return list(self._adapters.values())
 
     def list_ids(self) -> List[str]:
-        """Returns a list of all registered datasource IDs."""
+        """Returns a list of all registered datasource IDs.
+
+        Returns:
+            List[str]: All registered IDs.
+        """
         return list(self._adapters.keys())

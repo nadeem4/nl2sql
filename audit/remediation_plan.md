@@ -22,10 +22,11 @@ This document serves as the master backlog for addressing findings from the Arch
   - **Fix**: Sanitize or hash non-user-facing errors in `AggregatorNode` before prompt construction. Only show generic error codes to the LLM.
   - **Status**: Fixed. Unit tests added in `tests/unit/test_node_aggregator.py`.
 
-- [ ] **BUG-004: Schema Drift (Stale Cache)** (High)
+- [x] **BUG-004: Schema Drift (Stale Cache)** (High)
   - **Component**: Governance / Registry
   - **Issue**: `DatasourceRegistry` caches adapters indefinitely at startup. If the DB schema changes, the Planner hallucinates invalid columns.
-  - **Fix**: Implement `SchemaWatcher` or TTL-based cache revocation in `DatasourceRegistry` to force schema refresh.
+  - **Fix**: Implemented idempotent `refresh_schema` and `refresh_examples` in `OrchestratorVectorStore`, along with dynamic `register_datasource` in `DatasourceRegistry`.
+  - **Status**: Fixed. Unit tests added in `tests/unit/test_schema_lifecycle.py`.
 
 - [ ] **BUG-005: Missing Distributed Tracing** (High)
   - **Component**: Observability / Logging
