@@ -8,10 +8,11 @@ This platform transforms complex natural language questions into safe, optimized
 
 ### Key Features
 
-* **🛡️ Security First**: Strict AST Validation, RBAC Policies, and Read-Only enforcement.
+* **🛡️ Security First**: Strict AST Validation, **Intent Analysis** (Jailbreak Detection), RBAC Policies, and Read-Only enforcement.
 * **🧠 Agentic Reasoning**: Self-correcting nodes that fix SQL errors automatically.
 * **🔌 Polyglot**: First-class support for Postgres, MySQL, MSSQL, and SQLite.
 * **⚡ Smart Routing**: Decomposes complex queries into sub-queries for multi-datasource environments.
+* **🔄 Reliability**: Built-in **Exponential Backoff** and **Circuit Breakers** to handle transient failures gracefully.
 
 ## 🏁 Quick Demo
 
