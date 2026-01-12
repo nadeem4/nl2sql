@@ -1,5 +1,6 @@
 from typing import Dict, Any
 from sqlalchemy import create_engine, inspect, text
+from sqlalchemy.dialects import postgresql
 from nl2sql_adapter_sdk import (
     DryRunResult,
     QueryPlan,
@@ -13,7 +14,7 @@ from typing import Optional
 
 class PostgresConnectionConfig(BaseModel):
     """Strict configuration schema for Postgres adapter."""
-    type: str
+    type: str = Field("postgresql", description="Connection type")
     host: str = Field(..., description="Postgres server hostname")
     user: str = Field(..., description="Username")
     password: str = Field(..., description="Password")
@@ -21,7 +22,6 @@ class PostgresConnectionConfig(BaseModel):
     database: str = Field(..., description="Database name")
     options: Dict[str, Any] = Field(default_factory=dict)
     
-    # Allow extra fields (handled by Base/Registry, but ignored here unless mapped)
     model_config = {"extra": "ignore"}
 
 class PostgresAdapter(BaseSQLAlchemyAdapter):
@@ -64,8 +64,6 @@ class PostgresAdapter(BaseSQLAlchemyAdapter):
              
         connect_args = {}
         if self.statement_timeout_ms:
-            # Native Postgres Timeout (server-side)
-            # -c statement_timeout={ms}
             connect_args["options"] = f"-c statement_timeout={self.statement_timeout_ms}"
 
         try:
@@ -79,9 +77,6 @@ class PostgresAdapter(BaseSQLAlchemyAdapter):
             import logging
             logging.getLogger(__name__).error(f"Failed to connect to Postgres: {e}")
             raise
-
-
-
 
     def dry_run(self, sql: str) -> DryRunResult:
         try:
@@ -111,5 +106,8 @@ class PostgresAdapter(BaseSQLAlchemyAdapter):
             return CostEstimate(estimated_cost=0.0, estimated_rows=0)
         except Exception:
             return CostEstimate(estimated_cost=0.0, estimated_rows=0)
+
+    def get_dialect(self) -> str:
+        return postgresql.dialect()
 
 

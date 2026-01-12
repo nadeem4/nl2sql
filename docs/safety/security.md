@@ -53,13 +53,71 @@ Even after safe SQL is generated, we perform **Physical Validation**.
 
 Secrets are never hardcoded. The `SecretManager` uses a **Provider Pattern**.
 
-* **Resolution**: Secrets are resolved at runtime using `${provider:key}` syntax.
-* **Two-Phase Loading**:
-    1. **Bootstrap**: Loads `env` provider first.
-    2. **Resolution**: Resolves config references (e.g. `${env:DB_PASS}`) before registering subsequent providers.
-* **Default Provider**: Environment Variables (`${env:MY_SECRET}`).
-* **Extensible**: You can register custom providers (e.g., AWS Secrets Manager, Azure KeyVault).
+* **Runtime Resolution**: Secrets are resolved using `${provider:key}` syntax.
+* **Two-Phase Startup**:
+    1. **Bootstrap**: The `env` provider is loaded immediately.
+    2. **Configuration**: Other providers (AWS, Azure) are configured. These configurations can themselves reference `env` secrets (e.g., `client_secret: "${env:AZURE_SECRET}"`).
+* **Extensible**: Supports built-in providers (AWS, Azure, HashiCorp) and custom implementations.
 
-::: nl2sql.pipeline.nodes.validator.node.LogicalValidatorNode
-::: nl2sql.security.policies.RolePolicy
-::: nl2sql.secrets.manager.SecretManager
+### Configuration (`configs/secrets.yaml`)
+
+You configure providers in the `secrets.yaml` file.
+
+```yaml
+version: 1
+providers:
+  - id: "aws-prod"
+    type: "aws"
+    region_name: "us-east-1"
+  - id: "azure-main"
+    type: "azure"
+    vault_url: "https://my-vault.vault.azure.net/"
+    # You can reference other secrets (Two-Phase Loading)
+    client_secret: "${env:AZURE_CLIENT_SECRET}"
+```
+
+### Resolution Syntax
+
+Resolves at runtime using `${provider:key}` syntax.
+
+* `${env:DB_PASS}`: Environment variable `DB_PASS`.
+* `${aws-prod:rds_password}`: Secret `rds_password` from the `aws-prod` provider.
+
+### Supported Providers
+
+We support the following backend providers out of the box.
+
+#### 1. Environment Variables (`type: env`)
+
+* **Default**: Always available as the `env` provider.
+* **Usage**: `${env:VAR_NAME}`.
+
+#### 2. AWS Secrets Manager (`type: aws`)
+
+Fetches secrets from AWS Secrets Manager.
+
+| Config | Description | Default |
+| :--- | :--- | :--- |
+| `region_name` | AWS Region (e.g. `us-east-1`) | `AWS_DEFAULT_REGION` env var |
+| `profile_name` | AWS CLI Profile to use | Default boto3 profile |
+
+#### 3. Azure Key Vault (`type: azure`)
+
+Fetches secrets from Azure Key Vault.
+
+| Config | Description | Required? |
+| :--- | :--- | :--- |
+| `vault_url` | Full URL to the vault | Yes |
+| `client_id` | Service Principal Client ID | Yes |
+| `client_secret` | Service Principal Secret | Yes |
+| `tenant_id` | Azure Tenant ID | Yes |
+
+#### 4. HashiCorp Vault (`type: hashi`)
+
+Fetches secrets from a HashiCorp Vault KV engine.
+
+| Config | Description | Default |
+| :--- | :--- | :--- |
+| `url` | Vault Server URL | **Required** |
+| `token` | Auth Token | None (Must be provided) |
+| `mount_point` | KV engine mount path | `secret` |

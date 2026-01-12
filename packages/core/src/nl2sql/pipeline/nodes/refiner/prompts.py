@@ -13,6 +13,9 @@ User Query: "{user_query}"
 ### Errors (Validation or Execution)
 {errors}
 
+### Previous Reasoning (Trace)
+{reasoning}
+
 ### Instructions
 1. Analyze the Errors in the context of the Schema and User Query.
 2. If the error is an Execution Error (e.g., syntax error, runtime error), analyze why the SQL failed and suggest a fix in the Plan.

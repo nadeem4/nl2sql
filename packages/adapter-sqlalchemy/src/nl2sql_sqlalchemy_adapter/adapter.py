@@ -310,11 +310,10 @@ class BaseSQLAlchemyAdapter(DatasourceAdapter):
             return DryRunResult(is_valid=False, error_message=str(e))
 
     def explain(self, sql: str) -> QueryPlan:
-        return QueryPlan(plan_text="Not implemented")
+        raise NotImplementedError(f"Adapter {self.__class__.__name__} must implement explain")
     
     def get_dialect(self) -> str:
-        """Returns the dialect name. Defaults to engine type."""
-        return (self.datasource_engine_type or "unknown").lower()
+        raise NotImplementedError(f"Adapter {self.__class__.__name__} must implement get_dialect")
 
     def cost_estimate(self, sql: str) -> CostEstimate:
-        return CostEstimate(estimated_cost=0.0, estimated_rows=0)
+        raise NotImplementedError(f"Adapter {self.__class__.__name__} must implement cost_estimate")
