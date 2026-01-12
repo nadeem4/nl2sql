@@ -1,59 +1,41 @@
 site_name: NL2SQL Platform
-site_description: Production-grade Natural Language to SQL engine.
-site_url: https://nadeem4.github.io/nl2sql/
+site_description: Production-grade Natural Language to SQL Platform Documentation
+site_author: Platform Engineering
+
 theme:
   name: material
   features:
     - navigation.tabs
     - navigation.sections
     - navigation.expand
-    - search.suggest
-    - search.highlight
+    - navigation.top
     - toc.follow
-  palette:
+    - content.code.copy
+  palette: 
     - scheme: default
-      primary: indigo
-      accent: indigo
+      primary: teal
+      accent: purple
       toggle:
-        icon: material/brightness-7
+        icon: material/brightness-7 
         name: Switch to dark mode
     - scheme: slate
-      primary: indigo
-      accent: indigo
+      primary: teal
+      accent: lime
       toggle:
         icon: material/brightness-4
         name: Switch to light mode
-  icon:
-    repo: fontawesome/brands/git-alt
-
-
-extra:
-  social:
-    - icon: fontawesome/brands/github
-      link: https://github.com/nadeem4/nl2sql
-
-copyright: Copyright &copy; 2024 NL2SQL Contributors
-
-
-repo_url: https://github.com/nadeem4/nl2sql
-repo_name: nl2sql
-edit_uri: edit/main/docs/
-
-# Validation settings (Strict Mode equivalent)
-validation:
-  omitted_files: warn
-  absolute_links: warn
-  unrecognized_links: warn
 
 plugins:
   - search
-
+  - mermaid2
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [packages/core/src, packages/cli/src, packages/adapter-sdk/src]
 
 markdown_extensions:
   - pymdownx.highlight:
       anchor_linenums: true
-      line_spans: __span
-      pygments_lang_class: true
   - pymdownx.inlinehilite
   - pymdownx.snippets
   - pymdownx.superfences:
@@ -61,42 +43,35 @@ markdown_extensions:
         - name: mermaid
           class: mermaid
           format: !!python/name:pymdownx.superfences.fence_code_format
-  - pymdownx.tabbed:
-      alternate_style: true
   - admonition
   - pymdownx.details
   - attr_list
-  - md_in_html
 
 nav:
   - Home: index.md
-  - Architecture:
-    - Overview: architecture/overview.md
-    - Security Model: architecture/security.md
-    - SQL Agent (Pipeline): architecture/sql_agent.md
-    - Data Indexing: architecture/indexing.md
-    - Routing Strategy: architecture/routing.md
-    - Adapter Plugins: architecture/adapters.md
-  - Guides:
-    - Getting Started: guides/getting_started.md
-    - Configuration: guides/configuration.md
-    - Deployment: guides/deployment.md
-    - Benchmarking: guides/benchmarking.md
-    - Production Roadmap: guides/production_roadmap.md
-    - Development: guides/development.md
-  - Reference:
-    - Test Data: reference/test_data.md
-    - CLI: reference/cli.md
-    - Lessons Learned: reference/lessons_learned.md
-    - API:
-      - GraphState: reference/api/graph_state.md
-      - Adapter SDK: reference/api/adapter_sdk.md
-    - Nodes:
-      - Aggregator: nodes/aggregator_node.md
-      - Decomposer: nodes/decomposer_node.md
-      - Executor: nodes/executor_node.md
-      - Generator: nodes/generator_node.md
-      - Planner: nodes/planner_node.md
-      - Refiner: nodes/refiner_node.md
-      - Semantic Analysis: nodes/semantic_analysis_node.md
-      - Logical Validator: nodes/validator_node.md
+  - Getting Started:
+    - Installation: getting-started/installation.md
+    - Quickstart (Demo): getting-started/demo.md
+  - Core Engine:
+    - Architecture: core/architecture.md
+    - Nodes & Pipeline: core/nodes.md
+    - Environments: core/environment.md
+  - Agents & Subgraphs: core/agents.md
+  - Retrieval & Indexing: core/indexing.md
+  - Security Architecture: safety/security.md
+  - Operations:
+    - Configuration: ops/configuration.md
+    - Observability: ops/observability.md
+    - Benchmarking: ops/benchmarking.md
+    - Error Reference: ops/errors.md
+  - Adapters:
+    - Overview: adapters/index.md
+    - Supported Databases:
+      - Postgres: adapters/postgres.md
+      - MySQL: adapters/mysql.md
+      - MSSQL: adapters/mssql.md
+      - SQLite: adapters/sqlite.md
+    - Extensions:
+      - Building Adapters: adapters/development.md
+  - Development:
+    - API Reference: dev/api.md
