@@ -27,3 +27,20 @@ The platform is instrumented with [LangSmith](https://smith.langchain.com/) for 
 2. Set `LANGCHAIN_API_KEY=...`.
 
 This will stream full traces of the Planner, Validator, and Generator steps to the LangSmith dashboard.
+
+## Metrics (Prometheus)
+
+The platform exposes a `/metrics` endpoint for Prometheus scraping.
+
+### Key Metrics
+
+| Metric Name | Type | Description |
+| :--- | :--- | :--- |
+| `nl2sql_requests_total` | Counter | Total number of requests served. |
+| `nl2sql_request_latency_seconds` | Histogram | End-to-end latency distribution. |
+| `nl2sql_token_usage_total` | Counter | Total LLM tokens consumed (prompt + completion). |
+| `nl2sql_active_connections` | Gauge | Current number of active DB connections. |
+
+### Grafana Dashboard
+
+A standard Grafana dashboard ID `#12345` is available for import to visualize these metrics.

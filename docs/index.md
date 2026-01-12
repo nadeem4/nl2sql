@@ -50,4 +50,4 @@ graph TD
 * [**Core Engine**](core/nodes.md): Deep dive into the Neural Components (Nodes) and Graph State.
 * [**Security**](safety/security.md): How we ensure Safety, Compliance, and Data Protection.
 * [**Operations**](ops/configuration.md): Configuration, Logging, and Benchmarking guides.
-* [**Development**](dev/adapters.md): Guide to building custom adapters and extending the platform.
+* [**Building Adapters**](adapters/development.md): Guide to building custom adapters and extending the platform.
