@@ -67,7 +67,19 @@ def _check_user_access(state):
 
 If the user context has no allowed datasources, the request is rejected immediately with `ErrorCode.SECURITY_VIOLATION`.
 
-## 3. Authorization (RBAC)
+## 3. Internal Error Sanitization (Data Leakage)
+
+To prevent leaking schema details, SQL fragments, or connection secrets to the LLM (and potentially the user), the **Aggregator Node** implements an internal firewall for error messages.
+
+### Sanitization Mechanism
+
+Before injecting execution errors into the LLM context for summarization:
+
+1. **Check Error Code**: Identify the type of error (e.g., `DB_EXECUTION_ERROR`, `SAFEGUARD_VIOLATION`).
+2. **Sanitize**: If the error type is sensitive, replace the raw message (e.g., `Syntax error at column "password"`) with a safe, generic message (`An internal database error occurred`).
+3. **Result**: The LLM works with safe abstractions, while raw errors are preserved in the internal Audit Log for admins.
+
+## 4. Authorization (RBAC)
 
 We use a strict **Role-Based Access Control** system defined in `configs/policies.json`.
 
@@ -86,14 +98,14 @@ The `LogicalValidator` checks the `user_context` against the `RolePolicy`.
 * **Strict Namespacing**: Policies MUST use the `datasource.table` format.
 * **Fail-Closed**: If the system cannot determine the `selected_datasource_id` (e.g., ambiguous routing), the Validator fails immediately/closed. It never defaults to "Allow All".
 
-## 3. Physical Validation & Sandboxing
+## 5. Physical Validation & Sandboxing
 
 Even after safe SQL is generated, we perform **Physical Validation**.
 
 * **Dry Run**: We execute an `EXPLAIN` (or equivalent) on the generated SQL. This catches semantic errors (e.g., type mismatches) safely.
 * **Cost Estimation**: We verify the query won't return > `row_limit` (default 1000) rows. Exceeding this triggers `ErrorCode.PERFORMANCE_WARNING` and stops execution.
 
-## 4. Secrets Management
+## 6. Secrets Management
 
 Secrets are never hardcoded. The `SecretManager` uses a **Provider Pattern**.
 

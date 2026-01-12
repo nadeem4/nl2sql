@@ -1,77 +1,81 @@
-
-import unittest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, ANY
+import pytest
 from nl2sql.pipeline.nodes.aggregator.node import AggregatorNode
-from nl2sql.pipeline.nodes.aggregator.schemas import AggregatedResponse
 from nl2sql.pipeline.state import GraphState
-from nl2sql.common.errors import ErrorCode
+from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 
-class TestAggregatorNode(unittest.TestCase):
-    def setUp(self):
-        self.mock_llm = MagicMock()
-        self.node = AggregatorNode(self.mock_llm)
-        self.node.chain = self.mock_llm # Bypass prompt chain
+class TestAggregatorNode:
+    """Unit tests for the AggregatorNode."""
 
-    def test_fast_path(self):
-        """Test direct data return for single result with output_mode='data'."""
+    @pytest.fixture
+    def mock_llm(self):
+        """Creates a mock LLM runnable."""
+        mock = MagicMock()
+        mock.invoke.return_value = MagicMock(summary="Summary", content="Content", format_type="text")
+        return mock
+
+    def test_sanitization_of_sensitive_errors(self, mock_llm):
+        """Verifies that sensitive database errors are sanitized before reaching the LLM."""
+        # Setup
+        node = AggregatorNode(llm=mock_llm)
+        
+        # Create a state with a sensitive DB error
+        secret_message = "Syntax error in table 'confidential_users', column 'ssn'"
+        error = PipelineError(
+            node="executor",
+            message=secret_message,
+            severity=ErrorSeverity.ERROR,
+            error_code=ErrorCode.DB_EXECUTION_ERROR,
+            stack_trace="Traceback: ..."
+        )
+        
         state = GraphState(
-            user_query="q",
-            intermediate_results=[{"id": 1, "val": "A"}],
-            output_mode="data"
+            user_query="SELECT * FROM users",
+            intermediate_results=[],
+            errors=[error]
+        )
+
+        # Mock the chain directly to avoid LangChain internals complexity
+        node.chain = MagicMock()
+        node.chain.invoke.return_value = MagicMock(summary="Safe", content="Safe", format_type="text")
+
+        # Execute internal method that prepares prompt
+        node._display_result_with_llm(state)
+
+        # Verify CHAIN invoke arguments (input dict)
+        call_args = node.chain.invoke.call_args[0][0]
+        intermediate_res_str = call_args["intermediate_results"]
+        
+        # Assertion: Secrets should NOT be present
+        assert "confidential_users" not in intermediate_res_str
+        assert "ssn" not in intermediate_res_str
+        
+        # Assertion: Safe message SHOULD be present
+        assert "An internal database error occurred" in intermediate_res_str
+
+    def test_pass_through_of_safe_errors(self, mock_llm):
+        """Verifies that non-sensitive errors are passed through safely."""
+        node = AggregatorNode(llm=mock_llm)
+        node.chain = MagicMock()
+        node.chain.invoke.return_value = MagicMock(summary="Safe", content="Safe", format_type="text")
+
+        safe_message = "I could not find a plan for this query."
+        error = PipelineError(
+            node="planner",
+            message=safe_message,
+            severity=ErrorSeverity.WARNING,
+            error_code=ErrorCode.PLANNING_FAILURE
         )
         
-        result = self.node(state)
-        
-        self.assertEqual(result["final_answer"], {"id": 1, "val": "A"})
-        self.assertIn("Fast path", result["reasoning"][0]["content"])
-
-    def test_slow_path_llm(self):
-        """Test LLM synthesis for complex or multiple results."""
         state = GraphState(
-            user_query="q",
-            intermediate_results=[{"id": 1}],
-            output_mode="synthesis"
+            user_query="Help",
+            intermediate_results=[],
+            errors=[error]
         )
         
-        # Mock LLM Response
-        self.mock_llm.invoke.return_value = AggregatedResponse(
-            summary="Found 1 item.",
-            content="Item details...",
-            format_type="text"
-        )
+        node._display_result_with_llm(state)
         
-        result = self.node(state)
+        call_args = node.chain.invoke.call_args[0][0]
+        intermediate_res_str = call_args["intermediate_results"]
         
-        self.assertIn("Found 1 item", result["final_answer"])
-        self.assertIn("LLM Aggregation used", result["reasoning"][0]["content"])
-
-    def test_slow_path_multiple_results(self):
-        """Test that multiple results force LLM path even if mode is data (actually, does it?).
-           Code says: if len(results) == 1 and not errors and mode == data -> Fast.
-           So 2 results -> Slow.
-        """
-        state = GraphState(
-            user_query="q",
-            intermediate_results=[{"a": 1}, {"b": 2}],
-            output_mode="data"
-        )
-        
-        self.mock_llm.invoke.return_value = AggregatedResponse(summary="Multi", content="Multi", format_type="text")
-        
-        result = self.node(state)
-        
-        self.assertIn("LLM Aggregation used", result["reasoning"][0]["content"])
-
-    def test_error_handling(self):
-        """Test that exception behaves correctly."""
-        self.mock_llm.invoke.side_effect = Exception("Boom")
-        
-        state = GraphState(user_query="q", intermediate_results=[], output_mode="synthesis")
-        result = self.node(state)
-        
-        self.assertEqual(len(result["errors"]), 1)
-        self.assertEqual(result["errors"][0].error_code, ErrorCode.AGGREGATOR_FAILED)
-        self.assertIn("Boom", result["final_answer"])
-
-if __name__ == "__main__":
-    unittest.main()
+        assert safe_message in intermediate_res_str

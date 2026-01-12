@@ -58,7 +58,8 @@ class AggregatorNode:
         if state.errors:
             formatted_results += "\n--- Errors Encountered ---\n"
             for err in state.errors:
-                formatted_results += f"Error from {err.node}: {err.message}\n"
+                safe_msg = err.get_safe_message()
+                formatted_results += f"Error from {err.node}: {safe_msg}\n"
 
         response: AggregatedResponse = self.chain.invoke({
             "user_query": user_query,

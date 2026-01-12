@@ -56,6 +56,14 @@ FATAL_ERRORS = {
     ErrorCode.INVALID_STATE
 }
 
+SAFE_ERROR_MESSAGES = {
+    ErrorCode.DB_EXECUTION_ERROR: "An internal database error occurred while executing the query.",
+    ErrorCode.SAFEGUARD_VIOLATION: "The query result was blocked by data protection safeguards.",
+    ErrorCode.EXECUTOR_CRASH: "The query execution service encountered an unexpected error.",
+    ErrorCode.VALIDATOR_CRASH: "The validation service encountered an unexpected error.",
+    ErrorCode.MISSING_DATASOURCE_ID: "Datasource configuration error."
+}
+
 class PipelineError(BaseModel):
     """Represents a structured error within the pipeline.
 
@@ -82,4 +90,15 @@ class PipelineError(BaseModel):
         if self.severity == ErrorSeverity.CRITICAL:
             return False
         return self.error_code not in FATAL_ERRORS
+
+    def get_safe_message(self) -> str:
+        """Returns a sanitized error message safe for exposure to LLMs or users.
+
+        If a safe mapping exists for the error code, it is returned.
+        Otherwise, the original message is used (assuming it's safe).
+
+        Returns:
+            str: The sanitized error message.
+        """
+        return SAFE_ERROR_MESSAGES.get(self.error_code, self.message)
 

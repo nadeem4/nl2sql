@@ -16,10 +16,11 @@ This document serves as the master backlog for addressing findings from the Arch
   - **Fix**: Implement **Exponential Backoff** and **Jitter** in the `retry_handler` logic within `sql_agent.py`. Added selective retry logic to fail fast on fatal errors.
   - **Status**: Fixed. Unit tests added in `tests/unit/test_sql_agent_retry.py`.
 
-- [ ] **BUG-003: Internal Error Leakage** (High)
+- [x] **BUG-003: Internal Error Leakage** (High)
   - **Component**: Security / Aggregator
   - **Issue**: `AggregatorNode` feeds raw database error strings (which may contain schema details or secrets) into the LLM context.
   - **Fix**: Sanitize or hash non-user-facing errors in `AggregatorNode` before prompt construction. Only show generic error codes to the LLM.
+  - **Status**: Fixed. Unit tests added in `tests/unit/test_node_aggregator.py`.
 
 - [ ] **BUG-004: Schema Drift (Stale Cache)** (High)
   - **Component**: Governance / Registry
