@@ -23,7 +23,31 @@ A recursive walker traverses the AST to verify that:
 * No ambiguous columns (without aliases) are present if multiple tables share the column name.
 * *Failures result in `ErrorCode.COLUMN_NOT_FOUND` or `ErrorCode.INVALID_ALIAS_USAGE`.*
 
-## 2. Authorization (RBAC)
+## 2. Retrieval Security (Scope)
+
+Before the system even attempts to plan, we limit the **Knowledge Scope** available to the LLM. This prevents the "Decomposer" from hallucinating or planning against tables the user cannot see.
+
+### Vector Store Filtering
+
+The `OrchestratorVectorStore` enforces a strict **Metadata Filter** on every retrieval call.
+
+* **Mechanism**: `query({filter: {'datasource_id': {'$in': allowed_ds_ids}}})`
+* **Guarantee**: If a user only has access to `sales_db`, vectors from `hr_db` are physically excluded from the search space. The LLM never sees them.
+
+### Decomposer Fail-Safe
+
+The `DecomposerNode` performs an explicit pre-check:
+
+```python
+def _check_user_access(state):
+    allowed = state.user_context.get("allowed_datasources")
+    if not allowed:
+        raise SecurityViolation("Access Denied")
+```
+
+If the user context has no allowed datasources, the request is rejected immediately with `ErrorCode.SECURITY_VIOLATION`.
+
+## 3. Authorization (RBAC)
 
 We use a strict **Role-Based Access Control** system defined in `configs/policies.json`.
 
