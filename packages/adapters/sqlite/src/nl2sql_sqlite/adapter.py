@@ -1,5 +1,6 @@
 from typing import Any, List, Dict
 from sqlalchemy import create_engine, text, inspect
+from sqlalchemy.dialects import sqlite
 from nl2sql_adapter_sdk import (
  
     QueryResult, 
@@ -79,3 +80,7 @@ class SqliteAdapter(BaseSQLAlchemyAdapter):
             return CostEstimate(estimated_cost=1.0, estimated_rows=10) # Stub
         except Exception:
             return CostEstimate(estimated_cost=-1.0, estimated_rows=0)
+
+
+    def get_dialect(self) -> str:
+        return sqlite.dialect()

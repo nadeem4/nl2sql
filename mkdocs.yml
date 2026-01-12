@@ -58,9 +58,10 @@ nav:
     - Kubernetes: deployment/kubernetes.md
   - Core Engine:
     - Architecture: core/architecture.md
+    - The Orchestrator: core/orchestrator.md
     - Nodes & Pipeline: core/nodes.md
     - Environments: core/environment.md
-  - Agents & Subgraphs: core/agents.md
+  - SQL Agent Subgraph: core/sql_agent.md
   - Retrieval & Indexing: core/indexing.md
   - Security Architecture: safety/security.md
   - Operations:

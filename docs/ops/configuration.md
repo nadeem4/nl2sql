@@ -1,40 +1,122 @@
-# Configuration
+# Configuration Reference
 
-The platform is configured via a combination of **Environment Variables** (for secrets/global settings) and **YAML Config Files** (for structured data).
+The platform uses a **Two-Layer Configuration System**:
 
-## Global Settings (`config.yml` / `.env`)
+1. **Environment Variables**: For global settings, paths, and secrets.
+2. **YAML/JSON Files**: For structured data (Datasources, LLMs, Policies).
 
-Global settings control the behavior of the core engine.
+The `ConfigManager` enforces strict schemas (Pydantic Models) for all files.
 
-::: nl2sql.common.settings.Settings
+## 1. Global Settings (`.env`)
 
-## Datasources (`datasources.yaml`)
+These settings control the startup behavior and file locations.
 
-Defines the available databases and their connection details.
+| Variable | Default | Description |
+| :--- | :--- | :--- |
+| `OPENAI_API_KEY` | `None` | Required for LLM usage. |
+| `VECTOR_STORE` | `./chroma_db` | Path to the vector store persistence directory. |
+| `DATASOURCE_CONFIG` | `configs/datasources.yaml` | Path to the datasources file. |
+| `LLM_CONFIG` | `configs/llm.yaml` | Path to the LLM profile file. |
+| `SECRETS_CONFIG` | `configs/secrets.yaml` | Path to the secrets provider file. |
+| `POLICIES_CONFIG` | `configs/policies.json` | Path to the RBAC definitions. |
+| `ROUTER_L1_THRESHOLD` | `0.4` | Vector search similarity threshold. |
+
+## 2. Datasources (`datasources.yaml`)
+
+Defines the databases the platform can query.
+
+**Schema:** `List[DatasourceConfig]` wrapped in a file envelope.
 
 ```yaml
-postgres_prod:
-  type: postgres
-  connection_string: ${env:POSTGRES_URL}
-  schema: public
+version: 1
+datasources:
+  - id: "postgres_prod"
+    description: "Main production database"
+    connection:
+      type: "postgres"
+      host: "db.prod.internal"
+      port: 5432
+      database: "main_db"
+      username: "${aws-secrets:prod-db-user}"  # Secret Reference
+      password: "${aws-secrets:prod-db-pass}"
+    options:
+      schema: "public"
+      sslmode: "require"
 ```
 
-## RBAC Policies (`policies.json`)
+* **id**: Unique identifier used in routing and policies.
+* **connection**: Driver-specific connection args.
+* **options**: Extra kwargs passed to the adapter.
 
-Defines roles and access rules. (See [Security](../safety/security.md) for details).
+## 3. LLM Profiles (`llm.yaml`)
 
-## LLM Configuration (`llm.yaml`)
+Defines the models used by different agents.
 
-Defines the LLM providers and model parameters for different agents.
+**Schema:** `LLMFileConfig`
 
 ```yaml
+version: 1
+
 default:
-  provider: openai
-  model: gpt-4o
+  provider: "openai"
+  model: "gpt-4o"
+  temperature: 0.0
 
 agents:
   planner:
-    model: o1-preview  # Uses reasoning model for planning
+    provider: "openai"
+    model: "o1-preview"  # Reasoning model for planning
+  
   generator:
-    model: gpt-4o
+    provider: "openai"
+    model: "gpt-4o"
+    temperature: 0.0 # Strict generation
 ```
+
+* **default**: Fallback config for all agents.
+* **agents**: Overrides for specific nodes (`planner`, `generator`, `refiner`, `decomposer`).
+
+## 4. Security Policies (`policies.json`)
+
+Defines Role-Based Access Control (RBAC).
+
+**Schema:** `PolicyFileConfig`
+
+```json
+{
+  "version": 1,
+  "roles": {
+    "analyst": {
+      "description": "Standard read-only access",
+      "role": "analyst",
+      "allowed_datasources": ["postgres_prod"],
+      "allowed_tables": ["postgres_prod.users", "postgres_prod.orders"]
+    },
+    "admin": {
+      "description": "Full access",
+      "role": "admin",
+      "allowed_datasources": ["*"],
+      "allowed_tables": ["*"]
+    }
+  }
+}
+```
+
+* **allowed_tables**: Must be in `datasource.table` format (or `*`).
+
+## 5. Secrets (`secrets.yaml`)
+
+Configures how the app retrieves secrets (e.g., passwords, API keys).
+
+```yaml
+version: 1
+providers:
+  - id: "aws-secrets"
+    type: "aws_secrets_manager"
+    region_name: "us-east-1"
+
+  - id: "env-vars"
+    type: "env"
+```
+
+**Usage:** Access secrets in other config files using the syntax `${provider_id:secret_key}`.

@@ -1,5 +1,6 @@
 from typing import Any, List, Dict
 from sqlalchemy import create_engine, text, inspect
+from sqlalchemy.dialects import mssql
 from nl2sql_adapter_sdk import (
  
     QueryResult, 
@@ -14,7 +15,7 @@ from typing import Optional
 
 class MssqlConnectionConfig(BaseModel):
     """Strict configuration schema for MSSQL adapter."""
-    type: str
+    type: str = Field("mssql", description="Connection type")
     host: str = Field(..., description="Server hostname")
     user: Optional[str] = None
     password: Optional[str] = None
@@ -89,11 +90,7 @@ class MssqlAdapter(BaseSQLAlchemyAdapter):
 
     def get_dialect(self) -> str:
         """MSSQL uses T-SQL dialect."""
-        return "tsql"
-
-
-
-
+        return mssql.dialect()
 
     def cost_estimate(self, sql: str) -> CostEstimate:
         import re

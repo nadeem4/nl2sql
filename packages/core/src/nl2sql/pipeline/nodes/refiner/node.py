@@ -81,12 +81,19 @@ class RefinerNode:
             # Extract messages from PipelineError objects
             errors_str = "\n".join(f"- {e.message}" for e in state.errors)
 
+            reasoning_str = "No reasoning history."
+            if state.reasoning:
+                reasoning_str = "\n".join(
+                    f"[{r.get('node', 'unknown')}]: {r.get('content')}" for r in state.reasoning
+                )
+
             try:
                 feedback = self.chain.invoke({
                     "user_query": state.user_query,
                     "relevant_tables": relevant_tables,
                     "failed_plan": failed_plan_str,
-                    "errors": errors_str
+                    "errors": errors_str,
+                    "reasoning": reasoning_str
                 })
                 
                 return {

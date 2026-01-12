@@ -13,6 +13,13 @@ We provide first-class support for the following SQL databases via SQLAlchemy.
 | **[Microsoft SQL Server](mssql.md)** | Enterprise support via `pyodbc` and `T-SQL` dialect. | 🟡 Beta |
 | **[SQLite](sqlite.md)** | File-based local development. | 🟢 Stable |
 
+## Core Libraries
+
+For developers building their own adapters, we provide detailed reference documentation for our core SDKs.
+
+* **[Adapter SDK Reference](sdk.md)**: The core interface (`DatasourceAdapter`) that all adapters must implement.
+* **[SQLAlchemy Adapter Reference](sqlalchemy.md)**: The helper base class (`BaseSQLAlchemyAdapter`) for building SQL-based adapters.
+
 ## Missing your database?
 
 Can't find what you need? Check out the **[Building Adapters](development.md)** guide to see how to implement your own.

@@ -1,5 +1,6 @@
 from typing import Any, List, Dict
 from sqlalchemy import create_engine, text, inspect
+from sqlalchemy.dialects import mysql
 from nl2sql_adapter_sdk import (
     QueryResult, 
     CostEstimate,
@@ -98,9 +99,6 @@ class MysqlAdapter(BaseSQLAlchemyAdapter):
             return QueryPlan(plan_text=f"Error: {e}")
 
 
-
-
-
     def cost_estimate(self, sql: str) -> CostEstimate:
         import json
         try:
@@ -108,7 +106,6 @@ class MysqlAdapter(BaseSQLAlchemyAdapter):
                 res = conn.execute(text(f"EXPLAIN FORMAT=JSON {sql}")).scalar()
                 if res:
                     data = json.loads(res)
-                    # structure: { "query_block": { "cost_info": { "query_cost": "1.00" } } }
                     cost_info = data.get('query_block', {}).get('cost_info', {})
                     return CostEstimate(
                         estimated_cost=float(cost_info.get('query_cost', 0.0)),
@@ -117,3 +114,7 @@ class MysqlAdapter(BaseSQLAlchemyAdapter):
         except Exception:
              pass
         return CostEstimate(estimated_cost=0.0, estimated_rows=0)
+
+    def get_dialect(self) -> str:
+        return mysql.dialect()
+

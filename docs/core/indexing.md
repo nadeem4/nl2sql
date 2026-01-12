@@ -50,6 +50,3 @@ This ensures the Decomposer always receives both the **Schema Candidates** AND t
 Retrieval is strictly scoped by Security considerations:
 
 * **AuthZ**: `filter={'datasource_id': {'$in': allowed_ids}}` is applied to every query. The user can *never* retrieve a schema they don't have access to.
-
-::: nl2sql.services.vector_store.OrchestratorVectorStore.index_schema
-::: nl2sql.services.vector_store.OrchestratorVectorStore.retrieve_routing_context

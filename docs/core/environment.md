@@ -31,5 +31,3 @@ Example `.env.prod`:
 DB_PASSWORD=${aws-secrets:prod-db-password}
 API_KEY=${env:OPENAI_API_KEY}
 ```
-
-::: nl2sql.cli.generators.env.generator.EnvFileGenerator

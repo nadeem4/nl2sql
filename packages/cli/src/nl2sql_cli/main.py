@@ -14,7 +14,7 @@ from nl2sql.services.llm import LLMRegistry
 from nl2sql.common.settings import settings
 from nl2sql.services.vector_store import OrchestratorVectorStore
 from nl2sql.common.logger import configure_logging
-from nl2sql.secrets import secret_manager
+from nl2sql.context import NL2SQLContext
 
 # Local CLI Imports
 from nl2sql_cli.commands.indexing import run_indexing
@@ -36,11 +36,8 @@ app = typer.Typer(
 
 app.add_typer(policy_app, name="policy", help="Manage RBAC policies and security.")
 
-# Shared Options
-# Shared Options
 ConfigOption = Annotated[Optional[pathlib.Path], typer.Option("--config", help="Path to datasource config YAML")]
 SecretsConfigOption = Annotated[Optional[pathlib.Path], typer.Option("--secrets-config", help="Path to secrets config YAML")]
-# Common Option Types
 LLMConfigOption = Annotated[Optional[pathlib.Path], typer.Option("--llm-config", help="Path to LLM config YAML")]
 VectorStoreOption = Annotated[Optional[str], typer.Option("--vector-store", help="Path to vector store directory")]
 
@@ -93,26 +90,15 @@ def run(
         vector_store_path=vector_store
     )
     
-    cm = ConfigManager()
-    
-    # 1. Load Secrets FIRST (Datasources depend on them)
-    secret_configs = cm.load_secrets(secrets_config)
-    if secret_configs:
-         secret_manager.configure(secret_configs)
-    
-    # 2. Load Datasources
-    configs = cm.load_datasources(config)
-    ds_registry = DatasourceRegistry(configs)
-    
-    try:
-        llm_cfg = cm.load_llm(llm_config)
-        llm_registry = LLMRegistry(llm_cfg)
-    except Exception:
-        llm_registry = LLMRegistry(None)
 
-    v_store = OrchestratorVectorStore(persist_directory=vector_store)
+    ctx = NL2SQLContext.from_paths(
+        config_path=config,
+        secrets_path=secrets_config,
+        llm_config_path=llm_config,
+        vector_store_path=vector_store
+    )
 
-    exec_pipeline(run_config, ds_registry, llm_registry, v_store)
+    exec_pipeline(run_config, ctx.registry, ctx.llm_registry, ctx.vector_store)
 
 
 @app.command()
@@ -135,24 +121,14 @@ def index(
     if vector_store is None:
         vector_store = settings.vector_store_path
 
-    cm = ConfigManager()
-
-    # Load Secrets FIRST
-    secret_configs = cm.load_secrets(secrets_config)
-    if secret_configs:
-         secret_manager.configure(secret_configs)
-
-    configs = cm.load_datasources(config)
+    ctx = NL2SQLContext.from_paths(
+        config_path=config,
+        secrets_path=secrets_config,
+        llm_config_path=llm_config,
+        vector_store_path=vector_store
+    )
     
-    try:
-        llm_cfg = cm.load_llm(llm_config)
-        llm_registry = LLMRegistry(llm_cfg)
-    except Exception:
-        llm_registry = None
-
-    v_store = OrchestratorVectorStore(persist_directory=vector_store)
-    
-    run_indexing(configs, vector_store, v_store, llm_registry)
+    run_indexing(ctx.registry.get_all(), vector_store, ctx.vector_store, ctx.llm_registry)
 
 @app.command()
 def doctor():
@@ -227,18 +203,14 @@ def benchmark(
         stub_llm=False
     )
     
-    cm = ConfigManager()
-    
-    # Load Registry (Configs -> Eager Adapters)
-    secret_configs = cm.load_secrets(secrets_config)
-    if secret_configs:
-        secret_manager.configure(secret_configs)
 
-    configs = cm.load_datasources(config)
-    ds_registry = DatasourceRegistry(configs)
-    v_store = OrchestratorVectorStore(persist_directory=vector_store)
+    ctx = NL2SQLContext.from_paths(
+        config_path=config,
+        secrets_path=secrets_config,
+        vector_store_path=vector_store
+    )
     
-    exec_benchmark(bench_run_config, ds_registry, v_store)
+    exec_benchmark(bench_run_config, ctx.registry, ctx.vector_store)
 
 
 def main():

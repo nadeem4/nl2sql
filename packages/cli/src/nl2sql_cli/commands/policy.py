@@ -53,7 +53,7 @@ def validate(
         # Load and Configure Secrets
         secret_configs = cm.load_secrets(secrets)
         if secret_configs:
-             secret_manager.configure(secret_configs)
+            secret_manager.configure(secret_configs)
         
         # Load Datasources
         ds_configs = cm.load_datasources(config)

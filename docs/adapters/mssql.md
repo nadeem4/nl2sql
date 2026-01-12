@@ -2,8 +2,7 @@
 
 Support for SQL Server 2017+ and Azure SQL.
 
-!!! info "Implementation"
-    This adapter extends `BaseSQLAlchemyAdapter` but provides specialized `dry_run` logic using `SET NOEXEC ON` to safely validate T-SQL.
+This adapter extends `BaseSQLAlchemyAdapter` but provides specialized `dry_run` logic using `SET NOEXEC ON` to safely validate T-SQL.
 
 ## Configuration
 
@@ -34,6 +33,12 @@ connection:
 | **Timeout** | Not strictly enforced by driver | Rely on global statement timeout. |
 | **Dry Run** | `SET NOEXEC ON` | Validates syntax without execution. |
 | **Costing** | `SET SHOWPLAN_XML ON` | Parses XML for `StatementSubTreeCost`. |
+
+### Optimization Details
+
+* **Dry Run**: Uses `SET NOEXEC ON`. This is a native T-SQL session setting that compiles the query but ensures it is **not executed**. This is extremely safe and accurate for validation.
+* **Explain**: Uses `SET SHOWPLAN_XML ON` to retrieve the execution plan in XML format.
+* **Cost Estimate**: Parses the XML plan to find `StatementSubTreeCost` (estimated cost) and `StatementEstRows` (estimated rows).
 
 ## Requirements
 
