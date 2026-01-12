@@ -52,6 +52,10 @@ nav:
   - Getting Started:
     - Installation: getting-started/installation.md
     - Quickstart (Demo): getting-started/demo.md
+  - Deployment:
+    - Overview: deployment/index.md
+    - Docker: deployment/docker.md
+    - Kubernetes: deployment/kubernetes.md
   - Core Engine:
     - Architecture: core/architecture.md
     - Nodes & Pipeline: core/nodes.md
@@ -73,5 +77,5 @@ nav:
       - SQLite: adapters/sqlite.md
     - Extensions:
       - Building Adapters: adapters/development.md
-  - Development:
+  - Reference:
     - API Reference: dev/api.md
