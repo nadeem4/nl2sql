@@ -46,6 +46,7 @@ The core execution engine is built on **[LangGraph](https://langchain-ai.github.
 
 * **[Nodes & Pipeline](nodes.md)**: The atomic building blocks (Planner, Validator, Generator).
 * **[SQL Agent Subgraph](sql_agent.md)**: The "ReAct" reasoning loop that handles the planning and correction logic.
+* **Reliability Layer**: Built-in **Exponential Backoff** and **Smart Retries** to prevent cascading failures (Retry Storms) during transient outages.
 
 ## 2. The Data Plane (Retrieval)
 
