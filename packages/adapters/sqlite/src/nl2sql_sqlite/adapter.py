@@ -64,9 +64,9 @@ class SqliteAdapter(BaseSQLAlchemyAdapter):
         try:
             with self.engine.connect() as conn:
                 conn.execute(text(f"EXPLAIN QUERY PLAN {query}"))
-            return DryRunResult(valid=True, error=None)
+            return DryRunResult(is_valid=True, error_message=None)
         except Exception as e:
-            return DryRunResult(valid=False, error=str(e))
+            return DryRunResult(is_valid=False, error_message=str(e))
 
     def explain(self, query: str) -> QueryPlan:
          return QueryPlan(original_query=query, plan="EXPLAIN QUERY PLAN not fully parsed")
@@ -83,4 +83,4 @@ class SqliteAdapter(BaseSQLAlchemyAdapter):
 
 
     def get_dialect(self) -> str:
-        return sqlite.dialect()
+        return sqlite.dialect.name

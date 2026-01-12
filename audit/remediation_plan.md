@@ -28,10 +28,11 @@ This document serves as the master backlog for addressing findings from the Arch
   - **Fix**: Implemented idempotent `refresh_schema` and `refresh_examples` in `OrchestratorVectorStore`, along with dynamic `register_datasource` in `DatasourceRegistry`.
   - **Status**: Fixed. Unit tests added in `tests/unit/test_schema_lifecycle.py`.
 
-- [ ] **BUG-005: Missing Distributed Tracing** (High)
+- [x] **BUG-005: Missing Distributed Tracing** (High)
   - **Component**: Observability / Logging
   - **Issue**: Logs lack a unique `trace_id` per request, making concurrent request debugging impossible in multi-threaded environments.
-  - **Fix**: Inject `trace_id` at the `GraphState` entry point and propagate it to `Python LogRecord` context.
+  - **Fix**: Implemented `trace_id` in `GraphState`, `TraceContextFilter` in logger, and `traced_node` wrapper for context propagation.
+  - **Status**: Fixed. Verified in `tests/unit/test_tracing.py`.
 
 ## 🟡 Medium & Low Priority Bugs
 

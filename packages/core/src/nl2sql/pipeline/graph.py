@@ -15,9 +15,27 @@ from nl2sql.pipeline.state import GraphState
 from nl2sql.services.vector_store import OrchestratorVectorStore
 from nl2sql.services.llm import LLMRegistry
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
+from nl2sql.common.logger import trace_context
 
 
 LLMCallable = Union[Callable[[str], str], Runnable]
+
+
+def traced_node(node: Callable):
+    """Wraps a node to inject trace_id from state into the logging context."""
+    def wrapper(state: Union[Dict, Any]):
+        # Extract trace_id from state (dict or object)
+        tid = None
+        if isinstance(state, dict):
+            tid = state.get("trace_id")
+        else:
+            tid = getattr(state, "trace_id", None)
+            
+        if tid:
+            with trace_context(tid):
+                return node(state)
+        return node(state)
+    return wrapper
 
 
 def build_graph(
@@ -112,12 +130,12 @@ def build_graph(
             "intermediate_results": [message],
         }
 
-    graph.add_node("semantic_analysis", semantic_node)
-    graph.add_node("intent_validator", intent_validator_node)
-    graph.add_node("decomposer", decomposer_node)
-    graph.add_node("execution_branch", execution_wrapper)
-    graph.add_node("report_missing_datasource", report_missing_datasource)
-    graph.add_node("aggregator", aggregator_node)
+    graph.add_node("semantic_analysis", traced_node(semantic_node))
+    graph.add_node("intent_validator", traced_node(intent_validator_node))
+    graph.add_node("decomposer", traced_node(decomposer_node))
+    graph.add_node("execution_branch", traced_node(execution_wrapper))
+    graph.add_node("report_missing_datasource", traced_node(report_missing_datasource))
+    graph.add_node("aggregator", traced_node(aggregator_node))
 
     graph.set_entry_point("semantic_analysis")
     
@@ -140,6 +158,7 @@ def build_graph(
                 branches.append(Send("report_missing_datasource", {"user_query": sq.query}))
             
             payload = {
+                "trace_id": state.trace_id,
                 "user_query": sq.query,
                 "selected_datasource_id": sq.datasource_id,
                 "complexity": sq.complexity,

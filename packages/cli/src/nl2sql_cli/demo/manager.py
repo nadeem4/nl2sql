@@ -210,6 +210,7 @@ class DemoManager:
         from nl2sql.services.vector_store import OrchestratorVectorStore
         from nl2sql.services.llm import LLMRegistry
         from nl2sql.configs import ConfigManager 
+        from nl2sql.datasources import DatasourceRegistry 
         
         try:
             indexer_config_manager = ConfigManager(self.project_root)
@@ -224,7 +225,8 @@ class DemoManager:
             except Exception:
                 pass # Optional for schema indexing
                 
-            run_indexing(configs, settings.vector_store_path, v_store, llm_registry)
+            registry = DatasourceRegistry(configs)
+            run_indexing(registry, settings.vector_store_path, v_store, llm_registry)
             return True
         except Exception as e:
             self.print_error(f"Indexing Failed: {e}")

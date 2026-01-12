@@ -116,5 +116,5 @@ class MysqlAdapter(BaseSQLAlchemyAdapter):
         return CostEstimate(estimated_cost=0.0, estimated_rows=0)
 
     def get_dialect(self) -> str:
-        return mysql.dialect()
+        return mysql.dialect.name
 

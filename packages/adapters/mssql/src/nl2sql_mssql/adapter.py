@@ -90,7 +90,7 @@ class MssqlAdapter(BaseSQLAlchemyAdapter):
 
     def get_dialect(self) -> str:
         """MSSQL uses T-SQL dialect."""
-        return mssql.dialect()
+        return mssql.dialect.name
 
     def cost_estimate(self, sql: str) -> CostEstimate:
         import re

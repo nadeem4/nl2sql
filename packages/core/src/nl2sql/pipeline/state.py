@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Annotated, Literal
 import operator
+import uuid
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -40,6 +41,7 @@ class GraphState(BaseModel):
     """
     model_config = ConfigDict(extra="ignore", arbitrary_types_allowed=True)
 
+    trace_id: str = Field(default_factory=lambda: str(uuid.uuid4()), description="Distributed unique trace ID.")
     user_query: str = Field(description="Canonical user query.")
     complexity: Literal["simple", "complex"] = Field(
         default="complex",

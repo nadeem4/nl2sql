@@ -108,6 +108,4 @@ class PostgresAdapter(BaseSQLAlchemyAdapter):
             return CostEstimate(estimated_cost=0.0, estimated_rows=0)
 
     def get_dialect(self) -> str:
-        return postgresql.dialect()
-
-
+        return postgresql.dialect.name

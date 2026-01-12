@@ -17,11 +17,11 @@ You are the gatekeeper for a SQL generation system.
 
 [OUTPUT SCHEMA]
 Return a JSON object matching `IntentValidationResult`:
-{
+{{
   "is_safe": boolean,
   "violation_category": "jailbreak" | "pii_exfiltration" | "destructive" | "system_probing" | "none",
   "reasoning": "string"
-}
+}}
 
 [USER_QUERY]
 {user_query}
