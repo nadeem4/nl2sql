@@ -14,6 +14,10 @@ from nl2sql.common.errors import ErrorSeverity
 LLMCallable = Union[Callable[[str], str], Runnable]
 
 
+import time
+import random
+
+
 def build_sql_agent_graph(
     llm_map: Dict[str, LLMCallable],
     registry: DatasourceRegistry,
@@ -38,31 +42,50 @@ def build_sql_agent_graph(
     executor = ExecutorNode(registry=registry)
 
     def retry_node(state: GraphState) -> Dict:
+        """Increments retry count with exponential backoff and jitter."""
+        count = state.retry_count
+        base_delay = min(10.0, 1.0 * (2 ** count))
+        jitter = random.uniform(0.0, 0.5)
+        sleep_time = base_delay + jitter
+        
+        time.sleep(sleep_time)
+        
         return {
-            "retry_count": state.retry_count + 1,
+            "retry_count": count + 1,
         }
 
     def check_planner(state: GraphState) -> str:
+        """Routes based on planner result."""
         if not state.plan:
+            # If explicit errors exist, check retryability
+            if state.errors:
+                 if not all(e.is_retryable for e in state.errors):
+                     return "end"
+            
             if state.retry_count < 3:
                 return "retry"
             return "end"
         return "ok"
 
     def check_logical_validation(state: GraphState) -> str:
+        """Routes based on logical validation result."""
         if state.errors:
-            # Critical errors (e.g., Security) might stop execution immediately
-            if any(e.severity == ErrorSeverity.CRITICAL for e in state.errors):
+            # Critical/Fatal errors stop execution immediately
+            if not all(e.is_retryable for e in state.errors):
                 return "end"
+            
             if state.retry_count < 3:
                 return "retry"
             return "end"
         return "ok"
 
     def check_physical_validation(state: GraphState) -> str:
+        """Routes based on physical validation result."""
         if state.errors:
-            if any(e.severity == ErrorSeverity.CRITICAL for e in state.errors):
+             # Critical/Fatal errors stop execution immediately
+            if not all(e.is_retryable for e in state.errors):
                 return "end"
+            
             if state.retry_count < 3:
                 return "retry"
             return "end"
@@ -78,34 +101,28 @@ def build_sql_agent_graph(
 
     graph.set_entry_point("planner")
 
-    # Step 1: Planner
     graph.add_conditional_edges(
         "planner",
         check_planner,
         {"ok": "logical_validator", "retry": "retry_handler", "end": END},
     )
 
-    # Step 2: Logical Validation (AST)
     graph.add_conditional_edges(
         "logical_validator",
         check_logical_validation,
         {"ok": "generator", "retry": "retry_handler", "end": END},
     )
 
-    # Step 3: SQL Generation
     graph.add_edge("generator", "physical_validator")
 
-    # Step 4: Physical Validation (SQL Safety/Dry Run)
     graph.add_conditional_edges(
         "physical_validator",
         check_physical_validation,
         {"ok": "executor", "retry": "retry_handler", "end": END},
     )
 
-    # Step 5: Execution
     graph.add_edge("executor", END)
 
-    # Feedback Loop
     graph.add_edge("retry_handler", "refiner")
     graph.add_edge("refiner", "planner")
 

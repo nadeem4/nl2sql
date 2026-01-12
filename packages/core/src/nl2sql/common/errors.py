@@ -46,6 +46,16 @@ class ErrorCode(str, Enum):
     INTENT_VIOLATION = "INTENT_VIOLATION"
 
 
+
+FATAL_ERRORS = {
+    ErrorCode.SECURITY_VIOLATION,
+    ErrorCode.INTENT_VIOLATION,
+    ErrorCode.SAFEGUARD_VIOLATION,
+    ErrorCode.MISSING_DATASOURCE_ID,
+    ErrorCode.MISSING_LLM,
+    ErrorCode.INVALID_STATE
+}
+
 class PipelineError(BaseModel):
     """Represents a structured error within the pipeline.
 
@@ -65,3 +75,11 @@ class PipelineError(BaseModel):
     error_code: ErrorCode
     stack_trace: Optional[str] = None
     details: Optional[Any] = None
+
+    @property
+    def is_retryable(self) -> bool:
+        """Determines if this error should trigger a retry/refinement loop."""
+        if self.severity == ErrorSeverity.CRITICAL:
+            return False
+        return self.error_code not in FATAL_ERRORS
+

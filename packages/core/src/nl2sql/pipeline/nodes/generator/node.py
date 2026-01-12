@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import sqlglot
 from sqlglot import expressions as exp
-from typing import Dict, Any, List, Union
-from nl2sql.pipeline.state import GraphState
+from typing import Dict, Any, List, Union, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from nl2sql.pipeline.state import GraphState
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.datasources import DatasourceRegistry
 from nl2sql.common.logger import get_logger

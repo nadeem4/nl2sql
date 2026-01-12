@@ -10,10 +10,11 @@ This document serves as the master backlog for addressing findings from the Arch
   - **Fix**: Implement a dedicated **Intent Validator** layer separate from the Planner and `LogicalValidator` that specifically checks for adversarial patterns before planning.
   - **Status**: Fixed. Unit tests added in `tests/unit/test_node_intent_validator.py`.
 
-- [ ] **BUG-002: Unbounded Retry Storms** (Critical)
+- [x] **BUG-002: Unbounded Retry Storms** (Critical)
   - **Component**: Reliability / Graph
   - **Issue**: `check_planner` logic retries 3 times immediately without backoff. In a high-load or outage scenario, this triples the load on downstream services, causing cascading failure.
-  - **Fix**: Implement **Exponential Backoff** and **Jitter** in the `retry_handler` logic within `sql_agent.py`.
+  - **Fix**: Implement **Exponential Backoff** and **Jitter** in the `retry_handler` logic within `sql_agent.py`. Added selective retry logic to fail fast on fatal errors.
+  - **Status**: Fixed. Unit tests added in `tests/unit/test_sql_agent_retry.py`.
 
 - [ ] **BUG-003: Internal Error Leakage** (High)
   - **Component**: Security / Aggregator

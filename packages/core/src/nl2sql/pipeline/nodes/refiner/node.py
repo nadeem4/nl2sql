@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import json
-from typing import Callable, Optional, Union, Dict, Any
-
+from typing import Callable, Optional, Union, Dict, Any, TYPE_CHECKING
 from langchain_core.runnables import Runnable
 
-from nl2sql.pipeline.state import GraphState
+if TYPE_CHECKING:
+    from nl2sql.pipeline.state import GraphState
 from .prompts import REFINER_PROMPT
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 

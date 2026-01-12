@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from typing import Set, Dict, Any, List, Optional, Tuple
+from typing import Set, Dict, Any, List, Optional, Tuple, TYPE_CHECKING
 import traceback
 
-from nl2sql.pipeline.state import GraphState
+if TYPE_CHECKING:
+    from nl2sql.pipeline.state import GraphState
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.pipeline.nodes.planner.schemas import PlanModel, Expr
 from nl2sql.datasources import DatasourceRegistry
