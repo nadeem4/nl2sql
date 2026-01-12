@@ -9,6 +9,7 @@ from nl2sql.datasources import DatasourceRegistry
 from nl2sql.pipeline.nodes.decomposer import DecomposerNode
 from nl2sql.pipeline.nodes.aggregator import AggregatorNode
 from nl2sql.pipeline.nodes.semantic import SemanticAnalysisNode
+from nl2sql.pipeline.nodes.intent_validator import IntentValidatorNode
 from nl2sql.pipeline.subgraphs.execution import build_execution_subgraph
 from nl2sql.pipeline.state import GraphState
 from nl2sql.services.vector_store import OrchestratorVectorStore
@@ -54,6 +55,14 @@ def build_graph(
         registry, llm_registry, vector_store, vector_store_path
     )
     semantic_node = SemanticAnalysisNode(llm_registry.semantic_llm())
+    intent_validator_node = IntentValidatorNode(llm_registry.intent_validator_llm())
+
+    def check_intent(state: GraphState):
+        """Conditional check for intent violations."""
+        errors = state.errors or []
+        if any(e.error_code == ErrorCode.INTENT_VIOLATION for e in errors):
+            return "end"
+        return "continue"
 
     def execution_wrapper(state: Dict):
         result = execution_subgraph.invoke(state)
@@ -104,13 +113,21 @@ def build_graph(
         }
 
     graph.add_node("semantic_analysis", semantic_node)
+    graph.add_node("intent_validator", intent_validator_node)
     graph.add_node("decomposer", decomposer_node)
     graph.add_node("execution_branch", execution_wrapper)
     graph.add_node("report_missing_datasource", report_missing_datasource)
     graph.add_node("aggregator", aggregator_node)
 
     graph.set_entry_point("semantic_analysis")
-    graph.add_edge("semantic_analysis", "decomposer")
+    
+    graph.add_edge("semantic_analysis", "intent_validator")
+    
+    graph.add_conditional_edges(
+        "intent_validator",
+        check_intent,
+        {"continue": "decomposer", "end": "aggregator"} 
+    )
 
     def continue_to_subqueries(state: GraphState):
         branches = []

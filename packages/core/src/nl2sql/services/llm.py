@@ -170,6 +170,12 @@ class LLMRegistry:
         llm = self._base_llm("semantic_analysis")
         return self._wrap_structured_usage(llm, SemanticAnalysisResponse)
 
+    def intent_validator_llm(self) -> LLMCallable:
+        """Returns the LLM callable for the Intent Validator agent."""
+        from nl2sql.pipeline.nodes.intent_validator.schemas import IntentValidationResult
+        llm = self._base_llm("intent_validator")
+        return self._wrap_structured_usage(llm, IntentValidationResult)
+
     def llm_map(self) -> Dict[str, LLMCallable]:
         """Returns a dictionary of all agent LLM callables."""
         return {

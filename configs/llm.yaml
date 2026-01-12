@@ -2,4 +2,9 @@ version: 1
 default:
   provider: openai
   model: gpt-5.2
+agents:
+  intent_validator:
+    provider: openai
+    model: gpt-4o-mini
+    temperature: 0.0
 

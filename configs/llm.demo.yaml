@@ -6,3 +6,9 @@ default:
   model: gpt-4o
   temperature: 0.0
   api_key: ${env:OPENAI_API_KEY}
+agents:
+  intent_validator:
+    provider: openai
+    model: gpt-4o-mini
+    temperature: 0.0
+    api_key: ${env:OPENAI_API_KEY}

@@ -2,6 +2,26 @@
 
 Security is a first-class citizen in the NL2SQL Platform. We implement a **Defense-in-Depth** strategy involving Static Analysis, Execution Sandboxing, and Role-Based Access Control.
 
+## 0. Intent Validation (Layer 0)
+
+Before the pipeline even begins semantic analysis, the **Intent Validator** acts as the primary gatekeeper.
+
+### Purpose
+
+To mitigate **Logic Injection** and **Jailbreak** attacks where users trick the LLM into ignoring instructions or revealing sensitive data.
+
+### Mechanism
+
+The `IntentValidatorNode` uses a specialized, low-temperature LLM call to classify the User Query into one of several categories:
+
+1. **SAFE**: Benign business queries (e.g., "Show me sales").
+2. **JAILBREAK**: Attempts to bypass rules (e.g., "Ignore previous instructions").
+3. **PII_EXFILTRATION**: Requests for mass dumps of sensitive data without filters.
+4. **DESTRUCTIVE**: Attempts to modify data (DROP, DELETE).
+5. **SYSTEM_PROBING**: Queries about the system's own prompts or architecture.
+
+**Any result other than SAFE fails immediately** with `ErrorCode.INTENT_VIOLATION`. This node runs *before* the Planner has a chance to see the prompt, providing strong isolation.
+
 ## 1. Logical Validation (The Firewall)
 
 Before any SQL is generated or executed, the **Abstract Syntax Tree (AST)** must pass the **Logical Validator**.
