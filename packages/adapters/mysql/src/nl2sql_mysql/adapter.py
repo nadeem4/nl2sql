@@ -9,7 +9,7 @@ from nl2sql_adapter_sdk import (
 )
 from nl2sql_sqlalchemy_adapter import BaseSQLAlchemyAdapter
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, SecretStr
 from typing import Optional
 
 class MysqlConnectionConfig(BaseModel):
@@ -17,7 +17,7 @@ class MysqlConnectionConfig(BaseModel):
     type: str
     host: str = Field(..., description="MySQL server hostname")
     user: str = Field(..., description="Username")
-    password: str = Field(..., description="Password")
+    password: SecretStr = Field(..., description="Password")
     port: int = 3306
     database: str = Field(..., description="Database name")
     options: Dict[str, Any] = Field(default_factory=dict)
@@ -41,7 +41,7 @@ class MysqlAdapter(BaseSQLAlchemyAdapter):
         config = MysqlConnectionConfig(**args)
         
         user = config.user
-        password = config.password
+        password = config.password.get_secret_value()
         host = config.host
         port = config.port
         database = config.database

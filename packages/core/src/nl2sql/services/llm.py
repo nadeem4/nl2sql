@@ -111,15 +111,18 @@ class LLMRegistry:
         cfg = self._agent_cfg(agent)
         if cfg.provider != "openai":
             raise ValueError(f"Unsupported LLM provider: {cfg.provider}")
-        key = cfg.api_key or settings.openai_api_key
-        if not key:
+        
+        # Unwrap SecretStr if present
+        key_val = cfg.api_key.get_secret_value() if cfg.api_key else settings.openai_api_key
+        
+        if not key_val:
             raise RuntimeError("OPENAI_API_KEY is not set and no api_key provided in config.")
             
         # Enforce determinism: Temperature 0 and fixed seed
         return ChatOpenAI(
             model=cfg.model, 
             temperature=0.0, 
-            api_key=key, 
+            api_key=key_val, 
             tags=[agent],
             seed=42
         )

@@ -10,7 +10,7 @@ from nl2sql_adapter_sdk import (
 )
 from nl2sql_sqlalchemy_adapter import BaseSQLAlchemyAdapter
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, SecretStr
 from typing import Optional
 
 class MssqlConnectionConfig(BaseModel):
@@ -18,7 +18,7 @@ class MssqlConnectionConfig(BaseModel):
     type: str = Field("mssql", description="Connection type")
     host: str = Field(..., description="Server hostname")
     user: Optional[str] = None
-    password: Optional[str] = None
+    password: Optional[SecretStr] = None
     port: int = 1433
     database: str = Field(..., description="Database name")
     driver: str = "ODBC Driver 17 for SQL Server"
@@ -44,7 +44,7 @@ class MssqlAdapter(BaseSQLAlchemyAdapter):
         config = MssqlConnectionConfig(**args)
         
         user = config.user or ""
-        password = config.password or ""
+        password = config.password.get_secret_value() if config.password else ""
         host = config.host
         port = config.port
         database = config.database

@@ -33,14 +33,14 @@ class AzureSecretConfig(BaseSecretConfig):
     vault_url: str = Field(..., description="URL of the Key Vault.")
     
     client_id: Optional[str] = Field(None, description="Azure Client ID (Service Principal).")
-    client_secret: Optional[str] = Field(None, description="Azure Client Secret.")
+    client_secret: Optional[SecretStr] = Field(None, description="Azure Client Secret.")
     tenant_id: Optional[str] = Field(None, description="Azure Tenant ID.")
 
 class HashiCorpSecretConfig(BaseSecretConfig):
     """Configuration for HashiCorp Vault."""
     type: Literal["hashi"] = "hashi"
     url: str = Field(..., description="URL of the HashiCorp Vault server.")
-    token: Optional[str] = Field(None, description="Vault Token.")
+    token: Optional[SecretStr] = Field(None, description="Vault Token.")
     mount_point: str = Field("secret", description="Secrets engine mount point.")
 
 class EnvSecretConfig(BaseSecretConfig):

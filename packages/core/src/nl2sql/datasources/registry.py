@@ -33,10 +33,14 @@ class DatasourceRegistry:
         Returns:
             dict: The connection dictionary with resolved secrets.
         """
+        from pydantic import SecretStr
+        
         resolved_connection = unresolved_connection.copy()
         for key, value in unresolved_connection.items():
             if isinstance(value, str) and value.startswith("${") and value.endswith("}"):
-                resolved_connection[key] = self.find_and_resolve_secret(value)
+                # Wrap the resolved secret in SecretStr for safety
+                secret_val = self.find_and_resolve_secret(value)
+                resolved_connection[key] = SecretStr(secret_val)
         return resolved_connection
 
     def __init__(self, configs: List[Dict[str, Any]]):

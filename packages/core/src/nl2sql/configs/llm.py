@@ -1,13 +1,13 @@
 
 from typing import Optional, Dict
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, SecretStr
 
 class AgentConfig(BaseModel):
     """Configuration for a specific agent's LLM."""
     provider: str
     model: str
     temperature: float = 0.0
-    api_key: Optional[str] = None
+    api_key: Optional[SecretStr] = None
     base_url: Optional[str] = None
 
 class LLMFileConfig(BaseModel):

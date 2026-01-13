@@ -53,10 +53,11 @@ This document serves as the master backlog for addressing findings from the Arch
   - **Fix**: Enforced `temperature=0.0` and fixed `seed=42` in `LLMRegistry`.
   - **Status**: Fixed. Verified in `tests/unit/test_determinism.py`.
 
-- [ ] **BUG-009: Plaintext Secrets in Memory** (Low)
+- [x] **BUG-009: Plaintext Secrets in Memory** (Low)
   - **Component**: Security
   - **Issue**: Connection args (including passwords) are passed around in standard unique dictionaries.
-  - **Fix**: Wrap sensitive connection args in `SecretStr` (Pydantic) to prevent accidental logging/printing.
+  - **Fix**: Wrapped database passwords, API keys, and secret provider tokens in `SecretStr`.
+  - **Status**: Fixed. Verified in `tests/unit/test_secrets.py`.
 
 ## 🚀 Enhancements (Architecture Upgrade)
 
