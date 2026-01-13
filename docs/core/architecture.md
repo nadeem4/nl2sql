@@ -74,3 +74,4 @@ The platform is designed to be cloud-agnostic and operationally robust.
 
 * **[Environments](environment.md)**: Configuration management via `.env` files.
 * **[Adapters](../adapters/index.md)**: The connectivity layer that abstracts specific database dialects (Postgres, MSSQL, etc.).
+* **[Sandboxed Execution](../architecture/decisions/ADR-001_sandboxed_execution.md)**: Isolated process pools for executing untrusted SQL and performing heavy schema introspection.

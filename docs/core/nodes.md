@@ -45,14 +45,14 @@ The pipeline is composed of specialized **Nodes**. Each node performs a single r
 
 **Responsibility**: Execution Readiness.
 
-* **Dry Run**: Executes `EXPLAIN` or equivalent to verify syntax validity without running the query.
-* **Performance**: Checks row cost estimates against `row_limit`.
+* **Dry Run (Sandboxed)**: Executes `EXPLAIN` or equivalent inside the **Execution Sandbox** to verify syntax validity without crashing the main process.
+* **Performance (Sandboxed)**: Checks row cost estimates against `row_limit` in the sandbox.
 
 ## 7. Executor Node
 
 **Responsibility**: Sandboxed Execution.
 
-* **Logic**: Connects to the database using the specific Adapter and executes the query.
+* **Logic**: Offloads the query execution to the **Execution Process Pool** (`nl2sql.common.sandbox`). This isolates the main application from driver segfaults (e.g., OOMs, C-extension panics).
 * **Safety**: Read-only connection enforcement.
 
 ## 8. Refiner Node

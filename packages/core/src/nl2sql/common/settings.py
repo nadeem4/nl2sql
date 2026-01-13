@@ -45,6 +45,18 @@ class Settings(BaseSettings):
         description="Global timeout in seconds for pipeline execution."
     )
 
+    sandbox_exec_workers: int = Field(
+        default=4,
+        validation_alias="SANDBOX_EXEC_WORKERS",
+        description="Max workers for latency-sensitive execution pool."
+    )
+
+    sandbox_index_workers: int = Field(
+        default=2,
+        validation_alias="SANDBOX_INDEX_WORKERS",
+        description="Max workers for throughput-heavy indexing pool."
+    )
+
     model_config = SettingsConfigDict(
         env_file=".env", 
         env_file_encoding="utf-8", 
