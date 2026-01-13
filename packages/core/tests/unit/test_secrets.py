@@ -55,5 +55,30 @@ def test_config_hides_secrets():
         database="db"
     )
     
+
     assert "hidden_password" not in str(config)
     assert "**********" in str(config)
+
+def test_llm_registry_resolves_secrets():
+    """Verify SecretManager resolves SecretStr within Pydantic models."""
+    from nl2sql.secrets import secret_manager
+    from nl2sql.configs import LLMFileConfig, AgentConfig
+
+    config = LLMFileConfig(
+        default=AgentConfig(
+            provider="openai",
+            model="gpt-4o",
+            api_key=SecretStr("${env:TEST_LLM_KEY}")
+        )
+    )
+    
+    # Mock resolve
+    with patch("nl2sql.secrets.manager.SecretManager.resolve") as mock_resolve:
+        mock_resolve.return_value = "sk-resolved-key"
+        
+        # Test resolve_object directly (ConfigManager uses this)
+        resolved_config = secret_manager.resolve_object(config)
+        
+        # Verify resolution happened inside SecretStr
+        assert resolved_config.default.api_key.get_secret_value() == "sk-resolved-key"
+        mock_resolve.assert_called_with("${env:TEST_LLM_KEY}")

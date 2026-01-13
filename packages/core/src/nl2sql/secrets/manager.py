@@ -82,24 +82,35 @@ class SecretManager:
         
         raise ValueError(f"Secret not found: {secret_ref}")
 
+        return obj
+
     def resolve_object(self, obj: Any) -> Any:
         """
-        Recursively resolves secret references in a generic object (Pydantic model, dict, list, str).
+        Recursively resolves secret references in a generic object (Pydantic model, dict, list, str, SecretStr).
         Returns a new object with secrets resolved.
         """
-        from pydantic import BaseModel
+        from pydantic import BaseModel, SecretStr
 
         # Base case: String
         if isinstance(obj, str):
             if obj.startswith("${") and obj.endswith("}"):
                 return self.resolve(obj)
             return obj
+            
+        # Handle SecretStr
+        if isinstance(obj, SecretStr):
+            secret_val = obj.get_secret_value()
+            if secret_val and secret_val.startswith("${") and secret_val.endswith("}"):
+                resolved_val = self.resolve(secret_val)
+                return SecretStr(resolved_val)
+            return obj
         
         # Pydantic Model
         if isinstance(obj, BaseModel):
             # Recursively resolve fields
             updates = {}
-            for field_name in obj.model_fields.keys():
+            # Access model_fields from the class, not the instance
+            for field_name in type(obj).model_fields.keys():
                 val = getattr(obj, field_name)
                 resolved = self.resolve_object(val)
                 # Only update if changed (optimization)
