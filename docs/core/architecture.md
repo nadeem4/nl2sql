@@ -17,7 +17,7 @@ graph TD
     end
     
     subgraph "Data Plane (Memory)"
-        Orch <--> VS[(Vector Store)]
+        Orch -- "Guard (Breaker)" --> VS[(Vector Store)]
         VS -- Schema & Examples --> Plan
     end
     
@@ -28,11 +28,19 @@ graph TD
     
     subgraph "Infrastructure"
         Secret[Secret Manager] -.-> Adapters
-        Adapters[Datasource Adapters] <--> DB[(SQL Database)]
+        
+        subgraph "Sandbox (Isolation)"
+            Adapters[Datasource Adapters]
+        end
+        
+        Adapters <--> DB[(SQL Database)]
+        LLM[LLM Provider API]
     end
     
-    Exec --> Adapters
+    Exec -- "Guard (Breaker)" --> Adapters
     Agg --> Result([Final Result])
+    
+    Plan & Val & Agg -. "Guard (Breaker)" .-> LLM
 ```
 
 ## 1. The Control Plane (Pipeline)
@@ -46,7 +54,7 @@ The core execution engine is built on **[LangGraph](https://langchain-ai.github.
 
 * **[Nodes & Pipeline](nodes.md)**: The atomic building blocks (Planner, Validator, Generator).
 * **[SQL Agent Subgraph](sql_agent.md)**: The "ReAct" reasoning loop that handles the planning and correction logic.
-* **Reliability Layer**: Built-in **Exponential Backoff** and **Smart Retries** to prevent cascading failures (Retry Storms) during transient outages.
+* **Resilience**: Integrated **Circuit Breakers** and **Retries** to ensure robust execution.
 
 ## 2. The Data Plane (Retrieval)
 
@@ -57,7 +65,17 @@ The platform uses a **Retrieval Augmented Generation (RAG)** architecture to man
 * **[Indexing & Retrieval](indexing.md)**: How schemas and examples are stored in the Vector Store.
 * **Dynamic Context**: The `Orchestrator` retrieves only the relevant tables and similar SQL examples at runtime.
 
-## 3. The Security Plane (The Shield)
+## 3. The Reliability Plane (Defense in Depth)
+
+We assume that failures **will** happen. The system uses a layered defense strategy to maintain stability during outages or crashes.
+
+**Key Components:**
+
+* **[Reliability & Fault Tolerance](reliability.md)**: Comprehensive guide to Circuit Breakers, Sandboxing, and Retries.
+* **Circuit Breakers**: "Fail Fast" guards to prevent cascading failures when external services are down.
+* **Sandboxing**: Process isolation to prevent worker crashes from killing the orchestrator.
+
+## 4. The Security Plane (The Shield)
 
 Security is not an afterthought; it is architected into the "Firewall" layer of the pipeline.
 
@@ -66,7 +84,7 @@ Security is not an afterthought; it is architected into the "Firewall" layer of 
 * **[Security Architecture](../safety/security.md)**: Detailed breakdown of the Validator, RBAC Policies, and Secret Management.
 * **Valid-by-Construction**: The system generates an Abstract Syntax Tree (AST) first, validates it, and only then compiles it to SQL.
 
-## 4. Infrastructure
+## 5. Infrastructure
 
 The platform is designed to be cloud-agnostic and operationally robust.
 
@@ -74,4 +92,4 @@ The platform is designed to be cloud-agnostic and operationally robust.
 
 * **[Environments](environment.md)**: Configuration management via `.env` files.
 * **[Adapters](../adapters/index.md)**: The connectivity layer that abstracts specific database dialects (Postgres, MSSQL, etc.).
-* **[Sandboxed Execution](../architecture/decisions/ADR-001_sandboxed_execution.md)**: Isolated process pools for executing untrusted SQL and performing heavy schema introspection.
+* **[Sandboxed Execution](reliability.md#2-sandboxing-crash-isolation)**: Isolated process pools for executing untrusted SQL and performing heavy schema introspection.

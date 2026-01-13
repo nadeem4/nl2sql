@@ -128,98 +128,105 @@ class OrchestratorVectorStore:
             Dict[str, int]: Stats containing counts of indexed tables, columns, and foreign keys.
 
         Raises:
+        Raises:
              ValueError: If schema fetching fails in the sandbox.
         """
-        self.delete_documents(filter={"datasource_id": datasource_id, "type": "table"})
+        from nl2sql.common.resilience import VECTOR_BREAKER
 
-        pool = get_indexing_pool()
-            
-        request = ExecutionRequest(
-            mode="fetch_schema",
-            datasource_id=datasource_id,
-            engine_type=adapter.datasource_engine_type,
-            connection_args=adapter.connection_args
-        )
+        @VECTOR_BREAKER
+        def _execute_refresh():
+            self.delete_documents(filter={"datasource_id": datasource_id, "type": "table"})
 
-        from nl2sql.common.sandbox import execute_in_sandbox
-        result_contract = execute_in_sandbox(pool, _fetch_schema_in_process, request, timeout_sec=60)
-        
-        if not result_contract.success:
-            if result_contract.metrics.get("is_crash"):
+            pool = get_indexing_pool()
+                 
+            request = ExecutionRequest(
+                mode="fetch_schema",
+                datasource_id=datasource_id,
+                engine_type=adapter.datasource_engine_type,
+                connection_args=adapter.connection_args
+            )
+
+            from nl2sql.common.sandbox import execute_in_sandbox
+            result_contract = execute_in_sandbox(pool, _fetch_schema_in_process, request, timeout_sec=60)
+             
+            if not result_contract.success:
+                if result_contract.metrics.get("is_crash"):
                     logger.critical(f"Schema indexing caused Sandbox Crash: {result_contract.error}")
                     raise ValueError(f"Schema Fetch CRASHED (Segfault/OOM): {result_contract.error}")
-            else:
+                else:
                     raise ValueError(f"Schema Fetch Failed: {result_contract.error}")
 
-        schema_def = result_contract.data
+            schema_def = result_contract.data
 
-        documents = []
-        alias_map = {}
+            documents = []
+            alias_map = {}
 
-        for i, table_obj in enumerate(schema_def.tables):
-            alias = f"{datasource_id}_t{i+1}"
-            alias_map[table_obj.name] = alias
-            table_obj.alias = alias
+            for i, table_obj in enumerate(schema_def.tables):
+                alias = f"{datasource_id}_t{i+1}"
+                alias_map[table_obj.name] = alias
+                table_obj.alias = alias
 
-        for table_obj in schema_def.tables:
-            current_alias = table_obj.alias
+            for table_obj in schema_def.tables:
+                current_alias = table_obj.alias
 
-            col_strs = []
-            for col in table_obj.columns:
-                c_str = f"{current_alias}.{col.name} ({col.type})"
-                if col.description:
-                    c_str += f" '{col.description}'"
+                col_strs = []
+                for col in table_obj.columns:
+                    c_str = f"{current_alias}.{col.name} ({col.type})"
+                    if col.description:
+                        c_str += f" '{col.description}'"
+                    
+                    if col.statistics:
+                        stats = col.statistics
+                        extras = []
+                        if stats.sample_values:
+                            formatted_samples = [str(v) for v in stats.sample_values[:5]]
+                            extras.append(f"Samples: {formatted_samples}")
+                        if stats.min_value is not None and stats.max_value is not None:
+                            extras.append(f"Range: {stats.min_value}..{stats.max_value}")
+                        if extras:
+                            c_str += f" [{'; '.join(extras)}]"
+                    col_strs.append(c_str)
+                col_desc = ", ".join(col_strs)
+
+                pks = [col.name for col in table_obj.columns if col.is_primary_key]
+                pk_desc = f" Primary Key: {', '.join(pks)}." if pks else ""
+
+                fk_strs = []
+                for fk in table_obj.foreign_keys:
+                    target_alias = alias_map.get(fk.referred_table, fk.referred_table)
+                    src_cols = ",".join([f"{current_alias}.{c}" for c in fk.constrained_columns])
+                    ref_cols = ",".join(fk.referred_columns)
+                    fk_strs.append(f"{src_cols} -> {target_alias}.{ref_cols}")
                 
-                if col.statistics:
-                    stats = col.statistics
-                    extras = []
-                    if stats.sample_values:
-                        formatted_samples = [str(v) for v in stats.sample_values[:5]]
-                        extras.append(f"Samples: {formatted_samples}")
-                    if stats.min_value is not None and stats.max_value is not None:
-                        extras.append(f"Range: {stats.min_value}..{stats.max_value}")
-                    if extras:
-                        c_str += f" [{'; '.join(extras)}]"
-                col_strs.append(c_str)
-            col_desc = ", ".join(col_strs)
+                fk_desc = f" Foreign Keys: {'; '.join(fk_strs)}." if fk_strs else ""
+                comment_desc = f" Comment: {table_obj.description}." if table_obj.description else ""
 
-            pks = [col.name for col in table_obj.columns if col.is_primary_key]
-            pk_desc = f" Primary Key: {', '.join(pks)}." if pks else ""
+                content = (
+                    f"Table: {table_obj.name} (Alias: {current_alias}).{comment_desc} "
+                    f"Columns: {col_desc}.{pk_desc}{fk_desc}"
+                )
 
-            fk_strs = []
-            for fk in table_obj.foreign_keys:
-                target_alias = alias_map.get(fk.referred_table, fk.referred_table)
-                src_cols = ",".join([f"{current_alias}.{c}" for c in fk.constrained_columns])
-                ref_cols = ",".join(fk.referred_columns)
-                fk_strs.append(f"{src_cols} -> {target_alias}.{ref_cols}")
-            
-            fk_desc = f" Foreign Keys: {'; '.join(fk_strs)}." if fk_strs else ""
-            comment_desc = f" Comment: {table_obj.description}." if table_obj.description else ""
+                doc = Document(
+                    page_content=content,
+                    metadata={
+                        "table_name": table_obj.name,
+                        "datasource_id": datasource_id,
+                        "type": "table",
+                        "schema_json": table_obj.model_dump_json(),
+                    },
+                )
+                documents.append(doc)
 
-            content = (
-                f"Table: {table_obj.name} (Alias: {current_alias}).{comment_desc} "
-                f"Columns: {col_desc}.{pk_desc}{fk_desc}"
-            )
+            if documents:
+                self.vectorstore.add_documents(documents)
 
-            doc = Document(
-                page_content=content,
-                metadata={
-                    "table_name": table_obj.name,
-                    "datasource_id": datasource_id,
-                    "type": "table",
-                    "schema_json": table_obj.model_dump_json(),
-                },
-            )
-            documents.append(doc)
+            return {
+                "tables": len(schema_def.tables),
+                "columns": sum(len(t.columns) for t in schema_def.tables),
+                "fks": sum(len(t.foreign_keys) for t in schema_def.tables),
+            }
 
-        if documents:
-            self.vectorstore.add_documents(documents)
-
-        return {
-            "tables": len(schema_def.tables),
-            "columns": sum(len(t.columns) for t in schema_def.tables),
-            "fks": sum(len(t.foreign_keys) for t in schema_def.tables),
-        }
+        return _execute_refresh()
 
     def refresh_examples(self, datasource_id: str, examples: List[str], enricher: Any = None) -> int:
         """Refreshes the example questions index for a specific datasource.
@@ -256,18 +263,24 @@ class OrchestratorVectorStore:
         Returns:
             List[str]: List of table names.
         """
-        filter_arg = None
-        if datasource_id:
-            if isinstance(datasource_id, str):
-                filter_arg = {"datasource_id": datasource_id}
-            elif isinstance(datasource_id, list):
-                if len(datasource_id) == 1:
-                    filter_arg = {"datasource_id": datasource_id[0]}
-                else:
-                    filter_arg = {"datasource_id": {"$in": datasource_id}}
+        from nl2sql.common.resilience import VECTOR_BREAKER
 
-        docs = self.vectorstore.similarity_search(query, k=k, filter=filter_arg)
-        return [doc.metadata.get("table_name", "Unknown") for doc in docs]
+        @VECTOR_BREAKER
+        def _execute_search():
+            filter_arg = None
+            if datasource_id:
+                if isinstance(datasource_id, str):
+                    filter_arg = {"datasource_id": datasource_id}
+                elif isinstance(datasource_id, list):
+                    if len(datasource_id) == 1:
+                        filter_arg = {"datasource_id": datasource_id[0]}
+                    else:
+                        filter_arg = {"datasource_id": {"$in": datasource_id}}
+
+            docs = self.vectorstore.similarity_search(query, k=k, filter=filter_arg)
+            return [doc.metadata.get("table_name", "Unknown") for doc in docs]
+
+        return _execute_search()
 
     def _prepare_examples_for_datasource(
         self, ds_id: str, questions: List[str], enricher: Any = None
@@ -320,24 +333,30 @@ class OrchestratorVectorStore:
         Returns:
             List[Document]: Combined list of relevant documents.
         """
-        filter_base = None
-        if datasource_id:
-            filter_base = {"datasource_id": {"$in": datasource_id}}
+        from nl2sql.common.resilience import VECTOR_BREAKER
 
-        filter_tables = filter_base.copy() if filter_base else {}
-        filter_tables["type"] = "table"
+        @VECTOR_BREAKER
+        def _execute_mmr():
+            filter_base = None
+            if datasource_id:
+                filter_base = {"datasource_id": {"$in": datasource_id}}
 
-        table_docs = self.vectorstore.max_marginal_relevance_search(
-            query, k=k, fetch_k=k * 4, lambda_mult=0.7, filter=filter_tables
-        )
+            filter_tables = filter_base.copy() if filter_base else {}
+            filter_tables["type"] = "table"
 
-        filter_examples = filter_base.copy() if filter_base else {}
-        filter_examples["type"] = "example"
+            table_docs = self.vectorstore.max_marginal_relevance_search(
+                query, k=k, fetch_k=k * 4, lambda_mult=0.7, filter=filter_tables
+            )
 
-        example_docs = self.vectorstore.max_marginal_relevance_search(
-            query, k=k, fetch_k=k * 4, lambda_mult=0.7, filter=filter_examples
-        )
+            filter_examples = filter_base.copy() if filter_base else {}
+            filter_examples["type"] = "example"
 
-        return table_docs + example_docs
+            example_docs = self.vectorstore.max_marginal_relevance_search(
+                query, k=k, fetch_k=k * 4, lambda_mult=0.7, filter=filter_examples
+            )
+
+            return table_docs + example_docs
+
+        return _execute_mmr()
 
 

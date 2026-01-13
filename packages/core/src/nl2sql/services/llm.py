@@ -137,6 +137,9 @@ class LLMRegistry:
     def _wrap_structured_usage(self, llm: ChatOpenAI, schema: Any) -> LLMCallable:    
         structured_llm = llm.with_structured_output(schema)
 
+        from nl2sql.common.resilience import LLM_BREAKER
+
+        @LLM_BREAKER
         def call(prompt: str) -> Any:
             return structured_llm.invoke(prompt)
 
@@ -151,7 +154,15 @@ class LLMRegistry:
     def refiner_llm(self) -> LLMCallable:
         """Returns the LLM callable for the Refiner agent."""
         llm = self._base_llm("refiner")
-        return llm.invoke
+        from nl2sql.common.resilience import LLM_BREAKER
+        
+        # We need to wrap the bound method or return a wrapper function
+        # Using decorator on a lambda or wrapper is cleaner
+        @LLM_BREAKER
+        def wrapped_invoke(prompt: str) -> Any:
+            return llm.invoke(prompt)
+
+        return wrapped_invoke
 
 
     def decomposer_llm(self) -> LLMCallable:

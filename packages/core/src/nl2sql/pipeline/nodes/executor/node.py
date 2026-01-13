@@ -165,32 +165,67 @@ class ExecutorNode:
 
             # Use centralized safe execution helper
             from nl2sql.common.sandbox import execute_in_sandbox
-            result_contract = execute_in_sandbox(pool, _execute_in_process, request)
+            from nl2sql.common.resilience import DB_BREAKER
+            import pybreaker
+
+            try:
+                @DB_BREAKER
+                def _execute_guarded():
+                    res = execute_in_sandbox(pool, _execute_in_process, request)
+                    if not res.success:
+                        # Trip breaker on Crashes (Segfault/OOM) or Timeouts
+                        # We do NOT trip on generic SQL errors (Syntax, Constraint)
+                        if res.metrics.get("is_crash"):
+                            raise RuntimeError(f"Sandbox Crash: {res.error}")
+                        if "timed out" in str(res.error).lower():
+                            raise TimeoutError(res.error)
+                    return res
+
+                result_contract = _execute_guarded()
+
+            except pybreaker.CircuitBreakerError:
+                msg = "Execution unavailable (Circuit Breaker Open). The database seems to be down."
+                logger.warning(f"DB_BREAKER prevented execution for {ds_id}")
+                return {
+                        "execution": ExecutionModel(row_count=0, rows=[], error=msg),
+                        "errors": [PipelineError(
+                            node=node_name,
+                            message=msg,
+                            severity=ErrorSeverity.ERROR,
+                            error_code=ErrorCode.SERVICE_UNAVAILABLE
+                        )]
+                }
+            except Exception as e:
+                # Re-construct failure result if the guard raised (and thus tripped breaker)
+                # This handles the "first" failure that trips it, or failures while closed
+                
+                err_code = ErrorCode.DB_EXECUTION_ERROR
+                if isinstance(e, RuntimeError) and "Sandbox Crash" in str(e):
+                    err_code = ErrorCode.EXECUTOR_CRASH
+                elif isinstance(e, TimeoutError):
+                    err_code = ErrorCode.EXECUTION_TIMEOUT
+
+                return {
+                    "execution": ExecutionModel(row_count=0, rows=[], error=str(e)),
+                    "errors": [PipelineError(
+                        node=node_name,
+                        message=f"Execution Failed (Breaker Monitored): {e}",
+                        severity=ErrorSeverity.ERROR, 
+                        error_code=err_code
+                    )]
+                }
 
             if not result_contract.success:
-                 # Check if it was a crash or logic error
-                 if result_contract.metrics.get("is_crash"):
-                     error_msg = result_contract.error
-                     return {
-                        "execution": ExecutionModel(row_count=0, rows=[], error=error_msg),
-                        "errors": [PipelineError(
-                            node=node_name,
-                            message=error_msg,
-                            severity=ErrorSeverity.CRITICAL,
-                            error_code=ErrorCode.EXECUTOR_CRASH
-                        )]
-                     }
-                 else:
-                     # Standard execution error
-                     return {
-                        "execution": ExecutionModel(row_count=0, rows=[], error=result_contract.error),
-                        "errors": [PipelineError(
-                            node=node_name,
-                            message=f"Execution error: {result_contract.error}",
-                            severity=ErrorSeverity.ERROR,
-                            error_code=ErrorCode.DB_EXECUTION_ERROR
-                        )]
-                     }
+                 # Standard logic execution error (Syntax, etc.) that didn't trip breaker
+                 return {
+                    "execution": ExecutionModel(row_count=0, rows=[], error=result_contract.error),
+                    "errors": [PipelineError(
+                        node=node_name,
+                        message=f"Execution error: {result_contract.error}",
+                        severity=ErrorSeverity.ERROR,
+                        error_code=ErrorCode.DB_EXECUTION_ERROR
+                    )]
+                 }
 
             result_data = result_contract.data
             total_bytes = result_data.get("bytes_returned", 0)
