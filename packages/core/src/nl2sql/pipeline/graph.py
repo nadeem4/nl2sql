@@ -230,7 +230,45 @@ def run_with_graph(
         user_context=user_context or {},
     )
 
-    return graph.invoke(
-        initial_state.model_dump(),
-        config={"callbacks": callbacks},
-    )
+    from nl2sql.common.settings import settings
+    import concurrent.futures
+    import traceback
+
+    timeout_sec = settings.global_timeout_sec
+
+    def _invoke():
+        return graph.invoke(
+            initial_state.model_dump(),
+            config={"callbacks": callbacks},
+        )
+
+    try:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(_invoke)
+            return future.result(timeout=timeout_sec)
+    except concurrent.futures.TimeoutError:
+        error_msg = f"Pipeline execution timed out after {timeout_sec} seconds."
+        return {
+            "errors": [
+                PipelineError(
+                    node="orchestrator",
+                    message=error_msg,
+                    severity=ErrorSeverity.ERROR,
+                    error_code=ErrorCode.PIPELINE_TIMEOUT,
+                )
+            ],
+            "final_answer": "I apologize, but the request timed out. Please try again with a simpler query."
+        }
+    except Exception as e:
+        # Fallback for other runtime crashes
+        return {
+            "errors": [
+                 PipelineError(
+                    node="orchestrator",
+                    message=f"Pipeline crashed: {str(e)}",
+                    severity=ErrorSeverity.ERROR,
+                    error_code=ErrorCode.UNKNOWN_ERROR,
+                    stack_trace=traceback.format_exc()
+                )
+            ]
+        }

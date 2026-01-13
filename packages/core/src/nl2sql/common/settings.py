@@ -38,6 +38,12 @@ class Settings(BaseSettings):
         validation_alias="ROUTER_L2_THRESHOLD", 
         description="relaxed distance threshold for Layer 2 (Multi-Query) voting."
     )
+    
+    global_timeout_sec: int = Field(
+        default=60,
+        validation_alias="GLOBAL_TIMEOUT_SEC",
+        description="Global timeout in seconds for pipeline execution."
+    )
 
     model_config = SettingsConfigDict(
         env_file=".env", 

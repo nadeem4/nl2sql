@@ -115,8 +115,14 @@ class LLMRegistry:
         if not key:
             raise RuntimeError("OPENAI_API_KEY is not set and no api_key provided in config.")
             
-        # We use tags to identifying agent in the global PipelineMonitor
-        return ChatOpenAI(model=cfg.model, temperature=cfg.temperature, api_key=key, tags=[agent])
+        # Enforce determinism: Temperature 0 and fixed seed
+        return ChatOpenAI(
+            model=cfg.model, 
+            temperature=0.0, 
+            api_key=key, 
+            tags=[agent],
+            seed=42
+        )
 
     def get_llm(self, agent: str) -> ChatOpenAI:
         """

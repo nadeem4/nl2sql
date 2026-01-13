@@ -36,20 +36,22 @@ This document serves as the master backlog for addressing findings from the Arch
 
 ## 🟡 Medium & Low Priority Bugs
 
-- [ ] **BUG-006: Missing Global Timeout** (Medium)
+- [x] **BUG-006: Missing Global Timeout** (Medium)
   - **Component**: Reliability
   - **Issue**: Sub-query branches or long-running chains have no global deadline, risking zombie threads.
-  - **Fix**: Add `execution_timeout` to the `Graph.invoke` config and handle `TimeoutError` gracefully.
+  - **Fix**: Implemented `ThreadPoolExecutor` wrapper in `run_with_graph` to enforce `GLOBAL_TIMEOUT_SEC`.
+  - **Status**: Fixed. Verified in `tests/unit/test_timeout.py`.
 
 - [ ] **BUG-007: Ephemeral Cost Tracking** (Medium)
   - **Component**: Operations
   - **Issue**: Token usage logs are stored in a global in-memory variable `token_log`. Data is lost on pod restart.
   - **Fix**: Flush token usage logs to a persistent store (Audit DB or structured log stream).
 
-- [ ] **BUG-008: Non-Deterministic Planning** (Medium)
-  - **Component**: Safety
+- [x] **BUG-008: Non-Deterministic Planning** (Medium)
+  - **Component**: Safety / Governance
   - **Issue**: `configs/llm.yaml` does not enforce `temperature=0`. Users get different execution plans for the same query.
-  - **Fix**: Hardcode `temperature: 0.0` for all Planner/Validator agents in `LLMRegistry`.
+  - **Fix**: Enforced `temperature=0.0` and fixed `seed=42` in `LLMRegistry`.
+  - **Status**: Fixed. Verified in `tests/unit/test_determinism.py`.
 
 - [ ] **BUG-009: Plaintext Secrets in Memory** (Low)
   - **Component**: Security
