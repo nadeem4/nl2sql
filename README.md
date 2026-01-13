@@ -32,6 +32,13 @@ The architecture is composed of three distinct planes, ensuring separation of co
 * **Blast Radius Isolation**: SQL Drivers (ODBC/C-Ext) run in a dedicated **[Sandboxed Process Pool](docs/architecture/decisions/ADR-001_sandboxed_execution.md)**. A segfault in a driver kills a disposable worker, not the Agent.
 * **Partitioned Retrieval**: The [Orchestrator](docs/core/indexing.md) uses Partitioned MMR to inject only relevant schema context, preventing context window overflow.
 
+### 4. The Reliability Plane (The Guard)
+
+**Responsibility**: Fault Tolerance and Stability.
+
+* **Layered Defense**: A combination of **[Retries, Circuit Breakers, and Sandboxing](docs/core/reliability.md)** ensures the system stays up even when LLMs or Databases go down.
+* **Fail-Fast**: We stop processing immediately if a dependency is unresponsive, preserving resources.
+
 ---
 
 ## 📐 Architectural Invariants
@@ -83,7 +90,8 @@ nl2sql setup --demo
 * **[System Architecture](docs/core/architecture.md)**: Deep dive into the Control, Security, and Data planes.
 * **[Component Reference](docs/core/nodes.md)**: Detailed specs for Planner, Validator, Executor, etc.
 * **[Security Model](docs/safety/security.md)**: Defense-in-depth strategy against prompt injection and unauthorized access.
-* **[ADR-001: Sandboxed Execution](docs/architecture/decisions/ADR-001_sandboxed_execution.md)**: Decision record for the Process Pool architecture.
+* **[Security Model](docs/safety/security.md)**: Defense-in-depth strategy against prompt injection and unauthorized access.
+* **[Reliability & Fault Tolerance](docs/core/reliability.md)**: Guide to Circuit Breakers, Sandbox isolation, and Recovery strategies.
 
 ---
 

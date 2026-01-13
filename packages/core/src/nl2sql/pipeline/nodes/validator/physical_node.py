@@ -54,7 +54,7 @@ def _cost_estimate_in_process(request: ExecutionRequest) -> ExecutionResult:
         cost = adapter.cost_estimate(request.sql)
         return ExecutionResult(
             success=True,
-            data={"estimated_rows": cost.estimated_rows, "estimated_bytes": cost.estimated_bytes}
+            data=cost.model_dump()
         )
     except Exception as e:
         return ExecutionResult(success=False, error=str(e))
@@ -107,23 +107,36 @@ class PhysicalValidatorNode:
             )
             
             from nl2sql.common.sandbox import execute_in_sandbox
-            res_contract = execute_in_sandbox(pool, _dry_run_in_process, request)
+            from nl2sql.common.resilience import DB_BREAKER
+            import pybreaker
+            
+            @DB_BREAKER
+            def _guarded_semantic():
+                 res = execute_in_sandbox(pool, _dry_run_in_process, request)
+                 if not res.success:
+                     if res.metrics.get("is_crash"):
+                         raise RuntimeError(f"Sandbox Crash: {res.error}")
+                     if "timed out" in str(res.error).lower():
+                         raise TimeoutError(res.error)
+                 return res
+
+            res_contract = _guarded_semantic()
             
             if not res_contract.success:
-                # Check for crash
-                if res_contract.metrics.get("is_crash"):
-                    logger.error(f"Dry run caused Sandbox Crash: {res_contract.error}")
-                    return PipelineError(
-                        node="physical_validator",
-                        message="Validation Pre-Check caused a Segfault (Sandbox Crash). Query likely unsafe.",
-                        severity=ErrorSeverity.CRITICAL,
-                        error_code=ErrorCode.EXECUTOR_CRASH
-                    )
-                
-                return PipelineError(
-                    node="physical_validator",
-                    message=f"Dry Run Failed: {res_contract.error}",
-                    severity=ErrorSeverity.ERROR,
+                 # Check for crash
+                 if res_contract.metrics.get("is_crash"):
+                     logger.error(f"Dry run caused Sandbox Crash: {res_contract.error}")
+                     return PipelineError(
+                         node="physical_validator",
+                         message="Validation Pre-Check caused a Segfault (Sandbox Crash). Query likely unsafe.",
+                         severity=ErrorSeverity.CRITICAL,
+                         error_code=ErrorCode.EXECUTOR_CRASH
+                     )
+                 
+                 return PipelineError(
+                     node="physical_validator",
+                     message=f"Dry Run Failed: {res_contract.error}",
+                     severity=ErrorSeverity.ERROR,
                      error_code=ErrorCode.EXECUTION_ERROR
                  )
 
@@ -137,6 +150,14 @@ class PhysicalValidatorNode:
                     error_code=ErrorCode.EXECUTION_ERROR
                 )
 
+        except pybreaker.CircuitBreakerError:
+             logger.warning("DB Circuit Breaker Open during semantic validation.")
+             return PipelineError(
+                 node="physical_validator",
+                 message="Validation skipped (Circuit Breaker Open).",
+                 severity=ErrorSeverity.ERROR,
+                 error_code=ErrorCode.SERVICE_UNAVAILABLE
+             )
         except Exception as e:
             logger.warning(f"Dry run skipped or failed: {e}")
         return None
@@ -163,7 +184,20 @@ class PhysicalValidatorNode:
             )
             
             from nl2sql.common.sandbox import execute_in_sandbox
-            res_contract = execute_in_sandbox(pool, _cost_estimate_in_process, request)
+            from nl2sql.common.resilience import DB_BREAKER
+            import pybreaker
+
+            @DB_BREAKER
+            def _guarded_performance():
+                res = execute_in_sandbox(pool, _cost_estimate_in_process, request)
+                if not res.success:
+                    if res.metrics.get("is_crash"):
+                        raise RuntimeError(f"Sandbox Crash: {res.error}")
+                    if "timed out" in str(res.error).lower():
+                        raise TimeoutError(res.error)
+                return res
+
+            res_contract = _guarded_performance()
             
             if res_contract.success:
                 data = res_contract.data
@@ -179,6 +213,9 @@ class PhysicalValidatorNode:
             else:
                  logger.warning(f"Cost estimation failed: {res_contract.error}")
 
+        except pybreaker.CircuitBreakerError:
+            logger.warning("Cost estimation skipped (Circuit Breaker Open).")
+            # We don't return error here, just skip performance check
         except Exception as e:
              logger.warning(f"Performance check skipped: {e}")
         return errors

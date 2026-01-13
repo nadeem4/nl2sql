@@ -61,6 +61,7 @@ nav:
     - The Orchestrator: core/orchestrator.md
     - Nodes & Pipeline: core/nodes.md
     - Environments: core/environment.md
+    - Reliability: core/reliability.md
   - SQL Agent Subgraph: core/sql_agent.md
   - Retrieval & Indexing: core/indexing.md
   - Security Architecture: safety/security.md

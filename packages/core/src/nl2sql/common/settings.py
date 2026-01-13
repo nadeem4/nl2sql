@@ -57,6 +57,22 @@ class Settings(BaseSettings):
         description="Max workers for throughput-heavy indexing pool."
     )
 
+    default_row_limit: int = Field(
+        default=10000,
+        validation_alias="DEFAULT_ROW_LIMIT",
+        description="Default row limit for SQL execution safeguards."
+    )
+    default_max_bytes: int = Field(
+        default=10485760, # 10 MB
+        validation_alias="DEFAULT_MAX_BYTES",
+        description="Default max bytes limit for SQL execution safeguards."
+    )
+    default_statement_timeout_ms: int = Field(
+        default=30000, # 30s
+        validation_alias="DEFAULT_STATEMENT_TIMEOUT_MS",
+        description="Default statement timeout for SQL execution safeguards."
+    )
+
     model_config = SettingsConfigDict(
         env_file=".env", 
         env_file_encoding="utf-8", 
