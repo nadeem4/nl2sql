@@ -73,6 +73,18 @@ class Settings(BaseSettings):
         description="Default statement timeout for SQL execution safeguards."
     )
 
+    observability_exporter: str = Field(
+        default="none",
+        validation_alias="OBSERVABILITY_EXPORTER",
+        description="Exporter for metrics/traces: 'none', 'console', 'otlp'."
+    )
+
+    otlp_endpoint: Optional[str] = Field(
+        default=None,
+        validation_alias="OTEL_EXPORTER_OTLP_ENDPOINT",
+        description="Endpoint for OTLP exporter (e.g. http://localhost:4317)."
+    )
+
     model_config = SettingsConfigDict(
         env_file=".env", 
         env_file_encoding="utf-8", 
