@@ -1,10 +1,12 @@
 
 import unittest
-from unittest.mock import MagicMock
-from nl2sql.pipeline.nodes.executor.node import ExecutorNode
+from unittest.mock import MagicMock, patch
+from concurrent.futures import Future
+
+from nl2sql.pipeline.nodes.executor.node import ExecutorNode, _execute_in_process
 from nl2sql.pipeline.state import GraphState
-from nl2sql.common.errors import ErrorCode
-from nl2sql_adapter_sdk import QueryResult, Column, CostEstimate
+from nl2sql.common.errors import ErrorCode, ErrorSeverity
+from nl2sql_adapter_sdk import QueryResult, CostEstimate
 
 class TestExecutorNode(unittest.TestCase):
     def setUp(self):
@@ -16,8 +18,12 @@ class TestExecutorNode(unittest.TestCase):
         self.mock_adapter.row_limit = 100
         self.mock_adapter.max_bytes = 1000
         self.mock_adapter.connection_type = "mock_db"
+        self.mock_adapter.datasource_engine_type = "mock_engine"
+        self.mock_adapter.connection_args = {"host": "localhost"}
+        self.mock_adapter.statement_timeout_ms = 5000
         
         self.node = ExecutorNode(self.mock_registry)
+
 
     def test_missing_inputs(self):
         """Test error when SQL or Datasource ID is missing."""
@@ -29,66 +35,79 @@ class TestExecutorNode(unittest.TestCase):
         res = self.node(state)
         self.assertEqual(res["errors"][0].error_code, ErrorCode.MISSING_DATASOURCE_ID)
 
-    def test_safeguard_row_limit(self):
-        """Test that execution halts if estimated rows exceed limit."""
-        self.mock_adapter.cost_estimate.return_value = CostEstimate(estimated_rows=200, estimated_cost=10.0)
+    @patch("nl2sql.pipeline.nodes.executor.node.get_execution_pool")
+    def test_execution_success(self, mock_get_pool):
+        """Test successful query execution via sandbox."""
+        # 1. Setup Mock Pool and Future
+        mock_pool = MagicMock()
+        mock_get_pool.return_value = mock_pool
         
-        state = GraphState(user_query="q", sql_draft="SELECT * FROM huge_table", selected_datasource_id="ds1")
-        res = self.node(state)
-        
-        self.assertEqual(len(res["errors"]), 1)
-        self.assertEqual(res["errors"][0].error_code, ErrorCode.SAFEGUARD_VIOLATION)
-        self.assertIn("exceeding limit of 100", res["errors"][0].message)
-        self.mock_adapter.execute.assert_not_called()
-
-    def test_safeguard_max_bytes(self):
-        """Test that execution halts if result size exceeds limit."""
-        # Cost estimate passes
-        self.mock_adapter.cost_estimate.return_value = CostEstimate(estimated_rows=10, estimated_cost=1.0)
-        
-        # Execution returns huge result
-        self.mock_adapter.execute.return_value = QueryResult(
-            columns=["d"], 
-            rows=[["x"]], 
-            row_count=1, 
-            bytes_returned=2000 # > 1000
-        )
-        
-        state = GraphState(user_query="q", sql_draft="SELECT * FROM blob_table", selected_datasource_id="ds1")
-        res = self.node(state)
-        
-        self.assertEqual(len(res["errors"]), 1)
-        self.assertEqual(res["errors"][0].error_code, ErrorCode.SAFEGUARD_VIOLATION)
-        self.assertIn("exceeds configured limit", res["errors"][0].message)
-
-    def test_execution_success(self):
-        """Test successful query execution."""
-        self.mock_adapter.cost_estimate.return_value = CostEstimate(estimated_rows=10, estimated_cost=1.0)
-        self.mock_adapter.execute.return_value = QueryResult(
+        expected_result = QueryResult(
             columns=["id", "val"], 
             rows=[[1, "A"], [2, "B"]], 
             row_count=2, 
             bytes_returned=100
         )
         
+        future = Future()
+        future.set_result(expected_result)
+        mock_pool.submit.return_value = future
+        
+        # 2. Run
         state = GraphState(user_query="q", sql_draft="SELECT * FROM table", selected_datasource_id="ds1")
         res = self.node(state)
         
+        # 3. Verify
         self.assertFalse(res["errors"])
         self.assertEqual(res["execution"].row_count, 2)
         self.assertEqual(res["execution"].rows[0]["val"], "A")
-
-    def test_adapter_failure(self):
-        """Test handling of DB execution errors."""
-        self.mock_adapter.cost_estimate.return_value = CostEstimate(estimated_rows=10, estimated_cost=1.0)
-        self.mock_adapter.execute.side_effect = Exception("DB Connection Lost")
         
-        state = GraphState(user_query="q", sql_draft="SELECT 1", selected_datasource_id="ds1")
+        # Verify submit called with correct args
+        mock_pool.submit.assert_called_once()
+        args, kwargs = mock_pool.submit.call_args
+        self.assertEqual(args[0], _execute_in_process)
+        self.assertEqual(kwargs["engine_type"], "mock_engine")
+        self.assertEqual(kwargs["sql"], "SELECT * FROM table")
+
+    @patch("nl2sql.pipeline.nodes.executor.node.get_execution_pool")
+    def test_safeguard_max_bytes(self, mock_get_pool):
+        """Test that execution halts if result size exceeds limit (Post-Execution Check)."""
+        mock_pool = MagicMock()
+        mock_get_pool.return_value = mock_pool
+        
+        # Result > 1000 bytes
+        huge_result = QueryResult(
+            columns=["d"], rows=[["x"]], row_count=1, bytes_returned=2000 
+        )
+        
+        future = Future()
+        future.set_result(huge_result)
+        mock_pool.submit.return_value = future
+        
+        state = GraphState(user_query="q", sql_draft="SELECT * FROM blob", selected_datasource_id="ds1")
         res = self.node(state)
         
         self.assertEqual(len(res["errors"]), 1)
-        self.assertEqual(res["errors"][0].error_code, ErrorCode.DB_EXECUTION_ERROR)
-        self.assertIn("DB Connection Lost", res["errors"][0].message)
+        self.assertEqual(res["errors"][0].error_code, ErrorCode.SAFEGUARD_VIOLATION)
+
+    @patch("nl2sql.pipeline.nodes.executor.node.get_execution_pool")
+    def test_sandbox_crash(self, mock_get_pool):
+        """Test handling of Sandbox Process Crash (Segfault)."""
+        mock_pool = MagicMock()
+        mock_get_pool.return_value = mock_pool
+        
+        future = Future()
+        from concurrent.futures.process import BrokenProcessPool
+        future.set_exception(BrokenProcessPool("A process in the process pool was terminated abruptly."))
+        mock_pool.submit.return_value = future
+        
+        state = GraphState(user_query="q", sql_draft="SELECT KILL", selected_datasource_id="ds1")
+        res = self.node(state)
+        
+        self.assertEqual(len(res["errors"]), 1)
+        self.assertEqual(res["errors"][0].error_code, ErrorCode.EXECUTOR_CRASH)
+        self.assertEqual(res["errors"][0].severity, ErrorSeverity.CRITICAL)
+        self.assertIn("SANDBOX CRASH", res["errors"][0].message)
 
 if __name__ == "__main__":
     unittest.main()

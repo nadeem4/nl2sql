@@ -98,12 +98,12 @@ class ExecutionResponse(BaseModel):
 
 ## 6. Recommendation
 
-**Phase 1: Option A (Multiprocessing)**
+### Phase 1: Option A (Multiprocessing)
 
 * It solves the critical **Blast Radius** immediately.
 * It separates **Indexing** from **Execution** via distinct pools.
 * It is "Service-Ready": The `ExecutionRequest` protocol makes migrating to Option B trivial later.
 
-**Phase 2: Option B (Dedicated Service)**
+### Phase 2: Option B (Dedicated Service)
 
 * Migrate only when we need to scale Execution independently of the Agent or require strict network segmentation.

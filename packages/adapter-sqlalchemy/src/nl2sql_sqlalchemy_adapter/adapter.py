@@ -40,6 +40,7 @@ class BaseSQLAlchemyAdapter(DatasourceAdapter):
         if self.statement_timeout_ms:
             self.execution_options["timeout"] = self.statement_timeout_ms / 1000.0
 
+        self.connection_args = connection_args
         self.connection_string = self.construct_uri(connection_args)
 
         self.engine: Engine = None

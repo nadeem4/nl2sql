@@ -10,6 +10,7 @@ We index two main types of documents: **Schema** and **Examples**.
 
 Table schemas are "flattened" into a rich text representation before embedding.
 
+* **Sandboxed Introspection**: Schema fetching is offloaded to the **Indexing Process Pool** ensuring that connecting to slow/unstable databases does not block the Orchestrator's main event loop.
 * **Format**: `Table: {name} (Alias: {alias}). Columns: {col_desc}. Primary Key: {pk}. Foreign Keys: {fk}.`
 * **Offline Aliasing**: To prevent conflicts, tables are assigned canonical aliases (e.g., `sales_db_t1`) during indexing.
 * **Rich Metadata (via Adapter)**:

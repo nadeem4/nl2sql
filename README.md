@@ -1,101 +1,100 @@
-# NL2SQL Platform
+# Enterprise NL2SQL Engine
 
-An enterprise-grade **Natural Language to SQL** engine built on an Agentic Graph Architecture.
+> **A Production-Grade Natural Language to SQL Engine built on the principles of Zero Trust and Deterministic Execution.**
 
-## 🚀 Overview
+This platform treats "Text-to-SQL" not as a prompt engineering problem, but as a **Distributed Systems** problem. It replaces fragile one-shot generation with a robust, compiled pipeline that bridges the gap between Unstructured Intention (User Language) and Structured Execution (SQL Databases).
 
-This platform transforms complex natural language questions into safe, optimized, and executable SQL queries across multiple database engines (PostgreSQL, MySQL, MSSQL, SQLite). It uses a **Directed Cyclic Graph** (LangGraph) to orchestrate planning, validation, generation, and self-correction.
+---
 
-### Key Features
+## 🏗️ System Topology
 
-* **🛡️ Security First**: Strict AST Validation, **Intent Analysis** (Jailbreak Detection), RBAC Policies, and Read-Only enforcement.
-* **🧠 Agentic Reasoning**: Self-correcting nodes that fix SQL errors automatically.
-* **🔌 Polyglot**: First-class support for Postgres, MySQL, MSSQL, and SQLite.
-* **⚡ Smart Routing**: Decomposes complex queries into sub-queries for multi-datasource environments.
-* **🔄 Reliability**: Built-in **Exponential Backoff** and **Circuit Breakers** to handle transient failures gracefully.
+The architecture is composed of three distinct planes, ensuring separation of concerns and failure isolation.
 
-## 🏁 Quick Demo
+### 1. The Control Plane (The Graph)
 
-Explore the platform's capabilities with our interactive setup wizard. You can choose between **Lite Mode** (in-memory, no deps) or **Docker Mode** (real databases).
+**Responsibility**: Reasoning, Planning, and Orchestration.
 
-### 1. Lite Mode (Fastest) uses SQLite
+* **Agentic Graph**: Implemented as a Directed Cyclic Graph (LangGraph) to enable "Refinement Loops". If a plan fails validation, the system self-corrects.
+* **State Management**: Deterministic state transitions ensure auditability and reproducibility of every decision.
 
-Perfect for a standardized, local environment without needing Docker.
+### 2. The Security Plane (The Firewall)
+
+**Responsibility**: Invariants Enforcement.
+
+* **Valid-by-Construction**: The LLM *never* executes SQL directly. It generates an **Abstract Syntax Tree (AST)**.
+* **Static Analysis**: The [Validator Node](docs/core/nodes.md#4-logical-validator) enforces **Row-Level Security (RLS)** and type safety on the AST *before* compilation.
+* **Intent Classification**: Upstream detection of adversarial prompts (Jailbreaks/Injections).
+
+### 3. The Data Plane (The Sandbox)
+
+**Responsibility**: Semantic Search and Execution.
+
+* **Blast Radius Isolation**: SQL Drivers (ODBC/C-Ext) run in a dedicated **[Sandboxed Process Pool](docs/architecture/decisions/ADR-001_sandboxed_execution.md)**. A segfault in a driver kills a disposable worker, not the Agent.
+* **Partitioned Retrieval**: The [Orchestrator](docs/core/indexing.md) uses Partitioned MMR to inject only relevant schema context, preventing context window overflow.
+
+---
+
+## 📐 Architectural Invariants
+
+| Invariant | Rationale | Mechanism |
+| :--- | :--- | :--- |
+| **No Unvalidated SQL** | Prevent Hullucinations & Data Leaks | All plans pass through `LogicalValidator` (AST) + `PhysicalValidator` (Dry Run) before execution. |
+| **Zero Shared State** | Crash Safety | Execution happens in isolated processes; no shared memory with the Control Plane. |
+| **Fail-Fast** | Reliability | Circuit Breakers and Strict Timeouts prevent cascading failures (Retry Storms). |
+| **Determinism** | Debuggability | Temperature-0 generation + Strict Typing (Pydantic) for all LLM outputs. |
+
+---
+
+## 🚀 Quick Start
+
+### Prerequisites
+
+* Python 3.10+
+* Docker (Optional, for full integration environment)
+
+### 1. Installation
+
+```bash
+git clone https://github.com/nadeem4/nl2sql.git
+cd nl2sql
+
+# Set up environment
+python -m venv venv
+source venv/bin/activate
+
+# Install Core Engine & CLI
+pip install -e packages/core
+pip install -e packages/cli
+pip install -e packages/adapter-sdk
+```
+
+### 2. Run Demo (Lite Mode)
+
+Boot the engine with an in-memory SQLite database (No Docker required).
 
 ```bash
 nl2sql setup --demo
 ```
 
-### 2. Docker Mode (Full Fidelity) uses Postgres
+---
 
-Spins up real orchestrator and database containers for a production-like test.
+## 📚 Technical Documentation
 
-```bash
-nl2sql setup --demo --docker
+* **[System Architecture](docs/core/architecture.md)**: Deep dive into the Control, Security, and Data planes.
+* **[Component Reference](docs/core/nodes.md)**: Detailed specs for Planner, Validator, Executor, etc.
+* **[Security Model](docs/safety/security.md)**: Defense-in-depth strategy against prompt injection and unauthorized access.
+* **[ADR-001: Sandboxed Execution](docs/architecture/decisions/ADR-001_sandboxed_execution.md)**: Decision record for the Process Pool architecture.
+
+---
+
+## 📦 Repository Structure
+
+```text
+packages/
+├── core/               # The Engine (Graph, State, Logic)
+├── cli/                # Terminal Interface & Ops Tools
+├── adapter-sdk/        # Interface Contract for new Databases
+└── adapters/           # Official Dialects (Postgres, MSSQL, MySQL)
+configs/                # Runtime Configuration (Policies, Prompts)
+docs/                   # Architecture & Operations Manual
 ```
-
-## 🛠️ Installation
-
-This is a monorepo. To develop or run the platform from source:
-
-### Prerequisites
-
-* Python 3.10+
-* Docker & Docker Compose (optional, for Integration Tests)
-
-### Setup
-
-1. **Clone and Install**:
-
-    ```bash
-    git clone https://github.com/nadeem4/nl2sql.git
-    cd nl2sql
-    
-    # Create virtual environment
-    python -m venv venv
-    source venv/bin/activate  # or .\venv\Scripts\activate on Windows
-    
-    # Install Core and CLI
-    pip install -e packages/core
-    pip install -e packages/adapter-sdk
-    pip install -e packages/cli
-    pip install -e packages/adapters/postgres  # Install specific adapters as needed
-    ```
-
-2. **Verify Installation**:
-
-    ```bash
-    nl2sql --help
-    ```
-
-## 🏗️ Architecture
-
-The system is composed of specialized Neural Nodes:
-
-1. **Semantic Analysis**: Intent classification and entity extraction.
-2. **Decomposer (Router)**: Splits complex queries and routes them to the correct datasource.
-3. **Planner**: Generates a database-agnostic Abstract Syntax Tree (AST).
-4. **Validator**: Enforces security policies and logical correctness on the AST.
-5. **Generator**: Compiles AST to dialect-specific SQL.
-6. **Executor**: Runs the query in a sandboxed environment.
-7. **Refiner**: Self-corrects errors by analyzing stack traces and feedback.
-8. **Aggregator**: Synthesizes results from multiple sub-queries.
-
-See [Architecture Documentation](docs/core/architecture.md) for details.
-
-## 📚 Documentation
-
-Full documentation is available in the `docs/` directory.
-
-```bash
-pip install -r requirements-docs.txt
-mkdocs serve
-```
-
-## 📂 Repository Structure
-
-* `packages/core`: The core graph engine, nodes, and state management.
-* `packages/cli`: Command-line interface tool.
-* `packages/adapter-sdk`: SDK for building custom database adapters.
-* `configs/`: Configuration files (Policies, Datasources).
-* `docs/`: MkDocs source files.

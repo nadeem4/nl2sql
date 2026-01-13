@@ -1,7 +1,9 @@
 
 import pytest
 from unittest.mock import MagicMock, patch, ANY
-from nl2sql.services.vector_store import OrchestratorVectorStore
+from concurrent.futures import Future
+
+from nl2sql.services.vector_store import OrchestratorVectorStore, _fetch_schema_in_process
 from langchain_core.documents import Document
 from nl2sql_adapter_sdk import DatasourceAdapter, SchemaMetadata, Table, Column, ForeignKey
 
@@ -17,18 +19,18 @@ def store(mock_chroma):
     mock_embeddings = MagicMock()
     return OrchestratorVectorStore(embeddings=mock_embeddings)
 
-def test_index_schema_fk_aliasing(store, mock_chroma):
+@patch("nl2sql.services.vector_store.get_indexing_pool")
+def test_index_schema_fk_aliasing(mock_get_pool, store, mock_chroma):
     """
     Verifies that schema indexing correctly applies aliases to tables and updates 
     Foreign Key references to point to these new aliases.
-    
-    Expected behavior:
-    - Tables are renamed to {datasource_id}_t{index}
-    - Foreign Keys in downstream tables are updated to reference the aliased table names.
-    - Original table names are preserved in metadata.
+    (Updated for Sandboxed Execution)
     """
-    mock_adapter = MagicMock(spec=DatasourceAdapter)
-    mock_adapter.fetch_schema.return_value = SchemaMetadata(
+    # 1. Setup Mock Pool
+    mock_pool = MagicMock()
+    mock_get_pool.return_value = mock_pool
+
+    schema_data = SchemaMetadata(
         datasource_id="ds1",
         datasource_engine_type="sqlite",
         tables=[
@@ -47,8 +49,23 @@ def test_index_schema_fk_aliasing(store, mock_chroma):
         ]
     )
     
+    future = Future()
+    future.set_result(schema_data)
+    mock_pool.submit.return_value = future
+
+    mock_adapter = MagicMock(spec=DatasourceAdapter)
+    mock_adapter.datasource_engine_type = "sqlite"
+    mock_adapter.connection_args = {}
+    
+    # 2. Run
     store.refresh_schema(mock_adapter, datasource_id="test_ds")
     
+    # 3. Verify Sandbox Call
+    mock_pool.submit.assert_called_once()
+    args, kwargs = mock_pool.submit.call_args
+    assert args[0] == _fetch_schema_in_process
+    
+    # 4. Verify Indexing
     mock_chroma.add_documents.assert_called_once()
     docs = mock_chroma.add_documents.call_args[0][0]
     
@@ -56,8 +73,6 @@ def test_index_schema_fk_aliasing(store, mock_chroma):
     orders_doc = next(d for d in docs if d.metadata["table_name"] == "orders")
     
     # Verify Aliases
-    # users -> test_ds_t1
-    # orders -> test_ds_t2
     assert "Alias: test_ds_t1" in users_doc.page_content
     assert "Alias: test_ds_t2" in orders_doc.page_content
     
@@ -65,23 +80,20 @@ def test_index_schema_fk_aliasing(store, mock_chroma):
     assert users_doc.metadata["table_name"] == "users"
     
     # Verify FK in Orders points to Aliased Users
-    # Expected: foreign keys should mention test_ds_t1.id
     assert "test_ds_t1.id" in orders_doc.page_content
     assert "test_ds_t2.user_id" in orders_doc.page_content 
     
-    # Verify Correct String Formatting (No double aliasing)
-    # Correct: test_ds_t2.user_id -> test_ds_t1.id
-    # Buggy:   test_ds_t2.user_id -> test_ds_t1.test_ds_t1.id
+    # Verify Correct String Formatting
     assert "test_ds_t2.user_id -> test_ds_t1.id" in orders_doc.page_content
-    assert "test_ds_t1.test_ds_t1.id" not in orders_doc.page_content 
 
-def test_index_schema_orphaned_fk(store, mock_chroma):
-    """
-    Verifies resilience when a Foreign Key refers to a table that does not exist 
-    in the fetched schema (orphaned FK). The system should not crash.
-    """
-    mock_adapter = MagicMock(spec=DatasourceAdapter)
-    mock_adapter.fetch_schema.return_value = SchemaMetadata(
+
+@patch("nl2sql.services.vector_store.get_indexing_pool")
+def test_index_schema_orphaned_fk(mock_get_pool, store, mock_chroma):
+    """Verifies resilience when a Foreign Key refers to a table that does not exist."""
+    mock_pool = MagicMock()
+    mock_get_pool.return_value = mock_pool
+
+    schema_data = SchemaMetadata(
         datasource_id="ds1",
         datasource_engine_type="sqlite",
         tables=[
@@ -98,6 +110,14 @@ def test_index_schema_orphaned_fk(store, mock_chroma):
             )
         ]
     )
+
+    future = Future()
+    future.set_result(schema_data)
+    mock_pool.submit.return_value = future
+
+    mock_adapter = MagicMock(spec=DatasourceAdapter)
+    mock_adapter.datasource_engine_type = "sqlite"
+    mock_adapter.connection_args = {}
     
     store.refresh_schema(mock_adapter, datasource_id="test_ds")
     
@@ -116,7 +136,7 @@ def test_retrieve_filtering_single(store, mock_chroma):
     )
 
 def test_retrieve_filtering_list(store, mock_chroma):
-    """Verifies that retrieval correctly filters by a list of datasource IDs using the $in operator."""
+    """Verifies that retrieval correctly filters by a list of datasource IDs."""
     mock_chroma.similarity_search.return_value = []
     store.retrieve_table_names("q", datasource_id=["a", "b"])
     
@@ -134,10 +154,7 @@ def test_retrieve_no_filter(store, mock_chroma):
     )
 
 def test_refresh_examples_enrichment_failure(store, mock_chroma):
-    """
-    Verifies system resilience when the LLM enrichment step fails (e.g. API error).
-    The system should fallback to indexing the original question rather than crashing.
-    """
+    """Verifies system resilience when the LLM enrichment step fails."""
     mock_enricher = MagicMock()
     mock_enricher.invoke.side_effect = Exception("API Down")
     

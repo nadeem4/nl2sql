@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import json
-from typing import List, Optional, Union
+from typing import List, Optional, Union, Dict, Any
+from concurrent.futures import ProcessPoolExecutor, TimeoutError
 
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
@@ -12,8 +13,29 @@ from nl2sql.services.embeddings import EmbeddingService
 from nl2sql_adapter_sdk import SchemaMetadata, Table, Column, DatasourceAdapter
 
 from nl2sql.common.logger import get_logger
+from nl2sql.common.sandbox import get_indexing_pool
+from nl2sql.datasources.discovery import discover_adapters
 
 logger = get_logger(__name__)
+
+
+def _fetch_schema_in_process(
+    engine_type: str,
+    ds_id: str,
+    connection_args: Dict[str, Any]
+) -> SchemaMetadata:
+    """Fetches schema in a separate process to isolate crashes."""
+    available = discover_adapters()
+    if engine_type not in available:
+        raise ValueError(f"Unknown datasource engine type: {engine_type}")
+    
+    adapter_cls = available[engine_type]
+    adapter = adapter_cls(
+        datasource_id=ds_id,
+        datasource_engine_type=engine_type,
+        connection_args=connection_args
+    )
+    return adapter.fetch_schema()
 
 
 class OrchestratorVectorStore:
@@ -92,17 +114,35 @@ class OrchestratorVectorStore:
 
         This operation is idempotent. It first deletes all existing table documents
         for the given datasource_id, then fetches the fresh schema and indexes it.
+        
+        The schema fetching happens in a Sandboxed process (Indexing Pool) to preserve
+        main process stability during heavy Introspection IO.
 
         Args:
-            adapter: The DatasourceAdapter to fetch schema from.
-            datasource_id: The ID of the datasource to refresh.
+            adapter (DatasourceAdapter): The DatasourceAdapter to fetch schema from.
+            datasource_id (str): The ID of the datasource to refresh.
 
         Returns:
-            Dict[str, int]: Counts of indexed tables, columns, and foreign keys.
+            Dict[str, int]: Stats containing counts of indexed tables, columns, and foreign keys.
+
+        Raises:
+             ValueError: If schema fetching fails in the sandbox.
         """
         self.delete_documents(filter={"datasource_id": datasource_id, "type": "table"})
 
-        schema_def = adapter.fetch_schema()
+        try:
+            pool = get_indexing_pool()
+            future = pool.submit(
+                _fetch_schema_in_process,
+                engine_type=adapter.datasource_engine_type,
+                ds_id=datasource_id,
+                connection_args=adapter.connection_args
+            )
+            schema_def = future.result(timeout=60)
+        except Exception as e:
+            logger.error(f"Failed to fetch schema for {datasource_id} in sandbox: {e}")
+            raise ValueError(f"Schema Fetch Failed (Sandbox): {e}")
+
         documents = []
         alias_map = {}
 
@@ -138,7 +178,6 @@ class OrchestratorVectorStore:
 
             fk_strs = []
             for fk in table_obj.foreign_keys:
-                # Update FK references to use aliases if available
                 target_alias = alias_map.get(fk.referred_table, fk.referred_table)
                 src_cols = ",".join([f"{current_alias}.{c}" for c in fk.constrained_columns])
                 ref_cols = ",".join(fk.referred_columns)
