@@ -65,9 +65,10 @@ This document serves as the master backlog for addressing findings from the Arch
   - **Value**: Prevents driver crashes from taking down the Agent and mitigates RCE risks.
   - **Action**: Move `ExecutorNode` logic to a separate gRPC service/sidecar with limited privileges.
 
-- [ ] **ENH-002: Circuit Breaker Pattern** (P0 - Critical)
+- [x] **ENH-002: Circuit Breaker Pattern** (P0 - Critical)
   - **Value**: Fails fast during outages instead of hanging threads.
   - **Action**: Wrap OpenAI and Database calls with Circuit Breakers (e.g., `pybreaker`).
+  - **Status**: Fixed. Implemented in `nl2sql.common.resilience` and verified in `tests/unit/test_resilience.py`.
 
 - [ ] **ENH-003: OpenTelemetry Integration** (P1 - High)
   - **Value**: Enable standard APM features (Datadog/Jaeger) for trace visualization.
