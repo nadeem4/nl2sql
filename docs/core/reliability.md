@@ -65,3 +65,58 @@ For transient errors (network glitches, 503s), we implement **Exponential Backof
 * **Non-Retryable Errors**: `SyntaxError`, `SecurityViolation`, `ContextWindowExceeded`.
 
 The **Retry Node** in the graph manages the loop, ensuring we don't spiral into an infinite retry storm.
+
+---
+
+## 4. Operational Scenarios (Runbook)
+
+Strategies for common failure modes:
+
+| Scenario | System Behavior | Error Code | Recovery |
+| :--- | :--- | :--- | :--- |
+| **Worker Crash (Segfault)** | Request fails immediately. Worker replaced. | `EXECUTOR_CRASH` | Automatic (Next request uses new worker) |
+| **DB Timeout (>30s)** | Request cancelled. | `EXECUTION_TIMEOUT` | Retryable (if configured) |
+| **DB Outage (5+ fails)** | **Circuit Breaker Trips**. All DB calls rejected fast. | `SERVICE_UNAVAILABLE` | Auto-reset after 30s |
+| **LLM Rate Limit (429)** | **Backoff & Retry**. Does NOT trip breaker. | `None` (Handled internally) | Exponential Backoff |
+| **LLM Outage (503)** | **Circuit Breaker Trips**. Fails fast. | `SERVICE_UNAVAILABLE` | Auto-reset after 60s |
+
+### Deep Dive: Worker Crash Recovery
+
+The following diagram illustrates exactly how the system handles a "Hard Crash" (Segfault/OOM) in the worker process:
+
+```mermaid
+sequenceDiagram
+    participant Main as ExecutorNode (Main Process)
+    participant Breaker as DB_BREAKER
+    participant Sandbox as SandboxManager
+    participant Worker as Worker Process (PID: 1234)
+
+    Main->>Breaker: Call _execute_guarded()
+    activate Breaker
+    
+    Breaker->>Sandbox: execute_in_sandbox(request)
+    activate Sandbox
+    
+    Sandbox->>Worker: Dispatch Task (Pickle)
+    activate Worker
+    
+    Note right of Worker: SEGFAULT / OOM
+    Worker--xSandbox: Process Terminated (Signal 9)
+    deactivate Worker
+    
+    Sandbox->>Sandbox: Catch BrokenProcessPool
+    Sandbox-->>Breaker: Return Result(success=False, metrics={'is_crash': 1})
+    deactivate Sandbox
+    
+    Breaker->>Breaker: Check metrics['is_crash']
+    Breaker->>Breaker: Raise RuntimeError("Sandbox Crash")
+    
+    Note over Breaker: Failure Count++
+    
+    Breaker-->>Main: Re-raise RuntimeError
+    deactivate Breaker
+    
+    Main->>Main: Catch RuntimeError
+    Main-->>Main: Log CRITICAL Error
+    Main-->>User: Return ErrorCode.EXECUTOR_CRASH
+```
