@@ -57,13 +57,19 @@ class SecretManager:
                 logger.error(f"Failed to configure secret provider '{config.id}': {e}")
                 
     def resolve(self, secret_ref: str) -> str:
-        """
-        Resolves a secret reference string.
+        """Resolves a secret reference string.
+
         Format: ${provider_id:key}
-        Examples:
-            '${env:DB_PASS}' -> fetches DB_PASS from env
-            '${azure-main:my-secret}' -> fetches my-secret from provider with id 'azure-main'
-            '${aws-prod:my-secret}' -> fetches my-secret from provider with id 'aws-prod'
+        
+        Args:
+            secret_ref: The reference string to resolve.
+
+        Returns:
+            str: The resolved secret value.
+
+        Raises:
+            ValueError: If the format is invalid, provider is unknown, or secret
+                is not found.
         """
         cleaned_ref = secret_ref.replace('${', '').replace('}', '')
         
@@ -82,22 +88,28 @@ class SecretManager:
         
         raise ValueError(f"Secret not found: {secret_ref}")
 
-        return obj
-
     def resolve_object(self, obj: Any) -> Any:
-        """
-        Recursively resolves secret references in a generic object (Pydantic model, dict, list, str, SecretStr).
-        Returns a new object with secrets resolved.
+        """Recursively resolves secret references in a generic object.
+
+        Traverses the object structure (Pydantic models, dicts, lists) and resolves
+        any string values matching the secret pattern "${...}". Handles SecretStr
+        by unwrapping, resolving, and re-wrapping.
+
+        Args:
+            obj: The object to resolve secrets in. Can be a Pydantic model,
+                dictionary, list, string, or SecretStr.
+
+        Returns:
+            Any: A new object with all secret references resolved to their
+                actual values.
         """
         from pydantic import BaseModel, SecretStr
 
-        # Base case: String
         if isinstance(obj, str):
             if obj.startswith("${") and obj.endswith("}"):
                 return self.resolve(obj)
             return obj
             
-        # Handle SecretStr
         if isinstance(obj, SecretStr):
             secret_val = obj.get_secret_value()
             if secret_val and secret_val.startswith("${") and secret_val.endswith("}"):
@@ -105,15 +117,11 @@ class SecretManager:
                 return SecretStr(resolved_val)
             return obj
         
-        # Pydantic Model
         if isinstance(obj, BaseModel):
-            # Recursively resolve fields
             updates = {}
-            # Access model_fields from the class, not the instance
             for field_name in type(obj).model_fields.keys():
                 val = getattr(obj, field_name)
                 resolved = self.resolve_object(val)
-                # Only update if changed (optimization)
                 if resolved != val:
                     updates[field_name] = resolved
             
@@ -121,11 +129,9 @@ class SecretManager:
                 return obj.model_copy(update=updates)
             return obj
             
-        # Lists
         if isinstance(obj, list):
             return [self.resolve_object(item) for item in obj]
             
-        # Dicts
         if isinstance(obj, dict):
              return {k: self.resolve_object(v) for k, v in obj.items()}
              
