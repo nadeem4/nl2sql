@@ -54,7 +54,7 @@ def _cost_estimate_in_process(request: ExecutionRequest) -> ExecutionResult:
         cost = adapter.cost_estimate(request.sql)
         return ExecutionResult(
             success=True,
-            data={"estimated_rows": cost.estimated_rows, "estimated_bytes": cost.estimated_bytes}
+            data=cost.model_dump()
         )
     except Exception as e:
         return ExecutionResult(success=False, error=str(e))

@@ -141,10 +141,13 @@ class ExecutorNode:
                     "execution": ExecutionModel(row_count=0, rows=[], error="Missing Datasource ID")
                 }
 
+            from nl2sql.common.settings import settings
+            
             adapter = self.registry.get_adapter(ds_id)
             
-            safeguard_row_limit = adapter.row_limit or 10000
-            safeguard_max_bytes = adapter.max_bytes or 10485760 # 10 MB
+            safeguard_timeout_ms = adapter.statement_timeout_ms or settings.default_statement_timeout_ms
+            safeguard_row_limit = adapter.row_limit or settings.default_row_limit
+            safeguard_max_bytes = adapter.max_bytes or settings.default_max_bytes
 
             total_bytes = 0
             execution_future = None
@@ -157,9 +160,9 @@ class ExecutorNode:
                 connection_args=adapter.connection_args,
                 sql=sql,
                 limits={
-                    "timeout_ms": adapter.statement_timeout_ms,
-                    "row_limit": adapter.row_limit,
-                    "max_bytes": adapter.max_bytes
+                    "timeout_ms": safeguard_timeout_ms,
+                    "row_limit": safeguard_row_limit,
+                    "max_bytes": safeguard_max_bytes
                 }
             )
 
