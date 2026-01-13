@@ -19,23 +19,25 @@ from nl2sql.datasources.discovery import discover_adapters
 logger = get_logger(__name__)
 
 
-def _fetch_schema_in_process(
-    engine_type: str,
-    ds_id: str,
-    connection_args: Dict[str, Any]
-) -> SchemaMetadata:
+from nl2sql.common.contracts import ExecutionRequest, ExecutionResult
+
+def _fetch_schema_in_process(request: ExecutionRequest) -> ExecutionResult:
     """Fetches schema in a separate process to isolate crashes."""
     available = discover_adapters()
-    if engine_type not in available:
-        raise ValueError(f"Unknown datasource engine type: {engine_type}")
+    if request.engine_type not in available:
+        return ExecutionResult(success=False, error=f"Unknown engine: {request.engine_type}")
     
-    adapter_cls = available[engine_type]
-    adapter = adapter_cls(
-        datasource_id=ds_id,
-        datasource_engine_type=engine_type,
-        connection_args=connection_args
-    )
-    return adapter.fetch_schema()
+    try:
+        adapter_cls = available[request.engine_type]
+        adapter = adapter_cls(
+            datasource_id=request.datasource_id,
+            datasource_engine_type=request.engine_type,
+            connection_args=request.connection_args
+        )
+        schema = adapter.fetch_schema()
+        return ExecutionResult(success=True, data=schema)
+    except Exception as e:
+        return ExecutionResult(success=False, error=str(e))
 
 
 class OrchestratorVectorStore:
@@ -130,18 +132,26 @@ class OrchestratorVectorStore:
         """
         self.delete_documents(filter={"datasource_id": datasource_id, "type": "table"})
 
-        try:
-            pool = get_indexing_pool()
-            future = pool.submit(
-                _fetch_schema_in_process,
-                engine_type=adapter.datasource_engine_type,
-                ds_id=datasource_id,
-                connection_args=adapter.connection_args
-            )
-            schema_def = future.result(timeout=60)
-        except Exception as e:
-            logger.error(f"Failed to fetch schema for {datasource_id} in sandbox: {e}")
-            raise ValueError(f"Schema Fetch Failed (Sandbox): {e}")
+        pool = get_indexing_pool()
+            
+        request = ExecutionRequest(
+            mode="fetch_schema",
+            datasource_id=datasource_id,
+            engine_type=adapter.datasource_engine_type,
+            connection_args=adapter.connection_args
+        )
+
+        from nl2sql.common.sandbox import execute_in_sandbox
+        result_contract = execute_in_sandbox(pool, _fetch_schema_in_process, request, timeout_sec=60)
+        
+        if not result_contract.success:
+            if result_contract.metrics.get("is_crash"):
+                    logger.critical(f"Schema indexing caused Sandbox Crash: {result_contract.error}")
+                    raise ValueError(f"Schema Fetch CRASHED (Segfault/OOM): {result_contract.error}")
+            else:
+                    raise ValueError(f"Schema Fetch Failed: {result_contract.error}")
+
+        schema_def = result_contract.data
 
         documents = []
         alias_map = {}

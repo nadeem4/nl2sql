@@ -15,43 +15,49 @@ from nl2sql_adapter_sdk import DatasourceAdapter, DryRunResult, CostEstimate
 
 logger = get_logger("physical_validator")
 
-def _dry_run_in_process(
-    engine_type: str,
-    ds_id: str,
-    connection_args: Dict[str, Any],
-    sql: str
-) -> DryRunResult:
+from nl2sql.common.contracts import ExecutionRequest, ExecutionResult
+
+def _dry_run_in_process(request: ExecutionRequest) -> ExecutionResult:
     """Executes dry run in a separate process."""
     available = discover_adapters()
-    if engine_type not in available:
-        raise ValueError(f"Unknown datasource engine type: {engine_type}")
+    if request.engine_type not in available:
+        return ExecutionResult(success=False, error=f"Unknown engine: {request.engine_type}")
     
-    adapter_cls = available[engine_type]
-    adapter = adapter_cls(
-        datasource_id=ds_id,
-        datasource_engine_type=engine_type,
-        connection_args=connection_args
-    )
-    return adapter.dry_run(sql)
+    try:
+        adapter_cls = available[request.engine_type]
+        adapter = adapter_cls(
+            datasource_id=request.datasource_id,
+            datasource_engine_type=request.engine_type,
+            connection_args=request.connection_args
+        )
+        res = adapter.dry_run(request.sql)
+        return ExecutionResult(
+            success=True,
+            data={"is_valid": res.is_valid, "error_message": res.error_message}
+        )
+    except Exception as e:
+        return ExecutionResult(success=False, error=str(e))
 
-def _cost_estimate_in_process(
-    engine_type: str,
-    ds_id: str,
-    connection_args: Dict[str, Any],
-    sql: str
-) -> CostEstimate:
+def _cost_estimate_in_process(request: ExecutionRequest) -> ExecutionResult:
     """Executes cost estimation in a separate process."""
     available = discover_adapters()
-    if engine_type not in available:
-        raise ValueError(f"Unknown datasource engine type: {engine_type}")
+    if request.engine_type not in available:
+        return ExecutionResult(success=False, error=f"Unknown engine: {request.engine_type}")
     
-    adapter_cls = available[engine_type]
-    adapter = adapter_cls(
-        datasource_id=ds_id,
-        datasource_engine_type=engine_type,
-        connection_args=connection_args
-    )
-    return adapter.cost_estimate(sql)
+    try:
+        adapter_cls = available[request.engine_type]
+        adapter = adapter_cls(
+            datasource_id=request.datasource_id,
+            datasource_engine_type=request.engine_type,
+            connection_args=request.connection_args
+        )
+        cost = adapter.cost_estimate(request.sql)
+        return ExecutionResult(
+            success=True,
+            data={"estimated_rows": cost.estimated_rows, "estimated_bytes": cost.estimated_bytes}
+        )
+    except Exception as e:
+        return ExecutionResult(success=False, error=str(e))
 
 
 class PhysicalValidatorNode:
@@ -92,35 +98,46 @@ class PhysicalValidatorNode:
         """
         try:
             pool = get_execution_pool()
-            future = pool.submit(
-                _dry_run_in_process,
+            request = ExecutionRequest(
+                mode="dry_run",
+                datasource_id=adapter.datasource_id,
                 engine_type=adapter.datasource_engine_type,
-                ds_id=adapter.datasource_id,
                 connection_args=adapter.connection_args,
                 sql=sql
             )
             
-            res = future.result(timeout=10) 
+            from nl2sql.common.sandbox import execute_in_sandbox
+            res_contract = execute_in_sandbox(pool, _dry_run_in_process, request)
             
-            if not res.is_valid:
+            if not res_contract.success:
+                # Check for crash
+                if res_contract.metrics.get("is_crash"):
+                    logger.error(f"Dry run caused Sandbox Crash: {res_contract.error}")
+                    return PipelineError(
+                        node="physical_validator",
+                        message="Validation Pre-Check caused a Segfault (Sandbox Crash). Query likely unsafe.",
+                        severity=ErrorSeverity.CRITICAL,
+                        error_code=ErrorCode.EXECUTOR_CRASH
+                    )
+                
                 return PipelineError(
                     node="physical_validator",
-                    message=f"Dry Run Failed: {res.error_message}",
+                    message=f"Dry Run Failed: {res_contract.error}",
+                    severity=ErrorSeverity.ERROR,
+                     error_code=ErrorCode.EXECUTION_ERROR
+                 )
+
+            # Unpack the business result
+            data = res_contract.data
+            if not data["is_valid"]:
+                return PipelineError(
+                    node="physical_validator",
+                    message=f"Dry Run Failed: {data['error_message']}",
                     severity=ErrorSeverity.ERROR,
                     error_code=ErrorCode.EXECUTION_ERROR
                 )
-        except TimeoutError:
-             logger.warning("Dry run timed out. Skipping.")
+
         except Exception as e:
-            msg = str(e)
-            if "BrokenProcessPool" in msg:
-                 logger.error(f"Dry run caused Sandbox Crash: {msg}")
-                 return PipelineError(
-                     node="physical_validator",
-                     message="Validation Pre-Check caused a Segfault (Sandbox Crash). Query likely unsafe.",
-                     severity=ErrorSeverity.CRITICAL,
-                     error_code=ErrorCode.EXECUTOR_CRASH
-                 )
             logger.warning(f"Dry run skipped or failed: {e}")
         return None
 
@@ -137,26 +154,33 @@ class PhysicalValidatorNode:
         errors = []
         try:
             pool = get_execution_pool()
-            future = pool.submit(
-                _cost_estimate_in_process,
+            request = ExecutionRequest(
+                mode="cost_estimate",
+                datasource_id=adapter.datasource_id,
                 engine_type=adapter.datasource_engine_type,
-                ds_id=adapter.datasource_id,
                 connection_args=adapter.connection_args,
                 sql=sql
             )
-            cost = future.result(timeout=10)
             
-            if self.row_limit and cost.estimated_rows > self.row_limit:
-                 errors.append(PipelineError(
-                     node="physical_validator",
-                     message=f"Estimated {cost.estimated_rows} rows exceeds limit {self.row_limit}",
-                     severity=ErrorSeverity.WARNING,
-                     error_code=ErrorCode.PERFORMANCE_WARNING
-                 ))
-        except TimeoutError:
-            logger.warning("Cost estimation timed out. Skipping.")
+            from nl2sql.common.sandbox import execute_in_sandbox
+            res_contract = execute_in_sandbox(pool, _cost_estimate_in_process, request)
+            
+            if res_contract.success:
+                data = res_contract.data
+                estimated_rows = data.get("estimated_rows", 0)
+                
+                if self.row_limit and estimated_rows > self.row_limit:
+                     errors.append(PipelineError(
+                         node="physical_validator",
+                         message=f"Estimated {estimated_rows} rows exceeds limit {self.row_limit}",
+                         severity=ErrorSeverity.WARNING,
+                         error_code=ErrorCode.PERFORMANCE_WARNING
+                     ))
+            else:
+                 logger.warning(f"Cost estimation failed: {res_contract.error}")
+
         except Exception as e:
-            logger.warning(f"Performance check skipped: {e}")
+             logger.warning(f"Performance check skipped: {e}")
         return errors
 
     def __call__(self, state: GraphState) -> Dict[str, Any]:

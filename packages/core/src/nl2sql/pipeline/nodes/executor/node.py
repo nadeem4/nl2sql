@@ -20,52 +20,66 @@ logger = get_logger("executor")
 
 
 
-def _execute_in_process(
-    engine_type: str,
-    ds_id: str,
-    connection_args: Dict[str, Any],
-    sql: str,
-    timeout_ms: int = None,
-    row_limit: int = None,
-    max_bytes: int = None
-) -> SdkExecutionResult:
+from nl2sql.common.contracts import ExecutionRequest, ExecutionResult
+
+def _execute_in_process(request: ExecutionRequest) -> ExecutionResult:
     """Executes SQL in a separate process to isolate crashes (segfaults).
     
-    This function re-instantiates the adapter inside the worker process to avoid 
-    pickling issues with database connections.
-
     Args:
-        engine_type (str): The type of datasource engine (e.g., 'postgres', 'sqlite').
-        ds_id (str): The unique identifier of the datasource.
-        connection_args (Dict[str, Any]): Arguments required to establish a DB connection.
-        sql (str): The SQL query string to execute.
-        timeout_ms (int, optional): Statement timeout in milliseconds.
-        row_limit (int, optional): Maximum number of rows to return.
-        max_bytes (int, optional): Maximum size of the result in bytes.
+        request (ExecutionRequest): The execution parameters.
 
     Returns:
-        SdkExecutionResult: The query execution result containing rows and columns.
-
-    Raises:
-        ValueError: If the engine type is unknown.
-        Exception: Propagates any exception raised by the adapter execution.
+        ExecutionResult: The result of the execution.
     """
+    import time
+    start = time.perf_counter()
+    
     available = discover_adapters()
-    if engine_type not in available:
-        raise ValueError(f"Unknown datasource engine type: {engine_type}")
+    if request.engine_type not in available:
+        return ExecutionResult(
+            success=False, 
+            error=f"Unknown datasource engine type: {request.engine_type}"
+        )
     
-    adapter_cls = available[engine_type]
-    
-    adapter = adapter_cls(
-        datasource_id=ds_id,
-        datasource_engine_type=engine_type,
-        connection_args=connection_args,
-        statement_timeout_ms=timeout_ms,
-        row_limit=row_limit,
-        max_bytes=max_bytes
-    )
-    
-    return adapter.execute(sql)
+    try:
+        adapter_cls = available[request.engine_type]
+        
+        # Extract safeguards from request.limits
+        timeout_ms = request.limits.get("timeout_ms")
+        row_limit = request.limits.get("row_limit")
+        max_bytes = request.limits.get("max_bytes")
+
+        adapter = adapter_cls(
+            datasource_id=request.datasource_id,
+            datasource_engine_type=request.engine_type,
+            connection_args=request.connection_args,
+            statement_timeout_ms=timeout_ms,
+            row_limit=row_limit,
+            max_bytes=max_bytes
+        )
+        
+        sdk_result = adapter.execute(request.sql)
+        
+        # Determine success based on adapter behavior (usually raises on error)
+        # Assuming adapter.execute returns QueryResult or raises
+        
+        rows_as_dicts = [dict(zip(sdk_result.columns, row)) for row in sdk_result.rows]
+        
+        duration = (time.perf_counter() - start) * 1000
+        
+        return ExecutionResult(
+            success=True,
+            data={
+                "row_count": sdk_result.row_count,
+                "rows": rows_as_dicts,
+                "columns": sdk_result.columns,
+                "bytes_returned": sdk_result.bytes_returned
+            },
+            metrics={"execution_time_ms": duration}
+        )
+
+    except Exception as e:
+        return ExecutionResult(success=False, error=str(e))
 
 
 class ExecutorNode:
@@ -134,77 +148,75 @@ class ExecutorNode:
 
             total_bytes = 0
             execution_future = None
-            try:
-                pool = get_execution_pool()
-                
-                execution_future = pool.submit(
-                    _execute_in_process,
-                    engine_type=adapter.datasource_engine_type,
-                    ds_id=ds_id,
-                    connection_args=adapter.connection_args,
-                    sql=sql,
-                    timeout_ms=adapter.statement_timeout_ms,
-                    row_limit=adapter.row_limit,
-                    max_bytes=adapter.max_bytes
-                )
-                
-                sdk_result = execution_future.result()
+            pool = get_execution_pool()
+            
+            request = ExecutionRequest(
+                mode="execute",
+                datasource_id=ds_id,
+                engine_type=adapter.datasource_engine_type,
+                connection_args=adapter.connection_args,
+                sql=sql,
+                limits={
+                    "timeout_ms": adapter.statement_timeout_ms,
+                    "row_limit": adapter.row_limit,
+                    "max_bytes": adapter.max_bytes
+                }
+            )
 
-                rows_as_dicts = [dict(zip(sdk_result.columns, row)) for row in sdk_result.rows]
-                
-                total_bytes = sdk_result.bytes_returned or 0
-                
-                if total_bytes > safeguard_max_bytes:
-                    err_msg = (f"Result size ({total_bytes} bytes) exceeds configured limit "
-                               f"({safeguard_max_bytes} bytes). Check 'max_bytes' in datasource config.")
-                    logger.error(err_msg)
-                    return {
+            # Use centralized safe execution helper
+            from nl2sql.common.sandbox import execute_in_sandbox
+            result_contract = execute_in_sandbox(pool, _execute_in_process, request)
+
+            if not result_contract.success:
+                 # Check if it was a crash or logic error
+                 if result_contract.metrics.get("is_crash"):
+                     error_msg = result_contract.error
+                     return {
+                        "execution": ExecutionModel(row_count=0, rows=[], error=error_msg),
                         "errors": [PipelineError(
                             node=node_name,
-                            message=err_msg,
+                            message=error_msg,
+                            severity=ErrorSeverity.CRITICAL,
+                            error_code=ErrorCode.EXECUTOR_CRASH
+                        )]
+                     }
+                 else:
+                     # Standard execution error
+                     return {
+                        "execution": ExecutionModel(row_count=0, rows=[], error=result_contract.error),
+                        "errors": [PipelineError(
+                            node=node_name,
+                            message=f"Execution error: {result_contract.error}",
                             severity=ErrorSeverity.ERROR,
-                            error_code=ErrorCode.SAFEGUARD_VIOLATION
-                        )],
-                        "execution": ExecutionModel(row_count=0, rows=[], error=err_msg)
-                    }
+                            error_code=ErrorCode.DB_EXECUTION_ERROR
+                        )]
+                     }
 
-                execution_result = ExecutionModel(
-                    row_count=sdk_result.row_count,
-                    rows=rows_as_dicts,
-                    columns=sdk_result.columns,
-                    error=None
-                )
+            result_data = result_contract.data
+            total_bytes = result_data.get("bytes_returned", 0)
+            
+            if total_bytes > safeguard_max_bytes:
+                err_msg = (f"Result size ({total_bytes} bytes) exceeds configured limit "
+                           f"({safeguard_max_bytes} bytes). Check 'max_bytes' in datasource config.")
+                logger.error(err_msg)
+                return {
+                    "errors": [PipelineError(
+                        node=node_name,
+                        message=err_msg,
+                        severity=ErrorSeverity.ERROR,
+                        error_code=ErrorCode.SAFEGUARD_VIOLATION
+                    )],
+                    "execution": ExecutionModel(row_count=0, rows=[], error=err_msg)
+                }
 
-            except Exception as exc:
-                error_msg = str(exc)
-                code = ErrorCode.DB_EXECUTION_ERROR
-                
-                is_crash = False
-                try:
-                    from concurrent.futures.process import BrokenProcessPool
-                    if isinstance(exc, BrokenProcessPool):
-                        is_crash = True
-                except ImportError:
-                    pass
-                
-                if not is_crash and ("BrokenProcessPool" in error_msg or "Terminated" in error_msg):
-                    is_crash = True
+            execution_result = ExecutionModel(
+                row_count=result_data["row_count"],
+                rows=result_data["rows"],
+                columns=result_data["columns"],
+                error=None
+            )
+             
 
-                if is_crash:
-                    error_msg = f"SANDBOX CRASH: The worker process died while executing the query. This indicates a driver segfault or OOM. ({exc})"
-                    code = ErrorCode.EXECUTOR_CRASH
-                    severity = ErrorSeverity.CRITICAL
-                else:
-                    severity = ErrorSeverity.ERROR
-
-                execution_result = ExecutionModel(row_count=0, rows=[], error=error_msg)
-                errors.append(PipelineError(
-                    node=node_name,
-                    message=f"Execution error: {error_msg}",
-                    severity=severity,
-                    error_code=code,
-                    stack_trace=str(exc)
-                ))
 
             exec_msg = f"Executed on {ds_id} (Sandbox). Rows: {execution_result.row_count}. Size: {total_bytes}b."
             if execution_result.error:

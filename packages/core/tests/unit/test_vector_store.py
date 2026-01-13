@@ -19,6 +19,8 @@ def store(mock_chroma):
     mock_embeddings = MagicMock()
     return OrchestratorVectorStore(embeddings=mock_embeddings)
 
+from nl2sql.common.contracts import ExecutionResult
+
 @patch("nl2sql.services.vector_store.get_indexing_pool")
 def test_index_schema_fk_aliasing(mock_get_pool, store, mock_chroma):
     """
@@ -49,8 +51,11 @@ def test_index_schema_fk_aliasing(mock_get_pool, store, mock_chroma):
         ]
     )
     
+    # Mock Execution Result
+    exec_res = ExecutionResult(success=True, data=schema_data)
+    
     future = Future()
-    future.set_result(schema_data)
+    future.set_result(exec_res)
     mock_pool.submit.return_value = future
 
     mock_adapter = MagicMock(spec=DatasourceAdapter)
@@ -62,8 +67,11 @@ def test_index_schema_fk_aliasing(mock_get_pool, store, mock_chroma):
     
     # 3. Verify Sandbox Call
     mock_pool.submit.assert_called_once()
-    args, kwargs = mock_pool.submit.call_args
+    args, _ = mock_pool.submit.call_args
     assert args[0] == _fetch_schema_in_process
+    request = args[1]
+    assert request.mode == "fetch_schema"
+    assert request.datasource_id == "test_ds"
     
     # 4. Verify Indexing
     mock_chroma.add_documents.assert_called_once()
@@ -111,8 +119,11 @@ def test_index_schema_orphaned_fk(mock_get_pool, store, mock_chroma):
         ]
     )
 
+    # Mock Execution Result
+    exec_res = ExecutionResult(success=True, data=schema_data)
+
     future = Future()
-    future.set_result(schema_data)
+    future.set_result(exec_res)
     mock_pool.submit.return_value = future
 
     mock_adapter = MagicMock(spec=DatasourceAdapter)

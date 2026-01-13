@@ -90,3 +90,67 @@ def get_indexing_pool() -> ProcessPoolExecutor:
         ProcessPoolExecutor: The shared indexing pool instance.
     """
     return SandboxManager.get_indexing_pool()
+
+from typing import Callable, Any, Dict
+from nl2sql.common.contracts import ExecutionRequest, ExecutionResult
+
+def execute_in_sandbox(
+    pool: ProcessPoolExecutor,
+    func: Callable[[ExecutionRequest], ExecutionResult],
+    request: ExecutionRequest,
+    timeout_sec: int = 30
+) -> ExecutionResult:
+    """Executes a function in the sandbox with centralized error handling.
+
+    This helper centralizes the logic for handling:
+    1. BrokenProcessPool (Worker Crash/Segfault/OOM)
+    2. TimeoutError (Job hung)
+    3. Generic Exception (Serialization error or other infra failure)
+
+    Args:
+        pool (ProcessPoolExecutor): The execution pool to usage.
+        func (Callable): The function to execute (must accept ExecutionRequest and return ExecutionResult).
+        request (ExecutionRequest): The contract payload.
+        timeout_sec (int): Maximum time to wait for the result.
+
+    Returns:
+        ExecutionResult: The result, safely wrapping any infrastructure errors.
+    """
+    try:
+        future = pool.submit(func, request)
+        return future.result(timeout=timeout_sec)
+    
+    except TimeoutError:
+        logger.error(f"Sandbox Timeout ({timeout_sec}s) for {func.__name__}")
+        return ExecutionResult(
+            success=False,
+            error=f"Operation timed out after {timeout_sec} seconds. The worker process may be hung.",
+            metrics={"execution_time_ms": timeout_sec * 1000}
+        )
+        
+    except Exception as e:
+        msg = str(e)
+        logger.error(f"Sandbox Exception: {msg}")
+        
+        is_crash = False
+        try:
+            from concurrent.futures.process import BrokenProcessPool
+            if isinstance(e, BrokenProcessPool):
+                is_crash = True
+        except ImportError:
+            pass
+            
+        if "BrokenProcessPool" in msg or "Terminated" in msg:
+            is_crash = True
+            
+        if is_crash:
+            return ExecutionResult(
+                success=False,
+                error=f"SANDBOX CRASH: The worker process terminated abruptly (Segfault/OOM). ({msg})",
+                metrics={"is_crash": 1.0}
+            )
+            
+        return ExecutionResult(
+            success=False,
+            error=f"Sandbox Execution Failed: {msg}"
+        )

@@ -7,6 +7,7 @@ from nl2sql.pipeline.nodes.executor.node import ExecutorNode, _execute_in_proces
 from nl2sql.pipeline.state import GraphState
 from nl2sql.common.errors import ErrorCode, ErrorSeverity
 from nl2sql_adapter_sdk import QueryResult, CostEstimate
+from nl2sql.common.contracts import ExecutionResult
 
 class TestExecutorNode(unittest.TestCase):
     def setUp(self):
@@ -35,6 +36,7 @@ class TestExecutorNode(unittest.TestCase):
         res = self.node(state)
         self.assertEqual(res["errors"][0].error_code, ErrorCode.MISSING_DATASOURCE_ID)
 
+
     @patch("nl2sql.pipeline.nodes.executor.node.get_execution_pool")
     def test_execution_success(self, mock_get_pool):
         """Test successful query execution via sandbox."""
@@ -42,11 +44,15 @@ class TestExecutorNode(unittest.TestCase):
         mock_pool = MagicMock()
         mock_get_pool.return_value = mock_pool
         
-        expected_result = QueryResult(
-            columns=["id", "val"], 
-            rows=[[1, "A"], [2, "B"]], 
-            row_count=2, 
-            bytes_returned=100
+        expected_result = ExecutionResult(
+            success=True,
+            data={
+                "row_count": 2,
+                "rows": [{"id": 1, "val": "A"}, {"id": 2, "val": "B"}],
+                "columns": ["id", "val"],
+                "bytes_returned": 100
+            },
+            metrics={"execution_time_ms": 10}
         )
         
         future = Future()
@@ -62,12 +68,13 @@ class TestExecutorNode(unittest.TestCase):
         self.assertEqual(res["execution"].row_count, 2)
         self.assertEqual(res["execution"].rows[0]["val"], "A")
         
-        # Verify submit called with correct args
+        # Verify submit called with ExecutionRequest
         mock_pool.submit.assert_called_once()
-        args, kwargs = mock_pool.submit.call_args
+        args, _ = mock_pool.submit.call_args
         self.assertEqual(args[0], _execute_in_process)
-        self.assertEqual(kwargs["engine_type"], "mock_engine")
-        self.assertEqual(kwargs["sql"], "SELECT * FROM table")
+        request = args[1]
+        self.assertEqual(request.engine_type, "mock_engine")
+        self.assertEqual(request.sql, "SELECT * FROM table")
 
     @patch("nl2sql.pipeline.nodes.executor.node.get_execution_pool")
     def test_safeguard_max_bytes(self, mock_get_pool):
@@ -76,8 +83,14 @@ class TestExecutorNode(unittest.TestCase):
         mock_get_pool.return_value = mock_pool
         
         # Result > 1000 bytes
-        huge_result = QueryResult(
-            columns=["d"], rows=[["x"]], row_count=1, bytes_returned=2000 
+        huge_result = ExecutionResult(
+            success=True,
+            data={
+                "row_count": 1, 
+                "rows": [{"d": "x"}], 
+                "columns": ["d"],
+                "bytes_returned": 2000
+            }
         )
         
         future = Future()

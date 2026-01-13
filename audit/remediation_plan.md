@@ -61,7 +61,7 @@ This document serves as the master backlog for addressing findings from the Arch
 
 ## 🚀 Enhancements (Architecture Upgrade)
 
-- [ ] **ENH-001: Sandboxed Execution Service** (P0 - Critical)
+- [x] **ENH-001: Sandboxed Execution Service** (P0 - Critical)
   - **Value**: Prevents driver crashes from taking down the Agent and mitigates RCE risks.
   - **Action**: Move `ExecutorNode` logic to a separate gRPC service/sidecar with limited privileges.
 

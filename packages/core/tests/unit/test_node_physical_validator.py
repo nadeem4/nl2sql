@@ -8,6 +8,7 @@ from nl2sql.pipeline.state import GraphState
 from nl2sql.datasources import DatasourceRegistry
 from nl2sql.common.errors import ErrorCode
 from nl2sql_adapter_sdk import DryRunResult, CostEstimate
+from nl2sql.common.contracts import ExecutionResult
 
 class TestPhysicalValidatorNode(unittest.TestCase):
     def setUp(self):
@@ -20,16 +21,18 @@ class TestPhysicalValidatorNode(unittest.TestCase):
         self.registry.get_adapter.return_value = self.adapter
         self.node = PhysicalValidatorNode(self.registry)
 
+
     @patch("nl2sql.pipeline.nodes.validator.physical_node.get_execution_pool")
     def test_physical_validator_dry_run_failure(self, mock_get_pool):
         """Test handling of Dry Run Failure (Semantic Check)."""
         mock_pool = MagicMock()
         mock_get_pool.return_value = mock_pool
 
-        # Mock DryRunResult
-        mock_res = MagicMock(spec=DryRunResult)
-        mock_res.is_valid = False
-        mock_res.error_message = "Syntax Error near..."
+        # Mock ExecutionResult (Success=True means worker didn't crash, Data=Invalid)
+        mock_res = ExecutionResult(
+            success=True,
+            data={"is_valid": False, "error_message": "Syntax Error near..."}
+        )
         
         future = Future()
         future.set_result(mock_res)
@@ -47,13 +50,17 @@ class TestPhysicalValidatorNode(unittest.TestCase):
         self.assertIn("Dry Run Failed", result["errors"][0].message)
         
         # Verify Correct Function Submission
-        mock_pool.submit.assert_any_call(
-            _dry_run_in_process,
-            engine_type="mock_engine",
-            ds_id="ds1",
-            connection_args={},
-            sql="SELECT * FROM users"
-        )
+        match_call = None
+        for call in mock_pool.submit.call_args_list:
+            if call.args[0] == _dry_run_in_process:
+                match_call = call
+                break
+        
+        self.assertIsNotNone(match_call, "_dry_run_in_process was never called")
+        args, _ = match_call
+        req = args[1]
+        self.assertEqual(req.mode, "dry_run")
+        self.assertEqual(req.sql, "SELECT * FROM users")
 
     @patch("nl2sql.pipeline.nodes.validator.physical_node.get_execution_pool")
     def test_physical_validator_perf_check(self, mock_get_pool):
@@ -62,18 +69,22 @@ class TestPhysicalValidatorNode(unittest.TestCase):
         mock_get_pool.return_value = mock_pool
         
         # Mock DryRun Success
-        mock_dry_res = MagicMock(spec=DryRunResult)
-        mock_dry_res.is_valid = True
+        res_dry = ExecutionResult(
+            success=True,
+            data={"is_valid": True, "error_message": None}
+        )
         
         # Mock CostEstimate
-        mock_cost = MagicMock(spec=CostEstimate)
-        mock_cost.estimated_rows = 5000
+        res_cost = ExecutionResult(
+            success=True,
+            data={"estimated_rows": 5000, "estimated_bytes": 0}
+        )
         
         # The node calls submit twice: once for dry run, once for cost estimate
         f1 = Future()
-        f1.set_result(mock_dry_res)
+        f1.set_result(res_dry)
         f2 = Future()
-        f2.set_result(mock_cost)
+        f2.set_result(res_cost)
         
         mock_pool.submit.side_effect = [f1, f2]
         
