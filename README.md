@@ -39,6 +39,13 @@ The architecture is composed of three distinct planes, ensuring separation of co
 * **Layered Defense**: A combination of **[Retries, Circuit Breakers, and Sandboxing](docs/core/reliability.md)** ensures the system stays up even when LLMs or Databases go down.
 * **Fail-Fast**: We stop processing immediately if a dependency is unresponsive, preserving resources.
 
+### 5. The Observability Plane (The Watchtower)
+
+**Responsibility**: Visibility, Forensics, and Compliance.
+
+* **Full-Stack Telemetry**: Native [OpenTelemetry](docs/ops/observability.md) integration provides distributed tracing (Jaeger) and metrics (Prometheus) for every node execution.
+* **Forensic Audit Logs**: A tamper-evident, persistent [Audit Log](docs/ops/observability.md#3-persistent-audit-log) records every AI decision (Prompt/Response/Reasoning) for compliance and debugging.
+
 ---
 
 ## 📐 Architectural Invariants
@@ -92,6 +99,7 @@ nl2sql setup --demo
 * **[Security Model](docs/safety/security.md)**: Defense-in-depth strategy against prompt injection and unauthorized access.
 * **[Security Model](docs/safety/security.md)**: Defense-in-depth strategy against prompt injection and unauthorized access.
 * **[Reliability & Fault Tolerance](docs/core/reliability.md)**: Guide to Circuit Breakers, Sandbox isolation, and Recovery strategies.
+* **[Observability & Operations](docs/ops/observability.md)**: Configuring OpenTelemetry, Logging, and Audit Trails.
 
 ---
 

@@ -85,6 +85,12 @@ class Settings(BaseSettings):
         description="Endpoint for OTLP exporter (e.g. http://localhost:4317)."
     )
 
+    audit_log_path: str = Field(
+        default="logs/audit_events.log",
+        validation_alias="AUDIT_LOG_PATH",
+        description="Path to the persistent audit log file."
+    )
+
     model_config = SettingsConfigDict(
         env_file=".env", 
         env_file_encoding="utf-8", 
@@ -101,3 +107,11 @@ class Settings(BaseSettings):
         self.__dict__.update(new_settings.__dict__)
 
 settings = Settings()
+
+# Auto-configure logging based on settings
+# We want JSON logs in production (OTLP) to allow parsing by aggregators
+from nl2sql.common.logger import configure_logging
+configure_logging(
+    level="INFO",
+    json_format=(settings.observability_exporter == "otlp")
+)

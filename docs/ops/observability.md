@@ -1,46 +1,75 @@
-# Observability
+# Observability and Monitoring
 
-## Logging
+The platform includes a comprehensive observability stack designed for production readiness, leveraging **OpenTelemetry**, **Structured Logging**, and **Forensic Audit Logs**.
 
-We use a structured logging approach suitable for production environments (Splunk, Datadog, ELK).
+## 1. Metrics & Tracing (OpenTelemetry)
 
-* **Format**: JSON (Production) or Human-Readable (Dev).
-* **Attributes**: Logs include `request_id`, `user_id`, `node_name`, and `execution_time`.
+We use **OpenTelemetry (OTel)** for vendor-neutral instrumentation.
 
-### Enabling JSON Logs
+### Configuration
 
-Set the environment variable or use the flag:
+Set the following environment variables:
 
-```bash
-export LOG_FORMAT=json
-# or
-nl2sql run "query" --json-logs
-```
-
-::: nl2sql.common.logger.JsonFormatter
-
-## Tracing
-
-The platform is instrumented with [LangSmith](https://smith.langchain.com/) for deep tracing of the Agentic Graph.
-
-1. Set `LANGCHAIN_TRACING_V2=true`.
-2. Set `LANGCHAIN_API_KEY=...`.
-
-This will stream full traces of the Planner, Validator, and Generator steps to the LangSmith dashboard.
-
-## Metrics (Prometheus)
-
-The platform exposes a `/metrics` endpoint for Prometheus scraping.
+- `OBSERVABILITY_EXPORTER="otlp"`: Enables the OTLP exporter (requires a collector like Jaeger or Datadog Agent).
+- `OTEL_EXPORTER_OTLP_ENDPOINT="http://localhost:4317"`: The endpoint for the collector (gRPC).
 
 ### Key Metrics
 
-| Metric Name | Type | Description |
-| :--- | :--- | :--- |
-| `nl2sql_requests_total` | Counter | Total number of requests served. |
-| `nl2sql_request_latency_seconds` | Histogram | End-to-end latency distribution. |
-| `nl2sql_token_usage_total` | Counter | Total LLM tokens consumed (prompt + completion). |
-| `nl2sql_active_connections` | Gauge | Current number of active DB connections. |
+| Metric Name | Type | Unit | Attributes | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `nl2sql.token.usage` | Counter | `1` | `model`, `agent`, `datasource_id` | Total LLM tokens consumed. |
+| `nl2sql.node.duration` | Histogram | `s` | `node`, `datasource_id` | Execution duration of graph nodes. |
 
-### Grafana Dashboard
+### Visualization
 
-A standard Grafana dashboard ID `#12345` is available for import to visualize these metrics.
+- **Local**: Use [Jaeger](https://www.jaegertracing.io/) for traces and [Prometheus](https://prometheus.io/) for metrics.
+- **Production**: Compatible with Datadog, Honeycomb, New Relic, etc.
+
+## 2. Structured Logging
+
+For production, logs are output in **JSON format** to facilitate parsing by aggregators (Splunk, ELK).
+
+- **Activation**: JSON logging is automatically enabled when `OBSERVABILITY_EXPORTER="otlp"`.
+- **Correlation**: Every log entry includes a `trace_id` and `tenant_id` (if authenticated) to correlate logs across the request lifecycle.
+
+**Example Log Entry:**
+
+```json
+{
+  "timestamp": "2024-01-01T12:00:00",
+  "level": "INFO",
+  "message": "Planning phase completed",
+  "trace_id": "8a3c...",
+  "tenant_id": "org_123",
+  "node": "planner"
+}
+```
+
+## 3. Persistent Audit Log
+
+For forensic analysis and "Time Travel" debugging, the system maintains a separate, persistent audit log.
+
+- **Location**: `logs/audit_events.log` (Rotation enabled: 10MB x 5 backups).
+- **Content**: detailed record of AI Decisions (Prompt inputs, Model responses, Token usage).
+- **Purpose**: Allows operators to answer "Why did the AI say X?" hours or days later.
+
+**Event Structure:**
+
+```json
+{
+  "timestamp": "...",
+  "event_type": "llm_interaction",
+  "trace_id": "...",
+  "tenant_id": "...",
+  "data": {
+    "agent": "planner",
+    "model": "gpt-4o",
+    "response_snippet": "SELECT * FROM...",
+    "token_usage": {"total_tokens": 150}
+  }
+}
+```
+
+## 4. Legacy Tooling
+
+The CLI `Performance Tree` is preserved for local development convenience but piggybacks on the same instrumentation hooks.

@@ -69,8 +69,8 @@ class DecomposerNode:
         if not self.vector_store:
             return []
 
-        user_ctx = state.user_context or {}
-        allowed_ds = user_ctx.get("allowed_datasources") or []
+        user_ctx = state.user_context
+        allowed_ds = user_ctx.allowed_datasources or []
 
         query_text = override_query or state.user_query
 
@@ -95,8 +95,8 @@ class DecomposerNode:
         Returns:
             bool: True if access is allowed, False otherwise.
         """
-        user_ctx = state.user_context or {}
-        allowed_ds = user_ctx.get("allowed_datasources") or []
+        user_ctx = state.user_context
+        allowed_ds = user_ctx.allowed_datasources
         return bool(allowed_ds)
 
     def __call__(self, state: GraphState) -> Dict[str, Any]:

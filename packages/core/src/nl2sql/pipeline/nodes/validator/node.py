@@ -216,9 +216,9 @@ class LogicalValidatorNode:
         plan = state.plan
         errors: list[PipelineError] = []
 
-        user_ctx = state.user_context or {}
-        allowed_tables = user_ctx.get("allowed_tables", [])
-        role = user_ctx.get("role", "unknown")
+        user_ctx = state.user_context 
+        allowed_tables = user_ctx.allowed_tables
+        role = ','.join(user_ctx.roles)
         
         # Resolve Datasource ID for Namespacing
         ds_id = state.selected_datasource_id

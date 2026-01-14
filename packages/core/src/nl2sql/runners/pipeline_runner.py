@@ -4,7 +4,7 @@ import json
 import traceback
 from typing import Dict, Any, Optional, List
 from dataclasses import dataclass, field
-from nl2sql.pipeline.graph import run_with_graph
+from nl2sql.pipeline.graph import run_with_graph, UserContext
 from nl2sql.datasources import DatasourceRegistry
 from nl2sql.services.llm import LLMRegistry
 from nl2sql.services.vector_store import OrchestratorVectorStore
@@ -108,7 +108,7 @@ class PipelineRunner:
                 available = list(policy_cfg.roles.keys())
                 raise ValueError(f"Role '{role}' not defined. Available: {available}")
                 
-            return role_policy.model_dump()
+            return UserContext(roles = [role], **role_policy.model_dump())
             
         except Exception as e:
             raise NL2SQLError(f"Policy Context Error: {e}") from e

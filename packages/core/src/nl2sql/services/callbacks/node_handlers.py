@@ -2,7 +2,7 @@ import time
 from typing import Dict, Any, List, Optional
 
 from nl2sql.common.context import current_datasource_id
-from nl2sql.common.metrics import LATENCY_LOG
+from nl2sql.common.metrics import LATENCY_LOG, node_duration_histogram
 from nl2sql.reporting import ConsolePresenter
 from nl2sql.services.callbacks.node_context import current_node_run_id
 from nl2sql.services.callbacks.node_metrics import NodeMetrics
@@ -105,6 +105,7 @@ class NodeHandler:
         metrics.end_time = max(metrics.end_time, end)
         metrics.duration = metrics.end_time - metrics.start_time
 
+
         LATENCY_LOG.append(
             {
                 "node": node,
@@ -112,6 +113,15 @@ class NodeHandler:
                 "datasource_id": current_datasource_id.get(),
                 "run_id": run_id,
                 "parent_run_id": self.run_parent.get(run_id),
+            }
+        )
+        
+        # OTeL Instrumentation
+        node_duration_histogram.record(
+            end - start,
+            attributes={
+                "node": node,
+                "datasource_id": str(current_datasource_id.get() or "none"),
             }
         )
 
