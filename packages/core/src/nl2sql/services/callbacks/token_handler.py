@@ -1,15 +1,18 @@
 from langchain_core.outputs import LLMResult
-from nl2sql.common.metrics import TOKEN_LOG
+from nl2sql.common.metrics import TOKEN_LOG, token_usage_counter
 from nl2sql.common.context import current_datasource_id
 from nl2sql.services.callbacks.node_context import current_node_run_id
 from nl2sql.services.callbacks.node_metrics import NodeMetrics
 
 
 class TokenHandler:
+    """Handles token usage tracking and metrics."""
+
     def __init__(self, node_metrics: dict[str, NodeMetrics]):
         self.node_metrics = node_metrics
 
     def on_llm_end(self, response: LLMResult, agent_name: str = "unknown", model_name: str = "unknown"):
+        """Records token usage from LLM response."""
         usage = None
         if response and response.llm_output:
             usage = response.llm_output.get("token_usage") or response.llm_output.get("usage")
@@ -23,6 +26,7 @@ class TokenHandler:
 
         run_id = current_node_run_id.get()
 
+
         TOKEN_LOG.append(
             {
                 "agent": agent_name,
@@ -32,6 +36,16 @@ class TokenHandler:
                 "completion_tokens": c,
                 "total_tokens": t,
                 "run_id": run_id,
+            }
+        )
+
+        token_usage_counter.add(
+            t,
+            attributes={
+                "agent": agent_name,
+                "model": model_name,
+                "datasource_id": str(current_datasource_id.get() or "none"),
+                "type": "total"
             }
         )
 

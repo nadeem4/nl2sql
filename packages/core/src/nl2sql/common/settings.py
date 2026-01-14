@@ -73,6 +73,24 @@ class Settings(BaseSettings):
         description="Default statement timeout for SQL execution safeguards."
     )
 
+    observability_exporter: str = Field(
+        default="none",
+        validation_alias="OBSERVABILITY_EXPORTER",
+        description="Exporter for metrics/traces: 'none', 'console', 'otlp'."
+    )
+
+    otlp_endpoint: Optional[str] = Field(
+        default=None,
+        validation_alias="OTEL_EXPORTER_OTLP_ENDPOINT",
+        description="Endpoint for OTLP exporter (e.g. http://localhost:4317)."
+    )
+
+    audit_log_path: str = Field(
+        default="logs/audit_events.log",
+        validation_alias="AUDIT_LOG_PATH",
+        description="Path to the persistent audit log file."
+    )
+
     model_config = SettingsConfigDict(
         env_file=".env", 
         env_file_encoding="utf-8", 
@@ -89,3 +107,10 @@ class Settings(BaseSettings):
         self.__dict__.update(new_settings.__dict__)
 
 settings = Settings()
+
+# Configure logging during import
+from nl2sql.common.logger import configure_logging
+configure_logging(
+    level="INFO",
+    json_format=(settings.observability_exporter == "otlp")
+)

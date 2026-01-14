@@ -20,6 +20,9 @@ These settings control the startup behavior and file locations.
 | `SECRETS_CONFIG` | `configs/secrets.yaml` | Path to the secrets provider file. |
 | `POLICIES_CONFIG` | `configs/policies.json` | Path to the RBAC definitions. |
 | `ROUTER_L1_THRESHOLD` | `0.4` | Vector search similarity threshold. |
+| `OBSERVABILITY_EXPORTER` | `none` | Telemetry exporter: `otlp` (prod), `console` (dev), `none`. |
+| `OTEL_EXPORTER_OTLP_ENDPOINT`| `None` | Endpoint for OTeL Collector (e.g. `http://localhost:4317`). |
+| `AUDIT_LOG_PATH` | `logs/audit_events.log` | Path for the persistent forensic audit log. |
 
 ## 2. Datasources (`datasources.yaml`)
 

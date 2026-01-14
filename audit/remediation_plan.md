@@ -71,17 +71,22 @@ This document serves as the master backlog for addressing findings from the Arch
   - **Status**: Fixed. Implemented in `nl2sql.common.resilience` and verified in `tests/unit/test_resilience.py`.
 
 - [ ] **ENH-003: OpenTelemetry Integration** (P1 - High)
-  - **Value**: Enable standard APM features (Datadog/Jaeger) for trace visualization.
-  - **Action**: Replace custom `json` logging with OTelSDK.
+  - **Value**: Standardize metrics export (Latency, Token Counts, Errors) to OTLP-compatible backends (Datadog, Honeycomb).
+  - **Action**: Replace in-memory `LATENCY_LOG` with `opentelemetry-sdk` MeterProvider.
+  - **Dependencies**: `opentelemetry-api`, `opentelemetry-sdk`, `opentelemetry-exporter-otlp`.
 
 - [ ] **ENH-004: Persistent Audit Log** (P1 - High)
-  - **Value**: Required for Compliance and Regression Testing.
-  - **Action**: Create a `request_audit` database table to store Query/Plan/SQL tuples.
+  - **Value**: Enable forensic debugging of AI decisions ("Time Travel Debugging").
+  - **Action**: Implement `EventLogger` that writes {prompt, response, trace_id, duration} to a persistent store (file/DB) securely.
 
 - [ ] **ENH-005: Tenant-Aware RLS Middleware** (P2 - Medium)
   - **Value**: Defense-in-depth enforcement of multi-tenancy.
-  - **Action**: Implement a SQL transformation layer in `Generator` that automatically injects `WHERE tenant_id = ?` clauses into every generated AST.
+  - **Action**: Implement a SQL transformation layer in `Generator` that automatically injects `WHERE tenant_id = ?` clauses into every generic AST.
 
 - [ ] **ENH-006: Streaming Response Support** (P2 - Medium)
   - **Value**: Improves perceived latency.
   - **Action**: Update `AggregatorNode` to stream tokens to the frontend instead of waiting for full generation.
+
+- [ ] **ENH-007: Structured Logging (JSON)** (P1 - High)
+  - **Value**: Machine-readable logs for Splunk/ELK.
+  - **Action**: Update `nl2sql.common.logger` to support `JsonFormatter` by default in production.

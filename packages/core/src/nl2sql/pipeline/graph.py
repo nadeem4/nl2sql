@@ -11,29 +11,39 @@ from nl2sql.pipeline.nodes.aggregator import AggregatorNode
 from nl2sql.pipeline.nodes.semantic import SemanticAnalysisNode
 from nl2sql.pipeline.nodes.intent_validator import IntentValidatorNode
 from nl2sql.pipeline.subgraphs.execution import build_execution_subgraph
-from nl2sql.pipeline.state import GraphState
+from nl2sql.pipeline.state import GraphState, UserContext
 from nl2sql.services.vector_store import OrchestratorVectorStore
 from nl2sql.services.llm import LLMRegistry
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
-from nl2sql.common.logger import trace_context
+from nl2sql.common.logger import trace_context, tenant_context
 
 
 LLMCallable = Union[Callable[[str], str], Runnable]
 
 
 def traced_node(node: Callable):
-    """Wraps a node to inject trace_id from state into the logging context."""
+    """Wraps a node to inject trace_id and tenant_id from state into the logging context."""
     def wrapper(state: Union[Dict, Any]):
-        # Extract trace_id from state (dict or object)
         tid = None
+        tenant_id = None
+        
         if isinstance(state, dict):
             tid = state.get("trace_id")
+            uc = state.get("user_context")
+            if isinstance(uc, dict):
+                tenant_id = uc.get("tenant_id")
+            elif hasattr(uc, "tenant_id"):
+                tenant_id = uc.tenant_id
         else:
             tid = getattr(state, "trace_id", None)
+            uc = getattr(state, "user_context", None)
+            if uc:
+               tenant_id = getattr(uc, "tenant_id", None)
             
         if tid:
             with trace_context(tid):
-                return node(state)
+                with tenant_context(tenant_id):
+                    return node(state)
         return node(state)
     return wrapper
 
@@ -198,7 +208,7 @@ def run_with_graph(
     vector_store: Optional[OrchestratorVectorStore] = None,
     vector_store_path: str = "",
     callbacks: Optional[List] = None,
-    user_context: Optional[Dict[str, Any]] = None,
+    user_context: UserContext = None,
 ) -> Dict:
     """Convenience function to run the full pipeline.
 
@@ -211,7 +221,7 @@ def run_with_graph(
         vector_store (Optional[OrchestratorVectorStore]): RAG vector store.
         vector_store_path (str): Path to local vector store.
         callbacks (Optional[List]): LangChain callbacks.
-        user_context (Optional[Dict[str, Any]]): User identity/permissions.
+        user_context (UserContext): User identity/permissions.
 
     Returns:
         Dict: Final execution result.
@@ -227,7 +237,7 @@ def run_with_graph(
     initial_state = GraphState(
         user_query=user_query,
         selected_datasource_id=datasource_id,
-        user_context=user_context or {},
+        user_context=user_context,
     )
 
     from nl2sql.common.settings import settings

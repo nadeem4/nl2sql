@@ -6,11 +6,13 @@ from contextlib import contextmanager
 from typing import Any, Dict, Optional
 
 _trace_id_ctx = contextvars.ContextVar("trace_id", default=None)
+_tenant_id_ctx = contextvars.ContextVar("tenant_id", default=None)
 
 class TraceContextFilter(logging.Filter):
-    """Injects trace_id from contextvar into the log record."""
+    """Injects trace_id and tenant_id from contextvars into the log record."""
     def filter(self, record):
         record.trace_id = _trace_id_ctx.get()
+        record.tenant_id = _tenant_id_ctx.get()
         return True
 
 @contextmanager
@@ -21,6 +23,15 @@ def trace_context(trace_id: str):
         yield
     finally:
         _trace_id_ctx.reset(token)
+
+@contextmanager
+def tenant_context(tenant_id: Optional[str]):
+    """Context manager to set the tenant_id for the current context."""
+    token = _tenant_id_ctx.set(tenant_id)
+    try:
+        yield
+    finally:
+        _tenant_id_ctx.reset(token)
 
 class JsonFormatter(logging.Formatter):
     """Formatter that outputs JSON strings after parsing the LogRecord."""
@@ -43,6 +54,9 @@ class JsonFormatter(logging.Formatter):
         
         if getattr(record, "trace_id", None):
             log_record["trace_id"] = record.trace_id
+            
+        if getattr(record, "tenant_id", None):
+            log_record["tenant_id"] = record.tenant_id
 
         # Standard LogRecord attributes to ignore
         standard_attrs = {
@@ -50,7 +64,7 @@ class JsonFormatter(logging.Formatter):
             "funcName", "levelname", "levelno", "lineno", "module",
             "msecs", "message", "msg", "name", "pathname", "process",
             "processName", "relativeCreated", "stack_info", "thread", "threadName",
-            "taskName", "trace_id"
+            "taskName", "trace_id", "tenant_id"
         }
 
         for key, value in record.__dict__.items():
@@ -80,10 +94,7 @@ def configure_logging(level: str = "INFO", json_format: bool = False):
     if json_format:
         handler.setFormatter(JsonFormatter())
     else:
-        # Include trace_id in standard format if present
-        # This is a bit tricky with dynamic formatting, usually easier to check record in formatter
-        # For simplicity, we stick to standard format but maybe prepend trace_id if possible?
-        # We'll stick to a standard format for text logs for now, trace_id mainly for JSON/Production
+        # Standard text format
         formatter = logging.Formatter(
             "%(asctime)s - [%(trace_id)s] - %(name)s - %(levelname)s - %(message)s"
         )

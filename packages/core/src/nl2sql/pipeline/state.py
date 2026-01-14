@@ -14,6 +14,16 @@ from nl2sql.common.errors import PipelineError
 from nl2sql_adapter_sdk import Table
 
 
+class UserContext(BaseModel):
+    """User identity and permission context."""
+    user_id: Optional[str] = Field(default=None, description="Unique identifier for the user.")
+    tenant_id: Optional[str] = Field(default=None, description="Organization/Tenant identifier.")
+    roles: List[str] = Field(default_factory=list, description="List of assigned roles.")
+    allowed_datasources: List[str] = Field(default_factory=list, description="List of allowed datasource IDs or '*'")
+    allowed_tables: List[str] = Field(default_factory=list, description="List of allowed tables in 'datasource.table' format")
+    model_config = ConfigDict(extra="ignore")
+
+
 class GraphState(BaseModel):
     """Represents the shared state of the NL2SQL pipeline execution graph.
 
@@ -36,7 +46,7 @@ class GraphState(BaseModel):
         query_history (List[Dict[str, Any]]): History of executed sub-queries.
         final_answer (Optional[str]): The synthesized final response for the user.
         system_events (List[str]): Log of distinct system events.
-        user_context (Optional[Dict[str, Any]]): User identity and permissions context.
+        user_context (UserContext): User identity and permissions context.
         semantic_analysis (Optional[SemanticAnalysisResponse]): Enriched query metadata.
     """
     model_config = ConfigDict(extra="ignore", arbitrary_types_allowed=True)
@@ -69,5 +79,5 @@ class GraphState(BaseModel):
     query_history: Annotated[List[Dict[str, Any]], operator.add] = Field(default_factory=list)
     final_answer: Optional[str] = Field(default=None)
     system_events: Annotated[List[str], operator.add] = Field(default_factory=list)
-    user_context: Optional[Dict[str, Any]] = Field(default_factory=dict, description="User identity and permissions context.")
+    user_context: UserContext = Field(default_factory=UserContext, description="User identity and permissions context.")
     semantic_analysis: Optional[SemanticAnalysisResponse] = Field(default=None, description="Enriched query metadata (canonical form, keywords).")
