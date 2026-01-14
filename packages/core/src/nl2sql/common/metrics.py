@@ -5,11 +5,10 @@ from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics.export import ConsoleMetricExporter, PeriodicExportingMetricReader
 from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter
 
-# Legacy in-memory logs (kept for CLI compatibility)
+# Legacy lists for CLI compatibility
 TOKEN_LOG: List[Dict[str, Any]] = []
 LATENCY_LOG: List[Dict[str, Any]] = []
 
-# OpenTelemetry Instruments
 _meter = metrics.get_meter("nl2sql.core")
 node_duration_histogram = _meter.create_histogram(
     name="nl2sql.node.duration",

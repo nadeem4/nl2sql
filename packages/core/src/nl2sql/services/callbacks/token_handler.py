@@ -6,10 +6,13 @@ from nl2sql.services.callbacks.node_metrics import NodeMetrics
 
 
 class TokenHandler:
+    """Handles token usage tracking and metrics."""
+
     def __init__(self, node_metrics: dict[str, NodeMetrics]):
         self.node_metrics = node_metrics
 
     def on_llm_end(self, response: LLMResult, agent_name: str = "unknown", model_name: str = "unknown"):
+        """Records token usage from LLM response."""
         usage = None
         if response and response.llm_output:
             usage = response.llm_output.get("token_usage") or response.llm_output.get("usage")
@@ -36,7 +39,6 @@ class TokenHandler:
             }
         )
 
-        # OTeL Instrumentation
         token_usage_counter.add(
             t,
             attributes={

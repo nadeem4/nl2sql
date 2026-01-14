@@ -52,7 +52,6 @@ class EventLogger:
             tenant_id: Tenant/Customer ID.
         """
         
-        # Basic PII/Secret Redaction (Keys to scrub)
         sensitive_keys = {"api_key", "password", "secret", "authorization"}
         cleaned_payload = self._redact(payload, sensitive_keys)
         
@@ -67,7 +66,15 @@ class EventLogger:
         self.logger.info(json.dumps(event))
 
     def _redact(self, data: Any, keys_to_redact: set) -> Any:
-        """Recursively redact sensitive keys from dictionary."""
+        """Recursively redact sensitive keys from dictionary.
+
+        Args:
+            data: Input data (dict, list, or primitive).
+            keys_to_redact: Set of lowercase keys to match and redact.
+
+        Returns:
+            The sanitized data structure with sensitive values replaced by '***REDACTED***'.
+        """
         if isinstance(data, dict):
             return {
                 k: ("***REDACTED***" if k.lower() in keys_to_redact else self._redact(v, keys_to_redact))

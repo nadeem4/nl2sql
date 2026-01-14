@@ -108,8 +108,7 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
-# Auto-configure logging based on settings
-# We want JSON logs in production (OTLP) to allow parsing by aggregators
+# Configure logging during import
 from nl2sql.common.logger import configure_logging
 configure_logging(
     level="INFO",

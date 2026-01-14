@@ -135,7 +135,6 @@ class DecomposerNode:
             if state.semantic_analysis:
                 analysis = state.semantic_analysis
                 if analysis.keywords or analysis.synonyms:
-                    # Construct a search blob: Canonical + Keywords + Synonyms
                     expanded_query = f"{analysis.canonical_query} {' '.join(analysis.keywords)} {' '.join(analysis.synonyms)}"
                     print(f"Expanded Query: {expanded_query}")
 

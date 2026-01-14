@@ -94,10 +94,7 @@ def configure_logging(level: str = "INFO", json_format: bool = False):
     if json_format:
         handler.setFormatter(JsonFormatter())
     else:
-        # Include trace_id in standard format if present
-        # This is a bit tricky with dynamic formatting, usually easier to check record in formatter
-        # For simplicity, we stick to standard format but maybe prepend trace_id if possible?
-        # We'll stick to a standard format for text logs for now, trace_id mainly for JSON/Production
+        # Standard text format
         formatter = logging.Formatter(
             "%(asctime)s - [%(trace_id)s] - %(name)s - %(levelname)s - %(message)s"
         )

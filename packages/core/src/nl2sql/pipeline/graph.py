@@ -24,13 +24,11 @@ LLMCallable = Union[Callable[[str], str], Runnable]
 def traced_node(node: Callable):
     """Wraps a node to inject trace_id and tenant_id from state into the logging context."""
     def wrapper(state: Union[Dict, Any]):
-        # Extract trace_id and tenant_id from state
         tid = None
         tenant_id = None
         
         if isinstance(state, dict):
             tid = state.get("trace_id")
-            # user_context might be dict or object depending on serialization state in LangGraph
             uc = state.get("user_context")
             if isinstance(uc, dict):
                 tenant_id = uc.get("tenant_id")

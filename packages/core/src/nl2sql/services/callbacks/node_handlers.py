@@ -9,6 +9,8 @@ from nl2sql.services.callbacks.node_metrics import NodeMetrics
 
 
 class NodeHandler:
+    """Handles node execution lifecycle events and metrics recording."""
+
     def __init__(self, presenter: ConsolePresenter):
         self.presenter = presenter
 
@@ -116,7 +118,6 @@ class NodeHandler:
             }
         )
         
-        # OTeL Instrumentation
         node_duration_histogram.record(
             end - start,
             attributes={
