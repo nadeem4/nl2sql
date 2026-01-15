@@ -8,6 +8,7 @@ if TYPE_CHECKING:
 from .schemas import SemanticAnalysisResponse
 from .prompts import SEMANTIC_ANALYSIS_PROMPT
 from nl2sql.common.logger import get_logger
+from nl2sql.context import NL2SQLContext
 
 logger = get_logger("semantic_node")
 
@@ -23,41 +24,19 @@ class SemanticAnalysisNode:
         chain (Runnable): The analysis chain.
     """
 
-    def __init__(self, llm: Any):
+    def __init__(self, ctx: NL2SQLContext):
         """Initializes the SemanticAnalysisNode.
 
         Args:
             llm (Any): The language model instance.
         """
-        self.llm = llm
+        self.node_name = self.__class__.__name__.lower().replace('node', '')
+        self.llm = ctx.llm_registry.get_llm(self.node_name)
         self.prompt = ChatPromptTemplate.from_template(SEMANTIC_ANALYSIS_PROMPT)
-        self.chain = self.prompt | self.llm
+        self.chain = self.prompt | self.llm.with_structured_output(SemanticAnalysisResponse)
 
-    def invoke(self, query: str) -> SemanticAnalysisResponse:
-        """Analyzes the query and returns normalization + expansion data.
 
-        Directly callable (used by Indexing).
-
-        Args:
-            query (str): The user query to analyze.
-
-        Returns:
-            SemanticAnalysisResponse: The analysis result including canonical form,
-                keywords, and synonyms.
-        """
-        try:
-            return self.chain.invoke({"user_query": query})
-        except Exception as e:
-            logger.error(f"Semantic Analysis failed: {e}")
-            return SemanticAnalysisResponse(
-                canonical_query=query,
-                thought_process="Analysis failed, returning raw query.",
-                keywords=[],
-                synonyms=[],
-                reasoning=f"Analysis failed: {str(e)}"
-            )
-
-    def __call__(self, state: "GraphState") -> Dict[str, Any]:
+    def __call__(self, state: GraphState) -> Dict[str, Any]:
         """Executes the semantic analysis node within the LangGraph pipeline.
 
         Args:
@@ -67,18 +46,31 @@ class SemanticAnalysisNode:
             Dict[str, Any]: A dictionary containing the 'semantic_analysis' result
                 and 'reasoning'.
         """
-        response = self.invoke(state.user_query)
-
-        reasoning_step = {
-            "node": "semantic_analysis",
-            "content": response.reasoning,
-            "metadata": {
-                "keywords": response.keywords,
-                "synonyms": response.synonyms
+        try:
+            response = self.chain.invoke({"user_query": state.user_query})
+        except Exception as e:
+            logger.error(f"Node {self.node_name} failed: {e}")
+            return {
+                "reasoning": [{"node": self.node_name, "content": f"Semantic Analysis failed: {e}", "type": "error"}],
+                "errors": [
+                    PipelineError(
+                        node=self.node_name,
+                        message=f"Semantic Analysis failed: {e}",
+                        severity=ErrorSeverity.ERROR,
+                        error_code=ErrorCode.SEMANTIC_ANALYSIS_FAILED,
+                        stack_trace=str(e)
+                    )
+                ]
             }
-        }
+
+        reasoning =[
+            {
+                "node": self.node_name,
+                "content": response.reasoning,
+            }
+        ]
 
         return {
             "semantic_analysis": response,
-            "reasoning": [reasoning_step]
+            "reasoning": reasoning
         }

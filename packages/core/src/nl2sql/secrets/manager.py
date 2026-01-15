@@ -137,4 +137,3 @@ class SecretManager:
              
         return obj
 
-secret_manager = SecretManager()

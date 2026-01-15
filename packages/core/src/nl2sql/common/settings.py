@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     benchmark_config_path: str = Field(default="configs/benchmark_suite.yaml", validation_alias="BENCHMARK_CONFIG")
     secrets_config_path: str = Field(default="configs/secrets.yaml", validation_alias="SECRETS_CONFIG")
     embedding_model: str = Field(default="text-embedding-3-small", validation_alias="EMBEDDING_MODEL")
+    tenant_id: str = Field(default="default_tenant", validation_alias="TENANT_ID")
     sample_questions_path: str = Field(
         default="configs/sample_questions.yaml", 
         validation_alias="ROUTING_EXAMPLES",

@@ -18,6 +18,7 @@ LLMCallable = Union[Callable[[str], str], Runnable]
 from langchain_core.prompts import ChatPromptTemplate
 
 from langchain_core.output_parsers import StrOutputParser
+from nl2sql.context import NL2SQLContext
 
 class RefinerNode:
     """
@@ -26,17 +27,17 @@ class RefinerNode:
     Uses an LLM to look at the failed plan, the schema, and the errors to suggest fixes.
     """
 
-    def __init__(self, llm: Optional[LLMCallable] = None):
+    def __init__(self, ctx: NL2SQLContext):
         """
         Initializes the RefinerNode.
 
         Args:
             llm: The language model to use for refinement.
         """
-        self.llm = llm
-        if self.llm:
-            self.prompt = ChatPromptTemplate.from_template(REFINER_PROMPT)
-            self.chain = self.prompt | self.llm | StrOutputParser()
+        self.node_name = self.__class__.__name__.lower().replace('node', '')
+        self.llm = ctx.llm_registry.get_llm(self.node_name)
+        self.prompt = ChatPromptTemplate.from_template(REFINER_PROMPT)
+        self.chain = self.prompt | self.llm | StrOutputParser()
 
     def __call__(self, state: GraphState) -> Dict[str, Any]:
         """
@@ -48,21 +49,7 @@ class RefinerNode:
         Returns:
             Dictionary updates for the graph state with refined error messages (feedback).
         """
-        node_name = "refiner"
-
         try:
-            if not self.llm:
-                return {
-                    "errors": [
-                        PipelineError(
-                            node=node_name,
-                            message="Refiner LLM not provided.",
-                            severity=ErrorSeverity.CRITICAL,
-                            error_code=ErrorCode.MISSING_LLM
-                        )
-                    ]
-                }
-
             relevant_tables = ""
             if state.relevant_tables:
                 lines = []
@@ -99,24 +86,24 @@ class RefinerNode:
                 return {
                     "errors": [
                         PipelineError(
-                            node=node_name,
+                            node=self.node_name,
                             message=feedback,
                             severity=ErrorSeverity.WARNING, # Feedback for retry
                             error_code=ErrorCode.PLAN_FEEDBACK
                         )
                     ],
-                    "reasoning": [{"node": "refiner", "content": feedback}]
+                    "reasoning": [{"node": self.node_name, "content": feedback}]
                 }
             except Exception as e:
                     raise e
                      
         except Exception as e:
-            logger.error(f"Node {node_name} failed: {e}")
+            logger.error(f"Node {self.node_name} failed: {e}")
             return {
-                "reasoning": [{"node": "refiner", "content": f"Refiner failed: {e}", "type": "error"}],
+                "reasoning": [{"node": self.node_name, "content": f"Refiner failed: {e}", "type": "error"}],
                 "errors": [
                     PipelineError(
-                        node=node_name,
+                        node=self.node_name,
                         message=f"Refiner failed: {e}",
                         severity=ErrorSeverity.ERROR,
                         error_code=ErrorCode.REFINER_FAILED,

@@ -12,6 +12,9 @@ class SubQuery(BaseModel):
         complexity (Literal): Complexity classification (simple or complex).
         relevant_tables (Optional[List[Table]]): Relevant table schemas for this sub-query.
     """
+    id: str = Field(
+        description="Unique identifier for this sub-query."
+    )
     query: str = Field(
         description="Natural language question to be executed against the datasource."
     )

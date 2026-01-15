@@ -208,7 +208,7 @@ class DemoManager:
         
         from nl2sql_cli.commands.indexing import run_indexing
         from nl2sql.services.vector_store import OrchestratorVectorStore
-        from nl2sql.services.llm import LLMRegistry
+        from nl2sql.llm import LLMRegistry
         from nl2sql.configs import ConfigManager 
         from nl2sql.datasources import DatasourceRegistry 
         

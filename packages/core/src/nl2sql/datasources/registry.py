@@ -2,13 +2,20 @@ from typing import Dict, Type, List, Any, Union
 import importlib
 from nl2sql_adapter_sdk import DatasourceAdapter
 from nl2sql.datasources.discovery import discover_adapters
-from nl2sql.secrets import secret_manager
+from nl2sql.secrets import SecretManager
+from nl2sql.configs.datasources import DatasourceConfig, ConnectionConfig
 
 class DatasourceRegistry:
     """Manages a collection of active DatasourceAdapters.
     
     Acts as the factory and cache for DataSourceAdapter instances.
     """
+
+    def __init__(self, secret_manager: SecretManager):
+        """Initializes the registry by eagerly creating adapters for all configs."""
+        self._adapters: Dict[str, DatasourceAdapter] = {}
+        self._available_adapters = discover_adapters()
+        self._secret_manager = secret_manager
 
     def find_and_resolve_secret(self, key: str) -> str:
         """Attempts to resolve a secret using the secret manager.
@@ -22,44 +29,34 @@ class DatasourceRegistry:
         Raises:
             ValueError: If the secret cannot be resolved.
         """
-        return secret_manager.resolve(key)
+        return self._secret_manager.resolve(key)
 
-    def resolved_connection(self, unresolved_connection: dict) -> dict:
+    def resolved_connection(self, unresolved_connection: ConnectionConfig) -> ConnectionConfig:
         """Resolves all secrets in a connection dictionary.
 
         Args:
-            unresolved_connection (dict): The connection dictionary with potential secrets.
+            unresolved_connection (ConnectionConfig): The connection dictionary with potential secrets.
 
         Returns:
-            dict: The connection dictionary with resolved secrets.
+            ConnectionConfig: The connection dictionary with resolved secrets.
         """
         from pydantic import SecretStr
         
-        resolved_connection = unresolved_connection.copy()
-        for key, value in unresolved_connection.items():
+        resolved_connection = unresolved_connection.model_dump()
+        for key, value in unresolved_connection.model_dump().items():
             if isinstance(value, str) and value.startswith("${") and value.endswith("}"):
-                # Wrap the resolved secret in SecretStr for safety
                 secret_val = self.find_and_resolve_secret(value)
                 resolved_connection[key] = SecretStr(secret_val)
-        return resolved_connection
+        return ConnectionConfig(**resolved_connection)
 
-    def __init__(self, configs: List[Dict[str, Any]]):
-        """Initializes the registry by eagerly creating adapters for all configs.
-
-        Args:
-            configs: List of datasource configuration objects (Dict or DatasourceConfig).
-        """
-        self._adapters: Dict[str, DatasourceAdapter] = {}
-        self._available_adapters = discover_adapters()
-
+    def register_datasources(self, configs: List[DatasourceConfig]):
         for config in configs:
             try:
                 self.register_datasource(config)
             except Exception as e:
-                # Log usage would be better here, but we raise to stop startup on bad config
-                raise ValueError(f"Failed to initialize adapter for '{config.get('id', 'unknown')}': {e}") from e
+                raise ValueError(f"Failed to initialize adapter for '{config.id}': {e}") from e
 
-    def register_datasource(self, config: Union[Dict[str, Any], Any]) -> DatasourceAdapter:
+    def register_datasource(self, config: DatasourceConfig) -> DatasourceAdapter:
         """Registers a new datasource dynamically.
 
         Args:
@@ -71,16 +68,12 @@ class DatasourceRegistry:
         Raises:
             ValueError: If configuration is invalid or adapter type is unknown.
         """
-        # Normalize Pydantic Model to Dict
-        if hasattr(config, "model_dump"):
-            config = config.model_dump()
-
-        ds_id = config.get("id")
+        ds_id = config.id
         if not ds_id:
             raise ValueError("Datasource ID is required. Please check your configuration.")
 
-        connection = config.get("connection", {})
-        conn_type = connection.get("type", "").lower()
+        connection = config.connection
+        conn_type = connection.type.lower()
         resolved_connection = self.resolved_connection(connection)
 
         if conn_type in self._available_adapters:
@@ -90,9 +83,9 @@ class DatasourceRegistry:
                 datasource_id=ds_id,
                 datasource_engine_type=conn_type,
                 connection_args=resolved_connection,
-                statement_timeout_ms=config.get("statement_timeout_ms"),
-                row_limit=config.get("row_limit"),
-                max_bytes=config.get("max_bytes"),
+                statement_timeout_ms=config.options.get("statement_timeout_ms"),
+                row_limit=config.options.get("row_limit"),
+                max_bytes=config.options.get("max_bytes"),
             )
             self._adapters[ds_id] = adapter
             return adapter

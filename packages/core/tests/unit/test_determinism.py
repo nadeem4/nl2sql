@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import MagicMock
-from nl2sql.services.llm import LLMRegistry
+from nl2sql.llm import LLMRegistry
 from nl2sql.configs import LLMFileConfig, AgentConfig
 
 def test_determinism_enforcement():

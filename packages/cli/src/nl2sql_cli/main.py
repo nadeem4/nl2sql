@@ -10,7 +10,7 @@ from typing_extensions import Annotated
 # Core Library Imports
 from nl2sql.datasources import DatasourceRegistry
 from nl2sql.configs import ConfigManager
-from nl2sql.services.llm import LLMRegistry
+from nl2sql.llm import LLMRegistry
 from nl2sql.common.settings import settings
 from nl2sql.services.vector_store import OrchestratorVectorStore
 from nl2sql.common.logger import configure_logging
@@ -19,7 +19,7 @@ from nl2sql.context import NL2SQLContext
 # Local CLI Imports
 from nl2sql_cli.commands.indexing import run_indexing
 from nl2sql_cli.commands.benchmark import run_benchmark as exec_benchmark
-from nl2sql_cli.commands.run import run_pipeline as exec_pipeline
+from nl2sql_cli.commands.run import run_pipeline 
 from nl2sql_cli.commands.info import list_available_adapters
 from nl2sql_cli.commands.doctor import doctor_command
 from nl2sql_cli.commands.setup import setup_command
@@ -36,7 +36,7 @@ app = typer.Typer(
 
 app.add_typer(policy_app, name="policy", help="Manage RBAC policies and security.")
 
-ConfigOption = Annotated[Optional[pathlib.Path], typer.Option("--config", help="Path to datasource config YAML")]
+DatasourceConfigOption = Annotated[Optional[pathlib.Path], typer.Option("--config", help="Path to datasource config YAML")]
 SecretsConfigOption = Annotated[Optional[pathlib.Path], typer.Option("--secrets-config", help="Path to secrets config YAML")]
 LLMConfigOption = Annotated[Optional[pathlib.Path], typer.Option("--llm-config", help="Path to LLM config YAML")]
 VectorStoreOption = Annotated[Optional[str], typer.Option("--vector-store", help="Path to vector store directory")]
@@ -56,80 +56,48 @@ def global_callback(
 @app.command()
 def run(
     query: Annotated[str, typer.Argument(help="Natural language query")],
-    config: ConfigOption = None,
-    secrets_config: SecretsConfigOption = None,
-    id: Annotated[Optional[str], typer.Option(help="Target specific datasource ID")] = None,
-    llm_config: LLMConfigOption = None,
-    vector_store: VectorStoreOption = None,
+    ds_config_path: DatasourceConfigOption = None,
+    secrets_config_path: SecretsConfigOption = None,
+    ds_id: Annotated[Optional[str], typer.Option(help="Target specific datasource ID")] = None,
+    llm_config_path: LLMConfigOption = None,
+    vector_store_path: VectorStoreOption = None,
     role: Annotated[str, typer.Option(help="Role ID for RBAC policies")] = "admin",
     no_exec: Annotated[bool, typer.Option("--no-exec", help="Skip execution (plan & validate only)")] = False,
     verbose: Annotated[bool, typer.Option("--verbose", "-v", help="Show detailed reasoning")] = False,
     show_perf: Annotated[bool, typer.Option("--show-perf", help="Show performance metrics")] = False,
+    policies_config_path: Annotated[Optional[str], typer.Option("--policies-config", help="Path to policies config")] = None,
 ):
     """
     Execute a query against the knowledge graph.
     """
-    # Resolve Paths (Callback may have updated settings)
-    if config is None:
-        config = pathlib.Path(settings.datasource_config_path)
-    if secrets_config is None:
-        secrets_config = pathlib.Path(settings.secrets_config_path)
-    if llm_config is None:
-        llm_config = pathlib.Path(settings.llm_config_path)
-    if vector_store is None:
-        vector_store = settings.vector_store_path
 
     run_config = RunConfig(
         query=query,
-        config_path=config,
-        datasource_id=id,
+        ds_id=ds_id,
         role=role,
         no_exec=no_exec,
         verbose=verbose,
-        show_perf=show_perf,
-        vector_store_path=vector_store
+        show_perf=show_perf
     )
-    
+    ctx = NL2SQLContext(ds_config_path, secrets_config_path, llm_config_path, vector_store_path, policies_config_path)
 
-    ctx = NL2SQLContext.from_paths(
-        config_path=config,
-        secrets_path=secrets_config,
-        llm_config_path=llm_config,
-        vector_store_path=vector_store
-    )
-
-    exec_pipeline(run_config, ctx.registry, ctx.llm_registry, ctx.vector_store)
+    run_pipeline(run_config, ctx)
 
 
 @app.command()
 def index(
-    config: ConfigOption = None,
-    secrets_config: SecretsConfigOption = None,
-    vector_store: VectorStoreOption = None,
-    llm_config: LLMConfigOption = None,
+    ds_config_path: DatasourceConfigOption = None,
+    secrets_config_path: SecretsConfigOption = None,
+    vector_store_path: VectorStoreOption = None,
+    llm_config_path: LLMConfigOption = None,
 ):
     """
     Index schemas and examples into the Vector Store.
     """
-    # Resolve Paths
-    if config is None:
-        config = pathlib.Path(settings.datasource_config_path)
-    if secrets_config is None:
-        secrets_config = pathlib.Path(settings.secrets_config_path)
-    if llm_config is None:
-        llm_config = pathlib.Path(settings.llm_config_path)
-    if vector_store is None:
-        vector_store = settings.vector_store_path
+    ctx = NL2SQLContext(ds_config_path, secrets_config_path, llm_config_path, vector_store_path)
 
-    ctx = NL2SQLContext.from_paths(
-        config_path=config,
-        secrets_path=secrets_config,
-        llm_config_path=llm_config,
-        vector_store_path=vector_store
-    )
+    run_indexing(ctx)
     
-    run_indexing(ctx.registry, vector_store, ctx.vector_store, ctx.llm_registry)
-
 @app.command()
 def doctor():
     """
@@ -170,10 +138,10 @@ def list_adapters():
 @app.command()
 def benchmark(
     dataset: Annotated[pathlib.Path, typer.Option(help="Path to golden dataset YAML")],
-    config: ConfigOption = None,
-    secrets_config: SecretsConfigOption = None,
-    vector_store: VectorStoreOption = None,
-    bench_config: Annotated[Optional[pathlib.Path], typer.Option(help="Path to LLM matrix config")] = None,
+    ds_config_path: DatasourceConfigOption = None,
+    secrets_config_path: SecretsConfigOption = None,
+    vector_store_path: VectorStoreOption = None,
+    bench_config_path: Annotated[Optional[pathlib.Path], typer.Option(help="Path to LLM matrix config")] = None,
     iterations: Annotated[int, typer.Option(help="Iterations per test case")] = 3,
     routing_only: Annotated[bool, typer.Option(help="Verify routing only, skip SQL execution")] = False,
     include_ids: Annotated[Optional[List[str]], typer.Option(help="Specific Test IDs to run")] = None,
@@ -182,13 +150,7 @@ def benchmark(
     """
     Run accuracy benchmarks against a golden dataset.
     """
-    # Resolve Paths
-    if config is None:
-        config = pathlib.Path(settings.datasource_config_path)
-    if secrets_config is None:
-        secrets_config = pathlib.Path(settings.secrets_config_path)
-    if vector_store is None:
-        vector_store = settings.vector_store_path
+
 
     bench_run_config = BenchmarkConfig(
         dataset_path=dataset,
@@ -204,11 +166,7 @@ def benchmark(
     )
     
 
-    ctx = NL2SQLContext.from_paths(
-        config_path=config,
-        secrets_path=secrets_config,
-        vector_store_path=vector_store
-    )
+    ctx = NL2SQLContext(ds_config_path, secrets_config_path, llm_config_path, vector_store_path)
     
     exec_benchmark(bench_run_config, ctx.registry, ctx.vector_store)
 

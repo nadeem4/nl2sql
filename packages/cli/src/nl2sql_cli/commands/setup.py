@@ -353,7 +353,7 @@ def setup_command(demo: bool = False, lite: bool = True, docker: bool = False, a
     from nl2sql.services.vector_store import OrchestratorVectorStore
     from nl2sql.common.settings import settings
     from nl2sql_cli.commands.indexing import run_indexing
-    from nl2sql.services.llm import LLMRegistry
+    from nl2sql.llm import LLMRegistry
 
     try:
         v_store = OrchestratorVectorStore(persist_directory=settings.vector_store_path)

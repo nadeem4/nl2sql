@@ -3,15 +3,12 @@ from typing import Dict, Any
 from nl2sql.reporting import ConsolePresenter
 from nl2sql.services.vector_store import OrchestratorVectorStore
 from nl2sql.datasources import DatasourceRegistry
-
+from nl2sql.context import NL2SQLContext
 from nl2sql_cli.common.decorators import handle_cli_errors
 
 @handle_cli_errors
 def run_indexing(
-    registry: DatasourceRegistry,
-    vector_store_path: str,
-    vector_store: OrchestratorVectorStore,
-    llm_registry: Any = None,
+    ctx: NL2SQLContext,
 ) -> None:
     """Runs the indexing process for schemas and examples.
 
@@ -23,18 +20,17 @@ def run_indexing(
 
     Args:
         registry: The initialized DatasourceRegistry.
-        vector_store_path: Path to the vector store directory.
         vector_store: The initialized vector store instance.
         llm_registry: Registry of LLMs used for semantic enrichment.
     """
     presenter = ConsolePresenter()
-    presenter.print_indexing_start(vector_store_path)
+    presenter.print_indexing_start(ctx.vector_store.persist_directory)
 
-    adapters = registry.list_adapters()
+    adapters = ctx.registry.list_adapters()
     stats = []
 
     with presenter.console.status("[bold cyan]Clearing existing data...[/bold cyan]"):
-        vector_store.clear()
+        ctx.vector_store.clear()
     presenter.print_step("[green][OK][/green] Cleared existing data.")
 
     presenter.console.print("\n[bold]Indexing Schemas...[/bold]")
@@ -44,7 +40,7 @@ def run_indexing(
         with presenter.console.status(f"[cyan]Indexing schema: {ds_id}...[/cyan]"):
             try:
                 # Use idempotent refresh
-                schema_stats = vector_store.refresh_schema(adapter, datasource_id=ds_id)
+                schema_stats = ctx.vector_store.refresh_schema(adapter, datasource_id=ds_id)
                 schema_stats["id"] = ds_id
                 stats.append(schema_stats)
 

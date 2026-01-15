@@ -2,7 +2,7 @@ import pytest
 from unittest.mock import MagicMock
 from nl2sql.pipeline.graph import run_with_graph, build_execution_subgraph
 from nl2sql.datasources import DatasourceRegistry
-from nl2sql.services.llm import LLMRegistry
+from nl2sql.llm import LLMRegistry
 from nl2sql.pipeline.nodes.decomposer.schemas import DecomposerResponse
 from nl2sql.pipeline.nodes.aggregator.schemas import AggregatedResponse
 

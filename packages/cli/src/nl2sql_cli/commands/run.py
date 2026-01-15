@@ -3,7 +3,7 @@ import json
 from typing import Optional
 
 from nl2sql.datasources import DatasourceRegistry
-from nl2sql.services.llm import LLMRegistry
+from nl2sql.llm import LLMRegistry
 from nl2sql.services.vector_store import OrchestratorVectorStore
 # Updated Import
 from nl2sql_cli.commands.visualize import draw_execution_trace
@@ -12,14 +12,12 @@ from nl2sql.runners.pipeline_runner import PipelineRunner
 from nl2sql.common.settings import settings
 from nl2sql_cli.types import RunConfig
 from nl2sql_cli.common.decorators import handle_cli_errors
-
+from nl2sql.context import NL2SQLContext
 
 @handle_cli_errors
 def run_pipeline(
     config: RunConfig, 
-    datasource_registry: DatasourceRegistry, 
-    llm_registry: LLMRegistry, 
-    vector_store: OrchestratorVectorStore
+    ctx: NL2SQLContext
 ) -> None:
     """Executes the NL2SQL pipeline."""
     if not config.query:
@@ -29,7 +27,7 @@ def run_pipeline(
     presenter.print_query(config.query)
     
     # Instantiate Runner
-    runner = PipelineRunner(datasource_registry, llm_registry, vector_store)
+    runner = PipelineRunner(ctx)
     
     # Setup Monitoring
     from nl2sql.services.callbacks.monitor import PipelineMonitorCallback
@@ -57,10 +55,6 @@ def run_pipeline(
         
     final_state = result.final_state
     
-    # ... Presentation Logic ...
-    
-    # Print Static Status Tree
-    #monitor.get_status_tree()
 
     query_history = final_state.get("query_history", [])
     
@@ -68,7 +62,6 @@ def run_pipeline(
         reasoning = final_state.get("reasoning", [])
         presenter.print_execution_tree(config.query, query_history, top_level_reasoning=reasoning)
         
-        # Save detailed trace
         try:
             with open("last_reasoning.json", "w") as f:
                 dump_data = {
@@ -93,14 +86,12 @@ def run_pipeline(
                     header = f"[bold]Sub-Query: {sub_query}[/bold]\n" + header
                 presenter.print_sql(f"{header}\n\n{sql}")
     
-    # Fallback for single execution if history is empty (e.g. direct run)
     elif final_state.get("sql_draft"):
         sql_draft_data = final_state.get("sql_draft")
         sql_draft = sql_draft_data.get("sql") if isinstance(sql_draft_data, dict) else getattr(sql_draft_data, "sql", None)
         if sql_draft:
              presenter.print_sql(f"[bold]SQL Generated:[/bold]\n{sql_draft}")
 
-    # Print Pipeline Errors
     errors = final_state.get("errors")
     if errors:
         presenter.print_pipeline_errors(errors)

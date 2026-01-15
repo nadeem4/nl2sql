@@ -3,15 +3,15 @@ from langchain_core.runnables import Runnable
 from langgraph.graph import END, StateGraph
 
 from nl2sql.pipeline.state import GraphState
-from nl2sql.pipeline.nodes.planner import PlannerNode
+from nl2sql.pipeline.nodes.planner import ASTPlannerNode
 from nl2sql.pipeline.nodes.validator import LogicalValidatorNode, PhysicalValidatorNode
 from nl2sql.pipeline.nodes.refiner import RefinerNode
 from nl2sql.pipeline.nodes.generator import GeneratorNode
 from nl2sql.pipeline.nodes.executor import ExecutorNode
 from nl2sql.datasources import DatasourceRegistry
 from nl2sql.common.errors import ErrorSeverity
+from nl2sql.context import NL2SQLContext
 
-LLMCallable = Union[Callable[[str], str], Runnable]
 
 
 import time
@@ -19,9 +19,7 @@ import random
 
 
 def build_sql_agent_graph(
-    llm_map: Dict[str, LLMCallable],
-    registry: DatasourceRegistry,
-    row_limit: int = 100,
+    ctx: NL2SQLContext,
 ):
     """Builds the SQL Agent Subgraph.
 
@@ -34,12 +32,12 @@ def build_sql_agent_graph(
     """
     graph = StateGraph(GraphState)
 
-    planner = PlannerNode(registry=registry, llm=llm_map.get("planner"))
-    logical_validator = LogicalValidatorNode(registry=registry)
-    physical_validator = PhysicalValidatorNode(registry=registry, row_limit=row_limit)
-    refiner = RefinerNode(llm=llm_map.get("refiner"))
-    generator = GeneratorNode(registry=registry)
-    executor = ExecutorNode(registry=registry)
+    ast_planner = ASTPlannerNode(ctx)
+    logical_validator = LogicalValidatorNode(ctx)
+    physical_validator = PhysicalValidatorNode(ctx)
+    refiner = RefinerNode(ctx)
+    generator = GeneratorNode(ctx)
+    executor = ExecutorNode(ctx)
 
     def retry_node(state: GraphState) -> Dict:
         """Increments retry count with exponential backoff and jitter."""
@@ -91,7 +89,7 @@ def build_sql_agent_graph(
             return "end"
         return "ok"
 
-    graph.add_node("planner", planner)
+    graph.add_node("ast_planner", ast_planner)
     graph.add_node("logical_validator", logical_validator)
     graph.add_node("generator", generator)
     graph.add_node("physical_validator", physical_validator)
@@ -99,10 +97,10 @@ def build_sql_agent_graph(
     graph.add_node("refiner", refiner)
     graph.add_node("retry_handler", retry_node)
 
-    graph.set_entry_point("planner")
+    graph.set_entry_point("ast_planner")
 
     graph.add_conditional_edges(
-        "planner",
+        "ast_planner",
         check_planner,
         {"ok": "logical_validator", "retry": "retry_handler", "end": END},
     )
@@ -124,6 +122,6 @@ def build_sql_agent_graph(
     graph.add_edge("executor", END)
 
     graph.add_edge("retry_handler", "refiner")
-    graph.add_edge("refiner", "planner")
+    graph.add_edge("refiner", "ast_planner")
 
     return graph.compile()

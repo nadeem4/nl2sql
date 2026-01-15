@@ -10,6 +10,7 @@ from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.datasources import DatasourceRegistry
 from nl2sql.common.logger import get_logger
 from nl2sql.pipeline.nodes.planner.schemas import PlanModel, Expr
+from nl2sql.context import NL2SQLContext
 
 logger = get_logger("generator")
 
@@ -143,13 +144,14 @@ class GeneratorNode:
         registry (DatasourceRegistry): The registry to fetch datasource dialects.
     """
 
-    def __init__(self, registry: DatasourceRegistry):
+    def __init__(self, ctx: NL2SQLContext):
         """Initializes the GeneratorNode.
 
         Args:
             registry (DatasourceRegistry): The registry of datasources.
         """
-        self.registry = registry
+        self.node_name = self.__class__.__name__.lower().replace('node', '')
+        self.ds_registry = ctx.ds_registry
 
     def __call__(self, state: GraphState) -> Dict[str, Any]:
         """Executes the generator node.
@@ -163,8 +165,6 @@ class GeneratorNode:
         Returns:
             Dict[str, Any]: A dictionary with the generated 'sql_draft' and reasoning.
         """
-        node_name = "generator"
-
         try:
             if not state.selected_datasource_id:
                 raise ValueError("No datasource selected")
@@ -174,7 +174,7 @@ class GeneratorNode:
             plan: PlanModel = state.plan
             
             # Fix: Use adapter directly since get_profile is removed
-            adapter = self.registry.get_adapter(state.selected_datasource_id)
+            adapter = self.ds_registry.get_adapter(state.selected_datasource_id)
             dialect = adapter.get_dialect()
 
             row_limit = adapter.row_limit or 1000
@@ -185,7 +185,7 @@ class GeneratorNode:
             return {
                 "sql_draft": sql,
                 "reasoning": [
-                    {"node": node_name, "content": ["Generated SQL", sql]}
+                    {"node": self.node_name, "content": ["Generated SQL", sql]}
                 ]
             }
 
@@ -194,7 +194,7 @@ class GeneratorNode:
             return {
                 "errors": [
                     PipelineError(
-                        node=node_name,
+                        node=self.node_name,
                         message=str(exc),
                         error_code=ErrorCode.SQL_GEN_FAILED,
                         severity=ErrorSeverity.ERROR,

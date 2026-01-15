@@ -1,6 +1,6 @@
 from .decomposer.node import DecomposerNode
 from .aggregator.node import AggregatorNode
-from .planner.node import PlannerNode
+from .planner.node import ASTPlannerNode
 from .generator.node import GeneratorNode
 from .executor.node import ExecutorNode
 from .refiner.node import RefinerNode
@@ -8,7 +8,7 @@ from .validator.node import LogicalValidatorNode
 from .validator.physical_node import PhysicalValidatorNode
 
 __all__ = [
-    "PlannerNode", 
+    "ASTPlannerNode", 
     "GeneratorNode", 
     "ExecutorNode", 
     "RefinerNode", 

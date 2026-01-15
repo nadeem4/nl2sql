@@ -6,9 +6,9 @@ from langchain_core.prompts import ChatPromptTemplate
 
 from .prompts import PLANNER_PROMPT, PLANNER_EXAMPLES
 from .schemas import PlanModel
-from nl2sql.datasources import DatasourceRegistry
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.common.logger import get_logger
+from nl2sql.context import NL2SQLContext
 
 if TYPE_CHECKING:
     from nl2sql.pipeline.state import GraphState
@@ -16,31 +16,28 @@ if TYPE_CHECKING:
 logger = get_logger("planner")
 
 
-class PlannerNode:
+class ASTPlannerNode:
     """Generates a structured SQL execution plan (PlanModel).
 
     Uses an LLM to interpret the user query and semantic context, producing a
     deterministic Abstract Syntax Tree (AST) that represents the SQL query.
 
     Attributes:
-        registry (DatasourceRegistry): The registry of datasources.
         llm (Optional[Runnable]): The Language Model executable.
         chain (Optional[Runnable]): The langchain chain for planning.
     """
 
-    def __init__(self, registry: DatasourceRegistry, llm: Optional[Runnable] = None):
+    def __init__(self, ctx: NL2SQLContext):
         """Initializes the PlannerNode.
 
         Args:
-            registry (DatasourceRegistry): The registry of datasources.
-            llm (Optional[Runnable]): The Language Model to use for planning.
+            ctx (NL2SQLContext): The context of the pipeline.
         """
-        self.registry = registry
-        self.llm = llm
+        self.node_name = self.__class__.__name__.lower().replace('node', '')
+        self.llm = ctx.llm_registry.get_llm(self.node_name)
 
-        if self.llm:
-            prompt = ChatPromptTemplate.from_template(PLANNER_PROMPT)
-            self.chain = prompt | self.llm
+        self.prompt = ChatPromptTemplate.from_template(PLANNER_PROMPT)
+        self.chain = self.prompt | self.llm.with_structured_output(PlanModel)
 
     def __call__(self, state: GraphState) -> Dict[str, Any]:
         """Executes the planning node.
@@ -48,24 +45,10 @@ class PlannerNode:
         Args:
            state (GraphState): The current state of the execution graph.
 
-        Returns:
+        Returns:s
             Dict[str, Any]: A dictionary containing the generated 'plan', 'reasoning',
                 and any 'errors' encountered.
         """
-        node_name = "planner"
-
-        if not self.llm:
-            return {
-                "errors": [
-                    PipelineError(
-                        node=node_name,
-                        message="Planner LLM not provided; no plan generated.",
-                        severity=ErrorSeverity.CRITICAL,
-                        error_code=ErrorCode.MISSING_LLM,
-                    )
-                ]
-            }
-
         try:
             relevant_tables = '\n'.join(
                 t.model_dump_json(indent=2) for t in state.relevant_tables
@@ -88,7 +71,6 @@ class PlannerNode:
                     "examples": PLANNER_EXAMPLES,
                     "feedback": feedback,
                     "user_query": state.user_query,
-                    # date_format removed
                     "semantic_context": semantic_context,
                 }
             )
@@ -97,7 +79,7 @@ class PlannerNode:
                 "plan": plan,
                 "reasoning": [
                     {
-                        "node": node_name,
+                        "node": self.node_name,
                         "content": [
                             f"Reasoning: {plan.reasoning or 'None'}",
                             f"Tables: {', '.join(t.name for t in plan.tables)}",
@@ -113,7 +95,7 @@ class PlannerNode:
                 "plan": None,
                 "errors": [
                     PipelineError(
-                        node=node_name,
+                        node=self.node_name,
                         message="Planner failed.",
                         severity=ErrorSeverity.ERROR,
                         error_code=ErrorCode.PLANNING_FAILURE,

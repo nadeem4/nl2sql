@@ -7,11 +7,11 @@ if TYPE_CHECKING:
     from nl2sql.pipeline.state import GraphState
 
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
-from nl2sql.datasources import DatasourceRegistry
 from nl2sql.datasources.discovery import discover_adapters
 from nl2sql.common.logger import get_logger
 from nl2sql.common.sandbox import get_execution_pool
 from nl2sql_adapter_sdk import DatasourceAdapter, DryRunResult, CostEstimate
+from nl2sql.context import NL2SQLContext
 
 logger = get_logger("physical_validator")
 
@@ -73,14 +73,14 @@ class PhysicalValidatorNode:
         row_limit (int | None): Configured maximum row limit for performance warnings.
     """
 
-    def __init__(self, registry: DatasourceRegistry, row_limit: int | None = None):
+    def __init__(self, ctx: NL2SQLContext, row_limit: int | None = None):
         """Initializes the PhysicalValidatorNode.
 
         Args:
-            registry (DatasourceRegistry): The registry of datasources.
+            ctx (NL2SQLContext): The context of the pipeline.
             row_limit (int | None): Optional row limit for performance validation.
         """
-        self.registry = registry
+        self.registry = ctx.ds_registry
         self.row_limit = row_limit
 
     def _validate_semantic(self, sql: str, adapter: DatasourceAdapter) -> Optional[PipelineError]:

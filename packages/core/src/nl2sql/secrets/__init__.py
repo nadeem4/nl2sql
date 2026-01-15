@@ -1,4 +1,4 @@
-from .manager import secret_manager, SecretManager
+from .manager import SecretManager
 from .interfaces import SecretProvider
 
 from pathlib import Path
@@ -8,4 +8,4 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-__all__ = ["secret_manager", "SecretManager", "SecretProvider"]
+__all__ = ["SecretManager", "SecretProvider"]

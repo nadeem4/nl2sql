@@ -12,16 +12,9 @@ from nl2sql.pipeline.nodes.executor.schemas import ExecutionModel
 from nl2sql.pipeline.nodes.semantic.schemas import SemanticAnalysisResponse
 from nl2sql.common.errors import PipelineError
 from nl2sql_adapter_sdk import Table
+from nl2sql.auth import UserContext
 
 
-class UserContext(BaseModel):
-    """User identity and permission context."""
-    user_id: Optional[str] = Field(default=None, description="Unique identifier for the user.")
-    tenant_id: Optional[str] = Field(default=None, description="Organization/Tenant identifier.")
-    roles: List[str] = Field(default_factory=list, description="List of assigned roles.")
-    allowed_datasources: List[str] = Field(default_factory=list, description="List of allowed datasource IDs or '*'")
-    allowed_tables: List[str] = Field(default_factory=list, description="List of allowed tables in 'datasource.table' format")
-    model_config = ConfigDict(extra="ignore")
 
 
 class GraphState(BaseModel):
@@ -42,7 +35,6 @@ class GraphState(BaseModel):
         selected_datasource_id (Optional[str]): ID of the target datasource.
         sub_queries (Optional[List[SubQuery]]): List of decomposed sub-queries.
         confidence (Optional[float]): Confidence score from Decomposer.
-        intermediate_results (List[Any]): Results from sub-query execution branches.
         query_history (List[Dict[str, Any]]): History of executed sub-queries.
         final_answer (Optional[str]): The synthesized final response for the user.
         system_events (List[str]): Log of distinct system events.
@@ -75,7 +67,7 @@ class GraphState(BaseModel):
         default=None,
         description="Confidence score from Decomposer."
     )
-    intermediate_results: Annotated[List[Any], operator.add] = Field(default_factory=list)
+
     query_history: Annotated[List[Dict[str, Any]], operator.add] = Field(default_factory=list)
     final_answer: Optional[str] = Field(default=None)
     system_events: Annotated[List[str], operator.add] = Field(default_factory=list)

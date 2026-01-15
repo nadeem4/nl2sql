@@ -8,7 +8,7 @@ import pandas as pd
 from sqlalchemy import text, create_engine
 
 from nl2sql.datasources import DatasourceRegistry
-from nl2sql.services.llm import LLMRegistry
+from nl2sql.llm import LLMRegistry
 from nl2sql.services.vector_store import OrchestratorVectorStore
 from nl2sql.pipeline.graph import run_with_graph
 from nl2sql.evaluation.evaluator import ModelEvaluator

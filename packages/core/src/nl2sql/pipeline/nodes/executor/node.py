@@ -15,6 +15,7 @@ from .schemas import ExecutionModel
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.common.logger import get_logger
 from nl2sql.common.sandbox import get_execution_pool
+from nl2sql.context import NL2SQLContext
 
 logger = get_logger("executor")
 
@@ -89,13 +90,14 @@ class ExecutorNode:
         registry (DatasourceRegistry): The registry of datasources.
     """
 
-    def __init__(self, registry: DatasourceRegistry):
+    def __init__(self, ctx: NL2SQLContext):
         """Initializes the ExecutorNode.
 
         Args:
             registry (DatasourceRegistry): The registry of datasources.
         """
-        self.registry = registry
+        self.node_name = self.__class__.__name__.lower().replace('node', '')
+        self.ds_registry = ctx.ds_registry
 
     def __call__(self, state: GraphState) -> Dict[str, Any]:
         """Executes the generated SQL against the selected datasource.
@@ -112,8 +114,6 @@ class ExecutorNode:
             Dict[str, Any]: A dictionary containing the 'execution' result,
                 any 'errors', and 'reasoning' logs.
         """
-        node_name = f"{self.__class__.__name__} ({state.selected_datasource_id}) ({state.user_query})"
-
         try:
             errors = []
             ds_id = state.selected_datasource_id
@@ -121,7 +121,7 @@ class ExecutorNode:
 
             if not sql:
                 errors.append(PipelineError(
-                    node=node_name,
+                    node=self.node_name,
                     message="No SQL to execute.",
                     severity=ErrorSeverity.ERROR,
                     error_code=ErrorCode.MISSING_SQL
@@ -131,7 +131,7 @@ class ExecutorNode:
 
             if not ds_id:
                 errors.append(PipelineError(
-                    node=node_name,
+                    node=self.node_name,
                     message="No datasource_id in state.",
                     severity=ErrorSeverity.ERROR,
                     error_code=ErrorCode.MISSING_DATASOURCE_ID
@@ -143,7 +143,7 @@ class ExecutorNode:
 
             from nl2sql.common.settings import settings
             
-            adapter = self.registry.get_adapter(ds_id)
+            adapter = self.ds_registry.get_adapter(ds_id)
             
             safeguard_timeout_ms = adapter.statement_timeout_ms or settings.default_statement_timeout_ms
             safeguard_row_limit = adapter.row_limit or settings.default_row_limit
@@ -211,7 +211,7 @@ class ExecutorNode:
                 return {
                     "execution": ExecutionModel(row_count=0, rows=[], error=str(e)),
                     "errors": [PipelineError(
-                        node=node_name,
+                        node=self.node_name,
                         message=f"Execution Failed (Breaker Monitored): {e}",
                         severity=ErrorSeverity.ERROR, 
                         error_code=err_code
@@ -223,7 +223,7 @@ class ExecutorNode:
                  return {
                     "execution": ExecutionModel(row_count=0, rows=[], error=result_contract.error),
                     "errors": [PipelineError(
-                        node=node_name,
+                        node=self.node_name,
                         message=f"Execution error: {result_contract.error}",
                         severity=ErrorSeverity.ERROR,
                         error_code=ErrorCode.DB_EXECUTION_ERROR
@@ -239,7 +239,7 @@ class ExecutorNode:
                 logger.error(err_msg)
                 return {
                     "errors": [PipelineError(
-                        node=node_name,
+                        node=self.node_name,
                         message=err_msg,
                         severity=ErrorSeverity.ERROR,
                         error_code=ErrorCode.SAFEGUARD_VIOLATION
@@ -261,17 +261,17 @@ class ExecutorNode:
                 exec_msg += f" Error: {execution_result.error}"
 
             return {
-                "execution": execution_result,
+                "execution": sql_agent_wrapper,
                 "errors": errors,
-                "reasoning": [{"node": "executor", "content": exec_msg}]
+                "reasoning": [{"node": self.node_name, "content": exec_msg}]
             }
 
         except Exception as exc:
-            logger.error(f"Node {node_name} failed: {exc}")
+            logger.error(f"Node {self.node_name} failed: {exc}")
             return {
                 "execution": None,
                 "errors": [PipelineError(
-                    node=node_name, message=f"Executor crash: {exc}",
+                    node=self.node_name, message=f"Executor crash: {exc}",
                     severity=ErrorSeverity.CRITICAL, error_code=ErrorCode.EXECUTOR_CRASH
                 )]
             }

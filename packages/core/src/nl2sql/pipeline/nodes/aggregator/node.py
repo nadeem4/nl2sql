@@ -2,6 +2,7 @@ from __future__ import annotations
 from typing import List, Dict, Any, Literal, Callable, Union, TYPE_CHECKING
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import Runnable
+from nl2sql.llm.registry import LLMRegistry
 
 if TYPE_CHECKING:
     from nl2sql.pipeline.state import GraphState
@@ -11,10 +12,10 @@ from .prompts import AGGREGATOR_PROMPT
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 
 from nl2sql.common.logger import get_logger
+from nl2sql.context import NL2SQLContext
 
 logger = get_logger("aggregator")
 
-LLMCallable = Union[Callable[[str], Any], Runnable]
 
 
 class AggregatorNode:
@@ -25,20 +26,21 @@ class AggregatorNode:
     to generate a summary (Slow Path).
 
     Attributes:
-        llm (LLMCallable): The language model callable used for aggregation.
+        llm (ChatOpenAI): The language model callable used for aggregation.
         prompt (ChatPromptTemplate): The prompt template used for aggregation.
         chain (Runnable): The LangChain runnable sequence.
     """
 
-    def __init__(self, llm: LLMCallable):
+    def __init__(self, ctx: NL2SQLContext):
         """Initializes the AggregatorNode.
 
         Args:
-            llm (LLMCallable): The language model callable.
+            registry (LLMRegistry): The LLM registry.
         """
-        self.llm = llm
+        self.node_name = self.__class__.__name__.lower().replace("node", "")
+        self.llm = ctx.llm_registry.get_llm(self.node_name)
         self.prompt = ChatPromptTemplate.from_template(AGGREGATOR_PROMPT)
-        self.chain = self.prompt | self.llm
+        self.chain = self.prompt | self.llm.with_structured_output(AggregatedResponse) 
 
     def _display_result_with_llm(self, state: GraphState) -> str:
         """Generates a text summary using the LLM.
@@ -50,10 +52,23 @@ class AggregatorNode:
             str: A string containing the aggregated final answer.
         """
         user_query = state.user_query
-        intermediate_results = state.intermediate_results or []
+        query_history = state.query_history or []
         formatted_results = ""
-        for i, res in enumerate(intermediate_results):
-            formatted_results += f"--- Result {i+1} ---\n{str(res)}\n\n"
+
+        for i, item in enumerate(query_history):
+            ds_id = item.get("datasource_id", "unknown")
+            sub_q = item.get("sub_query", "unknown")
+            exec_data = item.get("execution")
+            
+            rows = []
+            if exec_data:
+                # Handle both Pydantic model and dict serialization
+                if hasattr(exec_data, "rows"):
+                    rows = exec_data.rows
+                elif isinstance(exec_data, dict):
+                    rows = exec_data.get("rows", [])
+            
+            formatted_results += f"--- Result {i+1} (Datasource: {ds_id}) ---\nSub-Query: {sub_q}\nData: {str(rows)}\n\n"
 
         if state.errors:
             formatted_results += "\n--- Errors Encountered ---\n"
@@ -89,31 +104,39 @@ class AggregatorNode:
             Dict[str, Any]: A dictionary containing the final answer and reasoning.
         """
         user_query = state.user_query
-        intermediate_results = state.intermediate_results or []
-        node_name = "aggregator"
+        query_history = state.query_history or []
         try:
             output_mode = state.output_mode
 
-            if len(intermediate_results) == 1 and not state.errors and output_mode == "data":
+            if len(query_history) == 1 and not state.errors and output_mode == "data":
+                item = query_history[0]
+                exec_data = item.get("execution")
+                rows = []
+                if exec_data:
+                    if hasattr(exec_data, "rows"):
+                        rows = exec_data.rows
+                    elif isinstance(exec_data, dict):
+                        rows = exec_data.get("rows", [])
+
                 return {
-                    "final_answer": intermediate_results[0],
-                    "reasoning": [{"node": "aggregator", "content": "Fast path: Raw data result passed through (output_mode='data')."}]
+                    "final_answer": rows,
+                    "reasoning": [{"node": self.node_name, "content": "Fast path: Raw data result passed through (output_mode='data')."}]
                 }
 
             final_answer = self._display_result_with_llm(state)
 
             return {
                 "final_answer": final_answer,
-                "reasoning": [{"node": "aggregator", "content": "LLM Aggregation used."}]
+                "reasoning": [{"node": self.node_name, "content": "LLM Aggregation used."}]
             }
         except Exception as e:
-            logger.error(f"Node {node_name} failed: {e}")
+            logger.error(f"Node {self.node_name} failed: {e}")
             return {
                 "final_answer": f"Error during aggregation: {str(e)}",
-                "reasoning": [{"node": "aggregator", "content": f"Error: {str(e)}", "type": "error"}],
+                "reasoning": [{"node": self.node_name, "content": f"Error: {str(e)}", "type": "error"}],
                 "errors": [
                     PipelineError(
-                        node=node_name,
+                        node=self.node_name,
                         message=f"Aggregator failed: {str(e)}",
                         severity=ErrorSeverity.ERROR,
                         error_code=ErrorCode.AGGREGATOR_FAILED,

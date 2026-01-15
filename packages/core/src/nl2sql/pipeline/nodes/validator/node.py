@@ -7,7 +7,7 @@ if TYPE_CHECKING:
     from nl2sql.pipeline.state import GraphState
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.pipeline.nodes.planner.schemas import PlanModel, Expr
-from nl2sql.datasources import DatasourceRegistry
+from nl2sql.context import NL2SQLContext
 from nl2sql.common.logger import get_logger
 
 
@@ -115,13 +115,14 @@ class LogicalValidatorNode:
         registry (DatasourceRegistry): Registry to fetch schemas and profiles.
     """
 
-    def __init__(self, registry: DatasourceRegistry):
+    def __init__(self, ctx: NL2SQLContext):
         """Initializes the LogicalValidatorNode.
 
         Args:
             registry (DatasourceRegistry): The registry of datasources.
         """
-        self.registry = registry
+        self.registry = ctx.ds_registry
+        self.rbac = ctx.rbac
 
     def _build_alias_map(
         self, state: GraphState, plan: PlanModel
@@ -217,7 +218,7 @@ class LogicalValidatorNode:
         errors: list[PipelineError] = []
 
         user_ctx = state.user_context 
-        allowed_tables = user_ctx.allowed_tables
+        allowed_tables = self.rbac.get_allowed_tables(user_ctx)
         role = ','.join(user_ctx.roles)
         
         # Resolve Datasource ID for Namespacing
