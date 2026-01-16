@@ -6,8 +6,9 @@ import uuid
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from nl2sql.pipeline.nodes.decomposer.schemas import SubQuery
-from nl2sql.pipeline.nodes.planner.schemas import PlanModel
+from nl2sql.pipeline.nodes.decomposer.schemas import SubQuery, DecomposerResponse
+from nl2sql.pipeline.nodes.global_planner.schemas import ResultPlan
+from nl2sql.pipeline.nodes.ast_planner.schemas import PlanModel
 from nl2sql.pipeline.nodes.executor.schemas import ExecutionModel
 from nl2sql.pipeline.nodes.semantic.schemas import SemanticAnalysisResponse
 from nl2sql.common.errors import PipelineError
@@ -15,6 +16,11 @@ from nl2sql_adapter_sdk import Table
 from nl2sql.auth import UserContext
 
 
+def update_results(current: Dict, new: Dict) -> Dict:
+    """Reducer to merge execution results from parallel branches."""
+    if current is None:
+        return new
+    return {**current, **new}
 
 
 class GraphState(BaseModel):
@@ -35,7 +41,7 @@ class GraphState(BaseModel):
         selected_datasource_id (Optional[str]): ID of the target datasource.
         sub_queries (Optional[List[SubQuery]]): List of decomposed sub-queries.
         confidence (Optional[float]): Confidence score from Decomposer.
-        query_history (List[Dict[str, Any]]): History of executed sub-queries.
+        subquery_results (Dict[str, ExecutionModel]): History of executed sub-queries via parallel map.
         final_answer (Optional[str]): The synthesized final response for the user.
         system_events (List[str]): Log of distinct system events.
         user_context (UserContext): User identity and permissions context.
@@ -68,7 +74,10 @@ class GraphState(BaseModel):
         description="Confidence score from Decomposer."
     )
 
-    query_history: Annotated[List[Dict[str, Any]], operator.add] = Field(default_factory=list)
+    subquery_results: Annotated[Dict[str, ExecutionModel], update_results] = Field(default_factory=dict)
+    sub_query_id: Optional[str] = Field(default=None, description="ID of the sub-query being executed in this branch.")
+    expected_schema: Optional[List[Any]] = Field(default=None, description="The columns this execution branch must return.")
+    result_plan: Optional[ResultPlan] = Field(default=None, description="The deterministic aggregation plan from GlobalPlanner.")
     final_answer: Optional[str] = Field(default=None)
     system_events: Annotated[List[str], operator.add] = Field(default_factory=list)
     user_context: UserContext = Field(default_factory=UserContext, description="User identity and permissions context.")

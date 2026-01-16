@@ -56,7 +56,20 @@ def run_pipeline(
     final_state = result.final_state
     
 
-    query_history = final_state.get("query_history", [])
+    subquery_results = final_state.get("subquery_results", {})
+    sub_queries = final_state.get("sub_queries", [])
+    sq_map = {sq.id: sq for sq in sub_queries}
+    
+    # Reconstruct history for display compatibility
+    query_history = []
+    for sq_id, exec_model in subquery_results.items():
+        sq = sq_map.get(sq_id)
+        if sq:
+            query_history.append({
+                "sub_query": sq.query,
+                "datasource_id": sq.datasource_id,
+                "execution": exec_model,
+            })
     
     if config.verbose:
         reasoning = final_state.get("reasoning", [])

@@ -1,3 +1,3 @@
-from .node import AggregatorNode
+from .node import EngineAggregatorNode
 
-__all__ = ["AggregatorNode"]
+__all__ = ["EngineAggregatorNode"]

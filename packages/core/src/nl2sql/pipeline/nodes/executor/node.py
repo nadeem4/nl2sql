@@ -261,7 +261,7 @@ class ExecutorNode:
                 exec_msg += f" Error: {execution_result.error}"
 
             return {
-                "execution": sql_agent_wrapper,
+                "execution": execution_result,
                 "errors": errors,
                 "reasoning": [{"node": self.node_name, "content": exec_msg}]
             }

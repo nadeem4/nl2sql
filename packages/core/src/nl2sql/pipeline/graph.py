@@ -7,7 +7,8 @@ from langgraph.types import Send
 
 from nl2sql.datasources import DatasourceRegistry
 from nl2sql.pipeline.nodes.decomposer import DecomposerNode
-from nl2sql.pipeline.nodes.aggregator import AggregatorNode
+from nl2sql.pipeline.nodes.global_planner import GlobalPlannerNode
+from nl2sql.pipeline.nodes.aggregator import EngineAggregatorNode
 from nl2sql.pipeline.nodes.semantic import SemanticAnalysisNode
 from nl2sql.pipeline.nodes.intent_validator import IntentValidatorNode
 
@@ -38,7 +39,7 @@ def build_graph(
     graph = StateGraph(GraphState)
 
     decomposer_node = DecomposerNode(ctx)
-    aggregator_node = AggregatorNode(ctx)
+    aggregator_node = EngineAggregatorNode(ctx)
 
     sql_agent_subgraph = build_sql_agent_graph(ctx)
     semantic_node = SemanticAnalysisNode(ctx)
@@ -54,19 +55,14 @@ def build_graph(
     def sql_agent_wrapper(state: GraphState):
         result = sql_agent_subgraph.invoke(state)
 
-        selected_id = result.get("selected_datasource_id")
         execution = result.get("execution")
-        history_item = {
-            "datasource_id": selected_id,
-            "sub_query": result.get("user_query"),
-            "sql": result.get("sql_draft"),
-            "reasoning": result.get("reasoning", {}),
-            "execution": execution,
-        }
+        sq_id = result.get("sub_query_id") or "unknown"
+        sub_reasoning = result.get("reasoning", [])
 
         return {
-            "query_history": [history_item],
+            "subquery_results": {sq_id: execution} if execution else {},
             "errors": result.get("errors", []),
+            "reasoning": sub_reasoning
         }
 
     def report_missing_datasource(state: GraphState):
@@ -91,6 +87,7 @@ def build_graph(
     graph.add_node("semantic_analysis", semantic_node)
     graph.add_node("intent_validator", intent_validator_node)
     graph.add_node("decomposer", decomposer_node)
+    graph.add_node("global_planner", GlobalPlannerNode(ctx))
     graph.add_node("sql_agent_subgraph", sql_agent_wrapper)
     graph.add_node("report_missing_datasource", report_missing_datasource)
     graph.add_node("aggregator", aggregator_node)
@@ -105,10 +102,19 @@ def build_graph(
         {"continue": "decomposer", "end": "aggregator"} 
     )
 
+    graph.add_edge("decomposer", "global_planner")
+
     def continue_to_subqueries(state: GraphState):
         branches = []
 
         if not state.sub_queries:
+            # If no subqueries, check for errors. If errors, go to aggregator?
+            # Current logic implies we stop or relies on side-effects?
+            # For now, preserve existing behavior: return empty list implies END of branch.
+            # But wait, if we end here, Aggregator never runs to show errors.
+            # We should probably Send("aggregator", {}) if no subqueries but we want to report error?
+            # Let's strictly follow previous logic for now to avoid scope creep, 
+            # but usually we want to go to Aggregator.
             return []
 
         for sq in state.sub_queries:
@@ -119,8 +125,10 @@ def build_graph(
                 "trace_id": state.trace_id,
                 "user_query": sq.query,
                 "selected_datasource_id": sq.datasource_id,
+                "sub_query_id": sq.id,
                 "complexity": sq.complexity,
                 "relevant_tables": sq.relevant_tables,
+                "expected_schema": sq.expected_schema,
                 "reasoning": [
                     {
                         "node": f"execution_{sq.id}",
@@ -135,7 +143,7 @@ def build_graph(
         return branches
 
     graph.add_conditional_edges(
-        "decomposer",
+        "global_planner",
         continue_to_subqueries,
         ["sql_agent", "report_missing_datasource"],
     )

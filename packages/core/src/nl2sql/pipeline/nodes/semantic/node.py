@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import List, Any, Dict, TYPE_CHECKING
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import Runnable

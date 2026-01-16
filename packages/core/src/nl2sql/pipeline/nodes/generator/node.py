@@ -9,7 +9,7 @@ if TYPE_CHECKING:
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.datasources import DatasourceRegistry
 from nl2sql.common.logger import get_logger
-from nl2sql.pipeline.nodes.planner.schemas import PlanModel, Expr
+from nl2sql.pipeline.nodes.ast_planner.schemas import PlanModel, Expr
 from nl2sql.context import NL2SQLContext
 
 logger = get_logger("generator")

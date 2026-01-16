@@ -1,5 +1,5 @@
 from nl2sql.configs.policies import PolicyFileConfig
-from .schemas import UserContext
+from .schema import UserContext
 from typing import List
 
 class RBAC:

@@ -49,6 +49,14 @@ RULES
 6. **Schema Injection**
    - Do NOT populate `relevant_tables` in the output. Leave it empty []. The system will handle this.
 
+7. **Contract Definition**
+   - For EACH sub-query, you MUST define the `expected_schema`.
+   - If you plan to JOIN two sub-queries, they MUST share a common column (e.g. `customer_id`).
+   - Explicitly list these columns in `expected_schema` so the downstream aggregator knows what to expect.
+   - Example:
+     - SQ1 (Users): expected_schema=[{"name": "user_id"}, {"name": "email"}]
+     - SQ2 (Orders): expected_schema=[{"name": "user_id"}, {"name": "order_total"}]
+
 --------------------------------------------------------------------
 OUTPUT FORMAT (JSON)
 --------------------------------------------------------------------
@@ -59,10 +67,15 @@ OUTPUT FORMAT (JSON)
   "output_mode": "data",
   "sub_queries": [
     {{
+      "id": "sq_1",
       "query": "Sub-query text",
       "datasource_id": "postgres_db",
       "complexity": "simple",
-      "relevant_tables": []
+      "relevant_tables": [],
+      "expected_schema": [
+         {{"name": "user_id", "description": "Common Join Key"}},
+         {{"name": "total_sales", "description": "Aggregated Metric"}}
+      ]
     }}
   ]
 }}

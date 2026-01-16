@@ -1,6 +1,7 @@
 from .decomposer.node import DecomposerNode
-from .aggregator.node import AggregatorNode
-from .planner.node import ASTPlannerNode
+from .global_planner.node import GlobalPlannerNode
+from .aggregator.node import EngineAggregatorNode
+from .ast_planner.node import ASTPlannerNode
 from .generator.node import GeneratorNode
 from .executor.node import ExecutorNode
 from .refiner.node import RefinerNode
@@ -13,7 +14,8 @@ __all__ = [
     "ExecutorNode", 
     "RefinerNode", 
     "DecomposerNode", 
+    "GlobalPlannerNode",
     "LogicalValidatorNode",
     "PhysicalValidatorNode",
-    "AggregatorNode",
+    "EngineAggregatorNode",
 ]

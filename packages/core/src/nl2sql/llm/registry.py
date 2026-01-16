@@ -1,6 +1,7 @@
 from nl2sql.configs import LLMFileConfig, AgentConfig
 from nl2sql.secrets import SecretManager
 from pathlib import Path
+from langchain_openai import ChatOpenAI
 
 
 

@@ -3,7 +3,7 @@ from langchain_core.runnables import Runnable
 from langgraph.graph import END, StateGraph
 
 from nl2sql.pipeline.state import GraphState
-from nl2sql.pipeline.nodes.planner import ASTPlannerNode
+from nl2sql.pipeline.nodes.ast_planner import ASTPlannerNode
 from nl2sql.pipeline.nodes.validator import LogicalValidatorNode, PhysicalValidatorNode
 from nl2sql.pipeline.nodes.refiner import RefinerNode
 from nl2sql.pipeline.nodes.generator import GeneratorNode
