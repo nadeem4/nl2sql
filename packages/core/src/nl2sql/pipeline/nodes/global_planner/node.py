@@ -35,12 +35,8 @@ class GlobalPlannerNode:
         """Executes the planning logic."""
         sub_queries = state.sub_queries or []
 
-        # Optimization: If 0 or 1 subquery, no complex plan needed.
-        if len(sub_queries) <= 1:
-            return {
-                "result_plan": None,
-                "reasoning": [{"node": self.node_name, "content": "Skipping global planning (<= 1 subquery)."}]
-            }
+        # Optimization removed to enforce strict ResultPlan generation for all queries.
+
 
         try:
             # Serialize SubQueries for the LLM

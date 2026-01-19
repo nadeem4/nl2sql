@@ -1,16 +1,16 @@
 import importlib
 from importlib.metadata import entry_points
 from typing import Dict, Type
-from nl2sql_adapter_sdk import DatasourceAdapter
+from nl2sql_sqlalchemy_adapter import SQLAlchemyAdapterProtocol
 from nl2sql.common.logger import get_logger
 
 logger = get_logger(__name__)
 
-def discover_adapters() -> Dict[str, Type[DatasourceAdapter]]:
+def discover_adapters() -> Dict[str, Type[SQLAlchemyAdapterProtocol]]:
     """Discovers installed adapters via 'nl2sql.adapters' entry points.
     
     Returns:
-        Dict[str, Type[DatasourceAdapter]]: Dict mapping adapter name (e.g., 'postgres')
+        Dict[str, Type[SQLAlchemyAdapterProtocol]]: Dict mapping adapter name (e.g., 'postgres')
             to the Adapter Class.
     """
     adapters = {}

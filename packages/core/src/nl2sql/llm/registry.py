@@ -1,9 +1,8 @@
-from nl2sql.configs import LLMFileConfig, AgentConfig
 from nl2sql.secrets import SecretManager
 from pathlib import Path
 from langchain_openai import ChatOpenAI
-
-
+from .models import AgentConfig
+from typing import Dict
 
 class LLMRegistry:
 
@@ -11,9 +10,8 @@ class LLMRegistry:
         self.secret_manager = secret_manager
         self.llms = {}
 
-    def register_llms(self, config: LLMFileConfig):
-        self.register_llm(config.default)
-        for agent in config.agents.values():
+    def register_llms(self, config: Dict[str, AgentConfig]):
+        for agent in config.values():
             self.register_llm(agent)
 
 

@@ -22,7 +22,7 @@ def mock_engine(mock_profile):
 
 @pytest.fixture
 def mock_vector_store():
-    """Returns a mocked OrchestratorVectorStore."""
+    """Returns a mocked VectorStore."""
     store = MagicMock()
     store.retrieve.return_value = []
     store.is_empty.return_value = False

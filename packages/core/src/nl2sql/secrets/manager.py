@@ -5,7 +5,7 @@ import re
 from typing import Optional, Dict, Type, List, Any
 from .interfaces import SecretProvider
 from .providers.env import EnvironmentSecretProvider
-from nl2sql.configs.secrets import SecretProviderConfig
+from .models import SecretProviderConfig
 import logging
 
 logger = logging.getLogger(__name__)

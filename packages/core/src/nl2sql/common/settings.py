@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     tenant_id: str = Field(default="default_tenant", validation_alias="TENANT_ID")
     sample_questions_path: str = Field(
         default="configs/sample_questions.yaml", 
-        validation_alias="ROUTING_EXAMPLES",
+        validation_alias="SAMPLE_QUESTIONS",
         description="Path to the YAML file containing sample questions for routing."
     )
     policies_config_path: str = Field(

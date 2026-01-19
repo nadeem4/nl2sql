@@ -12,7 +12,7 @@ from nl2sql.pipeline.nodes.ast_planner.schemas import PlanModel
 from nl2sql.pipeline.nodes.executor.schemas import ExecutionModel
 from nl2sql.pipeline.nodes.semantic.schemas import SemanticAnalysisResponse
 from nl2sql.common.errors import PipelineError
-from nl2sql_adapter_sdk import Table
+from nl2sql_sqlalchemy_adapter.schema.models import Table
 from nl2sql.auth import UserContext
 
 

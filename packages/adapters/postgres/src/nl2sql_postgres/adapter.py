@@ -1,13 +1,12 @@
 from typing import Dict, Any
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.dialects import postgresql
-from nl2sql_adapter_sdk import (
+from nl2sql_sqlalchemy_adapter import (
     DryRunResult,
     QueryPlan,
     CostEstimate,
-    ForeignKey
+    BaseSQLAlchemyAdapter
 )
-from nl2sql_sqlalchemy_adapter import BaseSQLAlchemyAdapter
 
 from pydantic import BaseModel, Field, SecretStr
 from typing import Optional
@@ -109,3 +108,7 @@ class PostgresAdapter(BaseSQLAlchemyAdapter):
 
     def get_dialect(self) -> str:
         return postgresql.dialect.name
+
+
+    def exclude_schemas(self) -> set[str]:
+        return {"pg_catalog", "information_schema"}

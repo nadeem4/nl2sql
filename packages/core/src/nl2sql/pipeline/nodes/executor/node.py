@@ -4,9 +4,8 @@ import asyncio
 from concurrent.futures import ProcessPoolExecutor
 from typing import TYPE_CHECKING, Dict, Any
 
-from nl2sql.datasources import DatasourceRegistry
+from nl2sql.datasources import DatasourceRegistry, QueryResult as SdkExecutionResult, DatasourceAdapter, AdapterErrors
 from nl2sql.datasources.discovery import discover_adapters
-from nl2sql_adapter_sdk import QueryResult as SdkExecutionResult, DatasourceAdapter
 
 if TYPE_CHECKING:
     from nl2sql.pipeline.state import GraphState

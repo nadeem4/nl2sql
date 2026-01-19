@@ -1,9 +1,10 @@
-from .schema import UserContext
+from .models import UserContext, RolePolicy
 from .rbac import RBAC
-from .users import UserManager
+from .users import UserManager  
 
 __all__ = [
     "UserContext",
     "RBAC",
-    "UserManager"
+    "UserManager",
+    "RolePolicy"
 ]

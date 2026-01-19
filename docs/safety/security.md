@@ -49,7 +49,7 @@ Before the system even attempts to plan, we limit the **Knowledge Scope** availa
 
 ### Vector Store Filtering
 
-The `OrchestratorVectorStore` enforces a strict **Metadata Filter** on every retrieval call.
+The `VectorStore` enforces a strict **Metadata Filter** on every retrieval call.
 
 * **Mechanism**: `query({filter: {'datasource_id': {'$in': allowed_ds_ids}}})`
 * **Guarantee**: If a user only has access to `sales_db`, vectors from `hr_db` are physically excluded from the search space. The LLM never sees them.

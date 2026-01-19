@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import MagicMock, patch, ANY
-from nl2sql.services.vector_store import OrchestratorVectorStore
+from nl2sql.services.vector_store import VectorStore
 from nl2sql.datasources.registry import DatasourceRegistry
 from nl2sql_adapter_sdk import SchemaMetadata, Table, Column, ForeignKey
 
@@ -36,7 +36,7 @@ def mock_vector_store():
         mock_collection = MagicMock()
         mock_instance._collection = mock_collection
         
-        store = OrchestratorVectorStore(embeddings=MagicMock())
+        store = VectorStore(embeddings=MagicMock())
         return store, mock_collection
 
 def test_refresh_schema_idempotency(mock_vector_store, mock_adapter):

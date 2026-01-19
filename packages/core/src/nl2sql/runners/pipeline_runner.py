@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from nl2sql.pipeline.graph import run_with_graph, UserContext
 from nl2sql.datasources import DatasourceRegistry
 from nl2sql.llm import LLMRegistry
-from nl2sql.services.vector_store import OrchestratorVectorStore
+from nl2sql.indexing.vector_store import VectorStore
 from nl2sql.common.settings import settings
 from nl2sql.common.exceptions import NL2SQLError
 from nl2sql.configs.policies import PolicyFileConfig

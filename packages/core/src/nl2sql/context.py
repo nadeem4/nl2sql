@@ -5,10 +5,12 @@ from typing import Optional
 from nl2sql.configs import ConfigManager
 from nl2sql.datasources import DatasourceRegistry
 from nl2sql.llm import LLMRegistry
-from nl2sql.services.vector_store import OrchestratorVectorStore
+from nl2sql.indexing.vector_store import VectorStore
 from nl2sql.secrets import SecretManager
 from nl2sql.common.settings import settings
 from nl2sql.auth import RBAC
+
+from nl2sql_sqlalchemy_adapter import SchemaContractStore, SchemaMetadataStore
 
 class NL2SQLContext:
     """
@@ -49,11 +51,16 @@ class NL2SQLContext:
 
         llm_cfg = cm.load_llm(llm_config_path)
         self.llm_registry = LLMRegistry(secret_manager)
-        self.llm_registry.register_llms(llm_cfg)
+
+        agents = llm_cfg.agents or {}
+        agents["default"] = llm_cfg.default
+        self.llm_registry.register_llms(agents)
 
         self.policies_cfg = cm.load_policies(policies_config_path)
-        self.rbac = RBAC(self.policies_cfg)
+        self.rbac = RBAC(self.policies_cfg.roles)
 
-        self.vector_store = OrchestratorVectorStore(persist_directory=vector_store_path)
+        self.vector_store = VectorStore(persist_directory=vector_store_path)
+        self.schema_contract_store = SchemaContractStore()
+        self.schema_metadata_store = SchemaMetadataStore()
 
        

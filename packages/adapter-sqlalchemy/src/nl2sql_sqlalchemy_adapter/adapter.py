@@ -1,21 +1,29 @@
 from typing import Dict, Any, List
-from sqlalchemy import create_engine, inspect, text, Engine, select, func, table, column, case, literal_column
-from nl2sql_adapter_sdk import (
-    DatasourceAdapter, 
-    SchemaMetadata, 
-    Table, 
-    Column, 
-    ForeignKey,
+from sqlalchemy import create_engine, inspect, text, Engine, select, func, table, column, case, literal_column, Connection
+from sqlalchemy.engine.reflection import Inspector
+from typing import Tuple
+from nl2sql.datasources import (
     QueryResult, 
     DryRunResult,
     QueryPlan,
-    CostEstimate,
-    ColumnStatistics
+    CostEstimate
+)
+from .schema.models import (
+    SchemaContract,
+    SchemaMetadata,
+    TableContract,
+    ColumnContract,
+    ForeignKeyContract,
+    ColumnMetadata,
+    TableMetadata,
+    SchemaSnapshot,
+    ColumnStatistics,
+    TableRef
 )
 import logging
 logger = logging.getLogger(__name__)
 
-class BaseSQLAlchemyAdapter(DatasourceAdapter):
+class BaseSQLAlchemyAdapter:
     """
     Base class for all SQLAlchemy-based adapters.
     Implements common logic for connection, execution, and schema fetching.
@@ -142,7 +150,56 @@ class BaseSQLAlchemyAdapter(DatasourceAdapter):
             bytes_returned=total_bytes
         )
 
-    def fetch_schema(self) -> SchemaMetadata:
+
+    @property
+    def exclude_schemas(self) -> set[str]:
+        raise NotImplementedError(f"Adapter {self.__class__.__name__} must implement exclude_schemas")
+
+
+    def fetch_schema_contact(self) -> SchemaContract:
+        """Fetches the schema contract for the connected datasource.
+
+        Returns:
+            SchemaContract: The contract containing tables, columns, and relationships.
+
+        Raises:
+            RuntimeError: If the adapter is not connected.
+        """
+        if not self.engine:
+            raise RuntimeError(f"Not connected to {self}. Please verify the connection details.")
+
+        exclude_schemas = {schema.lower() for schema in self.exclude_schemas}
+        inspector = inspect(self.engine)
+        tables_contract = {}
+
+        try:
+            schemas = [schema for schema in inspector.get_schema_names() if schema.lower() not in exclude_schemas]
+        except Exception as e:
+            logger.error(f"Failed to fetch table names for {self}: {e}")
+            raise
+
+        with self.engine.connect() as conn:
+            for schema in sorted(schemas):
+                table_names = inspector.get_table_names(schema=schema)
+                for table_name in sorted(table_names):
+                    table_ref = TableRef(schema_name=schema, table_name=table_name)
+                    columns_contract = self._get_column_contract(inspector, conn, table_ref)
+                    fks = self._get_fk_cols(inspector, table_ref)
+
+                    table_contract = TableContract(
+                        table=table_ref,
+                        columns=columns_contract,
+                        foreign_keys=fks
+                    )
+                    tables_contract[table_ref.full_name] = table_contract
+
+        return SchemaContract(
+            datasource_id=self.datasource_id,
+            engine_type=self.datasource_engine_type,
+            tables=tables_contract
+        )
+
+    def fetch_schema_metadata(self) -> SchemaMetadata:
         """Fetches the schema metadata for the connected datasource.
 
         Returns:
@@ -153,81 +210,123 @@ class BaseSQLAlchemyAdapter(DatasourceAdapter):
         """
         if not self.engine:
             raise RuntimeError(f"Not connected to {self}. Please verify the connection details.")
-            
+
+        exclude_schemas = {schema.lower() for schema in self.exclude_schemas}
         inspector = inspect(self.engine)
-        tables = []
-        
+        tables_metadata = {}
+
         try:
-            table_names = inspector.get_table_names()
+            schemas = [schema for schema in inspector.get_schema_names() if schema.lower() not in exclude_schemas]
         except Exception as e:
             logger.error(f"Failed to fetch table names for {self}: {e}")
             raise
 
+        with self.engine.connect() as conn:
+            for schema in sorted(schemas):
+                table_names = inspector.get_table_names(schema=schema)
+                for table_name in sorted(table_names):
+                    table_ref = TableRef(schema_name=schema, table_name=table_name)
+                    row_count = self._get_row_count(conn, table_ref)
+                    columns_metadata = self._get_columns_metadata(inspector, conn, table_ref, row_count)
+                    try:
+                        table_comment = inspector.get_table_comment(
+                            table_ref.table_name,
+                            schema=table_ref.schema_name
+                        ).get("text")
+                    except Exception:
+                        table_comment = None
 
-        for table_name in table_names:
-            columns = []
-            row_count = self._get_row_count(table_name)
-            for col_info in inspector.get_columns(table_name):
-                columns.append(Column(
-                    name=col_info["name"],
-                    type=str(col_info["type"]),
-                    is_nullable=bool(col_info["nullable"]),
-                    is_primary_key=bool(col_info.get("primary_key", False)),
-                    description=col_info.get("comment"),
-                    statistics=self._get_column_stats(table_name, col_info["name"], row_count, str(col_info["type"]))
-                ))
-            
-            fks = []
-            try:
-                for fk_info in inspector.get_foreign_keys(table_name):
-                    fks.append(ForeignKey(
-                        constrained_columns=fk_info["constrained_columns"],
-                        referred_table=fk_info["referred_table"],
-                        referred_columns=fk_info["referred_columns"],
-                        referred_schema=fk_info.get("referred_schema")
-                    ))
-            except Exception as e:
-                logger.warning(f"Failed to fetch foreign keys for {self}: {e}") 
+                    table_metadata = TableMetadata(
+                        table=table_ref,
+                        columns=columns_metadata,
+                        row_count=row_count,
+                        description=table_comment
+                    )
+                    tables_metadata[table_ref.full_name] = table_metadata
 
-            try:
-                tbl_comment = inspector.get_table_comment(table_name).get("text")
-            except Exception:
-                tbl_comment = None
+        return SchemaMetadata(
+            datasource_id=self.datasource_id,
+            engine_type=self.datasource_engine_type,
+            description="",
+            domains=[],
+            tables=tables_metadata
+        )
 
-            table_obj = Table(
-                name=table_name, 
-                columns=columns,
-                foreign_keys=fks,
-                description=tbl_comment,
-                row_count=row_count 
+    def fetch_schema_snapshot(self) -> SchemaSnapshot:
+        """Fetches the schema metadata for the connected datasource.
+
+        Returns:
+            SchemaMetadata: The metadata containing tables, columns, and relationships.
+
+        Raises:
+            RuntimeError: If the adapter is not connected.
+        """
+
+        schema_contract = self.fetch_schema_contact()
+        schema_metadata = self.fetch_schema_metadata()
+
+        return SchemaSnapshot(contract=schema_contract, metadata=schema_metadata)
+
+
+    def _get_columns_metadata(self, inspector: Inspector, conn: Connection, table_ref: TableRef, row_count: int) -> Dict[str, ColumnMetadata]:
+        columns_metadata = {}
+
+        for col_info in inspector.get_columns(table_ref.table_name, schema=table_ref.schema_name):
+            columns_metadata[col_info["name"]] = ColumnMetadata(
+                description=col_info.get("comment"),
+                statistics=self._get_column_stats(conn, table_ref, col_info["name"], row_count, str(col_info["type"])),
+                synonyms=[],
+                pii=False
             )
 
-            tables.append(table_obj)
-            
-        return SchemaMetadata(datasource_id=self.datasource_id, datasource_engine_type=self.datasource_engine_type, tables=tables)
+        return columns_metadata
 
-    def _get_row_count(self, table_name: str) -> int:
+    def _get_column_contract(self, inspector: Inspector, conn: Connection, table_ref: TableRef) -> Dict[str, ColumnContract]:
+        columns_contract = {}
+        pk_cols = set(inspector.get_pk_constraint(table_ref.table_name, schema=table_ref.schema_name).get("constrained_columns") or [])
+        for col_info in inspector.get_columns(table_ref.table_name, schema=table_ref.schema_name):
+            columns_contract[col_info["name"]] = ColumnContract(
+                name=col_info["name"],
+                data_type=str(col_info["type"]),
+                is_nullable=bool(col_info["nullable"]),
+                is_primary_key=col_info["name"] in pk_cols
+            )
+        return columns_contract
+
+    def _get_fk_cols(self, inspector: Inspector, table_ref: TableRef) -> List[ForeignKeyContract]:
+        fks = []
+        try:
+            for fk_info in inspector.get_foreign_keys(table_ref.table_name, schema=table_ref.schema_name):
+                fks.append(ForeignKeyContract(
+                    constrained_columns=fk_info["constrained_columns"],
+                    referred_table=TableRef(schema_name=fk_info.get("referred_schema"), table_name=fk_info["referred_table"]),
+                    referred_columns=fk_info["referred_columns"],
+                ))
+        except Exception as e:
+            logger.warning(f"Failed to fetch foreign keys for {self}: {e}") 
+        return fks
+
+    def _get_row_count(self, conn: Connection, table_ref: TableRef) -> int:
         """Fetches the total row count for a specific table.
 
         Args:
-            table_name (str): The name of the table to count.
+            table_ref (TableRef): The table reference.
 
         Returns:
             int: The total number of rows.
         """
         try:
-            with self.engine.connect() as conn:
-                stmt = select(func.count()).select_from(table(table_name))
-                return conn.execute(stmt).scalar()
+            stmt = select(func.count()).select_from(table(table_ref.table_name, schema=table_ref.schema_name))
+            return conn.execute(stmt).scalar()
         except Exception as e:
-            logger.warning(f"Failed to fetch row count for {self}: {table_name}: {e}")
+            logger.warning(f"Failed to fetch row count for {self}: {table_ref.full_name}: {e}")
             return 0
 
-    def _get_column_stats(self, table_name: str, column_name: str, row_count: int, column_type: str) -> ColumnStatistics:
+    def _get_column_stats(self, conn: Connection, table_ref: TableRef, column_name: str, row_count: int, column_type: str) -> ColumnStatistics:
         """Fetches statistics for a specific column.
 
         Args:
-            table_name (str): The table name.
+            table_ref (TableRef): The table reference.
             column_name (str): The column name.
             row_count (int): Total rows in the table.
             column_type (str): The column type string.
@@ -244,32 +343,31 @@ class BaseSQLAlchemyAdapter(DatasourceAdapter):
                 sample_values=[]
             )
 
-        with self.engine.connect() as conn:
-            t = table(table_name)
-            c = column(column_name)
-            
-            stmt = (
-                select(
-                    func.count(case((c == None, 1))),
-                    func.min(c),
-                    func.max(c),
-                    func.count(func.distinct(c))
-                )
-                .select_from(t)
+        t = table(table_ref.table_name, column(column_name), schema=table_ref.schema_name)
+        c = t.c[column_name]
+        
+        stmt = (
+            select(
+                func.count(case((c == None, 1))),
+                func.min(c),
+                func.max(c),
+                func.count(func.distinct(c))
             )
-            
-            result = conn.execute(stmt).fetchone()
-            null_count, min_val, max_val, distinct_count = result
+            .select_from(t)
+        )
+        
+        result = conn.execute(stmt).fetchone()
+        null_count, min_val, max_val, distinct_count = result
 
-            return ColumnStatistics(
-                null_percentage=(null_count / row_count) if row_count > 0 else 0,
-                distinct_count=distinct_count,
-                min_value=min_val,
-                max_value=max_val,
-                sample_values=self._get_sample_values(table_name, column_name) if any(t in column_type.lower() for t in ['char', 'text', 'string', 'clob']) else []
-            )
+        return ColumnStatistics(
+            null_percentage=(null_count / row_count) if row_count > 0 else 0,
+            distinct_count=distinct_count,
+            min_value=min_val,
+            max_value=max_val,
+            sample_values=self._get_sample_values(conn, table_ref, column_name) if any(t in column_type.lower() for t in ['char', 'text', 'string', 'clob']) else []
+        )
 
-    def _get_sample_values(self, table_name: str, column_name: str, limit: int = 5) -> List[Any]:
+    def _get_sample_values(self, conn: Connection, table_ref: TableRef, column_name: str, limit: int = 5) -> List[Any]:
         """Fetches frequently occurring sample values for a column.
 
         Args:
@@ -280,8 +378,8 @@ class BaseSQLAlchemyAdapter(DatasourceAdapter):
         Returns:
             List[Any]: A list of sample values.
         """
-        t = table(table_name)
-        c = column(column_name)
+        t = table(table_ref.table_name, column(column_name), schema=table_ref.schema_name)
+        c = t.c[column_name]
 
         stmt = (
             select(c)
@@ -292,8 +390,7 @@ class BaseSQLAlchemyAdapter(DatasourceAdapter):
             .limit(limit)
         )
         
-        with self.engine.connect() as conn:
-            return [row[0] for row in conn.execute(stmt).fetchall()]
+        return [row[0] for row in conn.execute(stmt).fetchall()]
 
     
     def dry_run(self, sql: str) -> DryRunResult:

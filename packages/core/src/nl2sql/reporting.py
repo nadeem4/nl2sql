@@ -706,7 +706,7 @@ class ConsolePresenter:
     # Indexing (indexing.py)
     # -------------------------------------------------------------------------
     def print_indexing_start(self, path: str) -> None:
-         self.console.print(f"[bold blue]Indexing schema to:[/bold blue] {path}")
+        self.console.print(f"[bold blue]Indexing schema to:[/bold blue] {path}")
 
     def print_indexing_error(self, ds_id: str, error: str) -> None:
         self.console.print(f"[red]Failed to index {ds_id}: {error}[/red]")

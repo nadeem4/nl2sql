@@ -12,7 +12,7 @@ from nl2sql.datasources import DatasourceRegistry
 from nl2sql.configs import ConfigManager
 from nl2sql.llm import LLMRegistry
 from nl2sql.common.settings import settings
-from nl2sql.services.vector_store import OrchestratorVectorStore
+from nl2sql.indexing.vector_store import VectorStore
 from nl2sql.common.logger import configure_logging
 from nl2sql.context import NL2SQLContext
 

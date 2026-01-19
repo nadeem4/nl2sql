@@ -25,7 +25,7 @@ This document serves as the master backlog for addressing findings from the Arch
 - [x] **BUG-004: Schema Drift (Stale Cache)** (High)
   - **Component**: Governance / Registry
   - **Issue**: `DatasourceRegistry` caches adapters indefinitely at startup. If the DB schema changes, the Planner hallucinates invalid columns.
-  - **Fix**: Implemented idempotent `refresh_schema` and `refresh_examples` in `OrchestratorVectorStore`, along with dynamic `register_datasource` in `DatasourceRegistry`.
+  - **Fix**: Implemented idempotent `refresh_schema` and `refresh_examples` in `VectorStore`, along with dynamic `register_datasource` in `DatasourceRegistry`.
   - **Status**: Fixed. Unit tests added in `tests/unit/test_schema_lifecycle.py`.
 
 - [x] **BUG-005: Missing Distributed Tracing** (High)

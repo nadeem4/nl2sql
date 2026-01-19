@@ -34,46 +34,14 @@ class EngineAggregatorNode:
         self.prompt = ChatPromptTemplate.from_template(AGGREGATOR_PROMPT)
         self.chain = self.prompt | self.llm.with_structured_output(AggregatedResponse) 
 
-    def _display_result_with_llm(self, state: GraphState) -> str:
-        """Generates a text summary using the LLM (Fallback)."""
-        results = state.subquery_results or {}
-        sub_queries_map = {sq.id: sq for sq in (state.sub_queries or [])}
-        formatted_results = ""
 
-        for sq_id, exec_model in results.items():
-            sq = sub_queries_map.get(sq_id)
-            query_text = sq.query if sq else "Unknown Query"
-            ds_id = sq.datasource_id if sq else "unknown"
-            
-            rows = exec_model.rows if exec_model else []
-            formatted_results += f"--- SubQuery: {query_text} (ID: {sq_id}, DS: {ds_id}) ---\nData: {str(rows)}\n\n"
 
-        if state.errors:
-            formatted_results += "\n--- Errors Encountered ---\n"
-            for err in state.errors:
-                safe_msg = err.get_safe_message()
-                formatted_results += f"Error from {err.node}: {safe_msg}\n"
-
-        response: AggregatedResponse = self.chain.invoke({
-            "user_query": state.user_query,
-            "intermediate_results": formatted_results
-        })
-
-        final_answer = f"### Summary\n{response.summary}\n\n"
-        if response.format_type == "table":
-            final_answer += f"### Data\n\n{response.content}"
-        elif response.format_type == "list":
-            final_answer += f"### Details\n\n{response.content}"
-        else:
-            final_answer += f"\n{response.content}"
-
-        return final_answer
-
-    def _compile_expr(self, expr: Expr) -> str:
+    def _compile_expr(self, expr: Expr, scope: Optional[str] = None) -> str:
         """Compiles a Typed Expr to a SQL string fragment for DuckDB."""
         if expr.type == "col":
             # Using double quotes for column identifier safety
-            return f'"{expr.name}"'
+            ident = f'"{expr.name}"'
+            return f"{scope}.{ident}" if scope else ident
         elif expr.type == "lit":
             val = expr.value
             if val is None:
@@ -84,15 +52,25 @@ class EngineAggregatorNode:
                 return f"'{safe_val}'"
             return str(val)
         elif expr.type == "binop":
-            left = self._compile_expr(expr.left)
-            right = self._compile_expr(expr.right)
+            left = self._compile_expr(expr.left, scope=scope)
+            right = self._compile_expr(expr.right, scope=scope)
             return f"({left} {expr.op} {right})"
         
         raise ValueError(f"Unknown expression type: {expr}")
 
+    def _validate_identifier(self, ident: str) -> str:
+        """Strictly validates that an identifier is safe for SQL interpolation.
+        
+        Allows only alphanumeric characters, underscores, and hyphens.
+        """
+        import re
+        if not re.match(r'^[a-zA-Z0-9_-]+$', ident):
+             raise ValueError(f"Invalid identifier detected: '{ident}'. Only alphanumeric, '_', and '-' allowed.")
+        return ident
+
     def _get_table_ref(self, ref: RelationRef) -> str:
         """Resolves a RelationRef to a SQL table name."""
-        return ref.id # IDs are registered as table names directly
+        return self._validate_identifier(ref.id)
 
     def _execute_deterministic_plan(self, state: GraphState) -> List[Dict]:
         """Executes the ResultPlan using DuckDB and Polars."""
@@ -108,20 +86,36 @@ class EngineAggregatorNode:
         # 1. Initialize DuckDB
         con = duckdb.connect(":memory:")
         
-        # 2. Register SubQuery Results
-        for sq_id, exec_model in results.items():
+        # 2. Register SubQuery Results (Strict Validation)
+        # Ensure all planned subqueries are present. 
+        # We rely on sub_queries in state to know what was expected.
+        expected_sqs = {sq.id: sq for sq in (state.sub_queries or [])}
+        
+        for sq_id in expected_sqs:
+            if sq_id not in results:
+                raise PipelineError(
+                    node=self.node_name,
+                    message=f"Missing execution result for SubQuery {sq_id}. Partial failure detected.",
+                    severity=ErrorSeverity.ERROR,
+                    error_code=ErrorCode.EXECUTION_FAILED
+                )
+            
+            exec_model = results[sq_id]
             if not exec_model or not exec_model.rows:
-                # Basic empty schema handling - ideal would be to use valid schema
-                df = pl.DataFrame([]) 
+                 # Strictly handle empty results vs valid empty sets? 
+                 # If exec_model exists but rows is empty, it's a valid empty result.
+                 df = pl.DataFrame([]) 
             else:
                 df = pl.DataFrame(exec_model.rows)
             
-            con.register(sq_id, df)
+            # Validate ID before registration, though UUIDs should be safe.
+            safe_id = self._validate_identifier(sq_id)
+            con.register(safe_id, df)
 
         # 3. Execute Plan Steps
         for step in plan.steps:
             op = step.operation
-            step_id = step.step_id
+            step_id = self._validate_identifier(step.step_id)
             query = ""
 
             try:
@@ -136,35 +130,25 @@ class EngineAggregatorNode:
                     
                     on_clauses = []
                     for bin_op in op.on:
-                        on_clauses.append(self._compile_expr(bin_op))
+                        # Hardening: Assume planner puts left column in left.
+                        # We use explicit L and R aliases in the JOIN below.
+                        l_sql = self._compile_expr(bin_op.left, scope="L")
+                        r_sql = self._compile_expr(bin_op.right, scope="R")
+                        on_clauses.append(f"({l_sql} {bin_op.op} {r_sql})")
                     
                     on_sql = " AND ".join(on_clauses)
                     join_type = op.join_type.upper()
                     
-                    # Using A and B aliases for clarity in generated SQL if we were enforcing it,
-                    # but here we rely on the compiled expression referencing columns cleanly.
-                    # Since column references in Expr don't have scope (e.g. "t1.col"), 
-                    # we must assume columns are unambiguous OR assume 'left' and 'right' context 
-                    # is implied if we had scoped variables.
-                    # HOWEVER, the Typed Expr schema defines 'Col' just as name. 
-                    # For Joins, normally we need "left.id = right.id". 
-                    # If on_columns was used it's easy. But 'on' is a list of BinOp.
-                    # BinOp(left=Col(id), right=Col(id)).
-                    # If both tables have 'id', ambiguous.
-                    # Standard SQL solves this with aliases.
-                    # Let's verify how we compile BinOp. It blindly returns "id".
-                    # We need to hack this slightly or rely on the planner to output unique names?
-                    # The prompt says "Keys MUST exist in input schemas". 
-                    # For safety in this iteration, let's assume unique names or simple ON.
-                    # NOTE: Basic implementation for now:
-                    
                     query = f"""
                         CREATE OR REPLACE TABLE {step_id} AS 
-                        SELECT * 
+                        SELECT L.*, R.* EXCLUDE ({", ".join([f'"{c.name}"' for c in (op.on_columns or [])]) if op.on_columns else ""})
                         FROM {left_ref} AS L
                         {join_type} JOIN {right_ref} AS R 
                         ON {on_sql}
                     """
+                    # Use EXCLUDE if we have on_columns to prevent duplicate keys in result table,
+                    # though DuckDB handles 'SELECT *' from joins with duplicate names by renaming.
+                    # A cleaner way is just SELECT L.*, R.* and let DuckDB rename if ambiguous.
                     # Wait, if on_sql is just "id = id", that's 1=1 or ambiguous.
                     # We absolutely need scoped references for joins.
                     # But Schema doesn't have ScopedCol.
@@ -270,29 +254,19 @@ class EngineAggregatorNode:
         results = state.subquery_results or {}
         
         try:
-            # Deterministic Path
-            if state.result_plan:
-                 final_rows = self._execute_deterministic_plan(state)
-                 return {
-                    "final_answer": final_rows,
-                    "reasoning": [{"node": self.node_name, "content": "Deterministic Aggregation (Strict Plan) executed successfully."}]
-                 }
+            # Strict Path (Only deterministic)
+            if not state.result_plan:
+                 raise PipelineError(
+                     node=self.node_name,
+                     message="No ResultPlan found. Aggregation cannot proceed.",
+                     severity=ErrorSeverity.ERROR,
+                     error_code=ErrorCode.PLANNER_FAILED
+                 )
 
-            # Fast Path (Single Result)
-            output_mode = state.output_mode
-            if len(results) == 1 and not state.errors and output_mode == "data":
-                 first_result = next(iter(results.values()))
-                 rows = first_result.rows if first_result else []
-                 return {
-                    "final_answer": rows,
-                    "reasoning": [{"node": self.node_name, "content": "Fast path: Raw data result passed through (output_mode='data')."}]
-                }
-            
-            # Slow Path (LLM Fallback)
-            final_answer = self._display_result_with_llm(state)
+            final_rows = self._execute_deterministic_plan(state)
             return {
-                "final_answer": final_answer,
-                "reasoning": [{"node": self.node_name, "content": "LLM Aggregation used (Fallback). warning: Non-deterministic."}]
+                "final_answer": final_rows,
+                "reasoning": [{"node": self.node_name, "content": "Deterministic Aggregation (Strict Plan) executed successfully."}]
             }
 
         except Exception as e:

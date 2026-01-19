@@ -207,7 +207,7 @@ class DemoManager:
             return False
         
         from nl2sql_cli.commands.indexing import run_indexing
-        from nl2sql.services.vector_store import OrchestratorVectorStore
+        from nl2sql.services.vector_store import VectorStore
         from nl2sql.llm import LLMRegistry
         from nl2sql.configs import ConfigManager 
         from nl2sql.datasources import DatasourceRegistry 
@@ -216,7 +216,7 @@ class DemoManager:
             indexer_config_manager = ConfigManager(self.project_root)
             
             configs = indexer_config_manager.load_datasources()
-            v_store = OrchestratorVectorStore(persist_directory=settings.vector_store_path)
+            v_store = VectorStore(persist_directory=settings.vector_store_path)
             
             llm_registry = None
             try:

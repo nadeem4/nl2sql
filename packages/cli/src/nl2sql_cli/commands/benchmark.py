@@ -1,8 +1,8 @@
 import sys
 import yaml
-from nl2sql.services.llm import parse_llm_config, LLMRegistry
+from nl2sql.llm import LLMRegistry
 from nl2sql.datasources import DatasourceRegistry
-from nl2sql.services.vector_store import OrchestratorVectorStore
+from nl2sql.indexing.vector_store import VectorStore
 from nl2sql.evaluation.evaluator import ModelEvaluator
 from nl2sql.reporting import ConsolePresenter
 from nl2sql.runners.benchmark_runner import BenchmarkRunner
@@ -14,14 +14,14 @@ from nl2sql_cli.common.decorators import handle_cli_errors
 def run_benchmark(
     config: BenchmarkConfig, 
     datasource_registry: DatasourceRegistry, 
-    vector_store: OrchestratorVectorStore
+    vector_store: VectorStore
 ) -> None:
     """Runs the benchmark suite based on provided arguments.
 
     Args:
         config (BenchmarkConfig): Benchmark run configuration.
         datasource_registry (DatasourceRegistry): Datasource registry.
-        vector_store (OrchestratorVectorStore): Vector store instance.
+        vector_store (VectorStore): Vector store instance.
     """
     presenter = ConsolePresenter()
     
@@ -31,9 +31,12 @@ def run_benchmark(
     if config.bench_config_path and config.bench_config_path.exists():
         try:
             bench_data = yaml.safe_load(config.bench_config_path.read_text()) or {}
+            from nl2sql.configs import ConfigManager
+            cm = ConfigManager()
             for name, cfg_data in bench_data.items():
                 if isinstance(cfg_data, dict):
-                     llm_configs[name] = parse_llm_config(cfg_data)
+                     # Benchmark config often has sub-hashes of LLM configs
+                     llm_configs[name] = cm.load_llm_from_data(cfg_data)
         except Exception as e:
             presenter.print_error(f"Error reading bench config: {e}")
             sys.exit(1)

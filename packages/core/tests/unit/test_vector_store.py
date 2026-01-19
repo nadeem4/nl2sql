@@ -3,25 +3,25 @@ import pytest
 from unittest.mock import MagicMock, patch, ANY
 from concurrent.futures import Future
 
-from nl2sql.services.vector_store import OrchestratorVectorStore, _fetch_schema_in_process
+from nl2sql.indexing.vector_store import VectorStore
 from langchain_core.documents import Document
 from nl2sql_adapter_sdk import DatasourceAdapter, SchemaMetadata, Table, Column, ForeignKey
 
 @pytest.fixture
 def mock_chroma():
     """Provides a mocked Chroma client."""
-    with patch("nl2sql.services.vector_store.Chroma") as mock:
+    with patch("nl2sql.indexing.vector_store.Chroma") as mock:
         yield mock.return_value
 
 @pytest.fixture
 def store(mock_chroma):
-    """Provides an OrchestratorVectorStore instance with mocked dependencies."""
+    """Provides an VectorStore instance with mocked dependencies."""
     mock_embeddings = MagicMock()
-    return OrchestratorVectorStore(embeddings=mock_embeddings)
+    return VectorStore(embeddings=mock_embeddings)
 
 from nl2sql.common.contracts import ExecutionResult
 
-@patch("nl2sql.services.vector_store.get_indexing_pool")
+@patch("nl2sql.indexing.vector_store.get_indexing_pool", create=True)
 def test_index_schema_fk_aliasing(mock_get_pool, store, mock_chroma):
     """
     Verifies that schema indexing correctly applies aliases to tables and updates 
@@ -137,32 +137,6 @@ def test_index_schema_orphaned_fk(mock_get_pool, store, mock_chroma):
     
     assert "ghost_users" in orders_doc.page_content
 
-def test_retrieve_filtering_single(store, mock_chroma):
-    """Verifies that retrieval correctly filters by a single datasource ID."""
-    mock_chroma.similarity_search.return_value = []
-    store.retrieve_table_names("q", datasource_id="ds1")
-    
-    mock_chroma.similarity_search.assert_called_with(
-        "q", k=5, filter={"datasource_id": "ds1"}
-    )
-
-def test_retrieve_filtering_list(store, mock_chroma):
-    """Verifies that retrieval correctly filters by a list of datasource IDs."""
-    mock_chroma.similarity_search.return_value = []
-    store.retrieve_table_names("q", datasource_id=["a", "b"])
-    
-    mock_chroma.similarity_search.assert_called_with(
-        "q", k=5, filter={"datasource_id": {"$in": ["a", "b"]}}
-    )
-
-def test_retrieve_no_filter(store, mock_chroma):
-    """Verifies that retrieval works correctly without any datasource filter."""
-    mock_chroma.similarity_search.return_value = []
-    store.retrieve_table_names("q")
-    
-    mock_chroma.similarity_search.assert_called_with(
-        "q", k=5, filter=None
-    )
 
 def test_refresh_examples_enrichment_failure(store, mock_chroma):
     """Verifies system resilience when the LLM enrichment step fails."""

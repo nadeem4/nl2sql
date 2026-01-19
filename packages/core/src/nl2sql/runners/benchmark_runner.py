@@ -9,7 +9,7 @@ from sqlalchemy import text, create_engine
 
 from nl2sql.datasources import DatasourceRegistry
 from nl2sql.llm import LLMRegistry
-from nl2sql.services.vector_store import OrchestratorVectorStore
+from nl2sql.indexing.vector_store import VectorStore
 from nl2sql.pipeline.graph import run_with_graph
 from nl2sql.evaluation.evaluator import ModelEvaluator
 from nl2sql_cli.types import BenchmarkConfig
@@ -30,7 +30,7 @@ class BenchmarkRunner:
         self,
         config: BenchmarkConfig,
         datasource_registry: DatasourceRegistry,
-        vector_store: OrchestratorVectorStore,
+        vector_store: VectorStore,
         llm_registry: LLMRegistry
     ):
         self.config = config

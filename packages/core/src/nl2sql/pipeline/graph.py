@@ -13,7 +13,7 @@ from nl2sql.pipeline.nodes.semantic import SemanticAnalysisNode
 from nl2sql.pipeline.nodes.intent_validator import IntentValidatorNode
 
 from nl2sql.pipeline.state import GraphState, UserContext
-from nl2sql.services.vector_store import OrchestratorVectorStore
+from nl2sql.indexing.vector_store import VectorStore
 from nl2sql.llm import LLMRegistry
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.common.logger import trace_context, tenant_context
@@ -88,7 +88,7 @@ def build_graph(
     graph.add_node("intent_validator", intent_validator_node)
     graph.add_node("decomposer", decomposer_node)
     graph.add_node("global_planner", GlobalPlannerNode(ctx))
-    graph.add_node("sql_agent_subgraph", sql_agent_wrapper)
+    graph.add_node("sql_agent", sql_agent_wrapper)
     graph.add_node("report_missing_datasource", report_missing_datasource)
     graph.add_node("aggregator", aggregator_node)
 

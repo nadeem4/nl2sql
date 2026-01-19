@@ -4,9 +4,7 @@ from typing import Optional
 
 from nl2sql.datasources import DatasourceRegistry
 from nl2sql.llm import LLMRegistry
-from nl2sql.services.vector_store import OrchestratorVectorStore
-# Updated Import
-from nl2sql_cli.commands.visualize import draw_execution_trace
+from nl2sql.indexing.vector_store import VectorStore
 from nl2sql.reporting import ConsolePresenter
 from nl2sql.runners.pipeline_runner import PipelineRunner
 from nl2sql.common.settings import settings
@@ -24,7 +22,7 @@ def run_pipeline(
         return
         
     presenter = ConsolePresenter()
-    presenter.print_query(config.query)
+    presenter.print_info(f"Query: {config.query}")
     
     # Instantiate Runner
     runner = PipelineRunner(ctx)
@@ -33,7 +31,7 @@ def run_pipeline(
     from nl2sql.services.callbacks.monitor import PipelineMonitorCallback
     monitor = PipelineMonitorCallback(presenter)
     
-    presenter.start_interactive_status("[bold green]Thinking...[/bold green]")
+    presenter.start_interactive_status("Thinking...")
     
     # Execution
     result = runner.run(
@@ -60,7 +58,6 @@ def run_pipeline(
     sub_queries = final_state.get("sub_queries", [])
     sq_map = {sq.id: sq for sq in sub_queries}
     
-    # Reconstruct history for display compatibility
     query_history = []
     for sq_id, exec_model in subquery_results.items():
         sq = sq_map.get(sq_id)
@@ -82,7 +79,7 @@ def run_pipeline(
                     "execution_history": query_history
                 }
                 json.dump(dump_data, f, indent=2, default=str)
-            presenter.console.print("[dim]Detailed reasoning trace saved to last_reasoning.json[/dim]")
+            presenter.print_info("Detailed reasoning trace saved to last_reasoning.json")
         except Exception:
             pass
 

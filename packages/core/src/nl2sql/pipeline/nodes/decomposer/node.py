@@ -8,14 +8,13 @@ from nl2sql.llm.registry import LLMRegistry
 
 if TYPE_CHECKING:
     from nl2sql.pipeline.state import GraphState
-    from nl2sql.services.vector_store import OrchestratorVectorStore
-    from nl2sql.pipeline.nodes.semantic.node import SemanticAnalysisNode
+    from nl2sql.services.vector_store import VectorStore
 
 from .schemas import DecomposerResponse, SubQuery
 from .prompts import DECOMPOSER_PROMPT
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.common.logger import get_logger
-from nl2sql_adapter_sdk import Table
+from nl2sql_sqlalchemy_adapter.schema.models import Table
 from nl2sql.context import NL2SQLContext
 import uuid
 
@@ -31,7 +30,7 @@ class DecomposerNode:
 
     Attributes:
         llm (ChatOpenAI): The language model to use.
-        vector_store (Optional[OrchestratorVectorStore]): Store for retrieving context.
+        vector_store (Optional[VectorStore]): Store for retrieving context.
         prompt (ChatPromptTemplate): The prompt template.
         chain (Runnable): The execution chain.
     """
@@ -41,7 +40,7 @@ class DecomposerNode:
 
         Args:
             llm (LLMCallable): The LLM instance or runnable.
-            vector_store (Optional[OrchestratorVectorStore]): Vector store for RAG.
+            vector_store (Optional[VectorStore]): Vector store for RAG.
         """
         self.node_name = self.__class__.__name__.lower().replace('node', '')
         self.llm = ctx.llm_registry.get_llm(self.node_name)
@@ -156,9 +155,9 @@ class DecomposerNode:
             ds_tables: Dict[str, list] = {}
 
             for doc in docs:
-                d_type = doc.metadata.get("type", "table")
-                d_id = doc.metadata.get("datasource_id", "unknown")
-                name = doc.metadata.get("table_name", "unknown")
+                d_type = doc.metadata.get("type")
+                d_id = doc.metadata.get("datasource_id")
+                name = doc.metadata.get("table_name")
 
                 if d_type == "table":
                     schema_json_str = doc.metadata.get("schema_json")

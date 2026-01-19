@@ -4,7 +4,7 @@
 
 ### The Core Issue: "Blast Radius" & Reliability
 
-Currently, the NL2SQL Agent executes SQL queries via `ExecutorNode`, performs dry-runs via `PhysicalValidatorNode`, and indexes schemas via `OrchestratorVectorStore` **in-process**.
+Currently, the NL2SQL Agent executes SQL queries via `ExecutorNode`, performs dry-runs via `PhysicalValidatorNode`, and indexes schemas via `VectorStore` **in-process**.
 
 This couples the stability of the Agent to the stability of the underlying SQL Drivers and the Database itself.
 
@@ -34,7 +34,7 @@ Spawn worker processes on the same machine (Process Boundary Isolation).
 
 * **Mechanism**:
   * **Execution Pool**: A low-latency pool for `ExecutorNode` and `PhysicalValidatorNode` (User-facing queries).
-  * **Indexing Pool**: A separate, lower-priority pool for `OrchestratorVectorStore` (Background tasks).
+  * **Indexing Pool**: A separate, lower-priority pool for `VectorStore` (Background tasks).
 * **Controls**:
   * `max_workers`: Hard cap on concurrency to prevent OOM.
   * `initializer`: Setup persistent global `SQLAlchemy Engine` for connection pooling.
