@@ -2,28 +2,29 @@
 import pytest
 from pydantic import SecretStr
 from unittest.mock import MagicMock, patch
+
 from nl2sql.datasources.registry import DatasourceRegistry
+from nl2sql.datasources.models import ConnectionConfig
+from nl2sql.secrets import SecretManager, secret_manager
 from nl2sql_postgres.adapter import PostgresAdapter, PostgresConnectionConfig
 
 def test_registry_wraps_secrets():
     """Verify registry wraps resolved secrets in SecretStr."""
-    configs = [] 
-    registry = DatasourceRegistry(configs)
-    
-    # Mock secret manager
-    with patch("nl2sql.datasources.registry.secret_manager") as mock_sm:
-        mock_sm.resolve.return_value = "super_secret_password"
-        
-        unresolved = {
-            "host": "localhost",
-            "password": "${aws:db_password}"
-        }
-        
-        resolved = registry.resolved_connection(unresolved)
-        
-        assert isinstance(resolved["password"], SecretStr)
-        assert resolved["password"].get_secret_value() == "super_secret_password"
-        assert str(resolved["password"]) == "**********"
+    mock_sm = MagicMock(spec=SecretManager)
+    mock_sm.resolve.return_value = "super_secret_password"
+    registry = DatasourceRegistry(mock_sm)
+
+    unresolved = ConnectionConfig(
+        type="postgres",
+        host="localhost",
+        password="${aws:db_password}",
+    )
+
+    resolved = registry.resolved_connection(unresolved)
+
+    assert isinstance(resolved.password, SecretStr)
+    assert resolved.password.get_secret_value() == "super_secret_password"
+    assert str(resolved.password) == "**********"
 
 def test_postgres_adapter_accepts_secretstr():
     """Verify PostgresAdapter accepts SecretStr and unwraps it for engine creation."""
@@ -61,7 +62,6 @@ def test_config_hides_secrets():
 
 def test_llm_registry_resolves_secrets():
     """Verify SecretManager resolves SecretStr within Pydantic models."""
-    from nl2sql.secrets import secret_manager
     from nl2sql.configs import LLMFileConfig, AgentConfig
 
     config = LLMFileConfig(

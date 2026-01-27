@@ -10,13 +10,14 @@ from rich.tree import Tree
 class ConsolePresenter:
     def __init__(self):
         self.console = Console()
+        self._status = None
 
     def print_table(self, data: list[dict], title: str = "") -> None:
         table = Table(title=title)
         for key in data[0].keys():
             table.add_column(key)
         for item in data:
-            table.add_row(*item.values())
+            table.add_row(*[str(value) for value in item.values()])
         self.console.print(table)
 
 
@@ -32,12 +33,15 @@ class ConsolePresenter:
     def print_warning(self, message: str) -> None:
         self.console.print(f"[yellow][WARN][/yellow] {message}")
 
-    def status_context(self, message: str) -> None:
-        self.console.status(message)
+    def status_context(self, message: str):
+        return self.console.status(message)
 
     def start_interactive_status(self, message: str) -> None:
-        self.console.status(message)
+        self._status = self.console.status(message)
+        self._status.start()
 
     def stop_interactive_status(self) -> None:
-        self.console.status.stop()
+        if self._status:
+            self._status.stop()
+            self._status = None
 

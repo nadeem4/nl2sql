@@ -7,6 +7,8 @@ from nl2sql.common.errors import ErrorCode, ErrorSeverity
 from nl2sql.common.resilience import DB_BREAKER, LLM_BREAKER
 import pybreaker
 from nl2sql.pipeline.nodes.executor.node import ExecutorNode
+from nl2sql.pipeline.nodes.generator.schemas import GeneratorResponse
+from nl2sql.pipeline.nodes.decomposer.schemas import SubQuery
 from nl2sql.datasources import DatasourceRegistry
 
 class TestExecutorNodeResilience:
@@ -31,12 +33,14 @@ class TestExecutorNodeResilience:
         
         registry.get_adapter.return_value = mock_adapter
         
-        node = ExecutorNode(registry)
+        ctx = MagicMock()
+        ctx.ds_registry = registry
+        node = ExecutorNode(ctx)
         
         # Mock request
         state = MagicMock()
-        state.selected_datasource_id = "test_ds"
-        state.sql_draft = "SELECT * FROM users"
+        state.sub_query = SubQuery(id="sq1", datasource_id="test_ds", intent="q")
+        state.generator_response = GeneratorResponse(sql_draft="SELECT * FROM users")
         
         # Simulate Crash Logic -> Trips Breaker
         mock_sandbox.return_value = ExecutionResult(

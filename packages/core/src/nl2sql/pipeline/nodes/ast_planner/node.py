@@ -5,13 +5,13 @@ from langchain_core.runnables import Runnable
 from langchain_core.prompts import ChatPromptTemplate
 
 from .prompts import PLANNER_PROMPT, PLANNER_EXAMPLES
-from .schemas import PlanModel
+from .schemas import PlanModel, ASTPlannerResponse
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.common.logger import get_logger
 from nl2sql.context import NL2SQLContext
 
 if TYPE_CHECKING:
-    from nl2sql.pipeline.state import GraphState
+    from nl2sql.pipeline.state import SubgraphExecutionState
 
 logger = get_logger("planner")
 
@@ -39,7 +39,7 @@ class ASTPlannerNode:
         self.prompt = ChatPromptTemplate.from_template(PLANNER_PROMPT)
         self.chain = self.prompt | self.llm.with_structured_output(PlanModel)
 
-    def __call__(self, state: GraphState) -> Dict[str, Any]:
+    def __call__(self, state: SubgraphExecutionState) -> Dict[str, Any]:
         """Executes the planning node.
 
         Args:
@@ -59,24 +59,22 @@ class ASTPlannerNode:
             if state.errors:
                 feedback = "\n".join(e.model_dump_json(indent=2) for e in state.errors)
 
-            semantic_context = (
-                state.semantic_analysis.model_dump_json(indent=2)
-                if state.semantic_analysis
-                else "No semantic context available."
-            )
-
+            query_text = state.sub_query.intent if state.sub_query else ""
+            expected_schema = []
+            if state.sub_query and state.sub_query.expected_schema:
+                expected_schema = [c.model_dump() for c in state.sub_query.expected_schema]
             plan: PlanModel = self.chain.invoke(
                 {
                     "relevant_tables": relevant_tables,
                     "examples": PLANNER_EXAMPLES,
                     "feedback": feedback,
-                    "user_query": state.user_query,
-                    "semantic_context": semantic_context,
+                    "expected_schema": expected_schema,
+                    "user_query": query_text,
                 }
             )
 
             return {
-                "plan": plan,
+                "ast_planner_response": ASTPlannerResponse(plan=plan),
                 "reasoning": [
                     {
                         "node": self.node_name,
@@ -92,7 +90,7 @@ class ASTPlannerNode:
         except Exception as exc:
             logger.exception("Planner failed")
             return {
-                "plan": None,
+                "ast_planner_response": ASTPlannerResponse(plan=None),
                 "errors": [
                     PipelineError(
                         node=self.node_name,

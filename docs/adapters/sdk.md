@@ -1,13 +1,19 @@
-# Adapter SDK Reference
+# Adapter Interface Reference
 
-The **Adapter SDK** (`nl2sql-adapter-sdk`) defines the core contract that all datasources must implement.
+The adapter contract lives in the adapter SDK:
 
-## Interface: `DatasourceAdapter`
+- `nl2sql.datasources.protocols.DatasourceAdapterProtocol`
+- `nl2sql_adapter_sdk.contracts.AdapterRequest`
+- `nl2sql_adapter_sdk.contracts.ResultFrame`
 
-All adapters must inherit from `nl2sql_adapter_sdk.interfaces.DatasourceAdapter`.
+## Interface: `DatasourceAdapterProtocol`
+
+Adapters expose a capability-driven interface:
 
 ```python
-from nl2sql_adapter_sdk import DatasourceAdapter
+from nl2sql.datasources.protocols import DatasourceAdapterProtocol
+from nl2sql_adapter_sdk.contracts import AdapterRequest, ResultFrame
+from nl2sql_adapter_sdk.capabilities import DatasourceCapability
 ```
 
 ### Mandatory Properties
@@ -15,68 +21,44 @@ from nl2sql_adapter_sdk import DatasourceAdapter
 | Property | Type | Description |
 | :--- | :--- | :--- |
 | `datasource_id` | `str` | Unique identifier (e.g., "production_db"). |
-| `row_limit` | `int` | **Safety Breaker**. Must return a safe limit (e.g., 1000) to prevent OOM errors. |
-| `max_bytes` | `int` | **Safety Breaker**. Recommended limit for network payloads. |
+| `datasource_engine_type` | `str` | Engine type string (e.g., `postgres`, `rest`). |
+| `row_limit` | `int` | Safety breaker (limit returned rows). |
+| `max_bytes` | `int` | Safety breaker (limit payload size). |
 
 ### Mandatory Methods
 
-#### `fetch_schema()`
+#### `capabilities() -> set[DatasourceCapability]`
 
-Returns `SchemaMetadata`.
+Declares supported capabilities (e.g., `supports_sql`, `supports_rest`).
 
-* **Returns**: `SchemaMetadata` containing tables, columns, PKs, FKs.
-* **Requirement**: Must populate `col.statistics` (samples, min/max) for the validation logic to work effectively.
+#### `execute(request: AdapterRequest) -> ResultFrame`
 
-#### `execute(sql: str)`
+Executes a plan-specific request and returns a normalized `ResultFrame`.
 
-Executes a query and returns results.
+* **Args**: `AdapterRequest` with `plan_type` and `payload`
+* **Returns**: `ResultFrame` with `columns`, `rows`, `row_count`, and error metadata
 
-* **Args**: `sql` (str) - The SQL query to run.
-* **Returns**: `QueryResult` with `rows` (list of dicts) and `columns` (list of names).
+#### `fetch_schema_snapshot()`
+
+Required only if `supports_schema_introspection` is advertised.
+
+### Optional Methods (SQL adapters)
 
 #### `dry_run(sql: str)`
 
 Validates SQL without executing it (or safely rolling back).
 
-* **Args**: `sql` (str)
-* **Returns**: `DryRunResult(is_valid=bool, error_message=str)`
-
-### Optional Methods
-
 #### `explain(sql: str)`
 
 Returns the execution plan.
-
-* **Returns**: `QueryPlan(plan_text=str)`
 
 #### `cost_estimate(sql: str)`
 
 Returns cost/row estimates for the Physical Validator.
 
-* **Returns**: `CostEstimate(estimated_cost=float, estimated_rows=int)`
-
 ---
 
 ## Compliance Testing
 
-The SDK provides a compliance test suite. **All Adapters MUST pass this suite.**
-
-It verifies:
-
-* Schema Introspection (PKs/FKs detected?)
-* Type Mapping (Date -> Python Date, Numeric -> Python Float)
-* Error Handling (Bad SQL -> AdapterError)
-
-### Running Tests
-
-```python
-# tests/test_my_adapter.py
-from nl2sql_adapter_sdk.testing import BaseAdapterTest
-from my_adapter import MyAdapter
-import pytest
-
-class TestMyAdapter(BaseAdapterTest):
-    @pytest.fixture
-    def adapter(self):
-        return MyAdapter(...)
-```
+All adapters should pass the compliance test suite (schema introspection, type mapping,
+error handling, and result contract validation).

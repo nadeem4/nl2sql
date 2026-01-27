@@ -9,4 +9,6 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-__all__ = ["SecretManager", "SecretProvider", "SecretProviderConfig"]
+secret_manager = SecretManager()
+
+__all__ = ["SecretManager", "SecretProvider", "SecretProviderConfig", "secret_manager"]

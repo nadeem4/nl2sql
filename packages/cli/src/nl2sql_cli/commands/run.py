@@ -54,18 +54,23 @@ def run_pipeline(
     final_state = result.final_state
     
 
-    subquery_results = final_state.get("subquery_results", {})
+    result_refs = final_state.get("result_refs", {})
     sub_queries = final_state.get("sub_queries", [])
     sq_map = {sq.id: sq for sq in sub_queries}
     
     query_history = []
-    for sq_id, exec_model in subquery_results.items():
+    for sq_id, result_id in result_refs.items():
         sq = sq_map.get(sq_id)
         if sq:
+            frame = ctx.result_store.get(result_id)
+            metadata = ctx.result_store.get_metadata(result_id)
             query_history.append({
-                "sub_query": sq.query,
-                "datasource_id": sq.datasource_id,
-                "execution": exec_model,
+                "sub_query": sq.intent,
+                "datasource_id": metadata.get("datasource_id", sq.datasource_id),
+                "execution": {
+                    "row_count": frame.row_count,
+                    "columns": [c.name for c in frame.columns],
+                },
             })
     
     if config.verbose:

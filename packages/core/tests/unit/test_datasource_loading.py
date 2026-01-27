@@ -2,11 +2,13 @@ import pathlib
 import os
 import pytest
 from unittest.mock import MagicMock, patch
-from nl2sql.configs import ConfigManager
-from nl2sql.datasources.registry import DatasourceRegistry
-from nl2sql_adapter_sdk import DatasourceAdapter
 
-class MockAdapter(DatasourceAdapter):
+from nl2sql.configs import ConfigManager
+from nl2sql.datasources import DatasourceRegistry, DatasourceConfig, ConnectionConfig
+from nl2sql.secrets import SecretManager
+from nl2sql_adapter_sdk.contracts import AdapterRequest, ResultFrame
+
+class MockAdapter:
     """Mock adapter for testing registry initialization."""
     @property
     def datasource_id(self) -> str:
@@ -26,11 +28,14 @@ class MockAdapter(DatasourceAdapter):
         self.connection_args = connection_args
         self.kwargs = kwargs
     
-    def fetch_schema(self):
+    def fetch_schema_snapshot(self):
         return None
     
-    def execute(self, query):
-        return []
+    def execute(self, request: AdapterRequest):
+        return ResultFrame(success=True, rows=[], columns=[], row_count=0)
+
+    def capabilities(self):
+        return set()
         
     def get_dialect(self):
         return "mock"
@@ -98,10 +103,11 @@ def test_registry_resolves_env_secrets():
     
     with patch.dict(os.environ, {"TEST_SECRET": "resolved_value"}):
         with patch("nl2sql.datasources.registry.discover_adapters", return_value={"mock_db": MockAdapter}):
-            registry = DatasourceRegistry([config])
+            registry = DatasourceRegistry(SecretManager())
+            registry.register_datasource(DatasourceConfig.model_validate(config))
             adapter = registry.get_adapter("secure_ds")
             
-            assert adapter.connection_args["password"] == "resolved_value"
+            assert adapter.connection_args.password.get_secret_value() == "resolved_value"
 
 def test_registry_ignores_partial_secrets():
     """Verifies that DatasourceRegistry does not resolve partial secret strings."""
@@ -115,10 +121,11 @@ def test_registry_ignores_partial_secrets():
     
     with patch.dict(os.environ, {"VAR": "value"}):
         with patch("nl2sql.datasources.registry.discover_adapters", return_value={"mock_db": MockAdapter}):
-            registry = DatasourceRegistry([config])
+            registry = DatasourceRegistry(SecretManager())
+            registry.register_datasource(DatasourceConfig.model_validate(config))
             adapter = registry.get_adapter("partial_ds")
             
-            assert adapter.connection_args["host"] == "prefix_${env:VAR}"
+            assert adapter.connection_args.host == "prefix_${env:VAR}"
 
 def test_registry_missing_secret_error():
     """Verifies that DatasourceRegistry raises ValueError when a secret is missing."""
@@ -131,8 +138,9 @@ def test_registry_missing_secret_error():
     }
     
     with patch("nl2sql.datasources.registry.discover_adapters", return_value={"mock_db": MockAdapter}):
+        registry = DatasourceRegistry(SecretManager())
         with pytest.raises(ValueError) as exc:
-            DatasourceRegistry([config])
+            registry.register_datasource(DatasourceConfig.model_validate(config))
         assert "Secret not found: ${env:MISSING_VAR}" in str(exc.value)
 
 def test_registry_init_success():
@@ -146,7 +154,8 @@ def test_registry_init_success():
     }
     
     with patch("nl2sql.datasources.registry.discover_adapters", return_value={"mock_db": MockAdapter}):
-        registry = DatasourceRegistry([config])
+        registry = DatasourceRegistry(SecretManager())
+        registry.register_datasource(DatasourceConfig.model_validate(config))
         adapter = registry.get_adapter("full_ds")
         
         assert isinstance(adapter, MockAdapter)
@@ -162,8 +171,9 @@ def test_registry_unknown_adapter_type():
     }
     
     with patch("nl2sql.datasources.registry.discover_adapters", return_value={"mock_db": MockAdapter}):
+        registry = DatasourceRegistry(SecretManager())
         with pytest.raises(ValueError) as exc:
-            DatasourceRegistry([config])
+            registry.register_datasource(DatasourceConfig.model_validate(config))
         assert "No adapter found for engine type: 'unknown_db'" in str(exc.value)
 
 def test_registry_missing_id():
@@ -172,6 +182,7 @@ def test_registry_missing_id():
         "connection": {"type": "mock_db"}
     }
     
+    registry = DatasourceRegistry(SecretManager())
     with pytest.raises(ValueError) as exc:
-        DatasourceRegistry([config])
+        registry.register_datasource(DatasourceConfig.model_validate(config))
     assert "Datasource ID is required" in str(exc.value)

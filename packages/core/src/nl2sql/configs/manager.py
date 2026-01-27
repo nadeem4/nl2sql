@@ -160,6 +160,14 @@ class ConfigManager:
         except Exception as e:
             raise ValueError(f"Failed to load sample questions: {e}")
 
+    def get_example_questions(self, datasource_id: str) -> List[str]:
+        """Returns example questions for a datasource, if configured."""
+        try:
+            questions = self.load_sample_questions(ds_id=datasource_id)
+            return questions or []
+        except FileNotFoundError:
+            return []
+
 
 
 

@@ -4,9 +4,10 @@ from unittest.mock import MagicMock, patch
 from concurrent.futures import Future
 
 from nl2sql.pipeline.nodes.executor.node import ExecutorNode, _execute_in_process
-from nl2sql.pipeline.state import GraphState
+from nl2sql.pipeline.state import SubgraphExecutionState
+from nl2sql.pipeline.nodes.generator.schemas import GeneratorResponse
+from nl2sql.pipeline.nodes.decomposer.schemas import SubQuery
 from nl2sql.common.errors import ErrorCode, ErrorSeverity
-from nl2sql_adapter_sdk import QueryResult, CostEstimate
 from nl2sql.common.contracts import ExecutionResult
 
 class TestExecutorNode(unittest.TestCase):
@@ -23,16 +24,26 @@ class TestExecutorNode(unittest.TestCase):
         self.mock_adapter.connection_args = {"host": "localhost"}
         self.mock_adapter.statement_timeout_ms = 5000
         
-        self.node = ExecutorNode(self.mock_registry)
+        self.ctx = MagicMock()
+        self.ctx.ds_registry = self.mock_registry
+        self.node = ExecutorNode(self.ctx)
 
 
     def test_missing_inputs(self):
         """Test error when SQL or Datasource ID is missing."""
-        state = GraphState(user_query="q", sql_draft=None, selected_datasource_id="ds1")
+        state = SubgraphExecutionState(
+            trace_id="t",
+            generator_response=GeneratorResponse(sql_draft=None),
+            sub_query=SubQuery(id="sq1", datasource_id="ds1", intent="q"),
+        )
         res = self.node(state)
         self.assertEqual(res["errors"][0].error_code, ErrorCode.MISSING_SQL)
         
-        state = GraphState(user_query="q", sql_draft="SELECT 1", selected_datasource_id=None)
+        state = SubgraphExecutionState(
+            trace_id="t",
+            generator_response=GeneratorResponse(sql_draft="SELECT 1"),
+            sub_query=None,
+        )
         res = self.node(state)
         self.assertEqual(res["errors"][0].error_code, ErrorCode.MISSING_DATASOURCE_ID)
 
@@ -60,13 +71,17 @@ class TestExecutorNode(unittest.TestCase):
         mock_pool.submit.return_value = future
         
         # 2. Run
-        state = GraphState(user_query="q", sql_draft="SELECT * FROM table", selected_datasource_id="ds1")
+        state = SubgraphExecutionState(
+            trace_id="t",
+            generator_response=GeneratorResponse(sql_draft="SELECT * FROM table"),
+            sub_query=SubQuery(id="sq1", datasource_id="ds1", intent="q"),
+        )
         res = self.node(state)
         
         # 3. Verify
         self.assertFalse(res["errors"])
-        self.assertEqual(res["execution"].row_count, 2)
-        self.assertEqual(res["execution"].rows[0]["val"], "A")
+        self.assertEqual(res["executor_response"].execution.row_count, 2)
+        self.assertEqual(res["executor_response"].execution.rows[0]["val"], "A")
         
         # Verify submit called with ExecutionRequest
         mock_pool.submit.assert_called_once()
@@ -97,7 +112,11 @@ class TestExecutorNode(unittest.TestCase):
         future.set_result(huge_result)
         mock_pool.submit.return_value = future
         
-        state = GraphState(user_query="q", sql_draft="SELECT * FROM blob", selected_datasource_id="ds1")
+        state = SubgraphExecutionState(
+            trace_id="t",
+            generator_response=GeneratorResponse(sql_draft="SELECT * FROM blob"),
+            sub_query=SubQuery(id="sq1", datasource_id="ds1", intent="q"),
+        )
         res = self.node(state)
         
         self.assertEqual(len(res["errors"]), 1)
@@ -114,7 +133,11 @@ class TestExecutorNode(unittest.TestCase):
         future.set_exception(BrokenProcessPool("A process in the process pool was terminated abruptly."))
         mock_pool.submit.return_value = future
         
-        state = GraphState(user_query="q", sql_draft="SELECT KILL", selected_datasource_id="ds1")
+        state = SubgraphExecutionState(
+            trace_id="t",
+            generator_response=GeneratorResponse(sql_draft="SELECT KILL"),
+            sub_query=SubQuery(id="sq1", datasource_id="ds1", intent="q"),
+        )
         res = self.node(state)
         
         self.assertEqual(len(res["errors"]), 1)

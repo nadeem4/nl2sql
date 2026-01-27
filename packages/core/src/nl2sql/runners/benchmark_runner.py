@@ -173,13 +173,35 @@ class BenchmarkRunner:
                 "layer_match": layer_match
             }
             
-        generated_sql_data = state.get("sql_draft")
-        if isinstance(generated_sql_data, str):
-            generated_sql = generated_sql_data
-        else:
-            generated_sql = generated_sql_data.get("sql") if isinstance(generated_sql_data, dict) else getattr(generated_sql_data, "sql", None)
+        generated_sql = None
+        execution_res = None
+        subgraph_outputs = state.get("subgraph_outputs") or {}
+        if subgraph_outputs:
+            first_output = next(iter(subgraph_outputs.values()))
+            generated_sql = (
+                first_output.get("sql_draft")
+                if isinstance(first_output, dict)
+                else getattr(first_output, "sql_draft", None)
+            )
+            execution_res = (
+                first_output.get("execution")
+                if isinstance(first_output, dict)
+                else getattr(first_output, "execution", None)
+            )
+
+        if not generated_sql:
+            generated_sql_data = state.get("sql_draft")
+            if isinstance(generated_sql_data, str):
+                generated_sql = generated_sql_data
+            else:
+                generated_sql = (
+                    generated_sql_data.get("sql")
+                    if isinstance(generated_sql_data, dict)
+                    else getattr(generated_sql_data, "sql", None)
+                )
         
-        execution_res = state.get("execution")
+        if execution_res is None:
+            execution_res = state.get("execution")
         generated_rows = execution_res.get("rows") if isinstance(execution_res, dict) else getattr(execution_res, "rows", [])
         exec_error = execution_res.get("error") if isinstance(execution_res, dict) else getattr(execution_res, "error", None)
         

@@ -2,30 +2,24 @@
 import pytest
 from unittest.mock import MagicMock
 from types import SimpleNamespace
-from nl2sql.datasources import DatasourceRegistry
-from nl2sql.pipeline.nodes.generator.node import GeneratorNode
-from nl2sql.pipeline.state import GraphState
-from nl2sql.pipeline.nodes.planner.schemas import (
-    PlanModel, TableRef, JoinSpec, SelectItem, 
-    Expr
-)
 
-# Shared Mock Registry
-class MockRegistry(DatasourceRegistry):
-    def __init__(self):
-        super().__init__({})
-        
-    def get_adapter(self, id):
-        # Modern Mock: Adapter is an object with row_limit/max_bytes/get_dialect
-        return SimpleNamespace(
-            row_limit=1000,
-            max_bytes=100000,
-            get_dialect=lambda: "sqlite" # Defaulting to sqlite for these tests
-        )
+from nl2sql.pipeline.nodes.generator.node import GeneratorNode
+from nl2sql.pipeline.state import SubgraphExecutionState
+from nl2sql.pipeline.nodes.ast_planner.schemas import (
+    PlanModel, TableRef, JoinSpec, SelectItem,
+    Expr, ASTPlannerResponse,
+)
+from nl2sql.pipeline.nodes.decomposer.schemas import SubQuery
 
 @pytest.fixture
 def generator():
-    return GeneratorNode(registry=MockRegistry())
+    ctx = MagicMock()
+    ctx.ds_registry.get_adapter.return_value = SimpleNamespace(
+        row_limit=1000,
+        max_bytes=100000,
+        get_dialect=lambda: "sqlite"
+    )
+    return GeneratorNode(ctx=ctx)
 
 class TestGeneratorNode:
     """Consolidated Generator Node Tests."""
@@ -52,11 +46,15 @@ class TestGeneratorNode:
             where=where_clause
         )
         
-        state = GraphState(user_query="q", selected_datasource_id="mock_db", plan=plan.model_dump())
+        state = SubgraphExecutionState(
+            sub_query=SubQuery(id="sq1", datasource_id="mock_db", intent="q"),
+            ast_planner_response=ASTPlannerResponse(plan=plan),
+            trace_id="t",
+        )
         result = generator(state)
         
         assert not result.get("errors")
-        sql = result["sql_draft"]
+        sql = result["generator_response"].sql_draft
         
         assert "(t1.col1 > 10 OR t1.col2 < 5)" in sql
         assert "AND t1.col3 = 'test'" in sql
@@ -81,11 +79,15 @@ class TestGeneratorNode:
             ]
         )
         
-        state = GraphState(user_query="q", selected_datasource_id="mock", plan=plan.model_dump())
+        state = SubgraphExecutionState(
+            sub_query=SubQuery(id="sq1", datasource_id="mock", intent="q"),
+            ast_planner_response=ASTPlannerResponse(plan=plan),
+            trace_id="t",
+        )
         result = generator(state)
         
         assert not result.get("errors")
-        sql = result["sql_draft"]
+        sql = result["generator_response"].sql_draft
         
         # Check SELECT clause order: date_first (0) < id_second (1)
         col_date_idx = sql.find("date_first")
@@ -113,11 +115,15 @@ class TestGeneratorNode:
             "where": None, "joins": [], "order_by": []
         }
     
-        state = GraphState(user_query="test", plan=plan, selected_datasource_id="test_ds")
+        state = SubgraphExecutionState(
+            ast_planner_response=ASTPlannerResponse(plan=PlanModel.model_validate(plan)),
+            sub_query=SubQuery(id="sq1", datasource_id="test_ds", intent="q"),
+            trace_id="t",
+        )
         new_state = generator(state)
         
         assert not new_state.get("errors")
-        sql = new_state["sql_draft"].lower()
+        sql = new_state["generator_response"].sql_draft.lower()
         assert "having" in sql
         assert "count(*) > 5" in sql or "count(*) > '5'" in sql
 
@@ -132,8 +138,12 @@ class TestGeneratorNode:
             "where": None, "joins": [], "having": None, "order_by": []
         }
     
-        state = GraphState(user_query="test", plan=plan, selected_datasource_id="test_ds")
+        state = SubgraphExecutionState(
+            ast_planner_response=ASTPlannerResponse(plan=PlanModel.model_validate(plan)),
+            sub_query=SubQuery(id="sq1", datasource_id="test_ds", intent="q"),
+            trace_id="t",
+        )
         new_state = generator(state)
         
         assert not new_state.get("errors")
-        assert "GROUP BY" in new_state["sql_draft"]
+        assert "GROUP BY" in new_state["generator_response"].sql_draft

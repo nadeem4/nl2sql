@@ -226,6 +226,10 @@ class PlanModel(BaseModel):
     reasoning: Optional[str] = None
 
 
+class ASTPlannerResponse(BaseModel):
+    plan: Optional[PlanModel] = None
+
+
 # Fix forward references
 Expr.model_rebuild()
 CaseWhen.model_rebuild()

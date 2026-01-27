@@ -74,6 +74,28 @@ class Settings(BaseSettings):
         description="Default statement timeout for SQL execution safeguards."
     )
 
+    schema_store_backend: str = Field(
+        default="memory",
+        validation_alias="SCHEMA_STORE_BACKEND",
+        description="Schema store backend identifier (e.g., 'memory', 'redis')."
+    )
+    schema_store_max_versions: int = Field(
+        default=3,
+        validation_alias="SCHEMA_STORE_MAX_VERSIONS",
+        description="Max versions to retain per datasource in schema store."
+    )
+    schema_version_mismatch_policy: str = Field(
+        default="warn",
+        validation_alias="SCHEMA_VERSION_MISMATCH_POLICY",
+        description="Action when chunk schema_version differs from SchemaStore: warn, fail, or ignore."
+    )
+
+    logical_validator_strict_columns: bool = Field(
+        default=False,
+        validation_alias="LOGICAL_VALIDATOR_STRICT_COLUMNS",
+        description="Treat missing columns as errors in logical validation."
+    )
+
     observability_exporter: str = Field(
         default="none",
         validation_alias="OBSERVABILITY_EXPORTER",

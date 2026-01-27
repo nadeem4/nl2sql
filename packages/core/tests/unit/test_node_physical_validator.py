@@ -4,10 +4,11 @@ from unittest.mock import MagicMock, patch
 from concurrent.futures import Future
 
 from nl2sql.pipeline.nodes.validator.physical_node import PhysicalValidatorNode, _dry_run_in_process, _cost_estimate_in_process
-from nl2sql.pipeline.state import GraphState
+from nl2sql.pipeline.state import SubgraphExecutionState
+from nl2sql.pipeline.nodes.generator.schemas import GeneratorResponse
+from nl2sql.pipeline.nodes.decomposer.schemas import SubQuery
 from nl2sql.datasources import DatasourceRegistry
 from nl2sql.common.errors import ErrorCode
-from nl2sql_adapter_sdk import DryRunResult, CostEstimate
 from nl2sql.common.contracts import ExecutionResult
 
 class TestPhysicalValidatorNode(unittest.TestCase):
@@ -19,7 +20,9 @@ class TestPhysicalValidatorNode(unittest.TestCase):
         self.adapter.connection_args = {}
         
         self.registry.get_adapter.return_value = self.adapter
-        self.node = PhysicalValidatorNode(self.registry)
+        self.ctx = MagicMock()
+        self.ctx.ds_registry = self.registry
+        self.node = PhysicalValidatorNode(self.ctx)
 
 
     @patch("nl2sql.pipeline.nodes.validator.physical_node.get_execution_pool")
@@ -38,10 +41,10 @@ class TestPhysicalValidatorNode(unittest.TestCase):
         future.set_result(mock_res)
         mock_pool.submit.return_value = future
 
-        state = GraphState(
-            user_query="q",
-            sql_draft="SELECT * FROM users",
-            selected_datasource_id="ds1",
+        state = SubgraphExecutionState(
+            trace_id="t",
+            generator_response=GeneratorResponse(sql_draft="SELECT * FROM users"),
+            sub_query=SubQuery(id="sq1", datasource_id="ds1", intent="q"),
         )
         result = self.node(state)
         
@@ -88,11 +91,11 @@ class TestPhysicalValidatorNode(unittest.TestCase):
         
         mock_pool.submit.side_effect = [f1, f2]
         
-        node_limited = PhysicalValidatorNode(self.registry, row_limit=1000)
-        state = GraphState(
-            user_query="q",
-            sql_draft="SELECT * FROM users",
-            selected_datasource_id="ds1",
+        node_limited = PhysicalValidatorNode(self.ctx, row_limit=1000)
+        state = SubgraphExecutionState(
+            trace_id="t",
+            generator_response=GeneratorResponse(sql_draft="SELECT * FROM users"),
+            sub_query=SubQuery(id="sq1", datasource_id="ds1", intent="q"),
         )
         result = node_limited(state)
         

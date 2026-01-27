@@ -4,11 +4,13 @@ from typing import Set, Dict, Any, List, Optional, Tuple, TYPE_CHECKING
 import traceback
 
 if TYPE_CHECKING:
-    from nl2sql.pipeline.state import GraphState
+    from nl2sql.pipeline.state import SubgraphExecutionState
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.pipeline.nodes.ast_planner.schemas import PlanModel, Expr
 from nl2sql.context import NL2SQLContext
 from nl2sql.common.logger import get_logger
+from nl2sql.common.settings import settings
+from nl2sql.pipeline.nodes.validator.schemas import LogicalValidatorResponse
 
 
 logger = get_logger("logical_validator")
@@ -84,6 +86,9 @@ class ValidatorVisitor:
 
             allowed = self.alias_to_cols[alias]
 
+            if col_name == "*":
+                return
+
             if col_name != "*" and col_name not in allowed:
                 self.errors.append(
                     f"Column '{col.column_name}' does not exist in table alias '{alias}'."
@@ -123,14 +128,62 @@ class LogicalValidatorNode:
         """
         self.registry = ctx.ds_registry
         self.rbac = ctx.rbac
+        self.strict_columns = settings.logical_validator_strict_columns
+
+    def _normalize_table_key(
+        self,
+        table_name: str,
+        schema_name: Optional[str] = None,
+        database: Optional[str] = None,
+    ) -> str:
+        parts = []
+        if database:
+            parts.append(database)
+        if schema_name:
+            parts.append(schema_name)
+        parts.append(table_name)
+        return ".".join(parts).lower()
+
+    def _collect_aliases(self, expr: Expr) -> Set[str]:
+        aliases: Set[str] = set()
+
+        def walk(node: Optional[Expr]) -> None:
+            if not node:
+                return
+            if node.kind == "column":
+                if node.alias:
+                    aliases.add(node.alias)
+                return
+            if node.kind == "func":
+                for arg in node.args:
+                    walk(arg)
+                return
+            if node.kind == "binary":
+                walk(node.left)
+                walk(node.right)
+                return
+            if node.kind == "unary":
+                walk(node.expr)
+                return
+            if node.kind == "case":
+                if node.whens:
+                    for when in node.whens:
+                        walk(when.condition)
+                        walk(when.result)
+                if node.else_expr:
+                    walk(node.else_expr)
+                return
+
+        walk(expr)
+        return aliases
 
     def _build_alias_map(
-        self, state: GraphState, plan: PlanModel
+        self, state: SubgraphExecutionState, plan: PlanModel
     ) -> Tuple[Dict[str, Set[str]], Set[str], List[PipelineError]]:
         """Constructs a map of table aliases to column sets from the schema.
 
         Args:
-            state (GraphState): Current execution state containing relevant_tables.
+            state (SubgraphExecutionState): Current execution state containing relevant_tables.
             plan (PlanModel): The plan containing table references.
 
         Returns:
@@ -143,13 +196,60 @@ class LogicalValidatorNode:
         plan_aliases: Set[str] = set()
         errors: List[PipelineError] = []
 
+        simple_map: Dict[str, List[Any]] = {}
+        full_map: Dict[str, Any] = {}
+        for rt in state.relevant_tables:
+            rt_name = (rt.name or "").lower()
+            simple_name = rt_name.split(".")[-1] if rt_name else ""
+            if simple_name:
+                simple_map.setdefault(simple_name, []).append(rt)
+            if "." in rt_name:
+                full_map[rt_name] = rt
+
         for t in plan.tables:
             plan_aliases.add(t.alias)
 
-            found_table = next(
-                (rt for rt in state.relevant_tables if rt.name == t.name),
-                None
-            )
+            found_table = None
+            plan_simple = (t.name or "").lower()
+            if t.schema_name or t.database:
+                plan_key = self._normalize_table_key(
+                    t.name, t.schema_name, t.database
+                )
+                found_table = full_map.get(plan_key)
+                if not found_table:
+                    candidates = simple_map.get(plan_simple, [])
+                    if len(candidates) == 1:
+                        found_table = candidates[0]
+                    elif len(candidates) > 1:
+                        errors.append(
+                            PipelineError(
+                                node="logical_validator",
+                                message=(
+                                    f"Ambiguous table '{t.name}' across schemas; "
+                                    "plan must specify schema."
+                                ),
+                                severity=ErrorSeverity.ERROR,
+                                error_code=ErrorCode.TABLE_NOT_FOUND,
+                            )
+                        )
+                        continue
+            else:
+                candidates = simple_map.get(plan_simple, [])
+                if len(candidates) == 1:
+                    found_table = candidates[0]
+                elif len(candidates) > 1:
+                    errors.append(
+                        PipelineError(
+                            node="logical_validator",
+                            message=(
+                                f"Ambiguous table '{t.name}' across schemas; "
+                                "plan must specify schema."
+                            ),
+                            severity=ErrorSeverity.ERROR,
+                            error_code=ErrorCode.TABLE_NOT_FOUND,
+                        )
+                    )
+                    continue
 
             if not found_table:
                 errors.append(
@@ -205,16 +305,16 @@ class LogicalValidatorNode:
             seen.add(t.alias)
         return None
 
-    def _validate_policy(self, state: GraphState) -> list[PipelineError]:
+    def _validate_policy(self, state: SubgraphExecutionState) -> list[PipelineError]:
         """Validates that the query adheres to access control policies.
 
         Args:
-            state (GraphState): Execution state containing user_context.
+            state (SubgraphExecutionState): Execution state containing user_context.
 
         Returns:
             list[PipelineError]: Errors if unauthorized tables are accessed.
         """
-        plan = state.plan
+        plan = state.ast_planner_response.plan if state.ast_planner_response else None
         errors: list[PipelineError] = []
 
         user_ctx = state.user_context 
@@ -222,13 +322,13 @@ class LogicalValidatorNode:
         role = ','.join(user_ctx.roles)
         
         # Resolve Datasource ID for Namespacing
-        ds_id = state.selected_datasource_id
+        ds_id = state.sub_query.datasource_id if state.sub_query else None
         if not ds_id:
              # Fail Closed if we don't know the datasource (cannot enforce namespace)
              return [
                  PipelineError(
                     node="logical_validator",
-                    message="Security Enforcement Failed: No 'selected_datasource_id' in state.",
+                    message="Security Enforcement Failed: No sub_query datasource_id in state.",
                     severity=ErrorSeverity.CRITICAL,
                     error_code=ErrorCode.SECURITY_VIOLATION
                  )
@@ -264,7 +364,7 @@ class LogicalValidatorNode:
 
         return errors
 
-    def _validate_static(self, state: GraphState) -> list[PipelineError]:
+    def _validate_static(self, state: SubgraphExecutionState) -> list[PipelineError]:
         """Performs static structure validation on the plan.
 
         Checks:
@@ -274,8 +374,18 @@ class LogicalValidatorNode:
         - Join alias validity.
         - Column existence (via ValidatorVisitor).
         """
-        plan: PlanModel = state.plan
+        plan: PlanModel = state.ast_planner_response.plan if state.ast_planner_response else None
         errors: list[PipelineError] = []
+
+        if not plan.tables:
+            return [
+                PipelineError(
+                    node="logical_validator",
+                    message="Plan has no tables.",
+                    severity=ErrorSeverity.ERROR,
+                    error_code=ErrorCode.INVALID_PLAN_STRUCTURE,
+                )
+            ]
 
         if plan.query_type != "READ":
             return [
@@ -302,6 +412,34 @@ class LogicalValidatorNode:
         if alias_err:
             errors.append(alias_err)
 
+        if state.sub_query and state.sub_query.expected_schema:
+            expected_names = [c.name for c in state.sub_query.expected_schema if c.name]
+            actual_aliases = [s.alias for s in plan.select_items if s.alias]
+            if len(plan.select_items) != len(expected_names):
+                errors.append(
+                    PipelineError(
+                        node="logical_validator",
+                        message=(
+                            "Select item count must match expected_schema. "
+                            f"Expected {len(expected_names)}, got {len(plan.select_items)}."
+                        ),
+                        severity=ErrorSeverity.ERROR,
+                        error_code=ErrorCode.INVALID_PLAN_STRUCTURE,
+                    )
+                )
+            if sorted(actual_aliases) != sorted(expected_names):
+                errors.append(
+                    PipelineError(
+                        node="logical_validator",
+                        message=(
+                            "Select aliases must match expected_schema names. "
+                            f"Expected {expected_names}, got {actual_aliases}."
+                        ),
+                        severity=ErrorSeverity.ERROR,
+                        error_code=ErrorCode.INVALID_PLAN_STRUCTURE,
+                    )
+                )
+
         alias_to_cols, plan_aliases, alias_errors = self._build_alias_map(state, plan)
         errors.extend(alias_errors)
 
@@ -325,6 +463,19 @@ class LogicalValidatorNode:
                         error_code=ErrorCode.JOIN_TABLE_NOT_IN_PLAN,
                     )
                 )
+            join_aliases = self._collect_aliases(j.condition)
+            if j.left_alias not in join_aliases or j.right_alias not in join_aliases:
+                errors.append(
+                    PipelineError(
+                        node="logical_validator",
+                        message=(
+                            "Join condition must reference both "
+                            f"'{j.left_alias}' and '{j.right_alias}'."
+                        ),
+                        severity=ErrorSeverity.ERROR,
+                        error_code=ErrorCode.INVALID_PLAN_STRUCTURE,
+                    )
+                )
 
         visitor = ValidatorVisitor(alias_to_cols)
 
@@ -346,12 +497,15 @@ class LogicalValidatorNode:
         for j in plan.joins:
             visitor.visit(j.condition)
 
+        column_severity = (
+            ErrorSeverity.ERROR if self.strict_columns else ErrorSeverity.WARNING
+        )
         for msg in visitor.errors:
             errors.append(
                 PipelineError(
                     node="logical_validator",
                     message=msg,
-                    severity=ErrorSeverity.WARNING,
+                    severity=column_severity,
                     error_code=ErrorCode.COLUMN_NOT_FOUND,
                 )
             )
@@ -360,11 +514,11 @@ class LogicalValidatorNode:
 
 
 
-    def __call__(self, state: GraphState) -> Dict[str, Any]:
+    def __call__(self, state: SubgraphExecutionState) -> Dict[str, Any]:
         """Executes the validation node.
 
         Args:
-            state (GraphState): Current execution state.
+            state (SubgraphExecutionState): Current execution state.
 
         Returns:
             Dict[str, Any]: Validation results, including errors and reasoning.
@@ -374,44 +528,71 @@ class LogicalValidatorNode:
 
         try:
             logger.debug("Logical Validator received plan:")
-            if state.plan:
-                logger.debug(state.plan.model_dump_json(indent=2))
+            plan = state.ast_planner_response.plan if state.ast_planner_response else None
+            if plan:
+                logger.debug(plan.model_dump_json(indent=2))
             else:
                 logger.warning("No plan to validate.")
 
-            if not state.plan:
+            if not plan:
                 return {
-                     "errors": [
-                         PipelineError(node=node_name, message="Missing Plan", severity=ErrorSeverity.CRITICAL, error_code=ErrorCode.MISSING_PLAN)
-                     ]
+                    "logical_validator_response": LogicalValidatorResponse(
+                        errors=[
+                            PipelineError(
+                                node=node_name,
+                                message="Missing Plan",
+                                severity=ErrorSeverity.CRITICAL,
+                                error_code=ErrorCode.MISSING_PLAN,
+                            )
+                        ],
+                        reasoning=[],
+                    ),
+                    "errors": [
+                        PipelineError(
+                            node=node_name,
+                            message="Missing Plan",
+                            severity=ErrorSeverity.CRITICAL,
+                            error_code=ErrorCode.MISSING_PLAN,
+                        )
+                    ],
                 }
 
             errors.extend(self._validate_static(state))
             errors.extend(self._validate_policy(state))
 
             if any(e.severity in (ErrorSeverity.CRITICAL, ErrorSeverity.ERROR) for e in errors):
+                response = LogicalValidatorResponse(
+                    errors=errors,
+                    reasoning=[{"node": node_name, "content": [e.message for e in errors]}],
+                )
                 return {
+                    "logical_validator_response": response,
                     "errors": errors,
-                    "reasoning": [{"node": node_name, "content": [e.message for e in errors]}],
+                    "reasoning": response.reasoning,
                 }
 
             reasoning = "Logical validation successful."
 
+            response = LogicalValidatorResponse(
+                errors=errors,
+                reasoning=[{"node": node_name, "content": reasoning}],
+            )
             return {
+                "logical_validator_response": response,
                 "errors": errors,
-                "reasoning": [{"node": node_name, "content": reasoning}],
+                "reasoning": response.reasoning,
             }
 
         except Exception as exc:
             logger.exception("Logical Validator crashed")
+            error = PipelineError(
+                node=node_name,
+                message=f"Logical Validator crashed: {exc}",
+                severity=ErrorSeverity.ERROR,
+                error_code=ErrorCode.VALIDATOR_CRASH,
+                stack_trace=traceback.format_exc(),
+            )
             return {
-                "errors": [
-                    PipelineError(
-                        node=node_name,
-                        message=f"Logical Validator crashed: {exc}",
-                        severity=ErrorSeverity.ERROR,
-                        error_code=ErrorCode.VALIDATOR_CRASH,
-                        stack_trace=traceback.format_exc(),
-                    )
-                ]
+                "logical_validator_response": LogicalValidatorResponse(errors=[error]),
+                "errors": [error],
             }

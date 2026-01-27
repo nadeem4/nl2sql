@@ -12,7 +12,7 @@ To mitigate **Logic Injection** and **Jailbreak** attacks where users trick the 
 
 ### Mechanism
 
-The `IntentValidatorNode` uses a specialized, low-temperature LLM call to classify the User Query into one of several categories:
+The intent validator uses a low-temperature LLM call to classify the user query into one of several categories:
 
 1. **SAFE**: Benign business queries (e.g., "Show me sales").
 2. **JAILBREAK**: Attempts to bypass rules (e.g., "Ignore previous instructions").

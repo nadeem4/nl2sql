@@ -55,6 +55,46 @@ Plan:
     }
   ]
 }
+
+User Query: "Total revenue by region last quarter"
+Expected Schema:
+[
+  {"name": "region", "dtype": "string"},
+  {"name": "total_revenue", "dtype": "float"}
+]
+
+Plan:
+{
+  "reasoning": "Group by region and sum revenue.",
+  "tables": [
+    {"name": "orders", "alias": "t1", "ordinal": 0}
+  ],
+  "joins": [],
+  "where": {
+    "kind": "binary",
+    "op": "=",
+    "left": {"kind": "column", "alias": "t1", "column_name": "quarter"},
+    "right": {"kind": "literal", "value": "last_quarter"}
+  },
+  "select_items": [
+    {
+      "ordinal": 0,
+      "expr": {"kind": "column", "alias": "t1", "column_name": "region"},
+      "alias": "region"
+    },
+    {
+      "ordinal": 1,
+      "expr": {"kind": "func", "func_name": "SUM", "args": [{"kind": "column", "alias": "t1", "column_name": "revenue"}], "is_aggregate": true},
+      "alias": "total_revenue"
+    }
+  ],
+  "group_by": [
+    {
+      "ordinal": 0,
+      "expr": {"kind": "column", "alias": "t1", "column_name": "region"}
+    }
+  ]
+}
 """
 
 PLANNER_PROMPT = (
@@ -68,7 +108,15 @@ PLANNER_PROMPT = (
     "3. Define joins using ONLY table aliases (left_alias/right_alias).\n"
     "4. Build Expr trees using:\n"
     "   literal | column | func | binary | unary | case\n"
-    "5. Every list MUST contain `ordinal` fields in ascending order starting at 0.\n\n"
+    "5. Every list MUST contain `ordinal` fields in ascending order starting at 0.\n"
+    "6. Order lists to match ordinals (0..N) exactly.\n\n"
+
+    "[OUTPUT CONTRACT]\n"
+    "- If [EXPECTED_SCHEMA] is provided and non-empty:\n"
+    "  - select_items length MUST equal expected_schema length.\n"
+    "  - select_items aliases MUST match expected_schema names in the same order.\n"
+    "- All table/column references MUST come from [RELEVANT_TABLES].\n"
+    "- The [EXAMPLES] are illustrative; always follow [EXPECTED_SCHEMA] when provided.\n\n"
 
     "[CONSTRAINTS]\n"
     "- STRICTLY follow PlanModel schema.\n"
@@ -78,6 +126,7 @@ PLANNER_PROMPT = (
     "- No extra keys beyond the schema.\n\n"
 
     "[RELEVANT_TABLES]\n{relevant_tables}\n\n"
+    "[EXPECTED_SCHEMA]\n{expected_schema}\n\n"
     "[SEMANTIC_CONTEXT]\n{semantic_context}\n\n"
     "[EXAMPLES]\n{examples}\n\n"
     "[FEEDBACK]\n{feedback}\n\n"

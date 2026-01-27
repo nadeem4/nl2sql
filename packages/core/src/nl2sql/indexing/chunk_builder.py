@@ -10,7 +10,7 @@ from .models import (
     TableRef,
     ColumnRef,
 )
-from nl2sql_sqlalchemy_adapter import SchemaSnapshot
+from nl2sql.schema import SchemaSnapshot
 
 
 class SchemaChunkBuilder:
@@ -95,7 +95,10 @@ class SchemaChunkBuilder:
 
         for table_key, table_contract in contract.tables.items():
             table_md = metadata.tables.get(table_key)
-            table_ref = table_contract.table
+            table_ref = TableRef(
+                schema_name=table_contract.table.schema_name,
+                table_name=table_contract.table.table_name,
+            )
 
             primary_keys = [
                 c.name for c in table_contract.columns.values() if c.is_primary_key
@@ -135,7 +138,10 @@ class SchemaChunkBuilder:
 
         for table_key, table_contract in contract.tables.items():
             table_md = metadata.tables.get(table_key)
-            table_ref = table_contract.table
+            table_ref = TableRef(
+                schema_name=table_contract.table.schema_name,
+                table_name=table_contract.table.table_name,
+            )
 
             for column_name, column_contract in table_contract.columns.items():
                 column_md = table_md.columns.get(column_name) if table_md else None
@@ -178,10 +184,16 @@ class SchemaChunkBuilder:
         contract = self.schema_snapshot.contract
 
         for table_contract in contract.tables.values():
-            from_table = table_contract.table
+            from_table = TableRef(
+                schema_name=table_contract.table.schema_name,
+                table_name=table_contract.table.table_name,
+            )
 
             for fk in table_contract.foreign_keys:
-                to_table = fk.referred_table
+                to_table = TableRef(
+                    schema_name=fk.referred_table.schema_name,
+                    table_name=fk.referred_table.table_name,
+                )
 
                 chunks.append(
                     RelationshipChunk(

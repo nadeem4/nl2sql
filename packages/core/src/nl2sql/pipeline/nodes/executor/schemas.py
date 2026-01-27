@@ -17,3 +17,9 @@ class ExecutionModel(BaseModel):
     error: Optional[str] = Field(None, description="Error message if execution failed")
 
     model_config = ConfigDict(extra="allow")
+
+
+class ExecutorResponse(BaseModel):
+    execution: Optional[ExecutionModel] = None
+    errors: List[Any] = Field(default_factory=list)
+    reasoning: List[Dict[str, Any]] = Field(default_factory=list)

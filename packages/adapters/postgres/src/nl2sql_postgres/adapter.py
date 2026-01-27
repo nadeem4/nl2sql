@@ -79,21 +79,21 @@ class PostgresAdapter(BaseSQLAlchemyAdapter):
 
     def dry_run(self, sql: str) -> DryRunResult:
         try:
-            self.execute(f"EXPLAIN {sql}")
+            self.execute_sql(f"EXPLAIN {sql}")
             return DryRunResult(is_valid=True)
         except Exception as e:
             return DryRunResult(is_valid=False, error_message=str(e))
 
     def explain(self, sql: str) -> QueryPlan:
         try:
-            res = self.execute(f"EXPLAIN (FORMAT JSON) {sql}")
+            res = self.execute_sql(f"EXPLAIN (FORMAT JSON) {sql}")
             return QueryPlan(plan_text=str(res.rows))
         except Exception:            # Fallback
             return QueryPlan(plan_text="Could not retrieve plan")
 
     def cost_estimate(self, sql: str) -> CostEstimate:
         try:
-            res = self.execute(f"EXPLAIN (FORMAT JSON) {sql}")
+            res = self.execute_sql(f"EXPLAIN (FORMAT JSON) {sql}")
             if res.rows and res.rows[0]:
                 plan_data = res.rows[0][0] # The JSON object/list
                 if isinstance(plan_data, list) and len(plan_data) > 0:
@@ -110,5 +110,6 @@ class PostgresAdapter(BaseSQLAlchemyAdapter):
         return postgresql.dialect.name
 
 
+    @property
     def exclude_schemas(self) -> set[str]:
         return {"pg_catalog", "information_schema"}

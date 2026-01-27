@@ -2,19 +2,29 @@
 import unittest
 from unittest.mock import MagicMock
 from nl2sql.pipeline.nodes.refiner.node import RefinerNode
-from nl2sql.pipeline.state import GraphState
+from nl2sql.pipeline.state import SubgraphExecutionState
+from nl2sql.pipeline.nodes.ast_planner.schemas import ASTPlannerResponse
+from nl2sql.pipeline.nodes.decomposer.schemas import SubQuery
 from nl2sql.common.errors import PipelineError, ErrorCode, ErrorSeverity
 
 class TestRefinerNode(unittest.TestCase):
     def setUp(self):
         self.mock_llm = MagicMock()
-        self.node = RefinerNode(self.mock_llm)
+        self.mock_ctx = MagicMock()
+        self.mock_ctx.llm_registry.get_llm.return_value = self.mock_llm
+        self.node = RefinerNode(self.mock_ctx)
         self.node.chain = self.mock_llm # Bypass chain for testing
 
     def test_missing_llm(self):
         """Test error when no LLM is provided."""
-        node = RefinerNode(None)
-        state = GraphState(user_query="q", errors=[])
+        mock_ctx = MagicMock()
+        mock_ctx.llm_registry.get_llm.return_value = None
+        node = RefinerNode(mock_ctx)
+        state = SubgraphExecutionState(
+            errors=[],
+            trace_id="t",
+            sub_query=SubQuery(id="sq1", datasource_id="ds1", intent="q"),
+        )
         res = node(state)
         
         self.assertEqual(len(res["errors"]), 1)
@@ -24,10 +34,11 @@ class TestRefinerNode(unittest.TestCase):
         """Test generating feedback from errors."""
         self.mock_llm.invoke.return_value = "Try using alias 'u'"
         
-        state = GraphState(
-            user_query="q",
+        state = SubgraphExecutionState(
             errors=[PipelineError(node="val", message="Unknown alias", error_code=ErrorCode.INVALID_ALIAS_USAGE, severity=ErrorSeverity.ERROR)],
-            plan={"tables": []}
+            ast_planner_response=ASTPlannerResponse(plan={"tables": []}),
+            trace_id="t",
+            sub_query=SubQuery(id="sq1", datasource_id="ds1", intent="q"),
         )
         
         res = self.node(state)
@@ -42,7 +53,11 @@ class TestRefinerNode(unittest.TestCase):
         """Test refiner works even with minimal state info."""
         self.mock_llm.invoke.return_value = "General advice"
         
-        state = GraphState(user_query="q", errors=[]) # No plan, no tables
+        state = SubgraphExecutionState(
+            errors=[],
+            trace_id="t",
+            sub_query=SubQuery(id="sq1", datasource_id="ds1", intent="q"),
+        ) # No plan, no tables
         
         res = self.node(state)
         self.assertEqual(res["errors"][0].message, "General advice")

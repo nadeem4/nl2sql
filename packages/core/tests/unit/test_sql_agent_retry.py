@@ -1,33 +1,59 @@
 
 import pytest
 from unittest.mock import MagicMock, patch, call
-from nl2sql.pipeline.state import GraphState
+
+from nl2sql.pipeline.state import SubgraphExecutionState
 from nl2sql.pipeline.subgraphs.sql_agent import build_sql_agent_graph
-from nl2sql.common.errors import ErrorCode, PipelineError, ErrorSeverity
-from nl2sql.pipeline.nodes.planner.schemas import PlanModel
+from nl2sql.common.errors import ErrorCode
+from nl2sql.pipeline.nodes.ast_planner.schemas import PlanModel, TableRef
+from nl2sql.pipeline.nodes.decomposer.schemas import SubQuery
+from nl2sql.schema import Table
+from nl2sql.auth import UserContext
 
 class TestSQLAgentRetry:
     
     @pytest.fixture
-    def mock_registry(self):
-        return MagicMock()
+    def mock_ctx(self):
+        ctx = MagicMock()
+        ctx.ds_registry = MagicMock()
+        ctx.rbac = MagicMock()
+        ctx.rbac.get_allowed_tables.return_value = ["sales_db.sales"]
+        ctx.llm_registry = MagicMock()
+        return ctx
 
     @pytest.fixture
     def mock_llm_map(self):
+        planner_llm = MagicMock()
+        planner_runner = MagicMock()
+        planner_llm.with_structured_output.return_value = planner_runner
+        refiner_llm = MagicMock()
         return {
-            "planner": MagicMock(),
-            "refiner": MagicMock()
+            "ast_planner": planner_llm,
+            "ast_planner_runner": planner_runner,
+            "refiner": refiner_llm,
         }
 
     @patch("nl2sql.pipeline.subgraphs.sql_agent.time.sleep")
     @patch("nl2sql.pipeline.subgraphs.sql_agent.random.uniform")
-    def test_retry_backoff_logic(self, mock_jitter, mock_sleep, mock_registry, mock_llm_map):
+    def test_retry_backoff_logic(self, mock_jitter, mock_sleep, mock_ctx, mock_llm_map):
         """Test that retry_node calculates sleep time correctly."""
         # Setup fixed jitter
         mock_jitter.return_value = 0.5
         
         # Build graph
-        graph = build_sql_agent_graph(mock_llm_map, mock_registry)
+        def get_llm(name):
+            if name == "ast_planner":
+                return mock_llm_map["ast_planner"]
+            if name == "refiner":
+                return mock_llm_map["refiner"]
+            return MagicMock()
+
+        mock_ctx.llm_registry.get_llm.side_effect = get_llm
+
+        # Planner fails to trigger retry
+        mock_llm_map["ast_planner_runner"].invoke.side_effect = Exception("LLM Auto Fail")
+
+        graph = build_sql_agent_graph(mock_ctx)
         
         # We want to trigger the retry_handler node.
         # Since retry_node is internal, we can't unit test it directly easily.
@@ -51,7 +77,10 @@ class TestSQLAgentRetry:
         retry_node = graph.nodes["retry_handler"]
         
         # Test Retry 0 -> 1
-        state_0 = GraphState(user_query="q", retry_count=0)
+        state_0 = SubgraphExecutionState(
+            trace_id="t",
+            sub_query=SubQuery(id="sq1", datasource_id="ds1", intent="q"),
+        )
         # The node might expect a dict or state object, LangGraph wraps it.
         # Usually checking the source, retry_node takes state and returns dict.
         # If CompiledGraph wrapping is complex, this might fail, but let's try invoking the runnable associated.
@@ -77,11 +106,13 @@ class TestSQLAgentRetry:
         
         # We want Planner to return { "errors": [RETRYABLE], "plan": None }
         # PlannerNode logic: if LLM fails, it catches exception and returns PLANNING_FAILURE (Retryable).
-        mock_llm_map["planner"].invoke.side_effect = Exception("LLM Auto Fail")
-        
         # Run graph
         # Cap max execution to avoid infinite loops if logic is broken (recursion_limit)
-        initial_state = GraphState(user_query="test", retry_count=0)
+        initial_state = SubgraphExecutionState(
+            user_context=UserContext(),
+            trace_id="t",
+            sub_query=SubQuery(id="sq1", datasource_id="ds1", intent="test"),
+        )
         
         try:
             graph.invoke(initial_state, config={"recursion_limit": 10})
@@ -112,7 +143,7 @@ class TestSQLAgentRetry:
         assert calls[2] == call(4.5)
 
     @patch("nl2sql.pipeline.subgraphs.sql_agent.time.sleep")
-    def test_fail_fast_on_fatal_error(self, mock_sleep, mock_registry, mock_llm_map):
+    def test_fail_fast_on_fatal_error(self, mock_sleep, mock_ctx, mock_llm_map):
         """Test that Fatal errors do NOT trigger retries."""
         
         # We need the Planner (or Validator) to return a FATAL error.
@@ -126,33 +157,37 @@ class TestSQLAgentRetry:
         # 1. Planner returns a valid plan (so we pass check_planner).
         mock_plan = PlanModel(query_type="READ", tables=[], select_items=[], joins=[])
         # Ensure both invoke and __call__ return the plan
-        mock_llm_map["planner"].invoke.return_value = mock_plan
-        mock_llm_map["planner"].return_value = mock_plan
+        mock_llm_map["ast_planner_runner"].invoke.return_value = mock_plan
         
         # 2. Logical Validator needs to produce SECURITY_VIOLATION.
         # LogicalValidator uses `registry`. We can't easily mock the inner LogicValidator behavior 
         # unless we give it a plan that fails policy.
         # A plan with table not in allowed_tables causes SECURITY_VIOLATION.
         
-        graph = build_sql_agent_graph(mock_llm_map, mock_registry)
-        
-        user_context = {"role": "user", "allowed_tables": ["sales"]}
+        mock_ctx.rbac.get_allowed_tables.return_value = ["sales_db.sales"]
+
+        def get_llm(name):
+            if name == "ast_planner":
+                return mock_llm_map["ast_planner"]
+            if name == "refiner":
+                return mock_llm_map["refiner"]
+            return MagicMock()
+
+        mock_ctx.llm_registry.get_llm.side_effect = get_llm
+
+        graph = build_sql_agent_graph(mock_ctx)
+
         # Plan queries "secret_table"
-        # Plan queries "secret_table"
-        from nl2sql.pipeline.nodes.planner.schemas import TableRef 
-        from nl2sql_adapter_sdk import Table, Column
-        
-        # Validation checks state.relevant_tables (SDK Table) and plan.tables (TableRef)
         bad_table_sdk = Table(name="secret_table", columns=[])
         bad_table_ref = TableRef(name="secret_table", alias="t", ordinal=0)
         
         mock_plan.tables = [bad_table_ref]
         
-        state = GraphState(
-             user_query="read secret", 
-             selected_datasource_id="ds1",
-             user_context=user_context,
-             relevant_tables=[bad_table_sdk] 
+        state = SubgraphExecutionState(
+             sub_query=SubQuery(id="sq1", datasource_id="sales_db", intent="read secret"),
+             user_context=UserContext(roles=["user"]),
+             relevant_tables=[bad_table_sdk],
+             trace_id="t",
         )
         
         res = graph.invoke(state)

@@ -1,9 +1,13 @@
-from typing import Dict
+from __future__ import annotations
 
-from nl2sql_sqlalchemy_adapter import SQLAlchemyAdapterProtocol
+from typing import Dict, TYPE_CHECKING
+
+from nl2sql.datasources.protocols import DatasourceAdapterProtocol
 from nl2sql.common.logger import get_logger
-from nl2sql.context import NL2SQLContext
 from nl2sql.indexing.chunk_builder import SchemaChunkBuilder
+
+if TYPE_CHECKING:
+    from nl2sql.context import NL2SQLContext
 
 logger = get_logger("indexing_orchestrator")
 
@@ -24,8 +28,7 @@ class IndexingOrchestrator:
             ctx: Initialized NL2SQLContext.
         """
         self.vector_store = ctx.vector_store
-        self.schema_contract_store = ctx.schema_contract_store
-        self.schema_metadata_store = ctx.schema_metadata_store
+        self.schema_store = ctx.schema_store
         self.config_manager = ctx.config_manager
 
     def clear_store(self) -> None:
@@ -36,7 +39,7 @@ class IndexingOrchestrator:
 
     def index_datasource(
         self,
-        adapter: SQLAlchemyAdapterProtocol,
+        adapter: DatasourceAdapterProtocol,
     ) -> Dict[str, int]:
         """
         Indexes schema chunks for a datasource.
@@ -49,20 +52,9 @@ class IndexingOrchestrator:
         """
         schema_snapshot = adapter.fetch_schema_snapshot()
 
-        schema_version, evicted_versions = self.schema_contract_store.register(
-            schema_snapshot.contract
+        schema_version, evicted_versions = self.schema_store.register_snapshot(
+            schema_snapshot
         )
-
-        self.schema_metadata_store.register(
-            schema_version,
-            schema_snapshot.metadata,
-        )
-
-        for evicted_version in evicted_versions:
-            self.schema_metadata_store.delete(
-                adapter.datasource_id,
-                evicted_version,
-            )
 
         questions = self.config_manager.get_example_questions(
             adapter.datasource_id

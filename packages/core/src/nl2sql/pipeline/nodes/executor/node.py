@@ -4,13 +4,14 @@ import asyncio
 from concurrent.futures import ProcessPoolExecutor
 from typing import TYPE_CHECKING, Dict, Any
 
-from nl2sql.datasources import DatasourceRegistry, QueryResult as SdkExecutionResult, DatasourceAdapter, AdapterErrors
+from nl2sql.datasources import DatasourceRegistry
 from nl2sql.datasources.discovery import discover_adapters
+from nl2sql_adapter_sdk.contracts import AdapterRequest, ResultFrame
 
 if TYPE_CHECKING:
-    from nl2sql.pipeline.state import GraphState
+    from nl2sql.pipeline.state import SubgraphExecutionState
 
-from .schemas import ExecutionModel
+from .schemas import ExecutionModel, ExecutorResponse
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.common.logger import get_logger
 from nl2sql.common.sandbox import get_execution_pool
@@ -58,22 +59,38 @@ def _execute_in_process(request: ExecutionRequest) -> ExecutionResult:
             max_bytes=max_bytes
         )
         
-        sdk_result = adapter.execute(request.sql)
-        
-        # Determine success based on adapter behavior (usually raises on error)
-        # Assuming adapter.execute returns QueryResult or raises
-        
-        rows_as_dicts = [dict(zip(sdk_result.columns, row)) for row in sdk_result.rows]
+        adapter_request = AdapterRequest(
+            plan_type="sql",
+            payload={"sql": request.sql},
+            limits=request.limits,
+        )
+        sdk_result = adapter.execute(adapter_request)
+
+        if isinstance(sdk_result, ResultFrame):
+            if not sdk_result.success:
+                err_msg = sdk_result.error.safe_message if sdk_result.error else "Adapter execution failed."
+                return ExecutionResult(success=False, error=err_msg)
+
+            rows_as_dicts = sdk_result.to_row_dicts()
+            columns = [col.name for col in sdk_result.columns]
+            row_count = sdk_result.row_count or len(rows_as_dicts)
+            bytes_returned = sdk_result.bytes or 0
+        else:
+            # Backwards compatibility: adapter returned legacy object
+            rows_as_dicts = [dict(zip(sdk_result.columns, row)) for row in sdk_result.rows]
+            columns = sdk_result.columns
+            row_count = sdk_result.row_count
+            bytes_returned = sdk_result.bytes_returned
         
         duration = (time.perf_counter() - start) * 1000
         
         return ExecutionResult(
             success=True,
             data={
-                "row_count": sdk_result.row_count,
+                "row_count": row_count,
                 "rows": rows_as_dicts,
-                "columns": sdk_result.columns,
-                "bytes_returned": sdk_result.bytes_returned
+                "columns": columns,
+                "bytes_returned": bytes_returned
             },
             metrics={"execution_time_ms": duration}
         )
@@ -98,7 +115,7 @@ class ExecutorNode:
         self.node_name = self.__class__.__name__.lower().replace('node', '')
         self.ds_registry = ctx.ds_registry
 
-    def __call__(self, state: GraphState) -> Dict[str, Any]:
+    def __call__(self, state: SubgraphExecutionState) -> Dict[str, Any]:
         """Executes the generated SQL against the selected datasource.
 
         This method validates the input state, retrieves the appropriate adapter 
@@ -107,7 +124,7 @@ class ExecutorNode:
         configured safeguards on result size.
 
         Args:
-            state (GraphState): The current state of the execution graph.
+            state (SubgraphExecutionState): The current state of the execution graph.
 
         Returns:
             Dict[str, Any]: A dictionary containing the 'execution' result,
@@ -115,8 +132,8 @@ class ExecutorNode:
         """
         try:
             errors = []
-            ds_id = state.selected_datasource_id
-            sql = state.sql_draft
+            ds_id = state.sub_query.datasource_id if state.sub_query else None
+            sql = state.generator_response.sql_draft if state.generator_response else None
 
             if not sql:
                 errors.append(PipelineError(
@@ -125,7 +142,11 @@ class ExecutorNode:
                     severity=ErrorSeverity.ERROR,
                     error_code=ErrorCode.MISSING_SQL
                 ))
-                return {"errors": errors, "execution": ExecutionModel(row_count=0, rows=[], error="No SQL to execute")}
+                response = ExecutorResponse(
+                    execution=ExecutionModel(row_count=0, rows=[], error="No SQL to execute"),
+                    errors=errors,
+                )
+                return {"executor_response": response, "errors": errors}
 
 
             if not ds_id:
@@ -135,10 +156,11 @@ class ExecutorNode:
                     severity=ErrorSeverity.ERROR,
                     error_code=ErrorCode.MISSING_DATASOURCE_ID
                 ))
-                return {
-                    "errors": errors,
-                    "execution": ExecutionModel(row_count=0, rows=[], error="Missing Datasource ID")
-                }
+                response = ExecutorResponse(
+                    execution=ExecutionModel(row_count=0, rows=[], error="Missing Datasource ID"),
+                    errors=errors,
+                )
+                return {"executor_response": response, "errors": errors}
 
             from nl2sql.common.settings import settings
             
@@ -188,15 +210,17 @@ class ExecutorNode:
             except pybreaker.CircuitBreakerError:
                 msg = "Execution unavailable (Circuit Breaker Open). The database seems to be down."
                 logger.warning(f"DB_BREAKER prevented execution for {ds_id}")
-                return {
-                        "execution": ExecutionModel(row_count=0, rows=[], error=msg),
-                        "errors": [PipelineError(
-                            node=node_name,
-                            message=msg,
-                            severity=ErrorSeverity.ERROR,
-                            error_code=ErrorCode.SERVICE_UNAVAILABLE
-                        )]
-                }
+                error = PipelineError(
+                    node=self.node_name,
+                    message=msg,
+                    severity=ErrorSeverity.ERROR,
+                    error_code=ErrorCode.SERVICE_UNAVAILABLE,
+                )
+                response = ExecutorResponse(
+                    execution=ExecutionModel(row_count=0, rows=[], error=msg),
+                    errors=[error],
+                )
+                return {"executor_response": response, "errors": [error]}
             except Exception as e:
                 # Re-construct failure result if the guard raised (and thus tripped breaker)
                 # This handles the "first" failure that trips it, or failures while closed
@@ -207,27 +231,31 @@ class ExecutorNode:
                 elif isinstance(e, TimeoutError):
                     err_code = ErrorCode.EXECUTION_TIMEOUT
 
-                return {
-                    "execution": ExecutionModel(row_count=0, rows=[], error=str(e)),
-                    "errors": [PipelineError(
-                        node=self.node_name,
-                        message=f"Execution Failed (Breaker Monitored): {e}",
-                        severity=ErrorSeverity.ERROR, 
-                        error_code=err_code
-                    )]
-                }
+                error = PipelineError(
+                    node=self.node_name,
+                    message=f"Execution Failed (Breaker Monitored): {e}",
+                    severity=ErrorSeverity.ERROR,
+                    error_code=err_code,
+                )
+                response = ExecutorResponse(
+                    execution=ExecutionModel(row_count=0, rows=[], error=str(e)),
+                    errors=[error],
+                )
+                return {"executor_response": response, "errors": [error]}
 
             if not result_contract.success:
                  # Standard logic execution error (Syntax, etc.) that didn't trip breaker
-                 return {
-                    "execution": ExecutionModel(row_count=0, rows=[], error=result_contract.error),
-                    "errors": [PipelineError(
-                        node=self.node_name,
-                        message=f"Execution error: {result_contract.error}",
-                        severity=ErrorSeverity.ERROR,
-                        error_code=ErrorCode.DB_EXECUTION_ERROR
-                    )]
-                 }
+                 error = PipelineError(
+                     node=self.node_name,
+                     message=f"Execution error: {result_contract.error}",
+                     severity=ErrorSeverity.ERROR,
+                     error_code=ErrorCode.DB_EXECUTION_ERROR,
+                 )
+                 response = ExecutorResponse(
+                     execution=ExecutionModel(row_count=0, rows=[], error=result_contract.error),
+                     errors=[error],
+                 )
+                 return {"executor_response": response, "errors": [error]}
 
             result_data = result_contract.data
             total_bytes = result_data.get("bytes_returned", 0)
@@ -236,15 +264,17 @@ class ExecutorNode:
                 err_msg = (f"Result size ({total_bytes} bytes) exceeds configured limit "
                            f"({safeguard_max_bytes} bytes). Check 'max_bytes' in datasource config.")
                 logger.error(err_msg)
-                return {
-                    "errors": [PipelineError(
-                        node=self.node_name,
-                        message=err_msg,
-                        severity=ErrorSeverity.ERROR,
-                        error_code=ErrorCode.SAFEGUARD_VIOLATION
-                    )],
-                    "execution": ExecutionModel(row_count=0, rows=[], error=err_msg)
-                }
+                error = PipelineError(
+                    node=self.node_name,
+                    message=err_msg,
+                    severity=ErrorSeverity.ERROR,
+                    error_code=ErrorCode.SAFEGUARD_VIOLATION,
+                )
+                response = ExecutorResponse(
+                    execution=ExecutionModel(row_count=0, rows=[], error=err_msg),
+                    errors=[error],
+                )
+                return {"executor_response": response, "errors": [error]}
 
             execution_result = ExecutionModel(
                 row_count=result_data["row_count"],
@@ -259,18 +289,26 @@ class ExecutorNode:
             if execution_result.error:
                 exec_msg += f" Error: {execution_result.error}"
 
+            response = ExecutorResponse(
+                execution=execution_result,
+                errors=errors,
+                reasoning=[{"node": self.node_name, "content": exec_msg}],
+            )
             return {
-                "execution": execution_result,
+                "executor_response": response,
                 "errors": errors,
-                "reasoning": [{"node": self.node_name, "content": exec_msg}]
+                "reasoning": response.reasoning,
             }
 
         except Exception as exc:
             logger.error(f"Node {self.node_name} failed: {exc}")
+            error = PipelineError(
+                node=self.node_name,
+                message=f"Executor crash: {exc}",
+                severity=ErrorSeverity.CRITICAL,
+                error_code=ErrorCode.EXECUTOR_CRASH,
+            )
             return {
-                "execution": None,
-                "errors": [PipelineError(
-                    node=self.node_name, message=f"Executor crash: {exc}",
-                    severity=ErrorSeverity.CRITICAL, error_code=ErrorCode.EXECUTOR_CRASH
-                )]
+                "executor_response": ExecutorResponse(errors=[error]),
+                "errors": [error],
             }

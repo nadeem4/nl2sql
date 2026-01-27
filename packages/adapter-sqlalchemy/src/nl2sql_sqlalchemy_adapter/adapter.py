@@ -2,13 +2,15 @@ from typing import Dict, Any, List
 from sqlalchemy import create_engine, inspect, text, Engine, select, func, table, column, case, literal_column, Connection
 from sqlalchemy.engine.reflection import Inspector
 from typing import Tuple
-from nl2sql.datasources import (
-    QueryResult, 
-    DryRunResult,
-    QueryPlan,
-    CostEstimate
+from nl2sql_adapter_sdk.capabilities import DatasourceCapability
+from nl2sql_adapter_sdk.contracts import (
+    AdapterRequest,
+    ResultColumn,
+    ResultError,
+    ResultFrame,
 )
-from .schema.models import (
+from .models import DryRunResult, QueryPlan, CostEstimate
+from nl2sql_adapter_sdk.schema import (
     SchemaContract,
     SchemaMetadata,
     TableContract,
@@ -18,7 +20,7 @@ from .schema.models import (
     TableMetadata,
     SchemaSnapshot,
     ColumnStatistics,
-    TableRef
+    TableRef,
 )
 import logging
 logger = logging.getLogger(__name__)
@@ -98,14 +100,23 @@ class BaseSQLAlchemyAdapter:
             raise
 
 
-    def execute(self, sql: str) -> QueryResult:
+    def capabilities(self) -> set[DatasourceCapability]:
+        """Default capability set for SQL adapters."""
+        return {
+            DatasourceCapability.SUPPORTS_SQL,
+            DatasourceCapability.SUPPORTS_SCHEMA_INTROSPECTION,
+            DatasourceCapability.SUPPORTS_DRY_RUN,
+            DatasourceCapability.SUPPORTS_COST_ESTIMATE,
+        }
+
+    def execute_sql(self, sql: str) -> ResultFrame:
         """Executes a SQL query against the datasource.
 
         Args:
             sql (str): The SQL query string to execute.
 
         Returns:
-            QueryResult: The results of the query execution.
+            ResultFrame: The results of the query execution.
 
         Raises:
             RuntimeError: If the adapter is not connected.
@@ -142,13 +153,48 @@ class BaseSQLAlchemyAdapter:
             avg_row_bytes = sample_bytes / sample_size
             total_bytes = int(avg_row_bytes * row_count)
 
-        return QueryResult(
-            columns=cols,
+        return ResultFrame(
+            success=True,
+            columns=[ResultColumn(name=col, type="unknown") for col in cols],
             rows=rows,
             row_count=row_count,
-            execution_time_ms=duration * 1000,
-            bytes_returned=total_bytes
+            bytes=total_bytes,
+            datasource_id=self.datasource_id,
+            execution_stats={"execution_time_ms": duration * 1000},
         )
+
+    def execute(self, request: AdapterRequest) -> ResultFrame:
+        """Executes an adapter request and returns a ResultFrame."""
+        if request.plan_type.lower() != "sql":
+            return ResultFrame(
+                success=False,
+                datasource_id=self.datasource_id,
+                error=ResultError(
+                    error_code="CAPABILITY_VIOLATION",
+                    safe_message="SQL adapter received non-SQL request.",
+                    severity="ERROR",
+                    retryable=False,
+                    stage="adapter",
+                    datasource_id=self.datasource_id,
+                ),
+            )
+
+        sql = request.payload.get("sql")
+        if not sql:
+            return ResultFrame(
+                success=False,
+                datasource_id=self.datasource_id,
+                error=ResultError(
+                    error_code="MISSING_SQL",
+                    safe_message="SQL adapter received an empty SQL payload.",
+                    severity="ERROR",
+                    retryable=False,
+                    stage="adapter",
+                    datasource_id=self.datasource_id,
+                ),
+            )
+
+        return self.execute_sql(sql)
 
 
     @property

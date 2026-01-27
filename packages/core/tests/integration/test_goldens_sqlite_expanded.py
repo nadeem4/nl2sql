@@ -146,6 +146,8 @@ GOLDENS = [
 
 from nl2sql.configs import ConfigManager
 from nl2sql.datasources import DatasourceRegistry
+from nl2sql_adapter_sdk.contracts import AdapterRequest
+from nl2sql.secrets import SecretManager
 
 @pytest.fixture(scope="session")
 def registry():
@@ -153,7 +155,9 @@ def registry():
     repo_root = ROOT.parents[1]
     config_path = repo_root / "configs" / "datasources.example.yaml"
     configs = cm.load_datasources(config_path)
-    return DatasourceRegistry(configs)
+    registry = DatasourceRegistry(SecretManager())
+    registry.register_datasources(configs)
+    return registry
 
 @pytest.fixture(scope="session")
 def adapter(registry):
@@ -162,5 +166,5 @@ def adapter(registry):
 
 @pytest.mark.parametrize("label, sql", GOLDENS)
 def test_expanded_goldens(adapter, label, sql):
-    result = adapter.execute(sql)
+    result = adapter.execute(AdapterRequest(plan_type="sql", payload={"sql": sql}))
     assert result.row_count > 0, f"No rows returned for: {label}"

@@ -10,7 +10,8 @@ from nl2sql.secrets import SecretManager
 from nl2sql.common.settings import settings
 from nl2sql.auth import RBAC
 
-from nl2sql_sqlalchemy_adapter import SchemaContractStore, SchemaMetadataStore
+from nl2sql.schema import build_schema_store
+from nl2sql.common.result_store import ResultStore
 
 class NL2SQLContext:
     """
@@ -39,6 +40,7 @@ class NL2SQLContext:
         policies_config_path = policies_config_path or pathlib.Path(settings.policies_config_path)
 
         cm = ConfigManager()
+        self.config_manager = cm
 
         secret_configs = cm.load_secrets(secrets_config_path)
         secret_manager = SecretManager()
@@ -60,7 +62,10 @@ class NL2SQLContext:
         self.rbac = RBAC(self.policies_cfg.roles)
 
         self.vector_store = VectorStore(persist_directory=vector_store_path)
-        self.schema_contract_store = SchemaContractStore()
-        self.schema_metadata_store = SchemaMetadataStore()
+        self.schema_store = build_schema_store(
+            settings.schema_store_backend,
+            settings.schema_store_max_versions,
+        )
+        self.result_store = ResultStore()
 
        

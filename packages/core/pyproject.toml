@@ -13,6 +13,7 @@ dependencies = [
     "langgraph>=0.0.29",
     "langchain>=0.2.0",
     "langchain-openai>=0.1.0",
+    "nl2sql-adapter-sdk",
     "pydantic>=1.10",
     "opentelemetry-api>=1.20.0",
     "opentelemetry-sdk>=1.20.0",

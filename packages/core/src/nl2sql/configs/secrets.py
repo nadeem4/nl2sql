@@ -1,5 +1,7 @@
 
 from typing import List
+
+from pydantic import BaseModel, Field
 from nl2sql.secrets.models import SecretProviderConfig
 
 class SecretsFileConfig(BaseModel):

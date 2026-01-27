@@ -2,7 +2,6 @@ from typing import Any, List, Dict
 from sqlalchemy import create_engine, text, inspect
 from sqlalchemy.dialects import sqlite
 from nl2sql_sqlalchemy_adapter import (
-    QueryResult, 
     CostEstimate,
     DryRunResult,
     QueryPlan,
@@ -84,5 +83,6 @@ class SqliteAdapter(BaseSQLAlchemyAdapter):
     def get_dialect(self) -> str:
         return sqlite.dialect.name
 
+    @property
     def exclude_schemas(self) -> set[str]:
         return set()

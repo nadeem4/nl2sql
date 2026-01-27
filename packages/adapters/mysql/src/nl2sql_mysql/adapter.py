@@ -2,7 +2,6 @@ from typing import Any, List, Dict
 from sqlalchemy import create_engine, text, inspect
 from sqlalchemy.dialects import mysql
 from nl2sql_sqlalchemy_adapter import (
-    QueryResult, 
     CostEstimate,
     DryRunResult,
     QueryPlan,
@@ -119,5 +118,6 @@ class MysqlAdapter(BaseSQLAlchemyAdapter):
         return mysql.dialect.name
 
 
+    @property
     def exclude_schemas(self) -> set[str]:
         return {"mysql", "INFORMATION_SCHEMA", "performance_schema", "sys"}

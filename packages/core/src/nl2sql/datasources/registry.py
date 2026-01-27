@@ -1,6 +1,8 @@
-from typing import Dict, Type, List, Any
-from nl2sql_sqlalchemy_adapter import SQLAlchemyAdapterProtocol
+from typing import Dict, List, Any, Set
+
+from nl2sql_adapter_sdk.capabilities import DatasourceCapability
 from nl2sql.datasources.discovery import discover_adapters
+from nl2sql.datasources.protocols import DatasourceAdapterProtocol
 from nl2sql.secrets import SecretManager
 from .models import DatasourceConfig, ConnectionConfig
 
@@ -12,7 +14,8 @@ class DatasourceRegistry:
 
     def __init__(self, secret_manager: SecretManager):
         """Initializes the registry by eagerly creating adapters for all configs."""
-        self._adapters: Dict[str, SQLAlchemyAdapterProtocol] = {}
+        self._adapters: Dict[str, DatasourceAdapterProtocol] = {}
+        self._capabilities: Dict[str, Set[str]] = {}
         self._available_adapters = discover_adapters()
         self._secret_manager = secret_manager
 
@@ -55,14 +58,25 @@ class DatasourceRegistry:
             except Exception as e:
                 raise ValueError(f"Failed to initialize adapter for '{config.id}': {e}") from e
 
-    def register_datasource(self, config: DatasourceConfig) -> SQLAlchemyAdapterProtocol:
+    def _normalize_capabilities(self, caps: Any) -> Set[str]:
+        if not caps:
+            return set()
+        normalized = set()
+        for cap in caps:
+            if isinstance(cap, DatasourceCapability):
+                normalized.add(cap.value)
+            else:
+                normalized.add(str(cap))
+        return normalized
+
+    def register_datasource(self, config: DatasourceConfig) -> DatasourceAdapterProtocol:
         """Registers a new datasource dynamically.
 
         Args:
             config: The datasource configuration dictionary or object.
 
         Returns:
-            DatasourceAdapter: The created and registered adapter.
+            DatasourceAdapterProtocol: The created and registered adapter.
 
         Raises:
             ValueError: If configuration is invalid or adapter type is unknown.
@@ -74,6 +88,7 @@ class DatasourceRegistry:
         connection = config.connection
         conn_type = connection.type.lower()
         resolved_connection = self.resolved_connection(connection)
+        connection_args = resolved_connection.model_dump()
 
         if conn_type in self._available_adapters:
             adapter_cls = self._available_adapters[conn_type]
@@ -81,12 +96,16 @@ class DatasourceRegistry:
             adapter = adapter_cls(
                 datasource_id=ds_id,
                 datasource_engine_type=conn_type,
-                connection_args=resolved_connection,
+                connection_args=connection_args,
                 statement_timeout_ms=config.options.get("statement_timeout_ms"),
                 row_limit=config.options.get("row_limit"),
                 max_bytes=config.options.get("max_bytes"),
             )
             self._adapters[ds_id] = adapter
+            if hasattr(adapter, "capabilities"):
+                self._capabilities[ds_id] = self._normalize_capabilities(adapter.capabilities())
+            else:
+                self._capabilities[ds_id] = {DatasourceCapability.SUPPORTS_SQL.value}
             return adapter
         else:
             raise ValueError(
@@ -112,14 +131,14 @@ class DatasourceRegistry:
         adapter = self.get_adapter(datasource_id)
         return vector_store.refresh_schema(adapter, datasource_id)
 
-    def get_adapter(self, datasource_id: str) -> SQLAlchemyAdapterProtocol:
-        """Retrieves the SQLAlchemyAdapterProtocol for a datasource.
+    def get_adapter(self, datasource_id: str) -> DatasourceAdapterProtocol:
+        """Retrieves the adapter for a datasource.
 
         Args:
             datasource_id: The ID of the datasource.
 
         Returns:
-            SQLAlchemyAdapterProtocol: The active adapter instance.
+            DatasourceAdapterProtocol: The active adapter instance.
 
         Raises:
             ValueError: If the datasource ID is unknown.
@@ -139,11 +158,17 @@ class DatasourceRegistry:
         """
         return self.get_adapter(datasource_id).get_dialect()
 
-    def list_adapters(self) -> List[SQLAlchemyAdapterProtocol]:
+    def get_capabilities(self, datasource_id: str) -> Set[str]:
+        """Returns the capability flags for a datasource."""
+        if datasource_id not in self._capabilities:
+            raise ValueError(f"Unknown datasource ID: {datasource_id}")
+        return self._capabilities[datasource_id]
+
+    def list_adapters(self) -> List[DatasourceAdapterProtocol]:
         """Returns a list of all registered adapters.
 
         Returns:
-            List[SQLAlchemyAdapterProtocol]: All active adapters.
+            List[DatasourceAdapterProtocol]: All active adapters.
         """
         return list(self._adapters.values())
 

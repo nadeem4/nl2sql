@@ -1,26 +1,14 @@
 from __future__ import annotations
-from typing import List, Literal, Union, Optional
+from typing import List, Literal, Optional, Dict, Any
 from pydantic import BaseModel, Field, model_validator
 
-# -----------------------------
-# JSON-safe literal definition
-# -----------------------------
 
-JsonLiteral = Union[str, int, float, bool, None]
+JsonLiteral = str | int | float | bool | None
 
-# -----------------------------
-# Core relation + schema types
-# -----------------------------
-
-class RelationRef(BaseModel):
-    id: str = Field(description="SubQuery.id or PlanStep.id")
-    source: Literal["subquery", "step"]
 
 class ColumnSpec(BaseModel):
     name: str
     dtype: Optional[str] = None
-    nullable: bool = True
-    description: Optional[str] = None
 
 class RelationSchema(BaseModel):
     columns: List[ColumnSpec]
@@ -32,124 +20,82 @@ class RelationSchema(BaseModel):
             raise ValueError(f"Duplicate columns in schema: {names}")
         return self
 
-# -----------------------------
-# Typed expressions (NO SQL)
-# -----------------------------
-
-class Expr(BaseModel):
-    pass
-
-class Col(Expr):
-    type: Literal["col"] = "col"
-    name: str
-
-class Lit(Expr):
-    type: Literal["lit"] = "lit"
-    value: JsonLiteral
-
-class BinOp(Expr):
-    type: Literal["binop"] = "binop"
-    op: Literal["=", "!=", ">", ">=", "<", "<=", "and", "or"]
-    left: Expr
-    right: Expr
-
-class AggSpec(BaseModel):
-    func: Literal["count", "sum", "avg", "min", "max"]
-    expr: Expr
-    distinct: bool = False
-    as_name: str
-
-class SortSpec(BaseModel):
-    expr: Expr
-    direction: Literal["asc", "desc"] = "asc"
-    nulls: Literal["first", "last"] = "last"
-
-# -----------------------------
-# Relational operations
-# -----------------------------
-
-class Operation(BaseModel):
-    op: str
-
-class ProjectOp(Operation):
-    op: Literal["project"] = "project"
-    input: RelationRef
-    exprs: List[Expr]
-    aliases: List[str]
-
-class FilterOp(Operation):
-    op: Literal["filter"] = "filter"
-    input: RelationRef
-    predicate: Expr
-
-class JoinOp(Operation):
-    op: Literal["join"] = "join"
-    left: RelationRef
-    right: RelationRef
-    join_type: Literal["inner", "left", "right", "full"] = "inner"
-    on: List[BinOp]
-    suffixes: List[str] = ["_l", "_r"]
-
-class UnionOp(Operation):
-    op: Literal["union"] = "union"
-    inputs: List[RelationRef]
-    mode: Literal["all", "distinct"] = "all"
-
-class GroupAggOp(Operation):
-    op: Literal["group_agg"] = "group_agg"
-    input: RelationRef
-    keys: List[Expr]
-    aggs: List[AggSpec]
-
-class OrderLimitOp(Operation):
-    op: Literal["order_limit"] = "order_limit"
-    input: RelationRef
-    order_by: List[SortSpec]
-    limit: Optional[int] = None
-    offset: Optional[int] = None
-
-OpT = Union[
-    ProjectOp,
-    FilterOp,
-    JoinOp,
-    UnionOp,
-    GroupAggOp,
-    OrderLimitOp,
-]
-
-# -----------------------------
-# Plan steps + plan
-# -----------------------------
-
-class PlanStep(BaseModel):
-    step_id: str
-    operation: OpT = Field(discriminator="op")
+class LogicalNode(BaseModel):
+    node_id: str
+    kind: Literal[
+        "scan",
+        "combine",
+        "post_filter",
+        "post_aggregate",
+        "post_project",
+        "post_sort",
+        "post_limit",
+    ]
+    inputs: List[str] = Field(default_factory=list)
     output_schema: RelationSchema
-    description: Optional[str] = None
+    attributes: Dict[str, Any] = Field(default_factory=dict)
 
-class ResultPlan(BaseModel):
-    plan_id: str
-    steps: List[PlanStep]
-    final_output: RelationRef
+
+class LogicalEdge(BaseModel):
+    edge_id: str
+    from_id: str
+    to_id: str
+    role: Optional[str] = None
+
+
+class ExecutionDAG(BaseModel):
+    dag_id: Optional[str] = None
+    content_hash: Optional[str] = None
+    nodes: List[LogicalNode]
+    edges: List[LogicalEdge]
+    layers: List[List[str]] = Field(default_factory=list)
+    version: str = "v1"
 
     @model_validator(mode="after")
-    def validate_references(self):
-        step_ids = {s.step_id for s in self.steps}
-
-        def check_ref(r: RelationRef):
-            if r.source == "step" and r.id not in step_ids:
-                raise ValueError(f"Unknown step reference: {r.id}")
-
-        for s in self.steps:
-            op = s.operation
-            if hasattr(op, "input"):
-                check_ref(op.input)
-            if hasattr(op, "left"):
-                check_ref(op.left)
-                check_ref(op.right)
-            if hasattr(op, "inputs"):
-                for r in op.inputs:
-                    check_ref(r)
-
-        check_ref(self.final_output)
+    def populate_layers(self):
+        if not self.layers and self.nodes:
+            self.layers = self._layered_toposort(self.nodes, self.edges)
         return self
+
+    @staticmethod
+    def _layered_toposort(
+        nodes: List[LogicalNode],
+        edges: List[LogicalEdge],
+    ) -> List[List[str]]:
+        node_ids = {n.node_id for n in nodes}
+        indegree: Dict[str, int] = {n.node_id: 0 for n in nodes}
+        dependents: Dict[str, List[str]] = {n.node_id: [] for n in nodes}
+
+        for edge in edges:
+            if edge.from_id not in node_ids or edge.to_id not in node_ids:
+                continue
+            indegree[edge.to_id] += 1
+            dependents[edge.from_id].append(edge.to_id)
+
+        layers: List[List[str]] = []
+        ready = sorted([n_id for n_id, deg in indegree.items() if deg == 0])
+        processed = 0
+
+        while ready:
+            current_layer = ready
+            layers.append(current_layer)
+            processed += len(current_layer)
+
+            next_ready: List[str] = []
+            for node_id in current_layer:
+                for child in sorted(dependents.get(node_id, [])):
+                    indegree[child] -= 1
+                    if indegree[child] == 0:
+                        next_ready.append(child)
+            ready = sorted(set(next_ready))
+
+        if processed != len(nodes):
+            raise ValueError("ExecutionDAG contains a cycle; layered topo sort failed.")
+
+        return layers
+
+
+class GlobalPlannerResponse(BaseModel):
+    execution_dag: Optional[ExecutionDAG] = None
+
+

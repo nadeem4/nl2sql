@@ -2,11 +2,13 @@
 import pytest
 from unittest.mock import MagicMock
 from pydantic import ValidationError
-from nl2sql.pipeline.nodes.planner.schemas import Expr, CaseWhen, PlanModel
-from nl2sql.pipeline.nodes.planner.node import PlannerNode
-from nl2sql.pipeline.state import GraphState
+
+from nl2sql.pipeline.nodes.ast_planner.schemas import Expr, CaseWhen, PlanModel
+from nl2sql.pipeline.nodes.decomposer.schemas import SubQuery
+from nl2sql.pipeline.nodes.ast_planner.node import ASTPlannerNode
+from nl2sql.pipeline.state import SubgraphExecutionState
 from nl2sql.common.errors import ErrorCode
-from nl2sql_adapter_sdk import Table, Column
+from nl2sql.schema import Table, Column
 
 # --- Schema Validation Tests (Preserved) ---
 
@@ -45,31 +47,36 @@ def test_case_when_validation():
 
 class TestPlannerNodeLogic:
     @pytest.fixture
-    def mock_registry(self):
-        return MagicMock()
-
-    @pytest.fixture
     def mock_llm(self):
         return MagicMock()
 
     @pytest.fixture
+    def mock_ctx(self, mock_llm):
+        ctx = MagicMock()
+        ctx.llm_registry.get_llm.return_value = mock_llm
+        return ctx
+
+    @pytest.fixture
     def basic_state(self):
-        return GraphState(
-            user_query="Show users",
-            relevant_tables=[Table(name="users", columns=[Column(name="id", type="int")])]
+        return SubgraphExecutionState(
+            sub_query=SubQuery(id="sq1", datasource_id="ds1", intent="Show users"),
+            relevant_tables=[Table(name="users", columns=[Column(name="id", type="int")])],
+            trace_id="t",
         )
 
-    def test_missing_llm_error(self, mock_registry, basic_state):
-        """Test error when no LLM is provided."""
-        node = PlannerNode(registry=mock_registry, llm=None)
+    def test_planner_failure(self, mock_ctx, basic_state):
+        """Test error when planning fails."""
+        node = ASTPlannerNode(ctx=mock_ctx)
+        node.chain = MagicMock()
+        node.chain.invoke.side_effect = RuntimeError("Missing LLM")
         res = node(basic_state)
-        
-        assert len(res["errors"]) == 1
-        assert res["errors"][0].error_code == ErrorCode.MISSING_LLM
 
-    def test_successful_planning(self, mock_registry, mock_llm, basic_state):
+        assert len(res["errors"]) == 1
+        assert res["errors"][0].error_code == ErrorCode.PLANNING_FAILURE
+
+    def test_successful_planning(self, mock_ctx, mock_llm, basic_state):
         """Test successful plan generation."""
-        node = PlannerNode(registry=mock_registry, llm=mock_llm)
+        node = ASTPlannerNode(ctx=mock_ctx)
         
         # Mock LLM Response
         mock_plan = PlanModel(
@@ -83,7 +90,7 @@ class TestPlannerNodeLogic:
         
         res = node(basic_state)
         
-        assert res["plan"] == mock_plan
+        assert res["ast_planner_response"].plan == mock_plan
         assert not res["errors"]
         assert "Simple plan" in res["reasoning"][0]["content"][0]
         
@@ -94,15 +101,15 @@ class TestPlannerNodeLogic:
         assert "relevant_tables" in context
         assert "users" in context["relevant_tables"]
 
-    def test_planner_exception_handling(self, mock_registry, mock_llm, basic_state):
+    def test_planner_exception_handling(self, mock_ctx, mock_llm, basic_state):
         """Test handling of unexpected exceptions."""
-        node = PlannerNode(registry=mock_registry, llm=mock_llm)
+        node = ASTPlannerNode(ctx=mock_ctx)
         node.chain = MagicMock()
         node.chain.invoke.side_effect = RuntimeError("LLM Crash")
         
         res = node(basic_state)
         
-        assert res["plan"] is None
+        assert res["ast_planner_response"].plan is None
         assert len(res["errors"]) == 1
         assert res["errors"][0].error_code == ErrorCode.PLANNING_FAILURE
         assert "LLM Crash" in res["errors"][0].stack_trace

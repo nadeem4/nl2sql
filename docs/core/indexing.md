@@ -23,7 +23,7 @@ Routing examples are indexed to help the model distinguish between similar datas
 
 * **Source**: Loaded from `configs/sample_questions.yaml`.
 * **Enrichment (Semantic Variants)**:
-    The `SemanticAnalysisNode` is used to generate variants for each example to maximize retrieval surface area.
+    Query variants are generated for each example to maximize retrieval surface area.
     1. **Original**: "Show me my orders"
     2. **Canonical**: "select orders from sales_db" (Hypothetical SQL-like intent)
     3. **Meta-Text**: "purchases transactions history active items" (Keywords & Synonyms)

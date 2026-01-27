@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import List, Dict, Optional, Literal
+from typing import List, Dict, Optional, Literal, Any
 from pydantic import BaseModel, Field
 
 
@@ -37,6 +37,10 @@ class ColumnRef(BaseModel):
     @property
     def full_name(self) -> str:
         return f"{self.schema_name}.{self.table_name}.{self.column_name}"
+
+    @property
+    def table_full_name(self) -> str:
+        return f"{self.schema_name}.{self.table_name}"
 
 
 class DatasourceChunk(BaseChunk):
@@ -130,6 +134,7 @@ class ColumnChunk(BaseChunk):
             **super().get_metadata(),
             "datasource_id": self.datasource_id,
             "column": self.column.full_name,
+            "table": self.column.table_full_name,
             "dtype": self.dtype,
             "pii": self.pii,
             "schema_version": self.schema_version,
@@ -171,6 +176,9 @@ class RelationshipChunk(BaseChunk):
             "datasource_id": self.datasource_id,
             "from_table": self.from_table.full_name,
             "to_table": self.to_table.full_name,
+            "table": self.from_table.full_name,
+            "from_columns": self.from_columns or [],
+            "to_columns": self.to_columns or [],
             "cardinality": self.cardinality,
             "schema_version": self.schema_version,
         }
