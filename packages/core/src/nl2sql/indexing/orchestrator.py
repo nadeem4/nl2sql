@@ -5,6 +5,7 @@ from typing import Dict, TYPE_CHECKING
 from nl2sql.datasources.protocols import DatasourceAdapterProtocol
 from nl2sql.common.logger import get_logger
 from nl2sql.indexing.chunk_builder import SchemaChunkBuilder
+from nl2sql.indexing.enrichment_service import enrich_schema_snapshot
 
 if TYPE_CHECKING:
     from nl2sql.context import NL2SQLContext
@@ -30,6 +31,7 @@ class IndexingOrchestrator:
         self.vector_store = ctx.vector_store
         self.schema_store = ctx.schema_store
         self.config_manager = ctx.config_manager
+        self.llm_registry = ctx.llm_registry
 
     def clear_store(self) -> None:
         """
@@ -52,12 +54,21 @@ class IndexingOrchestrator:
         """
         schema_snapshot = adapter.fetch_schema_snapshot()
 
-        schema_version, evicted_versions = self.schema_store.register_snapshot(
-            schema_snapshot
+        questions = self.config_manager.get_example_questions(adapter.datasource_id)
+        datasource_description = self.config_manager.get_datasource_description(
+            adapter.datasource_id
         )
 
-        questions = self.config_manager.get_example_questions(
-            adapter.datasource_id
+        llm = self.llm_registry.get_llm("indexing_enrichment")
+        schema_snapshot, questions = enrich_schema_snapshot(
+            snapshot=schema_snapshot,
+            llm=llm,
+            datasource_description=datasource_description,
+            existing_questions=questions,
+        )
+
+        schema_version, evicted_versions = self.schema_store.register_snapshot(
+            schema_snapshot
         )
 
         chunk_builder = SchemaChunkBuilder(

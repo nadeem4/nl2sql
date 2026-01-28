@@ -81,6 +81,7 @@ class TableChunk(BaseChunk):
     table: TableRef
     description: Optional[str] = None
     primary_key: List[str] = Field(default_factory=list)
+    columns: List[str] = Field(default_factory=list)
     foreign_keys: List[str] = Field(
         default_factory=list,
         description="Human-readable FK summaries (retrieval only)"
@@ -90,10 +91,12 @@ class TableChunk(BaseChunk):
 
     def get_page_content(self) -> str:
         pk = ", ".join(self.primary_key) if self.primary_key else "None"
+        column_list = ", ".join(self.columns) if self.columns else "None"
         return (
             f"Table: {self.table.full_name}\n"
             f"{self.description or ''}\n"
-            f"Primary Key: {pk}"
+            f"Primary Key: {pk}\n"
+            f"Columns: {column_list}"
         )
 
     def get_metadata(self) -> Dict[str, Any]:
@@ -122,11 +125,17 @@ class ColumnChunk(BaseChunk):
 
     def get_page_content(self) -> str:
         stats = f"Stats: {self.column_stats}" if self.column_stats else ""
+        synonyms = (
+            f"Synonyms: {', '.join(self.synonyms)}"
+            if self.synonyms
+            else ""
+        )
         return (
             f"Column: {self.column.full_name}\n"
             f"Type: {self.dtype}\n"
             f"{self.description or ''}\n"
-            f"{stats}"
+            f"{stats}\n"
+            f"{synonyms}"
         )
 
     def get_metadata(self) -> Dict[str, Any]:

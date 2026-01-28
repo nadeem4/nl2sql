@@ -168,6 +168,17 @@ class ConfigManager:
         except FileNotFoundError:
             return []
 
+    def get_datasource_description(self, datasource_id: str) -> Optional[str]:
+        """Returns the configured datasource description if available."""
+        try:
+            datasources = self.load_datasources()
+        except FileNotFoundError:
+            return None
+        for ds in datasources:
+            if ds.id == datasource_id:
+                return ds.description
+        return None
+
 
 
 

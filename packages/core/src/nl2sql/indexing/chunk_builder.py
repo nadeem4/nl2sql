@@ -104,6 +104,8 @@ class SchemaChunkBuilder:
                 c.name for c in table_contract.columns.values() if c.is_primary_key
             ]
 
+            column_names = sorted(table_contract.columns.keys())
+
             foreign_keys = [
                 f"{table_ref.full_name} -> {fk.referred_table.full_name}"
                 for fk in table_contract.foreign_keys
@@ -116,6 +118,7 @@ class SchemaChunkBuilder:
                     table=table_ref,
                     description=table_md.description if table_md else None,
                     primary_key=primary_keys,
+                        columns=column_names,
                     foreign_keys=foreign_keys,
                     row_count=table_md.row_count if table_md else None,
                     schema_version=self.schema_version,

@@ -74,6 +74,18 @@ class SchemaRetrieverNode:
                     if table_full and table_full not in table_full_names:
                         table_full_names.append(table_full)
 
+            if self.vector_store and not table_full_names:
+                column_docs = self.vector_store.retrieve_column_candidates(
+                    query, datasource_id, k=8
+                )
+                for doc in column_docs:
+                    table_full = doc.metadata.get("table")
+                    column_full = doc.metadata.get("column")
+                    if not table_full and column_full:
+                        table_full, _ = self._column_parts(column_full)
+                    if table_full and table_full not in table_full_names:
+                        table_full_names.append(table_full)
+
             table_full_set = set(table_full_names)
             planning_docs = []
             if self.vector_store and table_full_names:

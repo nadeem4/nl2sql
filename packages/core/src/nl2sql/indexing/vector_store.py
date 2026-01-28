@@ -233,6 +233,40 @@ class VectorStore:
 
         return _execute()
 
+    def retrieve_column_candidates(
+        self,
+        query: str,
+        datasource_id: str,
+        k: int = 8,
+    ) -> List[Document]:
+        """
+        Retrieves candidate column documents for a datasource.
+
+        Args:
+            query: User query.
+            datasource_id: Selected datasource identifier.
+            k: Number of column documents to retrieve.
+
+        Returns:
+            Retrieved column documents.
+        """
+        from nl2sql.common.resilience import VECTOR_BREAKER
+
+        @VECTOR_BREAKER
+        def _execute():
+            return self.vectorstore.max_marginal_relevance_search(
+                query,
+                k=k,
+                fetch_k=k * 4,
+                lambda_mult=0.7,
+                filter={
+                    "datasource_id": datasource_id,
+                    "type": "schema.column",
+                },
+            )
+
+        return _execute()
+
     def retrieve_planning_context(
         self,
         query: str,
