@@ -23,6 +23,6 @@ class AggregatedResponse(BaseModel):
 
 class AggregatorResponse(BaseModel):
     terminal_results: Dict[str, List[Dict[str, Any]]] = Field(default_factory=dict)
-    computed_refs: Dict[str, str] = Field(default_factory=dict)
+    computed_artifacts: Dict[str, Any] = Field(default_factory=dict)
     errors: List[Any] = Field(default_factory=list)
     reasoning: List[Dict[str, Any]] = Field(default_factory=list)

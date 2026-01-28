@@ -22,6 +22,11 @@ dependencies = [
     "pydantic-settings>=2.0.0",
     "pandas>=1.5.0", # For metrics/evals
     "pybreaker>=1.3.0", # Circuit breaker pattern (ENH-002)
+    "pyarrow",
+    "boto3",
+    "azure-storage-blob",
+    "polars",
+    "duckdb",
 ]
 
 [project.optional-dependencies]

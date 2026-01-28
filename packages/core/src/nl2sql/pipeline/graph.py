@@ -21,12 +21,12 @@ from nl2sql.common.logger import trace_context, tenant_context
 from nl2sql.context import NL2SQLContext
 from nl2sql.pipeline.subgraphs import build_subgraph_registry, SubgraphOutput
 from nl2sql.pipeline.nodes.datasource_resolver.schemas import DatasourceResolverResponse, ResolvedDatasource
-from nl2sql_adapter_sdk.contracts import ResultFrame, ResultError
+
 
 
 def _next_scan_layer_ids(
     dag: "ExecutionDAG",
-    results: Dict[str, str],
+    artifact_refs: Dict[str, Any],
 ) -> List[str]:
     node_index = {n.node_id: n for n in dag.nodes}
     for layer in dag.layers or []:
@@ -35,7 +35,7 @@ def _next_scan_layer_ids(
             for node_id in layer
             if node_id in node_index
             and node_index[node_id].kind == "scan"
-            and node_id not in results
+            and node_id not in artifact_refs
         ]
         if pending_scan:
             return pending_scan
@@ -70,42 +70,24 @@ def build_graph(
         name: spec.builder(ctx) for name, spec in subgraph_specs.items()
     }
     
-    def _execution_to_result_frame(
-        execution: Any,
-        datasource_id: Optional[str],
-    ) -> ResultFrame:
-        rows = execution.get("rows", []) if isinstance(execution, dict) else getattr(execution, "rows", [])
-        columns = execution.get("columns", []) if isinstance(execution, dict) else getattr(execution, "columns", [])
-        row_count = execution.get("row_count") if isinstance(execution, dict) else getattr(execution, "row_count", None)
-        error_msg = execution.get("error") if isinstance(execution, dict) else getattr(execution, "error", None)
-
-        result_error = None
-        if error_msg:
-            result_error = ResultError(
-                error_code=ErrorCode.DB_EXECUTION_ERROR.value,
-                safe_message=str(error_msg),
-                severity=ErrorSeverity.ERROR.value,
-                retryable=False,
-                stage="executor",
-                datasource_id=datasource_id,
-            )
-
-        return ResultFrame.from_row_dicts(
-            rows,
-            columns=columns,
-            row_count=row_count,
-            success=error_msg is None,
-            datasource_id=datasource_id,
-            error=result_error,
-        )
-
     def _wrap_subgraph(subgraph, subgraph_name: str):
+        def _get_state_value(state_obj, key: str, default=None):
+            if isinstance(state_obj, dict):
+                return state_obj.get(key, default)
+            return getattr(state_obj, key, default)
+
         def _wrapper(state: GraphState):
-            subgraph_id = state.subgraph_id or f"{subgraph_name}:unknown:{state.trace_id}"
+            trace_id = _get_state_value(state, "trace_id")
+            subgraph_id = _get_state_value(state, "subgraph_id") or f"{subgraph_name}:unknown:{trace_id}"
+            if not trace_id and subgraph_id and ":" in subgraph_id:
+                parts = subgraph_id.split(":")
+                if len(parts) >= 3:
+                    trace_id = parts[2]
+            trace_id = trace_id or "unknown"
             sub_query_id = subgraph_id.split(":")[1] if ":" in subgraph_id else None
             selected_datasource_id = None
             sub_query = None
-            decomposer_response = state.decomposer_response
+            decomposer_response = _get_state_value(state, "decomposer_response")
             for sq in (decomposer_response.sub_queries if decomposer_response else []):
                 if sq.id == sub_query_id:
                     sub_query = sq
@@ -113,8 +95,8 @@ def build_graph(
                     break
 
             sub_state = SubgraphExecutionState(
-                trace_id=state.trace_id,
-                user_context=state.user_context,
+                trace_id=trace_id,
+                user_context=_get_state_value(state, "user_context"),
                 sub_query=sub_query,
                 subgraph_id=subgraph_id,
                 subgraph_name=subgraph_name,
@@ -134,7 +116,6 @@ def build_graph(
             generator_response = result.get("generator_response")
             planner_response = result.get("ast_planner_response")
 
-            execution = _get_response_value(executor_response, "execution") or result.get("result_frame")
             sq_id = result.get("sub_query_id") or (sub_query.id if sub_query else None) or sub_query_id or "unknown"
             sub_reasoning = result.get("reasoning", [])
             datasource_id = result.get("selected_datasource_id") or selected_datasource_id
@@ -142,7 +123,7 @@ def build_graph(
                 datasource_id = sub_query.datasource_id
 
             schema_version = None
-            resolver_response = state.datasource_resolver_response
+            resolver_response = _get_state_value(state, "datasource_resolver_response")
             if resolver_response:
                 for entry in resolver_response.resolved_datasources:
                     entry_id = getattr(entry, "datasource_id", None)
@@ -155,27 +136,11 @@ def build_graph(
                             schema_version = entry.get("schema_version")
                         break
 
-            if isinstance(execution, ResultFrame):
-                result_frame = execution
-            else:
-                result_frame = _execution_to_result_frame(execution, datasource_id) if execution else None
-
-            results = {}
-            if result_frame:
-                result_id = ctx.result_store.put(
-                    result_frame,
-                    metadata={
-                        "node_id": sq_id,
-                        "dag_id": getattr(
-                            getattr(state.global_planner_response, "execution_dag", None),
-                            "dag_id",
-                            None,
-                        ),
-                        "datasource_id": datasource_id,
-                        "trace_id": state.trace_id,
-                    },
-                )
-                results[sq_id] = result_id
+            artifact_refs = {}
+            artifact = _get_response_value(executor_response, "artifact")
+            if artifact:
+                ctx.execution_store.put(sq_id, artifact)
+                artifact_refs[sq_id] = artifact
 
             retry_count = result.get("retry_count", 0)
             status = "error" if result.get("errors") else "success"
@@ -188,14 +153,14 @@ def build_graph(
                 retry_count=retry_count,
                 plan=_get_response_value(planner_response, "plan"),
                 sql_draft=_get_response_value(generator_response, "sql_draft"),
-                execution=result_frame,
+                artifact=artifact,
                 errors=result.get("errors", []),
                 reasoning=sub_reasoning,
                 status=status,
             )
 
             return {
-                "results": results,
+                "artifact_refs": artifact_refs,
                 "subgraph_outputs": {subgraph_id: subgraph_output},
                 "errors": result.get("errors", []),
                 "reasoning": sub_reasoning
@@ -251,16 +216,16 @@ def build_graph(
         decomposer_response = state.decomposer_response
         sub_queries = decomposer_response.sub_queries if decomposer_response else []
         sub_query_map = {sq.id: sq for sq in sub_queries}
-        results = state.results or {}
+        artifact_refs = state.artifact_refs or {}
 
         if not dag or not dag.layers:
-            pending_ids = [sq.id for sq in sub_queries if sq.id not in results]
+            pending_ids = [sq.id for sq in sub_queries if sq.id not in artifact_refs]
             if not pending_ids:
                 return [Send("aggregator", {})]
             target_ids = pending_ids
         else:
             node_index = {n.node_id: n for n in dag.nodes}
-            target_ids = _next_scan_layer_ids(dag, results)
+            target_ids = _next_scan_layer_ids(dag, artifact_refs)
             if not target_ids:
                 return [Send("aggregator", {})]
 

@@ -16,7 +16,7 @@ from nl2sql.pipeline.nodes.answer_synthesizer.schemas import AnswerSynthesizerRe
 from nl2sql.pipeline.nodes.ast_planner.schemas import ASTPlannerResponse
 from nl2sql.pipeline.nodes.validator.schemas import LogicalValidatorResponse, PhysicalValidatorResponse
 from nl2sql.pipeline.nodes.generator.schemas import GeneratorResponse
-from nl2sql.pipeline.nodes.executor.schemas import ExecutorResponse
+from nl2sql.execution.contracts import ArtifactRef, ExecutorBaseModel
 from nl2sql.pipeline.nodes.refiner.schemas import RefinerResponse
 from nl2sql.pipeline.subgraphs.schemas import SubgraphOutput
 from nl2sql.schema import Table
@@ -41,7 +41,7 @@ class GraphState(BaseModel):
         global_planner_response (Optional[GlobalPlannerResponse]): Output of planner node.
         aggregator_response (Optional[AggregatorResponse]): Output of aggregator node.
         answer_synthesizer_response (Optional[AnswerSynthesizerResponse]): Output of synthesizer node.
-        results (Dict[str, str]): ResultStore refs keyed by ExecutionDAG node_id.
+        artifact_refs (Dict[str, ArtifactRef]): Artifact refs keyed by ExecutionDAG node_id.
         subgraph_outputs (Dict[str, SubgraphOutput]): Per-subgraph diagnostic outputs.
         errors (List[PipelineError]): List of errors encountered during execution.
         reasoning (List[Dict[str, Any]]): Log of reasoning steps from nodes.
@@ -58,7 +58,7 @@ class GraphState(BaseModel):
     global_planner_response: Optional[GlobalPlannerResponse] = Field(default=None)
     aggregator_response: Optional[AggregatorResponse] = Field(default=None)
     answer_synthesizer_response: Optional[AnswerSynthesizerResponse] = Field(default=None)
-    results: Annotated[Dict[str, str], update_results] = Field(default_factory=dict)
+    artifact_refs: Annotated[Dict[str, ArtifactRef], update_results] = Field(default_factory=dict)
     subgraph_outputs: Annotated[Dict[str, SubgraphOutput], update_results] = Field(default_factory=dict)
     errors: Annotated[List[PipelineError], operator.add] = Field(default_factory=list)
     reasoning: Annotated[List[Dict[str, Any]], operator.add] = Field(default_factory=list)
@@ -80,7 +80,7 @@ class SubgraphExecutionState(BaseModel):
     logical_validator_response: Optional[LogicalValidatorResponse] = Field(default=None)
     physical_validator_response: Optional[PhysicalValidatorResponse] = Field(default=None)
     generator_response: Optional[GeneratorResponse] = Field(default=None)
-    executor_response: Optional[ExecutorResponse] = Field(default=None)
+    executor_response: Optional[ExecutorBaseModel] = Field(default=None)
     refiner_response: Optional[RefinerResponse] = Field(default=None)
 
     retry_count: int = 0

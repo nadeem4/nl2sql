@@ -184,9 +184,9 @@ class BenchmarkRunner:
                 else getattr(first_output, "sql_draft", None)
             )
             execution_res = (
-                first_output.get("execution")
+                first_output.get("artifact")
                 if isinstance(first_output, dict)
-                else getattr(first_output, "execution", None)
+                else getattr(first_output, "artifact", None)
             )
 
         if not generated_sql:

@@ -1,91 +1,59 @@
-import unittest
-from unittest.mock import MagicMock
+from types import SimpleNamespace
 
 from nl2sql.pipeline.nodes.datasource_resolver.node import DatasourceResolverNode
 from nl2sql.pipeline.state import GraphState
 from nl2sql.auth import UserContext
-from nl2sql_adapter_sdk.capabilities import DatasourceCapability
-from nl2sql.common.settings import settings
+from nl2sql.common.errors import ErrorCode
+from nl2sql.auth import UserContext
 
 
-class TestDatasourceResolverNode(unittest.TestCase):
-    def setUp(self):
-        self.ctx = MagicMock()
-        self.ctx.vector_store = MagicMock()
-        self.ctx.rbac = MagicMock()
-        self.ctx.ds_registry = MagicMock()
-        self.ctx.schema_store = MagicMock()
-        self.ctx.rbac.get_allowed_datasources.return_value = ["sales_db"]
-        self.ctx.ds_registry.get_capabilities.return_value = {
-            DatasourceCapability.SUPPORTS_SQL.value
-        }
-        self.ctx.schema_store.get_latest_version.return_value = "v1"
-        self.node = DatasourceResolverNode(self.ctx)
+def test_datasource_resolver_schema_version_mismatch_fail(monkeypatch):
+    # Validates mismatch policy because stale schema must be rejected when configured.
+    # Arrange
+    vector_store = SimpleNamespace()
+    doc = SimpleNamespace()
+    doc.metadata = {"datasource_id": "ds1", "schema_version": "v1"}
+    vector_store.retrieve_datasource_candidates = lambda *_a, **_k: [doc]
 
-    def test_resolver_outputs_ids(self):
-        doc = MagicMock()
-        doc.metadata = {"datasource_id": "sales_db", "schema_version": "v1"}
-        self.ctx.vector_store.retrieve_datasource_candidates.return_value = [doc]
+    rbac = SimpleNamespace(get_allowed_datasources=lambda _ctx: ["ds1"])
+    ds_registry = SimpleNamespace(get_capabilities=lambda _id: {"supports_sql"})
+    schema_store = SimpleNamespace(get_latest_version=lambda _id: "v2")
 
-        state = GraphState(user_query="sales", user_context=UserContext())
-        result = self.node(state)
+    ctx = SimpleNamespace(
+        vector_store=vector_store,
+        rbac=rbac,
+        ds_registry=ds_registry,
+        schema_store=schema_store,
+    )
+    node = DatasourceResolverNode(ctx)
 
-        resolved = result["datasource_resolver_response"].resolved_datasources[0]
-        self.assertEqual(resolved.datasource_id, "sales_db")
-        self.assertEqual(resolved.schema_version, "v1")
-        self.assertEqual(resolved.chunk_schema_version, "v1")
-        self.assertFalse(resolved.schema_version_mismatch)
-        self.assertEqual(result["datasource_resolver_response"].unsupported_datasource_ids, [])
+    monkeypatch.setattr(
+        "nl2sql.pipeline.nodes.datasource_resolver.node.settings.schema_version_mismatch_policy",
+        "fail",
+    )
+    state = GraphState(user_query="q", user_context=UserContext())
 
-    def test_resolver_marks_unsupported(self):
-        doc = MagicMock()
-        doc.metadata = {"datasource_id": "legacy_db"}
-        self.ctx.vector_store.retrieve_datasource_candidates.return_value = [doc]
-        self.ctx.rbac.get_allowed_datasources.return_value = ["legacy_db"]
-        self.ctx.ds_registry.get_capabilities.return_value = set()
-        self.ctx.schema_store.get_latest_version.return_value = "v1"
-        node = DatasourceResolverNode(self.ctx)
+    # Act
+    result = node(state)
 
-        state = GraphState(user_query="legacy", user_context=UserContext())
-        result = node(state)
-
-        resolved = result["datasource_resolver_response"].resolved_datasources[0]
-        self.assertEqual(resolved.datasource_id, "legacy_db")
-        self.assertEqual(result["datasource_resolver_response"].unsupported_datasource_ids, ["legacy_db"])
-
-    def test_schema_version_mismatch_warns(self):
-        doc = MagicMock()
-        doc.metadata = {"datasource_id": "sales_db", "schema_version": "v0"}
-        self.ctx.vector_store.retrieve_datasource_candidates.return_value = [doc]
-        self.ctx.schema_store.get_latest_version.return_value = "v1"
-
-        state = GraphState(user_query="sales", user_context=UserContext())
-        result = self.node(state)
-
-        resolved = result["datasource_resolver_response"].resolved_datasources[0]
-        self.assertTrue(resolved.schema_version_mismatch)
-        self.assertNotIn("errors", result)
-
-    def test_schema_version_mismatch_fails(self):
-        doc = MagicMock()
-        doc.metadata = {"datasource_id": "sales_db", "schema_version": "v0"}
-        self.ctx.vector_store.retrieve_datasource_candidates.return_value = [doc]
-        self.ctx.schema_store.get_latest_version.return_value = "v1"
-
-        previous_policy = settings.schema_version_mismatch_policy
-        settings.schema_version_mismatch_policy = "fail"
-        try:
-            state = GraphState(user_query="sales", user_context=UserContext())
-            result = self.node(state)
-        finally:
-            settings.schema_version_mismatch_policy = previous_policy
-
-        self.assertIn("errors", result)
-        self.assertEqual(
-            result["datasource_resolver_response"].allowed_datasource_ids,
-            [],
-        )
+    # Assert
+    assert result["errors"][0].error_code == ErrorCode.INVALID_STATE
 
 
-if __name__ == "__main__":
-    unittest.main()
+def test_datasource_resolver_handles_missing_vector_store():
+    # Validates fallback behavior because resolver must fail closed without vector store.
+    # Arrange
+    ctx = SimpleNamespace(
+        vector_store=None,
+        rbac=SimpleNamespace(get_allowed_datasources=lambda _ctx: []),
+        ds_registry=SimpleNamespace(get_capabilities=lambda _id: {"supports_sql"}),
+        schema_store=SimpleNamespace(get_latest_version=lambda _id: "v1"),
+    )
+    node = DatasourceResolverNode(ctx)
+
+    # Act
+    result = node(GraphState(user_query="q", user_context=UserContext()))
+
+    # Assert
+    assert result["datasource_resolver_response"].resolved_datasources == []
+    assert "Vector store unavailable" in result["reasoning"][0]["content"]

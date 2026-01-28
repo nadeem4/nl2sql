@@ -74,6 +74,47 @@ class Settings(BaseSettings):
         description="Default statement timeout for SQL execution safeguards."
     )
 
+    result_artifact_backend: str = Field(
+        default="local",
+        validation_alias="RESULT_ARTIFACT_BACKEND",
+        description="Artifact backend to store executor results: local, s3, adls."
+    )
+    result_artifact_base_uri: str = Field(
+        default="./artifacts",
+        validation_alias="RESULT_ARTIFACT_BASE_URI",
+        description="Base URI or path for artifact storage."
+    )
+    result_artifact_path_template: str = Field(
+        default="<tenant_id>/<request_id>/<subgraph_name>/<dag_node_id>/<schema_version>/part-00000.parquet",
+        validation_alias="RESULT_ARTIFACT_PATH_TEMPLATE",
+        description="Template for artifact paths."
+    )
+    result_artifact_s3_bucket: Optional[str] = Field(
+        default=None,
+        validation_alias="RESULT_ARTIFACT_S3_BUCKET",
+        description="S3 bucket for artifact storage."
+    )
+    result_artifact_s3_prefix: Optional[str] = Field(
+        default=None,
+        validation_alias="RESULT_ARTIFACT_S3_PREFIX",
+        description="S3 prefix for artifact storage."
+    )
+    result_artifact_adls_account: Optional[str] = Field(
+        default=None,
+        validation_alias="RESULT_ARTIFACT_ADLS_ACCOUNT",
+        description="ADLS storage account name."
+    )
+    result_artifact_adls_container: Optional[str] = Field(
+        default=None,
+        validation_alias="RESULT_ARTIFACT_ADLS_CONTAINER",
+        description="ADLS container name."
+    )
+    result_artifact_adls_connection_string: Optional[str] = Field(
+        default=None,
+        validation_alias="RESULT_ARTIFACT_ADLS_CONNECTION_STRING",
+        description="ADLS connection string, if using key-based auth."
+    )
+
     schema_store_backend: str = Field(
         default="memory",
         validation_alias="SCHEMA_STORE_BACKEND",

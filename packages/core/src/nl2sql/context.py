@@ -12,6 +12,8 @@ from nl2sql.auth import RBAC
 
 from nl2sql.schema import build_schema_store
 from nl2sql.common.result_store import ResultStore
+from nl2sql.execution import ExecutionStore
+from nl2sql.execution.artifacts import build_artifact_store
 
 class NL2SQLContext:
     """
@@ -67,5 +69,7 @@ class NL2SQLContext:
             settings.schema_store_max_versions,
         )
         self.result_store = ResultStore()
+        self.execution_store = ExecutionStore()
+        self.artifact_store = build_artifact_store()
 
        
