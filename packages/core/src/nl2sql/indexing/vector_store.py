@@ -23,17 +23,17 @@ class VectorStore:
 
     def __init__(
         self,
-        collection_name: str = "nl2sql_store",
+        collection_name: str,
+        persist_directory: str,
         embeddings: Optional[Embeddings] = None,
-        persist_directory: str = "./chroma_db",
     ):
         """
         Initializes the vector store.
 
         Args:
             collection_name: Name of the Chroma collection.
-            embeddings: Embedding implementation to use.
             persist_directory: Directory used for persistence.
+            embeddings: Embedding implementation to use.
         """
         self.collection_name = collection_name
         self.embeddings = embeddings or EmbeddingService.get_embeddings()
@@ -226,8 +226,10 @@ class VectorStore:
                 fetch_k=k * 4,
                 lambda_mult=0.7,
                 filter={
-                    "datasource_id": datasource_id,
-                    "type": {"$in": ["schema.table", "schema.metric"]},
+                    "$and": [
+                        {"datasource_id": datasource_id},
+                        {"type": {"$in": ["schema.table", "schema.metric"]}},
+                    ]
                 },
             )
 
@@ -260,8 +262,10 @@ class VectorStore:
                 fetch_k=k * 4,
                 lambda_mult=0.7,
                 filter={
-                    "datasource_id": datasource_id,
-                    "type": "schema.column",
+                    "$and": [
+                        {"datasource_id": datasource_id},
+                        {"type": "schema.column"},
+                    ]
                 },
             )
 
@@ -296,9 +300,11 @@ class VectorStore:
                 fetch_k=k * 4,
                 lambda_mult=0.7,
                 filter={
-                    "datasource_id": datasource_id,
-                    "type": {"$in": ["schema.column", "schema.relationship"]},
-                    "table": {"$in": tables},
+                    "$and": [
+                        {"datasource_id": datasource_id},
+                        {"type": {"$in": ["schema.column", "schema.relationship"]}},
+                        {"table": {"$in": tables}},
+                    ]
                 },
             )
 

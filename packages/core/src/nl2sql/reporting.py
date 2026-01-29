@@ -52,6 +52,9 @@ class ConsolePresenter:
     def print_step(self, message: str) -> None:
         self.console.print(f"[bold blue]{message}[/bold blue]")
 
+    def print_info(self, message: str) -> None:
+        self.console.print(f"[bold blue]{message}[/bold blue]")
+
     def print_header(self, message: str) -> None:
         self.console.print(f"\n[bold magenta]--- {message} ---[/bold magenta]")
 

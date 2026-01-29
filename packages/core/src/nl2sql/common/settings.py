@@ -11,7 +11,16 @@ class Settings(BaseSettings):
     """Application configuration settings backed by environment variables."""
     
     openai_api_key: Optional[str] = Field(default=None, validation_alias="OPENAI_API_KEY")
-    vector_store_path: Optional[str] = Field(default="./chroma_db", validation_alias="VECTOR_STORE")
+    vector_store_path: Optional[str] = Field(
+        default="./chroma_db",
+        validation_alias="VECTOR_STORE",
+        description="Persist directory for the vector store."
+    )
+    vector_store_collection_name: str = Field(
+        default="nl2sql_store",
+        validation_alias="VECTOR_STORE_COLLECTION",
+        description="Chroma collection name for schema embeddings."
+    )
     llm_config_path: str = Field(default="configs/llm.yaml", validation_alias="LLM_CONFIG")
     datasource_config_path: str = Field(default="configs/datasources.yaml", validation_alias="DATASOURCE_CONFIG")
     benchmark_config_path: str = Field(default="configs/benchmark_suite.yaml", validation_alias="BENCHMARK_CONFIG")
@@ -116,9 +125,14 @@ class Settings(BaseSettings):
     )
 
     schema_store_backend: str = Field(
-        default="memory",
+        default="sqlite",
         validation_alias="SCHEMA_STORE_BACKEND",
-        description="Schema store backend identifier (e.g., 'memory', 'redis')."
+        description="Schema store backend identifier (e.g., 'sqlite', 'memory')."
+    )
+    schema_store_path: str = Field(
+        default="data/schema_store.db",
+        validation_alias="SCHEMA_STORE_PATH",
+        description="SQLite database path for schema store persistence."
     )
     schema_store_max_versions: int = Field(
         default=3,

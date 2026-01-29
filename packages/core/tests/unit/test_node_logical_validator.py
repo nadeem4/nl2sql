@@ -1,5 +1,7 @@
 from types import SimpleNamespace
 
+import pytest
+
 from nl2sql.pipeline.nodes.validator.node import LogicalValidatorNode
 from nl2sql.pipeline.nodes.ast_planner.schemas import (
     PlanModel,
@@ -14,6 +16,7 @@ from nl2sql.pipeline.state import SubgraphExecutionState
 from nl2sql.schema import Table, Column
 from nl2sql.auth import UserContext
 from nl2sql.common.errors import ErrorCode
+from nl2sql.common.settings import settings
 
 
 def _col(alias: str, name: str):
@@ -103,3 +106,108 @@ def test_logical_validator_expected_schema_mismatch():
 
     # Assert
     assert any(e.error_code == ErrorCode.INVALID_PLAN_STRUCTURE for e in result["errors"])
+
+
+def test_logical_validator_duplicate_aliases():
+    # Validates alias collision detection because duplicate aliases break scoping.
+    node = LogicalValidatorNode(_ctx())
+    plan = PlanModel(
+        query_type="READ",
+        tables=[
+            TableRef(name="users", alias="t", ordinal=0),
+            TableRef(name="orders", alias="t", ordinal=1),
+        ],
+        select_items=[SelectItem(expr=_col("t", "id"), ordinal=0)],
+        joins=[],
+    )
+    state = SubgraphExecutionState(
+        trace_id="t",
+        sub_query=SubQuery(id="sq1", datasource_id="ds1", intent="q"),
+        relevant_tables=[
+            Table(name="users", columns=[Column(name="id", type="int")]),
+            Table(name="orders", columns=[Column(name="id", type="int")]),
+        ],
+        ast_planner_response=ASTPlannerResponse(plan=plan),
+        user_context=UserContext(),
+    )
+
+    result = node(state)
+
+    assert any(e.error_code == ErrorCode.INVALID_PLAN_STRUCTURE for e in result["errors"])
+
+
+def test_logical_validator_invalid_ordinals():
+    # Validates ordinal checks because non-contiguous ordinals should be rejected.
+    node = LogicalValidatorNode(_ctx())
+    plan = PlanModel(
+        query_type="READ",
+        tables=[TableRef(name="users", alias="u", ordinal=1)],
+        select_items=[SelectItem(expr=_col("u", "id"), ordinal=1)],
+        joins=[],
+    )
+    state = SubgraphExecutionState(
+        trace_id="t",
+        sub_query=SubQuery(id="sq1", datasource_id="ds1", intent="q"),
+        relevant_tables=[Table(name="users", columns=[Column(name="id", type="int")])],
+        ast_planner_response=ASTPlannerResponse(plan=plan),
+        user_context=UserContext(),
+    )
+
+    result = node(state)
+
+    assert any(e.error_code == ErrorCode.INVALID_PLAN_STRUCTURE for e in result["errors"])
+
+
+def test_logical_validator_ambiguous_column_without_alias():
+    # Validates ambiguous column detection when alias is omitted.
+    node = LogicalValidatorNode(_ctx())
+    plan = PlanModel(
+        query_type="READ",
+        tables=[
+            TableRef(name="users", alias="u", ordinal=0),
+            TableRef(name="orders", alias="o", ordinal=1),
+        ],
+        select_items=[SelectItem(expr=Expr(kind="column", column_name="id"), ordinal=0)],
+        joins=[],
+    )
+    state = SubgraphExecutionState(
+        trace_id="t",
+        sub_query=SubQuery(id="sq1", datasource_id="ds1", intent="q"),
+        relevant_tables=[
+            Table(name="users", columns=[Column(name="id", type="int")]),
+            Table(name="orders", columns=[Column(name="id", type="int")]),
+        ],
+        ast_planner_response=ASTPlannerResponse(plan=plan),
+        user_context=UserContext(),
+    )
+
+    result = node(state)
+
+    assert any(e.error_code == ErrorCode.COLUMN_NOT_FOUND for e in result["errors"])
+
+
+def test_logical_validator_column_not_found_strict_vs_warning(monkeypatch):
+    # Validates strict columns toggle because severity depends on settings.
+    plan = PlanModel(
+        query_type="READ",
+        tables=[TableRef(name="users", alias="u", ordinal=0)],
+        select_items=[SelectItem(expr=_col("u", "missing"), ordinal=0)],
+        joins=[],
+    )
+    state = SubgraphExecutionState(
+        trace_id="t",
+        sub_query=SubQuery(id="sq1", datasource_id="ds1", intent="q"),
+        relevant_tables=[Table(name="users", columns=[Column(name="id", type="int")])],
+        ast_planner_response=ASTPlannerResponse(plan=plan),
+        user_context=UserContext(),
+    )
+
+    monkeypatch.setattr(settings, "logical_validator_strict_columns", False)
+    node = LogicalValidatorNode(_ctx())
+    result = node(state)
+    assert any(e.error_code == ErrorCode.COLUMN_NOT_FOUND and e.severity.value == "WARNING" for e in result["errors"])
+
+    monkeypatch.setattr(settings, "logical_validator_strict_columns", True)
+    node = LogicalValidatorNode(_ctx())
+    result = node(state)
+    assert any(e.error_code == ErrorCode.COLUMN_NOT_FOUND and e.severity.value == "ERROR" for e in result["errors"])

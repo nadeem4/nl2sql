@@ -1,4 +1,4 @@
-from nl2sql.schema.store import InMemorySchemaStore
+from nl2sql.schema import InMemorySchemaStore
 from nl2sql_adapter_sdk.schema import (
     SchemaContract,
     SchemaMetadata,

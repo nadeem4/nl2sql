@@ -216,7 +216,10 @@ class DemoManager:
             indexer_config_manager = ConfigManager(self.project_root)
             
             configs = indexer_config_manager.load_datasources()
-            v_store = VectorStore(persist_directory=settings.vector_store_path)
+            v_store = VectorStore(
+                collection_name=settings.vector_store_collection_name,
+                persist_directory=settings.vector_store_path,
+            )
             
             llm_registry = None
             try:

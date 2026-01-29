@@ -37,7 +37,7 @@ def run_pipeline(
     result = runner.run(
         query=config.query,
         role=config.role,
-        datasource_id=config.datasource_id,
+        datasource_id=config.ds_id,
         execute=not config.no_exec,
         callbacks=[monitor]
     )

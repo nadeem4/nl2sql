@@ -356,7 +356,10 @@ def setup_command(demo: bool = False, lite: bool = True, docker: bool = False, a
     from nl2sql.llm import LLMRegistry
 
     try:
-        v_store = VectorStore(persist_directory=settings.vector_store_path)
+        v_store = VectorStore(
+            collection_name=settings.vector_store_collection_name,
+            persist_directory=settings.vector_store_path,
+        )
         should_index = False
         
         if not v_store.is_empty():

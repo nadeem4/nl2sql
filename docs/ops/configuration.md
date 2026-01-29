@@ -15,6 +15,8 @@ These settings control the startup behavior and file locations.
 | :--- | :--- | :--- |
 | `OPENAI_API_KEY` | `None` | Required for LLM usage. |
 | `VECTOR_STORE` | `./chroma_db` | Path to the vector store persistence directory. |
+| `SCHEMA_STORE_BACKEND` | `sqlite` | Schema store backend: `sqlite` or `memory`. |
+| `SCHEMA_STORE_PATH` | `./schema_store.db` | SQLite database path for schema store persistence. |
 | `DATASOURCE_CONFIG` | `configs/datasources.yaml` | Path to the datasources file. |
 | `LLM_CONFIG` | `configs/llm.yaml` | Path to the LLM profile file. |
 | `SECRETS_CONFIG` | `configs/secrets.yaml` | Path to the secrets provider file. |

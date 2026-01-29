@@ -3,8 +3,6 @@ from __future__ import annotations
 from typing import Dict, List, Tuple
 
 import polars as pl
-
-from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.execution.contracts import ArtifactRef
 from nl2sql.pipeline.nodes.global_planner.schemas import ExecutionDAG, LogicalNode, LogicalEdge
 
@@ -21,12 +19,10 @@ class AggregationService:
         artifact_refs: Dict[str, ArtifactRef],
     ) -> Dict[str, List[Dict]]:
         if not dag:
-            raise PipelineError(
-                node="aggregator",
-                message="No ExecutionDAG found for aggregation.",
-                severity=ErrorSeverity.ERROR,
-                error_code=ErrorCode.AGGREGATOR_FAILED,
-            )
+            raise ValueError("No ExecutionDAG found for aggregation.")
+
+        if not dag.nodes:
+            return {}
 
         node_index: Dict[str, LogicalNode] = {n.node_id: n for n in dag.nodes}
         edges: List[LogicalEdge] = dag.edges
@@ -46,11 +42,8 @@ class AggregationService:
                 if node.kind == "scan":
                     artifact = artifact_refs.get(node_id)
                     if not artifact:
-                        raise PipelineError(
-                            node="aggregator",
-                            message=f"Missing artifact for scan node {node_id}.",
-                            severity=ErrorSeverity.ERROR,
-                            error_code=ErrorCode.EXECUTION_ERROR,
+                        raise ValueError(
+                            f"Missing artifact for scan node {node_id}."
                         )
                     computed[node_id] = self.engine.load_scan(artifact)
                     continue
@@ -68,11 +61,8 @@ class AggregationService:
                 if node.kind.startswith("post_"):
                     input_ids = node.inputs or []
                     if len(input_ids) != 1 or input_ids[0] not in computed:
-                        raise PipelineError(
-                            node="aggregator",
-                            message=f"Post-combine node '{node_id}' expects a single input.",
-                            severity=ErrorSeverity.ERROR,
-                            error_code=ErrorCode.AGGREGATOR_FAILED,
+                        raise ValueError(
+                            f"Post-combine node '{node_id}' expects a single input."
                         )
                     computed[node_id] = self.engine.post_op(
                         node.attributes.get("operation"),
@@ -81,21 +71,13 @@ class AggregationService:
                     )
                     continue
 
-                raise PipelineError(
-                    node="aggregator",
-                    message=f"Unsupported logical node kind '{node.kind}'.",
-                    severity=ErrorSeverity.ERROR,
-                    error_code=ErrorCode.AGGREGATOR_FAILED,
+                raise ValueError(
+                    f"Unsupported logical node kind '{node.kind}'."
                 )
 
         terminal_nodes = sorted([n.node_id for n in dag.nodes if n.node_id not in outgoing_edges])
         if not terminal_nodes:
-            raise PipelineError(
-                node="aggregator",
-                message="No terminal nodes found in DAG.",
-                severity=ErrorSeverity.ERROR,
-                error_code=ErrorCode.AGGREGATOR_FAILED,
-            )
+            return {}
 
         return {
             node_id: self.engine.to_rows(computed[node_id])

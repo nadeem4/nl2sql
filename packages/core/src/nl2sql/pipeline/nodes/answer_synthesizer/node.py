@@ -24,7 +24,9 @@ class AnswerSynthesizerNode:
         self.node_name = self.__class__.__name__.lower().replace("node", "")
         self.llm = ctx.llm_registry.get_llm(self.node_name)
         self.prompt = ChatPromptTemplate.from_template(ANSWER_SYNTHESIZER_PROMPT)
-        self.chain = self.prompt | self.llm.with_structured_output(AggregatedResponse)
+        self.chain = self.prompt | self.llm.with_structured_output(
+            AggregatedResponse, method="function_calling"
+        )
 
     def _serialize_result(self, result: Any) -> str:
         try:
@@ -52,10 +54,19 @@ class AnswerSynthesizerNode:
             }
 
         try:
+            unmapped_subqueries = []
+            if state.decomposer_response:
+                unmapped_subqueries = [
+                    u.model_dump()
+                    for u in (state.decomposer_response.unmapped_subqueries or [])
+                ]
             response: AggregatedResponse = self.chain.invoke(
                 {
                     "user_query": state.user_query,
                     "aggregated_result": self._serialize_result(aggregated_result),
+                    "unmapped_subqueries": json.dumps(
+                        unmapped_subqueries, indent=2, ensure_ascii=True
+                    ),
                 }
             )
 

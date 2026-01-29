@@ -35,3 +35,29 @@ def test_logical_validator_enforces_policy_namespace():
 
     # Assert
     assert any(e.error_code == ErrorCode.SECURITY_VIOLATION for e in result["errors"])
+
+
+def test_logical_validator_missing_datasource_id_fails_closed():
+    # Validates security enforcement when datasource_id is missing.
+    rbac = SimpleNamespace(get_allowed_tables=lambda _: ["*"])
+    ctx = SimpleNamespace(ds_registry=SimpleNamespace(), rbac=rbac)
+    node = LogicalValidatorNode(ctx)
+
+    plan = PlanModel(
+        query_type="READ",
+        tables=[TableRef(name="users", alias="u", ordinal=0)],
+        select_items=[SelectItem(expr=Expr(kind="column", alias="u", column_name="id"), ordinal=0)],
+        joins=[],
+    )
+    state = SubgraphExecutionState(
+        trace_id="t",
+        sub_query=SubQuery(id="sq1", datasource_id="ds1", intent="q"),
+        relevant_tables=[Table(name="users", columns=[Column(name="id", type="int")])],
+        ast_planner_response=ASTPlannerResponse(plan=plan),
+        user_context=UserContext(roles=["user"]),
+    )
+    state.sub_query.datasource_id = None
+
+    result = node(state)
+
+    assert any(e.error_code == ErrorCode.SECURITY_VIOLATION for e in result["errors"])

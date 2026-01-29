@@ -104,3 +104,42 @@ def test_generator_raises_on_unknown_join_alias():
 
     # Assert
     assert result["errors"]
+
+
+def test_generator_requires_datasource_id():
+    # Validates datasource requirement because SQL generation depends on adapter dialect.
+    adapter = SimpleNamespace(row_limit=5, max_bytes=1000, get_dialect=lambda: "sqlite")
+    ctx = SimpleNamespace(ds_registry=SimpleNamespace(get_adapter=lambda _id: adapter))
+    node = GeneratorNode(ctx)
+
+    plan = PlanModel(
+        tables=[TableRef(name="users", alias="u", ordinal=0)],
+        select_items=[SelectItem(expr=_col("u", "id"), ordinal=0)],
+        joins=[],
+    )
+    state = SubgraphExecutionState(
+        trace_id="t",
+        sub_query=SubQuery(id="sq1", datasource_id="ds1", intent="q"),
+        ast_planner_response=ASTPlannerResponse(plan=plan),
+    )
+    state.sub_query.datasource_id = None
+
+    result = node(state)
+
+    assert result["errors"]
+
+
+def test_generator_requires_plan():
+    # Validates missing plan handling because generator must fail closed.
+    adapter = SimpleNamespace(row_limit=5, max_bytes=1000, get_dialect=lambda: "sqlite")
+    ctx = SimpleNamespace(ds_registry=SimpleNamespace(get_adapter=lambda _id: adapter))
+    node = GeneratorNode(ctx)
+
+    state = SubgraphExecutionState(
+        trace_id="t",
+        sub_query=SubQuery(id="sq1", datasource_id="ds1", intent="q"),
+    )
+
+    result = node(state)
+
+    assert result["errors"]

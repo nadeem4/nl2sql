@@ -221,13 +221,29 @@ def build_graph(
         if not dag or not dag.layers:
             pending_ids = [sq.id for sq in sub_queries if sq.id not in artifact_refs]
             if not pending_ids:
-                return [Send("aggregator", {})]
+                return [
+                    Send(
+                        "aggregator",
+                        {
+                            "global_planner_response": state.global_planner_response,
+                            "artifact_refs": state.artifact_refs,
+                        },
+                    )
+                ]
             target_ids = pending_ids
         else:
             node_index = {n.node_id: n for n in dag.nodes}
             target_ids = _next_scan_layer_ids(dag, artifact_refs)
             if not target_ids:
-                return [Send("aggregator", {})]
+                return [
+                    Send(
+                        "aggregator",
+                        {
+                            "global_planner_response": state.global_planner_response,
+                            "artifact_refs": state.artifact_refs,
+                        },
+                    )
+                ]
 
         branches = []
         for node_id in target_ids:

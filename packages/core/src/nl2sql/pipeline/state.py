@@ -45,6 +45,7 @@ class GraphState(BaseModel):
         subgraph_outputs (Dict[str, SubgraphOutput]): Per-subgraph diagnostic outputs.
         errors (List[PipelineError]): List of errors encountered during execution.
         reasoning (List[Dict[str, Any]]): Log of reasoning steps from nodes.
+        warnings (List[Dict[str, Any]]): Warning messages emitted by nodes.
         subgraph_id (Optional[str]): ID of the subgraph execution.
         subgraph_name (Optional[str]): Name of the subgraph execution.
     """
@@ -62,6 +63,7 @@ class GraphState(BaseModel):
     subgraph_outputs: Annotated[Dict[str, SubgraphOutput], update_results] = Field(default_factory=dict)
     errors: Annotated[List[PipelineError], operator.add] = Field(default_factory=list)
     reasoning: Annotated[List[Dict[str, Any]], operator.add] = Field(default_factory=list)
+    warnings: Annotated[List[Dict[str, Any]], operator.add] = Field(default_factory=list)
     subgraph_id: Optional[str] = Field(default=None)
     subgraph_name: Optional[str] = Field(default=None)
 
@@ -86,3 +88,4 @@ class SubgraphExecutionState(BaseModel):
     retry_count: int = 0
     errors: Annotated[List[PipelineError], operator.add] = Field(default_factory=list)
     reasoning: Annotated[List[Dict[str, Any]], operator.add] = Field(default_factory=list)
+    warnings: Annotated[List[Dict[str, Any]], operator.add] = Field(default_factory=list)

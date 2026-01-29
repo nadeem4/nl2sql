@@ -6,6 +6,7 @@ if TYPE_CHECKING:
 
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.pipeline.nodes.aggregator.schemas import AggregatorResponse
+from nl2sql.pipeline.nodes.global_planner.schemas import GlobalPlannerResponse
 from nl2sql.common.logger import get_logger
 from nl2sql.context import NL2SQLContext
 from nl2sql.aggregation import AggregationService
@@ -24,8 +25,16 @@ class EngineAggregatorNode:
 
     def __call__(self, state: GraphState) -> Dict[str, Any]:
         try:
-            dag = getattr(state.global_planner_response, "execution_dag", None)
-            artifact_refs = state.artifact_refs or {}
+            if isinstance(state, dict):
+                planner_response = state.get("global_planner_response")
+                artifact_refs = state.get("artifact_refs") or {}
+            else:
+                planner_response = state.global_planner_response
+                artifact_refs = state.artifact_refs or {}
+
+            if isinstance(planner_response, dict):
+                planner_response = GlobalPlannerResponse.model_validate(planner_response)
+            dag = getattr(planner_response, "execution_dag", None) if planner_response else None
             terminal_results = self.service.execute(dag, artifact_refs)
             aggregator_response = AggregatorResponse(
                 terminal_results=terminal_results,

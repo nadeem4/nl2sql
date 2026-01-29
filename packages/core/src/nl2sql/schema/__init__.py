@@ -14,13 +14,10 @@ from nl2sql_adapter_sdk.schema import (
     SchemaMetadata,
     SchemaSnapshot,
 )
-from .store import (
-    SchemaContractStore,
-    SchemaMetadataStore,
-    SchemaStore,
-    InMemorySchemaStore,
-    build_schema_store,
-)
+from .protocol import SchemaStore
+from .in_memory_store import SchemaContractStore, SchemaMetadataStore, InMemorySchemaStore
+from .sqlite_store import SqliteSchemaStore
+from .store import build_schema_store
 
 __all__ = [
     "Column",
@@ -39,5 +36,6 @@ __all__ = [
     "SchemaMetadataStore",
     "SchemaStore",
     "InMemorySchemaStore",
+    "SqliteSchemaStore",
     "build_schema_store",
 ]

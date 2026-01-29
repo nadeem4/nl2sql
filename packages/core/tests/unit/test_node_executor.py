@@ -11,6 +11,66 @@ from nl2sql.common.errors import ErrorCode
 from nl2sql_adapter_sdk.capabilities import DatasourceCapability
 
 
+def test_executor_returns_invalid_state_when_no_executor(monkeypatch):
+    # Validates executor selection because missing executor must fail closed.
+    adapter = SimpleNamespace(capabilities=lambda: {DatasourceCapability.SUPPORTS_SQL})
+    ctx = SimpleNamespace(
+        ds_registry=SimpleNamespace(get_adapter=lambda _id: adapter)
+    )
+    node = ExecutorNode(ctx)
+    monkeypatch.setattr(node.registry, "get_executor", lambda _caps: None)
+
+    state = SubgraphExecutionState(
+        trace_id="t",
+        sub_query=SubQuery(id="sq1", datasource_id="ds1", intent="q"),
+        generator_response=GeneratorResponse(sql_draft="SELECT 1"),
+    )
+
+    result = node(state)
+
+    assert result["errors"][0].error_code == ErrorCode.INVALID_STATE
+
+
+def test_executor_default_capabilities_path(monkeypatch):
+    # Validates default capabilities because adapters may not implement capabilities().
+    adapter = SimpleNamespace()
+    ctx = SimpleNamespace(
+        ds_registry=SimpleNamespace(get_adapter=lambda _id: adapter)
+    )
+    node = ExecutorNode(ctx)
+    executor = SimpleNamespace(execute=lambda _req: SimpleNamespace(errors=[], reasoning=[]))
+    monkeypatch.setattr(node.registry, "get_executor", lambda _caps: executor)
+
+    state = SubgraphExecutionState(
+        trace_id="t",
+        sub_query=SubQuery(id="sq1", datasource_id="ds1", intent="q"),
+        generator_response=GeneratorResponse(sql_draft="SELECT 1"),
+    )
+
+    result = node(state)
+
+    assert result["errors"] == []
+
+
+def test_executor_handles_crash(monkeypatch):
+    # Validates crash handling because executor exceptions must be wrapped.
+    adapter = SimpleNamespace(capabilities=lambda: {DatasourceCapability.SUPPORTS_SQL})
+    ctx = SimpleNamespace(
+        ds_registry=SimpleNamespace(get_adapter=lambda _id: adapter)
+    )
+    node = ExecutorNode(ctx)
+    executor = SimpleNamespace(execute=lambda _req: (_ for _ in ()).throw(RuntimeError("boom")))
+    monkeypatch.setattr(node.registry, "get_executor", lambda _caps: executor)
+
+    state = SubgraphExecutionState(
+        trace_id="t",
+        sub_query=SubQuery(id="sq1", datasource_id="ds1", intent="q"),
+        generator_response=GeneratorResponse(sql_draft="SELECT 1"),
+    )
+
+    result = node(state)
+
+    assert result["errors"][0].error_code == ErrorCode.EXECUTOR_CRASH
 def test_executor_requires_sql_and_datasource():
     # Validates required inputs because execution must fail closed.
     # Arrange

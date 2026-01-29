@@ -40,7 +40,9 @@ class DecomposerNode:
         self.node_name = self.__class__.__name__.lower().replace('node', '')
         self.llm = ctx.llm_registry.get_llm(self.node_name)
         self.prompt = ChatPromptTemplate.from_template(DECOMPOSER_PROMPT)
-        self.chain = self.prompt | self.llm.with_structured_output(DecomposerResponse)
+        self.chain = self.prompt | self.llm.with_structured_output(
+            DecomposerResponse, method="function_calling"
+        )
 
     def _stable_id(self, prefix: str, payload: Dict[str, Any]) -> str:
         data = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True)

@@ -59,3 +59,49 @@ def test_physical_validator_emits_performance_warning(monkeypatch):
 
     # Assert
     assert any(e.error_code == ErrorCode.PERFORMANCE_WARNING for e in result["errors"])
+
+
+def test_physical_validator_skips_when_no_sql():
+    # Validates no-op because missing SQL should return empty response.
+    ctx = SimpleNamespace(ds_registry=SimpleNamespace())
+    node = PhysicalValidatorNode(ctx)
+    state = SubgraphExecutionState(trace_id="t", generator_response=GeneratorResponse(sql_draft=None))
+
+    result = node(state)
+
+    assert result["physical_validator_response"].errors == []
+
+
+def test_physical_validator_dry_run_failure(monkeypatch):
+    # Validates dry run failure because invalid SQL must error.
+    adapter = SimpleNamespace(
+        datasource_id="ds1",
+        datasource_engine_type="sqlite",
+        connection_args={},
+    )
+    ctx = SimpleNamespace(ds_registry=SimpleNamespace(get_adapter=lambda _id: adapter))
+    node = PhysicalValidatorNode(ctx, row_limit=10)
+
+    responses = [
+        ExecutionResult(success=True, data={"is_valid": False, "error_message": "bad sql"}),
+    ]
+
+    def _fake_execute(*_a, **_k):
+        return responses.pop(0)
+
+    monkeypatch.setattr("nl2sql.common.sandbox.execute_in_sandbox", _fake_execute)
+    monkeypatch.setattr(
+        "nl2sql.pipeline.nodes.validator.physical_node.get_execution_pool",
+        lambda: SimpleNamespace(),
+    )
+    monkeypatch.setattr("nl2sql.common.resilience.DB_BREAKER", lambda fn: fn)
+
+    state = SubgraphExecutionState(
+        trace_id="t",
+        sub_query=SubQuery(id="sq1", datasource_id="ds1", intent="q"),
+        generator_response=GeneratorResponse(sql_draft="SELECT * FROM users"),
+    )
+
+    result = node(state)
+
+    assert any(e.error_code == ErrorCode.EXECUTION_ERROR for e in result["errors"])

@@ -38,8 +38,14 @@ class NL2SQLContext:
         ds_config_path = ds_config_path or pathlib.Path(settings.datasource_config_path)
         secrets_config_path = secrets_config_path or pathlib.Path(settings.secrets_config_path)
         llm_config_path = llm_config_path or pathlib.Path(settings.llm_config_path)
-        vector_store_path = vector_store_path or pathlib.Path(settings.vector_store_path)
         policies_config_path = policies_config_path or pathlib.Path(settings.policies_config_path)
+
+        if not settings.vector_store_collection_name:
+            raise ValueError("VECTOR_STORE_COLLECTION must be set.")
+        if vector_store_path is None:
+            if not settings.vector_store_path:
+                raise ValueError("VECTOR_STORE path must be set.")
+            vector_store_path = pathlib.Path(settings.vector_store_path)
 
         cm = ConfigManager()
         self.config_manager = cm
@@ -63,10 +69,14 @@ class NL2SQLContext:
         self.policies_cfg = cm.load_policies(policies_config_path)
         self.rbac = RBAC(self.policies_cfg.roles)
 
-        self.vector_store = VectorStore(persist_directory=vector_store_path)
+        self.vector_store = VectorStore(
+            collection_name=settings.vector_store_collection_name,
+            persist_directory=vector_store_path,
+        )
         self.schema_store = build_schema_store(
             settings.schema_store_backend,
             settings.schema_store_max_versions,
+            path=pathlib.Path(settings.schema_store_path),
         )
         self.result_store = ResultStore()
         self.execution_store = ExecutionStore()

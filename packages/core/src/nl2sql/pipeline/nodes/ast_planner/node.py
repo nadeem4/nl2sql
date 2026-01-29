@@ -69,6 +69,7 @@ class ASTPlannerNode:
                     "examples": PLANNER_EXAMPLES,
                     "feedback": feedback,
                     "expected_schema": expected_schema,
+                    "semantic_context": "",
                     "user_query": query_text,
                 }
             )

@@ -141,6 +141,12 @@ class SchemaRetrieverNode:
                             "type": "warning",
                         }
                     ],
+                    "warnings": [
+                        {
+                            "node": self.node_name,
+                            "content": "Fallback to schema store for table definitions.",
+                        }
+                    ],
                 }
 
             relevant_tables: List[Table] = []
