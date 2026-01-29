@@ -25,25 +25,11 @@ class DatasourceResolverNode:
         self.vector_store = ctx.vector_store
         self.rbac = ctx.rbac
         self.ds_registry = ctx.ds_registry
-        from nl2sql.pipeline.subgraphs import build_subgraph_registry
-        self.subgraph_specs = build_subgraph_registry(ctx)
         self.schema_store = ctx.schema_store
 
     def _get_unsupported_datasources(self, datasource_ids: list[str]) -> list[str]:
-        unsupported = []
-        for ds_id in datasource_ids:
-            try:
-                caps = self.ds_registry.get_capabilities(ds_id)
-            except Exception:
-                unsupported.append(ds_id)
-                continue
-
-            is_supported = any(
-                spec.required_capabilities.issubset(caps)
-                for spec in self.subgraph_specs.values()
-            )
-            if not is_supported:
-                unsupported.append(ds_id)
+        available_ds_ids = self.ds_registry.list_ids()
+        unsupported = [ds_id for ds_id in datasource_ids if ds_id not in available_ds_ids]
         return sorted(unsupported)
 
     def _get_latest_schema_version(self, datasource_id: str) -> str | None:
@@ -164,6 +150,51 @@ class DatasourceResolverNode:
 
     def __call__(self, state: GraphState) -> Dict[str, Any]:
         try:
+            if state.datasource_id:
+                unsupported_ids = self._get_unsupported_datasources([state.datasource_id])
+                if unsupported_ids:
+                    return self._error_response(
+                        resolved_datasources=[],
+                        allowed_ids=[],
+                        unsupported_ids=unsupported_ids,
+                        message=f"Datasource not found: {state.datasource_id}.",
+                        severity=ErrorSeverity.ERROR,
+                        error_code=ErrorCode.INVALID_STATE,
+                    )
+
+                resolved = ResolvedDatasource(
+                    datasource_id=state.datasource_id,
+                    metadata={},
+                    schema_version=self._get_latest_schema_version(state.datasource_id),
+                )
+                allowed_ids = self._get_allowed_datasource_ids(
+                    state.user_context,
+                    [state.datasource_id],
+                )
+                if not allowed_ids:
+                    return self._error_response(
+                        resolved_datasources=[resolved],
+                        allowed_ids=[],
+                        unsupported_ids=[],
+                        message="Datasource not allowed.",
+                        severity=ErrorSeverity.CRITICAL,
+                        error_code=ErrorCode.SECURITY_VIOLATION,
+                    )
+
+                return {
+                    "datasource_resolver_response": DatasourceResolverResponse(
+                        resolved_datasources=[resolved],
+                        allowed_datasource_ids=allowed_ids,
+                        unsupported_datasource_ids=[],
+                    ),
+                    "reasoning": [
+                        {
+                            "node": self.node_name,
+                            "content": "Using explicit datasource override.",
+                        }
+                    ],
+                }
+
             if not self.vector_store:
                 return {
                     "datasource_resolver_response": DatasourceResolverResponse(),
@@ -195,19 +226,6 @@ class DatasourceResolverNode:
                     error_code=ErrorCode.SECURITY_VIOLATION,
                 )
 
-            authorized_ids = allowed_ids if "*" in allowed_ids else [
-                ds_id for ds_id in candidate_ids if ds_id in allowed_ids
-            ]
-            authorized_ids = [ds_id for ds_id in authorized_ids if ds_id not in unsupported_ids]
-            if not authorized_ids:
-                return self._error_response(
-                    resolved_datasources=list(candidate_datasources.values()),
-                    allowed_ids=allowed_ids,
-                    unsupported_ids=unsupported_ids,
-                    message="Resolved datasources are not authorized.",
-                    severity=ErrorSeverity.CRITICAL,
-                    error_code=ErrorCode.SECURITY_VIOLATION,
-                )
 
             schema_version_mismatch_response = self._apply_schema_version_mismatch_policy(
                 list(candidate_datasources.values()),
@@ -217,15 +235,17 @@ class DatasourceResolverNode:
             if schema_version_mismatch_response:
                 return schema_version_mismatch_response
             
-            resolved = [
-                candidate_datasources[ds_id] for ds_id in authorized_ids
-            ]
+
+            result = DatasourceResolverResponse(
+                resolved_datasources=list(candidate_datasources.values()),
+                allowed_datasource_ids=allowed_ids,
+                unsupported_datasource_ids=unsupported_ids,
+            )   
+        
+            logger.info(f"Resolved datasources: {result.model_dump_json(indent=2)}")
+            
             return {
-                "datasource_resolver_response": DatasourceResolverResponse(
-                    resolved_datasources=resolved,
-                    allowed_datasource_ids=allowed_ids,
-                    unsupported_datasource_ids=unsupported_ids,
-                ),
+                "datasource_resolver_response": result,
                 "reasoning": [{"node": self.node_name, "content": "Ranked by vector similarity."}],
             }
         except Exception as exc:

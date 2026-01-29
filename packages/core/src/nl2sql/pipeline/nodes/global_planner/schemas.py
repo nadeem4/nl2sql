@@ -96,6 +96,6 @@ class ExecutionDAG(BaseModel):
 
 
 class GlobalPlannerResponse(BaseModel):
-    execution_dag: Optional[ExecutionDAG] = None
+    execution_dag: ExecutionDAG
 
 

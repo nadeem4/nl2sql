@@ -151,6 +151,27 @@ class Settings(BaseSettings):
         description="Treat missing columns as errors in logical validation."
     )
 
+    sql_agent_max_retries: int = Field(
+        default=3,
+        validation_alias="SQL_AGENT_MAX_RETRIES",
+        description="Max retry attempts for SQL agent refinement loop."
+    )
+    sql_agent_retry_base_delay_sec: float = Field(
+        default=1.0,
+        validation_alias="SQL_AGENT_RETRY_BASE_DELAY_SEC",
+        description="Base delay for SQL agent retries (seconds)."
+    )
+    sql_agent_retry_max_delay_sec: float = Field(
+        default=10.0,
+        validation_alias="SQL_AGENT_RETRY_MAX_DELAY_SEC",
+        description="Max delay for SQL agent retries (seconds)."
+    )
+    sql_agent_retry_jitter_sec: float = Field(
+        default=0.5,
+        validation_alias="SQL_AGENT_RETRY_JITTER_SEC",
+        description="Max jitter added to SQL agent retry delays (seconds)."
+    )
+
     observability_exporter: str = Field(
         default="none",
         validation_alias="OBSERVABILITY_EXPORTER",

@@ -202,6 +202,22 @@ class SqlExecutorService(ExecutorService):
             )
 
         if not result_contract.success:
+            if result_contract.metrics.get("cancelled"):
+                error = PipelineError(
+                    node="sql_executor",
+                    message="Execution cancelled by user.",
+                    severity=ErrorSeverity.ERROR,
+                    error_code=ErrorCode.CANCELLED,
+                )
+                return ExecutorBaseModel(
+                    executor_name="sql_executor",
+                    subgraph_name=request.subgraph_name,
+                    node_id=request.node_id,
+                    trace_id=request.trace_id,
+                    datasource_id=request.datasource_id,
+                    schema_version=request.schema_version,
+                    errors=[error],
+                )
             error = PipelineError(
                 node="sql_executor",
                 message=f"Execution error: {result_contract.error}",
@@ -244,9 +260,18 @@ class SqlExecutorService(ExecutorService):
                 errors=[error],
             )
 
+        normalized_columns = []
+        for col in columns:
+            if isinstance(col, dict):
+                normalized_columns.append(col.get("name"))
+            elif hasattr(col, "name") and not isinstance(col, str):
+                normalized_columns.append(getattr(col, "name"))
+            else:
+                normalized_columns.append(col)
+
         result_frame = ResultFrame.from_row_dicts(
             rows,
-            columns=[ResultColumn(name=name, type="unknown") for name in columns],
+            columns=[ResultColumn(name=name, type="unknown") for name in normalized_columns],
             row_count=row_count,
             success=True,
             datasource_id=request.datasource_id,

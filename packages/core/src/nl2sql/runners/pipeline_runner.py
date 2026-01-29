@@ -4,7 +4,8 @@ import json
 import traceback
 from typing import Dict, Any, Optional, List
 from dataclasses import dataclass, field
-from nl2sql.pipeline.graph import run_with_graph, UserContext
+from nl2sql.auth import UserContext
+from nl2sql.pipeline.runtime import run_with_graph
 from nl2sql.datasources import DatasourceRegistry
 from nl2sql.llm import LLMRegistry
 from nl2sql.indexing.vector_store import VectorStore

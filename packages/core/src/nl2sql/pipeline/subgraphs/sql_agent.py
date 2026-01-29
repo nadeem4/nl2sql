@@ -1,7 +1,10 @@
-from typing import Dict, Callable, Union
+from typing import Dict
 from langchain_core.runnables import Runnable
 from langgraph.graph import END, StateGraph
 
+from nl2sql.common.cancellation import is_cancelled, wait as wait_cancel
+from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
+from nl2sql.common.settings import settings
 from nl2sql.pipeline.state import SubgraphExecutionState
 from nl2sql.pipeline.nodes.ast_planner import ASTPlannerNode
 from nl2sql.pipeline.nodes.schema_retriever import SchemaRetrieverNode
@@ -14,7 +17,6 @@ from nl2sql.context import NL2SQLContext
 
 
 
-import time
 import random
 
 
@@ -52,11 +54,35 @@ def build_sql_agent_graph(
     def retry_node(state: SubgraphExecutionState) -> Dict:
         """Increments retry count with exponential backoff and jitter."""
         count = _get_retry_count(state)
-        base_delay = min(10.0, 1.0 * (2 ** count))
-        jitter = random.uniform(0.0, 0.5)
+        if is_cancelled():
+            return {
+                "errors": [
+                    PipelineError(
+                        node="retry_handler",
+                        message="Pipeline cancelled by user.",
+                        severity=ErrorSeverity.ERROR,
+                        error_code=ErrorCode.CANCELLED,
+                    )
+                ]
+            }
+        if count >= settings.sql_agent_max_retries:
+            return {"retry_count": count}
+
+        base_delay = min(settings.sql_agent_retry_max_delay_sec, settings.sql_agent_retry_base_delay_sec * (2 ** count))
+        jitter = random.uniform(0.0, settings.sql_agent_retry_jitter_sec)
         sleep_time = base_delay + jitter
-        
-        time.sleep(sleep_time)
+
+        if wait_cancel(timeout=sleep_time):
+            return {
+                "errors": [
+                    PipelineError(
+                        node="retry_handler",
+                        message="Pipeline cancelled by user.",
+                        severity=ErrorSeverity.ERROR,
+                        error_code=ErrorCode.CANCELLED,
+                    )
+                ]
+            }
 
         return {
             "retry_count": count + 1,
@@ -64,37 +90,43 @@ def build_sql_agent_graph(
 
     def check_planner(state: SubgraphExecutionState) -> str:
         """Routes based on planner result."""
+        if is_cancelled():
+            return "end"
         if not (state.ast_planner_response and state.ast_planner_response.plan):
             # If explicit errors exist, check retryability
             if state.errors:
                  if not all(e.is_retryable for e in state.errors):
                      return "end"
 
-            if _get_retry_count(state) < 3:
+            if _get_retry_count(state) < settings.sql_agent_max_retries:
                 return "retry"
             return "end"
         return "ok"
 
     def check_logical_validation(state: SubgraphExecutionState) -> str:
         """Routes based on logical validation result."""
+        if is_cancelled():
+            return "end"
         if state.logical_validator_response and state.logical_validator_response.errors:
             # Critical/Fatal errors stop execution immediately
             if not all(e.is_retryable for e in state.logical_validator_response.errors):
                 return "end"
 
-            if _get_retry_count(state) < 3:
+            if _get_retry_count(state) < settings.sql_agent_max_retries:
                 return "retry"
             return "end"
         return "ok"
 
     def check_physical_validation(state: SubgraphExecutionState) -> str:
         """Routes based on physical validation result."""
+        if is_cancelled():
+            return "end"
         if state.physical_validator_response and state.physical_validator_response.errors:
              # Critical/Fatal errors stop execution immediately
             if not all(e.is_retryable for e in state.physical_validator_response.errors):
                 return "end"
 
-            if _get_retry_count(state) < 3:
+            if _get_retry_count(state) < settings.sql_agent_max_retries:
                 return "retry"
             return "end"
         return "ok"
@@ -124,13 +156,13 @@ def build_sql_agent_graph(
         {"ok": "generator", "retry": "retry_handler", "end": END},
     )
 
-    graph.add_edge("generator", "physical_validator")
+    graph.add_edge("generator", "executor")
 
-    graph.add_conditional_edges(
+    """ graph.add_conditional_edges(
         "physical_validator",
         check_physical_validation,
         {"ok": "executor", "retry": "retry_handler", "end": END},
-    )
+    ) """
 
     graph.add_edge("executor", END)
 

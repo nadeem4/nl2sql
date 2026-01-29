@@ -186,6 +186,8 @@ class DecomposerNode:
                 unmapped_subqueries=unmapped,
             )
 
+            logger.info(f"Decomposer response: {response.model_dump_json(indent=2)}")
+
             return {
                 "decomposer_response": response,
                 "reasoning": [{"node": self.node_name, "content": "Decomposition completed."}],

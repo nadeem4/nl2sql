@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Dict, Any
 
+from nl2sql.common.cancellation import is_cancelled
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.common.logger import get_logger
 from nl2sql.context import NL2SQLContext
@@ -25,6 +26,15 @@ class ExecutorNode:
 
     def __call__(self, state: SubgraphExecutionState) -> Dict[str, Any]:
         try:
+            if is_cancelled():
+                error = PipelineError(
+                    node=self.node_name,
+                    message="Pipeline cancelled by user.",
+                    severity=ErrorSeverity.ERROR,
+                    error_code=ErrorCode.CANCELLED,
+                )
+                return {"executor_response": None, "errors": [error]}
+
             ds_id = state.sub_query.datasource_id if state.sub_query else None
             sql = state.generator_response.sql_draft if state.generator_response else None
 

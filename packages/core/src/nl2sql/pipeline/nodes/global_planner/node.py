@@ -151,8 +151,12 @@ class GlobalPlannerNode:
             execution_dag.content_hash = self._hash_execution_dag(execution_dag)
             execution_dag.dag_id = f"dag_{execution_dag.content_hash[:12]}"
 
+            result = GlobalPlannerResponse(execution_dag=execution_dag)
+
+            logger.info(f"Global planner response: {result.model_dump_json(indent=2)}")
+
             return {
-                "global_planner_response": GlobalPlannerResponse(execution_dag=execution_dag),
+                "global_planner_response": result,      
                 "reasoning": [{"node": self.node_name, "content": "Built explicit execution DAG."}],
             }
 

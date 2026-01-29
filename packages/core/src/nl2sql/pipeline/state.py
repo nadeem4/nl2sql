@@ -36,6 +36,7 @@ class GraphState(BaseModel):
         trace_id (str): Distributed unique trace ID.
         user_query (str): Canonical user query.
         user_context (UserContext): User identity and permissions context.
+        datasource_id (Optional[str]): Optional datasource override for resolution.
         datasource_resolver_response (Optional[DatasourceResolverResponse]): Output of resolver node.
         decomposer_response (Optional[DecomposerResponse]): Output of decomposer node.
         global_planner_response (Optional[GlobalPlannerResponse]): Output of planner node.
@@ -54,6 +55,7 @@ class GraphState(BaseModel):
     trace_id: str = Field(default_factory=lambda: str(uuid.uuid4()), description="Distributed unique trace ID.")
     user_query: str = Field(description="Canonical user query.")
     user_context: UserContext = Field(default_factory=UserContext, description="User identity and permissions context.")
+    datasource_id: Optional[str] = Field(default=None, description="Optional datasource override for resolution.")
     datasource_resolver_response: Optional[DatasourceResolverResponse] = Field(default=None)
     decomposer_response: Optional[DecomposerResponse] = Field(default=None)
     global_planner_response: Optional[GlobalPlannerResponse] = Field(default=None)

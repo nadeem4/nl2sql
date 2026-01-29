@@ -10,9 +10,11 @@ It implements the Singleton pattern to ensure pools are reused across requests.
 from __future__ import annotations
 
 import atexit
-from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, TimeoutError as FutureTimeout
 from typing import Optional
+import time
 
+from nl2sql.common.cancellation import is_cancelled
 from nl2sql.common.logger import get_logger
 from nl2sql.common.settings import settings
 
@@ -117,10 +119,35 @@ def execute_in_sandbox(
         ExecutionResult: The result, safely wrapping any infrastructure errors.
     """
     try:
+        if is_cancelled():
+            return ExecutionResult(
+                success=False,
+                error="Operation cancelled by user.",
+                metrics={"cancelled": 1.0},
+            )
+
         future = pool.submit(func, request)
-        return future.result(timeout=timeout_sec)
-    
-    except TimeoutError:
+        start_time = time.monotonic()
+
+        while True:
+            if is_cancelled():
+                future.cancel()
+                return ExecutionResult(
+                    success=False,
+                    error="Operation cancelled by user.",
+                    metrics={"cancelled": 1.0},
+                )
+
+            elapsed = time.monotonic() - start_time
+            if elapsed >= timeout_sec:
+                raise FutureTimeout()
+
+            try:
+                return future.result(timeout=0.25)
+            except FutureTimeout:
+                continue
+
+    except FutureTimeout:
         logger.error(f"Sandbox Timeout ({timeout_sec}s) for {func.__name__}")
         return ExecutionResult(
             success=False,
