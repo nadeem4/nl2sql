@@ -1,12 +1,12 @@
 from nl2sql.execution.executor.registry import ExecutorRegistry
 from nl2sql.execution.executor.base import ExecutorService
-from nl2sql.execution.contracts import ExecutorRequest, ExecutorBaseModel
+from nl2sql.execution.contracts import ExecutorRequest, ExecutorResponse
 from nl2sql_adapter_sdk.capabilities import DatasourceCapability
 
 
 class FakeExecutor(ExecutorService):
-    def execute(self, request: ExecutorRequest) -> ExecutorBaseModel:
-        return ExecutorBaseModel(
+    def execute(self, request: ExecutorRequest) -> ExecutorResponse:
+        return ExecutorResponse(
             executor_name="fake",
             subgraph_name=request.subgraph_name,
             node_id=request.node_id,

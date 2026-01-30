@@ -16,13 +16,7 @@ class PolarsDuckdbEngine(AggregationEngine):
         self.artifact_store = build_artifact_store()
 
     def load_scan(self, artifact: ArtifactRef) -> pl.DataFrame:
-        if artifact.uri.startswith("s3://") or artifact.uri.startswith("abfs://"):
-            result_frame = self.artifact_store.read_result_frame(artifact)
-            return pl.from_dicts(result_frame.to_row_dicts())
-
-        relation = duckdb.query(f"SELECT * FROM '{artifact.uri}'")
-        table = relation.arrow()
-        return pl.from_arrow(table)
+        return self.artifact_store.read_parquet(artifact)
 
     def combine(
         self,

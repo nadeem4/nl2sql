@@ -32,13 +32,6 @@ class DatasourceResolverNode:
         unsupported = [ds_id for ds_id in datasource_ids if ds_id not in available_ds_ids]
         return sorted(unsupported)
 
-    def _get_latest_schema_version(self, datasource_id: str) -> str | None:
-        try:
-            latest = self.schema_store.get_latest_version(datasource_id)
-        except Exception:
-            return None
-        return latest
-
     def _error_response(
         self,
         resolved_datasources: list[ResolvedDatasource],
@@ -75,7 +68,7 @@ class DatasourceResolverNode:
             if not ds_id or ds_id in candidate_datasources:
                 continue
             if ds_id not in schema_versions:
-                schema_versions[ds_id] = self._get_latest_schema_version(ds_id)
+                schema_versions[ds_id] = self.schema_store.get_latest_version(ds_id)
             chunk_schema_version = doc.metadata.get("schema_version")
             schema_version = schema_versions.get(ds_id)
             candidate_datasources[ds_id] = ResolvedDatasource(
@@ -240,10 +233,7 @@ class DatasourceResolverNode:
                 resolved_datasources=list(candidate_datasources.values()),
                 allowed_datasource_ids=allowed_ids,
                 unsupported_datasource_ids=unsupported_ids,
-            )   
-        
-            logger.info(f"Resolved datasources: {result.model_dump_json(indent=2)}")
-            
+            )               
             return {
                 "datasource_resolver_response": result,
                 "reasoning": [{"node": self.node_name, "content": "Ranked by vector similarity."}],

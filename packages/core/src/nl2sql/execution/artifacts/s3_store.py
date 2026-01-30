@@ -11,7 +11,7 @@ from .parquet import result_frame_to_polars, write_parquet_polars, read_parquet_
 
 
 class S3ArtifactStore(ArtifactStore):
-    def write_result_frame(self, frame: ResultFrame, metadata: Dict[str, str]):
+    def create_artifact_ref(self, frame: ResultFrame, metadata: Dict[str, str]):
         if not self.config.s3_bucket:
             raise ValueError("S3 bucket not configured for artifact store.")
         relative_path = self._render_path(metadata)
@@ -24,7 +24,7 @@ class S3ArtifactStore(ArtifactStore):
         bytes_written = getattr(df, "estimated_size", lambda: 0)()
 
         payload = {
-            "columns": [c.name for c in frame.columns],
+            "columns": frame.columns,
             "row_count": frame.row_count,
             "key": key,
         }

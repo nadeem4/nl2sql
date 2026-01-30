@@ -174,7 +174,6 @@ class GeneratorNode:
             if not plan:
                 raise ValueError("No plan provided")
 
-            # Fix: Use adapter directly since get_profile is removed
             adapter = self.ds_registry.get_adapter(datasource_id)
             dialect = adapter.get_dialect()
 

@@ -153,8 +153,6 @@ class GlobalPlannerNode:
 
             result = GlobalPlannerResponse(execution_dag=execution_dag)
 
-            logger.info(f"Global planner response: {result.model_dump_json(indent=2)}")
-
             return {
                 "global_planner_response": result,      
                 "reasoning": [{"node": self.node_name, "content": "Built explicit execution DAG."}],

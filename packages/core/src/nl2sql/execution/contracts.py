@@ -36,11 +36,12 @@ class ExecutorRequest(BaseModel):
     schema_version: Optional[str] = None
     sql: Optional[str] = None
     user_context: Optional[UserContext] = None
+    tenant_id: str
 
     model_config = ConfigDict(extra="ignore")
 
 
-class ExecutorBaseModel(BaseModel):
+class ExecutorResponse(BaseModel):
     executor_name: str
     subgraph_name: str
     node_id: str
@@ -51,5 +52,6 @@ class ExecutorBaseModel(BaseModel):
     metrics: Dict[str, float] = Field(default_factory=dict)
     errors: List[PipelineError] = Field(default_factory=list)
     reasoning: List[Dict[str, Any]] = Field(default_factory=list)
+    tenant_id: str
 
     model_config = ConfigDict(extra="ignore")

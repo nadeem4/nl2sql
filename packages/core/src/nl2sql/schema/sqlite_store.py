@@ -32,7 +32,7 @@ class SqliteSchemaStore:
     def _connect(self) -> sqlite3.Connection:
         if str(self._path) != ":memory:":
             self._path.parent.mkdir(parents=True, exist_ok=True)
-        connection = sqlite3.connect(str(self._path))
+        connection = sqlite3.connect(str(self._path), check_same_thread=False)
         connection.execute("PRAGMA journal_mode=WAL;")
         return connection
 
@@ -78,9 +78,11 @@ class SqliteSchemaStore:
             )
             return existing_version, []
 
-        ts = datetime.utcnow().strftime("%Y%m%d%H%M%S")
+        now = datetime.utcnow()
+
+        ts = now.strftime("%Y%m%d%H%M%S")
         schema_version = f"{ts}_{fingerprint[:8]}"
-        created_at = int(datetime.utcnow().timestamp())
+        created_at = int(now.timestamp())
 
         contract_json = json.dumps(snapshot.contract.model_dump(mode="json"))
         metadata_json = json.dumps(snapshot.metadata.model_dump(mode="json"))
@@ -134,17 +136,20 @@ class SqliteSchemaStore:
         return self.get_snapshot(datasource_id, latest_version)
 
     def get_latest_version(self, datasource_id: str) -> Optional[str]:
-        row = self._connection.execute(
-            """
-            SELECT schema_version
-            FROM schema_snapshots
-            WHERE datasource_id = ?
-            ORDER BY created_at DESC
-            LIMIT 1;
-            """,
-            (datasource_id,),
-        ).fetchone()
-        return row[0] if row else None
+        with self._connection:
+            row = self._connection.execute(
+                """
+                SELECT schema_version
+                FROM schema_snapshots
+                WHERE datasource_id = ?
+                ORDER BY created_at DESC
+                LIMIT 1;
+                """,
+                (datasource_id,),
+            ).fetchone()
+
+            print(f"Latest version row for {datasource_id}: {row}")  # Debug print
+            return row[0] if row else None
 
     def list_versions(self, datasource_id: str) -> List[str]:
         rows = self._connection.execute(

@@ -16,7 +16,7 @@ from nl2sql.pipeline.nodes.answer_synthesizer.schemas import AnswerSynthesizerRe
 from nl2sql.pipeline.nodes.ast_planner.schemas import ASTPlannerResponse
 from nl2sql.pipeline.nodes.validator.schemas import LogicalValidatorResponse, PhysicalValidatorResponse
 from nl2sql.pipeline.nodes.generator.schemas import GeneratorResponse
-from nl2sql.execution.contracts import ArtifactRef, ExecutorBaseModel
+from nl2sql.execution.contracts import ArtifactRef, ExecutorResponse
 from nl2sql.pipeline.nodes.refiner.schemas import RefinerResponse
 from nl2sql.pipeline.subgraphs.schemas import SubgraphOutput
 from nl2sql.schema import Table
@@ -84,7 +84,7 @@ class SubgraphExecutionState(BaseModel):
     logical_validator_response: Optional[LogicalValidatorResponse] = Field(default=None)
     physical_validator_response: Optional[PhysicalValidatorResponse] = Field(default=None)
     generator_response: Optional[GeneratorResponse] = Field(default=None)
-    executor_response: Optional[ExecutorBaseModel] = Field(default=None)
+    executor_response: Optional[ExecutorResponse] = Field(default=None)
     refiner_response: Optional[RefinerResponse] = Field(default=None)
 
     retry_count: int = 0

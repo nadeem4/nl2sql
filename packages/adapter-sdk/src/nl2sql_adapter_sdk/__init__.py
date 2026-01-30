@@ -1,7 +1,7 @@
 """Adapter SDK: shared contracts for core and adapters."""
 
 from .capabilities import DatasourceCapability
-from .contracts import AdapterRequest, ResultColumn, ResultError, ResultFrame
+from .contracts import AdapterRequest, ResultError, ResultFrame
 from .protocols import DatasourceAdapterProtocol
 from .schema import (
     Column,
@@ -21,7 +21,6 @@ from .schema import (
 __all__ = [
     "DatasourceCapability",
     "AdapterRequest",
-    "ResultColumn",
     "ResultError",
     "ResultFrame",
     "DatasourceAdapterProtocol",

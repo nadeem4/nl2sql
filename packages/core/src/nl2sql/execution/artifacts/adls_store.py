@@ -21,7 +21,7 @@ class AdlsArtifactStore(ArtifactStore):
         account_url = f"https://{self.config.adls_account}.blob.core.windows.net"
         return BlobServiceClient(account_url=account_url)
 
-    def write_result_frame(self, frame: ResultFrame, metadata: Dict[str, str]):
+    def create_artifact_ref(self, frame: ResultFrame, metadata: Dict[str, str]):
         if not self.config.adls_container:
             raise ValueError("ADLS container not configured for artifact store.")
         relative_path = self._render_path(metadata)
@@ -36,7 +36,7 @@ class AdlsArtifactStore(ArtifactStore):
         bytes_written = getattr(df, "estimated_size", lambda: 0)()
 
         payload = {
-            "columns": [c.name for c in frame.columns],
+            "columns": frame.columns,
             "row_count": frame.row_count,
             "blob": relative_path,
         }

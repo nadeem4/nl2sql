@@ -112,24 +112,6 @@ class DatasourceRegistry:
                 f"No adapter found for engine type: '{conn_type}' in datasource '{ds_id}'"
             )
 
-    def refresh_schema(self, datasource_id: str, vector_store: Any) -> Dict[str, int]:
-        """Refreshes the schema for a specific datasource.
-        
-        This triggers a fresh intrusion of the database schema via the adapter
-        and updates the vector store index.
-
-        Args:
-            datasource_id: The ID of the datasource to refresh.
-            vector_store: The VectorStore instance.
-
-        Returns:
-            Dict[str, int]: Statistics of the refreshed components.
-
-        Raises:
-            ValueError: If the datasource ID is unknown.
-        """
-        adapter = self.get_adapter(datasource_id)
-        return vector_store.refresh_schema(adapter, datasource_id)
 
     def get_adapter(self, datasource_id: str) -> DatasourceAdapterProtocol:
         """Retrieves the adapter for a datasource.

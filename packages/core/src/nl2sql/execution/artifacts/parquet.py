@@ -11,13 +11,13 @@ from nl2sql_adapter_sdk.contracts import ResultFrame
 
 def result_frame_to_polars(frame: ResultFrame) -> pl.DataFrame:
     rows = frame.to_row_dicts()
-    columns = [c.name for c in frame.columns]
+    columns = frame.columns
     if columns:
         return pl.DataFrame(rows, schema=columns)
     return pl.DataFrame(rows)
 
 
-def write_parquet_polars(
+def write_parquet(
     df: pl.DataFrame,
     target: Any,
     storage_options: Optional[Dict[str, Any]] = None,

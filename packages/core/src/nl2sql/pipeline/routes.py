@@ -15,6 +15,9 @@ from nl2sql.pipeline.graph_utils import (
 )
 from nl2sql.pipeline.state import GraphState
 from nl2sql.pipeline.subgraphs import SubgraphSpec
+from nl2sql.common.logger import get_logger
+
+logger = get_logger("router")
 
 
 def resolver_route(state: GraphState) -> str:
@@ -32,14 +35,12 @@ def build_scan_layer_router(
     subgraph_specs: Dict[str, SubgraphSpec],
 ):
     def route_scan_layers(state: GraphState):
-        accessor = StateAccessor(state)
-        global_planner_response = accessor.get("global_planner_response")
+        global_planner_response = state.global_planner_response
         dag = global_planner_response.execution_dag if global_planner_response else None
-        decomposer_response = accessor.get("decomposer_response")
+        decomposer_response = state.decomposer_response
         sub_queries = decomposer_response.sub_queries if decomposer_response else []
         sub_query_map = {sq.id: sq for sq in sub_queries}
-        artifact_refs = accessor.get("artifact_refs") or {}
-
+        artifact_refs = state.artifact_refs or {}
         if not dag or not dag.layers:
             return END
 
@@ -47,13 +48,7 @@ def build_scan_layer_router(
         target_ids = next_scan_layer_ids(dag, artifact_refs)
         if not target_ids:
             return [
-                Send(
-                    "aggregator",
-                    {
-                        "global_planner_response": global_planner_response,
-                        "artifact_refs": artifact_refs,
-                    },
-                )
+                Send("aggregator",state)
             ]
 
         branches = []

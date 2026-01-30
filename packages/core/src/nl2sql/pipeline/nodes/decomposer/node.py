@@ -62,20 +62,18 @@ class DecomposerNode:
         """
         try:
             resolver_response = state.datasource_resolver_response
-            resolved_datasources = resolver_response.resolved_datasources if resolver_response else []
+            if not resolver_response or not resolver_response.resolved_datasources:
+                raise ValueError("Unable to resolve any datasource for the current user query.")
+            
+            resolved_datasources = resolver_response.resolved_datasources 
             resolved_payload = []
             resolved_ids = set()
-            for entry in resolved_datasources:
-                if hasattr(entry, "model_dump"):
-                    data = entry.model_dump()
-                elif isinstance(entry, dict):
-                    data = entry
-                else:
-                    data = {"datasource_id": getattr(entry, "datasource_id", None)}
-                resolved_payload.append(data)
-                ds_id = data.get("datasource_id")
-                if ds_id:
-                    resolved_ids.add(ds_id)
+            schema_version_map = {}
+            for datasource in resolved_datasources:
+                resolved_payload.append(datasource.model_dump())
+                resolved_ids.add(datasource.datasource_id)
+                schema_version_map[datasource.datasource_id] = datasource.schema_version
+
             llm_response: DecomposerResponse = self.chain.invoke(
                 {
                     "user_query": state.user_query,
@@ -84,9 +82,9 @@ class DecomposerNode:
             )
 
             final_sub_queries = []
-            unmapped = list(llm_response.unmapped_subqueries or [])
-            allowed_ids = set(resolver_response.allowed_datasource_ids or []) if resolver_response else set()
-            unsupported_ids = set(resolver_response.unsupported_datasource_ids or []) if resolver_response else set()
+            unmapped = []
+            allowed_ids = set(resolver_response.allowed_datasource_ids)
+            unsupported_ids = set(resolver_response.unsupported_datasource_ids)
             id_map: Dict[str, str] = {}
 
             for llm_sq in llm_response.sub_queries:
@@ -141,6 +139,7 @@ class DecomposerNode:
                     filters=llm_sq.filters,
                     group_by=llm_sq.group_by,
                     expected_schema=llm_sq.expected_schema,
+                    schema_version=schema_version_map.get(datasource_id),
                 )
                 final_sub_queries.append(sq)
 
@@ -185,8 +184,6 @@ class DecomposerNode:
                 post_combine_ops=post_combine_ops,
                 unmapped_subqueries=unmapped,
             )
-
-            logger.info(f"Decomposer response: {response.model_dump_json(indent=2)}")
 
             return {
                 "decomposer_response": response,

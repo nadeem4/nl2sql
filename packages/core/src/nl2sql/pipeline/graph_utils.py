@@ -8,6 +8,7 @@ from nl2sql.context import NL2SQLContext
 from nl2sql.pipeline.nodes.global_planner.schemas import ExecutionDAG
 from nl2sql.pipeline.state import GraphState, SubgraphExecutionState
 from nl2sql.pipeline.subgraphs import SubgraphOutput, SubgraphSpec
+import logging
 
 
 class StateAccessor:
@@ -61,105 +62,60 @@ def build_scan_payload(
     subgraph_name: str,
     node_id: str,
 ) -> Dict[str, Any]:
-    accessor = StateAccessor(state)
-    trace_id = accessor.get("trace_id")
+    trace_id = state.trace_id   
     return {
         "subgraph_id": f"{subgraph_name}:{node_id}:{trace_id}",
         "subgraph_name": subgraph_name,
         "trace_id": trace_id,
-        "user_context": accessor.get("user_context"),
-        "decomposer_response": accessor.get("decomposer_response"),
-        "datasource_resolver_response": accessor.get("datasource_resolver_response"),
+        "user_context": state.user_context,
+        "decomposer_response": state.decomposer_response,
+        "datasource_resolver_response": state.datasource_resolver_response,
     }
-
-
-def _get_response_value(response: Any, attr: str) -> Any:
-    if response is None:
-        return None
-    if hasattr(response, attr):
-        return getattr(response, attr)
-    if isinstance(response, dict):
-        return response.get(attr)
-    return None
-
 
 def wrap_subgraph(
     subgraph: Runnable,
     subgraph_name: str,
     ctx: NL2SQLContext,
-) -> Callable[[GraphState], Dict[str, Any]]:
-    def _wrapper(state: GraphState) -> Dict[str, Any]:
-        accessor = StateAccessor(state)
-        trace_id = accessor.get("trace_id")
-        subgraph_id = accessor.get("subgraph_id")
-        trace_id = trace_id or "unknown"
-        sub_query_id = subgraph_id.split(":")[1] if ":" in subgraph_id else None
-        selected_datasource_id = None
+) -> Callable[Dict[str, Any]]:
+    def _wrapper(state_dict: dict) -> Dict[str, Any]:
+        trace_id = state_dict.get("trace_id")
+        subgraph_id = state_dict.get("subgraph_id")
+        sub_query_id = subgraph_id.split(":")[1]
         sub_query = None
-        decomposer_response = accessor.get("decomposer_response")
-        for sq in (decomposer_response.sub_queries if decomposer_response else []):
+        decomposer_response = state_dict.get("decomposer_response")
+        for sq in decomposer_response.sub_queries:
             if sq.id == sub_query_id:
                 sub_query = sq
-                selected_datasource_id = sq.datasource_id
                 break
 
         sub_state = SubgraphExecutionState(
             trace_id=trace_id,
-            user_context=accessor.get("user_context"),
+            user_context=state_dict.get("user_context"),
             sub_query=sub_query,
             subgraph_id=subgraph_id,
             subgraph_name=subgraph_name,
         )
         result = subgraph.invoke(sub_state.model_dump())
 
-        executor_response = result.get("executor_response")
-        generator_response = result.get("generator_response")
-        planner_response = result.get("ast_planner_response")
+        returned_state = SubgraphExecutionState.model_validate(result)
 
-        sq_id = (
-            result.get("sub_query_id")
-            or (sub_query.id if sub_query else None)
-            or sub_query_id
-            or "unknown"
-        )
-        sub_reasoning = result.get("reasoning", [])
-        datasource_id = result.get("selected_datasource_id") or selected_datasource_id
-        if sub_query:
-            datasource_id = sub_query.datasource_id
-
-        schema_version = None
-        resolver_response = accessor.get("datasource_resolver_response")
-        if resolver_response:
-            for entry in resolver_response.resolved_datasources:
-                entry_id = getattr(entry, "datasource_id", None)
-                if not entry_id and isinstance(entry, dict):
-                    entry_id = entry.get("datasource_id")
-                if entry_id == datasource_id:
-                    if hasattr(entry, "schema_version"):
-                        schema_version = entry.schema_version
-                    elif isinstance(entry, dict):
-                        schema_version = entry.get("schema_version")
-                    break
-
+        executor_response = returned_state.executor_response
+        planner_response = returned_state.ast_planner_response
+        sub_reasoning = returned_state.reasoning
         artifact_refs: Dict[str, Any] = {}
-        artifact = _get_response_value(executor_response, "artifact")
-        if artifact:
-            ctx.execution_store.put(sq_id, artifact)
-            artifact_refs[sq_id] = artifact
+        artifact = executor_response.artifact
+        artifact_refs[sub_query.id] = artifact
 
-        retry_count = result.get("retry_count", 0)
-        status = "error" if result.get("errors") else "success"
+        retry_count = returned_state.retry_count
+        status = "error" if returned_state.errors else "success"
         subgraph_output = SubgraphOutput(
-            subgraph_id=subgraph_id,
+            sub_query=sub_query,
             subgraph_name=subgraph_name,
-            sub_query_id=sq_id,
-            selected_datasource_id=datasource_id,
-            schema_version=schema_version,
+            subgraph_id=subgraph_id,
             retry_count=retry_count,
-            plan=_get_response_value(planner_response, "plan"),
-            sql_draft=_get_response_value(generator_response, "sql_draft"),
+            plan=planner_response.plan,
             artifact=artifact,
-            errors=result.get("errors", []),
+            errors=returned_state.errors,
             reasoning=sub_reasoning,
             status=status,
         )
@@ -167,8 +123,8 @@ def wrap_subgraph(
         return {
             "artifact_refs": artifact_refs,
             "subgraph_outputs": {subgraph_id: subgraph_output},
-            "errors": result.get("errors", []),
-            "reasoning": sub_reasoning,
+            "errors": returned_state.errors,
+            "reasoning": returned_state.reasoning,
         }
 
     return _wrapper

@@ -48,6 +48,7 @@ class NL2SQLContext:
             vector_store_path = pathlib.Path(settings.vector_store_path)
 
         cm = ConfigManager()
+        self.tenant_id = settings.tenant_id
         self.config_manager = cm
 
         secret_configs = cm.load_secrets(secrets_config_path)

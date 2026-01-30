@@ -70,6 +70,8 @@ class AnswerSynthesizerNode:
                 }
             )
 
+            logger.info(f"Answer Synthesizer response: {response.model_dump_json(indent=2)}")
+
             return {
                 "answer_synthesizer_response": AnswerSynthesizerResponse(
                     final_answer=response.model_dump(),

@@ -23,20 +23,12 @@ class ExecutorNode:
         self.node_name = self.__class__.__name__.lower().replace("node", "")
         self.ds_registry = ctx.ds_registry
         self.registry = ExecutorRegistry(ctx.ds_registry)
+        self.tenant_id = ctx.tenant_id
 
     def __call__(self, state: SubgraphExecutionState) -> Dict[str, Any]:
         try:
-            if is_cancelled():
-                error = PipelineError(
-                    node=self.node_name,
-                    message="Pipeline cancelled by user.",
-                    severity=ErrorSeverity.ERROR,
-                    error_code=ErrorCode.CANCELLED,
-                )
-                return {"executor_response": None, "errors": [error]}
-
-            ds_id = state.sub_query.datasource_id if state.sub_query else None
-            sql = state.generator_response.sql_draft if state.generator_response else None
+            ds_id = state.sub_query.datasource_id 
+            sql = state.generator_response.sql_draft 
 
             if not sql:
                 error = PipelineError(
@@ -56,9 +48,7 @@ class ExecutorNode:
                 )
                 return {"executor_response": None, "errors": [error]}
 
-            adapter = self.ds_registry.get_adapter(ds_id)
-            caps = adapter.capabilities() if hasattr(adapter, "capabilities") else {DatasourceCapability.SUPPORTS_SQL}
-            executor = self.registry.get_executor(caps)
+            executor = self.registry.get_executor(ds_id)
             if executor is None:
                 error = PipelineError(
                     node=self.node_name,
@@ -69,13 +59,14 @@ class ExecutorNode:
                 return {"executor_response": None, "errors": [error]}
 
             request = ExecutorRequest(
-                node_id=state.sub_query.id if state.sub_query else "unknown",
+                node_id=state.sub_query.id,
                 trace_id=state.trace_id,
-                subgraph_name=state.subgraph_name or "sql_agent",
+                subgraph_name=state.subgraph_name,
                 datasource_id=ds_id,
-                schema_version=getattr(state.sub_query, "schema_version", None),
+                schema_version=state.sub_query.schema_version,
                 sql=sql,
                 user_context=state.user_context,
+                tenant_id=self.tenant_id,
             )
             response = executor.execute(request)
             return {

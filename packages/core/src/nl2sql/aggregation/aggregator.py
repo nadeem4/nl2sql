@@ -34,7 +34,7 @@ class AggregationService:
 
         computed: Dict[str, pl.DataFrame] = {}
 
-        for layer in dag.layers or []:
+        for layer in dag.layers:
             for node_id in layer:
                 node = node_index.get(node_id)
                 if not node:

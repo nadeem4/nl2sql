@@ -44,6 +44,7 @@ class SubQuery(BaseModel):
     filters: List[FilterSpec] = Field(default_factory=list)
     group_by: List[GroupBySpec] = Field(default_factory=list)
     expected_schema: List[ExpectedColumn] = Field(default_factory=list)
+    schema_version: Optional[str] = None
 
     @model_validator(mode="after")
     def validate_semantic_only(self):

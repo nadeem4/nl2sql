@@ -5,7 +5,6 @@ from typing import Tuple
 from nl2sql_adapter_sdk.capabilities import DatasourceCapability
 from nl2sql_adapter_sdk.contracts import (
     AdapterRequest,
-    ResultColumn,
     ResultError,
     ResultFrame,
 )
@@ -155,7 +154,7 @@ class BaseSQLAlchemyAdapter:
 
         return ResultFrame(
             success=True,
-            columns=[ResultColumn(name=col, type="unknown") for col in cols],
+            columns=cols,
             rows=rows,
             row_count=row_count,
             bytes=total_bytes,

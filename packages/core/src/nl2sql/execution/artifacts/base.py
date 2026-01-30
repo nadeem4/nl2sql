@@ -6,6 +6,7 @@ from typing import Dict, Optional
 
 from abc import ABC, abstractmethod
 
+import polars as pl
 from nl2sql.common.settings import settings
 from nl2sql.execution.contracts import ArtifactRef
 from nl2sql_adapter_sdk.contracts import ResultFrame
@@ -28,18 +29,20 @@ class ArtifactStore(ABC):
         self.config = config
 
     @abstractmethod
-    def write_result_frame(self, frame: ResultFrame, metadata: Dict[str, str]) -> ArtifactRef:
+    def create_artifact_ref(self, frame: ResultFrame, metadata: Dict[str, str]) -> ArtifactRef:
         raise NotImplementedError
 
     @abstractmethod
     def read_result_frame(self, artifact: ArtifactRef) -> ResultFrame:
         raise NotImplementedError
+    
+    @abstractmethod
+    def read_parquet(self, artifact: ArtifactRef) -> pl.DataFrame:
+        return NotImplementedError
 
-    def _render_path(self, metadata: Dict[str, str]) -> str:
-        path = self.config.path_template
-        for key, value in metadata.items():
-            path = path.replace(f"<{key}>", value or "unknown")
-        return path
+    @abstractmethod
+    def get_upload_path(self, request_id: str, tenant_id: str) -> str:
+        return NotImplementedError
 
     def _build_artifact_ref(
         self,
@@ -49,13 +52,12 @@ class ArtifactStore(ABC):
         bytes_written: int,
         schema_version: Optional[str],
     ) -> ArtifactRef:
-        columns = [c.name for c in frame.columns]
         return ArtifactRef(
             uri=uri,
             backend=self.config.backend,
             format="parquet",
             row_count=frame.row_count or len(frame.rows),
-            columns=columns,
+            columns=frame.columns,
             bytes=bytes_written,
             content_hash=content_hash,
             created_at=datetime.utcnow(),

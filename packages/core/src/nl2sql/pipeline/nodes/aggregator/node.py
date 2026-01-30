@@ -25,16 +25,13 @@ class EngineAggregatorNode:
 
     def __call__(self, state: GraphState) -> Dict[str, Any]:
         try:
-            if isinstance(state, dict):
-                planner_response = state.get("global_planner_response")
-                artifact_refs = state.get("artifact_refs") or {}
-            else:
-                planner_response = state.global_planner_response
-                artifact_refs = state.artifact_refs or {}
-
-            if isinstance(planner_response, dict):
-                planner_response = GlobalPlannerResponse.model_validate(planner_response)
-            dag = getattr(planner_response, "execution_dag", None) if planner_response else None
+            planner_response = state.global_planner_response
+            logger.info(f"Planner response: {planner_response.model_dump_json(indent=2)}")
+            artifact_refs = state.artifact_refs
+            logger.info(f"Artifact references: {artifact_refs}")
+           
+            dag = planner_response.execution_dag
+            
             terminal_results = self.service.execute(dag, artifact_refs)
             aggregator_response = AggregatorResponse(
                 terminal_results=terminal_results,
