@@ -1,8 +1,6 @@
 """Core schema models and stores."""
 
 from nl2sql_adapter_sdk.schema import (
-    Column,
-    Table,
     TableRef,
     ColumnStatistics,
     ColumnMetadata,
@@ -20,8 +18,6 @@ from .sqlite_store import SqliteSchemaStore
 from .store import build_schema_store
 
 __all__ = [
-    "Column",
-    "Table",
     "TableRef",
     "ColumnStatistics",
     "ColumnMetadata",

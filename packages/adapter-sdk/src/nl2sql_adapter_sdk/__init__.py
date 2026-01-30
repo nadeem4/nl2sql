@@ -4,8 +4,6 @@ from .capabilities import DatasourceCapability
 from .contracts import AdapterRequest, ResultError, ResultFrame
 from .protocols import DatasourceAdapterProtocol
 from .schema import (
-    Column,
-    Table,
     TableRef,
     ColumnStatistics,
     ColumnMetadata,
@@ -16,6 +14,7 @@ from .schema import (
     SchemaContract,
     SchemaMetadata,
     SchemaSnapshot,
+    ColumnRef   
 )
 
 __all__ = [
@@ -24,8 +23,6 @@ __all__ = [
     "ResultError",
     "ResultFrame",
     "DatasourceAdapterProtocol",
-    "Column",
-    "Table",
     "TableRef",
     "ColumnStatistics",
     "ColumnMetadata",
@@ -36,4 +33,5 @@ __all__ = [
     "SchemaContract",
     "SchemaMetadata",
     "SchemaSnapshot",
+    "ColumnRef",
 ]

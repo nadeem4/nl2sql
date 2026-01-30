@@ -50,6 +50,16 @@ class VectorStore:
             persist_directory=self.persist_directory,
         )
 
+    def initialize_if_not_exists(self) -> None:
+        """
+        Initializes the vector store if it does not exist.
+        """
+        try:
+            _ = self.vectorstore._collection.count()
+        except Exception:
+            logger.info("Vector store not found, initializing new store.")
+            self._initialize_vector_store()
+
     def is_empty(self) -> bool:
         """
         Checks whether the vector store is empty.
@@ -185,6 +195,7 @@ class VectorStore:
         Returns:
             Retrieved datasource documents.
         """
+        self.initialize_if_not_exists()
         from nl2sql.common.resilience import VECTOR_BREAKER
 
         @VECTOR_BREAKER
@@ -216,7 +227,9 @@ class VectorStore:
         Returns:
             Retrieved schema documents.
         """
+        self.initialize_if_not_exists()
         from nl2sql.common.resilience import VECTOR_BREAKER
+
 
         @VECTOR_BREAKER
         def _execute():
@@ -253,6 +266,8 @@ class VectorStore:
             Retrieved column documents.
         """
         from nl2sql.common.resilience import VECTOR_BREAKER
+
+        self.initialize_if_not_exists()
 
         @VECTOR_BREAKER
         def _execute():
@@ -292,6 +307,8 @@ class VectorStore:
         """
         from nl2sql.common.resilience import VECTOR_BREAKER
 
+        self.initialize_if_not_exists()
+    
         @VECTOR_BREAKER
         def _execute():
             return self.vectorstore.max_marginal_relevance_search(

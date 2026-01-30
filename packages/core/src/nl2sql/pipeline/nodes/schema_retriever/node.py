@@ -1,13 +1,17 @@
 from __future__ import annotations
 
-from typing import Dict, Any, List, Optional, TYPE_CHECKING
+from collections import defaultdict
+from typing import Dict, Any, List, Optional, TYPE_CHECKING, Set
 
 if TYPE_CHECKING:
     from nl2sql.pipeline.state import SubgraphExecutionState
+    from nl2sql.pipeline.nodes.decomposer.schemas import SubQuery
 
 from nl2sql.common.logger import get_logger
 from nl2sql.context import NL2SQLContext
-from nl2sql.schema import Table, Column
+from .schema import Table, Column
+from nl2sql_adapter_sdk.schema import SchemaSnapshot
+
 
 logger = get_logger("schema_retriever")
 
@@ -20,141 +24,210 @@ class SchemaRetrieverNode:
         self.vector_store = ctx.vector_store
         self.schema_store = ctx.schema_store
 
-    def _table_name_from_full(self, table_full: str) -> str:
-        if "." in table_full:
-            return table_full.rsplit(".", 1)[-1]
-        return table_full
 
-    def _column_parts(self, column_full: str) -> tuple[Optional[str], Optional[str]]:
-        if not column_full:
-            return None, None
-        if "." not in column_full:
-            return None, column_full
-        table_full, column_name = column_full.rsplit(".", 1)
-        return table_full, column_name
+    def _build_semantic_query(self, sub_query: SubQuery) -> str:
+        parts: List[str] = []
+        if sub_query and sub_query.intent:
+            parts.append(sub_query.intent)
+
+        if sub_query and sub_query.filters:
+            filters_text = []
+            for f in sub_query.filters:
+                value = f.value
+                if isinstance(value, list):
+                    value = ", ".join(str(v) for v in value)
+                filters_text.append(f"{f.attribute}={value}")
+            if filters_text:
+                parts.append("filters: " + "; ".join(filters_text))
+
+        if sub_query and sub_query.group_by:
+            group_by = ", ".join(g.attribute for g in sub_query.group_by)
+            if group_by:
+                parts.append("group_by: " + group_by)
+
+        if sub_query and sub_query.expected_schema:
+            expected = ", ".join(c.name for c in sub_query.expected_schema)
+            if expected:
+                parts.append("expected_schema: " + expected)
+
+        if sub_query and sub_query.metrics:
+            metrics = ", ".join(m.name for m in sub_query.metrics)
+            if metrics:
+                parts.append("metrics: " + metrics)
+
+        return "\n".join(parts).strip()
+
+    def _resolve_snapshot(self, datasource_id: str, schema_version: Optional[str]) -> Optional[SchemaSnapshot]:
+        if not self.schema_store:
+            return None
+        if schema_version:
+            return self.schema_store.get_snapshot(datasource_id, schema_version)
+        return self.schema_store.get_latest_snapshot(datasource_id)
 
     def _build_tables_from_snapshot(
         self,
-        datasource_id: str,
-        allowed_tables: Optional[set[str]],
+        snapshot: SchemaSnapshot,
+        resolved_tables: Optional[Dict[str, Set[str]]] = None,
+        schema_version: Optional[str] = None,
     ) -> List[Table]:
-        snapshot = self.schema_store.get_latest_snapshot(datasource_id) if self.schema_store else None
+        logger.info(f"Building tables from snapshot: {snapshot.model_dump_json(indent=2)}")
         if not snapshot:
             return []
 
-        tables: List[Table] = []
-        for table_contract in snapshot.contract.tables.values():
-            table_full = (
-                f"{table_contract.table.schema_name}.{table_contract.table.table_name}"
-            )
-            if allowed_tables and table_full not in allowed_tables:
-                continue
-            columns = [
-                Column(name=col.name, type=col.data_type)
-                for col in table_contract.columns.values()
-            ]
-            tables.append(Table(name=table_contract.table.table_name, columns=columns))
+        tables_out: List[Table] = []
+        table_keys = (
+            list(snapshot.contract.tables.keys())
+            if not resolved_tables
+            else list(resolved_tables.keys())
+        )
 
-        return tables
+        for table_key in table_keys:
+            table_contract = snapshot.contract.tables.get(table_key)
+            table_metadata = snapshot.metadata.tables.get(table_key)
+            if not table_contract:
+                continue
+
+            resolved_columns = resolved_tables[table_key] if resolved_tables else set()
+            if not resolved_columns:
+                resolved_columns = set(table_contract.columns.keys())
+
+            columns: List[Column] = []
+            for col_key, col_contract in table_contract.columns.items():
+                if col_key not in resolved_columns:
+                    continue
+                col_metadata = table_metadata.columns.get(col_key) if table_metadata else None
+
+                columns.append(
+                    Column(
+                        name=col_key,
+                        type=col_contract.data_type,
+                        stats=col_metadata.statistics.model_dump() if col_metadata and col_metadata.statistics else {},
+                        description=col_metadata.description if col_metadata else ""
+                    )
+                )
+
+            relationships = []
+            for fk in table_contract.foreign_keys:
+                relationships.append(
+                    {
+                        "from_table": table_contract.table.full_name,
+                        "to_table": fk.referred_table.full_name,
+                        "from_columns": fk.constrained_columns,
+                        "to_columns": fk.referred_columns,
+                        "cardinality": fk.cardinality,
+                        "business_meaning": fk.business_meaning,
+                    }
+                )
+
+            primary_keys = [
+                col.name for col in table_contract.columns.values() if col.is_primary_key
+            ]
+
+            table = Table(
+                    name=table_contract.table.table_name,
+                    columns=columns,
+                    description=table_metadata.description if table_metadata else "",
+                    primary_key=primary_keys,
+                    schema_version=schema_version,
+                    relationships=relationships,
+                )
+
+            tables_out.append( table )        
+
+        return tables_out
 
     def __call__(self, state: SubgraphExecutionState) -> Dict[str, Any]:
         try:
             sub_query = state.sub_query
-            datasource_id = sub_query.datasource_id 
+            if not sub_query:
+                return {"relevant_tables": []}
 
-            query = sub_query.intent 
+            datasource_id = sub_query.datasource_id
+            schema_version = sub_query.schema_version
+            query = self._build_semantic_query(sub_query)
 
-            table_full_names: List[str] = []
+            tables: Dict[str, Set[str]] = defaultdict(set)
+            schema_docs = []
+            column_docs = []
+
             if self.vector_store:
                 schema_docs = self.vector_store.retrieve_schema_context(
                     query, datasource_id, k=8
                 )
-                for doc in schema_docs:
-                    table_full = doc.metadata.get("table")
-                    if table_full and table_full not in table_full_names:
-                        table_full_names.append(table_full)
+                if schema_docs:
+                    for doc in schema_docs:
+                        table = doc.metadata.get("table")
+                        if table:
+                            tables[table].update([])
+                else:
+                    column_docs = self.vector_store.retrieve_column_candidates(
+                        query, datasource_id, k=8
+                    )
+                    for doc in column_docs:
+                        table = doc.metadata.get("table")
+                        column = doc.metadata.get("column")
+                        if not table:
+                            continue
+                        tables[table].update([])
+                        if column:
+                            tables[table].add(column)
 
-            if self.vector_store and not table_full_names:
-                column_docs = self.vector_store.retrieve_column_candidates(
-                    query, datasource_id, k=8
-                )
-                for doc in column_docs:
-                    table_full = doc.metadata.get("table")
-                    column_full = doc.metadata.get("column")
-                    if not table_full and column_full:
-                        table_full, _ = self._column_parts(column_full)
-                    if table_full and table_full not in table_full_names:
-                        table_full_names.append(table_full)
-
-            table_full_set = set(table_full_names)
             planning_docs = []
-            if self.vector_store and table_full_names:
+            if self.vector_store and tables:
                 planning_docs = self.vector_store.retrieve_planning_context(
-                    query, datasource_id, table_full_names, k=12
+                    query, datasource_id, list(tables.keys()), k=12
                 )
-
-            table_columns: Dict[str, Dict[str, Column]] = {}
 
             for doc in planning_docs:
                 doc_type = doc.metadata.get("type")
                 if doc_type == "schema.column":
-                    table_full = doc.metadata.get("table")
-                    column_full = doc.metadata.get("column")
-                    if not table_full and column_full:
-                        table_full, _ = self._column_parts(column_full)
-                    if not table_full or not column_full:
-                        continue
-                    table_name = self._table_name_from_full(table_full)
-                    _, column_name = self._column_parts(column_full)
-                    if not column_name:
-                        continue
-                    dtype = doc.metadata.get("dtype")
-                    table_columns.setdefault(table_name, {})
-                    table_columns[table_name][column_name] = Column(
-                        name=column_name, type=dtype
-                    )
+                    table = doc.metadata.get("table")
+                    column = doc.metadata.get("column")
+                    if table and column:
+                        tables[table].add(column)
 
-                elif doc_type == "schema.relationship":
+                if doc_type == "schema.relationship":
                     from_table = doc.metadata.get("from_table")
                     to_table = doc.metadata.get("to_table")
-                    from_columns = doc.metadata.get("from_columns") or []
-                    to_columns = doc.metadata.get("to_columns") or []
                     if from_table:
-                        table_name = self._table_name_from_full(from_table)
-                        table_columns.setdefault(table_name, {})
-                        for col in from_columns:
-                            table_columns[table_name].setdefault(col, Column(name=col))
+                        tables[from_table].update(doc.metadata.get("from_columns"))
                     if to_table:
-                        table_name = self._table_name_from_full(to_table)
-                        table_columns.setdefault(table_name, {})
-                        for col in to_columns:
-                            table_columns[table_name].setdefault(col, Column(name=col))
+                        tables[to_table].update(doc.metadata.get("to_columns"))
 
-            if not planning_docs:
-                tables = self._build_tables_from_snapshot(datasource_id, table_full_set)
+            if not tables:
+                snapshot = self._resolve_snapshot(datasource_id, schema_version)
+                relevant_tables = self._build_tables_from_snapshot(
+                    snapshot,
+                    resolved_tables=None,
+                    schema_version=schema_version,
+                )
+                logger.info(f"Length of relevant tables for planning: {len(relevant_tables)}")
                 return {
-                    "relevant_tables": tables,
+                    "relevant_tables": relevant_tables,
                     "reasoning": [
                         {
                             "node": self.node_name,
-                            "content": "Fallback to schema store for table definitions.",
+                            "content": "Vector retrieval produced no candidates. Using full schema snapshot.",
                             "type": "warning",
                         }
                     ],
                     "warnings": [
                         {
                             "node": self.node_name,
-                            "content": "Fallback to schema store for table definitions.",
+                            "content": "Vector retrieval produced no candidates. Using full schema snapshot.",
                         }
                     ],
                 }
 
-            relevant_tables: List[Table] = []
-            for table_full in table_full_names:
-                table_name = self._table_name_from_full(table_full)
-                columns = list(table_columns.get(table_name, {}).values())
-                columns = sorted(columns, key=lambda c: c.name)
-                relevant_tables.append(Table(name=table_name, columns=columns))
+            snapshot = self._resolve_snapshot(datasource_id, schema_version)
+            relevant_tables = self._build_tables_from_snapshot(
+                snapshot,
+                resolved_tables=tables,
+                schema_version=schema_version,
+            )
+
+
+            logger.info(f"Length of relevant tables for planning: {len(relevant_tables)}")
 
             return {
                 "relevant_tables": relevant_tables,

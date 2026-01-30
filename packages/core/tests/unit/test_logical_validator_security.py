@@ -4,7 +4,7 @@ from nl2sql.pipeline.nodes.validator.node import LogicalValidatorNode
 from nl2sql.pipeline.nodes.ast_planner.schemas import PlanModel, TableRef, SelectItem, Expr, ASTPlannerResponse
 from nl2sql.pipeline.nodes.decomposer.schemas import SubQuery
 from nl2sql.pipeline.state import SubgraphExecutionState
-from nl2sql.schema import Table, Column
+from nl2sql.pipeline.nodes.schema_retriever.schema import Table, Column
 from nl2sql.auth import UserContext
 from nl2sql.common.errors import ErrorCode
 

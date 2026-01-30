@@ -74,6 +74,8 @@ class ASTPlannerNode:
                 }
             )
 
+            logger.info(f"Generated Plan: {plan.model_dump_json(indent=2)}")
+
             return {
                 "ast_planner_response": ASTPlannerResponse(plan=plan),
                 "reasoning": [

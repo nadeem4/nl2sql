@@ -8,22 +8,10 @@ Scalar = Union[str, int, float, bool, None]
 JsonValue = Union[Scalar, List[Scalar], Dict[str, Scalar]]
 
 
-class Column(BaseModel):
-    """Lightweight column schema for routing/planning."""
+class ColumnRef(BaseModel):
+    table: TableRef
+    column_name: str
 
-    name: str
-    type: Optional[str] = None
-
-    model_config = ConfigDict(extra="allow")
-
-
-class Table(BaseModel):
-    """Lightweight table schema for routing/planning."""
-
-    name: str
-    columns: List[Column] = Field(default_factory=list)
-
-    model_config = ConfigDict(extra="allow")
 
 
 class TableRef(BaseModel):

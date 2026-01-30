@@ -7,10 +7,9 @@ from .models import (
     ColumnChunk,
     RelationshipChunk,
     MetricChunk,
-    TableRef,
-    ColumnRef,
 )
 from nl2sql.schema import SchemaSnapshot
+from nl2sql_adapter_sdk.schema import TableRef, ColumnRef
 
 
 class SchemaChunkBuilder:
@@ -150,14 +149,13 @@ class SchemaChunkBuilder:
                 column_md = table_md.columns.get(column_name) if table_md else None
 
                 column_ref = ColumnRef(
-                    schema_name=table_ref.schema_name,
-                    table_name=table_ref.table_name,
+                    table=table_ref,
                     column_name=column_name,
                 )
 
                 chunks.append(
                     ColumnChunk(
-                        id=f"schema.column:{column_ref.full_name}:{self.schema_version}",
+                        id=f"schema.column:{column_ref.table.full_name}:{column_ref.column_name}:{self.schema_version}",
                         datasource_id=self.ds_id,
                         column=column_ref,
                         dtype=column_contract.data_type,

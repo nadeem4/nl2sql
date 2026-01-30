@@ -5,7 +5,7 @@ from nl2sql.pipeline.nodes.ast_planner.node import ASTPlannerNode
 from nl2sql.pipeline.nodes.ast_planner.schemas import PlanModel
 from nl2sql.pipeline.nodes.decomposer.schemas import SubQuery, ExpectedColumn
 from nl2sql.pipeline.state import SubgraphExecutionState
-from nl2sql.schema import Table, Column
+from nl2sql.pipeline.nodes.schema_retriever.schema import Table, Column
 from nl2sql.common.errors import ErrorCode
 
 

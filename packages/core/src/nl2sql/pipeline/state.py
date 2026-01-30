@@ -19,7 +19,7 @@ from nl2sql.pipeline.nodes.generator.schemas import GeneratorResponse
 from nl2sql.execution.contracts import ArtifactRef, ExecutorResponse
 from nl2sql.pipeline.nodes.refiner.schemas import RefinerResponse
 from nl2sql.pipeline.subgraphs.schemas import SubgraphOutput
-from nl2sql.schema import Table
+from nl2sql.pipeline.nodes.schema_retriever.schema import Table
 
 
 def update_results(current: Dict, new: Dict) -> Dict:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 from typing import List, Dict, Optional, Literal, Any
 from pydantic import BaseModel, Field
+from nl2sql_adapter_sdk.schema import TableRef, ColumnRef
 
 
 class BaseChunk(BaseModel):
@@ -19,28 +20,6 @@ class BaseChunk(BaseModel):
             "id": self.id,
             "type": self.type,
         }
-
-class TableRef(BaseModel):
-    schema_name: str
-    table_name: str
-
-    @property
-    def full_name(self) -> str:
-        return f"{self.schema_name}.{self.table_name}"
-
-
-class ColumnRef(BaseModel):
-    schema_name: str
-    table_name: str
-    column_name: str
-
-    @property
-    def full_name(self) -> str:
-        return f"{self.schema_name}.{self.table_name}.{self.column_name}"
-
-    @property
-    def table_full_name(self) -> str:
-        return f"{self.schema_name}.{self.table_name}"
 
 
 class DatasourceChunk(BaseChunk):
@@ -106,6 +85,9 @@ class TableChunk(BaseChunk):
             "table": self.table.full_name,
             "row_count": self.row_count,
             "schema_version": self.schema_version,
+            "description": self.description,
+            "primary_key": ','.join(self.primary_key),
+            "foreign_keys": ','.join(self.foreign_keys),
         }
 
 
@@ -131,7 +113,8 @@ class ColumnChunk(BaseChunk):
             else ""
         )
         return (
-            f"Column: {self.column.full_name}\n"
+            f"Table: {self.column.table.full_name}\n"
+            f"Column: {self.column.column_name}\n"
             f"Type: {self.dtype}\n"
             f"{self.description or ''}\n"
             f"{stats}\n"
@@ -142,11 +125,12 @@ class ColumnChunk(BaseChunk):
         return {
             **super().get_metadata(),
             "datasource_id": self.datasource_id,
-            "column": self.column.full_name,
-            "table": self.column.table_full_name,
+            "column": self.column.column_name,
+            "table": self.column.table.full_name,
             "dtype": self.dtype,
             "pii": self.pii,
             "schema_version": self.schema_version,
+            "description": self.description,
         }
 
 class RelationshipChunk(BaseChunk):
