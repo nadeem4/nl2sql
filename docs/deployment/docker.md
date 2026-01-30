@@ -1,35 +1,17 @@
 # Docker Deployment
 
-The simplest way to run the NL2SQL Platform is via Docker.
+The core engine is a Python library. This repository does **not** ship an HTTP server or a production image; deployments typically embed `run_with_graph()` in a service you own.
 
-## Prerequisites
+## Container requirements
 
-* Docker Engine 20.10+
-* Access to your target databases
+- Install `packages/core` (and adapter packages you use).
+- Provide configuration files under `configs/`.
+- Set required environment variables (e.g., `OPENAI_API_KEY`, `LLM_CONFIG`, `DATASOURCE_CONFIG`).
 
-## Quick Start
+## Persisted state
 
-```bash
-docker run -d \
-  --name nl2sql \
-  -p 8000:8000 \
-  -e OPENAI_API_KEY=sk-...\
-  -e POSTGRES_URL=postgresql://user:pass@host:5432/db \
-  ghcr.io/nl2sql/platform:latest
-```
+If you use a persistent vector store (`VECTOR_STORE`) or SQLite schema store (`SCHEMA_STORE_PATH`), mount the corresponding directories into the container.
 
-## Environment Variables
+## Reference configuration
 
-| Variable | Description | Required | Default |
-| :--- | :--- | :--- | :--- |
-| `OPENAI_API_KEY` | Key for the LLM provider. | Yes | - |
-| `LOG_LEVEL` | Logging verbosity (DEBUG, INFO, WARN). | No | INFO |
-| `WORKERS` | Number of Gunicorn workers. | No | 4 |
-
-## Volume Mounting (Optional)
-
-If you are using a local Vector Store for schema indexing, mount the storage directory to persist the index across restarts.
-
-```bash
-docker run -v ./data:/app/data ...
-```
+See `configuration/system.md` for the full list of settings and default paths.

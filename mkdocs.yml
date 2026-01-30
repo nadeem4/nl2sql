@@ -49,35 +49,42 @@ markdown_extensions:
 
 nav:
   - Home: index.md
-  - Getting Started:
-    - Installation: getting-started/installation.md
-    - Quickstart (Demo): getting-started/demo.md
+  - Getting Started: getting-started.md
+  - Architecture:
+    - High-Level System Architecture: architecture/high-level.md
+  - Agents:
+    - Agent Architecture: agents/architecture.md
+    - Node-by-Node Specs: agents/nodes.md
+  - Orchestration:
+    - DAG / Graph Orchestration: orchestration/dag.md
+  - Adapters:
+    - Plugin / Adapter Architecture: adapters/architecture.md
+  - Schema:
+    - Schema Store + Retrieval: schema/store.md
+  - Execution:
+    - Execution Sandbox: execution/sandbox.md
+    - Result Frame + Data Flow: execution/result-flow.md
+  - Storage:
+    - Artifact Store: storage/artifact-store.md
+  - Observability:
+    - Observability Stack: observability/stack.md
+    - Error Handling + Circuit Breakers: observability/error-handling.md
+  - Security:
+    - Security Model: security/model.md
+    - Multi-Tenant Isolation: security/multi-tenant.md
+  - Configuration:
+    - Configuration System: configuration/system.md
   - Deployment:
-    - Overview: deployment/index.md
+    - Deployment Architecture: deployment/architecture.md
     - Docker: deployment/docker.md
     - Kubernetes: deployment/kubernetes.md
-  - Core Engine:
-    - Architecture: core/architecture.md
-    - The Orchestrator: core/orchestrator.md
-    - Nodes & Pipeline: core/nodes.md
-    - Environments: core/environment.md
-    - Reliability: core/reliability.md
-  - SQL Agent Subgraph: core/sql_agent.md
-  - Retrieval & Indexing: core/indexing.md
-  - Security Architecture: safety/security.md
-  - Operations:
-    - Configuration: ops/configuration.md
-    - Observability: ops/observability.md
-    - Benchmarking: ops/benchmarking.md
-    - Error Reference: ops/errors.md
-  - Adapters:
-    - Overview: adapters/index.md
-    - Supported Databases:
-      - Postgres: adapters/postgres.md
-      - MySQL: adapters/mysql.md
-      - MSSQL: adapters/mssql.md
-      - SQLite: adapters/sqlite.md
-    - Extensions:
-      - Building Adapters: adapters/development.md
-  - Reference:
-    - API Reference: dev/api.md
+  - Development:
+    - Extending NL2SQL: development/index.md
+  - Testing:
+    - Testing Architecture: testing/architecture.md
+  - ADR:
+    - Overview: adr/index.md
+    - ADR-001 Sandboxed Execution: adr/adr-001-sandboxed-execution.md
+    - ADR-002 Circuit Breakers: adr/adr-002-circuit-breakers.md
+  - API:
+    - Overview: api/index.md

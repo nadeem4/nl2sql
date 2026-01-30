@@ -1,50 +1,80 @@
-# Enterprise NL2SQL Engine
+# NL2SQL Engine
 
-> **A Production-Grade Natural Language to SQL Engine built on the principles of Zero Trust and Deterministic Execution.**
+> **Production-grade Natural Language → SQL runtime with deterministic orchestration.**
 
-This platform treats "Text-to-SQL" not as a prompt engineering problem, but as a **Distributed Systems** problem. It replaces fragile one-shot generation with a robust, compiled pipeline that bridges the gap between Unstructured Intention (User Language) and Structured Execution (SQL Databases).
+NL2SQL treats text-to-SQL as a **distributed systems** problem. The engine compiles a user query into a validated plan, executes via adapters, and aggregates results through a graph-based pipeline.
 
 ---
 
+## 🧭 What you get
+
+- Graph-based orchestration (`LangGraph`) with explicit state (`GraphState`)
+- Deterministic planning and validation before SQL generation
+- Adapter-based execution with sandbox isolation
+- Observability hooks (metrics, logs, audit events)
+
 ## 🏗️ System Topology
 
-The architecture is composed of three distinct planes, ensuring separation of concerns and failure isolation.
+The runtime is organized around a LangGraph orchestration pipeline and supporting registries. It is designed for fault isolation and deterministic execution.
+
+```mermaid
+flowchart TD
+    User[User Query] --> Resolver[DatasourceResolverNode]
+    Resolver --> Decomposer[DecomposerNode]
+    Decomposer --> Planner[GlobalPlannerNode]
+    Planner --> Router[Layer Router]
+
+    subgraph SQLAgent["SQL Agent Subgraph"]
+        Schema[SchemaRetrieverNode] --> AST[ASTPlannerNode]
+        AST -->|ok| Logical[LogicalValidatorNode]
+        AST -->|retry| Retry[retry_node]
+        Logical -->|ok| Generator[GeneratorNode]
+        Logical -->|retry| Retry
+        Generator --> Executor[ExecutorNode]
+        Retry --> Refiner[RefinerNode]
+        Refiner --> AST
+    end
+
+    Router --> Schema
+    Executor --> Router
+    Router --> Aggregator[EngineAggregatorNode]
+    Aggregator --> Synthesizer[AnswerSynthesizerNode]
+```
 
 ### 1. The Control Plane (The Graph)
 
 **Responsibility**: Reasoning, Planning, and Orchestration.
 
-* **Agentic Graph**: Implemented as a Directed Cyclic Graph (LangGraph) to enable "Refinement Loops". If a plan fails validation, the system self-corrects.
-* **State Management**: Deterministic state transitions ensure auditability and reproducibility of every decision.
+* **Agentic Graph**: Implemented as a Directed Cyclic Graph (LangGraph) to enable refinement loops. If a plan fails validation, the system self-corrects.
+* **State Management**: Shared `GraphState` ensures auditability and reproducibility of every decision.
 
 ### 2. The Security Plane (The Firewall)
 
 **Responsibility**: Invariants Enforcement.
 
-* **Valid-by-Construction**: The LLM *never* executes SQL directly. It generates an **Abstract Syntax Tree (AST)**.
-* **Static Analysis**: The [Validator Node](docs/core/nodes.md#4-logical-validator) enforces **Row-Level Security (RLS)** and type safety on the AST *before* compilation.
-* **Intent Classification**: Upstream detection of adversarial prompts (Jailbreaks/Injections).
+* **Valid-by-Construction**: The LLM generates an **Abstract Syntax Tree (AST)** rather than executing SQL.
+* **Static Analysis**: The [Logical Validator](docs/agents/nodes.md) enforces RBAC and schema constraints before SQL generation.
 
 ### 3. The Data Plane (The Sandbox)
 
 **Responsibility**: Semantic Search and Execution.
 
-* **Blast Radius Isolation**: SQL Drivers (ODBC/C-Ext) run in a dedicated **[Sandboxed Process Pool](docs/architecture/decisions/ADR-001_sandboxed_execution.md)**. A segfault in a driver kills a disposable worker, not the Agent.
-* **Partitioned Retrieval**: The [Orchestrator](docs/core/indexing.md) uses Partitioned MMR to inject only relevant schema context, preventing context window overflow.
+* **Blast Radius Isolation**: SQL drivers run in a dedicated **[Sandboxed Process Pool](docs/adr/adr-001-sandboxed-execution.md)**. A segfault in a driver kills a disposable worker, not the Agent.
+* **Partitioned Retrieval**: The [Schema Store + Retrieval](docs/schema/store.md) flow injects relevant schema context, preventing context window overflow.
 
 ### 4. The Reliability Plane (The Guard)
 
 **Responsibility**: Fault Tolerance and Stability.
 
-* **Layered Defense**: A combination of **[Retries, Circuit Breakers, and Sandboxing](docs/core/reliability.md)** ensures the system stays up even when LLMs or Databases go down.
+* **Layered Defense**: A combination of **[Circuit Breakers](docs/observability/error-handling.md)** and **[Sandboxing](docs/execution/sandbox.md)** keeps the system stable during outages.
 * **Fail-Fast**: We stop processing immediately if a dependency is unresponsive, preserving resources.
 
 ### 5. The Observability Plane (The Watchtower)
 
 **Responsibility**: Visibility, Forensics, and Compliance.
 
-* **Full-Stack Telemetry**: Native [OpenTelemetry](docs/ops/observability.md) integration provides distributed tracing (Jaeger) and metrics (Prometheus) for every node execution.
-* **Forensic Audit Logs**: A tamper-evident, persistent [Audit Log](docs/ops/observability.md#3-persistent-audit-log) records every AI decision (Prompt/Response/Reasoning) for compliance and debugging.
+* **Full-Stack Telemetry**: Native [OpenTelemetry](docs/observability/stack.md) integration provides distributed tracing (Jaeger) and metrics (Prometheus) for every node execution.
+* **Forensic Audit Logs**: A persistent [Audit Log](docs/observability/stack.md) records AI decisions for compliance and debugging.
 
 ---
 
@@ -52,7 +82,7 @@ The architecture is composed of three distinct planes, ensuring separation of co
 
 | Invariant | Rationale | Mechanism |
 | :--- | :--- | :--- |
-| **No Unvalidated SQL** | Prevent Hullucinations & Data Leaks | All plans pass through `LogicalValidator` (AST) + `PhysicalValidator` (Dry Run) before execution. |
+| **No Unvalidated SQL** | Prevent hallucinations & data leaks | All plans pass through `LogicalValidator` (AST). `PhysicalValidator` exists but is not wired into the default SQL subgraph. |
 | **Zero Shared State** | Crash Safety | Execution happens in isolated processes; no shared memory with the Control Plane. |
 | **Fail-Fast** | Reliability | Circuit Breakers and Strict Timeouts prevent cascading failures (Retry Storms). |
 | **Determinism** | Debuggability | Temperature-0 generation + Strict Typing (Pydantic) for all LLM outputs. |
@@ -64,7 +94,8 @@ The architecture is composed of three distinct planes, ensuring separation of co
 ### Prerequisites
 
 * Python 3.10+
-* Docker (Optional, for full integration environment)
+* A configured datasource (`configs/datasources.yaml`)
+* A configured LLM (`configs/llm.yaml`)
 
 ### 1. Installation
 
@@ -76,30 +107,31 @@ cd nl2sql
 python -m venv venv
 source venv/bin/activate
 
-# Install Core Engine & CLI
+# Install core engine and adapter SDK
 pip install -e packages/core
-pip install -e packages/cli
 pip install -e packages/adapter-sdk
 ```
 
-### 2. Run Demo (Lite Mode)
+### 2. Run a query (Python API)
 
-Boot the engine with an in-memory SQLite database (No Docker required).
+```python
+from nl2sql.context import NL2SQLContext
+from nl2sql.pipeline.runtime import run_with_graph
 
-```bash
-nl2sql setup --demo
+ctx = NL2SQLContext()
+result = run_with_graph(ctx, "Top 5 customers by revenue last quarter?")
+
+print(result.get("final_answer"))
 ```
 
----
+## 📚 Documentation
 
-## 📚 Technical Documentation
-
-* **[System Architecture](docs/core/architecture.md)**: Deep dive into the Control, Security, and Data planes.
-* **[Component Reference](docs/core/nodes.md)**: Detailed specs for Planner, Validator, Executor, etc.
-* **[Security Model](docs/safety/security.md)**: Defense-in-depth strategy against prompt injection and unauthorized access.
-* **[Security Model](docs/safety/security.md)**: Defense-in-depth strategy against prompt injection and unauthorized access.
-* **[Reliability & Fault Tolerance](docs/core/reliability.md)**: Guide to Circuit Breakers, Sandbox isolation, and Recovery strategies.
-* **[Observability & Operations](docs/ops/observability.md)**: Configuring OpenTelemetry, Logging, and Audit Trails.
+- **[System Architecture](docs/architecture/high-level.md)**: runtime topology and core flows
+- **[Agent Nodes](docs/agents/nodes.md)**: node-by-node specs and responsibilities
+- **[Schema Store + Retrieval](docs/schema/store.md)**: schema snapshots and vector retrieval
+- **[Execution Sandbox](docs/execution/sandbox.md)**: process isolation and failures
+- **[Observability](docs/observability/stack.md)**: metrics, logging, audit events
+  
 
 ---
 
@@ -108,7 +140,6 @@ nl2sql setup --demo
 ```text
 packages/
 ├── core/               # The Engine (Graph, State, Logic)
-├── cli/                # Terminal Interface & Ops Tools
 ├── adapter-sdk/        # Interface Contract for new Databases
 └── adapters/           # Official Dialects (Postgres, MSSQL, MySQL)
 configs/                # Runtime Configuration (Policies, Prompts)
