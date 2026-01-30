@@ -1,12 +1,10 @@
 from typing import Any, List, Dict
 from sqlalchemy import create_engine, text, inspect
 from sqlalchemy.dialects import mssql
-from nl2sql_adapter_sdk import (
- 
-    QueryResult, 
+from nl2sql_sqlalchemy_adapter import (
     CostEstimate,
     DryRunResult,
-    QueryPlan
+    QueryPlan,
 )
 from nl2sql_sqlalchemy_adapter import BaseSQLAlchemyAdapter
 
@@ -116,4 +114,9 @@ class MssqlAdapter(BaseSQLAlchemyAdapter):
         except Exception:
              pass
         return CostEstimate(estimated_cost=0.0, estimated_rows=0)
+
+    
+    @property
+    def exclude_schemas(self) -> set[str]:
+        return {"sys", "INFORMATION_SCHEMA"}
 

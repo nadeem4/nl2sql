@@ -22,7 +22,7 @@ This section provides auto-generated documentation for the core Python API.
 
 ### Services
 
-::: nl2sql.services.vector_store.OrchestratorVectorStore
+::: nl2sql.services.vector_store.VectorStore
 ::: nl2sql.services.llm.LLMRegistry
 
 ## Adapter SDK

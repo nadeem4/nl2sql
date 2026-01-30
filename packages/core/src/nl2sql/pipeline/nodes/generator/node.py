@@ -5,11 +5,13 @@ from sqlglot import expressions as exp
 from typing import Dict, Any, List, Union, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from nl2sql.pipeline.state import GraphState
+    from nl2sql.pipeline.state import SubgraphExecutionState
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.datasources import DatasourceRegistry
 from nl2sql.common.logger import get_logger
-from nl2sql.pipeline.nodes.planner.schemas import PlanModel, Expr
+from nl2sql.pipeline.nodes.ast_planner.schemas import PlanModel, Expr
+from nl2sql.pipeline.nodes.generator.schemas import GeneratorResponse
+from nl2sql.context import NL2SQLContext
 
 logger = get_logger("generator")
 
@@ -143,38 +145,36 @@ class GeneratorNode:
         registry (DatasourceRegistry): The registry to fetch datasource dialects.
     """
 
-    def __init__(self, registry: DatasourceRegistry):
+    def __init__(self, ctx: NL2SQLContext):
         """Initializes the GeneratorNode.
 
         Args:
             registry (DatasourceRegistry): The registry of datasources.
         """
-        self.registry = registry
+        self.node_name = self.__class__.__name__.lower().replace('node', '')
+        self.ds_registry = ctx.ds_registry
 
-    def __call__(self, state: GraphState) -> Dict[str, Any]:
+    def __call__(self, state: SubgraphExecutionState) -> Dict[str, Any]:
         """Executes the generator node.
 
         Converts the PlanModel into a SQL string tailored for the target
         datasource's dialect.
 
         Args:
-            state (GraphState): The current state containing the execution plan.
+            state (SubgraphExecutionState): The current state containing the execution plan.
 
         Returns:
             Dict[str, Any]: A dictionary with the generated 'sql_draft' and reasoning.
         """
-        node_name = "generator"
-
         try:
-            if not state.selected_datasource_id:
+            datasource_id = state.sub_query.datasource_id if state.sub_query else None
+            if not datasource_id:
                 raise ValueError("No datasource selected")
-            if not state.plan:
+            plan = state.ast_planner_response.plan if state.ast_planner_response else None
+            if not plan:
                 raise ValueError("No plan provided")
 
-            plan: PlanModel = state.plan
-            
-            # Fix: Use adapter directly since get_profile is removed
-            adapter = self.registry.get_adapter(state.selected_datasource_id)
+            adapter = self.ds_registry.get_adapter(datasource_id)
             dialect = adapter.get_dialect()
 
             row_limit = adapter.row_limit or 1000
@@ -182,25 +182,27 @@ class GeneratorNode:
 
             sql = self._generate_sql(plan, limit, dialect)
 
+            response = GeneratorResponse(
+                sql_draft=sql,
+                reasoning=[{"node": self.node_name, "content": ["Generated SQL", sql]}],
+            )
             return {
-                "sql_draft": sql,
-                "reasoning": [
-                    {"node": node_name, "content": ["Generated SQL", sql]}
-                ]
+                "generator_response": response,
+                "reasoning": response.reasoning,
             }
 
         except Exception as exc:
             logger.exception(exc)
+            error = PipelineError(
+                node=self.node_name,
+                message=str(exc),
+                error_code=ErrorCode.SQL_GEN_FAILED,
+                severity=ErrorSeverity.ERROR,
+                stack_trace=str(exc),
+            )
             return {
-                "errors": [
-                    PipelineError(
-                        node=node_name,
-                        message=str(exc),
-                        error_code=ErrorCode.SQL_GEN_FAILED,
-                        severity=ErrorSeverity.ERROR,
-                        stack_trace=str(exc),
-                    )
-                ]
+                "generator_response": GeneratorResponse(errors=[error]),
+                "errors": [error],
             }
 
     def _generate_sql(self, plan: PlanModel, limit: int, dialect: str) -> str:

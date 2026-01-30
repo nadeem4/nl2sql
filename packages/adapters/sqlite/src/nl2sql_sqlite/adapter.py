@@ -1,14 +1,12 @@
 from typing import Any, List, Dict
 from sqlalchemy import create_engine, text, inspect
 from sqlalchemy.dialects import sqlite
-from nl2sql_adapter_sdk import (
- 
-    QueryResult, 
+from nl2sql_sqlalchemy_adapter import (
     CostEstimate,
     DryRunResult,
-    QueryPlan
+    QueryPlan,
+    BaseSQLAlchemyAdapter
 )
-from nl2sql_sqlalchemy_adapter import BaseSQLAlchemyAdapter
 
 from pydantic import BaseModel, Field
 from typing import Optional
@@ -84,3 +82,7 @@ class SqliteAdapter(BaseSQLAlchemyAdapter):
 
     def get_dialect(self) -> str:
         return sqlite.dialect.name
+
+    @property
+    def exclude_schemas(self) -> set[str]:
+        return set()

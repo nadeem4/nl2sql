@@ -9,7 +9,6 @@ description = "MSSQL Adapter for NL2SQL using PyODBC"
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
-    "nl2sql-adapter-sdk",
     "nl2sql-adapter-sqlalchemy",
     "SQLAlchemy>=2.0",
     "pyodbc>=4.0.0",

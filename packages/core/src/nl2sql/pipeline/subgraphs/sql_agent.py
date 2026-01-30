@@ -1,27 +1,27 @@
-from typing import Dict, Callable, Union
+from typing import Dict
 from langchain_core.runnables import Runnable
 from langgraph.graph import END, StateGraph
 
-from nl2sql.pipeline.state import GraphState
-from nl2sql.pipeline.nodes.planner import PlannerNode
+from nl2sql.common.cancellation import is_cancelled, wait as wait_cancel
+from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
+from nl2sql.common.settings import settings
+from nl2sql.pipeline.state import SubgraphExecutionState
+from nl2sql.pipeline.nodes.ast_planner import ASTPlannerNode
+from nl2sql.pipeline.nodes.schema_retriever import SchemaRetrieverNode
 from nl2sql.pipeline.nodes.validator import LogicalValidatorNode, PhysicalValidatorNode
 from nl2sql.pipeline.nodes.refiner import RefinerNode
 from nl2sql.pipeline.nodes.generator import GeneratorNode
 from nl2sql.pipeline.nodes.executor import ExecutorNode
 from nl2sql.datasources import DatasourceRegistry
-from nl2sql.common.errors import ErrorSeverity
-
-LLMCallable = Union[Callable[[str], str], Runnable]
+from nl2sql.context import NL2SQLContext
 
 
-import time
+
 import random
 
 
 def build_sql_agent_graph(
-    llm_map: Dict[str, LLMCallable],
-    registry: DatasourceRegistry,
-    row_limit: int = 100,
+    ctx: NL2SQLContext,
 ):
     """Builds the SQL Agent Subgraph.
 
@@ -32,66 +32,107 @@ def build_sql_agent_graph(
     (LogicalValidator Error) -> RetryHandler -> Refiner -> Planner
     (PhysicalValidator Error) -> RetryHandler -> Refiner -> Planner
     """
-    graph = StateGraph(GraphState)
+    graph = StateGraph(SubgraphExecutionState)
 
-    planner = PlannerNode(registry=registry, llm=llm_map.get("planner"))
-    logical_validator = LogicalValidatorNode(registry=registry)
-    physical_validator = PhysicalValidatorNode(registry=registry, row_limit=row_limit)
-    refiner = RefinerNode(llm=llm_map.get("refiner"))
-    generator = GeneratorNode(registry=registry)
-    executor = ExecutorNode(registry=registry)
+    schema_retriever = SchemaRetrieverNode(ctx)
+    ast_planner = ASTPlannerNode(ctx)
+    logical_validator = LogicalValidatorNode(ctx)
+    physical_validator = PhysicalValidatorNode(ctx)
+    refiner = RefinerNode(ctx)
+    generator = GeneratorNode(ctx)
+    executor = ExecutorNode(ctx)
 
-    def retry_node(state: GraphState) -> Dict:
+    def _get_subgraph_id(state: SubgraphExecutionState) -> str:
+        if state.subgraph_id:
+            return state.subgraph_id
+        sub_query_id = state.sub_query.id if state.sub_query else None
+        return f"sql_agent:{sub_query_id}:{state.trace_id}"
+
+    def _get_retry_count(state: SubgraphExecutionState) -> int:
+        return state.retry_count
+
+    def retry_node(state: SubgraphExecutionState) -> Dict:
         """Increments retry count with exponential backoff and jitter."""
-        count = state.retry_count
-        base_delay = min(10.0, 1.0 * (2 ** count))
-        jitter = random.uniform(0.0, 0.5)
+        count = _get_retry_count(state)
+        if is_cancelled():
+            return {
+                "errors": [
+                    PipelineError(
+                        node="retry_handler",
+                        message="Pipeline cancelled by user.",
+                        severity=ErrorSeverity.ERROR,
+                        error_code=ErrorCode.CANCELLED,
+                    )
+                ]
+            }
+        if count >= settings.sql_agent_max_retries:
+            return {"retry_count": count}
+
+        base_delay = min(settings.sql_agent_retry_max_delay_sec, settings.sql_agent_retry_base_delay_sec * (2 ** count))
+        jitter = random.uniform(0.0, settings.sql_agent_retry_jitter_sec)
         sleep_time = base_delay + jitter
-        
-        time.sleep(sleep_time)
-        
+
+        if wait_cancel(timeout=sleep_time):
+            return {
+                "errors": [
+                    PipelineError(
+                        node="retry_handler",
+                        message="Pipeline cancelled by user.",
+                        severity=ErrorSeverity.ERROR,
+                        error_code=ErrorCode.CANCELLED,
+                    )
+                ]
+            }
+
         return {
             "retry_count": count + 1,
         }
 
-    def check_planner(state: GraphState) -> str:
+    def check_planner(state: SubgraphExecutionState) -> str:
         """Routes based on planner result."""
-        if not state.plan:
+        if is_cancelled():
+            return "end"
+        if not (state.ast_planner_response and state.ast_planner_response.plan):
             # If explicit errors exist, check retryability
             if state.errors:
                  if not all(e.is_retryable for e in state.errors):
                      return "end"
-            
-            if state.retry_count < 3:
+
+            if _get_retry_count(state) < settings.sql_agent_max_retries:
                 return "retry"
             return "end"
         return "ok"
 
-    def check_logical_validation(state: GraphState) -> str:
+    def check_logical_validation(state: SubgraphExecutionState) -> str:
         """Routes based on logical validation result."""
-        if state.errors:
+        if is_cancelled():
+            return "end"
+        if state.logical_validator_response and state.logical_validator_response.errors:
             # Critical/Fatal errors stop execution immediately
-            if not all(e.is_retryable for e in state.errors):
+            if not all(e.is_retryable for e in state.logical_validator_response.errors):
                 return "end"
-            
-            if state.retry_count < 3:
+
+            if _get_retry_count(state) < settings.sql_agent_max_retries:
                 return "retry"
             return "end"
         return "ok"
 
-    def check_physical_validation(state: GraphState) -> str:
+    def check_physical_validation(state: SubgraphExecutionState) -> str:
         """Routes based on physical validation result."""
-        if state.errors:
+        if is_cancelled():
+            return "end"
+        if state.physical_validator_response and state.physical_validator_response.errors:
              # Critical/Fatal errors stop execution immediately
-            if not all(e.is_retryable for e in state.errors):
+            if not all(e.is_retryable for e in state.physical_validator_response.errors):
                 return "end"
-            
-            if state.retry_count < 3:
+
+            if _get_retry_count(state) < settings.sql_agent_max_retries:
                 return "retry"
             return "end"
         return "ok"
 
-    graph.add_node("planner", planner)
+    graph.add_node("schema_retriever", schema_retriever)
+    graph.add_node("ast_planner", ast_planner)
     graph.add_node("logical_validator", logical_validator)
     graph.add_node("generator", generator)
     graph.add_node("physical_validator", physical_validator)
@@ -99,10 +140,12 @@ def build_sql_agent_graph(
     graph.add_node("refiner", refiner)
     graph.add_node("retry_handler", retry_node)
 
-    graph.set_entry_point("planner")
+    graph.set_entry_point("schema_retriever")
+
+    graph.add_edge("schema_retriever", "ast_planner")
 
     graph.add_conditional_edges(
-        "planner",
+        "ast_planner",
         check_planner,
         {"ok": "logical_validator", "retry": "retry_handler", "end": END},
     )
@@ -113,17 +156,17 @@ def build_sql_agent_graph(
         {"ok": "generator", "retry": "retry_handler", "end": END},
     )
 
-    graph.add_edge("generator", "physical_validator")
+    graph.add_edge("generator", "executor")
 
-    graph.add_conditional_edges(
+    """ graph.add_conditional_edges(
         "physical_validator",
         check_physical_validation,
         {"ok": "executor", "retry": "retry_handler", "end": END},
-    )
+    ) """
 
     graph.add_edge("executor", END)
 
     graph.add_edge("retry_handler", "refiner")
-    graph.add_edge("refiner", "planner")
+    graph.add_edge("refiner", "ast_planner")
 
     return graph.compile()

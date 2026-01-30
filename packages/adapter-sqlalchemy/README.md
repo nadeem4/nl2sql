@@ -28,15 +28,15 @@ class MyPostgresAdapter(BaseSQLAlchemyAdapter):
 
 ## 🔌 Adapter Interface Explained
 
-Each method in the `DatasourceAdapter` plays a specific role in the **Plan-Validate-Execute** loop of the agent.
+Each method in the adapter plays a specific role in the **Plan-Validate-Execute** loop of the agent.
 
 ### 1. Core Execution
 
 | Method | Purpose | Who Calls It? |
 | :--- | :--- | :--- |
 | `connect()` | Establishes the connection pool to the database using SQLAlchemy. | Initialization |
-| `execute(sql)` | Runs the actual query and returns a standardized `QueryResult`. | **Executor Node** |
-| `fetch_schema()` | Introspects the database to retrieve Tables, Columns (with Types), Foreign Keys, and usage statistics. | **Indexing Service** |
+| `execute(request)` | Runs the request and returns a standardized `ResultFrame`. | **Executor Node** |
+| `fetch_schema_snapshot()` | Introspects the database to retrieve Tables, Columns (with Types), Foreign Keys, and usage statistics. | **Indexing Service** |
 
 ### 2. Planning & Safety Capabilities
 

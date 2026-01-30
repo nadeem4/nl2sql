@@ -11,6 +11,7 @@ from .datasources import DatasourceConfig, DatasourceFileConfig
 from .llm import LLMFileConfig
 from .policies import PolicyFileConfig
 from .secrets import SecretProviderConfig, SecretsFileConfig
+from .sample_questions import SampleQuestionsFileConfig
 
 class ConfigManager:
     """
@@ -34,6 +35,7 @@ class ConfigManager:
         self._llm_path = root / settings.llm_config_path
         self._policy_path = root / settings.policies_config_path
         self._secrets_path = root / settings.secrets_config_path
+        self._sample_questions_path = root / settings.sample_questions_path
 
     def ensure_config_dirs(self) -> None:
         """Ensures that the configuration directories exist."""
@@ -139,6 +141,43 @@ class ConfigManager:
             raise ValueError(f"Secret Configuration Invalid: {e}")
         except Exception as e:
             raise ValueError(f"Failed to load secrets: {e}")
+
+
+    def load_sample_questions(self, path: Optional[pathlib.Path] = None, ds_id: Optional[str] = None) -> Union[Dict[str, List[str]], List[str]]:
+        """Loads sample questions from a YAML file."""
+        target_path = path or self._sample_questions_path
+        
+        if not target_path.exists():
+            raise FileNotFoundError(f"Sample questions file not found: {target_path}")
+            
+        try:
+            raw = yaml.safe_load(target_path.read_text(encoding="utf-8")) or {}
+            
+            if ds_id:
+                return raw.get(ds_id, [])
+
+            return raw
+        except Exception as e:
+            raise ValueError(f"Failed to load sample questions: {e}")
+
+    def get_example_questions(self, datasource_id: str) -> List[str]:
+        """Returns example questions for a datasource, if configured."""
+        try:
+            questions = self.load_sample_questions(ds_id=datasource_id)
+            return questions or []
+        except FileNotFoundError:
+            return []
+
+    def get_datasource_description(self, datasource_id: str) -> Optional[str]:
+        """Returns the configured datasource description if available."""
+        try:
+            datasources = self.load_datasources()
+        except FileNotFoundError:
+            return None
+        for ds in datasources:
+            if ds.id == datasource_id:
+                return ds.description
+        return None
 
 
 

@@ -57,7 +57,11 @@ def validate(
         
         # Load Datasources
         ds_configs = cm.load_datasources(config)
-        registry = DatasourceRegistry(ds_configs)
+        
+        # Fixed: registry requires secret_manager, then register_datasources
+        from nl2sql.secrets import secret_manager
+        registry = DatasourceRegistry(secret_manager)
+        registry.register_datasources(ds_configs)
         
         available_ds = set(registry.list_ids())
         console.print(f"[dim]Available Datasources: {available_ds}[/dim]")

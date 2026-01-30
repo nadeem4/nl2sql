@@ -9,7 +9,7 @@ There are two primary ways to build an adapter. Choose the one that fits your ta
 | If you are checking... | Use... | Reference |
 | :--- | :--- | :--- |
 | A standard SQL Database (Postgres, Oracle, Snowflake) | `nl2sql-adapter-sqlalchemy` | **[SQLAlchemy Adapter Reference](sqlalchemy.md)** |
-| A NoSQL DB, REST API, or custom driver | `nl2sql-adapter-sdk` | **[Adapter SDK Reference](sdk.md)** |
+| A NoSQL DB, REST API, or custom driver | Core adapter protocol | **[Adapter Interface Reference](sdk.md)** |
 
 ## Option 1: The "Fast Lane" (SQLAlchemy)
 
@@ -35,11 +35,11 @@ class PostgresAdapter(BaseSQLAlchemyAdapter):
 
 > See the **[SQLAlchemy Adapter Reference](sqlalchemy.md)** for full API details.
 
-## Option 2: The "Custom" Path (SDK)
+## Option 2: The "Custom" Path (Protocol)
 
-If you need to connect to something else (e.g., ElasticSearch, a CRM API, or a raw SQL driver), you must implement the raw interface.
+If you need to connect to something else (e.g., ElasticSearch, a CRM API, or a raw SQL driver), implement the core adapter protocol.
 
-**Implement `DatasourceAdapter`**. You must manually handle:
+**Implement `DatasourceAdapterProtocol`**. You must manually handle:
 
 * Fetching and normalizing schema metadata.
 * Executing queries and formatting results.
@@ -48,25 +48,29 @@ If you need to connect to something else (e.g., ElasticSearch, a CRM API, or a r
 ### Example
 
 ```python
-from nl2sql_adapter_sdk import DatasourceAdapter
+from nl2sql.datasources.protocols import DatasourceAdapterProtocol
+from nl2sql_adapter_sdk.contracts import AdapterRequest, ResultFrame
+from nl2sql_adapter_sdk.capabilities import DatasourceCapability
 
-class MyRestAdapter(DatasourceAdapter):
-    def fetch_schema(self) -> SchemaMetadata:
+class MyRestAdapter(DatasourceAdapterProtocol):
+    def capabilities(self):
+        return {DatasourceCapability.SUPPORTS_REST}
+
+    def fetch_schema_snapshot(self):
         # call API, return schema
         pass
 
-    def execute(self, query: str) -> QueryResult:
-        # run query, return rows
+    def execute(self, request: AdapterRequest) -> ResultFrame:
+        # run request, return rows
         pass
 ```
 
-> See the **[Adapter SDK Reference](sdk.md)** for the mandatory method signatures and compliance testing guide.
+> See the **[Adapter Interface Reference](sdk.md)** for the method signatures and compliance guide.
 
 ## Compliance Testing
 
-Regardless of which path you choose, your adapter **MUST** pass the compliance test suite to ensuring it handles types and errors correctly.
+Regardless of which path you choose, your adapter **MUST** pass the compliance test suite to ensure it handles types and errors correctly.
 
 ```python
-from nl2sql_adapter_sdk.testing import BaseAdapterTest
-# ... see SDK Reference for test setup
+# See Adapter Interface Reference for test setup
 ```

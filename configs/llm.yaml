@@ -3,8 +3,8 @@ default:
   provider: openai
   model: gpt-5.2
 agents:
-  intent_validator:
+  indexing_enrichment:
     provider: openai
-    model: gpt-4o-mini
+    model: gpt-5.2
     temperature: 0.0
 

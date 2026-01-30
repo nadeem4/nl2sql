@@ -1,13 +1,12 @@
 from typing import Any, List, Dict
 from sqlalchemy import create_engine, text, inspect
 from sqlalchemy.dialects import mysql
-from nl2sql_adapter_sdk import (
-    QueryResult, 
+from nl2sql_sqlalchemy_adapter import (
     CostEstimate,
     DryRunResult,
-    QueryPlan
+    QueryPlan,
+    BaseSQLAlchemyAdapter
 )
-from nl2sql_sqlalchemy_adapter import BaseSQLAlchemyAdapter
 
 from pydantic import BaseModel, Field, SecretStr
 from typing import Optional
@@ -118,3 +117,7 @@ class MysqlAdapter(BaseSQLAlchemyAdapter):
     def get_dialect(self) -> str:
         return mysql.dialect.name
 
+
+    @property
+    def exclude_schemas(self) -> set[str]:
+        return {"mysql", "INFORMATION_SCHEMA", "performance_schema", "sys"}

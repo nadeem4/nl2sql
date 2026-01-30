@@ -350,13 +350,16 @@ def setup_command(demo: bool = False, lite: bool = True, docker: bool = False, a
 
     # 6. Indexing Prompt
     console.print("")
-    from nl2sql.services.vector_store import OrchestratorVectorStore
+    from nl2sql.indexing.vector_store import VectorStore
     from nl2sql.common.settings import settings
     from nl2sql_cli.commands.indexing import run_indexing
-    from nl2sql.services.llm import LLMRegistry
+    from nl2sql.llm import LLMRegistry
 
     try:
-        v_store = OrchestratorVectorStore(persist_directory=settings.vector_store_path)
+        v_store = VectorStore(
+            collection_name=settings.vector_store_collection_name,
+            persist_directory=settings.vector_store_path,
+        )
         should_index = False
         
         if not v_store.is_empty():
@@ -380,7 +383,22 @@ def setup_command(demo: bool = False, lite: bool = True, docker: bool = False, a
             except Exception:
                 pass
             
-            run_indexing(configs, settings.vector_store_path, v_store, llm_registry)
+            # Create a localized context for indexing
+            from nl2sql.context import NL2SQLContext
+            from nl2sql.datasources import DatasourceRegistry
+            from nl2sql.secrets import secret_manager
+            
+            ds_registry = DatasourceRegistry(secret_manager)
+            ds_registry.register_datasources(configs)
+            
+            ctx = NL2SQLContext(
+                ds_registry=ds_registry,
+                llm_registry=llm_registry,
+                vector_store=v_store,
+                secret_manager=secret_manager
+            )
+
+            run_indexing(ctx)
             print_success("Indexing process finished.")
             
     except Exception as e:

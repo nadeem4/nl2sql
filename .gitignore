@@ -27,3 +27,5 @@ site
 data
 
 last_reasoning.json
+
+artifacts/

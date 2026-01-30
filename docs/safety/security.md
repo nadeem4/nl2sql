@@ -12,7 +12,7 @@ To mitigate **Logic Injection** and **Jailbreak** attacks where users trick the 
 
 ### Mechanism
 
-The `IntentValidatorNode` uses a specialized, low-temperature LLM call to classify the User Query into one of several categories:
+The intent validator uses a low-temperature LLM call to classify the user query into one of several categories:
 
 1. **SAFE**: Benign business queries (e.g., "Show me sales").
 2. **JAILBREAK**: Attempts to bypass rules (e.g., "Ignore previous instructions").
@@ -49,7 +49,7 @@ Before the system even attempts to plan, we limit the **Knowledge Scope** availa
 
 ### Vector Store Filtering
 
-The `OrchestratorVectorStore` enforces a strict **Metadata Filter** on every retrieval call.
+The `VectorStore` enforces a strict **Metadata Filter** on every retrieval call.
 
 * **Mechanism**: `query({filter: {'datasource_id': {'$in': allowed_ds_ids}}})`
 * **Guarantee**: If a user only has access to `sales_db`, vectors from `hr_db` are physically excluded from the search space. The LLM never sees them.

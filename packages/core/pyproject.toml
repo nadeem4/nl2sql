@@ -8,12 +8,12 @@ version = "0.1.0"
 description = "Core orchestration engine for NL2SQL"
 requires-python = ">=3.9"
 dependencies = [
-    "nl2sql-adapter-sdk",
     "SQLAlchemy>=2.0",
     "PyYAML>=6.0",
     "langgraph>=0.0.29",
     "langchain>=0.2.0",
     "langchain-openai>=0.1.0",
+    "nl2sql-adapter-sdk",
     "pydantic>=1.10",
     "opentelemetry-api>=1.20.0",
     "opentelemetry-sdk>=1.20.0",
@@ -22,6 +22,11 @@ dependencies = [
     "pydantic-settings>=2.0.0",
     "pandas>=1.5.0", # For metrics/evals
     "pybreaker>=1.3.0", # Circuit breaker pattern (ENH-002)
+    "pyarrow",
+    "boto3",
+    "azure-storage-blob",
+    "polars",
+    "duckdb",
 ]
 
 [project.optional-dependencies]

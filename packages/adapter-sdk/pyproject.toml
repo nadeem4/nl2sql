@@ -5,11 +5,14 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "nl2sql-adapter-sdk"
 version = "0.1.0"
-description = "Public contract/interface for nl2sql adapters"
+description = "Shared adapter contracts for NL2SQL"
 requires-python = ">=3.9"
 dependencies = [
     "pydantic>=1.10",
 ]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]

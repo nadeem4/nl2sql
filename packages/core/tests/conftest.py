@@ -1,29 +1,9 @@
-import pytest
-from unittest.mock import MagicMock
+import sys
+from pathlib import Path
 
+ROOT = Path(__file__).resolve().parents[3]
+CORE_SRC = ROOT / "packages" / "core" / "src"
+SDK_SRC = ROOT / "packages" / "adapter-sdk" / "src"
 
-
-@pytest.fixture
-def mock_profile():
-    """Returns a standard SQLite datasource profile for testing."""
-    from types import SimpleNamespace
-    return SimpleNamespace(
-        id="test_sqlite",
-        type="sqlite",
-        connection={"database": ":memory:"},
-        row_limit=100
-    )
-
-@pytest.fixture
-def mock_engine(mock_profile):
-    """Returns an in-memory SQLite engine."""
-    from sqlalchemy import create_engine
-    return create_engine("sqlite:///:memory:")
-
-@pytest.fixture
-def mock_vector_store():
-    """Returns a mocked OrchestratorVectorStore."""
-    store = MagicMock()
-    store.retrieve.return_value = []
-    store.is_empty.return_value = False
-    return store
+for path in (CORE_SRC, SDK_SRC):
+    sys.path.insert(0, str(path))

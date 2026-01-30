@@ -11,15 +11,25 @@ class Settings(BaseSettings):
     """Application configuration settings backed by environment variables."""
     
     openai_api_key: Optional[str] = Field(default=None, validation_alias="OPENAI_API_KEY")
-    vector_store_path: Optional[str] = Field(default="./chroma_db", validation_alias="VECTOR_STORE")
+    vector_store_path: Optional[str] = Field(
+        default="./chroma_db",
+        validation_alias="VECTOR_STORE",
+        description="Persist directory for the vector store."
+    )
+    vector_store_collection_name: str = Field(
+        default="nl2sql_store",
+        validation_alias="VECTOR_STORE_COLLECTION",
+        description="Chroma collection name for schema embeddings."
+    )
     llm_config_path: str = Field(default="configs/llm.yaml", validation_alias="LLM_CONFIG")
     datasource_config_path: str = Field(default="configs/datasources.yaml", validation_alias="DATASOURCE_CONFIG")
     benchmark_config_path: str = Field(default="configs/benchmark_suite.yaml", validation_alias="BENCHMARK_CONFIG")
     secrets_config_path: str = Field(default="configs/secrets.yaml", validation_alias="SECRETS_CONFIG")
     embedding_model: str = Field(default="text-embedding-3-small", validation_alias="EMBEDDING_MODEL")
+    tenant_id: str = Field(default="default_tenant", validation_alias="TENANT_ID")
     sample_questions_path: str = Field(
         default="configs/sample_questions.yaml", 
-        validation_alias="ROUTING_EXAMPLES",
+        validation_alias="SAMPLE_QUESTIONS",
         description="Path to the YAML file containing sample questions for routing."
     )
     policies_config_path: str = Field(
@@ -71,6 +81,95 @@ class Settings(BaseSettings):
         default=30000, # 30s
         validation_alias="DEFAULT_STATEMENT_TIMEOUT_MS",
         description="Default statement timeout for SQL execution safeguards."
+    )
+
+    result_artifact_backend: str = Field(
+        default="local",
+        validation_alias="RESULT_ARTIFACT_BACKEND",
+        description="Artifact backend to store executor results: local, s3, adls."
+    )
+    result_artifact_base_uri: str = Field(
+        default="./artifacts",
+        validation_alias="RESULT_ARTIFACT_BASE_URI",
+        description="Base URI or path for artifact storage."
+    )
+    result_artifact_path_template: str = Field(
+        default="<tenant_id>/<request_id>/<subgraph_name>/<dag_node_id>/<schema_version>/part-00000.parquet",
+        validation_alias="RESULT_ARTIFACT_PATH_TEMPLATE",
+        description="Template for artifact paths."
+    )
+    result_artifact_s3_bucket: Optional[str] = Field(
+        default=None,
+        validation_alias="RESULT_ARTIFACT_S3_BUCKET",
+        description="S3 bucket for artifact storage."
+    )
+    result_artifact_s3_prefix: Optional[str] = Field(
+        default=None,
+        validation_alias="RESULT_ARTIFACT_S3_PREFIX",
+        description="S3 prefix for artifact storage."
+    )
+    result_artifact_adls_account: Optional[str] = Field(
+        default=None,
+        validation_alias="RESULT_ARTIFACT_ADLS_ACCOUNT",
+        description="ADLS storage account name."
+    )
+    result_artifact_adls_container: Optional[str] = Field(
+        default=None,
+        validation_alias="RESULT_ARTIFACT_ADLS_CONTAINER",
+        description="ADLS container name."
+    )
+    result_artifact_adls_connection_string: Optional[str] = Field(
+        default=None,
+        validation_alias="RESULT_ARTIFACT_ADLS_CONNECTION_STRING",
+        description="ADLS connection string, if using key-based auth."
+    )
+
+    schema_store_backend: str = Field(
+        default="sqlite",
+        validation_alias="SCHEMA_STORE_BACKEND",
+        description="Schema store backend identifier (e.g., 'sqlite', 'memory')."
+    )
+    schema_store_path: str = Field(
+        default="data/schema_store.db",
+        validation_alias="SCHEMA_STORE_PATH",
+        description="SQLite database path for schema store persistence."
+    )
+    schema_store_max_versions: int = Field(
+        default=3,
+        validation_alias="SCHEMA_STORE_MAX_VERSIONS",
+        description="Max versions to retain per datasource in schema store."
+    )
+    schema_version_mismatch_policy: str = Field(
+        default="warn",
+        validation_alias="SCHEMA_VERSION_MISMATCH_POLICY",
+        description="Action when chunk schema_version differs from SchemaStore: warn, fail, or ignore."
+    )
+
+    logical_validator_strict_columns: bool = Field(
+        default=False,
+        validation_alias="LOGICAL_VALIDATOR_STRICT_COLUMNS",
+        description="Treat missing columns as errors in logical validation."
+    )
+
+    sql_agent_max_retries: int = Field(
+        default=3,
+        validation_alias="SQL_AGENT_MAX_RETRIES",
+        description="Max retry attempts for SQL agent refinement loop."
+    )
+    sql_agent_retry_base_delay_sec: float = Field(
+        default=1.0,
+        validation_alias="SQL_AGENT_RETRY_BASE_DELAY_SEC",
+        description="Base delay for SQL agent retries (seconds)."
+    )
+    sql_agent_retry_max_delay_sec: float = Field(
+        default=10.0,
+        validation_alias="SQL_AGENT_RETRY_MAX_DELAY_SEC",
+        description="Max delay for SQL agent retries (seconds)."
+    )
+    sql_agent_retry_jitter_sec: float = Field(
+        default=0.5,
+        validation_alias="SQL_AGENT_RETRY_JITTER_SEC",
+        description="Max jitter added to SQL agent retry delays (seconds)."
     )
 
     observability_exporter: str = Field(

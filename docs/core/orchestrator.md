@@ -79,7 +79,6 @@ class GraphState(BaseModel):
     complexity: Literal["simple", "complex"] = Field(default="complex")
     output_mode: Literal["data", "synthesis"] = Field(default="synthesis")
     confidence: Optional[float] = Field(default=None, description="Confidence score from Decomposer.")
-    semantic_analysis: Optional[SemanticAnalysisResponse] = Field(default=None)
 
     # --- Map Phase (Routing) ---
     sub_queries: Optional[List[SubQuery]] = Field(default=None, description="Decomposed sub-queries.")

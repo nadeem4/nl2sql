@@ -1,108 +1,58 @@
 from __future__ import annotations
-from typing import Dict, Any, Callable, Union, TYPE_CHECKING, Optional
-import json
+from typing import Dict, Any, TYPE_CHECKING
 
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import Runnable
 
 if TYPE_CHECKING:
     from nl2sql.pipeline.state import GraphState
-    from nl2sql.services.vector_store import OrchestratorVectorStore
-    from nl2sql.pipeline.nodes.semantic.node import SemanticAnalysisNode
 
-from .schemas import DecomposerResponse, SubQuery
+from .schemas import DecomposerResponse, SubQuery, UnmappedSubQuery, PostCombineOp
 from .prompts import DECOMPOSER_PROMPT
-from nl2sql.datasources import DatasourceRegistry
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.common.logger import get_logger
-from nl2sql_adapter_sdk import Table
+from nl2sql.context import NL2SQLContext
+import hashlib
+import json
 
 logger = get_logger("decomposer")
 
-LLMCallable = Union[Callable[[str], Any], Runnable]
 
 
 class DecomposerNode:
     """Orchestrates query decomposition and routing.
 
-    Analyzes the user query and retrieved context to determine which datasource(s)
-    should handle the request. Splits complex multi-source queries into sub-queries.
+    Analyzes the user query to generate semantic sub-queries and combine groups.
 
     Attributes:
-        llm (LLMCallable): The language model to use.
-        registry (DatasourceRegistry): Registry of datasources.
-        vector_store (Optional[OrchestratorVectorStore]): Store for retrieving context.
+        llm (ChatOpenAI): The language model to use.
         prompt (ChatPromptTemplate): The prompt template.
         chain (Runnable): The execution chain.
     """
 
-    def __init__(
-        self,
-        llm: LLMCallable,
-        registry: DatasourceRegistry,
-        vector_store: Optional[OrchestratorVectorStore] = None,
-    ):
+    def __init__(self, ctx: NL2SQLContext):
         """Initializes the DecomposerNode.
 
         Args:
             llm (LLMCallable): The LLM instance or runnable.
-            registry (DatasourceRegistry): The datasource registry.
-            vector_store (Optional[OrchestratorVectorStore]): Vector store for RAG.
+            vector_store (Optional[VectorStore]): Vector store for RAG.
         """
-        self.llm = llm
-        self.registry = registry
-        self.vector_store = vector_store
+        self.node_name = self.__class__.__name__.lower().replace('node', '')
+        self.llm = ctx.llm_registry.get_llm(self.node_name)
         self.prompt = ChatPromptTemplate.from_template(DECOMPOSER_PROMPT)
-        self.chain = self.prompt | self.llm
+        self.chain = self.prompt | self.llm.with_structured_output(
+            DecomposerResponse, method="function_calling"
+        )
 
-    def _get_relevant_docs(self, state: GraphState, override_query: str = None) -> list:
-        """Helper to retrieve relevant docs from Vector Store based on user_context.
-
-        Args:
-            state (GraphState): Current execution state.
-            override_query (str): Optional query string to use instead of state.user_query.
-
-        Returns:
-            list: A list of relevant documents.
-        """
-
-        if not self.vector_store:
-            return []
-
-        user_ctx = state.user_context
-        allowed_ds = user_ctx.allowed_datasources or []
-
-        query_text = override_query or state.user_query
-
-        if "*" in allowed_ds:
-            return self.vector_store.retrieve_routing_context(
-                query_text, k=20
-            )
-        elif allowed_ds:
-            return self.vector_store.retrieve_routing_context(
-                query_text, k=20, datasource_id=allowed_ds
-            )
-        else:
-            logger.warning("AuthZ: No allowed_datasources found in user_context. Skipping retrieval.")
-            return []
-
-    def _check_user_access(self, state: GraphState) -> bool:
-        """Checks if the user has access to any datasources.
-
-        Args:
-           state (GraphState): Current execution state.
-
-        Returns:
-            bool: True if access is allowed, False otherwise.
-        """
-        user_ctx = state.user_context
-        allowed_ds = user_ctx.allowed_datasources
-        return bool(allowed_ds)
+    def _stable_id(self, prefix: str, payload: Dict[str, Any]) -> str:
+        data = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+        digest = hashlib.sha256(data.encode("utf-8")).hexdigest()[:12]
+        return f"{prefix}_{digest}"
 
     def __call__(self, state: GraphState) -> Dict[str, Any]:
         """Executes the decomposer node.
 
-        Retrieves context, invokes the LLM, and produces a routing decision.
+        Invokes the LLM to produce semantic sub-queries and combine groups.
 
         Args:
             state (GraphState): The current execution state.
@@ -110,125 +60,156 @@ class DecomposerNode:
         Returns:
             Dict[str, Any]: Dictionary containing 'sub_queries', confidence, reasoning, etc.
         """
-        node_name = "decomposer"
-
         try:
-            if not self._check_user_access(state):
-                return {
-                    "sub_queries": [],
-                    "confidence": 0.0,
-                    "reasoning": [
-                        {"node": node_name, "content": "AuthZ: Request rejected. No allowed_datasources found in user_context."}
-                    ],
-                    "errors": [
-                        PipelineError(
-                            node=node_name,
-                            message="Access Denied: User has no allowed datasources.",
-                            severity=ErrorSeverity.CRITICAL,
-                            error_code=ErrorCode.SECURITY_VIOLATION
-                        )
-                    ]
-                }
-
-            expanded_query = state.user_query
-
-            if state.semantic_analysis:
-                analysis = state.semantic_analysis
-                if analysis.keywords or analysis.synonyms:
-                    expanded_query = f"{analysis.canonical_query} {' '.join(analysis.keywords)} {' '.join(analysis.synonyms)}"
-                    print(f"Expanded Query: {expanded_query}")
-
-            retrieved_context = ""
-            docs = self._get_relevant_docs(state, override_query=expanded_query)
-
-            if not docs:
-                logger.warning("No relevant docs found for query: %s", expanded_query)
-                return {
-                    "sub_queries": [],
-                    "confidence": 0.0,
-                    "reasoning": [
-                        {"node": node_name, "content": f"Retrieval returned 0 documents for search query: '{expanded_query}'."}
-                    ],
-                    "errors": [
-                        PipelineError(
-                            node=node_name,
-                            message="Data Not Found: No relevant tables found in allowed datasources.",
-                            severity=ErrorSeverity.CRITICAL,
-                            error_code=ErrorCode.SCHEMA_RETRIEVAL_FAILED
-                        )
-                    ]
-                }
-
-            context_lines = []
-            ds_tables: Dict[str, list] = {}
-
-            for doc in docs:
-                d_type = doc.metadata.get("type", "table")
-                d_id = doc.metadata.get("datasource_id", "unknown")
-                name = doc.metadata.get("table_name", "unknown")
-
-                if d_type == "table":
-                    schema_json_str = doc.metadata.get("schema_json")
-                    content_block = schema_json_str
-
-                    if d_id not in ds_tables:
-                        ds_tables[d_id] = []
-                    ds_tables[d_id].append(Table.model_validate_json(schema_json_str))
-
-                    context_lines.append(f"[Table] {name} (DS: {d_id}):\n{content_block}")
-                elif d_type == "example":
-                    context_lines.append(f"[Example] (DS: {d_id}): {doc.page_content}")
-
-            retrieved_context = "\n\n".join(context_lines)
+            resolver_response = state.datasource_resolver_response
+            if not resolver_response or not resolver_response.resolved_datasources:
+                raise ValueError("Unable to resolve any datasource for the current user query.")
+            
+            resolved_datasources = resolver_response.resolved_datasources 
+            resolved_payload = []
+            resolved_ids = set()
+            schema_version_map = {}
+            for datasource in resolved_datasources:
+                resolved_payload.append(datasource.model_dump())
+                resolved_ids.add(datasource.datasource_id)
+                schema_version_map[datasource.datasource_id] = datasource.schema_version
 
             llm_response: DecomposerResponse = self.chain.invoke(
                 {
                     "user_query": state.user_query,
-                    "retrieved_context": retrieved_context,
+                    "resolved_datasources": resolved_payload,
                 }
             )
 
             final_sub_queries = []
+            unmapped = []
+            allowed_ids = set(resolver_response.allowed_datasource_ids)
+            unsupported_ids = set(resolver_response.unsupported_datasource_ids)
+            id_map: Dict[str, str] = {}
 
             for llm_sq in llm_response.sub_queries:
-                sq = SubQuery(
-                    query=llm_sq.query,
-                    datasource_id=llm_sq.datasource_id,
-                    complexity=llm_sq.complexity
+                datasource_id = (llm_sq.datasource_id or "").strip() or None
+                if not datasource_id or datasource_id not in resolved_ids:
+                    unmapped.append(
+                        UnmappedSubQuery(
+                            intent=llm_sq.intent,
+                            reason="no_datasource",
+                            datasource_id=datasource_id,
+                            detail="Datasource is missing or not resolved for this sub-query.",
+                        )
+                    )
+                    continue
+                if datasource_id not in allowed_ids:
+                    unmapped.append(
+                        UnmappedSubQuery(
+                            intent=llm_sq.intent,
+                            reason="restricted_datasource",
+                            datasource_id=datasource_id,
+                            detail="Datasource is not allowed for the current user context.",
+                        )
+                    )
+                    continue
+                if datasource_id in unsupported_ids:
+                    unmapped.append(
+                        UnmappedSubQuery(
+                            intent=llm_sq.intent,
+                            reason="unsupported_datasource",
+                            datasource_id=datasource_id,
+                            detail="Datasource does not match any supported adapter capabilities.",
+                        )
+                    )
+                    continue
+                stable_id = self._stable_id(
+                    "sq",
+                    {
+                        "datasource_id": datasource_id,
+                        "intent": llm_sq.intent,
+                        "metrics": [m.model_dump() for m in llm_sq.metrics],
+                        "filters": [f.model_dump() for f in llm_sq.filters],
+                        "group_by": [g.model_dump() for g in llm_sq.group_by],
+                        "expected_schema": [c.model_dump() for c in llm_sq.expected_schema],
+                    },
                 )
-
-                if sq.datasource_id in ds_tables:
-                    sq.relevant_tables = ds_tables[sq.datasource_id]
-
+                id_map[llm_sq.id] = stable_id
+                sq = SubQuery(
+                    id=stable_id,
+                    intent=llm_sq.intent,
+                    datasource_id=datasource_id,
+                    metrics=llm_sq.metrics,
+                    filters=llm_sq.filters,
+                    group_by=llm_sq.group_by,
+                    expected_schema=llm_sq.expected_schema,
+                    schema_version=schema_version_map.get(datasource_id),
+                )
                 final_sub_queries.append(sq)
 
-            reasoning_list = []
+            valid_ids = {sq.id for sq in final_sub_queries}
+            combine_groups = []
+            for group in llm_response.combine_groups:
+                updated_inputs = []
+                for inp in group.inputs:
+                    mapped_id = id_map.get(inp.subquery_id, inp.subquery_id)
+                    if mapped_id in valid_ids:
+                        updated_inputs.append(inp.model_copy(update={"subquery_id": mapped_id}))
+                if not updated_inputs:
+                    continue
+                combine_groups.append(group.model_copy(update={"inputs": updated_inputs}))
 
-            reasoning_list.append({"node": node_name, "content": llm_response.reasoning})
+            combine_groups = sorted(combine_groups, key=lambda g: g.group_id)
+            final_sub_queries = sorted(final_sub_queries, key=lambda s: s.id)
+
+            post_combine_ops = []
+            for op in llm_response.post_combine_ops or []:
+                op_id = self._stable_id(
+                    "op",
+                    {
+                        "target_group_id": op.target_group_id,
+                        "operation": op.operation,
+                        "filters": [f.model_dump() for f in op.filters],
+                        "metrics": [m.model_dump() for m in op.metrics],
+                        "group_by": [g.model_dump() for g in op.group_by],
+                        "order_by": [o.model_dump() for o in op.order_by],
+                        "limit": op.limit,
+                        "expected_schema": [c.model_dump() for c in op.expected_schema],
+                        "metadata": op.metadata,
+                    },
+                )
+                post_combine_ops.append(op.model_copy(update={"op_id": op_id}))
+
+            post_combine_ops = sorted(post_combine_ops, key=lambda o: o.op_id)
+
+            response = DecomposerResponse(
+                sub_queries=final_sub_queries,
+                combine_groups=combine_groups,
+                post_combine_ops=post_combine_ops,
+                unmapped_subqueries=unmapped,
+            )
 
             return {
-                "sub_queries": final_sub_queries,
-                "confidence": llm_response.confidence,
-                "output_mode": llm_response.output_mode,
-                "reasoning": reasoning_list,
+                "decomposer_response": response,
+                "reasoning": [{"node": self.node_name, "content": "Decomposition completed."}],
             }
 
         except Exception as e:
-            logger.error(f"Node {node_name} failed: {e}")
+            logger.error(f"Node {self.node_name} failed: {e}")
 
             return {
-                "sub_queries": [],
-                "confidence": 0.0,
+                "decomposer_response": DecomposerResponse(
+                    sub_queries=[],
+                    combine_groups=[],
+                    post_combine_ops=[],
+                    unmapped_subqueries=[],
+                ),
                 "reasoning": [
                     {
-                        "node": node_name,
+                        "node": self.node_name,
                         "content": f"Decomposition failed: {str(e)}",
                         "type": "error",
                     }
                 ],
                 "errors": [
                     PipelineError(
-                        node=node_name,
+                        node=self.node_name,
                         message=f"Decomposition failed: {str(e)}",
                         severity=ErrorSeverity.CRITICAL,
                         error_code=ErrorCode.ORCHESTRATOR_CRASH,

@@ -16,14 +16,10 @@ class RolePolicy(BaseModel):
             if table == "*":
                 continue
             
-            # Check for datasource wildcard definition (e.g. "sales_db.*")
             if table.endswith(".*"):
-                # Basic check for structure "ds.*"
                 if table.count(".") < 1:
                      raise ValueError(f"Invalid wildcard '{table}'. Must be 'datasource.*'.")
                 continue
-
-            # Standard Table check
             if "." not in table:
                 raise ValueError(f"Invalid table '{table}'. Policy requires explicit 'datasource.table' format to prevent ambiguity.")
         

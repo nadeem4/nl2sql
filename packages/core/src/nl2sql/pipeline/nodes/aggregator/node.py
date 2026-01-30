@@ -1,123 +1,57 @@
 from __future__ import annotations
-from typing import List, Dict, Any, Literal, Callable, Union, TYPE_CHECKING
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.runnables import Runnable
+from typing import Dict, Any, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from nl2sql.pipeline.state import GraphState
 
-from .schemas import AggregatedResponse
-from .prompts import AGGREGATOR_PROMPT
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
-
+from nl2sql.pipeline.nodes.aggregator.schemas import AggregatorResponse
+from nl2sql.pipeline.nodes.global_planner.schemas import GlobalPlannerResponse
 from nl2sql.common.logger import get_logger
+from nl2sql.context import NL2SQLContext
+from nl2sql.aggregation import AggregationService
+from nl2sql.aggregation.engines.polars_duckdb import PolarsDuckdbEngine
 
 logger = get_logger("aggregator")
 
-LLMCallable = Union[Callable[[str], Any], Runnable]
 
+class EngineAggregatorNode:
+    """Thin wrapper for aggregation service using ExecutionDAG layers."""
 
-class AggregatorNode:
-    """Node responsible for aggregating results from parallel sub-queries.
-
-    This node synthesizes intermediate results from multiple execution branches.
-    It can either pass through a single result directly (Fast Path) or use an LLM
-    to generate a summary (Slow Path).
-
-    Attributes:
-        llm (LLMCallable): The language model callable used for aggregation.
-        prompt (ChatPromptTemplate): The prompt template used for aggregation.
-        chain (Runnable): The LangChain runnable sequence.
-    """
-
-    def __init__(self, llm: LLMCallable):
-        """Initializes the AggregatorNode.
-
-        Args:
-            llm (LLMCallable): The language model callable.
-        """
-        self.llm = llm
-        self.prompt = ChatPromptTemplate.from_template(AGGREGATOR_PROMPT)
-        self.chain = self.prompt | self.llm
-
-    def _display_result_with_llm(self, state: GraphState) -> str:
-        """Generates a text summary using the LLM.
-
-        Args:
-            state (GraphState): The current graph state containing intermediate results.
-
-        Returns:
-            str: A string containing the aggregated final answer.
-        """
-        user_query = state.user_query
-        intermediate_results = state.intermediate_results or []
-        formatted_results = ""
-        for i, res in enumerate(intermediate_results):
-            formatted_results += f"--- Result {i+1} ---\n{str(res)}\n\n"
-
-        if state.errors:
-            formatted_results += "\n--- Errors Encountered ---\n"
-            for err in state.errors:
-                safe_msg = err.get_safe_message()
-                formatted_results += f"Error from {err.node}: {safe_msg}\n"
-
-        response: AggregatedResponse = self.chain.invoke({
-            "user_query": user_query,
-            "intermediate_results": formatted_results
-        })
-
-        final_answer = f"### Summary\n{response.summary}\n\n"
-        if response.format_type == "table":
-            final_answer += f"### Data\n\n{response.content}"
-        elif response.format_type == "list":
-            final_answer += f"### Details\n\n{response.content}"
-        else:
-            final_answer += f"\n{response.content}"
-
-        return final_answer
+    def __init__(self, ctx: NL2SQLContext):
+        self.node_name = self.__class__.__name__.lower().replace("node", "")
+        self.ctx = ctx
+        self.service = AggregationService(PolarsDuckdbEngine())
 
     def __call__(self, state: GraphState) -> Dict[str, Any]:
-        """Executes the aggregation logic.
-
-        Determines whether to use the fast path (direct data return) or slow
-        path (LLM synthesis) based on complexity and output mode.
-
-        Args:
-            state (GraphState): The current graph state.
-
-        Returns:
-            Dict[str, Any]: A dictionary containing the final answer and reasoning.
-        """
-        user_query = state.user_query
-        intermediate_results = state.intermediate_results or []
-        node_name = "aggregator"
         try:
-            output_mode = state.output_mode
-
-            if len(intermediate_results) == 1 and not state.errors and output_mode == "data":
-                return {
-                    "final_answer": intermediate_results[0],
-                    "reasoning": [{"node": "aggregator", "content": "Fast path: Raw data result passed through (output_mode='data')."}]
-                }
-
-            final_answer = self._display_result_with_llm(state)
-
+            planner_response = state.global_planner_response
+            logger.info(f"Planner response: {planner_response.model_dump_json(indent=2)}")
+            artifact_refs = state.artifact_refs
+            logger.info(f"Artifact references: {artifact_refs}")
+           
+            dag = planner_response.execution_dag
+            
+            terminal_results = self.service.execute(dag, artifact_refs)
+            aggregator_response = AggregatorResponse(
+                terminal_results=terminal_results,
+                computed_artifacts={},
+            )
             return {
-                "final_answer": final_answer,
-                "reasoning": [{"node": "aggregator", "content": "LLM Aggregation used."}]
+                "aggregator_response": aggregator_response,
+                "reasoning": [{"node": self.node_name, "content": "ExecutionDAG aggregation executed successfully."}],
             }
-        except Exception as e:
-            logger.error(f"Node {node_name} failed: {e}")
+        except Exception as exc:
+            logger.error(f"Node {self.node_name} failed: {exc}")
             return {
-                "final_answer": f"Error during aggregation: {str(e)}",
-                "reasoning": [{"node": "aggregator", "content": f"Error: {str(e)}", "type": "error"}],
+                "aggregator_response": AggregatorResponse(),
+                "reasoning": [{"node": self.node_name, "content": f"Error: {str(exc)}", "type": "error"}],
                 "errors": [
                     PipelineError(
-                        node=node_name,
-                        message=f"Aggregator failed: {str(e)}",
+                        node=self.node_name,
+                        message=f"Aggregator failed: {str(exc)}",
                         severity=ErrorSeverity.ERROR,
                         error_code=ErrorCode.AGGREGATOR_FAILED,
-                        stack_trace=str(e)
                     )
-                ]
+                ],
             }

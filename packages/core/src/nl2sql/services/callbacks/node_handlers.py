@@ -45,6 +45,12 @@ class NodeHandler:
         if raw_node == "execution_branch":
             if isinstance(inputs, dict):
                 q = inputs.get("user_query")
+                if not q:
+                    sub_query = inputs.get("sub_query")
+                    if isinstance(sub_query, dict):
+                        q = sub_query.get("intent")
+                    elif hasattr(sub_query, "intent"):
+                        q = sub_query.intent
                 if q:
                     display_node = f"execution_branch ({q})"
 
@@ -76,6 +82,12 @@ class NodeHandler:
         ds_id = None
         if isinstance(inputs, dict):
             ds_id = inputs.get("selected_datasource_id") or inputs.get("datasource_id")
+            if not ds_id:
+                sub_query = inputs.get("sub_query")
+                if isinstance(sub_query, dict):
+                    ds_id = sub_query.get("datasource_id")
+                elif hasattr(sub_query, "datasource_id"):
+                    ds_id = sub_query.datasource_id
 
         if ds_id:
             tok = current_datasource_id.set(ds_id)

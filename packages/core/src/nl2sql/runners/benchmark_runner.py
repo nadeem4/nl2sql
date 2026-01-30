@@ -8,9 +8,9 @@ import pandas as pd
 from sqlalchemy import text, create_engine
 
 from nl2sql.datasources import DatasourceRegistry
-from nl2sql.services.llm import LLMRegistry
-from nl2sql.services.vector_store import OrchestratorVectorStore
-from nl2sql.pipeline.graph import run_with_graph
+from nl2sql.llm import LLMRegistry
+from nl2sql.indexing.vector_store import VectorStore
+from nl2sql.pipeline.runtime import run_with_graph
 from nl2sql.evaluation.evaluator import ModelEvaluator
 from nl2sql_cli.types import BenchmarkConfig
 
@@ -30,7 +30,7 @@ class BenchmarkRunner:
         self,
         config: BenchmarkConfig,
         datasource_registry: DatasourceRegistry,
-        vector_store: OrchestratorVectorStore,
+        vector_store: VectorStore,
         llm_registry: LLMRegistry
     ):
         self.config = config
@@ -173,13 +173,35 @@ class BenchmarkRunner:
                 "layer_match": layer_match
             }
             
-        generated_sql_data = state.get("sql_draft")
-        if isinstance(generated_sql_data, str):
-            generated_sql = generated_sql_data
-        else:
-            generated_sql = generated_sql_data.get("sql") if isinstance(generated_sql_data, dict) else getattr(generated_sql_data, "sql", None)
+        generated_sql = None
+        execution_res = None
+        subgraph_outputs = state.get("subgraph_outputs") or {}
+        if subgraph_outputs:
+            first_output = next(iter(subgraph_outputs.values()))
+            generated_sql = (
+                first_output.get("sql_draft")
+                if isinstance(first_output, dict)
+                else getattr(first_output, "sql_draft", None)
+            )
+            execution_res = (
+                first_output.get("artifact")
+                if isinstance(first_output, dict)
+                else getattr(first_output, "artifact", None)
+            )
+
+        if not generated_sql:
+            generated_sql_data = state.get("sql_draft")
+            if isinstance(generated_sql_data, str):
+                generated_sql = generated_sql_data
+            else:
+                generated_sql = (
+                    generated_sql_data.get("sql")
+                    if isinstance(generated_sql_data, dict)
+                    else getattr(generated_sql_data, "sql", None)
+                )
         
-        execution_res = state.get("execution")
+        if execution_res is None:
+            execution_res = state.get("execution")
         generated_rows = execution_res.get("rows") if isinstance(execution_res, dict) else getattr(execution_res, "rows", [])
         exec_error = execution_res.get("error") if isinstance(execution_res, dict) else getattr(execution_res, "error", None)
         
