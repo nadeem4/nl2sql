@@ -70,7 +70,6 @@ class SchemaRetrieverNode:
         resolved_tables: Optional[Dict[str, Set[str]]] = None,
         schema_version: Optional[str] = None,
     ) -> List[Table]:
-        logger.info(f"Building tables from snapshot: {snapshot.model_dump_json(indent=2)}")
         if not snapshot:
             return []
 
@@ -201,7 +200,6 @@ class SchemaRetrieverNode:
                     resolved_tables=None,
                     schema_version=schema_version,
                 )
-                logger.info(f"Length of relevant tables for planning: {len(relevant_tables)}")
                 return {
                     "relevant_tables": relevant_tables,
                     "reasoning": [
@@ -227,7 +225,6 @@ class SchemaRetrieverNode:
             )
 
 
-            logger.info(f"Length of relevant tables for planning: {len(relevant_tables)}")
 
             return {
                 "relevant_tables": relevant_tables,

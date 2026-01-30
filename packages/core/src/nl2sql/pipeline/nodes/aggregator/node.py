@@ -26,9 +26,7 @@ class EngineAggregatorNode:
     def __call__(self, state: GraphState) -> Dict[str, Any]:
         try:
             planner_response = state.global_planner_response
-            logger.info(f"Planner response: {planner_response.model_dump_json(indent=2)}")
             artifact_refs = state.artifact_refs
-            logger.info(f"Artifact references: {artifact_refs}")
            
             dag = planner_response.execution_dag
             
