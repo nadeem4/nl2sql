@@ -1,12 +1,26 @@
-# NL2SQL Engineering Documentation
+# NL2SQL Platform Documentation
 
-This documentation describes the **current runtime behavior** of NL2SQL as implemented in code. It is architecture-driven and intended for engineers who operate, extend, or audit the system.
+This documentation describes the **current, production-grade runtime behavior** of NL2SQL as implemented in code. It is engineered for platform engineers, system architects, and contributors who need a precise mental model of the architecture, contracts, and operational behavior.
 
-## What NL2SQL does
+## Problem this system solves
 
-- Orchestrates a LangGraph pipeline built in `build_graph()` and executed via `run_with_graph()` for every user query.
-- Splits multi-part questions into sub-queries and executes them across datasources via subgraphs.
-- Generates SQL with agent nodes, validates the plan, executes via adapters, and aggregates results into a final answer.
+NL2SQL converts natural language requests into **deterministic, validated SQL** across one or more datasources. It enforces schema-grounded planning, policy constraints, and reproducible execution. The system is built for multi-datasource enterprise environments where correctness, safety, and observability matter more than conversational flexibility.
+
+## Design philosophy
+
+- **Determinism first**: stable IDs, deterministic DAG layering, and structured ASTs ensure the same input yields the same orchestration structure.
+- **Schema grounding**: planning is constrained by a schema snapshot retrieved via structured chunks.
+- **Explicit validation gates**: logical validation enforces schema and RBAC constraints before execution.
+- **Modularity**: adapters, subgraphs, and executors are capability-driven and replaceable.
+- **Isolation**: execution and indexing can be offloaded to sandboxed process pools.
+- **Observability**: structured logging, metrics, and audit events are first-class.
+
+## Non-functional goals
+
+- Reliability under partial failures (circuit breakers, retry semantics, safe failure).
+- Extensibility via plugins and registries (datasources, subgraphs, executors).
+- Cost awareness (row limits, byte limits, optional dry run/cost estimate).
+- Security by default (RBAC, policy-based table access, audit logging).
 
 ## High-level flow
 
@@ -15,7 +29,7 @@ flowchart TD
     User[User Query] --> Resolver[DatasourceResolverNode]
     Resolver --> Decomposer[DecomposerNode]
     Decomposer --> Planner[GlobalPlannerNode]
-    Planner --> Router[Layer Router]
+    Planner --> Router[Scan Layer Router]
     Router --> Subgraph[SQL Agent Subgraph]
     Subgraph --> Router
     Router --> Aggregator[EngineAggregatorNode]
@@ -28,9 +42,11 @@ flowchart TD
 - Graph builder: `nl2sql.pipeline.graph.build_graph`
 - Application context: `nl2sql.context.NL2SQLContext`
 
-## Where to start
+## Navigate the docs
 
-- `getting-started.md` for bootstrapping.
-- `architecture/high-level.md` for system architecture.
-- `agents/architecture.md` for the SQL agent subgraph.
-- `orchestration/dag.md` for DAG orchestration and routing.
+- `architecture/high-level.md` for end-to-end system architecture and subsystem boundaries.
+- `architecture/pipeline.md` for LangGraph pipeline flow, routing, and subgraph lifecycle.
+- `schema/store.md` and `architecture/indexing.md` for schema contracts, chunking, and retrieval.
+- `execution/sandbox.md` for execution isolation and concurrency details.
+- `adapters/architecture.md` for plugin discovery and capability-based routing.
+- `observability/stack.md` and `observability/error-handling.md` for metrics, logging, and failure modes.

@@ -1,6 +1,6 @@
 # Artifact Store Architecture
 
-Execution results are persisted as **artifacts** that can be referenced by downstream aggregation and API responses. `ArtifactStore` abstracts storage backends (local, S3, ADLS).
+Execution results are persisted as **artifacts**. The artifact store abstracts storage backends (local, S3, ADLS) and emits `ArtifactRef` metadata used by aggregation and downstream consumers.
 
 ## Storage lifecycle
 
@@ -12,17 +12,26 @@ flowchart TD
     Ref --> Aggregation[EngineAggregatorNode]
 ```
 
+## ArtifactRef fields
+
+`ArtifactRef` contains:
+
+- `uri`, `backend`, `format`
+- `row_count`, `columns`, `bytes`
+- `content_hash`, `created_at`
+- optional `schema_version`
+
 ## Backends
 
-- `LocalArtifactStore`: writes Parquet to `result_artifact_base_uri` using a tenant/request based path.
-- `S3ArtifactStore`: writes artifacts to S3 (configured by settings).
-- `AdlsArtifactStore`: writes artifacts to Azure Data Lake Storage.
+- **Local**: writes Parquet to `result_artifact_base_uri`.
+- **S3**: writes artifacts to S3 (settings-backed).
+- **ADLS**: writes artifacts to Azure Data Lake Storage.
 
-`build_artifact_store()` resolves the backend using `Settings.result_artifact_backend`.
+Backend selection is controlled by `Settings.result_artifact_backend`.
 
-## Tenant-aware paths
+## Tenant-aware paths (local backend)
 
-`ArtifactStore.get_upload_path()` is tenant-aware. The local backend persists artifacts in:
+The local backend ignores `result_artifact_path_template` and uses:
 
 ```
 <result_artifact_base_uri>/<tenant_id>/<request_id>.parquet

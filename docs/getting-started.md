@@ -32,6 +32,21 @@ pip install -e packages/adapter-sqlalchemy
 
 Template examples exist in `configs/*.example.yaml` and `configs/*.example.json`.
 
+## Index schema (required for retrieval)
+
+Before running queries, index your datasource schema:
+
+```python
+from nl2sql.context import NL2SQLContext
+from nl2sql.indexing.orchestrator import IndexingOrchestrator
+
+ctx = NL2SQLContext()
+orchestrator = IndexingOrchestrator(ctx)
+
+for adapter in ctx.ds_registry.list_adapters():
+    orchestrator.index_datasource(adapter)
+```
+
 ## Run a query
 
 ```python

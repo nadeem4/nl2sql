@@ -27,6 +27,18 @@ flowchart TD
 - DAG layering (`test_graph_layers.py`)
 - Registry and store behavior (`test_*_registry.py`, `test_schema_store.py`)
 
+## Deterministic validation
+
+Tests enforce deterministic behavior by:
+
+- using structured output schemas for planner/decomposer
+- validating stable IDs and DAG layering
+- running logical validator checks for expected schema alignment
+
+## Adapter compliance testing
+
+Adapter SDK includes testing utilities to validate schema introspection and result contracts for new adapters.
+
 ## Source references
 
 - Test configuration: `pytest.ini`

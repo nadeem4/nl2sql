@@ -1,27 +1,41 @@
 # Security Model
 
-NL2SQL enforces security through **policy-driven authorization**, **schema-aware validation**, and **sandboxed execution**.
+Security is enforced at **planning time** and **execution time** through RBAC, schema validation, and audit logging. The system is designed to fail closed when authorization cannot be verified.
 
 ## Security controls
 
-- **RBAC policies** are loaded from `configs/policies.json` and evaluated via `RBAC`.
-- **Logical validation** enforces plan correctness before execution.
-- **Execution isolation** is provided by `SandboxManager` process pools.
-- **Audit logging** records LLM interactions and high-value events.
+- **RBAC policies** loaded from `configs/policies.json` and evaluated by `RBAC`.
+- **Logical validation** enforces schema constraints and policy-based table access.
+- **Audit logging** records LLM interactions and security-relevant events.
+- **Execution isolation** can be provided via sandboxed process pools (available, not required by default).
 
 ```mermaid
 flowchart TD
     User[UserContext] --> RBAC[RBAC]
     RBAC --> Validator[LogicalValidatorNode]
     Validator --> Executor[ExecutorNode]
-    Executor --> Sandbox[SandboxManager]
     Executor --> Audit[EventLogger]
 ```
+
+## RBAC enforcement details
+
+`LogicalValidatorNode` enforces **strict namespacing**:
+
+- Allowed tables must match `datasource.table` or `datasource.*`.
+- If no datasource ID is present, validation fails closed.
+- Wildcard access is supported via `*` in policy lists.
+
+## Validation gates
+
+The validator rejects:
+
+- Non-READ query types.
+- Plans with missing/ambiguous tables or columns.
+- Joins that do not match known relationships.
+- Column filters that conflict with known statistics (if available).
 
 ## Source references
 
 - RBAC: `packages/core/src/nl2sql/auth/rbac.py`
-- User context: `packages/core/src/nl2sql/auth/models.py`
 - Validator node: `packages/core/src/nl2sql/pipeline/nodes/validator/node.py`
-- Sandbox: `packages/core/src/nl2sql/common/sandbox.py`
 - Audit logger: `packages/core/src/nl2sql/common/event_logger.py`

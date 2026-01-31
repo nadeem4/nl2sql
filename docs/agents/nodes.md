@@ -153,3 +153,24 @@ flowchart LR
   - Adds a `PLAN_FEEDBACK` warning to drive retry logic.
 - **Errors**: `MISSING_LLM`, `REFINER_FAILED`
 - **Source**: `packages/core/src/nl2sql/pipeline/nodes/refiner/node.py`
+
+## Shared state model (subgraph)
+
+`SubgraphExecutionState` carries:
+
+- `sub_query`, `user_context`, `relevant_tables`
+- `ast_planner_response`, `logical_validator_response`, `generator_response`, `executor_response`
+- `retry_count`, `errors`, `reasoning`, `warnings`
+
+The subgraph state is merged back into `GraphState` via `wrap_subgraph()`, which extracts artifacts and diagnostics into `SubgraphOutput`.
+
+## Retry and failure semantics
+
+- Planner/validator failures trigger the `retry_handler` path if errors are retryable and `retry_count < sql_agent_max_retries`.
+- Critical failures (e.g., RBAC violations, missing plan) are non-retryable.
+- Physical validation exists but is currently not wired in the default subgraph.
+
+## Deterministic behavior notes
+
+- Sub-query IDs are deterministic hashes, ensuring stable artifact keys.
+- `ExecutionDAG` layers are deterministic, so subgraph invocation order is stable.

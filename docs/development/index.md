@@ -1,19 +1,15 @@
 # Development Guide
 
-This guide focuses on extension points: adapters, executors, and subgraphs.
+This guide focuses on **extension points**: adapters, executors, subgraphs, chunking, and planner logic.
 
-## Add a new adapter
+## Extension guides
 
-1. Implement `DatasourceAdapterProtocol`.
-2. Expose the adapter via the `nl2sql.adapters` entry point.
-3. Add datasource configuration in `configs/datasources.yaml`.
+- `extensions/add-adapter.md` for new datasource adapters.
+- `extensions/add-chunk-types.md` for new schema chunk types.
+- `extensions/extend-planner.md` for planner/AST updates.
+- `extensions/add-execution-backend.md` for new executor services.
 
-## Add a new executor
-
-1. Implement `ExecutorService`.
-2. Register it in `ExecutorRegistry.register()` with a capability key.
-
-## Add a new subgraph
+## Subgraph extension overview
 
 1. Implement a `build_*_graph(ctx)` function that returns a LangGraph runnable.
 2. Register it in `build_subgraph_registry()` with required capabilities.

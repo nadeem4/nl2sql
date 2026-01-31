@@ -1,6 +1,6 @@
 # Observability Stack
 
-Observability is implemented via **logging**, **OpenTelemetry metrics**, and **audit events**. The pipeline emits metrics and audit logs through callback handlers while the root logger uses contextual trace and tenant metadata.
+NL2SQL provides observability through **structured logging**, **OpenTelemetry metrics**, and **audit events**. The system is designed to be callback-driven, so telemetry is only emitted when callbacks are supplied to `run_with_graph()`.
 
 ## Telemetry flow
 
@@ -20,16 +20,20 @@ sequenceDiagram
 
 ## Metrics
 
-`configure_metrics()` sets an OpenTelemetry meter provider and exports:
+`configure_metrics()` installs an OpenTelemetry meter provider. Exported metrics include:
 
 - `nl2sql.node.duration` (histogram)
 - `nl2sql.token.usage` (counter)
 
-Token and latency logs are additionally appended to `TOKEN_LOG` and `LATENCY_LOG`.
+Legacy token and latency events are recorded in `TOKEN_LOG` and `LATENCY_LOG`.
 
 ## Audit logging
 
-`EventLogger` writes JSON events to a rotating log file defined by `Settings.audit_log_path`. Payloads are redacted for sensitive keys.
+`EventLogger` writes JSON events to a rotating log file configured by `Settings.audit_log_path`. Payloads are sanitized to redact sensitive keys.
+
+## Structured logging
+
+The core logger uses JSON formatting when OTLP is enabled and propagates trace/tenant context for correlation.
 
 ## Source references
 

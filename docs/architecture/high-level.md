@@ -1,15 +1,15 @@
 # High-Level System Architecture
 
-NL2SQL is organized around an **orchestration graph** and a **context object** that wires registries and storage. The entry point `run_with_graph()` builds the graph (`build_graph()`), injects a `GraphState`, and invokes the compiled LangGraph pipeline.
+NL2SQL is a **multi-stage, deterministic orchestration pipeline** built on LangGraph. A single request flows through control-plane nodes (resolution, decomposition, planning), capability-driven subgraphs (SQL agents), and a deterministic aggregation layer. The system is wired by `NL2SQLContext`, which instantiates registries, stores, and policy enforcement.
 
 ## Key runtime components
 
-- `NL2SQLContext` (`nl2sql.context.NL2SQLContext`) initializes registries and stores.
-- `build_graph()` (`nl2sql.pipeline.graph.build_graph`) builds the LangGraph pipeline.
-- `run_with_graph()` (`nl2sql.pipeline.runtime.run_with_graph`) executes the pipeline with timeout and cancellation.
-- `GraphState` (`nl2sql.pipeline.state.GraphState`) is the shared state for the pipeline.
+- `NL2SQLContext` initializes registries, stores, and policy enforcement.
+- `build_graph()` compiles the LangGraph control-plane pipeline.
+- `run_with_graph()` executes the pipeline with cancellation and timeout.
+- `GraphState` is the shared mutable state across pipeline nodes.
 
-## Component topology
+## System topology
 
 ```mermaid
 flowchart TD
@@ -18,7 +18,7 @@ flowchart TD
     Graph --> Resolver[DatasourceResolverNode]
     Resolver --> Decomposer[DecomposerNode]
     Decomposer --> Planner[GlobalPlannerNode]
-    Planner --> Router[build_scan_layer_router]
+    Planner --> Router[Scan Layer Router]
     Router --> Subgraph[SQL Agent Subgraph]
     Subgraph --> Router
     Router --> Aggregator[EngineAggregatorNode]
@@ -29,20 +29,80 @@ flowchart TD
         LLM[LLMRegistry]
         VS[VectorStore]
         SS[SchemaStore]
+        RBAC[RBAC]
         AS[ArtifactStore]
-        RS[ResultStore]
     end
 ```
 
-## Runtime flow (summary)
+## Subsystem architecture
 
-1. `run_with_graph()` constructs `GraphState` and invokes the compiled graph.
-2. `DatasourceResolverNode` selects compatible datasources.
-3. `DecomposerNode` splits complex questions into sub-queries.
-4. `GlobalPlannerNode` produces an `ExecutionDAG` representing scan/combine/post operations.
-5. `build_scan_layer_router()` dispatches sub-queries to the SQL agent subgraph.
-6. `EngineAggregatorNode` loads artifacts and applies `ExecutionDAG` using the aggregation engine.
-7. `AnswerSynthesizerNode` formats the final response.
+```mermaid
+flowchart LR
+    User[User Query]
+    Planner[Planner/Decomposer]
+    Schema[Schema Store]
+    Retrieval[Chunking + Retrieval]
+    Validator[Validation Layer]
+    Execution[Execution Layer]
+    Adapter[Adapter/Plugin Backend]
+    Artifacts[Artifact Store]
+    Obs[Observability]
+
+    User --> Planner
+    Planner --> Retrieval
+    Retrieval --> Schema
+    Planner --> Validator
+    Validator --> Execution
+    Execution --> Adapter
+    Execution --> Artifacts
+    Planner --> Obs
+    Execution --> Obs
+```
+
+## Major subsystems (and responsibilities)
+
+- **Planner / Decomposer**: `DecomposerNode` produces stable, semantically-scoped sub-queries; `GlobalPlannerNode` produces a deterministic `ExecutionDAG`.
+- **Schema Store**: `SchemaStore` persists versioned schema snapshots with fingerprints.
+- **Chunking + Retrieval**: `SchemaChunkBuilder` produces typed chunks; `VectorStore` provides staged retrieval for routing and planning context.
+- **Validation layer**: `LogicalValidatorNode` enforces schema correctness and RBAC.
+- **Execution layer**: `ExecutorNode` routes to capability-driven executor services (e.g., SQL executor).
+- **Adapter / Plugin backend**: adapters implement `DatasourceAdapterProtocol` and are discovered via entry points.
+- **Artifact store**: executor results are persisted as Parquet artifacts and referenced by `ArtifactRef`.
+- **Observability**: structured logs, OpenTelemetry metrics, and audit events.
+
+## End-to-end flow
+
+```mermaid
+sequenceDiagram
+    participant User as User
+    participant Runtime as run_with_graph
+    participant Resolver as DatasourceResolverNode
+    participant Decomposer as DecomposerNode
+    participant Planner as GlobalPlannerNode
+    participant Router as Scan Layer Router
+    participant Subgraph as SQL Agent Subgraph
+    participant Agg as EngineAggregatorNode
+    participant Synth as AnswerSynthesizerNode
+
+    User->>Runtime: user_query
+    Runtime->>Resolver: GraphState
+    Resolver->>Decomposer: resolved datasources
+    Decomposer->>Planner: sub_queries + combine groups
+    Planner->>Router: ExecutionDAG
+    Router->>Subgraph: Send(sub_query)
+    Subgraph-->>Router: ArtifactRef + diagnostics
+    Router->>Agg: all scan artifacts
+    Agg->>Synth: aggregated rows
+    Synth-->>Runtime: final_answer + errors
+```
+
+## Determinism guarantees
+
+Determinism is achieved by design:
+
+- **Stable sub-query IDs**: `DecomposerNode` hashes payloads into deterministic IDs.
+- **Deterministic layering**: `ExecutionDAG._layered_toposort()` produces ordered scan layers.
+- **Stable aggregation**: `AggregationService` executes layers in order and uses deterministic input ordering.
 
 ## Source references
 

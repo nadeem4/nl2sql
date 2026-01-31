@@ -52,18 +52,29 @@ nav:
   - Getting Started: getting-started.md
   - Architecture:
     - High-Level System Architecture: architecture/high-level.md
+    - Indexing Architecture: architecture/indexing.md
+    - Pipeline Architecture: architecture/pipeline.md
+    - Nodes:
+      - Answer Synthesizer: architecture/nodes/answer_synthesizer_node.md
+      - AST Planner: architecture/nodes/ast_planner_node.md
+      - Datasource Resolver: architecture/nodes/datasource_resolver_node.md
+      - Decomposer: architecture/nodes/decomposer_node.md
+      - Engine Aggregator: architecture/nodes/engine_aggregator_node.md
+      - Executor: architecture/nodes/executor_node.md
+      - Generator: architecture/nodes/generator_node.md
+      - Global Planner: architecture/nodes/global_planner_node.md
+      - Logical Validator: architecture/nodes/logical_validator_node.md
+      - Physical Validator: architecture/nodes/physical_validator_node.md
+      - Refiner: architecture/nodes/refiner_node.md
+      - Schema Retriever: architecture/nodes/schema_retriever_node.md
   - Agents:
-    - Agent Architecture: agents/architecture.md
     - Node-by-Node Specs: agents/nodes.md
-  - Orchestration:
-    - DAG / Graph Orchestration: orchestration/dag.md
+  - Schema:
+    - Schema Store + Metadata: schema/store.md
   - Adapters:
     - Plugin / Adapter Architecture: adapters/architecture.md
-  - Schema:
-    - Schema Store + Retrieval: schema/store.md
   - Execution:
     - Execution Sandbox: execution/sandbox.md
-    - Result Frame + Data Flow: execution/result-flow.md
   - Storage:
     - Artifact Store: storage/artifact-store.md
   - Observability:
@@ -80,11 +91,22 @@ nav:
     - Kubernetes: deployment/kubernetes.md
   - Development:
     - Extending NL2SQL: development/index.md
+  - Extensions:
+    - Add Adapter: extensions/add-adapter.md
+    - Add Chunk Types: extensions/add-chunk-types.md
+    - Extend Planner: extensions/extend-planner.md
+    - Add Execution Backend: extensions/add-execution-backend.md
   - Testing:
     - Testing Architecture: testing/architecture.md
   - ADR:
     - Overview: adr/index.md
     - ADR-001 Sandboxed Execution: adr/adr-001-sandboxed-execution.md
     - ADR-002 Circuit Breakers: adr/adr-002-circuit-breakers.md
+    - ADR-003 Chunking Strategy: adr/adr-003-chunking-strategy.md
+    - ADR-004 Schema Store Design: adr/adr-004-schema-store-design.md
+    - ADR-005 Adapter Abstraction: adr/adr-005-adapter-abstraction.md
+    - ADR-006 Deterministic Planning: adr/adr-006-deterministic-planning.md
+    - ADR-007 Artifact Storage: adr/adr-007-artifact-storage.md
   - API:
     - Overview: api/index.md
+  - Glossary: glossary.md

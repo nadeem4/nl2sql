@@ -1,30 +1,33 @@
 # Multi-Tenant Isolation Model
 
-Tenant separation is enforced via **context propagation**, **artifact partitioning**, and **policy filtering**. The tenant identifier originates in `Settings.tenant_id` and can be overridden per request via `UserContext`.
+Multi-tenancy is enforced through **context propagation**, **artifact partitioning**, and **policy filtering**. Tenant identity originates from `Settings.tenant_id` and is passed through execution requests and artifact paths.
 
 ## Tenant context propagation
 
 ```mermaid
 flowchart TD
     Settings[Settings.tenant_id] --> Context[NL2SQLContext.tenant_id]
-    Context --> GraphState[GraphState.user_context]
-    GraphState --> Executor[ExecutorNode/ExecutorRequest]
+    Context --> Executor[ExecutorNode/ExecutorRequest]
     Executor --> Artifacts[ArtifactStore.get_upload_path]
-    GraphState --> Logger[tenant_context()]
 ```
 
 ## Storage isolation
 
-`ArtifactStore.get_upload_path()` is tenant-aware. The local artifact backend nests artifacts under `<base_uri>/<tenant_id>/...`.
+The local artifact backend persists data under:
+
+```
+<result_artifact_base_uri>/<tenant_id>/<request_id>.parquet
+```
+
+This ensures per-tenant isolation for artifacts, and downstream aggregation only reads referenced artifacts from the current request.
 
 ## Authorization model
 
-`RBAC` uses `UserContext.roles` with `RolePolicy` definitions loaded from `configs/policies.json`. The registry is initialized in `NL2SQLContext` and consulted by nodes that require policy enforcement.
+RBAC evaluates `UserContext.roles` against policies defined in `configs/policies.json`. The validator enforces datasource/table scope at planning time.
 
 ## Source references
 
 - Tenant settings: `packages/core/src/nl2sql/common/settings.py`
-- Context propagation: `packages/core/src/nl2sql/context.py`
-- Logger tenant context: `packages/core/src/nl2sql/common/logger.py`
-- Artifact store paths: `packages/core/src/nl2sql/execution/artifacts/base.py`
+- Context initialization: `packages/core/src/nl2sql/context.py`
+- Artifact paths: `packages/core/src/nl2sql/execution/artifacts/local_store.py`
 - RBAC: `packages/core/src/nl2sql/auth/rbac.py`
