@@ -148,7 +148,6 @@ class SqliteSchemaStore:
                 (datasource_id,),
             ).fetchone()
 
-            print(f"Latest version row for {datasource_id}: {row}")  # Debug print
             return row[0] if row else None
 
     def list_versions(self, datasource_id: str) -> List[str]:

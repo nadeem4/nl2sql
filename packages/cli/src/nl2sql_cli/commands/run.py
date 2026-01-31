@@ -5,7 +5,7 @@ from typing import Optional
 from nl2sql.datasources import DatasourceRegistry
 from nl2sql.llm import LLMRegistry
 from nl2sql.indexing.vector_store import VectorStore
-from nl2sql.reporting import ConsolePresenter
+from nl2sql_cli.reporting import ConsolePresenter
 from nl2sql.runners.pipeline_runner import PipelineRunner
 from nl2sql.common.settings import settings
 from nl2sql_cli.types import RunConfig
@@ -23,6 +23,8 @@ def run_pipeline(
         
     presenter = ConsolePresenter()
     presenter.print_info(f"Query: {config.query}")
+    if config.no_exec:
+        presenter.print_warning("Execution disabled (no_exec). Only SQL/plan output will be shown.")
     
     # Instantiate Runner
     runner = PipelineRunner(ctx)
@@ -111,13 +113,30 @@ def run_pipeline(
     if errors:
         presenter.print_pipeline_errors(errors)
 
+    warnings = final_state.get("warnings") or []
+    for warning in warnings:
+        if isinstance(warning, dict):
+            presenter.print_warning(json.dumps(warning, default=str))
+        else:
+            presenter.print_warning(str(warning))
+
+    answer_payload = None
+    answer_synth = final_state.get("answer_synthesizer_response")
+    if answer_synth:
+        if isinstance(answer_synth, dict):
+            answer_payload = answer_synth.get("final_answer")
+        else:
+            answer_payload = getattr(answer_synth, "final_answer", None)
+    if isinstance(answer_payload, dict) and answer_payload:
+        presenter.print_answer_synthesizer_output(answer_payload)
+
     final_answer = final_state.get("final_answer")
-    if type(final_answer) == str and final_answer:
+    if isinstance(final_answer, dict) and final_answer:
+        presenter.print_answer_synthesizer_output(final_answer)
+    elif type(final_answer) == str and final_answer:
         presenter.print_final_answer(final_answer)
     elif type(final_answer) == list and final_answer:
         presenter.print_execution_result(final_answer)
-    else:
-        return
         
     execution = final_state.get("execution")
     if execution:

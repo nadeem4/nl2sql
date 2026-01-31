@@ -1,6 +1,6 @@
 from typing import List, Dict, Any
 from langgraph.graph.state import CompiledStateGraph
-from nl2sql.reporting import ConsolePresenter
+from nl2sql_cli.reporting import ConsolePresenter
 
 from nl2sql_cli.common.decorators import handle_cli_errors
 

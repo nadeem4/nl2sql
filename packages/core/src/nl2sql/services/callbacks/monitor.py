@@ -1,7 +1,7 @@
 from nl2sql.services.callbacks.node_handlers import NodeHandler
 from nl2sql.services.callbacks.token_handler import TokenHandler
 from langchain_core.callbacks import BaseCallbackHandler
-from nl2sql.reporting import ConsolePresenter
+from nl2sql.services.callbacks.presenter import PresenterProtocol
 from typing import Dict, Any
 from langchain_core.outputs import LLMResult
 
@@ -11,7 +11,7 @@ class PipelineMonitorCallback(BaseCallbackHandler):
     Integrates with OpenTelemetry for metrics and EventLogger for audit trails.
     """
     
-    def __init__(self, presenter: ConsolePresenter):
+    def __init__(self, presenter: PresenterProtocol):
         from nl2sql.common.settings import settings
         from nl2sql.common.metrics import configure_metrics
         

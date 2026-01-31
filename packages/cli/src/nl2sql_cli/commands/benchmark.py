@@ -4,7 +4,7 @@ from nl2sql.llm import LLMRegistry
 from nl2sql.datasources import DatasourceRegistry
 from nl2sql.indexing.vector_store import VectorStore
 from nl2sql.evaluation.evaluator import ModelEvaluator
-from nl2sql.reporting import ConsolePresenter
+from nl2sql_cli.reporting import ConsolePresenter
 from nl2sql.runners.benchmark_runner import BenchmarkRunner
 from nl2sql_cli.types import BenchmarkConfig
 from nl2sql_cli.common.decorators import handle_cli_errors

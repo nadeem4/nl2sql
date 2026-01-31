@@ -3,7 +3,7 @@ from typing import Dict, Any, List, Optional
 
 from nl2sql.common.context import current_datasource_id
 from nl2sql.common.metrics import LATENCY_LOG, node_duration_histogram
-from nl2sql.reporting import ConsolePresenter
+from nl2sql.services.callbacks.presenter import PresenterProtocol
 from nl2sql.services.callbacks.node_context import current_node_run_id
 from nl2sql.services.callbacks.node_metrics import NodeMetrics
 
@@ -11,7 +11,7 @@ from nl2sql.services.callbacks.node_metrics import NodeMetrics
 class NodeHandler:
     """Handles node execution lifecycle events and metrics recording."""
 
-    def __init__(self, presenter: ConsolePresenter):
+    def __init__(self, presenter: PresenterProtocol):
         self.presenter = presenter
 
         self.run_start: Dict[str, float] = {}
@@ -141,8 +141,8 @@ class NodeHandler:
         self.node_active_count[node] -= 1
         if self.node_active_count[node] == 0:
             tok_str = f" | {metrics.total_tokens} tok" if metrics.total_tokens else ""
-            self.presenter.console.print(
-                f"[green]OK[/green] [bold]{node}[/bold] Completed ({metrics.duration:.2f}s{tok_str})"
+            self.presenter.print_success(
+                f"{node} Completed ({metrics.duration:.2f}s{tok_str})"
             )
             self.presenter.update_interactive_status("Thinking...")
 
@@ -166,8 +166,8 @@ class NodeHandler:
             metrics.duration = metrics.end_time - metrics.start_time
             metrics.error = str(error)
 
-            self.presenter.console.print(
-                f"[red]X[/red] [bold]{node}[/bold] Failed: {error}"
+            self.presenter.print_error(
+                f"{node} Failed: {error}"
             )
             self.presenter.update_interactive_status("Error encountered...")
 

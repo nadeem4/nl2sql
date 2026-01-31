@@ -133,7 +133,9 @@ class VectorStore:
         if documents:
             self.vectorstore.add_documents(documents)
 
-        stats: Dict[str, int] = {}
+        stats: Dict[str, Any] = {}
+        stats["datasource_id"] = datasource_id
+        stats["schema_version"] = schema_version
         for chunk in chunks:
             stats[chunk.type] = stats.get(chunk.type, 0) + 1
 
