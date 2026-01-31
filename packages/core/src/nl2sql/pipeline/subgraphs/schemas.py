@@ -16,6 +16,7 @@ class SubgraphOutput(BaseModel):
     subgraph_name: Optional[str] = None
     retry_count: int = 0
     plan: Optional[PlanModel] = None
+    sql_draft: Optional[str] = None
     artifact: Optional[ArtifactRef] = None
     errors: List[PipelineError] = Field(default_factory=list)
     reasoning: List[Dict[str, Any]] = Field(default_factory=list)

@@ -59,21 +59,61 @@ def run_pipeline(
     result_refs = final_state.get("result_refs", {})
     sub_queries = final_state.get("sub_queries", [])
     sq_map = {sq.id: sq for sq in sub_queries}
-    
+
     query_history = []
-    for sq_id, result_id in result_refs.items():
-        sq = sq_map.get(sq_id)
-        if sq:
-            frame = ctx.result_store.get(result_id)
-            metadata = ctx.result_store.get_metadata(result_id)
-            query_history.append({
-                "sub_query": sq.intent,
-                "datasource_id": metadata.get("datasource_id", sq.datasource_id),
-                "execution": {
+    subgraph_outputs = final_state.get("subgraph_outputs") or {}
+    if subgraph_outputs:
+        for _subgraph_id, output in subgraph_outputs.items():
+            if isinstance(output, dict):
+                sub_query = output.get("sub_query")
+                sql_draft = output.get("sql_draft")
+            else:
+                sub_query = getattr(output, "sub_query", None)
+                sql_draft = getattr(output, "sql_draft", None)
+
+            if not sub_query:
+                continue
+
+            if isinstance(sub_query, dict):
+                sq_id = sub_query.get("id")
+                ds_id = sub_query.get("datasource_id")
+                intent = sub_query.get("intent")
+            else:
+                sq_id = getattr(sub_query, "id", None)
+                ds_id = getattr(sub_query, "datasource_id", None)
+                intent = getattr(sub_query, "intent", None)
+
+            entry: Dict[str, Any] = {
+                "sub_query": intent,
+                "datasource_id": ds_id,
+                "sql": sql_draft,
+            }
+
+            result_id = result_refs.get(sq_id)
+            if result_id:
+                frame = ctx.result_store.get(result_id)
+                metadata = ctx.result_store.get_metadata(result_id)
+                entry["datasource_id"] = metadata.get("datasource_id", ds_id)
+                entry["execution"] = {
                     "row_count": frame.row_count,
                     "columns": [c.name for c in frame.columns],
-                },
-            })
+                }
+
+            query_history.append(entry)
+    else:
+        for sq_id, result_id in result_refs.items():
+            sq = sq_map.get(sq_id)
+            if sq:
+                frame = ctx.result_store.get(result_id)
+                metadata = ctx.result_store.get_metadata(result_id)
+                query_history.append({
+                    "sub_query": sq.intent,
+                    "datasource_id": metadata.get("datasource_id", sq.datasource_id),
+                    "execution": {
+                        "row_count": frame.row_count,
+                        "columns": [c.name for c in frame.columns],
+                    },
+                })
     
     if config.verbose:
         reasoning = final_state.get("reasoning", [])
@@ -91,14 +131,17 @@ def run_pipeline(
             pass
 
     if query_history:
+        datasources_used = sorted({item.get("datasource_id") for item in query_history if item.get("datasource_id")})
+        if datasources_used:
+            presenter.print_info(f"Datasources used: {', '.join(datasources_used)}")
+
         for item in query_history:
             ds = item.get("datasource_id", "Unknown")
-            ds_type = item.get("datasource_type", "Unknown")
             sub_query = item.get("sub_query")
             sql = item.get("sql")
-            
+
             if sql:
-                header = f"[bold]Datasource: {ds} ({ds_type})[/bold]"
+                header = f"[bold]Datasource: {ds}[/bold]"
                 if sub_query:
                     header = f"[bold]Sub-Query: {sub_query}[/bold]\n" + header
                 presenter.print_sql(f"{header}\n\n{sql}")

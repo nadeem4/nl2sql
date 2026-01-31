@@ -101,6 +101,7 @@ def wrap_subgraph(
 
         executor_response = returned_state.executor_response
         planner_response = returned_state.ast_planner_response
+        generator_response = returned_state.generator_response
         sub_reasoning = returned_state.reasoning
         artifact_refs: Dict[str, Any] = {}
         artifact = executor_response.artifact
@@ -114,6 +115,7 @@ def wrap_subgraph(
             subgraph_id=subgraph_id,
             retry_count=retry_count,
             plan=planner_response.plan,
+            sql_draft=generator_response.sql_draft if generator_response else None,
             artifact=artifact,
             errors=returned_state.errors,
             reasoning=sub_reasoning,
