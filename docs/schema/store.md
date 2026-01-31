@@ -39,23 +39,11 @@ Each `SchemaSnapshot` (contract + metadata) is versioned using a **deterministic
 
 Schema versions are timestamped and include a fingerprint prefix (e.g., `YYYYMMDDhhmmss_<fp8>`). Old versions are evicted beyond `schema_store_max_versions`.
 
-## Retrieval flow
+## Retrieval and authority
 
-```mermaid
-flowchart TD
-    SubQuery[SubQuery] --> Retriever[SchemaRetrieverNode]
-    Retriever --> Vector[VectorStore.retrieve_*]
-    Vector --> Tables[Candidate tables/columns]
-    Tables --> Snapshot[SchemaStore.get_snapshot]
-    Snapshot --> Relevant[Table + Column objects]
-```
+Schema retrieval resolves **authoritative** tables/columns from `SchemaStore`, not from the vector store. Vector store chunks are only used to identify candidates; final schema is resolved via snapshot. If retrieval yields no candidates, the retriever falls back to the full snapshot. `schema_version_mismatch_policy` governs mismatches between chunk versions and store versions.
 
-## Authority and drift handling
-
-- Schema retrieval resolves **authoritative** tables/columns from `SchemaStore`, not from the vector store.
-- Vector store chunks are only used to identify candidates; final schema is resolved via snapshot.
-- If retrieval yields no candidates, the retriever falls back to the full snapshot.
-- `schema_version_mismatch_policy` governs mismatches between chunk versions and store versions.
+See `../architecture/indexing.md` for retrieval stages, chunk types, and vector store behavior.
 
 ## Source references
 

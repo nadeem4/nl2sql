@@ -1,13 +1,13 @@
-# High-Level System Architecture
+# Architecture Overview
 
-NL2SQL is a **multi-stage, deterministic orchestration pipeline** built on LangGraph. A single request flows through control-plane nodes (resolution, decomposition, planning), capability-driven subgraphs (SQL agents), and a deterministic aggregation layer. The system is wired by `NL2SQLContext`, which instantiates registries, stores, and policy enforcement.
+NL2SQL is a **multi-stage orchestration pipeline** built on LangGraph. A single request flows through control-plane nodes (resolution, decomposition, planning), capability-driven subgraphs (SQL agents), and an aggregation layer. The system is wired by `NL2SQLContext`, which instantiates registries, stores, and policy enforcement.
 
 ## Key runtime components
 
 - `NL2SQLContext` initializes registries, stores, and policy enforcement.
 - `build_graph()` compiles the LangGraph control-plane pipeline.
 - `run_with_graph()` executes the pipeline with cancellation and timeout.
-- `GraphState` is the shared mutable state across pipeline nodes.
+- `GraphState` is the shared mutable state across pipeline nodes (see `graph_state.md`).
 
 ## System topology
 
@@ -96,13 +96,9 @@ sequenceDiagram
     Synth-->>Runtime: final_answer + errors
 ```
 
-## Determinism guarantees
+## Determinism
 
-Determinism is achieved by design:
-
-- **Stable sub-query IDs**: `DecomposerNode` hashes payloads into deterministic IDs.
-- **Deterministic layering**: `ExecutionDAG._layered_toposort()` produces ordered scan layers.
-- **Stable aggregation**: `AggregationService` executes layers in order and uses deterministic input ordering.
+Determinism guarantees and non-determinism sources are documented in `determinism.md`.
 
 ## Source references
 

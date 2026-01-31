@@ -32,6 +32,8 @@ flowchart TD
     Retry -->|no| Stop[Terminate branch]
 ```
 
+See `../architecture/failure_recovery.md` for failure domains, retry scope, and recovery limitations.
+
 ## Cancellation and timeouts
 
 - `run_with_graph()` enforces a global timeout (`Settings.global_timeout_sec`).

@@ -49,12 +49,19 @@ markdown_extensions:
 
 nav:
   - Home: index.md
-  - Getting Started: getting-started.md
   - Architecture:
-    - High-Level System Architecture: architecture/high-level.md
-    - Indexing Architecture: architecture/indexing.md
-    - Pipeline Architecture: architecture/pipeline.md
+    - Overview: architecture/overview.md
+    - Pipeline: architecture/pipeline.md
+    - Graph State: architecture/graph_state.md
+    - Determinism: architecture/determinism.md
+    - Invariants: architecture/invariants.md
+    - Failure + Recovery: architecture/failure_recovery.md
+    - Indexing + Retrieval: architecture/indexing.md
+    - Subgraphs:
+      - Main Pipeline Graph: architecture/subgraphs/main_pipeline_graph.md
+      - SQL Agent Subgraph: architecture/subgraphs/sql_agent.md
     - Nodes:
+      - Node Catalog: architecture/nodes/index.md
       - Answer Synthesizer: architecture/nodes/answer_synthesizer_node.md
       - AST Planner: architecture/nodes/ast_planner_node.md
       - Datasource Resolver: architecture/nodes/datasource_resolver_node.md
@@ -67,12 +74,21 @@ nav:
       - Physical Validator: architecture/nodes/physical_validator_node.md
       - Refiner: architecture/nodes/refiner_node.md
       - Schema Retriever: architecture/nodes/schema_retriever_node.md
-  - Agents:
-    - Node-by-Node Specs: agents/nodes.md
+  - Getting Started: getting-started.md
+  - Configuration:
+    - Configuration System: configuration/system.md
+  - Adapters:
+    - Overview: adapters/index.md
+    - Architecture: adapters/architecture.md
+    - SDK Reference: adapters/sdk.md
+    - SQLAlchemy Reference: adapters/sqlalchemy.md
+    - Building Adapters: adapters/development.md
+    - Microsoft SQL Server: adapters/mssql.md
+    - MySQL: adapters/mysql.md
+    - PostgreSQL: adapters/postgres.md
+    - SQLite: adapters/sqlite.md
   - Schema:
     - Schema Store + Metadata: schema/store.md
-  - Adapters:
-    - Plugin / Adapter Architecture: adapters/architecture.md
   - Execution:
     - Execution Sandbox: execution/sandbox.md
   - Storage:
@@ -83,30 +99,18 @@ nav:
   - Security:
     - Security Model: security/model.md
     - Multi-Tenant Isolation: security/multi-tenant.md
-  - Configuration:
-    - Configuration System: configuration/system.md
   - Deployment:
     - Deployment Architecture: deployment/architecture.md
     - Docker: deployment/docker.md
     - Kubernetes: deployment/kubernetes.md
   - Development:
     - Extending NL2SQL: development/index.md
-  - Extensions:
     - Add Adapter: extensions/add-adapter.md
     - Add Chunk Types: extensions/add-chunk-types.md
     - Extend Planner: extensions/extend-planner.md
     - Add Execution Backend: extensions/add-execution-backend.md
   - Testing:
     - Testing Architecture: testing/architecture.md
-  - ADR:
-    - Overview: adr/index.md
-    - ADR-001 Sandboxed Execution: adr/adr-001-sandboxed-execution.md
-    - ADR-002 Circuit Breakers: adr/adr-002-circuit-breakers.md
-    - ADR-003 Chunking Strategy: adr/adr-003-chunking-strategy.md
-    - ADR-004 Schema Store Design: adr/adr-004-schema-store-design.md
-    - ADR-005 Adapter Abstraction: adr/adr-005-adapter-abstraction.md
-    - ADR-006 Deterministic Planning: adr/adr-006-deterministic-planning.md
-    - ADR-007 Artifact Storage: adr/adr-007-artifact-storage.md
   - API:
     - Overview: api/index.md
   - Glossary: glossary.md

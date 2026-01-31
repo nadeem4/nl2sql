@@ -4,19 +4,9 @@ This guide describes how to add a new datasource adapter and make it available t
 
 ## 1. Implement the adapter contract
 
-All adapters must implement `DatasourceAdapterProtocol`:
+All adapters must implement `DatasourceAdapterProtocol`. See `../adapters/sdk.md` for the authoritative contract and required fields/methods.
 
-- `capabilities()` returns a set of supported capabilities.
-- `connect()` initializes connections/clients.
-- `fetch_schema_snapshot()` returns a `SchemaSnapshot` (contract + metadata).
-- `execute(AdapterRequest)` returns a `ResultFrame`.
-- `get_dialect()` returns the SQL dialect string (SQL adapters).
-
-If you are building a SQL adapter, extending `BaseSQLAlchemyAdapter` provides:
-
-- schema introspection (`fetch_schema_snapshot`)
-- default SQL execution (`execute_sql`)
-- baseline capability set
+If you are building a SQL adapter, extending `BaseSQLAlchemyAdapter` can provide schema introspection and default SQL execution. See `../adapters/sqlalchemy.md`.
 
 ## 2. Expose an entry point
 

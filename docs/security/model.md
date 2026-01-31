@@ -27,12 +27,7 @@ flowchart TD
 
 ## Validation gates
 
-The validator rejects:
-
-- Non-READ query types.
-- Plans with missing/ambiguous tables or columns.
-- Joins that do not match known relationships.
-- Column filters that conflict with known statistics (if available).
+Validation rules are enforced by `LogicalValidatorNode` and documented in `../architecture/invariants.md` and `../architecture/nodes/logical_validator_node.md`.
 
 ## Source references
 

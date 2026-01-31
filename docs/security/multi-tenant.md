@@ -21,6 +21,8 @@ The local artifact backend persists data under:
 
 This ensures per-tenant isolation for artifacts, and downstream aggregation only reads referenced artifacts from the current request.
 
+Tenant isolation is **not** applied to indexing; the vector store and schema store are global in the current implementation (see `../architecture/indexing.md`).
+
 ## Authorization model
 
 RBAC evaluates `UserContext.roles` against policies defined in `configs/policies.json`. The validator enforces datasource/table scope at planning time.

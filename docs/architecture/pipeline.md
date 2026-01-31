@@ -1,6 +1,6 @@
 # Pipeline Architecture
 
-This document consolidates the LangGraph pipeline architecture as implemented in code. It describes the control graph, logical DAG, SQL agent subgraph, execution/aggregation flow, and current limitations.
+This document consolidates the LangGraph pipeline architecture as implemented in code. It describes the control graph, logical DAG, routing, and execution/aggregation flow. Node and subgraph details live in their respective sections.
 
 ## End-to-end flow
 
@@ -9,7 +9,7 @@ flowchart TD
     Resolver[DatasourceResolverNode] --> Decomposer[DecomposerNode]
     Decomposer --> Planner[GlobalPlannerNode]
     Planner --> Router[layer_router]
-    Router --> SqlAgent[SQLAgentSubgraph]
+    Router --> SqlAgent[SQL Agent Subgraph]
     SqlAgent --> Router
     Router --> Aggregator[EngineAggregatorNode]
     Aggregator --> Synthesizer[AnswerSynthesizerNode]
@@ -63,7 +63,7 @@ Subgraph selection is capability-based via `resolve_subgraph()`:
 
 ```mermaid
 flowchart TD
-    DatasourceId[DatasourceId] --> Capabilities[AdapterCapabilities]
+    DatasourceId[DatasourceId] --> Capabilities[DatasourceCapability set]
     Capabilities --> SubgraphRegistry[SubgraphRegistry]
     SubgraphRegistry --> Match{RequiredSubset}
     Match -->|yes| Subgraph[SelectedSubgraph]
@@ -74,42 +74,9 @@ If no compatible subgraph is found, routing raises `PipelineError` and terminate
 
 ## SQL agent subgraph lifecycle
 
-The only registered subgraph today is `sql_agent` (`build_sql_agent_graph()`):
+The only registered subgraph today is `sql_agent` (`build_sql_agent_graph()`).
 
-```mermaid
-flowchart LR
-    Schema[SchemaRetrieverNode] --> AST[ASTPlannerNode]
-    AST -->|ok| Logical[LogicalValidatorNode]
-    AST -->|retry| Retry[retry_handler]
-    Logical -->|ok| Generator[GeneratorNode]
-    Logical -->|retry| Retry
-    Generator --> Executor[ExecutorNode]
-    Retry --> Refiner[RefinerNode]
-    Refiner --> AST
-```
-
-### Node responsibilities
-
-- [SchemaRetrieverNode](nodes/schema_retriever_node.md): staged vector retrieval + snapshot resolution.
-- [ASTPlannerNode](nodes/ast_planner_node.md): LLM-based AST planning (`PlanModel`).
-- [LogicalValidatorNode](nodes/logical_validator_node.md): schema + RBAC validation of AST.
-- [GeneratorNode](nodes/generator_node.md): compile AST to SQL via `sqlglot`.
-- [ExecutorNode](nodes/executor_node.md): execute SQL via executor registry and persist artifacts.
-- [RefinerNode](nodes/refiner_node.md): LLM feedback for retry.
-
-### Retry semantics
-
-`retry_handler` applies exponential backoff with jitter. Maximum retries are controlled by `Settings.sql_agent_max_retries`. Only retryable errors trigger the loop.
-
-Retry stop conditions (from `check_planner` and `check_logical_validation`):
-
-- Non-retryable errors → terminate subgraph.
-- Retry count exhausted → terminate subgraph.
-- Planner returns no plan and no retryable errors → terminate subgraph.
-
-### Physical validation
-
-`PhysicalValidatorNode` exists but is **not wired** in the SQL agent graph (its edge is commented out).
+See `subgraphs/sql_agent.md` for full lifecycle, retry semantics, and node wiring.
 
 ## Execution, artifacts, and aggregation
 
@@ -136,63 +103,25 @@ Aggregation uses `AggregationService(PolarsDuckdbEngine())` and executes layers 
 
 ## State model
 
-### `GraphState`
+Shared and subgraph state models are defined in `graph_state.md`. The pipeline uses:
 
-Shared control-graph state includes:
+- `GraphState` for control graph execution and aggregation.
+- `SubgraphExecutionState` for subgraph-local execution.
+- `wrap_subgraph()` to merge subgraph outputs back into `GraphState`.
 
-- `trace_id`, `user_query`, `user_context`
-- resolver/decomposer/planner/aggregator/synthesizer responses
-- `artifact_refs` keyed by `ExecutionDAG` node ID
-- `subgraph_outputs`, `errors`, `reasoning`, `warnings`
+## Determinism
 
-### `SubgraphExecutionState`
+Determinism guarantees and non-determinism sources are centralized in `determinism.md`.
 
-Subgraph-local state includes:
+## Known limitations (current)
 
-- `sub_query`, `relevant_tables`, `user_context`
-- planner/validator/generator/executor responses
-- retry counters and error diagnostics
-
-`wrap_subgraph()` merges subgraph outputs back into `GraphState`.
-
-### Subgraph payload wiring
-
-`build_scan_payload()` injects `decomposer_response` and `datasource_resolver_response` into the subgraph wrapper. `wrap_subgraph()` uses `subgraph_id` to resolve the matching `SubQuery` and construct `SubgraphExecutionState`.
-
-## Determinism guarantees
-
-- Sub-query and post-op IDs are hashed deterministically in `DecomposerNode`.
-- `ExecutionDAG._layered_toposort()` produces stable scan layers.
-- Aggregation processes layers in deterministic order.
-
-### Non-determinism sources
-
-- LLM outputs in decomposer/planner are model-dependent and can vary unless configured deterministically.
-- Vector retrieval ranking is not part of the control graph but can influence planner input.
-
-## Failure modes and limitations (current)
-
-### Failure modes
-
-- No allowed datasources → `resolver_route` ends the pipeline early.
-- No compatible subgraph → router raises `PipelineError`.
-- Missing artifacts → aggregation errors.
-- Planner/validator failures → retry loop (if retryable).
-
-### Limitations
-
-- `PhysicalValidatorNode` not wired.
+- `PhysicalValidatorNode` is implemented but not wired into the SQL agent graph.
 - Execution sandbox exists but SQL executor runs in-process by default.
 - Circuit breakers are not uniformly wired across all execution paths.
-- No human-in-the-loop steps are wired.
 
 ## Observability hooks (current)
 
-- `run_with_graph()` accepts callbacks (e.g., `PipelineMonitorCallback`).
-- Audit events emitted on LLM completion via `EventLogger`.
-- Metrics via `configure_metrics()` when callbacks are provided.
-
-Pipeline callbacks are only invoked when passed into `run_with_graph(..., callbacks=...)`.
+Observability stack and callback behavior are documented in `../observability/stack.md`.
 
 ## Source references
 

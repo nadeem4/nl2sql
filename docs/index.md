@@ -44,9 +44,11 @@ flowchart TD
 
 ## Navigate the docs
 
-- `architecture/high-level.md` for end-to-end system architecture and subsystem boundaries.
-- `architecture/pipeline.md` for LangGraph pipeline flow, routing, and subgraph lifecycle.
+- `architecture/overview.md` for end-to-end system architecture and subsystem boundaries.
+- `architecture/pipeline.md` for LangGraph pipeline flow, routing, and execution DAG behavior.
+- `architecture/graph_state.md`, `architecture/determinism.md`, and `architecture/invariants.md` for state, determinism, and enforced rules.
+- `architecture/failure_recovery.md` for failure domains and retry scope.
 - `schema/store.md` and `architecture/indexing.md` for schema contracts, chunking, and retrieval.
 - `execution/sandbox.md` for execution isolation and concurrency details.
 - `adapters/architecture.md` for plugin discovery and capability-based routing.
-- `observability/stack.md` and `observability/error-handling.md` for metrics, logging, and failure modes.
+- `observability/stack.md` and `observability/error-handling.md` for metrics, logging, and error contracts.

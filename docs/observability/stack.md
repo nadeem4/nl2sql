@@ -33,7 +33,7 @@ Legacy token and latency events are recorded in `TOKEN_LOG` and `LATENCY_LOG`.
 
 ## Structured logging
 
-The core logger uses JSON formatting when OTLP is enabled and propagates trace/tenant context for correlation.
+Logging is configured at import time; JSON formatting is enabled when `Settings.observability_exporter == "otlp"`. Trace and tenant context helpers exist (`trace_context`, `tenant_context`), but the pipeline does not set them; callers must establish context if they want trace/tenant IDs in logs.
 
 ## Source references
 

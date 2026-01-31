@@ -38,6 +38,8 @@ classDiagram
     }
 ```
 
+See `sdk.md` for the authoritative adapter interface reference and required fields/methods.
+
 ## Capability-driven routing
 
 Adapters expose capabilities (e.g., `supports_sql`, `supports_schema_introspection`). These capabilities drive:
