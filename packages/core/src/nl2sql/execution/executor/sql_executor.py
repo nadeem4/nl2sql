@@ -4,13 +4,8 @@ from typing import Optional, Dict, Any
 
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.common.logger import get_logger
-from nl2sql.common.contracts import ExecutionRequest, ExecutionResult
-from nl2sql.common.sandbox import execute_in_sandbox, get_execution_pool
-from nl2sql.common.resilience import DB_BREAKER
-from nl2sql.common.settings import settings
 from nl2sql.execution.contracts import ExecutorRequest, ExecutorResponse
 from nl2sql.execution.artifacts import build_artifact_store
-from nl2sql_adapter_sdk.contracts import ResultFrame
 from nl2sql_adapter_sdk.capabilities import DatasourceCapability
 from nl2sql.datasources import DatasourceRegistry
 from nl2sql_adapter_sdk.contracts import AdapterRequest

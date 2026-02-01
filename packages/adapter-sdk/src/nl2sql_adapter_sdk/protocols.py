@@ -34,3 +34,8 @@ class DatasourceAdapterProtocol(Protocol):
     def get_dialect(self) -> str:
         """Return the normalized dialect string (SQL adapters)."""
         ...
+
+
+    def test_connection(self) -> bool:
+        """Test if the connection to the datasource can be established."""
+        ...

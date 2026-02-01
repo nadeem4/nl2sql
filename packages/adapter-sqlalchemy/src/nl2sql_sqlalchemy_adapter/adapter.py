@@ -460,3 +460,16 @@ class BaseSQLAlchemyAdapter:
 
     def cost_estimate(self, sql: str) -> CostEstimate:
         raise NotImplementedError(f"Adapter {self.__class__.__name__} must implement cost_estimate")
+    
+
+    def test_connection(self) -> bool:
+        """
+        Tests the database connection by executing a simple query.
+        """
+        try:
+            with self.engine.connect() as conn:
+                conn.execute(text("SELECT 1"))
+            return True
+        except Exception as e:
+            logger.error(f"Connection test failed for {self}: {e}")
+            return False

@@ -51,11 +51,7 @@ def create_breaker(
         exclude=exclude or []
     )
 
-# --- Global Breakers ---
 
-# LLM Breaker: Semantic Layer
-# Excludes: RateLimitError, AuthenticationError (Soft failures)
-# Note: We import exceptions dynamically to avoid circular imports or import errors if optional deps missing.
 _llm_excludes = []
 try:
     from openai import RateLimitError, AuthenticationError, BadRequestError
