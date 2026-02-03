@@ -37,5 +37,9 @@ class LLMRegistry:
         if name not in self.llms:
             return self.llms['default']
         return self.llms[name]
+    
+
+    def list_llms(self) -> dict:
+        return self.llms
 
     

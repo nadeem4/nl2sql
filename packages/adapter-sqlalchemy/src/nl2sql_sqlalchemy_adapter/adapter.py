@@ -473,3 +473,4 @@ class BaseSQLAlchemyAdapter:
         except Exception as e:
             logger.error(f"Connection test failed for {self}: {e}")
             return False
+        

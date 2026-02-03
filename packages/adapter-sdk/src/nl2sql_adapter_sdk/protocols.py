@@ -39,3 +39,7 @@ class DatasourceAdapterProtocol(Protocol):
     def test_connection(self) -> bool:
         """Test if the connection to the datasource can be established."""
         ...
+
+    def get_details(self) -> Dict[str, Any]:
+        """Return detailed information about the datasource."""
+        ...

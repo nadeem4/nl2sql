@@ -70,4 +70,13 @@ class LLM_API:
         Returns:
             LLM instance
         """
-        return self._registry.get_llm(name)
+        return self._registry.get_llm(name).dict()
+    
+    def list_llms(self) -> dict:
+        """
+        List all configured LLMs.
+        
+        Returns:
+            List of LLM names
+        """
+        return self._registry.list_llms()

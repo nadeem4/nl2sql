@@ -48,17 +48,12 @@ class NL2SQL:
             vector_store_path: Path to vector store directory
             policies_config_path: Path to policies configuration file
         """
-        # Convert string paths to Path objects if needed
-        if ds_config_path:
-            ds_config_path = pathlib.Path(ds_config_path)
-        if secrets_config_path:
-            secrets_config_path = pathlib.Path(secrets_config_path)
-        if llm_config_path:
-            llm_config_path = pathlib.Path(llm_config_path)
-        if vector_store_path:
-            vector_store_path = pathlib.Path(vector_store_path)
-        if policies_config_path:
-            policies_config_path = pathlib.Path(policies_config_path)
+        ds_config_path = pathlib.Path(ds_config_path) if ds_config_path else None
+        secrets_config_path = pathlib.Path(secrets_config_path) if secrets_config_path else None
+        llm_config_path = pathlib.Path(llm_config_path) if llm_config_path else None
+        vector_store_path = pathlib.Path(vector_store_path) if vector_store_path else None
+        policies_config_path = pathlib.Path(policies_config_path) if policies_config_path else None
+
 
         self._ctx = NL2SQLContext(
             ds_config_path=ds_config_path,
@@ -117,6 +112,13 @@ class NL2SQL:
         List all registered datasource IDs.
         """
         return self.datasource.list_datasources()
+    
+    def get_datasource_capabilities(self, datasource_id: str) -> dict:
+        """
+        Get capabilities of a specific datasource.
+        """
+        return self.datasource.get_capabilities(datasource_id)
+
 
     def configure_llm(self, config):
         """
@@ -130,6 +132,19 @@ class NL2SQL:
         """
         return self.llm.configure_llm_from_config(config_path)
 
+
+    def list_llms(self) -> dict:
+        """
+        List all configured LLMs.
+        """
+        return self.llm.list_llms()
+    
+    def get_llm(self, llm_name: str) -> dict:
+        """
+        Get details of a specific LLM.
+        """
+        return self.llm.get_llm(llm_name)
+    
     def index_datasource(self, datasource_id: str):
         """
         Index schema for a specific datasource.
@@ -161,7 +176,6 @@ class NL2SQL:
         """
         return self.auth.get_allowed_resources(user_context)
 
-    # Settings API convenience methods
     def get_current_settings(self):
         """
         Get the current application settings.
@@ -179,22 +193,3 @@ class NL2SQL:
         Validate the current configuration.
         """
         return self.settings.validate_configuration()
-
-    # Result API convenience methods
-    def store_query_result(self, frame, metadata=None):
-        """
-        Store a query result in the result store.
-        """
-        return self.results.store_query_result(frame, metadata)
-
-    def retrieve_query_result(self, result_id):
-        """
-        Retrieve a stored query result.
-        """
-        return self.results.retrieve_query_result(result_id)
-
-    def get_result_metadata(self, result_id):
-        """
-        Get metadata associated with a stored result.
-        """
-        return self.results.get_result_metadata(result_id)

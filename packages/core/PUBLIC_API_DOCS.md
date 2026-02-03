@@ -2,6 +2,24 @@
 
 The NL2SQL Public API provides a clean, stable interface to the NL2SQL core engine functionality. This API defines the official boundaries for external consumers and ensures backward compatibility.
 
+## Two-Tier API Architecture
+
+NL2SQL provides a two-tier API architecture:
+
+### 1. Core API (Python)
+- **Location**: Within the core package (`nl2sql` module)
+- **Interface**: Direct Python class interface (`NL2SQL` class)
+- **Use Case**: Direct Python integration, embedded applications
+- **Access**: Import and use directly in Python code
+
+### 2. REST API (HTTP)
+- **Location**: API package (`nl2sql-api`)
+- **Interface**: HTTP REST endpoints
+- **Use Case**: Remote clients, web applications, TypeScript CLI
+- **Access**: HTTP requests to API endpoints
+
+Both APIs provide access to the same underlying NL2SQL engine functionality, allowing flexible integration options.
+
 ## Main Class: NL2SQL
 
 The main entry point for interacting with the NL2SQL engine.

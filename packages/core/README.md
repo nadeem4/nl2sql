@@ -87,6 +87,23 @@ result = engine.run_query("Show top 10 customers by revenue")
 print(result.final_answer)
 ```
 
+### Two-Tier API Architecture
+
+NL2SQL provides a two-tier API architecture:
+
+#### 1. Core API (Python) - This Package
+- **Interface**: Direct Python class interface (`NL2SQL` class)
+- **Use Case**: Direct Python integration, embedded applications
+- **Access**: Import and use directly in Python code
+
+#### 2. REST API (HTTP)
+- **Package**: API package (`nl2sql-api`)
+- **Interface**: HTTP REST endpoints
+- **Use Case**: Remote clients, web applications, TypeScript CLI
+- **Access**: HTTP requests to API endpoints
+
+Both APIs provide access to the same underlying NL2SQL engine functionality, allowing flexible integration options.
+
 ### Modular API Structure
 
 The engine provides modular APIs for different functionality areas:

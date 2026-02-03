@@ -2,6 +2,24 @@
 
 API layer for the NL2SQL engine that provides a REST interface to the core functionality.
 
+## Two-Tier API Architecture
+
+NL2SQL provides a two-tier API architecture:
+
+### 1. Core API (Python)
+- **Location**: Core package (`nl2sql-core`)
+- **Interface**: Direct Python class interface (`NL2SQL` class)
+- **Use Case**: Direct Python integration, embedded applications
+- **Access**: Import and use directly in Python code
+
+### 2. REST API (HTTP) - This Package
+- **Location**: API package (`nl2sql-api`) - This package
+- **Interface**: HTTP REST endpoints
+- **Use Case**: Remote clients, web applications, TypeScript CLI
+- **Access**: HTTP requests to API endpoints
+
+This REST API package serves as a bridge between external HTTP clients and the core NL2SQL engine, using the core's public API internally.
+
 ## Overview
 
 This package provides a FastAPI-based REST API that uses the NL2SQL core's public API to interact with the NL2SQL engine over HTTP. It serves as a bridge between external clients (such as the TypeScript CLI) and the core engine functionality.
@@ -21,11 +39,31 @@ The API package leverages the NL2SQL core's public API layer (`NL2SQL` class), e
 
 ## Endpoints
 
+### Query Endpoints
 - `POST /api/v1/query` - Execute a natural language query
-- `GET /api/v1/schema/{datasource_id}` - Get schema for a specific datasource
-- `GET /api/v1/schema` - List available datasources
 - `GET /api/v1/health` - Health check endpoint
 - `GET /api/v1/ready` - Readiness check endpoint
+
+### Schema Endpoints
+- `GET /api/v1/schema/{datasource_id}` - Get schema for a specific datasource
+- `GET /api/v1/schema` - List available datasources
+
+### Datasource Management Endpoints
+- `POST /api/v1/datasource` - Add a new datasource programmatically
+- `GET /api/v1/datasource` - List all registered datasources
+- `GET /api/v1/datasource/{datasource_id}` - Get details of a specific datasource
+- `DELETE /api/v1/datasource/{datasource_id}` - Remove a datasource (not currently supported)
+
+### LLM Management Endpoints
+- `POST /api/v1/llm` - Configure an LLM programmatically
+- `GET /api/v1/llm` - List all configured LLMs
+- `GET /api/v1/llm/{llm_name}` - Get details of a specific LLM
+
+### Indexing Management Endpoints
+- `POST /api/v1/index/{datasource_id}` - Index schema for a specific datasource
+- `POST /api/v1/index-all` - Index schema for all registered datasources
+- `DELETE /api/v1/index` - Clear the vector store index
+- `GET /api/v1/index/status` - Get the status of the index
 
 ## Running the API
 
