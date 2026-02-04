@@ -1,4 +1,5 @@
 from typing import Dict, List, Any, Set
+from threading import RLock
 
 from nl2sql_adapter_sdk.capabilities import DatasourceCapability
 from nl2sql.datasources.discovery import discover_adapters
@@ -18,6 +19,7 @@ class DatasourceRegistry:
         self._capabilities: Dict[str, Set[str]] = {}
         self._available_adapters = discover_adapters()
         self._secret_manager = secret_manager
+        self._lock = RLock()
 
     def find_and_resolve_secret(self, key: str) -> str:
         """Attempts to resolve a secret using the secret manager.
@@ -101,11 +103,14 @@ class DatasourceRegistry:
                 row_limit=config.options.get("row_limit"),
                 max_bytes=config.options.get("max_bytes"),
             )
-            self._adapters[ds_id] = adapter
-            if hasattr(adapter, "capabilities"):
-                self._capabilities[ds_id] = self._normalize_capabilities(adapter.capabilities())
-            else:
-                self._capabilities[ds_id] = {DatasourceCapability.SUPPORTS_SQL.value}
+            with self._lock:
+                self._adapters[ds_id] = adapter
+                if hasattr(adapter, "capabilities"):
+                    self._capabilities[ds_id] = self._normalize_capabilities(
+                        adapter.capabilities()
+                    )
+                else:
+                    self._capabilities[ds_id] = {DatasourceCapability.SUPPORTS_SQL.value}
             return adapter
         else:
             raise ValueError(
@@ -125,9 +130,10 @@ class DatasourceRegistry:
         Raises:
             ValueError: If the datasource ID is unknown.
         """
-        if datasource_id not in self._adapters:
-            raise ValueError(f"Unknown datasource ID: {datasource_id}")
-        return self._adapters[datasource_id]
+        with self._lock:
+            if datasource_id not in self._adapters:
+                raise ValueError(f"Unknown datasource ID: {datasource_id}")
+            return self._adapters[datasource_id]
 
     def get_dialect(self, datasource_id: str) -> str:
         """Returns a normalized dialect string from the adapter.
@@ -142,9 +148,10 @@ class DatasourceRegistry:
 
     def get_capabilities(self, datasource_id: str) -> Set[str]:
         """Returns the capability flags for a datasource."""
-        if datasource_id not in self._capabilities:
-            raise ValueError(f"Unknown datasource ID: {datasource_id}")
-        return self._capabilities[datasource_id]
+        with self._lock:
+            if datasource_id not in self._capabilities:
+                raise ValueError(f"Unknown datasource ID: {datasource_id}")
+            return set(self._capabilities[datasource_id])
 
     def list_adapters(self) -> List[DatasourceAdapterProtocol]:
         """Returns a list of all registered adapters.
@@ -152,7 +159,8 @@ class DatasourceRegistry:
         Returns:
             List[DatasourceAdapterProtocol]: All active adapters.
         """
-        return list(self._adapters.values())
+        with self._lock:
+            return list(self._adapters.values())
 
     def list_ids(self) -> List[str]:
         """Returns a list of all registered datasource IDs.
@@ -160,4 +168,5 @@ class DatasourceRegistry:
         Returns:
             List[str]: All registered IDs.
         """
-        return list(self._adapters.keys())
+        with self._lock:
+            return list(self._adapters.keys())

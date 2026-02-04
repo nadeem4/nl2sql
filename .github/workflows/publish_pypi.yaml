@@ -27,6 +27,21 @@ jobs:
     - name: Build Adapter SDK
       run: python -m build packages/adapter-sdk
 
+    - name: Build Adapter SQLAlchemy
+      run: python -m build packages/adapter-sqlalchemy
+
+    - name: Build Adapter MSSQL
+      run: python -m build packages/adapters/mssql
+
+    - name: Build Adapter MySQL
+      run: python -m build packages/adapters/mysql
+
+    - name: Build Adapter Postgres
+      run: python -m build packages/adapters/postgres
+
+    - name: Build Adapter SQLite
+      run: python -m build packages/adapters/sqlite
+
     - name: Build Core
       run: python -m build packages/core
 

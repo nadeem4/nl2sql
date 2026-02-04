@@ -74,9 +74,17 @@ nav:
       - Physical Validator: architecture/nodes/physical_validator_node.md
       - Refiner: architecture/nodes/refiner_node.md
       - Schema Retriever: architecture/nodes/schema_retriever_node.md
-  - Getting Started: getting-started.md
+  - Getting Started:
+    - Overview: getting_started/index.md
+    - PyPI (Python API): getting_started/pypi.md
+    - Docker (REST API): getting_started/docker.md
+    - From Source (Development): getting_started/source.md
   - Configuration:
     - Configuration System: configuration/system.md
+    - Datasources: configuration/datasources.md
+    - LLMs: configuration/llm.md
+    - Policies: configuration/policies.md
+    - Secrets: configuration/secrets.md
   - Adapters:
     - Overview: adapters/index.md
     - Architecture: adapters/architecture.md
@@ -113,4 +121,20 @@ nav:
     - Testing Architecture: testing/architecture.md
   - API:
     - Overview: api/index.md
+    - Core API (Python):
+      - Public Facade: api/core/public-facade.md
+      - Auth: api/core/auth.md
+      - Datasource: api/core/datasource.md
+      - LLM: api/core/llm.md
+      - Indexing: api/core/indexing.md
+      - Query: api/core/query.md
+      - Settings: api/core/settings.md
+      - Result: api/core/result.md
+    - REST API (FastAPI):
+      - Overview: api/rest/index.md
+      - Health: api/rest/health.md
+      - Query: api/rest/query.md
+      - Datasource: api/rest/datasource.md
+      - LLM: api/rest/llm.md
+      - Indexing: api/rest/indexing.md
   - Glossary: glossary.md

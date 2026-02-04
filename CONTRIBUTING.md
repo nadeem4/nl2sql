@@ -1,88 +1,90 @@
 # Contributing to NL2SQL
 
-Welcome to the `nl2sql` monorepo! This project is a production-grade Natural Language to SQL engine.
+Thanks for contributing to the `nl2sql` monorepo. This guide covers local setup,
+tests, documentation, and adapter development.
 
-## 🏗️ Monorepo Structure
+## Monorepo layout
 
-* `packages/core`: The main query engine (LangGraph, core Logic).
-* `packages/adapter-sdk`: The interface definition for database adapters.
-* `packages/adapters/*`: Implementation of database drivers (Postgres, MSSQL, MySQL, etc.).
+- `packages/core`: Core engine and pipeline.
+- `packages/api`: FastAPI REST service.
+- `packages/adapter-sdk`: Adapter interfaces and contracts.
+- `packages/adapter-sqlalchemy`: SQLAlchemy adapter base.
+- `packages/adapters/*`: Database adapter implementations.
+- `docs/`: MkDocs documentation.
 
-## 🚀 Getting Started
+## Prerequisites
 
-### Prerequisites
+- Python 3.10+
+- Docker (required for integration tests that spin up databases)
 
-* Python 3.10+
-* Docker & Docker Compose (for integration tests)
+## Local setup
 
-### Installation
+1. Clone the repository.
+2. Create and activate a virtual environment.
+3. Install editable packages you plan to work on.
 
-1. **Clone the repo**:
+Example (PowerShell):
 
-    ```bash
-    git clone https://github.com/nadeem4/nl2sql.git
-    cd nl2sql
-    ```
+```powershell
+python -m venv venv
+.\venv\Scripts\activate
+python -m pip install -e packages/adapter-sdk
+python -m pip install -e packages/core
+python -m pip install -e packages/adapter-sqlalchemy
+python -m pip install -e packages/adapters/postgres
+```
 
-2. **Create a Virtual Environment**:
+## Running tests
 
-    ```bash
-    python -m venv venv
-    .\venv\Scripts\activate   # Windows
-    source venv/bin/activate  # Linux/Mac
-    ```
-
-3. **Install Editable Packages**:
-
-    ```bash
-    pip install -r requirements.txt
-    ```
-
-## 🧪 Testing
-
-### Running Unit Tests
+Unit tests:
 
 ```bash
 pytest packages/core/tests/unit
 ```
 
-### Running Integration Tests
-
-This requires Docker. It will spin up REAL databases and run the Compliance Suite against them.
+Integration tests (requires Docker):
 
 ```powershell
 ./scripts/test_integration.ps1
 ```
 
-## 🤝 Contribution Workflow
+## Documentation
 
-1. Create a branch `feat/your-feature`.
-2. Make changes in the relevant package.
-3. **Run Tests** to ensure no regression.
-4. Submit a Pull Request.
+Docs are built with MkDocs. To run locally:
 
-## 🧩 Creating a New Adapter
+```bash
+python -m pip install -r requirements-docs.txt
+mkdocs serve
+```
 
-We have two base classes for adapters. Choose the right one to keep dependencies minimal:
+## Contribution workflow
 
-| Base Class | Package | Use Case | Dependencies |
-| :--- | :--- | :--- | :--- |
-| `BaseSQLAlchemyAdapter` | `adapter-sqlalchemy` | **Relational Databases** (Postgres, Snowflake, Oracle, etc.) | High (`SQLAlchemy`) |
-| `DatasourceAdapter` (Protocol) | `adapter-sdk` | **Everything Else** (REST APIs, Mongo, CSV, GraphDBs) | None |
+1. Create a feature branch (e.g., `feat/my-change`).
+2. Make changes and run relevant tests.
+3. Open a pull request with a clear summary and test plan.
 
-### 1. SQL Database Adapter
+## Creating a new adapter
 
-Inherit from `BaseSQLAlchemyAdapter`. It handles `fetch_schema` and `execute` for you.
+Choose the base class that matches your datasource:
+
+| Base | Package | Use Case | Dependencies |
+| --- | --- | --- | --- |
+| `BaseSQLAlchemyAdapter` | `adapter-sqlalchemy` | Relational databases | SQLAlchemy |
+| `DatasourceAdapter` (protocol) | `adapter-sdk` | Non-SQL or custom sources | None |
+
+### SQL adapter
+
+Implement `BaseSQLAlchemyAdapter` to inherit schema fetch and execution.
 
 ```python
 from nl2sql_sqlalchemy_adapter import BaseSQLAlchemyAdapter
 
 class MyDbAdapter(BaseSQLAlchemyAdapter):
     def connect(self, config):
-        # ... implementation ...
+        ...
 ```
 
-### 2. General Adapter (API/NoSQL)
+### Non-SQL adapter
 
 Implement the `DatasourceAdapter` protocol directly.
 
@@ -90,5 +92,11 @@ Implement the `DatasourceAdapter` protocol directly.
 from nl2sql_adapter_sdk import DatasourceAdapter
 
 class MyApiAdapter(DatasourceAdapter):
-    # You MUST implement fetch_schema, execute, etc. yourself
+    ...
 ```
+
+## Where to look
+
+- Architecture and system behavior: `docs/architecture/`
+- Core API reference: `docs/api/core/`
+- REST API reference: `docs/api/rest/`

@@ -10,7 +10,7 @@ authors = [{name = "Antigravity Team"}]
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
-    "nl2sql-core",
+    "nl2sql-core==0.1.0",
     "rich>=13.0.0",
     "typer[all]>=0.9.0",
     "inquirerpy>=0.3.4",

@@ -18,12 +18,8 @@ class LLMService:
 
     def list_llms(self) -> list:
         """List all configured LLMs."""
-        # The engine doesn't have a direct method to list LLMs, so we'll return a placeholder
-        # In a real implementation, we would need to add this to the core API
-        return ["default"]  # Placeholder
+        return self.engine.list_llms()
 
     def get_llm(self, llm_name: str) -> dict:
         """Get details of a specific LLM."""
-        # Similar to listing, we don't have a direct method to get LLM details
-        # This would need to be implemented in the core if needed
-        return {"llm_name": llm_name, "configured": True}  # Placeholder
+        return self.engine.get_llm(llm_name)

@@ -12,6 +12,7 @@ dependencies = [
     "PyYAML>=6.0",
     "langgraph>=0.0.29",
     "langchain>=0.2.0",
+    "langchain-chroma>=0.1.0",
     "langchain-openai>=0.1.0",
     "nl2sql-adapter-sdk",
     "pydantic>=1.10",
@@ -21,10 +22,7 @@ dependencies = [
     "sqlglot>=23.0.0",
     "pydantic-settings>=2.0.0",
     "pandas>=1.5.0", # For metrics/evals
-    "pybreaker>=1.3.0", # Circuit breaker pattern (ENH-002)
-    "pyarrow",
-    "boto3",
-    "azure-storage-blob",
+    "pybreaker>=1.3.0",
     "polars",
     "duckdb",
 ]
@@ -33,6 +31,18 @@ dependencies = [
 aws = ["boto3"]
 azure = ["azure-identity", "azure-keyvault-secrets"]
 hashicorp = ["hvac"]
+mssql = ["nl2sql-mssql"]
+mysql = ["nl2sql-mysql"]
+postgres = ["nl2sql-postgres"]
+sqlite = ["nl2sql-sqlite"]
+sqlalchemy = ["nl2sql-adapter-sqlalchemy"]
+all = [
+    "nl2sql-adapter-sqlalchemy",
+    "nl2sql-mssql",
+    "nl2sql-mysql",
+    "nl2sql-postgres",
+    "nl2sql-sqlite"
+]
 
 # Scripts section removed as moved to CLI package
 

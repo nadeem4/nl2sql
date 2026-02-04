@@ -100,6 +100,19 @@ flowchart TD
 ### 1. Installation
 
 ```bash
+# Install core only
+pip install nl2sql-core
+
+# Install core with selected adapters
+pip install nl2sql-core[mysql,mssql]
+
+# Install core with all adapters
+pip install nl2sql-core[all]
+```
+
+For local development:
+
+```bash
 git clone https://github.com/nadeem4/nl2sql.git
 cd nl2sql
 
@@ -123,6 +136,12 @@ result = run_with_graph(ctx, "Top 5 customers by revenue last quarter?")
 
 print(result.get("final_answer"))
 ```
+
+## 🔖 Versioning Policy
+
+NL2SQL uses unified versioning across the monorepo. Core, adapters, API, and CLI
+share the same version number and are released together. Internal dependencies
+are pinned to the same version to avoid mismatches.
 
 ## 📚 Documentation
 

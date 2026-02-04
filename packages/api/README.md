@@ -31,7 +31,7 @@ The API package leverages the NL2SQL core's public API layer (`NL2SQL` class), e
 ## Features
 
 - RESTful API endpoints for natural language to SQL conversion
-- Schema introspection capabilities
+- Datasource and LLM management endpoints
 - Health and readiness checks
 - Proper error handling and response formatting
 - Lazy initialization to avoid configuration issues during import
@@ -43,10 +43,6 @@ The API package leverages the NL2SQL core's public API layer (`NL2SQL` class), e
 - `POST /api/v1/query` - Execute a natural language query
 - `GET /api/v1/health` - Health check endpoint
 - `GET /api/v1/ready` - Readiness check endpoint
-
-### Schema Endpoints
-- `GET /api/v1/schema/{datasource_id}` - Get schema for a specific datasource
-- `GET /api/v1/schema` - List available datasources
 
 ### Datasource Management Endpoints
 - `POST /api/v1/datasource` - Add a new datasource programmatically
@@ -72,10 +68,10 @@ pip install -e .
 nl2sql-api --host 0.0.0.0 --port 8000 --reload
 ```
 
-Or using uvicorn directly:
+Or using the server script directly:
 
 ```bash
-uvicorn nl2sql_api.main:app --host 0.0.0.0 --port 8000 --reload
+python -m nl2sql_api.server --host 0.0.0.0 --port 8000 --reload
 ```
 
 ## Development

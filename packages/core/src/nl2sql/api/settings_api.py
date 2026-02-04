@@ -19,7 +19,7 @@ class SettingsAPI:
     
     def __init__(self, ctx: NL2SQLContext):
         self._ctx = ctx
-        self._settings: Settings = ctx.config_manager.settings if hasattr(ctx, 'config_manager') else ctx.settings if hasattr(ctx, 'settings') else None
+        self._settings: Settings = ctx.config_manager.settings 
     
     def get_current_settings(self) -> Dict[str, Any]:
         """

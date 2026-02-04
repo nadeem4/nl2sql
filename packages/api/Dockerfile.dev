@@ -1,0 +1,46 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+ARG NL2SQL_EXTRAS="all"
+
+COPY ./pyproject.toml /app/pyproject.toml
+COPY ./packages/adapter-sdk/pyproject.toml /app/packages/adapter-sdk/pyproject.toml
+COPY ./packages/adapter-sdk/src /app/packages/adapter-sdk/src
+COPY ./packages/core/pyproject.toml /app/packages/core/pyproject.toml
+COPY ./packages/core/src /app/packages/core/src
+COPY ./packages/adapter-sqlalchemy/pyproject.toml /app/packages/adapter-sqlalchemy/pyproject.toml
+COPY ./packages/adapter-sqlalchemy/src /app/packages/adapter-sqlalchemy/src
+COPY ./packages/adapters/mssql/pyproject.toml /app/packages/adapters/mssql/pyproject.toml
+COPY ./packages/adapters/mssql/src /app/packages/adapters/mssql/src
+COPY ./packages/adapters/mysql/pyproject.toml /app/packages/adapters/mysql/pyproject.toml
+COPY ./packages/adapters/mysql/src /app/packages/adapters/mysql/src
+COPY ./packages/adapters/postgres/pyproject.toml /app/packages/adapters/postgres/pyproject.toml
+COPY ./packages/adapters/postgres/src /app/packages/adapters/postgres/src
+COPY ./packages/adapters/sqlite/pyproject.toml /app/packages/adapters/sqlite/pyproject.toml
+COPY ./packages/adapters/sqlite/src /app/packages/adapters/sqlite/src
+COPY ./packages/api/pyproject.toml /app/packages/api/pyproject.toml
+COPY ./packages/api/src /app/packages/api/src
+
+RUN pip install --no-cache-dir -U pip setuptools wheel \
+    && pip install --no-cache-dir -e /app/packages/adapter-sdk \
+    && pip install --no-cache-dir -e /app/packages/adapter-sqlalchemy \
+    && pip install --no-cache-dir -e /app/packages/core \
+    && if [ "$NL2SQL_EXTRAS" = "all" ]; then \
+        pip install --no-cache-dir -e /app/packages/adapters/mssql \
+            -e /app/packages/adapters/mysql \
+            -e /app/packages/adapters/postgres \
+            -e /app/packages/adapters/sqlite; \
+       elif [ -n "$NL2SQL_EXTRAS" ]; then \
+        for adapter in $(echo "$NL2SQL_EXTRAS" | tr ',' ' '); do \
+            pip install --no-cache-dir -e "/app/packages/adapters/$adapter"; \
+        done; \
+       fi \
+    && pip install --no-cache-dir -e /app/packages/api
+
+EXPOSE 8000
+
+CMD ["uvicorn", "nl2sql_api.main:app", "--host", "0.0.0.0", "--port", "8000"]

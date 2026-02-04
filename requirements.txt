@@ -1,3 +1,0 @@
--e packages/adapter-sdk
--e packages/core
--e packages/adapters/postgres

@@ -1,11 +1,13 @@
 from typing import Optional
+import os
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from dotenv import load_dotenv
+from nl2sql.common.logger import get_logger
 
-# Load environment variables from .env into os.environ
-load_dotenv()
+logger = get_logger(__name__)
 
+from nl2sql.common.logger import get_logger
+logger = get_logger(__name__)
 
 class Settings(BaseSettings):
     """Application configuration settings backed by environment variables."""
@@ -196,16 +198,25 @@ class Settings(BaseSettings):
         extra="ignore"
     )
 
-    def configure_env(self, env: str) -> None:
-        """Loads environment-specific variables and reloads settings."""
-        if not env:
-            return
-            
-        load_dotenv(f".env.{env}", override=True)
-        new_settings = Settings()
-        self.__dict__.update(new_settings.__dict__)
 
-settings = Settings()
+def load_settings() -> Settings:
+    """Load settings using ENV_FILE_PATH or ENV/APP_ENV when provided."""
+    env_file_path = os.getenv("ENV_FILE_PATH")
+    env_name = os.getenv("ENV") or os.getenv("APP_ENV")
+
+    if env_file_path:
+        logger.info(f"Loading settings from ENV_FILE_PATH={env_file_path}")
+        return Settings(_env_file=env_file_path)
+    if env_name:
+        env_file = f".env.{env_name}"
+        logger.info(f"Loading settings from {env_file}")
+        return Settings(_env_file=env_file)
+
+    logger.info("Loading settings from default .env")
+    return Settings()
+
+
+settings = load_settings()
 
 # Configure logging during import
 from nl2sql.common.logger import configure_logging

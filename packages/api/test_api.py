@@ -17,15 +17,14 @@ def test_api_basic():
         return False
 
     try:
-        from nl2sql_api.services.nl2sql_service import NL2SQLService
-        service = NL2SQLService()
-        assert service is not None
-        print("+ Service object created successfully")
+        from nl2sql_api import dependencies
+        assert callable(dependencies.get_engine)
+        assert callable(dependencies.get_query_service)
+        print("+ Dependency providers available")
     except Exception as e:
-        print(f"- Failed to create service: {e}")
-        # This is expected if config files are not present
-        print("  (This is expected if configuration files are not set up)")
-    
+        print(f"- Failed to load dependency providers: {e}")
+        return False
+
     return True
 
 if __name__ == "__main__":

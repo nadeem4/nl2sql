@@ -11,7 +11,6 @@ from typing_extensions import Annotated
 from nl2sql.datasources import DatasourceRegistry
 from nl2sql.configs import ConfigManager
 from nl2sql.llm import LLMRegistry
-from nl2sql.common.settings import settings
 from nl2sql.indexing.vector_store import VectorStore
 from nl2sql.common.logger import configure_logging
 from nl2sql.context import NL2SQLContext
@@ -43,15 +42,11 @@ VectorStoreOption = Annotated[Optional[str], typer.Option("--vector-store", help
 
 
 @app.callback()
-def global_callback(
-    ctx: typer.Context,
-    env: Annotated[Optional[str], typer.Option("--env", "-e", help="Environment name (e.g. dev, prod). Isolation for configs/data.")] = None,
-):
+def global_callback(ctx: typer.Context):
     """
     NL2SQL CLI Entry Point.
     """
-    if env:
-        settings.configure_env(env)
+    return
 
 @app.command()
 def run(

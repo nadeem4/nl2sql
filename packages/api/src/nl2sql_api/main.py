@@ -1,16 +1,14 @@
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 
-from .container import Container
 from .routes import query, health, datasource, llm, indexing
 from fastapi.middleware.cors import CORSMiddleware
+from nl2sql import NL2SQL
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    container = Container()
-
-    app.state.container = container
+    app.state.engine = NL2SQL()
     yield
 
 
@@ -35,6 +33,3 @@ app.add_middleware(
 )
 
 
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)

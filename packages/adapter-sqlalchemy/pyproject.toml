@@ -9,7 +9,7 @@ description = "Base SQLAlchemy Adapter for NL2SQL"
 requires-python = ">=3.9"
 dependencies = [
     "SQLAlchemy>=2.0",
-    "nl2sql-adapter-sdk",
+    "nl2sql-adapter-sdk==0.1.0",
 ]
 
 [tool.setuptools]

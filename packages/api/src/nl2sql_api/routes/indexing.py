@@ -1,13 +1,18 @@
-from fastapi import APIRouter, HTTPException, Request
-from typing import Dict, Any
+from fastapi import APIRouter, HTTPException, Depends
+from typing import Dict, Any, Annotated
 
+from nl2sql_api.dependencies import get_indexing_service
+from nl2sql_api.services import IndexingService
 router = APIRouter()
 
+IndexingSvc = Annotated[IndexingService, Depends(get_indexing_service)]
 
 @router.post("/index/{datasource_id}", response_model=Dict[str, Any])
-async def index_datasource(request: Request, datasource_id: str):
+async def index_datasource(
+    datasource_id: str,
+    service: IndexingSvc
+):
     try:
-        service = request.app.state.container.indexing
         result = service.index_datasource(datasource_id)
 
         return {
@@ -24,9 +29,10 @@ async def index_datasource(request: Request, datasource_id: str):
 
 
 @router.post("/index-all", response_model=Dict[str, Any])
-async def index_all_datasources(request: Request):
+async def index_all_datasources(
+    service: IndexingSvc
+):
     try:
-        service = request.app.state.container.indexing
         results = service.index_all_datasources()
 
         return {
@@ -42,9 +48,10 @@ async def index_all_datasources(request: Request):
 
 
 @router.delete("/index", response_model=Dict[str, Any])
-async def clear_index(request: Request):
+async def clear_index(
+    service: IndexingSvc
+):
     try:
-        service = request.app.state.container.indexing
         return service.clear_index()
     except Exception as e:
         raise HTTPException(
@@ -54,9 +61,10 @@ async def clear_index(request: Request):
 
 
 @router.get("/index/status", response_model=Dict[str, Any])
-async def get_index_status(request: Request):
+async def get_index_status(
+    service: IndexingSvc
+):
     try:
-        service = request.app.state.container.indexing
         return service.get_index_status()
     except Exception as e:
         raise HTTPException(

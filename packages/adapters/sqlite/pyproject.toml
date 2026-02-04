@@ -9,7 +9,7 @@ description = "SQLite Adapter for NL2SQL"
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
-    "nl2sql-adapter-sqlalchemy",
+    "nl2sql-adapter-sqlalchemy==0.1.0",
     "SQLAlchemy>=2.0"
 ]
 

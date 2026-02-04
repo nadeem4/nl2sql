@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Postgres adapter for NL2SQL"
 requires-python = ">=3.9"
 dependencies = [
-    "nl2sql-adapter-sqlalchemy",
+    "nl2sql-adapter-sqlalchemy==0.1.0",
     "SQLAlchemy>=2.0",
     "psycopg2-binary>=2.9",
 ]

@@ -79,7 +79,8 @@ from nl2sql import NL2SQL
 # Initialize the engine
 engine = NL2SQL(
     ds_config_path="configs/datasources.yaml",
-    llm_config_path="configs/llm.yaml"
+    llm_config_path="configs/llm.yaml",
+    policies_path="configs/policies.json"
 )
 
 # Run a natural language query
@@ -116,7 +117,8 @@ The engine provides modular APIs for different functionality areas:
 - `engine.settings` - Configuration and settings API (`get_current_settings`, `validate_configuration`, etc.)
 - `engine.results` - Result management API (`store_query_result`, `retrieve_query_result`, etc.)
 
-For complete API documentation, see [PUBLIC_API_DOCS.md](PUBLIC_API_DOCS.md).
+For complete Core API documentation, see `docs/api/core.md` in this repo
+or the API section of the published MkDocs site.
 
 ## 📋 Public API Classes
 
@@ -131,8 +133,21 @@ The public API exports the following classes and types:
 ## 📦 Installation
 
 ```bash
-pip install -e packages/core
+# Install core only
+pip install nl2sql-core
+
+# Install core with selected adapters
+pip install nl2sql-core[mysql,mssql]
+
+# Install core with all adapters
+pip install nl2sql-core[all]
 ```
+
+## 🔖 Versioning Policy
+
+All NL2SQL packages in this monorepo share a single version number and are
+released together. Core, adapters, API, and CLI pin internal dependencies to
+the same version to prevent mismatches.
 
 ## 🚀 Usage (CLI)
 

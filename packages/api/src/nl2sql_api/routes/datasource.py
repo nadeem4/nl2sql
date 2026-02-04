@@ -1,33 +1,42 @@
-from fastapi import APIRouter, HTTPException, Request
-from typing import Dict, Any
+from fastapi import APIRouter, HTTPException, Depends
+from typing import Dict, Any, Annotated
 
 from nl2sql_api.models.datasource import DatasourceRequest, DatasourceResponse
+from nl2sql_api.dependencies import get_datasource_service
+from nl2sql_api.services import DatasourceService
 
 router = APIRouter()
 
+DatasourceSvc = Annotated[DatasourceService, Depends(get_datasource_service)]
+
 
 @router.post("/datasource", response_model=DatasourceResponse)
-async def add_datasource(request: Request, payload: DatasourceRequest):
+async def add_datasource(
+    payload: DatasourceRequest,
+    service: DatasourceSvc,
+):
     try:
-        service = request.app.state.container.datasource
         return service.add_datasource(payload)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/datasource", response_model=Dict[str, Any])
-async def list_datasources(request: Request):
+async def list_datasources(
+    service: DatasourceSvc,
+):
     try:
-        service = request.app.state.container.datasource
         return {"datasources": service.list_datasources()}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/datasource/{datasource_id}", response_model=Dict[str, Any])
-async def get_datasource(request: Request, datasource_id: str):
+async def get_datasource(
+    datasource_id: str,
+    service: DatasourceSvc,
+):
     try:
-        service = request.app.state.container.datasource
         return service.get_datasource(datasource_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -36,9 +45,11 @@ async def get_datasource(request: Request, datasource_id: str):
 
 
 @router.delete("/datasource/{datasource_id}", response_model=Dict[str, Any])
-async def remove_datasource(request: Request, datasource_id: str):
+async def remove_datasource(
+    datasource_id: str,
+    service: DatasourceSvc,
+):
     try:
-        service = request.app.state.container.datasource
         return service.remove_datasource(datasource_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))

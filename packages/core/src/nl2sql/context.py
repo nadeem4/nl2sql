@@ -14,6 +14,10 @@ from nl2sql.schema import build_schema_store
 from nl2sql.execution import ExecutionStore
 from nl2sql.execution.artifacts import build_artifact_store
 
+from nl2sql.common.logger import get_logger
+logger = get_logger(__name__)
+
+
 class NL2SQLContext:
     """
     Centralized application context that manages the initialization lifecycle.
@@ -39,12 +43,12 @@ class NL2SQLContext:
         llm_config_path = llm_config_path or pathlib.Path(settings.llm_config_path)
         policies_config_path = policies_config_path or pathlib.Path(settings.policies_config_path)
 
-        if not settings.vector_store_collection_name:
-            raise ValueError("VECTOR_STORE_COLLECTION must be set.")
-        if vector_store_path is None:
-            if not settings.vector_store_path:
-                raise ValueError("VECTOR_STORE path must be set.")
-            vector_store_path = pathlib.Path(settings.vector_store_path)
+
+        logger.info(f"Loading datasource configuration from {ds_config_path}")
+        logger.info(f"Loading secrets configuration from {secrets_config_path}")
+        logger.info(f"Loading LLM configuration from {llm_config_path}")
+        logger.info(f"Loading policies configuration from {policies_config_path}")
+        logger.info(f"Loading vector store configuration from {vector_store_path}")
 
         cm = ConfigManager()
         self.tenant_id = settings.tenant_id

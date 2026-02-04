@@ -1,11 +1,11 @@
 # Docker Deployment
 
-NL2SQL ships as a Python library, not a standalone HTTP service. Container images should embed `run_with_graph()` inside your service.
+NL2SQL can be deployed as a standalone HTTP service using the `nl2sql-api` package and Docker. You can also embed the core library in your own service.
 
 ## Container requirements
 
-- Install `packages/core` and required adapter packages.
-- Provide configuration files under `configs/`.
+- Install `nl2sql-core` and add adapters via extras (e.g. `nl2sql-core[postgres]`).
+- Provide configuration files under `configs/` (or configure paths via env vars).
 - Set required environment variables (LLM keys, config paths, storage paths).
 
 ## Persistence mounts

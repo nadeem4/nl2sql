@@ -1,58 +1,35 @@
 # API Overview
 
-NL2SQL provides a two-tier API architecture for flexible integration:
+NL2SQL exposes two API surfaces: a Python Core API for in-process use and a REST
+API for remote clients. Use the links below for the full technical references.
 
-## Two-Tier API Architecture
+## Core API (Python)
 
-### 1. Core API (Python)
 - **Location**: Core package (`nl2sql-core`)
 - **Interface**: Direct Python class interface (`NL2SQL` class and low-level functions)
-- **Use Case**: Direct Python integration, embedded applications
-- **Access**: Import and use directly in Python code
+- **Use Case**: Embedded/SDK use in Python applications
+- **Reference**: Core API index and per-module references:
+  - [Core API index](core/public-facade.md)
+  - [Auth API](core/auth.md)
+  - [Datasource API](core/datasource.md)
+  - [LLM API](core/llm.md)
+  - [Indexing API](core/indexing.md)
+  - [Query API](core/query.md)
+  - [Settings API](core/settings.md)
+  - [Result API](core/result.md)
 
-### 2. REST API (HTTP)
+## REST API (FastAPI)
+
 - **Location**: API package (`nl2sql-api`)
 - **Interface**: HTTP REST endpoints
 - **Use Case**: Remote clients, web applications, TypeScript CLI
-- **Access**: HTTP requests to API endpoints
-
-Both APIs provide access to the same underlying NL2SQL engine functionality, allowing flexible integration options.
-
-## Core API (Low-Level)
-
-The low-level Python API surface is centered on:
-
-- `NL2SQLContext` (initialization)
-- `run_with_graph()` (pipeline execution)
-
-```python
-from nl2sql.context import NL2SQLContext
-from nl2sql.pipeline.runtime import run_with_graph
-
-ctx = NL2SQLContext()
-result = run_with_graph(ctx, "Example query")
-```
-
-## High-Level Core API
-
-The high-level Python API provides a cleaner interface through the `NL2SQL` class:
-
-```python
-from nl2sql import NL2SQL
-
-engine = NL2SQL()
-result = engine.run_query("Example query")
-```
-
-## REST API
-
-The REST API provides HTTP endpoints for remote access:
-
-- `POST /api/v1/query` - Execute natural language queries
-- `GET /api/v1/schema/{datasource_id}` - Get schema information
-- `GET /api/v1/schema` - List available datasources
-- `GET /api/v1/health` - Health check
-- `GET /api/v1/ready` - Readiness check
+- **Reference**: REST API index and per-route references:
+  - [REST API index](rest/index.md)
+  - [Health API](rest/health.md)
+  - [Query API](rest/query.md)
+  - [Datasource API](rest/datasource.md)
+  - [LLM API](rest/llm.md)
+  - [Indexing API](rest/indexing.md)
 
 ## Supporting contracts
 
