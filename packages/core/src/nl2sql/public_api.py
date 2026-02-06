@@ -19,6 +19,8 @@ from nl2sql.api.indexing_api import IndexingAPI
 from nl2sql.api.auth_api import AuthAPI
 from nl2sql.api.settings_api import SettingsAPI
 from nl2sql.api.result_api import ResultAPI
+from nl2sql.api.policy_api import PolicyAPI
+from nl2sql.api.benchmark_api import BenchmarkAPI
 
 
 class NL2SQL:
@@ -71,6 +73,8 @@ class NL2SQL:
         self.auth = AuthAPI(self._ctx)
         self.settings = SettingsAPI(self._ctx)
         self.results = ResultAPI(self._ctx)
+        self.policy = PolicyAPI(self._ctx)
+        self.benchmark = BenchmarkAPI(self._ctx)
 
     @property
     def context(self) -> NL2SQLContext:

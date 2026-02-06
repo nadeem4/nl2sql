@@ -116,6 +116,8 @@ The engine provides modular APIs for different functionality areas:
 - `engine.auth` - Authentication and RBAC API (`check_permissions`, `get_allowed_resources`, etc.)
 - `engine.settings` - Configuration and settings API (`get_current_settings`, `validate_configuration`, etc.)
 - `engine.results` - Result management API (`store_query_result`, `retrieve_query_result`, etc.)
+- `engine.policy` - Policy validation API (`validate_policies`, etc.)
+- `engine.benchmark` - Benchmarking API (`run_matrix`, etc.)
 
 For complete Core API documentation, see `docs/api/core.md` in this repo
 or the API section of the published MkDocs site.
@@ -128,7 +130,8 @@ The public API exports the following classes and types:
 - `QueryResult` - Query result container
 - `UserContext` - User authentication context
 - `ErrorSeverity`, `ErrorCode`, `PipelineError` - Error handling types
-- `QueryAPI`, `DatasourceAPI`, `LLM_API`, `IndexingAPI`, `AuthAPI`, `SettingsAPI`, `ResultAPI` - Modular API classes
+- `QueryAPI`, `DatasourceAPI`, `LLM_API`, `IndexingAPI`, `AuthAPI`, `SettingsAPI`, `ResultAPI`, `PolicyAPI`, `BenchmarkAPI` - Modular API classes
+- `BenchmarkConfig` - Benchmark configuration model
 
 ## 📦 Installation
 
@@ -207,7 +210,9 @@ src/nl2sql/
 │   ├── indexing_api.py  # Schema indexing API
 │   ├── auth_api.py      # Authentication API
 │   ├── settings_api.py  # Settings API
-│   └── result_api.py    # Result management API
+│   ├── result_api.py    # Result management API
+│   ├── policy_api.py    # Policy validation API
+│   └── benchmark_api.py # Benchmarking API
 ├── auth/                # Authentication and RBAC
 ├── common/              # Common utilities and settings
 ├── configs/             # Configuration management

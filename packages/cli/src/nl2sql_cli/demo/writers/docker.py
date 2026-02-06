@@ -23,14 +23,19 @@ class DockerWriter:
         output_dir.mkdir(parents=True, exist_ok=True)
         
         # Unpack
-        factories, mtypes, shifts = ref_data
+        factories, mtypes, shifts, departments, roles, segments = ref_data
         employees, machines, logs = ops_data
-        products, suppliers, inventory = supply_data
+        products, suppliers, inventory, supplier_products = supply_data
         orders, items, runs = history_data
         
         # 1. SQL Scripts
         DockerWriter._write_sql(output_dir / "init_ref.sql", REF_SQL_POSTGRES, secrets["DEMO_REF_PASSWORD"], "ref_admin", "manufacturing_ref", {
-            "factories": factories, "machine_types": mtypes, "shifts": shifts
+            "factories": factories,
+            "machine_types": mtypes,
+            "shifts": shifts,
+            "departments": departments,
+            "employee_roles": roles,
+            "customer_segments": segments
         })
         
         DockerWriter._write_sql(output_dir / "init_ops.sql", OPS_SQL_POSTGRES, secrets["DEMO_OPS_PASSWORD"], "ops_admin", "manufacturing_ops", {
@@ -38,7 +43,7 @@ class DockerWriter:
         })
         
         DockerWriter._write_mysql(output_dir / "init_supply.sql", SUPPLY_SQL_MYSQL, {
-            "products": products, "suppliers": suppliers, "inventory": inventory
+            "products": products, "suppliers": suppliers, "inventory": inventory, "supplier_products": supplier_products
         })
         
         DockerWriter._write_mssql(output_dir / "init_history.sql", HISTORY_SQL_MSSQL, secrets, {

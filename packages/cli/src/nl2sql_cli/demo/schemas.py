@@ -20,6 +20,19 @@ CREATE TABLE shifts (
     start_time TEXT,
     end_time TEXT
 );
+CREATE TABLE departments (
+    id SERIAL PRIMARY KEY,
+    name TEXT
+);
+CREATE TABLE employee_roles (
+    id SERIAL PRIMARY KEY,
+    title TEXT,
+    department_id INTEGER
+);
+CREATE TABLE customer_segments (
+    id SERIAL PRIMARY KEY,
+    name TEXT
+);
 """
 
 REF_SQL_SQLITE = """
@@ -41,6 +54,19 @@ CREATE TABLE shifts (
     start_time TEXT,
     end_time TEXT
 );
+CREATE TABLE departments (
+    id INTEGER PRIMARY KEY,
+    name TEXT
+);
+CREATE TABLE employee_roles (
+    id INTEGER PRIMARY KEY,
+    title TEXT,
+    department_id INTEGER
+);
+CREATE TABLE customer_segments (
+    id INTEGER PRIMARY KEY,
+    name TEXT
+);
 """
 
 OPS_SQL_POSTGRES = """
@@ -48,21 +74,28 @@ CREATE TABLE employees (
     id SERIAL PRIMARY KEY,
     name TEXT,
     factory_id INTEGER,
-    shift_id INTEGER
+    shift_id INTEGER,
+    hire_date DATE,
+    role_id INTEGER,
+    department_id INTEGER,
+    status TEXT
 );
 CREATE TABLE machines (
     id SERIAL PRIMARY KEY,
     factory_id INTEGER,
     type_id INTEGER,
     status TEXT DEFAULT 'Active',
-    installation_date DATE
+    installation_date DATE,
+    last_maintenance_date DATE
 );
 CREATE TABLE maintenance_logs (
     id SERIAL PRIMARY KEY,
     machine_id INTEGER,
     date DATE,
     description TEXT,
-    technician_id INTEGER
+    technician_id INTEGER,
+    severity TEXT,
+    downtime_hours INTEGER
 );
 """
 
@@ -71,21 +104,28 @@ CREATE TABLE employees (
     id INTEGER PRIMARY KEY,
     name TEXT,
     factory_id INTEGER,
-    shift_id INTEGER
+    shift_id INTEGER,
+    hire_date DATE,
+    role_id INTEGER,
+    department_id INTEGER,
+    status TEXT
 );
 CREATE TABLE machines (
     id INTEGER PRIMARY KEY,
     factory_id INTEGER,
     type_id INTEGER,
     status TEXT,
-    installation_date DATE
+    installation_date DATE,
+    last_maintenance_date DATE
 );
 CREATE TABLE maintenance_logs (
     id INTEGER PRIMARY KEY,
     machine_id INTEGER,
     date DATE,
     description TEXT,
-    technician_id INTEGER
+    technician_id INTEGER,
+    severity TEXT,
+    downtime_hours INTEGER
 );
 """
 
@@ -106,7 +146,13 @@ CREATE TABLE inventory (
     product_id INT,
     factory_id INT,
     quantity INT,
+    last_updated DATE,
     PRIMARY KEY (product_id, factory_id)
+);
+CREATE TABLE supplier_products (
+    supplier_id INT,
+    product_id INT,
+    PRIMARY KEY (supplier_id, product_id)
 );
 """
 
@@ -127,7 +173,13 @@ CREATE TABLE inventory (
     product_id INTEGER,
     factory_id INTEGER,
     quantity INTEGER,
+    last_updated DATE,
     PRIMARY KEY (product_id, factory_id)
+);
+CREATE TABLE supplier_products (
+    supplier_id INTEGER,
+    product_id INTEGER,
+    PRIMARY KEY (supplier_id, product_id)
 );
 """
 
@@ -136,20 +188,26 @@ CREATE TABLE sales_orders (
     id INT IDENTITY(1,1) PRIMARY KEY,
     customer_name NVARCHAR(255),
     order_date DATE,
-    total_amount DECIMAL(12,2)
+    total_amount DECIMAL(12,2),
+    status NVARCHAR(50),
+    customer_segment_id INT,
+    factory_id INT
 );
 CREATE TABLE sales_items (
     id INT IDENTITY(1,1) PRIMARY KEY,
     order_id INT,
     product_id INT,
     quantity INT,
-    unit_price DECIMAL(10,2)
+    unit_price DECIMAL(10,2),
+    discount_pct DECIMAL(5,2)
 );
 CREATE TABLE production_runs (
     id INT IDENTITY(1,1) PRIMARY KEY,
     factory_id INT,
     date DATE,
-    output_quantity INT
+    output_quantity INT,
+    shift_id INT,
+    status NVARCHAR(50)
 );
 """
 
@@ -158,20 +216,26 @@ CREATE TABLE sales_orders (
     id INTEGER PRIMARY KEY,
     customer_name TEXT,
     order_date DATE,
-    total_amount REAL
+    total_amount REAL,
+    status TEXT,
+    customer_segment_id INTEGER,
+    factory_id INTEGER
 );
 CREATE TABLE sales_items (
     id INTEGER PRIMARY KEY,
     order_id INTEGER,
     product_id INTEGER,
     quantity INTEGER,
-    unit_price REAL
+    unit_price REAL,
+    discount_pct REAL
 );
 CREATE TABLE production_runs (
     id INTEGER PRIMARY KEY,
     factory_id INTEGER,
     date DATE,
-    output_quantity INTEGER
+    output_quantity INTEGER,
+    shift_id INTEGER,
+    status TEXT
 );
 """
 

@@ -6,24 +6,34 @@ Provides functionality for executing natural language queries against databases.
 
 from __future__ import annotations
 
-from typing import Optional, List
-from dataclasses import dataclass
+from typing import Optional, List, Dict, Any
 
+from pydantic import BaseModel, Field
 from nl2sql.context import NL2SQLContext
 from nl2sql.pipeline.runtime import run_with_graph
 from nl2sql.auth import UserContext
+from nl2sql.execution.contracts import ArtifactRef
 
 
-@dataclass
-class QueryResult:
+class SubQueryResult(BaseModel):
+    """Represents the result of a sub-query execution."""
+    id: str = Field(default="")
+    intent: str = Field(default="")
+    sql: str = Field(default="")
+    query: str = Field(default="")
+    datasource_id: str = Field(default="")
+    schema_version: str = Field(default="")
+
+
+class QueryResult(BaseModel):
     """Represents the result of a query execution."""
-    sql: Optional[str] = None
-    results: list = None
-    final_answer: Optional[str] = None
-    errors: list = None
-    trace_id: Optional[str] = None
-    reasoning: List[dict] = None
-    warnings: List[dict] = None
+    sub_queries: List[SubQueryResult] = Field(default_factory=list)
+    final_answer: Optional[Dict[str, str]] = None
+    errors: List[str] = Field(default_factory=list)
+    trace_id: str = Field(default="")
+    reasoning: List[dict] = Field(default_factory=list)
+    warnings: List[dict] = Field(default_factory=list)
+    artifact_refs: Dict[str, ArtifactRef] = Field(default_factory=dict)
 
 
 class QueryAPI:
@@ -40,7 +50,7 @@ class QueryAPI:
         datasource_id: Optional[str] = None,
         execute: bool = True,
         user_context: Optional[UserContext] = None,
-    ) -> QueryResult:
+    ) -> Dict[str, Any]:
         """
         Execute a natural language query against the database.
         
@@ -51,7 +61,7 @@ class QueryAPI:
             user_context: Optional user context for permissions
             
         Returns:
-            QueryResult containing the results of the query execution
+            Raw graph state dict from the pipeline execution
         """
         result_dict = run_with_graph(
             self._ctx,
@@ -60,4 +70,4 @@ class QueryAPI:
             execute=execute,
             user_context=user_context
         )
-        return QueryResult(**result_dict)
+        return result_dict

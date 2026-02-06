@@ -12,6 +12,7 @@ to use the platform:
 - [PyPI (Python API)](pypi.md)
 - [Docker (REST API)](docker.md)
 - [From Source (Development)](source.md)
+- [Demo Data (CLI-first)](demo.md)
 
 ## Configuration prerequisites
 

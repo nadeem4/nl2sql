@@ -8,12 +8,9 @@ from typing import Optional, List
 from typing_extensions import Annotated
 
 # Core Library Imports
-from nl2sql.datasources import DatasourceRegistry
-from nl2sql.configs import ConfigManager
-from nl2sql.llm import LLMRegistry
-from nl2sql.indexing.vector_store import VectorStore
 from nl2sql.common.logger import configure_logging
 from nl2sql.context import NL2SQLContext
+from nl2sql import BenchmarkConfig
 
 # Local CLI Imports
 from nl2sql_cli.commands.indexing import run_indexing
@@ -24,7 +21,7 @@ from nl2sql_cli.commands.doctor import doctor_command
 from nl2sql_cli.commands.setup import setup_command
 from nl2sql_cli.commands.install import install_command
 from nl2sql_cli.commands.policy import app as policy_app
-from nl2sql_cli.types import RunConfig, BenchmarkConfig
+from nl2sql_cli.types import RunConfig
 
 app = typer.Typer(
     name="nl2sql",
@@ -149,21 +146,19 @@ def benchmark(
 
     bench_run_config = BenchmarkConfig(
         dataset_path=dataset,
-        config_path=config,
-        bench_config_path=bench_config,
+        config_path=ds_config_path,
+        bench_config_path=bench_config_path,
         llm_config_path=None, # Matrix uses bench_config
         iterations=iterations,
         routing_only=routing_only,
         include_ids=include_ids,
         export_path=export_path,
-        vector_store_path=vector_store,
-        stub_llm=False
+        vector_store_path=vector_store_path,
+        secrets_path=secrets_config_path,
+        stub_llm=False,
     )
     
-
-    ctx = NL2SQLContext(ds_config_path, secrets_config_path, llm_config_path, vector_store_path)
-    
-    exec_benchmark(bench_run_config, ctx.registry, ctx.vector_store)
+    exec_benchmark(bench_run_config)
 
 
 def main():

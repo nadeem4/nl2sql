@@ -137,6 +137,28 @@ result = run_with_graph(ctx, "Top 5 customers by revenue last quarter?")
 print(result.get("final_answer"))
 ```
 
+## 🧪 Demo data (CLI-only)
+
+Use the CLI to generate deterministic demo data and configs, then point the API at the generated files.
+
+1. Generate demo data + configs:
+
+```bash
+nl2sql setup --demo --lite
+```
+
+2. Start the API with demo settings:
+
+```bash
+# Option A: load .env.demo via ENV
+ENV=demo uvicorn nl2sql_api.main:app
+
+# Option B: load a specific env file
+ENV_FILE_PATH=.env.demo uvicorn nl2sql_api.main:app
+```
+
+The demo datasource file uses relative paths (e.g. `data/demo_lite/*.db`), so start the API from the repo root.
+
 ## 🔖 Versioning Policy
 
 NL2SQL uses unified versioning across the monorepo. Core, adapters, API, and CLI

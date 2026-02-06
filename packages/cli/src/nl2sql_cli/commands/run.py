@@ -6,7 +6,7 @@ from nl2sql.datasources import DatasourceRegistry
 from nl2sql.llm import LLMRegistry
 from nl2sql.indexing.vector_store import VectorStore
 from nl2sql_cli.reporting import ConsolePresenter
-from nl2sql.runners.pipeline_runner import PipelineRunner
+from nl2sql.pipeline.pipeline_runner import PipelineRunner
 from nl2sql.common.settings import settings
 from nl2sql_cli.types import RunConfig
 from nl2sql_cli.common.decorators import handle_cli_errors

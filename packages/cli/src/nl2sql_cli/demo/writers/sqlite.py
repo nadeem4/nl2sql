@@ -22,16 +22,19 @@ class SQLiteWriter:
         output_dir.mkdir(parents=True, exist_ok=True)
         
         # Unpack Data
-        factories, mtypes, shifts = ref_data
+        factories, mtypes, shifts, departments, roles, segments = ref_data
         employees, machines, logs = ops_data
-        products, suppliers, inventory = supply_data
+        products, suppliers, inventory, supplier_products = supply_data
         orders, items, runs = history_data
         
         # 1. Ref
         SQLiteWriter._create_db(output_dir / "manufacturing_ref.db", REF_SQL_SQLITE, {
             "factories": factories,
             "machine_types": mtypes,
-            "shifts": shifts
+            "shifts": shifts,
+            "departments": departments,
+            "employee_roles": roles,
+            "customer_segments": segments
         })
         
         # 2. Ops
@@ -45,7 +48,8 @@ class SQLiteWriter:
         SQLiteWriter._create_db(output_dir / "manufacturing_supply.db", SUPPLY_SQL_SQLITE, {
             "products": products,
             "suppliers": suppliers,
-            "inventory": inventory
+            "inventory": inventory,
+            "supplier_products": supplier_products
         })
         
         # 4. History

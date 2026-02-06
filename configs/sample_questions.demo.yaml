@@ -3,20 +3,35 @@ manufacturing_ref:
 - Show me the capacity of Berlin Plant
 - What shifts are available?
 - List all machine types produced by TechCorp
+- Which factories have capacity greater than 4000?
+- Show all employee roles in the Maintenance department
+- List customer segments available for reporting
 manufacturing_ops:
 - Show me active employees in the Austin Gigafactory
 - Which machines have error logs in the last 7 days?
 - Who is the operator for machine 5?
 - Count the number of active machines per factory
 - List maintenance logs for Vibration sensor alerts
+- Which machines are overdue for maintenance based on last_maintenance_date?
+- Show employees hired in the last 12 months
+- Compare machine status counts by factory
+- List maintenance technicians with the most downtime hours logged
 manufacturing_supply:
 - Total sales amount for 'Industrial Controller'
 - Find suppliers for high value components
 - Check inventory levels for 'Bolt M5' in Berlin
 - List products with base cost greater than 500
 - Show me suppliers from Germany
+- List products with low inventory across all factories
+- Which suppliers provide EV Battery Pack Long Range?
+- Show inventory last updated more than 7 days ago
+- Compare inventory levels for Hardware category products
 manufacturing_history:
 - Show total sales orders in Q4
 - Calculate average production output per run
 - Summarize sales by customer for last year
 - List the top 5 largest orders
+- Show sales orders by status for the last 30 days
+- Compare production output by factory over the last quarter
+- List highest revenue products by month
+- Show average discount percentage by customer segment
