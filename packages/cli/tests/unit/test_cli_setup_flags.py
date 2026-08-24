@@ -1,10 +1,25 @@
 from __future__ import annotations
 
+import re
+
 from typer.testing import CliRunner
 
 from nl2sql_cli.main import app
 
 runner = CliRunner()
+
+_ANSI = re.compile(r"\x1b\[[0-9;]*m")
+
+
+def _plain(output: str) -> str:
+    """Strip ANSI styling from CLI output.
+
+    Rich highlights option names in error text and splits the token while doing
+    so -- ``--lite`` is emitted as ``-`` + reset + ``-lite``. A raw substring
+    check therefore passes locally, where colour is off because stdout is not a
+    terminal, and fails in CI, where colour is on.
+    """
+    return _ANSI.sub("", output)
 
 
 def test_lite_flag_is_accepted(monkeypatch):
@@ -51,4 +66,6 @@ def test_lite_and_docker_together_is_an_error(monkeypatch):
     result = runner.invoke(app, ["setup", "--demo", "--lite", "--docker"])
 
     assert result.exit_code != 0
-    assert "--lite" in result.output and "--docker" in result.output
+    output = _plain(result.output)
+    assert "mutually exclusive" in output
+    assert "--lite" in output and "--docker" in output
