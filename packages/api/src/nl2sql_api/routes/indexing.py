@@ -8,7 +8,7 @@ router = APIRouter()
 IndexingSvc = Annotated[IndexingService, Depends(get_indexing_service)]
 
 @router.post("/index/{datasource_id}", response_model=Dict[str, Any])
-async def index_datasource(
+def index_datasource(
     datasource_id: str,
     service: IndexingSvc
 ):
@@ -29,7 +29,7 @@ async def index_datasource(
 
 
 @router.post("/index-all", response_model=Dict[str, Any])
-async def index_all_datasources(
+def index_all_datasources(
     service: IndexingSvc
 ):
     try:
@@ -48,7 +48,7 @@ async def index_all_datasources(
 
 
 @router.delete("/index", response_model=Dict[str, Any])
-async def clear_index(
+def clear_index(
     service: IndexingSvc
 ):
     try:
@@ -61,7 +61,7 @@ async def clear_index(
 
 
 @router.get("/index/status", response_model=Dict[str, Any])
-async def get_index_status(
+def get_index_status(
     service: IndexingSvc
 ):
     try:
