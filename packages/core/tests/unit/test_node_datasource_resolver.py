@@ -200,3 +200,32 @@ def test_datasource_resolver_missing_datasource_id():
     result = node(GraphState(user_query="q", user_context=UserContext()))
 
     assert result["errors"][0].error_code == ErrorCode.SCHEMA_RETRIEVAL_FAILED
+
+
+def test_datasource_resolver_explicit_datasource_override():
+    # Validates the explicit override path because --ds-id / API datasource_id must
+    # resolve a registered, allowed datasource and populate schema_version.
+    ctx = SimpleNamespace(
+        vector_store=SimpleNamespace(
+            retrieve_datasource_candidates=lambda *_a, **_k: []
+        ),
+        rbac=SimpleNamespace(get_allowed_datasources=lambda _ctx: ["ds1"]),
+        ds_registry=SimpleNamespace(
+            get_capabilities=lambda _id: {"supports_sql"},
+            list_ids=lambda: ["ds1"],
+        ),
+        schema_store=SimpleNamespace(get_latest_version=lambda _id: "v7"),
+    )
+    node = DatasourceResolverNode(ctx)
+
+    result = node(
+        GraphState(user_query="q", user_context=UserContext(), datasource_id="ds1")
+    )
+
+    assert "errors" not in result
+    response = result["datasource_resolver_response"]
+    assert response.allowed_datasource_ids == ["ds1"]
+    assert len(response.resolved_datasources) == 1
+    resolved = response.resolved_datasources[0]
+    assert resolved.datasource_id == "ds1"
+    assert resolved.schema_version == "v7"
