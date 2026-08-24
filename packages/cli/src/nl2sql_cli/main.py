@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Unified CLI for the NL2SQL Ecosystem."""
 import typer
+import os
 import sys
 import pathlib
 import json
@@ -9,6 +10,7 @@ from typing_extensions import Annotated
 
 # Core Library Imports
 from nl2sql.common.logger import configure_logging
+from nl2sql.common.settings import reload_settings
 from nl2sql.context import NL2SQLContext
 from nl2sql import BenchmarkConfig
 
@@ -39,11 +41,23 @@ VectorStoreOption = Annotated[Optional[str], typer.Option("--vector-store", help
 
 
 @app.callback()
-def global_callback(ctx: typer.Context):
+def global_callback(
+    ctx: typer.Context,
+    env: Annotated[Optional[str], typer.Option("--env", help="Environment name to load (.env.<name>)")] = None,
+    env_file: Annotated[Optional[pathlib.Path], typer.Option("--env-file", help="Explicit path to an env file (wins over --env)")] = None,
+):
     """
     NL2SQL CLI Entry Point.
     """
-    return
+    # `settings` is built when nl2sql.common.settings is first imported, which
+    # happens above. Setting the variables is therefore not enough on its own;
+    # the singleton has to be refreshed before any command builds a context.
+    if env:
+        os.environ["ENV"] = env
+    if env_file:
+        os.environ["ENV_FILE_PATH"] = str(env_file)
+    if env or env_file:
+        reload_settings()
 
 @app.command()
 def run(
@@ -102,14 +116,17 @@ def doctor():
 def setup(
     demo: Annotated[bool, typer.Option("--demo", help="Quickstart specific demo environment")] = False,
     docker: Annotated[bool, typer.Option("--docker", help="Use Docker for demo (Full fidelity)")] = False,
+    lite: Annotated[bool, typer.Option("--lite", help="Use local SQLite files for the demo (default)")] = False,
     api_key: Annotated[Optional[str], typer.Option("--api-key", help="API Key for LLM provider (e.g. OpenAI)")] = None,
 ):
     """
     Interactive setup wizard for first-time users.
     """
-    # If Docker provided, lite is False. If not provided, lite is True (default).
-    lite = not docker
-    setup_command(demo=demo, lite=lite, docker=docker, api_key=api_key)
+    if lite and docker:
+        raise typer.BadParameter("--lite and --docker are mutually exclusive; pick one.")
+
+    # Lite is the default: it only turns off when --docker is requested.
+    setup_command(demo=demo, lite=not docker, docker=docker, api_key=api_key)
 
 
 @app.command()
