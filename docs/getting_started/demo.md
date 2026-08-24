@@ -38,6 +38,31 @@ This writes:
 
 For the lite demo, setup also runs schema indexing once automatically.
 
+### API keys in the demo
+
+`.env.demo` is generated with `EMBEDDING_PROVIDER=local`, so schema chunks are
+embedded with the key-free ONNX `all-MiniLM-L6-v2` model bundled with chromadb
+instead of the OpenAI embeddings API. The first indexing run downloads roughly
+79 MB of model files into a local cache, which can take a few minutes.
+
+This covers the embedding step only. The demo is **not** key-free end to end:
+
+- `nl2sql --env demo run "..."` calls a chat model, so it needs a working LLM key
+  (`OPENAI_API_KEY`, or an OpenRouter key with `configs/llm.demo.yaml` pointed at
+  `provider: openrouter`).
+- Indexing also runs an optional LLM enrichment pass over the schema. Without a
+  usable chat key that pass logs an error and is skipped; the chunks are still
+  indexed, but with no LLM-generated descriptions.
+- `NL2SQLContext` builds its LLM clients eagerly, so `nl2sql setup --demo` and
+  `nl2sql --env demo index` currently still fail if `.env.demo` has no chat key
+  at all. Fill in `OPENAI_API_KEY` in `.env.demo` before running them.
+
+Because the demo indexes with `local` and the default environment indexes with
+`openai`, the two use different vector dimensions. `.env.demo` keeps its own
+`VECTOR_STORE=data/vector_store_demo` directory, so they do not collide. If you
+change `EMBEDDING_PROVIDER` for an existing store, re-run `nl2sql index` — the
+store otherwise raises `EmbeddingDimensionMismatchError`.
+
 ## 3. Use demo data with the CLI
 
 ```bash

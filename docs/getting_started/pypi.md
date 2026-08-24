@@ -114,8 +114,11 @@ default:
   api_key: ${env:OPENROUTER_API_KEY}
 ```
 
-Note that OpenRouter serves chat completions only. Embeddings still go through
-OpenAI, so `nl2sql index` needs `OPENAI_API_KEY` set as well.
+Note that OpenRouter serves chat completions only. Embeddings are selected
+separately with `EMBEDDING_PROVIDER`: the default `openai` means `nl2sql index`
+needs `OPENAI_API_KEY` set as well, while `EMBEDDING_PROVIDER=local` embeds with
+a key-free ONNX model (see
+[System configuration → Embeddings](../configuration/system.md#embeddings)).
 
 See [LLM config](../configuration/llm.md) for full schema details.
 

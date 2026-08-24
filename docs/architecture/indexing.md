@@ -106,10 +106,14 @@ Current failure behaviors:
 - Vector retrieval errors in `SchemaRetrieverNode` return empty results with warnings.
 - If no candidates are found, the retriever falls back to full schema snapshot.
 - Enrichment failures return the original snapshot without enrichment.
+- Retrieving from a vector store whose persisted vectors do not match the
+  configured embedding provider raises `EmbeddingDimensionMismatchError`. The check
+  is on the read path only, so a re-index clears the collection and recovers.
 
 ## Performance characteristics (current)
 
-- Embedding uses OpenAI embeddings via `EmbeddingService`.
+- Embedding uses `EmbeddingService`: OpenAI embeddings by default, or the local
+  ONNX `all-MiniLM-L6-v2` model when `EMBEDDING_PROVIDER=local`.
 - Vector search uses Chroma MMR (`lambda_mult=0.7`, `fetch_k = 4*k`).
 - No caching or sharding layers are implemented.
 - Index refresh is full reindex per schema snapshot.

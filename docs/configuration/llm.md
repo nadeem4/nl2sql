@@ -85,20 +85,20 @@ default:
 
 ### OpenRouter does not cover embeddings
 
-OpenRouter serves chat completions only. `EmbeddingService` still builds
-`OpenAIEmbeddings` from `settings.openai_api_key`, so **`nl2sql index` continues
-to require a real `OPENAI_API_KEY`** even when every chat call runs through
-OpenRouter. Choosing OpenRouter changes which models answer questions; it does
-not remove the OpenAI dependency for indexing and schema retrieval.
-
-Set both keys when using OpenRouter:
+OpenRouter serves chat completions only. Embeddings are not routed through
+`LLMRegistry`; they come from `EmbeddingService`, which is selected with the
+`EMBEDDING_PROVIDER` environment variable:
 
 ```bash
 OPENROUTER_API_KEY=sk-or-...   # chat completions
-OPENAI_API_KEY=sk-...          # embeddings for `nl2sql index`
+OPENAI_API_KEY=sk-...          # embeddings, when EMBEDDING_PROVIDER=openai (default)
 ```
 
-A local-embeddings option is planned separately.
+Set `EMBEDDING_PROVIDER=local` to embed with the key-free ONNX
+`all-MiniLM-L6-v2` model bundled with chromadb, and no `OPENAI_API_KEY` is needed
+for the embedding step. Chat still requires a provider key, and switching
+embedding providers requires a re-index. See
+[System configuration → Embeddings](system.md#embeddings).
 
 ## Notes
 
