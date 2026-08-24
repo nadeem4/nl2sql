@@ -14,7 +14,7 @@ tests, documentation, and adapter development.
 
 ## Prerequisites
 
-- Python 3.10+
+- Python 3.9+
 - Docker (required for integration tests that spin up databases)
 
 ## Local setup
