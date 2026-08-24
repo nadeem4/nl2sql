@@ -56,7 +56,7 @@ def test_aggregator_filters_rows_deterministically(monkeypatch):
                 path_template=settings.result_artifact_path_template,
             )
         )
-        artifact = store.write_result_frame(
+        artifact = store.create_artifact_ref(
             ResultFrame.from_row_dicts([{"id": 1, "value": 5}, {"id": 2, "value": 20}]),
             {
                 "tenant_id": "t1",
@@ -118,21 +118,21 @@ def test_aggregator_join_requires_keys(monkeypatch):
                 path_template=settings.result_artifact_path_template,
             )
         )
-        left_artifact = store.write_result_frame(
+        left_artifact = store.create_artifact_ref(
             ResultFrame.from_row_dicts([{"id": 1}]),
             {
                 "tenant_id": "t1",
-                "request_id": "r1",
+                "request_id": "r1_left",
                 "subgraph_name": "sql_agent",
                 "dag_node_id": "sq_left",
                 "schema_version": "v1",
             },
         )
-        right_artifact = store.write_result_frame(
+        right_artifact = store.create_artifact_ref(
             ResultFrame.from_row_dicts([{"id": 1}]),
             {
                 "tenant_id": "t1",
-                "request_id": "r1",
+                "request_id": "r1_right",
                 "subgraph_name": "sql_agent",
                 "dag_node_id": "sq_right",
                 "schema_version": "v1",
@@ -202,7 +202,7 @@ def test_aggregator_post_aggregate_sum(monkeypatch):
                 path_template=settings.result_artifact_path_template,
             )
         )
-        artifact = store.write_result_frame(
+        artifact = store.create_artifact_ref(
             ResultFrame.from_row_dicts([{"value": 5}, {"value": 7}]),
             {
                 "tenant_id": "t1",
@@ -273,7 +273,7 @@ def test_aggregator_post_sort_limit(monkeypatch):
                 path_template=settings.result_artifact_path_template,
             )
         )
-        artifact = store.write_result_frame(
+        artifact = store.create_artifact_ref(
             ResultFrame.from_row_dicts([{"value": 1}, {"value": 3}, {"value": 2}]),
             {
                 "tenant_id": "t1",
@@ -332,21 +332,21 @@ def test_aggregator_union_combines_rows(monkeypatch):
                 path_template=settings.result_artifact_path_template,
             )
         )
-        left_artifact = store.write_result_frame(
+        left_artifact = store.create_artifact_ref(
             ResultFrame.from_row_dicts([{"id": 1}]),
             {
                 "tenant_id": "t1",
-                "request_id": "r1",
+                "request_id": "r1_left",
                 "subgraph_name": "sql_agent",
                 "dag_node_id": "sq_left",
                 "schema_version": "v1",
             },
         )
-        right_artifact = store.write_result_frame(
+        right_artifact = store.create_artifact_ref(
             ResultFrame.from_row_dicts([{"id": 2}]),
             {
                 "tenant_id": "t1",
-                "request_id": "r1",
+                "request_id": "r1_right",
                 "subgraph_name": "sql_agent",
                 "dag_node_id": "sq_right",
                 "schema_version": "v1",

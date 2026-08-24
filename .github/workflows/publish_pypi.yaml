@@ -24,32 +24,14 @@ jobs:
         python -m pip install --upgrade pip
         pip install build twine
 
-    - name: Build Adapter SDK
-      run: python -m build packages/adapter-sdk
-
-    - name: Build Adapter SQLAlchemy
-      run: python -m build packages/adapter-sqlalchemy
-
-    - name: Build Adapter MSSQL
-      run: python -m build packages/adapters/mssql
-
-    - name: Build Adapter MySQL
-      run: python -m build packages/adapters/mysql
-
-    - name: Build Adapter Postgres
-      run: python -m build packages/adapters/postgres
-
-    - name: Build Adapter SQLite
-      run: python -m build packages/adapters/sqlite
-
-    - name: Build Core
-      run: python -m build packages/core
-
-    - name: Build CLI
-      run: python -m build packages/cli
+    - name: Build all distributions
+      run: |
+        for pkg in packages/adapter-sdk packages/adapter-sqlalchemy packages/core packages/cli packages/api packages/adapters/mssql packages/adapters/mysql packages/adapters/postgres packages/adapters/sqlite; do
+          python -m build "$pkg" --outdir dist
+        done
 
     - name: Publish distributions to PyPI
       uses: pypa/gh-action-pypi-publish@release/v1
       with:
-        packages-dir: packages/*/dist/
+        packages-dir: dist/
         # note: 'password' is not needed with trusted publishing

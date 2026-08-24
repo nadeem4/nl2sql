@@ -158,7 +158,7 @@ class DatasourceResolverNode:
                 resolved = ResolvedDatasource(
                     datasource_id=state.datasource_id,
                     metadata={},
-                    schema_version=self._get_latest_schema_version(state.datasource_id),
+                    schema_version=self.schema_store.get_latest_version(state.datasource_id),
                 )
                 allowed_ids = self._get_allowed_datasource_ids(
                     state.user_context,

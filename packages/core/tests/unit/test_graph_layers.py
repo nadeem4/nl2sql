@@ -1,4 +1,4 @@
-from nl2sql.pipeline.graph import _next_scan_layer_ids
+from nl2sql.pipeline.graph_utils import next_scan_layer_ids
 from nl2sql.pipeline.nodes.global_planner.schemas import (
     ExecutionDAG,
     LogicalNode,
@@ -32,6 +32,6 @@ def test_next_scan_layer_ids_respects_existing_results():
     )
 
     # Act / Assert
-    assert _next_scan_layer_ids(dag, {}) == ["sq_left", "sq_right"]
-    assert _next_scan_layer_ids(dag, {"sq_left": "r1"}) == ["sq_right"]
-    assert _next_scan_layer_ids(dag, {"sq_left": "r1", "sq_right": "r2"}) == []
+    assert next_scan_layer_ids(dag, {}) == ["sq_left", "sq_right"]
+    assert next_scan_layer_ids(dag, {"sq_left": "r1"}) == ["sq_right"]
+    assert next_scan_layer_ids(dag, {"sq_left": "r1", "sq_right": "r2"}) == []
