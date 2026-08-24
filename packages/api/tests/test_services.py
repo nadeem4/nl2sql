@@ -1,3 +1,5 @@
+"""Service-layer tests (ported from packages/api/test_services_updates.py)."""
+
 from nl2sql_api.models.datasource import DatasourceRequest
 from nl2sql_api.models.llm import LLMRequest
 from nl2sql_api.services.datasource import DatasourceService
