@@ -18,6 +18,11 @@ Configuration is split into **environment variables** (runtime settings) and **f
 | `VECTOR_STORE` | `./chroma_db` | Persist directory for the vector store. |
 | `VECTOR_STORE_COLLECTION` | `nl2sql_store` | Collection name for schema embeddings. |
 
+`NL2SQLContext` validates the vector store configuration before it loads secrets or
+builds the datasource and LLM registries. A blank `VECTOR_STORE_COLLECTION`, or a blank
+`VECTOR_STORE` with no explicit `vector_store_path` argument, raises `ValueError` at
+construction time instead of failing later during setup.
+
 ### Storage
 
 | Env var | Default | Description |
