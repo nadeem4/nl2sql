@@ -215,11 +215,14 @@ result = engine.run_query(
 )
 
 print(result.final_answer)
-print(result.sql)
+for sub_query in result.sub_queries:
+    print(sub_query.datasource_id, sub_query.sql)
 ```
 
-The `QueryResult` includes `sql`, `results`, `final_answer`, `errors`,
-`warnings`, and a `trace_id` for observability.
+The `QueryResult` includes `sub_queries` (each with its generated `sql`),
+`final_answer`, `errors`, `warnings`, `artifact_refs`, and a `trace_id` for
+observability. Result rows are not inlined; they live in artifact storage and are
+addressed through `artifact_refs`.
 
 ## Lifecycle (configure → index → query)
 

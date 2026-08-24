@@ -1,4 +1,3 @@
-from typing import Dict, Any, Optional
 from nl2sql import NL2SQL
 from nl2sql_api.models.query import QueryRequest, QueryResponse
 from nl2sql.auth.models import UserContext
@@ -18,16 +17,18 @@ class QueryService:
             request.natural_language,
             datasource_id=request.datasource_id,
             execute=request.execute,
-            user_context=user_context
+            user_context=user_context,
         )
 
-        # Map the result to QueryResponse
         return QueryResponse(
-            sql=result.sql,
-            results=result.results or [],
+            sub_queries=[sub_query.model_dump() for sub_query in result.sub_queries],
             final_answer=result.final_answer,
-            errors=result.errors or [],
+            errors=result.errors,
             trace_id=result.trace_id,
-            reasoning=result.reasoning or [],
-            warnings=result.warnings or []
+            reasoning=result.reasoning,
+            warnings=result.warnings,
+            artifact_refs={
+                node_id: ref.model_dump(mode="json")
+                for node_id, ref in result.artifact_refs.items()
+            },
         )

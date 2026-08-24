@@ -11,7 +11,7 @@ DatasourceSvc = Annotated[DatasourceService, Depends(get_datasource_service)]
 
 
 @router.post("/datasource", response_model=DatasourceResponse)
-async def add_datasource(
+def add_datasource(
     payload: DatasourceRequest,
     service: DatasourceSvc,
 ):
@@ -22,7 +22,7 @@ async def add_datasource(
 
 
 @router.get("/datasource", response_model=Dict[str, Any])
-async def list_datasources(
+def list_datasources(
     service: DatasourceSvc,
 ):
     try:
@@ -32,7 +32,7 @@ async def list_datasources(
 
 
 @router.get("/datasource/{datasource_id}", response_model=Dict[str, Any])
-async def get_datasource(
+def get_datasource(
     datasource_id: str,
     service: DatasourceSvc,
 ):
@@ -45,7 +45,7 @@ async def get_datasource(
 
 
 @router.delete("/datasource/{datasource_id}", response_model=Dict[str, Any])
-async def remove_datasource(
+def remove_datasource(
     datasource_id: str,
     service: DatasourceSvc,
 ):

@@ -10,7 +10,7 @@ router = APIRouter()
 LLMSvc = Annotated[LLMService, Depends(get_llm_service)]
 
 @router.post("/llm", response_model=LLMResponse)
-async def configure_llm(
+def configure_llm(
     payload: LLMRequest,
     service: LLMSvc,
 ):
@@ -21,7 +21,7 @@ async def configure_llm(
 
 
 @router.get("/llm", response_model=Dict[str, Any])
-async def list_llms(
+def list_llms(
     service: LLMSvc,
 ):
     try:
@@ -31,7 +31,7 @@ async def list_llms(
 
 
 @router.get("/llm/{llm_name}", response_model=Dict[str, Any])
-async def get_llm(
+def get_llm(
     llm_name: str,
     service: LLMSvc,
 ):
