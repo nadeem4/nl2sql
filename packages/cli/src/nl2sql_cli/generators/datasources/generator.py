@@ -19,6 +19,6 @@ class DatasourceGenerator:
         """
         dumped_config = config.model_dump(exclude_none=True)
         
-        yaml_block = yaml.dump(dumped_config, sort_keys=False)
+        yaml_block = yaml.safe_dump(dumped_config, sort_keys=False)
         
         return DatasourceGenerator.HEADER + yaml_block

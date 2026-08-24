@@ -17,8 +17,8 @@ class LLMGenerator:
         Returns:
             Formatted YAML string.
         """
-        dumped_config = config.model_dump(exclude_none=True)
+        dumped_config = config.model_dump(mode="json", exclude_none=True)
         
-        yaml_block = yaml.dump(dumped_config, sort_keys=False)
+        yaml_block = yaml.safe_dump(dumped_config, sort_keys=False)
         
         return LLMGenerator.HEADER + yaml_block
