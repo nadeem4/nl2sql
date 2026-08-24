@@ -16,6 +16,12 @@ def wizard_project(tmp_path, monkeypatch):
     """A project root shaped the way the wizard leaves it after configuration."""
     monkeypatch.chdir(tmp_path)
 
+    # Building a context builds the OpenAI embedder, which refuses to construct
+    # without credentials. `settings` is a singleton built at import, so patch
+    # the attribute rather than the environment variable. Nothing here reaches
+    # the network.
+    monkeypatch.setattr(settings, "openai_api_key", "test-key")
+
     db_path = tmp_path / "wizard.db"
     with sqlite3.connect(db_path) as conn:
         conn.execute("CREATE TABLE machines (id INTEGER PRIMARY KEY, name TEXT)")

@@ -9,6 +9,18 @@ LLM_CONFIG=configs/llm{suffix}.yaml
 BENCHMARK_CONFIG=configs/benchmark_suite.yaml
 VECTOR_STORE=data/vector_store_{env}
 ROUTING_EXAMPLES=configs/sample_questions{suffix}.yaml
+"""
 
+# Settings appended for specific environments only.
+ENV_SPECIFIC_SETTINGS = {
+    "demo": (
+        "\n# --- Embeddings ---\n"
+        "# Local ONNX embeddings keep `nl2sql index` key-free. The first index run\n"
+        "# downloads a ~79 MB model. Running a query still needs an LLM key.\n"
+        "EMBEDDING_PROVIDER=local\n"
+    ),
+}
+
+ENV_SECRETS_HEADER = """
 # --- Secrets ---
 """

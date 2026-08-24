@@ -1,5 +1,5 @@
 from typing import Dict, Optional
-from .templates import ENV_FILE_TEMPLATE
+from .templates import ENV_FILE_TEMPLATE, ENV_SECRETS_HEADER, ENV_SPECIFIC_SETTINGS
 
 class EnvFileGenerator:
     """Standard generator for .env files complying with Universal Environment Protocol."""
@@ -22,7 +22,9 @@ class EnvFileGenerator:
         
         # Populate template
         content = ENV_FILE_TEMPLATE.format(env=env, suffix=suffix)
-        
+        content += ENV_SPECIFIC_SETTINGS.get(env, "")
+        content += ENV_SECRETS_HEADER
+
         used_keys = set()
         
         if secrets:

@@ -8,7 +8,9 @@ Configuration is split into **environment variables** (runtime settings) and **f
 
 | Env var | Default | Description |
 | --- | --- | --- |
-| `OPENAI_API_KEY` | `—` | OpenAI API key. Used for chat when `provider: openai`, and **always** used for embeddings, so `nl2sql index` needs it even when chat runs through OpenRouter. |
+| `OPENAI_API_KEY` | `—` | OpenAI API key. Used for chat when `provider: openai`, and for embeddings when `EMBEDDING_PROVIDER=openai` (the default). |
+| `EMBEDDING_PROVIDER` | `openai` | Embedding backend: `openai` (needs `OPENAI_API_KEY`) or `local` (key-free ONNX `all-MiniLM-L6-v2` bundled with chromadb). |
+| `EMBEDDING_MODEL` | `text-embedding-3-small` | OpenAI embedding model. Ignored when `EMBEDDING_PROVIDER=local`. |
 | `LLM_CONFIG` | `configs/llm.yaml` | Path to the LLM config file. |
 | `DATASOURCE_CONFIG` | `configs/datasources.yaml` | Path to the datasource config file. |
 | `BENCHMARK_CONFIG` | `configs/benchmark_suite.yaml` | Path to the benchmark suite file. |
@@ -22,6 +24,35 @@ Configuration is split into **environment variables** (runtime settings) and **f
 builds the datasource and LLM registries. A blank `VECTOR_STORE_COLLECTION`, or a blank
 `VECTOR_STORE` with no explicit `vector_store_path` argument, raises `ValueError` at
 construction time instead of failing later during setup.
+
+### Embeddings
+
+`EMBEDDING_PROVIDER` selects how schema chunks are embedded during `nl2sql index`
+and how queries are embedded during retrieval:
+
+| Value | Model | Dimensions | API key |
+| --- | --- | --- | --- |
+| `openai` (default) | `EMBEDDING_MODEL`, default `text-embedding-3-small` | 1536 | `OPENAI_API_KEY` required |
+| `local` | `all-MiniLM-L6-v2` (ONNX, bundled with chromadb) | 384 | none |
+
+Notes on the `local` provider:
+
+- **No extra dependency.** The model ships with `chromadb`, which is already a
+  transitive dependency through `langchain-chroma`.
+- **One-time download.** The first indexing run downloads roughly 79 MB of ONNX
+  model files into a local cache directory. Expect a pause of up to a few
+  minutes; a log line is emitted before the download starts.
+- **Embeddings only.** This removes the API key requirement from the embedding
+  step. It does not make querying key-free — answering a question still needs a
+  chat model (OpenAI or OpenRouter).
+
+**Switching providers requires a re-index.** The two providers produce vectors of
+different dimensionality, so an existing Chroma collection cannot be read with the
+other provider. Retrieving from a store whose persisted vectors disagree with the
+configured provider raises `EmbeddingDimensionMismatchError` naming both
+providers. The check runs on the read path only, so the fix is simply to re-run
+`nl2sql index` (indexing clears the collection first); alternatively, point
+`VECTOR_STORE` at a separate directory per provider.
 
 ### Storage
 
