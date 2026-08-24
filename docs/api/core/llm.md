@@ -23,11 +23,18 @@ Source:
 Fields:
 | name | type | required | meaning |
 | --- | --- | --- | --- |
-| `provider` | `str` | yes | Provider name (only `openai` supported). |
+| `provider` | `str` | yes | Provider name: `openai` or `openrouter`. |
 | `model` | `str` | yes | Model identifier. |
 | `temperature` | `float` | no | Sampling temperature (default `0.0`). |
 | `api_key` | `Optional[SecretStr]` | no | API key or secret reference. |
+| `base_url` | `Optional[str]` | no | Endpoint override; defaults to the OpenRouter gateway when `provider` is `openrouter`. |
 | `name` | `str` | no | Agent name (default `default`). |
+
+!!! note
+    `AgentConfig` is duplicated in `packages/core/src/nl2sql/configs/llm.py`
+    (read/written by `ConfigManager` and `LLMGenerator`) and in
+    `packages/core/src/nl2sql/llm/models.py` (consumed by `LLMRegistry`). The
+    two must be kept in sync until they are unified.
 
 ### LLMFileConfig
 
@@ -59,7 +66,6 @@ Returns:
 
 Raises:
 - `ValueError` for unsupported provider.
-- `ImportError` if provider dependency is missing (`langchain-openai`).
 
 Side Effects:
 - Registers LLM config and instantiates provider client.
@@ -96,6 +102,17 @@ Returns:
 Map of LLM name → config (API key excluded).
 
 ## Behavioral Contracts
-- Only provider supported in core registry is `openai` (enforced by `LLMRegistry`).
-- `LLMRegistry.get_llm()` falls back to `default` if name is missing.
+- Providers supported in the core registry are `openai` and `openrouter`
+  (enforced by `LLMRegistry`); anything else raises
+  `ValueError: Unsupported LLM provider`.
+- Both are served by `ChatOpenAI`. `openrouter` defaults to
+  `https://openrouter.ai/api/v1`; a config-supplied `base_url` overrides that
+  default and also lets the same path serve any other OpenAI-compatible
+  endpoint (vLLM, LiteLLM, a local proxy).
+- `LLMRegistry.get_llm()` falls back to `default` if the name is missing, and
+  raises `ValueError` naming the missing agent when no `default` is registered
+  either.
+- Embeddings are not routed through the registry: `EmbeddingService` always uses
+  `OpenAIEmbeddings` with `settings.openai_api_key`, so `nl2sql index` requires
+  an OpenAI key even when chat runs through OpenRouter.
 - Determinism: OpenAI LLM is initialized with `seed=42`.

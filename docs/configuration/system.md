@@ -8,7 +8,7 @@ Configuration is split into **environment variables** (runtime settings) and **f
 
 | Env var | Default | Description |
 | --- | --- | --- |
-| `OPENAI_API_KEY` | `—` | API key for OpenAI provider (optional if using other providers). |
+| `OPENAI_API_KEY` | `—` | OpenAI API key. Used for chat when `provider: openai`, and **always** used for embeddings, so `nl2sql index` needs it even when chat runs through OpenRouter. |
 | `LLM_CONFIG` | `configs/llm.yaml` | Path to the LLM config file. |
 | `DATASOURCE_CONFIG` | `configs/datasources.yaml` | Path to the datasource config file. |
 | `BENCHMARK_CONFIG` | `configs/benchmark_suite.yaml` | Path to the benchmark suite file. |
