@@ -22,7 +22,10 @@ def test_datasource_resolver_schema_version_mismatch_fail(monkeypatch):
     vector_store.retrieve_datasource_candidates = lambda *_a, **_k: [_doc()]
 
     rbac = SimpleNamespace(get_allowed_datasources=lambda _ctx: ["ds1"])
-    ds_registry = SimpleNamespace(get_capabilities=lambda _id: {"supports_sql"})
+    ds_registry = SimpleNamespace(
+        get_capabilities=lambda _id: {"supports_sql"},
+        list_ids=lambda: ["ds1"],
+    )
     schema_store = SimpleNamespace(get_latest_version=lambda _id: "v2")
 
     ctx = SimpleNamespace(
@@ -52,7 +55,10 @@ def test_datasource_resolver_handles_missing_vector_store():
     ctx = SimpleNamespace(
         vector_store=None,
         rbac=SimpleNamespace(get_allowed_datasources=lambda _ctx: []),
-        ds_registry=SimpleNamespace(get_capabilities=lambda _id: {"supports_sql"}),
+        ds_registry=SimpleNamespace(
+            get_capabilities=lambda _id: {"supports_sql"},
+            list_ids=lambda: ["ds1"],
+        ),
         schema_store=SimpleNamespace(get_latest_version=lambda _id: "v1"),
     )
     node = DatasourceResolverNode(ctx)
@@ -71,7 +77,10 @@ def test_datasource_resolver_allows_wildcard_datasource():
     vector_store.retrieve_datasource_candidates = lambda *_a, **_k: [_doc()]
 
     rbac = SimpleNamespace(get_allowed_datasources=lambda _ctx: ["*"])
-    ds_registry = SimpleNamespace(get_capabilities=lambda _id: {"supports_sql"})
+    ds_registry = SimpleNamespace(
+        get_capabilities=lambda _id: {"supports_sql"},
+        list_ids=lambda: ["ds1"],
+    )
     schema_store = SimpleNamespace(get_latest_version=lambda _id: "v1")
     ctx = SimpleNamespace(
         vector_store=vector_store,
@@ -93,7 +102,10 @@ def test_datasource_resolver_no_candidates_returns_error():
     ctx = SimpleNamespace(
         vector_store=vector_store,
         rbac=SimpleNamespace(get_allowed_datasources=lambda _ctx: ["ds1"]),
-        ds_registry=SimpleNamespace(get_capabilities=lambda _id: {"supports_sql"}),
+        ds_registry=SimpleNamespace(
+            get_capabilities=lambda _id: {"supports_sql"},
+            list_ids=lambda: ["ds1"],
+        ),
         schema_store=SimpleNamespace(get_latest_version=lambda _id: "v1"),
     )
     node = DatasourceResolverNode(ctx)
@@ -111,7 +123,10 @@ def test_datasource_resolver_rbac_denies_all():
     ctx = SimpleNamespace(
         vector_store=vector_store,
         rbac=SimpleNamespace(get_allowed_datasources=lambda _ctx: []),
-        ds_registry=SimpleNamespace(get_capabilities=lambda _id: {"supports_sql"}),
+        ds_registry=SimpleNamespace(
+            get_capabilities=lambda _id: {"supports_sql"},
+            list_ids=lambda: ["ds1"],
+        ),
         schema_store=SimpleNamespace(get_latest_version=lambda _id: "v1"),
     )
     node = DatasourceResolverNode(ctx)
@@ -122,21 +137,24 @@ def test_datasource_resolver_rbac_denies_all():
 
 
 def test_datasource_resolver_unsupported_datasource():
-    # Validates capability filter because unsupported datasources must be rejected.
+    # Validates the registry filter because unsupported datasources must be rejected.
     vector_store = SimpleNamespace(
         retrieve_datasource_candidates=lambda *_a, **_k: [_doc()]
     )
     ctx = SimpleNamespace(
         vector_store=vector_store,
         rbac=SimpleNamespace(get_allowed_datasources=lambda _ctx: ["ds1"]),
-        ds_registry=SimpleNamespace(get_capabilities=lambda _id: set()),
+        # "ds1" is not registered, so the registry does not list it.
+        ds_registry=SimpleNamespace(get_capabilities=lambda _id: set(), list_ids=lambda: []),
         schema_store=SimpleNamespace(get_latest_version=lambda _id: "v1"),
     )
     node = DatasourceResolverNode(ctx)
 
-    result = node(GraphState(user_query="q", user_context=UserContext()))
+    result = node(
+        GraphState(user_query="q", user_context=UserContext(), datasource_id="ds1")
+    )
 
-    assert result["errors"][0].error_code == ErrorCode.SECURITY_VIOLATION
+    assert result["errors"][0].error_code == ErrorCode.INVALID_STATE
     response = result["datasource_resolver_response"]
     assert response.unsupported_datasource_ids == ["ds1"]
 
@@ -149,7 +167,10 @@ def test_datasource_resolver_dedupes_candidate_docs():
     ctx = SimpleNamespace(
         vector_store=vector_store,
         rbac=SimpleNamespace(get_allowed_datasources=lambda _ctx: ["*"]),
-        ds_registry=SimpleNamespace(get_capabilities=lambda _id: {"supports_sql"}),
+        ds_registry=SimpleNamespace(
+            get_capabilities=lambda _id: {"supports_sql"},
+            list_ids=lambda: ["ds1"],
+        ),
         schema_store=SimpleNamespace(get_latest_version=lambda _id: "v1"),
     )
     node = DatasourceResolverNode(ctx)
@@ -168,7 +189,10 @@ def test_datasource_resolver_missing_datasource_id():
     ctx = SimpleNamespace(
         vector_store=vector_store,
         rbac=SimpleNamespace(get_allowed_datasources=lambda _ctx: ["ds1"]),
-        ds_registry=SimpleNamespace(get_capabilities=lambda _id: {"supports_sql"}),
+        ds_registry=SimpleNamespace(
+            get_capabilities=lambda _id: {"supports_sql"},
+            list_ids=lambda: ["ds1"],
+        ),
         schema_store=SimpleNamespace(get_latest_version=lambda _id: "v1"),
     )
     node = DatasourceResolverNode(ctx)
