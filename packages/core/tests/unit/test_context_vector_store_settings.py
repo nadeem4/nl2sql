@@ -60,6 +60,10 @@ def test_context_allows_explicit_vector_store_path(monkeypatch, tmp_path):
     monkeypatch.setattr(settings, "vector_store_path", "")
     # Construction succeeds, so the LLM registry is built; a dummy key keeps the
     # test hermetic (no network call is made at construction time).
+    # `settings` is a singleton built at import, so the embedder reads this
+    # attribute rather than the environment. Patch both: the attribute for the
+    # embedder, the variable for the chat client the registry builds.
+    monkeypatch.setattr(settings, "openai_api_key", "test-key")
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
 
     ctx = NL2SQLContext(

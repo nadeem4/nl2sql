@@ -130,6 +130,17 @@ class EmbeddingService:
         return cls._instance
 
     @classmethod
+    def reset(cls) -> None:
+        """Drops the cached embedder so the next call rebuilds it.
+
+        The cache lives on the class and outlives any single caller, so tests
+        and long-lived processes that change the configured provider need a way
+        to discard it.
+        """
+        cls._instance = None
+        cls._instance_provider = None
+
+    @classmethod
     def _resolve_provider(cls) -> str:
         """Returns the normalized embedding provider from settings."""
         return (settings.embedding_provider or "openai").strip().lower()
