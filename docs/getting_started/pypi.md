@@ -102,6 +102,21 @@ agents:
     temperature: 0.0
     api_key: ${env:OPENAI_API_KEY}
 ```
+To route chat through [OpenRouter](https://openrouter.ai) instead — one key for
+Anthropic, Google, Meta and hundreds of other models, with no extra dependency:
+
+```yaml
+version: 1
+default:
+  provider: openrouter
+  model: anthropic/claude-sonnet-4.5
+  temperature: 0.0
+  api_key: ${env:OPENROUTER_API_KEY}
+```
+
+Note that OpenRouter serves chat completions only. Embeddings still go through
+OpenAI, so `nl2sql index` needs `OPENAI_API_KEY` set as well.
+
 See [LLM config](../configuration/llm.md) for full schema details.
 
 ### Add a datasource at runtime

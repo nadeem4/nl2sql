@@ -11,6 +11,7 @@ from nl2sql_cli.config import KNOWN_ADAPTERS
 from nl2sql_cli.commands.install import install_package
 from nl2sql_cli.checks import check_package, verify_connectivity
 
+from nl2sql.common.logger import get_logger
 from nl2sql.configs import ConfigManager
 from nl2sql.configs import (
     DatasourceConfig, 
@@ -22,6 +23,8 @@ from nl2sql.configs import (
     RolePolicy
 )
 from nl2sql_cli.demo import DemoManager
+
+logger = get_logger(__name__)
 
 # Resolve Project Root (Robust to CWD)
 try:
@@ -150,14 +153,16 @@ def _configure_llm(config_manager: ConfigManager, api_key: Optional[str] = None)
 
     console.print("No LLM configuration found. Let's configure one.")
     
+    # Only providers the engine can actually serve are offered here; anything
+    # else lets setup succeed and then fails on the first query.
     provider = inquirer.select(
         message="Select Provider:",
-        choices=["openai", "gemini", "ollama"],
+        choices=["openai", "openrouter"],
         default="openai"
     ).execute()
-    
+
     default_agent = None
-    
+
     if provider == "openai":
         api_key = inquirer.secret(message="OpenAI API Key:").execute()
         default_agent = AgentConfig(
@@ -165,20 +170,27 @@ def _configure_llm(config_manager: ConfigManager, api_key: Optional[str] = None)
             model="gpt-4o",
             api_key=api_key
         )
-    elif provider == "gemini":
-        api_key = inquirer.secret(message="Gemini API Key:").execute()
-        default_agent = AgentConfig(
-            provider="google_genai",
-            model="gemini-1.5-pro",
-            api_key=api_key
+    elif provider == "openrouter":
+        console.print(
+            "[dim]OpenRouter is an OpenAI-compatible gateway: one key reaches "
+            "Anthropic, Google, Meta and hundreds of other models.[/dim]"
         )
-    elif provider == "ollama":
-        base_url = inquirer.text(message="Base URL:", default="http://localhost:11434").execute()
-        model = inquirer.text(message="Model Name:", default="llama3").execute()
+        api_key = inquirer.secret(message="OpenRouter API Key:").execute()
+        model = inquirer.text(
+            message="OpenRouter model identifier (e.g. anthropic/claude-sonnet-4.5):",
+            default="anthropic/claude-sonnet-4.5"
+        ).execute()
+        env_var = "OPENROUTER_API_KEY"
+        os.environ[env_var] = api_key  # available to the rest of this session
         default_agent = AgentConfig(
-            provider="ollama",
+            provider="openrouter",
             model=model,
-            base_url=base_url
+            api_key=f"${{env:{env_var}}}"
+        )
+        console.print(f"[dim]Will save the key as: ${{env:{env_var}}}[/dim]")
+        console.print(
+            "[yellow]Note:[/yellow] embeddings still go through OpenAI, so "
+            "[cyan]nl2sql index[/cyan] needs OPENAI_API_KEY as well."
         )
 
     llm_config = LLMFileConfig(default=default_agent)
@@ -288,6 +300,51 @@ def _install_required_adapters(config_manager: ConfigManager):
         console.print(f"[red]Failed to check adapters: {e}[/red]")
 
 
+def _run_indexing_step():
+    """Offers schema indexing and runs it through a context built from config paths."""
+    from nl2sql.common.settings import settings
+    from nl2sql.context import NL2SQLContext
+    from nl2sql.indexing.vector_store import VectorStore
+    from nl2sql_cli.commands.indexing import run_indexing
+
+    try:
+        v_store = VectorStore(
+            collection_name=settings.vector_store_collection_name,
+            persist_directory=str(PROJECT_ROOT / settings.vector_store_path),
+        )
+        should_index = False
+
+        if not v_store.is_empty():
+            console.print("[yellow]Vector Store already contains data.[/yellow]")
+            if inquirer.confirm(message="Do you want to clear and re-index?", default=False).execute():
+                should_index = True
+        else:
+            if inquirer.confirm(message="Vector Store is empty. Run Schema Indexing now?", default=True).execute():
+                should_index = True
+
+        if not should_index:
+            return
+
+        print_step("Starting Indexer...")
+
+        # NL2SQLContext builds the datasource, LLM and vector store registries
+        # itself; it takes config *paths*, not pre-built registries.
+        ctx = NL2SQLContext(
+            ds_config_path=PROJECT_ROOT / settings.datasource_config_path,
+            secrets_config_path=PROJECT_ROOT / settings.secrets_config_path,
+            llm_config_path=PROJECT_ROOT / settings.llm_config_path,
+            vector_store_path=PROJECT_ROOT / settings.vector_store_path,
+            policies_config_path=PROJECT_ROOT / settings.policies_config_path,
+        )
+
+        run_indexing(ctx)
+        print_success("Indexing process finished.")
+
+    except Exception as e:
+        logger.debug("Indexing setup failed", exc_info=True)
+        console.print(f"[red]Indexing setup failed: {e}[/red]")
+
+
 @handle_cli_errors
 def setup_command(demo: bool = False, lite: bool = True, docker: bool = False, api_key: Optional[str] = None):
     
@@ -350,59 +407,7 @@ def setup_command(demo: bool = False, lite: bool = True, docker: bool = False, a
 
     # 6. Indexing Prompt
     console.print("")
-    from nl2sql.indexing.vector_store import VectorStore
-    from nl2sql.common.settings import settings
-    from nl2sql_cli.commands.indexing import run_indexing
-    from nl2sql.llm import LLMRegistry
+    _run_indexing_step()
 
-    try:
-        v_store = VectorStore(
-            collection_name=settings.vector_store_collection_name,
-            persist_directory=settings.vector_store_path,
-        )
-        should_index = False
-        
-        if not v_store.is_empty():
-            console.print("[yellow]Vector Store already contains data.[/yellow]")
-            if inquirer.confirm(message="Do you want to clear and re-index?", default=False).execute():
-                should_index = True
-        else:
-             if inquirer.confirm(message="Vector Store is empty. Run Schema Indexing now?", default=True).execute():
-                should_index = True
-
-        if should_index:
-            print_step("Starting Indexer...")
-            
-            # Use ConfigManager to load!
-            configs = config_manager.load_datasources()
-            
-            llm_registry = None
-            try:
-                llm_cfg = config_manager.load_llm()
-                llm_registry = LLMRegistry(llm_cfg)
-            except Exception:
-                pass
-            
-            # Create a localized context for indexing
-            from nl2sql.context import NL2SQLContext
-            from nl2sql.datasources import DatasourceRegistry
-            from nl2sql.secrets import secret_manager
-            
-            ds_registry = DatasourceRegistry(secret_manager)
-            ds_registry.register_datasources(configs)
-            
-            ctx = NL2SQLContext(
-                ds_registry=ds_registry,
-                llm_registry=llm_registry,
-                vector_store=v_store,
-                secret_manager=secret_manager
-            )
-
-            run_indexing(ctx)
-            print_success("Indexing process finished.")
-            
-    except Exception as e:
-        console.print(f"[red]Indexing setup failed: {e}[/red]")
-        
     console.print("\n[bold green]Setup Complete![/bold green]")
     console.print("Try running a query: [cyan]nl2sql run \"Show me all tables\"[/cyan]")
