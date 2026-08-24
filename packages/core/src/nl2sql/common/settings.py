@@ -224,3 +224,13 @@ configure_logging(
     level="INFO",
     json_format=(settings.observability_exporter == "otlp")
 )
+
+def reload_settings() -> Settings:
+    """Re-read settings from the environment and refresh the module singleton.
+
+    The ``settings`` object is created at import time, so switching environments
+    at runtime requires updating it in place; existing
+    ``from nl2sql.common.settings import settings`` references stay valid.
+    """
+    settings.__dict__.update(load_settings().__dict__)
+    return settings
