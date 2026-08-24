@@ -1,3 +1,4 @@
+import importlib.util
 from unittest.mock import MagicMock
 
 import pytest
@@ -49,11 +50,15 @@ ADAPTER_SPECS = [
             "database": "db",
         },
     ),
-    (
+    pytest.param(
         "mssql",
         MssqlAdapter,
         "nl2sql_mssql.adapter",
         {"type": "mssql", "host": "localhost", "database": "db"},
+        marks=pytest.mark.skipif(
+            importlib.util.find_spec("pyodbc") is None,
+            reason="pyodbc driver is not installed",
+        ),
     ),
 ]
 
