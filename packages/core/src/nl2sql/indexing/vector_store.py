@@ -6,11 +6,65 @@ from langchain_chroma import Chroma
 from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
 
-from nl2sql.indexing.embeddings import EmbeddingService
+from nl2sql.indexing.embeddings import (
+    PROVIDER_BY_DIMENSION,
+    EmbeddingService,
+    describe_embeddings,
+)
+from nl2sql.common.exceptions import NL2SQLError
 from nl2sql.common.logger import get_logger
 from .models import BaseChunk
 
 logger = get_logger(__name__)
+
+
+class EmbeddingDimensionMismatchError(NL2SQLError):
+    """Raised when a persisted collection was built with a different embedder."""
+
+
+def check_embedding_dimension_compatibility(
+    persisted_dimension: Optional[int],
+    embeddings: Embeddings,
+    collection_name: str,
+) -> None:
+    """
+    Verifies that a persisted collection can be queried with the current embedder.
+
+    Vectors from different embedding providers have different dimensionality
+    (OpenAI ``text-embedding-3-small`` is 1536, the local model is 384), so an
+    index built with one provider cannot be read with the other.
+
+    Args:
+        persisted_dimension: Dimensionality of the persisted vectors, or None
+            when the collection is empty or the dimension cannot be determined.
+        embeddings: Embedding implementation configured for this process.
+        collection_name: Name of the Chroma collection.
+
+    Raises:
+        EmbeddingDimensionMismatchError: If the dimensions disagree.
+    """
+    provider, model, expected_dimension = describe_embeddings(embeddings)
+
+    if persisted_dimension is None or expected_dimension is None:
+        return
+    if persisted_dimension == expected_dimension:
+        return
+
+    built_with = PROVIDER_BY_DIMENSION.get(persisted_dimension)
+    origin = (
+        f"the '{built_with}' embedding provider"
+        if built_with
+        else "a different embedding provider"
+    )
+
+    raise EmbeddingDimensionMismatchError(
+        f"Vector store collection '{collection_name}' was indexed with {origin} "
+        f"({persisted_dimension}-dimensional vectors), but the configured provider "
+        f"is '{provider}' ({model}, {expected_dimension}-dimensional vectors). "
+        "A vector index cannot be shared across embedding providers: re-index with "
+        "'nl2sql index' after changing EMBEDDING_PROVIDER, or point VECTOR_STORE at "
+        "a separate directory per provider."
+    )
 
 
 class VectorStore:
@@ -49,6 +103,42 @@ class VectorStore:
             embedding_function=self.embeddings,
             persist_directory=self.persist_directory,
         )
+        self._dimension_checked = False
+
+    def _verify_embedding_dimensions(self) -> None:
+        """
+        Checks the persisted vectors against the configured embedder once per
+        store instance.
+
+        The check runs on the read path only: indexing clears the collection
+        before writing, so a provider switch is fixed by re-running
+        ``nl2sql index`` rather than blocked by it.
+        """
+        if self._dimension_checked:
+            return
+        check_embedding_dimension_compatibility(
+            self._persisted_dimension(),
+            self.embeddings,
+            self.collection_name,
+        )
+        self._dimension_checked = True
+
+    def _persisted_dimension(self) -> Optional[int]:
+        """
+        Reads the dimensionality of the vectors already persisted in the collection.
+
+        Returns:
+            Vector dimensionality, or None when the collection is empty or the
+            dimension cannot be determined.
+        """
+        try:
+            stored = self.vectorstore._collection.peek(limit=1).get("embeddings")
+            if stored is None or len(stored) == 0:
+                return None
+            return len(stored[0])
+        except Exception as exc:
+            logger.debug(f"Could not determine persisted embedding dimension: {exc}")
+            return None
 
     def initialize_if_not_exists(self) -> None:
         """
@@ -59,6 +149,8 @@ class VectorStore:
         except Exception:
             logger.info("Vector store not found, initializing new store.")
             self._initialize_vector_store()
+
+        self._verify_embedding_dimensions()
 
     def is_empty(self) -> bool:
         """
