@@ -139,7 +139,6 @@ class DemoManager:
             f.write(content)
         
         self.print_step("Writing sample questions...")
-        import yaml
         samples_path = self.project_root / "configs" / "sample_questions.demo.yaml"
         with open(samples_path, "w") as f:
             yaml.dump(SAMPLE_QUESTIONS, f, sort_keys=False)
@@ -193,43 +192,32 @@ class DemoManager:
 
     def index_demo_data(self):
         """Triggers the indexing process for the demo."""
-        
-        from nl2sql.common.settings import settings, Settings
+
         from dotenv import load_dotenv
-        
+        from nl2sql.common.settings import settings, reload_settings
+
         env_path = self.project_root / ".env.demo"
-        if env_path.exists():
-            load_dotenv(env_path, override=True)
-            new_settings = Settings()
-            settings.__dict__.update(new_settings.__dict__)
-        else:
+        if not env_path.exists():
             self.print_error(f"Could not find {env_path}")
             return False
-        
+
+        # The demo environment must be active before the context is built:
+        # NL2SQLContext validates vector store settings during construction.
+        load_dotenv(env_path, override=True)
+        reload_settings()
+
+        from nl2sql.context import NL2SQLContext
         from nl2sql_cli.commands.indexing import run_indexing
-        from nl2sql.indexing.vector_store import VectorStore
-        from nl2sql.llm import LLMRegistry
-        from nl2sql.configs import ConfigManager 
-        from nl2sql.datasources import DatasourceRegistry 
-        
+
         try:
-            indexer_config_manager = ConfigManager(self.project_root)
-            
-            configs = indexer_config_manager.load_datasources()
-            v_store = VectorStore(
-                collection_name=settings.vector_store_collection_name,
-                persist_directory=settings.vector_store_path,
+            ctx = NL2SQLContext(
+                ds_config_path=self.project_root / settings.datasource_config_path,
+                secrets_config_path=self.project_root / settings.secrets_config_path,
+                llm_config_path=self.project_root / settings.llm_config_path,
+                vector_store_path=self.project_root / settings.vector_store_path,
+                policies_config_path=self.project_root / settings.policies_config_path,
             )
-            
-            llm_registry = None
-            try:
-                llm_cfg = indexer_config_manager.load_llm()
-                llm_registry = LLMRegistry(llm_cfg)
-            except Exception:
-                pass # Optional for schema indexing
-                
-            registry = DatasourceRegistry(configs)
-            run_indexing(registry, settings.vector_store_path, v_store, llm_registry)
+            run_indexing(ctx)
             return True
         except Exception as e:
             self.print_error(f"Indexing Failed: {e}")
