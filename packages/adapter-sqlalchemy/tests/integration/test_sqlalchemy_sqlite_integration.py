@@ -62,7 +62,7 @@ def test_execute_sql_returns_rows_and_metrics(sqlite_adapter):
     # Assert
     assert result.success is True
     assert result.row_count == 3
-    assert [col.name for col in result.columns] == ["id", "name"]
+    assert result.columns == ["id", "name"]
     assert result.execution_stats["execution_time_ms"] >= 0
 
 

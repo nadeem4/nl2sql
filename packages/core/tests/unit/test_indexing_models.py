@@ -20,7 +20,9 @@ def test_table_chunk_includes_columns_in_content():
 
 
 def test_column_chunk_includes_synonyms_in_content():
-    column_ref = ColumnRef(schema_name="public", table_name="users", column_name="email")
+    column_ref = ColumnRef(
+        table=TableRef(schema_name="public", table_name="users"), column_name="email"
+    )
     chunk = ColumnChunk(
         id="schema.column:public.users.email:v1",
         datasource_id="ds1",

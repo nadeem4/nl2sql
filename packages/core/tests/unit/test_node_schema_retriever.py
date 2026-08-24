@@ -14,6 +14,49 @@ from nl2sql_adapter_sdk.schema import (
 )
 
 
+USERS = TableRef(schema_name="public", table_name="users")
+ORDERS = TableRef(schema_name="public", table_name="orders")
+
+
+def _snapshot() -> SchemaSnapshot:
+    """Snapshot the retriever resolves table/column contracts from."""
+    return SchemaSnapshot(
+        contract=SchemaContract(
+            datasource_id="ds1",
+            engine_type="sqlite",
+            tables={
+                USERS.full_name: TableContract(
+                    table=USERS,
+                    columns={"id": ColumnContract(name="id", data_type="int", is_nullable=False, is_primary_key=True)},
+                    foreign_keys=[],
+                ),
+                ORDERS.full_name: TableContract(
+                    table=ORDERS,
+                    columns={
+                        "order_id": ColumnContract(
+                            name="order_id", data_type="int", is_nullable=False, is_primary_key=True
+                        ),
+                        "user_id": ColumnContract(name="user_id", data_type="int"),
+                    },
+                    foreign_keys=[],
+                ),
+            },
+        ),
+        metadata=SchemaMetadata(
+            datasource_id="ds1",
+            engine_type="sqlite",
+            tables={
+                USERS.full_name: TableMetadata(table=USERS, row_count=1, columns={}),
+                ORDERS.full_name: TableMetadata(table=ORDERS, row_count=1, columns={}),
+            },
+        ),
+    )
+
+
+def _schema_store() -> SimpleNamespace:
+    return SimpleNamespace(get_latest_snapshot=lambda _id: _snapshot())
+
+
 def test_schema_retriever_falls_back_to_schema_store():
     # Validates fallback logic because schema store is used without planning docs.
     # Arrange
@@ -22,27 +65,7 @@ def test_schema_retriever_falls_back_to_schema_store():
         retrieve_planning_context=lambda *_a, **_k: [],
         retrieve_column_candidates=lambda *_a, **_k: [],
     )
-    table_ref = TableRef(schema_name="public", table_name="users")
-    snapshot = SchemaSnapshot(
-        contract=SchemaContract(
-            datasource_id="ds1",
-            engine_type="sqlite",
-            tables={
-                table_ref.full_name: TableContract(
-                    table=table_ref,
-                    columns={"id": ColumnContract(name="id", data_type="int", is_nullable=False, is_primary_key=True)},
-                    foreign_keys=[],
-                )
-            },
-        ),
-        metadata=SchemaMetadata(
-            datasource_id="ds1",
-            engine_type="sqlite",
-            tables={table_ref.full_name: TableMetadata(table=table_ref, row_count=1, columns={})},
-        ),
-    )
-    schema_store = SimpleNamespace(get_latest_snapshot=lambda _id: snapshot)
-    ctx = SimpleNamespace(vector_store=vector_store, schema_store=schema_store)
+    ctx = SimpleNamespace(vector_store=vector_store, schema_store=_schema_store())
     node = SchemaRetrieverNode(ctx)
 
     state = SubgraphExecutionState(
@@ -62,19 +85,19 @@ def test_schema_retriever_builds_tables_from_docs():
     # Validates planning docs usage because vector store should enrich schema context.
     # Arrange
     doc_table = SimpleNamespace()
-    doc_table.metadata = {"table": "public.users"}
+    doc_table.metadata = {"table": USERS.full_name}
     doc_col = SimpleNamespace()
     doc_col.metadata = {
-        "table": "public.users",
+        "table": USERS.full_name,
         "type": "schema.column",
-        "column": "public.users.id",
+        "column": "id",
         "dtype": "int",
     }
     doc_rel = SimpleNamespace()
     doc_rel.metadata = {
         "type": "schema.relationship",
-        "from_table": "public.users",
-        "to_table": "public.orders",
+        "from_table": USERS.full_name,
+        "to_table": ORDERS.full_name,
         "from_columns": ["id"],
         "to_columns": ["user_id"],
     }
@@ -83,7 +106,7 @@ def test_schema_retriever_builds_tables_from_docs():
         retrieve_planning_context=lambda *_a, **_k: [doc_col, doc_rel],
         retrieve_column_candidates=lambda *_a, **_k: [],
     )
-    ctx = SimpleNamespace(vector_store=vector_store, schema_store=SimpleNamespace())
+    ctx = SimpleNamespace(vector_store=vector_store, schema_store=_schema_store())
     node = SchemaRetrieverNode(ctx)
 
     state = SubgraphExecutionState(
@@ -106,8 +129,8 @@ def test_schema_retriever_uses_column_fallback():
     doc_col = SimpleNamespace()
     doc_col.metadata = {
         "type": "schema.column",
-        "column": "public.orders.order_id",
-        "table": "public.orders",
+        "column": "order_id",
+        "table": ORDERS.full_name,
         "dtype": "int",
     }
     vector_store = SimpleNamespace(
@@ -115,7 +138,7 @@ def test_schema_retriever_uses_column_fallback():
         retrieve_planning_context=lambda *_a, **_k: [doc_col],
         retrieve_column_candidates=lambda *_a, **_k: [doc_col],
     )
-    ctx = SimpleNamespace(vector_store=vector_store, schema_store=SimpleNamespace())
+    ctx = SimpleNamespace(vector_store=vector_store, schema_store=_schema_store())
     node = SchemaRetrieverNode(ctx)
 
     state = SubgraphExecutionState(
