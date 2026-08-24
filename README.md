@@ -93,7 +93,7 @@ flowchart TD
 
 ### Prerequisites
 
-* Python 3.10+
+* Python 3.9+
 * A configured datasource (`configs/datasources.yaml`)
 * A configured LLM (`configs/llm.yaml`)
 
@@ -141,13 +141,35 @@ print(result.get("final_answer"))
 
 Use the CLI to generate deterministic demo data and configs, then point the API at the generated files.
 
-1. Generate demo data + configs:
+1. Generate demo data + configs, and index them:
 
 ```bash
+# SQLite files, no containers (default)
 nl2sql setup --demo --lite
+
+# Or full fidelity: Postgres/MySQL/MSSQL in Docker
+nl2sql setup --demo --docker
 ```
 
-2. Start the API with demo settings:
+`--lite` and `--docker` are mutually exclusive. The lite run writes
+`data/demo_lite/*.db`, the `configs/*.demo.*` files and `.env.demo`, then indexes
+the generated schemas. Indexing needs a valid OpenAI key, so pass one with
+`--api-key` or fill in `OPENAI_API_KEY` in `.env.demo` before re-indexing.
+
+2. Use the demo environment from the CLI:
+
+```bash
+# Re-index after editing the demo configs
+nl2sql --env demo index
+
+# Ask a question
+nl2sql --env demo run "Show me broken machines in Austin"
+```
+
+`--env <name>` loads `.env.<name>`; `--env-file <path>` loads an exact file and
+takes precedence over `--env`.
+
+3. Start the API with demo settings:
 
 ```bash
 # Option A: load .env.demo via ENV

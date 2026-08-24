@@ -17,8 +17,15 @@ pip install -e packages/cli
 ## 2. Generate demo data with the CLI
 
 ```bash
-nl2sql setup --demo
+# SQLite files, no containers (default)
+nl2sql setup --demo --lite
+
+# Or full fidelity: Postgres/MySQL/MSSQL in Docker
+nl2sql setup --demo --docker
 ```
+
+`--lite` and `--docker` are mutually exclusive; lite is the default when neither
+is given.
 
 This writes:
 
@@ -35,11 +42,15 @@ For the lite demo, setup also runs schema indexing once automatically.
 
 ```bash
 # Run a query against demo data
-ENV=demo nl2sql run "Show me broken machines in Austin"
+nl2sql --env demo run "Show me broken machines in Austin"
 
 # Index schemas if you need to re-index after regenerating demo data
-ENV=demo nl2sql index
+nl2sql --env demo index
 ```
+
+`--env <name>` loads `.env.<name>`. To point at an exact file instead, use
+`--env-file <path>`, which takes precedence over `--env`. The equivalent
+environment variables (`ENV` and `ENV_FILE_PATH`) still work.
 
 Note: the demo datasource config uses relative database paths (e.g. `data/demo_lite/*.db`),
 so run the CLI from the repo root.
@@ -228,7 +239,7 @@ Common join paths:
 Regenerate data at any time with:
 
 ```bash
-nl2sql setup --demo
+nl2sql setup --demo --lite
 ```
 
 This overwrites all demo databases and regenerates sample questions and configs.
