@@ -26,7 +26,7 @@ Source: `packages/api/src/nl2sql_api/dependencies.py`
 | API | Router Path | Purpose |
 | --- | --- | --- |
 | [Health](health.md) | `routes/health.py` | Liveness/readiness checks. |
-| [Query](query.md) | `routes/query.py` | Execute and fetch query results. |
+| [Query](query.md) | `routes/query.py` | Execute natural language queries. |
 | [Datasource](datasource.md) | `routes/datasource.py` | Manage datasource configs. |
 | [LLM](llm.md) | `routes/llm.py` | Configure and inspect LLMs. |
 | [Indexing](indexing.md) | `routes/indexing.py` | Index management and status. |
@@ -35,6 +35,14 @@ Source: `packages/api/src/nl2sql_api/dependencies.py`
 
 FastAPI routers wrap most failures in `HTTPException(status_code=500, detail=str(e))`.
 Datasource and delete endpoints map `ValueError` to `HTTP 404`.
+
+`POST /api/v1/query` is the exception: pipeline errors are returned as a normal
+`HTTP 200` inside `QueryResponse.errors`, and an unexpected failure returns a
+generic `HTTP 500` with the traceback logged server-side rather than returned.
+
+Route handlers that call blocking engine code are declared with `def` rather than
+`async def`, so Starlette runs them in its threadpool instead of blocking the
+event loop.
 
 ## Configuration
 

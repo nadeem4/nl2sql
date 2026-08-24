@@ -32,7 +32,7 @@ Parameters:
 | `user_context` | `Optional[UserContext]` | no | RBAC context. |
 
 Returns:
-`QueryResult` with fields: `sql`, `results`, `final_answer`, `errors`, `warnings`, `trace_id`, `reasoning`.
+`QueryResult`, built from the pipeline graph state by `result_from_state`.
 
 Raises:
 No exceptions are raised by `run_query`; errors are returned in `QueryResult.errors`.
@@ -57,10 +57,38 @@ Source:
 Fields:
 | name | type | required | meaning |
 | --- | --- | --- | --- |
-| `sql` | `Optional[str]` | no | Generated SQL (if any). |
-| `results` | `list` | no | Result rows (adapter-dependent). |
-| `final_answer` | `Optional[str]` | no | Natural language answer. |
-| `errors` | `list` | no | Pipeline errors. |
-| `trace_id` | `Optional[str]` | no | Trace identifier. |
-| `reasoning` | `List[dict]` | no | Reasoning events/logs. |
-| `warnings` | `List[dict]` | no | Warning events/logs. |
+| `sub_queries` | `List[SubQueryResult]` | no | One entry per decomposed sub-query. |
+| `final_answer` | `Optional[Dict[str, Any]]` | no | Answer synthesizer payload (`summary`, `format_type`, `content`). |
+| `errors` | `List[Dict[str, Any]]` | no | Pipeline errors (`node`, `message`, `error_code`, `severity`). |
+| `trace_id` | `str` | no | Trace identifier. |
+| `reasoning` | `List[Dict[str, Any]]` | no | Reasoning events/logs. |
+| `warnings` | `List[Dict[str, Any]]` | no | Warning events/logs. |
+| `artifact_refs` | `Dict[str, ArtifactRef]` | no | Result artifact references keyed by execution node id. |
+
+Result rows are not inlined. They live in artifact storage and are addressed
+through `artifact_refs`.
+
+### SubQueryResult
+
+| name | type | required | meaning |
+| --- | --- | --- | --- |
+| `id` | `str` | no | Sub-query identifier. |
+| `intent` | `str` | no | Semantic intent of the sub-query. |
+| `sql` | `str` | no | SQL generated for the sub-query (`subgraph_outputs[<id>].sql_draft`). |
+| `datasource_id` | `str` | no | Datasource the sub-query targets. |
+| `schema_version` | `str` | no | Schema version used for planning. |
+
+### State mapping
+
+`result_from_state` normalises the raw graph state (LangGraph may return dicts or
+model instances for nested values):
+
+| `QueryResult` field | Graph state source |
+| --- | --- |
+| `sub_queries[].sql` | `subgraph_outputs[<id>].sql_draft` |
+| `sub_queries[].id` / `.intent` / `.datasource_id` / `.schema_version` | `subgraph_outputs[<id>].sub_query` |
+| `final_answer` | `answer_synthesizer_response.final_answer` |
+| `errors`, `reasoning`, `warnings`, `trace_id`, `artifact_refs` | top-level state |
+
+`errors` are projected onto a client-safe summary; `stack_trace` and `details` are
+deliberately not exposed.
