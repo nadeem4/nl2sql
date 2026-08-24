@@ -12,12 +12,13 @@ for path in (CORE_SRC, SDK_SRC):
 
 
 def pytest_collection_modifyitems(config, items):
-    """Mark everything under an ``integration`` directory as integration.
+    """Mark the core integration tests so CI can skip them.
 
-    These tests need a live demo database, a populated vector store and a real
-    OPENAI_API_KEY, so CI runs with ``-m "not integration"``.
+    They need a live demo database, a populated vector store and a real
+    OPENAI_API_KEY, so CI runs with ``-m "not integration"``. Scoped to this
+    package only -- the sqlite-backed integration tests in the adapter
+    packages need none of that and stay selected.
     """
     for item in items:
-        parts = str(item.fspath).replace("\\", "/").split("/")
-        if "integration" in parts:
+        if "packages/core/tests/integration/" in str(item.fspath).replace("\\", "/"):
             item.add_marker(pytest.mark.integration)
