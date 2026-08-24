@@ -50,6 +50,24 @@ class NL2SQLContext:
         logger.info(f"Loading policies configuration from {policies_config_path}")
         logger.info(f"Loading vector store configuration from {vector_store_path}")
 
+        # Validate vector store configuration first so misconfiguration fails fast,
+        # before secrets, datasource and LLM registries are constructed.
+        vector_store_collection_name = settings.vector_store_collection_name
+        if not vector_store_collection_name:
+            raise ValueError(
+                "VECTOR_STORE_COLLECTION name is not configured. "
+                "Set vector_store_collection_name in settings."
+            )
+
+        vector_store_path = vector_store_path or (
+            pathlib.Path(settings.vector_store_path) if settings.vector_store_path else None
+        )
+        if not vector_store_path:
+            raise ValueError(
+                "VECTOR_STORE path is not configured. "
+                "Pass vector_store_path or set vector_store_path in settings."
+            )
+
         cm = ConfigManager()
         self.tenant_id = settings.tenant_id
         self.config_manager = cm
@@ -74,7 +92,7 @@ class NL2SQLContext:
         self.rbac = RBAC(self.policies_cfg.roles)
 
         self.vector_store = VectorStore(
-            collection_name=settings.vector_store_collection_name,
+            collection_name=vector_store_collection_name,
             persist_directory=vector_store_path,
         )
         self.schema_store = build_schema_store(

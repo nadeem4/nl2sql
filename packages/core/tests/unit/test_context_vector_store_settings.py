@@ -58,6 +58,9 @@ def test_context_allows_explicit_vector_store_path(monkeypatch, tmp_path):
     secrets_path = _write_empty_secrets(tmp_path)
     monkeypatch.setattr(settings, "vector_store_collection_name", "nl2sql_store")
     monkeypatch.setattr(settings, "vector_store_path", "")
+    # Construction succeeds, so the LLM registry is built; a dummy key keeps the
+    # test hermetic (no network call is made at construction time).
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
 
     ctx = NL2SQLContext(
         **_demo_config_paths(root, secrets_path),
