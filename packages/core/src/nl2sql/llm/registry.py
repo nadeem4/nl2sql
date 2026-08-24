@@ -4,6 +4,13 @@ from .models import AgentConfig
 from typing import Dict, Any
 from threading import RLock
 
+# OpenRouter is an OpenAI-compatible gateway, so it is served by ChatOpenAI
+# with a different base URL rather than a dedicated client.
+OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+
+# Providers reachable through the OpenAI-compatible client.
+OPENAI_COMPATIBLE_PROVIDERS = ("openai", "openrouter")
+
 class LLMRegistry:
 
     def __init__(self, secret_manager: SecretManager ):
@@ -20,19 +27,34 @@ class LLMRegistry:
     def register_llm(self, agent: AgentConfig):
         with self._lock:
             self._configs[agent.name] = agent
-        if agent.provider == "openai":
+        if agent.provider in OPENAI_COMPATIBLE_PROVIDERS:
             self.register_openai_llm(agent)
         else:
             raise ValueError(f"Unsupported LLM provider: {agent.provider}")
 
     def register_openai_llm(self, agent: AgentConfig):
-        try:
-            from langchain_openai import ChatOpenAI
-        except ImportError:
-            raise ImportError("langchain-openai is not installed. Please install it using 'pip install langchain-openai'")
+        """Builds a ChatOpenAI client for OpenAI or any OpenAI-compatible endpoint.
 
+        A config-supplied ``base_url`` always wins, which is what lets this same
+        path serve vLLM, LiteLLM or a local proxy. Otherwise ``openrouter``
+        falls back to the OpenRouter gateway and ``openai`` keeps the stock
+        endpoint that ChatOpenAI resolves on its own.
+        """
         api_key = self.secret_manager.resolve_object(agent.api_key)
-        llm = ChatOpenAI(model=agent.model, api_key=api_key,temperature=agent.temperature, tags=[agent.name], seed=42)
+
+        base_url = agent.base_url
+        if not base_url and agent.provider == "openrouter":
+            base_url = OPENROUTER_BASE_URL
+
+        kwargs = {"base_url": base_url} if base_url else {}
+        llm = ChatOpenAI(
+            model=agent.model,
+            api_key=api_key,
+            temperature=agent.temperature,
+            tags=[agent.name],
+            seed=42,
+            **kwargs,
+        )
         with self._lock:
             self.llms[agent.name] = llm
 
@@ -40,9 +62,15 @@ class LLMRegistry:
     
     def get_llm(self, name: str) -> ChatOpenAI:
         with self._lock:
-            if name not in self.llms:
+            if name in self.llms:
+                return self.llms[name]
+            if "default" in self.llms:
                 return self.llms["default"]
-            return self.llms[name]
+            raise ValueError(
+                f"No LLM named '{name}' is configured and no 'default' LLM has "
+                "been registered. Add it to configs/llm.yaml (under 'agents', or "
+                "as the 'default' agent)."
+            )
     
 
     def get_llm_config(self, name: str) -> Dict[str, Any]:
