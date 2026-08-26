@@ -63,7 +63,7 @@ providers. The check runs on the read path only, so the fix is simply to re-run
 | `SCHEMA_STORE_MAX_VERSIONS` | `3` | Max schema versions retained per datasource. |
 | `RESULT_ARTIFACT_BACKEND` | `local` | Artifact backend: `local`, `s3`, `adls`. |
 | `RESULT_ARTIFACT_BASE_URI` | `./artifacts` | Base URI or path for artifact storage. |
-| `RESULT_ARTIFACT_PATH_TEMPLATE` | `<tenant_id>/<request_id>/<subgraph_name>/<dag_node_id>/<schema_version>/part-00000.parquet` | Template for artifact paths. |
+| `RESULT_ARTIFACT_PATH_TEMPLATE` | `<tenant_id>/<request_id>.parquet` | Artifact path relative to the backend root. Placeholders available: `<tenant_id>`, `<request_id>`, `<schema_version>`. |
 | `RESULT_ARTIFACT_S3_BUCKET` | `—` | S3 bucket for artifact storage. |
 | `RESULT_ARTIFACT_S3_PREFIX` | `—` | S3 prefix for artifact storage. |
 | `RESULT_ARTIFACT_ADLS_ACCOUNT` | `—` | ADLS storage account name. |

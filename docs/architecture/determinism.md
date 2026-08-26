@@ -48,19 +48,19 @@
 - Deterministic (conditional): Retry routing decisions depend on current retry count and error retryability flags; deterministic if state is unchanged ([`pipeline/subgraphs/sql_agent.py`](../../packages/core/src/nl2sql/pipeline/subgraphs/sql_agent.py)).
 
 ### Artifact Storage and Hashing
-- Deterministic: Local artifact content hashes are computed from a sorted JSON payload (columns, row_count, path), giving stable hashes for the same payload ([`execution/artifacts/local_store.py`](../../packages/core/src/nl2sql/execution/artifacts/local_store.py)).
-- Non-deterministic: Artifact refs include `created_at=datetime.utcnow()`; this is time-based and changes for each creation ([`execution/artifacts/base.py`](../../packages/core/src/nl2sql/execution/artifacts/base.py)).
-- Deterministic (conditional): Upload paths are deterministic given `tenant_id` and `request_id`, but the request ID origin is external to this module ([`execution/artifacts/local_store.py`](../../packages/core/src/nl2sql/execution/artifacts/local_store.py)).
+- Deterministic: Artifact content hashes are computed from a sorted JSON payload (columns, row_count, path), giving stable hashes for the same payload ([`execution/artifacts/store.py`](../../packages/core/src/nl2sql/execution/artifacts/store.py)).
+- Non-deterministic: Artifact refs include `created_at=datetime.utcnow()`; this is time-based and changes for each creation ([`execution/artifacts/store.py`](../../packages/core/src/nl2sql/execution/artifacts/store.py)).
+- Deterministic (conditional): Upload paths are deterministic given `tenant_id` and `request_id`, but the request ID origin is external to this module ([`execution/artifacts/store.py`](../../packages/core/src/nl2sql/execution/artifacts/store.py)).
 
 ### State Mutation and Merge Semantics
 - Deterministic: Decomposer returns sorted sub-queries, combine groups, and post-combine ops by ID to stabilize downstream ordering ([`pipeline/nodes/decomposer/node.py`](../../packages/core/src/nl2sql/pipeline/nodes/decomposer/node.py)).
 - Potentially non-deterministic: GraphState merges dict fields with a last-write-wins reducer and concatenates lists; in parallel branches, merge order is not constrained in this code ([`pipeline/state.py`](../../packages/core/src/nl2sql/pipeline/state.py)).
 
 ### Hashing/Fingerprinting
-- Deterministic: Stable hashing is consistently performed with sorted JSON and fixed separators for sub-query IDs, DAG hashes, schema fingerprints, and artifact content hashes ([`pipeline/nodes/decomposer/node.py`](../../packages/core/src/nl2sql/pipeline/nodes/decomposer/node.py), [`pipeline/nodes/global_planner/node.py`](../../packages/core/src/nl2sql/pipeline/nodes/global_planner/node.py), [`schema/protocol.py`](../../packages/core/src/nl2sql/schema/protocol.py), [`execution/artifacts/local_store.py`](../../packages/core/src/nl2sql/execution/artifacts/local_store.py)).
+- Deterministic: Stable hashing is consistently performed with sorted JSON and fixed separators for sub-query IDs, DAG hashes, schema fingerprints, and artifact content hashes ([`pipeline/nodes/decomposer/node.py`](../../packages/core/src/nl2sql/pipeline/nodes/decomposer/node.py), [`pipeline/nodes/global_planner/node.py`](../../packages/core/src/nl2sql/pipeline/nodes/global_planner/node.py), [`schema/protocol.py`](../../packages/core/src/nl2sql/schema/protocol.py), [`execution/artifacts/store.py`](../../packages/core/src/nl2sql/execution/artifacts/store.py)).
 
 ### Time-Based Logic and Runtime Controls
-- Non-deterministic: Schema versions and artifact creation timestamps are derived from wall-clock time ([`schema/in_memory_store.py`](../../packages/core/src/nl2sql/schema/in_memory_store.py), [`schema/sqlite_store.py`](../../packages/core/src/nl2sql/schema/sqlite_store.py), [`execution/artifacts/base.py`](../../packages/core/src/nl2sql/execution/artifacts/base.py)).
+- Non-deterministic: Schema versions and artifact creation timestamps are derived from wall-clock time ([`schema/in_memory_store.py`](../../packages/core/src/nl2sql/schema/in_memory_store.py), [`schema/sqlite_store.py`](../../packages/core/src/nl2sql/schema/sqlite_store.py), [`execution/artifacts/store.py`](../../packages/core/src/nl2sql/execution/artifacts/store.py)).
 - Deterministic (conditional): Pipeline timeout handling is based on monotonic time; timeouts and cancellations depend on wall-clock progression and runtime scheduling ([`pipeline/runtime.py`](../../packages/core/src/nl2sql/pipeline/runtime.py)).
 
 ### External Calls
