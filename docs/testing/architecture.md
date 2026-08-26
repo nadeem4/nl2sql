@@ -13,7 +13,16 @@ packages/api/tests/  # FastAPI route and service tests (stubbed engine)
 packages/cli/tests/  # CLI command tests
 ```
 
-`pytest.ini` defines test paths and markers.
+`pytest.ini` defines test paths and markers. Dev/test tooling lives in the root
+`pyproject.toml` under `[dependency-groups] dev` (`pip install --group dev`).
+
+## Randomised test order
+
+`pytest-randomly` shuffles the order of tests on every run, which turns
+order-dependent tests - shared class-level caches, leaked globals, fixtures that
+do not unwind - into loud local failures rather than intermittent CI ones. Each
+run prints the seed it used; reproduce a failure with
+`pytest -p randomly --randomly-seed=<seed>`.
 
 ```mermaid
 flowchart TD
