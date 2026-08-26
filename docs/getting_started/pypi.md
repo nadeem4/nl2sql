@@ -114,6 +114,11 @@ default:
   api_key: ${env:OPENROUTER_API_KEY}
 ```
 
+A local [Ollama](https://ollama.com) daemon is configured the same way, with
+`provider: ollama` and no `api_key`; how well a given local model handles the
+pipeline's structured output varies by model, so see
+[LLM configuration → Ollama](../configuration/llm.md#ollama) first.
+
 Note that OpenRouter serves chat completions only. Embeddings are selected
 separately with `EMBEDDING_PROVIDER`: the default `openai` means `nl2sql index`
 needs `OPENAI_API_KEY` set as well, while `EMBEDDING_PROVIDER=local` embeds with

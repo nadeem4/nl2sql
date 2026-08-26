@@ -23,11 +23,11 @@ Source:
 Fields:
 | name | type | required | meaning |
 | --- | --- | --- | --- |
-| `provider` | `str` | yes | Provider name: `openai` or `openrouter`. |
+| `provider` | `str` | yes | Provider name: `openai`, `openrouter` or `ollama`. |
 | `model` | `str` | yes | Model identifier. |
 | `temperature` | `float` | no | Sampling temperature (default `0.0`). |
 | `api_key` | `Optional[SecretStr]` | no | API key or secret reference. |
-| `base_url` | `Optional[str]` | no | Endpoint override; defaults to the OpenRouter gateway when `provider` is `openrouter`. |
+| `base_url` | `Optional[str]` | no | Endpoint override; defaults to the provider preset (`https://openrouter.ai/api/v1` for `openrouter`, `http://localhost:11434/v1` for `ollama`). |
 | `name` | `str` | no | Agent name (default `default`). |
 
 !!! note
@@ -65,13 +65,15 @@ Returns:
 `None`.
 
 Raises:
-- `ValueError` for unsupported provider.
+- `ValueError` for an unsupported provider or an empty model.
 
 Side Effects:
-- Registers LLM config and instantiates provider client.
+- Registers the LLM config. The provider client is built lazily, on the first
+  `LLMRegistry.get_llm()` for that agent.
 
 Idempotency:
-- Re-registering same `name` overwrites config and client.
+- Re-registering same `name` overwrites the config and drops any client already
+  built from the previous one.
 
 ### LLM_API.configure_llm_from_config
 
@@ -102,13 +104,26 @@ Returns:
 Map of LLM name → config (API key excluded).
 
 ## Behavioral Contracts
-- Providers supported in the core registry are `openai` and `openrouter`
-  (enforced by `LLMRegistry`); anything else raises
-  `ValueError: Unsupported LLM provider`.
-- Both are served by `ChatOpenAI`. `openrouter` defaults to
-  `https://openrouter.ai/api/v1`; a config-supplied `base_url` overrides that
-  default and also lets the same path serve any other OpenAI-compatible
-  endpoint (vLLM, LiteLLM, a local proxy).
+- Providers supported in the core registry are `openai`, `openrouter` and
+  `ollama`, held in `PROVIDER_PRESETS` in `llm/registry.py`; anything else raises
+  `ValueError: Unsupported LLM provider`, naming the valid ones.
+- All three are served by `ChatOpenAI` and differ only by preset: `openai` uses
+  the client's own default endpoint, `openrouter` defaults to
+  `https://openrouter.ai/api/v1`, `ollama` to `http://localhost:11434/v1`. A
+  config-supplied `base_url` overrides the preset, which also lets the same path
+  serve any other OpenAI-compatible endpoint (vLLM, LiteLLM, a local proxy).
+- `openai` and `openrouter` require an API key; `ollama` does not, and its preset
+  supplies the placeholder key `ChatOpenAI` insists on.
+- Clients are built lazily. `register_llm()` validates the provider and model and
+  stores the config; `get_llm()` builds the client on first use and caches it
+  under the registry lock, so a context can be constructed with no credentials.
+  A provider that needs a key and cannot resolve one raises a `ValueError` naming
+  the agent, the provider and the environment variable to set - not the raw
+  `openai.OpenAIError: Missing credentials`.
+- Ollama is supported at the transport level. The pipeline calls
+  `with_structured_output` (including the recursive `PlanModel` in the AST
+  planner), so results depend on the chosen local model's structured-output
+  capability.
 - `LLMRegistry.get_llm()` falls back to `default` if the name is missing, and
   raises `ValueError` naming the missing agent when no `default` is registered
   either.
