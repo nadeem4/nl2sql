@@ -75,7 +75,7 @@ def demo_env() -> SimpleNamespace:
     monkeypatch.setattr(
         settings,
         "result_artifact_path_template",
-        "<tenant_id>/<request_id>/<subgraph_name>/<dag_node_id>/<schema_version>/part-00000.parquet",
+        "<tenant_id>/<request_id>.parquet",
     )
     monkeypatch.setattr(settings, "vector_store_collection_name", collection_name)
     monkeypatch.setattr(settings, "vector_store_path", str(vector_store_path))

@@ -21,8 +21,7 @@ from nl2sql.pipeline.nodes.global_planner.schemas import (
     GlobalPlannerResponse,
 )
 from nl2sql.pipeline.state import GraphState
-from nl2sql.execution.artifacts.base import ArtifactStoreConfig
-from nl2sql.execution.artifacts.local_store import LocalArtifactStore
+from nl2sql.execution.artifacts import ArtifactStore, ArtifactStoreConfig
 from nl2sql_adapter_sdk.contracts import ResultFrame
 from nl2sql.common.errors import ErrorSeverity
 
@@ -124,7 +123,7 @@ def test_aggregator_real_data(demo_env) -> None:
         edges=[LogicalEdge(edge_id="edge_f", from_id="sq_1", to_id="op_filter")],
     )
 
-    store = LocalArtifactStore(
+    store = ArtifactStore(
         ArtifactStoreConfig(
             backend="local",
             base_uri=settings.result_artifact_base_uri,
