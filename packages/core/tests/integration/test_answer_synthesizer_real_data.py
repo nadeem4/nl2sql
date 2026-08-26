@@ -129,7 +129,7 @@ def _build_aggregator_response() -> AggregatorResponse:
             path_template=settings.result_artifact_path_template,
         )
     )
-    artifact = store.write_result_frame(
+    artifact = store.create_artifact_ref(
         ResultFrame.from_row_dicts([{"value": 5}, {"value": 20}]),
         {
             "tenant_id": "t1",
