@@ -5,8 +5,10 @@ from pydantic import BaseModel, Field, SecretStr, field_serializer
 class AgentConfig(BaseModel):
     """Configuration for a specific agent's LLM.
 
-    NOTE: this model is duplicated in ``nl2sql.llm.models``, which is what
-    ``LLMRegistry`` consumes. Keep the two in sync until they are unified.
+    The single definition. ``nl2sql.llm.models`` re-exports this class, so
+    ``ConfigManager``/``LLMGenerator`` and ``LLMRegistry`` share one model.
+    Do not add a second copy: the previous duplicate silently swallowed a fix
+    applied to only one of the two.
     """
     provider: str
     model: str

@@ -18,7 +18,7 @@ Configure LLM providers and expose LLM configurations by name.
 ### AgentConfig
 
 Source:
-`packages/core/src/nl2sql/llm/models.py`
+`packages/core/src/nl2sql/configs/llm.py`
 
 Fields:
 | name | type | required | meaning |
@@ -31,10 +31,12 @@ Fields:
 | `name` | `str` | no | Agent name (default `default`). |
 
 !!! note
-    `AgentConfig` is duplicated in `packages/core/src/nl2sql/configs/llm.py`
-    (read/written by `ConfigManager` and `LLMGenerator`) and in
-    `packages/core/src/nl2sql/llm/models.py` (consumed by `LLMRegistry`). The
-    two must be kept in sync until they are unified.
+    There is one definition, in `packages/core/src/nl2sql/configs/llm.py`
+    (read/written by `ConfigManager` and `LLMGenerator`).
+    `packages/core/src/nl2sql/llm/models.py` re-exports it for `LLMRegistry`,
+    so `nl2sql.llm.AgentConfig` and `nl2sql.configs.AgentConfig` are the same
+    class. It used to be duplicated, and a fix applied to only one copy
+    silently did nothing.
 
 ### LLMFileConfig
 
