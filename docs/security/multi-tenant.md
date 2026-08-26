@@ -8,15 +8,15 @@ Multi-tenancy is enforced through **context propagation**, **artifact partitioni
 flowchart TD
     Settings[Settings.tenant_id] --> Context[NL2SQLContext.tenant_id]
     Context --> Executor[ExecutorNode/ExecutorRequest]
-    Executor --> Artifacts[ArtifactStore.get_upload_path]
+    Executor --> Artifacts[ArtifactStore.create_artifact_ref]
 ```
 
 ## Storage isolation
 
-The local artifact backend persists data under:
+Artifacts are persisted under a tenant-partitioned path on every backend, driven by `RESULT_ARTIFACT_PATH_TEMPLATE` (default `<tenant_id>/<request_id>.parquet`):
 
 ```
-<result_artifact_base_uri>/<tenant_id>/<request_id>.parquet
+<backend root>/<tenant_id>/<request_id>.parquet
 ```
 
 This ensures per-tenant isolation for artifacts, and downstream aggregation only reads referenced artifacts from the current request.
@@ -31,5 +31,5 @@ RBAC evaluates `UserContext.roles` against policies defined in `configs/policies
 
 - Tenant settings: `packages/core/src/nl2sql/common/settings.py`
 - Context initialization: `packages/core/src/nl2sql/context.py`
-- Artifact paths: `packages/core/src/nl2sql/execution/artifacts/local_store.py`
+- Artifact paths: `packages/core/src/nl2sql/execution/artifacts/store.py`
 - RBAC: `packages/core/src/nl2sql/auth/rbac.py`

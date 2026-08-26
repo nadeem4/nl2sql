@@ -13,8 +13,7 @@ from nl2sql.pipeline.nodes.global_planner.schemas import GlobalPlannerResponse
 from nl2sql.pipeline.state import GraphState
 from nl2sql_adapter_sdk.contracts import ResultFrame
 from nl2sql.common.errors import ErrorCode
-from nl2sql.execution.artifacts.base import ArtifactStoreConfig
-from nl2sql.execution.artifacts.local_store import LocalArtifactStore
+from nl2sql.execution.artifacts import ArtifactStore, ArtifactStoreConfig
 from nl2sql.common.settings import settings
 
 
@@ -49,7 +48,7 @@ def test_aggregator_filters_rows_deterministically(monkeypatch):
             "result_artifact_path_template",
             "<tenant_id>/<request_id>/<subgraph_name>/<dag_node_id>/<schema_version>/part-00000.parquet",
         )
-        store = LocalArtifactStore(
+        store = ArtifactStore(
             ArtifactStoreConfig(
                 backend="local",
                 base_uri=tmpdir,
@@ -111,7 +110,7 @@ def test_aggregator_join_requires_keys(monkeypatch):
             "result_artifact_path_template",
             "<tenant_id>/<request_id>/<subgraph_name>/<dag_node_id>/<schema_version>/part-00000.parquet",
         )
-        store = LocalArtifactStore(
+        store = ArtifactStore(
             ArtifactStoreConfig(
                 backend="local",
                 base_uri=tmpdir,
@@ -195,7 +194,7 @@ def test_aggregator_post_aggregate_sum(monkeypatch):
             "result_artifact_path_template",
             "<tenant_id>/<request_id>/<subgraph_name>/<dag_node_id>/<schema_version>/part-00000.parquet",
         )
-        store = LocalArtifactStore(
+        store = ArtifactStore(
             ArtifactStoreConfig(
                 backend="local",
                 base_uri=tmpdir,
@@ -266,7 +265,7 @@ def test_aggregator_post_sort_limit(monkeypatch):
             "result_artifact_path_template",
             "<tenant_id>/<request_id>/<subgraph_name>/<dag_node_id>/<schema_version>/part-00000.parquet",
         )
-        store = LocalArtifactStore(
+        store = ArtifactStore(
             ArtifactStoreConfig(
                 backend="local",
                 base_uri=tmpdir,
@@ -325,7 +324,7 @@ def test_aggregator_union_combines_rows(monkeypatch):
             "result_artifact_path_template",
             "<tenant_id>/<request_id>/<subgraph_name>/<dag_node_id>/<schema_version>/part-00000.parquet",
         )
-        store = LocalArtifactStore(
+        store = ArtifactStore(
             ArtifactStoreConfig(
                 backend="local",
                 base_uri=tmpdir,

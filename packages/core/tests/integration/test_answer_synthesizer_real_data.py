@@ -23,8 +23,7 @@ from nl2sql.pipeline.nodes.global_planner.schemas import (
 )
 from nl2sql.pipeline.nodes.aggregator.schemas import AggregatorResponse
 from nl2sql.pipeline.state import GraphState
-from nl2sql.execution.artifacts.base import ArtifactStoreConfig
-from nl2sql.execution.artifacts.local_store import LocalArtifactStore
+from nl2sql.execution.artifacts import ArtifactStore, ArtifactStoreConfig
 from nl2sql_adapter_sdk.contracts import ResultFrame
 
 
@@ -123,7 +122,7 @@ def _build_aggregator_response() -> AggregatorResponse:
         edges=[LogicalEdge(edge_id="edge_f", from_id="sq_1", to_id="op_filter")],
     )
 
-    store = LocalArtifactStore(
+    store = ArtifactStore(
         ArtifactStoreConfig(
             backend="local",
             base_uri=settings.result_artifact_base_uri,

@@ -101,9 +101,13 @@ class Settings(BaseSettings):
         description="Base URI or path for artifact storage."
     )
     result_artifact_path_template: str = Field(
-        default="<tenant_id>/<request_id>/<subgraph_name>/<dag_node_id>/<schema_version>/part-00000.parquet",
+        default="<tenant_id>/<request_id>.parquet",
         validation_alias="RESULT_ARTIFACT_PATH_TEMPLATE",
-        description="Template for artifact paths."
+        description=(
+            "Template for artifact paths, relative to the backend root. "
+            "Placeholders are <key> names resolved from executor metadata; "
+            "the executor supplies tenant_id, request_id and schema_version."
+        )
     )
     result_artifact_s3_bucket: Optional[str] = Field(
         default=None,

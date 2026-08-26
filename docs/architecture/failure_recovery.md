@@ -34,7 +34,7 @@ Failure in this system is represented as structured `PipelineError` objects accu
 
 ### Storage
 - Schema store uses SQLite or in-memory storage; failures manifest as exceptions on read/write (not caught in callers).
-- Artifact store is invoked by the SQL executor; aggregation loads artifacts via `AggregationEngine.load_scan()` using `ArtifactRef` URIs. Local, S3, and ADLS backends exist in this repository (see `../storage/artifact-store.md` for implementation details and limitations).
+- Artifact store is invoked by the SQL executor; aggregation loads artifacts via `AggregationEngine.load_scan()` using `ArtifactRef` URIs. A single store serves the local, S3, and ADLS backends; only local is verified against real storage (see `../storage/artifact-store.md`).
 - Result store and execution store are in-memory only and not used for recovery.
 
 ---
@@ -114,8 +114,8 @@ Failure in this system is represented as structured `PipelineError` objects accu
 - Aggregator expects an artifact for each scan node; missing artifacts raise and are surfaced as `AGGREGATOR_FAILED`.
 
 ### Overwrites
-- For S3/ADLS backends, `RESULT_ARTIFACT_PATH_TEMPLATE` is intended to render paths with `tenant_id`, `request_id`, `subgraph_name`, `dag_node_id`, and `schema_version`, but path rendering is not implemented in this repo (see `../storage/artifact-store.md`).
-- For the local backend, paths are `<result_artifact_base_uri>/<tenant_id>/<request_id>.parquet`, so repeat execution with the same trace ID targets the same file.
+- `RESULT_ARTIFACT_PATH_TEMPLATE` renders the artifact path for every backend from the metadata the executor supplies (`tenant_id`, `request_id`, `schema_version`); an unfillable placeholder raises rather than writing a bad path (see `../storage/artifact-store.md`).
+- With the default template, paths are `<backend root>/<tenant_id>/<request_id>.parquet`, so repeat execution with the same trace ID targets the same object.
 
 ### Cleanup
 - No cleanup or rollback is implemented for artifacts or partial aggregation results.
