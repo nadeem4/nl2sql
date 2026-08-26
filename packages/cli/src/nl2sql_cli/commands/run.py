@@ -1,6 +1,5 @@
 import sys
 import json
-from typing import Optional
 
 from nl2sql.datasources import DatasourceRegistry
 from nl2sql.llm import LLMRegistry
@@ -56,64 +55,31 @@ def run_pipeline(
     final_state = result.final_state
     
 
-    result_refs = final_state.get("result_refs", {})
-    sub_queries = final_state.get("sub_queries", [])
-    sq_map = {sq.id: sq for sq in sub_queries}
-
     query_history = []
     subgraph_outputs = final_state.get("subgraph_outputs") or {}
-    if subgraph_outputs:
-        for _subgraph_id, output in subgraph_outputs.items():
-            if isinstance(output, dict):
-                sub_query = output.get("sub_query")
-                sql_draft = output.get("sql_draft")
-            else:
-                sub_query = getattr(output, "sub_query", None)
-                sql_draft = getattr(output, "sql_draft", None)
+    for _subgraph_id, output in subgraph_outputs.items():
+        if isinstance(output, dict):
+            sub_query = output.get("sub_query")
+            sql_draft = output.get("sql_draft")
+        else:
+            sub_query = getattr(output, "sub_query", None)
+            sql_draft = getattr(output, "sql_draft", None)
 
-            if not sub_query:
-                continue
+        if not sub_query:
+            continue
 
-            if isinstance(sub_query, dict):
-                sq_id = sub_query.get("id")
-                ds_id = sub_query.get("datasource_id")
-                intent = sub_query.get("intent")
-            else:
-                sq_id = getattr(sub_query, "id", None)
-                ds_id = getattr(sub_query, "datasource_id", None)
-                intent = getattr(sub_query, "intent", None)
+        if isinstance(sub_query, dict):
+            ds_id = sub_query.get("datasource_id")
+            intent = sub_query.get("intent")
+        else:
+            ds_id = getattr(sub_query, "datasource_id", None)
+            intent = getattr(sub_query, "intent", None)
 
-            entry: Dict[str, Any] = {
-                "sub_query": intent,
-                "datasource_id": ds_id,
-                "sql": sql_draft,
-            }
-
-            result_id = result_refs.get(sq_id)
-            if result_id:
-                frame = ctx.result_store.get(result_id)
-                metadata = ctx.result_store.get_metadata(result_id)
-                entry["datasource_id"] = metadata.get("datasource_id", ds_id)
-                entry["execution"] = {
-                    "row_count": frame.row_count,
-                    "columns": [c.name for c in frame.columns],
-                }
-
-            query_history.append(entry)
-    else:
-        for sq_id, result_id in result_refs.items():
-            sq = sq_map.get(sq_id)
-            if sq:
-                frame = ctx.result_store.get(result_id)
-                metadata = ctx.result_store.get_metadata(result_id)
-                query_history.append({
-                    "sub_query": sq.intent,
-                    "datasource_id": metadata.get("datasource_id", sq.datasource_id),
-                    "execution": {
-                        "row_count": frame.row_count,
-                        "columns": [c.name for c in frame.columns],
-                    },
-                })
+        query_history.append({
+            "sub_query": intent,
+            "datasource_id": ds_id,
+            "sql": sql_draft,
+        })
     
     if config.verbose:
         reasoning = final_state.get("reasoning", [])
