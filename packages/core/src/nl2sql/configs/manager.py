@@ -3,7 +3,7 @@ import yaml
 import json
 import shutil
 import pathlib
-from typing import List, Dict, Any, Optional, Union
+from typing import List, Dict, Optional, Union
 from pydantic import ValidationError
 
 from nl2sql.common.settings import settings
@@ -17,6 +17,11 @@ class ConfigManager:
     """
     Centralized manager for reading and writing application configuration.
     Enforces consistency and handles file I/O for Datasources, LLMs, Policies, and Secrets.
+
+    Secret references such as ``${env:VAR}`` are returned verbatim. Resolution
+    happens at point of use, in ``DatasourceRegistry`` and ``LLMRegistry``.
+    Do not resolve them here: a resolved config written back to disk would
+    persist real credentials in plaintext.
     """
 
     def __init__(self, project_root: Optional[pathlib.Path] = None):
@@ -43,15 +48,6 @@ class ConfigManager:
             if not path.parent.exists():
                 path.parent.mkdir(parents=True, exist_ok=True)
 
-    def _resolve_secrets(self, obj: Any) -> Any:
-        """Helper to resolve secrets using the Secrets Manager."""
-        try:
-            from nl2sql.secrets.manager import secret_manager
-            return secret_manager.resolve_object(obj)
-        except ImportError:
-            return obj
-
-
     def load_datasources(self, path: Optional[pathlib.Path] = None) -> List[DatasourceConfig]:
         """
         Loads datasource configurations from YAML.
@@ -73,8 +69,7 @@ class ConfigManager:
         try:
             # Structurally validate the file envelope
             file_config = DatasourceFileConfig.model_validate(raw)
-            configs = file_config.datasources
-            return self._resolve_secrets(configs)
+            return file_config.datasources
         except ValidationError as e:
             raise ValueError(f"Datasource Configuration Invalid: {e}")
 
@@ -92,8 +87,7 @@ class ConfigManager:
             data = yaml.safe_load(target_path.read_text()) or {}
             
             # Use File Config for validation
-            config = LLMFileConfig.model_validate(data)
-            return self._resolve_secrets(config)
+            return LLMFileConfig.model_validate(data)
         except ValidationError as e:
             raise ValueError(f"LLM Configuration Invalid: {e}")
 
@@ -134,9 +128,7 @@ class ConfigManager:
             raw = yaml.safe_load(content) or []
             
             file_config = SecretsFileConfig.model_validate(raw)
-            configs = file_config.providers
-            
-            return self._resolve_secrets(configs)
+            return file_config.providers
         except ValidationError as e:
             raise ValueError(f"Secret Configuration Invalid: {e}")
         except Exception as e:

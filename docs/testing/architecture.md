@@ -13,7 +13,10 @@ packages/api/tests/  # FastAPI route and service tests (stubbed engine)
 packages/cli/tests/  # CLI command tests
 ```
 
-`pytest.ini` defines test paths and markers. Dev/test tooling lives in the root
+`pytest.ini` is the single source of truth for pytest configuration - test
+paths, markers, and `addopts`. Do not add a `[tool.pytest.ini_options]` table
+to `pyproject.toml`: pytest reads only one config file, and `pytest.ini` wins,
+so such a table is silently ignored. Dev/test tooling lives in the root
 `pyproject.toml` under `[dependency-groups] dev` (`pip install --group dev`).
 
 ## Randomised test order

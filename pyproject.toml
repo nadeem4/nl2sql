@@ -21,6 +21,3 @@ dev = [
   "pytest-randomly",
 ]
 
-[tool.pytest.ini_options]
-testpaths = ["packages/core/tests", "packages/adapter-sdk/tests", "packages/adapters/postgres/tests"]
-pythonpath = ["packages/core/src", "packages/adapter-sdk/src", "packages/adapters/postgres/src"]

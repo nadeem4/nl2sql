@@ -26,13 +26,10 @@ from nl2sql_cli.demo import DemoManager
 
 logger = get_logger(__name__)
 
-# Resolve Project Root (Robust to CWD)
-try:
-    PROJECT_ROOT = pathlib.Path(__file__).resolve().parents[5]
-    if not (PROJECT_ROOT / "configs").exists():
-        PROJECT_ROOT = pathlib.Path.cwd()
-except Exception:
-    PROJECT_ROOT = pathlib.Path.cwd()
+# The CLI writes where it is invoked. Do not resolve this from __file__:
+# that walks up out of the installed module and, in a source checkout,
+# lands on the repo root instead of the user's working directory.
+PROJECT_ROOT = pathlib.Path.cwd()
 
 CONFIG_DIR = PROJECT_ROOT / "configs"
 DATASOURCE_CONFIG = CONFIG_DIR / "datasources.yaml"
