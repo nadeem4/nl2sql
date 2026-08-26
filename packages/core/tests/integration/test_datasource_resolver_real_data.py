@@ -20,6 +20,14 @@ from nl2sql.pipeline.nodes.datasource_resolver.node import DatasourceResolverNod
 from nl2sql.pipeline.state import GraphState
 
 
+# The node under test needs no LLM. These are marked `llm` only because the
+# indexing fixture calls IndexingOrchestrator.index_datasource, which eagerly
+# builds the 'indexing_enrichment' client before reaching the try/except that is
+# supposed to make enrichment optional. Drop this marker once that is fixed --
+# every test in this module passes key-free with enrichment skipped.
+pytestmark = pytest.mark.llm
+
+
 def _project_root() -> Path:
     return Path(__file__).resolve().parents[4]
 

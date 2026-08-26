@@ -27,6 +27,11 @@ from nl2sql.execution.artifacts import ArtifactStore, ArtifactStoreConfig
 from nl2sql_adapter_sdk.contracts import ResultFrame
 
 
+# The node under test builds an LLM client in its constructor, so these cannot
+# run without a real key. See docs/testing/architecture.md.
+pytestmark = pytest.mark.llm
+
+
 def _project_root() -> Path:
     return Path(__file__).resolve().parents[4]
 

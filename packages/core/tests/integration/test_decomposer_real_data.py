@@ -21,6 +21,11 @@ from nl2sql.pipeline.nodes.decomposer.schemas import DecomposerResponse
 from nl2sql.pipeline.state import GraphState
 
 
+# The node under test builds an LLM client in its constructor, so these cannot
+# run without a real key. See docs/testing/architecture.md.
+pytestmark = pytest.mark.llm
+
+
 def _project_root() -> Path:
     return Path(__file__).resolve().parents[4]
 
