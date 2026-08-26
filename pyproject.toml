@@ -12,6 +12,15 @@ dependencies = [
   # Core dependencies are in packages/core
 ]
 
+# Dev/test tooling (PEP 735). Install with: pip install --group dev
+# pytest-randomly shuffles test order every run, so order-dependent tests -
+# shared caches, leaked globals - fail loudly instead of only in CI.
+[dependency-groups]
+dev = [
+  "pytest",
+  "pytest-randomly",
+]
+
 [tool.pytest.ini_options]
 testpaths = ["packages/core/tests", "packages/adapter-sdk/tests", "packages/adapters/postgres/tests"]
 pythonpath = ["packages/core/src", "packages/adapter-sdk/src", "packages/adapters/postgres/src"]

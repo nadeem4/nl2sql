@@ -36,11 +36,21 @@ python -m pip install -e packages/adapters/postgres
 
 ## Running tests
 
+Install the dev tooling (PEP 735 dependency group) first:
+
+```bash
+python -m pip install --group dev
+```
+
 Unit tests:
 
 ```bash
 pytest packages/core/tests/unit
 ```
+
+`pytest-randomly` shuffles test order on every run, so tests that depend on the
+order they run in fail locally instead of only in CI. Reproduce a failing run
+with the seed it prints: `pytest -p randomly --randomly-seed=<seed>`.
 
 Integration tests (requires Docker):
 

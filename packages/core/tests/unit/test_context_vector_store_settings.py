@@ -72,3 +72,29 @@ def test_context_allows_explicit_vector_store_path(monkeypatch, tmp_path):
     )
 
     assert Path(ctx.vector_store.persist_directory) == tmp_path
+
+
+def test_context_constructs_without_any_credentials(monkeypatch, tmp_path):
+    """A context must build on a machine with no API key configured.
+
+    LLM clients are built on first use, so `nl2sql setup --demo` and indexing
+    (key-free since local embeddings landed) no longer need a chat provider key
+    just to construct the registries.
+    """
+    root = _project_root()
+    secrets_path = _write_empty_secrets(tmp_path)
+    monkeypatch.setattr(settings, "vector_store_collection_name", "nl2sql_store")
+    monkeypatch.setattr(settings, "vector_store_path", "")
+    monkeypatch.setattr(settings, "embedding_provider", "local")
+    monkeypatch.setattr(settings, "openai_api_key", "")
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
+    ctx = NL2SQLContext(
+        **_demo_config_paths(root, secrets_path),
+        vector_store_path=tmp_path,
+    )
+
+    # The configuration is registered; only building the client needs the key.
+    assert ctx.llm_registry.get_llm_config("default")["provider"] == "openai"
+    with pytest.raises(ValueError, match="OPENAI_API_KEY"):
+        ctx.llm_registry.get_llm("default")

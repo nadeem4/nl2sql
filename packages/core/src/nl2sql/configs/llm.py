@@ -15,9 +15,10 @@ class AgentConfig(BaseModel):
     base_url: Optional[str] = Field(
         None,
         description=(
-            "Override the provider endpoint. Required for OpenAI-compatible "
-            "gateways; defaults to the OpenRouter gateway when provider is "
-            "'openrouter'."
+            "Override the provider endpoint. Defaults to the provider preset: "
+            "the OpenRouter gateway for 'openrouter', the local Ollama daemon "
+            "for 'ollama', the client default for 'openai'. Set it to reach any "
+            "other OpenAI-compatible endpoint."
         ),
     )
     name: str = Field("default", description="Name of the agent")
