@@ -27,7 +27,7 @@ nl2sql setup --demo --docker
 `--lite` and `--docker` are mutually exclusive; lite is the default when neither
 is given.
 
-This writes:
+This writes the following, relative to the directory you run the command in:
 
 - SQLite databases in `data/demo_lite/`
 - `configs/datasources.demo.yaml`

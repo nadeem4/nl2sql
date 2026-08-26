@@ -39,6 +39,9 @@ Interactive guide to install Core, missing adapters, and trigger schema indexing
 nl2sql setup
 ```
 
+The wizard writes `configs/`, `.env.*` and the vector store into the directory
+you run it from, so `cd` to your project first.
+
 **Install Adapters**:
 Easily install specific database adapters.
 
