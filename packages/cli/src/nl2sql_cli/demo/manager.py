@@ -3,6 +3,7 @@ import pathlib
 import subprocess
 import yaml
 from rich.console import Console
+from rich.markup import escape
 from nl2sql.configs import (
     ConfigManager, 
     LLMFileConfig, 
@@ -40,13 +41,13 @@ class DemoManager:
         self.factory = DemoDataFactory(seed=42)
 
     def print_step(self, msg: str):
-        self.console.print(f"[dim]{msg}[/dim]")
+        self.console.print(f"[dim]{escape(str(msg))}[/dim]")
     
     def print_success(self, msg: str):
-        self.console.print(f"[green][OK][/green] {msg}")
+        self.console.print(f"[green][OK][/green] {escape(str(msg))}")
 
     def print_error(self, msg: str):
-        self.console.print(f"[red][ERROR] {msg}[/red]")
+        self.console.print(f"[red][ERROR] {escape(str(msg))}[/red]")
 
     def setup_lite(self, api_key: Optional[str] = None):
         """Sets up the SQLite-based demo environment."""

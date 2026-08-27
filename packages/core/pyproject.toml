@@ -14,7 +14,7 @@ dependencies = [
     "langchain>=0.2.0",
     "langchain-chroma>=0.1.0",
     "langchain-openai>=0.1.0",
-    "nl2sql-adapter-sdk",
+    "nl2sql-adapter-sdk~=0.1",
     "pydantic>=1.10",
     "opentelemetry-api>=1.20.0",
     "opentelemetry-sdk>=1.20.0",
@@ -32,17 +32,17 @@ dependencies = [
 aws = ["boto3"]
 azure = ["azure-identity", "azure-keyvault-secrets"]
 hashicorp = ["hvac"]
-mssql = ["nl2sql-mssql"]
-mysql = ["nl2sql-mysql"]
-postgres = ["nl2sql-postgres"]
-sqlite = ["nl2sql-sqlite"]
-sqlalchemy = ["nl2sql-adapter-sqlalchemy"]
+mssql = ["nl2sql-mssql~=0.1"]
+mysql = ["nl2sql-mysql~=0.1"]
+postgres = ["nl2sql-postgres~=0.1"]
+sqlite = ["nl2sql-sqlite~=0.1"]
+sqlalchemy = ["nl2sql-adapter-sqlalchemy~=0.1"]
 all = [
-    "nl2sql-adapter-sqlalchemy",
-    "nl2sql-mssql",
-    "nl2sql-mysql",
-    "nl2sql-postgres",
-    "nl2sql-sqlite"
+    "nl2sql-adapter-sqlalchemy~=0.1",
+    "nl2sql-mssql~=0.1",
+    "nl2sql-mysql~=0.1",
+    "nl2sql-postgres~=0.1",
+    "nl2sql-sqlite~=0.1"
 ]
 
 # Scripts section removed as moved to CLI package

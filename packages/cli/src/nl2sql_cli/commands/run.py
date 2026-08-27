@@ -1,6 +1,8 @@
 import sys
 import json
 
+from rich.text import Text
+
 from nl2sql.datasources import DatasourceRegistry
 from nl2sql.llm import LLMRegistry
 from nl2sql.indexing.vector_store import VectorStore
@@ -107,16 +109,18 @@ def run_pipeline(
             sql = item.get("sql")
 
             if sql:
-                header = f"[bold]Datasource: {ds}[/bold]"
+                body = Text()
                 if sub_query:
-                    header = f"[bold]Sub-Query: {sub_query}[/bold]\n" + header
-                presenter.print_sql(f"{header}\n\n{sql}")
+                    body.append(f"Sub-Query: {sub_query}\n", style="bold")
+                body.append(f"Datasource: {ds}\n\n", style="bold")
+                body.append(str(sql))
+                presenter.print_sql(body)
     
     elif final_state.get("sql_draft"):
         sql_draft_data = final_state.get("sql_draft")
         sql_draft = sql_draft_data.get("sql") if isinstance(sql_draft_data, dict) else getattr(sql_draft_data, "sql", None)
         if sql_draft:
-             presenter.print_sql(f"[bold]SQL Generated:[/bold]\n{sql_draft}")
+             presenter.print_sql(str(sql_draft))
 
     errors = final_state.get("errors")
     if errors:

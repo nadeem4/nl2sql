@@ -4,6 +4,8 @@ import sys
 from typing import Optional
 from typing_extensions import Annotated
 from rich.console import Console
+from rich.markup import escape
+from rich.text import Text
 from rich.table import Table
 
 from nl2sql import PolicyAPI
@@ -23,16 +25,16 @@ def validate(
     """
     Validate policy syntax and integrity against defined datasources.
     """
-    console.print(f"[bold blue]Validating Policies from:[/bold blue] {policies or 'default'}")
+    console.print(f"[bold blue]Validating Policies from:[/bold blue] {escape(str(policies or 'default'))}")
 
     api = PolicyAPI()
     report = api.validate_policies(policies_path=policies, datasources_path=config, secrets_path=secrets)
 
     if report.errors:
-        console.print(f"[bold red]Schema Validation Failed:[/bold red]\\n{report.errors[0]}")
+        console.print(f"[bold red]Schema Validation Failed:[/bold red]\\n{escape(str(report.errors[0]))}")
         sys.exit(1)
 
-    console.print(f"[bold blue]Checking Integrity against Datasources:[/bold blue] {config or 'default'}")
+    console.print(f"[bold blue]Checking Integrity against Datasources:[/bold blue] {escape(str(config or 'default'))}")
     if report.available_datasources:
         console.print(f"[dim]Available Datasources: {report.available_datasources}[/dim]")
 
@@ -44,7 +46,7 @@ def validate(
 
     for entry in report.entries:
         status = "[green]OK[/green]" if entry.status == "OK" else f"[red]{entry.status}[/red]"
-        table.add_row(entry.role, entry.target, status, entry.details)
+        table.add_row(Text(str(entry.role)), Text(str(entry.target)), status, Text(str(entry.details)))
 
     console.print(table)
 

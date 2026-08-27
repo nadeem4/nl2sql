@@ -1,5 +1,6 @@
 import sys
 import subprocess
+from rich.markup import escape
 from rich.prompt import Confirm
 from nl2sql_cli.config import KNOWN_ADAPTERS
 from nl2sql_cli.console import console, print_success, print_error, print_step
@@ -22,5 +23,5 @@ def install_command(adapter_name: str):
     if adapter_name in KNOWN_ADAPTERS:
         target_pkg = KNOWN_ADAPTERS[adapter_name]
     
-    if Confirm.ask(f"Install [cyan]{target_pkg}[/cyan]?"):
+    if Confirm.ask(f"Install [cyan]{escape(str(target_pkg))}[/cyan]?"):
         install_package(target_pkg)

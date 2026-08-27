@@ -1,7 +1,9 @@
 import importlib.util
 from typing import Dict, Tuple
 import pathlib
+from rich.markup import escape
 from rich.table import Table
+from rich.text import Text
 from nl2sql_cli.console import console, print_success, print_error
 
 def check_package(name: str) -> bool:
@@ -39,7 +41,7 @@ def verify_connectivity(print_table: bool = True) -> bool:
             if print_table:
                 status = "[green]OK[/green]" if success else "[red]Failed[/red]"
                 details = msg if not success else ""
-                conn_table.add_row(ds_id, status, details)
+                conn_table.add_row(Text(str(ds_id)), status, Text(str(details)))
         
         if print_table:
             console.print(conn_table)
@@ -47,5 +49,5 @@ def verify_connectivity(print_table: bool = True) -> bool:
         return all_ok
 
     except Exception as e:
-         console.print(f"[red]Connectivity check failed: {e}[/red]")
+         console.print(f"[red]Connectivity check failed: {escape(str(e))}[/red]")
          return False
