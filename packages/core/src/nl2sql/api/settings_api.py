@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import Dict, Any
 
 from nl2sql.context import NL2SQLContext
-from nl2sql.common.settings import Settings
+from nl2sql.common.settings import Settings, settings
 
 
 class SettingsAPI:
@@ -19,7 +19,9 @@ class SettingsAPI:
     
     def __init__(self, ctx: NL2SQLContext):
         self._ctx = ctx
-        self._settings: Settings = ctx.config_manager.settings 
+        # ``settings`` is a module singleton that ``reload_settings()`` updates in
+        # place, so binding it once here keeps reading the live values.
+        self._settings: Settings = settings
     
     def get_current_settings(self) -> Dict[str, Any]:
         """
