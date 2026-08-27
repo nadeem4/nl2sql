@@ -29,8 +29,9 @@ jobs:
           pip install -e packages/adapter-sdk -e packages/adapter-sqlalchemy -e packages/core -e packages/adapters/sqlite -e packages/adapters/postgres -e packages/cli -e packages/api pytest pytest-randomly
 
       # Anything needing generated demo data or a downloaded model is marked
-      # `integration` and runs in the job below; anything needing a paid API
-      # key is marked `llm` and runs nowhere in CI.
+      # `integration` and runs in the job below. Only the four modules whose
+      # node under test calls a chat model are marked `llm`; those run nowhere
+      # in CI.
       - name: Run tests
         run: pytest -m "not integration"
 
@@ -63,11 +64,15 @@ jobs:
           key: chroma-onnx-all-MiniLM-L6-v2
 
       # Generates data/demo_lite/*.db and configs/*.demo.*. The schema-indexing
-      # step this also runs reports errors without a key and exits 0; the tests
-      # below build their own indexes and do not depend on it.
+      # step this also runs needs no key: .env.demo embeds locally and the LLM
+      # enrichment pass is optional, so it is skipped and logged at INFO. A
+      # datasource that genuinely fails to index exits non-zero and fails this
+      # step, which is the intent. The tests below build their own indexes.
       - name: Generate demo data
         run: nl2sql setup --demo --lite
 
+      # 29 tests: indexing, datasource resolution, schema retrieval,
+      # aggregation, physical validation and the local embedder.
       - name: Run key-free integration tests
         run: pytest -m "integration and not llm"
 

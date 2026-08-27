@@ -151,7 +151,9 @@ first time that agent's LLM is requested. Two consequences:
 
 - Building an `NL2SQLContext` (which `nl2sql setup`, `nl2sql index` and the API
   all do) no longer requires a chat provider key. A machine with no key can
-  still run key-free work such as indexing with `EMBEDDING_PROVIDER=local`.
+  still run key-free work such as indexing with `EMBEDDING_PROVIDER=local`. That
+  holds for indexing because the `indexing_enrichment` pass is genuinely
+  optional - it is skipped, not merely deferred to a later failure.
 - A missing or wrong key surfaces on the **first LLM call**, not at startup. The
   error names the agent, the provider and the environment variable to set:
 
@@ -184,6 +186,9 @@ for the embedding step. Switching embedding providers requires a re-index. See
 
 - `agents` overrides allow you to use specialized models for tasks like
   indexing enrichment while keeping a single default model for query execution.
+- `indexing_enrichment` is optional. Omit it, or leave its key unset, and
+  `nl2sql index` still works - the schema is indexed without LLM-written
+  descriptions.
 - `nl2sql setup` prompts for `openai` and `openrouter`, the two hosted providers
   it can also collect a key for. To use Ollama, edit `configs/llm.yaml` as shown
   above — no key prompt applies.

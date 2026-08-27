@@ -21,6 +21,10 @@ def run_indexing(
 
     Args:
         ctx: The initialized NL2SQLContext.
+
+    Raises:
+        SystemExit: With code 1 if the store could not be cleared or if any
+            datasource failed to index.
     """
     presenter = ConsolePresenter()
     presenter.print_info(f"Indexing schema to: {ctx.vector_store.persist_directory}")
@@ -112,6 +116,11 @@ def run_indexing(
         presenter.print_warning(f"Datasources with empty stats: {', '.join(empty_stats)}")
 
     if errors:
+        # Any failure is fatal, not just a total one: a partially populated
+        # index answers later queries from an incomplete schema, which is worse
+        # than a loud stop because it looks like it worked. Scripts chaining
+        # `nl2sql index && nl2sql run ...` need that signal.
         presenter.print_warning("Indexing completed with errors.")
-    else:
-        presenter.print_success("Indexing complete.")
+        sys.exit(1)
+
+    presenter.print_success("Indexing complete.")

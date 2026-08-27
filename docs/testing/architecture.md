@@ -31,7 +31,13 @@ markers. A test may carry both.
 
 Everything under `packages/core/tests/integration/` is marked `integration`
 automatically by `packages/core/tests/conftest.py`. The `llm` marker is
-declared per module, next to a comment saying which call needs the key.
+declared per module, next to a comment saying which call needs the key. Only
+four modules carry it - `test_ast_planner_real_data.py`,
+`test_decomposer_real_data.py`, `test_logical_validator_real_data.py` and
+`test_answer_synthesizer_real_data.py` - all of them nodes that call a chat
+model directly. Nothing else in the directory needs a key: indexing skips its
+optional enrichment pass when no LLM is available, so tests that index real
+data run key-free.
 
 `.github/workflows/test.yml` has two test jobs:
 
@@ -39,7 +45,10 @@ declared per module, next to a comment saying which call needs the key.
   is the fast job and must stay fast.
 - **`integration`** runs `pytest -m "integration and not llm"` on one Python
   version, after generating demo data with `nl2sql setup --demo --lite` and
-  with `EMBEDDING_PROVIDER=local`. The ONNX model is cached across runs.
+  with `EMBEDDING_PROVIDER=local`. The ONNX model is cached across runs. That
+  subset is 29 tests, covering schema indexing, datasource resolution, schema
+  retrieval, aggregation, physical validation and the local embedder against
+  the real demo databases.
 
 Nothing selects `llm`. Those tests are run by hand with a key:
 
@@ -51,7 +60,9 @@ EMBEDDING_PROVIDER=local OPENAI_API_KEY=sk-... pytest -m integration
 Collection is not enough to keep these honest. Every test in the directory
 imports cleanly even when it calls a method that no longer exists, so rot shows
 up only at call time - which is the point of running the key-free subset in CI
-rather than gating on `--collect-only`.
+rather than gating on `--collect-only`. The subset is worth keeping wide: every
+test that can run without a key should, because the ones that cannot are never
+run by CI at all.
 
 ## Randomised test order
 

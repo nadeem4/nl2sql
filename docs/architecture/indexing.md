@@ -7,7 +7,7 @@ This document describes **current indexing behavior** as implemented in code. In
 ```mermaid
 flowchart TD
     Adapter[Datasource Adapter] --> Snapshot[Schema Snapshot]
-    Snapshot --> Enrich[LLM Enrichment]
+    Snapshot --> Enrich[LLM Enrichment - optional]
     Enrich --> Register[SchemaStore.register_snapshot]
     Register --> Chunker[SchemaChunkBuilder]
     Chunker --> Refresh[VectorStore.refresh_schema_chunks]
@@ -105,7 +105,11 @@ Current failure behaviors:
 - Vector store retrieval wrapped by `VECTOR_BREAKER`; failures fast‑fail.
 - Vector retrieval errors in `SchemaRetrieverNode` return empty results with warnings.
 - If no candidates are found, the retriever falls back to full schema snapshot.
-- Enrichment failures return the original snapshot without enrichment.
+- Enrichment failures return the original snapshot without enrichment, and
+  never fail indexing. `enrich_schema_snapshot` resolves its own LLM inside the
+  guard, so a missing API key, an unreachable endpoint and a failed call all
+  degrade the same way. A missing/unusable LLM logs at `INFO`; anything
+  unexpected logs at `WARNING` with a stack trace.
 - Retrieving from a vector store whose persisted vectors do not match the
   configured embedding provider raises `EmbeddingDimensionMismatchError`. The check
   is on the read path only, so a re-index clears the collection and recovers.

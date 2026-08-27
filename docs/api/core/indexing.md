@@ -35,7 +35,8 @@ Indexing statistics by chunk type (includes `datasource_id` and `schema_version`
 
 Raises:
 - Adapter-specific errors for schema retrieval.
-- LLM or vector store errors during enrichment or indexing.
+- Vector store errors during indexing. Enrichment errors are **not** raised:
+  enrichment is best-effort and degrades to the unenriched snapshot.
 
 Side Effects:
 - Reads datasource schema.
@@ -66,6 +67,8 @@ Deletes and reinitializes the vector store collection.
 
 ## Execution Lifecycle
 - Fetch schema via adapter.
-- Enrich schema metadata using `indexing_enrichment` LLM.
+- Enrich schema metadata using the `indexing_enrichment` LLM. Optional: if the
+  client cannot be built (no API key), the endpoint is unreachable, or the call
+  fails, the unenriched snapshot is used and indexing continues.
 - Register schema snapshot and version.
 - Build schema chunks and refresh vector store.

@@ -50,14 +50,16 @@ This covers the embedding step only. The demo is **not** key-free end to end:
 - `nl2sql --env demo run "..."` calls a chat model, so it needs a working LLM key
   (`OPENAI_API_KEY`, or an OpenRouter key with `configs/llm.demo.yaml` pointed at
   `provider: openrouter`).
-- Indexing also runs an optional LLM enrichment pass over the schema. Without a
-  usable chat key that pass logs an error and is skipped; the chunks are still
-  indexed, but with no LLM-generated descriptions.
-- `NL2SQLContext` builds its LLM clients on first use, so `nl2sql setup --demo`
-  and `nl2sql --env demo index` complete with no chat key at all; a missing key
-  surfaces when a chat model is first called (with an error naming the agent,
-  the provider and the variable to set). Fill in `OPENAI_API_KEY` in `.env.demo`
-  before running a query.
+- Indexing also runs an optional LLM enrichment pass over the schema. Enrichment
+  is best-effort: without a usable chat key it is skipped with an `INFO` line
+  naming the agent, the provider and the variable to set, and the chunks are
+  still indexed - just with no LLM-generated descriptions. An enrichment failure
+  never fails indexing.
+- So `nl2sql setup --demo` and `nl2sql --env demo index` complete with no chat
+  key at all, and `nl2sql index` exits `0`. It exits `1` if any datasource
+  actually fails to index, which is safe to rely on in a script. A missing key
+  surfaces when a chat model is first called. Fill in `OPENAI_API_KEY` in
+  `.env.demo` before running a query.
 - Pointing `configs/llm.demo.yaml` at `provider: ollama` removes the chat key
   requirement, but a local model's ability to satisfy the pipeline's structured
   output is model-dependent - see
