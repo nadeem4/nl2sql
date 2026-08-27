@@ -22,7 +22,9 @@ resolves for users if every package declares the same version.
     ```
 
     Widen the `~=` constraints only when the major version changes; a patch or
-    minor bump needs no dependency edits.
+    minor bump needs no dependency edits. Every internal dependency carries a
+    `~=` constraint, including the ones named in `[project.optional-dependencies]`
+    extras.
 
 2. **Check for drift.** Needs Python 3.11+ (`tomllib`):
 
