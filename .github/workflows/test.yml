@@ -91,6 +91,14 @@ jobs:
           python -m pip install --upgrade pip
           pip install build
 
+      # Unified versioning: the nine published packages must declare the same
+      # version, or their internal ~= constraints cannot all be satisfied at
+      # once and the install is unresolvable for users. Runs here because this
+      # job is on 3.11 and the check needs tomllib; the test matrix includes
+      # 3.10.
+      - name: Check for version drift
+        run: python scripts/check_versions.py
+
       - name: Build all distributions
         run: |
           for pkg in packages/adapter-sdk packages/adapter-sqlalchemy packages/core packages/cli packages/api packages/adapters/mssql packages/adapters/mysql packages/adapters/postgres packages/adapters/sqlite; do
