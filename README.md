@@ -187,7 +187,11 @@ The demo datasource file uses relative paths (e.g. `data/demo_lite/*.db`), so st
 
 NL2SQL uses unified versioning across the monorepo. Core, adapters, API, and CLI
 share the same version number and are released together. Internal dependencies
-are pinned to the same version to avoid mismatches.
+use a compatible-release constraint (`~=0.1`) rather than an exact pin, so a
+patch or minor release never forces users into an unresolvable install while a
+mismatched major is still rejected.
+
+See [Releasing](docs/development/releasing.md) for the release checklist.
 
 ## 📚 Documentation
 

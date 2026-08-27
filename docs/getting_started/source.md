@@ -41,5 +41,9 @@ python -c "from nl2sql import NL2SQL; print(NL2SQL().run_query('hello'))"
 API service (Docker):
 
 ```bash
-python run.py --dockerfile packages/api/Dockerfile.dev --extras postgres
+docker build -f packages/api/Dockerfile.dev --build-arg NL2SQL_EXTRAS=postgres -t nl2sql-api-dev .
+docker run --rm -p 8000:8000 nl2sql-api-dev
 ```
+
+See [Docker (REST API)](docker.md) for adapter extras, environment selection
+and mounting config files.
