@@ -59,10 +59,12 @@ class IndexingOrchestrator:
             adapter.datasource_id
         )
 
-        llm = self.llm_registry.get_llm("indexing_enrichment")
+        # Best-effort: enrich_schema_snapshot owns resolving its own LLM and
+        # degrades to the unenriched snapshot when none is usable, so indexing
+        # never depends on an API key being present.
         schema_snapshot, questions = enrich_schema_snapshot(
             snapshot=schema_snapshot,
-            llm=llm,
+            llm_registry=self.llm_registry,
             datasource_description=datasource_description,
             existing_questions=questions,
         )

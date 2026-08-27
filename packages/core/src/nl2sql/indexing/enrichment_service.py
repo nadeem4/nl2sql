@@ -11,6 +11,9 @@ from nl2sql.common.logger import get_logger
 
 logger = get_logger("indexing_enrichment")
 
+# Name of the agent in configs/llm.yaml that enrichment calls.
+ENRICHMENT_LLM_NAME = "indexing_enrichment"
+
 
 class DatasourceEnrichment(BaseModel):
     description: Optional[str] = None
@@ -253,21 +256,56 @@ def apply_enrichment(
 
 def enrich_schema_snapshot(
     snapshot: SchemaSnapshot,
-    llm,
+    llm_registry,
     datasource_description: Optional[str],
     existing_questions: List[str],
     max_questions: int = 100,
 ) -> Tuple[SchemaSnapshot, List[str]]:
-    evidence = build_evidence(snapshot, datasource_description, existing_questions)
-    prompt = ChatPromptTemplate.from_template(ENRICHMENT_PROMPT)
-    chain = prompt | llm.with_structured_output(
-        SchemaEnrichment, method="function_calling"
-    )
+    """Adds LLM-written descriptions to a schema snapshot, if an LLM is usable.
+
+    Enrichment is an embellishment, never a prerequisite: indexing has to work
+    without any LLM at all. Every step that can involve the model - resolving
+    the client, binding structured output, the call itself - therefore sits
+    inside one guard, and any failure returns the inputs untouched so the
+    caller indexes an unenriched schema instead of failing.
+
+    Args:
+        snapshot: Schema snapshot to enrich.
+        llm_registry: Registry the ``indexing_enrichment`` client is built from.
+        datasource_description: Operator-supplied description, if any.
+        existing_questions: Example questions already configured.
+        max_questions: Upper bound on the merged question list.
+
+    Returns:
+        The enriched snapshot and merged questions, or the originals unchanged
+        when enrichment could not run.
+    """
+    datasource_id = snapshot.contract.datasource_id
 
     try:
+        llm = llm_registry.get_llm(ENRICHMENT_LLM_NAME)
+        evidence = build_evidence(snapshot, datasource_description, existing_questions)
+        prompt = ChatPromptTemplate.from_template(ENRICHMENT_PROMPT)
+        chain = prompt | llm.with_structured_output(
+            SchemaEnrichment, method="function_calling"
+        )
         enrichment = chain.invoke({"evidence_json": evidence})
+    except ValueError as exc:
+        # No usable LLM is configured - typically no API key. Expected on the
+        # key-free path, so it is reported without a stack trace.
+        logger.info(
+            f"Schema enrichment skipped for '{datasource_id}': {exc} "
+            "Indexing continues without LLM-written descriptions."
+        )
+        return snapshot, existing_questions
     except Exception as exc:
-        logger.error(f"Enrichment failed: {exc}")
+        # Anything else is a genuine surprise and stays fully visible, but it
+        # still must not take indexing down with it.
+        logger.warning(
+            f"Schema enrichment failed for '{datasource_id}': {exc}. "
+            "Indexing continues without LLM-written descriptions.",
+            exc_info=True,
+        )
         return snapshot, existing_questions
 
     sanitized = sanitize_enrichment(snapshot, enrichment, max_questions=max_questions)
