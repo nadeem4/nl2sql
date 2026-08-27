@@ -8,7 +8,6 @@ from .generator.node import GeneratorNode
 from .executor.node import ExecutorNode
 from .refiner.node import RefinerNode
 from .validator.node import LogicalValidatorNode
-from .validator.physical_node import PhysicalValidatorNode
 from .answer_synthesizer.node import AnswerSynthesizerNode
 
 __all__ = [
@@ -21,7 +20,6 @@ __all__ = [
     "DatasourceResolverNode",
     "GlobalPlannerNode",
     "LogicalValidatorNode",
-    "PhysicalValidatorNode",
     "EngineAggregatorNode",
     "AnswerSynthesizerNode",
 ]

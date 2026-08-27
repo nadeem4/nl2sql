@@ -47,7 +47,6 @@ class LogicalValidatorNode:
     """Validates the generated AST (PlanModel).
 
     Performs static validation on the AST structure and user policies.
-    Physical validation (SQL syntax, dry run) happens in PhysicalValidatorNode.
 
     Attributes:
         registry (DatasourceRegistry): Registry to fetch schemas and profiles.

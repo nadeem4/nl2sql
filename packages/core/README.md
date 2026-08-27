@@ -164,7 +164,7 @@ python -m nl2sql.cli --query "Show me all users" --id my_postgres_db
 
 | Invariant | Rationale | Mechanism |
 | :--- | :--- | :--- |
-| **No Unvalidated SQL** | Prevent hallucinations & data leaks | All plans pass through `LogicalValidator` (AST). `PhysicalValidator` exists but is not wired into the default SQL subgraph. |
+| **No Unvalidated SQL** | Prevent hallucinations & data leaks | All plans pass through `LogicalValidator` (AST). |
 | **Zero Shared State** | Crash Safety | Execution happens in isolated processes; no shared memory with the Control Plane. |
 | **Fail-Fast** | Reliability | Circuit Breakers and Strict Timeouts prevent cascading failures (Retry Storms). |
 | **Determinism** | Debuggability | Temperature-0 generation + Strict Typing (Pydantic) for all LLM outputs. |

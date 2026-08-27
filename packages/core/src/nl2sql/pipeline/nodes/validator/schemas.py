@@ -10,8 +10,3 @@ from nl2sql.common.errors import PipelineError
 class LogicalValidatorResponse(BaseModel):
     errors: List[PipelineError] = Field(default_factory=list)
     reasoning: List[Dict[str, Any]] = Field(default_factory=list)
-
-
-class PhysicalValidatorResponse(BaseModel):
-    errors: List[PipelineError] = Field(default_factory=list)
-    reasoning: List[Dict[str, Any]] = Field(default_factory=list)

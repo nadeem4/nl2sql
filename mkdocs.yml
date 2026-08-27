@@ -71,7 +71,6 @@ nav:
       - Generator: architecture/nodes/generator_node.md
       - Global Planner: architecture/nodes/global_planner_node.md
       - Logical Validator: architecture/nodes/logical_validator_node.md
-      - Physical Validator: architecture/nodes/physical_validator_node.md
       - Refiner: architecture/nodes/refiner_node.md
       - Schema Retriever: architecture/nodes/schema_retriever_node.md
   - Getting Started:

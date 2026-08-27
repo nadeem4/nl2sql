@@ -44,7 +44,6 @@ Fields (exact names and types from code):
 - `relevant_tables: List[Table]`
 - `ast_planner_response: Optional[ASTPlannerResponse]`
 - `logical_validator_response: Optional[LogicalValidatorResponse]`
-- `physical_validator_response: Optional[PhysicalValidatorResponse]`
 - `generator_response: Optional[GeneratorResponse]`
 - `executor_response: Optional[ExecutorResponse]`
 - `refiner_response: Optional[RefinerResponse]`
