@@ -6,9 +6,6 @@ from nl2sql.common.logger import get_logger
 
 logger = get_logger(__name__)
 
-from nl2sql.common.logger import get_logger
-logger = get_logger(__name__)
-
 class Settings(BaseSettings):
     """Application configuration settings backed by environment variables."""
     
@@ -226,13 +223,6 @@ def load_settings() -> Settings:
 
 
 settings = load_settings()
-
-# Configure logging during import
-from nl2sql.common.logger import configure_logging
-configure_logging(
-    level="INFO",
-    json_format=(settings.observability_exporter == "otlp")
-)
 
 def reload_settings() -> Settings:
     """Re-read settings from the environment and refresh the module singleton.
