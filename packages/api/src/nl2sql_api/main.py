@@ -1,3 +1,5 @@
+import os
+
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 
@@ -24,10 +26,12 @@ app.include_router(datasource.router, prefix="/api/v1")
 app.include_router(llm.router, prefix="/api/v1")
 app.include_router(indexing.router, prefix="/api/v1")
 
+_origins = [o.strip() for o in os.getenv("NL2SQL_API_CORS_ORIGINS", "").split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # tighten for prod
-    allow_credentials=True,
+    allow_origins=_origins,
+    allow_credentials=bool(_origins),
     allow_methods=["*"],
     allow_headers=["*"],
 )
