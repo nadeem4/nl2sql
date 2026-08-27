@@ -84,6 +84,12 @@ mkdocs serve
 2. Make changes and run relevant tests.
 3. Open a pull request with a clear summary and test plan.
 
+## Releasing
+
+All nine packages share one version and are released together. The checklist --
+bumping the versions, the drift check, and what publishing a GitHub release
+triggers -- is in `docs/development/releasing.md`.
+
 ## Creating a new adapter
 
 Choose the base class that matches your datasource:

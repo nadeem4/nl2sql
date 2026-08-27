@@ -113,6 +113,7 @@ nav:
     - Kubernetes: deployment/kubernetes.md
   - Development:
     - Extending NL2SQL: development/index.md
+    - Releasing: development/releasing.md
     - Add Adapter: extensions/add-adapter.md
     - Add Chunk Types: extensions/add-chunk-types.md
     - Extend Planner: extensions/extend-planner.md
