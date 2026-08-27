@@ -76,6 +76,28 @@ jobs:
       - name: Run key-free integration tests
         run: pytest -m "integration and not llm"
 
+  # Strict mode fails on broken internal links and bad references, which is
+  # the cheap, deterministic half of catching documentation drift. The
+  # judgment-based half (claims contradicted by code changes) is the advisory
+  # Claude review in docs_drift.yml.
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install docs tooling
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-docs.txt
+
+      - name: Build docs (strict)
+        run: python -m mkdocs build --strict --site-dir /tmp/site
+
   build:
     runs-on: ubuntu-latest
     steps:
