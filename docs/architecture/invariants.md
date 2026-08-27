@@ -350,4 +350,4 @@ Ensures latency bounds and prevents hung requests.
 - `packages/core/src/nl2sql/context.py`
 - `packages/core/src/nl2sql/schema/store.py`
 - `packages/core/src/nl2sql/pipeline/runtime.py`
-- `packages/core/src/nl2sql/security/policies.py`
+- `packages/core/src/nl2sql/auth/models.py`

@@ -279,7 +279,6 @@ Mutators / consumers:
 - `packages/core/src/nl2sql/pipeline/nodes/schema_retriever/node.py`
 - `packages/core/src/nl2sql/pipeline/nodes/ast_planner/node.py`
 - `packages/core/src/nl2sql/pipeline/nodes/validator/node.py`
-- `packages/core/src/nl2sql/pipeline/nodes/validator/physical_node.py`
 - `packages/core/src/nl2sql/pipeline/nodes/generator/node.py`
 - `packages/core/src/nl2sql/pipeline/nodes/executor/node.py`
 - `packages/core/src/nl2sql/pipeline/nodes/refiner/node.py`
