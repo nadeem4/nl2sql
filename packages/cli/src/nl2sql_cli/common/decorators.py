@@ -2,6 +2,7 @@ from functools import wraps
 import sys
 import traceback
 from rich.console import Console
+from rich.markup import escape
 from nl2sql.common.exceptions import NL2SQLError
 
 console = Console()
@@ -19,14 +20,14 @@ def handle_cli_errors(func):
         try:
             return func(*args, **kwargs)
         except NL2SQLError as e:
-            console.print(f"[bold red]Error:[/bold red] {e}")
+            console.print(f"[bold red]Error:[/bold red] {escape(str(e))}")
             sys.exit(1)
         except KeyboardInterrupt:
             console.print("\n[yellow]Operation cancelled by user.[/yellow]")
             sys.exit(130)  # Standard SIGINT exit code
         except Exception as e:
-            console.print(f"[bold red]Unexpected Error:[/bold red] {e}")
-            console.print(traceback.format_exc())
+            console.print(f"[bold red]Unexpected Error:[/bold red] {escape(str(e))}")
+            console.print(traceback.format_exc(), markup=False)
             console.print("[dim]Please report this bug to the nl2sql team.[/dim]")
             sys.exit(1)
             

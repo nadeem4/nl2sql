@@ -1,6 +1,7 @@
 import sys
 
 from rich.console import Console
+from rich.markup import escape
 from rich.theme import Theme
 
 
@@ -42,10 +43,10 @@ custom_theme = Theme({
 console = Console(theme=custom_theme)
 
 def print_step(message: str) -> None:
-    console.print(f"[bold blue]Step:[/bold blue] {message}")
+    console.print(f"[bold blue]Step:[/bold blue] {escape(str(message))}")
 
 def print_success(message: str) -> None:
-    console.print(f"[success][OK] {message}[/success]")
+    console.print(f"[success][OK] {escape(str(message))}[/success]")
 
 def print_error(message: str) -> None:
-    console.print(f"[error][ERROR] {message}[/error]")
+    console.print(f"[error][ERROR] {escape(str(message))}[/error]")

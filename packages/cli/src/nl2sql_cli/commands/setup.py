@@ -1,6 +1,7 @@
 
 import os
 import pathlib
+from rich.markup import escape
 from rich.panel import Panel
 from InquirerPy import inquirer
 from InquirerPy.validator import NumberValidator
@@ -90,7 +91,7 @@ def _configure_datasource(config_manager: ConfigManager):
         if inquirer.confirm(message="Secure this password with an Environment Variable?", default=True).execute():
              env_var = inquirer.text(message="Environment Variable Name:", default="DB_PASSWORD").execute()
              final_password = f"${{env:{env_var}}}"
-             console.print(f"[dim]Will save as: {final_password}[/dim]")
+             console.print(f"[dim]Will save as: {escape(str(final_password))}[/dim]")
              os.environ[env_var] = password # Set it for current session so validation passes
         
         conn_args = {
@@ -233,7 +234,7 @@ def _write_config_file(path: pathlib.Path, content: str):
             f.write(content)
         print_success(f"Created {path}")
     except Exception as e:
-        console.print(f"[red]Failed to write {path.name}: {e}[/red]")
+        console.print(f"[red]Failed to write {escape(str(path.name))}: {escape(str(e))}[/red]")
 
 
 def _configure_env_file(env: str, api_key: Optional[str] = None):
@@ -260,7 +261,7 @@ def _configure_env_file(env: str, api_key: Optional[str] = None):
             f.write(content)
         print_success(f"Created {target_file}")
     except Exception as e:
-        console.print(f"[red]Failed to write env file: {e}[/red]")
+        console.print(f"[red]Failed to write env file: {escape(str(e))}[/red]")
 
 def _install_required_adapters(config_manager: ConfigManager):
     """Reads config using ConfigManager and installs necessary adapters."""
@@ -294,7 +295,7 @@ def _install_required_adapters(config_manager: ConfigManager):
                     console.print(f"[dim]Adapter {pkg} is installed.[/dim]")
                     
     except Exception as e:
-        console.print(f"[red]Failed to check adapters: {e}[/red]")
+        console.print(f"[red]Failed to check adapters: {escape(str(e))}[/red]")
 
 
 def _run_indexing_step():
@@ -339,7 +340,7 @@ def _run_indexing_step():
 
     except Exception as e:
         logger.debug("Indexing setup failed", exc_info=True)
-        console.print(f"[red]Indexing setup failed: {e}[/red]")
+        console.print(f"[red]Indexing setup failed: {escape(str(e))}[/red]")
 
 
 @handle_cli_errors

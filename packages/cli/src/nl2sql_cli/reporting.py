@@ -7,11 +7,13 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence, Union
 from rich.columns import Columns
 from rich.console import Console, Group
 from rich.markdown import Markdown
+from rich.markup import escape
 from rich.panel import Panel
 from rich.table import Table
 from rich.tree import Tree
 from rich.live import Live
 from rich.spinner import Spinner
+from rich.style import Style
 from rich.text import Text
 
 
@@ -62,7 +64,7 @@ class ConsolePresenter:
     # Generic helpers
     # ------------------------------------------------------------------
     def _print_labeled(self, label: str, style: str, message: str) -> None:
-        self.console.print(f"[{style}]{label}[/{style}] {message}")
+        self.console.print(f"[{style}]{escape(label)}[/{style}] {escape(str(message))}")
 
     def print_success(self, message: str) -> None:
         self._print_labeled("✓", "green", message)
@@ -77,12 +79,14 @@ class ConsolePresenter:
         self._print_labeled("[INFO]", "blue", message)
 
     def print_header(self, message: str) -> None:
-        self.console.print(f"\n[bold magenta]--- {message} ---[/bold magenta]")
+        self.console.print(f"\n[bold magenta]--- {escape(str(message))} ---[/bold magenta]")
 
     def print_panel(self, content: Any, title: str, style: str = "green") -> None:
         if isinstance(content, (dict, list)):
             content = json.dumps(content, indent=2, default=str)
-        self.console.print(Panel(content, title=title, border_style=style))
+        if isinstance(content, str):
+            content = Text(content)
+        self.console.print(Panel(content, title=escape(str(title)), border_style=style))
 
     def print_table(
         self,
@@ -102,7 +106,7 @@ class ConsolePresenter:
             for key in keys:
                 table.add_column(str(key))
             for row in data:
-                table.add_row(*[str(row.get(k, "")) for k in keys])
+                table.add_row(*[Text(str(row.get(k, ""))) for k in keys])
         else:
             if columns:
                 for col in columns:
@@ -111,13 +115,13 @@ class ConsolePresenter:
                 for idx in range(len(first)):
                     table.add_column(f"Col {idx + 1}")
             for row in data:
-                table.add_row(*[str(val) for val in row])
+                table.add_row(*[Text(str(val)) for val in row])
 
         self.console.print(table)
 
     def print_tree(self, tree: Tree, title: Optional[str] = None, style: str = "cyan") -> None:
         if title:
-            self.console.print(Panel(tree, title=title, border_style=style))
+            self.console.print(Panel(tree, title=escape(str(title)), border_style=style))
         else:
             self.console.print(tree)
 
@@ -153,10 +157,10 @@ class ConsolePresenter:
                 sev_style = "bold red"
 
             table.add_row(
-                node.upper(),
-                f"[{sev_style}]{severity}[/{sev_style}]",
-                code,
-                msg,
+                Text(str(node).upper()),
+                f"[{sev_style}]{escape(str(severity))}[/{sev_style}]",
+                Text(str(code)),
+                Text(str(msg)),
             )
 
         self.console.print("\n")
@@ -164,14 +168,22 @@ class ConsolePresenter:
         self.console.print("\n")
 
     def print_query(self, query: str) -> None:
-        self.console.print(f"[bold blue]Query:[/bold blue] {query}")
+        self.console.print(f"[bold blue]Query:[/bold blue] {escape(str(query))}")
 
     def print_node_output(self, node_name: str, output: Any) -> None:
         title = f"{node_name.capitalize()} Output"
         self.print_panel(output, title=title, style="green")
 
-    def print_sql(self, sql: str, title: str = "SQL Generated") -> None:
-        self.console.print(Panel(sql, title=title, border_style="cyan", expand=False))
+    def print_sql(self, sql: Any, title: str = "SQL Generated") -> None:
+        """Render SQL in a panel.
+
+        A plain string is shown verbatim: SQL is not markup, and T-SQL
+        bracket-quoted identifiers such as ``[dbo].[orders]`` would otherwise be
+        parsed as style tags and vanish from the output. Callers that want
+        styling pass a pre-built renderable (e.g. ``Text``).
+        """
+        body = Text(sql) if isinstance(sql, str) else sql
+        self.console.print(Panel(body, title=escape(str(title)), border_style="cyan", expand=False))
 
     def print_final_answer(self, answer: str) -> None:
         self.console.print(Panel(Markdown(answer), title="[bold green]Final Answer[/bold green]", expand=False))
@@ -215,21 +227,21 @@ class ConsolePresenter:
 
         table = Table(title="Result Data", show_header=True, header_style="bold cyan", border_style="blue")
         for col in columns:
-            table.add_column(col)
+            table.add_column(Text(str(col)))
 
         for row in rows:
             row_vals = []
             for col in columns:
                 val = row.get(col, "") if isinstance(row, dict) else getattr(row, col, "")
                 row_vals.append(str(val))
-            table.add_row(*row_vals)
+            table.add_row(*[Text(v) for v in row_vals])
 
         self.console.print("\n")
         self.console.print(table)
         self.console.print("\n")
 
     def print_datasource_used(self, ds_id: str) -> None:
-        self.console.print(f"[bold blue]Datasource Used:[/bold blue] {ds_id}")
+        self.console.print(f"[bold blue]Datasource Used:[/bold blue] {escape(str(ds_id))}")
 
     def print_performance_report(self, latency: Dict[str, Any], token_log: List[Dict[str, Any]]) -> None:
         renderables = []
@@ -357,7 +369,7 @@ class ConsolePresenter:
     ) -> None:
         if top_level_reasoning is None:
             top_level_reasoning = []
-        tree = Tree(f"[bold blue]Root Query: {user_query}[/bold blue]")
+        tree = Tree(f"[bold blue]Root Query: {escape(str(user_query))}[/bold blue]")
 
         node_styles = {
             "decomposer": "bold magenta",
@@ -391,9 +403,9 @@ class ConsolePresenter:
 
                 if isinstance(content, list):
                     for line in content:
-                        step_branch.add(str(line))
+                        step_branch.add(Text(str(line)))
                 else:
-                    step_branch.add(str(content))
+                    step_branch.add(Text(str(content)))
 
         if top_level_reasoning:
             decomp_steps = [r for r in top_level_reasoning if r.get("node") == "decomposer"]
@@ -405,7 +417,10 @@ class ConsolePresenter:
             ds_id = item.get("datasource_id") or "Unknown"
             reasoning = item.get("reasoning", [])
 
-            branch = tree.add(f"[bold green]Branch {i+1}:[/bold green] {sub_query} [dim]({ds_id})[/dim]")
+            branch = tree.add(
+                f"[bold green]Branch {i+1}:[/bold green] {escape(str(sub_query))} "
+                f"[dim]({escape(str(ds_id))})[/dim]"
+            )
 
             add_reasoning_steps(branch, reasoning)
 
@@ -414,7 +429,7 @@ class ConsolePresenter:
                 sql = item.get("sql")
 
             if sql:
-                branch.add(f"[bold]SQL:[/bold] {sql}")
+                branch.add(f"[bold]SQL:[/bold] {escape(str(sql))}")
 
         if top_level_reasoning:
             agg_steps = [r for r in top_level_reasoning if r.get("node") == "aggregator"]
@@ -505,7 +520,7 @@ class ConsolePresenter:
                         label += f" | [cyan]{meta.total_tokens} tok[/cyan]"
 
                     if meta.error:
-                        label += f" [bold red]FAILED: {meta.error}[/bold red]"
+                        label += f" [bold red]FAILED: {escape(str(meta.error))}[/bold red]"
 
                 branch = tree_node.add(label)
 
@@ -635,13 +650,13 @@ class ConsolePresenter:
             sr_style = "green" if success_rate == 100 else "yellow" if success_rate >= 50 else "red"
 
             table.add_row(
-                qid,
+                Text(str(qid)),
                 f"[{sr_style}]{success_rate:.0f}%[/{sr_style}]",
                 f"{stability_rate:.0f}%",
                 f"{exec_acc:.0f}%",
                 f"{sem_acc:.0f}%",
                 f"{avg_latency:.2f}s",
-                error_str,
+                Text(error_str),
             )
 
         self.console.print(table)
@@ -706,7 +721,7 @@ class ConsolePresenter:
                 if len(candidates) > 3:
                     cand_str += "..."
 
-            cols.extend([reasoning, score_str, tokens, latency_str, cand_str])
+            cols.extend([Text(str(reasoning)), score_str, tokens, latency_str, cand_str])
 
             table.add_row(*cols)
 
@@ -745,7 +760,7 @@ class ConsolePresenter:
 
             self.console.print("\n[bold red]Top Errors:[/bold red]")
             for k in list(unique_errors.keys())[:5]:
-                self.console.print(k)
+                self.console.print(Text(k))
 
     def export_results(self, results: List[Dict[str, Any]], path: Path) -> None:
         export_data = []
@@ -768,7 +783,7 @@ class ConsolePresenter:
         if path.suffix.lower() == ".json":
             with open(path, "w", encoding="utf-8") as f:
                 json.dump(export_data, f, indent=2, default=str)
-            self.console.print(f"\n[bold green]Results exported to {path}[/bold green]")
+            self.console.print(f"\n[bold green]Results exported to {escape(str(path))}[/bold green]")
         elif path.suffix.lower() == ".csv":
             if not export_data:
                 self.console.print(f"\n[yellow]No results to export.[/yellow]")
@@ -778,20 +793,20 @@ class ConsolePresenter:
                     writer = csv.DictWriter(f, fieldnames=keys)
                     writer.writeheader()
                     writer.writerows(export_data)
-                self.console.print(f"\n[bold green]Results exported to {path}[/bold green]")
+                self.console.print(f"\n[bold green]Results exported to {escape(str(path))}[/bold green]")
         else:
             self.console.print(
-                f"\n[bold red]Unsupported export format: {path.suffix}. Use .json or .csv[/bold red]"
+                f"\n[bold red]Unsupported export format: {escape(str(path.suffix))}. Use .json or .csv[/bold red]"
             )
 
     # ------------------------------------------------------------------
     # Indexing (indexing.py)
     # ------------------------------------------------------------------
     def print_indexing_start(self, path: str) -> None:
-        self.console.print(f"[bold blue]Indexing schema to:[/bold blue] {path}")
+        self.console.print(f"[bold blue]Indexing schema to:[/bold blue] {escape(str(path))}")
 
     def print_indexing_error(self, ds_id: str, error: str) -> None:
-        self.console.print(f"[red]Failed to index {ds_id}: {error}[/red]")
+        self.console.print(f"[red]Failed to index {escape(str(ds_id))}: {escape(str(error))}[/red]")
 
     def print_indexing_complete(self) -> None:
         self.console.print("\n[bold green]Indexing complete![/bold green]")
@@ -819,7 +834,7 @@ class ConsolePresenter:
             total_cols += c
             total_examples += e
 
-            table.add_row(s.get("id", "Unknown"), str(t), str(c), str(e))
+            table.add_row(Text(str(s.get("id", "Unknown"))), str(t), str(c), str(e))
 
         table.add_row(
             "[bold]TOTAL[/bold]",
@@ -850,12 +865,11 @@ class ConsolePresenter:
         import os
 
         abs_path = os.path.abspath(path)
-        self.console.print(
-            f"Graph visualization saved to: [bold underline][link=file:///{abs_path}]{abs_path}[/link][/bold underline]"
-        )
+        link = Text(abs_path, style=Style(bold=True, underline=True, link=f"file:///{abs_path}"))
+        self.console.print("Graph visualization saved to: ", link)
 
     def print_graph_save_error(self, error: str) -> None:
-        self.console.print(f"[bold red]Failed to save graph image:[/bold red] {error}")
+        self.console.print(f"[bold red]Failed to save graph image:[/bold red] {escape(str(error))}")
 
     def track(self, sequence: Iterable[Any], description: str = "Working...", total: Optional[float] = None):
         from rich.progress import track
