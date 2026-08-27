@@ -52,9 +52,9 @@ pytest packages/core/tests/unit
 order they run in fail locally instead of only in CI. Reproduce a failing run
 with the seed it prints: `pytest -p randomly --randomly-seed=<seed>`.
 
-Integration tests need generated demo data, and some also need a real LLM API
-key. The two are separate markers, so the key-free subset -- the same one CI
-runs -- is selectable on its own:
+Integration tests need generated demo data, and four modules also need a real
+LLM API key. The two are separate markers, so the key-free subset -- 29 tests,
+the same ones CI runs -- is selectable on its own:
 
 ```bash
 nl2sql setup --demo --lite

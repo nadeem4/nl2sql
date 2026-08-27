@@ -153,8 +153,10 @@ nl2sql setup --demo --docker
 
 `--lite` and `--docker` are mutually exclusive. The lite run writes
 `data/demo_lite/*.db`, the `configs/*.demo.*` files and `.env.demo`, then indexes
-the generated schemas. Indexing needs a valid OpenAI key, so pass one with
-`--api-key` or fill in `OPENAI_API_KEY` in `.env.demo` before re-indexing.
+the generated schemas. That needs no API key: `.env.demo` sets
+`EMBEDDING_PROVIDER=local`, and the LLM enrichment pass over the schema is
+optional and simply skipped without one. A key is needed to *query* the demo, so
+pass one with `--api-key` or fill in `OPENAI_API_KEY` in `.env.demo` first.
 
 2. Use the demo environment from the CLI:
 
