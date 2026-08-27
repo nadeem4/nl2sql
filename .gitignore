@@ -2,6 +2,7 @@
 __pycache__/
 *.py[cod]
 *.pyo
+.pytest_cache/
 
 # Environment files
 .env
@@ -11,6 +12,8 @@ __pycache__/
 build/
 dist/
 *.egg-info/
+/artifacts/
+site/
 
 # Virtual environments
 .venv/
@@ -18,14 +21,12 @@ venv/
 
 # SQLite databases (generated locally)
 data/*.db
-chroma_db
 
-logs
+# Generated data stores
+chroma_db/
+data/demo_lite/
+data/vector_store_demo/
 
-site
-
-data
-
+# Runtime output
+logs/
 last_reasoning.json
-
-/artifacts/
