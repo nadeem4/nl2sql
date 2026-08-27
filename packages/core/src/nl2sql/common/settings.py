@@ -22,7 +22,6 @@ class Settings(BaseSettings):
     )
     llm_config_path: str = Field(default="configs/llm.yaml", validation_alias="LLM_CONFIG")
     datasource_config_path: str = Field(default="configs/datasources.yaml", validation_alias="DATASOURCE_CONFIG")
-    benchmark_config_path: str = Field(default="configs/benchmark_suite.yaml", validation_alias="BENCHMARK_CONFIG")
     secrets_config_path: str = Field(default="configs/secrets.yaml", validation_alias="SECRETS_CONFIG")
     embedding_model: str = Field(default="text-embedding-3-small", validation_alias="EMBEDDING_MODEL")
     embedding_provider: str = Field(
@@ -42,17 +41,6 @@ class Settings(BaseSettings):
         description="Path to the JSON file containing RBAC policies and permissions."
     )
     
-    router_l1_threshold: float = Field(
-        default=0.4, 
-        validation_alias="ROUTER_L1_THRESHOLD",
-        description="Distance threshold for Layer 1 (Vector Search) to be considered a match."
-    )
-    router_l2_threshold: float = Field(
-        default=0.6, 
-        validation_alias="ROUTER_L2_THRESHOLD", 
-        description="relaxed distance threshold for Layer 2 (Multi-Query) voting."
-    )
-    
     global_timeout_sec: int = Field(
         default=60,
         validation_alias="GLOBAL_TIMEOUT_SEC",
@@ -63,28 +51,6 @@ class Settings(BaseSettings):
         default=4,
         validation_alias="SANDBOX_EXEC_WORKERS",
         description="Max workers for latency-sensitive execution pool."
-    )
-
-    sandbox_index_workers: int = Field(
-        default=2,
-        validation_alias="SANDBOX_INDEX_WORKERS",
-        description="Max workers for throughput-heavy indexing pool."
-    )
-
-    default_row_limit: int = Field(
-        default=10000,
-        validation_alias="DEFAULT_ROW_LIMIT",
-        description="Default row limit for SQL execution safeguards."
-    )
-    default_max_bytes: int = Field(
-        default=10485760, # 10 MB
-        validation_alias="DEFAULT_MAX_BYTES",
-        description="Default max bytes limit for SQL execution safeguards."
-    )
-    default_statement_timeout_ms: int = Field(
-        default=30000, # 30s
-        validation_alias="DEFAULT_STATEMENT_TIMEOUT_MS",
-        description="Default statement timeout for SQL execution safeguards."
     )
 
     result_artifact_backend: str = Field(
@@ -190,12 +156,6 @@ class Settings(BaseSettings):
         default=None,
         validation_alias="OTEL_EXPORTER_OTLP_ENDPOINT",
         description="Endpoint for OTLP exporter (e.g. http://localhost:4317)."
-    )
-
-    audit_log_path: str = Field(
-        default="logs/audit_events.log",
-        validation_alias="AUDIT_LOG_PATH",
-        description="Path to the persistent audit log file."
     )
 
     model_config = SettingsConfigDict(

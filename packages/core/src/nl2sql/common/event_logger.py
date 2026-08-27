@@ -4,7 +4,6 @@ import os
 from logging.handlers import RotatingFileHandler
 from typing import Any, Dict, Optional
 from datetime import datetime
-from nl2sql.common.settings import settings
 
 class EventLogger:
     """Persistent audit logger for high-value AI events.
@@ -20,7 +19,7 @@ class EventLogger:
         
         # Ensure handlers are set up (singleton-ish check)
         if not self.logger.handlers:
-            log_path = getattr(settings, "audit_log_path", "logs/audit_events.log")
+            log_path = "logs/audit_events.log"
             
             # Ensure directory exists
             os.makedirs(os.path.dirname(log_path), exist_ok=True)
