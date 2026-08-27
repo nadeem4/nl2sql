@@ -97,12 +97,12 @@ nav:
   - Schema:
     - Schema Store + Metadata: schema/store.md
   - Execution:
-    - Execution Sandbox: execution/sandbox.md
+    - Execution Isolation + Concurrency: execution/isolation.md
   - Storage:
     - Artifact Store: storage/artifact-store.md
   - Observability:
     - Observability Stack: observability/stack.md
-    - Error Handling + Circuit Breakers: observability/error-handling.md
+    - Error Handling + Circuit Breaker: observability/error-handling.md
   - Security:
     - Security Model: security/model.md
     - Multi-Tenant Isolation: security/multi-tenant.md

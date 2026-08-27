@@ -7,7 +7,7 @@ Security is enforced at **planning time** and **execution time** through RBAC, s
 - **RBAC policies** loaded from `configs/policies.json` and evaluated by `RBAC`.
 - **Logical validation** enforces schema constraints and policy-based table access.
 - **Audit logging** records LLM interactions and security-relevant events.
-- **Execution isolation** can be provided via sandboxed process pools (available, not required by default).
+- **Bounded execution**: a global timeout and a per-run cancellation token cap each run. There is **no process sandbox** — the engine runs in-process (see `../execution/isolation.md`).
 
 ```mermaid
 flowchart TD

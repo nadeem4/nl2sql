@@ -10,12 +10,12 @@ NL2SQL treats text-to-SQL as a **distributed systems** problem. The engine compi
 
 - Graph-based orchestration (`LangGraph`) with explicit state (`GraphState`)
 - Deterministic planning and validation before SQL generation
-- Adapter-based execution with sandbox isolation
+- Adapter-based execution with per-run cancellation and a global timeout
 - Observability hooks (metrics, logs, audit events)
 
 ## 🏗️ System Topology
 
-The runtime is organized around a LangGraph orchestration pipeline and supporting registries. It is designed for fault isolation and deterministic execution.
+The runtime is organized around a LangGraph orchestration pipeline and supporting registries. It is designed for deterministic execution and structured, inspectable failure.
 
 ```mermaid
 flowchart TD
@@ -55,19 +55,19 @@ flowchart TD
 * **Valid-by-Construction**: The LLM generates an **Abstract Syntax Tree (AST)** rather than executing SQL.
 * **Static Analysis**: The [Logical Validator](docs/architecture/nodes/logical_validator_node.md) enforces RBAC and schema constraints before SQL generation, resolving every column against the retrieved schema with `sqlglot`'s optimizer.
 
-### 3. The Data Plane (The Sandbox)
+### 3. The Data Plane (Retrieval and Execution)
 
 **Responsibility**: Semantic Search and Execution.
 
-* **Blast Radius Isolation**: SQL drivers run in a dedicated **[Sandboxed Process Pool](docs/adr/adr-001-sandboxed-execution.md)**. A segfault in a driver kills a disposable worker, not the Agent.
+* **In-Process Execution**: The graph runs on a thread pool (`settings.sandbox_exec_workers`) inside the host process. There is **no process sandbox**: a driver-level crash takes the process with it. See [Execution Isolation + Concurrency](docs/execution/isolation.md) for the exact boundaries.
 * **Partitioned Retrieval**: The [Schema Store + Retrieval](docs/schema/store.md) flow injects relevant schema context, preventing context window overflow.
 
 ### 4. The Reliability Plane (The Guard)
 
 **Responsibility**: Fault Tolerance and Stability.
 
-* **Layered Defense**: A combination of **[Circuit Breakers](docs/observability/error-handling.md)** and **[Sandboxing](docs/execution/sandbox.md)** keeps the system stable during outages.
-* **Fail-Fast**: We stop processing immediately if a dependency is unresponsive, preserving resources.
+* **Bounded Runs**: A [global timeout](docs/execution/isolation.md) caps every invocation, and a per-run `CancellationToken` lets a caller unwind a run cooperatively.
+* **Fail-Fast Retrieval**: A single [circuit breaker](docs/observability/error-handling.md) (`VECTOR_BREAKER`) trips the vector store out of the path when retrieval is failing. LLM and SQL calls are not breaker-guarded; their failures surface as structured errors in state.
 
 ### 5. The Observability Plane (The Watchtower)
 
@@ -83,8 +83,8 @@ flowchart TD
 | Invariant | Rationale | Mechanism |
 | :--- | :--- | :--- |
 | **No Unvalidated SQL** | Prevent hallucinations & data leaks | All plans pass through `LogicalValidator` (AST), whose column resolution is delegated to `sqlglot.optimizer.qualify`. |
-| **Zero Shared State** | Crash Safety | Execution happens in isolated processes; no shared memory with the Control Plane. |
-| **Fail-Fast** | Reliability | Circuit Breakers and Strict Timeouts prevent cascading failures (Retry Storms). |
+| **Bounded Runs** | Reliability | `GLOBAL_TIMEOUT_SEC` caps every invocation and a per-run `CancellationToken` unwinds it on demand (`pipeline/runtime.py`, `common/cancellation.py`). |
+| **Fail-Fast Retrieval** | Availability | `VECTOR_BREAKER` fast-fails vector retrieval during an outage (`common/resilience.py`). |
 | **Determinism** | Debuggability | Temperature-0 generation + Strict Typing (Pydantic) for all LLM outputs. |
 
 ---
@@ -195,10 +195,10 @@ See [Releasing](docs/development/releasing.md) for the release checklist.
 
 ## 📚 Documentation
 
-- **[System Architecture](docs/architecture/high-level.md)**: runtime topology and core flows
-- **[Agent Nodes](docs/agents/nodes.md)**: node-by-node specs and responsibilities
+- **[System Architecture](docs/architecture/overview.md)**: runtime topology and core flows
+- **[Agent Nodes](docs/architecture/nodes/index.md)**: node-by-node specs and responsibilities
 - **[Schema Store + Retrieval](docs/schema/store.md)**: schema snapshots and vector retrieval
-- **[Execution Sandbox](docs/execution/sandbox.md)**: process isolation and failures
+- **[Execution Isolation + Concurrency](docs/execution/isolation.md)**: what the runtime does and does not bound
 - **[Observability](docs/observability/stack.md)**: metrics, logging, audit events
   
 

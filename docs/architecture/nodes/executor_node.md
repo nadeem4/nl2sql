@@ -153,7 +153,7 @@ Emits `PipelineError` with:
 
 ## Known Limitations
 
-- Executes in‑process by default (sandbox not used in SQL executor).
+- Executes in‑process on the pipeline thread pool; there is no process sandbox (see `../../execution/isolation.md`).
 - No built‑in retries on transient execution failures.
 
 ---

@@ -28,7 +28,7 @@ flowchart TD
 ## Scaling and isolation
 
 - Orchestration runs in-process and can scale horizontally with your service.
-- Sandbox process pools are available for isolation but are not enforced by default in the SQL executor.
+- There is no process-level sandbox. The graph runs on a thread pool inside your service process (`SANDBOX_EXEC_WORKERS` sizes it), so a driver-level crash takes the process down. If you need blast-radius containment, isolate at the deployment boundary — a replica or container you are willing to lose — and let your supervisor restart it. See `../execution/isolation.md`.
 
 ## Source references
 
