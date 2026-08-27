@@ -3,10 +3,15 @@ from __future__ import annotations
 from typing import Set, Dict, Any, List, Optional, Tuple, TYPE_CHECKING
 import traceback
 
+from sqlglot import expressions as exp
+from sqlglot.errors import SqlglotError
+from sqlglot.optimizer.qualify import qualify
+
 if TYPE_CHECKING:
     from nl2sql.pipeline.state import SubgraphExecutionState
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.pipeline.nodes.ast_planner.schemas import PlanModel, Expr
+from nl2sql.pipeline.nodes.generator.node import SqlVisitor
 from nl2sql.context import NL2SQLContext
 from nl2sql.common.logger import get_logger
 from nl2sql.common.settings import settings
@@ -15,99 +20,27 @@ from nl2sql.pipeline.nodes.validator.schemas import LogicalValidatorResponse
 
 logger = get_logger("logical_validator")
 
+_MAX_HINTED_COLUMNS = 15
 
-class ValidatorVisitor:
-    """Traverses the Expr AST to validate column existence and scoping.
 
-    Attributes:
-        alias_to_cols (Dict[str, Set[str]]): Map of table aliases to their column names.
-        errors (List[str]): List of validation error messages collected during traversal.
+class ValidationSqlVisitor(SqlVisitor):
+    """``SqlVisitor`` variant used to build a throw-away tree for validation.
+
+    Identical to the generator's visitor except that a ``*`` column name is
+    rendered as a real sqlglot star, so the optimizer expands it instead of
+    trying to resolve a column literally named ``*``.
     """
 
-    def __init__(self, alias_to_cols: Dict[str, Set[str]]):
-        """Initializes the ValidatorVisitor.
-
-        Args:
-            alias_to_cols (Dict[str, Set[str]]): Mapping of aliases to available columns.
-        """
-        self.alias_to_cols = alias_to_cols
-        self.errors: List[str] = []
-
-    def visit(self, expr: Expr) -> None:
-        """Recursively visits an expression node to check for column errors.
-
-        Args:
-            expr (Expr): The expression to validate.
-        """
-        kind = expr.kind
-
-        if kind == "column":
-            self._visit_column(expr)
-
-        elif kind == "func":
-            for arg in expr.args:
-                self.visit(arg)
-
-        elif kind == "binary":
-            if expr.left:
-                self.visit(expr.left)
-            if expr.right:
-                self.visit(expr.right)
-
-        elif kind == "unary":
-            if expr.expr:
-                self.visit(expr.expr)
-
-        elif kind == "case":
-            if expr.whens:
-                for when in expr.whens:
-                    self.visit(when.condition)
-                    self.visit(when.result)
-            if expr.else_expr:
-                self.visit(expr.else_expr)
-
-        elif kind == "literal":
-            return
-
-    def _visit_column(self, col: Expr):
-        """Validates a column expression against the known alias map."""
-        if not col.column_name:
-            return
-
-        col_name = col.column_name.lower()
-
-        if col.alias:
-            alias = col.alias
-            if alias not in self.alias_to_cols:
-                self.errors.append(
-                    f"Column '{col.column_name}' uses undeclared alias '{alias}'."
+    def _visit_column(self, expr: Expr) -> exp.Expression:
+        """Converts a column expression, mapping wildcards to sqlglot stars."""
+        if (expr.column_name or "").strip() == "*":
+            if expr.alias:
+                return exp.Column(
+                    this=exp.Star(),
+                    table=exp.Identifier(this=expr.alias, quoted=False),
                 )
-                return
-
-            allowed = self.alias_to_cols[alias]
-
-            if col_name == "*":
-                return
-
-            if col_name != "*" and col_name not in allowed:
-                self.errors.append(
-                    f"Column '{col.column_name}' does not exist in table alias '{alias}'."
-                )
-            return
-
-        if col_name == "*":
-            return
-
-        matches = [alias for alias, cols in self.alias_to_cols.items() if col_name in cols]
-
-        if not matches:
-            self.errors.append(
-                f"Column '{col.column_name}' not found in any relevant table."
-            )
-        elif len(matches) > 1:
-            self.errors.append(
-                f"Ambiguous column '{col.column_name}' referenced without alias."
-            )
+            return exp.Star()
+        return super()._visit_column(expr)
 
 
 class LogicalValidatorNode:
@@ -266,43 +199,20 @@ class LogicalValidatorNode:
         val = value.lower()
         return any(c in val or val in c for c in candidates)
 
-    def _collect_aliases(self, expr: Expr) -> Set[str]:
-        aliases: Set[str] = set()
+    def _condition_aliases(self, condition: Expr) -> Set[str]:
+        """Returns the table aliases referenced by a join condition."""
+        node = ValidationSqlVisitor().visit(condition)
+        return {col.table for col in node.find_all(exp.Column) if col.table}
 
-        def walk(node: Optional[Expr]) -> None:
-            if not node:
-                return
-            if node.kind == "column":
-                if node.alias:
-                    aliases.add(node.alias)
-                return
-            if node.kind == "func":
-                for arg in node.args:
-                    walk(arg)
-                return
-            if node.kind == "binary":
-                walk(node.left)
-                walk(node.right)
-                return
-            if node.kind == "unary":
-                walk(node.expr)
-                return
-            if node.kind == "case":
-                if node.whens:
-                    for when in node.whens:
-                        walk(when.condition)
-                        walk(when.result)
-                if node.else_expr:
-                    walk(node.else_expr)
-                return
-
-        walk(expr)
-        return aliases
-
-    def _build_alias_map(
+    def _resolve_plan_tables(
         self, state: SubgraphExecutionState, plan: PlanModel
     ) -> Tuple[Dict[str, Set[str]], Set[str], List[PipelineError]]:
-        """Constructs a map of table aliases to column sets from the schema.
+        """Resolves every plan table against the retrieved schema.
+
+        The resulting alias-to-column map is what is handed to sqlglot's
+        ``qualify()`` as the schema. Table existence is still checked here
+        because ``qualify()`` silently ignores relations that are absent from
+        the schema it is given.
 
         Args:
             state (SubgraphExecutionState): Current execution state containing relevant_tables.
@@ -322,9 +232,9 @@ class LogicalValidatorNode:
         full_map: Dict[str, Any] = {}
         for rt in state.relevant_tables:
             rt_name = (rt.name or "").lower()
-            simple_name = rt_name.split(".")[-1] if rt_name else ""
-            if simple_name:
-                simple_map.setdefault(simple_name, []).append(rt)
+            if not rt_name:
+                continue
+            simple_map.setdefault(rt_name.split(".")[-1], []).append(rt)
             if "." in rt_name:
                 full_map[rt_name] = rt
 
@@ -332,34 +242,14 @@ class LogicalValidatorNode:
             plan_aliases.add(t.alias)
 
             found_table = None
-            plan_simple = (t.name or "").lower()
             if t.schema_name or t.database:
-                plan_key = self._normalize_table_key(
-                    t.name, t.schema_name, t.database
+                found_table = full_map.get(
+                    self._normalize_table_key(t.name, t.schema_name, t.database)
                 )
-                found_table = full_map.get(plan_key)
-                if not found_table:
-                    candidates = simple_map.get(plan_simple, [])
-                    if len(candidates) == 1:
-                        found_table = candidates[0]
-                    elif len(candidates) > 1:
-                        errors.append(
-                            PipelineError(
-                                node="logical_validator",
-                                message=(
-                                    f"Ambiguous table '{t.name}' across schemas; "
-                                    "plan must specify schema."
-                                ),
-                                severity=ErrorSeverity.ERROR,
-                                error_code=ErrorCode.TABLE_NOT_FOUND,
-                            )
-                        )
-                        continue
-            else:
-                candidates = simple_map.get(plan_simple, [])
-                if len(candidates) == 1:
-                    found_table = candidates[0]
-                elif len(candidates) > 1:
+
+            if not found_table:
+                candidates = simple_map.get((t.name or "").lower(), [])
+                if len(candidates) > 1:
                     errors.append(
                         PipelineError(
                             node="logical_validator",
@@ -372,6 +262,7 @@ class LogicalValidatorNode:
                         )
                     )
                     continue
+                found_table = candidates[0] if candidates else None
 
             if not found_table:
                 errors.append(
@@ -384,17 +275,153 @@ class LogicalValidatorNode:
                 )
                 continue
 
-            cols: Set[str] = set()
-            for c in found_table.columns:
-                name = c.name.lower()
-                if "." in name:
-                    name = name.split(".")[-1]
-                cols.add(name)
-
-            alias_to_cols[t.alias] = cols
+            alias_to_cols[t.alias] = {
+                self._normalize_name(c.name) for c in found_table.columns
+            }
 
         logger.debug("Validator alias map: %s", alias_to_cols)
         return alias_to_cols, plan_aliases, errors
+
+    def _build_validation_query(
+        self, plan: PlanModel, aliases: List[str]
+    ) -> exp.Select:
+        """Builds a throw-away sqlglot query used purely for column resolution.
+
+        Every resolved plan table becomes a relation named after its alias, so
+        the sqlglot schema is keyed by alias and resolution scoping matches the
+        plan exactly. Tables are cross-joined rather than joined on their
+        conditions because the plan's alias-to-column visibility does not depend
+        on join structure; join conditions are folded into the WHERE clause so
+        that their columns are resolved too.
+        """
+        visitor = ValidationSqlVisitor()
+
+        selects = [visitor.visit(s.expr) for s in plan.select_items] or [exp.Star()]
+        query = exp.select(*selects)
+
+        query = query.from_(exp.Table(this=exp.Identifier(this=aliases[0], quoted=False)))
+        for alias in aliases[1:]:
+            query = query.join(
+                exp.Table(this=exp.Identifier(this=alias, quoted=False)),
+                join_type="CROSS",
+            )
+
+        for j in plan.joins:
+            query = query.where(visitor.visit(j.condition))
+        if plan.where:
+            query = query.where(visitor.visit(plan.where))
+        for g in plan.group_by:
+            query = query.group_by(visitor.visit(g.expr))
+        if plan.having:
+            query = query.having(visitor.visit(plan.having))
+        for o in plan.order_by:
+            query = query.order_by(visitor.visit(o.expr))
+
+        return query
+
+    def _describe_column_failure(
+        self, alias: str, column: str, alias_to_cols: Dict[str, Set[str]]
+    ) -> str:
+        """Turns an unresolvable column reference into actionable plan feedback.
+
+        sqlglot reports failures in terms of the SQL it was handed (``Unknown
+        column: x``, with a line/column offset). The planner never sees that
+        SQL, so the message is rewritten in terms of the plan's own aliases and
+        the schema the retriever supplied.
+        """
+        if alias and alias not in alias_to_cols:
+            known = ", ".join(sorted(alias_to_cols)) or "none"
+            return (
+                f"Column '{column}' uses undeclared alias '{alias}'. "
+                f"Declared table aliases: {known}."
+            )
+
+        if alias:
+            return (
+                f"Column '{column}' does not exist in table alias '{alias}'. "
+                f"Available columns: {self._format_columns(alias_to_cols[alias])}."
+            )
+
+        matches = sorted(
+            a for a, cols in alias_to_cols.items() if column.lower() in cols
+        )
+        if len(matches) > 1:
+            return (
+                f"Ambiguous column '{column}' referenced without alias. "
+                f"Qualify it with one of: {', '.join(matches)}."
+            )
+
+        available = {f"{a}.{c}" for a, cols in alias_to_cols.items() for c in cols}
+        return (
+            f"Column '{column}' not found in any relevant table. "
+            f"Available columns: {self._format_columns(available)}."
+        )
+
+    @staticmethod
+    def _format_columns(columns: Set[str]) -> str:
+        """Renders a bounded, deterministic list of column names for feedback."""
+        ordered = sorted(columns)
+        if not ordered:
+            return "none"
+        if len(ordered) > _MAX_HINTED_COLUMNS:
+            return ", ".join(ordered[:_MAX_HINTED_COLUMNS]) + ", ..."
+        return ", ".join(ordered)
+
+    def _validate_columns(
+        self, plan: PlanModel, alias_to_cols: Dict[str, Set[str]]
+    ) -> List[str]:
+        """Resolves every column reference in the plan via sqlglot's optimizer.
+
+        ``qualify()`` is the sole authority on whether a reference resolves; it
+        covers column existence, alias scoping and ambiguity. It fails on the
+        first bad reference, so when it does fail each distinct reference is
+        re-probed individually to report all of them at once.
+
+        Returns:
+            List[str]: Human-readable messages, one per unresolvable reference.
+        """
+        aliases = list(alias_to_cols)
+        if not aliases or not plan.select_items:
+            return []
+
+        schema = {a: {c: "UNKNOWN" for c in cols} for a, cols in alias_to_cols.items()}
+        query = self._build_validation_query(plan, aliases)
+
+        try:
+            qualify(query.copy(), schema=schema, validate_qualify_columns=True)
+            return []
+        except SqlglotError as exc:
+            logger.debug("sqlglot qualify rejected plan: %s", exc)
+            failure = exc
+
+        messages: List[str] = []
+        seen: Set[Tuple[str, str]] = set()
+        for column in query.find_all(exp.Column):
+            if isinstance(column.this, exp.Star):
+                continue
+            key = (column.table or "", column.name)
+            if key in seen:
+                continue
+            seen.add(key)
+
+            probe = exp.select(column.copy()).from_(
+                exp.Table(this=exp.Identifier(this=aliases[0], quoted=False))
+            )
+            for alias in aliases[1:]:
+                probe = probe.join(
+                    exp.Table(this=exp.Identifier(this=alias, quoted=False)),
+                    join_type="CROSS",
+                )
+            try:
+                qualify(probe, schema=schema, validate_qualify_columns=True)
+            except SqlglotError:
+                messages.append(
+                    self._describe_column_failure(key[0], key[1], alias_to_cols)
+                )
+
+        if not messages:
+            messages.append(f"Plan columns could not be resolved: {failure}")
+        return messages
 
     def _validate_ordinals(self, items: List[Any], label: str) -> Optional[PipelineError]:
         """Checks if ordinals in a list of items are contiguous starting from 0."""
@@ -494,7 +521,7 @@ class LogicalValidatorNode:
         - Ordinal integrity.
         - Alias uniqueness.
         - Join alias validity.
-        - Column existence (via ValidatorVisitor).
+        - Column existence and scoping (via sqlglot's qualify optimizer).
         """
         plan: PlanModel = state.ast_planner_response.plan if state.ast_planner_response else None
         errors: list[PipelineError] = []
@@ -562,7 +589,7 @@ class LogicalValidatorNode:
                     )
                 )
 
-        alias_to_cols, plan_aliases, alias_errors = self._build_alias_map(state, plan)
+        alias_to_cols, plan_aliases, alias_errors = self._resolve_plan_tables(state, plan)
         errors.extend(alias_errors)
 
         table_to_cols, table_to_stats, relationships = self._build_allowed_schema(state)
@@ -590,7 +617,7 @@ class LogicalValidatorNode:
                         error_code=ErrorCode.JOIN_TABLE_NOT_IN_PLAN,
                     )
                 )
-            join_aliases = self._collect_aliases(j.condition)
+            join_aliases = self._condition_aliases(j.condition)
             if j.left_alias not in join_aliases or j.right_alias not in join_aliases:
                 errors.append(
                     PipelineError(
@@ -654,25 +681,7 @@ class LogicalValidatorNode:
                         )
                     )
 
-        visitor = ValidatorVisitor(alias_to_cols)
-
-        if plan.where:
-            visitor.visit(plan.where)
-
-        if plan.having:
-            visitor.visit(plan.having)
-
-        for s in plan.select_items:
-            visitor.visit(s.expr)
-
-        for g in plan.group_by:
-            visitor.visit(g.expr)
-
-        for o in plan.order_by:
-            visitor.visit(o.expr)
-
-        for j in plan.joins:
-            visitor.visit(j.condition)
+        column_messages = self._validate_columns(plan, alias_to_cols)
 
         for expr in [plan.where, plan.having]:
             if not expr:
@@ -718,7 +727,7 @@ class LogicalValidatorNode:
         column_severity = (
             ErrorSeverity.ERROR if self.strict_columns else ErrorSeverity.WARNING
         )
-        for msg in visitor.errors:
+        for msg in column_messages:
             errors.append(
                 PipelineError(
                     node="logical_validator",
@@ -775,7 +784,22 @@ class LogicalValidatorNode:
                     ],
                 }
 
-            errors.extend(self._validate_static(state))
+            # Static validation is isolated so that a failure inside it can
+            # never skip policy enforcement. RBAC must run for every plan.
+            try:
+                errors.extend(self._validate_static(state))
+            except Exception as exc:
+                logger.exception("Static logical validation crashed")
+                errors.append(
+                    PipelineError(
+                        node=node_name,
+                        message=f"Static logical validation crashed: {exc}",
+                        severity=ErrorSeverity.ERROR,
+                        error_code=ErrorCode.VALIDATOR_CRASH,
+                        stack_trace=traceback.format_exc(),
+                    )
+                )
+
             errors.extend(self._validate_policy(state))
 
             if any(e.severity in (ErrorSeverity.CRITICAL, ErrorSeverity.ERROR) for e in errors):
