@@ -54,7 +54,7 @@ Returns the execution plan.
 
 #### `cost_estimate(sql: str)`
 
-Returns cost/row estimates for the Physical Validator.
+Returns cost/row estimates. Advertised via the `SUPPORTS_COST_ESTIMATE` capability; the pipeline does not currently call it.
 
 ---
 

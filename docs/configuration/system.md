@@ -74,7 +74,7 @@ providers. The check runs on the read path only, so the fix is simply to re-run
 | Env var | Default | Description |
 | --- | --- | --- |
 | `GLOBAL_TIMEOUT_SEC` | `60` | Global timeout in seconds for pipeline execution. |
-| `SANDBOX_EXEC_WORKERS` | `4` | Max workers for latency-sensitive execution pool. |
+| `SANDBOX_EXEC_WORKERS` | `4` | Width of the `ThreadPoolExecutor` the pipeline runs on. Despite the name it provides concurrency, not sandboxing (see `../execution/isolation.md`). |
 
 ### Behavior
 

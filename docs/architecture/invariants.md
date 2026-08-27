@@ -322,7 +322,7 @@ Ensures latency bounds and prevents hung requests.
 - **Execution**: SQL Execution Requires SQL, Datasource, and Capability; Execution DAG Must Be Valid and Acyclic; Aggregation Requires Scan Artifacts and Single-Input Post Nodes; Pipeline Execution Is Time-Bounded
 - **Security**: Policy Enforcement Is Namespaced and Fail-Closed; Datasource Access Is RBAC-Gated; Plan Model Is Strict and Read-Only
 - **Determinism**: Plan Ordinals Are Contiguous; Expected Schema Must Match Select List; Joins Must Be Valid and Schema-Backed
-- **Isolation**: SQL Generation Enforces a Row Limit Cap; Context Requires Vector Store and Schema Store Configuration
+- **Resource bounds**: SQL Generation Enforces a Row Limit Cap; Context Requires Vector Store and Schema Store Configuration
 
 ---
 

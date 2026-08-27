@@ -115,8 +115,8 @@ Determinism guarantees and non-determinism sources are centralized in `determini
 
 ## Known limitations (current)
 
-- Execution sandbox exists but SQL executor runs in-process by default.
-- Circuit breakers are not uniformly wired across all execution paths.
+- There is no execution sandbox; the SQL executor runs in-process on the pipeline thread pool (see `../execution/isolation.md`).
+- `VECTOR_BREAKER` is the only circuit breaker. LLM calls and SQL execution are not breaker-guarded.
 
 ## Observability hooks (current)
 

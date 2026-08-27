@@ -12,12 +12,12 @@ NL2SQL converts natural language requests into **deterministic, validated SQL** 
 - **Schema grounding**: planning is constrained by a schema snapshot retrieved via structured chunks.
 - **Explicit validation gates**: logical validation enforces schema and RBAC constraints before execution.
 - **Modularity**: adapters, subgraphs, and executors are capability-driven and replaceable.
-- **Isolation**: execution and indexing can be offloaded to sandboxed process pools.
+- **Bounded execution**: every run is capped by a global timeout and carries a per-run cancellation token; the graph itself runs in-process on a thread pool.
 - **Observability**: structured logging, metrics, and audit events are first-class.
 
 ## Non-functional goals
 
-- Reliability under partial failures (circuit breakers, retry semantics, safe failure).
+- Reliability under partial failures (a circuit breaker on vector retrieval, SQL-agent retry semantics, errors returned as state rather than raised).
 - Extensibility via plugins and registries (datasources, subgraphs, executors).
 - Cost awareness (row limits, byte limits, optional dry run/cost estimate).
 - Security by default (RBAC, policy-based table access, audit logging).
@@ -49,6 +49,6 @@ flowchart TD
 - `architecture/graph_state.md`, `architecture/determinism.md`, and `architecture/invariants.md` for state, determinism, and enforced rules.
 - `architecture/failure_recovery.md` for failure domains and retry scope.
 - `schema/store.md` and `architecture/indexing.md` for schema contracts, chunking, and retrieval.
-- `execution/sandbox.md` for execution isolation and concurrency details.
+- `execution/isolation.md` for what the runtime bounds, and what it does not.
 - `adapters/architecture.md` for plugin discovery and capability-based routing.
 - `observability/stack.md` and `observability/error-handling.md` for metrics, logging, and error contracts.

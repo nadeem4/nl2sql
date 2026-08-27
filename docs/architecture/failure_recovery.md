@@ -24,13 +24,13 @@ Failure in this system is represented as structured `PipelineError` objects accu
 
 ### Validation
 - Logical validation returns structured errors for missing tables, columns, invalid plan structure, or security violations.
-- Physical validation is implemented but not wired into the SQL agent subgraph flow and does not execute in the current graph.
+- Logical validation is the only validation gate; there is no physical/dry-run validation node in the graph.
 
 ### Execution
 - SQL generation failures return `SQL_GEN_FAILED`.
 - Executor returns errors for missing SQL, missing datasource, missing executor, or executor crashes.
 - SQL execution failures return `EXECUTION_FAILED` based on adapter result.
-- Sandbox execution errors (timeouts, worker crashes) are surfaced only when the physical validator uses the sandbox.
+- Execution is in-process on the pipeline thread pool. A driver-level crash is not contained and terminates the process; only Python-level exceptions become `PipelineError` values (see `../execution/isolation.md`).
 
 ### Storage
 - Schema store uses SQLite or in-memory storage; failures manifest as exceptions on read/write (not caught in callers).
@@ -144,9 +144,9 @@ Replay is not supported. There is no persisted graph state or execution log to r
 
 ## Known Gaps
 
-- Physical validation node exists but is not wired into the SQL agent subgraph, so dry-run and cost checks do not execute.
-- LLM circuit breaker is defined but never applied to LLM calls.
-- Database circuit breaker only guards physical validation; SQL execution is not wrapped and does not use the sandbox.
+- No dry-run or cost-estimate gate runs before execution, even where the adapter advertises `SUPPORTS_DRY_RUN` / `SUPPORTS_COST_ESTIMATE`.
+- `VECTOR_BREAKER` is the only circuit breaker; LLM calls and SQL execution have no breaker and no fast-fail path.
+- There is no process isolation around SQL execution, so a driver crash is unrecoverable at the engine level.
 - Subgraph wrapper assumes executor output is present; earlier failures can cause wrapper-level errors.
 - Pipeline completion does not imply success; `PipelineRunner` does not inspect `errors` and always returns `success=True` if the graph returns.
 - No graph-level retries or replay; only subgraph local retries.
@@ -163,7 +163,7 @@ Replay is not supported. There is no persisted graph state or execution log to r
 - `packages/core/src/nl2sql/pipeline/subgraphs/sql_agent.py`
 - `packages/core/src/nl2sql/common/errors.py`
 - `packages/core/src/nl2sql/common/resilience.py`
-- `packages/core/src/nl2sql/common/sandbox.py`
+- `packages/core/src/nl2sql/common/cancellation.py`
 - `packages/core/src/nl2sql/pipeline/nodes/*/node.py`
 - `packages/core/src/nl2sql/execution/executor/sql_executor.py`
 - `packages/core/src/nl2sql/aggregation/aggregator.py`

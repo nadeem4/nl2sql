@@ -46,9 +46,9 @@ data run key-free.
 - **`integration`** runs `pytest -m "integration and not llm"` on one Python
   version, after generating demo data with `nl2sql setup --demo --lite` and
   with `EMBEDDING_PROVIDER=local`. The ONNX model is cached across runs. That
-  subset is 29 tests, covering schema indexing, datasource resolution, schema
-  retrieval, aggregation, physical validation and the local embedder against
-  the real demo databases.
+  subset is 28 tests, covering schema indexing, datasource resolution, schema
+  retrieval, aggregation and the local embedder against the real demo
+  databases.
 
 Nothing selects `llm`. Those tests are run by hand with a key:
 
