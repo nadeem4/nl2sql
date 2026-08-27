@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Callable, Dict, List, Optional
 
-from langchain_core.runnables import Runnable
+from langchain_core.runnables import Runnable, RunnableConfig
 
 from nl2sql.context import NL2SQLContext
 from nl2sql.pipeline.nodes.global_planner.schemas import ExecutionDAG
@@ -77,7 +77,7 @@ def wrap_subgraph(
     subgraph_name: str,
     ctx: NL2SQLContext,
 ) -> Callable[Dict[str, Any]]:
-    def _wrapper(state_dict: dict) -> Dict[str, Any]:
+    def _wrapper(state_dict: dict, config: Optional[RunnableConfig] = None) -> Dict[str, Any]:
         trace_id = state_dict.get("trace_id")
         subgraph_id = state_dict.get("subgraph_id")
         sub_query_id = subgraph_id.split(":")[1]
@@ -95,7 +95,8 @@ def wrap_subgraph(
             subgraph_id=subgraph_id,
             subgraph_name=subgraph_name,
         )
-        result = subgraph.invoke(sub_state.model_dump())
+        # Propagate the run config (carrying the cancellation token) into the subgraph.
+        result = subgraph.invoke(sub_state.model_dump(), config=config)
 
         returned_state = SubgraphExecutionState.model_validate(result)
 

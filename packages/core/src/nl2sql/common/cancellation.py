@@ -3,20 +3,23 @@ from __future__ import annotations
 import threading
 from typing import Optional
 
-_cancel_event = threading.Event()
 
+class CancellationToken:
+    """Per-run cancellation flag.
 
-def cancel() -> None:
-    _cancel_event.set()
+    Each run owns its own token, so cancelling one run never affects another.
+    Runs pass their token to the graph via
+    ``config={"configurable": {"cancellation_token": token}}``.
+    """
 
+    def __init__(self) -> None:
+        self._event = threading.Event()
 
-def reset() -> None:
-    _cancel_event.clear()
+    def cancel(self) -> None:
+        self._event.set()
 
+    def is_cancelled(self) -> bool:
+        return self._event.is_set()
 
-def is_cancelled() -> bool:
-    return _cancel_event.is_set()
-
-
-def wait(timeout: Optional[float] = None) -> bool:
-    return _cancel_event.wait(timeout=timeout)
+    def wait(self, timeout: Optional[float] = None) -> bool:
+        return self._event.wait(timeout=timeout)
