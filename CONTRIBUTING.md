@@ -52,11 +52,22 @@ pytest packages/core/tests/unit
 order they run in fail locally instead of only in CI. Reproduce a failing run
 with the seed it prints: `pytest -p randomly --randomly-seed=<seed>`.
 
-Integration tests (requires Docker):
+Integration tests need generated demo data, and some also need a real LLM API
+key. The two are separate markers, so the key-free subset -- the same one CI
+runs -- is selectable on its own:
 
-```powershell
-./scripts/test_integration.ps1
+```bash
+nl2sql setup --demo --lite
+EMBEDDING_PROVIDER=local pytest -m "integration and not llm"
 ```
+
+Add a key to run the rest:
+
+```bash
+EMBEDDING_PROVIDER=local OPENAI_API_KEY=sk-... pytest -m integration
+```
+
+See `docs/testing/architecture.md` for what each marker means.
 
 ## Documentation
 

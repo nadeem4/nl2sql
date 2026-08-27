@@ -12,12 +12,16 @@ for path in (CORE_SRC, SDK_SRC):
 
 
 def pytest_collection_modifyitems(config, items):
-    """Mark the core integration tests so CI can skip them.
+    """Mark the core integration tests as needing external resources.
 
-    They need a live demo database, a populated vector store and a real
-    OPENAI_API_KEY, so CI runs with ``-m "not integration"``. Scoped to this
-    package only -- the sqlite-backed integration tests in the adapter
-    packages need none of that and stay selected.
+    Everything under ``tests/integration/`` needs something a bare checkout
+    does not have: the generated demo SQLite databases, or the downloaded ONNX
+    embedding model. That is what ``integration`` means. Whether a test also
+    needs a paid API key is a separate axis, carried by the ``llm`` marker that
+    individual modules declare for themselves.
+
+    Scoped to this package only -- the sqlite-backed integration tests in the
+    adapter packages need none of that and stay selected.
     """
     for item in items:
         if "packages/core/tests/integration/" in str(item.fspath).replace("\\", "/"):

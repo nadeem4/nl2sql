@@ -28,10 +28,48 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e packages/adapter-sdk -e packages/adapter-sqlalchemy -e packages/core -e packages/adapters/sqlite -e packages/adapters/postgres -e packages/cli -e packages/api pytest pytest-randomly
 
-      # Integration tests need a live database, a populated vector store and a
-      # real OPENAI_API_KEY, so they cannot run here.
+      # Anything needing generated demo data or a downloaded model is marked
+      # `integration` and runs in the job below; anything needing a paid API
+      # key is marked `llm` and runs nowhere in CI.
       - name: Run tests
         run: pytest -m "not integration"
+
+  # The subset of packages/core/tests/integration that needs neither an LLM API
+  # key nor an external database: generated SQLite demo data and the local ONNX
+  # embedder are enough. Kept separate from the unit job so that one stays fast.
+  integration:
+    runs-on: ubuntu-latest
+    env:
+      EMBEDDING_PROVIDER: local
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install packages
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e packages/adapter-sdk -e packages/adapter-sqlalchemy -e packages/core -e packages/adapters/sqlite -e packages/adapters/postgres -e packages/cli -e packages/api pytest pytest-randomly
+
+      # all-MiniLM-L6-v2 is ~79 MB and immutable, so a fixed key is correct: a
+      # hit skips the download entirely, and there is nothing to invalidate.
+      - name: Cache the local embedding model
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/chroma
+          key: chroma-onnx-all-MiniLM-L6-v2
+
+      # Generates data/demo_lite/*.db and configs/*.demo.*. The schema-indexing
+      # step this also runs reports errors without a key and exits 0; the tests
+      # below build their own indexes and do not depend on it.
+      - name: Generate demo data
+        run: nl2sql setup --demo --lite
+
+      - name: Run key-free integration tests
+        run: pytest -m "integration and not llm"
 
   build:
     runs-on: ubuntu-latest

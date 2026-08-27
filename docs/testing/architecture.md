@@ -19,6 +19,40 @@ to `pyproject.toml`: pytest reads only one config file, and `pytest.ini` wins,
 so such a table is silently ignored. Dev/test tooling lives in the root
 `pyproject.toml` under `[dependency-groups] dev` (`pip install --group dev`).
 
+## Markers and what CI runs
+
+Two independent things can make a test unrunnable in CI, so they are two
+markers. A test may carry both.
+
+| Marker | Means | Provided by |
+| --- | --- | --- |
+| `integration` | Needs external resources: the generated demo SQLite databases, or the downloaded ONNX embedding model. | `nl2sql setup --demo --lite` |
+| `llm` | Needs a real `OPENAI_API_KEY`. Costs money per run. | Nothing in CI - never selected. |
+
+Everything under `packages/core/tests/integration/` is marked `integration`
+automatically by `packages/core/tests/conftest.py`. The `llm` marker is
+declared per module, next to a comment saying which call needs the key.
+
+`.github/workflows/test.yml` has two test jobs:
+
+- **`test`** runs `pytest -m "not integration"` across Python 3.10-3.13. This
+  is the fast job and must stay fast.
+- **`integration`** runs `pytest -m "integration and not llm"` on one Python
+  version, after generating demo data with `nl2sql setup --demo --lite` and
+  with `EMBEDDING_PROVIDER=local`. The ONNX model is cached across runs.
+
+Nothing selects `llm`. Those tests are run by hand with a key:
+
+```bash
+nl2sql setup --demo --lite
+EMBEDDING_PROVIDER=local OPENAI_API_KEY=sk-... pytest -m integration
+```
+
+Collection is not enough to keep these honest. Every test in the directory
+imports cleanly even when it calls a method that no longer exists, so rot shows
+up only at call time - which is the point of running the key-free subset in CI
+rather than gating on `--collect-only`.
+
 ## Randomised test order
 
 `pytest-randomly` shuffles the order of tests on every run, which turns

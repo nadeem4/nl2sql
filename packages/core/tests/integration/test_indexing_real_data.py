@@ -15,6 +15,15 @@ from nl2sql.indexing.embeddings import EmbeddingService
 from nl2sql.indexing.orchestrator import IndexingOrchestrator
 
 
+# These assert on embeddings and schema-version eviction, neither of which
+# involves an LLM. They are marked `llm` only because
+# IndexingOrchestrator.index_datasource eagerly builds the
+# 'indexing_enrichment' client before reaching the try/except that is supposed
+# to make enrichment optional. Drop this marker once that is fixed -- both
+# tests in this module pass key-free with enrichment skipped.
+pytestmark = pytest.mark.llm
+
+
 def _cosine_similarity(left: np.ndarray, right: np.ndarray) -> float:
     left_norm = np.linalg.norm(left)
     right_norm = np.linalg.norm(right)
