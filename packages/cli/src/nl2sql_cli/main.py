@@ -23,6 +23,7 @@ from nl2sql_cli.commands.doctor import doctor_command
 from nl2sql_cli.commands.setup import setup_command
 from nl2sql_cli.commands.install import install_command
 from nl2sql_cli.commands.policy import app as policy_app
+from nl2sql_cli.console import configure_output_encoding
 from nl2sql_cli.types import RunConfig
 
 app = typer.Typer(
@@ -179,6 +180,9 @@ def benchmark(
 
 
 def main():
+    # Before any command writes: rich emits symbols a legacy Windows code page
+    # cannot encode, and an unconfigured stream turns that into a crash.
+    configure_output_encoding()
     app()
 
 if __name__ == "__main__":
