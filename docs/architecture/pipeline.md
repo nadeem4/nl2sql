@@ -115,7 +115,6 @@ Determinism guarantees and non-determinism sources are centralized in `determini
 
 ## Known limitations (current)
 
-- `PhysicalValidatorNode` is implemented but not wired into the SQL agent graph.
 - Execution sandbox exists but SQL executor runs in-process by default.
 - Circuit breakers are not uniformly wired across all execution paths.
 

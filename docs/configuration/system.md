@@ -13,7 +13,6 @@ Configuration is split into **environment variables** (runtime settings) and **f
 | `EMBEDDING_MODEL` | `text-embedding-3-small` | OpenAI embedding model. Ignored when `EMBEDDING_PROVIDER=local`. |
 | `LLM_CONFIG` | `configs/llm.yaml` | Path to the LLM config file. |
 | `DATASOURCE_CONFIG` | `configs/datasources.yaml` | Path to the datasource config file. |
-| `BENCHMARK_CONFIG` | `configs/benchmark_suite.yaml` | Path to the benchmark suite file. |
 | `SAMPLE_QUESTIONS` | `configs/sample_questions.yaml` | Path to the sample questions file. |
 | `POLICIES_CONFIG` | `configs/policies.json` | Path to the RBAC policies file. |
 | `SECRETS_CONFIG` | `configs/secrets.yaml` | Path to the secrets config file. |
@@ -76,7 +75,6 @@ providers. The check runs on the read path only, so the fix is simply to re-run
 | --- | --- | --- |
 | `GLOBAL_TIMEOUT_SEC` | `60` | Global timeout in seconds for pipeline execution. |
 | `SANDBOX_EXEC_WORKERS` | `4` | Max workers for latency-sensitive execution pool. |
-| `SANDBOX_INDEX_WORKERS` | `2` | Max workers for throughput-heavy indexing pool. |
 
 ### Behavior
 
@@ -90,28 +88,12 @@ providers. The check runs on the read path only, so the fix is simply to re-run
 | `LOGICAL_VALIDATOR_STRICT_COLUMNS` | `false` | Treat missing columns as errors in logical validation. |
 | `TENANT_ID` | `default_tenant` | Default tenant ID for requests. |
 
-### Limits
-
-| Env var | Default | Description |
-| --- | --- | --- |
-| `DEFAULT_ROW_LIMIT` | `10000` | Default row limit for SQL execution safeguards. |
-| `DEFAULT_MAX_BYTES` | `10485760` | Default max bytes limit for SQL execution safeguards. |
-| `DEFAULT_STATEMENT_TIMEOUT_MS` | `30000` | Default statement timeout for SQL execution safeguards. |
-
-### Routing
-
-| Env var | Default | Description |
-| --- | --- | --- |
-| `ROUTER_L1_THRESHOLD` | `0.4` | Distance threshold for Layer 1 vector search. |
-| `ROUTER_L2_THRESHOLD` | `0.6` | Relaxed distance threshold for Layer 2 voting. |
-
 ### Observability
 
 | Env var | Default | Description |
 | --- | --- | --- |
 | `OBSERVABILITY_EXPORTER` | `none` | Exporter for metrics/traces: `none`, `console`, `otlp`. |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | `—` | Endpoint for OTLP exporter. |
-| `AUDIT_LOG_PATH` | `logs/audit_events.log` | Path to the persistent audit log file. |
 
 ### Environment file loading
 

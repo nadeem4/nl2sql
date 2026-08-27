@@ -174,7 +174,7 @@ Prevents invalid joins and enforces schema-authorized relationships.
 Allowed tables must be namespaced as `datasource.table` or `datasource.*`, and policy checks fail if datasource ID is missing.
 
 ### Enforcement Points
-- `RolePolicy.validate_namespace()` in `nl2sql.security.policies`
+- `RolePolicy.validate_namespace()` in `nl2sql.auth.models`
 - `LogicalValidatorNode._validate_policy()` in `nl2sql.pipeline.nodes.validator.node`
 
 ### Failure Behavior
@@ -350,4 +350,4 @@ Ensures latency bounds and prevents hung requests.
 - `packages/core/src/nl2sql/context.py`
 - `packages/core/src/nl2sql/schema/store.py`
 - `packages/core/src/nl2sql/pipeline/runtime.py`
-- `packages/core/src/nl2sql/security/policies.py`
+- `packages/core/src/nl2sql/auth/models.py`

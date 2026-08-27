@@ -17,7 +17,6 @@ For pipeline-level wiring, see `../pipeline.md`. For subgraph wiring and lifecyc
 - [SchemaRetrieverNode](schema_retriever_node.md)
 - [ASTPlannerNode](ast_planner_node.md)
 - [LogicalValidatorNode](logical_validator_node.md)
-- [PhysicalValidatorNode](physical_validator_node.md)
 - [GeneratorNode](generator_node.md)
 - [ExecutorNode](executor_node.md)
 - [RefinerNode](refiner_node.md)

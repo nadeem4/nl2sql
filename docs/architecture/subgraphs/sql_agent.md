@@ -156,7 +156,6 @@ See `../failure_recovery.md` for retry scope and recovery behavior.
 
 ## Known Limitations
 
-- `physical_validator` node is instantiated but not wired; physical validation is unreachable.
 - Generator and executor errors are not routed into the retry loop; failures proceed to `executor` or terminate at `END`.
 - No subgraph-specific metrics or trace spans are emitted.
 - Retry loop only considers planner and logical validation errors.

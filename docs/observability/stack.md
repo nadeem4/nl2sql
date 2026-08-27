@@ -29,7 +29,7 @@ Legacy token and latency events are recorded in `TOKEN_LOG` and `LATENCY_LOG`.
 
 ## Audit logging
 
-`EventLogger` writes JSON events to a rotating log file configured by `Settings.audit_log_path`. Payloads are sanitized to redact sensitive keys.
+`EventLogger` writes JSON events to a rotating log file at `logs/audit_events.log`. Payloads are sanitized to redact sensitive keys.
 
 ## Structured logging
 

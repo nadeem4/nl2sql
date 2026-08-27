@@ -8,7 +8,7 @@ from nl2sql.common.settings import settings
 from nl2sql.pipeline.state import SubgraphExecutionState
 from nl2sql.pipeline.nodes.ast_planner import ASTPlannerNode
 from nl2sql.pipeline.nodes.schema_retriever import SchemaRetrieverNode
-from nl2sql.pipeline.nodes.validator import LogicalValidatorNode, PhysicalValidatorNode
+from nl2sql.pipeline.nodes.validator import LogicalValidatorNode
 from nl2sql.pipeline.nodes.refiner import RefinerNode
 from nl2sql.pipeline.nodes.generator import GeneratorNode
 from nl2sql.pipeline.nodes.executor import ExecutorNode
@@ -27,18 +27,16 @@ def build_sql_agent_graph(
     """Builds the SQL Agent Subgraph.
 
     Pipeline Flow:
-    Planner -> LogicalValidator -> Generator -> PhysicalValidator -> Executor
+    Planner -> LogicalValidator -> Generator -> Executor
 
     Feedback Loop:
     (LogicalValidator Error) -> RetryHandler -> Refiner -> Planner
-    (PhysicalValidator Error) -> RetryHandler -> Refiner -> Planner
     """
     graph = StateGraph(SubgraphExecutionState)
 
     schema_retriever = SchemaRetrieverNode(ctx)
     ast_planner = ASTPlannerNode(ctx)
     logical_validator = LogicalValidatorNode(ctx)
-    physical_validator = PhysicalValidatorNode(ctx)
     refiner = RefinerNode(ctx)
     generator = GeneratorNode(ctx)
     executor = ExecutorNode(ctx)
@@ -135,25 +133,10 @@ def build_sql_agent_graph(
             return "end"
         return "ok"
 
-    def check_physical_validation(state: SubgraphExecutionState, config: Optional[RunnableConfig] = None) -> str:
-        """Routes based on physical validation result."""
-        if _is_cancelled(config):
-            return "end"
-        if state.physical_validator_response and state.physical_validator_response.errors:
-             # Critical/Fatal errors stop execution immediately
-            if not all(e.is_retryable for e in state.physical_validator_response.errors):
-                return "end"
-
-            if _get_retry_count(state) < settings.sql_agent_max_retries:
-                return "retry"
-            return "end"
-        return "ok"
-
     graph.add_node("schema_retriever", schema_retriever)
     graph.add_node("ast_planner", ast_planner)
     graph.add_node("logical_validator", logical_validator)
     graph.add_node("generator", generator)
-    graph.add_node("physical_validator", physical_validator)
     graph.add_node("executor", executor)
     graph.add_node("refiner", refiner)
     graph.add_node("retry_handler", retry_node)
@@ -175,12 +158,6 @@ def build_sql_agent_graph(
     )
 
     graph.add_edge("generator", "executor")
-
-    """ graph.add_conditional_edges(
-        "physical_validator",
-        check_physical_validation,
-        {"ok": "executor", "retry": "retry_handler", "end": END},
-    ) """
 
     graph.add_edge("executor", END)
 

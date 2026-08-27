@@ -2,11 +2,10 @@
 Resilience Module: Circuit Breakers and Fault Tolerance.
 
 This module centralizes the configuration of Circuit Breakers using `pybreaker`.
-It implements "Tiered Resilience" allowing the system to Fail Fast when 
-downstream dependencies (LLM, Vector DB, SQL DB) are unavailable.
+It allows the system to Fail Fast when the vector store is unavailable.
 
 Features:
-- Global Breaker Instances (LLM, DB, VECTOR)
+- Global Breaker Instance (VECTOR)
 - Observability via CircuitBreakerListener
 - Safe Exclusion of "Soft Failures" (e.g., Rate Limits)
 """
@@ -52,30 +51,9 @@ def create_breaker(
     )
 
 
-_llm_excludes = []
-try:
-    from openai import RateLimitError, AuthenticationError, BadRequestError
-    _llm_excludes.extend([RateLimitError, AuthenticationError, BadRequestError])
-except ImportError:
-    pass
-
-LLM_BREAKER = create_breaker(
-    name="LLM_BREAKER",
-    fail_max=5,
-    reset_timeout=60,
-    exclude=_llm_excludes
-)
-
 # Vector Breaker: Retrieval Layer
 VECTOR_BREAKER = create_breaker(
     name="VECTOR_BREAKER",
     fail_max=5,
     reset_timeout=30  # Faster recovery for infra blips
-)
-
-# Database Breaker: Execution Layer
-DB_BREAKER = create_breaker(
-    name="DB_BREAKER",
-    fail_max=5,
-    reset_timeout=30
 )

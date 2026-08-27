@@ -15,11 +15,9 @@ Common error codes include `MISSING_SQL`, `EXECUTION_FAILED`, `PIPELINE_TIMEOUT`
 
 `create_breaker()` configures `pybreaker.CircuitBreaker` instances with observability hooks:
 
-- `LLM_BREAKER`
 - `VECTOR_BREAKER`
-- `DB_BREAKER`
 
-Retrieval calls in `VectorStore` are wrapped with `VECTOR_BREAKER`. Other breakers are available but not uniformly wired across all execution paths.
+Retrieval calls in `VectorStore` are wrapped with `VECTOR_BREAKER`. It is the only breaker instance the system defines.
 
 ## Failure flow
 
