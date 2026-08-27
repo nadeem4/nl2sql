@@ -10,7 +10,7 @@ from typing_extensions import Annotated
 
 # Core Library Imports
 from nl2sql.common.logger import configure_logging
-from nl2sql.common.settings import reload_settings
+from nl2sql.common.settings import reload_settings, settings
 from nl2sql.context import NL2SQLContext
 from nl2sql import BenchmarkConfig
 
@@ -180,6 +180,12 @@ def benchmark(
 
 
 def main():
+    # The library no longer configures logging on import, so the application
+    # entry point owns it: without this call the CLI emits no log output.
+    configure_logging(
+        level="INFO",
+        json_format=(settings.observability_exporter == "otlp"),
+    )
     # Before any command writes: rich emits symbols a legacy Windows code page
     # cannot encode, and an unconfigured stream turns that into a crash.
     configure_output_encoding()

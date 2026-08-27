@@ -6,10 +6,18 @@ from contextlib import asynccontextmanager
 from .routes import query, health, datasource, llm, indexing
 from fastapi.middleware.cors import CORSMiddleware
 from nl2sql import NL2SQL
+from nl2sql.common.logger import configure_logging
+from nl2sql.common.settings import settings
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # The library no longer configures logging on import, so the application
+    # entry point owns it - before anything that logs is constructed.
+    configure_logging(
+        level="INFO",
+        json_format=(settings.observability_exporter == "otlp"),
+    )
     app.state.engine = NL2SQL()
     yield
 
