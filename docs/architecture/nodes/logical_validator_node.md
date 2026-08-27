@@ -17,6 +17,12 @@
 - Enforce RBAC table access using strict datasource namespacing.
 - Validate literal values against column stats (when available).
 
+Column resolution is delegated to `sqlglot`'s optimizer. The node converts the
+plan into a throw‑away `sqlglot` expression tree (reusing the generator's
+`SqlVisitor`) and runs `sqlglot.optimizer.qualify.qualify()` against a schema
+built from `relevant_tables`. The LLM contract is unchanged: the planner still
+emits a `PlanModel`, never SQL.
+
 ---
 
 ## Position in Execution Graph
@@ -75,8 +81,17 @@ Side effects:
 ## Internal Flow (Step-by-Step)
 
 1. If plan is missing, emit `MISSING_PLAN` and stop.
-2. Run `_validate_static()` for structural checks.
-3. Run `_validate_policy()` for RBAC enforcement.
+2. Run `_validate_static()` for structural checks:
+   - `_resolve_plan_tables()` maps each plan alias to its schema columns and
+     emits `TABLE_NOT_FOUND` for unknown tables. This stays hand-written
+     because `qualify()` silently ignores relations absent from its schema.
+   - `_validate_columns()` builds the plan's `sqlglot` tree and runs
+     `qualify(..., validate_qualify_columns=True)`. On failure each distinct
+     column reference is re-probed so every bad reference is reported, and
+     `_describe_column_failure()` rewrites the optimizer's SQL-oriented text
+     into plan-oriented feedback the refiner can act on.
+3. Run `_validate_policy()` for RBAC enforcement. This always runs, even when
+   static validation failed or raised — the security check is never skipped.
 4. If any errors are `ERROR`/`CRITICAL`, return with errors.
 5. Otherwise return success reasoning.
 6. On exception, emit `VALIDATOR_CRASH`.
@@ -148,6 +163,8 @@ Emits `PipelineError` with:
 ## Extension Points
 
 - Extend validation rules by modifying `_validate_static()` or `_validate_policy()`.
+- Column-resolution semantics follow `sqlglot`'s optimizer; changing them means
+  changing the schema handed to `qualify()`, not walking the AST by hand.
 - Replace node in `build_sql_agent_graph()` for custom validation.
 
 ---
@@ -162,3 +179,4 @@ Emits `PipelineError` with:
 ## Related Code
 
 - `packages/core/src/nl2sql/pipeline/nodes/validator/node.py`
+- `packages/core/src/nl2sql/pipeline/nodes/generator/node.py` (`SqlVisitor`, reused to build the validation tree)

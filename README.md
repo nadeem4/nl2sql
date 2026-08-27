@@ -53,7 +53,7 @@ flowchart TD
 **Responsibility**: Invariants Enforcement.
 
 * **Valid-by-Construction**: The LLM generates an **Abstract Syntax Tree (AST)** rather than executing SQL.
-* **Static Analysis**: The [Logical Validator](docs/agents/nodes.md) enforces RBAC and schema constraints before SQL generation.
+* **Static Analysis**: The [Logical Validator](docs/architecture/nodes/logical_validator_node.md) enforces RBAC and schema constraints before SQL generation, resolving every column against the retrieved schema with `sqlglot`'s optimizer.
 
 ### 3. The Data Plane (The Sandbox)
 
@@ -82,7 +82,7 @@ flowchart TD
 
 | Invariant | Rationale | Mechanism |
 | :--- | :--- | :--- |
-| **No Unvalidated SQL** | Prevent hallucinations & data leaks | All plans pass through `LogicalValidator` (AST). `PhysicalValidator` exists but is not wired into the default SQL subgraph. |
+| **No Unvalidated SQL** | Prevent hallucinations & data leaks | All plans pass through `LogicalValidator` (AST), whose column resolution is delegated to `sqlglot.optimizer.qualify`. `PhysicalValidator` exists but is not wired into the default SQL subgraph. |
 | **Zero Shared State** | Crash Safety | Execution happens in isolated processes; no shared memory with the Control Plane. |
 | **Fail-Fast** | Reliability | Circuit Breakers and Strict Timeouts prevent cascading failures (Retry Storms). |
 | **Determinism** | Debuggability | Temperature-0 generation + Strict Typing (Pydantic) for all LLM outputs. |

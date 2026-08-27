@@ -141,8 +141,8 @@ Keeps multi-stage subqueries contractually aligned.
 All column references must map to declared table aliases and be unambiguous.
 
 ### Enforcement Points
-- `ValidatorVisitor` in `nl2sql.pipeline.nodes.validator.node`
-- `LogicalValidatorNode._validate_static()` converts visitor errors to `PipelineError`
+- `LogicalValidatorNode._validate_columns()` in `nl2sql.pipeline.nodes.validator.node`, which resolves the plan with `sqlglot.optimizer.qualify.qualify()` against the schema retrieved for the query
+- `LogicalValidatorNode._validate_static()` converts resolution failures to `PipelineError`
 
 ### Failure Behavior
 Returns `PipelineError` with `COLUMN_NOT_FOUND` (severity depends on `logical_validator_strict_columns`).
