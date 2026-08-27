@@ -44,7 +44,7 @@ Idempotency:
 - Not guaranteed; execution can depend on external systems and time.
 
 ## Execution Lifecycle
-- Initialize cancellation and signal handlers.
+- Create a per-run `CancellationToken` and install signal / Ctrl+X handlers bound to it.
 - Build LangGraph pipeline from `build_graph`.
 - Execute graph in thread pool with timeout.
 - On timeout/cancel, return `PipelineError` with appropriate `ErrorCode`.

@@ -4,27 +4,27 @@ import concurrent.futures
 import signal
 import sys
 import threading
-import time
 import traceback
 from typing import Callable, Dict, List, Optional
 
 from nl2sql.auth import UserContext
-from nl2sql.common.cancellation import cancel, is_cancelled, reset
+from nl2sql.common.cancellation import CancellationToken
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.common.settings import settings
 from nl2sql.context import NL2SQLContext
 from nl2sql.pipeline.graph import build_graph
 from nl2sql.pipeline.state import GraphState
 
-_keyboard_listener_started = False
 
+def _start_keyboard_cancel_listener(
+    token: CancellationToken,
+    done: threading.Event,
+) -> None:
+    """Cancel ``token`` when Ctrl+X is pressed, until ``done`` is set.
 
-def _start_keyboard_cancel_listener() -> None:
-    global _keyboard_listener_started
-    if _keyboard_listener_started:
-        return
-    _keyboard_listener_started = True
-
+    One listener per run: the thread exits once the run finishes, so a later run
+    starts its own listener bound to its own token.
+    """
     if sys.platform != "win32":
         return
 
@@ -37,21 +37,22 @@ def _start_keyboard_cancel_listener() -> None:
         return
 
     def _listen():
-        while True:
+        while not done.is_set():
             if msvcrt.kbhit():
                 char = msvcrt.getch()
                 if char == b"\x18":  # Ctrl+X
-                    cancel()
+                    token.cancel()
                     return
+            done.wait(0.05)
 
     threading.Thread(target=_listen, daemon=True).start()
 
 
-def _install_signal_handlers() -> Callable[[], None]:
+def _install_signal_handlers(token: CancellationToken) -> Callable[[], None]:
     previous = {}
 
     def _handler(signum, frame):
-        cancel()
+        token.cancel()
 
     for sig in (getattr(signal, "SIGINT", None), getattr(signal, "SIGTERM", None)):
         if sig is None:
@@ -75,9 +76,10 @@ def run_with_graph(
     user_context: UserContext = None,
 ) -> Dict:
     """Convenience function to run the full pipeline."""
-    reset()
-    restore_signals = _install_signal_handlers()
-    _start_keyboard_cancel_listener()
+    token = CancellationToken()
+    run_done = threading.Event()
+    restore_signals = _install_signal_handlers(token)
+    _start_keyboard_cancel_listener(token, run_done)
 
     graph = build_graph(
         ctx,
@@ -95,35 +97,31 @@ def run_with_graph(
     def _invoke():
         return graph.invoke(
             initial_state.model_dump(),
-            config={"callbacks": callbacks},
+            config={
+                "configurable": {"cancellation_token": token},
+                "callbacks": callbacks,
+            },
         )
 
     try:
         # Use configured thread pool size for pipeline execution
         with concurrent.futures.ThreadPoolExecutor(max_workers=settings.sandbox_exec_workers) as executor:
             future = executor.submit(_invoke)
-            start_time = time.monotonic()
-            while True:
-                if is_cancelled():
-                    future.cancel()
-                    return {
-                        "errors": [
-                            PipelineError(
-                                node="orchestrator",
-                                message="Pipeline cancelled by user.",
-                                severity=ErrorSeverity.ERROR,
-                                error_code=ErrorCode.CANCELLED,
-                            )
-                        ]
-                    }
-                elapsed = time.monotonic() - start_time
-                if elapsed >= timeout_sec:
-                    raise concurrent.futures.TimeoutError()
+            result = future.result(timeout=timeout_sec)
 
-                try:
-                    return future.result(timeout=0.25)
-                except concurrent.futures.TimeoutError:
-                    continue
+        # Nodes observe the token and unwind, so a cancelled run returns normally.
+        if token.is_cancelled():
+            return {
+                "errors": [
+                    PipelineError(
+                        node="orchestrator",
+                        message="Pipeline cancelled by user.",
+                        severity=ErrorSeverity.ERROR,
+                        error_code=ErrorCode.CANCELLED,
+                    )
+                ]
+            }
+        return result
     except concurrent.futures.TimeoutError:
         error_msg = f"Pipeline execution timed out after {timeout_sec} seconds."
         return {
@@ -151,4 +149,5 @@ def run_with_graph(
             ]
         }
     finally:
+        run_done.set()
         restore_signals()

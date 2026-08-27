@@ -37,7 +37,7 @@ See `../architecture/failure_recovery.md` for failure domains, retry scope, and 
 ## Cancellation and timeouts
 
 - `run_with_graph()` enforces a global timeout (`Settings.global_timeout_sec`).
-- Cancellation is honored through `nl2sql.common.cancellation` checks.
+- Cancellation is honored through a per-run `nl2sql.common.cancellation.CancellationToken`, passed to the graph via `config["configurable"]["cancellation_token"]`, so cancelling one run never affects another.
 
 ## Source references
 

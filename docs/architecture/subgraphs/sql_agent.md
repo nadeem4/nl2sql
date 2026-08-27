@@ -39,7 +39,7 @@ Successful completion criteria:
 Failure exits:
 - `check_planner` returns `end` when planner output is missing and retries are exhausted or errors are non-retryable.
 - `check_logical_validation` returns `end` when validation errors are non-retryable or retries are exhausted.
-- Cancellation (`is_cancelled()`) forces `end` in router checks and in retry handler.
+- Cancellation forces `end` in router checks and in the retry handler. The run's `CancellationToken` is read from the `RunnableConfig` (`configurable.cancellation_token`); when no token is present the subgraph behaves as not cancelled.
 
 Partial completion behavior:
 - If planner or logical validation errors are retryable and retry budget remains, execution loops via `retry_handler` → `refiner` → `ast_planner`.

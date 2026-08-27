@@ -1,8 +1,8 @@
-from typing import Dict
-from langchain_core.runnables import Runnable
+from typing import Dict, Optional
+from langchain_core.runnables import Runnable, RunnableConfig
 from langgraph.graph import END, StateGraph
 
-from nl2sql.common.cancellation import is_cancelled, wait as wait_cancel
+from nl2sql.common.cancellation import CancellationToken
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.common.settings import settings
 from nl2sql.pipeline.state import SubgraphExecutionState
@@ -18,6 +18,7 @@ from nl2sql.context import NL2SQLContext
 
 
 import random
+import time
 
 
 def build_sql_agent_graph(
@@ -51,10 +52,24 @@ def build_sql_agent_graph(
     def _get_retry_count(state: SubgraphExecutionState) -> int:
         return state.retry_count
 
-    def retry_node(state: SubgraphExecutionState) -> Dict:
+    def _token(config: Optional[RunnableConfig]) -> Optional[CancellationToken]:
+        """Read the current run's cancellation token from the RunnableConfig.
+
+        Returns None when invoked without a config (e.g. a direct unit-test call),
+        which is treated as "not cancelled".
+        """
+        if not config:
+            return None
+        return (config.get("configurable") or {}).get("cancellation_token")
+
+    def _is_cancelled(config: Optional[RunnableConfig]) -> bool:
+        token = _token(config)
+        return bool(token and token.is_cancelled())
+
+    def retry_node(state: SubgraphExecutionState, config: Optional[RunnableConfig] = None) -> Dict:
         """Increments retry count with exponential backoff and jitter."""
         count = _get_retry_count(state)
-        if is_cancelled():
+        if _is_cancelled(config):
             return {
                 "errors": [
                     PipelineError(
@@ -72,7 +87,10 @@ def build_sql_agent_graph(
         jitter = random.uniform(0.0, settings.sql_agent_retry_jitter_sec)
         sleep_time = base_delay + jitter
 
-        if wait_cancel(timeout=sleep_time):
+        token = _token(config)
+        if token is None:
+            time.sleep(sleep_time)
+        elif token.wait(timeout=sleep_time):
             return {
                 "errors": [
                     PipelineError(
@@ -88,9 +106,9 @@ def build_sql_agent_graph(
             "retry_count": count + 1,
         }
 
-    def check_planner(state: SubgraphExecutionState) -> str:
+    def check_planner(state: SubgraphExecutionState, config: Optional[RunnableConfig] = None) -> str:
         """Routes based on planner result."""
-        if is_cancelled():
+        if _is_cancelled(config):
             return "end"
         if not (state.ast_planner_response and state.ast_planner_response.plan):
             # If explicit errors exist, check retryability
@@ -103,9 +121,9 @@ def build_sql_agent_graph(
             return "end"
         return "ok"
 
-    def check_logical_validation(state: SubgraphExecutionState) -> str:
+    def check_logical_validation(state: SubgraphExecutionState, config: Optional[RunnableConfig] = None) -> str:
         """Routes based on logical validation result."""
-        if is_cancelled():
+        if _is_cancelled(config):
             return "end"
         if state.logical_validator_response and state.logical_validator_response.errors:
             # Critical/Fatal errors stop execution immediately
@@ -117,9 +135,9 @@ def build_sql_agent_graph(
             return "end"
         return "ok"
 
-    def check_physical_validation(state: SubgraphExecutionState) -> str:
+    def check_physical_validation(state: SubgraphExecutionState, config: Optional[RunnableConfig] = None) -> str:
         """Routes based on physical validation result."""
-        if is_cancelled():
+        if _is_cancelled(config):
             return "end"
         if state.physical_validator_response and state.physical_validator_response.errors:
              # Critical/Fatal errors stop execution immediately
