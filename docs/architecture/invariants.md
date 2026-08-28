@@ -337,17 +337,17 @@ Ensures latency bounds and prevents hung requests.
 
 ## Related Code
 
-- `packages/core/src/nl2sql/pipeline/nodes/decomposer/schemas.py`
-- `packages/core/src/nl2sql/pipeline/nodes/ast_planner/schemas.py`
-- `packages/core/src/nl2sql/pipeline/nodes/validator/node.py`
-- `packages/core/src/nl2sql/pipeline/nodes/datasource_resolver/node.py`
-- `packages/core/src/nl2sql/pipeline/nodes/generator/node.py`
-- `packages/core/src/nl2sql/pipeline/nodes/executor/node.py`
-- `packages/core/src/nl2sql/execution/executor/sql_executor.py`
-- `packages/core/src/nl2sql/pipeline/nodes/global_planner/node.py`
-- `packages/core/src/nl2sql/pipeline/nodes/global_planner/schemas.py`
-- `packages/core/src/nl2sql/aggregation/aggregator.py`
-- `packages/core/src/nl2sql/context.py`
-- `packages/core/src/nl2sql/schema/store.py`
-- `packages/core/src/nl2sql/pipeline/runtime.py`
-- `packages/core/src/nl2sql/auth/models.py`
+- `packages/nl2sql/src/nl2sql/pipeline/nodes/decomposer/schemas.py`
+- `packages/nl2sql/src/nl2sql/pipeline/nodes/ast_planner/schemas.py`
+- `packages/nl2sql/src/nl2sql/pipeline/nodes/validator/node.py`
+- `packages/nl2sql/src/nl2sql/pipeline/nodes/datasource_resolver/node.py`
+- `packages/nl2sql/src/nl2sql/pipeline/nodes/generator/node.py`
+- `packages/nl2sql/src/nl2sql/pipeline/nodes/executor/node.py`
+- `packages/nl2sql/src/nl2sql/execution/executor/sql_executor.py`
+- `packages/nl2sql/src/nl2sql/pipeline/nodes/global_planner/node.py`
+- `packages/nl2sql/src/nl2sql/pipeline/nodes/global_planner/schemas.py`
+- `packages/nl2sql/src/nl2sql/aggregation/aggregator.py`
+- `packages/nl2sql/src/nl2sql/context.py`
+- `packages/nl2sql/src/nl2sql/schema/store.py`
+- `packages/nl2sql/src/nl2sql/pipeline/runtime.py`
+- `packages/nl2sql/src/nl2sql/auth/models.py`

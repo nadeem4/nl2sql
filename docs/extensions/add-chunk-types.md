@@ -33,7 +33,7 @@ If the chunk type carries new semantics, ensure:
 
 ## Source references
 
-- Chunk models: `packages/core/src/nl2sql/indexing/models.py`
-- Chunk builder: `packages/core/src/nl2sql/indexing/chunk_builder.py`
-- Vector store retrieval: `packages/core/src/nl2sql/indexing/vector_store.py`
-- Schema retriever: `packages/core/src/nl2sql/pipeline/nodes/schema_retriever/node.py`
+- Chunk models: `packages/nl2sql/src/nl2sql/indexing/models.py`
+- Chunk builder: `packages/nl2sql/src/nl2sql/indexing/chunk_builder.py`
+- Vector store retrieval: `packages/nl2sql/src/nl2sql/indexing/vector_store.py`
+- Schema retriever: `packages/nl2sql/src/nl2sql/pipeline/nodes/schema_retriever/node.py`

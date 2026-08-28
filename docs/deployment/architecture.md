@@ -32,5 +32,5 @@ flowchart TD
 
 ## Source references
 
-- Context initialization: `packages/core/src/nl2sql/context.py`
-- Settings: `packages/core/src/nl2sql/common/settings.py`
+- Context initialization: `packages/nl2sql/src/nl2sql/context.py`
+- Settings: `packages/nl2sql/src/nl2sql/common/settings.py`

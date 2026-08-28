@@ -4,7 +4,7 @@ NL2SQL can be deployed as a standalone HTTP service using the `nl2sql-api` packa
 
 ## Container requirements
 
-- Install `nl2sql-core` and add adapters via extras (e.g. `nl2sql-core[postgres]`).
+- Install `nl2sql` and add adapters via extras (e.g. `nl2sql[postgres]`).
 - Provide configuration files under `configs/` (or configure paths via env vars).
 - Set required environment variables (LLM keys, config paths, storage paths).
 

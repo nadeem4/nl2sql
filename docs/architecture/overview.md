@@ -102,7 +102,7 @@ Determinism guarantees and non-determinism sources are documented in `determinis
 
 ## Source references
 
-- Graph construction: `packages/core/src/nl2sql/pipeline/graph.py`
-- Runtime execution: `packages/core/src/nl2sql/pipeline/runtime.py`
-- Shared state: `packages/core/src/nl2sql/pipeline/state.py`
-- Context initialization: `packages/core/src/nl2sql/context.py`
+- Graph construction: `packages/nl2sql/src/nl2sql/pipeline/graph.py`
+- Runtime execution: `packages/nl2sql/src/nl2sql/pipeline/runtime.py`
+- Shared state: `packages/nl2sql/src/nl2sql/pipeline/state.py`
+- Context initialization: `packages/nl2sql/src/nl2sql/context.py`

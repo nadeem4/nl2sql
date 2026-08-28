@@ -155,17 +155,17 @@ Replay is not supported. There is no persisted graph state or execution log to r
 
 ## Related Code
 
-- `packages/core/src/nl2sql/pipeline/runtime.py`
-- `packages/core/src/nl2sql/pipeline/graph.py`
-- `packages/core/src/nl2sql/pipeline/routes.py`
-- `packages/core/src/nl2sql/pipeline/graph_utils.py`
-- `packages/core/src/nl2sql/pipeline/state.py`
-- `packages/core/src/nl2sql/pipeline/subgraphs/sql_agent.py`
-- `packages/core/src/nl2sql/common/errors.py`
-- `packages/core/src/nl2sql/common/resilience.py`
-- `packages/core/src/nl2sql/common/cancellation.py`
-- `packages/core/src/nl2sql/pipeline/nodes/*/node.py`
-- `packages/core/src/nl2sql/execution/executor/sql_executor.py`
-- `packages/core/src/nl2sql/aggregation/aggregator.py`
-- `packages/core/src/nl2sql/indexing/vector_store.py`
-- `packages/core/src/nl2sql/schema/*.py`
+- `packages/nl2sql/src/nl2sql/pipeline/runtime.py`
+- `packages/nl2sql/src/nl2sql/pipeline/graph.py`
+- `packages/nl2sql/src/nl2sql/pipeline/routes.py`
+- `packages/nl2sql/src/nl2sql/pipeline/graph_utils.py`
+- `packages/nl2sql/src/nl2sql/pipeline/state.py`
+- `packages/nl2sql/src/nl2sql/pipeline/subgraphs/sql_agent.py`
+- `packages/nl2sql/src/nl2sql/common/errors.py`
+- `packages/nl2sql/src/nl2sql/common/resilience.py`
+- `packages/nl2sql/src/nl2sql/common/cancellation.py`
+- `packages/nl2sql/src/nl2sql/pipeline/nodes/*/node.py`
+- `packages/nl2sql/src/nl2sql/execution/executor/sql_executor.py`
+- `packages/nl2sql/src/nl2sql/aggregation/aggregator.py`
+- `packages/nl2sql/src/nl2sql/indexing/vector_store.py`
+- `packages/nl2sql/src/nl2sql/schema/*.py`

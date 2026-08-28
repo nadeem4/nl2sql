@@ -28,7 +28,7 @@ For ADLS, `RESULT_ARTIFACT_ADLS_CONNECTION_STRING` is forwarded to polars as `st
 
 ## Verification status
 
-- **Local** is exercised by real read/write round-trip tests (`packages/core/tests/unit/test_artifact_store.py`).
+- **Local** is exercised by real read/write round-trip tests (`packages/nl2sql/tests/unit/test_artifact_store.py`).
 - **S3 and ADLS** are implemented and unit-tested at the URI and `storage_options` level, with the actual object-store IO mocked. They have **not** been verified against a real S3 bucket or ADLS account. Treat them as unproven until someone runs them against live storage.
 
 ## ArtifactRef fields
@@ -67,6 +67,6 @@ Because the default template starts with `<tenant_id>`, every backend partitions
 
 ## Source references
 
-- Artifact store: `packages/core/src/nl2sql/execution/artifacts/store.py`
-- Parquet helpers: `packages/core/src/nl2sql/execution/artifacts/parquet.py`
-- Artifact contracts: `packages/core/src/nl2sql/execution/contracts.py`
+- Artifact store: `packages/nl2sql/src/nl2sql/execution/artifacts/store.py`
+- Parquet helpers: `packages/nl2sql/src/nl2sql/execution/artifacts/parquet.py`
+- Artifact contracts: `packages/nl2sql/src/nl2sql/execution/contracts.py`

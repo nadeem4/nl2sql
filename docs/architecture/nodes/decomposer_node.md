@@ -6,7 +6,7 @@
 - Produces deterministic IDs for sub‑queries and post‑combine ops.
 - Sits after `DatasourceResolverNode` and before `GlobalPlannerNode`.
 - Class: `DecomposerNode`
-- Source: `packages/core/src/nl2sql/pipeline/nodes/decomposer/node.py`
+- Source: `packages/nl2sql/src/nl2sql/pipeline/nodes/decomposer/node.py`
 
 ---
 
@@ -160,5 +160,5 @@ Logs failures via `logger.error`.
 
 ## Related Code
 
-- `packages/core/src/nl2sql/pipeline/nodes/decomposer/node.py`
-- `packages/core/src/nl2sql/pipeline/nodes/decomposer/schemas.py`
+- `packages/nl2sql/src/nl2sql/pipeline/nodes/decomposer/node.py`
+- `packages/nl2sql/src/nl2sql/pipeline/nodes/decomposer/schemas.py`

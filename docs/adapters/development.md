@@ -8,7 +8,7 @@ There are two primary ways to build an adapter. Choose the one that fits your ta
 
 | If you are checking... | Use... | Reference |
 | :--- | :--- | :--- |
-| A standard SQL Database (Postgres, Oracle, Snowflake) | `nl2sql-adapter-sqlalchemy` | **[SQLAlchemy Adapter Reference](sqlalchemy.md)** |
+| A standard SQL Database (Postgres, Oracle, Snowflake) | `nl2sql.adapters.sqlalchemy_base` | **[SQLAlchemy Adapter Reference](sqlalchemy.md)** |
 | A NoSQL DB, REST API, or custom driver | Core adapter protocol | **[Adapter Interface Reference](sdk.md)** |
 
 ## Option 1: The "Fast Lane" (SQLAlchemy)
@@ -25,7 +25,7 @@ For 95% of use cases, you are connecting to a SQL database that already has a Py
 ### Example
 
 ```python
-from nl2sql_sqlalchemy_adapter import BaseSQLAlchemyAdapter
+from nl2sql.adapters.sqlalchemy_base import BaseSQLAlchemyAdapter
 
 class PostgresAdapter(BaseSQLAlchemyAdapter):
     def construct_uri(self, args: Dict[str, Any]) -> str:

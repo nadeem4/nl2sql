@@ -37,7 +37,7 @@ Logging is configured at import time; JSON formatting is enabled when `Settings.
 
 ## Source references
 
-- Metrics: `packages/core/src/nl2sql/common/metrics.py`
-- Audit logging: `packages/core/src/nl2sql/common/event_logger.py`
-- Pipeline callbacks: `packages/core/src/nl2sql/services/callbacks/monitor.py`
-- Logging: `packages/core/src/nl2sql/common/logger.py`
+- Metrics: `packages/nl2sql/src/nl2sql/common/metrics.py`
+- Audit logging: `packages/nl2sql/src/nl2sql/common/event_logger.py`
+- Pipeline callbacks: `packages/nl2sql/src/nl2sql/services/callbacks/monitor.py`
+- Logging: `packages/nl2sql/src/nl2sql/common/logger.py`

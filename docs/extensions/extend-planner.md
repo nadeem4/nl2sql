@@ -6,7 +6,7 @@ The planner generates a structured AST (`PlanModel`) which is validated and comp
 
 Modify `PlanModel` or related AST models in:
 
-- `packages/core/src/nl2sql/pipeline/nodes/ast_planner/schemas.py`
+- `packages/nl2sql/src/nl2sql/pipeline/nodes/ast_planner/schemas.py`
 
 Keep these rules in mind:
 
@@ -18,7 +18,7 @@ Keep these rules in mind:
 
 Update `PLANNER_PROMPT` and examples in:
 
-- `packages/core/src/nl2sql/pipeline/nodes/ast_planner/prompts.py`
+- `packages/nl2sql/src/nl2sql/pipeline/nodes/ast_planner/prompts.py`
 
 Ensure structured output still matches `PlanModel`.
 
@@ -43,7 +43,7 @@ Update `LogicalValidatorNode` to recognize any new AST constructs.
 
 ## Source references
 
-- AST schemas: `packages/core/src/nl2sql/pipeline/nodes/ast_planner/schemas.py`
-- Planner node: `packages/core/src/nl2sql/pipeline/nodes/ast_planner/node.py`
-- Logical validator: `packages/core/src/nl2sql/pipeline/nodes/validator/node.py`
-- SQL generator: `packages/core/src/nl2sql/pipeline/nodes/generator/node.py`
+- AST schemas: `packages/nl2sql/src/nl2sql/pipeline/nodes/ast_planner/schemas.py`
+- Planner node: `packages/nl2sql/src/nl2sql/pipeline/nodes/ast_planner/node.py`
+- Logical validator: `packages/nl2sql/src/nl2sql/pipeline/nodes/validator/node.py`
+- SQL generator: `packages/nl2sql/src/nl2sql/pipeline/nodes/generator/node.py`

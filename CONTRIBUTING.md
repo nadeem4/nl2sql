@@ -5,11 +5,10 @@ tests, documentation, and adapter development.
 
 ## Monorepo layout
 
-- `packages/core`: Core engine and pipeline.
+- `packages/nl2sql`: Engine and pipeline, the CLI (`nl2sql.cli`), and the
+  database adapters (`nl2sql.adapters.*`, including the SQLAlchemy base).
 - `packages/api`: FastAPI REST service.
 - `packages/adapter-sdk`: Adapter interfaces and contracts.
-- `packages/adapter-sqlalchemy`: SQLAlchemy adapter base.
-- `packages/adapters/*`: Database adapter implementations.
 - `docs/`: MkDocs documentation.
 
 ## Prerequisites
@@ -29,9 +28,8 @@ Example (PowerShell):
 python -m venv venv
 .\venv\Scripts\activate
 python -m pip install -e packages/adapter-sdk
-python -m pip install -e packages/core
-python -m pip install -e packages/adapter-sqlalchemy
-python -m pip install -e packages/adapters/postgres
+python -m pip install -e "packages/nl2sql[postgres]"
+python -m pip install -e packages/api
 ```
 
 ## Running tests
@@ -45,7 +43,7 @@ python -m pip install --group dev
 Unit tests:
 
 ```bash
-pytest packages/core/tests/unit
+pytest packages/nl2sql/tests/unit
 ```
 
 `pytest-randomly` shuffles test order on every run, so tests that depend on the
@@ -86,9 +84,9 @@ mkdocs serve
 
 ## Releasing
 
-All nine packages share one version and are released together. The checklist --
-bumping the versions, the drift check, and what publishing a GitHub release
-triggers -- is in `docs/development/releasing.md`.
+All three packages share one version and are released together. The checklist --
+bumping the versions and what publishing a GitHub release triggers -- is in
+`docs/development/releasing.md`.
 
 ## Creating a new adapter
 
@@ -96,7 +94,7 @@ Choose the base class that matches your datasource:
 
 | Base | Package | Use Case | Dependencies |
 | --- | --- | --- | --- |
-| `BaseSQLAlchemyAdapter` | `adapter-sqlalchemy` | Relational databases | SQLAlchemy |
+| `BaseSQLAlchemyAdapter` | `nl2sql.adapters.sqlalchemy_base` | Relational databases | SQLAlchemy |
 | `DatasourceAdapter` (protocol) | `adapter-sdk` | Non-SQL or custom sources | None |
 
 ### SQL adapter
@@ -104,7 +102,7 @@ Choose the base class that matches your datasource:
 Implement `BaseSQLAlchemyAdapter` to inherit schema fetch and execution.
 
 ```python
-from nl2sql_sqlalchemy_adapter import BaseSQLAlchemyAdapter
+from nl2sql.adapters.sqlalchemy_base import BaseSQLAlchemyAdapter
 
 class MyDbAdapter(BaseSQLAlchemyAdapter):
     def connect(self, config):

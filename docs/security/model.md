@@ -31,6 +31,6 @@ Validation rules are enforced by `LogicalValidatorNode` and documented in `../ar
 
 ## Source references
 
-- RBAC: `packages/core/src/nl2sql/auth/rbac.py`
-- Validator node: `packages/core/src/nl2sql/pipeline/nodes/validator/node.py`
-- Audit logger: `packages/core/src/nl2sql/common/event_logger.py`
+- RBAC: `packages/nl2sql/src/nl2sql/auth/rbac.py`
+- Validator node: `packages/nl2sql/src/nl2sql/pipeline/nodes/validator/node.py`
+- Audit logger: `packages/nl2sql/src/nl2sql/common/event_logger.py`

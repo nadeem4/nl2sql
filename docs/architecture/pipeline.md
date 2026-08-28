@@ -124,10 +124,10 @@ Observability stack and callback behavior are documented in `../observability/st
 
 ## Source references
 
-- Graph builder: `packages/core/src/nl2sql/pipeline/graph.py`
-- Runtime: `packages/core/src/nl2sql/pipeline/runtime.py`
-- Routing: `packages/core/src/nl2sql/pipeline/routes.py`
-- Subgraph wrapper: `packages/core/src/nl2sql/pipeline/graph_utils.py`
-- SQL agent graph: `packages/core/src/nl2sql/pipeline/subgraphs/sql_agent.py`
-- Execution DAG models: `packages/core/src/nl2sql/pipeline/nodes/global_planner/schemas.py`
-- Aggregation service: `packages/core/src/nl2sql/aggregation/aggregator.py`
+- Graph builder: `packages/nl2sql/src/nl2sql/pipeline/graph.py`
+- Runtime: `packages/nl2sql/src/nl2sql/pipeline/runtime.py`
+- Routing: `packages/nl2sql/src/nl2sql/pipeline/routes.py`
+- Subgraph wrapper: `packages/nl2sql/src/nl2sql/pipeline/graph_utils.py`
+- SQL agent graph: `packages/nl2sql/src/nl2sql/pipeline/subgraphs/sql_agent.py`
+- Execution DAG models: `packages/nl2sql/src/nl2sql/pipeline/nodes/global_planner/schemas.py`
+- Aggregation service: `packages/nl2sql/src/nl2sql/aggregation/aggregator.py`

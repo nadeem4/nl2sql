@@ -6,7 +6,7 @@
 - Persists results via the artifact store and returns `ExecutorResponse`.
 - Sits after `GeneratorNode` in the SQL agent subgraph.
 - Class: `ExecutorNode`
-- Source: `packages/core/src/nl2sql/pipeline/nodes/executor/node.py`
+- Source: `packages/nl2sql/src/nl2sql/pipeline/nodes/executor/node.py`
 
 ---
 
@@ -160,5 +160,5 @@ Emits `PipelineError` with:
 
 ## Related Code
 
-- `packages/core/src/nl2sql/pipeline/nodes/executor/node.py`
-- `packages/core/src/nl2sql/execution/executor/sql_executor.py`
+- `packages/nl2sql/src/nl2sql/pipeline/nodes/executor/node.py`
+- `packages/nl2sql/src/nl2sql/execution/executor/sql_executor.py`

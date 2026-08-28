@@ -101,13 +101,13 @@ flowchart TD
 
 ```bash
 # Install core only
-pip install nl2sql-core
+pip install nl2sql
 
 # Install core with selected adapters
-pip install nl2sql-core[mysql,mssql]
+pip install nl2sql[mysql,mssql]
 
 # Install core with all adapters
-pip install nl2sql-core[all]
+pip install nl2sql[all]
 ```
 
 For local development:
@@ -120,9 +120,9 @@ cd nl2sql
 python -m venv venv
 source venv/bin/activate
 
-# Install core engine and adapter SDK
-pip install -e packages/core
+# Install the adapter SDK and the engine (with every driver extra)
 pip install -e packages/adapter-sdk
+pip install -e "packages/nl2sql[all]"
 ```
 
 ### 2. Run a query (Python API)

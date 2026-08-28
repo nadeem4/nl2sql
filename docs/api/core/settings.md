@@ -9,8 +9,8 @@ Expose runtime settings and configuration validation.
 - Validate configuration integrity.
 
 ## Key Modules
-- `packages/core/src/nl2sql/api/settings_api.py`
-- `packages/core/src/nl2sql/common/settings.py`
+- `packages/nl2sql/src/nl2sql/api/settings_api.py`
+- `packages/nl2sql/src/nl2sql/common/settings.py`
 
 ## Public Surface
 

@@ -6,7 +6,7 @@
 - Exists to enforce correctness and security before SQL generation.
 - Sits between `ASTPlannerNode` and `GeneratorNode` in the SQL agent subgraph.
 - Class: `LogicalValidatorNode`
-- Source: `packages/core/src/nl2sql/pipeline/nodes/validator/node.py`
+- Source: `packages/nl2sql/src/nl2sql/pipeline/nodes/validator/node.py`
 
 ---
 
@@ -178,5 +178,5 @@ Emits `PipelineError` with:
 
 ## Related Code
 
-- `packages/core/src/nl2sql/pipeline/nodes/validator/node.py`
-- `packages/core/src/nl2sql/pipeline/nodes/generator/node.py` (`SqlVisitor`, reused to build the validation tree)
+- `packages/nl2sql/src/nl2sql/pipeline/nodes/validator/node.py`
+- `packages/nl2sql/src/nl2sql/pipeline/nodes/generator/node.py` (`SqlVisitor`, reused to build the validation tree)

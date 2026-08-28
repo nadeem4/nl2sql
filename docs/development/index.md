@@ -48,6 +48,6 @@ Tracebacks are printed with `console.print(..., markup=False)`.
 
 ## Source references
 
-- Subgraph selection: `packages/core/src/nl2sql/pipeline/graph_utils.py`
+- Subgraph selection: `packages/nl2sql/src/nl2sql/pipeline/graph_utils.py`
 - Adapter protocol: `packages/adapter-sdk/src/nl2sql_adapter_sdk/protocols.py`
-- SQL executor: `packages/core/src/nl2sql/execution/executor/sql_executor.py`
+- SQL executor: `packages/nl2sql/src/nl2sql/execution/executor/sql_executor.py`

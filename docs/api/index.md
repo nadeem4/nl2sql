@@ -5,7 +5,7 @@ API for remote clients. Use the links below for the full technical references.
 
 ## Core API (Python)
 
-- **Location**: Core package (`nl2sql-core`)
+- **Location**: Core package (`nl2sql`)
 - **Interface**: Direct Python class interface (`NL2SQL` class and low-level functions)
 - **Use Case**: Embedded/SDK use in Python applications
 - **Reference**: Core API index and per-module references:
@@ -39,7 +39,7 @@ API for remote clients. Use the links below for the full technical references.
 
 ## Source references
 
-- Context: `packages/core/src/nl2sql/context.py`
-- Runtime: `packages/core/src/nl2sql/pipeline/runtime.py`
-- Public API: `packages/core/src/nl2sql/public_api.py`
+- Context: `packages/nl2sql/src/nl2sql/context.py`
+- Runtime: `packages/nl2sql/src/nl2sql/pipeline/runtime.py`
+- Public API: `packages/nl2sql/src/nl2sql/public_api.py`
 - API Package: `packages/api/src/nl2sql_api/`

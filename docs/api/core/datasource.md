@@ -9,17 +9,17 @@ Register, validate, and inspect datasources backed by adapter implementations.
 - Expose adapter capabilities and details.
 
 ## Key Modules
-- `packages/core/src/nl2sql/api/datasource_api.py`
-- `packages/core/src/nl2sql/datasources/registry.py`
-- `packages/core/src/nl2sql/datasources/models.py`
-- `packages/core/src/nl2sql/datasources/discovery.py`
+- `packages/nl2sql/src/nl2sql/api/datasource_api.py`
+- `packages/nl2sql/src/nl2sql/datasources/registry.py`
+- `packages/nl2sql/src/nl2sql/datasources/models.py`
+- `packages/nl2sql/src/nl2sql/datasources/discovery.py`
 
 ## Public Surface
 
 ### ConnectionConfig
 
 Source:
-`packages/core/src/nl2sql/datasources/models.py`
+`packages/nl2sql/src/nl2sql/datasources/models.py`
 
 Fields:
 | name | type | required | meaning |
@@ -30,7 +30,7 @@ Fields:
 ### DatasourceConfig
 
 Source:
-`packages/core/src/nl2sql/datasources/models.py`
+`packages/nl2sql/src/nl2sql/datasources/models.py`
 
 Fields:
 | name | type | required | meaning |
@@ -43,7 +43,7 @@ Fields:
 ### DatasourceFileConfig
 
 Source:
-`packages/core/src/nl2sql/configs/datasources.py`
+`packages/nl2sql/src/nl2sql/configs/datasources.py`
 
 Fields:
 | name | type | required | meaning |
@@ -54,7 +54,7 @@ Fields:
 ### DatasourceAPI.add_datasource
 
 Source:
-`packages/core/src/nl2sql/api/datasource_api.py`
+`packages/nl2sql/src/nl2sql/api/datasource_api.py`
 
 Signature:
 `add_datasource(config: Union[DatasourceConfig, Dict[str, Any]]) -> None`
@@ -80,7 +80,7 @@ Idempotency:
 ### DatasourceAPI.add_datasource_from_config
 
 Source:
-`packages/core/src/nl2sql/api/datasource_api.py`
+`packages/nl2sql/src/nl2sql/api/datasource_api.py`
 
 Signature:
 `add_datasource_from_config(config_path: Union[str, pathlib.Path]) -> None`

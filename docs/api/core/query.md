@@ -8,17 +8,17 @@ Execute a natural language query using the NL2SQL pipeline.
 - Return a structured `QueryResult`.
 
 ## Key Modules
-- `packages/core/src/nl2sql/api/query_api.py`
-- `packages/core/src/nl2sql/pipeline/runtime.py`
-- `packages/core/src/nl2sql/pipeline/graph.py`
-- `packages/core/src/nl2sql/pipeline/state.py`
+- `packages/nl2sql/src/nl2sql/api/query_api.py`
+- `packages/nl2sql/src/nl2sql/pipeline/runtime.py`
+- `packages/nl2sql/src/nl2sql/pipeline/graph.py`
+- `packages/nl2sql/src/nl2sql/pipeline/state.py`
 
 ## Public Surface
 
 ### QueryAPI.run_query
 
 Source:
-`packages/core/src/nl2sql/api/query_api.py`
+`packages/nl2sql/src/nl2sql/api/query_api.py`
 
 Signature:
 `run_query(natural_language: str, datasource_id: Optional[str] = None, execute: bool = True, user_context: Optional[UserContext] = None) -> QueryResult`
@@ -52,7 +52,7 @@ Idempotency:
 ### QueryResult
 
 Source:
-`packages/core/src/nl2sql/api/query_api.py`
+`packages/nl2sql/src/nl2sql/api/query_api.py`
 
 Fields:
 | name | type | required | meaning |

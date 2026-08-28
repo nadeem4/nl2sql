@@ -48,7 +48,7 @@ See `../architecture/indexing.md` for retrieval stages, chunk types, and vector 
 ## Source references
 
 - Contracts and metadata: `packages/adapter-sdk/src/nl2sql_adapter_sdk/schema.py`
-- Fingerprinting: `packages/core/src/nl2sql/schema/protocol.py`
-- Schema store factory: `packages/core/src/nl2sql/schema/store.py`
-- Sqlite store: `packages/core/src/nl2sql/schema/sqlite_store.py`
-- Schema retriever: `packages/core/src/nl2sql/pipeline/nodes/schema_retriever/node.py`
+- Fingerprinting: `packages/nl2sql/src/nl2sql/schema/protocol.py`
+- Schema store factory: `packages/nl2sql/src/nl2sql/schema/store.py`
+- Sqlite store: `packages/nl2sql/src/nl2sql/schema/sqlite_store.py`
+- Schema retriever: `packages/nl2sql/src/nl2sql/pipeline/nodes/schema_retriever/node.py`

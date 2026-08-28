@@ -31,7 +31,7 @@ plugins:
   - mkdocstrings:
       handlers:
         python:
-          paths: [packages/core/src, packages/cli/src, packages/adapter-sdk/src]
+          paths: [packages/nl2sql/src, packages/adapter-sdk/src]
 
 markdown_extensions:
   - pymdownx.highlight:
