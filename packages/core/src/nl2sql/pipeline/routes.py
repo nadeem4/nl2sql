@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Dict
-
 from langgraph.graph import END
 from langgraph.types import Send
 
@@ -14,7 +12,6 @@ from nl2sql.pipeline.graph_utils import (
     resolve_subgraph,
 )
 from nl2sql.pipeline.state import GraphState
-from nl2sql.pipeline.subgraphs import SubgraphSpec
 from nl2sql.common.logger import get_logger
 
 logger = get_logger("router")
@@ -30,10 +27,7 @@ def resolver_route(state: GraphState) -> str:
     return "continue"
 
 
-def build_scan_layer_router(
-    ctx: NL2SQLContext,
-    subgraph_specs: Dict[str, SubgraphSpec],
-):
+def build_scan_layer_router(ctx: NL2SQLContext):
     def route_scan_layers(state: GraphState):
         global_planner_response = state.global_planner_response
         dag = global_planner_response.execution_dag if global_planner_response else None
@@ -62,7 +56,7 @@ def build_scan_layer_router(
                     continue
                 datasource_id = (node.attributes or {}).get("datasource_id")
 
-            target = resolve_subgraph(datasource_id, ctx, subgraph_specs)
+            target = resolve_subgraph(datasource_id, ctx)
             if not target:
                 raise PipelineError(
                     node="layer_router",

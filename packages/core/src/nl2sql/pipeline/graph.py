@@ -1,7 +1,7 @@
 from langgraph.graph import END, StateGraph
 
 from nl2sql.context import NL2SQLContext
-from nl2sql.pipeline.graph_utils import wrap_subgraph
+from nl2sql.pipeline.graph_utils import SQL_AGENT_SUBGRAPH, wrap_subgraph
 from nl2sql.pipeline.nodes.aggregator import EngineAggregatorNode
 from nl2sql.pipeline.nodes.answer_synthesizer import AnswerSynthesizerNode
 from nl2sql.pipeline.nodes.datasource_resolver import DatasourceResolverNode
@@ -9,7 +9,7 @@ from nl2sql.pipeline.nodes.decomposer import DecomposerNode
 from nl2sql.pipeline.nodes.global_planner import GlobalPlannerNode
 from nl2sql.pipeline.routes import build_scan_layer_router, resolver_route
 from nl2sql.pipeline.state import GraphState
-from nl2sql.pipeline.subgraphs import build_subgraph_registry
+from nl2sql.pipeline.subgraphs.sql_agent import build_sql_agent_graph
 
 def build_graph(
     ctx: NL2SQLContext,
@@ -35,16 +35,15 @@ def build_graph(
     synthesizer_node = AnswerSynthesizerNode(ctx)
     global_planner_node = GlobalPlannerNode(ctx)
 
-    subgraph_specs = build_subgraph_registry(ctx)
-    subgraph_runnables = {
-        name: spec.builder(ctx) for name, spec in subgraph_specs.items()
-    }
+    sql_agent_subgraph = build_sql_agent_graph(ctx)
 
     graph.add_node("datasource_resolver", resolver_node)
     graph.add_node("decomposer", decomposer_node)
     graph.add_node("global_planner", global_planner_node)
-    for name, subgraph in subgraph_runnables.items():
-        graph.add_node(name, wrap_subgraph(subgraph, name, ctx))
+    graph.add_node(
+        SQL_AGENT_SUBGRAPH,
+        wrap_subgraph(sql_agent_subgraph, SQL_AGENT_SUBGRAPH, ctx),
+    )
     graph.add_node("aggregator", aggregator_node)
     graph.add_node("answer_synthesizer", synthesizer_node)
     graph.add_node("layer_router", lambda state: {})
@@ -58,17 +57,16 @@ def build_graph(
     )
 
     graph.add_edge("decomposer", "global_planner")
-    route_scan_layers = build_scan_layer_router(ctx, subgraph_specs)
+    route_scan_layers = build_scan_layer_router(ctx)
 
     graph.add_edge("global_planner", "layer_router")
     graph.add_conditional_edges(
         "layer_router",
         route_scan_layers,
-        list(subgraph_runnables.keys()) + ["aggregator", END],
+        [SQL_AGENT_SUBGRAPH, "aggregator", END],
     )
 
-    for name in subgraph_runnables.keys():
-        graph.add_edge(name, "layer_router")
+    graph.add_edge(SQL_AGENT_SUBGRAPH, "layer_router")
     graph.add_edge("aggregator", "answer_synthesizer")
     graph.add_edge("answer_synthesizer", END)
 

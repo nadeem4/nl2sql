@@ -147,7 +147,7 @@ See `../failure_recovery.md` for retry scope and recovery behavior.
 
 ## Extension Points
 
-- Add new subgraphs by extending `build_subgraph_registry()` and providing a `SubgraphSpec`.
+- Add new subgraphs by constructing them in `build_graph()` and extending `resolve_subgraph()` with their required capabilities.
 - Insert additional nodes in `build_graph()` by adding nodes/edges to the `StateGraph`.
 - Customize routing by replacing `build_scan_layer_router()` or `resolver_route()`.
 

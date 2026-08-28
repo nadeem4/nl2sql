@@ -40,7 +40,7 @@
 - Deterministic: Router selects the next scan layer based on the DAG layers and existing artifact refs ([`pipeline/graph_utils.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/core/src/nl2sql/pipeline/graph_utils.py), [`pipeline/routes.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/core/src/nl2sql/pipeline/routes.py)).
 
 ### Subgraph Composition and Routing
-- Partially deterministic: Subgraph selection chooses the first matching spec in dictionary iteration order; if multiple subgraphs satisfy capabilities, selection depends on insertion order of `subgraph_specs` ([`pipeline/graph_utils.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/core/src/nl2sql/pipeline/graph_utils.py)).
+- Deterministic: Subgraph selection has a single outcome -- `sql_agent` when the datasource declares `supports_sql`, otherwise no subgraph ([`pipeline/graph_utils.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/core/src/nl2sql/pipeline/graph_utils.py)).
 - Deterministic (conditional): Scan payloads and subgraph outputs are built from explicit state fields; content is deterministic given the input state ([`pipeline/graph_utils.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/core/src/nl2sql/pipeline/graph_utils.py)).
 
 ### Retry Mechanisms and Backoff

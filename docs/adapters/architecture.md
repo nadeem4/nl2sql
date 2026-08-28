@@ -45,14 +45,14 @@ See `sdk.md` for the authoritative adapter interface reference and required fiel
 Adapters expose capabilities (e.g., `supports_sql`, `supports_schema_introspection`). These capabilities drive:
 
 - **Subgraph selection** (`resolve_subgraph()` in routing).
-- **Executor selection** (`ExecutorRegistry.get_executor()`).
+- **Executor selection** (`ExecutorNode._supports_sql()`, gating the SQL executor).
 
 ```mermaid
 flowchart TD
     Adapter[DatasourceAdapterProtocol] --> Caps[capabilities()]
-    Caps --> Exec[ExecutorRegistry]
+    Caps --> Exec[ExecutorNode capability gate]
     Caps --> Subgraph[resolve_subgraph()]
-    Exec --> Service[Executor Service]
+    Exec --> Service[SqlExecutorService]
     Subgraph --> Graph[Subgraph Selection]
 ```
 

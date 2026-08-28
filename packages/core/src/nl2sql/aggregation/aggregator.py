@@ -6,11 +6,11 @@ import polars as pl
 from nl2sql.execution.contracts import ArtifactRef
 from nl2sql.pipeline.nodes.global_planner.schemas import ExecutionDAG, LogicalNode, LogicalEdge
 
-from .engines.base import AggregationEngine
+from .engines.polars_duckdb import PolarsDuckdbEngine
 
 
 class AggregationService:
-    def __init__(self, engine: AggregationEngine):
+    def __init__(self, engine: PolarsDuckdbEngine):
         self.engine = engine
 
     def execute(

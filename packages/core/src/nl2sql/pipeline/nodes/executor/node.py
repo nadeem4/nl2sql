@@ -6,7 +6,7 @@ from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.common.logger import get_logger
 from nl2sql.context import NL2SQLContext
 from nl2sql.execution.contracts import ExecutorRequest
-from nl2sql.execution.executor import ExecutorRegistry
+from nl2sql.execution.executor import SqlExecutorService
 from nl2sql_adapter_sdk.capabilities import DatasourceCapability
 
 if TYPE_CHECKING:
@@ -21,8 +21,28 @@ class ExecutorNode:
     def __init__(self, ctx: NL2SQLContext):
         self.node_name = self.__class__.__name__.lower().replace("node", "")
         self.ds_registry = ctx.ds_registry
-        self.registry = ExecutorRegistry(ctx.ds_registry)
+        self.executor = SqlExecutorService(ctx.ds_registry)
         self.tenant_id = ctx.tenant_id
+
+    def _supports_sql(self, ds_id: str) -> bool:
+        """Reports whether a datasource may be executed as SQL.
+
+        The SQL executor is the only executor, so a datasource that does not
+        declare SUPPORTS_SQL -- or whose adapter cannot report capabilities --
+        gets no executor at all rather than being run as SQL anyway.
+        """
+        adapter = self.ds_registry.get_adapter(ds_id)
+        try:
+            capabilities = adapter.capabilities()
+        except Exception as exc:
+            logger.error(f"Failed to get capabilities for datasource '{ds_id}'. {exc}")
+            return False
+
+        normalized = {
+            cap.value if isinstance(cap, DatasourceCapability) else str(cap)
+            for cap in capabilities
+        }
+        return DatasourceCapability.SUPPORTS_SQL.value in normalized
 
     def __call__(self, state: SubgraphExecutionState) -> Dict[str, Any]:
         try:
@@ -47,7 +67,7 @@ class ExecutorNode:
                 )
                 return {"executor_response": None, "errors": [error]}
 
-            executor = self.registry.get_executor(ds_id)
+            executor = self.executor if self._supports_sql(ds_id) else None
             if executor is None:
                 error = PipelineError(
                     node=self.node_name,

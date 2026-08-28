@@ -7,8 +7,12 @@ from langchain_core.runnables import Runnable, RunnableConfig
 from nl2sql.context import NL2SQLContext
 from nl2sql.pipeline.nodes.global_planner.schemas import ExecutionDAG
 from nl2sql.pipeline.state import GraphState, SubgraphExecutionState
-from nl2sql.pipeline.subgraphs import SubgraphOutput, SubgraphSpec
+from nl2sql.pipeline.subgraphs import SubgraphOutput
+from nl2sql_adapter_sdk.capabilities import DatasourceCapability
 import logging
+
+SQL_AGENT_SUBGRAPH = "sql_agent"
+SQL_AGENT_REQUIRED_CAPABILITIES = {DatasourceCapability.SUPPORTS_SQL.value}
 
 
 class StateAccessor:
@@ -44,16 +48,20 @@ def next_scan_layer_ids(
 def resolve_subgraph(
     datasource_id: str,
     ctx: NL2SQLContext,
-    subgraph_specs: Dict[str, SubgraphSpec],
 ) -> Optional[str]:
+    """Returns the subgraph able to serve a datasource, or None if none can.
+
+    The sql_agent subgraph is the only one, and it requires SUPPORTS_SQL. A
+    datasource without that capability resolves to None so the caller fails
+    instead of routing it into SQL generation.
+    """
     try:
         caps = ctx.ds_registry.get_capabilities(datasource_id)
     except Exception:
         return None
 
-    for name, spec in subgraph_specs.items():
-        if spec.required_capabilities.issubset(caps):
-            return name
+    if SQL_AGENT_REQUIRED_CAPABILITIES.issubset(caps):
+        return SQL_AGENT_SUBGRAPH
     return None
 
 

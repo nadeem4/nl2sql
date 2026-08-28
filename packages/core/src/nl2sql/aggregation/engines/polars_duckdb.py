@@ -8,10 +8,8 @@ import polars as pl
 from nl2sql.execution.contracts import ArtifactRef
 from nl2sql.execution.artifacts import build_artifact_store
 
-from .base import AggregationEngine
 
-
-class PolarsDuckdbEngine(AggregationEngine):
+class PolarsDuckdbEngine:
     def __init__(self):
         self.artifact_store = build_artifact_store()
 
@@ -122,3 +120,6 @@ class PolarsDuckdbEngine(AggregationEngine):
             limit = attributes.get("limit")
             return frame.head(limit) if limit is not None else frame
         raise ValueError(f"Unsupported post-combine operation '{operation}'.")
+
+    def to_rows(self, frame: pl.DataFrame) -> List[Dict[str, Any]]:
+        return frame.to_dicts()

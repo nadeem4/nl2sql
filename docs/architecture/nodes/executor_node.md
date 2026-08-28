@@ -13,7 +13,7 @@
 ## Responsibilities
 
 - Validate required execution inputs (SQL and datasource ID).
-- Resolve executor via `ExecutorRegistry`.
+- Gate execution on the datasource declaring `supports_sql`.
 - Build and submit `ExecutorRequest`.
 - Return executor response and propagate errors.
 
@@ -76,7 +76,7 @@ Side effects:
 ## Internal Flow (Step-by-Step)
 
 1. Validate SQL and datasource ID.
-2. Resolve executor via `ExecutorRegistry`.
+2. Check the adapter declares `supports_sql`; otherwise return `INVALID_STATE`.
 3. Build `ExecutorRequest` with trace/subgraph identifiers and schema version.
 4. Execute request and return `ExecutorResponse`.
 5. On exception, emit `EXECUTOR_CRASH`.
@@ -146,7 +146,7 @@ Emits `PipelineError` with:
 
 ## Extension Points
 
-- Register new executors in `ExecutorRegistry`.
+- Extend `SqlExecutorService` to alter execution behavior.
 - Replace node in `build_sql_agent_graph()` to alter execution behavior.
 
 ---
