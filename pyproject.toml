@@ -9,7 +9,7 @@ description = "Monorepo for NL2SQL Agent"
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
-  # Core dependencies are in packages/core
+  # Runtime dependencies live in packages/nl2sql
 ]
 
 # Dev/test tooling (PEP 735). Install with: pip install --group dev
