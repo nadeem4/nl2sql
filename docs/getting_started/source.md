@@ -17,7 +17,7 @@ pip install -e "packages/nl2sql[postgres]"
 pip install -e packages/api
 ```
 
-Add any other adapters you need (mysql, mssql, sqlite).
+Add any other adapters you need (mysql, mssql, duckdb, sqlite).
 
 ## Configuration
 

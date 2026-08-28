@@ -7,6 +7,7 @@ CORE_MODULE = "nl2sql.cli"
 # each one needs to actually connect, carried by an extra.
 KNOWN_ADAPTERS = {
     "sqlite": "nl2sql",
+    "duckdb": "nl2sql[duckdb]",
     "postgresql": "nl2sql[postgres]",
     "mysql": "nl2sql[mysql]",
     "mssql": "nl2sql[mssql]",
@@ -16,6 +17,7 @@ KNOWN_ADAPTERS = {
 # sqlite needs none beyond the standard library.
 ADAPTER_DRIVERS = {
     "sqlite": "sqlite3",
+    "duckdb": "duckdb_engine",
     "postgresql": "psycopg2",
     "mysql": "pymysql",
     "mssql": "pyodbc",

@@ -12,6 +12,7 @@ We provide first-class support for the following SQL databases via SQLAlchemy.
 | **[MySQL](mysql.md)** | Support for 5.7+ and 8.0. Includes `MAX_EXECUTION_TIME` management. | 🟢 Stable |
 | **[Microsoft SQL Server](mssql.md)** | Enterprise support via `pyodbc` and `T-SQL` dialect. | 🟡 Beta |
 | **[SQLite](sqlite.md)** | File-based local development. | 🟢 Stable |
+| **[DuckDB](duckdb.md)** | In-process analytical engine over local files. | 🟢 Stable |
 
 ## Core Libraries
 

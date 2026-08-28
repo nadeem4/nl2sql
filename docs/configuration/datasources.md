@@ -29,7 +29,7 @@ datasources:
   - `id`: unique datasource ID
   - `description`: optional human-readable description
   - `connection`: connection details
-    - `type`: adapter type (e.g., `postgres`, `mysql`, `mssql`, `sqlite`)
+    - `type`: adapter type (e.g., `postgres`, `mysql`, `mssql`, `sqlite`, `duckdb`)
     - adapter-specific fields (host, port, database, driver, etc.)
   - optional limits and metadata (commonly used):
     - `statement_timeout_ms`

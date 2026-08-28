@@ -6,6 +6,7 @@ from pydantic import SecretStr
 
 from nl2sql_adapter_sdk.protocols import DatasourceAdapterProtocol
 from nl2sql_adapter_sdk.capabilities import DatasourceCapability
+from nl2sql.adapters.duckdb.adapter import DuckdbAdapter
 from nl2sql.adapters.mssql.adapter import MssqlAdapter
 from nl2sql.adapters.mysql.adapter import MysqlAdapter
 from nl2sql.adapters.postgres.adapter import PostgresAdapter
@@ -25,6 +26,14 @@ ADAPTER_SPECS = [
         SqliteAdapter,
         "nl2sql.adapters.sqlite.adapter",
         {"type": "sqlite", "database": ":memory:"},
+    ),
+    (
+        "duckdb",
+        DuckdbAdapter,
+        # DuckDB uses the base class's connect(), so that is where the engine
+        # factory has to be replaced.
+        "nl2sql.adapters.sqlalchemy_base.adapter",
+        {"type": "duckdb", "database": ":memory:"},
     ),
     (
         "postgres",
