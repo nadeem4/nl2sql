@@ -2,8 +2,8 @@ import sys
 import subprocess
 from rich.markup import escape
 from rich.prompt import Confirm
-from nl2sql_cli.config import KNOWN_ADAPTERS
-from nl2sql_cli.console import console, print_success, print_error, print_step
+from nl2sql.cli.config import KNOWN_ADAPTERS
+from nl2sql.cli.console import console, print_success, print_error, print_step
 
 def install_package(package_name: str) -> bool:
     print_step(f"Installing {package_name}...")
@@ -15,7 +15,7 @@ def install_package(package_name: str) -> bool:
         print_error(f"Failed to install {package_name}")
         return False
 
-from nl2sql_cli.common.decorators import handle_cli_errors
+from nl2sql.cli.common.decorators import handle_cli_errors
 
 @handle_cli_errors
 def install_command(adapter_name: str):

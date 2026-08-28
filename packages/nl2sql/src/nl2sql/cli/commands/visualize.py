@@ -1,8 +1,8 @@
 from typing import List, Dict, Any
 from langgraph.graph.state import CompiledStateGraph
-from nl2sql_cli.reporting import ConsolePresenter
+from nl2sql.cli.reporting import ConsolePresenter
 
-from nl2sql_cli.common.decorators import handle_cli_errors
+from nl2sql.cli.common.decorators import handle_cli_errors
 
 @handle_cli_errors
 def draw_execution_trace(

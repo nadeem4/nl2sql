@@ -12,10 +12,10 @@ from nl2sql.configs import (
     PolicyFileConfig
 )
 
-from nl2sql_cli.generators.env import EnvFileGenerator
-from nl2sql_cli.generators.datasources import DatasourceGenerator
-from nl2sql_cli.generators.llm import LLMGenerator
-from nl2sql_cli.generators.policies import PolicyGenerator
+from nl2sql.cli.generators.env import EnvFileGenerator
+from nl2sql.cli.generators.datasources import DatasourceGenerator
+from nl2sql.cli.generators.llm import LLMGenerator
+from nl2sql.cli.generators.policies import PolicyGenerator
 
 from .factory import DemoDataFactory
 from .writers.sqlite import SQLiteWriter
@@ -208,7 +208,7 @@ class DemoManager:
         reload_settings()
 
         from nl2sql.context import NL2SQLContext
-        from nl2sql_cli.commands.indexing import run_indexing
+        from nl2sql.cli.commands.indexing import run_indexing
 
         try:
             ctx = NL2SQLContext(

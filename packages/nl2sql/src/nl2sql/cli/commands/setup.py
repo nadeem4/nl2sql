@@ -6,11 +6,11 @@ from rich.panel import Panel
 from InquirerPy import inquirer
 from InquirerPy.validator import NumberValidator
 
-from nl2sql_cli.common.decorators import handle_cli_errors
-from nl2sql_cli.console import console, print_success, print_step
-from nl2sql_cli.config import KNOWN_ADAPTERS
-from nl2sql_cli.commands.install import install_package
-from nl2sql_cli.checks import check_package, verify_connectivity
+from nl2sql.cli.common.decorators import handle_cli_errors
+from nl2sql.cli.console import console, print_success, print_step
+from nl2sql.cli.config import ADAPTER_DRIVERS, KNOWN_ADAPTERS
+from nl2sql.cli.commands.install import install_package
+from nl2sql.cli.checks import check_package, verify_connectivity
 
 from nl2sql.common.logger import get_logger
 from nl2sql.configs import ConfigManager
@@ -23,7 +23,7 @@ from nl2sql.configs import (
     PolicyFileConfig, 
     RolePolicy
 )
-from nl2sql_cli.demo import DemoManager
+from nl2sql.cli.demo import DemoManager
 
 logger = get_logger(__name__)
 
@@ -125,7 +125,7 @@ def _configure_datasource(config_manager: ConfigManager):
 
 
 from nl2sql.configs import LLMFileConfig, AgentConfig
-from nl2sql_cli.generators.llm import LLMGenerator
+from nl2sql.cli.generators.llm import LLMGenerator
 
 
 def _configure_llm(config_manager: ConfigManager, api_key: Optional[str] = None):
@@ -221,10 +221,10 @@ def _configure_policies(config_manager: ConfigManager):
 
 
 
-from nl2sql_cli.generators.env import EnvFileGenerator
-from nl2sql_cli.generators.datasources import DatasourceGenerator
-from nl2sql_cli.generators.llm import LLMGenerator
-from nl2sql_cli.generators.policies import PolicyGenerator
+from nl2sql.cli.generators.env import EnvFileGenerator
+from nl2sql.cli.generators.datasources import DatasourceGenerator
+from nl2sql.cli.generators.llm import LLMGenerator
+from nl2sql.cli.generators.policies import PolicyGenerator
 
 def _write_config_file(path: pathlib.Path, content: str):
     """Helper to write generator output to file."""
@@ -273,26 +273,26 @@ def _install_required_adapters(config_manager: ConfigManager):
         # load_datasources returns List[Dict]
         configs = config_manager.load_datasources()
         
-        required_pkgs = set()
+        required = set()
         for config in configs:
             connection = config.get("connection", {})
             engine = connection.get("type", "").lower() or config.get("type", "").lower()
 
             for name, pkg in KNOWN_ADAPTERS.items():
                 if name in engine:
-                    required_pkgs.add(pkg)
+                    required.add((name, pkg))
                     break
         
-        if required_pkgs:
+        if required:
             print_step("Checking Adapters...")
-            for pkg in required_pkgs:
-                import_name = pkg.replace("-", "_")
-                if not check_package(import_name):
+            for name, pkg in sorted(required):
+                # The adapter ships with nl2sql; the extra supplies the driver.
+                if not check_package(ADAPTER_DRIVERS[name]):
                     if inquirer.confirm(message=f"Required adapter {pkg} is missing. Install now?", default=True).execute():
-                        console.print(f"[yellow]Installing {pkg}...[/yellow]")
+                        console.print(f"[yellow]Installing {escape(pkg)}...[/yellow]")
                         install_package(pkg)
                 else:
-                    console.print(f"[dim]Adapter {pkg} is installed.[/dim]")
+                    console.print(f"[dim]Adapter {escape(pkg)} is installed.[/dim]")
                     
     except Exception as e:
         console.print(f"[red]Failed to check adapters: {escape(str(e))}[/red]")
@@ -303,7 +303,7 @@ def _run_indexing_step():
     from nl2sql.common.settings import settings
     from nl2sql.context import NL2SQLContext
     from nl2sql.indexing.vector_store import VectorStore
-    from nl2sql_cli.commands.indexing import run_indexing
+    from nl2sql.cli.commands.indexing import run_indexing
 
     try:
         v_store = VectorStore(

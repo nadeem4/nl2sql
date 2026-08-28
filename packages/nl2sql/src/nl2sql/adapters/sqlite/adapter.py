@@ -1,7 +1,7 @@
 from typing import Any, List, Dict
 from sqlalchemy import create_engine, text, inspect
 from sqlalchemy.dialects import sqlite
-from nl2sql_sqlalchemy_adapter import (
+from nl2sql.adapters.sqlalchemy_base import (
     CostEstimate,
     DryRunResult,
     QueryPlan,

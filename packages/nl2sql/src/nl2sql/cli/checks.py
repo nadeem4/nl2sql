@@ -4,7 +4,7 @@ import pathlib
 from rich.markup import escape
 from rich.table import Table
 from rich.text import Text
-from nl2sql_cli.console import console, print_success, print_error
+from nl2sql.cli.console import console, print_success, print_error
 
 def check_package(name: str) -> bool:
     """Checks if a python package is installed."""

@@ -1,12 +1,13 @@
 import sys
 import importlib.util
+from rich.markup import escape
 from rich.table import Table
 from rich.panel import Panel
-from nl2sql_cli.console import console, print_success, print_error
-from nl2sql_cli.config import KNOWN_ADAPTERS
-from nl2sql_cli.checks import check_package, verify_connectivity
+from nl2sql.cli.console import console, print_success, print_error
+from nl2sql.cli.config import ADAPTER_DRIVERS, KNOWN_ADAPTERS
+from nl2sql.cli.checks import check_package, verify_connectivity
 
-from nl2sql_cli.common.decorators import handle_cli_errors
+from nl2sql.cli.common.decorators import handle_cli_errors
 
 @handle_cli_errors
 def doctor_command():
@@ -21,16 +22,10 @@ def doctor_command():
         print_success("Python version OK.")
 
     # 2. Core Check
-    if check_package("nl2sql-core"): 
-        if importlib.util.find_spec("nl2sql"):
-            print_success("Core package (nl2sql-core) installed.")
-        else:
-            print_error("Core package (nl2sql-core) NOT found.")
+    if importlib.util.find_spec("nl2sql"):
+        print_success("Core package (nl2sql) installed.")
     else:
-        if importlib.util.find_spec("nl2sql"):
-            print_success("Core package (nl2sql) installed.")
-        else:
-            print_error("Core package (nl2sql-core) NOT found.")
+        print_error("Core package (nl2sql) NOT found.")
 
     # 3. Adapters
     console.print("\n[bold]Adapters:[/bold]")
@@ -40,9 +35,11 @@ def doctor_command():
     table.add_column("Status")
 
     for name, pkg in KNOWN_ADAPTERS.items():
-        import_name = pkg.replace("-", "_")
-        status = "[green]Installed[/green]" if check_package(import_name) else "[red]Missing[/red]"
-        table.add_row(name, pkg, status)
+        # The adapter module always ships with nl2sql; the driver is what an
+        # extra adds, so that is what decides whether the dialect is usable.
+        ok = check_package(ADAPTER_DRIVERS[name])
+        status = "[green]Installed[/green]" if ok else "[red]Missing[/red]"
+        table.add_row(name, escape(pkg), status)
     
     console.print(table)
     

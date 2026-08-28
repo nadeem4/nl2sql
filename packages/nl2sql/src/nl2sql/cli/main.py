@@ -15,16 +15,16 @@ from nl2sql.context import NL2SQLContext
 from nl2sql import BenchmarkConfig
 
 # Local CLI Imports
-from nl2sql_cli.commands.indexing import run_indexing
-from nl2sql_cli.commands.benchmark import run_benchmark as exec_benchmark
-from nl2sql_cli.commands.run import run_pipeline 
-from nl2sql_cli.commands.info import list_available_adapters
-from nl2sql_cli.commands.doctor import doctor_command
-from nl2sql_cli.commands.setup import setup_command
-from nl2sql_cli.commands.install import install_command
-from nl2sql_cli.commands.policy import app as policy_app
-from nl2sql_cli.console import configure_output_encoding
-from nl2sql_cli.types import RunConfig
+from nl2sql.cli.commands.indexing import run_indexing
+from nl2sql.cli.commands.benchmark import run_benchmark as exec_benchmark
+from nl2sql.cli.commands.run import run_pipeline 
+from nl2sql.cli.commands.info import list_available_adapters
+from nl2sql.cli.commands.doctor import doctor_command
+from nl2sql.cli.commands.setup import setup_command
+from nl2sql.cli.commands.install import install_command
+from nl2sql.cli.commands.policy import app as policy_app
+from nl2sql.cli.console import configure_output_encoding
+from nl2sql.cli.types import RunConfig
 
 app = typer.Typer(
     name="nl2sql",

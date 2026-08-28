@@ -2,7 +2,7 @@ from rich.console import Console
 from rich.table import Table
 from nl2sql.datasources.discovery import discover_adapters
 
-from nl2sql_cli.common.decorators import handle_cli_errors
+from nl2sql.cli.common.decorators import handle_cli_errors
 
 @handle_cli_errors
 def list_available_adapters() -> None:
@@ -11,7 +11,7 @@ def list_available_adapters() -> None:
     adapters = discover_adapters()
 
     if not adapters:
-        console.print("[yellow]No adapters found. Please install an adapter package (e.g., nl2sql-postgres).[/yellow]")
+        console.print("[yellow]No adapters found. Please install a driver extra (e.g., nl2sql\[postgres]).[/yellow]")
         return
 
     table = Table(title="Installed Datasource Adapters")

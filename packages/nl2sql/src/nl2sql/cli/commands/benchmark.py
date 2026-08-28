@@ -1,7 +1,7 @@
 import sys
 from nl2sql import BenchmarkAPI, BenchmarkConfig
-from nl2sql_cli.reporting import ConsolePresenter
-from nl2sql_cli.common.decorators import handle_cli_errors
+from nl2sql.cli.reporting import ConsolePresenter
+from nl2sql.cli.common.decorators import handle_cli_errors
 
 
 @handle_cli_errors

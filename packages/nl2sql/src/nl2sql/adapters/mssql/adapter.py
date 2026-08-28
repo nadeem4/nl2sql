@@ -1,12 +1,12 @@
 from typing import Any, List, Dict
 from sqlalchemy import create_engine, text, inspect
 from sqlalchemy.dialects import mssql
-from nl2sql_sqlalchemy_adapter import (
+from nl2sql.adapters.sqlalchemy_base import (
     CostEstimate,
     DryRunResult,
     QueryPlan,
 )
-from nl2sql_sqlalchemy_adapter import BaseSQLAlchemyAdapter
+from nl2sql.adapters.sqlalchemy_base import BaseSQLAlchemyAdapter
 
 from pydantic import BaseModel, Field, SecretStr
 from typing import Optional

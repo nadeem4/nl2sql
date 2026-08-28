@@ -1,11 +1,11 @@
 import json
 import sys
 from typing import Any, Dict
-from nl2sql_cli.reporting import ConsolePresenter
+from nl2sql.cli.reporting import ConsolePresenter
 from nl2sql.indexing.vector_store import VectorStore
 from nl2sql.datasources import DatasourceRegistry
 from nl2sql.context import NL2SQLContext
-from nl2sql_cli.common.decorators import handle_cli_errors
+from nl2sql.cli.common.decorators import handle_cli_errors
 from nl2sql.indexing.orchestrator import IndexingOrchestrator
 
 @handle_cli_errors

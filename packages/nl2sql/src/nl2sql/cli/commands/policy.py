@@ -13,7 +13,7 @@ from nl2sql import PolicyAPI
 app = typer.Typer(help="Manage RBAC policies and security.")
 console = Console()
 
-from nl2sql_cli.common.decorators import handle_cli_errors
+from nl2sql.cli.common.decorators import handle_cli_errors
 
 @app.command("validate")
 @handle_cli_errors
