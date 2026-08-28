@@ -1297,6 +1297,37 @@
 </nav>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="#pinning-a-version-and-the-first-release">
+<span class="md-ellipsis">
+      
+        Pinning a version, and the first release
+      
+    </span>
+</a>
+<nav aria-label="Pinning a version, and the first release" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#bootstrap-sha-where-the-changelog-starts">
+<span class="md-ellipsis">
+      
+        bootstrap-sha — where the changelog starts
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#release-as-choosing-an-exact-version">
+<span class="md-ellipsis">
+      
+        Release-As: — choosing an exact version
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="#documentation-versions">
 <span class="md-ellipsis">
       
@@ -1780,6 +1811,37 @@
 </nav>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="#pinning-a-version-and-the-first-release">
+<span class="md-ellipsis">
+      
+        Pinning a version, and the first release
+      
+    </span>
+</a>
+<nav aria-label="Pinning a version, and the first release" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#bootstrap-sha-where-the-changelog-starts">
+<span class="md-ellipsis">
+      
+        bootstrap-sha — where the changelog starts
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#release-as-choosing-an-exact-version">
+<span class="md-ellipsis">
+      
+        Release-As: — choosing an exact version
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="#documentation-versions">
 <span class="md-ellipsis">
       
@@ -1896,6 +1958,21 @@ on <code>main</code>, so the commit subject is the release input:</p>
 </tr>
 </tbody>
 </table>
+<div class="admonition warning">
+<p class="admonition-title">The project is pre-1.0: a breaking change bumps the <em>minor</em></p>
+<p><code>release-please-config.json</code> sets top-level <code>bump-minor-pre-major: true</code>,
+which the schema describes as <em>"Breaking changes only bump semver minor if
+version &lt; 1.0.0"</em>. While the version is below <code>1.0.0</code>, a <code>feat!:</code> or a
+<code>BREAKING CHANGE:</code> footer therefore moves <code>0.1.0</code> to <code>0.2.0</code> rather than to
+<code>1.0.0</code> — semver's rule for an unstable public API.</p>
+<p>Without this setting the <em>first</em> breaking commit silently declares the
+project stable. That is exactly what happened before it was added: the
+<code>refactor!:</code> that collapsed the distributions made release-please propose
+<code>1.0.0</code>.</p>
+<p>Going to <code>1.0.0</code> is then a deliberate act: set the version explicitly with a
+<code>Release-As: 1.0.0</code> commit (below). The flag stays <code>true</code> afterwards and
+becomes a no-op once the version is <code>&gt;= 1.0.0</code>.</p>
+</div>
 <h3 id="2-release_pleaseyml-maintains-a-release-pr">2. <code>release_please.yml</code> maintains a release PR</h3>
 <p>Every push to <code>main</code> runs <code>googleapis/release-please-action@v4</code>. It keeps a
 single open pull request (<code>separate-pull-requests: false</code>, one manifest entry
@@ -1975,6 +2052,67 @@ changelog and the version it proposes is the release decision.</p>
 </ol>
 <p>Authentication is PyPI <strong>trusted publishing</strong> (OIDC, <code>id-token: write</code>). There
 is no API token anywhere in the workflow and no secret to rotate.</p>
+<h2 id="pinning-a-version-and-the-first-release">Pinning a version, and the first release</h2>
+<p>Two settings exist only because release-please was adopted <strong>mid-project</strong>,
+long after the first commit. Both concern the very first release and neither is
+permanent.</p>
+<h3 id="bootstrap-sha-where-the-changelog-starts"><code>bootstrap-sha</code> — where the changelog starts</h3>
+<p>With no tag in the repository, release-please has no marker for "the last
+release" and walks the whole history, so the first changelog it generated
+listed every <code>feat:</code> ever committed — 228 entries reaching back to before this
+phase of work.</p>
+<p>The top-level <code>bootstrap-sha</code> in <code>release-please-config.json</code> is the fix. The
+manifest-releaser documentation describes it as a key that <em>"will cause
+release-please to stop there for collecting changelog commits (so choose one
+commit earlier than the first commit you want to include)"</em>. Ours is:</p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-1-1" id="__codelineno-1-1" name="__codelineno-1-1"></a><span class="nt">"bootstrap-sha"</span><span class="p">:</span><span class="w"> </span><span class="s2">"39d488ae9f9943ea5d9879bf2dd503c34370b24a"</span>
+</code></pre></div>
+<p>That is the <strong>parent</strong> of <code>28687fe</code>, the merge of the first pull request in
+this phase of work, so the changelog begins at that pull request and covers
+this phase rather than the entire project.</p>
+<p>It is top-level on purpose: the schema does not accept it inside a <code>packages</code>
+entry, and the documentation notes it is <em>"only applicable at top-level
+config"</em>.</p>
+<div class="admonition note">
+<p class="admonition-title">It expires on its own</p>
+<p>Per the documentation, <em>"once a release-please generated PR has been
+merged, this config value will be ignored for all subsequent runs and can
+be removed."</em> Once a real <code>vX.Y.Z</code> tag exists, that tag is the baseline and
+<code>bootstrap-sha</code> does nothing. Deleting it then is tidy-up, not a behaviour
+change.</p>
+</div>
+<h3 id="release-as-choosing-an-exact-version"><code>Release-As:</code> — choosing an exact version</h3>
+<p>To publish a specific version rather than the one conventional commits imply,
+put a <code>Release-As:</code> footer in the <strong>body</strong> of a commit that lands on <code>main</code>:</p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-2-1" id="__codelineno-2-1" name="__codelineno-2-1"></a>ci: pin the first release to 0.1.0 and scope its changelog
+<a href="#__codelineno-2-2" id="__codelineno-2-2" name="__codelineno-2-2"></a>
+<a href="#__codelineno-2-3" id="__codelineno-2-3" name="__codelineno-2-3"></a>Release-As: 0.1.0
+</code></pre></div>
+<p>Release-please reads <code>Release-As: x.x.x</code> (case insensitive) from the commit
+body and opens its next release pull request for exactly that version. This is
+how the first release was pinned to <code>0.1.0</code> instead of the <code>1.0.0</code> that the
+<code>refactor!:</code> commit would otherwise have produced.</p>
+<p>The footer applies to <strong>one</strong> commit and expires with it — nothing has to be
+cleaned up afterwards.</p>
+<div class="admonition danger">
+<p class="admonition-title">Do not use the <code>release-as</code> <em>config</em> key instead</p>
+<p><code>release-please-config.json</code> accepts a <code>release-as</code> key that does the same
+job, and it is a trap. The schema marks the per-package form
+<strong><code>[DEPRECATED]</code></strong>, advising <em>"Consider using a <code>Release-As</code> commit
+instead"</em>, and the documentation warns that it is <strong>sticky</strong>:</p>
+<blockquote>
+<p>Note: once the release PR is merged you should either remove this or
+update it to a higher version. Otherwise subsequent <code>manifest-pr</code> runs
+will continue to use this version even though it was already set in the
+last release.</p>
+</blockquote>
+<p>A <code>release-as</code> left in the config does not pin one release — it pins
+<strong>every</strong> release, forever, to that version. The repository would stay at
+<code>0.1.0</code> while commits accumulated, and nobody would get an error saying so.</p>
+<p>This repository therefore has <strong>no <code>release-as</code> key at all</strong>, and should not
+gain one. Use the commit footer, which cannot be forgotten because it does
+not persist.</p>
+</div>
 <h2 id="documentation-versions">Documentation versions</h2>
 <p><code>gh-pages</code> is managed by <code>mike</code>, which keeps one built site per version:</p>
 <table>
