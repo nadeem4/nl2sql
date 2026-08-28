@@ -33,6 +33,12 @@ plugins:
         python:
           paths: [packages/nl2sql/src, packages/adapter-sdk/src]
 
+# mike writes one docs build per version to gh-pages; this makes the
+# Material theme render the version selector against mike's versions.json.
+extra:
+  version:
+    provider: mike
+
 markdown_extensions:
   - pymdownx.highlight:
       anchor_linenums: true

@@ -1,37 +1,130 @@
-name: Publish to PyPI
+# Fires on the vX.Y.Z tag that release-please pushes when the release PR is
+# merged. Everything downstream of `build` is gated on that job: if the freshly
+# built wheels do not install and import, nothing is published anywhere.
+name: Publish Release
 
 on:
-  release:
-    types: [published]
+  push:
+    tags:
+      - "v*"
 
 jobs:
-  publish:
+  # Same build + smoke-install commands as the `build` job in test.yml, so a
+  # green PR and a green tag exercise identical steps. This is the gate.
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install build tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install build
+
+      - name: Build all distributions
+        run: |
+          for pkg in packages/adapter-sdk packages/nl2sql packages/api; do
+            python -m build "$pkg" --outdir dist
+          done
+
+      - name: Smoke test the built wheels
+        run: |
+          python -m venv /tmp/smoke
+          /tmp/smoke/bin/pip install --upgrade pip
+          /tmp/smoke/bin/pip install --find-links dist dist/nl2sql_adapter_sdk-*.whl dist/nl2sql-*.whl dist/nl2sql_api-*.whl
+          /tmp/smoke/bin/python -c "import nl2sql"
+          /tmp/smoke/bin/nl2sql --help
+
+      - name: Upload distributions
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  # Trusted publishing (OIDC): the `id-token: write` permission is the whole
+  # credential. There is no API token secret to configure or rotate - PyPI is
+  # told which repository and which workflow file it will accept, once, by
+  # hand. See docs/development/releasing.md.
+  pypi:
+    needs: build
     runs-on: ubuntu-latest
     permissions:
-      id-token: write  # IMPORTANT: Mandatory for trusted publishing
+      id-token: write
       contents: read
-
     steps:
-    - uses: actions/checkout@v4
+      - name: Download distributions
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
 
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.10'
+      - name: Publish distributions to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/
 
-    - name: Install build tools
-      run: |
-        python -m pip install --upgrade pip
-        pip install build twine
+  # packages/api/Dockerfile installs nl2sql and nl2sql-api from PyPI, so this
+  # has to follow the upload rather than run beside it.
+  ghcr:
+    needs: pypi
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
 
-    - name: Build all distributions
-      run: |
-        for pkg in packages/adapter-sdk packages/nl2sql packages/api; do
-          python -m build "$pkg" --outdir dist
-        done
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Publish distributions to PyPI
-      uses: pypa/gh-action-pypi-publish@release/v1
-      with:
-        packages-dir: dist/
-        # note: 'password' is not needed with trusted publishing
+      - name: Build and push the API image
+        uses: docker/build-push-action@v6
+        with:
+          context: packages/api
+          push: true
+          tags: |
+            ghcr.io/nadeem4/nl2sql-api:${{ github.ref_name }}
+            ghcr.io/nadeem4/nl2sql-api:latest
+
+  # mike keeps one built copy of the docs per tag on gh-pages and moves the
+  # `latest` alias forward. Pushes to main deploy the `dev` version instead
+  # (publish_docs.yml), so the two never write the same directory.
+  docs:
+    needs: pypi
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: gh-pages
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git Credentials
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install docs tooling
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-docs.txt
+
+      - name: Deploy versioned docs
+        run: |
+          mike deploy --push --update-aliases "$GITHUB_REF_NAME" latest
+          mike set-default --push latest

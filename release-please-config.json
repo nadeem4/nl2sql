@@ -1,0 +1,26 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "release-type": "python",
+  "separate-pull-requests": false,
+  "include-component-in-tag": false,
+  "packages": {
+    ".": {
+      "package-name": "nl2sql",
+      "changelog-path": "CHANGELOG.md",
+      "extra-files": [
+        {
+          "type": "generic",
+          "path": "packages/adapter-sdk/pyproject.toml"
+        },
+        {
+          "type": "generic",
+          "path": "packages/nl2sql/pyproject.toml"
+        },
+        {
+          "type": "generic",
+          "path": "packages/api/pyproject.toml"
+        }
+      ]
+    }
+  }
+}

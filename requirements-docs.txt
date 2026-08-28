@@ -3,3 +3,4 @@ mkdocs-material>=9.5.0
 pymdown-extensions>=10.0
 mkdocs-mermaid2-plugin>=1.1.1
 mkdocstrings[python]>=0.24.0
+mike>=2.1.0
