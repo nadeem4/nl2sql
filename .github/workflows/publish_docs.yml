@@ -1,15 +1,29 @@
+# Pushes to main publish the in-development docs as the `dev` version, not as
+# `latest`. `mkdocs gh-deploy` used to overwrite the whole gh-pages root here,
+# which would clobber every version the release workflow had deployed; mike
+# writes one directory per version instead, so the two workflows coexist. The
+# `latest` alias and the site default are moved only by publish_pypi.yaml, on
+# a release tag.
 name: Publish Docs
+
 on:
   push:
     branches:
       - main
+
 permissions:
   contents: write
+
+concurrency:
+  group: gh-pages
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Configure Git Credentials
         run: |
           git config user.name github-actions[bot]
@@ -17,7 +31,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: 3.x
-      - run: echo "cache_id=$(date --utc '+%V')" >> $GITHUB_ENV 
+      - run: echo "cache_id=$(date --utc '+%V')" >> $GITHUB_ENV
       - uses: actions/cache@v4
         with:
           key: mkdocs-material-${{ hashFiles('requirements-docs.txt') }}
@@ -25,4 +39,4 @@ jobs:
           restore-keys: |
             mkdocs-material-
       - run: pip install -r requirements-docs.txt
-      - run: mkdocs gh-deploy --force
+      - run: mike deploy --push dev
