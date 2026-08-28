@@ -1,12 +1,36 @@
-# Fires on the vX.Y.Z tag that release-please pushes when the release PR is
-# merged. Everything downstream of `build` is gated on that job: if the freshly
-# built wheels do not install and import, nothing is published anywhere.
+# Publishes the vX.Y.Z release. Everything downstream of `build` is gated on
+# that job: if the freshly built wheels do not install and import, nothing is
+# published anywhere.
+#
+# Three entry points, one behaviour. GitHub does not start a workflow from an
+# event created with the default `GITHUB_TOKEN`, so the tag release-please
+# pushes never fires the `push: tags` trigger - `release_please.yml` therefore
+# calls this workflow directly (`workflow_call`) off its own outputs. The tag
+# trigger is kept for a human-pushed tag and `workflow_dispatch` is the manual
+# escape hatch. See docs/development/releasing.md.
+#
+# The tag every job works from is `${{ inputs.tag || github.ref_name }}`:
+# `inputs.tag` on a dispatched or called run, and the pushed tag otherwise.
+# On a dispatched run `github.ref_name` is the branch, so every checkout, the
+# GHCR image tag and `mike deploy` must use that expression, never the raw ref.
 name: Publish Release
 
 on:
   push:
     tags:
       - "v*"
+  workflow_call:
+    inputs:
+      tag:
+        description: "Release tag to publish, e.g. v0.1.0"
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to publish, e.g. v0.1.0"
+        required: true
+        type: string
 
 jobs:
   # Same build + smoke-install commands as the `build` job in test.yml, so a
@@ -15,6 +39,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref_name }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -106,6 +132,8 @@ jobs:
       packages: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref_name }}
 
       - name: Log in to GHCR
         uses: docker/login-action@v3
@@ -120,7 +148,7 @@ jobs:
           context: packages/api
           push: true
           tags: |
-            ghcr.io/nadeem4/nl2sql-api:${{ github.ref_name }}
+            ghcr.io/nadeem4/nl2sql-api:${{ inputs.tag || github.ref_name }}
             ghcr.io/nadeem4/nl2sql-api:latest
 
   # mike keeps one built copy of the docs per tag on gh-pages and moves the
@@ -136,6 +164,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ inputs.tag || github.ref_name }}
           fetch-depth: 0
 
       - name: Configure Git Credentials
@@ -153,6 +182,8 @@ jobs:
           pip install -r requirements-docs.txt
 
       - name: Deploy versioned docs
+        env:
+          TAG: ${{ inputs.tag || github.ref_name }}
         run: |
-          mike deploy --push --update-aliases "$GITHUB_REF_NAME" latest
+          mike deploy --push --update-aliases "$TAG" latest
           mike set-default --push latest

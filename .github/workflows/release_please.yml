@@ -1,8 +1,15 @@
 # Runs on every push to main and maintains a single release pull request that
 # accumulates Conventional Commits into CHANGELOG.md and bumps the unified
 # version across all three package manifests. Merging that PR is the manual
-# release gate: it tags vX.Y.Z and publishes a GitHub Release, which is what
-# publish_pypi.yaml waits for. Nothing here publishes anything.
+# release gate: it tags vX.Y.Z and publishes a GitHub Release.
+#
+# The tag alone cannot start the publish. GitHub refuses to trigger workflows
+# from events created with the default `GITHUB_TOKEN`, and that is the token
+# release-please tags with, so `publish_pypi.yaml`'s `push: tags` trigger never
+# fires for a release-please tag. Publishing is therefore chained to this
+# workflow's own outputs instead: `release-please` exposes `releases_created`
+# and `tag_name`, and the `publish` job below calls `publish_pypi.yaml` as a
+# reusable workflow with that tag. No PAT, no stored credential.
 name: Release Please
 
 on:
@@ -17,8 +24,31 @@ permissions:
 jobs:
   release-please:
     runs-on: ubuntu-latest
+    outputs:
+      releases_created: ${{ steps.release.outputs.releases_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
     steps:
       - uses: googleapis/release-please-action@v4
+        id: release
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+
+  # Only runs on the push to main that actually tagged a release; every other
+  # push leaves `releases_created` as `false` and this is skipped. The publish
+  # pipeline itself - build, smoke gate, per-package PyPI legs, GHCR, docs -
+  # stays in publish_pypi.yaml, which is also the workflow filename registered
+  # with PyPI's trusted publishers.
+  publish:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.releases_created == 'true' }}
+    uses: ./.github/workflows/publish_pypi.yaml
+    with:
+      tag: ${{ needs.release-please.outputs.tag_name }}
+    # Ceiling for the called workflow: its jobs keep their own narrower
+    # permissions, but a reusable workflow can never exceed the caller's.
+    # `id-token: write` is what carries OIDC trusted publishing through.
+    permissions:
+      contents: write
+      packages: write
+      id-token: write
