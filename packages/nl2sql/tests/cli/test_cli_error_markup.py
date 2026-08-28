@@ -14,7 +14,7 @@ import pytest
 from rich.console import Console
 
 from nl2sql.common.exceptions import NL2SQLError
-from nl2sql_cli.common import decorators
+from nl2sql.cli.common import decorators
 
 # A closing-tag-shaped sequence with no matching opening tag: rich raises
 # MarkupError on it. It is lifted from rich's own source, which is how a real
@@ -93,7 +93,7 @@ def test_traceback_containing_markup_is_displayed(captured_console):
 
 def _render(func, *args, **kwargs) -> str:
     """Run a presenter call against a buffered console and return the output."""
-    from nl2sql_cli.reporting import ConsolePresenter
+    from nl2sql.cli.reporting import ConsolePresenter
 
     buffer = io.StringIO()
     presenter = ConsolePresenter(
@@ -133,7 +133,7 @@ def test_presenter_execution_tree_escapes_query_and_sql():
 
 
 def test_shared_console_helpers_escape_message(monkeypatch):
-    from nl2sql_cli import console as console_module
+    from nl2sql.cli import console as console_module
 
     buffer = io.StringIO()
     monkeypatch.setattr(

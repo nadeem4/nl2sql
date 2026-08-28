@@ -5,8 +5,8 @@ import sys
 
 import pytest
 
-from nl2sql_cli.console import configure_output_encoding
-from nl2sql_cli.reporting import ConsolePresenter
+from nl2sql.cli.console import configure_output_encoding
+from nl2sql.cli.reporting import ConsolePresenter
 
 
 def _legacy_stdout(monkeypatch) -> io.TextIOWrapper:
@@ -57,11 +57,11 @@ def test_the_entry_point_configures_the_encoding(monkeypatch):
     """The fix is only useful if it runs before any command produces output."""
     calls: list[str] = []
     monkeypatch.setattr(
-        "nl2sql_cli.main.configure_output_encoding", lambda: calls.append("configured")
+        "nl2sql.cli.main.configure_output_encoding", lambda: calls.append("configured")
     )
-    monkeypatch.setattr("nl2sql_cli.main.app", lambda: calls.append("app"))
+    monkeypatch.setattr("nl2sql.cli.main.app", lambda: calls.append("app"))
 
-    from nl2sql_cli.main import main
+    from nl2sql.cli.main import main
 
     main()
 

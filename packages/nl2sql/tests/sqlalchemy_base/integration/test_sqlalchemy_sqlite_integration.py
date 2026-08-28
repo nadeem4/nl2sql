@@ -2,8 +2,8 @@ import sqlite3
 
 import pytest
 
-from nl2sql_sqlalchemy_adapter.adapter import BaseSQLAlchemyAdapter
-from nl2sql_sqlalchemy_adapter.models import QueryPlan, CostEstimate
+from nl2sql.adapters.sqlalchemy_base.adapter import BaseSQLAlchemyAdapter
+from nl2sql.adapters.sqlalchemy_base.models import QueryPlan, CostEstimate
 
 
 class _SQLiteTestAdapter(BaseSQLAlchemyAdapter):

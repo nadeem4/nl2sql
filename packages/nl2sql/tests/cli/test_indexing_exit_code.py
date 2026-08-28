@@ -10,7 +10,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from nl2sql_cli.commands import indexing as indexing_cmd
+from nl2sql.cli.commands import indexing as indexing_cmd
 
 
 class _StubAdapter:

@@ -11,7 +11,7 @@ import importlib
 import os
 import pathlib
 
-from nl2sql_cli.commands import setup as wizard
+from nl2sql.cli.commands import setup as wizard
 
 
 def _reload_in(directory) -> None:

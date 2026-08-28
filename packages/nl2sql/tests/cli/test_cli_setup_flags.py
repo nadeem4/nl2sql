@@ -4,7 +4,7 @@ import re
 
 from typer.testing import CliRunner
 
-from nl2sql_cli.main import app
+from nl2sql.cli.main import app
 
 runner = CliRunner()
 
@@ -25,7 +25,7 @@ def _plain(output: str) -> str:
 def test_lite_flag_is_accepted(monkeypatch):
     captured = {}
     monkeypatch.setattr(
-        "nl2sql_cli.main.setup_command", lambda **kwargs: captured.update(kwargs)
+        "nl2sql.cli.main.setup_command", lambda **kwargs: captured.update(kwargs)
     )
 
     result = runner.invoke(app, ["setup", "--demo", "--lite"])
@@ -38,7 +38,7 @@ def test_lite_flag_is_accepted(monkeypatch):
 def test_lite_defaults_to_true_without_docker(monkeypatch):
     captured = {}
     monkeypatch.setattr(
-        "nl2sql_cli.main.setup_command", lambda **kwargs: captured.update(kwargs)
+        "nl2sql.cli.main.setup_command", lambda **kwargs: captured.update(kwargs)
     )
 
     result = runner.invoke(app, ["setup", "--demo"])
@@ -50,7 +50,7 @@ def test_lite_defaults_to_true_without_docker(monkeypatch):
 def test_docker_flag_disables_lite(monkeypatch):
     captured = {}
     monkeypatch.setattr(
-        "nl2sql_cli.main.setup_command", lambda **kwargs: captured.update(kwargs)
+        "nl2sql.cli.main.setup_command", lambda **kwargs: captured.update(kwargs)
     )
 
     result = runner.invoke(app, ["setup", "--demo", "--docker"])
@@ -61,7 +61,7 @@ def test_docker_flag_disables_lite(monkeypatch):
 
 
 def test_lite_and_docker_together_is_an_error(monkeypatch):
-    monkeypatch.setattr("nl2sql_cli.main.setup_command", lambda **kwargs: None)
+    monkeypatch.setattr("nl2sql.cli.main.setup_command", lambda **kwargs: None)
 
     result = runner.invoke(app, ["setup", "--demo", "--lite", "--docker"])
 

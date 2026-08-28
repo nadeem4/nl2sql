@@ -4,7 +4,7 @@ from nl2sql.configs import AgentConfig, ConfigManager, LLMFileConfig
 from nl2sql.llm import LLMRegistry
 from nl2sql.llm.models import AgentConfig as RegistryAgentConfig
 from nl2sql.secrets import SecretManager
-from nl2sql_cli.generators.llm import LLMGenerator
+from nl2sql.cli.generators.llm import LLMGenerator
 
 
 def test_openrouter_agent_survives_a_generate_then_load_roundtrip(tmp_path, monkeypatch):

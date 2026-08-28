@@ -4,7 +4,7 @@ import pytest
 from typer.testing import CliRunner
 
 from nl2sql.common.settings import settings
-from nl2sql_cli.main import app
+from nl2sql.cli.main import app
 
 runner = CliRunner()
 

@@ -2,7 +2,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from nl2sql_sqlalchemy_adapter.adapter import BaseSQLAlchemyAdapter
+from nl2sql.adapters.sqlalchemy_base.adapter import BaseSQLAlchemyAdapter
 from nl2sql_adapter_sdk.contracts import AdapterRequest
 
 
@@ -27,7 +27,7 @@ class _TestAdapter(BaseSQLAlchemyAdapter):
 def test_execute_rejects_non_sql_requests(monkeypatch):
     # Validates error normalization because callers depend on consistent error codes.
     # Arrange
-    monkeypatch.setattr("nl2sql_sqlalchemy_adapter.adapter.create_engine", lambda *a, **k: MagicMock())
+    monkeypatch.setattr("nl2sql.adapters.sqlalchemy_base.adapter.create_engine", lambda *a, **k: MagicMock())
     adapter = _TestAdapter(
         datasource_id="ds1",
         datasource_engine_type="sqlite",
@@ -45,7 +45,7 @@ def test_execute_rejects_non_sql_requests(monkeypatch):
 def test_execute_rejects_missing_sql(monkeypatch):
     # Validates missing SQL handling because adapter must fail closed safely.
     # Arrange
-    monkeypatch.setattr("nl2sql_sqlalchemy_adapter.adapter.create_engine", lambda *a, **k: MagicMock())
+    monkeypatch.setattr("nl2sql.adapters.sqlalchemy_base.adapter.create_engine", lambda *a, **k: MagicMock())
     adapter = _TestAdapter(
         datasource_id="ds1",
         datasource_engine_type="sqlite",
@@ -63,7 +63,7 @@ def test_execute_rejects_missing_sql(monkeypatch):
 def test_statement_timeout_sets_execution_options(monkeypatch):
     # Validates timeout wiring because queries must honor SLA limits.
     # Arrange
-    monkeypatch.setattr("nl2sql_sqlalchemy_adapter.adapter.create_engine", lambda *a, **k: MagicMock())
+    monkeypatch.setattr("nl2sql.adapters.sqlalchemy_base.adapter.create_engine", lambda *a, **k: MagicMock())
 
     # Act
     adapter = _TestAdapter(

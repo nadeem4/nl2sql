@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from nl2sql_cli.generators.env.generator import EnvFileGenerator
+from nl2sql.cli.generators.env.generator import EnvFileGenerator
 
 
 def test_demo_env_selects_local_embeddings():

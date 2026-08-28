@@ -4,7 +4,7 @@ import pytest
 from rich.console import Console
 
 from nl2sql.context import NL2SQLContext
-from nl2sql_cli.demo.manager import DemoManager
+from nl2sql.cli.demo.manager import DemoManager
 
 
 @pytest.fixture()
@@ -23,7 +23,7 @@ def test_index_demo_data_hands_a_context_to_run_indexing(demo_project, monkeypat
         captured.append(ctx)
 
     monkeypatch.setattr(
-        "nl2sql_cli.commands.indexing.run_indexing", fake_run_indexing
+        "nl2sql.cli.commands.indexing.run_indexing", fake_run_indexing
     )
 
     assert demo_project.index_demo_data() is True
@@ -35,7 +35,7 @@ def test_index_demo_data_hands_a_context_to_run_indexing(demo_project, monkeypat
 def test_index_demo_data_context_points_at_demo_config(demo_project, monkeypatch, tmp_path):
     captured = []
     monkeypatch.setattr(
-        "nl2sql_cli.commands.indexing.run_indexing", captured.append
+        "nl2sql.cli.commands.indexing.run_indexing", captured.append
     )
 
     assert demo_project.index_demo_data() is True

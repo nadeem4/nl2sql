@@ -6,7 +6,7 @@ from nl2sql.datasources.registry import DatasourceRegistry
 from nl2sql.datasources.models import DatasourceConfig, ConnectionConfig
 from nl2sql.secrets.manager import SecretManager
 from nl2sql_adapter_sdk.contracts import AdapterRequest, ResultFrame
-from nl2sql_sqlite.adapter import SqliteAdapter
+from nl2sql.adapters.sqlite.adapter import SqliteAdapter
 
 
 def test_core_registry_registers_adapter_and_executes_contract(monkeypatch):
@@ -16,7 +16,7 @@ def test_core_registry_registers_adapter_and_executes_contract(monkeypatch):
         "nl2sql.datasources.registry.discover_adapters",
         lambda: {"sqlite": SqliteAdapter},
     )
-    monkeypatch.setattr("nl2sql_sqlite.adapter.create_engine", lambda *a, **k: MagicMock())
+    monkeypatch.setattr("nl2sql.adapters.sqlite.adapter.create_engine", lambda *a, **k: MagicMock())
 
     registry = DatasourceRegistry(SecretManager())
     config = DatasourceConfig(

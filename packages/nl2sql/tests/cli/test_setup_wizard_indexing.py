@@ -8,7 +8,7 @@ import pytest
 
 from nl2sql.common.settings import settings
 from nl2sql.context import NL2SQLContext
-from nl2sql_cli.commands import setup as wizard
+from nl2sql.cli.commands import setup as wizard
 
 
 @pytest.fixture()
@@ -76,7 +76,7 @@ def wizard_project(tmp_path, monkeypatch):
 def test_wizard_indexing_hands_a_context_to_run_indexing(wizard_project, monkeypatch):
     captured = []
     monkeypatch.setattr(
-        "nl2sql_cli.commands.indexing.run_indexing", captured.append
+        "nl2sql.cli.commands.indexing.run_indexing", captured.append
     )
     monkeypatch.setattr(wizard.inquirer, "confirm", _always_yes)
 
@@ -93,7 +93,7 @@ def test_wizard_indexing_hands_a_context_to_run_indexing(wizard_project, monkeyp
 def test_wizard_skips_indexing_when_declined(wizard_project, monkeypatch):
     captured = []
     monkeypatch.setattr(
-        "nl2sql_cli.commands.indexing.run_indexing", captured.append
+        "nl2sql.cli.commands.indexing.run_indexing", captured.append
     )
     monkeypatch.setattr(wizard.inquirer, "confirm", _always_no)
 

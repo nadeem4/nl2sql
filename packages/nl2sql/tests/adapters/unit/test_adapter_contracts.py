@@ -6,10 +6,10 @@ from pydantic import SecretStr
 
 from nl2sql_adapter_sdk.protocols import DatasourceAdapterProtocol
 from nl2sql_adapter_sdk.capabilities import DatasourceCapability
-from nl2sql_mssql.adapter import MssqlAdapter
-from nl2sql_mysql.adapter import MysqlAdapter
-from nl2sql_postgres.adapter import PostgresAdapter
-from nl2sql_sqlite.adapter import SqliteAdapter
+from nl2sql.adapters.mssql.adapter import MssqlAdapter
+from nl2sql.adapters.mysql.adapter import MysqlAdapter
+from nl2sql.adapters.postgres.adapter import PostgresAdapter
+from nl2sql.adapters.sqlite.adapter import SqliteAdapter
 
 from ..contract_harness import (
     build_adapter,
@@ -23,13 +23,13 @@ ADAPTER_SPECS = [
     (
         "sqlite",
         SqliteAdapter,
-        "nl2sql_sqlite.adapter",
+        "nl2sql.adapters.sqlite.adapter",
         {"type": "sqlite", "database": ":memory:"},
     ),
     (
         "postgres",
         PostgresAdapter,
-        "nl2sql_postgres.adapter",
+        "nl2sql.adapters.postgres.adapter",
         {
             "type": "postgres",
             "host": "localhost",
@@ -41,7 +41,7 @@ ADAPTER_SPECS = [
     (
         "mysql",
         MysqlAdapter,
-        "nl2sql_mysql.adapter",
+        "nl2sql.adapters.mysql.adapter",
         {
             "type": "mysql",
             "host": "localhost",
@@ -53,7 +53,7 @@ ADAPTER_SPECS = [
     pytest.param(
         "mssql",
         MssqlAdapter,
-        "nl2sql_mssql.adapter",
+        "nl2sql.adapters.mssql.adapter",
         {"type": "mssql", "host": "localhost", "database": "db"},
         marks=pytest.mark.skipif(
             importlib.util.find_spec("pyodbc") is None,
