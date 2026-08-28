@@ -297,9 +297,12 @@ services:
       interval: 5s
       retries: 5
 
+  # Opt-in: `docker compose --profile mssql up`. The image is a ~1.6 GB pull, so
+  # the default stack leaves it out. Nothing outside this profile depends on it.
   manufacturing_history:
     image: mcr.microsoft.com/mssql/server:2022-latest
     container_name: manufacturing_history
+    profiles: ["mssql"]
     ports:
       - "1434:1433"
     environment:
@@ -310,4 +313,24 @@ services:
     command: /bin/bash -c "/opt/mssql/bin/sqlservr & sleep 20 && /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P '${DEMO_MSSQL_SA_PASSWORD}' -i /init.sql -v HISTORY_USER='${DEMO_HISTORY_USER}' HISTORY_PASS='${DEMO_HISTORY_PASSWORD}' && wait"
     volumes:
       - ./init_history.sql:/init.sql
+
+  app:
+    build:
+      context: ..
+      dockerfile: packages/api/Dockerfile
+    container_name: nl2sql_app
+    ports:
+      - "8000:8000"
+    env_file:
+      - ../.env.demo
+    volumes:
+      - ../configs:/app/configs
+      - ../data:/app/data
+    depends_on:
+      manufacturing_ref:
+        condition: service_healthy
+      manufacturing_ops:
+        condition: service_healthy
+      manufacturing_supply:
+        condition: service_healthy
 """

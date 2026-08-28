@@ -7,26 +7,22 @@ Use this path when you want the HTTP API only.
 From the repo root:
 
 ```bash
-# Dev image (local source)
-docker build -f packages/api/Dockerfile.dev -t nl2sql-api-dev .
-
-# PyPI image (stable releases)
 docker build -f packages/api/Dockerfile -t nl2sql-api .
 ```
 
-## Install adapters
+The image installs the local packages from the build context -
+`packages/adapter-sdk`, `packages/nl2sql[postgres,mysql]` and `packages/api` - so
+the build context has to be the repo root.
 
-You choose adapters at build time:
+## Adapters
 
-```bash
-docker build -f packages/api/Dockerfile --build-arg NL2SQL_EXTRAS=postgres -t nl2sql-api .
-```
+The image ships the Postgres and MySQL drivers. Every dialect adapter is part of
+the `nl2sql` distribution; an extra only adds the driver it needs, so add another
+extra to the `pip install` line in `packages/api/Dockerfile` to include one -
+for example `"./packages/nl2sql[postgres,mysql,mssql]"`.
 
-For dev images:
-
-```bash
-docker build -f packages/api/Dockerfile.dev --build-arg NL2SQL_EXTRAS=all -t nl2sql-api-dev .
-```
+The demo stack builds this same image as its `app` service - see
+[Demo data](demo.md#the-docker-demo-stack).
 
 ## Run the API
 

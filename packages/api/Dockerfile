@@ -1,3 +1,7 @@
+# Builds the API image from this repository.
+#
+# Build context is the repo root:
+#   docker build -f packages/api/Dockerfile -t nl2sql-api .
 FROM python:3.11-slim
 
 WORKDIR /app
@@ -5,14 +9,15 @@ WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
-ARG NL2SQL_EXTRAS=""
+COPY ./packages/adapter-sdk /app/packages/adapter-sdk
+COPY ./packages/nl2sql /app/packages/nl2sql
+COPY ./packages/api /app/packages/api
 
 RUN pip install --no-cache-dir -U pip setuptools wheel \
-    && if [ -n "$NL2SQL_EXTRAS" ]; then \
-        pip install --no-cache-dir "nl2sql[$NL2SQL_EXTRAS]" nl2sql-api; \
-       else \
-        pip install --no-cache-dir nl2sql nl2sql-api; \
-       fi
+    && pip install --no-cache-dir \
+        ./packages/adapter-sdk \
+        "./packages/nl2sql[postgres,mysql]" \
+        ./packages/api
 
 EXPOSE 8000
 
