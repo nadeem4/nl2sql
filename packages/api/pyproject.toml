@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nl2sql-api"
-version = "0.1.0" # x-release-please-version
+version = "1.0.0" # x-release-please-version
 description = "API layer for NL2SQL engine"
 requires-python = ">=3.9"
 dependencies = [
