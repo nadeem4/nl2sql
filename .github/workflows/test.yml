@@ -23,11 +23,13 @@ jobs:
 
       # The mssql and mysql extras are omitted on purpose: they pull in
       # pyodbc / pymssql, which need system database drivers. Their adapters
-      # still ship in the nl2sql package; only the drivers are absent.
+      # still ship in the nl2sql package; only the drivers are absent. The
+      # duckdb extra is installed because the DuckDB adapter tests run against
+      # a real in-memory database and would fail without duckdb-engine.
       - name: Install packages
         run: |
           python -m pip install --upgrade pip
-          pip install -e packages/adapter-sdk -e "packages/nl2sql[postgres]" -e packages/api pytest pytest-randomly
+          pip install -e packages/adapter-sdk -e "packages/nl2sql[postgres,duckdb]" -e packages/api pytest pytest-randomly
 
       # Anything needing generated demo data or a downloaded model is marked
       # `integration` and runs in the job below. Only the four modules whose
@@ -54,7 +56,7 @@ jobs:
       - name: Install packages
         run: |
           python -m pip install --upgrade pip
-          pip install -e packages/adapter-sdk -e "packages/nl2sql[postgres]" -e packages/api pytest pytest-randomly
+          pip install -e packages/adapter-sdk -e "packages/nl2sql[postgres,duckdb]" -e packages/api pytest pytest-randomly
 
       # all-MiniLM-L6-v2 is ~79 MB and immutable, so a fixed key is correct: a
       # hit skips the download entirely, and there is nothing to invalidate.

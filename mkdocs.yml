@@ -90,6 +90,7 @@ nav:
     - SDK Reference: adapters/sdk.md
     - SQLAlchemy Reference: adapters/sqlalchemy.md
     - Building Adapters: adapters/development.md
+    - DuckDB: adapters/duckdb.md
     - Microsoft SQL Server: adapters/mssql.md
     - MySQL: adapters/mysql.md
     - PostgreSQL: adapters/postgres.md

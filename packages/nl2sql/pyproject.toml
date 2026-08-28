@@ -41,6 +41,7 @@ dependencies = [
 [project.optional-dependencies]
 aws = ["boto3"]
 azure = ["azure-identity", "azure-keyvault-secrets"]
+duckdb = ["duckdb", "duckdb-engine"]
 hashicorp = ["hvac"]
 mssql = [
     "pyodbc>=4.0.0",
@@ -49,6 +50,8 @@ mssql = [
 mysql = ["pymysql>=1.1.0"]
 postgres = ["psycopg2-binary>=2.9"]
 all = [
+    "duckdb",
+    "duckdb-engine",
     "pyodbc>=4.0.0",
     "pymssql>=2.2.0; platform_system=='Linux'",
     "pymysql>=1.1.0",
@@ -59,6 +62,7 @@ all = [
 nl2sql = "nl2sql.cli.main:main"
 
 [project.entry-points."nl2sql.adapters"]
+duckdb = "nl2sql.adapters.duckdb.adapter:DuckdbAdapter"
 mssql = "nl2sql.adapters.mssql.adapter:MssqlAdapter"
 mysql = "nl2sql.adapters.mysql.adapter:MysqlAdapter"
 postgres = "nl2sql.adapters.postgres.adapter:PostgresAdapter"

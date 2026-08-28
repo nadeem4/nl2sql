@@ -15,6 +15,7 @@ pip install "nl2sql[all]"
 # Core with selected adapters
 pip install "nl2sql[postgres]"
 pip install "nl2sql[mysql,mssql]"
+pip install "nl2sql[duckdb]"
 ```
 
 ## Configure
