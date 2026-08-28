@@ -125,7 +125,10 @@ class ConfigManager:
             
         try:
             content = target_path.read_text(encoding="utf-8")
-            raw = yaml.safe_load(content) or []
+            # An empty file parses as None. Fall back to a mapping, not a
+            # list: the envelope is a mapping, and `or []` made an empty file
+            # fail with a misleading "should be a valid dictionary".
+            raw = yaml.safe_load(content) or {}
             
             file_config = SecretsFileConfig.model_validate(raw)
             return file_config.providers

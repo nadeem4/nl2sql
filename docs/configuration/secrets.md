@@ -13,6 +13,10 @@ providers:
     region_name: "us-east-1"
 ```
 
+`providers` may be omitted, left empty, or have every entry commented out. All
+three mean "no secret providers configured" and load without error, which is
+why the shipped `configs/secrets.yaml` is usable as-is.
+
 ## Providers
 
 Each provider has:
