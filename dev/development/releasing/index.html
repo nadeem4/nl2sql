@@ -1860,7 +1860,7 @@ owns both. The one manual step is <strong>merging the release pull request</stro
     TAG --&gt; B[publish_pypi.yaml: build 3 dists]
     B --&gt; S{wheels install and import?}
     S --&gt;|no| STOP[Nothing is published]
-    S --&gt;|yes| PY[PyPI via trusted publishing]
+    S --&gt;|yes| PY[PyPI via trusted publishing:&lt;br/&gt;one job per package,&lt;br/&gt;one environment each]
     PY --&gt; GH[ghcr.io/nadeem4/nl2sql-api]
     PY --&gt; D[mike deploy: versioned docs]</code></pre>
 <h3 id="1-commit-messages-decide-the-version">1. Commit messages decide the version</h3>
@@ -1958,15 +1958,20 @@ changelog and the version it proposes is the release decision.</p>
    <code>nl2sql --help</code>. These are the same commands as the <code>build</code> job in
    <code>test.yml</code>.</li>
 <li><strong><code>pypi</code></strong> — <code>needs: build</code>, so a wheel that does not install or import
-   fails the gate and this never runs. Uploads all three distributions with
-   <code>pypa/gh-action-pypi-publish</code>.</li>
-<li><strong><code>ghcr</code></strong> — <code>needs: pypi</code>. Builds <code>packages/api/Dockerfile</code> and pushes
-   <code>ghcr.io/nadeem4/nl2sql-api</code> at both the tag and <code>latest</code>. It has to follow
-   the PyPI upload because that Dockerfile installs <code>nl2sql-engine</code> and <code>nl2sql-api</code>
-   from PyPI.</li>
-<li><strong><code>docs</code></strong> — <code>needs: pypi</code>. <code>mike deploy --push --update-aliases $TAG latest</code>
-   adds a versioned copy of the docs to <code>gh-pages</code> and moves the <code>latest</code> alias
-   onto it.</li>
+   fails the gate and this never runs. It is a matrix job with one leg per
+   package: each leg runs in its own GitHub Environment
+   (<code>pypi-nl2sql-engine</code>, <code>pypi-nl2sql-api</code>, <code>pypi-nl2sql-adapter-sdk</code>),
+   stages only that package's sdist and wheel into an <code>upload/</code> directory and
+   points <code>pypa/gh-action-pypi-publish</code> at it. One environment per package is
+   what makes each PyPI trusted-publisher registration unique — see
+   <a href="#pypi-pending-publishers">PyPI pending publishers</a>.</li>
+<li><strong><code>ghcr</code></strong> — <code>needs: pypi</code>, which waits for every leg of the matrix. Builds
+   <code>packages/api/Dockerfile</code> and pushes <code>ghcr.io/nadeem4/nl2sql-api</code> at both the
+   tag and <code>latest</code>. It has to follow the PyPI upload because that Dockerfile
+   installs <code>nl2sql-engine</code> and <code>nl2sql-api</code> from PyPI.</li>
+<li><strong><code>docs</code></strong> — <code>needs: pypi</code>, likewise after all three uploads.
+   <code>mike deploy --push --update-aliases $TAG latest</code> adds a versioned copy of
+   the docs to <code>gh-pages</code> and moves the <code>latest</code> alias onto it.</li>
 </ol>
 <p>Authentication is PyPI <strong>trusted publishing</strong> (OIDC, <code>id-token: write</code>). There
 is no API token anywhere in the workflow and no secret to rotate.</p>
@@ -2008,9 +2013,47 @@ workflow it will accept uploads from. For a project that does not exist on PyPI
 yet this is a <strong>pending publisher</strong>, created at
 <a href="https://pypi.org/manage/account/publishing/">pypi.org/manage/account/publishing</a>.</p>
 <p>Add one for each of the three names — <code>nl2sql-engine</code>, <code>nl2sql-api</code> and
-<code>nl2sql-adapter-sdk</code> — all with the same values. The engine publishes as
-<code>nl2sql-engine</code> because the <code>nl2sql</code> name on PyPI is already taken by an
-unrelated project; the import package is still <code>nl2sql</code>.</p>
+<code>nl2sql-adapter-sdk</code>. The engine publishes as <code>nl2sql-engine</code> because the
+<code>nl2sql</code> name on PyPI is already taken by an unrelated project; the import
+package is still <code>nl2sql</code>.</p>
+<div class="admonition warning">
+<p class="admonition-title">The environment name is required and differs per package</p>
+<p>PyPI keys a pending publisher on the tuple <strong>(owner, repository, workflow,
+environment)</strong> and requires that tuple to be unique. All three of our
+projects publish from the same owner, the same repository and the same
+workflow file, so with the environment left blank all three tuples are
+identical: the first registration succeeds and the next two are rejected
+with <em>"A pending trusted publisher matching this configuration has already
+been registered for a different project name."</em></p>
+<p>The environment is therefore the only field that can distinguish them, and
+<code>publish_pypi.yaml</code> gives each package its own. <strong>Fill it in exactly as
+below</strong> — these strings are the contract between the workflow and PyPI, and
+a mismatch fails the upload with an OIDC error rather than a helpful one.</p>
+</div>
+<p>Owner <code>nadeem4</code>, repository <code>nl2sql</code> and workflow <code>publish_pypi.yaml</code> are the
+same on all three entries. Only the project name and the environment differ:</p>
+<table>
+<thead>
+<tr>
+<th>PyPI Project Name</th>
+<th>Environment name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>nl2sql-engine</code></td>
+<td><code>pypi-nl2sql-engine</code></td>
+</tr>
+<tr>
+<td><code>nl2sql-api</code></td>
+<td><code>pypi-nl2sql-api</code></td>
+</tr>
+<tr>
+<td><code>nl2sql-adapter-sdk</code></td>
+<td><code>pypi-nl2sql-adapter-sdk</code></td>
+</tr>
+</tbody>
+</table>
 <table>
 <thead>
 <tr>
@@ -2019,10 +2062,6 @@ unrelated project; the import package is still <code>nl2sql</code>.</p>
 </tr>
 </thead>
 <tbody>
-<tr>
-<td>PyPI Project Name</td>
-<td><code>nl2sql-engine</code> / <code>nl2sql-api</code> / <code>nl2sql-adapter-sdk</code></td>
-</tr>
 <tr>
 <td>Owner</td>
 <td><code>nadeem4</code></td>
@@ -2037,16 +2076,20 @@ unrelated project; the import package is still <code>nl2sql</code>.</p>
 </tr>
 <tr>
 <td>Environment name</td>
-<td><em>(leave empty)</em></td>
+<td>per the table above — <strong>never blank</strong></td>
 </tr>
 </tbody>
 </table>
+<p>The environments do not need to be created by hand. Referencing them in
+<code>publish_pypi.yaml</code> is enough for GitHub to create them on the first run, after
+which they appear under <strong>Settings → Environments</strong> and can be given reviewers
+or branch rules if the release should be gated further.</p>
 <p>Once a name has published for the first time, its pending publisher becomes an
 ordinary trusted publisher on the project. <strong>Do not create an API token and do
 not add a <code>password</code> to the publish step</strong> — the workflow authenticates with
 OIDC and adding a token secret would only widen the blast radius.</p>
-<p>Renaming <code>publish_pypi.yaml</code> breaks publishing until the publisher entries are
-updated to match.</p>
+<p>Renaming <code>publish_pypi.yaml</code>, or renaming an environment in it, breaks
+publishing until the publisher entries are updated to match.</p>
 <h3 id="ghcr-package-visibility">GHCR package visibility</h3>
 <p>The first push creates <code>ghcr.io/nadeem4/nl2sql-api</code> as a <strong>private</strong> package.
 Make it public under the repository's <em>Packages</em> settings if the image is meant
@@ -2060,10 +2103,10 @@ fails with <code>GitHub Actions is not permitted to create or approve pull
 requests</code>, so the release pull request never appears and nothing can be merged
 or tagged.</p>
 <h2 id="package-order">Package order</h2>
-<p>The single upload step sends all three distributions together, so ordering is
-usually not something you manage. It matters when an upload partially fails and
-you re-publish by hand: release in dependency order so no package is ever on
-PyPI referencing a version of its dependency that is not.</p>
+<p>The three matrix legs run in parallel, so ordering is not something the
+workflow manages. It matters when one leg fails and you re-publish by hand:
+release in dependency order so no package is ever on PyPI referencing a version
+of its dependency that is not.</p>
 <pre class="mermaid"><code>flowchart TD
     SDK[nl2sql-adapter-sdk] --&gt; CORE[nl2sql-engine]
     CORE --&gt; API[nl2sql-api]</code></pre>
