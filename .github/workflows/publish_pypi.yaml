@@ -121,9 +121,16 @@ jobs:
         with:
           packages-dir: upload/
 
-  # packages/api/Dockerfile installs nl2sql and nl2sql-api from PyPI, so this
-  # has to follow the upload rather than run beside it. `needs: pypi` waits for
-  # every leg of the matrix, so all three uploads are done before this starts.
+  # packages/api/Dockerfile installs nl2sql-adapter-sdk, nl2sql-engine and
+  # nl2sql-api from the local sources, not from PyPI, and its COPY paths are
+  # written relative to the repository root (`./packages/...`). COPY resolves
+  # against the build context, so the context must be the repo root and the
+  # Dockerfile has to be named explicitly with `file:`. Pointing `context` at
+  # packages/api is what broke v0.1.0: buildx looked for
+  # packages/api/packages/adapter-sdk and failed with "not found".
+  #
+  # `needs: pypi` is kept so the image is only published for a release that
+  # actually made it onto PyPI; the build itself no longer depends on it.
   ghcr:
     needs: pypi
     runs-on: ubuntu-latest
@@ -145,7 +152,8 @@ jobs:
       - name: Build and push the API image
         uses: docker/build-push-action@v6
         with:
-          context: packages/api
+          context: .
+          file: packages/api/Dockerfile
           push: true
           tags: |
             ghcr.io/nadeem4/nl2sql-api:${{ inputs.tag || github.ref_name }}
