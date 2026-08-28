@@ -1328,6 +1328,37 @@
 </nav>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="#troubleshooting-the-release-pr-merges-but-nothing-is-tagged">
+<span class="md-ellipsis">
+      
+        Troubleshooting: the release PR merges but nothing is tagged
+      
+    </span>
+</a>
+<nav aria-label="Troubleshooting: the release PR merges but nothing is tagged" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#the-component-mismatch">
+<span class="md-ellipsis">
+      
+        The component mismatch
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#manifest-seeding">
+<span class="md-ellipsis">
+      
+        Manifest seeding
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="#documentation-versions">
 <span class="md-ellipsis">
       
@@ -1842,6 +1873,37 @@
 </nav>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="#troubleshooting-the-release-pr-merges-but-nothing-is-tagged">
+<span class="md-ellipsis">
+      
+        Troubleshooting: the release PR merges but nothing is tagged
+      
+    </span>
+</a>
+<nav aria-label="Troubleshooting: the release PR merges but nothing is tagged" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#the-component-mismatch">
+<span class="md-ellipsis">
+      
+        The component mismatch
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#manifest-seeding">
+<span class="md-ellipsis">
+      
+        Manifest seeding
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="#documentation-versions">
 <span class="md-ellipsis">
       
@@ -2113,6 +2175,62 @@ last release.</p>
 gain one. Use the commit footer, which cannot be forgotten because it does
 not persist.</p>
 </div>
+<h2 id="troubleshooting-the-release-pr-merges-but-nothing-is-tagged">Troubleshooting: the release PR merges but nothing is tagged</h2>
+<p>Both traps below fail the same way. <code>release_please.yml</code> reports success, no tag
+appears, and the merged release pull request keeps its <code>autorelease: pending</code>
+label — so every later run refuses to open a new release PR:</p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-3-1" id="__codelineno-3-1" name="__codelineno-3-1"></a>There are untagged, merged release PRs outstanding - aborting
+</code></pre></div>
+<p>That line is a <em>consequence</em>, not a diagnosis. The cause is earlier in the same
+run, in the <code>Building releases</code> phase.</p>
+<h3 id="the-component-mismatch">The component mismatch</h3>
+<p>Symptom, in the <code>Building releases</code> phase of the run log:</p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-4-1" id="__codelineno-4-1" name="__codelineno-4-1"></a>PR component: undefined does not match configured component: nl2sql-engine
+</code></pre></div>
+<p>With <code>separate-pull-requests: false</code> the Merge plugin names the grouped release
+branch <code>release-please--branches--main</code>, with no component in it. When the
+release is built back out of that merged PR, release-please compares the
+branch's component against <code>getBranchComponent()</code> — which returns the configured
+component <strong>regardless of <code>include-component-in-tag</code></strong>, unlike <code>getComponent()</code>,
+which honours it:</p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-5-1" id="__codelineno-5-1" name="__codelineno-5-1"></a><span class="k">async</span><span class="w"> </span><span class="nx">getComponent</span><span class="p">()</span><span class="w">       </span><span class="p">{</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="k">this</span><span class="p">.</span><span class="nx">includeComponentInTag</span><span class="p">)</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="s1">''</span><span class="p">;</span><span class="w"> </span><span class="p">...</span><span class="w"> </span><span class="p">}</span><span class="w">  </span><span class="c1">// ""</span>
+<a href="#__codelineno-5-2" id="__codelineno-5-2" name="__codelineno-5-2"></a><span class="k">async</span><span class="w"> </span><span class="nx">getBranchComponent</span><span class="p">()</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="k">this</span><span class="p">.</span><span class="nx">component</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="p">...;</span><span class="w"> </span><span class="p">}</span><span class="w">                    </span><span class="c1">// "nl2sql-engine"</span>
+</code></pre></div>
+<p>A <code>package-name</code> on the <code>packages</code> entry is what supplies that component. The
+two disagree, the release is skipped, and no tag is created.</p>
+<p>The fix is to carry <strong>no <code>package-name</code></strong> for the root package. It was inert
+otherwise: the <code>python</code> strategy takes its project name from the root
+<code>pyproject.toml</code> (<code>projectName = pyProject.name</code>), not from that key, so the set
+of files release-please updates is unchanged.</p>
+<div class="admonition danger">
+<p class="admonition-title">The <code>pullRequestTitlePattern</code> warnings are noise, not the cause</p>
+<p>The same run also logs, repeatedly:</p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-6-1" id="__codelineno-6-1" name="__codelineno-6-1"></a>pullRequestTitlePattern miss the part of '${scope}'
+<a href="#__codelineno-6-2" id="__codelineno-6-2" name="__codelineno-6-2"></a>pullRequestTitlePattern miss the part of '${component}'
+<a href="#__codelineno-6-3" id="__codelineno-6-3" name="__codelineno-6-3"></a>pullRequestTitlePattern miss the part of '${version}'
+</code></pre></div>
+<p>These fire unconditionally whenever a title pattern omits a placeholder, and
+the built-in grouped-PR default — <code>chore: release ${branch}</code>, which renders
+as <code>chore: release main</code> — omits all three. They appear on healthy runs too.</p>
+<p>A missing <code>${version}</code> in the title is <strong>not</strong> fatal. Release-please falls
+back to the pull request body, whose <code>&lt;summary&gt;</code> block carries the version;
+the documentation says it parses the version <em>"either via the pull request
+title or body format"</em>.</p>
+<p>Setting <code>group-pull-request-title-pattern</code> to add <code>${version}</code> does not fix
+the mismatch above, and it breaks that body fallback for any release PR
+already merged under the old title (<code>Bad pull request title: 'chore: release
+main'</code>), stranding that version permanently. Reading these warnings as the
+cause cost a release cycle.</p>
+</div>
+<h3 id="manifest-seeding">Manifest seeding</h3>
+<p><code>.release-please-manifest.json</code> records the <strong>last released</strong> version, not the
+next one, so it must be seeded <em>below</em> the first version to be shipped:</p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-7-1" id="__codelineno-7-1" name="__codelineno-7-1"></a><span class="p">{</span><span class="w"> </span><span class="nt">"."</span><span class="p">:</span><span class="w"> </span><span class="s2">"0.0.0"</span><span class="w"> </span><span class="p">}</span>
+</code></pre></div>
+<p>Seeding it at the target instead — <code>{".": "0.1.0"}</code> while a <code>Release-As: 0.1.0</code>
+footer pins the same value — makes the first release a no-op: release-please
+treats the version it would propose as already released, so the pull request it
+opens rewrites <code>CHANGELOG.md</code> and bumps nothing. This also cost a cycle.</p>
 <h2 id="documentation-versions">Documentation versions</h2>
 <p><code>gh-pages</code> is managed by <code>mike</code>, which keeps one built site per version:</p>
 <table>
