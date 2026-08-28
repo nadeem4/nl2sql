@@ -26,7 +26,7 @@ jobs:
 
     - name: Build all distributions
       run: |
-        for pkg in packages/adapter-sdk packages/adapter-sqlalchemy packages/core packages/cli packages/api packages/adapters/mssql packages/adapters/mysql packages/adapters/postgres packages/adapters/sqlite; do
+        for pkg in packages/adapter-sdk packages/nl2sql packages/api; do
           python -m build "$pkg" --outdir dist
         done
 
