@@ -10,12 +10,10 @@ from nl2sql_adapter_sdk.capabilities import DatasourceCapability
 from nl2sql.datasources import DatasourceRegistry
 from nl2sql_adapter_sdk.contracts import AdapterRequest
 
-from .base import ExecutorService
-
 logger = get_logger("sql_executor")
 
 
-class SqlExecutorService(ExecutorService):
+class SqlExecutorService:
     def __init__(self, ds_registry: DatasourceRegistry):
         self.ds_registry = ds_registry
         self.artifact_store = build_artifact_store()

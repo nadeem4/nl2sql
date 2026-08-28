@@ -149,7 +149,7 @@ See `../failure_recovery.md` for retry scope and recovery behavior.
 ## Extension Points
 
 - Modify `build_sql_agent_graph()` to insert, remove, or rewire nodes and edges.
-- Add new subgraphs by registering additional `SubgraphSpec` entries in `build_subgraph_registry()`.
+- Add new subgraphs by constructing them in `build_graph()` and extending `resolve_subgraph()` with their required capabilities.
 - Replace node implementations via dependency injection in `NL2SQLContext`.
 
 ---
@@ -165,7 +165,7 @@ See `../failure_recovery.md` for retry scope and recovery behavior.
 ## Related Code
 
 - Subgraph definition: `packages/core/src/nl2sql/pipeline/subgraphs/sql_agent.py`
-- Subgraph registry: `packages/core/src/nl2sql/pipeline/subgraphs/registry.py`
+- Subgraph selection: `packages/core/src/nl2sql/pipeline/graph_utils.py`
 - State model: `packages/core/src/nl2sql/pipeline/state.py`
 - Node implementations:
   - `packages/core/src/nl2sql/pipeline/nodes/schema_retriever/node.py`

@@ -34,7 +34,7 @@ Failure in this system is represented as structured `PipelineError` objects accu
 
 ### Storage
 - Schema store uses SQLite or in-memory storage; failures manifest as exceptions on read/write (not caught in callers).
-- Artifact store is invoked by the SQL executor; aggregation loads artifacts via `AggregationEngine.load_scan()` using `ArtifactRef` URIs. A single store serves the local, S3, and ADLS backends; only local is verified against real storage (see `../storage/artifact-store.md`).
+- Artifact store is invoked by the SQL executor; aggregation loads artifacts via `PolarsDuckdbEngine.load_scan()` using `ArtifactRef` URIs. A single store serves the local, S3, and ADLS backends; only local is verified against real storage (see `../storage/artifact-store.md`).
 - Result store and execution store are in-memory only and not used for recovery.
 
 ---

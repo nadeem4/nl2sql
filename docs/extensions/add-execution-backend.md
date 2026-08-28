@@ -1,6 +1,7 @@
 # Adding an Execution Backend
 
-Execution backends are implemented as `ExecutorService` instances and registered in `ExecutorRegistry`.
+`SqlExecutorService` is the only execution backend. `ExecutorNode` constructs it
+directly and gates it on the datasource declaring `supports_sql`.
 
 ## 1. Implement the executor service
 
@@ -11,17 +12,22 @@ Create a class that implements:
 
 Use `ExecutorRequest`/`ExecutorResponse` as the contract.
 
-## 2. Register the executor
+## 2. Wire the executor
 
-Register the executor in `ExecutorRegistry` for a capability key. The registry will select executors based on datasource capabilities.
+Construct the executor in `ExecutorNode.__init__` and select it in `__call__`
+based on the adapter's capabilities. `ExecutorNode._supports_sql()` shows the
+existing check: a datasource whose adapter does not declare the required
+capability must get no executor rather than being run anyway.
 
 ## 3. Update routing (if needed)
 
-If a new subgraph is required for the backend, add a subgraph spec in:
+If a new subgraph is required for the backend, add it as a node in:
 
-- `packages/core/src/nl2sql/pipeline/subgraphs/registry.py`
+- `packages/core/src/nl2sql/pipeline/graph.py`
 
-Ensure its `required_capabilities` match the adapter’s advertised capabilities.
+and extend `resolve_subgraph()` in
+`packages/core/src/nl2sql/pipeline/graph_utils.py` so the capabilities it
+requires match the adapter's advertised capabilities.
 
 ## 4. Artifact handling
 
@@ -32,6 +38,6 @@ If the backend returns tabular results:
 
 ## Source references
 
-- Executor service base: `packages/core/src/nl2sql/execution/executor/base.py`
-- Executor registry: `packages/core/src/nl2sql/execution/executor/registry.py`
+- SQL executor: `packages/core/src/nl2sql/execution/executor/sql_executor.py`
+- Executor node: `packages/core/src/nl2sql/pipeline/nodes/executor/node.py`
 - Executor contracts: `packages/core/src/nl2sql/execution/contracts.py`
