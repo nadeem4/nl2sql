@@ -16,7 +16,7 @@ flowchart TD
     C[Conventional Commit merged to main] --> RP[release_please.yml]
     RP --> PR[Release PR: CHANGELOG.md + version bumps]
     PR -->|a human merges it| TAG[Tag vX.Y.Z + GitHub Release]
-    TAG --> B[publish_pypi.yaml: build 3 dists]
+    TAG -->|release_please.yml calls it with tag_name<br/>the tag itself cannot trigger it| B[publish_pypi.yaml: build 3 dists]
     B --> S{wheels install and import?}
     S -->|no| STOP[Nothing is published]
     S -->|yes| PY[PyPI via trusted publishing:<br/>one job per package,<br/>one environment each]
@@ -91,9 +91,9 @@ release-please create the `vX.Y.Z` tag and publish the GitHub Release. Until
 someone merges it, nothing is tagged and nothing is published. Reviewing the
 changelog and the version it proposes is the release decision.
 
-### 4. The tag publishes everything
+### 4. The release publishes everything
 
-`publish_pypi.yaml` triggers on `push: tags: ["v*"]` and runs four jobs:
+`publish_pypi.yaml` runs four jobs:
 
 1. **`build`** — builds sdists and wheels for all three packages, then
    smoke-installs them into a clean virtualenv and runs `import nl2sql` and
@@ -117,6 +117,62 @@ changelog and the version it proposes is the release decision.
 
 Authentication is PyPI **trusted publishing** (OIDC, `id-token: write`). There
 is no API token anywhere in the workflow and no secret to rotate.
+
+### Why the publish is chained to release-please, not to the tag
+
+**GitHub does not trigger workflows from events created with the default
+`GITHUB_TOKEN`.** This is a deliberate recursion guard, and it has no opt-out
+short of pushing the tag with a personal access token instead. release-please
+tags with `GITHUB_TOKEN`, so a `v*` tag it pushes never fires
+`publish_pypi.yaml`'s `push: tags` trigger. This is exactly what happened to
+`v0.1.0`: the tag and the GitHub Release exist, both authored by
+`github-actions[bot]`, and *Publish Release* has no run for them.
+
+Introducing a PAT would defeat the point of trusted publishing, so the publish
+is chained to release-please's own outputs instead. `release_please.yml` gives
+the action step an `id`, re-exports `releases_created` and `tag_name` as job
+outputs, and calls `publish_pypi.yaml` as a **reusable workflow**:
+
+```yaml
+publish:
+  needs: release-please
+  if: ${{ needs.release-please.outputs.releases_created == 'true' }}
+  uses: ./.github/workflows/publish_pypi.yaml
+  with:
+    tag: ${{ needs.release-please.outputs.tag_name }}
+  permissions:
+    contents: write
+    packages: write
+    id-token: write
+```
+
+A called workflow's jobs can never hold more than the calling job grants, so
+`id-token: write` has to appear on the caller for OIDC to reach the `pypi`
+legs. Publishing still lives in `publish_pypi.yaml` — the same filename the
+PyPI trusted publishers are registered against, which is what the `pypi` job's
+OIDC token is checked on — so no publisher entry changes.
+
+`publish_pypi.yaml` keeps its `push: tags: ["v*"]` trigger as well. It costs
+nothing and still covers a tag a human pushes by hand.
+
+### Publishing a release manually
+
+`publish_pypi.yaml` also accepts `workflow_dispatch` with a required `tag`
+input. Use it when a release was tagged but never published — `v0.1.0`, or any
+tag pushed before the chaining above existed:
+
+```console
+$ gh workflow run publish_pypi.yaml -f tag=v0.1.0
+```
+
+or **Actions → Publish Release → Run workflow** and type the tag.
+
+Every job resolves its tag from `${{ inputs.tag || github.ref_name }}`, never
+from the raw ref. On a dispatched run `github.ref_name` is the *branch* you
+dispatched from, so the fallback would silently build `main` instead of the
+release; the input is what makes every checkout, the GHCR image tag and
+`mike deploy` land on the tagged commit. Dispatching is safe to repeat only up
+to the PyPI upload — PyPI rejects a re-upload of a version that already exists.
 
 ## Pinning a version, and the first release
 
@@ -279,7 +335,7 @@ opens rewrites `CHANGELOG.md` and bumps nothing. This also cost a cycle.
 | Version | Deployed by | When |
 | --- | --- | --- |
 | `dev` | `publish_docs.yml` | every push to `main` |
-| `X.Y.Z` + the `latest` alias | `publish_pypi.yaml` | on a release tag |
+| `X.Y.Z` + the `latest` alias | `publish_pypi.yaml` | on a release, or a manual dispatch |
 
 `publish_docs.yml` previously ran `mkdocs gh-deploy --force`, which replaces the
 entire `gh-pages` root and would have wiped every released version on the next
