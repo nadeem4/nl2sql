@@ -11,7 +11,7 @@ In-process analytical adapter for local files and ad-hoc analysis.
 The SQLAlchemy dialect lives in `duckdb-engine`, which ships in its own extra:
 
 ```bash
-pip install "nl2sql[duckdb]"
+pip install "nl2sql-engine[duckdb]"
 ```
 
 ## Configuration

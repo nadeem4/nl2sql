@@ -8,7 +8,7 @@ multi-database scenario with cross-database relationships.
 
 ```bash
 # Install from PyPI
-pip install nl2sql
+pip install nl2sql-engine
 
 # Or install from source (dev)
 pip install -e "packages/nl2sql[all]"

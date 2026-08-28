@@ -19,7 +19,7 @@ class HashiCorpSecretProvider:
         except ImportError:
             self.client = None
             self._available = False
-            logger.warning("HashiCorp Secret Provider initialized but 'hvac' missing. Install 'nl2sql[hashicorp]'.")
+            logger.warning("HashiCorp Secret Provider initialized but 'hvac' missing. Install 'nl2sql-engine[hashicorp]'.")
 
     def get_secret(self, key: str) -> Optional[str]:
         if not self._available or not self.client:

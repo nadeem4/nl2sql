@@ -101,13 +101,13 @@ flowchart TD
 
 ```bash
 # Install core only
-pip install nl2sql
+pip install nl2sql-engine
 
 # Install core with selected adapters
-pip install nl2sql[mysql,mssql]
+pip install nl2sql-engine[mysql,mssql]
 
 # Install core with all adapters
-pip install nl2sql[all]
+pip install nl2sql-engine[all]
 ```
 
 For local development:

@@ -30,7 +30,7 @@ class AzureSecretProvider:
         except ImportError:
             self.client = None
             self._available = False
-            logger.warning("Azure Secret Provider initialized but dependencies missing. Install 'nl2sql[azure]'.")
+            logger.warning("Azure Secret Provider initialized but dependencies missing. Install 'nl2sql-engine[azure]'.")
         except Exception as e:
             self.client = None
             self._available = False
