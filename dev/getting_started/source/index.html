@@ -3824,9 +3824,8 @@
 <a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="nb">source</span><span class="w"> </span>venv/bin/activate
 <a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>
 <a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span>packages/adapter-sdk
-<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span>packages/adapter-sdk
-<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">"packages/nl2sql[postgres]"</span>
-<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span>packages/api
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">"packages/nl2sql[postgres]"</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span>packages/api
 </code></pre></div>
 <p>Add any other adapters you need (mysql, mssql, duckdb, sqlite).</p>
 <h2 id="configuration">Configuration</h2>
@@ -3843,8 +3842,8 @@
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>python<span class="w"> </span>-c<span class="w"> </span><span class="s2">"from nl2sql import NL2SQL; print(NL2SQL().run_query('hello'))"</span>
 </code></pre></div>
 <p>API service (Docker):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>docker<span class="w"> </span>build<span class="w"> </span>-f<span class="w"> </span>packages/api/Dockerfile.dev<span class="w"> </span>--build-arg<span class="w"> </span><span class="nv">NL2SQL_EXTRAS</span><span class="o">=</span>postgres<span class="w"> </span>-t<span class="w"> </span>nl2sql-api-dev<span class="w"> </span>.
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>docker<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>-p<span class="w"> </span><span class="m">8000</span>:8000<span class="w"> </span>nl2sql-api-dev
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>docker<span class="w"> </span>build<span class="w"> </span>-f<span class="w"> </span>packages/api/Dockerfile<span class="w"> </span>-t<span class="w"> </span>nl2sql-api<span class="w"> </span>.
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>docker<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>-p<span class="w"> </span><span class="m">8000</span>:8000<span class="w"> </span>nl2sql-api
 </code></pre></div>
 <p>See <a href="../docker/">Docker (REST API)</a> for adapter extras, environment selection
 and mounting config files.</p>
