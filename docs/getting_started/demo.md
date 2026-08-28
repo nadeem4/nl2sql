@@ -8,10 +8,10 @@ multi-database scenario with cross-database relationships.
 
 ```bash
 # Install from PyPI
-pip install nl2sql-cli
+pip install nl2sql
 
 # Or install from source (dev)
-pip install -e packages/cli
+pip install -e "packages/nl2sql[all]"
 ```
 
 ## 2. Generate demo data with the CLI

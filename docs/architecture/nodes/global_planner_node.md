@@ -6,7 +6,7 @@
 - Creates scan, combine, and post‑combine nodes with explicit edges.
 - Sits between `DecomposerNode` and `layer_router`.
 - Class: `GlobalPlannerNode`
-- Source: `packages/core/src/nl2sql/pipeline/nodes/global_planner/node.py`
+- Source: `packages/nl2sql/src/nl2sql/pipeline/nodes/global_planner/node.py`
 
 ---
 
@@ -160,5 +160,5 @@ Logs failures via `logger.error`.
 
 ## Related Code
 
-- `packages/core/src/nl2sql/pipeline/nodes/global_planner/node.py`
-- `packages/core/src/nl2sql/pipeline/nodes/global_planner/schemas.py`
+- `packages/nl2sql/src/nl2sql/pipeline/nodes/global_planner/node.py`
+- `packages/nl2sql/src/nl2sql/pipeline/nodes/global_planner/schemas.py`

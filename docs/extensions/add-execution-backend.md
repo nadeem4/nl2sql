@@ -23,10 +23,10 @@ capability must get no executor rather than being run anyway.
 
 If a new subgraph is required for the backend, add it as a node in:
 
-- `packages/core/src/nl2sql/pipeline/graph.py`
+- `packages/nl2sql/src/nl2sql/pipeline/graph.py`
 
 and extend `resolve_subgraph()` in
-`packages/core/src/nl2sql/pipeline/graph_utils.py` so the capabilities it
+`packages/nl2sql/src/nl2sql/pipeline/graph_utils.py` so the capabilities it
 requires match the adapter's advertised capabilities.
 
 ## 4. Artifact handling
@@ -38,6 +38,6 @@ If the backend returns tabular results:
 
 ## Source references
 
-- SQL executor: `packages/core/src/nl2sql/execution/executor/sql_executor.py`
-- Executor node: `packages/core/src/nl2sql/pipeline/nodes/executor/node.py`
-- Executor contracts: `packages/core/src/nl2sql/execution/contracts.py`
+- SQL executor: `packages/nl2sql/src/nl2sql/execution/executor/sql_executor.py`
+- Executor node: `packages/nl2sql/src/nl2sql/pipeline/nodes/executor/node.py`
+- Executor contracts: `packages/nl2sql/src/nl2sql/execution/contracts.py`

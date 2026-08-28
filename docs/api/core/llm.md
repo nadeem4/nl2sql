@@ -8,17 +8,17 @@ Configure LLM providers and expose LLM configurations by name.
 - Provide config lookup and listing.
 
 ## Key Modules
-- `packages/core/src/nl2sql/api/llm_api.py`
-- `packages/core/src/nl2sql/llm/registry.py`
-- `packages/core/src/nl2sql/llm/models.py`
-- `packages/core/src/nl2sql/configs/llm.py`
+- `packages/nl2sql/src/nl2sql/api/llm_api.py`
+- `packages/nl2sql/src/nl2sql/llm/registry.py`
+- `packages/nl2sql/src/nl2sql/llm/models.py`
+- `packages/nl2sql/src/nl2sql/configs/llm.py`
 
 ## Public Surface
 
 ### AgentConfig
 
 Source:
-`packages/core/src/nl2sql/configs/llm.py`
+`packages/nl2sql/src/nl2sql/configs/llm.py`
 
 Fields:
 | name | type | required | meaning |
@@ -31,9 +31,9 @@ Fields:
 | `name` | `str` | no | Agent name (default `default`). |
 
 !!! note
-    There is one definition, in `packages/core/src/nl2sql/configs/llm.py`
+    There is one definition, in `packages/nl2sql/src/nl2sql/configs/llm.py`
     (read/written by `ConfigManager` and `LLMGenerator`).
-    `packages/core/src/nl2sql/llm/models.py` re-exports it for `LLMRegistry`,
+    `packages/nl2sql/src/nl2sql/llm/models.py` re-exports it for `LLMRegistry`,
     so `nl2sql.llm.AgentConfig` and `nl2sql.configs.AgentConfig` are the same
     class. It used to be duplicated, and a fix applied to only one copy
     silently did nothing.
@@ -41,7 +41,7 @@ Fields:
 ### LLMFileConfig
 
 Source:
-`packages/core/src/nl2sql/configs/llm.py`
+`packages/nl2sql/src/nl2sql/configs/llm.py`
 
 Fields:
 | name | type | required | meaning |
@@ -53,7 +53,7 @@ Fields:
 ### LLM_API.configure_llm
 
 Source:
-`packages/core/src/nl2sql/api/llm_api.py`
+`packages/nl2sql/src/nl2sql/api/llm_api.py`
 
 Signature:
 `configure_llm(config: Union[AgentConfig, Dict[str, Any]]) -> None`

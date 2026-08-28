@@ -10,15 +10,15 @@ modular APIs through a single class.
 - Provide a single object for application integration.
 
 ## Key Modules
-- `packages/core/src/nl2sql/public_api.py`
-- `packages/core/src/nl2sql/context.py`
+- `packages/nl2sql/src/nl2sql/public_api.py`
+- `packages/nl2sql/src/nl2sql/context.py`
 
 ## Public Surface
 
 ### NL2SQL.__init__
 
 Source:
-`packages/core/src/nl2sql/public_api.py`
+`packages/nl2sql/src/nl2sql/public_api.py`
 
 Signature:
 `NL2SQL(ds_config_path: Optional[Union[str, pathlib.Path]] = None, secrets_config_path: Optional[Union[str, pathlib.Path]] = None, llm_config_path: Optional[Union[str, pathlib.Path]] = None, vector_store_path: Optional[Union[str, pathlib.Path]] = None, policies_config_path: Optional[Union[str, pathlib.Path]] = None)`

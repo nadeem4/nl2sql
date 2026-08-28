@@ -6,7 +6,7 @@
 - Exists to constrain planning to relevant tables/columns while remaining schema‑grounded.
 - Sits at the entry of the SQL agent subgraph.
 - Class: `SchemaRetrieverNode`
-- Source: `packages/core/src/nl2sql/pipeline/nodes/schema_retriever/node.py`
+- Source: `packages/nl2sql/src/nl2sql/pipeline/nodes/schema_retriever/node.py`
 
 ---
 
@@ -156,5 +156,5 @@ Key contracts:
 
 ## Related Code
 
-- `packages/core/src/nl2sql/pipeline/nodes/schema_retriever/node.py`
-- `packages/core/src/nl2sql/indexing/vector_store.py`
+- `packages/nl2sql/src/nl2sql/pipeline/nodes/schema_retriever/node.py`
+- `packages/nl2sql/src/nl2sql/indexing/vector_store.py`

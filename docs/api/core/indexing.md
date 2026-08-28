@@ -8,19 +8,19 @@ Index datasource schemas into the vector store for retrieval and grounding.
 - Clear the vector store.
 
 ## Key Modules
-- `packages/core/src/nl2sql/api/indexing_api.py`
-- `packages/core/src/nl2sql/indexing/orchestrator.py`
-- `packages/core/src/nl2sql/indexing/vector_store.py`
-- `packages/core/src/nl2sql/indexing/chunk_builder.py`
-- `packages/core/src/nl2sql/indexing/enrichment_service.py`
-- `packages/core/src/nl2sql/schema/store.py`
+- `packages/nl2sql/src/nl2sql/api/indexing_api.py`
+- `packages/nl2sql/src/nl2sql/indexing/orchestrator.py`
+- `packages/nl2sql/src/nl2sql/indexing/vector_store.py`
+- `packages/nl2sql/src/nl2sql/indexing/chunk_builder.py`
+- `packages/nl2sql/src/nl2sql/indexing/enrichment_service.py`
+- `packages/nl2sql/src/nl2sql/schema/store.py`
 
 ## Public Surface
 
 ### IndexingAPI.index_datasource
 
 Source:
-`packages/core/src/nl2sql/api/indexing_api.py`
+`packages/nl2sql/src/nl2sql/api/indexing_api.py`
 
 Signature:
 `index_datasource(datasource_id: str) -> Dict[str, int]`

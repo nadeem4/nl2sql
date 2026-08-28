@@ -6,7 +6,7 @@
 - Exists to translate natural language intent into a deterministic, machine‑verifiable plan.
 - Sits after `SchemaRetrieverNode` in the SQL agent subgraph.
 - Class: `ASTPlannerNode`
-- Source: `packages/core/src/nl2sql/pipeline/nodes/ast_planner/node.py`
+- Source: `packages/nl2sql/src/nl2sql/pipeline/nodes/ast_planner/node.py`
 
 ---
 
@@ -155,5 +155,5 @@ Logs failures via `logger.exception`.
 
 ## Related Code
 
-- `packages/core/src/nl2sql/pipeline/nodes/ast_planner/node.py`
-- `packages/core/src/nl2sql/pipeline/nodes/ast_planner/schemas.py`
+- `packages/nl2sql/src/nl2sql/pipeline/nodes/ast_planner/node.py`
+- `packages/nl2sql/src/nl2sql/pipeline/nodes/ast_planner/schemas.py`

@@ -8,16 +8,16 @@ Enforce role-based access control (RBAC) for datasource and table access.
 - Return allowed datasources and tables for a user-context.
 
 ## Key Modules
-- `packages/core/src/nl2sql/api/auth_api.py`
-- `packages/core/src/nl2sql/auth/models.py`
-- `packages/core/src/nl2sql/auth/rbac.py`
+- `packages/nl2sql/src/nl2sql/api/auth_api.py`
+- `packages/nl2sql/src/nl2sql/auth/models.py`
+- `packages/nl2sql/src/nl2sql/auth/rbac.py`
 
 ## Public Surface
 
 ### UserContext
 
 Source:
-`packages/core/src/nl2sql/auth/models.py`
+`packages/nl2sql/src/nl2sql/auth/models.py`
 
 Fields:
 | name | type | required | meaning |
@@ -29,7 +29,7 @@ Fields:
 ### RolePolicy
 
 Source:
-`packages/core/src/nl2sql/auth/models.py`
+`packages/nl2sql/src/nl2sql/auth/models.py`
 
 Fields:
 | name | type | required | meaning |
@@ -42,7 +42,7 @@ Fields:
 ### AuthAPI.check_permissions
 
 Source:
-`packages/core/src/nl2sql/api/auth_api.py`
+`packages/nl2sql/src/nl2sql/api/auth_api.py`
 
 Signature:
 `check_permissions(user_context: UserContext, datasource_id: str, table: str) -> bool`
@@ -69,7 +69,7 @@ Yes.
 ### AuthAPI.get_allowed_resources
 
 Source:
-`packages/core/src/nl2sql/api/auth_api.py`
+`packages/nl2sql/src/nl2sql/api/auth_api.py`
 
 Signature:
 `get_allowed_resources(user_context: UserContext) -> dict`

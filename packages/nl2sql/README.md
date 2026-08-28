@@ -1,6 +1,6 @@
-# NL2SQL Core
+# NL2SQL
 
-The **NL2SQL Core** (`nl2sql-core`) is the brain of the natural language to SQL engine. It orchestrates the entire query lifecycle using a graph-based agent architecture.
+The **`nl2sql`** package is the brain of the natural language to SQL engine. It orchestrates the entire query lifecycle using a graph-based agent architecture, and also ships the `nl2sql` CLI (`nl2sql.cli`) and the four database adapters (`nl2sql.adapters.*`).
 
 ## 🏗️ Architecture Overview
 
@@ -136,21 +136,21 @@ The public API exports the following classes and types:
 ## 📦 Installation
 
 ```bash
-# Install core only
-pip install nl2sql-core
+# Engine, CLI and adapters; sqlite works out of the box
+pip install nl2sql
 
-# Install core with selected adapters
-pip install nl2sql-core[mysql,mssql]
+# Add the drivers for selected dialects
+pip install "nl2sql[mysql,mssql]"
 
-# Install core with all adapters
-pip install nl2sql-core[all]
+# Add every database driver
+pip install "nl2sql[all]"
 ```
 
 ## 🔖 Versioning Policy
 
-All NL2SQL packages in this monorepo share a single version number and are
-released together. Core, adapters, API, and CLI pin internal dependencies to
-the same version to prevent mismatches.
+The three distributions in this monorepo -- `nl2sql-adapter-sdk`, `nl2sql` and
+`nl2sql-api` -- share a single version number and are released together. They
+pin internal dependencies to the same version to prevent mismatches.
 
 ## 🚀 Usage (CLI)
 
@@ -216,7 +216,9 @@ src/nl2sql/
 ├── auth/                # Authentication and RBAC
 ├── common/              # Common utilities and settings
 ├── configs/             # Configuration management
-├── datasources/         # Datasource management and adapters
+├── adapters/            # Database adapters and the SQLAlchemy base
+├── cli/                 # `nl2sql` command line interface
+├── datasources/         # Datasource management and discovery
 ├── execution/           # Execution engine and artifacts
 ├── indexing/            # Schema indexing system
 ├── llm/                 # LLM management

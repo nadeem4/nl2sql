@@ -5,12 +5,14 @@ Tests are organized by scope and live under `packages/**/tests`. The core engine
 ## Test layout
 
 ```text
-packages/core/tests/
-  unit/          # Node-level tests, registries, stores
-  integration/   # Pipeline components with real data
-  e2e/           # End-to-end flows
-packages/api/tests/  # FastAPI route and service tests (stubbed engine)
-packages/cli/tests/  # CLI command tests
+packages/nl2sql/tests/
+  unit/             # Node-level tests, registries, stores
+  integration/      # Pipeline components with real data
+  e2e/              # End-to-end flows
+  cli/              # CLI command tests
+  adapters/         # Cross-dialect adapter contract tests
+  sqlalchemy_base/  # SQLAlchemy base adapter tests
+packages/api/tests/ # FastAPI route and service tests (stubbed engine)
 ```
 
 `pytest.ini` is the single source of truth for pytest configuration - test
@@ -29,8 +31,8 @@ markers. A test may carry both.
 | `integration` | Needs external resources: the generated demo SQLite databases, or the downloaded ONNX embedding model. | `nl2sql setup --demo --lite` |
 | `llm` | Needs a real `OPENAI_API_KEY`. Costs money per run. | Nothing in CI - never selected. |
 
-Everything under `packages/core/tests/integration/` is marked `integration`
-automatically by `packages/core/tests/conftest.py`. The `llm` marker is
+Everything under `packages/nl2sql/tests/integration/` is marked `integration`
+automatically by `packages/nl2sql/tests/conftest.py`. The `llm` marker is
 declared per module, next to a comment saying which call needs the key. Only
 four modules carry it - `test_ast_planner_real_data.py`,
 `test_decomposer_real_data.py`, `test_logical_validator_real_data.py` and
@@ -103,5 +105,5 @@ Adapter SDK includes testing utilities to validate schema introspection and resu
 ## Source references
 
 - Test configuration: `pytest.ini`
-- Core tests: `packages/core/tests/`
+- Core tests: `packages/nl2sql/tests/`
 - API tests: `packages/api/tests/`

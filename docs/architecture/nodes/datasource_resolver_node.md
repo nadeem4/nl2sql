@@ -6,7 +6,7 @@
 - Enforces RBAC and schema version mismatch policy before planning.
 - Sits at the entry of the control graph and gates the pipeline.
 - Class: `DatasourceResolverNode`
-- Source: `packages/core/src/nl2sql/pipeline/nodes/datasource_resolver/node.py`
+- Source: `packages/nl2sql/src/nl2sql/pipeline/nodes/datasource_resolver/node.py`
 
 ---
 
@@ -171,5 +171,5 @@ Exceptions are caught at the node boundary and logged with `logger.error`.
 
 ## Related Code
 
-- `packages/core/src/nl2sql/pipeline/nodes/datasource_resolver/node.py`
-- `packages/core/src/nl2sql/pipeline/nodes/datasource_resolver/schemas.py`
+- `packages/nl2sql/src/nl2sql/pipeline/nodes/datasource_resolver/node.py`
+- `packages/nl2sql/src/nl2sql/pipeline/nodes/datasource_resolver/schemas.py`

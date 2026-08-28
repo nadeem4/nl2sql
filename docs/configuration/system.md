@@ -135,6 +135,6 @@ flowchart TD
 
 ## Source references
 
-- Settings: `packages/core/src/nl2sql/common/settings.py`
-- ConfigManager: `packages/core/src/nl2sql/configs/manager.py`
-- SecretManager: `packages/core/src/nl2sql/secrets/manager.py`
+- Settings: `packages/nl2sql/src/nl2sql/common/settings.py`
+- ConfigManager: `packages/nl2sql/src/nl2sql/configs/manager.py`
+- SecretManager: `packages/nl2sql/src/nl2sql/secrets/manager.py`

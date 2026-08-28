@@ -12,9 +12,9 @@ python -m venv venv
 source venv/bin/activate
 
 pip install -e packages/adapter-sdk
-pip install -e packages/core
-pip install -e packages/adapter-sqlalchemy
-pip install -e packages/adapters/postgres
+pip install -e packages/adapter-sdk
+pip install -e "packages/nl2sql[postgres]"
+pip install -e packages/api
 ```
 
 Add any other adapters you need (mysql, mssql, sqlite).

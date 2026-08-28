@@ -6,7 +6,7 @@
 - Exists to combine scan results deterministically into final result sets.
 - Sits after `layer_router` and before `AnswerSynthesizerNode`.
 - Class: `EngineAggregatorNode`
-- Source: `packages/core/src/nl2sql/pipeline/nodes/aggregator/node.py`
+- Source: `packages/nl2sql/src/nl2sql/pipeline/nodes/aggregator/node.py`
 
 ---
 
@@ -147,5 +147,5 @@ Logs failures via `logger.error`.
 
 ## Related Code
 
-- `packages/core/src/nl2sql/pipeline/nodes/aggregator/node.py`
-- `packages/core/src/nl2sql/aggregation/aggregator.py`
+- `packages/nl2sql/src/nl2sql/pipeline/nodes/aggregator/node.py`
+- `packages/nl2sql/src/nl2sql/aggregation/aggregator.py`

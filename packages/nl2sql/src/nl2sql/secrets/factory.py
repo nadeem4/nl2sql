@@ -50,7 +50,7 @@ class SecretProviderFactory:
         try:
             from .providers.aws import AwsSecretProvider
         except ImportError:
-             raise ImportError("Missing dependency 'boto3'. Install 'nl2sql-core[aws]'.")
+             raise ImportError("Missing dependency 'boto3'. Install 'nl2sql[aws]'.")
         
         return AwsSecretProvider(
             region_name=config.region_name,
@@ -62,7 +62,7 @@ class SecretProviderFactory:
         try:
             from .providers.azure import AzureSecretProvider
         except ImportError:
-            raise ImportError("Missing dependencies. Install 'nl2sql-core[azure]'.")
+            raise ImportError("Missing dependencies. Install 'nl2sql[azure]'.")
 
         return AzureSecretProvider(
             vault_url=config.vault_url,
@@ -76,7 +76,7 @@ class SecretProviderFactory:
         try:
             from .providers.hashi import HashiCorpSecretProvider
         except ImportError:
-            raise ImportError("Missing dependency 'hvac'. Install 'nl2sql-core[hashicorp]'.")
+            raise ImportError("Missing dependency 'hvac'. Install 'nl2sql[hashicorp]'.")
             
         return HashiCorpSecretProvider(
             url=config.url,

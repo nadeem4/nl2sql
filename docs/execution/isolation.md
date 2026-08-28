@@ -8,7 +8,7 @@ does **not** do, because the boundaries matter when you reason about failure.
 
 The engine runs entirely **in one process**. `run_with_graph()` dispatches the
 graph onto a `concurrent.futures.ThreadPoolExecutor`
-([`pipeline/runtime.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/core/src/nl2sql/pipeline/runtime.py)),
+([`pipeline/runtime.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/pipeline/runtime.py)),
 sized by `settings.sandbox_exec_workers` (`SANDBOX_EXEC_WORKERS`, default `4`).
 Threads share one interpreter and one address space.
 
@@ -29,13 +29,13 @@ The setting is named `sandbox_exec_workers` for historical reasons. It controls
 This is the engine's real safety property, and it holds. The LLM emits an
 **Abstract Syntax Tree**, never SQL text. The AST passes through
 `LogicalValidatorNode`
-([`pipeline/nodes/validator/node.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/core/src/nl2sql/pipeline/nodes/validator/node.py))
+([`pipeline/nodes/validator/node.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/pipeline/nodes/validator/node.py))
 before the generator is reached. That node:
 
 - resolves every column against the retrieved schema snapshot using
   `sqlglot.optimizer.qualify`;
 - enforces RBAC table policy via `RBAC.get_allowed_tables()`
-  ([`auth/rbac.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/core/src/nl2sql/auth/rbac.py)),
+  ([`auth/rbac.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/auth/rbac.py)),
   failing closed when no datasource ID is present.
 
 An unvalidated plan never becomes SQL, so it never reaches an adapter. This is
@@ -46,7 +46,7 @@ SQL that passed.
 ### Per-run cancellation
 
 Each invocation constructs its own `CancellationToken`
-([`common/cancellation.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/core/src/nl2sql/common/cancellation.py))
+([`common/cancellation.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/common/cancellation.py))
 and threads it to nodes through
 `config={"configurable": {"cancellation_token": token}}`. Because the token is
 per-run, cancelling one run never affects another.
@@ -73,10 +73,10 @@ continue until its own I/O completes.
 ### One circuit breaker
 
 `VECTOR_BREAKER`
-([`common/resilience.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/core/src/nl2sql/common/resilience.py))
+([`common/resilience.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/common/resilience.py))
 is the only breaker the system defines (`fail_max=5`, `reset_timeout=30`). It
 wraps vector-store retrieval in
-[`indexing/vector_store.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/core/src/nl2sql/indexing/vector_store.py)
+[`indexing/vector_store.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/indexing/vector_store.py)
 only.
 
 LLM calls and SQL execution are **not** breaker-guarded. Their failures surface

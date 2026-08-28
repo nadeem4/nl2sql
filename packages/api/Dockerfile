@@ -9,9 +9,9 @@ ARG NL2SQL_EXTRAS=""
 
 RUN pip install --no-cache-dir -U pip setuptools wheel \
     && if [ -n "$NL2SQL_EXTRAS" ]; then \
-        pip install --no-cache-dir "nl2sql-core[$NL2SQL_EXTRAS]" nl2sql-api; \
+        pip install --no-cache-dir "nl2sql[$NL2SQL_EXTRAS]" nl2sql-api; \
        else \
-        pip install --no-cache-dir nl2sql-core nl2sql-api; \
+        pip install --no-cache-dir nl2sql nl2sql-api; \
        fi
 
 EXPOSE 8000

@@ -7,7 +7,7 @@ API layer for the NL2SQL engine that provides a REST interface to the core funct
 NL2SQL provides a two-tier API architecture:
 
 ### 1. Core API (Python)
-- **Location**: Core package (`nl2sql-core`)
+- **Location**: Core package (`nl2sql`)
 - **Interface**: Direct Python class interface (`NL2SQL` class)
 - **Use Case**: Direct Python integration, embedded applications
 - **Access**: Import and use directly in Python code

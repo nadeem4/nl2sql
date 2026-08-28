@@ -39,7 +39,7 @@ See `../architecture/failure_recovery.md` for failure domains, retry scope, and 
 
 ## Source references
 
-- Error contracts: `packages/core/src/nl2sql/common/errors.py`
-- Circuit breaker: `packages/core/src/nl2sql/common/resilience.py`
-- Retry logic: `packages/core/src/nl2sql/pipeline/subgraphs/sql_agent.py`
-- Cancellation: `packages/core/src/nl2sql/common/cancellation.py`
+- Error contracts: `packages/nl2sql/src/nl2sql/common/errors.py`
+- Circuit breaker: `packages/nl2sql/src/nl2sql/common/resilience.py`
+- Retry logic: `packages/nl2sql/src/nl2sql/pipeline/subgraphs/sql_agent.py`
+- Cancellation: `packages/nl2sql/src/nl2sql/common/cancellation.py`

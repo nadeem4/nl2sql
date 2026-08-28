@@ -6,7 +6,7 @@
 - Enforces adapter row limits and dialect selection.
 - Sits between `LogicalValidatorNode` and `ExecutorNode`.
 - Class: `GeneratorNode`
-- Source: `packages/core/src/nl2sql/pipeline/nodes/generator/node.py`
+- Source: `packages/nl2sql/src/nl2sql/pipeline/nodes/generator/node.py`
 
 ---
 
@@ -154,4 +154,4 @@ Logs exceptions via `logger.exception`.
 
 ## Related Code
 
-- `packages/core/src/nl2sql/pipeline/nodes/generator/node.py`
+- `packages/nl2sql/src/nl2sql/pipeline/nodes/generator/node.py`

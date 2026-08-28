@@ -1,14 +1,14 @@
 # GraphState Architecture
 
 ## Overview
-GraphState is the shared, typed state container for the NL2SQL pipeline's LangGraph execution. It exists to provide a single, structured place where node outputs, errors, reasoning, and subgraph artifacts accumulate as the graph runs. Its scope is the main pipeline graph built in `packages/core/src/nl2sql/pipeline/graph.py`, and it is the input/output contract for graph nodes declared in that graph.
+GraphState is the shared, typed state container for the NL2SQL pipeline's LangGraph execution. It exists to provide a single, structured place where node outputs, errors, reasoning, and subgraph artifacts accumulate as the graph runs. Its scope is the main pipeline graph built in `packages/nl2sql/src/nl2sql/pipeline/graph.py`, and it is the input/output contract for graph nodes declared in that graph.
 
 ---
 
 ## GraphState Definition
 
 ### Primary class
-- `GraphState` in `packages/core/src/nl2sql/pipeline/state.py`
+- `GraphState` in `packages/nl2sql/src/nl2sql/pipeline/state.py`
 
 Fields (exact names and types from code):
 - `trace_id: str`
@@ -33,7 +33,7 @@ Reducer behavior in `GraphState`:
 - `operator.add` concatenates lists for `errors`, `reasoning`, and `warnings`.
 
 ### Subgraph state boundary
-- `SubgraphExecutionState` in `packages/core/src/nl2sql/pipeline/state.py` is the per-subgraph state used by the SQL agent subgraph.
+- `SubgraphExecutionState` in `packages/nl2sql/src/nl2sql/pipeline/state.py` is the per-subgraph state used by the SQL agent subgraph.
 
 Fields (exact names and types from code):
 - `trace_id: str`
@@ -53,7 +53,7 @@ Fields (exact names and types from code):
 - `warnings: Annotated[List[Dict[str, Any]], operator.add]`
 
 ### Subgraph output structure
-- `SubgraphOutput` in `packages/core/src/nl2sql/pipeline/subgraphs/schemas.py`
+- `SubgraphOutput` in `packages/nl2sql/src/nl2sql/pipeline/subgraphs/schemas.py`
 
 Fields:
 - `sub_query: Optional[SubQuery]`
@@ -259,27 +259,27 @@ Based on code only:
 ## Related Code
 
 GraphState and reducers:
-- `packages/core/src/nl2sql/pipeline/state.py`
+- `packages/nl2sql/src/nl2sql/pipeline/state.py`
 
 Graph construction and routing:
-- `packages/core/src/nl2sql/pipeline/graph.py`
-- `packages/core/src/nl2sql/pipeline/routes.py`
-- `packages/core/src/nl2sql/pipeline/graph_utils.py`
+- `packages/nl2sql/src/nl2sql/pipeline/graph.py`
+- `packages/nl2sql/src/nl2sql/pipeline/routes.py`
+- `packages/nl2sql/src/nl2sql/pipeline/graph_utils.py`
 
 Subgraph state and execution:
-- `packages/core/src/nl2sql/pipeline/subgraphs/sql_agent.py`
-- `packages/core/src/nl2sql/pipeline/subgraphs/schemas.py`
+- `packages/nl2sql/src/nl2sql/pipeline/subgraphs/sql_agent.py`
+- `packages/nl2sql/src/nl2sql/pipeline/subgraphs/schemas.py`
 
 Mutators / consumers:
-- `packages/core/src/nl2sql/pipeline/nodes/datasource_resolver/node.py`
-- `packages/core/src/nl2sql/pipeline/nodes/decomposer/node.py`
-- `packages/core/src/nl2sql/pipeline/nodes/global_planner/node.py`
-- `packages/core/src/nl2sql/pipeline/nodes/aggregator/node.py`
-- `packages/core/src/nl2sql/pipeline/nodes/answer_synthesizer/node.py`
-- `packages/core/src/nl2sql/pipeline/nodes/schema_retriever/node.py`
-- `packages/core/src/nl2sql/pipeline/nodes/ast_planner/node.py`
-- `packages/core/src/nl2sql/pipeline/nodes/validator/node.py`
-- `packages/core/src/nl2sql/pipeline/nodes/generator/node.py`
-- `packages/core/src/nl2sql/pipeline/nodes/executor/node.py`
-- `packages/core/src/nl2sql/pipeline/nodes/refiner/node.py`
+- `packages/nl2sql/src/nl2sql/pipeline/nodes/datasource_resolver/node.py`
+- `packages/nl2sql/src/nl2sql/pipeline/nodes/decomposer/node.py`
+- `packages/nl2sql/src/nl2sql/pipeline/nodes/global_planner/node.py`
+- `packages/nl2sql/src/nl2sql/pipeline/nodes/aggregator/node.py`
+- `packages/nl2sql/src/nl2sql/pipeline/nodes/answer_synthesizer/node.py`
+- `packages/nl2sql/src/nl2sql/pipeline/nodes/schema_retriever/node.py`
+- `packages/nl2sql/src/nl2sql/pipeline/nodes/ast_planner/node.py`
+- `packages/nl2sql/src/nl2sql/pipeline/nodes/validator/node.py`
+- `packages/nl2sql/src/nl2sql/pipeline/nodes/generator/node.py`
+- `packages/nl2sql/src/nl2sql/pipeline/nodes/executor/node.py`
+- `packages/nl2sql/src/nl2sql/pipeline/nodes/refiner/node.py`
 

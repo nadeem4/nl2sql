@@ -1,13 +1,13 @@
 # SQLAlchemy Adapter Reference
 
-The **SQLAlchemy Adapter** (`nl2sql-adapter-sqlalchemy`) provides a helper base class for building adapters for any SQL database supported by SQLAlchemy.
+The **SQLAlchemy Adapter** (`nl2sql.adapters.sqlalchemy_base`, shipped in the `nl2sql` package) provides a helper base class for building adapters for any SQL database supported by SQLAlchemy.
 
 ## Base Class: `BaseSQLAlchemyAdapter`
 
 Constructs a robust adapter by wrapping standard SQLAlchemy components.
 
 ```python
-from nl2sql_sqlalchemy_adapter import BaseSQLAlchemyAdapter
+from nl2sql.adapters.sqlalchemy_base import BaseSQLAlchemyAdapter
 ```
 
 ### Features

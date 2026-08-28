@@ -6,7 +6,7 @@
 - When it is invoked: via `run_with_graph()` runtime entry point.
 
 Defining function: `build_graph()`  
-Source file path: `packages/core/src/nl2sql/pipeline/graph.py`
+Source file path: `packages/nl2sql/src/nl2sql/pipeline/graph.py`
 
 ---
 
@@ -49,13 +49,13 @@ Partial completion behavior:
 ## Internal Node Composition
 
 Execution order (nominal path):
-- `datasource_resolver` — `DatasourceResolverNode` — `packages/core/src/nl2sql/pipeline/nodes/datasource_resolver/node.py` — resolve candidate datasources and RBAC.
-- `decomposer` — `DecomposerNode` — `packages/core/src/nl2sql/pipeline/nodes/decomposer/node.py` — decompose query into sub-queries.
-- `global_planner` — `GlobalPlannerNode` — `packages/core/src/nl2sql/pipeline/nodes/global_planner/node.py` — build execution DAG.
-- `layer_router` — inline lambda + `routes.build_scan_layer_router` — `packages/core/src/nl2sql/pipeline/routes.py` — route each scan layer to a subgraph or aggregator.
-- `<subgraph nodes>` — via `wrap_subgraph()` — `packages/core/src/nl2sql/pipeline/graph_utils.py` — invoke registered subgraphs per scan node.
-- `aggregator` — `EngineAggregatorNode` — `packages/core/src/nl2sql/pipeline/nodes/aggregator/node.py` — execute aggregation DAG.
-- `answer_synthesizer` — `AnswerSynthesizerNode` — `packages/core/src/nl2sql/pipeline/nodes/answer_synthesizer/node.py` — produce final answer.
+- `datasource_resolver` — `DatasourceResolverNode` — `packages/nl2sql/src/nl2sql/pipeline/nodes/datasource_resolver/node.py` — resolve candidate datasources and RBAC.
+- `decomposer` — `DecomposerNode` — `packages/nl2sql/src/nl2sql/pipeline/nodes/decomposer/node.py` — decompose query into sub-queries.
+- `global_planner` — `GlobalPlannerNode` — `packages/nl2sql/src/nl2sql/pipeline/nodes/global_planner/node.py` — build execution DAG.
+- `layer_router` — inline lambda + `routes.build_scan_layer_router` — `packages/nl2sql/src/nl2sql/pipeline/routes.py` — route each scan layer to a subgraph or aggregator.
+- `<subgraph nodes>` — via `wrap_subgraph()` — `packages/nl2sql/src/nl2sql/pipeline/graph_utils.py` — invoke registered subgraphs per scan node.
+- `aggregator` — `EngineAggregatorNode` — `packages/nl2sql/src/nl2sql/pipeline/nodes/aggregator/node.py` — execute aggregation DAG.
+- `answer_synthesizer` — `AnswerSynthesizerNode` — `packages/nl2sql/src/nl2sql/pipeline/nodes/answer_synthesizer/node.py` — produce final answer.
 
 Mermaid diagram (main pipeline only):
 ```mermaid
@@ -75,7 +75,7 @@ flowchart TD
 
 ## State Contract
 
-State model: `GraphState` (`packages/core/src/nl2sql/pipeline/state.py`).
+State model: `GraphState` (`packages/nl2sql/src/nl2sql/pipeline/state.py`).
 
 Field ownership, reducers, and lifecycle are defined in `../graph_state.md`.
 
@@ -164,12 +164,12 @@ See `../failure_recovery.md` for retry scope and recovery behavior.
 
 ## Related Code
 
-- Subgraph definition: `packages/core/src/nl2sql/pipeline/graph.py`
-- Routing utilities: `packages/core/src/nl2sql/pipeline/routes.py`, `packages/core/src/nl2sql/pipeline/graph_utils.py`
-- State model: `packages/core/src/nl2sql/pipeline/state.py`
+- Subgraph definition: `packages/nl2sql/src/nl2sql/pipeline/graph.py`
+- Routing utilities: `packages/nl2sql/src/nl2sql/pipeline/routes.py`, `packages/nl2sql/src/nl2sql/pipeline/graph_utils.py`
+- State model: `packages/nl2sql/src/nl2sql/pipeline/state.py`
 - Node implementations:
-  - `packages/core/src/nl2sql/pipeline/nodes/datasource_resolver/node.py`
-  - `packages/core/src/nl2sql/pipeline/nodes/decomposer/node.py`
-  - `packages/core/src/nl2sql/pipeline/nodes/global_planner/node.py`
-  - `packages/core/src/nl2sql/pipeline/nodes/aggregator/node.py`
-  - `packages/core/src/nl2sql/pipeline/nodes/answer_synthesizer/node.py`
+  - `packages/nl2sql/src/nl2sql/pipeline/nodes/datasource_resolver/node.py`
+  - `packages/nl2sql/src/nl2sql/pipeline/nodes/decomposer/node.py`
+  - `packages/nl2sql/src/nl2sql/pipeline/nodes/global_planner/node.py`
+  - `packages/nl2sql/src/nl2sql/pipeline/nodes/aggregator/node.py`
+  - `packages/nl2sql/src/nl2sql/pipeline/nodes/answer_synthesizer/node.py`

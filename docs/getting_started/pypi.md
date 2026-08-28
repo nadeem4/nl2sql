@@ -7,14 +7,14 @@ See the Core API documentation at [docs/api/index.md](../api/index.md).
 
 ```bash
 # Core only
-pip install nl2sql-core
+pip install nl2sql
 
 # install all available adapters. (Never prefer this, until you really need all adapters.)
-pip install "nl2sql-core[all]"
+pip install "nl2sql[all]"
 
 # Core with selected adapters
-pip install "nl2sql-core[postgres]"
-pip install "nl2sql-core[mysql,mssql]"
+pip install "nl2sql[postgres]"
+pip install "nl2sql[mysql,mssql]"
 ```
 
 ## Configure
@@ -78,7 +78,7 @@ datasources:
 Install the adapter extras that match `connection.type`:
 
 ```bash
-pip install "nl2sql-core[postgres]"
+pip install "nl2sql[postgres]"
 ```
 
 See [Adapters](../adapters/index.md) for the full list of available adapters.
@@ -265,9 +265,9 @@ engine.index_all_datasources()
 Secrets providers are installed via extras and selected in `configs/secrets.yaml`:
 
 ```bash
-pip install "nl2sql-core[aws]"
-pip install "nl2sql-core[azure]"
-pip install "nl2sql-core[hashicorp]"
+pip install "nl2sql[aws]"
+pip install "nl2sql[azure]"
+pip install "nl2sql[hashicorp]"
 ```
 
 See [Configuration system](../configuration/system.md) for environment variables and defaults.

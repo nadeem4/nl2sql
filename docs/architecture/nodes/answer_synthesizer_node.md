@@ -6,7 +6,7 @@
 - Exists to convert structured results into human‑readable output.
 - Sits after `EngineAggregatorNode` at the end of the control graph.
 - Class: `AnswerSynthesizerNode`
-- Source: `packages/core/src/nl2sql/pipeline/nodes/answer_synthesizer/node.py`
+- Source: `packages/nl2sql/src/nl2sql/pipeline/nodes/answer_synthesizer/node.py`
 
 ---
 
@@ -151,4 +151,4 @@ Logs failures via `logger.error`.
 
 ## Related Code
 
-- `packages/core/src/nl2sql/pipeline/nodes/answer_synthesizer/node.py`
+- `packages/nl2sql/src/nl2sql/pipeline/nodes/answer_synthesizer/node.py`

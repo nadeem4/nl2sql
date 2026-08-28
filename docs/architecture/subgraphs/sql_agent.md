@@ -6,7 +6,7 @@
 - When it is invoked: when `layer_router` resolves a datasource with `SUPPORTS_SQL` capability and sends a scan-layer payload.
 
 Defining function: `build_sql_agent_graph()`  
-Source file path: `packages/core/src/nl2sql/pipeline/subgraphs/sql_agent.py`
+Source file path: `packages/nl2sql/src/nl2sql/pipeline/subgraphs/sql_agent.py`
 
 ---
 
@@ -49,13 +49,13 @@ Partial completion behavior:
 ## Internal Node Composition
 
 Execution order (nominal path):
-- `schema_retriever` — `SchemaRetrieverNode` — `packages/core/src/nl2sql/pipeline/nodes/schema_retriever/node.py` — retrieve relevant schema tables/columns.
-- `ast_planner` — `ASTPlannerNode` — `packages/core/src/nl2sql/pipeline/nodes/ast_planner/node.py` — create SQL AST plan.
-- `logical_validator` — `LogicalValidatorNode` — `packages/core/src/nl2sql/pipeline/nodes/validator/node.py` — validate plan correctness and policy constraints.
-- `generator` — `GeneratorNode` — `packages/core/src/nl2sql/pipeline/nodes/generator/node.py` — generate SQL text from AST.
-- `executor` — `ExecutorNode` — `packages/core/src/nl2sql/pipeline/nodes/executor/node.py` — execute SQL and produce artifacts.
-- `retry_handler` — `retry_node()` — `packages/core/src/nl2sql/pipeline/subgraphs/sql_agent.py` — apply exponential backoff and increment retry count.
-- `refiner` — `RefinerNode` — `packages/core/src/nl2sql/pipeline/nodes/refiner/node.py` — generate feedback for the planner.
+- `schema_retriever` — `SchemaRetrieverNode` — `packages/nl2sql/src/nl2sql/pipeline/nodes/schema_retriever/node.py` — retrieve relevant schema tables/columns.
+- `ast_planner` — `ASTPlannerNode` — `packages/nl2sql/src/nl2sql/pipeline/nodes/ast_planner/node.py` — create SQL AST plan.
+- `logical_validator` — `LogicalValidatorNode` — `packages/nl2sql/src/nl2sql/pipeline/nodes/validator/node.py` — validate plan correctness and policy constraints.
+- `generator` — `GeneratorNode` — `packages/nl2sql/src/nl2sql/pipeline/nodes/generator/node.py` — generate SQL text from AST.
+- `executor` — `ExecutorNode` — `packages/nl2sql/src/nl2sql/pipeline/nodes/executor/node.py` — execute SQL and produce artifacts.
+- `retry_handler` — `retry_node()` — `packages/nl2sql/src/nl2sql/pipeline/subgraphs/sql_agent.py` — apply exponential backoff and increment retry count.
+- `refiner` — `RefinerNode` — `packages/nl2sql/src/nl2sql/pipeline/nodes/refiner/node.py` — generate feedback for the planner.
 
 Mermaid diagram (sql_agent only):
 ```mermaid
@@ -75,7 +75,7 @@ flowchart TD
 
 ## State Contract
 
-State model: `SubgraphExecutionState` (`packages/core/src/nl2sql/pipeline/state.py`).
+State model: `SubgraphExecutionState` (`packages/nl2sql/src/nl2sql/pipeline/state.py`).
 
 Field ownership, reducers, and lifecycle are defined in `../graph_state.md`.
 
@@ -164,16 +164,16 @@ See `../failure_recovery.md` for retry scope and recovery behavior.
 
 ## Related Code
 
-- Subgraph definition: `packages/core/src/nl2sql/pipeline/subgraphs/sql_agent.py`
-- Subgraph selection: `packages/core/src/nl2sql/pipeline/graph_utils.py`
-- State model: `packages/core/src/nl2sql/pipeline/state.py`
+- Subgraph definition: `packages/nl2sql/src/nl2sql/pipeline/subgraphs/sql_agent.py`
+- Subgraph selection: `packages/nl2sql/src/nl2sql/pipeline/graph_utils.py`
+- State model: `packages/nl2sql/src/nl2sql/pipeline/state.py`
 - Node implementations:
-  - `packages/core/src/nl2sql/pipeline/nodes/schema_retriever/node.py`
-  - `packages/core/src/nl2sql/pipeline/nodes/ast_planner/node.py`
-  - `packages/core/src/nl2sql/pipeline/nodes/validator/node.py`
-  - `packages/core/src/nl2sql/pipeline/nodes/generator/node.py`
-  - `packages/core/src/nl2sql/pipeline/nodes/executor/node.py`
-  - `packages/core/src/nl2sql/pipeline/nodes/refiner/node.py`
+  - `packages/nl2sql/src/nl2sql/pipeline/nodes/schema_retriever/node.py`
+  - `packages/nl2sql/src/nl2sql/pipeline/nodes/ast_planner/node.py`
+  - `packages/nl2sql/src/nl2sql/pipeline/nodes/validator/node.py`
+  - `packages/nl2sql/src/nl2sql/pipeline/nodes/generator/node.py`
+  - `packages/nl2sql/src/nl2sql/pipeline/nodes/executor/node.py`
+  - `packages/nl2sql/src/nl2sql/pipeline/nodes/refiner/node.py`
 - Tests:
-  - `packages/core/tests/unit/test_sql_agent_subgraph.py`
-  - `packages/core/tests/unit/test_subgraph_registry.py`
+  - `packages/nl2sql/tests/unit/test_sql_agent_subgraph.py`
+  - `packages/nl2sql/tests/unit/test_subgraph_resolution.py`

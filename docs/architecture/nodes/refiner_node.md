@@ -6,7 +6,7 @@
 - Exists to improve planner outputs in retry loops.
 - Sits between `retry_handler` and `ASTPlannerNode` in the SQL agent subgraph.
 - Class: `RefinerNode`
-- Source: `packages/core/src/nl2sql/pipeline/nodes/refiner/node.py`
+- Source: `packages/nl2sql/src/nl2sql/pipeline/nodes/refiner/node.py`
 
 ---
 
@@ -153,4 +153,4 @@ Logs failures via `logger.error`.
 
 ## Related Code
 
-- `packages/core/src/nl2sql/pipeline/nodes/refiner/node.py`
+- `packages/nl2sql/src/nl2sql/pipeline/nodes/refiner/node.py`

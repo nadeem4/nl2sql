@@ -140,7 +140,7 @@ def test_shared_console_helpers_escape_message(monkeypatch):
         console_module, "console", Console(file=buffer, width=200, force_terminal=False)
     )
     console_module.print_error(f"install failed {MARKER}")
-    console_module.print_success(f"wrote nl2sql-postgres[all] {MARKER}")
+    console_module.print_success(f"wrote nl2sql[all] {MARKER}")
     output = buffer.getvalue()
     assert output.count(MARKER) == 2
-    assert "nl2sql-postgres[all]" in output
+    assert "nl2sql[all]" in output

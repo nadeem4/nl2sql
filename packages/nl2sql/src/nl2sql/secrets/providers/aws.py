@@ -13,7 +13,7 @@ class AwsSecretProvider:
             self.client = session.client('secretsmanager')
         except ImportError:
             self.client = None
-            logger.warning("AWS Secret Provider initialized but 'boto3' is missing. Please install 'nl2sql-core[aws]' to use AWS secrets.")
+            logger.warning("AWS Secret Provider initialized but 'boto3' is missing. Please install 'nl2sql[aws]' to use AWS secrets.")
 
     def get_secret(self, key: str) -> Optional[str]:
         if not self.client:
