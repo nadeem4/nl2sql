@@ -1333,6 +1333,15 @@
     </span>
 </a>
 </li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#actions-permission-to-open-pull-requests">
+<span class="md-ellipsis">
+      
+        Actions permission to open pull requests
+      
+    </span>
+</a>
+</li>
 </ul>
 </nav>
 </li>
@@ -1807,6 +1816,15 @@
     </span>
 </a>
 </li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#actions-permission-to-open-pull-requests">
+<span class="md-ellipsis">
+      
+        Actions permission to open pull requests
+      
+    </span>
+</a>
+</li>
 </ul>
 </nav>
 </li>
@@ -1944,7 +1962,7 @@ changelog and the version it proposes is the release decision.</p>
    <code>pypa/gh-action-pypi-publish</code>.</li>
 <li><strong><code>ghcr</code></strong> — <code>needs: pypi</code>. Builds <code>packages/api/Dockerfile</code> and pushes
    <code>ghcr.io/nadeem4/nl2sql-api</code> at both the tag and <code>latest</code>. It has to follow
-   the PyPI upload because that Dockerfile installs <code>nl2sql</code> and <code>nl2sql-api</code>
+   the PyPI upload because that Dockerfile installs <code>nl2sql-engine</code> and <code>nl2sql-api</code>
    from PyPI.</li>
 <li><strong><code>docs</code></strong> — <code>needs: pypi</code>. <code>mike deploy --push --update-aliases $TAG latest</code>
    adds a versioned copy of the docs to <code>gh-pages</code> and moves the <code>latest</code> alias
@@ -1982,15 +2000,17 @@ workflows write different directories. Both declare <code>concurrency: group:
 gh-pages</code> so they never push to that branch at the same time. Only the release
 workflow moves <code>latest</code> and sets the site default.</p>
 <h2 id="one-time-human-setup">One-time human setup</h2>
-<p>Two things must be configured by hand before the first release. Neither
-involves a token secret.</p>
+<p>Three things must be configured by hand before the first release. None of
+them involves a token secret.</p>
 <h3 id="pypi-pending-publishers">PyPI pending publishers</h3>
 <p>Trusted publishing has to be told, once per project name, which repository and
 workflow it will accept uploads from. For a project that does not exist on PyPI
 yet this is a <strong>pending publisher</strong>, created at
 <a href="https://pypi.org/manage/account/publishing/">pypi.org/manage/account/publishing</a>.</p>
-<p>Add one for each of the three names — <code>nl2sql</code>, <code>nl2sql-api</code> and
-<code>nl2sql-adapter-sdk</code> — all with the same values:</p>
+<p>Add one for each of the three names — <code>nl2sql-engine</code>, <code>nl2sql-api</code> and
+<code>nl2sql-adapter-sdk</code> — all with the same values. The engine publishes as
+<code>nl2sql-engine</code> because the <code>nl2sql</code> name on PyPI is already taken by an
+unrelated project; the import package is still <code>nl2sql</code>.</p>
 <table>
 <thead>
 <tr>
@@ -2001,7 +2021,7 @@ yet this is a <strong>pending publisher</strong>, created at
 <tbody>
 <tr>
 <td>PyPI Project Name</td>
-<td><code>nl2sql</code> / <code>nl2sql-api</code> / <code>nl2sql-adapter-sdk</code></td>
+<td><code>nl2sql-engine</code> / <code>nl2sql-api</code> / <code>nl2sql-adapter-sdk</code></td>
 </tr>
 <tr>
 <td>Owner</td>
@@ -2032,20 +2052,27 @@ updated to match.</p>
 Make it public under the repository's <em>Packages</em> settings if the image is meant
 to be pullable anonymously. The workflow itself needs no setup: it authenticates
 with the built-in <code>GITHUB_TOKEN</code> and <code>permissions: packages: write</code>.</p>
+<h3 id="actions-permission-to-open-pull-requests">Actions permission to open pull requests</h3>
+<p>Settings → Actions → General → Workflow permissions → tick <strong>"Allow GitHub
+Actions to create and approve pull requests"</strong>.</p>
+<p>Without it <code>release_please.yml</code> creates its release branch and commit and then
+fails with <code>GitHub Actions is not permitted to create or approve pull
+requests</code>, so the release pull request never appears and nothing can be merged
+or tagged.</p>
 <h2 id="package-order">Package order</h2>
 <p>The single upload step sends all three distributions together, so ordering is
 usually not something you manage. It matters when an upload partially fails and
 you re-publish by hand: release in dependency order so no package is ever on
 PyPI referencing a version of its dependency that is not.</p>
 <pre class="mermaid"><code>flowchart TD
-    SDK[nl2sql-adapter-sdk] --&gt; CORE[nl2sql]
+    SDK[nl2sql-adapter-sdk] --&gt; CORE[nl2sql-engine]
     CORE --&gt; API[nl2sql-api]</code></pre>
 <ol>
 <li><code>nl2sql-adapter-sdk</code> — no internal dependencies.</li>
-<li><code>nl2sql</code> — needs the SDK. Carries the engine, the CLI and all four dialect
-   adapters, so its extras (<code>nl2sql[postgres]</code> and friends) add only database
+<li><code>nl2sql-engine</code> — needs the SDK. Carries the engine, the CLI and all four dialect
+   adapters, so its extras (<code>nl2sql-engine[postgres]</code> and friends) add only database
    drivers from PyPI and cannot be broken by publish order.</li>
-<li><code>nl2sql-api</code> — needs <code>nl2sql</code>.</li>
+<li><code>nl2sql-api</code> — needs <code>nl2sql-engine</code>.</li>
 </ol>
 <p>PyPI never lets a version be re-uploaded. If a release goes out broken, yank it
 and ship the next patch version; do not try to replace it.</p>

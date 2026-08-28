@@ -3869,7 +3869,7 @@
 the build context has to be the repo root.</p>
 <h2 id="adapters">Adapters</h2>
 <p>The image ships the Postgres and MySQL drivers. Every dialect adapter is part of
-the <code>nl2sql</code> distribution; an extra only adds the driver it needs, so add another
+the <code>nl2sql-engine</code> distribution; an extra only adds the driver it needs, so add another
 extra to the <code>pip install</code> line in <code>packages/api/Dockerfile</code> to include one -
 for example <code>"./packages/nl2sql[postgres,mysql,mssql]"</code>.</p>
 <p>The demo stack builds this same image as its <code>app</code> service - see

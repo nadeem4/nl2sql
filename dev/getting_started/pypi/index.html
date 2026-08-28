@@ -4051,15 +4051,15 @@
 See the Core API documentation at <a href="../../api/">docs/api/index.md</a>.</p>
 <h2 id="install">Install</h2>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># Core only</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>pip<span class="w"> </span>install<span class="w"> </span>nl2sql
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>pip<span class="w"> </span>install<span class="w"> </span>nl2sql-engine
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
 <a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="c1"># install all available adapters. (Never prefer this, until you really need all adapters.)</span>
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"nl2sql[all]"</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"nl2sql-engine[all]"</span>
 <a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>
 <a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="c1"># Core with selected adapters</span>
-<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"nl2sql[postgres]"</span>
-<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"nl2sql[mysql,mssql]"</span>
-<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"nl2sql[duckdb]"</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"nl2sql-engine[postgres]"</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"nl2sql-engine[mysql,mssql]"</span>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"nl2sql-engine[duckdb]"</span>
 </code></pre></div>
 <h2 id="configure">Configure</h2>
 <p>Create config files in your working directory:</p>
@@ -4110,7 +4110,7 @@ long-running process without restart.</p>
 <a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="w">    </span><span class="nt">max_bytes</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10485760</span>
 </code></pre></div>
 <p>Install the adapter extras that match <code>connection.type</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"nl2sql[postgres]"</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"nl2sql-engine[postgres]"</span>
 </code></pre></div>
 <p>See <a href="../../adapters/">Adapters</a> for the full list of available adapters.
 See <a href="../../configuration/datasources/">Datasource config</a> for field definitions.</p>
@@ -4253,9 +4253,9 @@ addressed through <code>artifact_refs</code>.</p>
 </code></pre></div>
 <h2 id="configure-providers">Configure providers</h2>
 <p>Secrets providers are installed via extras and selected in <code>configs/secrets.yaml</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"nl2sql[aws]"</span>
-<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"nl2sql[azure]"</span>
-<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"nl2sql[hashicorp]"</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"nl2sql-engine[aws]"</span>
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"nl2sql-engine[azure]"</span>
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"nl2sql-engine[hashicorp]"</span>
 </code></pre></div>
 <p>See <a href="../../configuration/system/">Configuration system</a> for environment variables and defaults.</p>
 
