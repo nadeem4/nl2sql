@@ -3,7 +3,7 @@
 NL2SQL supports three ways to get started. Choose the guide that matches how you want
 to use the platform:
 
-- **PyPI (Python API)**: Install `nl2sql` and use it programmatically.
+- **PyPI (Python API)**: Install `nl2sql-engine` and use it programmatically.
 - **Docker (REST API)**: Run the API service and integrate over HTTP.
 - **From Source (Development)**: Clone the repo for local development and contributions.
 

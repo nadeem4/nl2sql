@@ -5,7 +5,7 @@
   "include-component-in-tag": false,
   "packages": {
     ".": {
-      "package-name": "nl2sql",
+      "package-name": "nl2sql-engine",
       "changelog-path": "CHANGELOG.md",
       "extra-files": [
         {

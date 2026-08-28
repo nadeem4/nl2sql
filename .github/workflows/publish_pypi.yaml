@@ -36,7 +36,7 @@ jobs:
         run: |
           python -m venv /tmp/smoke
           /tmp/smoke/bin/pip install --upgrade pip
-          /tmp/smoke/bin/pip install --find-links dist dist/nl2sql_adapter_sdk-*.whl dist/nl2sql-*.whl dist/nl2sql_api-*.whl
+          /tmp/smoke/bin/pip install --find-links dist dist/nl2sql_adapter_sdk-*.whl dist/nl2sql_engine-*.whl dist/nl2sql_api-*.whl
           /tmp/smoke/bin/python -c "import nl2sql"
           /tmp/smoke/bin/nl2sql --help
 

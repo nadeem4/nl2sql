@@ -88,7 +88,7 @@ changelog and the version it proposes is the release decision.
    `pypa/gh-action-pypi-publish`.
 3. **`ghcr`** — `needs: pypi`. Builds `packages/api/Dockerfile` and pushes
    `ghcr.io/nadeem4/nl2sql-api` at both the tag and `latest`. It has to follow
-   the PyPI upload because that Dockerfile installs `nl2sql` and `nl2sql-api`
+   the PyPI upload because that Dockerfile installs `nl2sql-engine` and `nl2sql-api`
    from PyPI.
 4. **`docs`** — `needs: pypi`. `mike deploy --push --update-aliases $TAG latest`
    adds a versioned copy of the docs to `gh-pages` and moves the `latest` alias
@@ -115,8 +115,8 @@ workflow moves `latest` and sets the site default.
 
 ## One-time human setup
 
-Two things must be configured by hand before the first release. Neither
-involves a token secret.
+Three things must be configured by hand before the first release. None of
+them involves a token secret.
 
 ### PyPI pending publishers
 
@@ -125,12 +125,14 @@ workflow it will accept uploads from. For a project that does not exist on PyPI
 yet this is a **pending publisher**, created at
 [pypi.org/manage/account/publishing](https://pypi.org/manage/account/publishing/).
 
-Add one for each of the three names — `nl2sql`, `nl2sql-api` and
-`nl2sql-adapter-sdk` — all with the same values:
+Add one for each of the three names — `nl2sql-engine`, `nl2sql-api` and
+`nl2sql-adapter-sdk` — all with the same values. The engine publishes as
+`nl2sql-engine` because the `nl2sql` name on PyPI is already taken by an
+unrelated project; the import package is still `nl2sql`.
 
 | Field | Value |
 | --- | --- |
-| PyPI Project Name | `nl2sql` / `nl2sql-api` / `nl2sql-adapter-sdk` |
+| PyPI Project Name | `nl2sql-engine` / `nl2sql-api` / `nl2sql-adapter-sdk` |
 | Owner | `nadeem4` |
 | Repository name | `nl2sql` |
 | Workflow name | `publish_pypi.yaml` |
@@ -151,6 +153,16 @@ Make it public under the repository's *Packages* settings if the image is meant
 to be pullable anonymously. The workflow itself needs no setup: it authenticates
 with the built-in `GITHUB_TOKEN` and `permissions: packages: write`.
 
+### Actions permission to open pull requests
+
+Settings → Actions → General → Workflow permissions → tick **"Allow GitHub
+Actions to create and approve pull requests"**.
+
+Without it `release_please.yml` creates its release branch and commit and then
+fails with `GitHub Actions is not permitted to create or approve pull
+requests`, so the release pull request never appears and nothing can be merged
+or tagged.
+
 ## Package order
 
 The single upload step sends all three distributions together, so ordering is
@@ -160,15 +172,15 @@ PyPI referencing a version of its dependency that is not.
 
 ```mermaid
 flowchart TD
-    SDK[nl2sql-adapter-sdk] --> CORE[nl2sql]
+    SDK[nl2sql-adapter-sdk] --> CORE[nl2sql-engine]
     CORE --> API[nl2sql-api]
 ```
 
 1. `nl2sql-adapter-sdk` — no internal dependencies.
-2. `nl2sql` — needs the SDK. Carries the engine, the CLI and all four dialect
-   adapters, so its extras (`nl2sql[postgres]` and friends) add only database
+2. `nl2sql-engine` — needs the SDK. Carries the engine, the CLI and all four dialect
+   adapters, so its extras (`nl2sql-engine[postgres]` and friends) add only database
    drivers from PyPI and cannot be broken by publish order.
-3. `nl2sql-api` — needs `nl2sql`.
+3. `nl2sql-api` — needs `nl2sql-engine`.
 
 PyPI never lets a version be re-uploaded. If a release goes out broken, yank it
 and ship the next patch version; do not try to replace it.

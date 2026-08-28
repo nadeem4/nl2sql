@@ -137,18 +137,18 @@ The public API exports the following classes and types:
 
 ```bash
 # Engine, CLI and adapters; sqlite works out of the box
-pip install nl2sql
+pip install nl2sql-engine
 
 # Add the drivers for selected dialects
-pip install "nl2sql[mysql,mssql]"
+pip install "nl2sql-engine[mysql,mssql]"
 
 # Add every database driver
-pip install "nl2sql[all]"
+pip install "nl2sql-engine[all]"
 ```
 
 ## 🔖 Versioning Policy
 
-The three distributions in this monorepo -- `nl2sql-adapter-sdk`, `nl2sql` and
+The three distributions in this monorepo -- `nl2sql-adapter-sdk`, `nl2sql-engine` and
 `nl2sql-api` -- share a single version number and are released together. They
 pin internal dependencies to the same version to prevent mismatches.
 

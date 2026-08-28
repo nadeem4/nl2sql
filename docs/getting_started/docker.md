@@ -17,7 +17,7 @@ the build context has to be the repo root.
 ## Adapters
 
 The image ships the Postgres and MySQL drivers. Every dialect adapter is part of
-the `nl2sql` distribution; an extra only adds the driver it needs, so add another
+the `nl2sql-engine` distribution; an extra only adds the driver it needs, so add another
 extra to the `pip install` line in `packages/api/Dockerfile` to include one -
 for example `"./packages/nl2sql[postgres,mysql,mssql]"`.
 
