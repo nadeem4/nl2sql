@@ -48,11 +48,28 @@ jobs:
 
   # Trusted publishing (OIDC): the `id-token: write` permission is the whole
   # credential. There is no API token secret to configure or rotate - PyPI is
-  # told which repository and which workflow file it will accept, once, by
-  # hand. See docs/development/releasing.md.
+  # told which repository, workflow file and environment it will accept, once,
+  # by hand. See docs/development/releasing.md.
+  #
+  # One leg per package, each in its own GitHub Environment. PyPI requires a
+  # pending trusted publisher to be unique on (owner, repository, workflow,
+  # environment); with three projects publishing from one repo and one workflow
+  # the environment is the only field left to differ, so the second and third
+  # registrations are rejected without it. The environment names below are the
+  # contract with PyPI and must match the pending publisher entries exactly.
   pypi:
     needs: build
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - package: nl2sql-engine
+            stem: nl2sql_engine
+          - package: nl2sql-api
+            stem: nl2sql_api
+          - package: nl2sql-adapter-sdk
+            stem: nl2sql_adapter_sdk
+    environment: pypi-${{ matrix.package }}
     permissions:
       id-token: write
       contents: read
@@ -63,13 +80,24 @@ jobs:
           name: dist
           path: dist/
 
-      - name: Publish distributions to PyPI
+      # gh-action-pypi-publish uploads everything in packages-dir, so each leg
+      # gets a directory holding only its own sdist and wheel. The trailing `-`
+      # in the glob is load-bearing: `nl2sql_a*` would match both nl2sql_api
+      # and nl2sql_adapter_sdk.
+      - name: Stage the distributions for ${{ matrix.package }}
+        run: |
+          mkdir -p upload
+          cp dist/${{ matrix.stem }}-*.tar.gz dist/${{ matrix.stem }}-*.whl upload/
+          ls -1 upload/
+
+      - name: Publish ${{ matrix.package }} to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          packages-dir: dist/
+          packages-dir: upload/
 
   # packages/api/Dockerfile installs nl2sql and nl2sql-api from PyPI, so this
-  # has to follow the upload rather than run beside it.
+  # has to follow the upload rather than run beside it. `needs: pypi` waits for
+  # every leg of the matrix, so all three uploads are done before this starts.
   ghcr:
     needs: pypi
     runs-on: ubuntu-latest

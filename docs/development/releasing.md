@@ -19,7 +19,7 @@ flowchart TD
     TAG --> B[publish_pypi.yaml: build 3 dists]
     B --> S{wheels install and import?}
     S -->|no| STOP[Nothing is published]
-    S -->|yes| PY[PyPI via trusted publishing]
+    S -->|yes| PY[PyPI via trusted publishing:<br/>one job per package,<br/>one environment each]
     PY --> GH[ghcr.io/nadeem4/nl2sql-api]
     PY --> D[mike deploy: versioned docs]
 ```
@@ -84,15 +84,20 @@ changelog and the version it proposes is the release decision.
    `nl2sql --help`. These are the same commands as the `build` job in
    `test.yml`.
 2. **`pypi`** — `needs: build`, so a wheel that does not install or import
-   fails the gate and this never runs. Uploads all three distributions with
-   `pypa/gh-action-pypi-publish`.
-3. **`ghcr`** — `needs: pypi`. Builds `packages/api/Dockerfile` and pushes
-   `ghcr.io/nadeem4/nl2sql-api` at both the tag and `latest`. It has to follow
-   the PyPI upload because that Dockerfile installs `nl2sql-engine` and `nl2sql-api`
-   from PyPI.
-4. **`docs`** — `needs: pypi`. `mike deploy --push --update-aliases $TAG latest`
-   adds a versioned copy of the docs to `gh-pages` and moves the `latest` alias
-   onto it.
+   fails the gate and this never runs. It is a matrix job with one leg per
+   package: each leg runs in its own GitHub Environment
+   (`pypi-nl2sql-engine`, `pypi-nl2sql-api`, `pypi-nl2sql-adapter-sdk`),
+   stages only that package's sdist and wheel into an `upload/` directory and
+   points `pypa/gh-action-pypi-publish` at it. One environment per package is
+   what makes each PyPI trusted-publisher registration unique — see
+   [PyPI pending publishers](#pypi-pending-publishers).
+3. **`ghcr`** — `needs: pypi`, which waits for every leg of the matrix. Builds
+   `packages/api/Dockerfile` and pushes `ghcr.io/nadeem4/nl2sql-api` at both the
+   tag and `latest`. It has to follow the PyPI upload because that Dockerfile
+   installs `nl2sql-engine` and `nl2sql-api` from PyPI.
+4. **`docs`** — `needs: pypi`, likewise after all three uploads.
+   `mike deploy --push --update-aliases $TAG latest` adds a versioned copy of
+   the docs to `gh-pages` and moves the `latest` alias onto it.
 
 Authentication is PyPI **trusted publishing** (OIDC, `id-token: write`). There
 is no API token anywhere in the workflow and no secret to rotate.
@@ -126,25 +131,52 @@ yet this is a **pending publisher**, created at
 [pypi.org/manage/account/publishing](https://pypi.org/manage/account/publishing/).
 
 Add one for each of the three names — `nl2sql-engine`, `nl2sql-api` and
-`nl2sql-adapter-sdk` — all with the same values. The engine publishes as
-`nl2sql-engine` because the `nl2sql` name on PyPI is already taken by an
-unrelated project; the import package is still `nl2sql`.
+`nl2sql-adapter-sdk`. The engine publishes as `nl2sql-engine` because the
+`nl2sql` name on PyPI is already taken by an unrelated project; the import
+package is still `nl2sql`.
+
+!!! warning "The environment name is required and differs per package"
+    PyPI keys a pending publisher on the tuple **(owner, repository, workflow,
+    environment)** and requires that tuple to be unique. All three of our
+    projects publish from the same owner, the same repository and the same
+    workflow file, so with the environment left blank all three tuples are
+    identical: the first registration succeeds and the next two are rejected
+    with *"A pending trusted publisher matching this configuration has already
+    been registered for a different project name."*
+
+    The environment is therefore the only field that can distinguish them, and
+    `publish_pypi.yaml` gives each package its own. **Fill it in exactly as
+    below** — these strings are the contract between the workflow and PyPI, and
+    a mismatch fails the upload with an OIDC error rather than a helpful one.
+
+Owner `nadeem4`, repository `nl2sql` and workflow `publish_pypi.yaml` are the
+same on all three entries. Only the project name and the environment differ:
+
+| PyPI Project Name | Environment name |
+| --- | --- |
+| `nl2sql-engine` | `pypi-nl2sql-engine` |
+| `nl2sql-api` | `pypi-nl2sql-api` |
+| `nl2sql-adapter-sdk` | `pypi-nl2sql-adapter-sdk` |
 
 | Field | Value |
 | --- | --- |
-| PyPI Project Name | `nl2sql-engine` / `nl2sql-api` / `nl2sql-adapter-sdk` |
 | Owner | `nadeem4` |
 | Repository name | `nl2sql` |
 | Workflow name | `publish_pypi.yaml` |
-| Environment name | *(leave empty)* |
+| Environment name | per the table above — **never blank** |
+
+The environments do not need to be created by hand. Referencing them in
+`publish_pypi.yaml` is enough for GitHub to create them on the first run, after
+which they appear under **Settings → Environments** and can be given reviewers
+or branch rules if the release should be gated further.
 
 Once a name has published for the first time, its pending publisher becomes an
 ordinary trusted publisher on the project. **Do not create an API token and do
 not add a `password` to the publish step** — the workflow authenticates with
 OIDC and adding a token secret would only widen the blast radius.
 
-Renaming `publish_pypi.yaml` breaks publishing until the publisher entries are
-updated to match.
+Renaming `publish_pypi.yaml`, or renaming an environment in it, breaks
+publishing until the publisher entries are updated to match.
 
 ### GHCR package visibility
 
@@ -165,10 +197,10 @@ or tagged.
 
 ## Package order
 
-The single upload step sends all three distributions together, so ordering is
-usually not something you manage. It matters when an upload partially fails and
-you re-publish by hand: release in dependency order so no package is ever on
-PyPI referencing a version of its dependency that is not.
+The three matrix legs run in parallel, so ordering is not something the
+workflow manages. It matters when one leg fails and you re-publish by hand:
+release in dependency order so no package is ever on PyPI referencing a version
+of its dependency that is not.
 
 ```mermaid
 flowchart TD
