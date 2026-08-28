@@ -359,13 +359,17 @@ def setup_command(demo: bool = False, lite: bool = True, docker: bool = False, a
             docker_dir = demo_manager.setup_docker(api_key=api_key)
             if inquirer.confirm(message="Start Docker containers now?", default=True).execute():
                 demo_manager.start_docker_containers(docker_dir)
-            if inquirer.confirm(message="Apply secrets to local environment (.env.demo)?", default=True).execute():
-                demo_manager.copy_docker_env_to_root(docker_dir)
                 
             console.print(Panel(f"""[bold yellow]Next Steps:[/bold yellow]
                     1. [bold]Verify & Index[/bold]:
                     Once database containers are healthy (~30s), run:
                     [cyan]nl2sql --env demo index[/cyan]
+
+                    2. [bold]API[/bold]: the 'app' container serves the REST API on
+                    [cyan]http://localhost:8000[/cyan].
+
+                    3. [bold]MSSQL[/bold] is opt-in:
+                    [cyan]docker compose -f docker-compose.demo.yml --profile mssql up -d[/cyan]
                     """, title="Docker Instructions", border_style="yellow")
                 )
         

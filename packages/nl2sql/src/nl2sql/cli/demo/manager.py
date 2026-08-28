@@ -123,6 +123,11 @@ class DemoManager:
             
         self._write_common_artifacts()
         
+        # The app container reads the same .env.demo the lite path writes, so it
+        # has to exist before `docker compose up` (and before `docker compose config`).
+        self.print_step("Writing .env.demo configuration...")
+        self.copy_docker_env_to_root(docker_dir)
+        
         self.print_success("Docker Configuration Generated")
         return docker_dir
 

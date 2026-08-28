@@ -27,6 +27,9 @@ nl2sql setup --demo --docker
 `--lite` and `--docker` are mutually exclusive; lite is the default when neither
 is given.
 
+`--docker` writes a `demo_docker/` directory and builds the application image
+from this repository, so run it from a clone of the repo.
+
 This writes the following, relative to the directory you run the command in:
 
 - SQLite databases in `data/demo_lite/`
@@ -70,6 +73,47 @@ Because the demo indexes with `local` and the default environment indexes with
 `VECTOR_STORE=data/vector_store_demo` directory, so they do not collide. If you
 change `EMBEDDING_PROVIDER` for an existing store, re-run `nl2sql index` — the
 store otherwise raises `EmbeddingDimensionMismatchError`.
+
+## The Docker demo stack
+
+`nl2sql setup --demo --docker` writes `demo_docker/docker-compose.demo.yml`. The
+default stack is the two Postgres databases, MySQL, and an `app` container that
+serves the REST API:
+
+```bash
+cd demo_docker
+docker compose -f docker-compose.demo.yml up -d
+```
+
+| Service | Image | Host port |
+| --- | --- | --- |
+| `manufacturing_ref` | `postgres:15` | 5433 |
+| `manufacturing_ops` | `postgres:15` | 5434 |
+| `manufacturing_supply` | `mysql:8` | 3307 |
+| `app` | built from `packages/api/Dockerfile` | 8000 |
+| `manufacturing_history` | `mcr.microsoft.com/mssql/server:2022-latest` | 1434 (profile `mssql`) |
+
+The `app` service builds from the repo root, reads the same `.env.demo` the lite
+path writes, mounts `configs/` and `data/` from the repo, and waits for each
+database to report healthy (`depends_on: condition: service_healthy`) before it
+starts. The API is then on <http://localhost:8000>.
+
+### MSSQL is opt-in
+
+`manufacturing_history` sits behind the `mssql` Compose profile because the SQL
+Server image is a ~1.6 GB pull. Nothing outside the profile depends on it, so the
+default `up` never touches it. Opt in with:
+
+```bash
+docker compose -f docker-compose.demo.yml --profile mssql up -d
+```
+
+Check what a profile resolves to without pulling anything:
+
+```bash
+docker compose -f docker-compose.demo.yml config --services
+docker compose -f docker-compose.demo.yml --profile mssql config --services
+```
 
 ## 3. Use demo data with the CLI
 
