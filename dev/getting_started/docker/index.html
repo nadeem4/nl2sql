@@ -1535,10 +1535,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#install-adapters" class="md-nav__link">
+  <a href="#adapters" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Install adapters
+        Adapters
       
     </span>
   </a>
@@ -3798,10 +3798,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#install-adapters" class="md-nav__link">
+  <a href="#adapters" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Install adapters
+        Adapters
       
     </span>
   </a>
@@ -3862,24 +3862,23 @@
 <p>Use this path when you want the HTTP API only.</p>
 <h2 id="build-the-image">Build the image</h2>
 <p>From the repo root:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># Dev image (local source)</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>docker<span class="w"> </span>build<span class="w"> </span>-f<span class="w"> </span>packages/api/Dockerfile.dev<span class="w"> </span>-t<span class="w"> </span>nl2sql-api-dev<span class="w"> </span>.
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="c1"># PyPI image (stable releases)</span>
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>docker<span class="w"> </span>build<span class="w"> </span>-f<span class="w"> </span>packages/api/Dockerfile<span class="w"> </span>-t<span class="w"> </span>nl2sql-api<span class="w"> </span>.
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>docker<span class="w"> </span>build<span class="w"> </span>-f<span class="w"> </span>packages/api/Dockerfile<span class="w"> </span>-t<span class="w"> </span>nl2sql-api<span class="w"> </span>.
 </code></pre></div>
-<h2 id="install-adapters">Install adapters</h2>
-<p>You choose adapters at build time:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>docker<span class="w"> </span>build<span class="w"> </span>-f<span class="w"> </span>packages/api/Dockerfile<span class="w"> </span>--build-arg<span class="w"> </span><span class="nv">NL2SQL_EXTRAS</span><span class="o">=</span>postgres<span class="w"> </span>-t<span class="w"> </span>nl2sql-api<span class="w"> </span>.
-</code></pre></div>
-<p>For dev images:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>docker<span class="w"> </span>build<span class="w"> </span>-f<span class="w"> </span>packages/api/Dockerfile.dev<span class="w"> </span>--build-arg<span class="w"> </span><span class="nv">NL2SQL_EXTRAS</span><span class="o">=</span>all<span class="w"> </span>-t<span class="w"> </span>nl2sql-api-dev<span class="w"> </span>.
-</code></pre></div>
+<p>The image installs the local packages from the build context -
+<code>packages/adapter-sdk</code>, <code>packages/nl2sql[postgres,mysql]</code> and <code>packages/api</code> - so
+the build context has to be the repo root.</p>
+<h2 id="adapters">Adapters</h2>
+<p>The image ships the Postgres and MySQL drivers. Every dialect adapter is part of
+the <code>nl2sql</code> distribution; an extra only adds the driver it needs, so add another
+extra to the <code>pip install</code> line in <code>packages/api/Dockerfile</code> to include one -
+for example <code>"./packages/nl2sql[postgres,mysql,mssql]"</code>.</p>
+<p>The demo stack builds this same image as its <code>app</code> service - see
+<a href="../demo/#the-docker-demo-stack">Demo data</a>.</p>
 <h2 id="run-the-api">Run the API</h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>docker<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>-p<span class="w"> </span><span class="m">8000</span>:8000<span class="w"> </span>nl2sql-api
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>docker<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>-p<span class="w"> </span><span class="m">8000</span>:8000<span class="w"> </span>nl2sql-api
 </code></pre></div>
 <p>To set environment selection:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>docker<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>-p<span class="w"> </span><span class="m">8000</span>:8000<span class="w"> </span>-e<span class="w"> </span><span class="nv">ENV</span><span class="o">=</span>demo<span class="w"> </span>nl2sql-api
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>docker<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>-p<span class="w"> </span><span class="m">8000</span>:8000<span class="w"> </span>-e<span class="w"> </span><span class="nv">ENV</span><span class="o">=</span>demo<span class="w"> </span>nl2sql-api
 </code></pre></div>
 <h2 id="configuration">Configuration</h2>
 <p>Mount or bake your config files into the container:</p>
@@ -3891,9 +3890,9 @@
 </ul>
 <p>See <code>configuration/system.md</code> for environment variables and defaults.</p>
 <h2 id="api-usage">API usage</h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>http://localhost:8000/api/v1/query<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">"Content-Type: application/json"</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">  </span>-d<span class="w"> </span><span class="s1">'{"natural_language":"Top 5 customers by revenue last quarter?"}'</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>http://localhost:8000/api/v1/query<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">"Content-Type: application/json"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span>-d<span class="w"> </span><span class="s1">'{"natural_language":"Top 5 customers by revenue last quarter?"}'</span>
 </code></pre></div>
 
 

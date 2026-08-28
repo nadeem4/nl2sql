@@ -1633,6 +1633,28 @@
 </nav>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="#the-docker-demo-stack">
+<span class="md-ellipsis">
+      
+        The Docker demo stack
+      
+    </span>
+</a>
+<nav aria-label="The Docker demo stack" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#mssql-is-opt-in">
+<span class="md-ellipsis">
+      
+        MSSQL is opt-in
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="#3-use-demo-data-with-the-cli">
 <span class="md-ellipsis">
       
@@ -1726,6 +1748,8 @@ multi-database scenario with cross-database relationships.</p>
 </code></pre></div>
 <p><code>--lite</code> and <code>--docker</code> are mutually exclusive; lite is the default when neither
 is given.</p>
+<p><code>--docker</code> writes a <code>demo_docker/</code> directory and builds the application image
+from this repository, so run it from a clone of the repo.</p>
 <p>This writes the following, relative to the directory you run the command in:</p>
 <ul>
 <li>SQLite databases in <code>data/demo_lite/</code></li>
@@ -1766,12 +1790,69 @@ instead of the OpenAI embeddings API. The first indexing run downloads roughly
 <code>VECTOR_STORE=data/vector_store_demo</code> directory, so they do not collide. If you
 change <code>EMBEDDING_PROVIDER</code> for an existing store, re-run <code>nl2sql index</code> — the
 store otherwise raises <code>EmbeddingDimensionMismatchError</code>.</p>
+<h2 id="the-docker-demo-stack">The Docker demo stack</h2>
+<p><code>nl2sql setup --demo --docker</code> writes <code>demo_docker/docker-compose.demo.yml</code>. The
+default stack is the two Postgres databases, MySQL, and an <code>app</code> container that
+serves the REST API:</p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-2-1" id="__codelineno-2-1" name="__codelineno-2-1"></a><span class="nb">cd</span><span class="w"> </span>demo_docker
+<a href="#__codelineno-2-2" id="__codelineno-2-2" name="__codelineno-2-2"></a>docker<span class="w"> </span>compose<span class="w"> </span>-f<span class="w"> </span>docker-compose.demo.yml<span class="w"> </span>up<span class="w"> </span>-d
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Service</th>
+<th>Image</th>
+<th>Host port</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>manufacturing_ref</code></td>
+<td><code>postgres:15</code></td>
+<td>5433</td>
+</tr>
+<tr>
+<td><code>manufacturing_ops</code></td>
+<td><code>postgres:15</code></td>
+<td>5434</td>
+</tr>
+<tr>
+<td><code>manufacturing_supply</code></td>
+<td><code>mysql:8</code></td>
+<td>3307</td>
+</tr>
+<tr>
+<td><code>app</code></td>
+<td>built from <code>packages/api/Dockerfile</code></td>
+<td>8000</td>
+</tr>
+<tr>
+<td><code>manufacturing_history</code></td>
+<td><code>mcr.microsoft.com/mssql/server:2022-latest</code></td>
+<td>1434 (profile <code>mssql</code>)</td>
+</tr>
+</tbody>
+</table>
+<p>The <code>app</code> service builds from the repo root, reads the same <code>.env.demo</code> the lite
+path writes, mounts <code>configs/</code> and <code>data/</code> from the repo, and waits for each
+database to report healthy (<code>depends_on: condition: service_healthy</code>) before it
+starts. The API is then on <a href="http://localhost:8000">http://localhost:8000</a>.</p>
+<h3 id="mssql-is-opt-in">MSSQL is opt-in</h3>
+<p><code>manufacturing_history</code> sits behind the <code>mssql</code> Compose profile because the SQL
+Server image is a ~1.6 GB pull. Nothing outside the profile depends on it, so the
+default <code>up</code> never touches it. Opt in with:</p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-3-1" id="__codelineno-3-1" name="__codelineno-3-1"></a>docker<span class="w"> </span>compose<span class="w"> </span>-f<span class="w"> </span>docker-compose.demo.yml<span class="w"> </span>--profile<span class="w"> </span>mssql<span class="w"> </span>up<span class="w"> </span>-d
+</code></pre></div>
+<p>Check what a profile resolves to without pulling anything:</p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-4-1" id="__codelineno-4-1" name="__codelineno-4-1"></a>docker<span class="w"> </span>compose<span class="w"> </span>-f<span class="w"> </span>docker-compose.demo.yml<span class="w"> </span>config<span class="w"> </span>--services
+<a href="#__codelineno-4-2" id="__codelineno-4-2" name="__codelineno-4-2"></a>docker<span class="w"> </span>compose<span class="w"> </span>-f<span class="w"> </span>docker-compose.demo.yml<span class="w"> </span>--profile<span class="w"> </span>mssql<span class="w"> </span>config<span class="w"> </span>--services
+</code></pre></div>
 <h2 id="3-use-demo-data-with-the-cli">3. Use demo data with the CLI</h2>
-<div class="highlight"><pre><span></span><code><a href="#__codelineno-2-1" id="__codelineno-2-1" name="__codelineno-2-1"></a><span class="c1"># Run a query against demo data</span>
-<a href="#__codelineno-2-2" id="__codelineno-2-2" name="__codelineno-2-2"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>run<span class="w"> </span><span class="s2">"Show me broken machines in Austin"</span>
-<a href="#__codelineno-2-3" id="__codelineno-2-3" name="__codelineno-2-3"></a>
-<a href="#__codelineno-2-4" id="__codelineno-2-4" name="__codelineno-2-4"></a><span class="c1"># Index schemas if you need to re-index after regenerating demo data</span>
-<a href="#__codelineno-2-5" id="__codelineno-2-5" name="__codelineno-2-5"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>index
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-5-1" id="__codelineno-5-1" name="__codelineno-5-1"></a><span class="c1"># Run a query against demo data</span>
+<a href="#__codelineno-5-2" id="__codelineno-5-2" name="__codelineno-5-2"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>run<span class="w"> </span><span class="s2">"Show me broken machines in Austin"</span>
+<a href="#__codelineno-5-3" id="__codelineno-5-3" name="__codelineno-5-3"></a>
+<a href="#__codelineno-5-4" id="__codelineno-5-4" name="__codelineno-5-4"></a><span class="c1"># Index schemas if you need to re-index after regenerating demo data</span>
+<a href="#__codelineno-5-5" id="__codelineno-5-5" name="__codelineno-5-5"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>index
 </code></pre></div>
 <p><code>--env &lt;name&gt;</code> loads <code>.env.&lt;name&gt;</code>. To point at an exact file instead, use
 <code>--env-file &lt;path&gt;</code>, which takes precedence over <code>--env</code>. The equivalent
@@ -1947,7 +2028,7 @@ mirror real-world enterprise setups where data is distributed across systems.</p
 - <code>manufacturing_history.sales_orders.factory_id</code> -&gt; <code>manufacturing_ref.factories.id</code></p>
 <h2 id="refreshing-demo-data">Refreshing demo data</h2>
 <p>Regenerate data at any time with:</p>
-<div class="highlight"><pre><span></span><code><a href="#__codelineno-3-1" id="__codelineno-3-1" name="__codelineno-3-1"></a>nl2sql<span class="w"> </span>setup<span class="w"> </span>--demo<span class="w"> </span>--lite
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-6-1" id="__codelineno-6-1" name="__codelineno-6-1"></a>nl2sql<span class="w"> </span>setup<span class="w"> </span>--demo<span class="w"> </span>--lite
 </code></pre></div>
 <p>This overwrites all demo databases and regenerates sample questions and configs.</p>
 </article>
