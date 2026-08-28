@@ -193,6 +193,85 @@ cleaned up afterwards.
     gain one. Use the commit footer, which cannot be forgotten because it does
     not persist.
 
+## Troubleshooting: the release PR merges but nothing is tagged
+
+Both traps below fail the same way. `release_please.yml` reports success, no tag
+appears, and the merged release pull request keeps its `autorelease: pending`
+label — so every later run refuses to open a new release PR:
+
+```txt
+There are untagged, merged release PRs outstanding - aborting
+```
+
+That line is a *consequence*, not a diagnosis. The cause is earlier in the same
+run, in the `Building releases` phase.
+
+### The component mismatch
+
+Symptom, in the `Building releases` phase of the run log:
+
+```txt
+PR component: undefined does not match configured component: nl2sql-engine
+```
+
+With `separate-pull-requests: false` the Merge plugin names the grouped release
+branch `release-please--branches--main`, with no component in it. When the
+release is built back out of that merged PR, release-please compares the
+branch's component against `getBranchComponent()` — which returns the configured
+component **regardless of `include-component-in-tag`**, unlike `getComponent()`,
+which honours it:
+
+```ts
+async getComponent()       { if (!this.includeComponentInTag) return ''; ... }  // ""
+async getBranchComponent() { return this.component || ...; }                    // "nl2sql-engine"
+```
+
+A `package-name` on the `packages` entry is what supplies that component. The
+two disagree, the release is skipped, and no tag is created.
+
+The fix is to carry **no `package-name`** for the root package. It was inert
+otherwise: the `python` strategy takes its project name from the root
+`pyproject.toml` (`projectName = pyProject.name`), not from that key, so the set
+of files release-please updates is unchanged.
+
+!!! danger "The `pullRequestTitlePattern` warnings are noise, not the cause"
+    The same run also logs, repeatedly:
+
+    ```txt
+    pullRequestTitlePattern miss the part of '${scope}'
+    pullRequestTitlePattern miss the part of '${component}'
+    pullRequestTitlePattern miss the part of '${version}'
+    ```
+
+    These fire unconditionally whenever a title pattern omits a placeholder, and
+    the built-in grouped-PR default — `chore: release ${branch}`, which renders
+    as `chore: release main` — omits all three. They appear on healthy runs too.
+
+    A missing `${version}` in the title is **not** fatal. Release-please falls
+    back to the pull request body, whose `<summary>` block carries the version;
+    the documentation says it parses the version *"either via the pull request
+    title or body format"*.
+
+    Setting `group-pull-request-title-pattern` to add `${version}` does not fix
+    the mismatch above, and it breaks that body fallback for any release PR
+    already merged under the old title (`Bad pull request title: 'chore: release
+    main'`), stranding that version permanently. Reading these warnings as the
+    cause cost a release cycle.
+
+### Manifest seeding
+
+`.release-please-manifest.json` records the **last released** version, not the
+next one, so it must be seeded *below* the first version to be shipped:
+
+```json
+{ ".": "0.0.0" }
+```
+
+Seeding it at the target instead — `{".": "0.1.0"}` while a `Release-As: 0.1.0`
+footer pins the same value — makes the first release a no-op: release-please
+treats the version it would propose as already released, so the pull request it
+opens rewrites `CHANGELOG.md` and bumps nothing. This also cost a cycle.
+
 ## Documentation versions
 
 `gh-pages` is managed by `mike`, which keeps one built site per version:
