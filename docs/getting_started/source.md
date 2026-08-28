@@ -12,7 +12,6 @@ python -m venv venv
 source venv/bin/activate
 
 pip install -e packages/adapter-sdk
-pip install -e packages/adapter-sdk
 pip install -e "packages/nl2sql[postgres]"
 pip install -e packages/api
 ```
@@ -41,8 +40,8 @@ python -c "from nl2sql import NL2SQL; print(NL2SQL().run_query('hello'))"
 API service (Docker):
 
 ```bash
-docker build -f packages/api/Dockerfile.dev --build-arg NL2SQL_EXTRAS=postgres -t nl2sql-api-dev .
-docker run --rm -p 8000:8000 nl2sql-api-dev
+docker build -f packages/api/Dockerfile -t nl2sql-api .
+docker run --rm -p 8000:8000 nl2sql-api
 ```
 
 See [Docker (REST API)](docker.md) for adapter extras, environment selection
