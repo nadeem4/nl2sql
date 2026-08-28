@@ -157,11 +157,19 @@ GO
         content = f"""# NL2SQL Demo Environment Secrets
 # Generated automatically. DO NOT COMMIT TO VERSION CONTROL.
 
+# Host-side defaults: the published ports on localhost, for
+# `nl2sql --env demo index` / `run` from the developer's machine. The compose
+# `app` service overrides these with the service names and internal ports.
+
 # 1. Manufacturing Ref (Postgres)
+DEMO_REF_HOST=localhost
+DEMO_REF_PORT=5433
 DEMO_REF_USER=ref_admin
 DEMO_REF_PASSWORD={secrets["DEMO_REF_PASSWORD"]}
 
 # 2. Manufacturing Ops (Postgres)
+DEMO_OPS_HOST=localhost
+DEMO_OPS_PORT=5434
 DEMO_OPS_USER=ops_admin
 DEMO_OPS_PASSWORD={secrets["DEMO_OPS_PASSWORD"]}
 
@@ -170,11 +178,15 @@ DEMO_POSTGRES_USER=postgres
 DEMO_POSTGRES_PASSWORD={secrets["DEMO_POSTGRES_PASSWORD"]}
 
 # 3. Manufacturing Supply (MySQL)
+DEMO_SUPPLY_HOST=localhost
+DEMO_SUPPLY_PORT=3307
 DEMO_SUPPLY_USER=supply_admin
 DEMO_SUPPLY_PASSWORD={secrets["DEMO_SUPPLY_PASSWORD"]}
 DEMO_MYSQL_ROOT_PASSWORD={secrets["DEMO_MYSQL_ROOT_PASSWORD"]}
 
 # 4. Manufacturing History (MSSQL)
+DEMO_HISTORY_HOST=localhost
+DEMO_HISTORY_PORT=1434
 DEMO_HISTORY_USER=history_admin
 DEMO_HISTORY_PASSWORD={secrets["DEMO_HISTORY_PASSWORD"]}
 DEMO_MSSQL_SA_PASSWORD={secrets["DEMO_MSSQL_SA_PASSWORD"]}

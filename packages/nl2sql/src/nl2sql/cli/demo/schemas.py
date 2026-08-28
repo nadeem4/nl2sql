@@ -323,6 +323,18 @@ services:
       - "8000:8000"
     env_file:
       - ../.env.demo
+    environment:
+      # .env.demo points at localhost + the published ports, which is correct
+      # from the developer's machine but not from in here -- inside the compose
+      # network the databases answer on their service names and internal ports.
+      DEMO_REF_HOST: manufacturing_ref
+      DEMO_REF_PORT: 5432
+      DEMO_OPS_HOST: manufacturing_ops
+      DEMO_OPS_PORT: 5432
+      DEMO_SUPPLY_HOST: manufacturing_supply
+      DEMO_SUPPLY_PORT: 3306
+      DEMO_HISTORY_HOST: manufacturing_history
+      DEMO_HISTORY_PORT: 1433
     volumes:
       - ../configs:/app/configs
       - ../data:/app/data

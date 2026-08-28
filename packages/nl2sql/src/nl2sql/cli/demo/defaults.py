@@ -69,13 +69,17 @@ DEMO_LITE_DATASOURCES = [
     {"id": "manufacturing_history", "connection": {"type": "sqlite", "database": "data/demo_lite/manufacturing_history.db"}, "description": "Historical Data (Sales)"},
 ]
 
+# Host and port are resolved from the environment so one config serves both
+# callers: `.env.demo` defaults to localhost + the published ports for the
+# host-side CLI, and the compose `app` service overrides them with the
+# compose service names + internal ports.
 DEMO_DOCKER_DATASOURCES = [
     {
         "id": "manufacturing_ref", 
         "connection": {
             "type": "postgres", 
-            "host": "localhost",
-            "port": 5433,
+            "host": "${env:DEMO_REF_HOST}",
+            "port": "${env:DEMO_REF_PORT}",
             "user": "${env:DEMO_REF_USER}",
             "password": "${env:DEMO_REF_PASSWORD}",
             "database": "manufacturing_ref"
@@ -86,8 +90,8 @@ DEMO_DOCKER_DATASOURCES = [
         "id": "manufacturing_ops", 
         "connection": {
             "type": "postgres", 
-            "host": "localhost",
-            "port": 5434,
+            "host": "${env:DEMO_OPS_HOST}",
+            "port": "${env:DEMO_OPS_PORT}",
             "user": "${env:DEMO_OPS_USER}",
             "password": "${env:DEMO_OPS_PASSWORD}",
             "database": "manufacturing_ops"
@@ -98,8 +102,8 @@ DEMO_DOCKER_DATASOURCES = [
         "id": "manufacturing_supply", 
         "connection": {
             "type": "mysql", 
-            "host": "localhost",
-            "port": 3307,
+            "host": "${env:DEMO_SUPPLY_HOST}",
+            "port": "${env:DEMO_SUPPLY_PORT}",
             "user": "${env:DEMO_SUPPLY_USER}",
             "password": "${env:DEMO_SUPPLY_PASSWORD}",
             "database": "manufacturing_supply"
@@ -110,8 +114,8 @@ DEMO_DOCKER_DATASOURCES = [
         "id": "manufacturing_history", 
         "connection": {
             "type": "mssql", 
-            "host": "localhost",
-            "port": 1434,
+            "host": "${env:DEMO_HISTORY_HOST}",
+            "port": "${env:DEMO_HISTORY_PORT}",
             "user": "${env:DEMO_HISTORY_USER}",
             "password": "${env:DEMO_HISTORY_PASSWORD}",
             "database": "manufacturing_history",
