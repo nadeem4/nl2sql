@@ -12,7 +12,14 @@ docker build -f packages/api/Dockerfile -t nl2sql-api .
 
 The image installs the local packages from the build context -
 `packages/adapter-sdk`, `packages/nl2sql[postgres,mysql]` and `packages/api` - so
-the build context has to be the repo root.
+the build context has to be the repo root. The `COPY ./packages/...` lines
+resolve against the context, so `-f packages/api/Dockerfile .` is the only
+correct invocation; building with `packages/api` as the context fails with
+`"/packages/adapter-sdk": not found`.
+
+The root `.dockerignore` keeps that context to the sources the build actually
+needs - it drops `.git`, virtualenvs, `docs/`, `site/`, `chroma_db/`, `data/`,
+`logs/` and stale `build/`, `dist/` and `*.egg-info` directories.
 
 ## Adapters
 

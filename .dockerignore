@@ -1,0 +1,47 @@
+# Build context for packages/api/Dockerfile is the repo root, so without this
+# the whole working tree is sent to the daemon. Only packages/adapter-sdk,
+# packages/nl2sql and packages/api are COPYed, and everything they need to
+# build must survive - including packages/nl2sql/README.md, which its
+# pyproject.toml declares via `readme = "README.md"`.
+#
+# Patterns are matched against the path relative to the context root, so
+# repo-level directories are named directly and anything that also appears
+# inside a package is prefixed with `**/`.
+
+# Version control and CI
+.git
+.gitignore
+.github
+
+# Virtualenvs
+.venv*
+venv
+**/.venv*
+
+# Python bytecode and test caches
+**/__pycache__
+**/*.pyc
+**/*.pyo
+**/.pytest_cache
+.mypy_cache
+.ruff_cache
+
+# Packaging artifacts (stale copies of the sources we install from)
+**/build
+**/dist
+**/*.egg-info
+
+# Docs sources and the built site
+docs
+site
+mkdocs.yml
+requirements-docs.txt
+
+# Local runtime state and generated data
+chroma_db
+data
+logs
+artifacts
+demo_docker
+.env
+.env.*
