@@ -208,9 +208,9 @@ See [Releasing](docs/development/releasing.md) for the release checklist.
 
 ```text
 packages/
-├── core/               # The Engine (Graph, State, Logic)
+├── nl2sql/             # Engine, CLI and adapters (Postgres, MySQL, MSSQL, SQLite, DuckDB)
 ├── adapter-sdk/        # Interface Contract for new Databases
-└── adapters/           # Official Dialects (Postgres, MSSQL, MySQL)
+└── api/                # REST API service (nl2sql-api)
 configs/                # Runtime Configuration (Policies, Prompts)
 docs/                   # Architecture & Operations Manual
 ```
