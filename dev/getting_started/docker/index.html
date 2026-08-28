@@ -3866,7 +3866,13 @@
 </code></pre></div>
 <p>The image installs the local packages from the build context -
 <code>packages/adapter-sdk</code>, <code>packages/nl2sql[postgres,mysql]</code> and <code>packages/api</code> - so
-the build context has to be the repo root.</p>
+the build context has to be the repo root. The <code>COPY ./packages/...</code> lines
+resolve against the context, so <code>-f packages/api/Dockerfile .</code> is the only
+correct invocation; building with <code>packages/api</code> as the context fails with
+<code>"/packages/adapter-sdk": not found</code>.</p>
+<p>The root <code>.dockerignore</code> keeps that context to the sources the build actually
+needs - it drops <code>.git</code>, virtualenvs, <code>docs/</code>, <code>site/</code>, <code>chroma_db/</code>, <code>data/</code>,
+<code>logs/</code> and stale <code>build/</code>, <code>dist/</code> and <code>*.egg-info</code> directories.</p>
 <h2 id="adapters">Adapters</h2>
 <p>The image ships the Postgres and MySQL drivers. Every dialect adapter is part of
 the <code>nl2sql-engine</code> distribution; an extra only adds the driver it needs, so add another

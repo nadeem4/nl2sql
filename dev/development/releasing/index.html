@@ -2142,8 +2142,15 @@ changelog and the version it proposes is the release decision.</p>
    <a href="#pypi-pending-publishers">PyPI pending publishers</a>.</li>
 <li><strong><code>ghcr</code></strong> — <code>needs: pypi</code>, which waits for every leg of the matrix. Builds
    <code>packages/api/Dockerfile</code> and pushes <code>ghcr.io/nadeem4/nl2sql-api</code> at both the
-   tag and <code>latest</code>. It has to follow the PyPI upload because that Dockerfile
-   installs <code>nl2sql-engine</code> and <code>nl2sql-api</code> from PyPI.</li>
+   tag and <code>latest</code>. The build context is the <strong>repository root</strong> (<code>context: .</code>)
+   with the Dockerfile named explicitly (<code>file: packages/api/Dockerfile</code>),
+   because the Dockerfile installs the three packages from their local sources
+   and its <code>COPY ./packages/...</code> paths resolve against the build context. A
+   context of <code>packages/api</code> makes them resolve to
+   <code>packages/api/packages/adapter-sdk</code>, which does not exist — that is what
+   failed on <code>v0.1.0</code>. A root <code>.dockerignore</code> keeps that context small.
+   <code>needs: pypi</code> is retained so the image is only published for a release that
+   reached PyPI, not because the image build needs PyPI.</li>
 <li><strong><code>docs</code></strong> — <code>needs: pypi</code>, likewise after all three uploads.
    <code>mike deploy --push --update-aliases $TAG latest</code> adds a versioned copy of
    the docs to <code>gh-pages</code> and moves the <code>latest</code> alias onto it.</li>
