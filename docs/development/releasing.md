@@ -37,6 +37,22 @@ on `main`, so the commit subject is the release input:
 | `docs:`, `perf:`, `deps:`, `revert:` | patch, and shown in the changelog |
 | `chore:`, `ci:`, `test:`, `build:`, `refactor:`, `style:` | no release on their own |
 
+!!! warning "The project is pre-1.0: a breaking change bumps the *minor*"
+    `release-please-config.json` sets top-level `bump-minor-pre-major: true`,
+    which the schema describes as *"Breaking changes only bump semver minor if
+    version < 1.0.0"*. While the version is below `1.0.0`, a `feat!:` or a
+    `BREAKING CHANGE:` footer therefore moves `0.1.0` to `0.2.0` rather than to
+    `1.0.0` — semver's rule for an unstable public API.
+
+    Without this setting the *first* breaking commit silently declares the
+    project stable. That is exactly what happened before it was added: the
+    `refactor!:` that collapsed the distributions made release-please propose
+    `1.0.0`.
+
+    Going to `1.0.0` is then a deliberate act: set the version explicitly with a
+    `Release-As: 1.0.0` commit (below). The flag stays `true` afterwards and
+    becomes a no-op once the version is `>= 1.0.0`.
+
 ### 2. `release_please.yml` maintains a release PR
 
 Every push to `main` runs `googleapis/release-please-action@v4`. It keeps a
@@ -101,6 +117,81 @@ changelog and the version it proposes is the release decision.
 
 Authentication is PyPI **trusted publishing** (OIDC, `id-token: write`). There
 is no API token anywhere in the workflow and no secret to rotate.
+
+## Pinning a version, and the first release
+
+Two settings exist only because release-please was adopted **mid-project**,
+long after the first commit. Both concern the very first release and neither is
+permanent.
+
+### `bootstrap-sha` — where the changelog starts
+
+With no tag in the repository, release-please has no marker for "the last
+release" and walks the whole history, so the first changelog it generated
+listed every `feat:` ever committed — 228 entries reaching back to before this
+phase of work.
+
+The top-level `bootstrap-sha` in `release-please-config.json` is the fix. The
+manifest-releaser documentation describes it as a key that *"will cause
+release-please to stop there for collecting changelog commits (so choose one
+commit earlier than the first commit you want to include)"*. Ours is:
+
+```json
+"bootstrap-sha": "39d488ae9f9943ea5d9879bf2dd503c34370b24a"
+```
+
+That is the **parent** of `28687fe`, the merge of the first pull request in
+this phase of work, so the changelog begins at that pull request and covers
+this phase rather than the entire project.
+
+It is top-level on purpose: the schema does not accept it inside a `packages`
+entry, and the documentation notes it is *"only applicable at top-level
+config"*.
+
+!!! note "It expires on its own"
+    Per the documentation, *"once a release-please generated PR has been
+    merged, this config value will be ignored for all subsequent runs and can
+    be removed."* Once a real `vX.Y.Z` tag exists, that tag is the baseline and
+    `bootstrap-sha` does nothing. Deleting it then is tidy-up, not a behaviour
+    change.
+
+### `Release-As:` — choosing an exact version
+
+To publish a specific version rather than the one conventional commits imply,
+put a `Release-As:` footer in the **body** of a commit that lands on `main`:
+
+```txt
+ci: pin the first release to 0.1.0 and scope its changelog
+
+Release-As: 0.1.0
+```
+
+Release-please reads `Release-As: x.x.x` (case insensitive) from the commit
+body and opens its next release pull request for exactly that version. This is
+how the first release was pinned to `0.1.0` instead of the `1.0.0` that the
+`refactor!:` commit would otherwise have produced.
+
+The footer applies to **one** commit and expires with it — nothing has to be
+cleaned up afterwards.
+
+!!! danger "Do not use the `release-as` *config* key instead"
+    `release-please-config.json` accepts a `release-as` key that does the same
+    job, and it is a trap. The schema marks the per-package form
+    **`[DEPRECATED]`**, advising *"Consider using a `Release-As` commit
+    instead"*, and the documentation warns that it is **sticky**:
+
+    > Note: once the release PR is merged you should either remove this or
+    > update it to a higher version. Otherwise subsequent `manifest-pr` runs
+    > will continue to use this version even though it was already set in the
+    > last release.
+
+    A `release-as` left in the config does not pin one release — it pins
+    **every** release, forever, to that version. The repository would stay at
+    `0.1.0` while commits accumulated, and nobody would get an error saying so.
+
+    This repository therefore has **no `release-as` key at all**, and should not
+    gain one. Use the commit footer, which cannot be forgotten because it does
+    not persist.
 
 ## Documentation versions
 
