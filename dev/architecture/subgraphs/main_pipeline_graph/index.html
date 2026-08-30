@@ -1946,7 +1946,7 @@ Source file path: <code>packages/nl2sql/src/nl2sql/pipeline/graph.py</code></p>
 <p>Failure exits:
 - <code>datasource_resolver</code> can short-circuit to <code>END</code> via <code>resolver_route</code> when no datasource is resolved/allowed.
 - <code>layer_router</code> can return <code>END</code> if no <code>execution_dag</code> or layers are present.
-- <code>layer_router</code> raises <code>PipelineError</code> when no compatible subgraph exists for a datasource; this propagates as an exception from the router function.</p>
+- <code>layer_router</code> raises <code>PipelineExecutionError</code> (an <code>NL2SQLError</code> carrying the <code>PipelineError</code> payload on <code>.error</code>) when no compatible subgraph exists for a datasource; this propagates as an exception from the router function. A conditional-edge router may only return routing decisions, so it cannot report the failure as a <code>PipelineError</code> value in state the way a node does.</p>
 <p>Partial completion behavior:
 - If routing cannot schedule any scan-layer work but <code>execution_dag</code> exists, it routes to <code>aggregator</code> directly.
 - Errors added to <code>GraphState.errors</code> do not automatically stop the graph; the graph relies on routing logic and node behavior for termination.</p>
