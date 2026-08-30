@@ -1,5 +1,7 @@
 import pytest
 
+from nl2sql.common.errors import ErrorCode, ErrorSeverity, PipelineError
+from nl2sql.common.exceptions import NL2SQLError, PipelineExecutionError
 from nl2sql.pipeline.graph_utils import resolve_subgraph
 from nl2sql.pipeline.nodes.global_planner.schemas import (
     ColumnSpec,
@@ -81,16 +83,80 @@ def _scan_state(datasource_id):
 
 def test_scan_layer_router_rejects_datasource_without_sql_capability():
     # Pins the routing path: an incompatible datasource fails closed, never dispatched.
-    # The raise in routes.py names PipelineError, which is a pydantic model rather
-    # than an exception type, so the interpreter surfaces a TypeError instead. That
-    # is pre-existing behaviour; what is pinned here is that routing stops.
     # Arrange
     ctx = _ctx_with_capabilities({"rest_ds": {DatasourceCapability.SUPPORTS_REST.value}})
     route = build_scan_layer_router(ctx)
 
     # Act / Assert
-    with pytest.raises(Exception):
+    with pytest.raises(PipelineExecutionError):
         route(_scan_state("rest_ds"))
+
+
+def test_scan_layer_router_raise_is_a_real_exception_not_a_type_error():
+    # Regression: routes.py used to `raise PipelineError(...)`, a pydantic BaseModel,
+    # so the interpreter raised `TypeError: exceptions must derive from BaseException`
+    # and the diagnostic message never reached the caller.
+    # Arrange
+    ctx = _ctx_with_capabilities({"rest_ds": {DatasourceCapability.SUPPORTS_REST.value}})
+    route = build_scan_layer_router(ctx)
+
+    # Act
+    with pytest.raises(PipelineExecutionError) as excinfo:
+        route(_scan_state("rest_ds"))
+
+    # Assert
+    assert not isinstance(excinfo.value, TypeError)
+    assert "exceptions must derive from BaseException" not in str(excinfo.value)
+
+
+def test_scan_layer_router_error_is_an_nl2sql_error_so_the_cli_catches_it():
+    # The CLI decorator catches NL2SQLError to print a clean red message, so the
+    # routing failure has to sit inside that hierarchy to be handled gracefully.
+    # Arrange
+    ctx = _ctx_with_capabilities({"rest_ds": {DatasourceCapability.SUPPORTS_REST.value}})
+    route = build_scan_layer_router(ctx)
+
+    # Act
+    with pytest.raises(NL2SQLError) as excinfo:
+        route(_scan_state("rest_ds"))
+
+    # Assert
+    assert isinstance(excinfo.value, NL2SQLError)
+
+
+def test_scan_layer_router_error_preserves_the_structured_payload():
+    # The payload is the point: error_code, severity and is_retryable drive downstream
+    # handling, so the exception must carry the PipelineError rather than a bare string.
+    # Arrange
+    ctx = _ctx_with_capabilities({"rest_ds": {DatasourceCapability.SUPPORTS_REST.value}})
+    route = build_scan_layer_router(ctx)
+
+    # Act
+    with pytest.raises(PipelineExecutionError) as excinfo:
+        route(_scan_state("rest_ds"))
+
+    # Assert
+    error = excinfo.value.error
+    assert isinstance(error, PipelineError)
+    assert error.error_code == ErrorCode.INVALID_STATE
+    assert error.severity == ErrorSeverity.ERROR
+    assert error.node == "layer_router"
+    assert error.is_retryable is False
+
+
+def test_scan_layer_router_error_message_names_the_datasource():
+    # The message is what the user reads; the datasource id is the actionable part.
+    # Arrange
+    ctx = _ctx_with_capabilities({"rest_ds": {DatasourceCapability.SUPPORTS_REST.value}})
+    route = build_scan_layer_router(ctx)
+
+    # Act
+    with pytest.raises(PipelineExecutionError) as excinfo:
+        route(_scan_state("rest_ds"))
+
+    # Assert
+    assert "rest_ds" in str(excinfo.value)
+    assert str(excinfo.value) == excinfo.value.error.message
 
 
 def test_scan_layer_router_dispatches_sql_capable_datasource_to_sql_agent():

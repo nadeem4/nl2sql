@@ -38,7 +38,7 @@ Successful completion criteria:
 Failure exits:
 - `datasource_resolver` can short-circuit to `END` via `resolver_route` when no datasource is resolved/allowed.
 - `layer_router` can return `END` if no `execution_dag` or layers are present.
-- `layer_router` raises `PipelineError` when no compatible subgraph exists for a datasource; this propagates as an exception from the router function.
+- `layer_router` raises `PipelineExecutionError` (an `NL2SQLError` carrying the `PipelineError` payload on `.error`) when no compatible subgraph exists for a datasource; this propagates as an exception from the router function. A conditional-edge router may only return routing decisions, so it cannot report the failure as a `PipelineError` value in state the way a node does.
 
 Partial completion behavior:
 - If routing cannot schedule any scan-layer work but `execution_dag` exists, it routes to `aggregator` directly.
