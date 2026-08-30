@@ -10,7 +10,7 @@ import pathlib
 from typing import Union, Dict, Any, List
 
 from nl2sql.context import NL2SQLContext
-from nl2sql.datasources.registry import DatasourceRegistry
+from nl2sql.datasources.registry import DatasourceRegistry, mask_connection_args
 from nl2sql.datasources.models import DatasourceConfig
 
 
@@ -123,7 +123,7 @@ class DatasourceAPI:
         details = {
             "datasource_id": adapter.datasource_id,
             "datasource_engine_type": adapter.datasource_engine_type,
-            "connection_args": adapter.connection_args,
+            "connection_args": mask_connection_args(adapter.connection_args),
             "statement_timeout_ms": adapter.statement_timeout_ms,
             "row_limit": adapter.row_limit,
             "max_bytes": adapter.max_bytes,

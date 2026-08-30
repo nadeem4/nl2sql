@@ -7,6 +7,32 @@ from nl2sql.datasources.protocols import DatasourceAdapterProtocol
 from nl2sql.secrets import SecretManager
 from .models import DatasourceConfig, ConnectionConfig
 
+# Resolved connection args hold plaintext secrets (see ``resolved_connection``),
+# so anything that renders them -- an API payload, a `doctor` row, a pydantic
+# ValidationError repr -- has to mask them by name first.
+SECRET_ARG_HINTS = ("password", "secret", "token", "api_key")
+
+
+def _is_secret_arg(key: str) -> bool:
+    return any(hint in key.lower() for hint in SECRET_ARG_HINTS)
+
+
+def mask_connection_args(connection_args: Dict[str, Any]) -> Dict[str, Any]:
+    """Returns a copy of the connection args with secret values masked."""
+    return {
+        key: ("***" if _is_secret_arg(key) and value else value)
+        for key, value in (connection_args or {}).items()
+    }
+
+
+def redact_connection_secrets(text: str, connection_args: Dict[str, Any]) -> str:
+    """Replaces every secret value from the connection args found in ``text``."""
+    for key, value in (connection_args or {}).items():
+        if _is_secret_arg(key) and isinstance(value, str) and value:
+            text = text.replace(value, "***")
+    return text
+
+
 class DatasourceRegistry:
     """Manages a collection of active DatasourceAdapters.
     
@@ -38,19 +64,24 @@ class DatasourceRegistry:
     def resolved_connection(self, unresolved_connection: ConnectionConfig) -> ConnectionConfig:
         """Resolves all secrets in a connection dictionary.
 
+        Values are returned as plain strings. ``ConnectionConfig`` declares only
+        ``type`` and allows extras, so there is no type information here to tell
+        a password apart from a host, a user or a port -- wrapping every
+        placeholder in ``SecretStr`` broke every non-password field. Each
+        adapter's own config model declares which fields are secret and pydantic
+        coerces the plain string into ``SecretStr`` for those, so masking is
+        preserved exactly where it is declared.
+
         Args:
             unresolved_connection (ConnectionConfig): The connection dictionary with potential secrets.
 
         Returns:
             ConnectionConfig: The connection dictionary with resolved secrets.
         """
-        from pydantic import SecretStr
-        
         resolved_connection = unresolved_connection.model_dump()
-        for key, value in unresolved_connection.model_dump().items():
+        for key, value in list(resolved_connection.items()):
             if isinstance(value, str) and value.startswith("${") and value.endswith("}"):
-                secret_val = self.find_and_resolve_secret(value)
-                resolved_connection[key] = SecretStr(secret_val)
+                resolved_connection[key] = self.find_and_resolve_secret(value)
         return ConnectionConfig(**resolved_connection)
 
     def register_datasources(self, configs: List[DatasourceConfig]):
@@ -95,14 +126,22 @@ class DatasourceRegistry:
         if conn_type in self._available_adapters:
             adapter_cls = self._available_adapters[conn_type]
 
-            adapter = adapter_cls(
-                datasource_id=ds_id,
-                datasource_engine_type=conn_type,
-                connection_args=connection_args,
-                statement_timeout_ms=config.options.get("statement_timeout_ms"),
-                row_limit=config.options.get("row_limit"),
-                max_bytes=config.options.get("max_bytes"),
-            )
+            try:
+                adapter = adapter_cls(
+                    datasource_id=ds_id,
+                    datasource_engine_type=conn_type,
+                    connection_args=connection_args,
+                    statement_timeout_ms=config.options.get("statement_timeout_ms"),
+                    row_limit=config.options.get("row_limit"),
+                    max_bytes=config.options.get("max_bytes"),
+                )
+            except Exception as e:
+                # A pydantic ValidationError renders the whole input dict, which
+                # now holds the plaintext password. Re-raise without the cause so
+                # neither the message nor the traceback carries it.
+                raise ValueError(
+                    redact_connection_secrets(str(e), connection_args)
+                ) from None
             with self._lock:
                 self._adapters[ds_id] = adapter
                 if hasattr(adapter, "capabilities"):

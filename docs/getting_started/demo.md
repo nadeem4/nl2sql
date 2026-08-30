@@ -98,6 +98,20 @@ path writes, mounts `configs/` and `data/` from the repo, and waits for each
 database to report healthy (`depends_on: condition: service_healthy`) before it
 starts. The API is then on <http://localhost:8000>.
 
+### One config, two addresses
+
+`configs/datasources.demo.yaml` resolves each database's host and port from the
+environment (`${env:DEMO_REF_HOST}`, `${env:DEMO_REF_PORT}`, and so on) so the
+same file works from both sides of the container boundary:
+
+| Caller | Host | Port | Comes from |
+| --- | --- | --- | --- |
+| `nl2sql --env demo index` / `run` on your machine | `localhost` | the host port above | `.env.demo` |
+| the `app` container | the Compose service name | the database's internal port (5432 / 3306 / 1433) | `environment:` on the `app` service, which overrides `.env.demo` |
+
+Point the demo at databases somewhere else by editing the `DEMO_*_HOST` and
+`DEMO_*_PORT` values in `.env.demo`.
+
 ### MSSQL is opt-in
 
 `manufacturing_history` sits behind the `mssql` Compose profile because the SQL
