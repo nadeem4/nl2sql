@@ -1643,6 +1643,15 @@
 <nav aria-label="The Docker demo stack" class="md-nav">
 <ul class="md-nav__list">
 <li class="md-nav__item">
+<a class="md-nav__link" href="#one-config-two-addresses">
+<span class="md-ellipsis">
+      
+        One config, two addresses
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="#mssql-is-opt-in">
 <span class="md-ellipsis">
       
@@ -1837,6 +1846,36 @@ serves the REST API:</p>
 path writes, mounts <code>configs/</code> and <code>data/</code> from the repo, and waits for each
 database to report healthy (<code>depends_on: condition: service_healthy</code>) before it
 starts. The API is then on <a href="http://localhost:8000">http://localhost:8000</a>.</p>
+<h3 id="one-config-two-addresses">One config, two addresses</h3>
+<p><code>configs/datasources.demo.yaml</code> resolves each database's host and port from the
+environment (<code>${env:DEMO_REF_HOST}</code>, <code>${env:DEMO_REF_PORT}</code>, and so on) so the
+same file works from both sides of the container boundary:</p>
+<table>
+<thead>
+<tr>
+<th>Caller</th>
+<th>Host</th>
+<th>Port</th>
+<th>Comes from</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>nl2sql --env demo index</code> / <code>run</code> on your machine</td>
+<td><code>localhost</code></td>
+<td>the host port above</td>
+<td><code>.env.demo</code></td>
+</tr>
+<tr>
+<td>the <code>app</code> container</td>
+<td>the Compose service name</td>
+<td>the database's internal port (5432 / 3306 / 1433)</td>
+<td><code>environment:</code> on the <code>app</code> service, which overrides <code>.env.demo</code></td>
+</tr>
+</tbody>
+</table>
+<p>Point the demo at databases somewhere else by editing the <code>DEMO_*_HOST</code> and
+<code>DEMO_*_PORT</code> values in <code>.env.demo</code>.</p>
 <h3 id="mssql-is-opt-in">MSSQL is opt-in</h3>
 <p><code>manufacturing_history</code> sits behind the <code>mssql</code> Compose profile because the SQL
 Server image is a ~1.6 GB pull. Nothing outside the profile depends on it, so the
