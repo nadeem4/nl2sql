@@ -4,6 +4,7 @@ from langgraph.graph import END
 from langgraph.types import Send
 
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
+from nl2sql.common.exceptions import PipelineExecutionError
 from nl2sql.context import NL2SQLContext
 from nl2sql.pipeline.graph_utils import (
     StateAccessor,
@@ -58,11 +59,13 @@ def build_scan_layer_router(ctx: NL2SQLContext):
 
             target = resolve_subgraph(datasource_id, ctx)
             if not target:
-                raise PipelineError(
-                    node="layer_router",
-                    message=f"No compatible subgraph found for datasource '{datasource_id}'.",
-                    severity=ErrorSeverity.ERROR,
-                    error_code=ErrorCode.INVALID_STATE,
+                raise PipelineExecutionError(
+                    PipelineError(
+                        node="layer_router",
+                        message=f"No compatible subgraph found for datasource '{datasource_id}'.",
+                        severity=ErrorSeverity.ERROR,
+                        error_code=ErrorCode.INVALID_STATE,
+                    )
                 )
             payload = build_scan_payload(state, target, node_id)
             branches.append(Send(target, payload))
