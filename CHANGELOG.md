@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.1.1](https://github.com/nadeem4/nl2sql/compare/v0.1.0...v0.1.1) (2026-08-30)
+
+
+### Bug Fixes
+
+* **ci:** build the API image from the repository root ([495c1c3](https://github.com/nadeem4/nl2sql/commit/495c1c3840508e8eac69696af81840b2884fb2d8))
+* **ci:** build the API image from the repository root ([6ce3c49](https://github.com/nadeem4/nl2sql/commit/6ce3c4925c8e3770904ab50aa3773928711321d7))
+* **cli:** repair the doctor connectivity check ([2abb600](https://github.com/nadeem4/nl2sql/commit/2abb60004d48a983d8cf39f8c075bf91386495eb))
+* **cli:** repair the doctor connectivity check ([1cc9e44](https://github.com/nadeem4/nl2sql/commit/1cc9e44b5a16a69d0e0a28c473e568b39dbc8a8d))
+* **config:** treat an empty providers list as no secret providers ([97fe5d2](https://github.com/nadeem4/nl2sql/commit/97fe5d28cce7c9d6ca1b694c7c97b9c4a07e690f))
+* **config:** treat an empty providers list as no secret providers ([d08a45c](https://github.com/nadeem4/nl2sql/commit/d08a45cad76dcc372c11010ec9629aa9ce605a92))
+* **demo:** make the docker demo datasources reachable ([b7edaf9](https://github.com/nadeem4/nl2sql/commit/b7edaf99125e04b7731f87d555e6bf86e7f9affb))
+* **demo:** make the docker demo datasources reachable ([1381c9c](https://github.com/nadeem4/nl2sql/commit/1381c9c1bdd9de45ae0cb93c29b60019babefb3e))
+* **pipeline:** raise a real exception when no subgraph matches ([#75](https://github.com/nadeem4/nl2sql/issues/75)) ([74f283b](https://github.com/nadeem4/nl2sql/commit/74f283b840a99b119f25565c5d19848966e8f8dc))
+
 ## 0.1.0 (2026-08-28)
 
 
