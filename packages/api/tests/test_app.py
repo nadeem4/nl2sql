@@ -1,8 +1,9 @@
 """App wiring tests (ported from packages/api/test_api.py)."""
 
 import inspect
+from importlib.metadata import PackageNotFoundError, version
 
-from nl2sql_api import dependencies
+from nl2sql_api import dependencies, main
 from nl2sql_api.main import app
 from nl2sql_api.routes import datasource, indexing, llm, query
 
@@ -30,3 +31,18 @@ def test_routes_doing_blocking_work_are_synchronous():
             if name.startswith("_") or not inspect.isfunction(func):
                 continue
             assert not inspect.iscoroutinefunction(func), f"{module.__name__}.{name} is async"
+
+
+def test_app_version_matches_installed_distribution():
+    """The OpenAPI version must track the distribution, not a hardcoded literal."""
+    assert app.version == version("nl2sql-api")
+
+
+def test_app_version_falls_back_when_distribution_is_missing(monkeypatch):
+    """Importing from a source tree with nl2sql-api uninstalled must not blow up."""
+
+    def _raise(name):
+        raise PackageNotFoundError(name)
+
+    monkeypatch.setattr(main, "version", _raise)
+    assert main._app_version()
