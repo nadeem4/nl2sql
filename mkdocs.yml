@@ -84,6 +84,7 @@ nav:
     - PyPI (Python API): getting_started/pypi.md
     - Docker (REST API): getting_started/docker.md
     - From Source (Development): getting_started/source.md
+    - Demo Data (CLI-first): getting_started/demo.md
   - Configuration:
     - Configuration System: configuration/system.md
     - Datasources: configuration/datasources.md

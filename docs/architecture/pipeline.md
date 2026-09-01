@@ -67,10 +67,10 @@ flowchart TD
     Capabilities --> SubgraphRegistry[SubgraphRegistry]
     SubgraphRegistry --> Match{RequiredSubset}
     Match -->|yes| Subgraph[SelectedSubgraph]
-    Match -->|no| Error[PipelineError]
+    Match -->|no| Error[PipelineExecutionError]
 ```
 
-If no compatible subgraph is found, routing raises `PipelineError` and terminates the pipeline.
+If no compatible subgraph is found, routing raises `PipelineExecutionError` (an `NL2SQLError` carrying the `PipelineError` payload on `.error`) and terminates the pipeline. A router may only return routing decisions, so it cannot report the failure as a `PipelineError` value in state the way a node does.
 
 ## SQL agent subgraph lifecycle
 
