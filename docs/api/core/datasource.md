@@ -151,7 +151,9 @@ Signature:
 `get_datasource_details(datasource_id: str) -> Dict[str, Any]`
 
 Returns:
-Adapter-derived metadata (connection args, limits, capabilities).
+Adapter-derived metadata (connection args, limits, capabilities). Connection arg
+values whose key contains `password`, `secret`, `token`, or `api_key`
+(case-insensitive) are masked as `"***"` before being returned.
 
 Raises:
 `ValueError` if datasource ID is unknown.
