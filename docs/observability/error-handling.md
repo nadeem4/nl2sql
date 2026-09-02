@@ -36,6 +36,9 @@ See `../architecture/failure_recovery.md` for failure domains, retry scope, and 
 
 - `run_with_graph()` enforces a global timeout (`Settings.global_timeout_sec`).
 - Cancellation is honored through a per-run `nl2sql.common.cancellation.CancellationToken`, passed to the graph via `config["configurable"]["cancellation_token"]`, so cancelling one run never affects another.
+- `run_with_graph()` never raises: cancellation, timeout, routing failures and unexpected crashes all
+  come back as `PipelineError` values in state. A `PipelineExecutionError` is unwrapped so its
+  original `error_code` survives; only genuinely unrecognised exceptions become `UNKNOWN_ERROR`.
 
 ## Source references
 

@@ -79,7 +79,10 @@ Failure in this system is represented as structured `PipelineError` objects accu
 
 ### Request termination
 - `run_with_graph` terminates early on cancellation (`CANCELLED`) or global timeout (`PIPELINE_TIMEOUT`).
-- Unhandled exceptions in graph execution return `UNKNOWN_ERROR` with stack trace.
+- `PipelineExecutionError` (raised where a router cannot return a `PipelineError` as a value)
+  is unwrapped and its structured payload returned unchanged, keeping its own `error_code`,
+  `severity`, `node` and `is_retryable`.
+- Other unhandled exceptions in graph execution return `UNKNOWN_ERROR` with stack trace.
 
 ### Cleanup
 - Signal handlers are restored after execution. There is no explicit cleanup of artifacts or partial state.
