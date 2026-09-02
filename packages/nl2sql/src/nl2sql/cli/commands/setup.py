@@ -7,6 +7,7 @@ from InquirerPy import inquirer
 from InquirerPy.validator import NumberValidator
 
 from nl2sql.cli.common.decorators import handle_cli_errors
+from nl2sql.cli.common.prompts import confirm
 from nl2sql.cli.console import console, print_success, print_step
 from nl2sql.cli.config import ADAPTER_DRIVERS, KNOWN_ADAPTERS
 from nl2sql.cli.commands.install import install_package
@@ -357,8 +358,22 @@ def setup_command(demo: bool = False, lite: bool = True, docker: bool = False, a
             demo_manager.setup_lite(api_key=api_key)
         elif docker:
             docker_dir = demo_manager.setup_docker(api_key=api_key)
-            if inquirer.confirm(message="Start Docker containers now?", default=True).execute():
+            # A terminal that cannot host a prompt (Git Bash/MSYS) must not be
+            # read as consent to pull images and bind ports, so the fallback is
+            # "no": the artifacts are already on disk and the panel below tells
+            # the user how to start the stack themselves.
+            if confirm(
+                "Start Docker containers now?",
+                default=True,
+                when_unavailable=False,
+            ):
                 demo_manager.start_docker_containers(docker_dir)
+            else:
+                console.print(
+                    f"[dim]Containers not started. To start them yourself: "
+                    f"cd {escape(str(docker_dir))} && "
+                    f"docker compose -f docker-compose.demo.yml up -d[/dim]"
+                )
                 
             console.print(Panel(f"""[bold yellow]Next Steps:[/bold yellow]
                     1. [bold]Verify & Index[/bold]:
