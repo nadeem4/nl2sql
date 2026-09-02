@@ -1,11 +1,14 @@
-"""Cancellation is scoped to a single run, not to the whole process."""
+"""``run_with_graph`` reports failures in state instead of raising, without losing
+their identity. Cancellation is scoped to a single run, not to the whole process.
+"""
 from __future__ import annotations
 
 import time
 
 from nl2sql.auth import UserContext
 from nl2sql.common.cancellation import CancellationToken
-from nl2sql.common.errors import ErrorCode, ErrorSeverity
+from nl2sql.common.errors import ErrorCode, ErrorSeverity, PipelineError
+from nl2sql.common.exceptions import PipelineExecutionError
 from nl2sql.pipeline import runtime
 
 
@@ -98,3 +101,57 @@ def test_run_exceeding_timeout_returns_pipeline_timeout_error(monkeypatch):
     assert error.error_code == ErrorCode.PIPELINE_TIMEOUT
     assert "timed out after 0.05 seconds" in error.message
     assert result["final_answer"].startswith("I apologize")
+
+
+def test_routing_error_keeps_its_own_error_code(monkeypatch):
+    # A PipelineExecutionError already carries a fully-populated PipelineError. The
+    # runtime must surface that payload as-is: relabelling it UNKNOWN_ERROR reports
+    # the wrong code and flips is_retryable for every downstream handler.
+    # Arrange
+    routing_error = PipelineError(
+        node="layer_router",
+        message="No compatible subgraph found for datasource 'rest_ds'.",
+        severity=ErrorSeverity.ERROR,
+        error_code=ErrorCode.INVALID_STATE,
+    )
+
+    def on_invoke(state, config):
+        raise PipelineExecutionError(routing_error)
+
+    _use_fake_graph(monkeypatch, on_invoke)
+
+    # Act
+    result = runtime.run_with_graph(None, "unroutable query", user_context=_USER)
+
+    # Assert
+    assert len(result["errors"]) == 1
+    error = result["errors"][0]
+    assert error.error_code == ErrorCode.INVALID_STATE
+    assert error.severity == ErrorSeverity.ERROR
+    assert error.node == "layer_router"
+    assert error.message == "No compatible subgraph found for datasource 'rest_ds'."
+    assert error.is_retryable is False
+    # Deliberate, well-understood failure: no traceback is added, matching the
+    # cancellation and timeout branches.
+    assert error.stack_trace is None
+
+
+def test_unexpected_crash_still_reports_unknown_error_with_a_stack_trace(monkeypatch):
+    # The blanket catch stays a safety net: anything the runtime cannot recognise
+    # is still reported as UNKNOWN_ERROR with a traceback to debug from.
+    # Arrange
+    def on_invoke(state, config):
+        raise RuntimeError("something nobody planned for")
+
+    _use_fake_graph(monkeypatch, on_invoke)
+
+    # Act
+    result = runtime.run_with_graph(None, "crashing query", user_context=_USER)
+
+    # Assert
+    assert len(result["errors"]) == 1
+    error = result["errors"][0]
+    assert error.node == "orchestrator"
+    assert error.error_code == ErrorCode.UNKNOWN_ERROR
+    assert "something nobody planned for" in error.message
+    assert "RuntimeError" in (error.stack_trace or "")
