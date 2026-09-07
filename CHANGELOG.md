@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.2](https://github.com/nadeem4/nl2sql/compare/v0.1.1...v0.1.2) (2026-09-07)
+
+
+### Bug Fixes
+
+* **ci:** publish without attestations from the called workflow ([#80](https://github.com/nadeem4/nl2sql/issues/80)) ([2bcdbe8](https://github.com/nadeem4/nl2sql/commit/2bcdbe84a4cc4ab0bd40a66f84b7efa467797f9a))
+
 ## [0.1.1](https://github.com/nadeem4/nl2sql/compare/v0.1.0...v0.1.1) (2026-09-07)
 
 
