@@ -2,6 +2,7 @@ import os
 
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
+from importlib.metadata import PackageNotFoundError, version
 
 from .routes import query, health, datasource, llm, indexing
 from fastapi.middleware.cors import CORSMiddleware
@@ -22,9 +23,23 @@ async def lifespan(app: FastAPI):
     yield
 
 
+def _app_version() -> str:
+    """Return the installed nl2sql-api version.
+
+    Read from the distribution metadata so the OpenAPI spec always matches the
+    version in pyproject.toml, with no second place to bump at release time. A
+    source checkout where the distribution is not installed falls back instead
+    of failing to import.
+    """
+    try:
+        return version("nl2sql-api")
+    except PackageNotFoundError:
+        return "0.0.0"
+
+
 app = FastAPI(
     title="NL2SQL API",
-    version="0.1.0",
+    version=_app_version(),
     lifespan=lifespan,
 )
 
