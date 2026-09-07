@@ -1747,6 +1747,9 @@
 <ul>
 <li><code>run_with_graph()</code> enforces a global timeout (<code>Settings.global_timeout_sec</code>).</li>
 <li>Cancellation is honored through a per-run <code>nl2sql.common.cancellation.CancellationToken</code>, passed to the graph via <code>config["configurable"]["cancellation_token"]</code>, so cancelling one run never affects another.</li>
+<li><code>run_with_graph()</code> never raises: cancellation, timeout, routing failures and unexpected crashes all
+  come back as <code>PipelineError</code> values in state. A <code>PipelineExecutionError</code> is unwrapped so its
+  original <code>error_code</code> survives; only genuinely unrecognised exceptions become <code>UNKNOWN_ERROR</code>.</li>
 </ul>
 <h2 id="source-references">Source references</h2>
 <ul>

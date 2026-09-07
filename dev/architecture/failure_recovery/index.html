@@ -4692,7 +4692,10 @@
 <h3 id="request-termination">Request termination</h3>
 <ul>
 <li><code>run_with_graph</code> terminates early on cancellation (<code>CANCELLED</code>) or global timeout (<code>PIPELINE_TIMEOUT</code>).</li>
-<li>Unhandled exceptions in graph execution return <code>UNKNOWN_ERROR</code> with stack trace.</li>
+<li><code>PipelineExecutionError</code> (raised where a router cannot return a <code>PipelineError</code> as a value)
+  is unwrapped and its structured payload returned unchanged, keeping its own <code>error_code</code>,
+  <code>severity</code>, <code>node</code> and <code>is_retryable</code>.</li>
+<li>Other unhandled exceptions in graph execution return <code>UNKNOWN_ERROR</code> with stack trace.</li>
 </ul>
 <h3 id="cleanup">Cleanup</h3>
 <ul>
