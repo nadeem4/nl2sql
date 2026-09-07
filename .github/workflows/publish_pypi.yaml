@@ -87,6 +87,12 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     strategy:
+      # One package failing must not cancel the other two mid-release. With the
+      # default fail-fast, the adapter-sdk leg failing on v0.1.1 cancelled the
+      # engine and api legs and skipped `ghcr` and `docs`, so the release landed
+      # nowhere. Each leg is an independent upload to an independent project;
+      # let the survivors finish and re-publish only what actually failed.
+      fail-fast: false
       matrix:
         include:
           - package: nl2sql-engine
@@ -116,10 +122,37 @@ jobs:
           cp dist/${{ matrix.stem }}-*.tar.gz dist/${{ matrix.stem }}-*.whl upload/
           ls -1 upload/
 
+      # `attestations` defaults to true in the action, and that is what broke
+      # v0.1.1. Do not re-enable it while this workflow is reached through
+      # `workflow_call`.
+      #
+      # When release_please.yml calls this workflow, OIDC authentication and
+      # PEP 740 attestation disagree about which workflow "this" is:
+      #
+      #   * auth  - PyPI matches the token's `job_workflow_ref` claim, which is
+      #             the *called* workflow: publish_pypi.yaml. That is what the
+      #             trusted publishers are registered against, so auth succeeds.
+      #   * attest - Sigstore signs with the entry-point identity, so the
+      #             certificate's Build Config URI is the *calling* workflow:
+      #             release_please.yml.
+      #
+      # PyPI verifies the attestation against the single publisher that
+      # authenticated the request, so the two can never both match one
+      # registration and the upload fails with:
+      #
+      #   400 Invalid attestations supplied during upload: ... Certificate's
+      #   Build Config URI (...release_please.yml@refs/heads/main) does not
+      #   match expected Trusted Publisher (publish_pypi.yaml @ nadeem4/nl2sql)
+      #
+      # Trusted publishing itself is unaffected - no API token is introduced.
+      # The cost is that released artifacts carry no PEP 740 provenance.
+      # See docs/development/releasing.md and
+      # https://docs.pypi.org/trusted-publishers/troubleshooting/#reusable-workflows-on-github
       - name: Publish ${{ matrix.package }} to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: upload/
+          attestations: false
 
   # packages/api/Dockerfile installs nl2sql-adapter-sdk, nl2sql-engine and
   # nl2sql-api from the local sources, not from PyPI, and its COPY paths are
