@@ -10,6 +10,7 @@ from typing import Callable, Dict, List, Optional
 from nl2sql.auth import UserContext
 from nl2sql.common.cancellation import CancellationToken
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
+from nl2sql.common.exceptions import PipelineExecutionError
 from nl2sql.common.settings import settings
 from nl2sql.context import NL2SQLContext
 from nl2sql.pipeline.graph import build_graph
@@ -135,6 +136,11 @@ def run_with_graph(
             ],
             "final_answer": "I apologize, but the request timed out. Please try again with a simpler query.",
         }
+    except PipelineExecutionError as e:
+        # Raised where a PipelineError cannot be returned as a value (conditional-edge
+        # routers). The payload is already structured, so surface it unchanged: the
+        # blanket catch below would relabel it UNKNOWN_ERROR and flip is_retryable.
+        return {"errors": [e.error]}
     except Exception as e:
         # Fallback for other runtime crashes
         return {
