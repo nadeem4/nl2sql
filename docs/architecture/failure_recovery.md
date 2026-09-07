@@ -43,7 +43,7 @@ Failure in this system is represented as structured `PipelineError` objects accu
 
 ### How nodes fail
 - Most nodes use try/except and return a `PipelineError` (with severity + error code) in their response.
-- Some routing logic raises `PipelineError` directly (e.g., no compatible subgraph found).
+- Some routing logic raises `PipelineExecutionError` directly (e.g., no compatible subgraph found) — an `NL2SQLError` carrying the `PipelineError` payload on `.error`, since a router may only return routing decisions and cannot report the failure as a state value the way a node does.
 - Nodes often return partial state plus errors (e.g., resolver returns a response plus errors).
 
 ### Propagation

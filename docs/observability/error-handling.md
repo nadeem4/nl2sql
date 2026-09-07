@@ -2,6 +2,8 @@
 
 NL2SQL represents failures as structured `PipelineError` objects and propagates them through state. Retries are managed at the subgraph level, and a single circuit breaker provides fast-fail safety for vector retrieval.
 
+One case cannot use state: LangGraph conditional-edge routers may only return routing decisions, so `route_scan_layers()` reports "no compatible subgraph found" by raising `PipelineExecutionError` (`nl2sql.common.exceptions`), an `NL2SQLError` carrying the `PipelineError` payload on `.error`. This propagates out of the router and is caught by `run_with_graph()`'s crash handler, which folds it into `GraphState.errors` as an `UNKNOWN_ERROR` `PipelineError`.
+
 ## Error contract
 
 `PipelineError` includes:
