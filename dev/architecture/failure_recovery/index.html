@@ -1993,6 +1993,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting_started/demo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Demo Data (CLI-first)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -4654,7 +4682,7 @@
 <h3 id="how-nodes-fail">How nodes fail</h3>
 <ul>
 <li>Most nodes use try/except and return a <code>PipelineError</code> (with severity + error code) in their response.</li>
-<li>Some routing logic raises <code>PipelineError</code> directly (e.g., no compatible subgraph found).</li>
+<li>Some routing logic raises <code>PipelineExecutionError</code> directly (e.g., no compatible subgraph found) — an <code>NL2SQLError</code> carrying the <code>PipelineError</code> payload on <code>.error</code>, since a router may only return routing decisions and cannot report the failure as a state value the way a node does.</li>
 <li>Nodes often return partial state plus errors (e.g., resolver returns a response plus errors).</li>
 </ul>
 <h3 id="propagation">Propagation</h3>

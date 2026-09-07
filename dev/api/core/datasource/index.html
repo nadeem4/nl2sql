@@ -1510,6 +1510,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../getting_started/demo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Demo Data (CLI-first)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -4206,7 +4234,9 @@ Per-adapter network/database connection attempts.</p>
 <p>Signature:
 <code>get_datasource_details(datasource_id: str) -&gt; Dict[str, Any]</code></p>
 <p>Returns:
-Adapter-derived metadata (connection args, limits, capabilities).</p>
+Adapter-derived metadata (connection args, limits, capabilities). Connection arg
+values whose key contains <code>password</code>, <code>secret</code>, <code>token</code>, or <code>api_key</code>
+(case-insensitive) are masked as <code>"***"</code> before being returned.</p>
 <p>Raises:
 <code>ValueError</code> if datasource ID is unknown.</p>
 <h2 id="behavioral-contracts">Behavioral Contracts</h2>

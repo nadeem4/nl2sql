@@ -7,6 +7,8 @@
 <meta content="width=device-width,initial-scale=1" name="viewport"/>
 <meta content="Production-grade Natural Language to SQL Platform Documentation" name="description"/>
 <meta content="Platform Engineering" name="author"/>
+<link href="../source/" rel="prev"/>
+<link href="../../configuration/system/" rel="next"/>
 <link href="../../assets/images/favicon.png" rel="icon"/>
 <meta content="mkdocs-1.6.1, mkdocs-material-9.7.7" name="generator"/>
 <title>Demo Data (CLI-first) - NL2SQL Platform</title>
@@ -122,7 +124,7 @@
 
         </a>
 </li>
-<li class="md-tabs__item">
+<li class="md-tabs__item md-tabs__item--active">
 <a class="md-tabs__link" href="../">
           
   
@@ -599,9 +601,9 @@
 </ul>
 </nav>
 </li>
-<li class="md-nav__item md-nav__item--nested">
-<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_3" type="checkbox"/>
-<label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+<li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+<input checked="" class="md-nav__toggle md-toggle" id="__nav_3" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
 <span class="md-ellipsis">
     
   
@@ -612,7 +614,7 @@
   </span>
 <span class="md-nav__icon md-icon"></span>
 </label>
-<nav aria-expanded="false" aria-labelledby="__nav_3_label" class="md-nav" data-md-level="1">
+<nav aria-expanded="true" aria-labelledby="__nav_3_label" class="md-nav" data-md-level="1">
 <label class="md-nav__title" for="__nav_3">
 <span class="md-nav__icon md-icon"></span>
             
@@ -669,6 +671,167 @@
     
   </span>
 </a>
+</li>
+<li class="md-nav__item md-nav__item--active">
+<input class="md-nav__toggle md-toggle" id="__toc" type="checkbox"/>
+<label class="md-nav__link md-nav__link--active" for="__toc">
+<span class="md-ellipsis">
+    
+  
+    Demo Data (CLI-first)
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<a class="md-nav__link md-nav__link--active" href="./">
+<span class="md-ellipsis">
+    
+  
+    Demo Data (CLI-first)
+  
+
+    
+  </span>
+</a>
+<nav aria-label="Table of contents" class="md-nav md-nav--secondary">
+<label class="md-nav__title" for="__toc">
+<span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+<ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#1-install-the-cli">
+<span class="md-ellipsis">
+      
+        1. Install the CLI
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#2-generate-demo-data-with-the-cli">
+<span class="md-ellipsis">
+      
+        2. Generate demo data with the CLI
+      
+    </span>
+</a>
+<nav aria-label="2. Generate demo data with the CLI" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#api-keys-in-the-demo">
+<span class="md-ellipsis">
+      
+        API keys in the demo
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#the-docker-demo-stack">
+<span class="md-ellipsis">
+      
+        The Docker demo stack
+      
+    </span>
+</a>
+<nav aria-label="The Docker demo stack" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#one-config-two-addresses">
+<span class="md-ellipsis">
+      
+        One config, two addresses
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#mssql-is-opt-in">
+<span class="md-ellipsis">
+      
+        MSSQL is opt-in
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#3-use-demo-data-with-the-cli">
+<span class="md-ellipsis">
+      
+        3. Use demo data with the CLI
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#demo-data-architecture">
+<span class="md-ellipsis">
+      
+        Demo data architecture
+      
+    </span>
+</a>
+<nav aria-label="Demo data architecture" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#entity-relationships">
+<span class="md-ellipsis">
+      
+        Entity relationships
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#data-scenarios-and-volumes">
+<span class="md-ellipsis">
+      
+        Data scenarios and volumes
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#sample-queries">
+<span class="md-ellipsis">
+      
+        Sample queries
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#relationship-guide">
+<span class="md-ellipsis">
+      
+        Relationship guide
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#refreshing-demo-data">
+<span class="md-ellipsis">
+      
+        Refreshing demo data
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
 </li>
 </ul>
 </nav>
