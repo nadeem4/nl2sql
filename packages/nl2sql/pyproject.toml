@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nl2sql-engine"
-version = "0.1.0" # x-release-please-version
+version = "0.1.1" # x-release-please-version
 description = "Natural-language-to-SQL engine, CLI and database adapters"
 readme = "README.md"
 requires-python = ">=3.9"
