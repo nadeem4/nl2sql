@@ -85,6 +85,12 @@ cd demo_docker
 docker compose -f docker-compose.demo.yml up -d
 ```
 
+Setup offers to run that command for you. On a terminal that cannot host an
+interactive prompt - Git Bash / MSYS on Windows, or a redirected one - the
+question is answered `no` instead of pulling images without being asked: the
+configuration is already written, and setup prints the command above and exits
+normally.
+
 | Service | Image | Host port |
 | --- | --- | --- |
 | `manufacturing_ref` | `postgres:15` | 5433 |
