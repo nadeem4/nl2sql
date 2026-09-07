@@ -125,6 +125,23 @@ changelog and the version it proposes is the release decision.
 Authentication is PyPI **trusted publishing** (OIDC, `id-token: write`). There
 is no API token anywhere in the workflow and no secret to rotate.
 
+!!! warning "PEP 740 attestations are off, and must stay off"
+    The `pypi` step sets `attestations: false`. Because `release_please.yml`
+    reaches this workflow through `workflow_call`, OIDC auth and attestation
+    signing disagree about which workflow "this" is: PyPI matches the token's
+    `job_workflow_ref` claim, which names the *called* workflow
+    (`publish_pypi.yaml`, the registered publisher), while Sigstore signs with
+    the *entry-point* identity, putting `release_please.yml` in the
+    certificate's Build Config URI. PyPI verifies the attestation against the
+    one publisher that authenticated the request, so the two can never both
+    match and the upload fails with `400 Invalid attestations supplied during
+    upload`. This is what broke `v0.1.1`. Trusted publishing is unaffected; the
+    cost is that released artifacts carry no PEP 740 provenance. See
+    [PyPI's note on reusable workflows](https://docs.pypi.org/trusted-publishers/troubleshooting/#reusable-workflows-on-github).
+
+The three `pypi` legs run with `fail-fast: false`, so one package failing no
+longer cancels the other two and skips `ghcr` and `docs`.
+
 ### Why the publish is chained to release-please, not to the tag
 
 **GitHub does not trigger workflows from events created with the default
@@ -173,6 +190,23 @@ $ gh workflow run publish_pypi.yaml -f tag=v0.1.0
 ```
 
 or **Actions → Publish Release → Run workflow** and type the tag.
+
+The same dispatch is how you recover a release that **tagged but never
+uploaded** — the `vX.Y.Z` tag and the GitHub Release exist, but PyPI still shows
+the previous version and no image reached GHCR. That is what happened to
+`v0.1.1`: the `pypi` matrix failed and took `ghcr` and `docs` down with it.
+Nothing needs to be re-tagged; fix the cause on `main`, then dispatch the same
+tag:
+
+```console
+$ gh workflow run publish_pypi.yaml -f tag=v0.1.1
+```
+
+The dispatch checks out the tag, so it publishes the tagged commit, not `main`.
+Only legs that never uploaded can be re-run — PyPI rejects a re-upload of a
+version it already has, so a partially-published release needs `skip-existing`
+or a manual publish of just the missing packages, in the
+[dependency order below](#package-order).
 
 Every job resolves its tag from `${{ inputs.tag || github.ref_name }}`, never
 from the raw ref. On a dispatched run `github.ref_name` is the *branch* you
