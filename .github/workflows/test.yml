@@ -39,7 +39,7 @@ jobs:
         run: pytest -m "not integration"
 
   # The subset of packages/core/tests/integration that needs neither an LLM API
-  # key nor an external database: generated SQLite demo data and the local ONNX
+  # key nor an external database: the Chinook SQLite demo and the local ONNX
   # embedder are enough. Kept separate from the unit job so that one stays fast.
   integration:
     runs-on: ubuntu-latest
@@ -66,17 +66,18 @@ jobs:
           path: ~/.cache/chroma
           key: chroma-onnx-all-MiniLM-L6-v2
 
-      # Generates data/demo_lite/*.db and configs/*.demo.*. The schema-indexing
-      # step this also runs needs no key: .env.demo embeds locally and the LLM
-      # enrichment pass is optional, so it is skipped and logged at INFO. A
-      # datasource that genuinely fails to index exits non-zero and fails this
-      # step, which is the intent. The tests below build their own indexes.
+      # Copies the vendored Chinook database to data/chinook.sqlite and writes
+      # configs/*.demo.*. The schema-indexing step this also runs needs no key:
+      # .env.demo embeds locally and the LLM enrichment pass is optional, so it
+      # is skipped and logged at INFO. A datasource that genuinely fails to
+      # index exits non-zero and fails this step, which is the intent. The
+      # tests below build their own indexes.
       - name: Generate demo data
-        run: nl2sql setup --demo --lite
+        run: nl2sql setup --demo
 
       # Indexing, datasource resolution, schema retrieval, aggregation,
       # physical validation and the local embedder -- plus tests/e2e, which
-      # generates its own lite demo in a temp directory and drives the whole
+      # generates its own Chinook demo in a temp directory and drives the whole
       # graph through `nl2sql.testing.fake_llm`, an OpenAI-compatible fake, so
       # a full question-to-answer run is covered here with no API key.
       - name: Run key-free integration tests

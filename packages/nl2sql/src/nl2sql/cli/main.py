@@ -129,28 +129,21 @@ def doctor():
 
 @app.command()
 def setup(
-    demo: Annotated[bool, typer.Option("--demo", help="Quickstart specific demo environment")] = False,
-    docker: Annotated[bool, typer.Option("--docker", help="Use Docker for demo (Full fidelity)")] = False,
-    lite: Annotated[bool, typer.Option("--lite", help="Use local SQLite files for the demo (default)")] = False,
+    demo: Annotated[bool, typer.Option("--demo", help="Scaffold the Chinook demo project instead of running the wizard")] = False,
     api_key: Annotated[Optional[str], typer.Option("--api-key", help="API Key for LLM provider (e.g. OpenAI)")] = None,
 ):
     """
     Interactive setup wizard for first-time users.
     """
-    if lite and docker:
-        raise typer.BadParameter("--lite and --docker are mutually exclusive; pick one.")
-
-    # Lite is the default: it only turns off when --docker is requested.
-    setup_command(demo=demo, lite=not docker, docker=docker, api_key=api_key)
+    setup_command(demo=demo, api_key=api_key)
 
 
 @app.command()
 def demo(
-    dataset: Annotated[str, typer.Option(help="chinook (default) or manufacturing")] = "chinook",
-    directory: Annotated[pathlib.Path, typer.Option("--dir", help="Where to write the demo project")] = pathlib.Path("nl2sql-demo"),
-    host: Annotated[str, typer.Option(help="Bind address")] = "127.0.0.1",
-    port: Annotated[int, typer.Option(help="Port")] = 8765,
-    no_browser: Annotated[bool, typer.Option("--no-browser")] = False,
+    directory: Annotated[pathlib.Path, typer.Option("--dir", help="Where to write the demo project (database, configs and vector store)")] = pathlib.Path("nl2sql-demo"),
+    host: Annotated[str, typer.Option(help="Bind address. The default binds localhost only; 0.0.0.0 exposes the playground to your network")] = "127.0.0.1",
+    port: Annotated[int, typer.Option(help="Port to serve the playground on")] = 8765,
+    no_browser: Annotated[bool, typer.Option("--no-browser", help="Do not open a browser tab; just serve and print the URL")] = False,
     record: Annotated[bool, typer.Option("--record", help="Record the sample questions through a real provider")] = False,
     api_key: Annotated[Optional[str], typer.Option(
         "--api-key",
@@ -164,8 +157,8 @@ def demo(
         ),
     )] = None,
 ):
-    """One-command playground over a sample database."""
-    demo_command(dataset, directory, host, port, no_browser, record, api_key)
+    """One-command playground over the Chinook sample database."""
+    demo_command(directory, host, port, no_browser, record, api_key)
 
 
 @app.command()

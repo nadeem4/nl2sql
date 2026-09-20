@@ -34,8 +34,8 @@ Create config files in your working directory:
 - `configs/policies.json`
 - `configs/secrets.yaml` (optional)
 
-Start from the examples in `configs/datasources.example.yaml`, `configs/llm.demo.yaml`,
-and `configs/policies.example.json`.
+Start from `configs/datasources.example.yaml` and `configs/policies.example.json`.
+There is no example LLM or secrets file; their schemas are linked below.
 Detailed schemas for each file:
 
 - [Datasources](../configuration/datasources.md)

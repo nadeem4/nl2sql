@@ -59,7 +59,7 @@ LLM API key. The two are separate markers, so the key-free subset -- the same
 selection CI runs -- can be run on its own:
 
 ```bash
-nl2sql setup --demo --lite
+nl2sql setup --demo
 EMBEDDING_PROVIDER=local pytest -m "integration and not llm"
 ```
 

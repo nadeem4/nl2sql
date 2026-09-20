@@ -117,16 +117,17 @@ def resolver_response(demo_env) -> DatasourceResolverResponse:
 
 
 def _build_queries(questions: dict[str, list[str]]) -> list[str]:
+    """Single-intent and two-intent queries, built from the demo's own questions.
+
+    Keyed off nothing: the demo ships one datasource today and may ship more
+    later, so this reads whatever ``sample_questions.demo.yaml`` contains.
+    """
     queries: list[str] = []
-    if "manufacturing_ref" in questions and questions["manufacturing_ref"]:
-        queries.append(questions["manufacturing_ref"][0])
-    for ds_id, items in questions.items():
+    for items in questions.values():
+        if items:
+            queries.append(items[0])
         if len(items) >= 2:
             queries.append(f"{items[0]} and {items[1]}")
-    if "manufacturing_supply" in questions and "manufacturing_history" in questions:
-        queries.append(
-            f"{questions['manufacturing_supply'][0]} and {questions['manufacturing_history'][0]}"
-        )
     return queries
 
 

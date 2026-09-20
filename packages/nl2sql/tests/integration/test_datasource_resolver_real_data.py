@@ -115,27 +115,19 @@ def indexed_env() -> SimpleNamespace:
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
 
+# Chinook is one datasource, so this no longer discriminates between several.
+# What it still covers is the node itself against a real index: that every
+# question resolves to something, that the resolution is inside the role's
+# allowlist, and that the schema version it pins matches the store.
 @pytest.mark.parametrize(
     ("datasource_id", "user_query"),
     [
-        ("manufacturing_ref", "List all factories in the US"),
-        ("manufacturing_ref", "Show me the capacity of Berlin Plant"),
-        ("manufacturing_ref", "What shifts are available?"),
-        ("manufacturing_ref", "List all machine types produced by TechCorp"),
-        ("manufacturing_ops", "Show me active employees in the Austin Gigafactory"),
-        ("manufacturing_ops", "Which machines have error logs in the last 7 days?"),
-        ("manufacturing_ops", "Who is the operator for machine 5?"),
-        ("manufacturing_ops", "Count the number of active machines per factory"),
-        ("manufacturing_ops", "List maintenance logs for Vibration sensor alerts"),
-        ("manufacturing_supply", "Total sales amount for 'Industrial Controller'"),
-        ("manufacturing_supply", "Find suppliers for high value components"),
-        ("manufacturing_supply", "Check inventory levels for 'Bolt M5' in Berlin"),
-        ("manufacturing_supply", "List products with base cost greater than 500"),
-        ("manufacturing_supply", "Show me suppliers from Germany"),
-        ("manufacturing_history", "Show total sales orders in Q4"),
-        ("manufacturing_history", "Calculate average production output per run"),
-        ("manufacturing_history", "Summarize sales by customer for last year"),
-        ("manufacturing_history", "List the top 5 largest orders"),
+        ("chinook", "How many customers do we have, by country?"),
+        ("chinook", "Who are the top 5 customers by total spend?"),
+        ("chinook", "Which artist has the most albums?"),
+        ("chinook", "What is the total revenue per year?"),
+        ("chinook", "Which genre sells the most tracks?"),
+        ("chinook", "Which employees support the most customers?"),
     ],
 )
 def test_datasource_resolver_real_queries(
@@ -209,7 +201,7 @@ def test_datasource_resolver_schema_mismatch_warn(indexed_env, tmp_path, monkeyp
     node = DatasourceResolverNode(ctx)
     result = node(
         GraphState(
-            user_query="inventory levels", user_context=UserContext(roles=["admin"])
+            user_query="customer invoice totals", user_context=UserContext(roles=["admin"])
         )
     )
 
@@ -227,7 +219,7 @@ def test_datasource_resolver_schema_mismatch_fail(indexed_env, tmp_path, monkeyp
     node = DatasourceResolverNode(ctx)
     result = node(
         GraphState(
-            user_query="inventory levels", user_context=UserContext(roles=["admin"])
+            user_query="customer invoice totals", user_context=UserContext(roles=["admin"])
         )
     )
 

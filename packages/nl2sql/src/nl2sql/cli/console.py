@@ -10,7 +10,7 @@ def configure_output_encoding() -> None:
 
     Rich renders symbols such as U+2713 that the default Windows code page
     (cp1252) cannot encode, so writing them raised UnicodeEncodeError and
-    aborted the command -- `nl2sql setup --demo --lite` died this way.
+    aborted the command -- `nl2sql setup --demo` died this way.
     Reconfiguring the streams once, at the entry point, is what
     PYTHONIOENCODING=utf-8 did for users who knew to set it; rich reads
     ``sys.stdout`` and its encoding lazily, so consoles built at import time

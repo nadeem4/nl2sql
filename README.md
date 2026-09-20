@@ -24,11 +24,9 @@ nl2sql demo
 
 That writes a demo project into `./nl2sql-demo`, copies in the
 [Chinook](THIRD_PARTY_NOTICES.md) sample database (11 tables, real foreign
-keys), indexes its schema locally, serves a playground on
-<http://127.0.0.1:8765/> and opens your browser. Indexing needs no API key: the
-first run downloads a ~79 MB ONNX embedding model and runs it on your machine.
-Use `--no-browser` to stay in the terminal, `--port` to move it, or
-`--dataset manufacturing` for the synthetic factory dataset.
+keys), indexes its schema on your machine, serves a playground on
+<http://127.0.0.1:8765/> and opens your browser. Indexing needs no API key; the
+first run downloads a ~79 MB ONNX embedding model.
 
 The page shows, side by side, the retrieved **schema**, the **plan** the model
 produced, the **validation checks** with pass/fail and a reason, the generated
@@ -36,6 +34,17 @@ produced, the **validation checks** with pass/fail and a reason, the generated
 and `viewer`: ask the `viewer` role about customers and the logical validator
 refuses the plan with a `SECURITY_VIOLATION`, the generator never runs, and the
 SQL pane says so. That is the engine's one real safety property, made visible.
+
+### `nl2sql demo` options
+
+| Flag | Default | What it does, and when you want it |
+| --- | --- | --- |
+| `--dir PATH` | `nl2sql-demo` | Where the demo project is written: the database, the `configs/*.demo.*` files, `.env.demo` and the vector store. Point it somewhere else to keep several demos side by side, to put it outside a git checkout, or to reuse one you already indexed — an existing project is not re-scaffolded and not re-indexed. |
+| `--host ADDR` | `127.0.0.1` | The bind address. The default binds **localhost only**, so nothing outside your machine can reach it. `0.0.0.0` is for containers and VMs, where localhost is not reachable from outside. The playground has **no authentication**: in live mode anyone who can reach the address can ask questions that spend your API credits. Bind it wide only on a network you trust. |
+| `--port N` | `8765` | The port to serve on. Change it when 8765 is taken, or when you are running two demos at once. |
+| `--no-browser` | off | Do not open a browser tab; just serve and print the URL. Use it over SSH and in containers, where there is no browser to open; in CI and scripts, where a browser would be noise or an error; when you are driving the HTTP API directly rather than the page; and on a demo you restart repeatedly, so each restart does not pile up another tab. |
+| `--record` | off | Run the guided questions through your real provider and save the responses to `recordings.json` in the demo project, so the key-free replay path can answer them later. Needs an API key — a reachable Ollama is not enough, because there is nothing to proxy through. This spends real API credits. |
+| `--api-key KEY` | unset | The key for live mode, saved into the demo project's `.env.demo` so later runs from that directory stay live without passing it again. The provider follows the key's shape: `sk-or-…` is OpenRouter, anything else is OpenAI. A key on the command line is visible in your shell history and to `ps`, so exporting the environment variable stays the more private route. |
 
 ### What the demo needs, honestly
 
@@ -46,11 +55,8 @@ nl2sql demo --api-key sk-...
 ```
 
 The key is written into the demo project's `.env.demo`, so later runs from that
-directory are live without passing it again. The provider follows the key's
-shape — an `sk-or-` key is OpenRouter, anything else is OpenAI. `.env.demo` is
-covered by `.gitignore`, but a key on the command line is visible in your shell
-history and to `ps`, so exporting the environment variable stays the more
-private route.
+directory are live without passing it again. `.env.demo` is covered by
+`.gitignore`.
 
 Without the flag the demo looks for a key in a fixed order, highest first:
 
@@ -65,10 +71,9 @@ The first four run live.
 With none of them it falls back to *replay* mode, which is meant to answer the
 guided sample questions from recorded model responses — **and no recordings are
 committed yet**. So today the key-free path cannot answer anything: clicking a
-guided question shows "This question has no recording." Recording and committing
-them is Phase 1c, Task 5. Until then, set a key (or point it at Ollama) if you
-want the demo to produce an answer; the schema view and the playground itself
-work either way.
+guided question shows "This question has no recording." Until recordings land,
+set a key (or point it at Ollama) if you want the demo to produce an answer; the
+schema view and the playground itself work either way.
 
 ---
 
@@ -78,7 +83,7 @@ Prerequisites: **Python 3.12+**, and an LLM key to run a query.
 
 ```bash
 pip install nl2sql-engine        # add [postgres], [mysql], [mssql], [duckdb] as needed
-nl2sql setup --demo --lite       # generates demo databases, configs and .env.demo
+nl2sql setup --demo              # writes the Chinook demo project and indexes it
 export OPENAI_API_KEY=sk-...
 ```
 
@@ -86,7 +91,7 @@ export OPENAI_API_KEY=sk-...
 from nl2sql import NL2SQL
 
 engine = NL2SQL(env="demo")
-result = engine.run_query("How many employees are there?")
+result = engine.run_query("How many customers are there?")
 
 for sq in result.sub_queries:
     print(sq.sql)
@@ -210,10 +215,18 @@ These are current facts about the code, not a roadmap.
   transport level; whether a given local model can fill that schema is another
   matter, and small ones frequently cannot. Expect malformed plans and repeated
   refiner loops. See [LLM configuration](docs/configuration/llm.md).
-* **The manufacturing demo declares no foreign keys.** Its DDL creates plain
-  integer columns, so the validator has no relationship to match a join against
-  and rejects any join question with "Join does not match any allowed
-  relationship." Chinook declares real foreign keys and is the dataset to demo.
+* **An `ORDER BY` over a function crashes the logical validator.** The validator
+  hands sqlglot's `qualify()` a bare expression instead of an `exp.Ordered`, so
+  any plan that orders by `COUNT(...)` or any other function fails with
+  `VALIDATOR_CRASH`, exhausts the refiner loop and never reaches SQL. That is
+  most "top N by <something>" questions. The generator is unaffected, but
+  validation runs first.
+* **Equality filters are checked against a five-value sample.** The adapter
+  records five sample values per text column and the validator treats them as an
+  exhaustive allowlist for `=` and `IN`, so a correct filter on any other real
+  value is rejected as `INVALID_PLAN_STRUCTURE` and the refiner cannot recover.
+  On a low-cardinality status column this is a useful check; on a name column it
+  is wrong.
 * **`max_bytes` is not enforced.** It is configured, stored and reported, and
   nothing compares it to anything. `row_limit` *is* enforced — the generator
   bakes it into the SQL.
@@ -234,32 +247,35 @@ These are current facts about the code, not a roadmap.
 ## Demo data and the CLI
 
 ```bash
-# SQLite files, no containers (default)
-nl2sql setup --demo --lite
-
-# Or full fidelity: Postgres/MySQL/MSSQL in Docker
-nl2sql setup --demo --docker
+nl2sql setup --demo
 ```
 
-`--lite` and `--docker` are mutually exclusive. The lite run writes
-`data/demo_lite/*.db`, the `configs/*.demo.*` files and `.env.demo`, then indexes
-the generated schemas. That needs no API key: `.env.demo` sets
-`EMBEDDING_PROVIDER=local`, and the LLM enrichment pass over the schema is
-optional and simply skipped without one. A key is needed to *query* the demo, so
-pass one with `--api-key` or fill in `OPENAI_API_KEY` in `.env.demo` first.
-`setup --api-key` and `demo --api-key` read the key the same way: the provider
-follows the key's shape, and an `sk-or-` key is stored as `OPENROUTER_API_KEY`
-with `provider: openrouter`.
+That copies the vendored Chinook database to `data/chinook.sqlite`, writes the
+`configs/*.demo.*` files and `.env.demo`, then indexes the schema. Indexing
+needs no API key: `.env.demo` sets `EMBEDDING_PROVIDER=local`, and the LLM
+enrichment pass over the schema is optional and simply skipped without one. A
+key is needed to *query* the demo, so pass one with `--api-key` or fill in
+`OPENAI_API_KEY` in `.env.demo` first. `setup --api-key` and `demo --api-key`
+read the key the same way: the provider follows the key's shape, and an `sk-or-`
+key is stored as `OPENROUTER_API_KEY` with `provider: openrouter`.
+
+Chinook is the only demo dataset. `--lite` and `--docker` chose between a
+generated manufacturing dataset and the same data in a Compose stack; both are
+gone. The Postgres, MySQL and MSSQL **adapters** are unaffected — they are
+product features, configured like any other datasource.
 
 ```bash
 # Re-index after editing the demo configs
 nl2sql --env demo index
 
 # Ask a question
-nl2sql --env demo run "Show me broken machines in Austin"
+nl2sql --env demo run "How many customers do we have, by country?"
 
 # Plan and validate without touching a database
-nl2sql --env demo run --no-exec "Show me broken machines in Austin"
+nl2sql --env demo run --no-exec "Which artist has the most albums?"
+
+# Ask as a role that is not allowed the answer
+nl2sql --env demo run --role viewer "Who are the top 5 customers by total spend?"
 
 # Check the environment: Python, installed drivers, datasource connectivity
 nl2sql doctor
@@ -276,8 +292,8 @@ ENV=demo uvicorn nl2sql_api.main:app
 ENV_FILE_PATH=.env.demo uvicorn nl2sql_api.main:app
 ```
 
-The demo datasource file uses relative paths (e.g. `data/demo_lite/*.db`), so
-start the API from the directory holding them. The service has **no
+The demo datasource file uses a relative path (`data/chinook.sqlite`), so start
+the API from the directory holding it. The service has **no
 authentication**; see [Security Model](docs/security/model.md).
 
 ---

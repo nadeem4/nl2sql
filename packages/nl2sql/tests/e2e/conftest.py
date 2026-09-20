@@ -28,9 +28,9 @@ def _base_env() -> dict:
 
 @pytest.fixture(scope="session")
 def demo_project(tmp_path_factory):
-    """A generated lite demo (four SQLite DBs, indexed locally, no key)."""
+    """A generated Chinook demo (one SQLite DB, indexed locally, no key)."""
     root = tmp_path_factory.mktemp("demo")
-    subprocess.run(CLI + ["setup", "--demo", "--lite"], cwd=root, env=_base_env(), check=True, timeout=900)
+    subprocess.run(CLI + ["setup", "--demo"], cwd=root, env=_base_env(), check=True, timeout=900)
     return root
 
 

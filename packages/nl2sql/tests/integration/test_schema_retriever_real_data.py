@@ -99,10 +99,12 @@ def pytest_generate_tests(metafunc):
     if "datasource_id" in metafunc.fixturenames and "user_query" in metafunc.fixturenames:
         root = _project_root()
         questions = _load_sample_questions(root)
+        # Chinook is a single datasource, so take several of its questions
+        # rather than one per datasource: otherwise this shrinks to one case.
         cases = []
         for ds_id, items in questions.items():
-            if items:
-                cases.append((ds_id, items[0]))
+            for question in (items or [])[:4]:
+                cases.append((ds_id, question))
         metafunc.parametrize(("datasource_id", "user_query"), cases)
 
 

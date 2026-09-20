@@ -28,9 +28,6 @@ the `nl2sql-engine` distribution; an extra only adds the driver it needs, so add
 extra to the `pip install` line in `packages/api/Dockerfile` to include one -
 for example `"./packages/nl2sql[postgres,mysql,mssql]"`.
 
-The demo stack builds this same image as its `app` service - see
-[Demo data](demo.md#the-docker-demo-stack).
-
 ## Run the API
 
 ```bash

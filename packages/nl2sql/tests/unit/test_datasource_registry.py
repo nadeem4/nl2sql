@@ -73,7 +73,7 @@ def test_resolved_connection_keeps_non_secret_fields_as_plain_strings(monkeypatc
         "nl2sql.datasources.registry.discover_adapters",
         lambda: {"stub": _StubAdapter},
     )
-    monkeypatch.setenv("DEMO_HOST", "manufacturing_ref")
+    monkeypatch.setenv("DEMO_HOST", "analytics_db")
     monkeypatch.setenv("DEMO_USER", "ref_admin")
     monkeypatch.setenv("DEMO_PASSWORD", "ref-pw")
     registry = DatasourceRegistry(SecretManager())
@@ -88,7 +88,7 @@ def test_resolved_connection_keeps_non_secret_fields_as_plain_strings(monkeypatc
     resolved = registry.resolved_connection(connection).model_dump()
 
     # Assert
-    assert resolved["host"] == "manufacturing_ref"
+    assert resolved["host"] == "analytics_db"
     assert resolved["user"] == "ref_admin"
     assert resolved["password"] == "ref-pw"
     assert all(isinstance(resolved[k], str) for k in ("host", "user", "password"))
@@ -110,11 +110,11 @@ def test_adapter_config_model_still_masks_the_resolved_password(monkeypatch):
             id="ds_pg",
             connection=ConnectionConfig(
                 type="stub",
-                host="manufacturing_ref",
+                host="analytics_db",
                 port=5432,
                 user="${env:DEMO_USER}",
                 password="${env:DEMO_PASSWORD}",
-                database="manufacturing_ref",
+                database="analytics_db",
             ),
         )
     )
@@ -129,29 +129,29 @@ def test_adapter_config_model_still_masks_the_resolved_password(monkeypatch):
     assert "ref-pw" not in repr(config)
 
 
-def test_docker_demo_shaped_datasource_registers(monkeypatch):
-    # Regression: every ``DEMO_DOCKER_DATASOURCES`` entry resolves host, port,
-    # user and password from the environment, so a wrapped non-password field
-    # made the whole Docker demo unregisterable.
+def test_fully_env_resolved_datasource_registers(monkeypatch):
+    # Regression: a datasource that resolves host, port, user *and* password
+    # from the environment was unregisterable, because a wrapped non-password
+    # field was not unwrapped.
     # Arrange
     monkeypatch.setattr(
         "nl2sql.datasources.registry.discover_adapters",
         lambda: {"postgres": PostgresAdapter},
     )
-    monkeypatch.setenv("DEMO_REF_HOST", "manufacturing_ref")
+    monkeypatch.setenv("DEMO_REF_HOST", "analytics_db")
     monkeypatch.setenv("DEMO_REF_PORT", "5432")
     monkeypatch.setenv("DEMO_REF_USER", "ref_admin")
     monkeypatch.setenv("DEMO_REF_PASSWORD", "ref-pw")
     registry = DatasourceRegistry(SecretManager())
     config = DatasourceConfig(
-        id="manufacturing_ref",
+        id="analytics_db",
         connection=ConnectionConfig(
             type="postgres",
             host="${env:DEMO_REF_HOST}",
             port="${env:DEMO_REF_PORT}",
             user="${env:DEMO_REF_USER}",
             password="${env:DEMO_REF_PASSWORD}",
-            database="manufacturing_ref",
+            database="analytics_db",
         ),
     )
 
@@ -160,7 +160,7 @@ def test_docker_demo_shaped_datasource_registers(monkeypatch):
 
     # Assert
     assert adapter.connection_string == (
-        "postgresql://ref_admin:ref-pw@manufacturing_ref:5432/manufacturing_ref"
+        "postgresql://ref_admin:ref-pw@analytics_db:5432/analytics_db"
     )
 
 
@@ -175,10 +175,10 @@ def test_registration_errors_do_not_echo_the_resolved_password(monkeypatch):
     monkeypatch.setenv("DEMO_REF_PASSWORD", "s3cret-pw")
     registry = DatasourceRegistry(SecretManager())
     config = DatasourceConfig(
-        id="manufacturing_ref",
+        id="analytics_db",
         connection=ConnectionConfig(
             type="postgres",
-            host="manufacturing_ref",
+            host="analytics_db",
             user="ref_admin",
             password="${env:DEMO_REF_PASSWORD}",
         ),  # `database` is missing on purpose
@@ -209,11 +209,11 @@ def test_datasource_details_mask_the_resolved_password(monkeypatch):
             id="ds",
             connection=ConnectionConfig(
                 type="postgres",
-                host="manufacturing_ref",
+                host="analytics_db",
                 port=5432,
                 user="ref_admin",
                 password="${env:DEMO_REF_PASSWORD}",
-                database="manufacturing_ref",
+                database="analytics_db",
             ),
         )
     )
@@ -225,7 +225,7 @@ def test_datasource_details_mask_the_resolved_password(monkeypatch):
 
     # Assert
     assert details["connection_args"]["password"] == "***"
-    assert details["connection_args"]["host"] == "manufacturing_ref"
+    assert details["connection_args"]["host"] == "analytics_db"
     assert details["connection_args"]["user"] == "ref_admin"
     # The adapter itself still needs the real value to connect.
     assert registry.get_adapter("ds").connection_args["password"] == "s3cret-pw"

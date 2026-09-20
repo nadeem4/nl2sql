@@ -9,11 +9,11 @@ def _stub_result() -> QueryResult:
         sub_queries=[
             SubQueryResult(
                 id="sq1",
-                intent="count employees",
-                sql="SELECT COUNT(*) FROM employees",
-                datasource_id="manufacturing_ops",
+                intent="count customers",
+                sql="SELECT COUNT(*) FROM Customer",
+                datasource_id="chinook",
                 schema_version="v1",
-                plan={"tables": [{"name": "employees", "alias": "e", "ordinal": 0}]},
+                plan={"tables": [{"name": "Customer", "alias": "c", "ordinal": 0}]},
                 validation=[
                     ValidationCheck(name="plan_present", passed=True, message="Plan received from the planner"),
                     ValidationCheck(name="structure_and_schema", passed=True, message="ok"),
@@ -33,14 +33,14 @@ def _stub_result() -> QueryResult:
 def test_query_response_carries_plan_validation_rows_status_and_timings(api_client):
     client, _engine = api_client(_stub_result())
 
-    response = client.post("/api/v1/query", json={"natural_language": "how many employees?"})
+    response = client.post("/api/v1/query", json={"natural_language": "how many customers?"})
 
     assert response.status_code == 200, response.text
     body = response.json()
     assert body["status"] == "success"
     assert body["timings"] == {"ast_planner": 0.12}
     sub_query = body["sub_queries"][0]
-    assert sub_query["plan"]["tables"][0]["name"] == "employees"
+    assert sub_query["plan"]["tables"][0]["name"] == "Customer"
     assert [check["name"] for check in sub_query["validation"]] == [
         "plan_present",
         "structure_and_schema",
@@ -61,7 +61,7 @@ def test_plan_only_run_reports_no_rows(api_client):
     )
 
     response = client.post(
-        "/api/v1/query", json={"natural_language": "how many employees?", "execute": False}
+        "/api/v1/query", json={"natural_language": "how many customers?", "execute": False}
     )
 
     assert response.status_code == 200, response.text

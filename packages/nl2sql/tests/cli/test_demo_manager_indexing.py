@@ -10,10 +10,10 @@ from nl2sql.cli.demo.manager import DemoManager
 
 @pytest.fixture()
 def demo_project(tmp_path, monkeypatch):
-    """A throwaway project root with a complete lite demo already generated."""
+    """A throwaway project root with a complete Chinook demo already generated."""
     monkeypatch.chdir(tmp_path)
     manager = DemoManager(Console(), tmp_path)
-    manager.setup_lite(api_key="test-key")
+    manager.setup_chinook(api_key="test-key")
     return manager
 
 
@@ -42,12 +42,7 @@ def test_index_demo_data_context_points_at_demo_config(demo_project, monkeypatch
     assert demo_project.index_demo_data() is True
 
     ctx = captured[0]
-    assert sorted(a.datasource_id for a in ctx.ds_registry.list_adapters()) == [
-        "manufacturing_history",
-        "manufacturing_ops",
-        "manufacturing_ref",
-        "manufacturing_supply",
-    ]
+    assert sorted(a.datasource_id for a in ctx.ds_registry.list_adapters()) == ["chinook"]
     assert str(tmp_path) in str(ctx.vector_store.persist_directory)
 
 
@@ -58,12 +53,8 @@ def test_index_demo_data_reports_missing_env_file(tmp_path, monkeypatch):
     assert manager.index_demo_data() is False
 
 
-def test_setup_lite_writes_the_secrets_envelope(demo_project, tmp_path):
-    """Every generated `.env.demo` points SECRETS_CONFIG at this file.
-
-    Only the Chinook path used to write it, so the lite demo shipped an env
-    file naming a config that did not exist.
-    """
+def test_setup_writes_the_secrets_envelope(demo_project, tmp_path):
+    """Every generated `.env.demo` points SECRETS_CONFIG at this file."""
     secrets_path = tmp_path / "configs" / "secrets.demo.yaml"
 
     assert secrets_path.exists()

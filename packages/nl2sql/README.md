@@ -47,7 +47,7 @@ Requires Python 3.12+.
 from nl2sql import NL2SQL
 
 engine = NL2SQL(env="demo")
-result = engine.run_query("How many employees are there?")
+result = engine.run_query("How many customers are there?")
 
 for sq in result.sub_queries:
     print(sq.sql)
@@ -57,7 +57,7 @@ print(result.final_answer["summary"])
 ```
 
 ```bash
-nl2sql setup --demo --lite                 # generate demo data and configs
+nl2sql setup --demo                       # write the Chinook demo project
 nl2sql --env demo index                    # index the schemas
 nl2sql --env demo run "..."                # ask a question
 nl2sql --env demo run --no-exec "..."      # plan and validate, touch no database

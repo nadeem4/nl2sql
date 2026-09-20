@@ -29,7 +29,7 @@ def test_the_check_mark_is_unencodable_on_a_legacy_code_page(monkeypatch):
 
 
 def test_cli_output_survives_a_legacy_code_page(monkeypatch):
-    """`nl2sql setup --demo --lite` died here with a UnicodeEncodeError.
+    """`nl2sql setup --demo` died here with a UnicodeEncodeError.
 
     ``ConsolePresenter.print_success`` writes U+2713, which cp1252 cannot
     encode, so the command aborted unless the user set PYTHONIOENCODING=utf-8.
