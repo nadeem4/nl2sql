@@ -41,12 +41,26 @@ def _run(*args):
     return runner.invoke(app, ["demo", "--no-browser", *args])
 
 
+_ANSI = re.compile(r"\x1b\[[0-9;]*m")
+
+
+def _plain(text: str) -> str:
+    """Strips the colour rich adds when it believes it has a terminal.
+
+    CI has one and a local run may not. Rich's repr highlighter colours numbers
+    inside a word, so `sk-...1234` and a key ending in digits both arrive split
+    across escape sequences -- which would quietly turn "the key is not in the
+    output" into a test that cannot fail.
+    """
+    return _ANSI.sub("", text)
+
+
 def test_api_key_selects_live_mode_with_nothing_in_the_environment(tmp_path):
     result = _run("--dir", str(tmp_path / "d"), "--api-key", FAKE_KEY)
 
     assert result.exit_code == 0, result.output
-    assert "live mode" in result.output.lower(), result.output
-    assert "using openai" in result.output.lower(), result.output
+    assert "live mode" in _plain(result.output).lower(), result.output
+    assert "using openai" in _plain(result.output).lower(), result.output
     llm = yaml.safe_load((tmp_path / "d" / "configs" / "llm.demo.yaml").read_text())
     # No base_url means the engine talks to the real provider, not a local
     # replay or recording server.
@@ -75,8 +89,8 @@ def test_a_later_run_in_that_directory_is_live_without_any_environment(tmp_path)
     second = _run("--dir", str(directory))
 
     assert second.exit_code == 0, second.output
-    assert "live mode" in second.output.lower(), second.output
-    assert "using openai" in second.output.lower(), second.output
+    assert "live mode" in _plain(second.output).lower(), second.output
+    assert "using openai" in _plain(second.output).lower(), second.output
     assert os.environ.get("OPENAI_API_KEY") == FAKE_KEY
 
 
@@ -84,7 +98,7 @@ def test_an_openrouter_shaped_key_selects_openrouter(tmp_path):
     result = _run("--dir", str(tmp_path / "d"), "--api-key", FAKE_OPENROUTER_KEY)
 
     assert result.exit_code == 0, result.output
-    assert "using openrouter" in result.output.lower(), result.output
+    assert "using openrouter" in _plain(result.output).lower(), result.output
     env_demo = (tmp_path / "d" / ".env.demo").read_text(encoding="utf-8")
     assert f"OPENROUTER_API_KEY={FAKE_OPENROUTER_KEY}" in env_demo
 
@@ -147,11 +161,14 @@ def test_the_key_is_never_echoed(tmp_path):
     result = _run("--dir", str(tmp_path / "d"), "--api-key", FAKE_KEY)
 
     assert result.exit_code == 0, result.output
-    assert FAKE_KEY not in result.output
-    assert FAKE_KEY not in result.stdout
+    plain = _plain(result.output)
+    assert FAKE_KEY not in plain
+    assert FAKE_KEY not in _plain(result.stdout)
+    # Rich wraps long lines, so a key could also be split across them.
+    assert FAKE_KEY not in "".join(plain.split())
     # The generated LLM config points at the variable, it does not inline it.
     assert FAKE_KEY not in (tmp_path / "d" / "configs" / "llm.demo.yaml").read_text()
-    assert "sk-...1234" in result.output
+    assert "sk-...1234" in plain
 
 
 def test_the_key_is_not_echoed_when_the_command_fails(tmp_path, monkeypatch):
@@ -165,16 +182,20 @@ def test_the_key_is_not_echoed_when_the_command_fails(tmp_path, monkeypatch):
     result = _run("--dir", str(tmp_path / "d"), "--api-key", FAKE_KEY)
 
     assert result.exit_code == 1
-    assert FAKE_KEY not in result.output
+    plain = _plain(result.output)
+    assert FAKE_KEY not in plain
+    assert FAKE_KEY not in "".join(plain.split())
 
 
 def test_help_states_the_precedence_and_the_argv_caveat():
     result = runner.invoke(app, ["demo", "--help"])
 
     assert result.exit_code == 0
-    # Rich wraps the help into a bordered panel, so drop the box-drawing
-    # characters and collapse the wrapping before matching on phrases.
-    text = " ".join(re.sub(r"[^\x20-\x7e]", " ", result.output).split())
+    # Rich colours the help when it thinks it has a terminal -- CI does, a local
+    # run may not -- and an option name is split across colour spans
+    # (`ESC[1;36m-ESC[0mESC[1;36m-api-key`). Strip the escapes first, then the
+    # box-drawing border, then the wrapping, before matching on phrases.
+    text = " ".join(re.sub(r"[^\x20-\x7e]", " ", _plain(result.output)).split())
     assert "--api-key" in text
     assert ".env.demo" in text
     assert "OPENROUTER_API_KEY" in text
