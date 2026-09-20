@@ -47,12 +47,6 @@ class Settings(BaseSettings):
         description="Global timeout in seconds for pipeline execution."
     )
 
-    sandbox_exec_workers: int = Field(
-        default=4,
-        validation_alias="SANDBOX_EXEC_WORKERS",
-        description="Max workers for latency-sensitive execution pool."
-    )
-
     result_artifact_backend: str = Field(
         default="local",
         validation_alias="RESULT_ARTIFACT_BACKEND",
