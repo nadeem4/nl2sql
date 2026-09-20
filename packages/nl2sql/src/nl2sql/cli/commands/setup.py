@@ -6,6 +6,7 @@ from rich.panel import Panel
 from InquirerPy import inquirer
 from InquirerPy.validator import NumberValidator
 
+from nl2sql.cli.common.api_key import env_var_for_key, provider_for_key
 from nl2sql.cli.common.decorators import handle_cli_errors
 from nl2sql.cli.common.prompts import confirm
 from nl2sql.cli.console import console, print_success, print_step
@@ -139,15 +140,24 @@ def _configure_llm(config_manager: ConfigManager, api_key: Optional[str] = None)
     console.print(Panel("[bold]2. LLM Configuration[/bold]", border_style="magenta"))
     
     if api_key:
-         console.print("[green]API Key provided via CLI. Creating default OpenAI configuration.[/green]")
+         # The provider follows the key's shape, the same rule `nl2sql demo
+         # --api-key` uses. Storing an OpenRouter key as OPENAI_API_KEY with
+         # `provider: openai` produced a config the engine could never use.
+         provider = provider_for_key(api_key)
+         console.print(f"[green]API Key provided via CLI. Creating default {provider} configuration.[/green]")
          default_agent = AgentConfig(
-            provider="openai",
-            model="gpt-4o",
-            api_key="${env:OPENAI_API_KEY}"
+            provider=provider,
+            model="anthropic/claude-sonnet-4.5" if provider == "openrouter" else "gpt-4o",
+            api_key=f"${{env:{env_var_for_key(api_key)}}}"
          )
          llm_config = LLMFileConfig(default=default_agent)
          content = LLMGenerator.generate(llm_config)
          _write_config_file(LLM_CONFIG, content)
+         if provider == "openrouter":
+             console.print(
+                 "[yellow]Note:[/yellow] embeddings still go through OpenAI, so "
+                 "[cyan]nl2sql index[/cyan] needs OPENAI_API_KEY as well."
+             )
          return
 
     console.print("No LLM configuration found. Let's configure one.")
@@ -253,8 +263,8 @@ def _configure_env_file(env: str, api_key: Optional[str] = None):
     # Generate Content
     secrets = {}
     if api_key:
-        secrets["OPENAI_API_KEY"] = api_key
-        
+        secrets[env_var_for_key(api_key)] = api_key
+
     content = EnvFileGenerator.generate(env, secrets=secrets)
 
     try:

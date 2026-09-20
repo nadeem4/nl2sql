@@ -152,9 +152,20 @@ def demo(
     port: Annotated[int, typer.Option(help="Port")] = 8765,
     no_browser: Annotated[bool, typer.Option("--no-browser")] = False,
     record: Annotated[bool, typer.Option("--record", help="Record the sample questions through a real provider")] = False,
+    api_key: Annotated[Optional[str], typer.Option(
+        "--api-key",
+        help=(
+            "API key for live mode, saved into the demo project's .env.demo so later runs "
+            "from that directory stay live. The provider follows the key shape: an sk-or- key "
+            "is OpenRouter, anything else is OpenAI. Precedence: --api-key, then "
+            "OPENAI_API_KEY/OPENROUTER_API_KEY in the environment, then .env.demo, then Ollama, "
+            "then replay. A key on argv is visible in shell history and to ps, so the "
+            "environment variable is the more private route."
+        ),
+    )] = None,
 ):
     """One-command playground over a sample database."""
-    demo_command(dataset, directory, host, port, no_browser, record)
+    demo_command(dataset, directory, host, port, no_browser, record, api_key)
 
 
 @app.command()

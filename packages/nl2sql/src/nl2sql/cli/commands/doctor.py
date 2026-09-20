@@ -75,7 +75,8 @@ def doctor_command():
         else:
             print_error(
                 f"MISSING: LLM {agent.provider}/{agent.model} needs {env_var}. "
-                f"Set it in {active_env_file()} or the environment."
+                f"Set it in {active_env_file()} or the environment, "
+                "or pass --api-key to nl2sql setup or nl2sql demo."
             )
     except Exception as exc:
         print_error(f"LLM configuration could not be loaded: {exc}")
