@@ -74,6 +74,7 @@ def _scan_state(datasource_id):
         user_context=None,
         datasource_resolver_response=None,
         artifact_refs={},
+        subgraph_outputs={},
         global_planner_response=SimpleNamespace(execution_dag=dag),
         decomposer_response=SimpleNamespace(
             sub_queries=[SimpleNamespace(id="sq_1", datasource_id=datasource_id)]

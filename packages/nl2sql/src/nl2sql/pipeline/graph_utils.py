@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, FrozenSet, List, Optional
 
 from langchain_core.runnables import Runnable, RunnableConfig
 
+from nl2sql.common.errors import ErrorSeverity
 from nl2sql.context import NL2SQLContext
 from nl2sql.pipeline.nodes.global_planner.schemas import ExecutionDAG
 from nl2sql.pipeline.state import GraphState, SubgraphExecutionState
@@ -30,6 +31,7 @@ class StateAccessor:
 def next_scan_layer_ids(
     dag: ExecutionDAG,
     artifact_refs: Dict[str, Any],
+    completed_node_ids: FrozenSet[str] = frozenset(),
 ) -> List[str]:
     node_index = {n.node_id: n for n in dag.nodes}
     for layer in dag.layers or []:
@@ -39,10 +41,23 @@ def next_scan_layer_ids(
             if node_id in node_index
             and node_index[node_id].kind == "scan"
             and node_id not in artifact_refs
+            and node_id not in completed_node_ids
         ]
         if pending_scan:
             return pending_scan
     return []
+
+
+def completed_scan_ids(subgraph_outputs: Optional[Dict[str, Any]]) -> FrozenSet[str]:
+    """Sub-query ids that already ran, with or without an artifact.
+
+    Subgraph ids are formatted ``name:node_id:trace_id``, so the node id is the
+    second segment. A scan that failed produces no artifact; without this the
+    layer router would re-dispatch it forever.
+    """
+    return frozenset(
+        key.split(":")[1] for key in (subgraph_outputs or {}) if key.count(":") >= 2
+    )
 
 
 def resolve_subgraph(
@@ -112,18 +127,22 @@ def wrap_subgraph(
         planner_response = returned_state.ast_planner_response
         generator_response = returned_state.generator_response
         sub_reasoning = returned_state.reasoning
-        artifact_refs: Dict[str, Any] = {}
-        artifact = executor_response.artifact
-        artifact_refs[sub_query.id] = artifact
+        artifact = executor_response.artifact if executor_response else None
+        artifact_refs: Dict[str, Any] = {sub_query.id: artifact} if artifact else {}
 
         retry_count = returned_state.retry_count
-        status = "error" if returned_state.errors else "success"
+        blocking = [
+            e
+            for e in returned_state.errors
+            if e.severity in (ErrorSeverity.ERROR, ErrorSeverity.CRITICAL)
+        ]
+        status = "error" if blocking else "success"
         subgraph_output = SubgraphOutput(
             sub_query=sub_query,
             subgraph_name=subgraph_name,
             subgraph_id=subgraph_id,
             retry_count=retry_count,
-            plan=planner_response.plan,
+            plan=planner_response.plan if planner_response else None,
             sql_draft=generator_response.sql_draft if generator_response else None,
             artifact=artifact,
             errors=returned_state.errors,

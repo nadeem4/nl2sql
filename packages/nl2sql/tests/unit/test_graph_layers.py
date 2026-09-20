@@ -35,3 +35,24 @@ def test_next_scan_layer_ids_respects_existing_results():
     assert next_scan_layer_ids(dag, {}) == ["sq_left", "sq_right"]
     assert next_scan_layer_ids(dag, {"sq_left": "r1"}) == ["sq_right"]
     assert next_scan_layer_ids(dag, {"sq_left": "r1", "sq_right": "r2"}) == []
+
+
+def test_completed_scan_without_artifact_is_not_pending():
+    # A scan that already ran and failed has no artifact; it must not be
+    # re-dispatched forever.
+    dag = ExecutionDAG(
+        nodes=[
+            LogicalNode(
+                node_id="sq1",
+                kind="scan",
+                attributes={},
+                inputs=[],
+                output_schema=_schema(["id"]),
+            )
+        ],
+        edges=[],
+        layers=[["sq1"]],
+    )
+
+    assert next_scan_layer_ids(dag, {}, completed_node_ids=frozenset({"sq1"})) == []
+    assert next_scan_layer_ids(dag, {}) == ["sq1"]
