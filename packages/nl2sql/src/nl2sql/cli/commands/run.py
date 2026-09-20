@@ -25,7 +25,7 @@ def run_pipeline(
     presenter = ConsolePresenter()
     presenter.print_info(f"Query: {config.query}")
     if config.no_exec:
-        presenter.print_warning("Execution disabled (no_exec). Only SQL/plan output will be shown.")
+        presenter.print_warning("Execution disabled (--no-exec): plan, validation and SQL only.")
     
     # Instantiate Runner
     runner = PipelineRunner(ctx)

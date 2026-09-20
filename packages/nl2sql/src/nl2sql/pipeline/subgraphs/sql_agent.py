@@ -23,6 +23,7 @@ import time
 
 def build_sql_agent_graph(
     ctx: NL2SQLContext,
+    execute: bool = True,
 ):
     """Builds the SQL Agent Subgraph.
 
@@ -31,6 +32,11 @@ def build_sql_agent_graph(
 
     Feedback Loop:
     (LogicalValidator Error) -> RetryHandler -> Refiner -> Planner
+
+    Args:
+        ctx: The application context.
+        execute: When False the executor is left out of the graph entirely, so
+            a plan-only run never opens a database connection.
     """
     graph = StateGraph(SubgraphExecutionState)
 
@@ -39,7 +45,6 @@ def build_sql_agent_graph(
     logical_validator = LogicalValidatorNode(ctx)
     refiner = RefinerNode(ctx)
     generator = GeneratorNode(ctx)
-    executor = ExecutorNode(ctx)
 
     def _get_subgraph_id(state: SubgraphExecutionState) -> str:
         if state.subgraph_id:
@@ -137,7 +142,8 @@ def build_sql_agent_graph(
     graph.add_node("ast_planner", ast_planner)
     graph.add_node("logical_validator", logical_validator)
     graph.add_node("generator", generator)
-    graph.add_node("executor", executor)
+    if execute:
+        graph.add_node("executor", ExecutorNode(ctx))
     graph.add_node("refiner", refiner)
     graph.add_node("retry_handler", retry_node)
 
@@ -157,9 +163,11 @@ def build_sql_agent_graph(
         {"ok": "generator", "retry": "retry_handler", "end": END},
     )
 
-    graph.add_edge("generator", "executor")
-
-    graph.add_edge("executor", END)
+    if execute:
+        graph.add_edge("generator", "executor")
+        graph.add_edge("executor", END)
+    else:
+        graph.add_edge("generator", END)
 
     graph.add_edge("retry_handler", "refiner")
     graph.add_edge("refiner", "ast_planner")
