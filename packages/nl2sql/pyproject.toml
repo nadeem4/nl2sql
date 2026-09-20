@@ -74,3 +74,4 @@ include = ["nl2sql*"]
 
 [tool.setuptools.package-data]
 "*" = ["configs/*.yaml", ".env"]
+"nl2sql.cli.demo" = ["data/*.sqlite", "recordings/*.json"]
