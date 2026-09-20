@@ -2060,12 +2060,7 @@ providers. The check runs on the read path only, so the fix is simply to re-run
 <tr>
 <td><code>GLOBAL_TIMEOUT_SEC</code></td>
 <td><code>60</code></td>
-<td>Global timeout in seconds for pipeline execution.</td>
-</tr>
-<tr>
-<td><code>SANDBOX_EXEC_WORKERS</code></td>
-<td><code>4</code></td>
-<td>Width of the <code>ThreadPoolExecutor</code> the pipeline runs on. Despite the name it provides concurrency, not sandboxing (see <code>../execution/isolation.md</code>).</td>
+<td>Global timeout in seconds for pipeline execution. The caller is answered within about a second of the limit; the run's worker thread winds down in the background (see <code>../execution/isolation.md</code>).</td>
 </tr>
 </tbody>
 </table>

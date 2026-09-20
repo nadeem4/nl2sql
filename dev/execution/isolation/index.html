@@ -3970,10 +3970,12 @@ the current implementation. It is deliberately explicit about what the engine
 does <strong>not</strong> do, because the boundaries matter when you reason about failure.</p>
 <h2 id="there-is-no-process-sandbox">There is no process sandbox</h2>
 <p>The engine runs entirely <strong>in one process</strong>. <code>run_with_graph()</code> dispatches the
-graph onto a <code>concurrent.futures.ThreadPoolExecutor</code>
-(<a href="https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/pipeline/runtime.py"><code>pipeline/runtime.py</code></a>),
-sized by <code>settings.sandbox_exec_workers</code> (<code>SANDBOX_EXEC_WORKERS</code>, default <code>4</code>).
-Threads share one interpreter and one address space.</p>
+graph onto a single-worker <code>concurrent.futures.ThreadPoolExecutor</code>
+(<a href="https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/pipeline/runtime.py"><code>pipeline/runtime.py</code></a>)
+created per run, so the caller's thread stays free to enforce
+<code>GLOBAL_TIMEOUT_SEC</code>. Concurrency across runs is the caller's to provide (a web
+server's own worker pool, for instance), not a setting of this engine. Threads
+share one interpreter and one address space.</p>
 <p>Two consequences follow, and neither is a sandbox property:</p>
 <ul>
 <li>A hard crash in a database driver (segfault, <code>abort()</code>) terminates the whole
@@ -3981,8 +3983,6 @@ Threads share one interpreter and one address space.</p>
   it.</li>
 <li>Memory is shared. A run cannot be isolated from another run by the runtime.</li>
 </ul>
-<p>The setting is named <code>sandbox_exec_workers</code> for historical reasons. It controls
-<strong>thread-pool width</strong>, not isolation.</p>
 <h2 id="what-the-engine-actually-guarantees">What the engine actually guarantees</h2>
 <h3 id="validation-before-sql-exists">Validation before SQL exists</h3>
 <p>This is the engine's real safety property, and it holds. The LLM emits an
@@ -4016,11 +4016,12 @@ abandon that call. The token is checked between and within nodes, not inside
 third-party I/O.</p>
 <h3 id="global-timeout">Global timeout</h3>
 <p><code>settings.global_timeout_sec</code> (<code>GLOBAL_TIMEOUT_SEC</code>, default <code>60</code>) is enforced by
-<code>future.result(timeout=...)</code> in <code>run_with_graph()</code>. On expiry the caller gets a
-<code>PIPELINE_TIMEOUT</code> error and a user-facing message.</p>
+<code>future.result(timeout=...)</code> in <code>run_with_graph()</code>. On expiry the run's
+<code>CancellationToken</code> is cancelled and the caller gets a <code>PIPELINE_TIMEOUT</code> error
+and a user-facing message, within about a second of the limit.</p>
 <p>The timeout bounds <strong>how long the caller waits</strong>, not how long the work runs.
-Since the executor is a thread pool, the underlying thread is not killed and may
-continue until its own I/O completes.</p>
+The underlying thread is not killed; it winds down in the background once its
+nodes observe the cancelled token, or once its current I/O completes.</p>
 <h3 id="one-circuit-breaker">One circuit breaker</h3>
 <p><code>VECTOR_BREAKER</code>
 (<a href="https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/common/resilience.py"><code>common/resilience.py</code></a>)
@@ -4068,7 +4069,7 @@ isolation.</p>
 <tr>
 <td style="text-align: left;"><code>ThreadPoolExecutor</code></td>
 <td style="text-align: left;"><code>pipeline/runtime.py</code></td>
-<td style="text-align: left;">Concurrency, <strong>not</strong> isolation</td>
+<td style="text-align: left;">One worker per run, so the caller can time out; <strong>not</strong> isolation</td>
 </tr>
 </tbody>
 </table>

@@ -2021,7 +2021,7 @@ Source file path: <code>packages/nl2sql/src/nl2sql/pipeline/graph.py</code></p>
 <li>Blocking calls include LLM requests in <code>decomposer</code> and <code>answer_synthesizer</code>.</li>
 <li><code>global_planner</code> and <code>aggregator</code> are CPU-bound (DAG construction and local aggregation).</li>
 <li>Subgraph executions are dispatched per scan layer and can run in parallel via LangGraph routing.</li>
-<li>Overall pipeline is executed within a thread pool controlled by <code>settings.sandbox_exec_workers</code> and guarded by <code>settings.global_timeout_sec</code>.</li>
+<li>Overall pipeline is executed on a single-worker thread pool created per run and guarded by <code>settings.global_timeout_sec</code>.</li>
 </ul>
 <hr/>
 <h2 id="observability">Observability</h2>
@@ -2035,7 +2035,6 @@ Source file path: <code>packages/nl2sql/src/nl2sql/pipeline/graph.py</code></p>
 <h2 id="configuration">Configuration</h2>
 <ul>
 <li><code>GLOBAL_TIMEOUT_SEC</code> controls total pipeline timeout (<code>settings.global_timeout_sec</code>).</li>
-<li><code>SANDBOX_EXEC_WORKERS</code> controls thread pool size (<code>settings.sandbox_exec_workers</code>).</li>
 <li>Subgraph selection is governed by datasource capabilities in the subgraph registry.</li>
 </ul>
 <hr/>
