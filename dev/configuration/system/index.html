@@ -2165,6 +2165,8 @@ providers. The check runs on the read path only, so the fix is simply to re-run
 </tr>
 </tbody>
 </table>
+<p>From Python, <code>NL2SQL(env="demo")</code> sets <code>ENV</code> and <code>NL2SQL(env_file=path)</code> sets
+<code>ENV_FILE_PATH</code>, reloading settings before any configuration path is resolved.</p>
 <h2 id="config-manager-flow">Config manager flow</h2>
 <pre class="mermaid"><code>flowchart TD
     Env[Environment Variables] --&gt; Settings[Settings]
