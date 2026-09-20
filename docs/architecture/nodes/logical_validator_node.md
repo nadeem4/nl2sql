@@ -69,8 +69,20 @@ Validation performed:
 
 Mutations to `SubgraphExecutionState`:
 
-- `logical_validator_response` (`LogicalValidatorResponse`)
+- `logical_validator_response` (`LogicalValidatorResponse`, carrying `errors`,
+  `reasoning` and `checks`)
 - `errors` and `reasoning`
+
+`checks` is a `List[ValidationCheck]` (`name`, `passed`, `message`) recording what
+was validated, not only what failed. The names are fixed and always in this order:
+
+| name | meaning |
+| --- | --- |
+| `plan_present` | A plan reached the validator. The only check emitted when it did not. |
+| `structure_and_schema` | Tables, columns, joins and literals resolve against the retrieved schema. |
+| `policy` | Every table in the plan is allowed for the caller's role. |
+
+On failure the check's `message` is the first corresponding error's message.
 
 Side effects:
 
@@ -109,6 +121,7 @@ def __call__(self, state: SubgraphExecutionState) -> Dict[str, Any]
 Key contracts:
 
 - `LogicalValidatorResponse`
+- `ValidationCheck`
 - `PipelineError`
 
 ---

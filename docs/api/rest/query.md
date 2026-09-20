@@ -20,6 +20,11 @@ Source: `packages/api/src/nl2sql_api/models/query.py`
 | `sql` | `str` | no | SQL generated for the sub-query. |
 | `datasource_id` | `str` | no | Datasource the sub-query targets. |
 | `schema_version` | `str` | no | Schema version used for planning. |
+| `plan` | `Optional[Dict[str, Any]]` | no | The validated plan, dumped. |
+| `validation` | `List[Dict[str, Any]]` | no | Validation checks (`name`, `passed`, `message`). |
+| `rows` | `Optional[Dict[str, Any]]` | no | Capped row sample (`columns`, `rows`, `total_rows`). |
+| `status` | `str` | no | `"success"` or `"error"` for this sub-query. |
+| `retry_count` | `int` | no | Plan/SQL refinement attempts made. |
 
 ### `QueryResponse`
 
@@ -34,9 +39,12 @@ Mirrors `nl2sql.api.query_api.QueryResult` field for field.
 | `reasoning` | `List[Dict[str, Any]]` | no | Reasoning events/logs. |
 | `warnings` | `List[Dict[str, Any]]` | no | Warning events/logs. |
 | `artifact_refs` | `Dict[str, Dict[str, Any]]` | no | Result artifact references keyed by execution node id. |
+| `status` | `str` | no | `"success"`, `"error"` or `"plan_only"` for the run. |
+| `timings` | `Dict[str, float]` | no | Wall-clock seconds per graph node. |
 
-Result rows are not inlined in the response. They are written to artifact storage
-and addressed through `artifact_refs` (`uri`, `format`, `row_count`, `columns`).
+Only a capped sample of the rows is inlined, in `sub_queries[].rows`. The full
+result set is written to artifact storage and addressed through `artifact_refs`
+(`uri`, `format`, `row_count`, `columns`).
 
 ## Endpoints
 
@@ -73,7 +81,16 @@ Example response:
       "intent": "top customers by revenue",
       "sql": "SELECT customer, SUM(revenue) FROM sales GROUP BY customer ORDER BY 2 DESC LIMIT 5",
       "datasource_id": "warehouse",
-      "schema_version": "v3"
+      "schema_version": "v3",
+      "plan": {"tables": [{"name": "sales", "alias": "s", "ordinal": 0}]},
+      "validation": [
+        {"name": "plan_present", "passed": true, "message": "Plan received from the planner"},
+        {"name": "structure_and_schema", "passed": true, "message": "Tables, columns and joins resolve against the retrieved schema"},
+        {"name": "policy", "passed": true, "message": "Role 'admin' may read every table in the plan"}
+      ],
+      "rows": {"columns": ["customer", "revenue"], "rows": [["acme", 42]], "total_rows": 5},
+      "status": "success",
+      "retry_count": 0
     }
   ],
   "final_answer": {
@@ -92,12 +109,15 @@ Example response:
       "row_count": 5,
       "columns": ["customer", "revenue"]
     }
-  }
+  },
+  "status": "success",
+  "timings": {"ast_planner": 0.02, "logical_validator": 0.001, "generator": 0.006, "executor": 0.038}
 }
 ```
 
 ## Tests
 
-`packages/api/tests/test_query_routes.py` covers this endpoint with FastAPI's
+`packages/api/tests/test_query_routes.py` and
+`packages/api/tests/test_query_response_shape.py` cover this endpoint with FastAPI's
 `TestClient` and a stubbed engine (`get_engine` dependency override), so no
 datasource, LLM or network access is required.

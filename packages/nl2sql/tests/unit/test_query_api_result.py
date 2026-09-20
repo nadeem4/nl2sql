@@ -1,10 +1,16 @@
 """QueryAPI must return a typed QueryResult built from the raw graph state."""
 
+from datetime import datetime
+from types import SimpleNamespace
+
 from nl2sql.api import query_api
 from nl2sql.api.query_api import QueryAPI, QueryResult, result_from_state
 from nl2sql.common.errors import ErrorCode, ErrorSeverity, PipelineError
 from nl2sql.pipeline.nodes.answer_synthesizer.schemas import AnswerSynthesizerResponse
 from nl2sql.pipeline.nodes.decomposer.schemas import SubQuery
+from nl2sql.execution.contracts import ArtifactRef
+from nl2sql.pipeline.nodes.ast_planner.schemas import Expr, PlanModel, SelectItem, TableRef
+from nl2sql.pipeline.nodes.validator.schemas import ValidationCheck
 from nl2sql.pipeline.subgraphs.schemas import SubgraphOutput
 
 
@@ -119,3 +125,39 @@ def test_run_query_returns_query_result(monkeypatch):
 
     assert isinstance(result, QueryResult)
     _assert_mapped(result)
+
+
+def test_result_carries_plan_validation_rows_status_and_timings():
+    plan = PlanModel(tables=[TableRef(name="t", alias="a", ordinal=0)], joins=[],
+                     select_items=[SelectItem(ordinal=0, expr=Expr(kind="column", alias="a", column_name="id"))])
+    artifact = ArtifactRef(uri="x", backend="local", format="parquet", row_count=120, columns=["id"], bytes=1,
+                           content_hash="h", created_at=datetime.now(), path_template="p")
+    state = {
+        "trace_id": "t", "timings": {"ast_planner": 0.12},
+        "subgraph_outputs": {"sql_agent:sq1:t": SubgraphOutput(
+            subgraph_id="sql_agent:sq1:t", sql_draft="SELECT id FROM t", plan=plan, artifact=artifact, status="success", retry_count=1,
+            validation=[ValidationCheck(name="policy", passed=True, message="ok")],
+            sub_query=SubQuery(id="sq1", intent="i", datasource_id="ds", schema_version="v"))},
+        "errors": [PipelineError(node="refiner", message="hint", severity=ErrorSeverity.WARNING, error_code=ErrorCode.PLAN_FEEDBACK)],
+    }
+
+    class _Store:
+        def read_result_frame(self, ref):
+            return SimpleNamespace(columns=["id"], rows=[[i] for i in range(120)], row_count=120)
+
+    result = result_from_state(state, artifact_store=_Store(), sample_rows=50)
+    sq = result.sub_queries[0]
+    assert sq.plan["tables"][0]["name"] == "t"
+    assert sq.validation[0].name == "policy" and sq.validation[0].passed
+    assert sq.rows.total_rows == 120 and len(sq.rows.rows) == 50
+    assert sq.status == "success" and sq.retry_count == 1
+    assert result.status == "success"
+    assert result.errors == [] and result.warnings[0]["message"] == "hint"
+    assert result.timings == {"ast_planner": 0.12}
+
+
+def test_plan_only_status_when_no_artifact_and_no_errors():
+    state = {"trace_id": "t", "subgraph_outputs": {"sql_agent:sq1:t": SubgraphOutput(
+        subgraph_id="sql_agent:sq1:t", sql_draft="SELECT 1", status="success",
+        sub_query=SubQuery(id="sq1", intent="i", datasource_id="ds"))}}
+    assert result_from_state(state).status == "plan_only"

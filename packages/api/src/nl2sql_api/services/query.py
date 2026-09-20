@@ -21,7 +21,9 @@ class QueryService:
         )
 
         return QueryResponse(
-            sub_queries=[sub_query.model_dump() for sub_query in result.sub_queries],
+            sub_queries=[
+                sub_query.model_dump(mode="json") for sub_query in result.sub_queries
+            ],
             final_answer=result.final_answer,
             errors=result.errors,
             trace_id=result.trace_id,
@@ -31,4 +33,6 @@ class QueryService:
                 node_id: ref.model_dump(mode="json")
                 for node_id, ref in result.artifact_refs.items()
             },
+            status=result.status,
+            timings=result.timings,
         )

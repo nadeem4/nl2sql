@@ -15,6 +15,7 @@ from nl2sql.common.settings import settings
 from nl2sql.context import NL2SQLContext
 from nl2sql.pipeline.graph import build_graph
 from nl2sql.pipeline.state import GraphState
+from nl2sql.pipeline.timing import NodeTimingCallback
 
 
 def _start_keyboard_cancel_listener(
@@ -105,13 +106,14 @@ def run_with_graph(
     )
 
     timeout_sec = settings.global_timeout_sec
+    timing = NodeTimingCallback()
 
     def _invoke():
         return graph.invoke(
             initial_state.model_dump(),
             config={
                 "configurable": {"cancellation_token": token},
-                "callbacks": callbacks,
+                "callbacks": [*(callbacks or []), timing],
             },
         )
 
@@ -154,6 +156,8 @@ def run_with_graph(
                     )
                 ]
             }
+        result = dict(result)
+        result["timings"] = timing.timings
         return result
     except PipelineExecutionError as e:
         # Raised where a PipelineError cannot be returned as a value (conditional-edge
