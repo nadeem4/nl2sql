@@ -156,13 +156,6 @@ class DemoManager:
 
         self._write_common_artifacts(CHINOOK_POLICIES, {"chinook": CHINOOK_QUESTIONS})
 
-        # The playground resolves SECRETS_CONFIG from .env.demo, so the envelope
-        # has to exist even though the demo configures no secret providers.
-        self.print_step("Writing secrets envelope...")
-        secrets_path = self.project_root / "configs" / "secrets.demo.yaml"
-        with open(secrets_path, "w", encoding="utf-8") as f:
-            yaml.safe_dump(SecretsFileConfig().model_dump(), f, sort_keys=False)
-
         self.print_step("Writing .env.demo configuration...")
         secrets = {}
         if api_key:
@@ -199,6 +192,14 @@ class DemoManager:
         llm_path = self.project_root / "configs" / "llm.demo.yaml"
         with open(llm_path, "w", encoding="utf-8") as f:
             f.write(content)
+
+        # Every generated `.env.demo` sets SECRETS_CONFIG, so the envelope has
+        # to exist for all three demos even though none configures a secret
+        # provider. Only the Chinook path used to write it.
+        self.print_step("Writing secrets envelope...")
+        secrets_path = self.project_root / "configs" / "secrets.demo.yaml"
+        with open(secrets_path, "w", encoding="utf-8") as f:
+            yaml.safe_dump(SecretsFileConfig().model_dump(), f, sort_keys=False)
             
     def start_docker_containers(self, docker_dir: pathlib.Path) -> bool:
         """Starts the docker containers using subprocess."""

@@ -1,8 +1,12 @@
+import os
 import sys
 import importlib.util
 from rich.markup import escape
 from rich.table import Table
 from rich.panel import Panel
+from nl2sql.common.env_hint import active_env_file
+from nl2sql.configs.manager import ConfigManager
+from nl2sql.llm.registry import PROVIDER_PRESETS
 from nl2sql.cli.console import console, print_success, print_error
 from nl2sql.cli.config import ADAPTER_DRIVERS, KNOWN_ADAPTERS
 from nl2sql.cli.checks import check_package, verify_connectivity
@@ -46,4 +50,33 @@ def doctor_command():
     # 4. Connectivity Check
     console.print("\n[bold]Connectivity:[/bold]")
     verify_connectivity(print_table=True)
+
+    # 5. LLM credential check
+    #
+    # Everything above this point can be green while a query still cannot run:
+    # the missing key is the single most common first-run failure, and doctor
+    # is where a stuck user looks. Reporting it is diagnosis, so a broken LLM
+    # config is printed, not raised.
+    console.print("\n[bold]LLM:[/bold]")
+    try:
+        agent = ConfigManager().load_llm().default
+        preset = PROVIDER_PRESETS.get(agent.provider)
+        env_var = preset.api_key_env if preset else None
+        configured_key = agent.api_key.get_secret_value() if agent.api_key else ""
+        has_key = (
+            bool(preset is not None and preset.api_key_placeholder)
+            or bool(env_var and os.environ.get(env_var))
+            # A "${env:VAR}" reference is a pointer, not a key; only a literal
+            # value in the config counts on its own.
+            or bool(configured_key and not configured_key.startswith("${env:"))
+        )
+        if has_key:
+            print_success(f"LLM {agent.provider}/{agent.model}: key found.")
+        else:
+            print_error(
+                f"MISSING: LLM {agent.provider}/{agent.model} needs {env_var}. "
+                f"Set it in {active_env_file()} or the environment."
+            )
+    except Exception as exc:
+        print_error(f"LLM configuration could not be loaded: {exc}")
 

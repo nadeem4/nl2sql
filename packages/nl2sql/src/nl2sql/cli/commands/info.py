@@ -1,4 +1,5 @@
 from rich.console import Console
+from rich.markup import escape
 from rich.table import Table
 from nl2sql.datasources.discovery import discover_adapters
 
@@ -11,7 +12,13 @@ def list_available_adapters() -> None:
     adapters = discover_adapters()
 
     if not adapters:
-        console.print("[yellow]No adapters found. Please install a driver extra (e.g., nl2sql\[postgres]).[/yellow]")
+        # `\[` in a normal string is not an escape sequence; Python 3.12 warns
+        # about it. `escape()` is how rich is meant to be told the brackets are
+        # literal text, not markup.
+        console.print(
+            "[yellow]No adapters found. Please install a driver extra "
+            f"(e.g., {escape('nl2sql[postgres]')}).[/yellow]"
+        )
         return
 
     table = Table(title="Installed Datasource Adapters")

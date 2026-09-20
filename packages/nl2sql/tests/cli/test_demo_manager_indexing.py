@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pytest
+import yaml
 from rich.console import Console
 
 from nl2sql.context import NL2SQLContext
@@ -55,3 +56,18 @@ def test_index_demo_data_reports_missing_env_file(tmp_path, monkeypatch):
     manager = DemoManager(Console(), tmp_path)
 
     assert manager.index_demo_data() is False
+
+
+def test_setup_lite_writes_the_secrets_envelope(demo_project, tmp_path):
+    """Every generated `.env.demo` points SECRETS_CONFIG at this file.
+
+    Only the Chinook path used to write it, so the lite demo shipped an env
+    file naming a config that did not exist.
+    """
+    secrets_path = tmp_path / "configs" / "secrets.demo.yaml"
+
+    assert secrets_path.exists()
+    assert yaml.safe_load(secrets_path.read_text(encoding="utf-8")) == {
+        "version": 1,
+        "providers": [],
+    }
