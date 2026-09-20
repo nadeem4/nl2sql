@@ -21,7 +21,7 @@ Source:
 `packages/nl2sql/src/nl2sql/public_api.py`
 
 Signature:
-`NL2SQL(ds_config_path: Optional[Union[str, pathlib.Path]] = None, secrets_config_path: Optional[Union[str, pathlib.Path]] = None, llm_config_path: Optional[Union[str, pathlib.Path]] = None, vector_store_path: Optional[Union[str, pathlib.Path]] = None, policies_config_path: Optional[Union[str, pathlib.Path]] = None)`
+`NL2SQL(ds_config_path: Optional[Union[str, pathlib.Path]] = None, secrets_config_path: Optional[Union[str, pathlib.Path]] = None, llm_config_path: Optional[Union[str, pathlib.Path]] = None, vector_store_path: Optional[Union[str, pathlib.Path]] = None, policies_config_path: Optional[Union[str, pathlib.Path]] = None, env: Optional[str] = None, env_file: Optional[Union[str, pathlib.Path]] = None)`
 
 Parameters:
 | name | type | required | meaning |
@@ -31,6 +31,8 @@ Parameters:
 | `llm_config_path` | `Optional[Union[str, pathlib.Path]]` | no | LLM config path override. |
 | `vector_store_path` | `Optional[Union[str, pathlib.Path]]` | no | Vector store persistence path override. |
 | `policies_config_path` | `Optional[Union[str, pathlib.Path]]` | no | Policies config path override. |
+| `env` | `Optional[str]` | no | Environment name. Sets `ENV` and reloads settings, so `.env.{env}` is read from the working directory before any config path is resolved. |
+| `env_file` | `Optional[Union[str, pathlib.Path]]` | no | Path to an env file. Sets `ENV_FILE_PATH` and reloads settings. Takes precedence over `env`. |
 
 Returns:
 `NL2SQL` instance with initialized context and API modules.
@@ -41,6 +43,17 @@ Raises:
 
 Side Effects:
 - Loads configs, resolves secrets, builds registries and stores.
+- With `env` or `env_file`, writes `ENV` / `ENV_FILE_PATH` into the process
+  environment and refreshes the `settings` singleton in place.
+
+Example:
+
+```python
+from nl2sql import NL2SQL
+
+engine = NL2SQL(env="demo")          # reads ./.env.demo
+engine = NL2SQL(env_file="/etc/nl2sql/.env")
+```
 
 Idempotency:
 - Initialization is not idempotent; it constructs new registries and stores.

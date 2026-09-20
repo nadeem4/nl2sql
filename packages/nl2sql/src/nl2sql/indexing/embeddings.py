@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from typing import Dict, List, Optional, Tuple
 
 from langchain_core.embeddings import Embeddings
@@ -157,9 +158,16 @@ class EmbeddingService:
             The embeddings implementation.
 
         Raises:
-            ValueError: If the provider is not recognized.
+            ValueError: If the provider is not recognized, or if the OpenAI
+                provider is selected without an API key.
         """
         if provider == "openai":
+            if not (settings.openai_api_key or os.environ.get("OPENAI_API_KEY")):
+                raise ValueError(
+                    "EMBEDDING_PROVIDER is 'openai' but OPENAI_API_KEY is not set. "
+                    "Set the key, or set EMBEDDING_PROVIDER=local to use the "
+                    "key-free ONNX embedder."
+                )
             return OpenAIEmbeddings(
                 model=settings.embedding_model,
                 api_key=settings.openai_api_key,

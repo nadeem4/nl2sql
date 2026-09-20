@@ -103,6 +103,9 @@ providers. The check runs on the read path only, so the fix is simply to re-run
 | `ENV` | `—` | Environment name used to load `.env.{ENV}`. |
 | `APP_ENV` | `—` | Alternate environment name used to load `.env.{APP_ENV}`. |
 
+From Python, `NL2SQL(env="demo")` sets `ENV` and `NL2SQL(env_file=path)` sets
+`ENV_FILE_PATH`, reloading settings before any configuration path is resolved.
+
 ## Config manager flow
 
 ```mermaid
