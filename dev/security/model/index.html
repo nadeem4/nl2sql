@@ -5,7 +5,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta content="width=device-width,initial-scale=1" name="viewport"/>
-<meta content="Production-grade Natural Language to SQL Platform Documentation" name="description"/>
+<meta content="Reference documentation for the NL2SQL engine, CLI and REST API" name="description"/>
 <meta content="Platform Engineering" name="author"/>
 <link href="../../observability/error-handling/" rel="prev"/>
 <link href="../multi-tenant/" rel="next"/>
@@ -1136,10 +1136,28 @@
     </label>
 <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
 <li class="md-nav__item">
+<a class="md-nav__link" href="#the-role-is-supplied-by-the-caller">
+<span class="md-ellipsis">
+      
+        The role is supplied by the caller
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="#security-controls">
 <span class="md-ellipsis">
       
         Security controls
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#what-keeps-the-sql-read-only">
+<span class="md-ellipsis">
+      
+        What keeps the SQL read-only
       
     </span>
 </a>
@@ -1672,10 +1690,28 @@
     </label>
 <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
 <li class="md-nav__item">
+<a class="md-nav__link" href="#the-role-is-supplied-by-the-caller">
+<span class="md-ellipsis">
+      
+        The role is supplied by the caller
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="#security-controls">
 <span class="md-ellipsis">
       
         Security controls
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#what-keeps-the-sql-read-only">
+<span class="md-ellipsis">
+      
+        What keeps the SQL read-only
       
     </span>
 </a>
@@ -1715,14 +1751,48 @@
 <div class="md-content" data-md-component="content">
 <article class="md-content__inner md-typeset">
 <h1 id="security-model">Security Model</h1>
-<p>Security is enforced at <strong>planning time</strong> and <strong>execution time</strong> through RBAC, schema validation, and audit logging. The system is designed to fail closed when authorization cannot be verified.</p>
+<p>Authorization is enforced at <strong>planning time</strong>, by the logical validator, before
+any SQL exists. That is the one security property this engine provides. It is
+not authentication, it is not containment, and it is not row- or column-level
+security.</p>
+<h2 id="the-role-is-supplied-by-the-caller">The role is supplied by the caller</h2>
+<p>There is <strong>no authentication anywhere in this project</strong>. The role is whatever
+the caller says it is:</p>
+<ul>
+<li>CLI: <code>nl2sql run --role &lt;id&gt;</code>, defaulting to <code>admin</code>.</li>
+<li>Python API and REST API: <code>UserContext(roles=[...])</code>. The REST layer reads it
+  straight out of the request body (<code>packages/api/src/nl2sql_api/services/query.py</code>)
+  and no route declares an auth dependency.</li>
+</ul>
+<p>So any client that can reach the REST API can assert <code>{"roles": ["admin"]}</code>.
+<strong>If you expose this service, you must put your own authentication in front of
+it and derive the role from that</strong>, never from user input. An empty <code>roles</code> list
+denies everything, which is the correct default for an unauthenticated caller.</p>
+<p>A role name that is not present in the policy file is a misconfiguration and is
+<strong>not</strong> handled gracefully today: <code>RBAC.get_allowed_tables</code> raises, the
+validator turns that into a <code>VALIDATOR_CRASH</code> error, and the run stops. It stops
+rather than leaking, but it stops with a crash rather than a denial, and one
+unknown name in a list alongside a known one fails the same way.</p>
 <h2 id="security-controls">Security controls</h2>
 <ul>
-<li><strong>RBAC policies</strong> loaded from <code>configs/policies.json</code> and evaluated by <code>RBAC</code>.</li>
+<li><strong>RBAC policies</strong> loaded from <code>configs/policies.json</code> and evaluated by <code>RBAC</code>.
+  A policy is a per-role allowlist of datasources and of <code>datasource.table</code>
+  strings — nothing finer. There is no column masking and no row-level security.</li>
 <li><strong>Logical validation</strong> enforces schema constraints and policy-based table access.</li>
-<li><strong>Audit logging</strong> records LLM interactions and security-relevant events.</li>
+<li><strong>Audit logging</strong> records <code>llm_interaction</code> events only, and only when the CLI
+  attaches its monitor callback. The Python and REST APIs emit none. See
+  <code>../observability/stack.md</code>.</li>
 <li><strong>Bounded execution</strong>: a global timeout and a per-run cancellation token cap each run. There is <strong>no process sandbox</strong> — the engine runs in-process (see <code>../execution/isolation.md</code>).</li>
 </ul>
+<h2 id="what-keeps-the-sql-read-only">What keeps the SQL read-only</h2>
+<p>The model never writes SQL. It emits a typed plan whose <code>query_type</code> is
+<code>Literal["READ"]</code>, and the generator renders that plan with <code>sqlglot</code> starting
+from <code>exp.select()</code>. A statement that is not a SELECT therefore cannot be
+produced, and free text from the model is never executed.</p>
+<p>What is <strong>not</strong> in place: database connections are <strong>not</strong> opened read-only on
+any dialect, and the executor has no statement-kind or statement-count gate of
+its own. The read-only property is structural, not defended in depth. <strong>Grant
+the engine a read-only database user.</strong></p>
 <pre class="mermaid"><code>flowchart TD
     User[UserContext] --&gt; RBAC[RBAC]
     RBAC --&gt; Validator[LogicalValidatorNode]

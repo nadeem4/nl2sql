@@ -5,7 +5,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta content="width=device-width,initial-scale=1" name="viewport"/>
-<meta content="Production-grade Natural Language to SQL Platform Documentation" name="description"/>
+<meta content="Reference documentation for the NL2SQL engine, CLI and REST API" name="description"/>
 <meta content="Platform Engineering" name="author"/>
 <link href="../../storage/artifact-store/" rel="prev"/>
 <link href="../error-handling/" rel="next"/>
@@ -1733,7 +1733,25 @@
 <div class="md-content" data-md-component="content">
 <article class="md-content__inner md-typeset">
 <h1 id="observability-stack">Observability Stack</h1>
-<p>NL2SQL provides observability through <strong>structured logging</strong>, <strong>OpenTelemetry metrics</strong>, and <strong>audit events</strong>. The system is designed to be callback-driven, so telemetry is only emitted when callbacks are supplied to <code>run_with_graph()</code>.</p>
+<p>NL2SQL provides <strong>structured logging</strong> always, plus <strong>OpenTelemetry metrics</strong>
+and <strong>audit events</strong> that are callback-driven: they are emitted only when a
+caller passes <code>callbacks=[PipelineMonitorCallback(...)]</code> to <code>run_with_graph()</code>.</p>
+<p>Read that literally, because the scope is narrow:</p>
+<ul>
+<li><strong>Only the CLI attaches that callback</strong> (<code>cli/commands/run.py</code>). <code>QueryAPI.run_query</code>
+  passes no callbacks, so the <strong>Python API and the REST API emit no metrics and
+  no audit events at all</strong>. A graph-level emitter that serves every caller is
+  not implemented; it is a Phase 2 item.</li>
+<li><strong>Metrics are off by default.</strong> <code>OBSERVABILITY_EXPORTER</code> defaults to <code>none</code>,
+  which installs no meter provider, so every recording is discarded. The
+  supported values are <code>none</code>, <code>console</code> and <code>otlp</code>.</li>
+<li><strong>There is no tracing.</strong> No span is ever started anywhere in the codebase, and
+  there is no Jaeger exporter and no Prometheus exporter. <code>opentelemetry-exporter-otlp</code>
+  is the only exporter dependency, and it is used for metrics over gRPC.</li>
+<li><strong>The audit log records exactly one event type</strong>, <code>llm_interaction</code>, written
+  from the callback's <code>on_llm_end</code>. It is not a record of queries executed,
+  roles, validation decisions or row counts.</li>
+</ul>
 <h2 id="telemetry-flow">Telemetry flow</h2>
 <pre class="mermaid"><code>sequenceDiagram
     participant Pipeline as run_with_graph()
@@ -1754,7 +1772,14 @@
 </ul>
 <p>Legacy token and latency events are recorded in <code>TOKEN_LOG</code> and <code>LATENCY_LOG</code>.</p>
 <h2 id="audit-logging">Audit logging</h2>
-<p><code>EventLogger</code> writes JSON events to a rotating log file at <code>logs/audit_events.log</code>. Payloads are sanitized to redact sensitive keys.</p>
+<p><code>EventLogger</code> writes JSON events to a rotating log file at <code>logs/audit_events.log</code>
+(relative to the working directory, 10 MB × 5). Payloads are sanitized to redact
+sensitive keys.</p>
+<p>The only event written anywhere in the codebase is <code>llm_interaction</code>, from
+<code>PipelineMonitorCallback.on_llm_end</code>. Its payload is the agent name, the model
+name, the first 1000 characters of the model's output, and token usage. Treat
+this as a debugging trace of model calls made through the CLI, not as a
+compliance audit trail.</p>
 <h2 id="structured-logging">Structured logging</h2>
 <p>Logging is configured at import time; JSON formatting is enabled when <code>Settings.observability_exporter == "otlp"</code>. Trace and tenant context helpers exist (<code>trace_context</code>, <code>tenant_context</code>), but the pipeline does not set them; callers must establish context if they want trace/tenant IDs in logs.</p>
 <h2 id="source-references">Source references</h2>

@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Production-grade Natural Language to SQL Platform Documentation">
+        <meta name="description" content="Reference documentation for the NL2SQL engine, CLI and REST API">
       
       
         <meta name="author" content="Platform Engineering">
@@ -4088,7 +4088,13 @@ See the Core API documentation at <a href="../../api/">docs/api/index.md</a>.</p
 <a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"nl2sql-engine[postgres]"</span>
 <a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"nl2sql-engine[mysql,mssql]"</span>
 <a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"nl2sql-engine[duckdb]"</span>
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="c1"># The browser playground behind `nl2sql demo` (adds fastapi + uvicorn).</span>
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="c1"># `[all]` does NOT include it -- `all` covers database drivers only.</span>
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"nl2sql-engine[demo]"</span>
 </code></pre></div>
+<p>Running a query needs an LLM key; only indexing is key-free. See
+<a href="https://github.com/nadeem4/nl2sql#known-limitations">Known limitations</a>.</p>
 <h2 id="configure">Configure</h2>
 <p>Create config files in your working directory:</p>
 <ul>
@@ -4248,7 +4254,6 @@ See <a href="../../configuration/policies/">Policies config</a> for allowed tabl
 <a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="w">  </span><span class="c1">#   vault_url: "https://my-vault.vault.azure.net/"</span>
 </code></pre></div>
 See <a href="../../configuration/secrets/">Secrets config</a> for supported providers and fields.</p>
-<p>Secrets providers are installed via extras and selected in <code>configs/secrets.yaml</code>:</p>
 <h2 id="run-a-query">Run a query</h2>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql</span><span class="w"> </span><span class="kn">import</span> <span class="n">NL2SQL</span>
 <a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql.auth.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">UserContext</span>

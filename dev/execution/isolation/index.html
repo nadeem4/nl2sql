@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Production-grade Natural Language to SQL Platform Documentation">
+        <meta name="description" content="Reference documentation for the NL2SQL engine, CLI and REST API">
       
       
         <meta name="author" content="Platform Engineering">
@@ -4033,9 +4033,16 @@ only.</p>
 as <code>PipelineError</code> values in graph state; see
 <a href="../../observability/error-handling/">Error Handling</a>.</p>
 <h3 id="adapter-level-limits">Adapter-level limits</h3>
-<p>Adapters enforce <code>row_limit</code> and <code>max_bytes</code> on results
-(see <a href="../../adapters/sdk/">SDK Reference</a>). These cap payload size; they are not
-isolation.</p>
+<p><code>row_limit</code> is real and is enforced where it cannot be talked around: the
+generator bakes <code>min(plan.limit, row_limit)</code> into the SQL it renders
+(<a href="https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/pipeline/nodes/generator/node.py"><code>pipeline/nodes/generator/node.py</code></a>).</p>
+<p><code>max_bytes</code> is <strong>not enforced</strong>. It is read from datasource options, stored on
+the adapter and reported by the datasource API, and nothing ever compares it to
+anything. The adapter does estimate a result's size (average row size from a
+50-row sample) and reports it as <code>ResultFrame.bytes</code>, but that number is only
+copied into metrics; no threshold is applied, nothing is truncated and no error
+is raised. Treat <code>max_bytes</code> as documentation of intent, not a limit.</p>
+<p>Neither is isolation in any case.</p>
 <h2 id="summary">Summary</h2>
 <table>
 <thead>
