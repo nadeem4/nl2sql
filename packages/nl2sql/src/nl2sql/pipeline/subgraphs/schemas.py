@@ -8,6 +8,7 @@ from nl2sql.common.errors import PipelineError
 from nl2sql.pipeline.nodes.ast_planner.schemas import PlanModel
 from nl2sql.execution.contracts import ArtifactRef
 from nl2sql.pipeline.nodes.decomposer.schemas import SubQuery
+from nl2sql.pipeline.nodes.validator.schemas import ValidationCheck
 
 
 class SubgraphOutput(BaseModel):
@@ -19,5 +20,6 @@ class SubgraphOutput(BaseModel):
     sql_draft: Optional[str] = None
     artifact: Optional[ArtifactRef] = None
     errors: List[PipelineError] = Field(default_factory=list)
+    validation: List[ValidationCheck] = Field(default_factory=list)
     reasoning: List[Dict[str, Any]] = Field(default_factory=list)
     status: Optional[str] = None

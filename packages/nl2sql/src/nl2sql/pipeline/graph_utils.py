@@ -146,6 +146,11 @@ def wrap_subgraph(
             sql_draft=generator_response.sql_draft if generator_response else None,
             artifact=artifact,
             errors=returned_state.errors,
+            validation=(
+                returned_state.logical_validator_response.checks
+                if returned_state.logical_validator_response
+                else []
+            ),
             reasoning=sub_reasoning,
             status=status,
         )

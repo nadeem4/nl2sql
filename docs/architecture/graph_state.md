@@ -64,6 +64,7 @@ Fields:
 - `sql_draft: Optional[str]`
 - `artifact: Optional[ArtifactRef]`
 - `errors: List[PipelineError]`
+- `validation: List[ValidationCheck]` (copied from `logical_validator_response.checks`)
 - `reasoning: List[Dict[str, Any]]`
 - `status: Optional[str]`
 

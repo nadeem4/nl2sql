@@ -44,3 +44,9 @@ def test_query_route_returns_sql(demo_project, fake_llm, monkeypatch):
     body = response.json()
     assert body["errors"] == []
     assert "COUNT(" in body["sub_queries"][0]["sql"]
+    # Everything the playground's four panes render: status, plan, checks, rows.
+    assert body["status"] == "success"
+    assert body["sub_queries"][0]["rows"]["total_rows"] == 1
+    assert body["sub_queries"][0]["validation"][2]["name"] == "policy"
+    assert body["sub_queries"][0]["plan"]["tables"]
+    assert {"ast_planner", "logical_validator", "generator", "executor"} <= set(body["timings"])

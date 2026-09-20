@@ -15,7 +15,7 @@ from nl2sql.pipeline.nodes.generator.node import SqlVisitor
 from nl2sql.context import NL2SQLContext
 from nl2sql.common.logger import get_logger
 from nl2sql.common.settings import settings
-from nl2sql.pipeline.nodes.validator.schemas import LogicalValidatorResponse
+from nl2sql.pipeline.nodes.validator.schemas import LogicalValidatorResponse, ValidationCheck
 
 
 logger = get_logger("logical_validator")
@@ -772,6 +772,13 @@ class LogicalValidatorNode:
                             )
                         ],
                         reasoning=[],
+                        checks=[
+                            ValidationCheck(
+                                name="plan_present",
+                                passed=False,
+                                message="No plan to validate",
+                            )
+                        ],
                     ),
                     "errors": [
                         PipelineError(
@@ -785,11 +792,12 @@ class LogicalValidatorNode:
 
             # Static validation is isolated so that a failure inside it can
             # never skip policy enforcement. RBAC must run for every plan.
+            static_errors: list[PipelineError] = []
             try:
-                errors.extend(self._validate_static(state))
+                static_errors.extend(self._validate_static(state))
             except Exception as exc:
                 logger.exception("Static logical validation crashed")
-                errors.append(
+                static_errors.append(
                     PipelineError(
                         node=node_name,
                         message=f"Static logical validation crashed: {exc}",
@@ -799,12 +807,42 @@ class LogicalValidatorNode:
                     )
                 )
 
-            errors.extend(self._validate_policy(state))
+            policy_errors = list(self._validate_policy(state))
+            errors.extend(static_errors)
+            errors.extend(policy_errors)
+
+            role = ",".join(state.user_context.roles) if state.user_context else ""
+            checks = [
+                ValidationCheck(
+                    name="plan_present",
+                    passed=True,
+                    message="Plan received from the planner",
+                ),
+                ValidationCheck(
+                    name="structure_and_schema",
+                    passed=not static_errors,
+                    message=(
+                        static_errors[0].message
+                        if static_errors
+                        else "Tables, columns and joins resolve against the retrieved schema"
+                    ),
+                ),
+                ValidationCheck(
+                    name="policy",
+                    passed=not policy_errors,
+                    message=(
+                        policy_errors[0].message
+                        if policy_errors
+                        else f"Role '{role}' may read every table in the plan"
+                    ),
+                ),
+            ]
 
             if any(e.severity in (ErrorSeverity.CRITICAL, ErrorSeverity.ERROR) for e in errors):
                 response = LogicalValidatorResponse(
                     errors=errors,
                     reasoning=[{"node": node_name, "content": [e.message for e in errors]}],
+                    checks=checks,
                 )
                 return {
                     "logical_validator_response": response,
@@ -817,6 +855,7 @@ class LogicalValidatorNode:
             response = LogicalValidatorResponse(
                 errors=errors,
                 reasoning=[{"node": node_name, "content": reasoning}],
+                checks=checks,
             )
             return {
                 "logical_validator_response": response,
