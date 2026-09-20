@@ -1,5 +1,7 @@
-from typing import Dict, Any, Optional
+from typing import Dict, Any, List, Optional
+import importlib.resources
 import pathlib
+import shutil
 import subprocess
 import yaml
 from rich.console import Console
@@ -11,6 +13,7 @@ from nl2sql.configs import (
     DatasourceFileConfig,
     PolicyFileConfig
 )
+from nl2sql.configs.secrets import SecretsFileConfig
 
 from nl2sql.cli.generators.env import EnvFileGenerator
 from nl2sql.cli.generators.datasources import DatasourceGenerator
@@ -20,6 +23,7 @@ from nl2sql.cli.generators.policies import PolicyGenerator
 from .factory import DemoDataFactory
 from .writers.sqlite import SQLiteWriter
 from .writers.docker import DockerWriter
+from .chinook import CHINOOK_DATASOURCE, CHINOOK_POLICIES, CHINOOK_QUESTIONS
 from .defaults import (
     SAMPLE_QUESTIONS, 
     DEMO_POLICIES,
@@ -74,7 +78,7 @@ class DemoManager:
         with open(ds_path, "w", encoding="utf-8") as f:
             f.write(content)
         
-        self._write_common_artifacts()
+        self._write_common_artifacts(DEMO_POLICIES, SAMPLE_QUESTIONS)
         
         self.print_step("Writing .env.demo configuration...")
         
@@ -121,7 +125,7 @@ class DemoManager:
         with open(ds_path, "w", encoding="utf-8") as f:
             f.write(content)
             
-        self._write_common_artifacts()
+        self._write_common_artifacts(DEMO_POLICIES, SAMPLE_QUESTIONS)
         
         # The app container reads the same .env.demo the lite path writes, so it
         # has to exist before `docker compose up` (and before `docker compose config`).
@@ -131,10 +135,50 @@ class DemoManager:
         self.print_success("Docker Configuration Generated")
         return docker_dir
 
-    def _write_common_artifacts(self):
-        """Writes policies and sample questions."""
+    def setup_chinook(self, api_key: Optional[str] = None):
+        """Sets up the Chinook (digital music store) demo environment."""
+        db_path = self.project_root / "data" / "chinook.sqlite"
+        self.print_step(f"Copying the Chinook database to {db_path}...")
+
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+        packaged = importlib.resources.files("nl2sql.cli.demo") / "data" / "chinook.sqlite"
+        with importlib.resources.as_file(packaged) as source:
+            shutil.copyfile(source, db_path)
+
+        self.print_step("Writing datasources config...")
+        ds_configs = [DatasourceConfig(**CHINOOK_DATASOURCE)]
+        file_config = DatasourceFileConfig(datasources=ds_configs)
+        content = DatasourceGenerator.generate(file_config)
+        ds_path = self.project_root / "configs" / "datasources.demo.yaml"
+        ds_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(ds_path, "w", encoding="utf-8") as f:
+            f.write(content)
+
+        self._write_common_artifacts(CHINOOK_POLICIES, {"chinook": CHINOOK_QUESTIONS})
+
+        # The playground resolves SECRETS_CONFIG from .env.demo, so the envelope
+        # has to exist even though the demo configures no secret providers.
+        self.print_step("Writing secrets envelope...")
+        secrets_path = self.project_root / "configs" / "secrets.demo.yaml"
+        with open(secrets_path, "w", encoding="utf-8") as f:
+            yaml.safe_dump(SecretsFileConfig().model_dump(), f, sort_keys=False)
+
+        self.print_step("Writing .env.demo configuration...")
+        secrets = {}
+        if api_key:
+            secrets["OPENAI_API_KEY"] = api_key
+
+        env_content = EnvFileGenerator.generate("demo", secrets=secrets)
+        env_path = self.project_root / ".env.demo"
+        with open(env_path, "w", encoding="utf-8") as f:
+            f.write(env_content)
+
+        self.print_success("Chinook Demo Setup Complete")
+
+    def _write_common_artifacts(self, policies: Dict[str, Any], questions: Dict[str, List[str]]):
+        """Writes policies, sample questions and the LLM config."""
         self.print_step("Writing policies...")
-        policy_config = PolicyFileConfig(roles=DEMO_POLICIES)
+        policy_config = PolicyFileConfig(roles=policies)
         content = PolicyGenerator.generate(policy_config)
         policy_path = self.project_root / "configs" / "policies.demo.json"
         
@@ -147,7 +191,7 @@ class DemoManager:
         self.print_step("Writing sample questions...")
         samples_path = self.project_root / "configs" / "sample_questions.demo.yaml"
         with open(samples_path, "w") as f:
-            yaml.dump(SAMPLE_QUESTIONS, f, sort_keys=False)
+            yaml.dump(questions, f, sort_keys=False)
             
         self.print_step("Writing LLM config...")
         llm_config = LLMFileConfig(**DEMO_LLM_CONFIG)
