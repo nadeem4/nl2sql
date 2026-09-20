@@ -17,6 +17,12 @@ ENV_SPECIFIC_SETTINGS = {
         "# Local ONNX embeddings keep `nl2sql index` key-free. The first index run\n"
         "# downloads a ~79 MB model. Running a query still needs an LLM key.\n"
         "EMBEDDING_PROVIDER=local\n"
+        "\n# --- Timeouts ---\n"
+        "# A live run walks decomposer, planner, refiner, sql_agent and\n"
+        "# synthesizer, each a real provider call; an observed OpenAI run took\n"
+        "# 136s. The 60s default turned every `nl2sql demo` question in live\n"
+        "# mode into a PIPELINE_TIMEOUT.\n"
+        "GLOBAL_TIMEOUT_SEC=300\n"
     ),
 }
 

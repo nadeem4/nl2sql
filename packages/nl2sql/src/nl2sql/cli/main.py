@@ -19,6 +19,7 @@ from nl2sql.cli.commands.indexing import run_indexing
 from nl2sql.cli.commands.benchmark import run_benchmark as exec_benchmark
 from nl2sql.cli.commands.run import run_pipeline 
 from nl2sql.cli.commands.info import list_available_adapters
+from nl2sql.cli.commands.demo import demo_command
 from nl2sql.cli.commands.doctor import doctor_command
 from nl2sql.cli.commands.setup import setup_command
 from nl2sql.cli.commands.install import install_command
@@ -128,6 +129,19 @@ def setup(
 
     # Lite is the default: it only turns off when --docker is requested.
     setup_command(demo=demo, lite=not docker, docker=docker, api_key=api_key)
+
+
+@app.command()
+def demo(
+    dataset: Annotated[str, typer.Option(help="chinook (default) or manufacturing")] = "chinook",
+    directory: Annotated[pathlib.Path, typer.Option("--dir", help="Where to write the demo project")] = pathlib.Path("nl2sql-demo"),
+    host: Annotated[str, typer.Option(help="Bind address")] = "127.0.0.1",
+    port: Annotated[int, typer.Option(help="Port")] = 8765,
+    no_browser: Annotated[bool, typer.Option("--no-browser")] = False,
+    record: Annotated[bool, typer.Option("--record", help="Record the sample questions through a real provider")] = False,
+):
+    """One-command playground over a sample database."""
+    demo_command(dataset, directory, host, port, no_browser, record)
 
 
 @app.command()

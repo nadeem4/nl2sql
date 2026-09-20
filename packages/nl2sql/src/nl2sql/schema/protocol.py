@@ -36,8 +36,13 @@ def generate_schema_fingerprint(schema: SchemaContract) -> str:
                     }
                     for fk in sorted(
                         table.foreign_keys,
+                        # ``full_name``, not the model: TableRef defines no
+                        # ordering, so sorting by it raised TypeError as soon as
+                        # a table had two foreign keys and no snapshot could be
+                        # registered. Tables with 0 or 1 never compare, so
+                        # fingerprints that already worked are unchanged.
                         key=lambda fk: (
-                            fk.referred_table,
+                            fk.referred_table.full_name,
                             sorted(fk.constrained_columns),
                         ),
                     )
