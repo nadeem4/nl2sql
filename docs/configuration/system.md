@@ -80,6 +80,7 @@ providers. The check runs on the read path only, so the fix is simply to re-run
 | Env var | Default | Description |
 | --- | --- | --- |
 | `SCHEMA_VERSION_MISMATCH_POLICY` | `warn` | Action on schema version mismatch: `warn`, `fail`, `ignore`. |
+| `SCHEMA_RETRIEVAL_FULL_SNAPSHOT_MAX_TABLES` | `15` | When a datasource's schema has at most this many tables, the schema retriever skips vector retrieval and passes the full schema snapshot (every table, every column) to the planner. Set to `0` to always use vector retrieval. |
 | `SQL_AGENT_MAX_RETRIES` | `3` | Max retry attempts for SQL agent refinement. |
 | `SQL_AGENT_RETRY_BASE_DELAY_SEC` | `1.0` | Base delay for SQL agent retries (seconds). |
 | `SQL_AGENT_RETRY_MAX_DELAY_SEC` | `10.0` | Max delay for SQL agent retries (seconds). |
