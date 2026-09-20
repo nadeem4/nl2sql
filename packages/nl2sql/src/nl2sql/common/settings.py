@@ -113,6 +113,12 @@ class Settings(BaseSettings):
         description="Action when chunk schema_version differs from SchemaStore: warn, fail, or ignore."
     )
 
+    schema_retrieval_full_snapshot_max_tables: int = Field(
+        default=15,
+        validation_alias="SCHEMA_RETRIEVAL_FULL_SNAPSHOT_MAX_TABLES",
+        description="Skip vector retrieval and pass the full schema snapshot when a datasource has at most this many tables."
+    )
+
     logical_validator_strict_columns: bool = Field(
         default=False,
         validation_alias="LOGICAL_VALIDATOR_STRICT_COLUMNS",

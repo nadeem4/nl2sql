@@ -8,6 +8,7 @@ if TYPE_CHECKING:
     from nl2sql.pipeline.nodes.decomposer.schemas import SubQuery
 
 from nl2sql.common.logger import get_logger
+from nl2sql.common.settings import settings
 from nl2sql.context import NL2SQLContext
 from .schema import Table, Column
 from nl2sql_adapter_sdk.schema import SchemaSnapshot
@@ -145,6 +146,25 @@ class SchemaRetrieverNode:
             schema_version = sub_query.schema_version
             query = self._build_semantic_query(sub_query)
 
+            snapshot = self._resolve_snapshot(datasource_id, schema_version)
+            limit = settings.schema_retrieval_full_snapshot_max_tables
+            if snapshot and len(snapshot.contract.tables) <= limit:
+                tables_out = self._build_tables_from_snapshot(
+                    snapshot, resolved_tables=None, schema_version=schema_version
+                )
+                return {
+                    "relevant_tables": tables_out,
+                    "reasoning": [
+                        {
+                            "node": self.node_name,
+                            "content": (
+                                f"Schema has {len(tables_out)} tables (limit {limit}); "
+                                "using the full snapshot without vector retrieval."
+                            ),
+                        }
+                    ],
+                }
+
             tables: Dict[str, Set[str]] = defaultdict(set)
             schema_docs = []
             column_docs = []
@@ -194,7 +214,6 @@ class SchemaRetrieverNode:
                         tables[to_table].update(doc.metadata.get("to_columns"))
 
             if not tables:
-                snapshot = self._resolve_snapshot(datasource_id, schema_version)
                 relevant_tables = self._build_tables_from_snapshot(
                     snapshot,
                     resolved_tables=None,
@@ -217,7 +236,6 @@ class SchemaRetrieverNode:
                     ],
                 }
 
-            snapshot = self._resolve_snapshot(datasource_id, schema_version)
             relevant_tables = self._build_tables_from_snapshot(
                 snapshot,
                 resolved_tables=tables,

@@ -1,4 +1,7 @@
 from types import SimpleNamespace
+from unittest.mock import MagicMock
+
+import pytest
 
 from nl2sql.pipeline.nodes.schema_retriever.node import SchemaRetrieverNode
 from nl2sql.pipeline.nodes.decomposer.schemas import SubQuery
@@ -150,3 +153,58 @@ def test_schema_retriever_uses_column_fallback():
 
     tables = result["relevant_tables"]
     assert any(t.name == "orders" for t in tables)
+
+
+@pytest.fixture
+def retriever_with_snapshot():
+    """Build a retriever over a snapshot with ``table_count`` tables."""
+
+    def _factory(table_count: int):
+        refs = [TableRef(schema_name="public", table_name=f"t{i}") for i in range(table_count)]
+        snapshot = SchemaSnapshot(
+            contract=SchemaContract(
+                datasource_id="ds",
+                engine_type="sqlite",
+                tables={
+                    ref.full_name: TableContract(
+                        table=ref,
+                        columns={
+                            "id": ColumnContract(
+                                name="id", data_type="int", is_nullable=False, is_primary_key=True
+                            ),
+                            "name": ColumnContract(name="name", data_type="text"),
+                        },
+                        foreign_keys=[],
+                    )
+                    for ref in refs
+                },
+            ),
+            metadata=SchemaMetadata(
+                datasource_id="ds",
+                engine_type="sqlite",
+                tables={ref.full_name: TableMetadata(table=ref, row_count=1, columns={}) for ref in refs},
+            ),
+        )
+        vector_store = SimpleNamespace(
+            retrieve_schema_context=MagicMock(return_value=[]),
+            retrieve_planning_context=MagicMock(return_value=[]),
+            retrieve_column_candidates=MagicMock(return_value=[]),
+        )
+        schema_store = SimpleNamespace(get_latest_snapshot=lambda _id: snapshot)
+        ctx = SimpleNamespace(vector_store=vector_store, schema_store=schema_store)
+        node = SchemaRetrieverNode(ctx)
+        return node, vector_store, {ref.table_name for ref in refs}
+
+    return _factory
+
+
+def test_small_schema_bypasses_vector_retrieval(retriever_with_snapshot, monkeypatch):
+    node, vector_store, snapshot_tables = retriever_with_snapshot(table_count=3)
+    monkeypatch.setattr(
+        "nl2sql.pipeline.nodes.schema_retriever.node.settings.schema_retrieval_full_snapshot_max_tables",
+        15,
+    )
+    out = node(SubgraphExecutionState(trace_id="t", sub_query=SubQuery(id="sq1", datasource_id="ds", intent="q")))
+    assert {t.name for t in out["relevant_tables"]} == snapshot_tables
+    assert all(len(t.columns) > 0 for t in out["relevant_tables"])
+    vector_store.retrieve_schema_context.assert_not_called()
