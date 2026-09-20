@@ -1,21 +1,102 @@
 # NL2SQL Engine
 
-> **Production-grade Natural Language → SQL runtime with deterministic orchestration.**
+> Ask a database questions in English. The model writes a **typed plan**, never
+> SQL text; the plan is checked against the real schema and the caller's role
+> before any SQL is generated.
 
-NL2SQL treats text-to-SQL as a **distributed systems** problem. The engine compiles a user query into a validated plan, executes via adapters, and aggregates results through a graph-based pipeline.
+NL2SQL is a LangGraph pipeline that decomposes a question, retrieves the schema
+it needs, has the model emit an abstract syntax tree, validates that tree, and
+only then renders SQL with `sqlglot` and runs it. The validation checks come
+back in the result, so a UI can show *why* a query was refused rather than
+printing a stack trace.
+
+It is a young project. The [Known limitations](#known-limitations) section below
+is not boilerplate — read it before you plan anything around this.
 
 ---
 
-## 🧭 What you get
+## Try it
 
-- Graph-based orchestration (`LangGraph`) with explicit state (`GraphState`)
-- Deterministic planning and validation before SQL generation
-- Adapter-based execution with per-run cancellation and a global timeout
-- Observability hooks (metrics, logs, audit events)
+```bash
+pip install "nl2sql-engine[demo]"
+nl2sql demo
+```
 
-## 🏗️ System Topology
+That writes a demo project into `./nl2sql-demo`, copies in the
+[Chinook](THIRD_PARTY_NOTICES.md) sample database (11 tables, real foreign
+keys), indexes its schema locally, serves a playground on
+<http://127.0.0.1:8765/> and opens your browser. Indexing needs no API key: the
+first run downloads a ~79 MB ONNX embedding model and runs it on your machine.
+Use `--no-browser` to stay in the terminal, `--port` to move it, or
+`--dataset manufacturing` for the synthetic factory dataset.
 
-The runtime is organized around a LangGraph orchestration pipeline and supporting registries. It is designed for deterministic execution and structured, inspectable failure.
+The page shows, side by side, the retrieved **schema**, the **plan** the model
+produced, the **validation checks** with pass/fail and a reason, the generated
+**SQL**, and the **rows**. A role selector switches between `admin`, `analyst`
+and `viewer`: ask the `viewer` role about customers and the logical validator
+refuses the plan with a `SECURITY_VIOLATION`, the generator never runs, and the
+SQL pane says so. That is the engine's one real safety property, made visible.
+
+### What the demo needs, honestly
+
+**Answering a question needs a model.** The demo detects one of
+`OPENAI_API_KEY`, `OPENROUTER_API_KEY`, or an Ollama daemon answering on
+`localhost:11434`. With one of those it runs live.
+
+With none of them it falls back to *replay* mode, which is meant to answer the
+guided sample questions from recorded model responses — **and no recordings are
+committed yet**. So today the key-free path cannot answer anything: clicking a
+guided question shows "This question has no recording." Recording and committing
+them is Phase 1c, Task 5. Until then, set a key (or point it at Ollama) if you
+want the demo to produce an answer; the schema view and the playground itself
+work either way.
+
+---
+
+## Use it from Python
+
+Prerequisites: **Python 3.12+**, and an LLM key to run a query.
+
+```bash
+pip install nl2sql-engine        # add [postgres], [mysql], [mssql], [duckdb] as needed
+nl2sql setup --demo --lite       # generates demo databases, configs and .env.demo
+export OPENAI_API_KEY=sk-...
+```
+
+```python
+from nl2sql import NL2SQL
+
+engine = NL2SQL(env="demo")
+result = engine.run_query("How many employees are there?")
+
+for sq in result.sub_queries:
+    print(sq.sql)
+    print([c.name for c in sq.validation if c.passed])
+    print(sq.rows.rows[:5] if sq.rows else "plan only")
+print(result.final_answer["summary"])
+```
+
+The same script is in [`examples/01_quickstart_sqlite.py`](examples/01_quickstart_sqlite.py).
+
+`QueryResult` carries, per sub-query, the plan, the validation checks, a capped
+row sample with the true total, the SQL, a status and a retry count; and per
+run, an overall status and per-node timings. `result.errors` holds ERROR and
+CRITICAL entries only; warnings live in `result.warnings`.
+
+Install the drivers you need as extras:
+
+```bash
+pip install "nl2sql-engine[postgres]"
+pip install "nl2sql-engine[mysql,mssql]"
+pip install "nl2sql-engine[all]"     # every database driver -- adapters only,
+                                     # not [demo], [aws], [azure] or [hashicorp]
+```
+
+SQLite needs no extra: its driver is in the standard library.
+
+---
+
+## How it works
 
 ```mermaid
 flowchart TD
@@ -41,107 +122,97 @@ flowchart TD
     Aggregator --> Synthesizer[AnswerSynthesizerNode]
 ```
 
-### 1. The Control Plane (The Graph)
+### The AST is the point
 
-**Responsibility**: Reasoning, Planning, and Orchestration.
+The model's output target is a Pydantic `PlanModel`, not a string of SQL. That
+plan goes to `LogicalValidatorNode`, which resolves every column against the
+schema snapshot retrieved for this question using `sqlglot.optimizer.qualify`,
+checks joins against the declared foreign keys, and checks every table against
+the caller's role policy. Only a plan that passes reaches `GeneratorNode`, which
+renders it with `sqlglot` starting from `exp.select()`.
 
-* **Agentic Graph**: Implemented as a Directed Cyclic Graph (LangGraph) to enable refinement loops. If a plan fails validation, the system self-corrects.
-* **State Management**: Shared `GraphState` ensures auditability and reproducibility of every decision.
+Two consequences are worth stating precisely:
 
-### 2. The Security Plane (The Firewall)
+* **Unvalidated SQL is never generated, so it is never executed.** A refused
+  plan ends the sub-query; there is no SQL string to leak into a log or a retry.
+* **Only SELECTs can be produced.** `query_type` is `Literal["READ"]` and the
+  generator builds a select expression. This is structural, not a gate: the
+  executor does not inspect the SQL, and **connections are not opened read-only
+  on any dialect**. Give the engine a read-only database user.
 
-**Responsibility**: Invariants Enforcement.
+### Refinement
 
-* **Valid-by-Construction**: The LLM generates an **Abstract Syntax Tree (AST)** rather than executing SQL.
-* **Static Analysis**: The [Logical Validator](docs/architecture/nodes/logical_validator_node.md) enforces RBAC and schema constraints before SQL generation, resolving every column against the retrieved schema with `sqlglot`'s optimizer.
+If validation fails with a retryable error the plan goes back through
+`RefinerNode` with the failure attached, up to `sql_agent_max_retries`. A
+`SECURITY_VIOLATION` is not retryable — a denial is final.
 
-### 3. The Data Plane (Retrieval and Execution)
+### What bounds a run
 
-**Responsibility**: Semantic Search and Execution.
+* `GLOBAL_TIMEOUT_SEC` (default 60) bounds **how long the caller waits**, not
+  how long the work runs. On expiry you get a `PIPELINE_TIMEOUT` error within
+  about a second; the worker thread winds down in the background.
+* A per-run `CancellationToken` lets a caller unwind cooperatively. A node
+  blocked inside a driver call does not abandon it.
+* `VECTOR_BREAKER` (`fail_max=5`, `reset_timeout=30`) is the only circuit
+  breaker. It guards vector retrieval and nothing else; LLM and SQL failures
+  surface as structured errors in state.
+* The graph runs **in one process**, on a one-worker thread pool per run. There
+  is no sandbox: a driver-level segfault takes the process with it. See
+  [Execution Isolation](docs/execution/isolation.md).
 
-* **In-Process Execution**: The graph runs on a one-worker thread pool inside the host process, one pool per run. There is **no process sandbox**: a driver-level crash takes the process with it. See [Execution Isolation + Concurrency](docs/execution/isolation.md) for the exact boundaries.
-* **Partitioned Retrieval**: The [Schema Store + Retrieval](docs/schema/store.md) flow injects relevant schema context, preventing context window overflow.
+### Authorization
 
-### 4. The Reliability Plane (The Guard)
+RBAC is a per-role allowlist of datasources and `datasource.table` strings, read
+from `configs/policies.json` and enforced by the validator. There is no column
+masking and no row-level security.
 
-**Responsibility**: Fault Tolerance and Stability.
-
-* **Bounded Runs**: A [global timeout](docs/execution/isolation.md) caps every invocation, and a per-run `CancellationToken` lets a caller unwind a run cooperatively.
-* **Fail-Fast Retrieval**: A single [circuit breaker](docs/observability/error-handling.md) (`VECTOR_BREAKER`) trips the vector store out of the path when retrieval is failing. LLM and SQL calls are not breaker-guarded; their failures surface as structured errors in state.
-
-### 5. The Observability Plane (The Watchtower)
-
-**Responsibility**: Visibility, Forensics, and Compliance.
-
-* **Full-Stack Telemetry**: Native [OpenTelemetry](docs/observability/stack.md) integration provides distributed tracing (Jaeger) and metrics (Prometheus) for every node execution.
-* **Forensic Audit Logs**: A persistent [Audit Log](docs/observability/stack.md) records AI decisions for compliance and debugging.
+**The role is supplied by the caller** — `--role` on the CLI (default `admin`),
+`user_context` in the REST payload — and there is no authentication in this
+project. Anything you expose must sit behind your own auth, with the role
+derived from that. See [Security Model](docs/security/model.md).
 
 ---
 
-## 📐 Architectural Invariants
+## Known limitations
 
-| Invariant | Rationale | Mechanism |
-| :--- | :--- | :--- |
-| **No Unvalidated SQL** | Prevent hallucinations & data leaks | All plans pass through `LogicalValidator` (AST), whose column resolution is delegated to `sqlglot.optimizer.qualify`. |
-| **Bounded Runs** | Reliability | `GLOBAL_TIMEOUT_SEC` caps every invocation and a per-run `CancellationToken` unwinds it on demand (`pipeline/runtime.py`, `common/cancellation.py`). |
-| **Fail-Fast Retrieval** | Availability | `VECTOR_BREAKER` fast-fails vector retrieval during an outage (`common/resilience.py`). |
-| **Determinism** | Debuggability | Temperature-0 generation + Strict Typing (Pydantic) for all LLM outputs. |
+These are current facts about the code, not a roadmap.
+
+* **Querying needs an LLM key.** Only indexing is key-free (`EMBEDDING_PROVIDER=local`
+  runs an ONNX embedder on your machine). Every question costs at least one
+  provider call, and typically several.
+* **The key-free demo answers nothing yet.** Replay mode needs recorded model
+  responses and none are committed; see [above](#what-the-demo-needs-honestly).
+* **The S3 and ADLS artifact backends have never been verified against a real
+  service.** Their URI construction is unit-tested with the parquet read/write
+  calls monkeypatched. No test has ever talked to S3 or ADLS, real or emulated.
+  Local filesystem is the only backend exercised end to end.
+* **Small local models often handle the AST poorly.** `PlanModel` is a recursive
+  structured-output target (`Expr` references itself). Ollama is supported at the
+  transport level; whether a given local model can fill that schema is another
+  matter, and small ones frequently cannot. Expect malformed plans and repeated
+  refiner loops. See [LLM configuration](docs/configuration/llm.md).
+* **The manufacturing demo declares no foreign keys.** Its DDL creates plain
+  integer columns, so the validator has no relationship to match a join against
+  and rejects any join question with "Join does not match any allowed
+  relationship." Chinook declares real foreign keys and is the dataset to demo.
+* **`max_bytes` is not enforced.** It is configured, stored and reported, and
+  nothing compares it to anything. `row_limit` *is* enforced — the generator
+  bakes it into the SQL.
+* **Audit events are CLI-only.** The audit log records `llm_interaction` events
+  and only when the CLI's monitor callback is attached; the Python and REST APIs
+  emit none.
+* **There is no distributed tracing.** OpenTelemetry *metrics* (node duration,
+  token usage) exist behind `OBSERVABILITY_EXPORTER`, which defaults to `none`.
+  No spans are started anywhere, and there is no Jaeger or Prometheus exporter.
+* **Determinism is structural only.** Stable sub-query and DAG ids, sorted layer
+  order, fixed topology, validation before generation. `temperature=0` and
+  `seed=42` are pinned, but the seed is best-effort on OpenAI and ignored
+  elsewhere: **the model's output is not reproducible.** See
+  [Determinism](docs/architecture/determinism.md).
 
 ---
 
-## 🚀 Quick Start
-
-### Prerequisites
-
-* Python 3.12+
-* A configured datasource (`configs/datasources.yaml`)
-* A configured LLM (`configs/llm.yaml`)
-
-### 1. Installation
-
-```bash
-# Install core only
-pip install nl2sql-engine
-
-# Install core with selected adapters
-pip install nl2sql-engine[mysql,mssql]
-
-# Install core with all adapters
-pip install nl2sql-engine[all]
-```
-
-For local development:
-
-```bash
-git clone https://github.com/nadeem4/nl2sql.git
-cd nl2sql
-
-# Set up environment
-python -m venv venv
-source venv/bin/activate
-
-# Install the adapter SDK and the engine (with every driver extra)
-pip install -e packages/adapter-sdk
-pip install -e "packages/nl2sql[all]"
-```
-
-### 2. Run a query (Python API)
-
-```python
-from nl2sql.context import NL2SQLContext
-from nl2sql.pipeline.runtime import run_with_graph
-
-ctx = NL2SQLContext()
-result = run_with_graph(ctx, "Top 5 customers by revenue last quarter?")
-
-print(result.get("final_answer"))
-```
-
-## 🧪 Demo data (CLI-only)
-
-Use the CLI to generate deterministic demo data and configs, then point the API at the generated files.
-
-1. Generate demo data + configs, and index them:
+## Demo data and the CLI
 
 ```bash
 # SQLite files, no containers (default)
@@ -158,59 +229,66 @@ the generated schemas. That needs no API key: `.env.demo` sets
 optional and simply skipped without one. A key is needed to *query* the demo, so
 pass one with `--api-key` or fill in `OPENAI_API_KEY` in `.env.demo` first.
 
-2. Use the demo environment from the CLI:
-
 ```bash
 # Re-index after editing the demo configs
 nl2sql --env demo index
 
 # Ask a question
 nl2sql --env demo run "Show me broken machines in Austin"
+
+# Plan and validate without touching a database
+nl2sql --env demo run --no-exec "Show me broken machines in Austin"
+
+# Check the environment: Python, installed drivers, datasource connectivity
+nl2sql doctor
 ```
 
 `--env <name>` loads `.env.<name>`; `--env-file <path>` loads an exact file and
 takes precedence over `--env`.
 
-3. Start the API with demo settings:
+### The REST API
 
 ```bash
-# Option A: load .env.demo via ENV
 ENV=demo uvicorn nl2sql_api.main:app
-
-# Option B: load a specific env file
+# or
 ENV_FILE_PATH=.env.demo uvicorn nl2sql_api.main:app
 ```
 
-The demo datasource file uses relative paths (e.g. `data/demo_lite/*.db`), so start the API from the repo root.
-
-## 🔖 Versioning Policy
-
-NL2SQL uses unified versioning across the monorepo. Core, adapters, API, and CLI
-share the same version number and are released together. Internal dependencies
-use a compatible-release constraint (`~=0.1`) rather than an exact pin, so a
-patch or minor release never forces users into an unresolvable install while a
-mismatched major is still rejected.
-
-See [Releasing](docs/development/releasing.md) for the release checklist.
-
-## 📚 Documentation
-
-- **[System Architecture](docs/architecture/overview.md)**: runtime topology and core flows
-- **[Agent Nodes](docs/architecture/nodes/index.md)**: node-by-node specs and responsibilities
-- **[Schema Store + Retrieval](docs/schema/store.md)**: schema snapshots and vector retrieval
-- **[Execution Isolation + Concurrency](docs/execution/isolation.md)**: what the runtime does and does not bound
-- **[Observability](docs/observability/stack.md)**: metrics, logging, audit events
-  
+The demo datasource file uses relative paths (e.g. `data/demo_lite/*.db`), so
+start the API from the directory holding them. The service has **no
+authentication**; see [Security Model](docs/security/model.md).
 
 ---
 
-## 📦 Repository Structure
+## Versioning
+
+`nl2sql-adapter-sdk`, `nl2sql-engine` and `nl2sql-api` share one version number
+and are released together. Internal dependencies use a compatible-release
+constraint (`~=0.1`) rather than an exact pin, so a patch or minor release never
+forces an unresolvable install while a mismatched major is still rejected.
+
+See [Releasing](docs/development/releasing.md).
+
+## Documentation
+
+- **[System Architecture](docs/architecture/overview.md)**: runtime topology and core flows
+- **[Agent Nodes](docs/architecture/nodes/index.md)**: node-by-node specs and responsibilities
+- **[Determinism](docs/architecture/determinism.md)**: what is reproducible and what is not
+- **[Schema Store + Retrieval](docs/schema/store.md)**: schema snapshots and vector retrieval
+- **[Execution Isolation + Concurrency](docs/execution/isolation.md)**: what the runtime does and does not bound
+- **[Security Model](docs/security/model.md)**: RBAC, and what it is not
+- **[Observability](docs/observability/stack.md)**: metrics, logging, audit events
+- **[Contributing](CONTRIBUTING.md)**: local setup and the test markers
+
+## Repository structure
 
 ```text
 packages/
 ├── nl2sql/             # Engine, CLI and adapters (Postgres, MySQL, MSSQL, SQLite, DuckDB)
-├── adapter-sdk/        # Interface Contract for new Databases
+├── adapter-sdk/        # Interface contract for new databases
 └── api/                # REST API service (nl2sql-api)
-configs/                # Runtime Configuration (Policies, Prompts)
-docs/                   # Architecture & Operations Manual
+web/playground/         # React source for the `nl2sql demo` page
+examples/               # Runnable scripts
+configs/                # Runtime configuration (policies, prompts)
+docs/                   # Architecture and operations manual
 ```

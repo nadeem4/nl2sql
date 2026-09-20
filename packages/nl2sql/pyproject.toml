@@ -33,6 +33,9 @@ dependencies = [
     "rich>=13.0.0",
     "typer[all]>=0.9.0",
     "inquirerpy>=0.3.4",
+    # cli/main.py and cli/commands/policy.py import it directly; it used to
+    # arrive only by way of typer and pydantic.
+    "typing_extensions>=4.0",
 ]
 
 # Every dialect adapter ships in this distribution; an extra only adds the

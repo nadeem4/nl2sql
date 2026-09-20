@@ -7,11 +7,13 @@ multi-database scenario with cross-database relationships.
 ## 1. Install the CLI
 
 ```bash
-# Install from PyPI
+# Install from PyPI. Add the `demo` extra if you also want the browser
+# playground that `nl2sql demo` serves; `[all]` covers drivers only.
 pip install nl2sql-engine
+pip install "nl2sql-engine[demo]"
 
 # Or install from source (dev)
-pip install -e "packages/nl2sql[all]"
+pip install -e "packages/nl2sql[all,demo]"
 ```
 
 ## 2. Generate demo data with the CLI

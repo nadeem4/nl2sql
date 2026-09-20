@@ -19,5 +19,12 @@ dependencies = [
 dev = [
   "pytest",
   "pytest-randomly",
+  # A hung test is otherwise indistinguishable from a slow one, and CI has no
+  # per-test deadline of its own. Run with `--timeout=<seconds>` when a suite
+  # stops finishing.
+  "pytest-timeout",
+  # packages/api tests drive the app through fastapi.testclient.TestClient,
+  # which imports httpx. No distribution in this repo depends on it.
+  "httpx",
 ]
 

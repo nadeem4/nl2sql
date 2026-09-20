@@ -1,5 +1,35 @@
 # Determinism Architecture
 
+## What "deterministic" means here
+
+The word is used narrowly and it does not mean "the same question gives the same
+answer". **Model output is not reproducible.** What is stable is the shape of a
+run:
+
+- **Stable sub-query and DAG ids.** Both are SHA-256 content hashes over
+  canonical JSON, not counters or UUIDs ([`decomposer/node.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/pipeline/nodes/decomposer/node.py), [`global_planner/node.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/pipeline/nodes/global_planner/node.py)). The same decomposition always yields the same ids.
+- **Sorted layer order.** The topological sort sorts each ready set and each
+  dependent set, so the execution layers of a given DAG are fixed
+  ([`global_planner/schemas.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/pipeline/nodes/global_planner/schemas.py)).
+- **Fixed graph topology.** The node sequence is compiled, not chosen by the
+  model; only the retry loop varies, and only in how many times it runs.
+- **Validation before generation.** The AST is checked against the retrieved
+  schema and the RBAC policy before any SQL exists, on every path.
+
+Everything else is best effort:
+
+- `temperature` defaults to `0.0` and `seed=42` is pinned when the client is
+  built ([`llm/registry.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/llm/registry.py)). The seed is sent to every provider because all three
+  speak the OpenAI protocol, but **only OpenAI interprets it, and even there it
+  is documented as best effort**; OpenRouter and Ollama ignore it. Temperature 0
+  is not a reproducibility guarantee either — it reduces variance, it does not
+  remove it.
+- Vector retrieval ranking, wall-clock schema versions, artifact timestamps and
+  retry jitter are all non-deterministic; the sections below say exactly where.
+
+If you need a byte-identical run, record the model's responses and replay them
+(`nl2sql/llm/replay.py`); that is what the key-free demo mode is built on.
+
 ## Overview
 - Determinism matters because the pipeline composes multi-step planning, execution, and aggregation; stable identifiers and ordering are required for reproducible DAGs, consistent merges, and auditability.
 - The system implements determinism in specific places (hashing, sorting, and schema fingerprinting) but also contains explicit nondeterminism (LLM outputs, vector retrieval ranking, timestamps, random retry jitter, and external calls).
@@ -12,7 +42,7 @@
 ### Inputs and Identifier Stability
 - Deterministic: Sub-query and post-combine op IDs are derived from sorted JSON payloads with SHA-256 ([`pipeline/nodes/decomposer/node.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/pipeline/nodes/decomposer/node.py)).
 - Non-deterministic: `GraphState.trace_id` defaults to `uuid.uuid4()`; subgraph IDs incorporate this value ([`pipeline/state.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/pipeline/state.py), [`pipeline/graph_utils.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/pipeline/graph_utils.py)), so identical inputs produce different IDs unless a trace ID is supplied.
-- Non-deterministic: User query interpretation depends on LLMs in the decomposer, planner, and refiner nodes, with no local temperature/seed control visible in these nodes ([`pipeline/nodes/decomposer/node.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/pipeline/nodes/decomposer/node.py), [`pipeline/nodes/ast_planner/node.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/pipeline/nodes/ast_planner/node.py), [`pipeline/nodes/refiner/node.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/pipeline/nodes/refiner/node.py)).
+- Non-deterministic: User query interpretation depends on LLMs in the decomposer, planner, and refiner nodes. These nodes set nothing themselves; `temperature` (default `0.0`) and `seed=42` are applied once, where the client is built in [`llm/registry.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/llm/registry.py), and neither makes the output reproducible ([`pipeline/nodes/decomposer/node.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/pipeline/nodes/decomposer/node.py), [`pipeline/nodes/ast_planner/node.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/pipeline/nodes/ast_planner/node.py), [`pipeline/nodes/refiner/node.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/pipeline/nodes/refiner/node.py)).
 
 ### Planner and DAG Construction
 - Deterministic: Global planner sorts nodes and edges by IDs and roles before constructing the DAG, then hashes a sorted JSON payload to produce a stable `dag_id` for a given logical plan ([`pipeline/nodes/global_planner/node.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/pipeline/nodes/global_planner/node.py)).
@@ -64,6 +94,6 @@
 - Deterministic (conditional): Pipeline timeout handling is based on monotonic time; timeouts and cancellations depend on wall-clock progression and runtime scheduling ([`pipeline/runtime.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/pipeline/runtime.py)).
 
 ### External Calls
-- Non-deterministic: LLM-driven nodes (decomposer, planner, refiner) invoke external LLMs without deterministic configuration in these nodes ([`pipeline/nodes/decomposer/node.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/pipeline/nodes/decomposer/node.py), [`pipeline/nodes/ast_planner/node.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/pipeline/nodes/ast_planner/node.py), [`pipeline/nodes/refiner/node.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/pipeline/nodes/refiner/node.py)).
+- Non-deterministic: LLM-driven nodes (decomposer, planner, refiner) invoke external LLMs. The client is pinned to `temperature=0.0` and `seed=42` in `llm/registry.py`, which narrows the variance without eliminating it ([`pipeline/nodes/decomposer/node.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/pipeline/nodes/decomposer/node.py), [`pipeline/nodes/ast_planner/node.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/pipeline/nodes/ast_planner/node.py), [`pipeline/nodes/refiner/node.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/pipeline/nodes/refiner/node.py)).
 - Non-deterministic: Vector store retrieval depends on external embeddings and search behavior ([`indexing/vector_store.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/indexing/vector_store.py)).
 - Non-deterministic: SQL execution delegates to external executors and underlying databases, which can return different results across time or state ([`pipeline/nodes/executor/node.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/pipeline/nodes/executor/node.py)).
