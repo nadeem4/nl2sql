@@ -3,6 +3,7 @@ their identity. Cancellation is scoped to a single run, not to the whole process
 """
 from __future__ import annotations
 
+import threading
 import time
 
 from nl2sql.auth import UserContext
@@ -155,3 +156,45 @@ def test_unexpected_crash_still_reports_unknown_error_with_a_stack_trace(monkeyp
     assert error.error_code == ErrorCode.UNKNOWN_ERROR
     assert "something nobody planned for" in error.message
     assert "RuntimeError" in (error.stack_trace or "")
+
+
+def test_timeout_fires_promptly_and_cancels_token(monkeypatch):
+    # The pool must not be a context manager: its ``__exit__`` joins the worker,
+    # so the timeout would only surface once the graph finished, however late.
+    seen = {}
+
+    def on_invoke(state, config):
+        seen["token"] = config["configurable"]["cancellation_token"]
+        time.sleep(2.0)
+        return {"final_answer": "late"}
+
+    _use_fake_graph(monkeypatch, on_invoke)
+    monkeypatch.setattr(runtime.settings, "global_timeout_sec", 0.2)
+
+    start = time.perf_counter()
+    result = runtime.run_with_graph(None, "slow query", user_context=_USER)
+    elapsed = time.perf_counter() - start
+
+    assert elapsed < 1.0, f"timeout surfaced after {elapsed:.2f}s"
+    assert result["errors"][0].error_code == ErrorCode.PIPELINE_TIMEOUT
+    assert seen["token"].is_cancelled()
+
+
+def test_run_from_worker_thread_does_not_raise(monkeypatch):
+    # FastAPI runs the sync ``/query`` handler in Starlette's threadpool, and
+    # ``signal.signal`` raises ValueError anywhere but the main thread.
+    _use_fake_graph(monkeypatch, lambda state, config: {"final_answer": "ok"})
+    box = {}
+
+    def worker():
+        try:
+            box["result"] = runtime.run_with_graph(None, "q", user_context=_USER)
+        except BaseException as exc:  # noqa: BLE001
+            box["exc"] = exc
+
+    t = threading.Thread(target=worker)
+    t.start()
+    t.join()
+
+    assert "exc" not in box, box.get("exc")
+    assert box["result"]["final_answer"] == "ok"

@@ -7,10 +7,12 @@ does **not** do, because the boundaries matter when you reason about failure.
 ## There is no process sandbox
 
 The engine runs entirely **in one process**. `run_with_graph()` dispatches the
-graph onto a `concurrent.futures.ThreadPoolExecutor`
-([`pipeline/runtime.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/pipeline/runtime.py)),
-sized by `settings.sandbox_exec_workers` (`SANDBOX_EXEC_WORKERS`, default `4`).
-Threads share one interpreter and one address space.
+graph onto a single-worker `concurrent.futures.ThreadPoolExecutor`
+([`pipeline/runtime.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/pipeline/runtime.py))
+created per run, so the caller's thread stays free to enforce
+`GLOBAL_TIMEOUT_SEC`. Concurrency across runs is the caller's to provide (a web
+server's own worker pool, for instance), not a setting of this engine. Threads
+share one interpreter and one address space.
 
 Two consequences follow, and neither is a sandbox property:
 
@@ -18,9 +20,6 @@ Two consequences follow, and neither is a sandbox property:
   process, including the orchestrator. There is no disposable worker to absorb
   it.
 - Memory is shared. A run cannot be isolated from another run by the runtime.
-
-The setting is named `sandbox_exec_workers` for historical reasons. It controls
-**thread-pool width**, not isolation.
 
 ## What the engine actually guarantees
 
@@ -63,12 +62,13 @@ third-party I/O.
 ### Global timeout
 
 `settings.global_timeout_sec` (`GLOBAL_TIMEOUT_SEC`, default `60`) is enforced by
-`future.result(timeout=...)` in `run_with_graph()`. On expiry the caller gets a
-`PIPELINE_TIMEOUT` error and a user-facing message.
+`future.result(timeout=...)` in `run_with_graph()`. On expiry the run's
+`CancellationToken` is cancelled and the caller gets a `PIPELINE_TIMEOUT` error
+and a user-facing message, within about a second of the limit.
 
 The timeout bounds **how long the caller waits**, not how long the work runs.
-Since the executor is a thread pool, the underlying thread is not killed and may
-continue until its own I/O completes.
+The underlying thread is not killed; it winds down in the background once its
+nodes observe the cancelled token, or once its current I/O completes.
 
 ### One circuit breaker
 
@@ -97,7 +97,7 @@ isolation.
 | `CancellationToken` | `common/cancellation.py` | One run, cooperatively |
 | `global_timeout_sec` | `pipeline/runtime.py` | How long the caller waits |
 | `VECTOR_BREAKER` | `common/resilience.py` | Vector retrieval only |
-| `ThreadPoolExecutor` | `pipeline/runtime.py` | Concurrency, **not** isolation |
+| `ThreadPoolExecutor` | `pipeline/runtime.py` | One worker per run, so the caller can time out; **not** isolation |
 
 If you need blast-radius containment against driver-level crashes, run the
 engine in a process you are willing to lose (a per-request worker, a container

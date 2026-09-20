@@ -50,6 +50,17 @@ def _start_keyboard_cancel_listener(
 
 
 def _install_signal_handlers(token: CancellationToken) -> Callable[[], None]:
+    """Install SIGINT/SIGTERM cancellation handlers, returning an undo callable.
+
+    ``signal.signal`` raises ``ValueError`` anywhere but the main thread, and a
+    server embedding the engine runs it off that thread: FastAPI dispatches the
+    synchronous ``/query`` handler into Starlette's threadpool. Interpreter-wide
+    signal handlers are not ours to install from there anyway, so a worker thread
+    gets a no-op instead of a crash; it still cancels through its own token.
+    """
+    if threading.current_thread() is not threading.main_thread():
+        return lambda: None
+
     previous = {}
 
     def _handler(signum, frame):
@@ -104,11 +115,32 @@ def run_with_graph(
             },
         )
 
+    # Deliberately not a ``with`` block: ``ThreadPoolExecutor.__exit__`` calls
+    # ``shutdown(wait=True)``, which joins the worker, so a timed-out
+    # ``future.result`` would still have to wait for the whole graph to finish
+    # before the timeout could surface. One worker per run; the run owns it.
+    pool = concurrent.futures.ThreadPoolExecutor(max_workers=1, thread_name_prefix="nl2sql-run")
     try:
-        # Use configured thread pool size for pipeline execution
-        with concurrent.futures.ThreadPoolExecutor(max_workers=settings.sandbox_exec_workers) as executor:
-            future = executor.submit(_invoke)
+        future = pool.submit(_invoke)
+        try:
             result = future.result(timeout=timeout_sec)
+        except concurrent.futures.TimeoutError:
+            # The worker keeps running the graph until its nodes observe the
+            # cancelled token. That is a background wind-down, not a hang: the
+            # caller is answered now.
+            token.cancel()
+            error_msg = f"Pipeline execution timed out after {timeout_sec} seconds."
+            return {
+                "errors": [
+                    PipelineError(
+                        node="orchestrator",
+                        message=error_msg,
+                        severity=ErrorSeverity.ERROR,
+                        error_code=ErrorCode.PIPELINE_TIMEOUT,
+                    )
+                ],
+                "final_answer": "I apologize, but the request timed out. Please try again with a simpler query.",
+            }
 
         # Nodes observe the token and unwind, so a cancelled run returns normally.
         if token.is_cancelled():
@@ -123,19 +155,6 @@ def run_with_graph(
                 ]
             }
         return result
-    except concurrent.futures.TimeoutError:
-        error_msg = f"Pipeline execution timed out after {timeout_sec} seconds."
-        return {
-            "errors": [
-                PipelineError(
-                    node="orchestrator",
-                    message=error_msg,
-                    severity=ErrorSeverity.ERROR,
-                    error_code=ErrorCode.PIPELINE_TIMEOUT,
-                )
-            ],
-            "final_answer": "I apologize, but the request timed out. Please try again with a simpler query.",
-        }
     except PipelineExecutionError as e:
         # Raised where a PipelineError cannot be returned as a value (conditional-edge
         # routers). The payload is already structured, so surface it unchanged: the
@@ -155,5 +174,6 @@ def run_with_graph(
             ]
         }
     finally:
+        pool.shutdown(wait=False, cancel_futures=True)
         run_done.set()
         restore_signals()

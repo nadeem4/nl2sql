@@ -124,7 +124,7 @@ See `../failure_recovery.md` for retry scope and recovery behavior.
 - Blocking calls include LLM requests in `decomposer` and `answer_synthesizer`.
 - `global_planner` and `aggregator` are CPU-bound (DAG construction and local aggregation).
 - Subgraph executions are dispatched per scan layer and can run in parallel via LangGraph routing.
-- Overall pipeline is executed within a thread pool controlled by `settings.sandbox_exec_workers` and guarded by `settings.global_timeout_sec`.
+- Overall pipeline is executed on a single-worker thread pool created per run and guarded by `settings.global_timeout_sec`.
 
 ---
 
@@ -140,7 +140,6 @@ See `../failure_recovery.md` for retry scope and recovery behavior.
 ## Configuration
 
 - `GLOBAL_TIMEOUT_SEC` controls total pipeline timeout (`settings.global_timeout_sec`).
-- `SANDBOX_EXEC_WORKERS` controls thread pool size (`settings.sandbox_exec_workers`).
 - Subgraph selection is governed by datasource capabilities in the subgraph registry.
 
 ---

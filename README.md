@@ -59,7 +59,7 @@ flowchart TD
 
 **Responsibility**: Semantic Search and Execution.
 
-* **In-Process Execution**: The graph runs on a thread pool (`settings.sandbox_exec_workers`) inside the host process. There is **no process sandbox**: a driver-level crash takes the process with it. See [Execution Isolation + Concurrency](docs/execution/isolation.md) for the exact boundaries.
+* **In-Process Execution**: The graph runs on a one-worker thread pool inside the host process, one pool per run. There is **no process sandbox**: a driver-level crash takes the process with it. See [Execution Isolation + Concurrency](docs/execution/isolation.md) for the exact boundaries.
 * **Partitioned Retrieval**: The [Schema Store + Retrieval](docs/schema/store.md) flow injects relevant schema context, preventing context window overflow.
 
 ### 4. The Reliability Plane (The Guard)
