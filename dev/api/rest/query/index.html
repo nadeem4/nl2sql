@@ -4041,6 +4041,36 @@
 <td>no</td>
 <td>Schema version used for planning.</td>
 </tr>
+<tr>
+<td><code>plan</code></td>
+<td><code>Optional[Dict[str, Any]]</code></td>
+<td>no</td>
+<td>The validated plan, dumped.</td>
+</tr>
+<tr>
+<td><code>validation</code></td>
+<td><code>List[Dict[str, Any]]</code></td>
+<td>no</td>
+<td>Validation checks (<code>name</code>, <code>passed</code>, <code>message</code>).</td>
+</tr>
+<tr>
+<td><code>rows</code></td>
+<td><code>Optional[Dict[str, Any]]</code></td>
+<td>no</td>
+<td>Capped row sample (<code>columns</code>, <code>rows</code>, <code>total_rows</code>).</td>
+</tr>
+<tr>
+<td><code>status</code></td>
+<td><code>str</code></td>
+<td>no</td>
+<td><code>"success"</code> or <code>"error"</code> for this sub-query.</td>
+</tr>
+<tr>
+<td><code>retry_count</code></td>
+<td><code>int</code></td>
+<td>no</td>
+<td>Plan/SQL refinement attempts made.</td>
+</tr>
 </tbody>
 </table>
 <h3 id="queryresponse"><code>QueryResponse</code></h3>
@@ -4097,10 +4127,23 @@
 <td>no</td>
 <td>Result artifact references keyed by execution node id.</td>
 </tr>
+<tr>
+<td><code>status</code></td>
+<td><code>str</code></td>
+<td>no</td>
+<td><code>"success"</code>, <code>"error"</code> or <code>"plan_only"</code> for the run.</td>
+</tr>
+<tr>
+<td><code>timings</code></td>
+<td><code>Dict[str, float]</code></td>
+<td>no</td>
+<td>Wall-clock seconds per graph node.</td>
+</tr>
 </tbody>
 </table>
-<p>Result rows are not inlined in the response. They are written to artifact storage
-and addressed through <code>artifact_refs</code> (<code>uri</code>, <code>format</code>, <code>row_count</code>, <code>columns</code>).</p>
+<p>Only a capped sample of the rows is inlined, in <code>sub_queries[].rows</code>. The full
+result set is written to artifact storage and addressed through <code>artifact_refs</code>
+(<code>uri</code>, <code>format</code>, <code>row_count</code>, <code>columns</code>).</p>
 <h2 id="endpoints">Endpoints</h2>
 <h3 id="post-apiv1query"><code>POST /api/v1/query</code></h3>
 <p>Source: <code>packages/api/src/nl2sql_api/routes/query.py</code></p>
@@ -4126,30 +4169,42 @@ event loop.</p>
 <a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">      </span><span class="nt">"intent"</span><span class="p">:</span><span class="w"> </span><span class="s2">"top customers by revenue"</span><span class="p">,</span>
 <a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">      </span><span class="nt">"sql"</span><span class="p">:</span><span class="w"> </span><span class="s2">"SELECT customer, SUM(revenue) FROM sales GROUP BY customer ORDER BY 2 DESC LIMIT 5"</span><span class="p">,</span>
 <a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">      </span><span class="nt">"datasource_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"warehouse"</span><span class="p">,</span>
-<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="w">      </span><span class="nt">"schema_version"</span><span class="p">:</span><span class="w"> </span><span class="s2">"v3"</span>
-<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="w">    </span><span class="p">}</span>
-<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="w">  </span><span class="p">],</span>
-<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="w">  </span><span class="nt">"final_answer"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="w">    </span><span class="nt">"summary"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Top 5 customers by revenue"</span><span class="p">,</span>
-<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="w">    </span><span class="nt">"format_type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"table"</span><span class="p">,</span>
-<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="w">    </span><span class="nt">"content"</span><span class="p">:</span><span class="w"> </span><span class="s2">"| customer | revenue |\n| --- | --- |"</span>
-<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="w">  </span><span class="p">},</span>
-<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a><span class="w">  </span><span class="nt">"errors"</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
-<a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a><span class="w">  </span><span class="nt">"trace_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"0f1c..."</span><span class="p">,</span>
-<a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a><span class="w">  </span><span class="nt">"reasoning"</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
-<a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a><span class="w">  </span><span class="nt">"warnings"</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
-<a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a><span class="w">  </span><span class="nt">"artifact_refs"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a><span class="w">    </span><span class="nt">"sq-1"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a><span class="w">      </span><span class="nt">"uri"</span><span class="p">:</span><span class="w"> </span><span class="s2">"file:///artifacts/sq-1.parquet"</span><span class="p">,</span>
-<a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a><span class="w">      </span><span class="nt">"format"</span><span class="p">:</span><span class="w"> </span><span class="s2">"parquet"</span><span class="p">,</span>
-<a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a><span class="w">      </span><span class="nt">"row_count"</span><span class="p">:</span><span class="w"> </span><span class="mi">5</span><span class="p">,</span>
-<a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a><span class="w">      </span><span class="nt">"columns"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"customer"</span><span class="p">,</span><span class="w"> </span><span class="s2">"revenue"</span><span class="p">]</span>
-<a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a><span class="w">    </span><span class="p">}</span>
-<a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a><span class="w">  </span><span class="p">}</span>
-<a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a><span class="p">}</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="w">      </span><span class="nt">"schema_version"</span><span class="p">:</span><span class="w"> </span><span class="s2">"v3"</span><span class="p">,</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="w">      </span><span class="nt">"plan"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"tables"</span><span class="p">:</span><span class="w"> </span><span class="p">[{</span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"sales"</span><span class="p">,</span><span class="w"> </span><span class="nt">"alias"</span><span class="p">:</span><span class="w"> </span><span class="s2">"s"</span><span class="p">,</span><span class="w"> </span><span class="nt">"ordinal"</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">}]},</span>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="w">      </span><span class="nt">"validation"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="w">        </span><span class="p">{</span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"plan_present"</span><span class="p">,</span><span class="w"> </span><span class="nt">"passed"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span><span class="w"> </span><span class="nt">"message"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Plan received from the planner"</span><span class="p">},</span>
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="w">        </span><span class="p">{</span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"structure_and_schema"</span><span class="p">,</span><span class="w"> </span><span class="nt">"passed"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span><span class="w"> </span><span class="nt">"message"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Tables, columns and joins resolve against the retrieved schema"</span><span class="p">},</span>
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="w">        </span><span class="p">{</span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"policy"</span><span class="p">,</span><span class="w"> </span><span class="nt">"passed"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span><span class="w"> </span><span class="nt">"message"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Role 'admin' may read every table in the plan"</span><span class="p">}</span>
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="w">      </span><span class="p">],</span>
+<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="w">      </span><span class="nt">"rows"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"columns"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"customer"</span><span class="p">,</span><span class="w"> </span><span class="s2">"revenue"</span><span class="p">],</span><span class="w"> </span><span class="nt">"rows"</span><span class="p">:</span><span class="w"> </span><span class="p">[[</span><span class="s2">"acme"</span><span class="p">,</span><span class="w"> </span><span class="mi">42</span><span class="p">]],</span><span class="w"> </span><span class="nt">"total_rows"</span><span class="p">:</span><span class="w"> </span><span class="mi">5</span><span class="p">},</span>
+<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a><span class="w">      </span><span class="nt">"status"</span><span class="p">:</span><span class="w"> </span><span class="s2">"success"</span><span class="p">,</span>
+<a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a><span class="w">      </span><span class="nt">"retry_count"</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span>
+<a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a><span class="w">  </span><span class="p">],</span>
+<a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a><span class="w">  </span><span class="nt">"final_answer"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a><span class="w">    </span><span class="nt">"summary"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Top 5 customers by revenue"</span><span class="p">,</span>
+<a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a><span class="w">    </span><span class="nt">"format_type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"table"</span><span class="p">,</span>
+<a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a><span class="w">    </span><span class="nt">"content"</span><span class="p">:</span><span class="w"> </span><span class="s2">"| customer | revenue |\n| --- | --- |"</span>
+<a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a><span class="w">  </span><span class="p">},</span>
+<a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a><span class="w">  </span><span class="nt">"errors"</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a><span class="w">  </span><span class="nt">"trace_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"0f1c..."</span><span class="p">,</span>
+<a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a><span class="w">  </span><span class="nt">"reasoning"</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a><span class="w">  </span><span class="nt">"warnings"</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<a id="__codelineno-0-29" name="__codelineno-0-29" href="#__codelineno-0-29"></a><span class="w">  </span><span class="nt">"artifact_refs"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-0-30" name="__codelineno-0-30" href="#__codelineno-0-30"></a><span class="w">    </span><span class="nt">"sq-1"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-0-31" name="__codelineno-0-31" href="#__codelineno-0-31"></a><span class="w">      </span><span class="nt">"uri"</span><span class="p">:</span><span class="w"> </span><span class="s2">"file:///artifacts/sq-1.parquet"</span><span class="p">,</span>
+<a id="__codelineno-0-32" name="__codelineno-0-32" href="#__codelineno-0-32"></a><span class="w">      </span><span class="nt">"format"</span><span class="p">:</span><span class="w"> </span><span class="s2">"parquet"</span><span class="p">,</span>
+<a id="__codelineno-0-33" name="__codelineno-0-33" href="#__codelineno-0-33"></a><span class="w">      </span><span class="nt">"row_count"</span><span class="p">:</span><span class="w"> </span><span class="mi">5</span><span class="p">,</span>
+<a id="__codelineno-0-34" name="__codelineno-0-34" href="#__codelineno-0-34"></a><span class="w">      </span><span class="nt">"columns"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"customer"</span><span class="p">,</span><span class="w"> </span><span class="s2">"revenue"</span><span class="p">]</span>
+<a id="__codelineno-0-35" name="__codelineno-0-35" href="#__codelineno-0-35"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-0-36" name="__codelineno-0-36" href="#__codelineno-0-36"></a><span class="w">  </span><span class="p">},</span>
+<a id="__codelineno-0-37" name="__codelineno-0-37" href="#__codelineno-0-37"></a><span class="w">  </span><span class="nt">"status"</span><span class="p">:</span><span class="w"> </span><span class="s2">"success"</span><span class="p">,</span>
+<a id="__codelineno-0-38" name="__codelineno-0-38" href="#__codelineno-0-38"></a><span class="w">  </span><span class="nt">"timings"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"ast_planner"</span><span class="p">:</span><span class="w"> </span><span class="mf">0.02</span><span class="p">,</span><span class="w"> </span><span class="nt">"logical_validator"</span><span class="p">:</span><span class="w"> </span><span class="mf">0.001</span><span class="p">,</span><span class="w"> </span><span class="nt">"generator"</span><span class="p">:</span><span class="w"> </span><span class="mf">0.006</span><span class="p">,</span><span class="w"> </span><span class="nt">"executor"</span><span class="p">:</span><span class="w"> </span><span class="mf">0.038</span><span class="p">}</span>
+<a id="__codelineno-0-39" name="__codelineno-0-39" href="#__codelineno-0-39"></a><span class="p">}</span>
 </code></pre></div>
 <h2 id="tests">Tests</h2>
-<p><code>packages/api/tests/test_query_routes.py</code> covers this endpoint with FastAPI's
+<p><code>packages/api/tests/test_query_routes.py</code> and
+<code>packages/api/tests/test_query_response_shape.py</code> cover this endpoint with FastAPI's
 <code>TestClient</code> and a stubbed engine (<code>get_engine</code> dependency override), so no
 datasource, LLM or network access is required.</p>
 

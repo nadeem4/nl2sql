@@ -3495,6 +3495,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#rowsample" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        RowSample
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#state-mapping" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3972,6 +3983,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#rowsample" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        RowSample
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#state-mapping" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4025,6 +4047,8 @@
 <code>packages/nl2sql/src/nl2sql/api/query_api.py</code></p>
 <p>Signature:
 <code>run_query(natural_language: str, datasource_id: Optional[str] = None, execute: bool = True, user_context: Optional[UserContext] = None) -&gt; QueryResult</code></p>
+<p><code>run_query</code> passes the context's artifact store to <code>result_from_state</code>, so each
+sub-query carries a capped row sample alongside its artifact reference.</p>
 <p>Parameters:
 | name | type | required | meaning |
 | --- | --- | --- | --- |
@@ -4059,9 +4083,17 @@ No exceptions are raised by <code>run_query</code>; errors are returned in <code
 | <code>trace_id</code> | <code>str</code> | no | Trace identifier. |
 | <code>reasoning</code> | <code>List[Dict[str, Any]]</code> | no | Reasoning events/logs. |
 | <code>warnings</code> | <code>List[Dict[str, Any]]</code> | no | Warning events/logs. |
-| <code>artifact_refs</code> | <code>Dict[str, ArtifactRef]</code> | no | Result artifact references keyed by execution node id. |</p>
-<p>Result rows are not inlined. They live in artifact storage and are addressed
-through <code>artifact_refs</code>.</p>
+| <code>artifact_refs</code> | <code>Dict[str, ArtifactRef]</code> | no | Result artifact references keyed by execution node id. |
+| <code>status</code> | <code>str</code> | no | <code>"success"</code>, <code>"error"</code>, <code>"plan_only"</code>, or <code>""</code> when nothing ran. |
+| <code>timings</code> | <code>Dict[str, float]</code> | no | Wall-clock seconds per graph node, plus <code>LangGraph</code> for the whole run. |</p>
+<p><code>errors</code> holds only <code>ERROR</code> and <code>CRITICAL</code> entries; <code>WARNING</code>-severity pipeline
+errors are appended to <code>warnings</code> as the same summary dict.</p>
+<p><code>status</code> is derived: <code>"error"</code> when any blocking error is present, otherwise
+<code>"plan_only"</code> when no sub-query produced rows or an artifact (an <code>execute=False</code>
+run), otherwise <code>"success"</code>. A state with no sub-queries and no errors leaves it
+empty.</p>
+<p>Only a capped sample of the rows is inlined, in <code>sub_queries[].rows</code>. The full
+result set lives in artifact storage, addressed through <code>artifact_refs</code>.</p>
 <h3 id="subqueryresult">SubQueryResult</h3>
 <table>
 <thead>
@@ -4103,6 +4135,67 @@ through <code>artifact_refs</code>.</p>
 <td>no</td>
 <td>Schema version used for planning.</td>
 </tr>
+<tr>
+<td><code>plan</code></td>
+<td><code>Optional[Dict[str, Any]]</code></td>
+<td>no</td>
+<td>The validated <code>PlanModel</code>, dumped.</td>
+</tr>
+<tr>
+<td><code>validation</code></td>
+<td><code>List[ValidationCheck]</code></td>
+<td>no</td>
+<td><code>name</code>, <code>passed</code>, <code>message</code> per validation gate.</td>
+</tr>
+<tr>
+<td><code>rows</code></td>
+<td><code>Optional[RowSample]</code></td>
+<td>no</td>
+<td>Capped row sample; <code>None</code> when nothing executed or the artifact could not be read.</td>
+</tr>
+<tr>
+<td><code>status</code></td>
+<td><code>str</code></td>
+<td>no</td>
+<td><code>"success"</code> or <code>"error"</code> for this sub-query.</td>
+</tr>
+<tr>
+<td><code>retry_count</code></td>
+<td><code>int</code></td>
+<td>no</td>
+<td>Plan/SQL refinement attempts made.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="rowsample">RowSample</h3>
+<table>
+<thead>
+<tr>
+<th>name</th>
+<th>type</th>
+<th>required</th>
+<th>meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>columns</code></td>
+<td><code>List[str]</code></td>
+<td>no</td>
+<td>Column names, in result order.</td>
+</tr>
+<tr>
+<td><code>rows</code></td>
+<td><code>List[List[Any]]</code></td>
+<td>no</td>
+<td>At most <code>sample_rows</code> rows (default 50).</td>
+</tr>
+<tr>
+<td><code>total_rows</code></td>
+<td><code>int</code></td>
+<td>no</td>
+<td>Row count of the whole result, not of the sample.</td>
+</tr>
 </tbody>
 </table>
 <h3 id="state-mapping">State mapping</h3>
@@ -4125,17 +4218,33 @@ model instances for nested values):</p>
 <td><code>subgraph_outputs[&lt;id&gt;].sub_query</code></td>
 </tr>
 <tr>
+<td><code>sub_queries[].plan</code> / <code>.validation</code> / <code>.status</code> / <code>.retry_count</code></td>
+<td><code>subgraph_outputs[&lt;id&gt;]</code></td>
+</tr>
+<tr>
+<td><code>sub_queries[].rows</code></td>
+<td><code>artifact_store.read_result_frame(subgraph_outputs[&lt;id&gt;].artifact)</code></td>
+</tr>
+<tr>
 <td><code>final_answer</code></td>
 <td><code>answer_synthesizer_response.final_answer</code></td>
 </tr>
 <tr>
-<td><code>errors</code>, <code>reasoning</code>, <code>warnings</code>, <code>trace_id</code>, <code>artifact_refs</code></td>
+<td><code>errors</code>, <code>reasoning</code>, <code>warnings</code>, <code>trace_id</code>, <code>artifact_refs</code>, <code>timings</code></td>
 <td>top-level state</td>
 </tr>
 </tbody>
 </table>
 <p><code>errors</code> are projected onto a client-safe summary; <code>stack_trace</code> and <code>details</code> are
 deliberately not exposed.</p>
+<p><code>result_from_state(state, artifact_store=None, sample_rows=50)</code> reads rows only
+when an artifact store is supplied. A failed read is not fatal: <code>rows</code> stays
+<code>None</code> and a warning is appended.</p>
+<p><code>timings</code> is collected by <code>NodeTimingCallback</code>
+(<code>packages/nl2sql/src/nl2sql/pipeline/timing.py</code>), a LangChain callback handler
+that <code>run_with_graph</code> always attaches. It keys on <code>metadata["langgraph_node"]</code>
+where LangGraph provides it, so the keys are node names such as <code>ast_planner</code>,
+<code>logical_validator</code>, <code>generator</code> and <code>executor</code>.</p>
 
 
 

@@ -1986,9 +1986,35 @@ emits a <code>PlanModel</code>, never SQL.</p>
 <h2 id="outputs">Outputs</h2>
 <p>Mutations to <code>SubgraphExecutionState</code>:</p>
 <ul>
-<li><code>logical_validator_response</code> (<code>LogicalValidatorResponse</code>)</li>
+<li><code>logical_validator_response</code> (<code>LogicalValidatorResponse</code>, carrying <code>errors</code>,
+  <code>reasoning</code> and <code>checks</code>)</li>
 <li><code>errors</code> and <code>reasoning</code></li>
 </ul>
+<p><code>checks</code> is a <code>List[ValidationCheck]</code> (<code>name</code>, <code>passed</code>, <code>message</code>) recording what
+was validated, not only what failed. The names are fixed and always in this order:</p>
+<table>
+<thead>
+<tr>
+<th>name</th>
+<th>meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>plan_present</code></td>
+<td>A plan reached the validator. The only check emitted when it did not.</td>
+</tr>
+<tr>
+<td><code>structure_and_schema</code></td>
+<td>Tables, columns, joins and literals resolve against the retrieved schema.</td>
+</tr>
+<tr>
+<td><code>policy</code></td>
+<td>Every table in the plan is allowed for the caller's role.</td>
+</tr>
+</tbody>
+</table>
+<p>On failure the check's <code>message</code> is the first corresponding error's message.</p>
 <p>Side effects:</p>
 <ul>
 <li>None beyond in‑memory validation.</li>
@@ -2020,6 +2046,7 @@ emits a <code>PlanModel</code>, never SQL.</p>
 <p>Key contracts:</p>
 <ul>
 <li><code>LogicalValidatorResponse</code></li>
+<li><code>ValidationCheck</code></li>
 <li><code>PipelineError</code></li>
 </ul>
 <hr/>
