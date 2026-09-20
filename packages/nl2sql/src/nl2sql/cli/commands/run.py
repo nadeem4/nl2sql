@@ -49,9 +49,13 @@ def run_pipeline(
     
     # Handle Result
     if not result.success:
-        if result.traceback:
+        # The traceback is a maintainer's debugging aid: printing it by default
+        # buried the one actionable line under 40 lines of frames.
+        if config.verbose and result.traceback:
             presenter.print_error(result.traceback)
         presenter.print_error(result.error or "Unknown Pipeline Error")
+        if result.traceback and not config.verbose:
+            presenter.print_info("Re-run with --verbose for the full traceback.")
         sys.exit(1)
         
     final_state = result.final_state

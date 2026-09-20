@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Unified CLI for the NL2SQL Ecosystem."""
 import typer
+import importlib.metadata
 import os
 import sys
 import pathlib
@@ -42,11 +43,23 @@ LLMConfigOption = Annotated[Optional[pathlib.Path], typer.Option("--llm-config",
 VectorStoreOption = Annotated[Optional[str], typer.Option("--vector-store", help="Path to vector store directory")]
 
 
+def _version_callback(value: bool) -> None:
+    """Prints the installed distribution version and exits.
+
+    Eager, so `nl2sql --version` answers without a subcommand and without
+    building a context.
+    """
+    if value:
+        typer.echo(importlib.metadata.version("nl2sql-engine"))
+        raise typer.Exit()
+
+
 @app.callback()
 def global_callback(
     ctx: typer.Context,
     env: Annotated[Optional[str], typer.Option("--env", help="Environment name to load (.env.<name>)")] = None,
     env_file: Annotated[Optional[pathlib.Path], typer.Option("--env-file", help="Explicit path to an env file (wins over --env)")] = None,
+    version: Annotated[bool, typer.Option("--version", help="Show the installed nl2sql-engine version and exit", callback=_version_callback, is_eager=True)] = False,
 ):
     """
     NL2SQL CLI Entry Point.

@@ -4,6 +4,7 @@ from typing import Any, Dict, NamedTuple, Optional
 
 from langchain_openai import ChatOpenAI
 
+from nl2sql.common.env_hint import active_env_file
 from nl2sql.secrets import SecretManager
 from .models import AgentConfig
 
@@ -184,7 +185,8 @@ class LLMRegistry:
         raise ValueError(
             f"LLM agent '{agent.name}' uses provider '{agent.provider}', which "
             f"requires an API key, but none could be resolved. Set {env_var} in "
-            "the environment, or give the agent an 'api_key' in configs/llm.yaml."
+            f"{active_env_file()} (the env file for this run) or in the "
+            "environment, or give the agent an 'api_key' in the LLM config file."
         )
 
     @staticmethod

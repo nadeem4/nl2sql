@@ -138,6 +138,26 @@ def test_missing_key_registers_but_fails_with_an_actionable_error_on_first_use(m
     assert "Missing credentials" not in message
 
 
+def test_missing_key_error_names_the_env_file_this_run_loads(monkeypatch):
+    """"Set OPENAI_API_KEY" is only actionable if it says *where*.
+
+    A user running `--env demo` has a `.env.demo`, not a `.env`, and the
+    message has to name the one this run reads.
+    """
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("ENV_FILE_PATH", raising=False)
+    monkeypatch.setenv("ENV", "demo")
+    registry = _registry()
+    registry.register_llm(
+        AgentConfig(provider="openai", model="gpt-4o", name="default")
+    )
+
+    with pytest.raises(ValueError) as exc:
+        registry.get_llm("default")
+
+    assert ".env.demo" in str(exc.value)
+
+
 def test_missing_key_error_is_not_the_raw_openai_error(monkeypatch):
     import openai
 
