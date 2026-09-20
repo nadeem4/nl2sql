@@ -9,6 +9,7 @@ from nl2sql.context import NL2SQLContext
 from nl2sql.pipeline.graph_utils import (
     StateAccessor,
     build_scan_payload,
+    completed_scan_ids,
     next_scan_layer_ids,
     resolve_subgraph,
 )
@@ -40,7 +41,9 @@ def build_scan_layer_router(ctx: NL2SQLContext):
             return END
 
         node_index = {n.node_id: n for n in dag.nodes}
-        target_ids = next_scan_layer_ids(dag, artifact_refs)
+        target_ids = next_scan_layer_ids(
+            dag, artifact_refs, completed_scan_ids(state.subgraph_outputs)
+        )
         if not target_ids:
             return [
                 Send("aggregator",state)
