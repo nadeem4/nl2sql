@@ -1949,6 +1949,13 @@ instead of the OpenAI embeddings API. The first indexing run downloads roughly
   naming the agent, the provider and the variable to set, and the chunks are
   still indexed - just with no LLM-generated descriptions. An enrichment failure
   never fails indexing.</li>
+<li>Both <code>nl2sql setup --api-key &lt;key&gt;</code> and <code>nl2sql demo --api-key &lt;key&gt;</code> take the
+  key on the command line and write it into the generated env file. The provider
+  follows the key's shape: a key beginning <code>sk-or-</code> is OpenRouter and is stored
+  as <code>OPENROUTER_API_KEY</code> with <code>provider: openrouter</code>; anything else is OpenAI.
+  <code>.env</code> and <code>.env.*</code> are covered by <code>.gitignore</code>, but a key passed on the
+  command line is visible in shell history and to <code>ps</code>, so the environment
+  variable remains the more private route.</li>
 <li>So <code>nl2sql setup --demo</code> and <code>nl2sql --env demo index</code> complete with no chat
   key at all, and <code>nl2sql index</code> exits <code>0</code>. It exits <code>1</code> if any datasource
   actually fails to index, which is safe to rely on in a script. A missing key
