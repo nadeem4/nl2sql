@@ -27,23 +27,22 @@ Example (PowerShell), using a 3.13 interpreter:
 ```powershell
 py -3.13 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install `
-    -e packages/adapter-sdk -e "packages/nl2sql[all]" -e packages/api `
-    pytest pytest-randomly httpx
+    -e packages/adapter-sdk -e "packages/nl2sql[postgres,duckdb,demo]" -e packages/api
+.\.venv\Scripts\python.exe -m pip install --group dev
 ```
 
-Swap `[all]` for a narrower extra (`[postgres]`, `[duckdb]`, ...) if you only
-need one dialect. `httpx` is listed explicitly because `packages/api` tests use
-`fastapi.testclient.TestClient`, which needs it; it currently also arrives
-transitively through the engine's dependencies, so naming it just makes the
-requirement intentional rather than accidental.
+The full suite is green only with those extras. `postgres` and `duckdb` supply
+the drivers the adapter tests import; `demo` supplies the FastAPI/uvicorn server
+behind `nl2sql demo`. Swap in `[all]` if you want every dialect driver — but
+note `all` covers adapters only, not `demo`, `aws`, `azure` or `hashicorp`.
+There is deliberately no `sqlite` extra: that driver is in the standard library.
+
+The second command installs the PEP 735 `dev` group (`pip` 25.1 or newer):
+`pytest`, `pytest-randomly`, `pytest-timeout`, and `httpx` — the last because
+`packages/api` tests drive the app through `fastapi.testclient.TestClient`,
+which imports it, and no distribution in this repo declares it.
 
 ## Running tests
-
-Install the dev tooling (PEP 735 dependency group) first:
-
-```bash
-python -m pip install --group dev
-```
 
 Unit tests:
 

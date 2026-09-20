@@ -85,9 +85,18 @@ as `PipelineError` values in graph state; see
 
 ### Adapter-level limits
 
-Adapters enforce `row_limit` and `max_bytes` on results
-(see [SDK Reference](../adapters/sdk.md)). These cap payload size; they are not
-isolation.
+`row_limit` is real and is enforced where it cannot be talked around: the
+generator bakes `min(plan.limit, row_limit)` into the SQL it renders
+([`pipeline/nodes/generator/node.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/pipeline/nodes/generator/node.py)).
+
+`max_bytes` is **not enforced**. It is read from datasource options, stored on
+the adapter and reported by the datasource API, and nothing ever compares it to
+anything. The adapter does estimate a result's size (average row size from a
+50-row sample) and reports it as `ResultFrame.bytes`, but that number is only
+copied into metrics; no threshold is applied, nothing is truncated and no error
+is raised. Treat `max_bytes` as documentation of intent, not a limit.
+
+Neither is isolation in any case.
 
 ## Summary
 

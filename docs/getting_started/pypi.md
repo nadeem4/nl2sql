@@ -16,7 +16,14 @@ pip install "nl2sql-engine[all]"
 pip install "nl2sql-engine[postgres]"
 pip install "nl2sql-engine[mysql,mssql]"
 pip install "nl2sql-engine[duckdb]"
+
+# The browser playground behind `nl2sql demo` (adds fastapi + uvicorn).
+# `[all]` does NOT include it -- `all` covers database drivers only.
+pip install "nl2sql-engine[demo]"
 ```
+
+Running a query needs an LLM key; only indexing is key-free. See
+[Known limitations](https://github.com/nadeem4/nl2sql#known-limitations).
 
 ## Configure
 
@@ -221,8 +228,6 @@ providers:
   #   vault_url: "https://my-vault.vault.azure.net/"
 ```
 See [Secrets config](../configuration/secrets.md) for supported providers and fields.
-
-Secrets providers are installed via extras and selected in `configs/secrets.yaml`:
 
 ## Run a query
 

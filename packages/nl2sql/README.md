@@ -1,139 +1,31 @@
-# NL2SQL
+# nl2sql-engine
 
-The **`nl2sql`** package is the brain of the natural language to SQL engine. It orchestrates the entire query lifecycle using a graph-based agent architecture, and also ships the `nl2sql` CLI (`nl2sql.cli`) and the four database adapters (`nl2sql.adapters.*`).
+Ask a database questions in English. The model writes a **typed plan**, never
+SQL text; the plan is checked against the real schema and the caller's role
+before any SQL is generated.
 
-## 🏗️ Architecture Overview
+This distribution is the whole engine: the LangGraph pipeline, the `nl2sql`
+CLI, and the database adapters (PostgreSQL, MySQL, SQL Server, SQLite, DuckDB).
 
-The NL2SQL Core is built around a **graph-based orchestration system** using LangGraph that treats text-to-SQL as a distributed systems problem. The architecture is organized around several key planes:
+## Try it
 
-### 1. **The Control Plane (The Graph)**
-- **Responsibility**: Reasoning, Planning, and Orchestration
-- **Implementation**: Directed Cyclic Graph (LangGraph) with explicit state (`GraphState`)
-- **Features**: Agentic graph with refinement loops for self-correction when plans fail validation
-
-### 2. **The Security Plane (The Firewall)**
-- **Responsibility**: Invariants Enforcement
-- **Implementation**: Valid-by-Construction approach where LLM generates Abstract Syntax Tree (AST) rather than executing SQL
-- **Features**: Static analysis through logical validators enforcing RBAC and schema constraints
-
-### 3. **The Data Plane (The Sandbox)**
-- **Responsibility**: Semantic Search and Execution
-- **Implementation**: Sandboxed Process Pool for SQL driver isolation
-- **Features**: Partitioned retrieval with schema store and vector-based context injection
-
-### 4. **The Reliability Plane (The Guard)**
-- **Responsibility**: Fault Tolerance and Stability
-- **Implementation**: Layered defense with Circuit Breakers and Sandboxing
-- **Features**: Fail-fast approach with strict timeouts preventing cascading failures
-
-### 5. **The Observability Plane (The Watchtower)**
-- **Responsibility**: Visibility, Forensics, and Compliance
-- **Implementation**: Native OpenTelemetry integration
-- **Features**: Distributed tracing (Jaeger), metrics (Prometheus), and forensic audit logs
-
-## 🧠 Key Components
-
-### **Context Management (`context.py`)**
-- `NL2SQLContext`: Centralized application context managing initialization lifecycle
-- Ensures proper ordering: secrets → datasources → LLMs → policies
-- Coordinates all registries and stores
-
-### **Graph Pipeline (`pipeline/`)**
-- **Graph Orchestration**: LangGraph-based state machine managing query flow
-- **Nodes**: DatasourceResolver, Decomposer, GlobalPlanner, Aggregator, AnswerSynthesizer
-- **Subgraphs**: SQL Agent subgraph with AST planner, validators, and executor
-- **State Management**: Shared `GraphState` for auditability and reproducibility
-
-### **Schema Management (`schema/`)**
-- **Schema Store**: Persistent storage for schema snapshots with versioning
-- **Schema Contracts**: Typed representations of database schemas
-- **Versioning**: Multiple schema versions with eviction policies
-
-### **Indexing System (`indexing/`)**
-- **Schema Indexing**: Vector-based indexing of schema information
-- **Chunk Builder**: Breaks schema into searchable chunks
-- **Enrichment Service**: Enhances schema with example questions
-
-### **Data Sources (`datasources/`)**
-- **Registry**: Dynamic registration and management of database adapters
-- **Protocols**: Standardized interfaces for database connectivity
-- **Discovery**: Automatic discovery of available adapter types
-
-### **LLM Management (`llm/`)**
-- **Registry**: Management of multiple LLM instances
-- **Configuration**: Flexible LLM provider configuration (OpenAI, etc.)
-- **Routing**: Intelligent routing to appropriate LLMs
-
-### **Authentication & Authorization (`auth/`)**
-- **RBAC**: Role-based access control for data access
-- **User Context**: Identity and permission context propagation
-- **Policy Engine**: Fine-grained access control rules
-
-## 🚀 Public API
-
-The main public interface is provided through the `NL2SQL` class:
-
-```python
-from nl2sql import NL2SQL
-
-# Initialize the engine
-engine = NL2SQL(
-    ds_config_path="configs/datasources.yaml",
-    llm_config_path="configs/llm.yaml",
-    policies_path="configs/policies.json"
-)
-
-# Run a natural language query
-result = engine.run_query("Show top 10 customers by revenue")
-print(result.final_answer)
+```bash
+pip install "nl2sql-engine[demo]"
+nl2sql demo
 ```
 
-### Two-Tier API Architecture
+That scaffolds a demo project, copies in the Chinook sample database, indexes
+its schema locally (no API key needed — a small ONNX embedder runs on your
+machine) and opens a browser playground showing the retrieved schema, the plan,
+the validation checks, the SQL and the rows, with a role selector that shows the
+validator refusing a plan before any SQL is generated.
 
-NL2SQL provides a two-tier API architecture:
+**Answering a question needs a model**: `OPENAI_API_KEY`, `OPENROUTER_API_KEY`,
+or a reachable Ollama daemon. The key-free replay mode relies on recorded model
+responses, and none ship yet, so without one of those the demo can show you the
+schema but cannot answer.
 
-#### 1. Core API (Python) - This Package
-- **Interface**: Direct Python class interface (`NL2SQL` class)
-- **Use Case**: Direct Python integration, embedded applications
-- **Access**: Import and use directly in Python code
-
-#### 2. REST API (HTTP)
-- **Package**: API package (`nl2sql-api`)
-- **Interface**: HTTP REST endpoints
-- **Use Case**: Remote clients, web applications, TypeScript CLI
-- **Access**: HTTP requests to API endpoints
-
-Both APIs provide access to the same underlying NL2SQL engine functionality, allowing flexible integration options.
-
-### Modular API Structure
-
-The engine provides modular APIs for different functionality areas:
-
-- `engine.query` - Query execution API (`run_query`, etc.)
-- `engine.datasource` - Datasource management API (`add_datasource`, `list_datasources`, etc.)
-- `engine.llm` - LLM configuration API (`configure_llm`, etc.)
-- `engine.indexing` - Schema indexing API (`index_datasource`, `clear_index`, etc.)
-- `engine.auth` - Authentication and RBAC API (`check_permissions`, `get_allowed_resources`, etc.)
-- `engine.settings` - Configuration and settings API (`get_current_settings`, `validate_configuration`, etc.)
-- `engine.results` - Result management API (`store_query_result`, `retrieve_query_result`, etc.)
-- `engine.policy` - Policy validation API (`validate_policies`, etc.)
-- `engine.benchmark` - Benchmarking API (`run_matrix`, etc.)
-
-For complete Core API documentation, see `docs/api/core.md` in this repo
-or the API section of the published MkDocs site.
-
-## 📋 Public API Classes
-
-The public API exports the following classes and types:
-
-- `NL2SQL` - Main engine class
-- `QueryResult` - Query result container
-- `UserContext` - User authentication context
-- `ErrorSeverity`, `ErrorCode`, `PipelineError` - Error handling types
-- `QueryAPI`, `DatasourceAPI`, `LLM_API`, `IndexingAPI`, `AuthAPI`, `SettingsAPI`, `ResultAPI`, `PolicyAPI`, `BenchmarkAPI` - Modular API classes
-- `BenchmarkConfig` - Benchmark configuration model
-
-## 📦 Installation
+## Install
 
 ```bash
 # Engine, CLI and adapters; sqlite works out of the box
@@ -142,100 +34,92 @@ pip install nl2sql-engine
 # Add the drivers for selected dialects
 pip install "nl2sql-engine[mysql,mssql]"
 
-# Add every database driver
+# Every database driver. Adapters only -- this does not include
+# [demo], [aws], [azure] or [hashicorp].
 pip install "nl2sql-engine[all]"
 ```
 
-## 🔖 Versioning Policy
+Requires Python 3.12+.
 
-The three distributions in this monorepo -- `nl2sql-adapter-sdk`, `nl2sql-engine` and
-`nl2sql-api` -- share a single version number and are released together. They
-pin internal dependencies to the same version to prevent mismatches.
+## Use it
 
-## 🚀 Usage (CLI)
+```python
+from nl2sql import NL2SQL
 
-The core package exposes the CLI entry point:
+engine = NL2SQL(env="demo")
+result = engine.run_query("How many employees are there?")
+
+for sq in result.sub_queries:
+    print(sq.sql)
+    print([c.name for c in sq.validation if c.passed])
+    print(sq.rows.rows[:5] if sq.rows else "plan only")
+print(result.final_answer["summary"])
+```
 
 ```bash
-python -m nl2sql.cli --query "Show me all users" --id my_postgres_db
+nl2sql setup --demo --lite                 # generate demo data and configs
+nl2sql --env demo index                    # index the schemas
+nl2sql --env demo run "..."                # ask a question
+nl2sql --env demo run --no-exec "..."      # plan and validate, touch no database
+nl2sql doctor                              # diagnose the environment
 ```
 
-## 🛡️ Architectural Invariants
+`QueryResult` carries, per sub-query, the plan, the validation checks with
+pass/fail and a reason, a capped row sample with the true total, the SQL, a
+status and a retry count; and per run, an overall status and per-node timings.
 
-| Invariant | Rationale | Mechanism |
-| :--- | :--- | :--- |
-| **No Unvalidated SQL** | Prevent hallucinations & data leaks | All plans pass through `LogicalValidator` (AST). |
-| **Zero Shared State** | Crash Safety | Execution happens in isolated processes; no shared memory with the Control Plane. |
-| **Fail-Fast** | Reliability | Circuit Breakers and Strict Timeouts prevent cascading failures (Retry Storms). |
-| **Determinism** | Debuggability | Temperature-0 generation + Strict Typing (Pydantic) for all LLM outputs. |
+## How it works
 
-## 🏗️ Pipeline Flow
+The pipeline is a compiled LangGraph: datasource resolver → decomposer → global
+planner → layer router, with a SQL-agent subgraph of schema retriever → AST
+planner → logical validator → generator → executor, plus a refiner loop for
+retryable failures.
 
-The main execution flow follows this sequence:
+The safety property is the order of those last three. The model's target is a
+recursive Pydantic `PlanModel`, not a SQL string. `LogicalValidatorNode`
+resolves every column against the retrieved schema snapshot with
+`sqlglot.optimizer.qualify`, matches joins against declared foreign keys, and
+checks every table against the caller's role policy. Only a plan that passes
+reaches the generator, which renders SQL with `sqlglot` from `exp.select()`. A
+plan that fails never becomes SQL, and the checks come back in the result so a
+UI can show which gate refused it.
 
-1. **Datasource Resolver** → **Decomposer** → **Global Planner** → **Layer Router**
-2. **SQL Agent Subgraph**: Schema Retriever → AST Planner → Logical Validator → Generator → Executor
-3. **Self-correction loops**: When validation fails, the system refines and retries
+`query_type` is `Literal["READ"]`, so only SELECTs can be produced. That is
+structural: the executor does not inspect the SQL and connections are not opened
+read-only on any dialect, so **grant the engine a read-only database user**.
 
-### SQL Agent Subgraph Details:
-- **AST Planner**: Generates Abstract Syntax Tree instead of direct SQL
-- **Logical Validator**: Enforces RBAC and schema constraints
-- **Generator**: Converts AST to dialect-specific SQL
-- **Executor**: Runs SQL in sandboxed environment
-- **Refiner**: Self-correction when validation fails
+## What it does not do
 
-## 🔐 Security Features
+- **No authentication.** The role is supplied by the caller (`--role`, or
+  `user_context` on the REST API). Put your own auth in front of anything you
+  expose and derive the role from it.
+- **No process sandbox.** The graph runs in-process on a one-worker thread pool
+  per run; a driver-level crash takes the process with it. `GLOBAL_TIMEOUT_SEC`
+  bounds how long the *caller* waits, not how long the work runs.
+- **No distributed tracing.** OpenTelemetry *metrics* (node duration, token
+  usage) exist behind `OBSERVABILITY_EXPORTER`, which defaults to `none`. No
+  spans are started; there is no Jaeger or Prometheus exporter.
+- **No row-level security or column masking.** RBAC is a per-role allowlist of
+  datasources and `datasource.table` strings.
+- **`max_bytes` is not enforced** — it is configured and reported only.
+  `row_limit` is enforced, in the generated SQL.
 
-- **RBAC System**: Role-based access control for data access
-- **Schema Validation**: All queries validated against schema before execution
-- **Sandboxed Execution**: SQL runs in isolated processes
-- **Query Limiting**: Row limits, timeout controls, and byte limits
-- **Audit Logging**: Comprehensive logging of all operations
+## Public API
 
-## 📊 Observability
+`NL2SQL` is the facade. Modular sub-APIs hang off it: `engine.query`,
+`engine.datasource`, `engine.llm`, `engine.indexing`, `engine.settings`,
+`engine.results`, `engine.policy`, `engine.benchmark`.
 
-- **OpenTelemetry Integration**: Native support for distributed tracing
-- **Metrics Collection**: Performance and operational metrics
-- **Audit Logs**: Persistent forensic logs for compliance
-- **Structured Logging**: Rich, contextual log information
+Exported types: `NL2SQL`, `QueryResult`, `UserContext`, `ErrorSeverity`,
+`ErrorCode`, `PipelineError`, `BenchmarkConfig`, and the modular API classes.
 
-## 📁 Directory Structure
+## Versioning
 
-```
-src/nl2sql/
-├── api/                  # Public API modules
-│   ├── query_api.py      # Query execution API
-│   ├── datasource_api.py # Datasource management API
-│   ├── llm_api.py       # LLM configuration API
-│   ├── indexing_api.py  # Schema indexing API
-│   ├── auth_api.py      # Authentication API
-│   ├── settings_api.py  # Settings API
-│   ├── result_api.py    # Result management API
-│   ├── policy_api.py    # Policy validation API
-│   └── benchmark_api.py # Benchmarking API
-├── auth/                # Authentication and RBAC
-├── common/              # Common utilities and settings
-├── configs/             # Configuration management
-├── adapters/            # Database adapters and the SQLAlchemy base
-├── cli/                 # `nl2sql` command line interface
-├── datasources/         # Datasource management and discovery
-├── execution/           # Execution engine and artifacts
-├── indexing/            # Schema indexing system
-├── llm/                 # LLM management
-├── pipeline/            # Graph orchestration
-│   ├── nodes/           # Individual pipeline nodes
-│   ├── subgraphs/       # Subgraph definitions
-│   └── routes/          # Routing logic
-├── schema/              # Schema management
-├── secrets/             # Secret management
-└── context.py           # Application context
-└── public_api.py        # Public API facade
-```
+`nl2sql-adapter-sdk`, `nl2sql-engine` and `nl2sql-api` share one version number
+and are released together, pinned to each other with `~=0.1`.
 
-## 📋 Configuration
+## Documentation
 
-The engine requires configuration files for:
-- `configs/datasources.yaml` - Database connection configurations
-- `configs/llm.yaml` - LLM provider configurations  
-- `configs/secrets.yaml` - Secret management configurations
-- `configs/policies.json` - RBAC policies and permissions
+Full documentation, including the known limitations of each subsystem, is in the
+repository at <https://github.com/nadeem4/nl2sql> and on the published MkDocs
+site.

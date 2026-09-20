@@ -1,5 +1,5 @@
 site_name: NL2SQL Platform
-site_description: Production-grade Natural Language to SQL Platform Documentation
+site_description: Reference documentation for the NL2SQL engine, CLI and REST API
 site_author: Platform Engineering
 
 theme:

@@ -1,26 +1,28 @@
 # NL2SQL Platform Documentation
 
-This documentation describes the **current, production-grade runtime behavior** of NL2SQL as implemented in code. It is engineered for platform engineers, system architects, and contributors who need a precise mental model of the architecture, contracts, and operational behavior.
+This documentation describes the **current runtime behavior** of NL2SQL as implemented in code, including the parts that are not implemented yet. It is written for engineers and contributors who need a precise mental model of the architecture, contracts, and operational behavior. Where a page states a limitation, the limitation is the fact; nothing here describes intent.
 
 ## Problem this system solves
 
-NL2SQL converts natural language requests into **deterministic, validated SQL** across one or more datasources. It enforces schema-grounded planning, policy constraints, and reproducible execution. The system is built for multi-datasource enterprise environments where correctness, safety, and observability matter more than conversational flexibility.
+NL2SQL converts natural language requests into **validated SQL** across one or more datasources. The model emits a typed AST, never SQL text; the AST is checked against the retrieved schema and the caller's RBAC policy before any SQL is generated. The system is built for multi-datasource environments where correctness and inspectable failure matter more than conversational flexibility.
+
+Model output itself is not reproducible; see [Determinism](architecture/determinism.md) for exactly which parts of a run are stable and which are not.
 
 ## Design philosophy
 
-- **Determinism first**: stable IDs, deterministic DAG layering, and structured ASTs ensure the same input yields the same orchestration structure.
+- **Determinism where it is achievable**: stable content-hashed IDs, sorted DAG layering, and a fixed graph topology. The LLM's output is not part of that guarantee.
 - **Schema grounding**: planning is constrained by a schema snapshot retrieved via structured chunks.
 - **Explicit validation gates**: logical validation enforces schema and RBAC constraints before execution.
 - **Modularity**: adapters, subgraphs, and executors are capability-driven and replaceable.
 - **Bounded execution**: every run is capped by a global timeout and carries a per-run cancellation token; the graph itself runs in-process on a thread pool.
-- **Observability**: structured logging, metrics, and audit events are first-class.
+- **Observability**: structured logging always; OpenTelemetry metrics and audit events when a caller attaches the pipeline callback (today, only the CLI does). See [Observability Stack](observability/stack.md).
 
 ## Non-functional goals
 
 - Reliability under partial failures (a circuit breaker on vector retrieval, SQL-agent retry semantics, errors returned as state rather than raised).
 - Extensibility via plugins and registries (datasources, subgraphs, executors).
-- Cost awareness (row limits, byte limits, optional dry run/cost estimate).
-- Security by default (RBAC, policy-based table access, audit logging).
+- Cost awareness (a row limit is baked into every generated statement; `max_bytes` is reported, not enforced).
+- Authorization at planning time (RBAC policy-based table access). The role is supplied by the caller, so the deployer owns authentication; see [Security Model](security/model.md).
 
 ## High-level flow
 

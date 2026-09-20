@@ -30,7 +30,7 @@ from nl2sql.cli.types import RunConfig
 
 app = typer.Typer(
     name="nl2sql",
-    help="Production-Grade Natural Language to SQL Engine.",
+    help="Ask a database questions in plain English. Run `nl2sql demo` to try it.",
     no_args_is_help=True,
     add_completion=False,
 )
