@@ -35,7 +35,7 @@ def build_graph(
     synthesizer_node = AnswerSynthesizerNode(ctx)
     global_planner_node = GlobalPlannerNode(ctx)
 
-    sql_agent_subgraph = build_sql_agent_graph(ctx)
+    sql_agent_subgraph = build_sql_agent_graph(ctx, execute=execute)
 
     graph.add_node("datasource_resolver", resolver_node)
     graph.add_node("decomposer", decomposer_node)
@@ -57,7 +57,7 @@ def build_graph(
     )
 
     graph.add_edge("decomposer", "global_planner")
-    route_scan_layers = build_scan_layer_router(ctx)
+    route_scan_layers = build_scan_layer_router(ctx, execute=execute)
 
     graph.add_edge("global_planner", "layer_router")
     graph.add_conditional_edges(

@@ -29,7 +29,14 @@ def resolver_route(state: GraphState) -> str:
     return "continue"
 
 
-def build_scan_layer_router(ctx: NL2SQLContext):
+def build_scan_layer_router(ctx: NL2SQLContext, execute: bool = True):
+    """Builds the router that fans sub-queries out and then moves on.
+
+    When ``execute`` is False the run stops once every scan has produced a
+    plan and SQL: aggregation and synthesis need executed rows, so the router
+    returns ``END`` instead of dispatching the aggregator.
+    """
+
     def route_scan_layers(state: GraphState):
         global_planner_response = state.global_planner_response
         dag = global_planner_response.execution_dag if global_planner_response else None
@@ -45,9 +52,7 @@ def build_scan_layer_router(ctx: NL2SQLContext):
             dag, artifact_refs, completed_scan_ids(state.subgraph_outputs)
         )
         if not target_ids:
-            return [
-                Send("aggregator",state)
-            ]
+            return [Send("aggregator", state)] if execute else END
 
         branches = []
         for node_id in target_ids:

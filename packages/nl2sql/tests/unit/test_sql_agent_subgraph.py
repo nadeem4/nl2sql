@@ -98,3 +98,20 @@ def test_sql_agent_planner_retry(monkeypatch):
 
     assert call_count["planner"] >= 2
     assert result["executor_response"] is not None
+
+
+def test_execute_false_skips_executor(monkeypatch):
+    def executor(state):
+        raise AssertionError("executor must not run when execute=False")
+
+    monkeypatch.setattr("nl2sql.pipeline.subgraphs.sql_agent.SchemaRetrieverNode", lambda _ctx: (lambda s: {"relevant_tables": []}))
+    monkeypatch.setattr("nl2sql.pipeline.subgraphs.sql_agent.ASTPlannerNode", lambda _ctx: (lambda s: {"ast_planner_response": ASTPlannerResponse(plan=_plan_ok()), "errors": []}))
+    monkeypatch.setattr("nl2sql.pipeline.subgraphs.sql_agent.LogicalValidatorNode", lambda _ctx: (lambda s: {"logical_validator_response": LogicalValidatorResponse(errors=[]), "errors": []}))
+    monkeypatch.setattr("nl2sql.pipeline.subgraphs.sql_agent.GeneratorNode", lambda _ctx: (lambda s: {"generator_response": GeneratorResponse(sql_draft="SELECT 1")}))
+    monkeypatch.setattr("nl2sql.pipeline.subgraphs.sql_agent.ExecutorNode", lambda _ctx: executor)
+    monkeypatch.setattr("nl2sql.pipeline.subgraphs.sql_agent.RefinerNode", lambda _ctx: (lambda _s: {}))
+
+    graph = build_sql_agent_graph(SimpleNamespace(), execute=False)
+    result = graph.invoke(SubgraphExecutionState(trace_id="t", sub_query=SubQuery(id="sq1", datasource_id="ds1", intent="q")))
+    assert result["generator_response"].sql_draft == "SELECT 1"
+    assert result.get("executor_response") is None
