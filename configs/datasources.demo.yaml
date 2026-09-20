@@ -1,0 +1,11 @@
+# NL2SQL Datasource Configuration
+
+version: 1
+datasources:
+- id: chinook
+  description: 'Chinook digital music store: artists, albums, tracks, genres, playlists,
+    customers, employees, invoices and invoice lines'
+  connection:
+    type: sqlite
+    database: data/chinook.sqlite
+  options: {}

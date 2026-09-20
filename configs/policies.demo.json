@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "roles": {
+    "admin": {
+      "description": "Every table",
+      "role": "admin",
+      "allowed_datasources": [
+        "*"
+      ],
+      "allowed_tables": [
+        "*"
+      ]
+    },
+    "analyst": {
+      "description": "Everything except employee records",
+      "role": "analyst",
+      "allowed_datasources": [
+        "chinook"
+      ],
+      "allowed_tables": [
+        "chinook.Album",
+        "chinook.Artist",
+        "chinook.Customer",
+        "chinook.Genre",
+        "chinook.Invoice",
+        "chinook.InvoiceLine",
+        "chinook.MediaType",
+        "chinook.Playlist",
+        "chinook.PlaylistTrack",
+        "chinook.Track"
+      ]
+    },
+    "viewer": {
+      "description": "Music catalog only, no customers or sales",
+      "role": "viewer",
+      "allowed_datasources": [
+        "chinook"
+      ],
+      "allowed_tables": [
+        "chinook.Album",
+        "chinook.Artist",
+        "chinook.Genre",
+        "chinook.MediaType",
+        "chinook.Playlist",
+        "chinook.PlaylistTrack",
+        "chinook.Track"
+      ]
+    }
+  }
+}
