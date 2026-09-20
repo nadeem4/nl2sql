@@ -77,9 +77,18 @@ class LogicalValidatorNode:
         return ".".join(parts).lower()
 
     def _normalize_name(self, value: Optional[str]) -> str:
+        """Reduces an identifier to its bare, comparable form.
+
+        Both sides of the relationship check must arrive here in the same
+        shape. Plan tables carry bare names (``Album``) while the schema
+        retriever emits relationships keyed by ``TableRef.full_name``, which is
+        delimited and qualified (``[main].[Album]``). Stripping the delimiters
+        is a de-quoting step, not a relaxation: ``[album]`` and ``album`` are
+        the same identifier, and unrelated identifiers still compare unequal.
+        """
         if not value:
             return ""
-        return value.lower().split(".")[-1]
+        return value.lower().split(".")[-1].strip().strip('[]"`')
 
     def _build_allowed_schema(
         self, state: SubgraphExecutionState

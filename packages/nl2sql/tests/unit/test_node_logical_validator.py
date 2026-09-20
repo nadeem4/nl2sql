@@ -302,3 +302,178 @@ def test_logical_validator_rejects_literal_not_in_stats():
     result = node(state)
 
     assert any(e.error_code == ErrorCode.INVALID_PLAN_STRUCTURE for e in result["errors"])
+
+
+def _album_artist_snapshot():
+    """Snapshot shaped exactly like a real one: keys and FK refs are
+    ``TableRef.full_name`` (``[schema].[Table]``), not bare table names.
+
+    Mirrors Chinook's ``Album.ArtistId -> Artist.ArtistId`` foreign key.
+    """
+    from nl2sql_adapter_sdk.schema import (
+        ColumnContract,
+        ForeignKeyContract,
+        SchemaContract,
+        SchemaMetadata,
+        SchemaSnapshot,
+        TableContract,
+        TableMetadata,
+    )
+    from nl2sql_adapter_sdk.schema import TableRef as SdkTableRef
+
+    album = SdkTableRef(schema_name="main", table_name="Album")
+    artist = SdkTableRef(schema_name="main", table_name="Artist")
+
+    return SchemaSnapshot(
+        contract=SchemaContract(
+            datasource_id="chinook",
+            engine_type="sqlite",
+            tables={
+                album.full_name: TableContract(
+                    table=album,
+                    columns={
+                        "AlbumId": ColumnContract(
+                            name="AlbumId", data_type="int", is_primary_key=True
+                        ),
+                        "ArtistId": ColumnContract(name="ArtistId", data_type="int"),
+                    },
+                    foreign_keys=[
+                        ForeignKeyContract(
+                            constrained_columns=["ArtistId"],
+                            referred_table=artist,
+                            referred_columns=["ArtistId"],
+                        )
+                    ],
+                ),
+                artist.full_name: TableContract(
+                    table=artist,
+                    columns={
+                        "ArtistId": ColumnContract(
+                            name="ArtistId", data_type="int", is_primary_key=True
+                        ),
+                        "Name": ColumnContract(name="Name", data_type="string"),
+                    },
+                    foreign_keys=[],
+                ),
+            },
+        ),
+        metadata=SchemaMetadata(
+            datasource_id="chinook",
+            engine_type="sqlite",
+            tables={
+                album.full_name: TableMetadata(table=album, row_count=347, columns={}),
+                artist.full_name: TableMetadata(table=artist, row_count=275, columns={}),
+            },
+        ),
+    )
+
+
+def _album_artist_plan():
+    """The plan for "Which artist has the most albums?" -- a legitimate FK join."""
+    return PlanModel(
+        query_type="READ",
+        tables=[
+            TableRef(name="Artist", alias="ar", ordinal=0),
+            TableRef(name="Album", alias="al", ordinal=1),
+        ],
+        select_items=[SelectItem(expr=_col("ar", "Name"), ordinal=0)],
+        joins=[
+            JoinSpec(
+                left_alias="ar",
+                right_alias="al",
+                join_type="inner",
+                ordinal=0,
+                condition=Expr(
+                    kind="binary",
+                    op="=",
+                    left=_col("ar", "ArtistId"),
+                    right=_col("al", "ArtistId"),
+                ),
+            )
+        ],
+    )
+
+
+def test_logical_validator_accepts_fk_join_from_retriever_output():
+    # A genuine FK join must validate against the relationships the schema
+    # retriever actually emits, which carry qualified ``[schema].[Table]``
+    # names while plan tables carry bare names.
+    # Arrange
+    from nl2sql.pipeline.nodes.schema_retriever.node import SchemaRetrieverNode
+
+    snapshot = _album_artist_snapshot()
+    retriever = SchemaRetrieverNode(
+        SimpleNamespace(
+            vector_store=None,
+            schema_store=SimpleNamespace(get_latest_snapshot=lambda _id: snapshot),
+        )
+    )
+    relevant_tables = retriever(
+        SubgraphExecutionState(
+            trace_id="t",
+            sub_query=SubQuery(
+                id="sq1", datasource_id="chinook", intent="which artist has the most albums"
+            ),
+        )
+    )["relevant_tables"]
+
+    state = SubgraphExecutionState(
+        trace_id="t",
+        sub_query=SubQuery(id="sq1", datasource_id="chinook", intent="q"),
+        relevant_tables=relevant_tables,
+        ast_planner_response=ASTPlannerResponse(plan=_album_artist_plan()),
+        user_context=UserContext(),
+    )
+
+    # Act
+    result = LogicalValidatorNode(_ctx())(state)
+
+    # Assert
+    assert not [
+        e
+        for e in result["errors"]
+        if e.error_code == ErrorCode.INVALID_PLAN_STRUCTURE
+    ], [e.message for e in result["errors"]]
+
+
+def test_logical_validator_still_rejects_non_fk_join_with_qualified_names():
+    # The de-quoting normalization must not make the check permissive: a join
+    # on a column pair that is NOT the foreign key is still rejected.
+    # Arrange
+    from nl2sql.pipeline.nodes.schema_retriever.node import SchemaRetrieverNode
+
+    snapshot = _album_artist_snapshot()
+    retriever = SchemaRetrieverNode(
+        SimpleNamespace(
+            vector_store=None,
+            schema_store=SimpleNamespace(get_latest_snapshot=lambda _id: snapshot),
+        )
+    )
+    relevant_tables = retriever(
+        SubgraphExecutionState(
+            trace_id="t",
+            sub_query=SubQuery(id="sq1", datasource_id="chinook", intent="x"),
+        )
+    )["relevant_tables"]
+
+    plan = _album_artist_plan()
+    # Artist.ArtistId = Album.AlbumId is not the declared foreign key.
+    plan.joins[0].condition.right = _col("al", "AlbumId")
+
+    state = SubgraphExecutionState(
+        trace_id="t",
+        sub_query=SubQuery(id="sq1", datasource_id="chinook", intent="q"),
+        relevant_tables=relevant_tables,
+        ast_planner_response=ASTPlannerResponse(plan=plan),
+        user_context=UserContext(),
+    )
+
+    # Act
+    result = LogicalValidatorNode(_ctx())(state)
+
+    # Assert
+    assert any(
+        e.error_code == ErrorCode.INVALID_PLAN_STRUCTURE
+        and e.message == "Join does not match any allowed relationship."
+        for e in result["errors"]
+    )
