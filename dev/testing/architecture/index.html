@@ -1820,14 +1820,14 @@ optional enrichment pass when no LLM is available, so tests that index real
 data run key-free.</p>
 <p><code>.github/workflows/test.yml</code> has two test jobs:</p>
 <ul>
-<li><strong><code>test</code></strong> runs <code>pytest -m "not integration"</code> across Python 3.10-3.13. This
-  is the fast job and must stay fast.</li>
+<li><strong><code>test</code></strong> runs <code>pytest -m "not integration"</code> across Python 3.12 and 3.13.
+  This is the fast job and must stay fast.</li>
 <li><strong><code>integration</code></strong> runs <code>pytest -m "integration and not llm"</code> on one Python
   version, after generating demo data with <code>nl2sql setup --demo --lite</code> and
   with <code>EMBEDDING_PROVIDER=local</code>. The ONNX model is cached across runs. That
-  subset is 28 tests, covering schema indexing, datasource resolution, schema
-  retrieval, aggregation and the local embedder against the real demo
-  databases.</li>
+  subset covers schema indexing, datasource resolution, schema retrieval,
+  aggregation and the local embedder against the real demo databases; run it
+  with <code>--collect-only -q</code> for the current list.</li>
 </ul>
 <p>Nothing selects <code>llm</code>. Those tests are run by hand with a key:</p>
 <div class="highlight"><pre><span></span><code><a href="#__codelineno-1-1" id="__codelineno-1-1" name="__codelineno-1-1"></a>nl2sql<span class="w"> </span>setup<span class="w"> </span>--demo<span class="w"> </span>--lite
