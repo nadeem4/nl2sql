@@ -33,3 +33,6 @@ demo_docker/
 # Runtime output
 logs/
 last_reasoning.json
+
+# Playground UI build dependencies (the built page itself is committed)
+node_modules/

@@ -41,6 +41,9 @@ dependencies = [
 [project.optional-dependencies]
 aws = ["boto3"]
 azure = ["azure-identity", "azure-keyvault-secrets"]
+# The browser playground `nl2sql demo` serves. The built page ships inside the
+# wheel, so this extra adds only the server.
+demo = ["fastapi>=0.100.0", "uvicorn>=0.20.0"]
 duckdb = ["duckdb", "duckdb-engine"]
 hashicorp = ["hvac"]
 mssql = [
@@ -75,3 +78,6 @@ include = ["nl2sql*"]
 [tool.setuptools.package-data]
 "*" = ["configs/*.yaml", ".env"]
 "nl2sql.cli.demo" = ["data/*.sqlite", "recordings/*.json"]
+# The committed Vite build of web/playground: the wheel must carry the finished
+# page so `pip install "nl2sql-engine[demo]"` needs no Node toolchain.
+"nl2sql.cli.demo.playground" = ["static/*"]
