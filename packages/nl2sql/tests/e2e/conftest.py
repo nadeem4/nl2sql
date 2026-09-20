@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import os
 import shutil
+import subprocess
+import sys
 import tempfile
 import uuid
 from pathlib import Path
@@ -12,6 +15,53 @@ import yaml
 from nl2sql.common.settings import settings
 from nl2sql.context import NL2SQLContext
 from nl2sql.indexing.orchestrator import IndexingOrchestrator
+from nl2sql.testing.fake_llm import FakeLLMServer
+
+CLI = [sys.executable, "-m", "nl2sql.cli.main"]
+
+
+def _base_env() -> dict:
+    env = {k: v for k, v in os.environ.items() if k not in ("OPENAI_API_KEY", "ENV", "ENV_FILE_PATH")}
+    env.update({"EMBEDDING_PROVIDER": "local", "NO_COLOR": "1", "TERM": "dumb", "COLUMNS": "200"})
+    return env
+
+
+@pytest.fixture(scope="session")
+def demo_project(tmp_path_factory):
+    """A generated lite demo (four SQLite DBs, indexed locally, no key)."""
+    root = tmp_path_factory.mktemp("demo")
+    subprocess.run(CLI + ["setup", "--demo", "--lite"], cwd=root, env=_base_env(), check=True, timeout=900)
+    return root
+
+
+@pytest.fixture
+def fake_llm(demo_project):
+    servers = []
+
+    def _make(rules):
+        server = FakeLLMServer(rules).start()
+        servers.append(server)
+        cfg = {"version": 1, "default": {"provider": "openai", "model": "gpt-4o", "temperature": 0.0,
+                                         "base_url": server.base_url, "api_key": "${env:OPENAI_API_KEY}",
+                                         "name": "default"}, "agents": {}}
+        (demo_project / "configs" / "llm.fake.yaml").write_text(yaml.safe_dump(cfg), encoding="utf-8")
+        env = _base_env()
+        env["OPENAI_API_KEY"] = "sk-fake"
+        return server, env
+
+    yield _make
+    for s in servers:
+        s.stop()
+
+
+def run_cli(root, env, *args, timeout=300):
+    # The CLI writes UTF-8 (``configure_output_encoding`` forces it). Decoding
+    # with the locale encoding instead raises UnicodeDecodeError inside
+    # subprocess' reader thread on a Windows box whose code page is cp1252, and
+    # leaves ``stdout`` as None, so name the encoding here.
+    return subprocess.run(CLI + ["--env", "demo", *args], cwd=root, env=env,
+                          capture_output=True, text=True, encoding="utf-8",
+                          errors="replace", timeout=timeout)
 
 
 def _project_root() -> Path:

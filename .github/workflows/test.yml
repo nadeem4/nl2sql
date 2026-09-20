@@ -74,8 +74,11 @@ jobs:
       - name: Generate demo data
         run: nl2sql setup --demo --lite
 
-      # 29 tests: indexing, datasource resolution, schema retrieval,
-      # aggregation, physical validation and the local embedder.
+      # Indexing, datasource resolution, schema retrieval, aggregation,
+      # physical validation and the local embedder -- plus tests/e2e, which
+      # generates its own lite demo in a temp directory and drives the whole
+      # graph through `nl2sql.testing.fake_llm`, an OpenAI-compatible fake, so
+      # a full question-to-answer run is covered here with no API key.
       - name: Run key-free integration tests
         run: pytest -m "integration and not llm"
 
