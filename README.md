@@ -93,7 +93,7 @@ flowchart TD
 
 ### Prerequisites
 
-* Python 3.9+
+* Python 3.12+
 * A configured datasource (`configs/datasources.yaml`)
 * A configured LLM (`configs/llm.yaml`)
 

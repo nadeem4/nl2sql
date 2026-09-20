@@ -13,24 +13,29 @@ tests, documentation, and adapter development.
 
 ## Prerequisites
 
-- Python 3.9+
+- Python 3.12+ (CI tests 3.12 and 3.13)
 - Docker (required for integration tests that spin up databases)
 
 ## Local setup
 
 1. Clone the repository.
-2. Create and activate a virtual environment.
-3. Install editable packages you plan to work on.
+2. Create and activate a virtual environment on a supported interpreter.
+3. Install the three packages in editable mode, plus the test tooling.
 
-Example (PowerShell):
+Example (PowerShell), using a 3.13 interpreter:
 
 ```powershell
-python -m venv venv
-.\venv\Scripts\activate
-python -m pip install -e packages/adapter-sdk
-python -m pip install -e "packages/nl2sql[postgres]"
-python -m pip install -e packages/api
+py -3.13 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install `
+    -e packages/adapter-sdk -e "packages/nl2sql[all]" -e packages/api `
+    pytest pytest-randomly httpx
 ```
+
+Swap `[all]` for a narrower extra (`[postgres]`, `[duckdb]`, ...) if you only
+need one dialect. `httpx` is listed explicitly because `packages/api` tests use
+`fastapi.testclient.TestClient`, which needs it; it currently also arrives
+transitively through the engine's dependencies, so naming it just makes the
+requirement intentional rather than accidental.
 
 ## Running tests
 
@@ -50,14 +55,18 @@ pytest packages/nl2sql/tests/unit
 order they run in fail locally instead of only in CI. Reproduce a failing run
 with the seed it prints: `pytest -p randomly --randomly-seed=<seed>`.
 
-Integration tests need generated demo data, and four modules also need a real
-LLM API key. The two are separate markers, so the key-free subset -- 29 tests,
-the same ones CI runs -- is selectable on its own:
+Integration tests need generated demo data, and some modules also need a real
+LLM API key. The two are separate markers, so the key-free subset -- the same
+selection CI runs -- can be run on its own:
 
 ```bash
 nl2sql setup --demo --lite
 EMBEDDING_PROVIDER=local pytest -m "integration and not llm"
 ```
+
+Add `--collect-only -q` to that command to see exactly which tests the subset
+covers; the count moves as tests are added, so read it from pytest rather than
+from this page.
 
 Add a key to run the rest:
 
@@ -65,7 +74,29 @@ Add a key to run the rest:
 EMBEDDING_PROVIDER=local OPENAI_API_KEY=sk-... pytest -m integration
 ```
 
+The `llm`-marked tests fail, rather than skip, without `OPENAI_API_KEY`. That
+is expected, not a regression.
+
 See `docs/testing/architecture.md` for what each marker means.
+
+### Troubleshooting: stale bytecode after moving a checkout
+
+If tests fail in a checkout you moved or renamed, and the traceback shows bare
+`>   ???` lines or file paths pointing at the *old* checkout directory, the
+cause is stale `__pycache__` bytecode that still records the previous paths --
+not the code you are looking at. Clear the caches and re-run:
+
+```bash
+find . -name "__pycache__" -type d -prune -exec rm -rf {} +
+rm -rf .pytest_cache
+```
+
+PowerShell equivalent:
+
+```powershell
+Get-ChildItem -Recurse -Directory -Filter __pycache__ | Remove-Item -Recurse -Force
+Remove-Item -Recurse -Force .pytest_cache -ErrorAction SilentlyContinue
+```
 
 ## Documentation
 

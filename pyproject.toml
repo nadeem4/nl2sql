@@ -7,7 +7,7 @@ name = "nl2sql-monorepo"
 version = "0.1.2"
 description = "Monorepo for NL2SQL Agent"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.12"
 dependencies = [
   # Runtime dependencies live in packages/nl2sql
 ]
