@@ -2080,6 +2080,11 @@ providers. The check runs on the read path only, so the fix is simply to re-run
 <td>Action on schema version mismatch: <code>warn</code>, <code>fail</code>, <code>ignore</code>.</td>
 </tr>
 <tr>
+<td><code>SCHEMA_RETRIEVAL_FULL_SNAPSHOT_MAX_TABLES</code></td>
+<td><code>15</code></td>
+<td>When a datasource's schema has at most this many tables, the schema retriever skips vector retrieval and passes the full schema snapshot (every table, every column) to the planner. Set to <code>0</code> to always use vector retrieval.</td>
+</tr>
+<tr>
 <td><code>SQL_AGENT_MAX_RETRIES</code></td>
 <td><code>3</code></td>
 <td>Max retry attempts for SQL agent refinement.</td>
