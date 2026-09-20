@@ -16,8 +16,8 @@ def doctor_command():
     # 1. Python Version
     py_ver = sys.version.split()[0]
     console.print(f"Python Version: {py_ver}")
-    if sys.version_info < (3, 9):
-        print_error("Python 3.9+ required.")
+    if sys.version_info < (3, 12):
+        print_error("Python 3.12+ required.")
     else:
         print_success("Python version OK.")
 
