@@ -136,7 +136,9 @@ def demo_command(
     record: bool,
 ) -> None:
     mode = detect_llm_mode()
-    if record and mode != "live":
+    # A reachable Ollama makes the mode "live" but gives recording nothing to
+    # proxy through, so --record asks for a key directly rather than for a mode.
+    if record and not any(os.environ.get(key) for key in PROVIDER_KEYS):
         print_error("--record needs OPENAI_API_KEY or OPENROUTER_API_KEY set.")
         raise SystemExit(1)
 

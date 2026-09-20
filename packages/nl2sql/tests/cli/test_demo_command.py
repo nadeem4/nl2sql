@@ -135,6 +135,24 @@ def test_record_without_a_key_is_refused(tmp_path, monkeypatch):
     assert "OPENAI_API_KEY" in result.output
 
 
+def test_record_needs_a_key_even_when_ollama_is_running(tmp_path, monkeypatch):
+    """Ollama makes the mode `live`, but there is nothing to record through.
+
+    `--record` proxies to an OpenAI-compatible upstream with a bearer token; a
+    reachable Ollama gave neither, so recording started with an empty key and
+    failed confusingly instead of saying what was missing.
+    """
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    monkeypatch.setattr("nl2sql.cli.commands.demo._ollama_reachable", lambda: True)
+    monkeypatch.setattr("nl2sql.cli.demo.manager.DemoManager.index_demo_data", lambda self: True)
+
+    result = runner.invoke(app, ["demo", "--dir", str(tmp_path / "d"), "--no-browser", "--record"])
+
+    assert result.exit_code == 1
+    assert "OPENAI_API_KEY" in result.output
+
+
 class _StubEngine:
     """Stands in for `NL2SQL()`; the command only reads policies off it."""
 
