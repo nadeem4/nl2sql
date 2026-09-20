@@ -60,6 +60,13 @@ This covers the embedding step only. The demo is **not** key-free end to end:
   naming the agent, the provider and the variable to set, and the chunks are
   still indexed - just with no LLM-generated descriptions. An enrichment failure
   never fails indexing.
+- Both `nl2sql setup --api-key <key>` and `nl2sql demo --api-key <key>` take the
+  key on the command line and write it into the generated env file. The provider
+  follows the key's shape: a key beginning `sk-or-` is OpenRouter and is stored
+  as `OPENROUTER_API_KEY` with `provider: openrouter`; anything else is OpenAI.
+  `.env` and `.env.*` are covered by `.gitignore`, but a key passed on the
+  command line is visible in shell history and to `ps`, so the environment
+  variable remains the more private route.
 - So `nl2sql setup --demo` and `nl2sql --env demo index` complete with no chat
   key at all, and `nl2sql index` exits `0`. It exits `1` if any datasource
   actually fails to index, which is safe to rely on in a script. A missing key

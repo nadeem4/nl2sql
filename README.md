@@ -39,9 +39,28 @@ SQL pane says so. That is the engine's one real safety property, made visible.
 
 ### What the demo needs, honestly
 
-**Answering a question needs a model.** The demo detects one of
-`OPENAI_API_KEY`, `OPENROUTER_API_KEY`, or an Ollama daemon answering on
-`localhost:11434`. With one of those it runs live.
+**Answering a question needs a model.** Pass one on the command line:
+
+```bash
+nl2sql demo --api-key sk-...
+```
+
+The key is written into the demo project's `.env.demo`, so later runs from that
+directory are live without passing it again. The provider follows the key's
+shape — an `sk-or-` key is OpenRouter, anything else is OpenAI. `.env.demo` is
+covered by `.gitignore`, but a key on the command line is visible in your shell
+history and to `ps`, so exporting the environment variable stays the more
+private route.
+
+Without the flag the demo looks for a key in a fixed order, highest first:
+
+1. `--api-key`
+2. `OPENAI_API_KEY` or `OPENROUTER_API_KEY` in the environment
+3. whichever of those is already in the demo project's `.env.demo`
+4. an Ollama daemon answering on `localhost:11434`
+5. replay
+
+The first four run live.
 
 With none of them it falls back to *replay* mode, which is meant to answer the
 guided sample questions from recorded model responses — **and no recordings are
@@ -228,6 +247,9 @@ the generated schemas. That needs no API key: `.env.demo` sets
 `EMBEDDING_PROVIDER=local`, and the LLM enrichment pass over the schema is
 optional and simply skipped without one. A key is needed to *query* the demo, so
 pass one with `--api-key` or fill in `OPENAI_API_KEY` in `.env.demo` first.
+`setup --api-key` and `demo --api-key` read the key the same way: the provider
+follows the key's shape, and an `sk-or-` key is stored as `OPENROUTER_API_KEY`
+with `provider: openrouter`.
 
 ```bash
 # Re-index after editing the demo configs

@@ -15,6 +15,7 @@ from nl2sql.configs import (
 )
 from nl2sql.configs.secrets import SecretsFileConfig
 
+from nl2sql.cli.common.api_key import env_var_for_key
 from nl2sql.cli.generators.env import EnvFileGenerator
 from nl2sql.cli.generators.datasources import DatasourceGenerator
 from nl2sql.cli.generators.llm import LLMGenerator
@@ -84,7 +85,7 @@ class DemoManager:
         
         secrets = {}
         if api_key:
-            secrets["OPENAI_API_KEY"] = api_key
+            secrets[env_var_for_key(api_key)] = api_key
             
         env_content = EnvFileGenerator.generate("demo", secrets=secrets)
         env_path = self.project_root / ".env.demo"
@@ -102,7 +103,7 @@ class DemoManager:
         # 1. Generate Data & Secrets
         secrets = self.factory.generate_secrets()
         if api_key:
-            secrets["OPENAI_API_KEY"] = api_key
+            secrets[env_var_for_key(api_key)] = api_key
             
         ref = self.factory.get_ref_data()
         ops = self.factory.get_ops_data()
@@ -159,7 +160,7 @@ class DemoManager:
         self.print_step("Writing .env.demo configuration...")
         secrets = {}
         if api_key:
-            secrets["OPENAI_API_KEY"] = api_key
+            secrets[env_var_for_key(api_key)] = api_key
 
         env_content = EnvFileGenerator.generate("demo", secrets=secrets)
         env_path = self.project_root / ".env.demo"
