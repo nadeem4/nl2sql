@@ -191,3 +191,12 @@ def test_reindexing_recovers_from_a_provider_switch(tmp_path):
     hits = reindexed.retrieve_datasource_candidates("orders")
 
     assert hits[0].page_content == "orders table"
+
+
+def test_openai_provider_without_key_raises_actionable_error(monkeypatch):
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setattr("nl2sql.indexing.embeddings.settings.openai_api_key", None)
+    monkeypatch.setattr("nl2sql.indexing.embeddings.settings.embedding_provider", "openai")
+    EmbeddingService.reset()
+    with pytest.raises(ValueError, match="EMBEDDING_PROVIDER=local"):
+        EmbeddingService.get_embeddings()

@@ -1,4 +1,5 @@
 from __future__ import annotations
+import os
 import pathlib
 from typing import Optional
 
@@ -7,7 +8,7 @@ from nl2sql.datasources import DatasourceRegistry
 from nl2sql.llm import LLMRegistry
 from nl2sql.indexing.vector_store import VectorStore
 from nl2sql.secrets import SecretManager
-from nl2sql.common.settings import settings
+from nl2sql.common.settings import reload_settings, settings
 from nl2sql.auth import RBAC
 
 from nl2sql.schema import build_schema_store
@@ -33,11 +34,24 @@ class NL2SQLContext:
         llm_config_path: Optional[pathlib.Path] = None,
         vector_store_path: Optional[pathlib.Path] = None,
         policies_config_path: Optional[pathlib.Path] = None,
+        env: Optional[str] = None,
+        env_file: Optional[pathlib.Path] = None,
     ) :
         """
         Factory method to create a context from configuration paths.
         Resolves defaults from global settings if paths are not provided.
+
+        ``env`` selects a ``.env.<env>`` file in the working directory and
+        ``env_file`` names one directly; either reloads the settings singleton
+        before anything reads it.
         """
+        if env:
+            os.environ["ENV"] = env
+        if env_file:
+            os.environ["ENV_FILE_PATH"] = str(env_file)
+        if env or env_file:
+            reload_settings()
+
         ds_config_path = ds_config_path or pathlib.Path(settings.datasource_config_path)
         secrets_config_path = secrets_config_path or pathlib.Path(settings.secrets_config_path)
         llm_config_path = llm_config_path or pathlib.Path(settings.llm_config_path)

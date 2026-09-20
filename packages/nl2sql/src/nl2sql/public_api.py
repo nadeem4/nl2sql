@@ -39,6 +39,8 @@ class NL2SQL:
         llm_config_path: Optional[Union[str, pathlib.Path]] = None,
         vector_store_path: Optional[Union[str, pathlib.Path]] = None,
         policies_config_path: Optional[Union[str, pathlib.Path]] = None,
+        env: Optional[str] = None,
+        env_file: Optional[Union[str, pathlib.Path]] = None,
     ):
         """
         Initialize the NL2SQL engine with optional configuration paths.
@@ -49,12 +51,15 @@ class NL2SQL:
             llm_config_path: Path to LLM configuration file
             vector_store_path: Path to vector store directory
             policies_config_path: Path to policies configuration file
+            env: Environment name; loads ``.env.<env>`` from the working directory
+            env_file: Path to an env file to load settings from
         """
         ds_config_path = pathlib.Path(ds_config_path) if ds_config_path else None
         secrets_config_path = pathlib.Path(secrets_config_path) if secrets_config_path else None
         llm_config_path = pathlib.Path(llm_config_path) if llm_config_path else None
         vector_store_path = pathlib.Path(vector_store_path) if vector_store_path else None
         policies_config_path = pathlib.Path(policies_config_path) if policies_config_path else None
+        env_file = pathlib.Path(env_file) if env_file else None
 
 
         self._ctx = NL2SQLContext(
@@ -63,6 +68,8 @@ class NL2SQL:
             llm_config_path=llm_config_path,
             vector_store_path=vector_store_path,
             policies_config_path=policies_config_path,
+            env=env,
+            env_file=env_file,
         )
 
         # Initialize modular APIs
