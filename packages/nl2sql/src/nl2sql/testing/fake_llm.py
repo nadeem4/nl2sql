@@ -25,6 +25,29 @@ class Rule:
     when: Optional[str] = None
 
 
+def classify_request(body: Dict[str, Any]) -> tuple:
+    """Classifies a chat.completions request body.
+
+    Returns ``(mode, name, prompt_text)`` where ``mode`` is ``"tools"``,
+    ``"json_schema"`` or ``"plain"``, ``name`` is the structured-output name the
+    client asked for (``"plain"`` for a free-text call), and ``prompt_text`` is
+    every message's content joined by newlines.
+
+    Shared with ``nl2sql.llm.replay.RecordingProxy`` so a recording is keyed
+    exactly the way the replay server later dispatches on it.
+    """
+    tools = body.get("tools") or []
+    rf = body.get("response_format") or {}
+    if tools:
+        mode, name = "tools", tools[0]["function"]["name"]
+    elif rf.get("type") == "json_schema":
+        mode, name = "json_schema", rf["json_schema"]["name"]
+    else:
+        mode, name = "plain", "plain"
+    text = "\n".join(str(m.get("content") or "") for m in body.get("messages", []))
+    return mode, name, text
+
+
 @dataclass
 class FakeLLMServer:
     rules: List[Rule]
@@ -48,15 +71,7 @@ class FakeLLMServer:
 
             def do_POST(self):
                 body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
-                tools = body.get("tools") or []
-                rf = body.get("response_format") or {}
-                if tools:
-                    mode, name = "tools", tools[0]["function"]["name"]
-                elif rf.get("type") == "json_schema":
-                    mode, name = "json_schema", rf["json_schema"]["name"]
-                else:
-                    mode, name = "plain", "plain"
-                text = "\n".join(str(m.get("content") or "") for m in body.get("messages", []))
+                mode, name, text = classify_request(body)
                 rule = next(
                     (r for r in outer.rules if r.name == name and (r.when is None or r.when in text)),
                     None,
