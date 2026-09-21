@@ -102,7 +102,7 @@ class BenchmarkAPI:
                 llm_configs["default"] = cm.load_llm(pathlib.Path(config.llm_config_path))
             else:
                 llm_configs["default"] = LLMFileConfig(
-                    default=AgentConfig(provider="openai", model="gpt-4o")
+                    default=AgentConfig(provider="openai", model="gpt-5.4")
                 )
 
         if config.stub_llm:

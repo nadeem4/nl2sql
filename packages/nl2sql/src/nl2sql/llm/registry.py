@@ -2,6 +2,7 @@ import os
 from threading import RLock
 from typing import Any, Dict, NamedTuple, Optional
 
+import openai
 from langchain_openai import ChatOpenAI
 
 from nl2sql.common.env_hint import active_env_file
@@ -51,6 +52,63 @@ PROVIDER_PRESETS: Dict[str, ProviderPreset] = {
 }
 
 
+SEED = 42
+
+
+def _rejects_temperature(exc: openai.BadRequestError) -> bool:
+    return getattr(exc, "param", None) == "temperature" or "'temperature'" in str(exc)
+
+
+class ConfiguredChatOpenAI(ChatOpenAI):
+    """``ChatOpenAI`` that explains a model's refusal of the temperature parameter.
+
+    Some models accept only their default temperature and answer anything else
+    with HTTP 400 (gpt-5.5 and gpt-5-mini did on 2026-09-20). The fix is in the
+    config, so the error says which model and which agent, and what to set.
+    Nothing is retried without the parameter: the config says what is sent.
+    """
+
+    def _explain(self, exc: openai.BadRequestError) -> ValueError:
+        agent = self.tags[0] if self.tags else "default"
+        body = exc.body if isinstance(exc.body, dict) else {}
+        reason = body.get("message") or str(exc)
+        return ValueError(
+            f"Model '{self.model_name}' (LLM agent '{agent}') rejected the temperature "
+            f"parameter (HTTP 400: {reason}) Set 'temperature: null' for agent '{agent}' "
+            "in the LLM config file so no temperature is sent to this model."
+        )
+
+    def _generate(self, *args: Any, **kwargs: Any):
+        try:
+            return super()._generate(*args, **kwargs)
+        except openai.BadRequestError as exc:
+            if _rejects_temperature(exc):
+                raise self._explain(exc) from exc
+            raise
+
+    async def _agenerate(self, *args: Any, **kwargs: Any):
+        try:
+            return await super()._agenerate(*args, **kwargs)
+        except openai.BadRequestError as exc:
+            if _rejects_temperature(exc):
+                raise self._explain(exc) from exc
+            raise
+
+
+def build_chat_client(model: str, temperature: Optional[float], **kwargs: Any) -> ConfiguredChatOpenAI:
+    """Builds a client that sends exactly the configured temperature, or none.
+
+    langchain-openai silently drops any temperature other than 1 for a model
+    whose name starts with ``gpt-5`` (its validator runs before construction).
+    gpt-5.4 accepts 0, so the temperature is set after construction and the
+    config, not the model name, decides what goes on the wire. ``None`` sends
+    no temperature at all.
+    """
+    client = ConfiguredChatOpenAI(model=model, seed=SEED, **kwargs)
+    client.temperature = temperature
+    return client
+
+
 class LLMRegistry:
 
     def __init__(self, secret_manager: SecretManager):
@@ -60,8 +118,15 @@ class LLMRegistry:
         self._lock = RLock()
 
     def register_llms(self, config: Dict[str, AgentConfig]):
-        for agent in config.values():
-            self.register_llm(agent)
+        """Registers each agent under its key in ``config``.
+
+        The key is the agent's name (``decomposer``, ``astplanner``, ...). An
+        entry's own ``name`` field defaults to 'default', so trusting it made
+        every unnamed entry under ``agents`` overwrite, and then be overwritten
+        by, the default agent.
+        """
+        for key, agent in config.items():
+            self.register_llm(agent if agent.name == key else agent.model_copy(update={"name": key}))
 
     def register_llm(self, agent: AgentConfig):
         """Validates an agent's configuration and records it for later use.
@@ -141,12 +206,11 @@ class LLMRegistry:
         base_url = agent.base_url or preset.base_url
         kwargs = {"base_url": base_url} if base_url else {}
 
-        return ChatOpenAI(
-            model=agent.model,
+        return build_chat_client(
+            agent.model,
+            agent.temperature,
             api_key=api_key,
-            temperature=agent.temperature,
             tags=[agent.name],
-            seed=42,
             **kwargs,
         )
 

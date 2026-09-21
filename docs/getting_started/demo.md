@@ -73,6 +73,14 @@ This covers the embedding step only. The demo is **not** key-free end to end:
 - `nl2sql --env demo run "..."` calls a chat model, so it needs a working LLM key
   (`OPENAI_API_KEY`, or an OpenRouter key with `configs/llm.demo.yaml` pointed at
   `provider: openrouter`).
+- The demo's model is `gpt-5.4` with `temperature: 0.0`. It replaced `gpt-4o`,
+  whose 30,000 tokens-per-minute limit on the owner's account was below one
+  question with a single retry; `gpt-5.4` had 500,000 and accepts
+  `temperature: 0`. To use a model that rejects it (`gpt-5.5`, `gpt-5-mini`),
+  set `temperature: null` in `configs/llm.demo.yaml` - see
+  [LLM configuration → Temperature](../configuration/llm.md#temperature). With an
+  OpenRouter key or Ollama, change `model` to one that provider serves: live
+  mode switches the provider, not the model name.
 - Indexing also runs an optional LLM enrichment pass over the schema. Enrichment
   is best-effort: without a usable chat key it is skipped with an `INFO` line
   naming the agent, the provider and the variable to set, and the chunks are

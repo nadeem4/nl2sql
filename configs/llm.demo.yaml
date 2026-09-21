@@ -3,7 +3,7 @@
 version: 1
 default:
   provider: openai
-  model: gpt-4o
+  model: gpt-5.4
   temperature: 0.0
   api_key: ${env:OPENAI_API_KEY}
   name: default

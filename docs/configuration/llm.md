@@ -30,7 +30,8 @@ Each LLM config supports:
 
 - `provider`: LLM provider name — `openai`, `openrouter` or `ollama`
 - `model`: model identifier (required; an empty model is rejected)
-- `temperature`: float (defaults to `0.0`)
+- `temperature`: float, or `null` to send no temperature at all (defaults to
+  `0.0`; see [Temperature](#temperature))
 - `api_key`: optional; can use `${env:VAR}` or `${provider:key}`
 - `base_url`: optional endpoint override (see [Other OpenAI-compatible
   endpoints](#other-openai-compatible-endpoints))
@@ -52,17 +53,22 @@ providers.
 
 ### OpenAI
 
+`nl2sql setup` and `nl2sql demo` write `gpt-5.4` as the OpenAI default. On the
+owner's account (probed 2026-09-20) it accepted `temperature: 0` with a limit of
+500,000 tokens per minute, against 30,000 for the previous default `gpt-4o` -
+less than one question with a single retry needs (about 33,500 tokens).
+
 ```yaml
 version: 1
 default:
   provider: openai
-  model: gpt-4o
+  model: gpt-5.4
   temperature: 0.0
   api_key: ${env:OPENAI_API_KEY}
 agents:
   indexing_enrichment:
     provider: openai
-    model: gpt-4o
+    model: gpt-5.4
     temperature: 0.0
     api_key: ${env:OPENAI_API_KEY}
 ```
@@ -126,6 +132,90 @@ different port).
     separate path (see [below](#embeddings-are-a-separate-path)), and the demo's
     other steps are unchanged.
 
+## Temperature
+
+Each agent sends exactly the `temperature` its config names, and `seed=42`:
+
+- Omitted, it is `0.0`, sent with every call. This reduces variance; it does
+  not make output reproducible (see [Determinism](../architecture/determinism.md)).
+- `temperature: null` sends **no temperature parameter at all**, so the model
+  uses its own default.
+
+Use `null` for models that accept only their default. Probed on 2026-09-20 with
+the engine's own parameters (`temperature=0`, `seed=42`, strict `json_schema`):
+
+| model | `temperature: 0` |
+| --- | --- |
+| `gpt-5.4`, `gpt-5.4-mini`, `gpt-4.1`, `gpt-4.1-mini`, `gpt-4o` | accepted |
+| `gpt-5.5`, `gpt-5-mini` | rejected: HTTP 400 *"Unsupported value: 'temperature' does not support 0.0 with this model. Only the default (1) value is supported."* |
+
+The rejected models accepted the same call without `temperature` (still with
+`seed=42`), so only the temperature needs to go. When a model rejects it, the
+first LLM call fails with an error that names the model and the agent and says
+what to set, instead of the provider's raw response:
+
+```text
+ValueError: Model 'gpt-5.5' (LLM agent 'default') rejected the temperature
+parameter (HTTP 400: Unsupported value: 'temperature' does not support 0.0 with
+this model. Only the default (1) value is supported.) Set 'temperature: null'
+for agent 'default' in the LLM config file so no temperature is sent to this
+model.
+```
+
+Nothing is retried without the parameter: what the config says is what is sent.
+
+!!! note "langchain-openai would drop it silently"
+    `langchain-openai` removes any temperature other than `1` from a model whose
+    name starts with `gpt-5` before the request is built, so `gpt-5.4` would
+    never receive the `0.0` it accepts. The registry sets the configured value
+    after the client is constructed, so the config - not the model name -
+    decides what is sent.
+
+## Per-node models
+
+The four pipeline nodes that call a model each ask the registry for their own
+agent name, and fall back to `default` when it is not configured:
+
+| agent name | node |
+| --- | --- |
+| `decomposer` | splits the question into sub-queries |
+| `astplanner` | writes the query plan (the largest prompt: it carries the schema) |
+| `refiner` | explains a failed plan so the planner can retry |
+| `answersynthesizer` | writes the final answer from the rows |
+| `indexing_enrichment` | writes schema descriptions during `nl2sql index` (optional) |
+
+The key under `agents` is the agent's name; a `name:` field is not needed. Each
+entry is a complete agent config - nothing is inherited from `default` - so
+`provider` and `model` are required, `temperature` falls back to `0.0` (not to
+the default agent's value), and a missing `api_key` falls back to the provider's
+environment variable. For example, keep `gpt-5.4` for planning and run the
+cheaper nodes on other models, one of which only accepts its default
+temperature:
+
+```yaml
+version: 1
+default:
+  provider: openai
+  model: gpt-5.4
+  temperature: 0.0
+  api_key: ${env:OPENAI_API_KEY}
+agents:
+  decomposer:
+    provider: openai
+    model: gpt-5.4-mini
+    temperature: 0.0
+    api_key: ${env:OPENAI_API_KEY}
+  answersynthesizer:
+    provider: openai
+    model: gpt-5-mini
+    temperature: null        # gpt-5-mini rejects temperature=0
+    api_key: ${env:OPENAI_API_KEY}
+```
+
+Here `astplanner` and `refiner` use `default`. The model each call actually
+used is recorded per node in `QueryResult.usage.calls` and in a run trace's
+`llm.by_node` (see [Debugging](../observability/debugging.md)).
+
 ## Other OpenAI-compatible endpoints
 
 A config-supplied `base_url` always overrides the provider preset. That is what
@@ -184,8 +274,8 @@ for the embedding step. Switching embedding providers requires a re-index. See
 
 ## Notes
 
-- `agents` overrides allow you to use specialized models for tasks like
-  indexing enrichment while keeping a single default model for query execution.
+- `agents` overrides give individual nodes, or indexing enrichment, their own
+  model and temperature; see [Per-node models](#per-node-models).
 - `indexing_enrichment` is optional. Omit it, or leave its key unset, and
   `nl2sql index` still works - the schema is indexed without LLM-written
   descriptions.

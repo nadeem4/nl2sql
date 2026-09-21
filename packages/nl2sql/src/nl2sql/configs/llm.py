@@ -12,7 +12,14 @@ class AgentConfig(BaseModel):
     """
     provider: str
     model: str
-    temperature: float = 0.0
+    temperature: Optional[float] = Field(
+        0.0,
+        description=(
+            "Sampling temperature sent with every call. Set it to null to send no "
+            "temperature at all, for models that accept only their default: on "
+            "2026-09-20 gpt-5.5 and gpt-5-mini rejected temperature=0 with HTTP 400."
+        ),
+    )
     api_key: Optional[SecretStr] = None
     base_url: Optional[str] = Field(
         None,

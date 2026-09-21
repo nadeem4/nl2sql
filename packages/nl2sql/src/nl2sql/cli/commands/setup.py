@@ -6,7 +6,13 @@ from rich.panel import Panel
 from InquirerPy import inquirer
 from InquirerPy.validator import NumberValidator
 
-from nl2sql.cli.common.api_key import env_var_for_key, provider_for_key
+from nl2sql.cli.common.api_key import (
+    DEFAULT_OPENAI_MODEL,
+    DEFAULT_OPENROUTER_MODEL,
+    default_model_for,
+    env_var_for_key,
+    provider_for_key,
+)
 from nl2sql.cli.common.decorators import handle_cli_errors
 from nl2sql.cli.console import console, print_success, print_step
 from nl2sql.cli.config import ADAPTER_DRIVERS, KNOWN_ADAPTERS
@@ -146,7 +152,7 @@ def _configure_llm(config_manager: ConfigManager, api_key: Optional[str] = None)
          console.print(f"[green]API Key provided via CLI. Creating default {provider} configuration.[/green]")
          default_agent = AgentConfig(
             provider=provider,
-            model="anthropic/claude-sonnet-4.5" if provider == "openrouter" else "gpt-4o",
+            model=default_model_for(provider),
             api_key=f"${{env:{env_var_for_key(api_key)}}}"
          )
          llm_config = LLMFileConfig(default=default_agent)
@@ -175,7 +181,7 @@ def _configure_llm(config_manager: ConfigManager, api_key: Optional[str] = None)
         api_key = inquirer.secret(message="OpenAI API Key:").execute()
         default_agent = AgentConfig(
             provider="openai",
-            model="gpt-4o",
+            model=DEFAULT_OPENAI_MODEL,
             api_key=api_key
         )
     elif provider == "openrouter":
@@ -186,7 +192,7 @@ def _configure_llm(config_manager: ConfigManager, api_key: Optional[str] = None)
         api_key = inquirer.secret(message="OpenRouter API Key:").execute()
         model = inquirer.text(
             message="OpenRouter model identifier (e.g. anthropic/claude-sonnet-4.5):",
-            default="anthropic/claude-sonnet-4.5"
+            default=DEFAULT_OPENROUTER_MODEL
         ).execute()
         env_var = "OPENROUTER_API_KEY"
         os.environ[env_var] = api_key  # available to the rest of this session
