@@ -43,3 +43,10 @@ def test_demo_env_traces_every_run_and_other_envs_keep_the_library_default():
     """The demo runs locally for its owner, so every run leaves a trace to debug from."""
     assert "TRACE_MODE=always" in EnvFileGenerator.generate("demo")
     assert "TRACE_MODE" not in EnvFileGenerator.generate("dev")
+
+
+def test_only_the_demo_opts_into_naming_the_forbidden_table_in_a_refusal():
+    """Showing the refusal is the demo's point; everywhere else the message names nothing."""
+    assert "RBAC_REFUSAL_NAMES_TABLES=true" in EnvFileGenerator.generate("demo")
+    assert "RBAC_REFUSAL_NAMES_TABLES" not in EnvFileGenerator.generate("dev")
+    assert "RBAC_REFUSAL_NAMES_TABLES" not in EnvFileGenerator.generate("prod")

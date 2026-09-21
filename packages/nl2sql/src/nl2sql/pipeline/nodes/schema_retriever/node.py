@@ -1,17 +1,18 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import Dict, Any, List, Optional, TYPE_CHECKING, Set
+from typing import Callable, Dict, Any, List, Optional, TYPE_CHECKING, Set
 
 if TYPE_CHECKING:
     from nl2sql.pipeline.state import SubgraphExecutionState
     from nl2sql.pipeline.nodes.decomposer.schemas import SubQuery
 
+from nl2sql.auth.rbac import table_allowed
 from nl2sql.common.logger import get_logger
 from nl2sql.common.settings import settings
 from nl2sql.context import NL2SQLContext
 from .schema import Table, Column
-from nl2sql_adapter_sdk.schema import SchemaSnapshot
+from nl2sql_adapter_sdk.schema import SchemaSnapshot, TableRef
 
 
 logger = get_logger("schema_retriever")
@@ -24,7 +25,23 @@ class SchemaRetrieverNode:
         self.node_name = self.__class__.__name__.lower().replace("node", "")
         self.vector_store = ctx.vector_store
         self.schema_store = ctx.schema_store
+        self.rbac = getattr(ctx, "rbac", None)
 
+    def _readable(self, state: SubgraphExecutionState, datasource_id: str) -> Callable[[TableRef], bool]:
+        """Whether the caller's role may read a table's data.
+
+        Structure yes, data no: the planner sees every table's name, columns,
+        types, keys and relationships, so a question that needs a forbidden
+        table still plans against it and the validator refuses it. What a
+        forbidden table loses is its data: sample values and column statistics
+        never reach the prompt, the LLM provider or the run trace. The same
+        ``table_allowed`` rule the validator enforces decides it. With no RBAC
+        configured nothing is readable, so the default is to strip.
+        """
+        if self.rbac is None:
+            return lambda _ref: False
+        allowed = self.rbac.get_allowed_tables(state.user_context)
+        return lambda ref: table_allowed(allowed, datasource_id, ref.table_name)
 
     def _build_semantic_query(self, sub_query: SubQuery) -> str:
         parts: List[str] = []
@@ -70,6 +87,8 @@ class SchemaRetrieverNode:
         snapshot: SchemaSnapshot,
         resolved_tables: Optional[Dict[str, Set[str]]] = None,
         schema_version: Optional[str] = None,
+        *,
+        readable: Callable[[TableRef], bool],
     ) -> List[Table]:
         if not snapshot:
             return []
@@ -91,6 +110,7 @@ class SchemaRetrieverNode:
             if not resolved_columns:
                 resolved_columns = set(table_contract.columns.keys())
 
+            with_data = readable(table_contract.table)
             columns: List[Column] = []
             for col_key, col_contract in table_contract.columns.items():
                 if col_key not in resolved_columns:
@@ -101,7 +121,11 @@ class SchemaRetrieverNode:
                     Column(
                         name=col_key,
                         type=col_contract.data_type,
-                        stats=col_metadata.statistics.model_dump() if col_metadata and col_metadata.statistics else {},
+                        stats=(
+                            col_metadata.statistics.model_dump()
+                            if with_data and col_metadata and col_metadata.statistics
+                            else {}
+                        ),
                         description=col_metadata.description if col_metadata else ""
                     )
                 )
@@ -147,10 +171,11 @@ class SchemaRetrieverNode:
             query = self._build_semantic_query(sub_query)
 
             snapshot = self._resolve_snapshot(datasource_id, schema_version)
+            readable = self._readable(state, datasource_id)
             limit = settings.schema_retrieval_full_snapshot_max_tables
             if snapshot and len(snapshot.contract.tables) <= limit:
                 tables_out = self._build_tables_from_snapshot(
-                    snapshot, resolved_tables=None, schema_version=schema_version
+                    snapshot, resolved_tables=None, schema_version=schema_version, readable=readable
                 )
                 return {
                     "relevant_tables": tables_out,
@@ -218,6 +243,7 @@ class SchemaRetrieverNode:
                     snapshot,
                     resolved_tables=None,
                     schema_version=schema_version,
+                    readable=readable,
                 )
                 return {
                     "relevant_tables": relevant_tables,
@@ -240,6 +266,7 @@ class SchemaRetrieverNode:
                 snapshot,
                 resolved_tables=tables,
                 schema_version=schema_version,
+                readable=readable,
             )
 
 

@@ -235,6 +235,16 @@ RBAC is a per-role allowlist of datasources and `datasource.table` strings, read
 from `configs/policies.json` and enforced by the validator. There is no column
 masking and no row-level security.
 
+A question that needs a table the role cannot read is **refused**, never
+answered from the tables the role can see. The planner still sees every table's
+structure (so the plan can name the forbidden table and be refused), but the
+sample values and column statistics of a forbidden table are stripped, so they
+never reach the model, the provider or the run trace. The caller is told only
+"You do not have permission to see the data this question requires."; the table
+and role go to the log and the trace (`RBAC_REFUSAL_NAMES_TABLES=true`, which
+the demo sets, names them in the message too). An unknown role, or none, is
+refused the same way.
+
 **The role is supplied by the caller** — `--role` on the CLI (default `admin`),
 `user_context` in the REST payload — and there is no authentication in this
 project. Anything you expose must sit behind your own auth, with the role

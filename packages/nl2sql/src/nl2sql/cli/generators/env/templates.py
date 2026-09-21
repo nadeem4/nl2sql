@@ -28,6 +28,11 @@ ENV_SPECIFIC_SETTINGS = {
         "# each node's inputs and outputs, and each LLM prompt and raw response.\n"
         "# Inspect one with `nl2sql trace show <file>`; the library default is on_failure.\n"
         "TRACE_MODE=always\n"
+        "\n# --- Access control ---\n"
+        "# Showing a refusal is the demo's point, so a refused question names the\n"
+        "# table and the role. Everywhere else the default message names nothing,\n"
+        "# because naming a table tells an unauthorised user that it exists.\n"
+        "RBAC_REFUSAL_NAMES_TABLES=true\n"
     ),
 }
 

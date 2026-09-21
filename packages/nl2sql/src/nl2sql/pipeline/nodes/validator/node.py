@@ -13,6 +13,7 @@ from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.pipeline.nodes.ast_planner.schemas import PlanModel, Expr
 from nl2sql.pipeline.nodes.generator.node import SqlVisitor, ordered
 from nl2sql.context import NL2SQLContext
+from nl2sql.auth.rbac import table_allowed
 from nl2sql.common.logger import get_logger
 from nl2sql.common.settings import settings
 from nl2sql.pipeline.nodes.validator.schemas import LogicalValidatorResponse, ValidationCheck
@@ -21,6 +22,11 @@ from nl2sql.pipeline.nodes.validator.schemas import LogicalValidatorResponse, Va
 logger = get_logger("logical_validator")
 
 _MAX_HINTED_COLUMNS = 15
+
+# What a caller is told when the plan needs a table their role cannot read.
+# It names nothing, so it reveals nothing about what exists; the table and
+# role go to the log and, through the error's details, the run trace.
+REFUSAL_MESSAGE = "You do not have permission to see the data this question requires."
 
 
 class ValidationSqlVisitor(SqlVisitor):
@@ -416,10 +422,13 @@ class LogicalValidatorNode:
         plan = state.ast_planner_response.plan if state.ast_planner_response else None
         errors: list[PipelineError] = []
 
-        user_ctx = state.user_context 
+        user_ctx = state.user_context
+        # An unknown role, or none, grants nothing: RBAC returns no tables and
+        # every table in the plan is refused below like any other denial.
         allowed_tables = self.rbac.get_allowed_tables(user_ctx)
-        role = ','.join(user_ctx.roles)
-        
+        roles = list(user_ctx.roles) if user_ctx else []
+        role = ','.join(roles)
+
         # Resolve Datasource ID for Namespacing
         ds_id = state.sub_query.datasource_id if state.sub_query else None
         if not ds_id:
@@ -435,29 +444,30 @@ class LogicalValidatorNode:
 
         logger.debug("Policy validation context: Role=%s, Allowed=%s", role, allowed_tables)
 
-        if "*" in allowed_tables:
-            return []
-
         for t in plan.tables:
-            # STRICT Namespacing Logic
+            # STRICT namespacing: "*", "<datasource>.*" or "<datasource>.<table>".
+            if table_allowed(allowed_tables, ds_id, t.name):
+                continue
+
             namespaced_name = f"{ds_id}.{t.name}"
-            ds_wildcard = f"{ds_id}.*"
-            
-            # Check 1: Exact Match (e.g. "sales_db.orders")
-            if namespaced_name in allowed_tables:
-                continue
-                
-            # Check 2: Datasource Wildcard (e.g. "sales_db.*")
-            if ds_wildcard in allowed_tables:
-                continue
-                
-            # If no match -> Violation
+            # The operator always gets the table and the role (log and trace);
+            # the user gets them only when the deployment opts in, because
+            # naming a table tells an unauthorised user that it exists.
+            logger.warning("Policy denied role(s) %s access to '%s'.", roles, namespaced_name)
+            if settings.rbac_refusal_names_tables:
+                message = (
+                    f"Role '{role or '(none)'}' denied access to '{namespaced_name}'. "
+                    "Policy requires explicit 'datasource.table' allow."
+                )
+            else:
+                message = REFUSAL_MESSAGE
             errors.append(
                 PipelineError(
                     node="logical_validator",
-                    message=f"Role '{role}' denied access to '{namespaced_name}'. Policy requires explicit 'datasource.table' allow.",
+                    message=message,
                     severity=ErrorSeverity.CRITICAL,
                     error_code=ErrorCode.SECURITY_VIOLATION,
+                    details={"datasource_id": ds_id, "table": namespaced_name, "roles": roles},
                 )
             )
 

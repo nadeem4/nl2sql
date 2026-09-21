@@ -63,7 +63,12 @@ visible without editing anything:
 | `viewer` | the music catalog only - no `Customer`, `Invoice`, `InvoiceLine` or `Employee` |
 
 Ask the `viewer` role about customers and the logical validator refuses the plan
-with a `SECURITY_VIOLATION` before any SQL is generated.
+with a `SECURITY_VIOLATION` before any SQL is generated. The planner saw the
+`Customer` and `Invoice` tables' columns but none of their sample values or
+statistics. `.env.demo` sets `RBAC_REFUSAL_NAMES_TABLES=true`, so the demo's
+refusal names the role and table; outside the demo the message is the generic
+"You do not have permission to see the data this question requires." See
+[Security Model](../security/model.md#strict-refusal).
 
 ### API keys in the demo
 
