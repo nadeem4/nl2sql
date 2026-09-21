@@ -16,6 +16,7 @@ from nl2sql.context import NL2SQLContext
 from nl2sql.pipeline.graph import build_graph
 from nl2sql.pipeline.state import GraphState
 from nl2sql.pipeline.timing import NodeTimingCallback
+from nl2sql.services.callbacks.token_handler import TokenUsageCallback
 
 
 def _start_keyboard_cancel_listener(
@@ -107,13 +108,18 @@ def run_with_graph(
 
     timeout_sec = settings.global_timeout_sec
     timing = NodeTimingCallback()
+    usage = TokenUsageCallback(prices=settings.llm_prices)
+
+    def _telemetry() -> Dict:
+        """Timings and token usage so far; also reported for a timed-out or cancelled run."""
+        return {"timings": dict(timing.timings), "usage": usage.usage().model_dump(mode="json")}
 
     def _invoke():
         return graph.invoke(
             initial_state.model_dump(),
             config={
                 "configurable": {"cancellation_token": token},
-                "callbacks": [*(callbacks or []), timing],
+                "callbacks": [*(callbacks or []), timing, usage],
             },
         )
 
@@ -142,6 +148,7 @@ def run_with_graph(
                     )
                 ],
                 "final_answer": "I apologize, but the request timed out. Please try again with a simpler query.",
+                **_telemetry(),
             }
 
         # Nodes observe the token and unwind, so a cancelled run returns normally.
@@ -154,10 +161,11 @@ def run_with_graph(
                         severity=ErrorSeverity.ERROR,
                         error_code=ErrorCode.CANCELLED,
                     )
-                ]
+                ],
+                **_telemetry(),
             }
         result = dict(result)
-        result["timings"] = timing.timings
+        result.update(_telemetry())
         return result
     except PipelineExecutionError as e:
         # Raised where a PipelineError cannot be returned as a value (conditional-edge

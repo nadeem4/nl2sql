@@ -140,9 +140,8 @@ class NodeHandler:
 
         self.node_active_count[node] -= 1
         if self.node_active_count[node] == 0:
-            tok_str = f" | {metrics.total_tokens} tok" if metrics.total_tokens else ""
             self.presenter.print_success(
-                f"{node} Completed ({metrics.duration:.2f}s{tok_str})"
+                f"{node} Completed ({metrics.duration:.2f}s)"
             )
             self.presenter.update_interactive_status("Thinking...")
 

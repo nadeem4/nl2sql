@@ -1,6 +1,8 @@
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any, List
 
+from nl2sql.services.callbacks.token_handler import QuestionUsage
+
 
 class QueryRequest(BaseModel):
     natural_language: str
@@ -38,3 +40,4 @@ class QueryResponse(BaseModel):
     artifact_refs: Dict[str, Dict[str, Any]] = Field(default_factory=dict)
     status: str = ""
     timings: Dict[str, float] = Field(default_factory=dict)
+    usage: QuestionUsage = Field(default_factory=QuestionUsage)

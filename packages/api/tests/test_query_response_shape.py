@@ -2,6 +2,7 @@
 
 from nl2sql.api.query_api import QueryResult, RowSample, SubQueryResult
 from nl2sql.pipeline.nodes.validator.schemas import ValidationCheck
+from nl2sql.services.callbacks.token_handler import LLMCallUsage, QuestionUsage, UsageTotals
 
 
 def _stub_result() -> QueryResult:
@@ -27,6 +28,16 @@ def _stub_result() -> QueryResult:
         trace_id="trace-1",
         status="success",
         timings={"ast_planner": 0.12},
+        usage=QuestionUsage(
+            total=UsageTotals(calls=2, input_tokens=12900, cached_input_tokens=7680, output_tokens=350,
+                              reasoning_tokens=128, total_tokens=13250, latency_s=1.5),
+            nodes={"ast_planner": UsageTotals(calls=1, input_tokens=11000, cached_input_tokens=7680,
+                                              output_tokens=300, reasoning_tokens=128, total_tokens=11300,
+                                              latency_s=1.2)},
+            calls=[LLMCallUsage(node="ast_planner", model="gpt-4o", input_tokens=11000,
+                                cached_input_tokens=7680, output_tokens=300, reasoning_tokens=128,
+                                total_tokens=11300, latency_s=1.2)],
+        ),
     )
 
 
@@ -50,6 +61,9 @@ def test_query_response_carries_plan_validation_rows_status_and_timings(api_clie
     assert sub_query["rows"] == {"columns": ["n"], "rows": [[42]], "total_rows": 1}
     assert sub_query["status"] == "success"
     assert sub_query["retry_count"] == 1
+    # The usage block is mirrored field for field.
+    assert body["usage"] == _stub_result().usage.model_dump(mode="json")
+    assert body["usage"]["nodes"]["ast_planner"]["cached_input_tokens"] == 7680
 
 
 def test_plan_only_run_reports_no_rows(api_client):

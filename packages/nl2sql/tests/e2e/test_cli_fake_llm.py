@@ -1,3 +1,5 @@
+import re
+
 import pytest
 
 from .conftest import run_cli
@@ -19,6 +21,10 @@ def test_count_customers_end_to_end(demo_project, fake_llm):
     assert "COUNT(" in r.stdout and "Customer" in r.stdout
     assert "59" in r.stdout
     assert [c["name"] for c in server.calls] == ["DecomposerResponse", "PlanModel", "AggregatedResponse"]
+    # One line totalling the question: the fake reports 1 prompt + 1 completion token per call.
+    [line] = [ln for ln in r.stdout.splitlines() if ln.startswith("LLM usage:")]
+    assert "3 calls" in line and "in 3" in line and "out 3" in line
+    assert "cached 0" in line and "reasoning 0" in line
 
 
 @pytest.mark.e2e
@@ -27,7 +33,8 @@ def test_no_exec_prints_sql_and_never_executes(demo_project, fake_llm):
     r = run_cli(demo_project, env, "run", "--no-exec", "--llm-config", "configs/llm.fake.yaml", "How many customers are there?")
     assert r.returncode == 0, r.stdout + r.stderr
     assert "COUNT(" in r.stdout
-    assert "59" not in r.stdout
+    # No count may appear, but durations such as "0.59s" legitimately can.
+    assert "59" not in re.sub(r"\d+\.\d+s\b", "", r.stdout)
     assert "AggregatedResponse" not in [c["name"] for c in server.calls]
 
 

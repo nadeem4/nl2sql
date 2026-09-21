@@ -161,3 +161,26 @@ def test_plan_only_status_when_no_artifact_and_no_errors():
         subgraph_id="sql_agent:sq1:t", sql_draft="SELECT 1", status="success",
         sub_query=SubQuery(id="sq1", intent="i", datasource_id="ds"))}}
     assert result_from_state(state).status == "plan_only"
+
+
+def test_result_carries_per_node_and_per_question_usage():
+    from nl2sql.services.callbacks.token_handler import QuestionUsage
+
+    usage = {
+        "total": {"calls": 2, "input_tokens": 12900, "cached_input_tokens": 7680, "output_tokens": 350,
+                  "reasoning_tokens": 128, "total_tokens": 13250, "latency_s": 1.5},
+        "nodes": {"ast_planner": {"calls": 1, "input_tokens": 11000, "cached_input_tokens": 7680,
+                                  "output_tokens": 300, "reasoning_tokens": 128, "total_tokens": 11300,
+                                  "latency_s": 1.2}},
+        "calls": [],
+    }
+    result = result_from_state({"trace_id": "t", "usage": usage})
+    assert isinstance(result.usage, QuestionUsage)
+    assert result.usage.total.calls == 2
+    assert result.usage.nodes["ast_planner"].cached_input_tokens == 7680
+    assert result.usage.total.cost is None
+
+
+def test_usage_defaults_to_empty_when_the_state_has_none():
+    result = result_from_state({"trace_id": "t"})
+    assert result.usage.total.calls == 0 and result.usage.nodes == {} and result.usage.calls == []

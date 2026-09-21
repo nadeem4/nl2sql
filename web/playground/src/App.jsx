@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import SchemaPanel from "./SchemaPanel.jsx";
-import { PlanPane, RowsPane, SqlPane, Timings, ValidationPane } from "./Panes.jsx";
+import { PlanPane, RowsPane, SqlPane, UsagePane, ValidationPane } from "./Panes.jsx";
 
 const REPLAY_NOTE =
   "No API key found. The guided questions run from recorded model responses; " +
@@ -135,7 +135,9 @@ export default function App() {
           <ValidationPane sub={sub} result={result} />
           <SqlPane sub={sub} />
           <RowsPane sub={sub} result={result} />
-          <Timings timings={result && result.timings} />
+          {result && (
+            <UsagePane usage={result.usage} timings={result.timings} replay={meta && meta.mode === "replay"} />
+          )}
         </div>
       </div>
     </div>

@@ -30,7 +30,9 @@ first run downloads a ~79 MB ONNX embedding model.
 
 The page shows, side by side, the retrieved **schema**, the **plan** the model
 produced, the **validation checks** with pass/fail and a reason, the generated
-**SQL**, and the **rows**. A role selector switches between `admin`, `analyst`
+**SQL**, the **rows**, and a **cost & time** table: LLM calls, tokens and seconds
+per node and for the whole question (in replay mode the token counts are
+placeholders from the recordings, not real usage). A role selector switches between `admin`, `analyst`
 and `viewer`: ask the `viewer` role about customers and the logical validator
 refuses the plan with a `SECURITY_VIOLATION`, the generator never runs, and the
 SQL pane says so. That is the engine's one real safety property, made visible.
@@ -104,7 +106,9 @@ The same script is in [`examples/01_quickstart_sqlite.py`](examples/01_quickstar
 
 `QueryResult` carries, per sub-query, the plan, the validation checks, a capped
 row sample with the true total, the SQL, a status and a retry count; and per
-run, an overall status and per-node timings. `result.errors` holds ERROR and
+run, an overall status, per-node timings and `result.usage`: LLM calls and
+input/cached/output/reasoning tokens per node and for the whole question (cost
+too, if you set `LLM_PRICES`). `result.errors` holds ERROR and
 CRITICAL entries only; warnings live in `result.warnings`.
 
 Install the drivers you need as extras:

@@ -18,11 +18,22 @@ from typing import Any, Callable, Dict, List, Optional, Union
 Payload = Union[Dict[str, Any], str, Callable[[str], Union[Dict[str, Any], str]]]
 
 
+DEFAULT_USAGE: Dict[str, Any] = {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2}
+
+
 @dataclass
 class Rule:
+    """``usage`` is the OpenAI ``usage`` object returned with each matching answer.
+
+    It defaults to one prompt and one completion token. Set it to report
+    realistic counts, including ``prompt_tokens_details.cached_tokens`` and
+    ``completion_tokens_details.reasoning_tokens``.
+    """
+
     name: str
     payload: Payload
     when: Optional[str] = None
+    usage: Optional[Dict[str, Any]] = None
 
 
 def classify_request(body: Dict[str, Any]) -> tuple:
@@ -98,7 +109,7 @@ class FakeLLMServer:
                 resp = {"id": "chatcmpl-fake", "object": "chat.completion", "created": int(time.time()),
                         "model": body.get("model", "fake"),
                         "choices": [{"index": 0, "message": msg, "finish_reason": finish}],
-                        "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2}}
+                        "usage": rule.usage or DEFAULT_USAGE}
                 out = json.dumps(resp).encode()
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
