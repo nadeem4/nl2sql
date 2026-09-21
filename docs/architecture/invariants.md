@@ -330,7 +330,7 @@ Ensures latency bounds and prevents hung requests.
 
 - Column existence enforcement can degrade to warnings when `logical_validator_strict_columns` is disabled, so missing columns do not always block execution.
 - Schema version mismatch handling is policy-driven and may only emit warnings (e.g., `schema_version_mismatch_policy=warn`), so mismatch is not always enforced as a hard failure.
-- Semantic-only checks are token based; they block a fixed list of SQL tokens rather than parsing for all possible SQL constructs.
+- Semantic-only checks are pattern based: they block a field that opens with `SELECT ... FROM`, a statement terminator and comment markers, rather than parsing for every possible SQL construct. An intent that literally reads "select ... from ..." is rejected as SQL.
 - If the vector store is unavailable, datasource resolution can return a response without errors, relying on downstream stages to detect missing candidates.
 
 ---
