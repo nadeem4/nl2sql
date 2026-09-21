@@ -1945,8 +1945,12 @@
 <li>Validate query type (READ‑only).</li>
 <li>Validate ordinals, aliases, joins, and column references.</li>
 <li>Enforce RBAC table access using strict datasource namespacing.</li>
-<li>Validate literal values against column stats (when available).</li>
 </ul>
+<p>Literal filter values are <strong>not</strong> validated against a column's sampled values.
+The adapter records at most five sample values per text column, which is a
+retrieval hint, not the column's domain; treating it as an allowlist rejected
+correct filters on any higher-cardinality column. Safety comes from the RBAC
+table allowlist and from schema resolution, neither of which depends on stats.</p>
 <p>Column resolution is delegated to <code>sqlglot</code>'s optimizer. The node converts the
 plan into a throw‑away <code>sqlglot</code> expression tree (reusing the generator's
 <code>SqlVisitor</code>) and runs <code>sqlglot.optimizer.qualify.qualify()</code> against a schema
@@ -2006,7 +2010,7 @@ was validated, not only what failed. The names are fixed and always in this orde
 </tr>
 <tr>
 <td><code>structure_and_schema</code></td>
-<td>Tables, columns, joins and literals resolve against the retrieved schema.</td>
+<td>Tables, columns and joins resolve against the retrieved schema.</td>
 </tr>
 <tr>
 <td><code>policy</code></td>
@@ -2031,7 +2035,10 @@ was validated, not only what failed. The names are fixed and always in this orde
      <code>qualify(..., validate_qualify_columns=True)</code>. On failure each distinct
      column reference is re-probed so every bad reference is reported, and
      <code>_describe_column_failure()</code> rewrites the optimizer's SQL-oriented text
-     into plan-oriented feedback the refiner can act on.</li>
+     into plan-oriented feedback the refiner can act on. ORDER BY terms are
+     wrapped in <code>exp.Ordered</code> first (<code>generator.node.ordered()</code>): sqlglot only
+     wraps an argument it has to <em>parse</em>, and a bare function node in
+     <code>Order.expressions</code> makes <code>qualify()</code> raise.</li>
 <li>Run <code>_validate_policy()</code> for RBAC enforcement. This always runs, even when
    static validation failed or raised — the security check is never skipped.</li>
 <li>If any errors are <code>ERROR</code>/<code>CRITICAL</code>, return with errors.</li>
