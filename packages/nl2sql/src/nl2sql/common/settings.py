@@ -1,6 +1,6 @@
 from typing import Dict, Literal, Optional
 import os
-from pydantic import Field
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from nl2sql.common.logger import get_logger
 
@@ -31,8 +31,10 @@ class Settings(BaseSettings):
     )
     tenant_id: str = Field(default="default_tenant", validation_alias="TENANT_ID")
     sample_questions_path: str = Field(
-        default="configs/sample_questions.yaml", 
-        validation_alias="SAMPLE_QUESTIONS",
+        default="configs/sample_questions.yaml",
+        # ROUTING_EXAMPLES is what `.env` files generated before the fix wrote
+        # (and nothing read), so folders scaffolded then keep their questions.
+        validation_alias=AliasChoices("SAMPLE_QUESTIONS", "ROUTING_EXAMPLES"),
         description="Path to the YAML file containing sample questions for routing."
     )
     policies_config_path: str = Field(

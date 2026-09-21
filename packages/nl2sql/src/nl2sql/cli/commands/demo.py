@@ -58,10 +58,11 @@ INSTALL_HINT = 'Install the demo extra: pip install "nl2sql-engine[demo]"'
 # playground, the replay recordings and the scaffolding all key off it.
 DATASET = "chinook"
 
-# `.env.demo` ships an empty `OPENAI_API_KEY=` placeholder and indexing loads it
-# with `override=True`, which blanks a real key already in the environment. Live
-# mode then silently fell back to `ollama` with no key at all, so the keys the
-# mode was chosen from are restored once scaffolding is done.
+# `.env.demo` ships an empty `OPENAI_API_KEY=` placeholder. Indexing used to load
+# it with `override=True`, which blanked a real key already in the environment,
+# so live mode fell back to `ollama` and enrichment ran with no key. Indexing now
+# keeps a key already set (`manager._load_demo_env`); restoring the keys the mode
+# was chosen from after scaffolding stays as a second guard.
 PROVIDER_KEYS = ("OPENAI_API_KEY", "OPENROUTER_API_KEY")
 
 

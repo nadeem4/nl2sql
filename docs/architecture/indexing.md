@@ -22,7 +22,7 @@ Only schema-derived chunks are indexed. There is no symbolic index, behavioral i
 
 Chunk types are defined in `nl2sql.indexing.models`:
 
-- **DatasourceChunk** (`schema.datasource`): datasource description, domains, and example questions.
+- **DatasourceChunk** (`schema.datasource`): datasource description, domains, and example questions. The description is the one in the datasources config (`description:`); it lives in the config rather than the database, so the orchestrator writes it into the snapshot's metadata, where it takes precedence over any description the adapter or enrichment produced. Example questions come from the `SAMPLE_QUESTIONS` file.
 - **TableChunk** (`schema.table`): table name, PKs, column list, FK summaries, row counts.
 - **ColumnChunk** (`schema.column`): column type, stats, synonyms, PII flags.
 - **RelationshipChunk** (`schema.relationship`): FK relationships, columns, cardinality.
