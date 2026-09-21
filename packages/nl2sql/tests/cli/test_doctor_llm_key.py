@@ -48,6 +48,23 @@ def test_doctor_reports_missing_llm_key_and_names_the_env_file(
     assert "MISSING" in result.output
 
 
+def test_doctor_reports_a_key_present_without_printing_it(tmp_path, monkeypatch):
+    """Settings hold the key as SecretStr; doctor still sees it and never prints it."""
+    fake_key = "-".join(["sk", "proj", "doctorneverprint" + "d" * 24 + "8c2e"])
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("COLUMNS", "200")
+    monkeypatch.setenv("OPENAI_API_KEY", fake_key)
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    DemoManager(Console(quiet=True), tmp_path).setup_chinook(api_key=fake_key)
+
+    result = runner.invoke(app, ["--env", "demo", "doctor"])
+
+    assert result.exit_code == 0, result.output
+    assert "key found" in result.output
+    assert "MISSING: LLM" not in result.output
+    assert fake_key not in result.output
+
+
 def test_doctor_reports_llm_key_present(demo_configs_in_cwd, monkeypatch):
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
 

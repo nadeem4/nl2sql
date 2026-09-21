@@ -16,7 +16,7 @@ from importlib import metadata
 from typing import Any, Dict, Iterable, Optional, Set
 
 from nl2sql.common.logger import get_logger
-from nl2sql.common.settings import settings
+from nl2sql.common.settings import secret_value, settings
 from nl2sql.tracing.document import (
     TRACE_FORMAT_VERSION,
     Limits,
@@ -60,9 +60,9 @@ def collect_secrets(ctx: Any) -> Set[str]:
         if value and _SECRET_ENV.search(name):
             found.add(value)
     for name in ("openai_api_key", "result_artifact_adls_connection_string"):
-        value = getattr(settings, name, None)
+        value = secret_value(getattr(settings, name, None))
         if value:
-            found.add(str(value))
+            found.add(value)
     for registry_name in ("llm_registry", "ds_registry"):
         registry = getattr(ctx, registry_name, None)
         manager = getattr(registry, "secret_manager", None)
@@ -77,8 +77,9 @@ def collect_secrets(ctx: Any) -> Set[str]:
 
 def settings_snapshot() -> Dict[str, Any]:
     """The settings in force, without any field that could hold a credential."""
-    data = settings.model_dump(mode="json")
-    return {k: v for k, v in data.items() if not _SECRET_SETTING.search(k)}
+    # Excluded before dumping, so a secret field is never even serialized.
+    secret_fields = {k for k in type(settings).model_fields if _SECRET_SETTING.search(k)}
+    return settings.model_dump(mode="json", exclude=secret_fields)
 
 
 def _llm_configs(ctx: Any) -> Dict[str, Any]:

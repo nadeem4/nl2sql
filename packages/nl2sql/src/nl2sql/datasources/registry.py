@@ -5,16 +5,11 @@ from nl2sql_adapter_sdk.capabilities import DatasourceCapability
 from nl2sql.datasources.discovery import discover_adapters
 from nl2sql.datasources.protocols import DatasourceAdapterProtocol
 from nl2sql.secrets import SecretManager
-from .models import DatasourceConfig, ConnectionConfig
+from .models import DatasourceConfig, ConnectionConfig, SECRET_ARG_HINTS, _is_secret_arg  # noqa: F401
 
 # Resolved connection args hold plaintext secrets (see ``resolved_connection``),
 # so anything that renders them -- an API payload, a `doctor` row, a pydantic
 # ValidationError repr -- has to mask them by name first.
-SECRET_ARG_HINTS = ("password", "secret", "token", "api_key")
-
-
-def _is_secret_arg(key: str) -> bool:
-    return any(hint in key.lower() for hint in SECRET_ARG_HINTS)
 
 
 def mask_connection_args(connection_args: Dict[str, Any]) -> Dict[str, Any]:

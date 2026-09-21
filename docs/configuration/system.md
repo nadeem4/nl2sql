@@ -8,7 +8,7 @@ Configuration is split into **environment variables** (runtime settings) and **f
 
 | Env var | Default | Description |
 | --- | --- | --- |
-| `OPENAI_API_KEY` | `—` | OpenAI API key. Used for chat when `provider: openai`, and for embeddings when `EMBEDDING_PROVIDER=openai` (the default). |
+| `OPENAI_API_KEY` | `—` | OpenAI API key (held as `SecretStr`: never printed). Used for chat when `provider: openai`, and for embeddings when `EMBEDDING_PROVIDER=openai` (the default). |
 | `EMBEDDING_PROVIDER` | `openai` | Embedding backend: `openai` (needs `OPENAI_API_KEY`) or `local` (key-free ONNX `all-MiniLM-L6-v2` bundled with chromadb). |
 | `EMBEDDING_MODEL` | `text-embedding-3-small` | OpenAI embedding model. Ignored when `EMBEDDING_PROVIDER=local`. |
 | `LLM_CONFIG` | `configs/llm.yaml` | Path to the LLM config file. |
@@ -67,7 +67,7 @@ providers. The check runs on the read path only, so the fix is simply to re-run
 | `RESULT_ARTIFACT_S3_PREFIX` | `—` | S3 prefix for artifact storage. |
 | `RESULT_ARTIFACT_ADLS_ACCOUNT` | `—` | ADLS storage account name. |
 | `RESULT_ARTIFACT_ADLS_CONTAINER` | `—` | ADLS container name. |
-| `RESULT_ARTIFACT_ADLS_CONNECTION_STRING` | `—` | ADLS connection string, if using key-based auth. |
+| `RESULT_ARTIFACT_ADLS_CONNECTION_STRING` | `—` | ADLS connection string, if using key-based auth (held as `SecretStr`: never printed). |
 
 ### Execution
 
