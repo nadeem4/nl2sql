@@ -1,6 +1,6 @@
 """``nl2sql doctor`` must answer the first question a stuck new user has.
 
-The PyPI install trial got as far as ``nl2sql setup --demo --lite`` and then
+The PyPI install trial got as far as ``nl2sql setup --demo`` and then
 ran a query, which died on a missing ``OPENAI_API_KEY``. ``doctor`` reported
 Python, the adapters and connectivity -- everything except the one thing that
 was actually wrong -- so the user had no way to find out from the tool which
@@ -21,7 +21,7 @@ runner = CliRunner()
 
 @pytest.fixture()
 def demo_configs_in_cwd(tmp_path, monkeypatch):
-    """A throwaway project root holding a freshly generated lite demo.
+    """A throwaway project root holding a freshly generated Chinook demo.
 
     ``--env demo`` resolves every config path out of the generated
     ``.env.demo``, so the command has to run with that directory as the cwd,
@@ -31,7 +31,7 @@ def demo_configs_in_cwd(tmp_path, monkeypatch):
     # Rich wraps to the terminal width; a narrow default would split the
     # strings these tests look for across lines.
     monkeypatch.setenv("COLUMNS", "200")
-    DemoManager(Console(quiet=True), tmp_path).setup_lite()
+    DemoManager(Console(quiet=True), tmp_path).setup_chinook()
     return tmp_path
 
 

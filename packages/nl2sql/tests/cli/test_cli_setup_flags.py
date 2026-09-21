@@ -1,3 +1,10 @@
+"""`nl2sql setup --demo` scaffolds the one demo dataset there is.
+
+`--lite` and `--docker` chose between the manufacturing SQLite files and the
+manufacturing Compose stack. Both datasets are gone, so both flags are gone:
+the tests below pin that they are rejected rather than silently ignored.
+"""
+
 from __future__ import annotations
 
 import re
@@ -22,20 +29,7 @@ def _plain(output: str) -> str:
     return _ANSI.sub("", output)
 
 
-def test_lite_flag_is_accepted(monkeypatch):
-    captured = {}
-    monkeypatch.setattr(
-        "nl2sql.cli.main.setup_command", lambda **kwargs: captured.update(kwargs)
-    )
-
-    result = runner.invoke(app, ["setup", "--demo", "--lite"])
-
-    assert result.exit_code == 0, result.output
-    assert captured["lite"] is True
-    assert captured["docker"] is False
-
-
-def test_lite_defaults_to_true_without_docker(monkeypatch):
+def test_demo_flag_reaches_the_command(monkeypatch):
     captured = {}
     monkeypatch.setattr(
         "nl2sql.cli.main.setup_command", lambda **kwargs: captured.update(kwargs)
@@ -44,28 +38,34 @@ def test_lite_defaults_to_true_without_docker(monkeypatch):
     result = runner.invoke(app, ["setup", "--demo"])
 
     assert result.exit_code == 0, result.output
-    assert captured["lite"] is True
+    assert captured == {"demo": True, "api_key": None}
 
 
-def test_docker_flag_disables_lite(monkeypatch):
+def test_setup_without_demo_runs_the_wizard(monkeypatch):
     captured = {}
     monkeypatch.setattr(
         "nl2sql.cli.main.setup_command", lambda **kwargs: captured.update(kwargs)
     )
 
-    result = runner.invoke(app, ["setup", "--demo", "--docker"])
+    result = runner.invoke(app, ["setup"])
 
     assert result.exit_code == 0, result.output
-    assert captured["lite"] is False
-    assert captured["docker"] is True
+    assert captured["demo"] is False
 
 
-def test_lite_and_docker_together_is_an_error(monkeypatch):
+def test_lite_is_no_longer_an_option(monkeypatch):
     monkeypatch.setattr("nl2sql.cli.main.setup_command", lambda **kwargs: None)
 
-    result = runner.invoke(app, ["setup", "--demo", "--lite", "--docker"])
+    result = runner.invoke(app, ["setup", "--demo", "--lite"])
 
     assert result.exit_code != 0
-    output = _plain(result.output)
-    assert "mutually exclusive" in output
-    assert "--lite" in output and "--docker" in output
+    assert "--lite" in _plain(result.output)
+
+
+def test_docker_is_no_longer_an_option(monkeypatch):
+    monkeypatch.setattr("nl2sql.cli.main.setup_command", lambda **kwargs: None)
+
+    result = runner.invoke(app, ["setup", "--demo", "--docker"])
+
+    assert result.exit_code != 0
+    assert "--docker" in _plain(result.output)

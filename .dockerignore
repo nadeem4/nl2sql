@@ -42,6 +42,5 @@ chroma_db
 data
 logs
 artifacts
-demo_docker
 .env
 .env.*

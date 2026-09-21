@@ -28,9 +28,9 @@ def _base_env() -> dict:
 
 @pytest.fixture(scope="session")
 def demo_project(tmp_path_factory):
-    """A generated lite demo (four SQLite DBs, indexed locally, no key)."""
+    """A generated Chinook demo (one SQLite DB, indexed locally, no key)."""
     root = tmp_path_factory.mktemp("demo")
-    subprocess.run(CLI + ["setup", "--demo", "--lite"], cwd=root, env=_base_env(), check=True, timeout=900)
+    subprocess.run(CLI + ["setup", "--demo"], cwd=root, env=_base_env(), check=True, timeout=900)
     return root
 
 
@@ -84,7 +84,16 @@ def _demo_config_paths(root: Path, secrets_config_path: Path) -> dict[str, Path]
 
 
 def _load_sample_questions(root: Path) -> dict[str, list[str]]:
+    """The demo's guided questions, or nothing if the demo is not generated.
+
+    This is read during *collection*, which happens before ``-m`` deselects
+    anything, so a missing file would error the whole module for every
+    selection -- including the unit job, which never runs these tests.
+    Returning empty leaves the parametrised tests with no cases instead.
+    """
     config_path = root / "configs" / "sample_questions.demo.yaml"
+    if not config_path.exists():
+        return {}
     payload = yaml.safe_load(config_path.read_text(encoding="utf-8"))
     return payload or {}
 

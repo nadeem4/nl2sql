@@ -43,6 +43,10 @@ RECORDINGS = pathlib.Path(__file__).resolve().parent.parent / "demo" / "recordin
 
 INSTALL_HINT = 'Install the demo extra: pip install "nl2sql-engine[demo]"'
 
+# The only demo dataset. Kept as a name rather than inlined because the
+# playground, the replay recordings and the scaffolding all key off it.
+DATASET = "chinook"
+
 # `.env.demo` ships an empty `OPENAI_API_KEY=` placeholder and indexing loads it
 # with `override=True`, which blanks a real key already in the environment. Live
 # mode then silently fell back to `ollama` with no key at all, so the keys the
@@ -156,15 +160,12 @@ def _persist_api_key(path: pathlib.Path, key: str) -> None:
     path.write_text("\n".join(kept) + "\n", encoding="utf-8")
 
 
-def prepare_project(directory: pathlib.Path, dataset: str) -> pathlib.Path:
+def prepare_project(directory: pathlib.Path) -> pathlib.Path:
     directory.mkdir(parents=True, exist_ok=True)
     manager = DemoManager(console, directory)
     if not (directory / "configs" / "datasources.demo.yaml").exists():
-        print_step(f"Writing the {dataset} demo project to {directory}")
-        if dataset == "chinook":
-            manager.setup_chinook()
-        else:
-            manager.setup_lite()
+        print_step(f"Writing the {DATASET} demo project to {directory}")
+        manager.setup_chinook()
     if not (directory / "data" / "vector_store_demo").exists():
         print_step("Indexing the schema (first run downloads a 79 MB embedding model)")
         manager.index_demo_data()
@@ -195,14 +196,6 @@ def _build_engine():
     return NL2SQL()
 
 
-def _manufacturing_questions(directory: pathlib.Path) -> List[str]:
-    path = directory / "configs" / "sample_questions.demo.yaml"
-    if not path.exists():
-        return []
-    grouped = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-    return [q for questions in grouped.values() for q in questions]
-
-
 def _record_all(engine, questions: List[str], proxy, store: ReplayStore, store_path: pathlib.Path) -> None:
     """Drives every guided question through the proxy so replay has an answer."""
     from nl2sql.auth.models import UserContext
@@ -226,7 +219,6 @@ def _record_all(engine, questions: List[str], proxy, store: ReplayStore, store_p
 
 @handle_cli_errors
 def demo_command(
-    dataset: str,
     directory: pathlib.Path,
     host: str,
     port: int,
@@ -259,7 +251,7 @@ def demo_command(
         raise SystemExit(1)
 
     preserved = {key: os.environ[key] for key in PROVIDER_KEYS if os.environ.get(key)}
-    directory = prepare_project(directory, dataset)
+    directory = prepare_project(directory)
     for key, value in preserved.items():
         if not os.environ.get(key):
             os.environ[key] = value
@@ -288,7 +280,7 @@ def demo_command(
         os.environ["OPENAI_API_KEY"] = os.environ.get("OPENAI_API_KEY") or "proxy"
         console.print("[bold]Recording mode:[/bold] running the sample questions through the real provider.")
     elif mode == "replay":
-        recordings = RECORDINGS / f"{dataset}.json"
+        recordings = RECORDINGS / f"{DATASET}.json"
         store = ReplayStore.load(recordings) if recordings.exists() else ReplayStore()
         replay_server = FakeLLMServer(store.rules()).start()
         _point_llm_config_at(directory, replay_server.base_url)
@@ -311,7 +303,7 @@ def demo_command(
         raise SystemExit(1)
 
     engine = _build_engine()
-    questions = CHINOOK_QUESTIONS if dataset == "chinook" else _manufacturing_questions(directory)
+    questions = list(CHINOOK_QUESTIONS)
     roles = list(engine.context.policies_cfg.roles)
 
     if record:
@@ -323,7 +315,7 @@ def demo_command(
         questions=questions,
         roles=roles,
         mode="replay" if replay_server else "live",
-        dataset=dataset,
+        dataset=DATASET,
     )
     url = f"http://{host}:{port}/"
     print_success(f"Playground ready at {url}")

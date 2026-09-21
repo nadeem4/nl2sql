@@ -2,14 +2,13 @@ from typing import Dict, Any, List, Optional
 import importlib.resources
 import pathlib
 import shutil
-import subprocess
 import yaml
 from rich.console import Console
 from rich.markup import escape
 from nl2sql.configs import (
-    ConfigManager, 
-    LLMFileConfig, 
-    DatasourceConfig, 
+    ConfigManager,
+    LLMFileConfig,
+    DatasourceConfig,
     DatasourceFileConfig,
     PolicyFileConfig
 )
@@ -21,120 +20,26 @@ from nl2sql.cli.generators.datasources import DatasourceGenerator
 from nl2sql.cli.generators.llm import LLMGenerator
 from nl2sql.cli.generators.policies import PolicyGenerator
 
-from .factory import DemoDataFactory
-from .writers.sqlite import SQLiteWriter
-from .writers.docker import DockerWriter
 from .chinook import CHINOOK_DATASOURCE, CHINOOK_POLICIES, CHINOOK_QUESTIONS
-from .defaults import (
-    SAMPLE_QUESTIONS, 
-    DEMO_POLICIES,
-    DEMO_LLM_CONFIG,
-    DEMO_LITE_DATASOURCES,
-    DEMO_DOCKER_DATASOURCES
-)
+from .defaults import DEMO_LLM_CONFIG
+
 
 class DemoManager:
-    """
-    Manages the creation of the Demo Environment (Lite or Docker).
-    Orchestrates Data Factory, Writers, and Generators.
-    """
+    """Creates the demo project: the Chinook database, its configs and `.env.demo`."""
 
     def __init__(self, console: Console, project_root: pathlib.Path):
         self.console = console
         self.project_root = project_root
         self.config_manager = ConfigManager(project_root)
-        self.factory = DemoDataFactory(seed=42)
 
     def print_step(self, msg: str):
         self.console.print(f"[dim]{escape(str(msg))}[/dim]")
-    
+
     def print_success(self, msg: str):
         self.console.print(f"[green][OK][/green] {escape(str(msg))}")
 
     def print_error(self, msg: str):
         self.console.print(f"[red][ERROR] {escape(str(msg))}[/red]")
-
-    def setup_lite(self, api_key: Optional[str] = None):
-        """Sets up the SQLite-based demo environment."""
-        data_dir = self.project_root / "data" / "demo_lite"
-        self.print_step(f"Generating SQLite Databases in {data_dir}...")
-        
-        # 1. Generate Data
-        ref = self.factory.get_ref_data()
-        ops = self.factory.get_ops_data()
-        supply = self.factory.get_supply_data()
-        history = self.factory.get_history_data()
-        
-        # 2. Write DBs
-        SQLiteWriter.write_lite(data_dir, ref, ops, supply, history)
-        
-        configs = DEMO_LITE_DATASOURCES
-        
-        # Write using Generator (Strict Typed)
-        ds_configs = [DatasourceConfig(**c) for c in configs]
-        file_config = DatasourceFileConfig(datasources=ds_configs)
-        content = DatasourceGenerator.generate(file_config)
-        ds_path = self.project_root / "configs" / "datasources.demo.yaml"
-        ds_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(ds_path, "w", encoding="utf-8") as f:
-            f.write(content)
-        
-        self._write_common_artifacts(DEMO_POLICIES, SAMPLE_QUESTIONS)
-        
-        self.print_step("Writing .env.demo configuration...")
-        
-        secrets = {}
-        if api_key:
-            secrets[env_var_for_key(api_key)] = api_key
-            
-        env_content = EnvFileGenerator.generate("demo", secrets=secrets)
-        env_path = self.project_root / ".env.demo"
-        with open(env_path, "w", encoding="utf-8") as f:
-            f.write(env_content)
-            
-        self.print_success("Lite Demo Setup Complete")
-
-
-    def setup_docker(self, api_key: Optional[str] = None):
-        """Sets up the Docker-based demo environment."""
-        docker_dir = self.project_root / "demo_docker"
-        self.print_step(f"Generating Docker Configuration in {docker_dir}...")
-        
-        # 1. Generate Data & Secrets
-        secrets = self.factory.generate_secrets()
-        if api_key:
-            secrets[env_var_for_key(api_key)] = api_key
-            
-        ref = self.factory.get_ref_data()
-        ops = self.factory.get_ops_data()
-        supply = self.factory.get_supply_data()
-        history = self.factory.get_history_data()
-        
-        # 2. Write Artifacts
-        DockerWriter.write_docker(docker_dir, secrets, ref, ops, supply, history)
-        
-        self.print_step("Writing datasources config...")
-        # Use defaults from configuration
-        configs = DEMO_DOCKER_DATASOURCES
-        
-
-        ds_configs = [DatasourceConfig(**c) for c in configs]
-        file_config = DatasourceFileConfig(datasources=ds_configs)
-        content = DatasourceGenerator.generate(file_config)
-        ds_path = self.project_root / "configs" / "datasources.demo.yaml"
-        ds_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(ds_path, "w", encoding="utf-8") as f:
-            f.write(content)
-            
-        self._write_common_artifacts(DEMO_POLICIES, SAMPLE_QUESTIONS)
-        
-        # The app container reads the same .env.demo the lite path writes, so it
-        # has to exist before `docker compose up` (and before `docker compose config`).
-        self.print_step("Writing .env.demo configuration...")
-        self.copy_docker_env_to_root(docker_dir)
-        
-        self.print_success("Docker Configuration Generated")
-        return docker_dir
 
     def setup_chinook(self, api_key: Optional[str] = None):
         """Sets up the Chinook (digital music store) demo environment."""
@@ -175,18 +80,18 @@ class DemoManager:
         policy_config = PolicyFileConfig(roles=policies)
         content = PolicyGenerator.generate(policy_config)
         policy_path = self.project_root / "configs" / "policies.demo.json"
-        
+
         if not policy_path.parent.exists():
              policy_path.parent.mkdir(parents=True, exist_ok=True)
-             
+
         with open(policy_path, "w", encoding="utf-8") as f:
             f.write(content)
-        
+
         self.print_step("Writing sample questions...")
         samples_path = self.project_root / "configs" / "sample_questions.demo.yaml"
         with open(samples_path, "w") as f:
             yaml.dump(questions, f, sort_keys=False)
-            
+
         self.print_step("Writing LLM config...")
         llm_config = LLMFileConfig(**DEMO_LLM_CONFIG)
         content = LLMGenerator.generate(llm_config)
@@ -195,52 +100,11 @@ class DemoManager:
             f.write(content)
 
         # Every generated `.env.demo` sets SECRETS_CONFIG, so the envelope has
-        # to exist for all three demos even though none configures a secret
-        # provider. Only the Chinook path used to write it.
+        # to exist even though the demo configures no secret provider.
         self.print_step("Writing secrets envelope...")
         secrets_path = self.project_root / "configs" / "secrets.demo.yaml"
         with open(secrets_path, "w", encoding="utf-8") as f:
             yaml.safe_dump(SecretsFileConfig().model_dump(), f, sort_keys=False)
-            
-    def start_docker_containers(self, docker_dir: pathlib.Path) -> bool:
-        """Starts the docker containers using subprocess."""
-        try:
-            subprocess.run(
-                ["docker", "compose", "-f", "docker-compose.demo.yml", "up", "-d"],
-                cwd=docker_dir,
-                check=True
-            )
-            return True
-        except Exception as e:
-            self.print_error(f"Failed to start Docker: {e}")
-            return False
-
-    def copy_docker_env_to_root(self, docker_dir: pathlib.Path) -> bool:
-        """Copies the generated .env from docker dir to project root as .env.demo, using Protocol."""
-        try:
-            src = docker_dir / ".env"
-            dest = self.project_root / ".env.demo"
-            
-            # Read secrets from source env
-            secrets = {}
-            if src.exists():
-                with open(src, "r", encoding="utf-8") as f:
-                    for line in f:
-                        line = line.strip()
-                        if line and not line.startswith("#") and "=" in line:
-                            k, v = line.split("=", 1)
-                            secrets[k.strip()] = v.strip()
-            
-            # Generate Standard Env Content with secrets injected
-            content = EnvFileGenerator.generate("demo", secrets=secrets)
-            
-            # Write content
-            with open(dest, "w", encoding="utf-8") as f:
-                f.write(content)
-                
-            return True
-        except Exception:
-            return False
 
     def index_demo_data(self):
         """Triggers the indexing process for the demo."""

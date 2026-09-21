@@ -19,8 +19,10 @@ to use the platform:
 All paths require configuration files. Start with the example configs:
 
 - `configs/datasources.example.yaml` → copy to `configs/datasources.yaml`
-- `configs/llm.example.yaml` → copy to `configs/llm.yaml`
 - `configs/policies.example.json` → copy to `configs/policies.json`
-- `configs/secrets.example.yaml` → copy to `configs/secrets.yaml` (optional)
+
+There is no shipped example for `configs/llm.yaml` or `configs/secrets.yaml`;
+write them from the schemas in [LLMs](../configuration/llm.md) and
+[Secrets](../configuration/secrets.md), or let `nl2sql setup` generate them.
 
 See `configuration/system.md` for environment variables and defaults.

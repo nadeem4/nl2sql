@@ -2,27 +2,10 @@
 
 version: 1
 datasources:
-- id: manufacturing_ref
-  description: Master Data (Factories)
+- id: chinook
+  description: 'Chinook digital music store: artists, albums, tracks, genres, playlists,
+    customers, employees, invoices and invoice lines'
   connection:
     type: sqlite
-    database: data/demo_lite/manufacturing_ref.db
-  options: {}
-- id: manufacturing_ops
-  description: Operational Data (Employees, Machines)
-  connection:
-    type: sqlite
-    database: data/demo_lite/manufacturing_ops.db
-  options: {}
-- id: manufacturing_supply
-  description: Supply Chain (Inventory)
-  connection:
-    type: sqlite
-    database: data/demo_lite/manufacturing_supply.db
-  options: {}
-- id: manufacturing_history
-  description: Historical Data (Sales)
-  connection:
-    type: sqlite
-    database: data/demo_lite/manufacturing_history.db
+    database: data/chinook.sqlite
   options: {}

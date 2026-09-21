@@ -9,7 +9,7 @@ import pytest
 pytest.importorskip("fastapi")
 pytest.importorskip("nl2sql_api")
 
-from .recordings_manufacturing import RULES_COUNT_EMPLOYEES  # noqa: E402
+from .recordings_chinook import RULES_COUNT_CUSTOMERS  # noqa: E402
 
 
 @pytest.mark.e2e
@@ -19,7 +19,7 @@ def test_query_route_returns_sql(demo_project, fake_llm, monkeypatch):
     from nl2sql.common.settings import reload_settings
     from nl2sql_api.main import app
 
-    server, env = fake_llm(RULES_COUNT_EMPLOYEES)
+    server, env = fake_llm(RULES_COUNT_CUSTOMERS)
     monkeypatch.chdir(demo_project)
     for key, value in env.items():
         monkeypatch.setenv(key, value)
@@ -33,7 +33,7 @@ def test_query_route_returns_sql(demo_project, fake_llm, monkeypatch):
             response = client.post(
                 "/api/v1/query",
                 json={
-                    "natural_language": "How many employees are there?",
+                    "natural_language": "How many customers are there?",
                     "user_context": {"roles": ["admin"]},
                 },
             )

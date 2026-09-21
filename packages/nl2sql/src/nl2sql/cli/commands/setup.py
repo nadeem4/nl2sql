@@ -8,7 +8,6 @@ from InquirerPy.validator import NumberValidator
 
 from nl2sql.cli.common.api_key import env_var_for_key, provider_for_key
 from nl2sql.cli.common.decorators import handle_cli_errors
-from nl2sql.cli.common.prompts import confirm
 from nl2sql.cli.console import console, print_success, print_step
 from nl2sql.cli.config import ADAPTER_DRIVERS, KNOWN_ADAPTERS
 from nl2sql.cli.commands.install import install_package
@@ -355,54 +354,21 @@ def _run_indexing_step():
 
 
 @handle_cli_errors
-def setup_command(demo: bool = False, lite: bool = True, docker: bool = False, api_key: Optional[str] = None):
-    
+def setup_command(demo: bool = False, api_key: Optional[str] = None):
+
     # Instantiate Managers
     config_manager = ConfigManager(PROJECT_ROOT)
     demo_manager = DemoManager(console, PROJECT_ROOT)
 
     if demo:
         console.print(Panel("[bold green]Setting up Demo Environment...[/bold green]", border_style="green"))
-        
-        if lite:
-            demo_manager.setup_lite(api_key=api_key)
-        elif docker:
-            docker_dir = demo_manager.setup_docker(api_key=api_key)
-            # A terminal that cannot host a prompt (Git Bash/MSYS) must not be
-            # read as consent to pull images and bind ports, so the fallback is
-            # "no": the artifacts are already on disk and the panel below tells
-            # the user how to start the stack themselves.
-            if confirm(
-                "Start Docker containers now?",
-                default=True,
-                when_unavailable=False,
-            ):
-                demo_manager.start_docker_containers(docker_dir)
-            else:
-                console.print(
-                    f"[dim]Containers not started. To start them yourself: "
-                    f"cd {escape(str(docker_dir))} && "
-                    f"docker compose -f docker-compose.demo.yml up -d[/dim]"
-                )
-                
-            console.print(Panel(f"""[bold yellow]Next Steps:[/bold yellow]
-                    1. [bold]Verify & Index[/bold]:
-                    Once database containers are healthy (~30s), run:
-                    [cyan]nl2sql --env demo index[/cyan]
 
-                    2. [bold]API[/bold]: the 'app' container serves the REST API on
-                    [cyan]http://localhost:8000[/cyan].
+        demo_manager.setup_chinook(api_key=api_key)
 
-                    3. [bold]MSSQL[/bold] is opt-in:
-                    [cyan]docker compose -f docker-compose.demo.yml --profile mssql up -d[/cyan]
-                    """, title="Docker Instructions", border_style="yellow")
-                )
-        
-        if not docker:
-            print_step("Indexing Demo Environment...")
-            demo_manager.index_demo_data()
-            console.print("Run: [cyan]nl2sql --env demo run \"Show me broken machines in Austin\"[/cyan]")
-            
+        print_step("Indexing Demo Environment...")
+        demo_manager.index_demo_data()
+        console.print("Run: [cyan]nl2sql --env demo run \"How many customers do we have, by country?\"[/cyan]")
+
         return
 
     # --- Standard Setup Wizard ---

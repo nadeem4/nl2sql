@@ -27,7 +27,7 @@ Create config files in your working directory:
 - `configs/policies.json`
 - `configs/secrets.yaml` (optional)
 
-Start from `configs/*.example.yaml` and `configs/*.example.json`.
+Start from `configs/datasources.example.yaml` and `configs/policies.example.json`.
 
 ## Run locally
 

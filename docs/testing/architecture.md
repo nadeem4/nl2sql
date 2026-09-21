@@ -28,7 +28,7 @@ markers. A test may carry both.
 
 | Marker | Means | Provided by |
 | --- | --- | --- |
-| `integration` | Needs external resources: the generated demo SQLite databases, or the downloaded ONNX embedding model. | `nl2sql setup --demo --lite` |
+| `integration` | Needs external resources: the generated Chinook SQLite database, or the downloaded ONNX embedding model. | `nl2sql setup --demo` |
 | `llm` | Needs a real `OPENAI_API_KEY`. Costs money per run. | Nothing in CI - never selected. |
 
 Everything under `packages/nl2sql/tests/integration/` is marked `integration`
@@ -46,16 +46,16 @@ data run key-free.
 - **`test`** runs `pytest -m "not integration"` across Python 3.12 and 3.13.
   This is the fast job and must stay fast.
 - **`integration`** runs `pytest -m "integration and not llm"` on one Python
-  version, after generating demo data with `nl2sql setup --demo --lite` and
-  with `EMBEDDING_PROVIDER=local`. The ONNX model is cached across runs. That
+  version, after generating the demo with `nl2sql setup --demo` and with
+  `EMBEDDING_PROVIDER=local`. The ONNX model is cached across runs. That
   subset covers schema indexing, datasource resolution, schema retrieval,
-  aggregation and the local embedder against the real demo databases; run it
-  with `--collect-only -q` for the current list.
+  aggregation and the local embedder against the real Chinook database; run
+  it with `--collect-only -q` for the current list.
 
 Nothing selects `llm`. Those tests are run by hand with a key:
 
 ```bash
-nl2sql setup --demo --lite
+nl2sql setup --demo
 EMBEDDING_PROVIDER=local OPENAI_API_KEY=sk-... pytest -m integration
 ```
 
