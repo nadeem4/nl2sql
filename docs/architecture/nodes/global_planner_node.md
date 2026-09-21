@@ -77,7 +77,9 @@ Side effects:
 6. Build `ExecutionDAG` with sorted nodes/edges.
 7. Compute `content_hash` and `dag_id`.
 8. Return `GlobalPlannerResponse`.
-9. On exception, emit `PLANNER_FAILED` error.
+9. On exception, emit a `PLANNER_FAILED` error carrying the cause, and no
+   `GlobalPlannerResponse`. The layer router finds no DAG and ends the run, so
+   this error is what the caller sees.
 
 ---
 

@@ -160,15 +160,16 @@ class GlobalPlannerNode:
 
         except Exception as e:
             logger.error(f"GlobalPlanner failed: {e}")
+            # No response: there is no DAG, and the layer router ends the run
+            # when it finds none, leaving this error as the run's cause.
             return {
-                "global_planner_response": GlobalPlannerResponse(execution_dag=None),
                 "reasoning": [{"node": self.node_name, "content": f"Planning failed: {e}", "type": "error"}],
                 "errors": [
                     PipelineError(
                         node=self.node_name,
                         message=f"Global Plan generation failed: {str(e)}",
                         severity=ErrorSeverity.ERROR,
-                        error_code=ErrorCode.PLANNER_FAILED 
+                        error_code=ErrorCode.PLANNER_FAILED,
                     )
                 ]
             }
