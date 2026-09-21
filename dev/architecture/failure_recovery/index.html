@@ -1013,6 +1013,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#sub-query-status" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sub-query status
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#partial-recovery" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4399,6 +4410,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#sub-query-status" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sub-query status
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#partial-recovery" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4685,7 +4707,7 @@
 <ul>
 <li>Decomposer LLM failures return <code>ORCHESTRATOR_CRASH</code> (critical) and empty responses.</li>
 <li>AST planner LLM failures return <code>PLANNING_FAILURE</code> and a <code>None</code> plan.</li>
-<li>Global planner failures return <code>PLANNER_FAILED</code> and <code>execution_dag=None</code>.</li>
+<li>Global planner failures return <code>PLANNER_FAILED</code> and no <code>global_planner_response</code>; the layer router ends the run.</li>
 </ul>
 <h3 id="validation">Validation</h3>
 <ul>
@@ -4734,14 +4756,26 @@
 <li>SQL agent subgraph routes to <code>END</code> when:</li>
 <li>The planner fails to produce a plan and errors are non-retryable.</li>
 <li>Logical validation returns non-retryable errors.</li>
-<li>Retry count reaches <code>sql_agent_max_retries</code>.</li>
+<li>Retry count reaches <code>sql_agent_max_retries</code> with a blocking (<code>ERROR</code>/<code>CRITICAL</code>) finding.</li>
 <li>Cancellation is detected.</li>
 <li>If errors are retryable and retry budget remains, the subgraph loops through <code>retry_handler -&gt; refiner -&gt; planner</code>.</li>
+<li>Validation findings that are only <code>WARNING</code> (<code>COLUMN_NOT_FOUND</code> with strict columns off) also loop while
+  retry budget remains, but never end the sub-query: once the budget is spent the plan proceeds to generation.</li>
+</ul>
+<h3 id="sub-query-status">Sub-query status</h3>
+<ul>
+<li><code>wrap_subgraph</code> derives <code>SubgraphOutput.status</code> from the final attempt, not from the accumulated errors:
+  <code>success</code> when the sub-query ended with SQL and, when executing, a result artifact; otherwise <code>error</code>.</li>
+<li><code>SubgraphExecutionState.errors</code> is an additive reducer, so it keeps every attempt's errors (the planner
+  reads them as retry feedback). <code>SubgraphOutput.errors</code> keeps them too.</li>
+<li>A successful sub-query sends those errors to the run's <code>warnings</code> (original severity, plus <code>sub_query_id</code>)
+  rather than its <code>errors</code>. A failed one sends them to <code>errors</code>, adding a <code>MISSING_SQL</code> error if none of them
+  was blocking.</li>
 </ul>
 <h3 id="partial-recovery">Partial recovery</h3>
 <ul>
 <li>Recovery is limited to re-planning and refining within the SQL agent. There is no partial recovery at the aggregator or graph layer.</li>
-<li>Subgraph wrapper assumes an <code>executor_response</code> is present; if executor output is missing (e.g., early failure), wrapper-level failures are possible.</li>
+<li>A sub-query that ends early (no plan, a refused plan, no SQL) is reported as <code>status: error</code> by the wrapper; it does not crash the run.</li>
 </ul>
 <hr />
 <h2 id="graph-level-failures">Graph-Level Failures</h2>

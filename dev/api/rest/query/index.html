@@ -4091,7 +4091,7 @@
 <td><code>status</code></td>
 <td><code>str</code></td>
 <td>no</td>
-<td><code>"success"</code> or <code>"error"</code> for this sub-query.</td>
+<td><code>"success"</code> or <code>"error"</code> for this sub-query, from its final attempt: <code>"success"</code> when it ended with SQL and, if executed, a result; otherwise <code>"error"</code>. A retry that recovers reports <code>"success"</code>.</td>
 </tr>
 <tr>
 <td><code>retry_count</code></td>

@@ -2006,7 +2006,9 @@
 <li>Build <code>ExecutionDAG</code> with sorted nodes/edges.</li>
 <li>Compute <code>content_hash</code> and <code>dag_id</code>.</li>
 <li>Return <code>GlobalPlannerResponse</code>.</li>
-<li>On exception, emit <code>PLANNER_FAILED</code> error.</li>
+<li>On exception, emit a <code>PLANNER_FAILED</code> error carrying the cause, and no
+   <code>GlobalPlannerResponse</code>. The layer router finds no DAG and ends the run, so
+   this error is what the caller sees.</li>
 </ol>
 <hr/>
 <h2 id="contracts-interfaces">Contracts &amp; Interfaces</h2>

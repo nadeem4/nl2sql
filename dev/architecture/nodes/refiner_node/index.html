@@ -1998,7 +1998,7 @@
 <h2 id="internal-flow-step-by-step">Internal Flow (Step-by-Step)</h2>
 <ol>
 <li>If no LLM configured, emit <code>MISSING_LLM</code> and stop.</li>
-<li>Serialize relevant tables and failed plan.</li>
+<li>Serialize relevant tables, and the failed plan as compact JSON (<code>model_dump_json(exclude_none=True)</code>).</li>
 <li>Build error and reasoning strings.</li>
 <li>Invoke LLM with refinement prompt.</li>
 <li>Emit <code>PLAN_FEEDBACK</code> warning and return <code>RefinerResponse</code>.</li>
