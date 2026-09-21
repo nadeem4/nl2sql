@@ -4195,7 +4195,9 @@ instead of the OpenAI embeddings API. The first indexing run downloads roughly
   enrichment failure never fails indexing. The demo's own indexing (the first
   run, the startup repair and the playground's Rebuild) leaves enrichment
   <strong>off</strong>, because it spends tokens on your key; the playground offers it as an
-  explicit checkbox.</li>
+  explicit checkbox. When it is on, the demo's indexing uses a key exported in
+  your shell, or one saved in <code>.env.demo</code>; the file's empty <code>OPENAI_API_KEY=</code>
+  placeholder no longer blanks an exported key while indexing runs.</li>
 <li>Both <code>nl2sql setup --api-key &lt;key&gt;</code> and <code>nl2sql demo --api-key &lt;key&gt;</code> take the
   key on the command line and write it into the generated env file. The provider
   follows the key's shape: a key beginning <code>sk-or-</code> is OpenRouter and is stored
@@ -4375,6 +4377,12 @@ ones the playground offers as guided questions:</p>
 <li>Which playlists contain tracks from more than three genres?</li>
 <li>Who are the top customers by total spend?</li>
 </ul>
+<p>They are also indexed: the <code>schema.datasource</code> entry the resolver matches every
+question against carries the datasource's configured description and these
+questions (<code>.env.demo</code> points <code>SAMPLE_QUESTIONS</code> at the file). Folders
+generated before this fix wrote the setting as <code>ROUTING_EXAMPLES</code>, which nothing
+read; the engine now accepts that name too, so re-index such a folder
+(<code>nl2sql --env demo index</code>) to pick the questions up.</p>
 <p>Whether a given question is answered correctly depends on the model; see
 <a href="https://github.com/nadeem4/nl2sql#known-limitations">Known limitations</a>.</p>
 <h2 id="regenerating-the-demo">Regenerating the demo</h2>

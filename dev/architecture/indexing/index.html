@@ -2009,7 +2009,7 @@
 <h2 id="chunk-types-and-contracts">Chunk types and contracts</h2>
 <p>Chunk types are defined in <code>nl2sql.indexing.models</code>:</p>
 <ul>
-<li><strong>DatasourceChunk</strong> (<code>schema.datasource</code>): datasource description, domains, and example questions.</li>
+<li><strong>DatasourceChunk</strong> (<code>schema.datasource</code>): datasource description, domains, and example questions. The description is the one in the datasources config (<code>description:</code>); it lives in the config rather than the database, so the orchestrator writes it into the snapshot's metadata, where it takes precedence over any description the adapter or enrichment produced. Example questions come from the <code>SAMPLE_QUESTIONS</code> file.</li>
 <li><strong>TableChunk</strong> (<code>schema.table</code>): table name, PKs, column list, FK summaries, row counts.</li>
 <li><strong>ColumnChunk</strong> (<code>schema.column</code>): column type, stats, synonyms, PII flags.</li>
 <li><strong>RelationshipChunk</strong> (<code>schema.relationship</code>): FK relationships, columns, cardinality.</li>
