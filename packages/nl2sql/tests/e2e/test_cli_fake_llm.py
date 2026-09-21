@@ -33,8 +33,10 @@ def test_no_exec_prints_sql_and_never_executes(demo_project, fake_llm):
     r = run_cli(demo_project, env, "run", "--no-exec", "--llm-config", "configs/llm.fake.yaml", "How many customers are there?")
     assert r.returncode == 0, r.stdout + r.stderr
     assert "COUNT(" in r.stdout
-    # No count may appear, but durations such as "0.59s" legitimately can.
-    assert "59" not in re.sub(r"\d+\.\d+s\b", "", r.stdout)
+    # No count may appear, but durations such as "0.59s" legitimately can, and
+    # so can the trace file's timestamped name (Rich may wrap it across lines).
+    out = re.sub(r"Trace written to .*?<file>\)", "", r.stdout, flags=re.DOTALL)
+    assert "59" not in re.sub(r"\d+\.\d+s\b", "", out)
     assert "AggregatedResponse" not in [c["name"] for c in server.calls]
 
 

@@ -8,14 +8,14 @@ These invariants capture rules that are enforced by the code paths responsible f
 ## Semantic-Only Subqueries and Post-Combine Ops
 
 ### Definition
-Sub-query intents and post-combine operations must not contain SQL tokens or physical schema keywords.
+Sub-query intents and post-combine operations must not contain SQL. Each text field (intent, metric names, filter, group-by and order-by attributes, expected-schema names) is checked on its own and rejected if it opens with a `SELECT ... FROM` statement, or contains a statement terminator (`;`) or a comment marker (`--`, `/*`, `*/`). English words that happen to be SQL keywords are allowed: "customers from Brazil" and "tracks where the genre is Rock" are valid intents.
 
 ### Enforcement Points
 - `SubQuery.validate_semantic_only()` in `nl2sql.pipeline.nodes.decomposer.schemas`
 - `PostCombineOp.validate_semantic_only()` in `nl2sql.pipeline.nodes.decomposer.schemas`
 
 ### Failure Behavior
-Raises `ValueError` on any forbidden token detection.
+Raises `ValueError` ("contains SQL syntax") when a field matches; the decomposer response fails validation.
 
 ### Why It Exists
 Prevents physical SQL leakage into semantic planning stages and keeps decomposer output safe to interpret downstream.
@@ -330,7 +330,7 @@ Ensures latency bounds and prevents hung requests.
 
 - Column existence enforcement can degrade to warnings when `logical_validator_strict_columns` is disabled, so missing columns do not always block execution.
 - Schema version mismatch handling is policy-driven and may only emit warnings (e.g., `schema_version_mismatch_policy=warn`), so mismatch is not always enforced as a hard failure.
-- Semantic-only checks are token based; they block a fixed list of SQL tokens rather than parsing for all possible SQL constructs.
+- Semantic-only checks are pattern based: they block a field that opens with `SELECT ... FROM`, a statement terminator and comment markers, rather than parsing for every possible SQL construct. An intent that literally reads "select ... from ..." is rejected as SQL.
 - If the vector store is unavailable, datasource resolution can return a response without errors, relying on downstream stages to detect missing candidates.
 
 ---
