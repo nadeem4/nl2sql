@@ -42,7 +42,7 @@ def build_graph(
     graph.add_node("global_planner", global_planner_node)
     graph.add_node(
         SQL_AGENT_SUBGRAPH,
-        wrap_subgraph(sql_agent_subgraph, SQL_AGENT_SUBGRAPH, ctx),
+        wrap_subgraph(sql_agent_subgraph, SQL_AGENT_SUBGRAPH, ctx, execute=execute),
     )
     graph.add_node("aggregator", aggregator_node)
     graph.add_node("answer_synthesizer", synthesizer_node)

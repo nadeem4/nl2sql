@@ -4,7 +4,7 @@ from typing import Any, Callable, Dict, FrozenSet, List, Optional
 
 from langchain_core.runnables import Runnable, RunnableConfig
 
-from nl2sql.common.errors import ErrorSeverity
+from nl2sql.common.errors import ErrorCode, ErrorSeverity, PipelineError
 from nl2sql.context import NL2SQLContext
 from nl2sql.pipeline.nodes.global_planner.schemas import ExecutionDAG
 from nl2sql.pipeline.state import GraphState, SubgraphExecutionState
@@ -95,11 +95,36 @@ def build_scan_payload(
         "datasource_resolver_response": state.datasource_resolver_response,
     }
 
+def _as_warning(error: PipelineError, sub_query_id: str) -> Dict[str, Any]:
+    """An error from a sub-query that succeeded, as a run warning.
+
+    Either an earlier attempt's error that a retry recovered from, or a
+    non-blocking warning. The original severity is kept.
+    """
+    return {
+        "node": error.node,
+        "message": error.message,
+        "error_code": getattr(error.error_code, "value", error.error_code),
+        "severity": getattr(error.severity, "value", error.severity),
+        "sub_query_id": sub_query_id,
+    }
+
+
 def wrap_subgraph(
     subgraph: Runnable,
     subgraph_name: str,
     ctx: NL2SQLContext,
+    execute: bool = True,
 ) -> Callable[Dict[str, Any]]:
+    """Run a sub-query's subgraph and report it to the parent graph.
+
+    The status reflects the final attempt, not the error history: the
+    sub-query succeeded if it ended with SQL (and, when ``execute`` is True,
+    with a result artifact), otherwise it failed. ``SubgraphOutput.errors``
+    keeps every attempt's errors. When the sub-query succeeded, those errors
+    were superseded by a later attempt, so they reach the run's ``warnings``
+    rather than its ``errors``.
+    """
     def _wrapper(state_dict: dict, config: Optional[RunnableConfig] = None) -> Dict[str, Any]:
         trace_id = state_dict.get("trace_id")
         subgraph_id = state_dict.get("subgraph_id")
@@ -131,21 +156,33 @@ def wrap_subgraph(
         artifact_refs: Dict[str, Any] = {sub_query.id: artifact} if artifact else {}
 
         retry_count = returned_state.retry_count
-        blocking = [
-            e
-            for e in returned_state.errors
-            if e.severity in (ErrorSeverity.ERROR, ErrorSeverity.CRITICAL)
-        ]
-        status = "error" if blocking else "success"
+        sql_draft = generator_response.sql_draft if generator_response else None
+        succeeded = bool(sql_draft) and (artifact is not None or not execute)
+        status = "success" if succeeded else "error"
+        errors = list(returned_state.errors)
+        blocking = [e for e in errors if e.severity in (ErrorSeverity.ERROR, ErrorSeverity.CRITICAL)]
+        if not succeeded and not blocking:
+            errors.append(
+                PipelineError(
+                    node=subgraph_name,
+                    message=(
+                        f"Sub-query '{sub_query.id}' ended without SQL."
+                        if not sql_draft
+                        else f"Sub-query '{sub_query.id}' ended without a result."
+                    ),
+                    severity=ErrorSeverity.ERROR,
+                    error_code=ErrorCode.MISSING_SQL if not sql_draft else ErrorCode.EXECUTION_FAILED,
+                )
+            )
         subgraph_output = SubgraphOutput(
             sub_query=sub_query,
             subgraph_name=subgraph_name,
             subgraph_id=subgraph_id,
             retry_count=retry_count,
             plan=planner_response.plan if planner_response else None,
-            sql_draft=generator_response.sql_draft if generator_response else None,
+            sql_draft=sql_draft,
             artifact=artifact,
-            errors=returned_state.errors,
+            errors=errors,
             validation=(
                 returned_state.logical_validator_response.checks
                 if returned_state.logical_validator_response
@@ -158,7 +195,8 @@ def wrap_subgraph(
         return {
             "artifact_refs": artifact_refs,
             "subgraph_outputs": {subgraph_id: subgraph_output},
-            "errors": returned_state.errors,
+            "errors": [] if succeeded else errors,
+            "warnings": [_as_warning(e, sub_query.id) for e in errors] if succeeded else [],
             "reasoning": returned_state.reasoning,
         }
 

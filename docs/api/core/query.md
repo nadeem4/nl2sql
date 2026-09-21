@@ -75,6 +75,13 @@ Fields:
 `errors` holds only `ERROR` and `CRITICAL` entries; `WARNING`-severity pipeline
 errors are appended to `warnings` as the same summary dict.
 
+A sub-query that succeeded contributes nothing to `errors`: the errors of the
+attempts it recovered from, and its warnings, are in `warnings` with their
+original `severity` and a `sub_query_id`. The run trace and
+`subgraph_outputs[<id>].errors` keep every attempt's errors for debugging. A
+sub-query that failed without a blocking error of its own (it ended with no SQL
+on warnings alone) adds a `MISSING_SQL` error, so the run reports `"error"`.
+
 `status` is derived: `"error"` when any blocking error is present, otherwise
 `"plan_only"` when no sub-query produced rows or an artifact (an `execute=False`
 run), otherwise `"success"`. A state with no sub-queries and no errors leaves it
@@ -95,7 +102,7 @@ result set lives in artifact storage, addressed through `artifact_refs`.
 | `plan` | `Optional[Dict[str, Any]]` | no | The validated `PlanModel`, dumped. |
 | `validation` | `List[ValidationCheck]` | no | `name`, `passed`, `message` per validation gate. |
 | `rows` | `Optional[RowSample]` | no | Capped row sample; `None` when nothing executed or the artifact could not be read. |
-| `status` | `str` | no | `"success"` or `"error"` for this sub-query. |
+| `status` | `str` | no | `"success"` or `"error"` for this sub-query, from its final attempt: `"success"` when it ended with SQL and, if executed, a result; otherwise `"error"`. A retry that recovers reports `"success"`. |
 | `retry_count` | `int` | no | Plan/SQL refinement attempts made. |
 
 ### RowSample

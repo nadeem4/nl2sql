@@ -115,3 +115,71 @@ def test_execute_false_skips_executor(monkeypatch):
     result = graph.invoke(SubgraphExecutionState(trace_id="t", sub_query=SubQuery(id="sq1", datasource_id="ds1", intent="q")))
     assert result["generator_response"].sql_draft == "SELECT 1"
     assert result.get("executor_response") is None
+
+
+def _patch_nodes(monkeypatch, planner, logical, generator, executor=None, refiner=None):
+    monkeypatch.setattr("nl2sql.pipeline.subgraphs.sql_agent.SchemaRetrieverNode", lambda _ctx: (lambda s: {"relevant_tables": []}))
+    monkeypatch.setattr("nl2sql.pipeline.subgraphs.sql_agent.ASTPlannerNode", lambda _ctx: planner)
+    monkeypatch.setattr("nl2sql.pipeline.subgraphs.sql_agent.LogicalValidatorNode", lambda _ctx: logical)
+    monkeypatch.setattr("nl2sql.pipeline.subgraphs.sql_agent.GeneratorNode", lambda _ctx: generator)
+    monkeypatch.setattr("nl2sql.pipeline.subgraphs.sql_agent.ExecutorNode", lambda _ctx: executor or (lambda s: {}))
+    monkeypatch.setattr("nl2sql.pipeline.subgraphs.sql_agent.RefinerNode", lambda _ctx: refiner or (lambda s: {}))
+    monkeypatch.setattr("nl2sql.pipeline.subgraphs.sql_agent.settings.sql_agent_retry_base_delay_sec", 0)
+    monkeypatch.setattr("nl2sql.pipeline.subgraphs.sql_agent.settings.sql_agent_retry_jitter_sec", 0)
+    monkeypatch.setattr("nl2sql.pipeline.subgraphs.sql_agent.settings.sql_agent_max_retries", 2)
+
+
+def test_warning_only_validation_retries_then_proceeds_to_generation(monkeypatch):
+    # COLUMN_NOT_FOUND is a WARNING when strict columns are off (the default).
+    # The refiner may still repair the plan, but once the retries are spent a
+    # warning must not stop the sub-query: it goes on to generation instead of
+    # ending with no SQL.
+    calls = {"planner": 0, "generator": 0}
+
+    def planner(state):
+        calls["planner"] += 1
+        return {"ast_planner_response": ASTPlannerResponse(plan=_plan_ok())}
+
+    def logical(state):
+        warning = PipelineError(node="logical_validator", message="Column 'idd' not found",
+                                severity=ErrorSeverity.WARNING, error_code=ErrorCode.COLUMN_NOT_FOUND)
+        return {"logical_validator_response": LogicalValidatorResponse(errors=[warning]), "errors": [warning]}
+
+    def generator(state):
+        calls["generator"] += 1
+        return {"generator_response": GeneratorResponse(sql_draft="SELECT 1")}
+
+    _patch_nodes(monkeypatch, planner, logical, generator)
+
+    result = build_sql_agent_graph(SimpleNamespace(), execute=False).invoke(
+        SubgraphExecutionState(trace_id="t", sub_query=SubQuery(id="sq1", datasource_id="ds1", intent="q")))
+
+    assert calls["planner"] == 3  # the first attempt plus two retries
+    assert calls["generator"] == 1
+    assert result["generator_response"].sql_draft == "SELECT 1"
+
+
+def test_blocking_validation_errors_still_end_without_sql_when_retries_run_out(monkeypatch):
+    calls = {"planner": 0, "generator": 0}
+
+    def planner(state):
+        calls["planner"] += 1
+        return {"ast_planner_response": ASTPlannerResponse(plan=_plan_ok())}
+
+    def logical(state):
+        error = PipelineError(node="logical_validator", message="Table 'x' not found",
+                              severity=ErrorSeverity.ERROR, error_code=ErrorCode.TABLE_NOT_FOUND)
+        return {"logical_validator_response": LogicalValidatorResponse(errors=[error]), "errors": [error]}
+
+    def generator(state):
+        calls["generator"] += 1
+        return {"generator_response": GeneratorResponse(sql_draft="SELECT 1")}
+
+    _patch_nodes(monkeypatch, planner, logical, generator)
+
+    result = build_sql_agent_graph(SimpleNamespace(), execute=False).invoke(
+        SubgraphExecutionState(trace_id="t", sub_query=SubQuery(id="sq1", datasource_id="ds1", intent="q")))
+
+    assert calls["planner"] == 3
+    assert calls["generator"] == 0
+    assert result.get("generator_response") is None

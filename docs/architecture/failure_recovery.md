@@ -65,13 +65,24 @@ Failure in this system is represented as structured `PipelineError` objects accu
 - SQL agent subgraph routes to `END` when:
   - The planner fails to produce a plan and errors are non-retryable.
   - Logical validation returns non-retryable errors.
-  - Retry count reaches `sql_agent_max_retries`.
+  - Retry count reaches `sql_agent_max_retries` with a blocking (`ERROR`/`CRITICAL`) finding.
   - Cancellation is detected.
 - If errors are retryable and retry budget remains, the subgraph loops through `retry_handler -> refiner -> planner`.
+- Validation findings that are only `WARNING` (`COLUMN_NOT_FOUND` with strict columns off) also loop while
+  retry budget remains, but never end the sub-query: once the budget is spent the plan proceeds to generation.
+
+### Sub-query status
+- `wrap_subgraph` derives `SubgraphOutput.status` from the final attempt, not from the accumulated errors:
+  `success` when the sub-query ended with SQL and, when executing, a result artifact; otherwise `error`.
+- `SubgraphExecutionState.errors` is an additive reducer, so it keeps every attempt's errors (the planner
+  reads them as retry feedback). `SubgraphOutput.errors` keeps them too.
+- A successful sub-query sends those errors to the run's `warnings` (original severity, plus `sub_query_id`)
+  rather than its `errors`. A failed one sends them to `errors`, adding a `MISSING_SQL` error if none of them
+  was blocking.
 
 ### Partial recovery
 - Recovery is limited to re-planning and refining within the SQL agent. There is no partial recovery at the aggregator or graph layer.
-- Subgraph wrapper assumes an `executor_response` is present; if executor output is missing (e.g., early failure), wrapper-level failures are possible.
+- A sub-query that ends early (no plan, a refused plan, no SQL) is reported as `status: error` by the wrapper; it does not crash the run.
 
 ---
 

@@ -187,7 +187,12 @@ Two consequences are worth stating precisely:
 
 If validation fails with a retryable error the plan goes back through
 `RefinerNode` with the failure attached, up to `sql_agent_max_retries`. A
-`SECURITY_VIOLATION` is not retryable — a denial is final.
+`SECURITY_VIOLATION` is not retryable — a denial is final. Warnings
+(`COLUMN_NOT_FOUND` when `LOGICAL_VALIDATOR_STRICT_COLUMNS` is off, the
+default) also go to the refiner while retries remain, but never block: once
+the retries are spent the plan proceeds to generation. A sub-query's status
+is its final attempt's: SQL (and rows, if executed) is `success`, anything
+else is `error`.
 
 ### What bounds a run
 

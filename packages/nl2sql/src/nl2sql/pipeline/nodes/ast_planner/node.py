@@ -85,7 +85,6 @@ class ASTPlannerNode:
                         ],
                     }
                 ],
-                "errors": [],
             }
 
         except Exception as exc:
