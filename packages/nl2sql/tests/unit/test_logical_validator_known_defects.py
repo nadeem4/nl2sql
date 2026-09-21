@@ -1,9 +1,8 @@
-"""Two defects in ``LogicalValidatorNode``, found by moving the demo to Chinook.
+"""Regression tests for two fixed defects in ``LogicalValidatorNode``.
 
-Both are pinned with ``xfail(strict=True)``: they fail today, and the day
-either is fixed this file turns red so the record is removed with the fix
-rather than rotting. Neither is fixed here -- they are engine changes, not
-part of retiring the manufacturing demo.
+Both were found by moving the demo to Chinook and were pinned here with
+``xfail(strict=True)`` until they were fixed; the markers came off with the
+fix, so these are now ordinary regression tests.
 
 Both hid behind the old demo dataset. Its DDL declared no foreign keys, so the
 validator rejected every join before reaching the ORDER BY, and no end-to-end
@@ -11,8 +10,6 @@ test ever put a literal filter through validation at all.
 """
 
 from types import SimpleNamespace
-
-import pytest
 
 from nl2sql.auth import UserContext
 from nl2sql.common.errors import ErrorCode
@@ -50,19 +47,6 @@ def _codes(result):
     return [e.error_code for e in result["errors"]]
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "LogicalValidatorNode._build_validation_query calls Select.order_by() with a "
-        "bare expression. sqlglot only wraps a *parsed* argument in exp.Ordered, so the "
-        "Anonymous node SqlVisitor emits for every function lands directly in "
-        "Order.expressions, and qualify()'s positional-reference expansion then reads "
-        "its string `this` as an expression: AttributeError 'str' object has no "
-        "attribute 'is_int', reported as VALIDATOR_CRASH. GeneratorNode passes desc=, "
-        "which makes sqlglot wrap it, so only validation is affected -- and validation "
-        "runs first, so no 'top N by <aggregate>' plan ever reaches SQL."
-    ),
-)
 def test_order_by_over_a_function_does_not_crash_the_validator():
     tables = [Table(name="orders", columns=[Column(name="id", type="int")])]
     plan = PlanModel(
@@ -100,16 +84,6 @@ def test_order_by_over_a_function_does_not_crash_the_validator():
     assert ErrorCode.VALIDATOR_CRASH not in _codes(result), _codes(result)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "The validator treats Column.stats['sample_values'] as an exhaustive allowlist "
-        "for = and IN. The SQLAlchemy adapter collects five sample values per text "
-        "column (_get_sample_values(limit=5)), so on any higher-cardinality text column "
-        "a correct equality filter on a real row value is rejected with "
-        "INVALID_PLAN_STRUCTURE, and the refiner cannot recover from it."
-    ),
-)
 def test_an_equality_filter_on_a_real_value_outside_the_sample_is_not_rejected():
     tables = [
         Table(

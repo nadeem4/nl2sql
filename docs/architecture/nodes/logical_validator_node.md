@@ -15,7 +15,12 @@
 - Validate query type (READ‑only).
 - Validate ordinals, aliases, joins, and column references.
 - Enforce RBAC table access using strict datasource namespacing.
-- Validate literal values against column stats (when available).
+
+Literal filter values are **not** validated against a column's sampled values.
+The adapter records at most five sample values per text column, which is a
+retrieval hint, not the column's domain; treating it as an allowlist rejected
+correct filters on any higher-cardinality column. Safety comes from the RBAC
+table allowlist and from schema resolution, neither of which depends on stats.
 
 Column resolution is delegated to `sqlglot`'s optimizer. The node converts the
 plan into a throw‑away `sqlglot` expression tree (reusing the generator's
@@ -79,7 +84,7 @@ was validated, not only what failed. The names are fixed and always in this orde
 | name | meaning |
 | --- | --- |
 | `plan_present` | A plan reached the validator. The only check emitted when it did not. |
-| `structure_and_schema` | Tables, columns, joins and literals resolve against the retrieved schema. |
+| `structure_and_schema` | Tables, columns and joins resolve against the retrieved schema. |
 | `policy` | Every table in the plan is allowed for the caller's role. |
 
 On failure the check's `message` is the first corresponding error's message.
@@ -101,7 +106,10 @@ Side effects:
      `qualify(..., validate_qualify_columns=True)`. On failure each distinct
      column reference is re-probed so every bad reference is reported, and
      `_describe_column_failure()` rewrites the optimizer's SQL-oriented text
-     into plan-oriented feedback the refiner can act on.
+     into plan-oriented feedback the refiner can act on. ORDER BY terms are
+     wrapped in `exp.Ordered` first (`generator.node.ordered()`): sqlglot only
+     wraps an argument it has to *parse*, and a bare function node in
+     `Order.expressions` makes `qualify()` raise.
 3. Run `_validate_policy()` for RBAC enforcement. This always runs, even when
    static validation failed or raised — the security check is never skipped.
 4. If any errors are `ERROR`/`CRITICAL`, return with errors.

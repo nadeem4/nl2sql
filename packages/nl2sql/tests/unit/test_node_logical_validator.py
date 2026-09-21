@@ -265,45 +265,6 @@ def test_logical_validator_rejects_join_not_in_relationships():
     assert any(e.error_code == ErrorCode.INVALID_PLAN_STRUCTURE for e in result["errors"])
 
 
-def test_logical_validator_rejects_literal_not_in_stats():
-    # Validates literal value enforcement using column stats.
-    node = LogicalValidatorNode(_ctx())
-    plan = PlanModel(
-        query_type="READ",
-        tables=[TableRef(name="orders", alias="o", ordinal=0)],
-        select_items=[SelectItem(expr=_col("o", "status"), ordinal=0)],
-        joins=[],
-        where=Expr(
-            kind="binary",
-            op="=",
-            left=_col("o", "status"),
-            right=Expr(kind="literal", value="broken"),
-        ),
-    )
-    state = SubgraphExecutionState(
-        trace_id="t",
-        sub_query=SubQuery(id="sq1", datasource_id="ds1", intent="q"),
-        relevant_tables=[
-            Table(
-                name="orders",
-                columns=[
-                    Column(
-                        name="status",
-                        type="string",
-                        stats={"sample_values": ["active", "error", "maintenance"]},
-                    )
-                ],
-            )
-        ],
-        ast_planner_response=ASTPlannerResponse(plan=plan),
-        user_context=UserContext(),
-    )
-
-    result = node(state)
-
-    assert any(e.error_code == ErrorCode.INVALID_PLAN_STRUCTURE for e in result["errors"])
-
-
 def _album_artist_snapshot():
     """Snapshot shaped exactly like a real one: keys and FK refs are
     ``TableRef.full_name`` (``[schema].[Table]``), not bare table names.

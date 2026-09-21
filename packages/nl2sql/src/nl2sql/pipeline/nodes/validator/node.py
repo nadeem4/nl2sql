@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     from nl2sql.pipeline.state import SubgraphExecutionState
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.pipeline.nodes.ast_planner.schemas import PlanModel, Expr
-from nl2sql.pipeline.nodes.generator.node import SqlVisitor
+from nl2sql.pipeline.nodes.generator.node import SqlVisitor, ordered
 from nl2sql.context import NL2SQLContext
 from nl2sql.common.logger import get_logger
 from nl2sql.common.settings import settings
@@ -92,9 +92,8 @@ class LogicalValidatorNode:
 
     def _build_allowed_schema(
         self, state: SubgraphExecutionState
-    ) -> Tuple[Dict[str, Set[str]], Dict[str, Dict[str, Dict[str, Any]]], List[Dict[str, Any]]]:
+    ) -> Tuple[Dict[str, Set[str]], List[Dict[str, Any]]]:
         table_to_cols: Dict[str, Set[str]] = {}
-        table_to_stats: Dict[str, Dict[str, Dict[str, Any]]] = {}
         relationships: List[Dict[str, Any]] = []
 
         for rt in state.relevant_tables:
@@ -102,22 +101,17 @@ class LogicalValidatorNode:
             if not table_name:
                 continue
             cols: Set[str] = set()
-            stats_map: Dict[str, Dict[str, Any]] = {}
             for c in rt.columns or []:
                 col_name = self._normalize_name(c.name)
                 if not col_name:
                     continue
                 cols.add(col_name)
-                stats = getattr(c, "stats", None)
-                if isinstance(stats, dict) and stats:
-                    stats_map[col_name] = stats
             table_to_cols[table_name] = cols
-            table_to_stats[table_name] = stats_map
 
             for rel in getattr(rt, "relationships", []) or []:
                 relationships.append(rel)
 
-        return table_to_cols, table_to_stats, relationships
+        return table_to_cols, relationships
 
     def _extract_join_pairs(self, expr: Expr) -> List[Tuple[str, str, str, str]]:
         pairs: List[Tuple[str, str, str, str]] = []
@@ -154,58 +148,6 @@ class LogicalValidatorNode:
 
         walk(expr)
         return pairs
-
-    def _extract_literal_checks(self, expr: Expr) -> List[Tuple[Optional[str], str, str, Any]]:
-        checks: List[Tuple[Optional[str], str, str, Any]] = []
-
-        def walk(node: Optional[Expr]) -> None:
-            if not node:
-                return
-            if node.kind == "binary" and node.op in ("=", "IN", "LIKE"):
-                left = node.left
-                right = node.right
-                if left and right:
-                    if left.kind == "column" and right.kind == "literal":
-                        if left.column_name:
-                            checks.append((left.alias, self._normalize_name(left.column_name), node.op, right.value))
-                    elif right.kind == "column" and left.kind == "literal":
-                        if right.column_name:
-                            checks.append((right.alias, self._normalize_name(right.column_name), node.op, left.value))
-            if node.kind == "binary":
-                walk(node.left)
-                walk(node.right)
-            elif node.kind == "func":
-                for arg in node.args:
-                    walk(arg)
-            elif node.kind == "unary":
-                walk(node.expr)
-            elif node.kind == "case":
-                for when in node.whens:
-                    walk(when.condition)
-                    walk(when.result)
-                walk(node.else_expr)
-
-        walk(expr)
-        return checks
-
-    def _value_matches_stats(self, value: Any, stats: Dict[str, Any]) -> bool:
-        samples = stats.get("sample_values") or []
-        if not samples:
-            return True
-        if isinstance(value, str):
-            return value.lower() in {str(s).lower() for s in samples}
-        return value in samples
-
-    def _like_matches_stats(self, value: Any, stats: Dict[str, Any]) -> bool:
-        if not isinstance(value, str):
-            return False
-        samples = [str(s).lower() for s in (stats.get("sample_values") or [])]
-        synonyms = [str(s).lower() for s in (stats.get("synonyms") or [])]
-        candidates = samples + synonyms
-        if not candidates:
-            return True
-        val = value.lower()
-        return any(c in val or val in c for c in candidates)
 
     def _condition_aliases(self, condition: Expr) -> Set[str]:
         """Returns the table aliases referenced by a join condition."""
@@ -323,7 +265,7 @@ class LogicalValidatorNode:
         if plan.having:
             query = query.having(visitor.visit(plan.having))
         for o in plan.order_by:
-            query = query.order_by(visitor.visit(o.expr))
+            query = query.order_by(ordered(visitor.visit(o.expr), o.direction))
 
         return query
 
@@ -600,7 +542,7 @@ class LogicalValidatorNode:
         alias_to_cols, plan_aliases, alias_errors = self._resolve_plan_tables(state, plan)
         errors.extend(alias_errors)
 
-        table_to_cols, table_to_stats, relationships = self._build_allowed_schema(state)
+        table_to_cols, relationships = self._build_allowed_schema(state)
         alias_to_table: Dict[str, str] = {
             t.alias: self._normalize_name(t.name) for t in plan.tables
         }
@@ -690,47 +632,6 @@ class LogicalValidatorNode:
                     )
 
         column_messages = self._validate_columns(plan, alias_to_cols)
-
-        for expr in [plan.where, plan.having]:
-            if not expr:
-                continue
-            checks = self._extract_literal_checks(expr)
-            for alias, col_name, op, value in checks:
-                resolved_alias = alias
-                if not resolved_alias:
-                    matches = [
-                        a for a, cols in alias_to_cols.items() if col_name in cols
-                    ]
-                    if len(matches) == 1:
-                        resolved_alias = matches[0]
-                if not resolved_alias:
-                    continue
-                table_name = alias_to_table.get(resolved_alias, "")
-                stats = table_to_stats.get(table_name, {}).get(col_name)
-                if not stats:
-                    continue
-                if op in ("=", "IN") and not self._value_matches_stats(value, stats):
-                    errors.append(
-                        PipelineError(
-                            node="logical_validator",
-                            message=(
-                                f"Literal value '{value}' not found in stats for {table_name}.{col_name}."
-                            ),
-                            severity=ErrorSeverity.ERROR,
-                            error_code=ErrorCode.INVALID_PLAN_STRUCTURE,
-                        )
-                    )
-                if op == "LIKE" and not self._like_matches_stats(value, stats):
-                    errors.append(
-                        PipelineError(
-                            node="logical_validator",
-                            message=(
-                                f"LIKE pattern '{value}' is not derived from stats for {table_name}.{col_name}."
-                            ),
-                            severity=ErrorSeverity.ERROR,
-                            error_code=ErrorCode.INVALID_PLAN_STRUCTURE,
-                        )
-                    )
 
         column_severity = (
             ErrorSeverity.ERROR if self.strict_columns else ErrorSeverity.WARNING

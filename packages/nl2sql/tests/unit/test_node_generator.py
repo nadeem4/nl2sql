@@ -9,6 +9,8 @@ from nl2sql.pipeline.nodes.ast_planner.schemas import (
     JoinSpec,
     SelectItem,
     Expr,
+    GroupByItem,
+    OrderItem,
     ASTPlannerResponse,
 )
 from nl2sql.pipeline.nodes.decomposer.schemas import SubQuery
@@ -143,3 +145,41 @@ def test_generator_requires_plan():
     result = node(state)
 
     assert result["errors"]
+
+
+def test_generator_emits_the_requested_sort_direction():
+    """``ORDER BY ... DESC`` must survive into the SQL.
+
+    ``Select.order_by(expr, desc=True)`` only ever applied ``desc`` while
+    parsing a *string*; an ``Expression`` argument is used as-is and the keyword
+    is dropped, so every "top N by <aggregate>" answer came back ascending.
+    """
+    adapter = SimpleNamespace(row_limit=5, max_bytes=1000, get_dialect=lambda: "sqlite")
+    ctx = SimpleNamespace(ds_registry=SimpleNamespace(get_adapter=lambda _id: adapter))
+    node = GeneratorNode(ctx)
+
+    count_id = Expr(
+        kind="func",
+        func_name="COUNT",
+        is_aggregate=True,
+        args=[_col("u", "id")],
+    )
+    plan = PlanModel(
+        tables=[TableRef(name="users", alias="u", ordinal=0)],
+        select_items=[
+            SelectItem(expr=_col("u", "name"), alias="name", ordinal=0),
+            SelectItem(expr=count_id, alias="n", ordinal=1),
+        ],
+        joins=[],
+        group_by=[GroupByItem(ordinal=0, expr=_col("u", "name"))],
+        order_by=[OrderItem(ordinal=0, direction="desc", expr=count_id)],
+    )
+    state = SubgraphExecutionState(
+        trace_id="t",
+        sub_query=SubQuery(id="sq1", datasource_id="ds1", intent="q"),
+        ast_planner_response=ASTPlannerResponse(plan=plan),
+    )
+
+    sql = node(state)["generator_response"].sql_draft.upper()
+
+    assert "ORDER BY COUNT(U.ID) DESC" in sql

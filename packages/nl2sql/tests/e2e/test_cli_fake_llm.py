@@ -1,7 +1,12 @@
 import pytest
 
 from .conftest import run_cli
-from .recordings_chinook import RULES_ALBUMS_PER_ARTIST, RULES_COUNT_CUSTOMERS
+from .recordings_chinook import (
+    RULES_ALBUMS_PER_ARTIST,
+    RULES_COUNT_CUSTOMERS,
+    RULES_JAZZ_TRACKS,
+    RULES_TOP_GENRE,
+)
 
 
 @pytest.mark.e2e
@@ -39,4 +44,42 @@ def test_a_foreign_key_join_passes_validation_and_executes(demo_project, fake_ll
     assert "JOIN" in r.stdout.upper()
     assert "does not match any allowed relationship" not in r.stdout
     assert "Pipeline Errors" not in r.stdout, r.stdout
+    assert [c["name"] for c in server.calls] == ["DecomposerResponse", "PlanModel", "AggregatedResponse"]
+
+
+@pytest.mark.e2e
+def test_top_n_by_an_aggregate_validates_and_sorts_descending(demo_project, fake_llm):
+    """"Which genre sells the most tracks?" -- one of the guided questions.
+
+    Its ORDER BY is a function call. The validator used to hand that to
+    `qualify()` unwrapped and abort with VALIDATOR_CRASH, so no "top N by
+    <aggregate>" plan ever reached the generator; the generator then dropped
+    the direction, so the answer would have come back ascending anyway.
+    """
+    server, env = fake_llm(RULES_TOP_GENRE)
+    r = run_cli(demo_project, env, "run", "--llm-config", "configs/llm.fake.yaml",
+                "Which genre sells the most tracks?")
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert "Pipeline Errors" not in r.stdout, r.stdout
+    assert "DESC" in r.stdout.upper()
+    # Rock leads with 835 sold invoice lines; ascending would have started at 1.
+    assert "Top genre: Rock with 835" in r.stdout
+    assert [c["name"] for c in server.calls] == ["DecomposerResponse", "PlanModel", "AggregatedResponse"]
+
+
+@pytest.mark.e2e
+def test_an_equality_filter_on_an_unsampled_value_validates(demo_project, fake_llm):
+    """`Genre.Name = 'Jazz'` -- a correct filter on a value outside the sample.
+
+    The adapter records five sample values per text column. The validator used
+    to read those five as the column's whole domain and reject this filter with
+    INVALID_PLAN_STRUCTURE, which the refiner could not recover from.
+    """
+    server, env = fake_llm(RULES_JAZZ_TRACKS)
+    r = run_cli(demo_project, env, "run", "--llm-config", "configs/llm.fake.yaml",
+                "How many jazz tracks are there?")
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert "Pipeline Errors" not in r.stdout, r.stdout
+    assert "not found in stats" not in r.stdout
+    assert "130" in r.stdout
     assert [c["name"] for c in server.calls] == ["DecomposerResponse", "PlanModel", "AggregatedResponse"]
