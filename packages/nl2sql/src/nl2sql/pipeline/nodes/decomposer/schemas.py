@@ -1,12 +1,22 @@
 from __future__ import annotations
 from typing import List, Optional, Literal, Dict, Any
+import re
+
 from pydantic import BaseModel, Field, model_validator
 
+# The decomposer emits semantic intent only; the model never writes SQL. Words
+# such as "from", "where" or "select" are ordinary English ("customers from
+# Brazil"), so only SQL syntax is rejected: a statement that opens with
+# SELECT ... FROM, a statement terminator, or a comment marker.
+_SQL_SYNTAX = re.compile(
+    r"^\W*select\b.*\bfrom\b|;|--|/\*|\*/",
+    re.IGNORECASE | re.DOTALL,
+)
 
-def _contains_physical_tokens(text: str) -> bool:
-    forbidden = ["select", "from", "join", "where", "group by", "order by", ";", "--", "/*", "*/"]
-    lowered = text.lower()
-    return any(token in lowered for token in forbidden)
+
+def _contains_sql(*texts: str) -> bool:
+    """True if any single text looks like SQL. Each field is checked alone."""
+    return any(_SQL_SYNTAX.search(text) for text in texts)
 
 
 class MetricSpec(BaseModel):
@@ -48,17 +58,14 @@ class SubQuery(BaseModel):
 
     @model_validator(mode="after")
     def validate_semantic_only(self):
-        content = " ".join(
-            [
-                self.intent,
-                " ".join(m.name for m in self.metrics),
-                " ".join(f.attribute for f in self.filters),
-                " ".join(g.attribute for g in self.group_by),
-                " ".join(c.name for c in self.expected_schema),
-            ]
-        ).lower()
-        if _contains_physical_tokens(content):
-            raise ValueError("SubQuery contains SQL or physical schema tokens.")
+        if _contains_sql(
+            self.intent,
+            *(m.name for m in self.metrics),
+            *(f.attribute for f in self.filters),
+            *(g.attribute for g in self.group_by),
+            *(c.name for c in self.expected_schema),
+        ):
+            raise ValueError("SubQuery contains SQL syntax.")
         return self
 
 
@@ -102,17 +109,14 @@ class PostCombineOp(BaseModel):
 
     @model_validator(mode="after")
     def validate_semantic_only(self):
-        content = " ".join(
-            [
-                " ".join(m.name for m in self.metrics),
-                " ".join(f.attribute for f in self.filters),
-                " ".join(g.attribute for g in self.group_by),
-                " ".join(o.attribute for o in self.order_by),
-                " ".join(c.name for c in self.expected_schema),
-            ]
-        )
-        if _contains_physical_tokens(content):
-            raise ValueError("PostCombineOp contains SQL or physical schema tokens.")
+        if _contains_sql(
+            *(m.name for m in self.metrics),
+            *(f.attribute for f in self.filters),
+            *(g.attribute for g in self.group_by),
+            *(o.attribute for o in self.order_by),
+            *(c.name for c in self.expected_schema),
+        ):
+            raise ValueError("PostCombineOp contains SQL syntax.")
         return self
 
 
