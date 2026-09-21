@@ -3072,6 +3072,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../testing/evaluation-dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -4089,7 +4117,7 @@
 | <code>provider</code> | <code>str</code> | yes | Provider name: <code>openai</code>, <code>openrouter</code> or <code>ollama</code>. |
 | <code>model</code> | <code>str</code> | yes | Model identifier. |
 | <code>temperature</code> | <code>Optional[float]</code> | no | Sampling temperature (default <code>0.0</code>). <code>None</code> (<code>null</code> in YAML) sends no temperature parameter, for models that accept only their default. |
-| <code>api_key</code> | <code>Optional[SecretStr]</code> | no | API key or secret reference. |
+| <code>api_key</code> | <code>Optional[SecretStr]</code> | no | API key or secret reference. Masked in <code>repr</code>, <code>str</code> and JSON dumps; <code>LLMGenerator</code> writes the real value or reference. |
 | <code>base_url</code> | <code>Optional[str]</code> | no | Endpoint override; defaults to the provider preset (<code>https://openrouter.ai/api/v1</code> for <code>openrouter</code>, <code>http://localhost:11434/v1</code> for <code>ollama</code>). |
 | <code>name</code> | <code>str</code> | no | Agent name (default <code>default</code>). |</p>
 <div class="admonition note">
