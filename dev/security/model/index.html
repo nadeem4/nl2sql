@@ -1157,6 +1157,15 @@
 </a>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="#strict-refusal">
+<span class="md-ellipsis">
+      
+        Strict refusal
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="#security-controls">
 <span class="md-ellipsis">
       
@@ -1711,6 +1720,15 @@
 </a>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="#strict-refusal">
+<span class="md-ellipsis">
+      
+        Strict refusal
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="#security-controls">
 <span class="md-ellipsis">
       
@@ -1780,11 +1798,50 @@ the caller says it is:</p>
 <strong>If you expose this service, you must put your own authentication in front of
 it and derive the role from that</strong>, never from user input. An empty <code>roles</code> list
 denies everything, which is the correct default for an unauthenticated caller.</p>
-<p>A role name that is not present in the policy file is a misconfiguration and is
-<strong>not</strong> handled gracefully today: <code>RBAC.get_allowed_tables</code> raises, the
-validator turns that into a <code>VALIDATOR_CRASH</code> error, and the run stops. It stops
-rather than leaking, but it stops with a crash rather than a denial, and one
-unknown name in a list alongside a known one fails the same way.</p>
+<p>A role name that is not present in the policy file grants nothing, exactly like
+an empty <code>roles</code> list. <code>RBAC</code> skips it, so the caller is refused with a normal
+<code>SECURITY_VIOLATION</code>, not a crash: through the pipeline the datasource resolver
+refuses first (no datasource is allowed), and the validator on its own refuses
+every table with its <code>policy</code> check failed. An unknown name listed beside a
+known one is ignored, and the known role's permissions still apply.</p>
+<h2 id="strict-refusal">Strict refusal</h2>
+<p>If a question needs a table the caller's role cannot read, the run is
+<strong>refused</strong>. Tables are never hidden from the planner, because a planner that
+cannot see a table quietly answers a <em>different</em> question from the tables it
+can see, and a confident wrong answer is worse than a refusal. The validator
+refuses the plan before any SQL exists, and the run ends there.</p>
+<ul>
+<li><strong>Structure yes, data no.</strong> The planner and the refiner still see every
+  table's name, columns, types, primary key and relationships, so a plan can
+  name the forbidden table and be refused. For a table the role cannot read,
+  the <strong>column statistics are stripped</strong>: <code>sample_values</code>, <code>min_value</code>,
+  <code>max_value</code>, <code>distinct_count</code> and <code>null_percentage</code> never reach the prompt,
+  the LLM provider or the run trace. The schema retriever decides this with the
+  same rule the validator enforces (<code>table_allowed</code> in <code>auth/rbac.py</code>), on both
+  the full-snapshot path and the vector-retrieval path. Column and table
+  descriptions are kept: they are structure. If you let an enrichment step
+  write descriptions from real values, those descriptions are not stripped.</li>
+<li><strong>A generic message for the user.</strong> The refusal the caller sees is
+  "You do not have permission to see the data this question requires." It names
+  no table, because naming one tells an unauthorised user that it exists. The
+  table and the role are logged as a warning and recorded in the error's
+  <code>details</code> (<code>datasource_id</code>, <code>table</code>, <code>roles</code>), which the run trace keeps and
+  the <code>QueryResult</code> error summary does not carry. The validator's <code>policy</code> check
+  is still present with <code>passed: false</code>, so a UI can show the gate firing.</li>
+<li><strong>Naming tables is an opt-in.</strong> Set <code>RBAC_REFUSAL_NAMES_TABLES=true</code> to put
+  the role and table in the user-facing message ("Role 'viewer' denied access
+  to 'chinook.Customer'. ..."). The generated demo's <code>.env.demo</code> sets it,
+  because showing the refusal is the demo's point.</li>
+<li><strong>The decision is deterministic code.</strong> Only the validator decides, from the
+  policy and the plan's table list. Nothing the model writes (its reasoning, a
+  claim that the role is allowed) is read by the policy check, so a crafted
+  prompt cannot turn a refusal into an allow.</li>
+</ul>
+<p>This is a <strong>table-level allowlist with data stripping</strong>. It is not column
+masking and not row-level security: a role that may read a table reads every
+column and every row of it. A downloaded trace of a <em>permitted</em> run holds real
+rows, and the playground serves any trace by id with no login, so restricting a
+trace to the user who produced it is left to a multi-user deployment.</p>
 <h2 id="security-controls">Security controls</h2>
 <ul>
 <li><strong>RBAC policies</strong> loaded from <code>configs/policies.json</code> and evaluated by <code>RBAC</code>.
@@ -1816,6 +1873,9 @@ the engine a read-only database user.</strong></p>
 <li>Allowed tables must match <code>datasource.table</code> or <code>datasource.*</code>.</li>
 <li>If no datasource ID is present, validation fails closed.</li>
 <li>Wildcard access is supported via <code>*</code> in policy lists.</li>
+<li>An unknown role, or no role, allows nothing and is refused like any denial.</li>
+<li>One <code>SECURITY_VIOLATION</code> per forbidden table, with the generic message unless
+  <code>RBAC_REFUSAL_NAMES_TABLES</code> is set, and <code>details</code> naming the table and roles.</li>
 </ul>
 <h2 id="validation-gates">Validation gates</h2>
 <p>Validation rules are enforced by <code>LogicalValidatorNode</code> and documented in <code>../architecture/invariants.md</code> and <code>../architecture/nodes/logical_validator_node.md</code>.</p>
@@ -1823,6 +1883,7 @@ the engine a read-only database user.</strong></p>
 <ul>
 <li>RBAC: <code>packages/nl2sql/src/nl2sql/auth/rbac.py</code></li>
 <li>Validator node: <code>packages/nl2sql/src/nl2sql/pipeline/nodes/validator/node.py</code></li>
+<li>Statistics stripping: <code>packages/nl2sql/src/nl2sql/pipeline/nodes/schema_retriever/node.py</code></li>
 <li>Audit logger: <code>packages/nl2sql/src/nl2sql/common/event_logger.py</code></li>
 </ul>
 </article>

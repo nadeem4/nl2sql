@@ -1958,6 +1958,13 @@
 <li>Retrieve candidate tables/columns/relationships from <code>VectorStore</code>.</li>
 <li>Resolve authoritative tables from <code>SchemaStore</code>.</li>
 <li>Fall back to full schema snapshot when retrieval returns no candidates.</li>
+<li>Strip column statistics (<code>sample_values</code>, <code>min_value</code>, <code>max_value</code>,
+  <code>distinct_count</code>, <code>null_percentage</code>) from every table the caller's role
+  cannot read, on every path, while keeping its name, columns, types, keys and
+  relationships ("structure yes, data no"). The rule is RBAC's
+  <code>table_allowed</code>, the one the logical validator refuses with; with no RBAC in
+  the context, every table is stripped. See
+  <a href="../../../security/model/#strict-refusal">Security Model</a>.</li>
 </ul>
 <hr/>
 <h2 id="position-in-execution-graph">Position in Execution Graph</h2>

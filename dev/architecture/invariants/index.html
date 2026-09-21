@@ -6352,7 +6352,7 @@
 <li><code>LogicalValidatorNode._validate_policy()</code> in <code>nl2sql.pipeline.nodes.validator.node</code></li>
 </ul>
 <h3 id="failure-behavior_10">Failure Behavior</h3>
-<p><code>ValueError</code> for invalid policy format; <code>PipelineError</code> with <code>SECURITY_VIOLATION</code> if datasource ID is missing or a table is not allowed.</p>
+<p><code>ValueError</code> for invalid policy format; <code>PipelineError</code> with <code>SECURITY_VIOLATION</code> if datasource ID is missing or a table is not allowed. An unknown role, or no role, allows nothing and is refused the same way, never with <code>VALIDATOR_CRASH</code>. The user-facing refusal names no table unless <code>RBAC_REFUSAL_NAMES_TABLES</code> is set; the table and roles are in the error's <code>details</code>.</p>
 <h3 id="why-it-exists_10">Why It Exists</h3>
 <p>Ensures access control boundaries are explicit and enforced.</p>
 <hr />

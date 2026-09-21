@@ -4093,7 +4093,12 @@ Yes.</p>
 <h2 id="behavioral-contracts">Behavioral Contracts</h2>
 <ul>
 <li>Policies enforce table namespacing (<code>datasource.table</code> or <code>datasource.*</code>).</li>
-<li>Unknown roles yield empty permissions.</li>
+<li>Unknown roles yield empty permissions, and an empty <code>roles</code> list does too;
+  neither raises. An unknown role beside a known one is ignored.</li>
+<li><code>table_allowed(allowed_tables, datasource_id, table)</code> is the single matching
+  rule (<code>*</code>, <code>datasource.*</code>, <code>datasource.table</code>) used by both the logical
+  validator (to refuse) and the schema retriever (to strip a forbidden table's
+  statistics).</li>
 </ul>
 
 

@@ -4169,7 +4169,12 @@ visible without editing anything:</p>
 </tbody>
 </table>
 <p>Ask the <code>viewer</code> role about customers and the logical validator refuses the plan
-with a <code>SECURITY_VIOLATION</code> before any SQL is generated.</p>
+with a <code>SECURITY_VIOLATION</code> before any SQL is generated. The planner saw the
+<code>Customer</code> and <code>Invoice</code> tables' columns but none of their sample values or
+statistics. <code>.env.demo</code> sets <code>RBAC_REFUSAL_NAMES_TABLES=true</code>, so the demo's
+refusal names the role and table; outside the demo the message is the generic
+"You do not have permission to see the data this question requires." See
+<a href="../../security/model/#strict-refusal">Security Model</a>.</p>
 <h3 id="api-keys-in-the-demo">API keys in the demo</h3>
 <p><code>.env.demo</code> is generated with <code>EMBEDDING_PROVIDER=local</code>, so schema chunks are
 embedded with the key-free ONNX <code>all-MiniLM-L6-v2</code> model bundled with chromadb

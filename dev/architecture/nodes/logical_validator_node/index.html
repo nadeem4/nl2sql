@@ -2052,7 +2052,14 @@ was validated, not only what failed. The names are fixed and always in this orde
      wraps an argument it has to <em>parse</em>, and a bare function node in
      <code>Order.expressions</code> makes <code>qualify()</code> raise.</li>
 <li>Run <code>_validate_policy()</code> for RBAC enforcement. This always runs, even when
-   static validation failed or raised — the security check is never skipped.</li>
+   static validation failed or raised — the security check is never skipped.
+   Each forbidden table yields a <code>CRITICAL</code> <code>SECURITY_VIOLATION</code> whose message
+   is "You do not have permission to see the data this question requires."
+   (it names nothing), with <code>details</code> = <code>{datasource_id, table, roles}</code> for the
+   trace, and a warning log line. <code>RBAC_REFUSAL_NAMES_TABLES=true</code> puts the role
+   and table in the message instead. An unknown role, or no role, allows no
+   table and is refused the same way. The decision reads only the policy and
+   the plan's table list, never the model's reasoning.</li>
 <li>If any errors are <code>ERROR</code>/<code>CRITICAL</code>, return with errors.</li>
 <li>Otherwise return success reasoning.</li>
 <li>On exception, emit <code>VALIDATOR_CRASH</code>.</li>

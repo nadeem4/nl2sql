@@ -2122,6 +2122,11 @@ providers. The check runs on the read path only, so the fix is simply to re-run
 <td>Treat missing columns as errors in logical validation.</td>
 </tr>
 <tr>
+<td><code>RBAC_REFUSAL_NAMES_TABLES</code></td>
+<td><code>false</code></td>
+<td>Name the role and the forbidden table in the refusal the user sees. Off, the message is "You do not have permission to see the data this question requires."; the table and role are always in the log and the run trace. <code>nl2sql setup --demo</code> writes <code>true</code> into <code>.env.demo</code>. See <a href="../../security/model/#strict-refusal">Security Model</a>.</td>
+</tr>
+<tr>
 <td><code>TENANT_ID</code></td>
 <td><code>default_tenant</code></td>
 <td>Default tenant ID for requests.</td>
