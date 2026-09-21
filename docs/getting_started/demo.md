@@ -92,7 +92,9 @@ This covers the embedding step only. The demo is **not** key-free end to end:
   enrichment failure never fails indexing. The demo's own indexing (the first
   run, the startup repair and the playground's Rebuild) leaves enrichment
   **off**, because it spends tokens on your key; the playground offers it as an
-  explicit checkbox.
+  explicit checkbox. When it is on, the demo's indexing uses a key exported in
+  your shell, or one saved in `.env.demo`; the file's empty `OPENAI_API_KEY=`
+  placeholder no longer blanks an exported key while indexing runs.
 - Both `nl2sql setup --api-key <key>` and `nl2sql demo --api-key <key>` take the
   key on the command line and write it into the generated env file. The provider
   follows the key's shape: a key beginning `sk-or-` is OpenRouter and is stored
@@ -270,6 +272,13 @@ ones the playground offers as guided questions:
 - What was the monthly revenue in 2013 for customers in the USA?
 - Which playlists contain tracks from more than three genres?
 - Who are the top customers by total spend?
+
+They are also indexed: the `schema.datasource` entry the resolver matches every
+question against carries the datasource's configured description and these
+questions (`.env.demo` points `SAMPLE_QUESTIONS` at the file). Folders
+generated before this fix wrote the setting as `ROUTING_EXAMPLES`, which nothing
+read; the engine now accepts that name too, so re-index such a folder
+(`nl2sql --env demo index`) to pick the questions up.
 
 Whether a given question is answered correctly depends on the model; see
 [Known limitations](https://github.com/nadeem4/nl2sql#known-limitations).

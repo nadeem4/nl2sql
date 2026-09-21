@@ -74,15 +74,33 @@ class SqliteSchemaStore:
         existing_version = self._get_version_by_fingerprint(
             snapshot.contract.datasource_id, fingerprint
         )
+        now = datetime.utcnow()
+
         if existing_version:
+            # Same structure, same version: the plan cache keys on it. But the
+            # metadata (statistics, descriptions, enrichment) is what the new
+            # chunks are built from, so it replaces the stored copy, and the
+            # version becomes the latest again (structure A, then B, then A).
+            with self._connection:
+                self._connection.execute(
+                    """
+                    UPDATE schema_snapshots
+                    SET metadata_json = ?, created_at = ?
+                    WHERE datasource_id = ? AND schema_version = ?;
+                    """,
+                    (
+                        json.dumps(snapshot.metadata.model_dump(mode="json")),
+                        int(now.timestamp()),
+                        snapshot.contract.datasource_id,
+                        existing_version,
+                    ),
+                )
             logger.info(
-                "Schema for %s already exists with version %s",
+                "Schema for %s unchanged (version %s); refreshed its metadata",
                 snapshot.contract.datasource_id,
                 existing_version,
             )
             return existing_version, []
-
-        now = datetime.utcnow()
 
         ts = now.strftime("%Y%m%d%H%M%S")
         schema_version = f"{ts}_{fingerprint[:8]}"

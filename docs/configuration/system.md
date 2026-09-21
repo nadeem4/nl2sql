@@ -13,7 +13,7 @@ Configuration is split into **environment variables** (runtime settings) and **f
 | `EMBEDDING_MODEL` | `text-embedding-3-small` | OpenAI embedding model. Ignored when `EMBEDDING_PROVIDER=local`. |
 | `LLM_CONFIG` | `configs/llm.yaml` | Path to the LLM config file. |
 | `DATASOURCE_CONFIG` | `configs/datasources.yaml` | Path to the datasource config file. |
-| `SAMPLE_QUESTIONS` | `configs/sample_questions.yaml` | Path to the sample questions file. |
+| `SAMPLE_QUESTIONS` | `configs/sample_questions.yaml` | Path to the sample questions file (a map of datasource id to questions). They are indexed into each datasource's `schema.datasource` entry. `ROUTING_EXAMPLES`, the name `.env` files generated before 2026-09-21 wrote, is accepted as well. |
 | `POLICIES_CONFIG` | `configs/policies.json` | Path to the RBAC policies file. |
 | `SECRETS_CONFIG` | `configs/secrets.yaml` | Path to the secrets config file. |
 | `VECTOR_STORE` | `./chroma_db` | Persist directory for the vector store. |

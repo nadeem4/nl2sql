@@ -39,6 +39,8 @@ Each `SchemaSnapshot` (contract + metadata) is versioned using a **deterministic
 
 Schema versions are timestamped and include a fingerprint prefix (e.g., `YYYYMMDDhhmmss_<fp8>`). Old versions are evicted beyond `schema_store_max_versions`.
 
+The fingerprint covers **structure only** (tables, columns, keys). Registering a snapshot whose structure matches an existing version returns that version unchanged, so anything keyed on it (the plan cache) stays valid, but the stored **metadata** (statistics, descriptions, enrichment) is replaced by the new snapshot's and the version becomes the latest again. The snapshot store and the chunks built from the same snapshot therefore always agree.
+
 ## Retrieval and authority
 
 Schema retrieval resolves **authoritative** tables/columns from `SchemaStore`, not from the vector store. Vector store chunks are only used to identify candidates; final schema is resolved via snapshot. If retrieval yields no candidates, the retriever falls back to the full snapshot. `schema_version_mismatch_policy` governs mismatches between chunk versions and store versions.

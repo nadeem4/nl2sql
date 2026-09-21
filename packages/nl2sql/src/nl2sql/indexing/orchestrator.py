@@ -79,6 +79,16 @@ class IndexingOrchestrator:
                 existing_questions=questions,
             )
 
+        # The description lives in the datasources config, not the database,
+        # so no adapter can report it. It is the operator's own words about
+        # what the datasource holds and is what the resolver matches questions
+        # against, so it wins over anything the adapter or enrichment wrote.
+        if datasource_description and datasource_description.strip():
+            metadata = schema_snapshot.metadata.model_copy(
+                update={"description": datasource_description.strip()}
+            )
+            schema_snapshot = schema_snapshot.model_copy(update={"metadata": metadata})
+
         schema_version, evicted_versions = self.schema_store.register_snapshot(
             schema_snapshot
         )

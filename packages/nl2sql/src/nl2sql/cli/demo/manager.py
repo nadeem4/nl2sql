@@ -25,6 +25,23 @@ from .defaults import DEMO_LLM_CONFIG
 from .stamp import write_stamp
 
 
+PROVIDER_KEYS = ("OPENAI_API_KEY", "OPENROUTER_API_KEY")
+
+
+def _load_demo_env(env_path: pathlib.Path) -> None:
+    """Loads `.env.demo` over the environment, keeping any provider key already set."""
+    import os
+
+    from dotenv import dotenv_values
+
+    for name, value in dotenv_values(env_path).items():
+        if value is None:
+            continue
+        if name in PROVIDER_KEYS and os.environ.get(name):
+            continue
+        os.environ[name] = value
+
+
 class DemoManager:
     """Creates the demo project: the Chinook database, its configs and `.env.demo`."""
 
@@ -139,7 +156,6 @@ class DemoManager:
         Enrichment is off unless asked for: it spends tokens on the user's key.
         """
 
-        from dotenv import load_dotenv
         from nl2sql.common.settings import settings, reload_settings
 
         env_path = self.project_root / ".env.demo"
@@ -149,7 +165,11 @@ class DemoManager:
 
         # The demo environment must be active before the context is built:
         # NL2SQLContext validates vector store settings during construction.
-        load_dotenv(env_path, override=True)
+        # Its settings override the shell's, except the provider keys: a key
+        # already exported wins over `.env.demo` (the precedence `nl2sql demo`
+        # documents), and the file's empty `OPENAI_API_KEY=` placeholder must
+        # never blank it, or enrichment runs with no key at all.
+        _load_demo_env(env_path)
         reload_settings()
 
         from nl2sql.context import NL2SQLContext
