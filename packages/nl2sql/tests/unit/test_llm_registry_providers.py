@@ -209,3 +209,34 @@ def test_listed_configs_never_expose_the_api_key():
 
     assert "api_key" not in registry.get_llm_config("default")
     assert "api_key" not in registry.list_llms()["default"]
+
+
+def test_replace_llms_drops_agents_the_new_config_no_longer_names(monkeypatch):
+    """The playground reloads the whole LLM config at runtime.
+
+    An agent removed from the file ("use the default") must fall back to the
+    default, not keep the client built from its old entry.
+    """
+    monkeypatch.setenv("OPENAI_API_KEY", "placeholder")
+    registry = _registry()
+    registry.register_llms({
+        "default": AgentConfig(provider="openai", model="gpt-5.4"),
+        "astplanner": AgentConfig(provider="openai", model="gpt-4.1"),
+    })
+    assert registry.get_llm("astplanner").model_name == "gpt-4.1"
+
+    registry.replace_llms({"default": AgentConfig(provider="openai", model="gpt-5.4-mini")})
+
+    assert registry.get_llm("astplanner").model_name == "gpt-5.4-mini"
+    assert set(registry.list_llms()) == {"default"}
+
+
+def test_replace_llms_keeps_the_old_config_when_the_new_one_is_invalid(monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "placeholder")
+    registry = _registry()
+    registry.register_llms({"default": AgentConfig(provider="openai", model="gpt-5.4")})
+
+    with pytest.raises(ValueError):
+        registry.replace_llms({"default": AgentConfig(provider="nope", model="x")})
+
+    assert registry.get_llm("default").model_name == "gpt-5.4"

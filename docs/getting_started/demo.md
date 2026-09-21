@@ -37,7 +37,9 @@ Setup then runs schema indexing once, automatically.
 
 For the browser playground instead of the CLI, `nl2sql demo` does the same
 scaffolding in `./nl2sql-demo` and serves a page over it. See the
-[README](https://github.com/nadeem4/nl2sql#try-it) for its flags.
+[README](https://github.com/nadeem4/nl2sql#try-it) for its flags, and
+[the settings panel](#the-settings-panel) for entering a key and choosing
+models from the page.
 
 ### The schema
 
@@ -109,6 +111,50 @@ Because the demo indexes with `local` and the default environment indexes with
 change `EMBEDDING_PROVIDER` for an existing store, re-run `nl2sql index` — the
 store otherwise raises `EmbeddingDimensionMismatchError`.
 
+### The settings panel
+
+The playground that `nl2sql demo` serves has a **Settings** button at the top
+right. It edits the same two files the CLI reads, and nothing else: there is no
+second settings store, and the browser keeps nothing but UI conveniences.
+
+- **API key.** Paste a key and press **Save key**. The provider follows the
+  key's shape by the same rule as `--api-key` (`sk-or-` is OpenRouter, anything
+  else OpenAI). The key is written to the demo project's `.env.demo` and the
+  running demo switches from replay to live **without a restart**: questions
+  already running finish on the model client they started with, then the
+  engine's LLM clients are rebuilt from `configs/llm.demo.yaml`. The key is
+  write-only: no response, log line, trace or error carries it, only a masked
+  form such as `sk-...4f2a`. On a later start the precedence above still holds,
+  so `--api-key` or a key exported in your shell wins over the saved one.
+- **A model for each LLM step.** One selector each for the question splitter
+  (`decomposer`), query planner (`astplanner`), plan repair (`refiner`) and
+  answer writer (`answersynthesizer`), each with a "Default" option that uses
+  the `default` agent. A choice is written to `configs/llm.demo.yaml` under
+  `agents:`, with the default's provider, endpoint and key reference, and takes
+  effect on the next question. The list is short on purpose. On 2026-09-20 each
+  model was sent the engine's exact parameters (`temperature=0`, `seed=42`,
+  strict `json_schema`) and worked with them, two of them only once the
+  temperature was left out. That says the model accepts the engine's calls, not
+  how well it plans, which is the evaluation's question:
+
+    | Model | Written with |
+    | --- | --- |
+    | `gpt-5.4` (the default), `gpt-5.4-mini`, `gpt-4.1`, `gpt-4.1-mini`, `gpt-4o` | `temperature: 0.0` |
+    | `gpt-5.5`, `gpt-5-mini` | `temperature: null`: they reject temperature 0, so a step on one runs at the model's default temperature and its answers vary more from run to run |
+
+    The list lives in one place, `VERIFIED_MODELS` in
+    `nl2sql/cli/common/api_key.py`. It is OpenAI-only for now: with an
+    OpenRouter key or Ollama the panel shows the configured model and offers no
+    list.
+- **Local only by default.** Settings work only when the playground is bound to
+  a loopback address (`127.0.0.1`, `localhost`, `::1`). On `0.0.0.0` or any
+  other address the panel says why it is off and the settings routes answer
+  `403`, because the playground has no login: a stranger who can reach it could
+  swap in their own key, or spend on yours. `nl2sql demo --allow-settings` turns
+  it on anyway, for a network you trust. Changes are also refused from another
+  site's page (a foreign `Origin`), through a hostname that is not a loopback
+  name, or in anything but JSON.
+
 ## 3. Use the demo from the CLI
 
 ```bash
@@ -164,7 +210,7 @@ Whether a given question is answered correctly depends on the model; see
 
 Re-running `nl2sql setup --demo` overwrites `data/chinook.sqlite` and the
 `configs/*.demo.*` files with fresh copies. An existing `.env.demo` is
-overwritten too, so a key recorded there is lost - pass `--api-key` again, or
+overwritten too, so a key recorded there is lost - pass `--api-key` again, save it in the playground's Settings panel, or
 re-add it afterwards.
 
 ## There is only one demo dataset

@@ -15,10 +15,13 @@ The key is looked for in a fixed order, highest precedence first:
 4. a reachable Ollama (live, but nothing to record through)
 5. replay
 
-``--api-key`` is the only source that writes anything down, and it writes only
-to ``.env.demo``. No path echoes a key to the console: what is printed is at
-most a masked form. The playground itself never sees a key and never writes to
-the demo database.
+``--api-key`` and the playground's settings panel are the only sources that
+write a key down, and both write only to ``.env.demo``, through
+:func:`_persist_api_key`. A key saved in the panel takes effect at once, and on
+the next start it sits at step 3 of the order above. No path echoes a key: the
+console and the playground show at most a masked form. The panel is on only
+for a loopback ``--host`` unless ``--allow-settings`` is given; the playground
+never writes to the demo database.
 """
 from __future__ import annotations
 
@@ -30,7 +33,13 @@ from typing import List, Optional, Tuple
 
 import yaml
 
-from nl2sql.cli.common.api_key import env_var_for_key, mask_key, provider_for_key
+from nl2sql.cli.common.api_key import (
+    OPENAI_ENV,
+    OPENROUTER_ENV,
+    env_var_for_key,
+    mask_key,
+    provider_for_key,
+)
 from nl2sql.cli.common.decorators import handle_cli_errors
 from nl2sql.cli.console import console, print_error, print_step, print_success
 from nl2sql.cli.demo import DemoManager
@@ -173,13 +182,29 @@ def prepare_project(directory: pathlib.Path) -> pathlib.Path:
 
 
 def _point_llm_config_at(directory: pathlib.Path, base_url: Optional[str], provider: str = "openai") -> None:
+    """Points the default agent, and every per-node agent, at one endpoint.
+
+    A per-node entry (written by the playground's settings panel) differs from
+    the default only in its model, so it follows the default's provider and
+    endpoint: in replay mode a node left on the real provider would be sent the
+    ``replay`` placeholder as its key.
+
+    The key reference follows the provider too. The scaffolded config reads
+    ``${env:OPENAI_API_KEY}``, and a reference names the one variable the
+    registry looks in, so an OpenRouter demo kept failing with "no API key"
+    while ``OPENROUTER_API_KEY`` was set.
+    """
     path = directory / "configs" / "llm.demo.yaml"
     cfg = yaml.safe_load(path.read_text(encoding="utf-8"))
-    cfg["default"]["provider"] = provider
-    if base_url:
-        cfg["default"]["base_url"] = base_url
-    else:
-        cfg["default"].pop("base_url", None)
+    key_variable = {"openai": OPENAI_ENV, "openrouter": OPENROUTER_ENV}.get(provider)
+    for agent in [cfg["default"], *(cfg.get("agents") or {}).values()]:
+        agent["provider"] = provider
+        if key_variable:
+            agent["api_key"] = "${env:" + key_variable + "}"
+        if base_url:
+            agent["base_url"] = base_url
+        else:
+            agent.pop("base_url", None)
     path.write_text(yaml.safe_dump(cfg, sort_keys=False), encoding="utf-8")
 
 
@@ -225,6 +250,7 @@ def demo_command(
     no_browser: bool,
     record: bool,
     api_key: Optional[str] = None,
+    allow_settings: bool = False,
 ) -> None:
     # chdir before anything indexes. The schema store path is resolved against
     # the working directory rather than the project root, so indexing from a
@@ -316,6 +342,9 @@ def demo_command(
         roles=roles,
         mode="replay" if replay_server else "live",
         dataset=DATASET,
+        project_dir=directory,
+        host=host,
+        allow_settings=allow_settings,
     )
     url = f"http://{host}:{port}/"
     print_success(f"Playground ready at {url}")

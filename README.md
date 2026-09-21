@@ -53,7 +53,8 @@ engine's one real safety property, made visible.
 | `--port N` | `8765` | The port to serve on. Change it when 8765 is taken, or when you are running two demos at once. |
 | `--no-browser` | off | Do not open a browser tab; just serve and print the URL. Use it over SSH and in containers, where there is no browser to open; in CI and scripts, where a browser would be noise or an error; when you are driving the HTTP API directly rather than the page; and on a demo you restart repeatedly, so each restart does not pile up another tab. |
 | `--record` | off | Run the guided questions through your real provider and save the responses to `recordings.json` in the demo project, so the key-free replay path can answer them later. Needs an API key — a reachable Ollama is not enough, because there is nothing to proxy through. This spends real API credits. |
-| `--api-key KEY` | unset | The key for live mode, saved into the demo project's `.env.demo` so later runs from that directory stay live without passing it again. The provider follows the key's shape: `sk-or-…` is OpenRouter, anything else is OpenAI. A key on the command line is visible in your shell history and to `ps`, so exporting the environment variable stays the more private route. |
+| `--api-key KEY` | unset | The key for live mode, saved into the demo project's `.env.demo` so later runs from that directory stay live without passing it again. The provider follows the key's shape: `sk-or-…` is OpenRouter, anything else is OpenAI. A key on the command line is visible in your shell history and to `ps`, so exporting the environment variable, or pasting the key into the playground's **Settings** panel, is the more private route. |
+| `--allow-settings` | off | Turn on the playground's **Settings** panel (API key, model per LLM step) when `--host` is not a loopback address. It is off there by default because the playground has no login: anyone who can reach the page could swap in their own key or run up costs on yours. On `127.0.0.1` / `localhost` the panel is always on. |
 
 ### What the demo needs, honestly
 
@@ -66,6 +67,16 @@ nl2sql demo --api-key sk-...
 The key is written into the demo project's `.env.demo`, so later runs from that
 directory are live without passing it again. `.env.demo` is covered by
 `.gitignore`.
+
+Or start the demo without a key and paste one into the playground: **Settings**
+(top right) takes the key, writes it to the same `.env.demo` and switches the
+running demo from replay to live without a restart. The page never shows the key
+again, only a masked form such as `sk-...4f2a`. The same panel picks a model for
+each LLM step (question splitter, query planner, plan repair, answer writer) from
+a short list of OpenAI models checked against the engine's parameters, and
+writes the choice to the demo's `configs/llm.demo.yaml`, the file the CLI reads.
+Settings work only when the playground is bound to localhost unless you pass
+`--allow-settings`; see [the demo guide](docs/getting_started/demo.md#the-settings-panel).
 
 Without the flag the demo looks for a key in a fixed order, highest first:
 

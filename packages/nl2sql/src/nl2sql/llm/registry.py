@@ -128,6 +128,38 @@ class LLMRegistry:
         for key, agent in config.items():
             self.register_llm(agent if agent.name == key else agent.model_copy(update={"name": key}))
 
+    def replace_llms(self, config: Dict[str, AgentConfig]):
+        """Replaces every agent with those in ``config``, as one step.
+
+        Unlike ``register_llms`` this also forgets agents the new config no
+        longer names, so they fall back to 'default'. Every entry is validated
+        before anything changes: an invalid config leaves the old one in place.
+        Clients already handed out are untouched; the next ``get_llm`` builds
+        from the new config.
+        """
+        named = {
+            key: agent if agent.name == key else agent.model_copy(update={"name": key})
+            for key, agent in config.items()
+        }
+        for agent in named.values():
+            self._validate(agent)
+        with self._lock:
+            self._configs = named
+            self.llms = {}
+
+    @staticmethod
+    def _validate(agent: AgentConfig) -> None:
+        if agent.provider not in PROVIDER_PRESETS:
+            raise ValueError(
+                f"Unsupported LLM provider: {agent.provider}. "
+                f"Valid providers are: {', '.join(sorted(PROVIDER_PRESETS))}."
+            )
+        if not agent.model or not agent.model.strip():
+            raise ValueError(
+                f"LLM agent '{agent.name}' has no model configured. "
+                "Set 'model' for it in configs/llm.yaml."
+            )
+
     def register_llm(self, agent: AgentConfig):
         """Validates an agent's configuration and records it for later use.
 
@@ -142,16 +174,7 @@ class LLMRegistry:
         Raises:
             ValueError: If the provider is unknown or the model is empty.
         """
-        if agent.provider not in PROVIDER_PRESETS:
-            raise ValueError(
-                f"Unsupported LLM provider: {agent.provider}. "
-                f"Valid providers are: {', '.join(sorted(PROVIDER_PRESETS))}."
-            )
-        if not agent.model or not agent.model.strip():
-            raise ValueError(
-                f"LLM agent '{agent.name}' has no model configured. "
-                "Set 'model' for it in configs/llm.yaml."
-            )
+        self._validate(agent)
 
         with self._lock:
             self._configs[agent.name] = agent

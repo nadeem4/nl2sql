@@ -97,8 +97,9 @@ class FakeLLMServer:
     """``reject_temperature`` answers any request carrying ``temperature`` with
     OpenAI's 400 for models that only accept the default, as gpt-5.5 does.
 
-    Each entry in ``calls`` keeps the request ``body`` so tests can check what
-    was actually sent.
+    Each entry in ``calls`` keeps the request ``body``, and the ``authorization``
+    header of a matched or unmatched call, so tests can check what was actually
+    sent and with which key.
     """
 
     rules: List[Rule]
@@ -142,7 +143,8 @@ class FakeLLMServer:
                     (r for r in outer.rules if r.name == name and (r.when is None or r.when in text)),
                     None,
                 )
-                outer.calls.append({"name": name, "mode": mode, "matched": rule is not None, "body": body})
+                outer.calls.append({"name": name, "mode": mode, "matched": rule is not None, "body": body,
+                                    "authorization": self.headers.get("Authorization")})
                 if rule is None:
                     self._send(400, {"error": {"message": f"fake llm: no rule for {name}"}})
                     return
