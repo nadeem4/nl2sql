@@ -42,7 +42,9 @@ def test_ast_planner_successful_plan():
 
     # Assert
     assert result["ast_planner_response"].plan is not None
-    assert result["errors"] == []
+    # No errors key: ``errors`` is an additive reducer, so returning [] would
+    # clear nothing. Earlier attempts' errors stay as retry feedback.
+    assert "errors" not in result
 
 
 def test_ast_planner_failure_returns_error():

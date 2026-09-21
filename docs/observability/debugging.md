@@ -109,9 +109,9 @@ named a column that does not exist; long values shortened here):
   and the usage record from `TokenUsageCallback` (the same record
   `QueryResult.usage.calls` reports).
 
-The file records what happened, including known reporting defects: a sub-query
-that recovers on retry can still carry `status: "error"`, and one that exhausts
-its retries on warnings can report `"success"`.
+The file records what happened. A sub-query's `status` reflects its final
+attempt, so one that recovers on retry reports `"success"`; the failed
+attempts stay in the node entries and in the result's `warnings`.
 
 ### Redaction
 

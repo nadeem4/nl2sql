@@ -185,14 +185,20 @@ def test_usage_reaches_query_result_and_the_rest_response(demo_project, fake_llm
         reload_settings()
 
     assert isinstance(result, QueryResult)
-    # The retry recovered: the second plan ran and returned the count. (The
-    # first plan's TABLE_NOT_FOUND still sits in ``errors`` after the recovery,
-    # so ``status`` is not asserted here; that is a separate, existing defect.)
+    # The retry recovered: the second plan ran and returned the count, so the
+    # sub-query and the run succeeded. The first plan's TABLE_NOT_FOUND stays
+    # visible as a warning, not as an error.
     assert result.sub_queries[0].retry_count == 1
     assert result.sub_queries[0].rows.total_rows == 1
+    assert result.sub_queries[0].status == "success"
+    assert result.status == "success"
+    assert result.errors == []
+    assert any(w.get("error_code") == "TABLE_NOT_FOUND" for w in result.warnings)
     _assert_usage(result.usage.model_dump(mode="json"))
 
     assert response.status_code == 200, response.text
     body = response.json()
     assert body["sub_queries"][0]["retry_count"] == 1
+    assert body["sub_queries"][0]["status"] == "success"
+    assert body["status"] == "success"
     _assert_usage(body["usage"])

@@ -146,6 +146,9 @@ def test_a_run_that_retries_is_traced_on_failure_with_both_planner_attempts(fail
     assert any(e["error_code"] == "COLUMN_NOT_FOUND" for e in validator_1["errors"] + validator_1["warnings"])
     assert [n["node"] for n in doc["nodes"] if n["llm_calls"]].count("refiner") == 1
     assert doc["result"]["sub_queries"][0]["retry_count"] == 1
+    # The retry recovered, so the run succeeded; the trace still records it.
+    assert doc["result"]["sub_queries"][0]["status"] == "success"
+    assert doc["result"]["status"] == "success"
 
 
 @pytest.mark.e2e

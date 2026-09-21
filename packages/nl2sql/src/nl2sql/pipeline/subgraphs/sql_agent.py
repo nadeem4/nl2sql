@@ -125,18 +125,26 @@ def build_sql_agent_graph(
         return "ok"
 
     def check_logical_validation(state: SubgraphExecutionState, config: Optional[RunnableConfig] = None) -> str:
-        """Routes based on logical validation result."""
+        """Routes based on logical validation result.
+
+        ERROR and CRITICAL findings block: non-retryable ones end the sub-query,
+        retryable ones go to the refiner while retries remain, then end.
+        WARNING findings (COLUMN_NOT_FOUND with strict columns off) do not block:
+        the refiner gets the chance to repair the plan while retries remain, and
+        once they are spent the plan proceeds to generation.
+        """
         if _is_cancelled(config):
             return "end"
-        if state.logical_validator_response and state.logical_validator_response.errors:
-            # Critical/Fatal errors stop execution immediately
-            if not all(e.is_retryable for e in state.logical_validator_response.errors):
-                return "end"
-
-            if _get_retry_count(state) < settings.sql_agent_max_retries:
-                return "retry"
+        findings = state.logical_validator_response.errors if state.logical_validator_response else []
+        if not findings:
+            return "ok"
+        blocking = [e for e in findings if e.severity in (ErrorSeverity.ERROR, ErrorSeverity.CRITICAL)]
+        # Critical/Fatal errors stop execution immediately
+        if not all(e.is_retryable for e in blocking):
             return "end"
-        return "ok"
+        if _get_retry_count(state) < settings.sql_agent_max_retries:
+            return "retry"
+        return "end" if blocking else "ok"
 
     graph.add_node("schema_retriever", schema_retriever)
     graph.add_node("ast_planner", ast_planner)

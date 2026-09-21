@@ -23,7 +23,7 @@ Source: `packages/api/src/nl2sql_api/models/query.py`
 | `plan` | `Optional[Dict[str, Any]]` | no | The validated plan, dumped. |
 | `validation` | `List[Dict[str, Any]]` | no | Validation checks (`name`, `passed`, `message`). |
 | `rows` | `Optional[Dict[str, Any]]` | no | Capped row sample (`columns`, `rows`, `total_rows`). |
-| `status` | `str` | no | `"success"` or `"error"` for this sub-query. |
+| `status` | `str` | no | `"success"` or `"error"` for this sub-query, from its final attempt: `"success"` when it ended with SQL and, if executed, a result; otherwise `"error"`. A retry that recovers reports `"success"`. |
 | `retry_count` | `int` | no | Plan/SQL refinement attempts made. |
 
 ### `QueryResponse`
