@@ -81,3 +81,51 @@ def doctor_command():
     except Exception as exc:
         print_error(f"LLM configuration could not be loaded: {exc}")
 
+    # 6. Index health
+    #
+    # Judged by the index's contents: an empty collection fails every
+    # question at the resolver while every check above can be green.
+    console.print("\n[bold]Index:[/bold]")
+    _report_index_health()
+
+
+def _report_index_health() -> None:
+    from pathlib import Path
+
+    from nl2sql.common.settings import settings
+    from nl2sql.indexing.health import inspect_index_at
+
+    try:
+        datasource_ids = [ds.id for ds in ConfigManager().load_datasources()]
+    except Exception:
+        datasource_ids = []
+    try:
+        health = inspect_index_at(
+            Path(settings.vector_store_path or ""),
+            settings.vector_store_collection_name,
+            Path(settings.schema_store_path),
+            datasource_ids,
+        )
+    except Exception as exc:
+        print_error(f"The vector index could not be inspected: {exc}")
+        return
+
+    console.print(f"Vector index: {escape(str(settings.vector_store_path))} "
+                  f"(collection {escape(settings.vector_store_collection_name)})")
+    if health.total:
+        counts = ", ".join(f"{kind}={n}" for kind, n in health.counts.items())
+        console.print(f"Entries: {health.total} ({escape(counts)})")
+    if health.built_at:
+        console.print(f"Built: {escape(health.built_at)}")
+    for ds in health.datasources:
+        if ds.entries and ds.snapshot_version and ds.index_version == ds.snapshot_version:
+            console.print(
+                f"{escape(ds.datasource_id)}: schema version {escape(ds.index_version)} "
+                "matches the latest snapshot."
+            )
+    if health.ok:
+        print_success("Index OK.")
+    else:
+        for problem in health.problems:
+            print_error(problem)
+

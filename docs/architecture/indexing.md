@@ -37,7 +37,68 @@ All chunk types are embedded as `langchain_core.documents.Document` and stored i
 - `Document.page_content` = `chunk.get_page_content()`
 - `Document.metadata` = `chunk.get_metadata()`
 
-There is **one index** (Chroma collection) per `VectorStore` configuration.
+There is **one index** (Chroma collection) per `VectorStore` configuration, shared by
+every datasource. Each entry also carries a `build_id` (see below); it is stripped
+from retrieved documents, because the resolver prints a datasource entry's
+metadata into the decomposer prompt.
+
+## Rebuilding without an empty index
+
+Re-indexing never deletes the collection first. Each datasource is rebuilt on its
+own, inside the one collection (`VectorStore.refresh_schema_chunks`):
+
+```mermaid
+%%{init: {"theme": "neutral"}}%%
+flowchart TD
+    A[Read schema, register snapshot] --> B[Write every entry under a new build_id]
+    B --> C{All entries written?}
+    C -->|no| D[Delete the partial new build; previous entries stay active]
+    C -->|yes| E[Switch: collection metadata build:DS = new build_id]
+    E --> F[Delete the datasource's other builds]
+```
+
+- The collection's metadata names each datasource's **active build**
+  (`build:<datasource_id>`) and when it was switched in (`built_at:<datasource_id>`).
+  Every retrieval filters on the active builds, so while the old and new builds
+  coexist a reader sees exactly one of them, never both and never a mix of schema
+  versions. Entries written before builds existed have no `build_id` and are read
+  as they are until their datasource is next re-indexed.
+- **Other datasources are never read, deleted or rewritten** by a datasource's
+  rebuild. `nl2sql index --datasource X` rebuilds only X; `nl2sql index` rebuilds
+  each configured datasource in turn, and a failure keeps that datasource's
+  previous entries active and exits `1`.
+- Callers that serve questions can hold them back around the switch:
+  `rebuild_index(..., switch_guard=...)`. The playground passes its `RunGate`, so
+  questions in flight finish first.
+- `nl2sql.indexing.rebuild.rebuild_index` is the one entry point for
+  `nl2sql index`, the demo's startup repair and the playground's Rebuild.
+
+### One embedding model per collection
+
+A query is embedded once, in one space, so every datasource in a collection
+must use the same embedding model. The collection records it
+(`embedding_model`, e.g. `local/all-MiniLM-L6-v2`) on its first write. If the
+configured model differs, retrieval and per-datasource re-indexing raise
+`EmbeddingModelMismatchError`, which also catches two different models of the
+same dimension that the dimension check cannot. A model change is the one case
+that needs every datasource rebuilt at once: `nl2sql index --full` builds all of
+them into a staging collection (`<name>__staging`) and swaps it in by renaming
+only when all succeed; a failure discards the staging collection and leaves the
+live one untouched. A collection written before models were recorded adopts the
+configured model on its next write (the dimension check still applies).
+
+## Index health
+
+`nl2sql.indexing.health` judges an index by its **contents**, never by whether
+its folder exists (the demo once had a `data/vector_store_demo` folder holding 0
+entries). Only active builds are counted. Status, worst first: `missing` (no
+folder or collection), `empty` (0 entries), `stale` (a configured datasource has
+no entries, its entries were built from an older schema version than the latest
+snapshot, or the configured embedding model differs), `ok`. It reports entry
+counts by type, the schema version per datasource, when each was built and the
+recorded embedding model. `nl2sql doctor` prints it under **Index**,
+`nl2sql demo` rebuilds at startup when it is not `ok`, and the playground shows
+it with a Rebuild button.
 
 ## Chunking strategy (as implemented)
 
@@ -111,8 +172,13 @@ Current failure behaviors:
   degrade the same way. A missing/unusable LLM logs at `INFO`; anything
   unexpected logs at `WARNING` with a stack trace.
 - Retrieving from a vector store whose persisted vectors do not match the
-  configured embedding provider raises `EmbeddingDimensionMismatchError`. The check
-  is on the read path only, so a re-index clears the collection and recovers.
+  configured embedding provider raises `EmbeddingDimensionMismatchError`; a
+  recorded embedding model that differs from the configured one raises
+  `EmbeddingModelMismatchError`. Either is fixed with `nl2sql index --full`.
+- When the resolver finds no datasource and the index is empty, its
+  `SCHEMA_RETRIEVAL_FAILED` error says so and names `nl2sql index`, instead of
+  "No datasource candidates resolved."
+- A failed rebuild leaves the previous entries active (see above).
 
 ## Performance characteristics (current)
 
@@ -120,7 +186,8 @@ Current failure behaviors:
   ONNX `all-MiniLM-L6-v2` model when `EMBEDDING_PROVIDER=local`.
 - Vector search uses Chroma MMR (`lambda_mult=0.7`, `fetch_k = 4*k`).
 - No caching or sharding layers are implemented.
-- Index refresh is full reindex per schema snapshot.
+- Index refresh re-embeds every entry of the datasource being re-indexed; other
+  datasources are untouched.
 
 ## Observability hooks
 

@@ -238,6 +238,62 @@ li[data-flag="denied"] .flag { color: var(--ink); background: var(--well); }
 .fks li { padding: 1px 0; }
 .fks code { color: var(--ink); font-size: 12px; }
 
+/* ---------- rail: the search index ----------
+   Sits above the Database because the two are easy to confuse: the Database
+   reads the schema snapshot and can look fine while the index is empty. When
+   healthy it is a quiet ledger; when not, it takes the fault colour and its
+   Rebuild becomes the one filled button in the rail. */
+
+.index { margin-bottom: 26px; padding-bottom: 18px; border-bottom: 1px solid var(--rule); }
+.index .ds { font-size: 13px; color: var(--ink-2); font-weight: 400; }
+.index-status { font-size: 13.5px; color: var(--ink-2); margin: -4px 0 10px; max-width: 42ch; }
+.index[data-status="empty"] .index-status,
+.index[data-status="missing"] .index-status,
+.index[data-status="stale"] .index-status { color: var(--fault); font-weight: 600; }
+
+.index-problems { margin: 0 0 12px; padding: 8px 12px; list-style: none; background: var(--fault-soft); border-radius: var(--r-well); font-size: 13px; color: var(--ink); display: grid; gap: 4px; }
+.index-problems li { overflow-wrap: anywhere; }
+
+.index-counts { margin: 0 0 10px; display: grid; grid-template-columns: repeat(4, minmax(0, max-content)); gap: 8px 20px; }
+.index-counts div { display: flex; flex-direction: column-reverse; }
+.index-counts dt { font-size: 12.5px; color: var(--ink-2); }
+.index-counts dd { margin: 0; font-family: var(--mono); font-size: 17px; font-variant-numeric: tabular-nums; }
+
+.index-meta { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 12.5px; color: var(--ink-3); margin-bottom: 12px; }
+.index-meta code { color: var(--ink-2); font-size: 12px; }
+.index-folder { margin-bottom: 12px; padding-left: 12px; border-left: 2px solid var(--rule-strong); font-size: 13px; color: var(--ink); max-width: 46ch; }
+
+.index-action { display: grid; gap: 6px; justify-items: start; }
+.index-enrich { font-size: 13.5px; }
+.index-enrich input:disabled { cursor: default; }
+.index-help { font-size: 12.5px; color: var(--ink-2); max-width: 46ch; }
+.index-help code { white-space: nowrap; }
+.index-rebuild {
+  margin-top: 4px; background: none; border: 1px solid var(--rule-strong); border-radius: var(--r-control);
+  padding: 4px 14px; font-size: 13.5px; font-weight: 600; color: var(--ink);
+  transition: color .15s ease, border-color .15s ease, filter .15s ease, transform .1s ease;
+}
+.index-rebuild:hover:not(:disabled) { border-color: var(--ink); }
+.index-rebuild:active:not(:disabled) { transform: translateY(1px); }
+.index-rebuild.is-primary { background: var(--ink); color: var(--paper); border-color: var(--ink); padding: 6px 16px; font-size: 14px; }
+.index-rebuild.is-primary:hover:not(:disabled) { filter: brightness(1.25); }
+.index-rebuild:disabled { background: var(--well); border-color: var(--well); color: var(--ink-3); }
+
+.index-progress { margin: 12px 0 0; padding: 0 0 0 18px; font-size: 13px; color: var(--ink-2); display: grid; gap: 3px; }
+.index-progress li[data-current] { color: var(--ink); font-weight: 600; }
+.index-progress .working { margin-left: 2px; }
+.index .fault { margin: 10px 0 0; font-size: 13.5px; }
+
+/* The page-wide warning: the only thing above the fold that says questions
+   will fail, because the rail sits below the run on a narrow window. */
+.index-warning {
+  margin: 14px 0 0; padding: 10px 14px; border-radius: var(--r-well);
+  background: var(--fault-soft); color: var(--fault); font-size: 14.5px; max-width: 96ch;
+}
+.index-warning strong { font-weight: 650; }
+.index-warning a { color: inherit; font-weight: 600; text-decoration: underline 1px; text-underline-offset: 3px; }
+.index-warning code { color: var(--ink); }
+
 /* ---------- the run: one spine, six stations ---------- */
 
 .spine { position: relative; padding-left: 34px; }

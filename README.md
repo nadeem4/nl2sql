@@ -28,9 +28,14 @@ keys), indexes its schema on your machine, serves a playground on
 <http://127.0.0.1:8765/> and opens your browser. Indexing needs no API key; the
 first run downloads a ~79 MB ONNX embedding model.
 
-The page opens on the indexed **schema** (every table, its row count, columns,
-keys and the tables it refers to), so you see the database before you ask
-anything. Each answer then reads top to bottom as one run: the **question**, the
+The page opens on the **search index** the engine matches questions against
+(entries by type, the schema version they were built from, and when), with a
+**Rebuild** button, and on the indexed **schema** (every table, its row count,
+columns, keys and the tables it refers to), so you see the database before you
+ask anything. Each start checks what the index contains and rebuilds it when it
+is empty or out of date with the schema; a rebuild writes the new entries
+beside the current ones and switches only when they are complete, so questions
+never meet an empty or half-built index. Each answer then reads top to bottom as one run: the **question**, the
 **plan** the model produced, the **checks** the validator ran on it (pass or
 refused, with a reason), the generated **SQL**, the **rows**, and what the
 answer **cost**: LLM calls, tokens and time for the question. The **Debug**
@@ -48,7 +53,7 @@ engine's one real safety property, made visible.
 
 | Flag | Default | What it does, and when you want it |
 | --- | --- | --- |
-| `--dir PATH` | `nl2sql-demo` | Where the demo project is written: the database, the `configs/*.demo.*` files, `.env.demo` and the vector store. Point it somewhere else to keep several demos side by side, to put it outside a git checkout, or to reuse one you already indexed — an existing project is not re-scaffolded and not re-indexed. |
+| `--dir PATH` | `nl2sql-demo` | Where the demo project is written: the database, the `configs/*.demo.*` files, `.env.demo` and the vector store. Point it somewhere else to keep several demos side by side, to put it outside a git checkout, or to reuse one you already indexed — an existing project is not re-scaffolded, and it is re-indexed only when its index is empty or out of date with the schema. A folder written by an older engine version is not upgraded: the demo warns and suggests a new `--dir`. |
 | `--host ADDR` | `127.0.0.1` | The bind address. The default binds **localhost only**, so nothing outside your machine can reach it. `0.0.0.0` is for containers and VMs, where localhost is not reachable from outside. The playground has **no authentication**: in live mode anyone who can reach the address can ask questions that spend your API credits. Bind it wide only on a network you trust. |
 | `--port N` | `8765` | The port to serve on. Change it when 8765 is taken, or when you are running two demos at once. |
 | `--no-browser` | off | Do not open a browser tab; just serve and print the URL. Use it over SSH and in containers, where there is no browser to open; in CI and scripts, where a browser would be noise or an error; when you are driving the HTTP API directly rather than the page; and on a demo you restart repeatedly, so each restart does not pile up another tab. |
@@ -294,7 +299,9 @@ gone. The Postgres, MySQL and MSSQL **adapters** are unaffected — they are
 product features, configured like any other datasource.
 
 ```bash
-# Re-index after editing the demo configs
+# Re-index after editing the demo configs (each datasource is rebuilt beside
+# its current entries; a failure keeps them). --datasource X rebuilds only X;
+# --full rebuilds every datasource, needed after changing the embedding model.
 nl2sql --env demo index
 
 # Ask a question
@@ -306,7 +313,8 @@ nl2sql --env demo run --no-exec "Which artist has the most albums?"
 # Ask as a role that is not allowed the answer
 nl2sql --env demo run --role viewer "Who are the top 5 customers by total spend?"
 
-# Check the environment: Python, installed drivers, datasource connectivity, LLM key
+# Check the environment: Python, installed drivers, datasource connectivity, LLM key,
+# and the index (entries by type, schema version vs the latest snapshot)
 nl2sql doctor
 ```
 

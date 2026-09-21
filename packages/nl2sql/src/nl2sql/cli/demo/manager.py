@@ -22,6 +22,7 @@ from nl2sql.cli.generators.policies import PolicyGenerator
 
 from .chinook import CHINOOK_DATASOURCE, CHINOOK_POLICIES, CHINOOK_QUESTIONS
 from .defaults import DEMO_LLM_CONFIG
+from .stamp import write_stamp
 
 
 class DemoManager:
@@ -72,6 +73,7 @@ class DemoManager:
         with open(env_path, "w", encoding="utf-8") as f:
             f.write(env_content)
 
+        write_stamp(self.project_root)
         self.print_success("Chinook Demo Setup Complete")
 
     def _write_common_artifacts(self, policies: Dict[str, Any], questions: Dict[str, List[str]]):
@@ -106,8 +108,36 @@ class DemoManager:
         with open(secrets_path, "w", encoding="utf-8") as f:
             yaml.safe_dump(SecretsFileConfig().model_dump(), f, sort_keys=False)
 
-    def index_demo_data(self):
-        """Triggers the indexing process for the demo."""
+    def index_health(self):
+        """Health of the demo's vector index, read from its contents.
+
+        Reads the paths from `.env.demo` without loading it, and loads no
+        embedding model, so it is cheap enough to run on every start.
+        """
+        from dotenv import dotenv_values
+        from nl2sql.common.settings import settings
+        from nl2sql.indexing.health import inspect_index_at
+
+        env_path = self.project_root / ".env.demo"
+        values = dotenv_values(env_path) if env_path.exists() else {}
+        ds_path = self.project_root / (values.get("DATASOURCE_CONFIG") or "configs/datasources.demo.yaml")
+        try:
+            raw = yaml.safe_load(ds_path.read_text(encoding="utf-8")) or {}
+            datasource_ids = [d["id"] for d in raw.get("datasources") or [] if d.get("id")]
+        except (OSError, yaml.YAMLError, KeyError, TypeError):
+            datasource_ids = []
+        return inspect_index_at(
+            self.project_root / (values.get("VECTOR_STORE") or "data/vector_store_demo"),
+            values.get("VECTOR_STORE_COLLECTION") or settings.vector_store_collection_name,
+            self.project_root / (values.get("SCHEMA_STORE_PATH") or "data/schema_store.db"),
+            datasource_ids,
+        )
+
+    def index_demo_data(self, enrich: bool = False) -> bool:
+        """Rebuilds the demo's index. Returns whether the new index is live.
+
+        Enrichment is off unless asked for: it spends tokens on the user's key.
+        """
 
         from dotenv import load_dotenv
         from nl2sql.common.settings import settings, reload_settings
@@ -133,8 +163,12 @@ class DemoManager:
                 vector_store_path=self.project_root / settings.vector_store_path,
                 policies_config_path=self.project_root / settings.policies_config_path,
             )
-            run_indexing(ctx)
+            run_indexing(ctx, enrich=enrich)
             return True
+        except SystemExit:
+            # run_indexing exits 1 on any failure, after printing why. The demo
+            # keeps going: the playground shows the problem and offers Rebuild.
+            return False
         except Exception as e:
             self.print_error(f"Indexing Failed: {e}")
             return False

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import List, Optional, Dict, Any
+from contextlib import nullcontext
+from typing import Any, Callable, ContextManager, Dict, List, Optional
 
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
@@ -20,6 +21,15 @@ logger = get_logger(__name__)
 
 class EmbeddingDimensionMismatchError(NL2SQLError):
     """Raised when a persisted collection was built with a different embedder."""
+
+
+class EmbeddingModelMismatchError(NL2SQLError):
+    """Raised when the collection records a different embedding model.
+
+    Two models of the same dimension would otherwise mix silently: every
+    datasource in the collection must be embedded in the same space as the
+    query.
+    """
 
 
 def check_embedding_dimension_compatibility(
@@ -110,8 +120,8 @@ class VectorStore:
         Checks the persisted vectors against the configured embedder once per
         store instance.
 
-        The check runs on the read path only: indexing clears the collection
-        before writing, so a provider switch is fixed by re-running
+        The check runs on the read path only: indexing writes a fresh staging
+        collection and swaps it in, so a provider switch is fixed by re-running
         ``nl2sql index`` rather than blocked by it.
         """
         if self._dimension_checked:
@@ -165,6 +175,252 @@ class VectorStore:
             logger.error(f"Failed to check vector store state: {exc}")
             return True
 
+    # --- one collection, one embedding model, one active build per datasource ---
+    #
+    # Every datasource lives in this one collection. Its entries carry a
+    # ``build_id``; the collection's metadata names each datasource's active
+    # build (``build:<datasource_id>``) and when it was switched in
+    # (``built_at:<datasource_id>``). Re-indexing a datasource writes a new build
+    # beside the active one, switches the pointer only when every entry is
+    # written, and then deletes that datasource's other builds. Readers filter
+    # on the active builds, so while two builds coexist they see exactly one,
+    # and no other datasource's entries are ever read, deleted or rewritten.
+    #
+    # The collection also records its embedding model (``embedding_model``).
+    # A query is embedded in one space, so every datasource must share it; a
+    # different configured model is refused until ``nl2sql index --full``
+    # rebuilds every datasource into a new collection and swaps it in.
+
+    BUILD_KEY = "build:"
+    BUILT_AT_KEY = "built_at:"
+    MODEL_KEY = "embedding_model"
+    STAGING_SUFFIX = "__staging"
+    PREVIOUS_SUFFIX = "__previous"
+
+    def _live_metadata(self) -> Dict[str, Any]:
+        """The collection's metadata, re-read so another writer's switch shows."""
+        try:
+            return dict(self.vectorstore._client.get_collection(self.collection_name).metadata or {})
+        except Exception:
+            try:
+                return dict(self.vectorstore._collection.metadata or {})
+            except Exception:
+                return {}
+
+    def _update_metadata(self, updates: Dict[str, Any]) -> None:
+        # Chroma replaces collection metadata wholesale, so merge first.
+        merged = {**self._live_metadata(), **updates}
+        self.vectorstore._collection.modify(metadata=merged)
+
+    def embedding_model_id(self) -> str:
+        provider, model, _ = describe_embeddings(self.embeddings)
+        return f"{provider}/{model}"
+
+    def recorded_embedding_model(self) -> Optional[str]:
+        return self._live_metadata().get(self.MODEL_KEY)
+
+    def check_embedding_model(self, metadata: Optional[Dict[str, Any]] = None) -> None:
+        """Refuses a configured embedding model other than the recorded one.
+
+        Raises:
+            EmbeddingModelMismatchError: If the collection records another model.
+        """
+        recorded = (metadata if metadata is not None else self._live_metadata()).get(self.MODEL_KEY)
+        current = self.embedding_model_id()
+        if recorded and recorded != current:
+            raise EmbeddingModelMismatchError(
+                f"Vector store collection '{self.collection_name}' was built with the embedding model "
+                f"'{recorded}', but the configured model is '{current}'. Every datasource in a collection "
+                "must use one embedding model, so a model change needs a full rebuild of every "
+                "datasource: run 'nl2sql index --full'."
+            )
+
+    def active_builds(self, metadata: Optional[Dict[str, Any]] = None) -> Dict[str, str]:
+        md = metadata if metadata is not None else self._live_metadata()
+        return {k[len(self.BUILD_KEY):]: v for k, v in md.items() if k.startswith(self.BUILD_KEY)}
+
+    def built_at(self, datasource_id: Optional[str] = None) -> Optional[str]:
+        """When a datasource's active build was switched in (the latest of all
+        when no datasource is named), ISO 8601 UTC, if recorded."""
+        md = self._live_metadata()
+        stamps = {k[len(self.BUILT_AT_KEY):]: v for k, v in md.items() if k.startswith(self.BUILT_AT_KEY)}
+        if datasource_id is not None:
+            return stamps.get(datasource_id)
+        return max(stamps.values()) if stamps else None
+
+    def _active_filter(self, datasource_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        """A ``where`` clause that keeps only active builds.
+
+        A datasource with no recorded build (an index written before builds
+        existed) is read as it is.
+        """
+        md = self._live_metadata()
+        self.check_embedding_model(md)
+        builds = self.active_builds(md)
+        if datasource_id is not None:
+            build = builds.get(datasource_id)
+            return {"build_id": build} if build else None
+        if not builds:
+            return None
+        return {
+            "$or": [
+                {"build_id": {"$in": list(builds.values())}},
+                {"datasource_id": {"$nin": list(builds.keys())}},
+            ]
+        }
+
+    @staticmethod
+    def _and(*clauses: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+        present = [c for c in clauses if c]
+        return present[0] if len(present) == 1 else {"$and": present}
+
+    @staticmethod
+    def _public(docs: List[Document]) -> List[Document]:
+        """Drops the storage-only build id: it would change every prompt the
+        metadata is printed into on every rebuild."""
+        for doc in docs:
+            doc.metadata.pop("build_id", None)
+        return docs
+
+    def entry_metadatas(self, active_only: bool = True) -> List[Dict[str, Any]]:
+        """The metadata of every entry (of the active builds), for health reporting."""
+        where = self._active_filter() if active_only else None
+        got = self.vectorstore._collection.get(where=where, include=["metadatas"]) if where else \
+            self.vectorstore._collection.get(include=["metadatas"])
+        return list(got["metadatas"] or [])
+
+    def refresh_schema_chunks(
+        self,
+        datasource_id: str,
+        schema_version: str,
+        chunks: List[BaseChunk],
+        evicted_versions: Optional[List[str]] = None,
+        switch_guard: Optional[Callable[[], ContextManager]] = None,
+        batch_size: int = 256,
+    ) -> Dict[str, int]:
+        """
+        Rebuilds one datasource's entries: write beside, switch, then delete.
+
+        1. Every chunk is written under a new ``build_id``, in batches. Readers
+           ignore it because the datasource's active build is still the old one.
+        2. The write is verified, then the active build is switched in the
+           collection metadata (under ``switch_guard`` when given, e.g. the
+           playground's ``RunGate.change``).
+        3. The datasource's other builds are deleted.
+
+        A failure in 1 or 2 deletes the partial new build and re-raises, so the
+        previous entries stay active. Other datasources are never touched.
+
+        Args:
+            datasource_id: Datasource identifier.
+            schema_version: Schema version the chunks were built from.
+            chunks: Schema chunks to index.
+            evicted_versions: Unused; every previous build of the datasource
+                is replaced. Kept for callers of the old signature.
+            switch_guard: Context manager factory held around the switch.
+            batch_size: Entries embedded and written per call.
+
+        Returns:
+            Indexing statistics by chunk type.
+
+        Raises:
+            EmbeddingModelMismatchError: If the collection records another model.
+        """
+        from datetime import datetime, timezone
+        from uuid import uuid4
+
+        self.check_embedding_model()
+        build_id = uuid4().hex[:12]
+        documents = self._prepare_chunk_documents(chunks)
+        ids = []
+        for i, doc in enumerate(documents):
+            doc.metadata["build_id"] = build_id
+            ids.append(f"{datasource_id}:{build_id}:{i}")
+        this_build = {"$and": [{"datasource_id": datasource_id}, {"build_id": build_id}]}
+
+        try:
+            for start in range(0, len(documents), batch_size):
+                self.vectorstore.add_documents(
+                    documents[start:start + batch_size], ids=ids[start:start + batch_size]
+                )
+            written = len(self.vectorstore._collection.get(where=this_build, include=[])["ids"])
+            if written != len(documents):
+                raise RuntimeError(
+                    f"Indexing {datasource_id}: wrote {written} of {len(documents)} entries."
+                )
+            with (switch_guard() if switch_guard else nullcontext()):
+                self._update_metadata({
+                    self.MODEL_KEY: self.embedding_model_id(),
+                    f"{self.BUILD_KEY}{datasource_id}": build_id,
+                    f"{self.BUILT_AT_KEY}{datasource_id}": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                })
+        except BaseException:
+            try:
+                self.vectorstore._collection.delete(where=this_build)
+            except Exception as exc:
+                logger.error(f"Could not remove the partial build of {datasource_id}: {exc}")
+            raise
+
+        # After the switch no reader sees these; a failure here only leaves
+        # garbage the next rebuild of this datasource removes.
+        try:
+            self.vectorstore._collection.delete(
+                where={"$and": [{"datasource_id": datasource_id}, {"build_id": {"$ne": build_id}}]}
+            )
+        except Exception as exc:
+            logger.warning(f"Could not delete the previous entries of {datasource_id}: {exc}")
+
+        stats: Dict[str, Any] = {"datasource_id": datasource_id, "schema_version": schema_version}
+        for chunk in chunks:
+            stats[chunk.type] = stats.get(chunk.type, 0) + 1
+        return stats
+
+    # --- full rebuild: a second collection, swapped in ------------------------
+
+    def _collection_names(self) -> List[str]:
+        return [c.name for c in self.vectorstore._client.list_collections()]
+
+    def create_staging(self) -> "VectorStore":
+        """Returns an empty collection beside this one for a full rebuild.
+
+        A staging collection left by a crashed earlier build is dropped first.
+        """
+        name = f"{self.collection_name}{self.STAGING_SUFFIX}"
+        if name in self._collection_names():
+            self.vectorstore._client.delete_collection(name)
+        return VectorStore(name, self.persist_directory, embeddings=self.embeddings)
+
+    def discard(self) -> None:
+        """Deletes this store's collection; used for an abandoned staging build."""
+        try:
+            self.vectorstore._client.delete_collection(self.collection_name)
+        except Exception as exc:
+            logger.warning(f"Could not delete collection '{self.collection_name}': {exc}")
+
+    def promote(self, staging: "VectorStore") -> None:
+        """Makes ``staging``'s collection the live one, then re-reads it.
+
+        The live collection is renamed aside first and restored if the second
+        rename fails, so the live name always ends up holding a complete index.
+        """
+        client = self.vectorstore._client
+        previous = f"{self.collection_name}{self.PREVIOUS_SUFFIX}"
+        names = self._collection_names()
+        if previous in names:
+            client.delete_collection(previous)
+        had_live = self.collection_name in names
+        if had_live:
+            client.get_collection(self.collection_name).modify(name=previous)
+        try:
+            staging.vectorstore._collection.modify(name=self.collection_name)
+        except Exception:
+            if had_live:
+                client.get_collection(previous).modify(name=self.collection_name)
+            raise
+        if had_live:
+            client.delete_collection(previous)
+        self._initialize_vector_store()
+
     def clear(self) -> None:
         """
         Deletes the entire vector collection.
@@ -191,67 +447,6 @@ class VectorStore:
             self.vectorstore._collection.delete(where=where)
         except Exception as exc:
             logger.error(f"Failed to delete documents: {exc}")
-
-    def refresh_schema_chunks(
-        self,
-        datasource_id: str,
-        schema_version: str,
-        chunks: List[BaseChunk],
-        evicted_versions: List[str],
-    ) -> Dict[str, int]:
-        """
-        Indexes schema chunks for a datasource and evicts old versions.
-
-        Args:
-            datasource_id: Datasource identifier.
-            schema_version: Active schema version.
-            chunks: Schema chunks to index.
-            evicted_versions: Schema versions to remove.
-
-        Returns:
-            Indexing statistics by chunk type.
-        """
-        self._delete_evicted_versions(datasource_id, evicted_versions)
-
-        self.delete_documents(
-            {
-                "datasource_id": datasource_id,
-                "schema_version": schema_version,
-            }
-        )
-
-        documents = self._prepare_chunk_documents(chunks)
-
-        if documents:
-            self.vectorstore.add_documents(documents)
-
-        stats: Dict[str, Any] = {}
-        stats["datasource_id"] = datasource_id
-        stats["schema_version"] = schema_version
-        for chunk in chunks:
-            stats[chunk.type] = stats.get(chunk.type, 0) + 1
-
-        return stats
-
-    def _delete_evicted_versions(
-        self,
-        datasource_id: str,
-        evicted_versions: List[str],
-    ) -> None:
-        """
-        Deletes all documents belonging to evicted schema versions.
-
-        Args:
-            datasource_id: Datasource identifier.
-            evicted_versions: Schema versions to remove.
-        """
-        for version in evicted_versions:
-            self.delete_documents(
-                {
-                    "datasource_id": datasource_id,
-                    "schema_version": version,
-                }
-            )
 
     def _prepare_chunk_documents(
         self,
@@ -292,6 +487,8 @@ class VectorStore:
         self.initialize_if_not_exists()
         from nl2sql.common.resilience import VECTOR_BREAKER
 
+        where = self._and({"type": "schema.datasource"}, self._active_filter())
+
         @VECTOR_BREAKER
         def _execute():
             return self.vectorstore.max_marginal_relevance_search(
@@ -299,10 +496,10 @@ class VectorStore:
                 k=k,
                 fetch_k=k * 4,
                 lambda_mult=0.7,
-                filter={"type": "schema.datasource"},
+                filter=where,
             )
 
-        return _execute()
+        return self._public(_execute())
 
     def retrieve_schema_context(
         self,
@@ -325,6 +522,12 @@ class VectorStore:
         from nl2sql.common.resilience import VECTOR_BREAKER
 
 
+        where = self._and(
+            {"datasource_id": datasource_id},
+            {"type": {"$in": ["schema.table", "schema.metric"]}},
+            self._active_filter(datasource_id),
+        )
+
         @VECTOR_BREAKER
         def _execute():
             return self.vectorstore.max_marginal_relevance_search(
@@ -332,15 +535,10 @@ class VectorStore:
                 k=k,
                 fetch_k=k * 4,
                 lambda_mult=0.7,
-                filter={
-                    "$and": [
-                        {"datasource_id": datasource_id},
-                        {"type": {"$in": ["schema.table", "schema.metric"]}},
-                    ]
-                },
+                filter=where,
             )
 
-        return _execute()
+        return self._public(_execute())
 
     def retrieve_column_candidates(
         self,
@@ -363,6 +561,12 @@ class VectorStore:
 
         self.initialize_if_not_exists()
 
+        where = self._and(
+            {"datasource_id": datasource_id},
+            {"type": "schema.column"},
+            self._active_filter(datasource_id),
+        )
+
         @VECTOR_BREAKER
         def _execute():
             return self.vectorstore.max_marginal_relevance_search(
@@ -370,15 +574,10 @@ class VectorStore:
                 k=k,
                 fetch_k=k * 4,
                 lambda_mult=0.7,
-                filter={
-                    "$and": [
-                        {"datasource_id": datasource_id},
-                        {"type": "schema.column"},
-                    ]
-                },
+                filter=where,
             )
 
-        return _execute()
+        return self._public(_execute())
 
     def retrieve_planning_context(
         self,
@@ -403,6 +602,13 @@ class VectorStore:
 
         self.initialize_if_not_exists()
     
+        where = self._and(
+            {"datasource_id": datasource_id},
+            {"type": {"$in": ["schema.column", "schema.relationship"]}},
+            {"table": {"$in": tables}},
+            self._active_filter(datasource_id),
+        )
+
         @VECTOR_BREAKER
         def _execute():
             return self.vectorstore.max_marginal_relevance_search(
@@ -410,13 +616,7 @@ class VectorStore:
                 k=k,
                 fetch_k=k * 4,
                 lambda_mult=0.7,
-                filter={
-                    "$and": [
-                        {"datasource_id": datasource_id},
-                        {"type": {"$in": ["schema.column", "schema.relationship"]}},
-                        {"table": {"$in": tables}},
-                    ]
-                },
+                filter=where,
             )
 
-        return _execute()
+        return self._public(_execute())

@@ -44,7 +44,12 @@ Side Effects:
 - Writes embeddings to vector store.
 
 Idempotency:
-- Re-indexing overwrites existing chunks for the same schema version.
+- Re-indexing replaces this datasource's entries: the new entries are written
+  under a new build id, switched in when all are written, and the previous ones
+  deleted. A failure leaves the previous entries active. Other datasources'
+  entries are never touched. Raises `EmbeddingModelMismatchError` when the
+  collection records a different embedding model (rebuild with
+  `nl2sql index --full`).
 
 ### IndexingAPI.index_all_datasources
 
@@ -63,7 +68,9 @@ Signature:
 `clear_index() -> None`
 
 Side Effects:
-Deletes and reinitializes the vector store collection.
+Deletes and reinitializes the vector store collection, for every datasource.
+Every question fails at the resolver until the index is rebuilt; to refresh an
+index, re-index instead, which never leaves it empty.
 
 ## Execution Lifecycle
 - Fetch schema via adapter.

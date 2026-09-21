@@ -20,8 +20,8 @@ def demo_project(tmp_path, monkeypatch):
 def test_index_demo_data_hands_a_context_to_run_indexing(demo_project, monkeypatch):
     captured = []
 
-    def fake_run_indexing(ctx):
-        captured.append(ctx)
+    def fake_run_indexing(ctx, enrich=True):
+        captured.append((ctx, enrich))
 
     monkeypatch.setattr(
         "nl2sql.cli.commands.indexing.run_indexing", fake_run_indexing
@@ -30,13 +30,15 @@ def test_index_demo_data_hands_a_context_to_run_indexing(demo_project, monkeypat
     assert demo_project.index_demo_data() is True
 
     assert len(captured) == 1
-    assert isinstance(captured[0], NL2SQLContext)
+    assert isinstance(captured[0][0], NL2SQLContext)
+    # Enrichment spends tokens, so the demo only runs it when asked.
+    assert captured[0][1] is False
 
 
 def test_index_demo_data_context_points_at_demo_config(demo_project, monkeypatch, tmp_path):
     captured = []
     monkeypatch.setattr(
-        "nl2sql.cli.commands.indexing.run_indexing", captured.append
+        "nl2sql.cli.commands.indexing.run_indexing", lambda ctx, enrich=True: captured.append(ctx)
     )
 
     assert demo_project.index_demo_data() is True

@@ -44,6 +44,8 @@ from nl2sql.cli.common.decorators import handle_cli_errors
 from nl2sql.cli.console import console, print_error, print_step, print_success
 from nl2sql.cli.demo import DemoManager
 from nl2sql.cli.demo.chinook import CHINOOK_QUESTIONS
+from nl2sql.cli.demo.stamp import outdated_warning
+from rich.markup import escape
 from nl2sql.common.settings import reload_settings
 from nl2sql.llm.replay import RecordingProxy, ReplayStore
 from nl2sql.testing.fake_llm import FakeLLMServer
@@ -169,15 +171,42 @@ def _persist_api_key(path: pathlib.Path, key: str) -> None:
     path.write_text("\n".join(kept) + "\n", encoding="utf-8")
 
 
+_INDEX_STATE = {
+    "missing": "No vector index yet",
+    "empty": "The vector index is empty",
+    "stale": "The vector index is out of date",
+}
+
+
 def prepare_project(directory: pathlib.Path) -> pathlib.Path:
+    """Scaffolds the demo folder if needed and makes sure its index is usable.
+
+    The index is judged by its contents (entries, and whether they match the
+    latest schema snapshot), not by whether its folder exists: a folder with
+    an empty collection once passed the old check on every start.
+    """
     directory.mkdir(parents=True, exist_ok=True)
     manager = DemoManager(console, directory)
     if not (directory / "configs" / "datasources.demo.yaml").exists():
         print_step(f"Writing the {DATASET} demo project to {directory}")
         manager.setup_chinook()
-    if not (directory / "data" / "vector_store_demo").exists():
-        print_step("Indexing the schema (first run downloads a 79 MB embedding model)")
-        manager.index_demo_data()
+    else:
+        warning = outdated_warning(directory)
+        if warning:
+            console.print(f"[warning]{escape(warning)}[/warning]")
+
+    health = manager.index_health()
+    if not health.ok:
+        print_step(
+            f"{_INDEX_STATE.get(health.status, 'The vector index needs rebuilding')}: indexing the schema "
+            "(first run downloads a 79 MB embedding model)"
+        )
+        if not manager.index_demo_data():
+            print_error(
+                "Indexing failed, so questions will fail until the index is rebuilt. "
+                "Any previous index is unchanged. Fix the error above, then press Rebuild "
+                "in the playground or run: nl2sql --env demo index"
+            )
     return directory
 
 
