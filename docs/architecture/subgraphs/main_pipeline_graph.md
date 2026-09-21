@@ -38,10 +38,11 @@ Successful completion criteria:
 Failure exits:
 - `datasource_resolver` can short-circuit to `END` via `resolver_route` when no datasource is resolved/allowed.
 - `layer_router` can return `END` if no `execution_dag` or layers are present.
+- `layer_router` returns `END` once every scan has run if none produced an artifact (every sub-query was denied or failed), and whenever the graph was built with `execute=False`. The aggregator and answer synthesizer are skipped, so the run's errors are the sub-queries' own -- for a policy denial, `SECURITY_VIOLATION` first -- and no LLM call is spent explaining an empty result.
 - `layer_router` raises `PipelineExecutionError` (an `NL2SQLError` carrying the `PipelineError` payload on `.error`) when no compatible subgraph exists for a datasource; this propagates as an exception from the router function. A conditional-edge router may only return routing decisions, so it cannot report the failure as a `PipelineError` value in state the way a node does.
 
 Partial completion behavior:
-- If routing cannot schedule any scan-layer work but `execution_dag` exists, it routes to `aggregator` directly.
+- If routing cannot schedule any scan-layer work but `execution_dag` exists and at least one scan produced an artifact, it routes to `aggregator` directly. If some scans produced artifacts and others did not, the aggregator still runs and reports the missing ones as `AGGREGATOR_FAILED`.
 - Errors added to `GraphState.errors` do not automatically stop the graph; the graph relies on routing logic and node behavior for termination.
 
 ---
@@ -91,7 +92,7 @@ Field ownership, reducers, and lifecycle are defined in `../graph_state.md`.
 4. `global_planner` builds a deterministic `ExecutionDAG` from sub-queries and combines.
 5. `layer_router` inspects the DAG and current `artifact_refs`:
    - If no DAG or layers, returns `END`.
-   - If next scan layer is empty, routes to `aggregator`.
+   - If next scan layer is empty, routes to `aggregator` -- or to `END` when no scan produced an artifact or `execute` is False.
    - For each scan node, resolves a compatible subgraph and sends `build_scan_payload`.
 6. Each subgraph execution returns `artifact_refs`, `subgraph_outputs`, and `errors` to `GraphState`.
 7. `layer_router` is re-entered until all scan-layer nodes produce artifacts.
@@ -154,7 +155,7 @@ See `../failure_recovery.md` for retry scope and recovery behavior.
 
 ## Known Limitations
 
-- `execute` parameter in `build_graph()` is accepted but not used in graph construction.
+- `execute=False` in `build_graph()` makes `layer_router` return `END` instead of dispatching the aggregator, and is passed to the SQL agent subgraph.
 - Errors accumulated in `GraphState.errors` do not alter routing unless explicit routes inspect them.
 - No trace/span propagation into logging context, despite trace context helpers existing.
 - Merge reducers for `artifact_refs`/`subgraph_outputs` overwrite on key conflicts without ordering guarantees.

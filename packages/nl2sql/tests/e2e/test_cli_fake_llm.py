@@ -4,7 +4,9 @@ from .conftest import run_cli
 from .recordings_chinook import (
     RULES_ALBUMS_PER_ARTIST,
     RULES_COUNT_CUSTOMERS,
+    RULES_GENRE_SALES_GPT4O,
     RULES_JAZZ_TRACKS,
+    RULES_TOP_CUSTOMERS,
     RULES_TOP_GENRE,
 )
 
@@ -83,3 +85,40 @@ def test_an_equality_filter_on_an_unsampled_value_validates(demo_project, fake_l
     assert "not found in stats" not in r.stdout
     assert "130" in r.stdout
     assert [c["name"] for c in server.calls] == ["DecomposerResponse", "PlanModel", "AggregatedResponse"]
+
+
+@pytest.mark.e2e
+def test_a_plan_gpt4o_wrote_generates_sql_that_runs(demo_project, fake_llm):
+    """Replays, unedited, the plan gpt-4o produced for a guided question.
+
+    It lists Genre first, joins Track to it with Genre as ``right_alias``, and
+    sums ``UnitPrice * Quantity``. The generator used to join Genre to itself,
+    never add InvoiceLine, and render the product as a function named ``*``,
+    so SQLite rejected the SQL with ``near "(": syntax error``.
+    """
+    server, env = fake_llm(RULES_GENRE_SALES_GPT4O)
+    r = run_cli(demo_project, env, "run", "--llm-config", "configs/llm.fake.yaml",
+                "Which genre sells the most tracks?")
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert "Pipeline Errors" not in r.stdout, r.stdout
+    assert "InvoiceLine AS t3" in r.stdout
+    assert "t3.UnitPrice * t3.Quantity" in r.stdout
+    # Rock grosses 826.65, the most of any genre.
+    assert "Top genre: Rock with 826.65" in r.stdout
+    assert [c["name"] for c in server.calls] == ["DecomposerResponse", "PlanModel", "AggregatedResponse"]
+
+
+@pytest.mark.e2e
+def test_a_denied_query_stops_before_aggregation_and_synthesis(demo_project, fake_llm):
+    """``viewer`` may not read Customer or Invoice.
+
+    The denial itself always worked; the run then went on to the aggregator,
+    which failed on the missing artifact, and to the answer synthesizer, which
+    spent another LLM call. Neither has anything to work on.
+    """
+    server, env = fake_llm(RULES_TOP_CUSTOMERS)
+    r = run_cli(demo_project, env, "run", "--role", "viewer", "--llm-config", "configs/llm.fake.yaml",
+                "Who are the top customers by total spend?")
+    assert "SECURITY_VIOLATION" in r.stdout, r.stdout + r.stderr
+    assert "AGGREGATOR_FAILED" not in r.stdout
+    assert "AggregatedResponse" not in [c["name"] for c in server.calls]
