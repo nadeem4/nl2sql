@@ -1,0 +1,877 @@
+- id: chinook_001
+  question: How many customers do we have, by country?
+  difficulty: easy
+  tags: [aggregation, rbac-denial]
+  needed_tables: [Customer]
+  needed_columns: [Customer.Country, Customer.CustomerId]
+  expected: {admin: allowed, analyst: allowed, viewer: refused}
+  order_matters: false
+  gold_sql: |
+    SELECT Country, COUNT(CustomerId) AS customer_count
+    FROM Customer
+    GROUP BY Country
+    ORDER BY customer_count DESC, Country
+  gold_result:
+  - {Country: USA, customer_count: 13}
+  - {Country: Canada, customer_count: 8}
+  - {Country: Brazil, customer_count: 5}
+  - {Country: France, customer_count: 5}
+  - {Country: Germany, customer_count: 4}
+  - {Country: United Kingdom, customer_count: 3}
+  - {Country: Czech Republic, customer_count: 2}
+  - {Country: India, customer_count: 2}
+  - {Country: Portugal, customer_count: 2}
+  - {Country: Argentina, customer_count: 1}
+  - {Country: Australia, customer_count: 1}
+  - {Country: Austria, customer_count: 1}
+  - {Country: Belgium, customer_count: 1}
+  - {Country: Chile, customer_count: 1}
+  - {Country: Denmark, customer_count: 1}
+  - {Country: Finland, customer_count: 1}
+  - {Country: Hungary, customer_count: 1}
+  - {Country: Ireland, customer_count: 1}
+  - {Country: Italy, customer_count: 1}
+  - {Country: Netherlands, customer_count: 1}
+  - {Country: Norway, customer_count: 1}
+  - {Country: Poland, customer_count: 1}
+  - {Country: Spain, customer_count: 1}
+  - {Country: Sweden, customer_count: 1}
+
+- id: chinook_002
+  question: Who are the top 5 customers by total spend?
+  difficulty: medium
+  tags: [join, aggregation, order-limit, ties, paraphrase, rbac-denial]
+  paraphrase_group: top_customers
+  needed_tables: [Customer, Invoice]
+  needed_columns: [Customer.CustomerId, Customer.FirstName, Customer.LastName, Invoice.CustomerId, Invoice.Total]
+  expected: {admin: allowed, analyst: allowed, viewer: refused}
+  order_matters: false
+  gold_sql: |
+    SELECT c.FirstName, c.LastName, ROUND(SUM(i.Total), 2) AS total_spend
+    FROM Customer c JOIN Invoice i ON i.CustomerId = c.CustomerId
+    GROUP BY c.CustomerId
+    ORDER BY total_spend DESC, c.CustomerId
+    LIMIT 5
+  gold_result:
+  - {FirstName: Helena, LastName: Holý, total_spend: 49.62}
+  - {FirstName: Richard, LastName: Cunningham, total_spend: 47.62}
+  - {FirstName: Luis, LastName: Rojas, total_spend: 46.62}
+  - {FirstName: Ladislav, LastName: Kovács, total_spend: 45.62}
+  - {FirstName: Hugh, LastName: O'Reilly, total_spend: 45.62}
+
+- id: chinook_003
+  question: Which artist has the most albums?
+  difficulty: easy
+  tags: [join, aggregation, order-limit, paraphrase]
+  paraphrase_group: artist_most_albums
+  needed_tables: [Album, Artist]
+  needed_columns: [Artist.ArtistId, Artist.Name, Album.ArtistId, Album.AlbumId]
+  expected: {admin: allowed, analyst: allowed, viewer: allowed}
+  order_matters: true
+  gold_sql: |
+    SELECT ar.Name, COUNT(al.AlbumId) AS album_count
+    FROM Artist ar JOIN Album al ON al.ArtistId = ar.ArtistId
+    GROUP BY ar.ArtistId
+    ORDER BY album_count DESC, ar.ArtistId
+    LIMIT 1
+  gold_result:
+  - {Name: Iron Maiden, album_count: 21}
+
+- id: chinook_004
+  question: What is the total revenue per year?
+  difficulty: medium
+  tags: [aggregation, date, paraphrase, rbac-denial]
+  paraphrase_group: revenue_per_year
+  needed_tables: [Invoice]
+  needed_columns: [Invoice.InvoiceDate, Invoice.Total]
+  expected: {admin: allowed, analyst: allowed, viewer: refused}
+  order_matters: false
+  gold_sql: |
+    SELECT strftime('%Y', InvoiceDate) AS year, ROUND(SUM(Total), 2) AS revenue
+    FROM Invoice
+    GROUP BY year
+    ORDER BY year
+  gold_result:
+  - {year: '2009', revenue: 449.46}
+  - {year: '2010', revenue: 481.45}
+  - {year: '2011', revenue: 469.58}
+  - {year: '2012', revenue: 477.53}
+  - {year: '2013', revenue: 450.58}
+
+- id: chinook_005
+  question: Which genre sells the most tracks?
+  difficulty: medium
+  tags: [multi-join, aggregation, order-limit, rbac-denial]
+  needed_tables: [Genre, InvoiceLine, Track]
+  needed_columns: [Genre.GenreId, Genre.Name, Track.TrackId, Track.GenreId, InvoiceLine.TrackId, InvoiceLine.Quantity]
+  expected: {admin: allowed, analyst: allowed, viewer: refused}
+  order_matters: true
+  gold_sql: |
+    SELECT g.Name, SUM(il.Quantity) AS tracks_sold
+    FROM InvoiceLine il
+    JOIN Track t ON t.TrackId = il.TrackId
+    JOIN Genre g ON g.GenreId = t.GenreId
+    GROUP BY g.GenreId
+    ORDER BY tracks_sold DESC, g.GenreId
+    LIMIT 1
+  gold_result:
+  - {Name: Rock, tracks_sold: 835}
+
+- id: chinook_006
+  question: What is the average invoice total by billing country?
+  difficulty: easy
+  tags: [aggregation, rbac-denial]
+  needed_tables: [Invoice]
+  needed_columns: [Invoice.BillingCountry, Invoice.Total]
+  expected: {admin: allowed, analyst: allowed, viewer: refused}
+  order_matters: false
+  gold_sql: |
+    SELECT BillingCountry, ROUND(AVG(Total), 2) AS avg_invoice_total
+    FROM Invoice
+    GROUP BY BillingCountry
+    ORDER BY BillingCountry
+  gold_result:
+  - {BillingCountry: Argentina, avg_invoice_total: 5.37}
+  - {BillingCountry: Australia, avg_invoice_total: 5.37}
+  - {BillingCountry: Austria, avg_invoice_total: 6.09}
+  - {BillingCountry: Belgium, avg_invoice_total: 5.37}
+  - {BillingCountry: Brazil, avg_invoice_total: 5.43}
+  - {BillingCountry: Canada, avg_invoice_total: 5.43}
+  - {BillingCountry: Chile, avg_invoice_total: 6.66}
+  - {BillingCountry: Czech Republic, avg_invoice_total: 6.45}
+  - {BillingCountry: Denmark, avg_invoice_total: 5.37}
+  - {BillingCountry: Finland, avg_invoice_total: 5.95}
+  - {BillingCountry: France, avg_invoice_total: 5.57}
+  - {BillingCountry: Germany, avg_invoice_total: 5.59}
+  - {BillingCountry: Hungary, avg_invoice_total: 6.52}
+  - {BillingCountry: India, avg_invoice_total: 5.79}
+  - {BillingCountry: Ireland, avg_invoice_total: 6.52}
+  - {BillingCountry: Italy, avg_invoice_total: 5.37}
+  - {BillingCountry: Netherlands, avg_invoice_total: 5.8}
+  - {BillingCountry: Norway, avg_invoice_total: 5.66}
+  - {BillingCountry: Poland, avg_invoice_total: 5.37}
+  - {BillingCountry: Portugal, avg_invoice_total: 5.52}
+  - {BillingCountry: Spain, avg_invoice_total: 5.37}
+  - {BillingCountry: Sweden, avg_invoice_total: 5.52}
+  - {BillingCountry: USA, avg_invoice_total: 5.75}
+  - {BillingCountry: United Kingdom, avg_invoice_total: 5.37}
+
+- id: chinook_007
+  question: Which employees support the most customers?
+  difficulty: medium
+  tags: [join, aggregation, rbac-denial]
+  needed_tables: [Customer, Employee]
+  needed_columns: [Employee.EmployeeId, Employee.FirstName, Employee.LastName, Customer.SupportRepId, Customer.CustomerId]
+  expected: {admin: allowed, analyst: refused, viewer: refused}
+  order_matters: true
+  gold_sql: |
+    SELECT e.FirstName, e.LastName, COUNT(c.CustomerId) AS customer_count
+    FROM Employee e JOIN Customer c ON c.SupportRepId = e.EmployeeId
+    GROUP BY e.EmployeeId
+    ORDER BY customer_count DESC, e.EmployeeId
+  gold_result:
+  - {FirstName: Jane, LastName: Peacock, customer_count: 21}
+  - {FirstName: Margaret, LastName: Park, customer_count: 20}
+  - {FirstName: Steve, LastName: Johnson, customer_count: 18}
+
+- id: chinook_008
+  question: What is the longest track in each genre?
+  difficulty: hard
+  tags: [join, aggregation]
+  needed_tables: [Genre, Track]
+  needed_columns: [Genre.GenreId, Genre.Name, Track.TrackId, Track.Name, Track.GenreId, Track.Milliseconds]
+  expected: {admin: allowed, analyst: allowed, viewer: allowed}
+  order_matters: false
+  gold_sql: |
+    SELECT genre, track, milliseconds
+    FROM (
+      SELECT g.Name AS genre, t.Name AS track, t.Milliseconds AS milliseconds,
+             ROW_NUMBER() OVER (PARTITION BY g.GenreId ORDER BY t.Milliseconds DESC, t.TrackId) AS rn
+      FROM Track t JOIN Genre g ON g.GenreId = t.GenreId
+    )
+    WHERE rn = 1
+    ORDER BY genre
+  gold_result:
+  - {genre: Alternative, track: Reach Down, milliseconds: 672773}
+  - {genre: Alternative & Punk, track: Homecoming / The Death Of St. Jimmy / East 12th St. / Nobody Likes You / Rock And Roll
+      Girlfriend / We're Coming Home Again, milliseconds: 558602}
+  - {genre: Blues, track: Talkin' 'Bout Women Obviously, milliseconds: 589531}
+  - {genre: Bossa Nova, track: Samba Da Bênção, milliseconds: 409965}
+  - {genre: Classical, track: 'Adagio for Strings from the String Quartet, Op. 11', milliseconds: 596519}
+  - {genre: Comedy, track: The Job, milliseconds: 2541875}
+  - {genre: Drama, track: Through a Looking Glass, milliseconds: 5088838}
+  - {genre: Easy Listening, track: Mack The Knife, milliseconds: 292075}
+  - {genre: Electronica/Dance, track: Just Another Story, milliseconds: 529684}
+  - {genre: Heavy Metal, track: Dance Of Death, milliseconds: 516649}
+  - {genre: Hip Hop/Rap, track: Se Liga, milliseconds: 410409}
+  - {genre: Jazz, track: My Funny Valentine (Live), milliseconds: 907520}
+  - {genre: Latin, track: Faroeste Caboclo, milliseconds: 543007}
+  - {genre: Metal, track: Rime of the Ancient Mariner, milliseconds: 816509}
+  - {genre: Opera, track: 'Die Zauberflöte, K.620: "Der Hölle Rache Kocht in Meinem Herze"', milliseconds: 174813}
+  - {genre: Pop, track: Amy Amy Amy (Outro), milliseconds: 663426}
+  - {genre: R&B/Soul, track: Rehab (Hot Chip Remix), milliseconds: 418293}
+  - {genre: Reggae, track: Equal Rights Downpresser Man, milliseconds: 366733}
+  - {genre: Rock, track: Dazed And Confused, milliseconds: 1612329}
+  - {genre: Rock And Roll, track: Slow Down, milliseconds: 163265}
+  - {genre: Sci Fi & Fantasy, track: 'Greetings from Earth, Pt. 1', milliseconds: 2960293}
+  - {genre: Science Fiction, track: Hero, milliseconds: 2713755}
+  - {genre: Soundtrack, track: Always Forever Now, milliseconds: 383764}
+  - {genre: TV Shows, track: Occupation / Precipice, milliseconds: 5286953}
+  - {genre: World, track: I Ka Barra (Your Work), milliseconds: 300605}
+
+- id: chinook_009
+  question: Which customers bought jazz tracks but never rock?
+  difficulty: hard
+  tags: [multi-join, filter, rbac-denial]
+  needed_tables: [Customer, Genre, Invoice, InvoiceLine, Track]
+  needed_columns: [Customer.CustomerId, Customer.FirstName, Customer.LastName, Invoice.InvoiceId, Invoice.CustomerId, InvoiceLine.InvoiceId,
+    InvoiceLine.TrackId, Track.TrackId, Track.GenreId, Genre.GenreId, Genre.Name]
+  expected: {admin: allowed, analyst: allowed, viewer: refused}
+  order_matters: false
+  gold_sql: |
+    WITH bought AS (
+      SELECT DISTINCT i.CustomerId, g.Name AS genre
+      FROM Invoice i
+      JOIN InvoiceLine il ON il.InvoiceId = i.InvoiceId
+      JOIN Track t ON t.TrackId = il.TrackId
+      JOIN Genre g ON g.GenreId = t.GenreId
+    )
+    SELECT c.FirstName, c.LastName
+    FROM Customer c
+    WHERE c.CustomerId IN (SELECT CustomerId FROM bought WHERE genre = 'Jazz')
+      AND c.CustomerId NOT IN (SELECT CustomerId FROM bought WHERE genre = 'Rock')
+    ORDER BY c.CustomerId
+  gold_result: []
+
+- id: chinook_010
+  question: What was the monthly revenue in 2013 for customers in the USA?
+  difficulty: medium
+  tags: [join, aggregation, date, filter, rbac-denial]
+  needed_tables: [Customer, Invoice]
+  needed_columns: [Customer.CustomerId, Customer.Country, Invoice.CustomerId, Invoice.InvoiceDate, Invoice.Total]
+  expected: {admin: allowed, analyst: allowed, viewer: refused}
+  order_matters: false
+  gold_sql: |
+    SELECT strftime('%Y-%m', i.InvoiceDate) AS month, ROUND(SUM(i.Total), 2) AS revenue
+    FROM Invoice i JOIN Customer c ON c.CustomerId = i.CustomerId
+    WHERE c.Country = 'USA' AND i.InvoiceDate >= '2013-01-01' AND i.InvoiceDate < '2014-01-01'
+    GROUP BY month
+    ORDER BY month
+  gold_result:
+  - {month: 2013-02, revenue: 13.86}
+  - {month: 2013-04, revenue: 18.81}
+  - {month: 2013-05, revenue: 0.99}
+  - {month: 2013-07, revenue: 14.85}
+  - {month: 2013-08, revenue: 0.99}
+  - {month: 2013-09, revenue: 3.96}
+  - {month: 2013-10, revenue: 22.77}
+  - {month: 2013-11, revenue: 0.99}
+  - {month: 2013-12, revenue: 7.92}
+
+- id: chinook_011
+  question: Which playlists contain tracks from more than three genres?
+  difficulty: hard
+  tags: [multi-join, aggregation, having]
+  needed_tables: [Playlist, PlaylistTrack, Track]
+  needed_columns: [Playlist.PlaylistId, Playlist.Name, PlaylistTrack.PlaylistId, PlaylistTrack.TrackId, Track.TrackId, Track.GenreId]
+  expected: {admin: allowed, analyst: allowed, viewer: allowed}
+  order_matters: false
+  gold_sql: |
+    SELECT p.PlaylistId, p.Name, COUNT(DISTINCT t.GenreId) AS genre_count
+    FROM Playlist p
+    JOIN PlaylistTrack pt ON pt.PlaylistId = p.PlaylistId
+    JOIN Track t ON t.TrackId = pt.TrackId
+    GROUP BY p.PlaylistId
+    HAVING COUNT(DISTINCT t.GenreId) > 3
+    ORDER BY p.PlaylistId
+  gold_result:
+  - {PlaylistId: 1, Name: Music, genre_count: 20}
+  - {PlaylistId: 3, Name: TV Shows, genre_count: 5}
+  - {PlaylistId: 5, Name: 90’s Music, genre_count: 16}
+  - {PlaylistId: 8, Name: Music, genre_count: 20}
+  - {PlaylistId: 10, Name: TV Shows, genre_count: 5}
+
+- id: chinook_012
+  question: Who are the top customers by total spend?
+  difficulty: medium
+  tags: [join, aggregation, order-limit, ties, paraphrase, rbac-denial]
+  paraphrase_group: top_customers
+  needed_tables: [Customer, Invoice]
+  needed_columns: [Customer.CustomerId, Customer.FirstName, Customer.LastName, Invoice.CustomerId, Invoice.Total]
+  expected: {admin: allowed, analyst: allowed, viewer: refused}
+  order_matters: false
+  gold_sql: |
+    SELECT c.FirstName, c.LastName, ROUND(SUM(i.Total), 2) AS total_spend
+    FROM Customer c JOIN Invoice i ON i.CustomerId = c.CustomerId
+    GROUP BY c.CustomerId
+    ORDER BY total_spend DESC, c.CustomerId
+    LIMIT 5
+  gold_result:
+  - {FirstName: Helena, LastName: Holý, total_spend: 49.62}
+  - {FirstName: Richard, LastName: Cunningham, total_spend: 47.62}
+  - {FirstName: Luis, LastName: Rojas, total_spend: 46.62}
+  - {FirstName: Ladislav, LastName: Kovács, total_spend: 45.62}
+  - {FirstName: Hugh, LastName: O'Reilly, total_spend: 45.62}
+
+- id: chinook_013
+  question: Show me the five customers who have spent the most money.
+  difficulty: medium
+  tags: [join, aggregation, order-limit, ties, paraphrase, rbac-denial]
+  paraphrase_group: top_customers
+  needed_tables: [Customer, Invoice]
+  needed_columns: [Customer.CustomerId, Customer.FirstName, Customer.LastName, Invoice.CustomerId, Invoice.Total]
+  expected: {admin: allowed, analyst: allowed, viewer: refused}
+  order_matters: false
+  gold_sql: |
+    SELECT c.FirstName, c.LastName, ROUND(SUM(i.Total), 2) AS total_spend
+    FROM Customer c JOIN Invoice i ON i.CustomerId = c.CustomerId
+    GROUP BY c.CustomerId
+    ORDER BY total_spend DESC, c.CustomerId
+    LIMIT 5
+  gold_result:
+  - {FirstName: Helena, LastName: Holý, total_spend: 49.62}
+  - {FirstName: Richard, LastName: Cunningham, total_spend: 47.62}
+  - {FirstName: Luis, LastName: Rojas, total_spend: 46.62}
+  - {FirstName: Ladislav, LastName: Kovács, total_spend: 45.62}
+  - {FirstName: Hugh, LastName: O'Reilly, total_spend: 45.62}
+
+- id: chinook_014
+  question: How much did we earn in each year?
+  difficulty: medium
+  tags: [aggregation, date, paraphrase, rbac-denial]
+  paraphrase_group: revenue_per_year
+  needed_tables: [Invoice]
+  needed_columns: [Invoice.InvoiceDate, Invoice.Total]
+  expected: {admin: allowed, analyst: allowed, viewer: refused}
+  order_matters: false
+  gold_sql: |
+    SELECT strftime('%Y', InvoiceDate) AS year, ROUND(SUM(Total), 2) AS revenue
+    FROM Invoice
+    GROUP BY year
+    ORDER BY year
+  gold_result:
+  - {year: '2009', revenue: 449.46}
+  - {year: '2010', revenue: 481.45}
+  - {year: '2011', revenue: 469.58}
+  - {year: '2012', revenue: 477.53}
+  - {year: '2013', revenue: 450.58}
+
+- id: chinook_015
+  question: Give me the yearly sales totals.
+  difficulty: medium
+  tags: [aggregation, date, paraphrase, rbac-denial]
+  paraphrase_group: revenue_per_year
+  needed_tables: [Invoice]
+  needed_columns: [Invoice.InvoiceDate, Invoice.Total]
+  expected: {admin: allowed, analyst: allowed, viewer: refused}
+  order_matters: false
+  gold_sql: |
+    SELECT strftime('%Y', InvoiceDate) AS year, ROUND(SUM(Total), 2) AS revenue
+    FROM Invoice
+    GROUP BY year
+    ORDER BY year
+  gold_result:
+  - {year: '2009', revenue: 449.46}
+  - {year: '2010', revenue: 481.45}
+  - {year: '2011', revenue: 469.58}
+  - {year: '2012', revenue: 477.53}
+  - {year: '2013', revenue: 450.58}
+
+- id: chinook_016
+  question: Name the artist with the largest number of albums.
+  difficulty: easy
+  tags: [join, aggregation, order-limit, paraphrase]
+  paraphrase_group: artist_most_albums
+  needed_tables: [Album, Artist]
+  needed_columns: [Artist.ArtistId, Artist.Name, Album.ArtistId, Album.AlbumId]
+  expected: {admin: allowed, analyst: allowed, viewer: allowed}
+  order_matters: true
+  gold_sql: |
+    SELECT ar.Name, COUNT(al.AlbumId) AS album_count
+    FROM Artist ar JOIN Album al ON al.ArtistId = ar.ArtistId
+    GROUP BY ar.ArtistId
+    ORDER BY album_count DESC, ar.ArtistId
+    LIMIT 1
+  gold_result:
+  - {Name: Iron Maiden, album_count: 21}
+
+- id: chinook_017
+  question: Which musician released more albums than anyone else in the catalog?
+  difficulty: medium
+  tags: [join, aggregation, order-limit, paraphrase]
+  paraphrase_group: artist_most_albums
+  needed_tables: [Album, Artist]
+  needed_columns: [Artist.ArtistId, Artist.Name, Album.ArtistId, Album.AlbumId]
+  expected: {admin: allowed, analyst: allowed, viewer: allowed}
+  order_matters: true
+  gold_sql: |
+    SELECT ar.Name, COUNT(al.AlbumId) AS album_count
+    FROM Artist ar JOIN Album al ON al.ArtistId = ar.ArtistId
+    GROUP BY ar.ArtistId
+    ORDER BY album_count DESC, ar.ArtistId
+    LIMIT 1
+  gold_result:
+  - {Name: Iron Maiden, album_count: 21}
+
+- id: chinook_018
+  question: List all the media types.
+  difficulty: easy
+  tags: [single-table]
+  needed_tables: [MediaType]
+  needed_columns: [MediaType.Name]
+  expected: {admin: allowed, analyst: allowed, viewer: allowed}
+  order_matters: false
+  gold_sql: |
+    SELECT Name FROM MediaType ORDER BY Name
+  gold_result:
+  - {Name: AAC audio file}
+  - {Name: MPEG audio file}
+  - {Name: Protected AAC audio file}
+  - {Name: Protected MPEG-4 video file}
+  - {Name: Purchased AAC audio file}
+
+- id: chinook_019
+  question: How many tracks are longer than ten minutes?
+  difficulty: easy
+  tags: [filter, aggregation]
+  needed_tables: [Track]
+  needed_columns: [Track.TrackId, Track.Milliseconds]
+  expected: {admin: allowed, analyst: allowed, viewer: allowed}
+  order_matters: false
+  gold_sql: |
+    SELECT COUNT(TrackId) AS track_count FROM Track WHERE Milliseconds > 600000
+  gold_result:
+  - {track_count: 260}
+
+- id: chinook_020
+  question: Which tracks are from the album Let There Be Rock?
+  difficulty: easy
+  tags: [join, filter, keyword-in-question]
+  needed_tables: [Album, Track]
+  needed_columns: [Album.AlbumId, Album.Title, Track.TrackId, Track.Name, Track.AlbumId]
+  expected: {admin: allowed, analyst: allowed, viewer: allowed}
+  order_matters: false
+  gold_sql: |
+    SELECT t.Name
+    FROM Track t JOIN Album a ON a.AlbumId = t.AlbumId
+    WHERE a.Title = 'Let There Be Rock'
+    ORDER BY t.TrackId
+  gold_result:
+  - {Name: Go Down}
+  - {Name: Dog Eat Dog}
+  - {Name: Let There Be Rock}
+  - {Name: Bad Boy Boogie}
+  - {Name: Problem Child}
+  - {Name: Overdose}
+  - {Name: Hell Ain't A Bad Place To Be}
+  - {Name: Whole Lotta Rosie}
+
+- id: chinook_021
+  question: Where do our customers from Germany live?
+  difficulty: easy
+  tags: [filter, keyword-in-question, rbac-denial]
+  needed_tables: [Customer]
+  needed_columns: [Customer.FirstName, Customer.LastName, Customer.City, Customer.Country]
+  expected: {admin: allowed, analyst: allowed, viewer: refused}
+  order_matters: false
+  gold_sql: |
+    SELECT FirstName, LastName, City
+    FROM Customer
+    WHERE Country = 'Germany'
+    ORDER BY CustomerId
+  gold_result:
+  - {FirstName: Leonie, LastName: Köhler, City: Stuttgart}
+  - {FirstName: Hannah, LastName: Schneider, City: Berlin}
+  - {FirstName: Fynn, LastName: Zimmermann, City: Frankfurt}
+  - {FirstName: Niklas, LastName: Schröder, City: Berlin}
+
+- id: chinook_022
+  question: List the customers where the country is Canada, with their email addresses.
+  difficulty: easy
+  tags: [filter, keyword-in-question, rbac-denial]
+  needed_tables: [Customer]
+  needed_columns: [Customer.FirstName, Customer.LastName, Customer.Email, Customer.Country]
+  expected: {admin: allowed, analyst: allowed, viewer: refused}
+  order_matters: false
+  gold_sql: |
+    SELECT FirstName, LastName, Email
+    FROM Customer
+    WHERE Country = 'Canada'
+    ORDER BY CustomerId
+  gold_result:
+  - {FirstName: François, LastName: Tremblay, Email: ftremblay@gmail.com}
+  - {FirstName: Mark, LastName: Philips, Email: mphilips12@shaw.ca}
+  - {FirstName: Jennifer, LastName: Peterson, Email: jenniferp@rogers.ca}
+  - {FirstName: Robert, LastName: Brown, Email: robbrown@shaw.ca}
+  - {FirstName: Edward, LastName: Francis, Email: edfrancis@yachoo.ca}
+  - {FirstName: Martha, LastName: Silk, Email: marthasilk@gmail.com}
+  - {FirstName: Aaron, LastName: Mitchell, Email: aaronmitchell@yahoo.ca}
+  - {FirstName: Ellie, LastName: Sullivan, Email: ellie.sullivan@shaw.ca}
+
+- id: chinook_023
+  question: How many tracks are on the album From The Muddy Banks Of The Wishkah [Live]?
+  difficulty: easy
+  tags: [join, filter, aggregation, keyword-in-value]
+  needed_tables: [Album, Track]
+  needed_columns: [Album.AlbumId, Album.Title, Track.TrackId, Track.AlbumId]
+  expected: {admin: allowed, analyst: allowed, viewer: allowed}
+  order_matters: false
+  gold_sql: |
+    SELECT COUNT(t.TrackId) AS track_count
+    FROM Track t JOIN Album a ON a.AlbumId = t.AlbumId
+    WHERE a.Title = 'From The Muddy Banks Of The Wishkah [Live]'
+  gold_result:
+  - {track_count: 17}
+
+- id: chinook_024
+  question: Which artist recorded the album Somewhere in Time?
+  difficulty: easy
+  tags: [join, filter, keyword-in-value]
+  needed_tables: [Album, Artist]
+  needed_columns: [Album.Title, Album.ArtistId, Artist.ArtistId, Artist.Name]
+  expected: {admin: allowed, analyst: allowed, viewer: allowed}
+  order_matters: false
+  gold_sql: |
+    SELECT ar.Name
+    FROM Album al JOIN Artist ar ON ar.ArtistId = al.ArtistId
+    WHERE al.Title = 'Somewhere in Time'
+  gold_result:
+  - {Name: Iron Maiden}
+
+- id: chinook_025
+  question: Which artists have more than ten albums?
+  difficulty: medium
+  tags: [join, aggregation, having]
+  needed_tables: [Album, Artist]
+  needed_columns: [Artist.ArtistId, Artist.Name, Album.AlbumId, Album.ArtistId]
+  expected: {admin: allowed, analyst: allowed, viewer: allowed}
+  order_matters: false
+  gold_sql: |
+    SELECT ar.Name, COUNT(al.AlbumId) AS album_count
+    FROM Artist ar JOIN Album al ON al.ArtistId = ar.ArtistId
+    GROUP BY ar.ArtistId
+    HAVING COUNT(al.AlbumId) > 10
+    ORDER BY album_count DESC, ar.ArtistId
+  gold_result:
+  - {Name: Iron Maiden, album_count: 21}
+  - {Name: Led Zeppelin, album_count: 14}
+  - {Name: Deep Purple, album_count: 11}
+
+- id: chinook_026
+  question: Which customers have spent more than 45 dollars in total?
+  difficulty: medium
+  tags: [join, aggregation, having, rbac-denial]
+  needed_tables: [Customer, Invoice]
+  needed_columns: [Customer.CustomerId, Customer.FirstName, Customer.LastName, Invoice.CustomerId, Invoice.Total]
+  expected: {admin: allowed, analyst: allowed, viewer: refused}
+  order_matters: false
+  gold_sql: |
+    SELECT c.FirstName, c.LastName, ROUND(SUM(i.Total), 2) AS total_spend
+    FROM Customer c JOIN Invoice i ON i.CustomerId = c.CustomerId
+    GROUP BY c.CustomerId
+    HAVING SUM(i.Total) > 45
+    ORDER BY total_spend DESC, c.CustomerId
+  gold_result:
+  - {FirstName: Helena, LastName: Holý, total_spend: 49.62}
+  - {FirstName: Richard, LastName: Cunningham, total_spend: 47.62}
+  - {FirstName: Luis, LastName: Rojas, total_spend: 46.62}
+  - {FirstName: Ladislav, LastName: Kovács, total_spend: 45.62}
+  - {FirstName: Hugh, LastName: O'Reilly, total_spend: 45.62}
+
+- id: chinook_027
+  question: How many invoices were issued in March 2010?
+  difficulty: easy
+  tags: [date, filter, aggregation, rbac-denial]
+  needed_tables: [Invoice]
+  needed_columns: [Invoice.InvoiceId, Invoice.InvoiceDate]
+  expected: {admin: allowed, analyst: allowed, viewer: refused}
+  order_matters: false
+  gold_sql: |
+    SELECT COUNT(InvoiceId) AS invoice_count
+    FROM Invoice
+    WHERE InvoiceDate >= '2010-03-01' AND InvoiceDate < '2010-04-01'
+  gold_result:
+  - {invoice_count: 7}
+
+- id: chinook_028
+  question: What was the total revenue in the fourth quarter of 2012?
+  difficulty: medium
+  tags: [date, filter, aggregation, rbac-denial]
+  needed_tables: [Invoice]
+  needed_columns: [Invoice.InvoiceDate, Invoice.Total]
+  expected: {admin: allowed, analyst: allowed, viewer: refused}
+  order_matters: false
+  gold_sql: |
+    SELECT ROUND(SUM(Total), 2) AS revenue
+    FROM Invoice
+    WHERE InvoiceDate >= '2012-10-01' AND InvoiceDate < '2013-01-01'
+  gold_result:
+  - {revenue: 117.86}
+
+- id: chinook_029
+  question: Which month of 2011 had the highest revenue?
+  difficulty: medium
+  tags: [date, aggregation, order-limit, rbac-denial]
+  needed_tables: [Invoice]
+  needed_columns: [Invoice.InvoiceDate, Invoice.Total]
+  expected: {admin: allowed, analyst: allowed, viewer: refused}
+  order_matters: true
+  gold_sql: |
+    SELECT strftime('%Y-%m', InvoiceDate) AS month, ROUND(SUM(Total), 2) AS revenue
+    FROM Invoice
+    WHERE InvoiceDate >= '2011-01-01' AND InvoiceDate < '2012-01-01'
+    GROUP BY month
+    ORDER BY revenue DESC, month
+    LIMIT 1
+  gold_result:
+  - {month: 2011-04, revenue: 51.62}
+
+- id: chinook_030
+  question: What are the top 3 countries by number of customers?
+  difficulty: easy
+  tags: [aggregation, order-limit, ties, rbac-denial]
+  needed_tables: [Customer]
+  needed_columns: [Customer.Country, Customer.CustomerId]
+  expected: {admin: allowed, analyst: allowed, viewer: refused}
+  order_matters: true
+  gold_sql: |
+    SELECT Country, COUNT(CustomerId) AS customer_count
+    FROM Customer
+    GROUP BY Country
+    ORDER BY customer_count DESC, Country
+    LIMIT 3
+  gold_result:
+  - {Country: USA, customer_count: 13}
+  - {Country: Canada, customer_count: 8}
+  - {Country: Brazil, customer_count: 5}
+
+- id: chinook_031
+  question: What is the total revenue per genre?
+  difficulty: medium
+  tags: [multi-join, aggregation, rbac-denial]
+  needed_tables: [Genre, InvoiceLine, Track]
+  needed_columns: [Genre.GenreId, Genre.Name, Track.TrackId, Track.GenreId, InvoiceLine.TrackId, InvoiceLine.UnitPrice, InvoiceLine.Quantity]
+  expected: {admin: allowed, analyst: allowed, viewer: refused}
+  order_matters: false
+  gold_sql: |
+    SELECT g.Name, ROUND(SUM(il.UnitPrice * il.Quantity), 2) AS revenue
+    FROM InvoiceLine il
+    JOIN Track t ON t.TrackId = il.TrackId
+    JOIN Genre g ON g.GenreId = t.GenreId
+    GROUP BY g.GenreId
+    ORDER BY revenue DESC, g.Name
+  gold_result:
+  - {Name: Rock, revenue: 826.65}
+  - {Name: Latin, revenue: 382.14}
+  - {Name: Metal, revenue: 261.36}
+  - {Name: Alternative & Punk, revenue: 241.56}
+  - {Name: TV Shows, revenue: 93.53}
+  - {Name: Jazz, revenue: 79.2}
+  - {Name: Blues, revenue: 60.39}
+  - {Name: Drama, revenue: 57.71}
+  - {Name: Classical, revenue: 40.59}
+  - {Name: R&B/Soul, revenue: 40.59}
+  - {Name: Sci Fi & Fantasy, revenue: 39.8}
+  - {Name: Reggae, revenue: 29.7}
+  - {Name: Pop, revenue: 27.72}
+  - {Name: Soundtrack, revenue: 19.8}
+  - {Name: Comedy, revenue: 17.91}
+  - {Name: Hip Hop/Rap, revenue: 16.83}
+  - {Name: Bossa Nova, revenue: 14.85}
+  - {Name: Alternative, revenue: 13.86}
+  - {Name: World, revenue: 12.87}
+  - {Name: Science Fiction, revenue: 11.94}
+  - {Name: Electronica/Dance, revenue: 11.88}
+  - {Name: Heavy Metal, revenue: 11.88}
+  - {Name: Easy Listening, revenue: 9.9}
+  - {Name: Rock And Roll, revenue: 5.94}
+
+- id: chinook_032
+  question: Which artist has earned the most revenue?
+  difficulty: hard
+  tags: [multi-join, aggregation, order-limit, rbac-denial]
+  needed_tables: [Album, Artist, InvoiceLine, Track]
+  needed_columns: [Artist.ArtistId, Artist.Name, Album.AlbumId, Album.ArtistId, Track.TrackId, Track.AlbumId, InvoiceLine.TrackId,
+    InvoiceLine.UnitPrice, InvoiceLine.Quantity]
+  expected: {admin: allowed, analyst: allowed, viewer: refused}
+  order_matters: true
+  gold_sql: |
+    SELECT ar.Name, ROUND(SUM(il.UnitPrice * il.Quantity), 2) AS revenue
+    FROM InvoiceLine il
+    JOIN Track t ON t.TrackId = il.TrackId
+    JOIN Album al ON al.AlbumId = t.AlbumId
+    JOIN Artist ar ON ar.ArtistId = al.ArtistId
+    GROUP BY ar.ArtistId
+    ORDER BY revenue DESC, ar.ArtistId
+    LIMIT 1
+  gold_result:
+  - {Name: Iron Maiden, revenue: 138.6}
+
+- id: chinook_033
+  question: How many tracks of each media type are in the Grunge playlist?
+  difficulty: medium
+  tags: [multi-join, filter, aggregation]
+  needed_tables: [MediaType, Playlist, PlaylistTrack, Track]
+  needed_columns: [Playlist.PlaylistId, Playlist.Name, PlaylistTrack.PlaylistId, PlaylistTrack.TrackId, Track.TrackId, Track.MediaTypeId,
+    MediaType.MediaTypeId, MediaType.Name]
+  expected: {admin: allowed, analyst: allowed, viewer: allowed}
+  order_matters: false
+  gold_sql: |
+    SELECT m.Name AS media_type, COUNT(t.TrackId) AS track_count
+    FROM Playlist p
+    JOIN PlaylistTrack pt ON pt.PlaylistId = p.PlaylistId
+    JOIN Track t ON t.TrackId = pt.TrackId
+    JOIN MediaType m ON m.MediaTypeId = t.MediaTypeId
+    WHERE p.Name = 'Grunge'
+    GROUP BY m.MediaTypeId
+    ORDER BY m.Name
+  gold_result:
+  - {media_type: MPEG audio file, track_count: 14}
+  - {media_type: Protected AAC audio file, track_count: 1}
+
+- id: chinook_034
+  question: How many different customers bought at least one track by AC/DC?
+  difficulty: hard
+  tags: [multi-join, filter, aggregation, rbac-denial]
+  needed_tables: [Album, Artist, Invoice, InvoiceLine, Track]
+  needed_columns: [Artist.ArtistId, Artist.Name, Album.AlbumId, Album.ArtistId, Track.TrackId, Track.AlbumId, InvoiceLine.InvoiceId,
+    InvoiceLine.TrackId, Invoice.InvoiceId, Invoice.CustomerId]
+  expected: {admin: allowed, analyst: allowed, viewer: refused}
+  order_matters: false
+  gold_sql: |
+    SELECT COUNT(DISTINCT i.CustomerId) AS customer_count
+    FROM Invoice i
+    JOIN InvoiceLine il ON il.InvoiceId = i.InvoiceId
+    JOIN Track t ON t.TrackId = il.TrackId
+    JOIN Album al ON al.AlbumId = t.AlbumId
+    JOIN Artist ar ON ar.ArtistId = al.ArtistId
+    WHERE ar.Name = 'AC/DC'
+  gold_result:
+  - {customer_count: 6}
+
+- id: chinook_035
+  question: How many employees does the company have?
+  difficulty: easy
+  tags: [single-table, aggregation, rbac-denial]
+  needed_tables: [Employee]
+  needed_columns: [Employee.EmployeeId]
+  expected: {admin: allowed, analyst: refused, viewer: refused}
+  order_matters: false
+  gold_sql: |
+    SELECT COUNT(EmployeeId) AS employee_count FROM Employee
+  gold_result:
+  - {employee_count: 8}
+
+- id: chinook_036
+  question: Who does Jane Peacock report to?
+  difficulty: medium
+  tags: [join, filter, rbac-denial]
+  needed_tables: [Employee]
+  needed_columns: [Employee.EmployeeId, Employee.FirstName, Employee.LastName, Employee.ReportsTo]
+  expected: {admin: allowed, analyst: refused, viewer: refused}
+  order_matters: false
+  gold_sql: |
+    SELECT m.FirstName, m.LastName
+    FROM Employee e JOIN Employee m ON m.EmployeeId = e.ReportsTo
+    WHERE e.FirstName = 'Jane' AND e.LastName = 'Peacock'
+  gold_result:
+  - {FirstName: Nancy, LastName: Edwards}
+
+- id: chinook_037
+  question: Which sales support agent brought in the most revenue from their customers?
+  difficulty: hard
+  tags: [multi-join, aggregation, order-limit, keyword-in-question, rbac-denial]
+  needed_tables: [Customer, Employee, Invoice]
+  needed_columns: [Employee.EmployeeId, Employee.FirstName, Employee.LastName, Customer.CustomerId, Customer.SupportRepId,
+    Invoice.CustomerId, Invoice.Total]
+  expected: {admin: allowed, analyst: refused, viewer: refused}
+  order_matters: true
+  gold_sql: |
+    SELECT e.FirstName, e.LastName, ROUND(SUM(i.Total), 2) AS revenue
+    FROM Employee e
+    JOIN Customer c ON c.SupportRepId = e.EmployeeId
+    JOIN Invoice i ON i.CustomerId = c.CustomerId
+    GROUP BY e.EmployeeId
+    ORDER BY revenue DESC, e.EmployeeId
+    LIMIT 1
+  gold_result:
+  - {FirstName: Jane, LastName: Peacock, revenue: 833.04}
+
+- id: chinook_038
+  question: What are the five longest tracks and how long are they in minutes?
+  difficulty: easy
+  tags: [single-table, order-limit]
+  needed_tables: [Track]
+  needed_columns: [Track.TrackId, Track.Name, Track.Milliseconds]
+  expected: {admin: allowed, analyst: allowed, viewer: allowed}
+  order_matters: true
+  gold_sql: |
+    SELECT Name, ROUND(Milliseconds / 60000.0, 2) AS minutes
+    FROM Track
+    ORDER BY Milliseconds DESC, TrackId
+    LIMIT 5
+  gold_result:
+  - {Name: Occupation / Precipice, minutes: 88.12}
+  - {Name: Through a Looking Glass, minutes: 84.81}
+  - {Name: 'Greetings from Earth, Pt. 1', minutes: 49.34}
+  - {Name: The Man With Nine Lives, minutes: 49.28}
+  - {Name: 'Battlestar Galactica, Pt. 2', minutes: 49.27}
+
+- id: chinook_039
+  question: How many tracks have never been purchased?
+  difficulty: medium
+  tags: [filter, aggregation, rbac-denial]
+  needed_tables: [InvoiceLine, Track]
+  needed_columns: [Track.TrackId, InvoiceLine.TrackId]
+  expected: {admin: allowed, analyst: allowed, viewer: refused}
+  order_matters: false
+  gold_sql: |
+    SELECT COUNT(t.TrackId) AS track_count
+    FROM Track t
+    WHERE NOT EXISTS (SELECT 1 FROM InvoiceLine il WHERE il.TrackId = t.TrackId)
+  gold_result:
+  - {track_count: 1519}
+
+- id: chinook_040
+  question: What will the weather be in Paris tomorrow?
+  difficulty: easy
+  tags: [unanswerable]
+  needed_tables: []
+  needed_columns: []
+  expected: {admin: unanswerable, analyst: unanswerable, viewer: unanswerable}
+  order_matters: false
+  gold_sql: null
+  gold_result: null
+
+- id: chinook_041
+  question: How many times was each track streamed on Spotify last month?
+  difficulty: easy
+  tags: [unanswerable]
+  needed_tables: []
+  needed_columns: []
+  expected: {admin: unanswerable, analyst: unanswerable, viewer: unanswerable}
+  order_matters: false
+  gold_sql: null
+  gold_result: null
+
+- id: chinook_042
+  question: What is our profit margin on each album after paying royalties?
+  difficulty: medium
+  tags: [unanswerable]
+  needed_tables: []
+  needed_columns: []
+  expected: {admin: unanswerable, analyst: unanswerable, viewer: unanswerable}
+  order_matters: false
+  gold_sql: null
+  gold_result: null
+
+- id: chinook_043
+  question: Which customers left a five-star review for an album?
+  difficulty: medium
+  tags: [unanswerable]
+  needed_tables: []
+  needed_columns: []
+  expected: {admin: unanswerable, analyst: unanswerable, viewer: unanswerable}
+  order_matters: false
+  gold_sql: null
+  gold_result: null
