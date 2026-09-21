@@ -1635,6 +1635,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#the-settings-panel" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The settings panel
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -3948,6 +3959,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#the-settings-panel" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The settings panel
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -4044,7 +4066,9 @@ generated.</p>
 <p>Setup then runs schema indexing once, automatically.</p>
 <p>For the browser playground instead of the CLI, <code>nl2sql demo</code> does the same
 scaffolding in <code>./nl2sql-demo</code> and serves a page over it. See the
-<a href="https://github.com/nadeem4/nl2sql#try-it">README</a> for its flags.</p>
+<a href="https://github.com/nadeem4/nl2sql#try-it">README</a> for its flags, and
+<a href="#the-settings-panel">the settings panel</a> for entering a key and choosing
+models from the page.</p>
 <h3 id="the-schema">The schema</h3>
 <p>Eleven tables with real declared foreign keys: <code>Artist</code>, <code>Album</code>, <code>Track</code>,
 <code>Genre</code>, <code>MediaType</code>, <code>Playlist</code>, <code>PlaylistTrack</code>, <code>Customer</code>, <code>Employee</code>,
@@ -4123,6 +4147,63 @@ instead of the OpenAI embeddings API. The first indexing run downloads roughly
 <code>VECTOR_STORE=data/vector_store_demo</code> directory, so they do not collide. If you
 change <code>EMBEDDING_PROVIDER</code> for an existing store, re-run <code>nl2sql index</code> — the
 store otherwise raises <code>EmbeddingDimensionMismatchError</code>.</p>
+<h3 id="the-settings-panel">The settings panel</h3>
+<p>The playground that <code>nl2sql demo</code> serves has a <strong>Settings</strong> button at the top
+right. It edits the same two files the CLI reads, and nothing else: there is no
+second settings store, and the browser keeps nothing but UI conveniences.</p>
+<ul>
+<li><strong>API key.</strong> Paste a key and press <strong>Save key</strong>. The provider follows the
+  key's shape by the same rule as <code>--api-key</code> (<code>sk-or-</code> is OpenRouter, anything
+  else OpenAI). The key is written to the demo project's <code>.env.demo</code> and the
+  running demo switches from replay to live <strong>without a restart</strong>: questions
+  already running finish on the model client they started with, then the
+  engine's LLM clients are rebuilt from <code>configs/llm.demo.yaml</code>. The key is
+  write-only: no response, log line, trace or error carries it, only a masked
+  form such as <code>sk-...4f2a</code>. On a later start the precedence above still holds,
+  so <code>--api-key</code> or a key exported in your shell wins over the saved one.</li>
+<li>
+<p><strong>A model for each LLM step.</strong> One selector each for the question splitter
+  (<code>decomposer</code>), query planner (<code>astplanner</code>), plan repair (<code>refiner</code>) and
+  answer writer (<code>answersynthesizer</code>), each with a "Default" option that uses
+  the <code>default</code> agent. A choice is written to <code>configs/llm.demo.yaml</code> under
+  <code>agents:</code>, with the default's provider, endpoint and key reference, and takes
+  effect on the next question. The list is short on purpose. On 2026-09-20 each
+  model was sent the engine's exact parameters (<code>temperature=0</code>, <code>seed=42</code>,
+  strict <code>json_schema</code>) and worked with them, two of them only once the
+  temperature was left out. That says the model accepts the engine's calls, not
+  how well it plans, which is the evaluation's question:</p>
+<table>
+<thead>
+<tr>
+<th>Model</th>
+<th>Written with</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>gpt-5.4</code> (the default), <code>gpt-5.4-mini</code>, <code>gpt-4.1</code>, <code>gpt-4.1-mini</code>, <code>gpt-4o</code></td>
+<td><code>temperature: 0.0</code></td>
+</tr>
+<tr>
+<td><code>gpt-5.5</code>, <code>gpt-5-mini</code></td>
+<td><code>temperature: null</code>: they reject temperature 0, so a step on one runs at the model's default temperature and its answers vary more from run to run</td>
+</tr>
+</tbody>
+</table>
+<p>The list lives in one place, <code>VERIFIED_MODELS</code> in
+<code>nl2sql/cli/common/api_key.py</code>. It is OpenAI-only for now: with an
+OpenRouter key or Ollama the panel shows the configured model and offers no
+list.
+- <strong>Local only by default.</strong> Settings work only when the playground is bound to
+  a loopback address (<code>127.0.0.1</code>, <code>localhost</code>, <code>::1</code>). On <code>0.0.0.0</code> or any
+  other address the panel says why it is off and the settings routes answer
+  <code>403</code>, because the playground has no login: a stranger who can reach it could
+  swap in their own key, or spend on yours. <code>nl2sql demo --allow-settings</code> turns
+  it on anyway, for a network you trust. Changes are also refused from another
+  site's page (a foreign <code>Origin</code>), through a hostname that is not a loopback
+  name, or in anything but JSON.</p>
+</li>
+</ul>
 <h2 id="3-use-the-demo-from-the-cli">3. Use the demo from the CLI</h2>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># Run a query against the demo</span>
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>run<span class="w"> </span><span class="s2">"How many customers do we have, by country?"</span>
@@ -4169,7 +4250,7 @@ ones the playground offers as guided questions:</p>
 <h2 id="regenerating-the-demo">Regenerating the demo</h2>
 <p>Re-running <code>nl2sql setup --demo</code> overwrites <code>data/chinook.sqlite</code> and the
 <code>configs/*.demo.*</code> files with fresh copies. An existing <code>.env.demo</code> is
-overwritten too, so a key recorded there is lost - pass <code>--api-key</code> again, or
+overwritten too, so a key recorded there is lost - pass <code>--api-key</code> again, save it in the playground's Settings panel, or
 re-add it afterwards.</p>
 <h2 id="there-is-only-one-demo-dataset">There is only one demo dataset</h2>
 <p><code>--lite</code> and <code>--docker</code> chose between a generated manufacturing dataset in

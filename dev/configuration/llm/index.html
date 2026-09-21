@@ -4321,6 +4321,17 @@ temperature:</p>
 <p>Here <code>astplanner</code> and <code>refiner</code> use <code>default</code>. The model each call actually
 used is recorded per node in <code>QueryResult.usage.calls</code> and in a run trace's
 <code>llm.by_node</code> (see <a href="../../observability/debugging/">Debugging</a>).</p>
+<p>In the demo, the playground's <strong>Settings</strong> panel writes exactly these entries
+into <code>configs/llm.demo.yaml</code>: choosing a model for a step adds an <code>agents:</code>
+entry with the default's provider, <code>base_url</code> and <code>api_key</code> reference, the
+chosen model, and <code>temperature: 0.0</code>, or <code>temperature: null</code> for <code>gpt-5.5</code> and
+<code>gpt-5-mini</code>; choosing "Default" removes the entry. The running engine reloads
+the file, so the change applies to the next question. The panel offers only
+the models in <code>VERIFIED_MODELS</code> (<code>nl2sql/cli/common/api_key.py</code>), OpenAI only
+for now. See <a href="../../getting_started/demo/#the-settings-panel">the settings panel</a>.</p>
+<p>Because a demo step differs from the default only in its model, <code>nl2sql demo</code>
+points every <code>agents:</code> entry at the same provider, endpoint and key variable as
+<code>default</code> when it picks replay or live mode at start-up.</p>
 <h2 id="other-openai-compatible-endpoints">Other OpenAI-compatible endpoints</h2>
 <p>A config-supplied <code>base_url</code> always overrides the provider preset. That is what
 lets the same code path serve any other OpenAI-compatible endpoint — vLLM,
