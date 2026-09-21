@@ -21,8 +21,10 @@ All paths require configuration files. Start with the example configs:
 - `configs/datasources.example.yaml` → copy to `configs/datasources.yaml`
 - `configs/policies.example.json` → copy to `configs/policies.json`
 
-There is no shipped example for `configs/llm.yaml` or `configs/secrets.yaml`;
-write them from the schemas in [LLMs](../configuration/llm.md) and
-[Secrets](../configuration/secrets.md), or let `nl2sql setup` generate them.
+`configs/llm.yaml` and `configs/secrets.yaml` are tracked in the repository as
+examples: an OpenAI default agent, and a secrets file whose providers are all
+commented out. Edit them against the schemas in [LLMs](../configuration/llm.md)
+and [Secrets](../configuration/secrets.md), or let `nl2sql setup` generate your
+own.
 
 See `configuration/system.md` for environment variables and defaults.

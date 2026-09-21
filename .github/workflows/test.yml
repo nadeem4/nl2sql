@@ -38,9 +38,9 @@ jobs:
       - name: Run tests
         run: pytest -m "not integration"
 
-  # The subset of packages/core/tests/integration that needs neither an LLM API
-  # key nor an external database: the Chinook SQLite demo and the local ONNX
-  # embedder are enough. Kept separate from the unit job so that one stays fast.
+  # The tests marked `integration` that need neither an LLM API key nor an
+  # external database: the Chinook SQLite demo and the local ONNX embedder are
+  # enough. Kept separate from the unit job so that one stays fast.
   integration:
     runs-on: ubuntu-latest
     env:
@@ -83,10 +83,9 @@ jobs:
       - name: Run key-free integration tests
         run: pytest -m "integration and not llm"
 
-  # Strict mode fails on broken internal links and bad references, which is
-  # the cheap, deterministic half of catching documentation drift. The
-  # judgment-based half (claims contradicted by code changes) is the advisory
-  # Claude review in docs_drift.yml.
+  # Strict mode fails on broken internal links and bad references, which
+  # catches the deterministic half of documentation drift. Claims that code
+  # changes contradict are not checked by any workflow.
   docs:
     runs-on: ubuntu-latest
     steps:

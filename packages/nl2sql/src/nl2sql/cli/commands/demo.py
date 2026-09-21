@@ -2,7 +2,9 @@
 
 Three modes, chosen at process start from the first key that turns up:
 
-``replay``  no key anywhere, so the guided questions answer from recordings
+``replay``  no key anywhere, so questions answer only from recordings: the
+            demo project's ``recordings.json`` (written by ``--record``), else
+            any packaged with the engine (none ship today)
 ``live``    a key (or a reachable Ollama) is present, so questions go upstream
 ``record``  ``--record`` with a key, capturing upstream answers for replay
 
@@ -238,6 +240,35 @@ def _point_llm_config_at(directory: pathlib.Path, base_url: Optional[str], provi
     path.write_text(yaml.safe_dump(cfg, sort_keys=False), encoding="utf-8")
 
 
+def replay_recordings(directory: pathlib.Path) -> Optional[pathlib.Path]:
+    """The recordings replay mode reads, or None when there are none.
+
+    The demo project's own ``recordings.json`` (what ``--record`` writes) wins;
+    otherwise the recordings packaged with the engine, if any ship.
+    """
+    for path in (directory / "recordings.json", RECORDINGS / f"{DATASET}.json"):
+        if path.exists():
+            return path
+    return None
+
+
+def replay_message(recorded: int, total: int, recordings: Optional[pathlib.Path]) -> str:
+    """The console line for replay mode; it claims recorded answers only when there are some."""
+    ask = (
+        "add an API key in the playground's Settings panel or pass --api-key "
+        "(or set OPENAI_API_KEY or OPENROUTER_API_KEY, or run Ollama)."
+    )
+    if not recorded:
+        return (
+            "[bold]Replay mode:[/bold] no API key found, and replay mode has no recorded answers, "
+            f"so no question can be answered. To ask questions, {ask}"
+        )
+    return (
+        f"[bold]Replay mode:[/bold] no API key found. {recorded} of {total} guided questions answer "
+        f"from recorded responses in {escape(str(recordings))}. For any other question, {ask}"
+    )
+
+
 def _serve(app, host: str, port: int) -> None:
     import uvicorn
 
@@ -322,6 +353,7 @@ def demo_command(
         )
 
     replay_server = None
+    recorded_questions = 0
     proxy = None
     store: Optional[ReplayStore] = None
     store_path = directory / "recordings.json"
@@ -336,15 +368,13 @@ def demo_command(
         os.environ["OPENAI_API_KEY"] = os.environ.get("OPENAI_API_KEY") or "proxy"
         console.print("[bold]Recording mode:[/bold] running the sample questions through the real provider.")
     elif mode == "replay":
-        recordings = RECORDINGS / f"{DATASET}.json"
-        store = ReplayStore.load(recordings) if recordings.exists() else ReplayStore()
+        recordings = replay_recordings(directory)
+        store = ReplayStore.load(recordings) if recordings else ReplayStore()
+        recorded_questions = len(store.covered(CHINOOK_QUESTIONS))
         replay_server = FakeLLMServer(store.rules()).start()
         _point_llm_config_at(directory, replay_server.base_url)
         os.environ["OPENAI_API_KEY"] = "replay"
-        console.print(
-            "[bold]Replay mode:[/bold] no API key found, the guided questions use recorded responses. "
-            "Pass --api-key, set OPENAI_API_KEY or OPENROUTER_API_KEY, or run Ollama for live mode."
-        )
+        console.print(replay_message(recorded_questions, len(CHINOOK_QUESTIONS), recordings))
     else:
         provider = live_provider(resolved_key, key_source)
         _point_llm_config_at(directory, None, provider=provider)
@@ -375,6 +405,7 @@ def demo_command(
         project_dir=directory,
         host=host,
         allow_settings=allow_settings,
+        recorded_questions=recorded_questions,
     )
     url = f"http://{host}:{port}/"
     print_success(f"Playground ready at {url}")

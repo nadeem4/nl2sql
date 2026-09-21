@@ -14,7 +14,7 @@ Model output itself is not reproducible; see [Determinism](architecture/determin
 - **Schema grounding**: planning is constrained by a schema snapshot retrieved via structured chunks.
 - **Explicit validation gates**: logical validation enforces schema and RBAC constraints before execution.
 - **Modularity**: adapters, subgraphs, and executors are capability-driven and replaceable.
-- **Bounded execution**: every run is capped by a global timeout and carries a per-run cancellation token; the graph itself runs in-process on a thread pool.
+- **Bounded waiting**: a global timeout bounds how long the caller waits for a run, not how long the work runs (on expiry the caller gets `PIPELINE_TIMEOUT` and the worker thread winds down in the background); each run carries a per-run cancellation token, and the graph itself runs in-process on a thread pool.
 - **Observability**: structured logging always; OpenTelemetry metrics and audit events when a caller attaches the pipeline callback (today, only the CLI does). See [Observability Stack](observability/stack.md).
 
 ## Non-functional goals

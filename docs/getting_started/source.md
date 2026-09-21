@@ -11,12 +11,18 @@ cd nl2sql
 python -m venv venv
 source venv/bin/activate
 
-pip install -e packages/adapter-sdk
-pip install -e "packages/nl2sql[postgres]"
-pip install -e packages/api
+pip install -e packages/adapter-sdk -e "packages/nl2sql[postgres,duckdb,demo]" -e packages/api
+pip install --group dev
 ```
 
-Add any other adapters you need (mysql, mssql, duckdb, sqlite).
+These are the extras the full test suite needs (see `CONTRIBUTING.md`):
+`postgres` and `duckdb` supply the drivers the adapter tests import, and `demo`
+supplies the FastAPI/uvicorn server behind `nl2sql demo`. Add `mysql` or
+`mssql` for those drivers, or use `[all]` for every dialect driver (it does not
+include `demo`). There is no `sqlite` extra: that driver is in the standard
+library. `pip install --group dev` (pip 25.1 or newer) installs the PEP 735
+`dev` group from the root `pyproject.toml`: `pytest`, `pytest-randomly`,
+`pytest-timeout` and `httpx`.
 
 ## Configuration
 

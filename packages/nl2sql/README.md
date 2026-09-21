@@ -22,8 +22,10 @@ validator refusing a plan before any SQL is generated.
 
 **Answering a question needs a model**: `OPENAI_API_KEY`, `OPENROUTER_API_KEY`,
 or a reachable Ollama daemon. The key-free replay mode relies on recorded model
-responses, and none ship yet, so without one of those the demo can show you the
-schema but cannot answer.
+responses, and none ship, so without one of those the demo can show you the
+schema but cannot answer. `nl2sql demo --record` (with a key) records the guided
+questions into the demo project's `recordings.json`, and later key-free runs of
+that project replay them.
 
 ## Install
 

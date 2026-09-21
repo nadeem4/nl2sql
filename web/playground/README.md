@@ -23,6 +23,11 @@ The React source for the page `nl2sql demo` serves.
   Where Rebuild is off (a non-loopback `--host` without `--allow-settings`) the
   panel says why (`#index-unavailable`). A demo folder written by an older
   engine shows `#index-folder-warning`.
+- **Mode line** (top bar): live or replay. In replay it states how many guided
+  questions the loaded recordings answer (`recorded_questions` from
+  `/api/meta`), or, with none, that replay mode has no recorded answers and a key
+  is needed. A question replay has no answer for shows "No recorded answer for
+  this question. Add an API key to ask it live." (`replay_miss` from `/api/ask`).
 - **Composer**: the question box, the role selector (`#role-select`), **Plan
   only** (`#plan-only`), **Debug** (`#debug-toggle`) and the guided questions
   from `/api/meta`.

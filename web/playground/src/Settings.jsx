@@ -17,7 +17,7 @@ async function send(url, body) {
   return reply;
 }
 
-function KeyForm({ settings, onSaved }) {
+function KeyForm({ settings, onSaved, recorded }) {
   const [key, setKey] = useState("");
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState(null);
@@ -49,7 +49,9 @@ function KeyForm({ settings, onSaved }) {
         {current ? (
           <>In use: <code>{current}</code> from <code>{settings.key.env_var}</code></>
         ) : (
-          "No key in use. Guided questions answer from recordings."
+          recorded
+            ? `No key in use. ${recorded} guided ${recorded === 1 ? "question answers" : "questions answer"} from recordings.`
+            : "No key in use, and there are no recorded answers. Paste a key to ask questions."
         )}
       </p>
       <label className="settings-label" htmlFor="settings-key">
@@ -162,7 +164,7 @@ function ModelsForm({ settings, onSaved }) {
 
 // The settings panel: a secondary surface, closed until asked for. When the
 // server has settings off it says why instead of offering a form that fails.
-export default function Settings({ settings, error, onSaved }) {
+export default function Settings({ settings, error, onSaved, recorded }) {
   if (error) {
     return <p className="fault">Settings could not be loaded: {error}</p>;
   }
@@ -179,7 +181,7 @@ export default function Settings({ settings, error, onSaved }) {
   }
   return (
     <div className="settings-grid">
-      <KeyForm settings={settings} onSaved={onSaved} />
+      <KeyForm settings={settings} onSaved={onSaved} recorded={recorded} />
       <ModelsForm settings={settings} onSaved={onSaved} />
     </div>
   );

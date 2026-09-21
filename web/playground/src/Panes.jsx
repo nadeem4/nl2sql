@@ -376,7 +376,7 @@ export default function Run({ asked, result, sub, busy, error, debug, replay }) 
       <Question asked={asked} busy={busy} />
       {miss && (
         <p className="notice" role="status">
-          This question has no recording. Add an API key under Settings, or restart with one, to ask it live.
+          No recorded answer for this question. Add an API key to ask it live.
         </p>
       )}
       {fault && <p className="fault" role="alert">The run stopped: {fault}</p>}

@@ -85,6 +85,15 @@ class ReplayStore:
         else:
             self._recordings[existing] = recording
 
+    def covered(self, questions: Iterable[str]) -> List[str]:
+        """The ``questions`` this store can start answering.
+
+        Every question begins with the decomposer, so a question without a
+        decomposer recording keyed on it misses however much else is recorded.
+        """
+        recorded = {r.when for r in self._recordings if r.name == "DecomposerResponse"}
+        return [q for q in questions if q in recorded]
+
     def rules(self) -> List[Rule]:
         """Rules for ``FakeLLMServer``, question-specific ones first.
 
