@@ -432,6 +432,37 @@
 </a>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="#rebuilding-without-an-empty-index">
+<span class="md-ellipsis">
+      
+        Rebuilding without an empty index
+      
+    </span>
+</a>
+<nav aria-label="Rebuilding without an empty index" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#one-embedding-model-per-collection">
+<span class="md-ellipsis">
+      
+        One embedding model per collection
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#index-health">
+<span class="md-ellipsis">
+      
+        Index health
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="#chunking-strategy-as-implemented">
 <span class="md-ellipsis">
       
@@ -1823,6 +1854,37 @@
 </a>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="#rebuilding-without-an-empty-index">
+<span class="md-ellipsis">
+      
+        Rebuilding without an empty index
+      
+    </span>
+</a>
+<nav aria-label="Rebuilding without an empty index" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#one-embedding-model-per-collection">
+<span class="md-ellipsis">
+      
+        One embedding model per collection
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#index-health">
+<span class="md-ellipsis">
+      
+        Index health
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="#chunking-strategy-as-implemented">
 <span class="md-ellipsis">
       
@@ -1960,7 +2022,60 @@
 <li><code>Document.page_content</code> = <code>chunk.get_page_content()</code></li>
 <li><code>Document.metadata</code> = <code>chunk.get_metadata()</code></li>
 </ul>
-<p>There is <strong>one index</strong> (Chroma collection) per <code>VectorStore</code> configuration.</p>
+<p>There is <strong>one index</strong> (Chroma collection) per <code>VectorStore</code> configuration, shared by
+every datasource. Each entry also carries a <code>build_id</code> (see below); it is stripped
+from retrieved documents, because the resolver prints a datasource entry's
+metadata into the decomposer prompt.</p>
+<h2 id="rebuilding-without-an-empty-index">Rebuilding without an empty index</h2>
+<p>Re-indexing never deletes the collection first. Each datasource is rebuilt on its
+own, inside the one collection (<code>VectorStore.refresh_schema_chunks</code>):</p>
+<pre class="mermaid"><code>%%{init: {"theme": "neutral"}}%%
+flowchart TD
+    A[Read schema, register snapshot] --&gt; B[Write every entry under a new build_id]
+    B --&gt; C{All entries written?}
+    C --&gt;|no| D[Delete the partial new build; previous entries stay active]
+    C --&gt;|yes| E[Switch: collection metadata build:DS = new build_id]
+    E --&gt; F[Delete the datasource's other builds]</code></pre>
+<ul>
+<li>The collection's metadata names each datasource's <strong>active build</strong>
+  (<code>build:&lt;datasource_id&gt;</code>) and when it was switched in (<code>built_at:&lt;datasource_id&gt;</code>).
+  Every retrieval filters on the active builds, so while the old and new builds
+  coexist a reader sees exactly one of them, never both and never a mix of schema
+  versions. Entries written before builds existed have no <code>build_id</code> and are read
+  as they are until their datasource is next re-indexed.</li>
+<li><strong>Other datasources are never read, deleted or rewritten</strong> by a datasource's
+  rebuild. <code>nl2sql index --datasource X</code> rebuilds only X; <code>nl2sql index</code> rebuilds
+  each configured datasource in turn, and a failure keeps that datasource's
+  previous entries active and exits <code>1</code>.</li>
+<li>Callers that serve questions can hold them back around the switch:
+  <code>rebuild_index(..., switch_guard=...)</code>. The playground passes its <code>RunGate</code>, so
+  questions in flight finish first.</li>
+<li><code>nl2sql.indexing.rebuild.rebuild_index</code> is the one entry point for
+  <code>nl2sql index</code>, the demo's startup repair and the playground's Rebuild.</li>
+</ul>
+<h3 id="one-embedding-model-per-collection">One embedding model per collection</h3>
+<p>A query is embedded once, in one space, so every datasource in a collection
+must use the same embedding model. The collection records it
+(<code>embedding_model</code>, e.g. <code>local/all-MiniLM-L6-v2</code>) on its first write. If the
+configured model differs, retrieval and per-datasource re-indexing raise
+<code>EmbeddingModelMismatchError</code>, which also catches two different models of the
+same dimension that the dimension check cannot. A model change is the one case
+that needs every datasource rebuilt at once: <code>nl2sql index --full</code> builds all of
+them into a staging collection (<code>&lt;name&gt;__staging</code>) and swaps it in by renaming
+only when all succeed; a failure discards the staging collection and leaves the
+live one untouched. A collection written before models were recorded adopts the
+configured model on its next write (the dimension check still applies).</p>
+<h2 id="index-health">Index health</h2>
+<p><code>nl2sql.indexing.health</code> judges an index by its <strong>contents</strong>, never by whether
+its folder exists (the demo once had a <code>data/vector_store_demo</code> folder holding 0
+entries). Only active builds are counted. Status, worst first: <code>missing</code> (no
+folder or collection), <code>empty</code> (0 entries), <code>stale</code> (a configured datasource has
+no entries, its entries were built from an older schema version than the latest
+snapshot, or the configured embedding model differs), <code>ok</code>. It reports entry
+counts by type, the schema version per datasource, when each was built and the
+recorded embedding model. <code>nl2sql doctor</code> prints it under <strong>Index</strong>,
+<code>nl2sql demo</code> rebuilds at startup when it is not <code>ok</code>, and the playground shows
+it with a Rebuild button.</p>
 <h2 id="chunking-strategy-as-implemented">Chunking strategy (as implemented)</h2>
 <p>Chunking is aligned to planning intent:</p>
 <ul>
@@ -2024,8 +2139,13 @@
   degrade the same way. A missing/unusable LLM logs at <code>INFO</code>; anything
   unexpected logs at <code>WARNING</code> with a stack trace.</li>
 <li>Retrieving from a vector store whose persisted vectors do not match the
-  configured embedding provider raises <code>EmbeddingDimensionMismatchError</code>. The check
-  is on the read path only, so a re-index clears the collection and recovers.</li>
+  configured embedding provider raises <code>EmbeddingDimensionMismatchError</code>; a
+  recorded embedding model that differs from the configured one raises
+  <code>EmbeddingModelMismatchError</code>. Either is fixed with <code>nl2sql index --full</code>.</li>
+<li>When the resolver finds no datasource and the index is empty, its
+  <code>SCHEMA_RETRIEVAL_FAILED</code> error says so and names <code>nl2sql index</code>, instead of
+  "No datasource candidates resolved."</li>
+<li>A failed rebuild leaves the previous entries active (see above).</li>
 </ul>
 <h2 id="performance-characteristics-current">Performance characteristics (current)</h2>
 <ul>
@@ -2033,7 +2153,8 @@
   ONNX <code>all-MiniLM-L6-v2</code> model when <code>EMBEDDING_PROVIDER=local</code>.</li>
 <li>Vector search uses Chroma MMR (<code>lambda_mult=0.7</code>, <code>fetch_k = 4*k</code>).</li>
 <li>No caching or sharding layers are implemented.</li>
-<li>Index refresh is full reindex per schema snapshot.</li>
+<li>Index refresh re-embeds every entry of the datasource being re-indexed; other
+  datasources are untouched.</li>
 </ul>
 <h2 id="observability-hooks">Observability hooks</h2>
 <ul>

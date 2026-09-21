@@ -4036,7 +4036,12 @@ Indexing statistics by chunk type (includes <code>datasource_id</code> and <code
 - Writes schema versions to schema store.
 - Writes embeddings to vector store.</p>
 <p>Idempotency:
-- Re-indexing overwrites existing chunks for the same schema version.</p>
+- Re-indexing replaces this datasource's entries: the new entries are written
+  under a new build id, switched in when all are written, and the previous ones
+  deleted. A failure leaves the previous entries active. Other datasources'
+  entries are never touched. Raises <code>EmbeddingModelMismatchError</code> when the
+  collection records a different embedding model (rebuild with
+  <code>nl2sql index --full</code>).</p>
 <h3 id="indexingapiindex_all_datasources">IndexingAPI.index_all_datasources</h3>
 <p>Signature:
 <code>index_all_datasources() -&gt; Dict[str, Dict[str, int]]</code></p>
@@ -4048,7 +4053,9 @@ Indexes all registered datasources; failures are captured per datasource.</p>
 <p>Signature:
 <code>clear_index() -&gt; None</code></p>
 <p>Side Effects:
-Deletes and reinitializes the vector store collection.</p>
+Deletes and reinitializes the vector store collection, for every datasource.
+Every question fails at the resolver until the index is rebuilt; to refresh an
+index, re-index instead, which never leaves it empty.</p>
 <h2 id="execution-lifecycle">Execution Lifecycle</h2>
 <ul>
 <li>Fetch schema via adapter.</li>

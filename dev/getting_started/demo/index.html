@@ -1636,6 +1636,39 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#index-health-and-repair" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Index health and repair
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-search-index-panel" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The search index panel
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#old-demo-folders" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Old demo folders
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#the-settings-panel" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3960,6 +3993,39 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#index-health-and-repair" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Index health and repair
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-search-index-panel" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The search index panel
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#old-demo-folders" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Old demo folders
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#the-settings-panel" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4062,8 +4128,10 @@ generated.</p>
 <li><code>configs/sample_questions.demo.yaml</code></li>
 <li><code>configs/secrets.demo.yaml</code></li>
 <li><code>.env.demo</code></li>
+<li><code>nl2sql-demo.json</code>, a small stamp recording which engine version wrote the
+  folder (see <a href="#old-demo-folders">Old demo folders</a>)</li>
 </ul>
-<p>Setup then runs schema indexing once, automatically.</p>
+<p>Setup then runs schema indexing once, automatically, and exits <code>1</code> if it fails.</p>
 <p>For the browser playground instead of the CLI, <code>nl2sql demo</code> does the same
 scaffolding in <code>./nl2sql-demo</code> and serves a page over it. See the
 <a href="https://github.com/nadeem4/nl2sql#try-it">README</a> for its flags, and
@@ -4120,11 +4188,14 @@ instead of the OpenAI embeddings API. The first indexing run downloads roughly
   <a href="../../configuration/llm/#temperature">LLM configuration → Temperature</a>. With an
   OpenRouter key or Ollama, change <code>model</code> to one that provider serves: live
   mode switches the provider, not the model name.</li>
-<li>Indexing also runs an optional LLM enrichment pass over the schema. Enrichment
-  is best-effort: without a usable chat key it is skipped with an <code>INFO</code> line
-  naming the agent, the provider and the variable to set, and the chunks are
-  still indexed - just with no LLM-generated descriptions. An enrichment failure
-  never fails indexing.</li>
+<li><code>nl2sql index</code> also runs an optional LLM enrichment pass over the schema.
+  Enrichment is best-effort: without a usable chat key it is skipped with an
+  <code>INFO</code> line naming the agent, the provider and the variable to set, and the
+  chunks are still indexed - just with no LLM-generated descriptions. An
+  enrichment failure never fails indexing. The demo's own indexing (the first
+  run, the startup repair and the playground's Rebuild) leaves enrichment
+  <strong>off</strong>, because it spends tokens on your key; the playground offers it as an
+  explicit checkbox.</li>
 <li>Both <code>nl2sql setup --api-key &lt;key&gt;</code> and <code>nl2sql demo --api-key &lt;key&gt;</code> take the
   key on the command line and write it into the generated env file. The provider
   follows the key's shape: a key beginning <code>sk-or-</code> is OpenRouter and is stored
@@ -4145,8 +4216,58 @@ instead of the OpenAI embeddings API. The first indexing run downloads roughly
 <p>Because the demo indexes with <code>local</code> and the default environment indexes with
 <code>openai</code>, the two use different vector dimensions. <code>.env.demo</code> keeps its own
 <code>VECTOR_STORE=data/vector_store_demo</code> directory, so they do not collide. If you
-change <code>EMBEDDING_PROVIDER</code> for an existing store, re-run <code>nl2sql index</code> — the
-store otherwise raises <code>EmbeddingDimensionMismatchError</code>.</p>
+change <code>EMBEDDING_PROVIDER</code> for an existing store, run <code>nl2sql index --full</code>:
+every datasource in a collection must share one embedding model, so the store
+otherwise raises <code>EmbeddingDimensionMismatchError</code> (or
+<code>EmbeddingModelMismatchError</code> for a different model of the same size).</p>
+<h3 id="index-health-and-repair">Index health and repair</h3>
+<p>The playground's schema panel reads the schema snapshot; the resolver, which
+picks the database for every question, reads the separate vector index. The two
+can disagree: a folder once had its snapshot intact and 0 entries in its index,
+so the page looked fine while every question failed with
+<code>SCHEMA_RETRIEVAL_FAILED</code>. Three things now guard against that:</p>
+<ul>
+<li><strong>Startup repair.</strong> Every <code>nl2sql demo</code> start checks what the index
+  <em>contains</em>: it rebuilds when the index is missing or empty, or was built from
+  an older schema version than the latest snapshot. A failed rebuild is
+  reported (the playground still starts, and offers Rebuild) rather than
+  ignored.</li>
+<li><strong>Rebuilds never leave an empty index.</strong> A datasource's new entries are
+  written beside its current ones and switched in only when all are written;
+  a failure keeps the previous entries answering questions. See
+  <a href="../../architecture/indexing/#rebuilding-without-an-empty-index">Indexing</a>.</li>
+<li><strong>Actionable errors.</strong> With an empty index the resolver says
+  "The vector index is empty ... Re-index with <code>nl2sql index</code>", and
+  <code>nl2sql --env demo doctor</code> reports the index under <strong>Index</strong>: entries by type,
+  whether each datasource's schema version matches the latest snapshot, and
+  when it was built.</li>
+</ul>
+<h3 id="the-search-index-panel">The search index panel</h3>
+<p>The playground's left rail opens with <strong>Search index</strong>: entries by type
+(datasource, tables, columns, relationships), the schema version they were
+built from, and when. When the index is empty, missing or out of date, a
+warning under the top bar says what that means for a question, and the panel's
+<strong>Rebuild the index</strong> button becomes the rail's one filled button. <strong>Rebuild</strong>
+is also always available on demand.</p>
+<ul>
+<li>Rebuild re-reads the schema from the database into a new snapshot and
+  rebuilds the Chinook entries beside the current ones; questions keep using
+  the current entries until the new ones are complete, and questions in flight
+  finish before the switch.</li>
+<li>It shows each step as it runs. The first run downloads the 79 MB embedding
+  model, so it can take a few minutes.</li>
+<li><strong>Write descriptions with the LLM</strong> is off by default because it spends
+  tokens on your key; it is unavailable in replay mode.</li>
+<li>It has the settings panel's guardrails: local only unless <code>--allow-settings</code>,
+  and only from the playground page itself.</li>
+</ul>
+<h3 id="old-demo-folders">Old demo folders</h3>
+<p>Demo folders are not upgraded in place: a folder written by an older engine
+keeps that engine's defaults (for example an older default model, or no
+<code>TRACE_MODE</code> line). New folders get a <code>nl2sql-demo.json</code> stamp; when <code>nl2sql demo</code>
+starts in a folder stamped by an older engine, or in one with no stamp at all,
+it warns and suggests a fresh <code>--dir</code>. The playground's index panel repeats the
+warning.</p>
 <h3 id="the-settings-panel">The settings panel</h3>
 <p>The playground that <code>nl2sql demo</code> serves has a <strong>Settings</strong> button at the top
 right. It edits the same two files the CLI reads, and nothing else: there is no
@@ -4216,6 +4337,15 @@ list.
 <a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>
 <a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="c1"># Re-index after regenerating or editing the demo configs</span>
 <a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>index
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>
+<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="c1"># Re-index one datasource only; the others' entries are left untouched</span>
+<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>index<span class="w"> </span>--datasource<span class="w"> </span>chinook
+<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>
+<a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a><span class="c1"># After changing the embedding model: rebuild every datasource, then switch</span>
+<a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>index<span class="w"> </span>--full
+<a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a>
+<a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a><span class="c1"># Check the index: entries by type, schema version, when built</span>
+<a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>doctor
 </code></pre></div>
 <p>The demo's <code>.env.demo</code> sets <code>TRACE_MODE=always</code>, so every run also writes a
 trace to <code>traces/</code> and prints its path. Inspect one with
