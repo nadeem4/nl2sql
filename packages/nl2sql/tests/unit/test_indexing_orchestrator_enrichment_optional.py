@@ -60,7 +60,7 @@ class _RecordingVectorStore:
     def clear(self):
         self.chunks = []
 
-    def refresh_schema_chunks(self, datasource_id, schema_version, chunks, evicted_versions):
+    def refresh_schema_chunks(self, datasource_id, schema_version, chunks, evicted_versions, switch_guard=None):
         self.chunks = list(chunks)
         return {"datasource_id": datasource_id, "schema_version": schema_version, "chunks": len(chunks)}
 
@@ -150,5 +150,18 @@ def test_unusable_llm_client_degrades_instead_of_raising():
     ctx = _context(SimpleNamespace(get_llm=lambda name: _BrokenLLM()))
 
     stats = IndexingOrchestrator(ctx).index_datasource(_StubAdapter())
+
+    assert stats["chunks"] > 0
+
+
+def test_enrichment_off_never_asks_for_an_llm():
+    """The demo and the playground index with enrich=False unless asked: no tokens spent."""
+
+    def _no_llm(name):
+        raise AssertionError(f"enrichment asked for the '{name}' LLM while off")
+
+    ctx = _context(SimpleNamespace(get_llm=_no_llm))
+
+    stats = IndexingOrchestrator(ctx, enrich=False).index_datasource(_StubAdapter())
 
     assert stats["chunks"] > 0

@@ -1,5 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import SchemaPanel from "./SchemaPanel.jsx";
+import IndexPanel from "./IndexPanel.jsx";
+import { needsRebuild } from "./indexHealth.js";
 import Run from "./Panes.jsx";
 import Settings from "./Settings.jsx";
 import { deniedTables, planTables } from "./run.js";
@@ -48,6 +50,8 @@ export default function App() {
   const [settings, setSettings] = useState(null);
   const [settingsError, setSettingsError] = useState(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [index, setIndex] = useState(null);
+  const [indexError, setIndexError] = useState(null);
   const runRef = useRef(null);
 
   useEffect(() => {
@@ -59,7 +63,39 @@ export default function App() {
       .catch((e) => setError(e.message));
     getJson("/api/schema").then(setSchema).catch((e) => setError(e.message));
     getJson("/api/settings").then(setSettings).catch((e) => setSettingsError(e.message));
+    getJson("/api/index").then(setIndex).catch((e) => setIndexError(e.message));
   }, []);
+
+  // While a rebuild runs, follow its steps; when it ends, re-read the schema,
+  // which the rebuild re-read from the database too.
+  const rebuilding = index && index.job.state === "running";
+  useEffect(() => {
+    if (!rebuilding) return undefined;
+    const timer = setInterval(() => {
+      getJson("/api/index")
+        .then((next) => {
+          setIndex(next);
+          if (next.job.state !== "running") {
+            getJson("/api/schema").then(setSchema).catch(() => {});
+          }
+        })
+        .catch((e) => setIndexError(e.message));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [rebuilding]);
+
+  const rebuildIndex = async (enrich) => {
+    const response = await fetch("/api/index/rebuild", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ enrich }),
+    });
+    const reply = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(typeof reply.detail === "string" ? reply.detail : `The server answered ${response.status}.`);
+    }
+    setIndex(reply);
+  };
 
   // A saved key can turn replay into live; the mode line follows the server.
   const settingsSaved = (next) => {
@@ -106,6 +142,7 @@ export default function App() {
   const denied = deniedTables(result && result.errors);
   const replay = meta && meta.mode === "replay";
   const canSet = settings && settings.available;
+  const indexBroken = index && needsRebuild(index.health) && index.job.state !== "running";
 
   return (
     <div className="app">
@@ -131,6 +168,18 @@ export default function App() {
           {settings && !settings.available && <span className="settings-toggle-off">off</span>}
         </button>
       </header>
+
+      {indexBroken && (
+        <p className="index-warning" id="index-warning" role="alert">
+          <strong>{index.health.status === "stale" ? "The search index is out of date." : "The search index is empty."}</strong>{" "}
+          {index.health.status === "stale"
+            ? "Answers may use an older schema. "
+            : "Every question will fail until it is rebuilt. "}
+          {index.rebuild.available
+            ? <a href="#index-rebuild">Rebuild it</a>
+            : <>Run <code>nl2sql --env demo index</code> in the demo directory.</>}
+        </p>
+      )}
 
       {settingsOpen && (
         <section id="settings-panel" className="settings" aria-labelledby="settings-heading">
@@ -193,6 +242,7 @@ export default function App() {
         </section>
 
         <aside className="rail">
+          <IndexPanel index={index} error={indexError} onRebuild={rebuildIndex} />
           <SchemaPanel schema={schema} used={used} denied={denied} role={asked && asked.role} />
         </aside>
 

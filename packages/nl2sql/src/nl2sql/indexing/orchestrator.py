@@ -21,13 +21,17 @@ class IndexingOrchestrator:
     registration, chunk construction, and vector store refresh.
     """
 
-    def __init__(self, ctx: NL2SQLContext):
+    def __init__(self, ctx: NL2SQLContext, enrich: bool = True):
         """
         Initializes the indexing orchestrator.
 
         Args:
             ctx: Initialized NL2SQLContext.
+            enrich: Whether to ask the ``indexing_enrichment`` LLM for
+                descriptions. Enrichment spends tokens, so the demo and the
+                playground turn it on only when asked.
         """
+        self.enrich = enrich
         self.vector_store = ctx.vector_store
         self.schema_store = ctx.schema_store
         self.config_manager = ctx.config_manager
@@ -42,12 +46,17 @@ class IndexingOrchestrator:
     def index_datasource(
         self,
         adapter: DatasourceAdapterProtocol,
+        vector_store=None,
+        switch_guard=None,
     ) -> Dict[str, int]:
         """
         Indexes schema chunks for a datasource.
 
         Args:
             adapter: SQLAlchemy adapter for the datasource.
+            vector_store: Store to write into; defaults to the live one. A full
+                rebuild passes a staging store (see ``indexing.rebuild``).
+            switch_guard: Held around the switch to the new entries.
 
         Returns:
             Indexing statistics by chunk type.
@@ -62,12 +71,13 @@ class IndexingOrchestrator:
         # Best-effort: enrich_schema_snapshot owns resolving its own LLM and
         # degrades to the unenriched snapshot when none is usable, so indexing
         # never depends on an API key being present.
-        schema_snapshot, questions = enrich_schema_snapshot(
-            snapshot=schema_snapshot,
-            llm_registry=self.llm_registry,
-            datasource_description=datasource_description,
-            existing_questions=questions,
-        )
+        if self.enrich:
+            schema_snapshot, questions = enrich_schema_snapshot(
+                snapshot=schema_snapshot,
+                llm_registry=self.llm_registry,
+                datasource_description=datasource_description,
+                existing_questions=questions,
+            )
 
         schema_version, evicted_versions = self.schema_store.register_snapshot(
             schema_snapshot
@@ -82,9 +92,11 @@ class IndexingOrchestrator:
 
         chunks = chunk_builder.build()
 
-        return self.vector_store.refresh_schema_chunks(
+        target = vector_store if vector_store is not None else self.vector_store
+        return target.refresh_schema_chunks(
             datasource_id=adapter.datasource_id,
             schema_version=schema_version,
             chunks=chunks,
             evicted_versions=evicted_versions,
+            switch_guard=switch_guard,
         )

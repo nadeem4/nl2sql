@@ -65,6 +65,10 @@ class SqliteSchemaStore:
         )
         self._connection.commit()
 
+    def close(self) -> None:
+        """Closes the connection; for short-lived readers such as a health check."""
+        self._connection.close()
+
     def register_snapshot(self, snapshot: SchemaSnapshot) -> Tuple[str, List[str]]:
         fingerprint = generate_schema_fingerprint(snapshot.contract)
         existing_version = self._get_version_by_fingerprint(

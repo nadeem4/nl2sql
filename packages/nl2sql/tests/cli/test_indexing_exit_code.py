@@ -18,9 +18,32 @@ class _StubAdapter:
         self.datasource_id = datasource_id
 
 
+class _StubStore:
+    """Records what the rebuild did with the live index."""
+
+    persist_directory = "/tmp/vs"
+
+    def __init__(self):
+        self.promoted = False
+        self.discarded = False
+        self.embeddings = SimpleNamespace(embed_query=lambda _text: [0.0])
+
+    def create_staging(self):
+        return self
+
+    def check_embedding_model(self):
+        return None
+
+    def discard(self):
+        self.discarded = True
+
+    def promote(self, staging):
+        self.promoted = True
+
+
 def _context(*datasource_ids: str) -> SimpleNamespace:
     return SimpleNamespace(
-        vector_store=SimpleNamespace(persist_directory="/tmp/vs"),
+        vector_store=_StubStore(),
         ds_registry=SimpleNamespace(
             list_adapters=lambda: [_StubAdapter(ds) for ds in datasource_ids]
         ),
@@ -31,21 +54,21 @@ def _context(*datasource_ids: str) -> SimpleNamespace:
 def orchestrator(monkeypatch):
     """Replaces the real orchestrator with one driven by a per-datasource script."""
     outcomes: dict = {}
+    indexed: list = []
+    outcomes["_indexed"] = indexed
 
     class _StubOrchestrator:
-        def __init__(self, ctx):
+        def __init__(self, ctx, enrich=True):
             self.ctx = ctx
 
-        def clear_store(self):
-            return None
-
-        def index_datasource(self, adapter):
+        def index_datasource(self, adapter, vector_store=None, switch_guard=None):
+            indexed.append(adapter.datasource_id)
             outcome = outcomes[adapter.datasource_id]
             if isinstance(outcome, Exception):
                 raise outcome
             return outcome
 
-    monkeypatch.setattr(indexing_cmd, "IndexingOrchestrator", _StubOrchestrator)
+    monkeypatch.setattr("nl2sql.indexing.rebuild.IndexingOrchestrator", _StubOrchestrator)
     return outcomes
 
 
@@ -60,19 +83,55 @@ def test_all_datasources_failing_exits_non_zero(orchestrator, capsys):
     assert "Indexing completed with errors" in capsys.readouterr().out
 
 
-def test_a_single_failure_exits_non_zero(orchestrator):
+def test_a_single_failure_exits_non_zero_and_keeps_the_previous_index(orchestrator, capsys):
     orchestrator["ds_a"] = {"datasource_id": "ds_a", "schema_version": "v1", "table": 3}
     orchestrator["ds_b"] = RuntimeError("connection refused")
+    ctx = _context("ds_a", "ds_b")
 
     with pytest.raises(SystemExit) as exit_info:
-        indexing_cmd.run_indexing(_context("ds_a", "ds_b"))
+        indexing_cmd.run_indexing(ctx)
 
     assert exit_info.value.code == 1
+    assert "keeps its previous index entries" in " ".join(capsys.readouterr().out.split())
 
 
 def test_full_success_exits_zero(orchestrator, capsys):
     orchestrator["ds_a"] = {"datasource_id": "ds_a", "schema_version": "v1", "table": 3}
 
-    indexing_cmd.run_indexing(_context("ds_a"))
+    ctx = _context("ds_a")
+    indexing_cmd.run_indexing(ctx)
 
     assert "Indexing complete." in capsys.readouterr().out
+
+
+def test_indexing_one_datasource_indexes_only_that_one(orchestrator):
+    orchestrator["ds_b"] = {"datasource_id": "ds_b", "schema_version": "v1", "table": 3}
+
+    indexing_cmd.run_indexing(_context("ds_a", "ds_b", "ds_c"), datasource_ids=["ds_b"])
+
+    assert orchestrator["_indexed"] == ["ds_b"]
+
+
+def test_an_unknown_datasource_exits_non_zero(orchestrator, capsys):
+    with pytest.raises(SystemExit) as exit_info:
+        indexing_cmd.run_indexing(_context("ds_a"), datasource_ids=["nope"])
+
+    assert exit_info.value.code == 1
+    assert "nope" in capsys.readouterr().out
+
+
+def test_the_index_command_passes_datasource_and_full(monkeypatch):
+    from typer.testing import CliRunner
+
+    from nl2sql.cli import main
+
+    seen = {}
+    monkeypatch.setattr(main, "NL2SQLContext", lambda *a, **k: "ctx")
+    monkeypatch.setattr(main, "run_indexing", lambda ctx, **kw: seen.update(kw))
+
+    result = CliRunner().invoke(main.app, ["index", "--datasource", "chinook", "--datasource", "sales"])
+    assert result.exit_code == 0, result.output
+    assert seen == {"datasource_ids": ["chinook", "sales"], "full": False}
+
+    CliRunner().invoke(main.app, ["index", "--full"])
+    assert seen == {"datasource_ids": None, "full": True}

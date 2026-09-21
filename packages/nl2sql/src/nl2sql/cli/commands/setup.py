@@ -14,7 +14,7 @@ from nl2sql.cli.common.api_key import (
     provider_for_key,
 )
 from nl2sql.cli.common.decorators import handle_cli_errors
-from nl2sql.cli.console import console, print_success, print_step
+from nl2sql.cli.console import console, print_error, print_success, print_step
 from nl2sql.cli.config import ADAPTER_DRIVERS, KNOWN_ADAPTERS
 from nl2sql.cli.commands.install import install_package
 from nl2sql.cli.checks import check_package, verify_connectivity
@@ -372,7 +372,9 @@ def setup_command(demo: bool = False, api_key: Optional[str] = None):
         demo_manager.setup_chinook(api_key=api_key)
 
         print_step("Indexing Demo Environment...")
-        demo_manager.index_demo_data()
+        if not demo_manager.index_demo_data():
+            print_error("Indexing failed; see the error above. Re-run with: nl2sql --env demo index")
+            raise SystemExit(1)
         console.print("Run: [cyan]nl2sql --env demo run \"How many customers do we have, by country?\"[/cyan]")
 
         return

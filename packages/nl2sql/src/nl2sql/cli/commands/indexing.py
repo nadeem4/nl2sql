@@ -1,78 +1,66 @@
 import json
 import sys
-from typing import Any, Dict
+from typing import Dict, List, Optional
+
 from nl2sql.cli.reporting import ConsolePresenter
-from nl2sql.indexing.vector_store import VectorStore
-from nl2sql.datasources import DatasourceRegistry
 from nl2sql.context import NL2SQLContext
 from nl2sql.cli.common.decorators import handle_cli_errors
-from nl2sql.indexing.orchestrator import IndexingOrchestrator
+from nl2sql.indexing.rebuild import rebuild_index
+
 
 @handle_cli_errors
 def run_indexing(
     ctx: NL2SQLContext,
+    enrich: bool = True,
+    datasource_ids: Optional[List[str]] = None,
+    full: bool = False,
 ) -> None:
     """
-    Runs schema indexing for all registered datasources.
+    Rebuilds the schema index, one datasource at a time.
 
-    This command clears the existing vector store and indexes
-    schema chunks for each configured datasource using the
-    indexing orchestrator.
+    Each datasource's new entries are written beside its current ones and
+    switched in only when all are written (see ``nl2sql.indexing.rebuild``):
+    a failure leaves that datasource's previous entries answering questions,
+    and no datasource's rebuild touches another's entries.
 
     Args:
         ctx: The initialized NL2SQLContext.
+        enrich: Ask the LLM for table and column descriptions (spends tokens).
+        datasource_ids: Only these datasources; every configured one when None.
+        full: Rebuild every datasource into a new collection and swap it in.
+            Needed after changing the embedding model.
 
     Raises:
-        SystemExit: With code 1 if the store could not be cleared or if any
-            datasource failed to index.
+        SystemExit: With code 1 if any datasource failed to index.
     """
     presenter = ConsolePresenter()
     presenter.print_info(f"Indexing schema to: {ctx.vector_store.persist_directory}")
 
-    adapters = ctx.ds_registry.list_adapters()
-    orchestrator = IndexingOrchestrator(ctx)
-    stats = []
-    errors = []
-    empty_stats = []
+    tasks: Dict[str, object] = {}
 
-    presenter.start_interactive_status("Clearing existing data...")
-    try:
-        orchestrator.clear_store()
-    except Exception as e:
-        presenter.stop_interactive_status()
-        presenter.print_error(f"Failed to clear existing data: {e}")
-        sys.exit(1)
-    presenter.stop_interactive_status()
-    presenter.print_success("Cleared existing data.")
+    def on_datasource(ds_id: str, event: str, error) -> None:
+        if event == "start":
+            tasks[ds_id] = presenter.start_task_line(f"Indexing {ds_id}...")
+        elif event == "done":
+            presenter.finish_task_line(tasks.pop(ds_id), f"{ds_id} indexed", success=True)
+        else:
+            presenter.finish_task_line(tasks.pop(ds_id), f"{ds_id} failed", success=False)
+            presenter.print_error(f"Failed to index {ds_id}: {error}")
 
-    for adapter in adapters:
-        ds_id = adapter.datasource_id
+    result = rebuild_index(
+        ctx, enrich=enrich, datasource_ids=datasource_ids, full=full, on_datasource=on_datasource
+    )
+    total_adapters = len(result.stats) + len(result.empty) + len(result.errors)
 
-        try:
-            task = presenter.start_task_line(f"Indexing {ds_id}...")
-            schema_stats = orchestrator.index_datasource(adapter)
-            if schema_stats:
-                stats.append(schema_stats)
-            else:
-                empty_stats.append(ds_id)
-            presenter.finish_task_line(task, f"{ds_id} indexed", success=True)
-        except Exception as e:
-            if "task" in locals():
-                presenter.finish_task_line(task, f"{ds_id} failed", success=False)
-            presenter.print_error(f"Failed to index {ds_id}: {e}")
-            errors.append(
-                {"datasource_id": ds_id, "error": str(e)}
-            )
-    
-    if errors:
-        presenter.print_table(errors, "Indexing Errors", columns=["datasource_id", "error"])
-    
-    if stats:
+    if result.errors:
+        presenter.print_table(result.errors, "Indexing Errors", columns=["datasource_id", "error"])
+
+    if result.stats:
         summary_rows = []
         total_chunks = 0
         totals_by_type: Dict[str, int] = {}
 
-        for s in stats:
+        for s in result.stats:
             ds_id = s.get("datasource_id", "unknown")
             schema_version = s.get("schema_version", "-")
             chunk_stats = {
@@ -104,23 +92,30 @@ def run_indexing(
             totals_str = ", ".join([f"{k}={v}" for k, v in sorted(totals_by_type.items())])
             presenter.print_info(f"Total chunks indexed: {total_chunks} ({totals_str})")
 
-    total_adapters = len(adapters)
-    succeeded = len(stats)
-    failed = len(errors)
-    skipped = len(empty_stats)
     presenter.print_info(
-        f"Datasources: total={total_adapters}, succeeded={succeeded}, failed={failed}, empty={skipped}"
+        f"Datasources: total={total_adapters}, succeeded={len(result.stats)}, "
+        f"failed={len(result.errors)}, empty={len(result.empty)}"
     )
 
-    if empty_stats:
-        presenter.print_warning(f"Datasources with empty stats: {', '.join(empty_stats)}")
+    if result.empty:
+        presenter.print_warning(f"Datasources with empty stats: {', '.join(result.empty)}")
 
-    if errors:
-        # Any failure is fatal, not just a total one: a partially populated
-        # index answers later queries from an incomplete schema, which is worse
-        # than a loud stop because it looks like it worked. Scripts chaining
+    if total_adapters == 0:
+        presenter.print_warning(
+            "No datasources are configured, so there is nothing to index. "
+            "The previous index is unchanged."
+        )
+        sys.exit(1)
+
+    if not result.ok:
+        # Any failure is fatal, not just a total one: scripts chaining
         # `nl2sql index && nl2sql run ...` need that signal.
-        presenter.print_warning("Indexing completed with errors.")
+        kept = (
+            "The new collection was not switched in; the previous index is unchanged."
+            if full else
+            "Each failed datasource keeps its previous index entries unchanged."
+        )
+        presenter.print_warning(f"Indexing completed with errors. {kept}")
         sys.exit(1)
 
     presenter.print_success("Indexing complete.")

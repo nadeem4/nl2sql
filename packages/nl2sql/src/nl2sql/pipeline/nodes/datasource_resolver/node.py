@@ -27,6 +27,13 @@ class DatasourceResolverNode:
         self.ds_registry = ctx.ds_registry
         self.schema_store = ctx.schema_store
 
+    def _index_is_empty(self) -> bool:
+        is_empty = getattr(self.vector_store, "is_empty", None)
+        try:
+            return bool(is_empty()) if callable(is_empty) else False
+        except Exception:
+            return False
+
     def _get_unsupported_datasources(self, datasource_ids: list[str]) -> list[str]:
         available_ds_ids = self.ds_registry.list_ids()
         unsupported = [ds_id for ds_id in datasource_ids if ds_id not in available_ds_ids]
@@ -201,11 +208,20 @@ class DatasourceResolverNode:
             candidate_datasources = self._get_candidate_datasources(candidate_docs)
             candidate_ids = list(candidate_datasources.keys())
             if not candidate_ids:
+                message = "No datasource candidates resolved."
+                if self._index_is_empty():
+                    # Said plainly, because an empty index fails every question
+                    # while the rest of the system (the schema snapshot, the
+                    # playground's schema panel) looks healthy.
+                    message = (
+                        "The vector index is empty, so no datasource can be matched. "
+                        "Re-index with `nl2sql index` (in the playground, use Rebuild)."
+                    )
                 return self._error_response(
                     resolved_datasources=[],
                     allowed_ids=[],
                     unsupported_ids=[],
-                    message="No datasource candidates resolved.",
+                    message=message,
                     severity=ErrorSeverity.ERROR,
                     error_code=ErrorCode.SCHEMA_RETRIEVAL_FAILED,
                 )

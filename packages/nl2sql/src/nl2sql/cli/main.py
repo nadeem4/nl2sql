@@ -129,13 +129,24 @@ def index(
     secrets_config_path: SecretsConfigOption = None,
     vector_store_path: VectorStoreOption = None,
     llm_config_path: LLMConfigOption = None,
+    datasource: Annotated[Optional[List[str]], typer.Option(
+        "--datasource", "-d",
+        help="Re-index only this datasource (repeatable). Other datasources' entries are left untouched.",
+    )] = None,
+    full: Annotated[bool, typer.Option(
+        "--full",
+        help=(
+            "Rebuild every datasource into a new collection and switch to it when all succeed. "
+            "Needed after changing the embedding model, since every datasource must share one model."
+        ),
+    )] = False,
 ):
     """
-    Index schemas and examples into the Vector Store.
+    Index schemas and examples into the Vector Store, one datasource at a time.
     """
     ctx = NL2SQLContext(ds_config_path, secrets_config_path, llm_config_path, vector_store_path)
 
-    run_indexing(ctx)
+    run_indexing(ctx, datasource_ids=datasource or None, full=full)
     
 @app.command()
 def doctor():

@@ -1,6 +1,6 @@
 """The playground FastAPI app.
 
-Eight routes:
+Ten routes:
 
 ``GET  /``                     the built React page
 ``GET  /api/meta``             mode, dataset, the guided questions and the roles
@@ -10,11 +10,15 @@ Eight routes:
 ``GET  /api/settings``         the settings panel: masked key, verified models, one model per node
 ``POST /api/settings/key``     save an API key to ``.env.demo`` and switch to live
 ``POST /api/settings/models``  write a model per LLM node into ``llm.demo.yaml``
+``GET  /api/index``            index health (entries by type, schema version, when built)
+                               and the state of a running rebuild
+``POST /api/index/rebuild``    rebuild the datasource's snapshot and vector entries
 
 Every result pane in the browser is a renderer over ``QueryResult``; nothing
 is computed here that the engine does not already return. The only state is
 the settings panel's (see ``settings.py``): the current mode, and the gate that
-keeps a settings change from landing under a running question.
+keeps a settings change from landing under a running question; and the index
+panel's (see ``index_panel.py``): the one rebuild that may be running.
 """
 from __future__ import annotations
 
@@ -29,6 +33,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from nl2sql.auth.models import UserContext
+from nl2sql.cli.demo.playground.index_panel import IndexPanel
 from nl2sql.cli.demo.playground.settings import SettingsPanel
 from nl2sql.common.settings import settings
 from nl2sql.tracing.document import find_trace
@@ -67,6 +72,10 @@ class KeyRequest(BaseModel):
 
 class ModelsRequest(BaseModel):
     models: Dict[str, Optional[str]]
+
+
+class RebuildRequest(BaseModel):
+    enrich: bool = False
 
 
 def _read_page() -> str:
@@ -152,6 +161,9 @@ def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset
     app = FastAPI(title="nl2sql playground")
     page = _read_page()
     panel = SettingsPanel(engine, project_dir, mode, host, allow_settings)
+    index_panel = IndexPanel(engine, panel, _default_datasource(engine, dataset), project_dir)
+    app.state.settings_panel = panel
+    app.state.index_panel = index_panel
 
     @app.exception_handler(RequestValidationError)
     async def _invalid_request(request: Request, exc: RequestValidationError) -> JSONResponse:
@@ -221,5 +233,16 @@ def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset
     def save_models(req: ModelsRequest) -> Dict[str, Any]:
         panel.set_models(req.models)
         return panel.read()
+
+    @app.get("/api/index")
+    def read_index() -> Dict[str, Any]:
+        return index_panel.read()
+
+    @app.post("/api/index/rebuild", status_code=202, dependencies=[Depends(panel.guard)])
+    def rebuild(req: RebuildRequest) -> Dict[str, Any]:
+        # Guarded exactly like a settings change: local only unless
+        # --allow-settings, and only from the playground page itself.
+        index_panel.start(req.enrich)
+        return index_panel.read()
 
     return app

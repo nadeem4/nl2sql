@@ -246,3 +246,46 @@ def test_resolved_metadata_has_a_stable_key_order():
     result = DatasourceResolverNode(ctx)(GraphState(user_query="q", user_context=UserContext()))
     [resolved] = result["datasource_resolver_response"].resolved_datasources
     assert list(resolved.metadata) == ["datasource_id", "id", "schema_version", "type"]
+
+
+def _ctx_with_store(vector_store):
+    return SimpleNamespace(
+        vector_store=vector_store,
+        rbac=SimpleNamespace(get_allowed_datasources=lambda _ctx: ["*"]),
+        ds_registry=SimpleNamespace(
+            get_capabilities=lambda _id: {"supports_sql"},
+            list_ids=lambda: ["ds1"],
+        ),
+        schema_store=SimpleNamespace(get_latest_version=lambda _id: "v1"),
+    )
+
+
+def test_an_empty_index_gets_an_actionable_error():
+    # The owner's demo: 0 entries, and every question said only
+    # "No datasource candidates resolved." with nothing to do about it.
+    vector_store = SimpleNamespace(
+        retrieve_datasource_candidates=lambda *_a, **_k: [],
+        is_empty=lambda: True,
+    )
+
+    result = DatasourceResolverNode(_ctx_with_store(vector_store))(
+        GraphState(user_query="q", user_context=UserContext())
+    )
+
+    error = result["errors"][0]
+    assert error.error_code == ErrorCode.SCHEMA_RETRIEVAL_FAILED
+    assert "vector index is empty" in error.message
+    assert "nl2sql index" in error.message
+
+
+def test_no_match_in_a_populated_index_keeps_the_original_message():
+    vector_store = SimpleNamespace(
+        retrieve_datasource_candidates=lambda *_a, **_k: [],
+        is_empty=lambda: False,
+    )
+
+    result = DatasourceResolverNode(_ctx_with_store(vector_store))(
+        GraphState(user_query="q", user_context=UserContext())
+    )
+
+    assert result["errors"][0].message == "No datasource candidates resolved."

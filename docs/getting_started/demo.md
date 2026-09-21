@@ -32,8 +32,10 @@ This writes the following, relative to the directory you run the command in:
 - `configs/sample_questions.demo.yaml`
 - `configs/secrets.demo.yaml`
 - `.env.demo`
+- `nl2sql-demo.json`, a small stamp recording which engine version wrote the
+  folder (see [Old demo folders](#old-demo-folders))
 
-Setup then runs schema indexing once, automatically.
+Setup then runs schema indexing once, automatically, and exits `1` if it fails.
 
 For the browser playground instead of the CLI, `nl2sql demo` does the same
 scaffolding in `./nl2sql-demo` and serves a page over it. See the
@@ -83,11 +85,14 @@ This covers the embedding step only. The demo is **not** key-free end to end:
   [LLM configuration → Temperature](../configuration/llm.md#temperature). With an
   OpenRouter key or Ollama, change `model` to one that provider serves: live
   mode switches the provider, not the model name.
-- Indexing also runs an optional LLM enrichment pass over the schema. Enrichment
-  is best-effort: without a usable chat key it is skipped with an `INFO` line
-  naming the agent, the provider and the variable to set, and the chunks are
-  still indexed - just with no LLM-generated descriptions. An enrichment failure
-  never fails indexing.
+- `nl2sql index` also runs an optional LLM enrichment pass over the schema.
+  Enrichment is best-effort: without a usable chat key it is skipped with an
+  `INFO` line naming the agent, the provider and the variable to set, and the
+  chunks are still indexed - just with no LLM-generated descriptions. An
+  enrichment failure never fails indexing. The demo's own indexing (the first
+  run, the startup repair and the playground's Rebuild) leaves enrichment
+  **off**, because it spends tokens on your key; the playground offers it as an
+  explicit checkbox.
 - Both `nl2sql setup --api-key <key>` and `nl2sql demo --api-key <key>` take the
   key on the command line and write it into the generated env file. The provider
   follows the key's shape: a key beginning `sk-or-` is OpenRouter and is stored
@@ -108,8 +113,62 @@ This covers the embedding step only. The demo is **not** key-free end to end:
 Because the demo indexes with `local` and the default environment indexes with
 `openai`, the two use different vector dimensions. `.env.demo` keeps its own
 `VECTOR_STORE=data/vector_store_demo` directory, so they do not collide. If you
-change `EMBEDDING_PROVIDER` for an existing store, re-run `nl2sql index` — the
-store otherwise raises `EmbeddingDimensionMismatchError`.
+change `EMBEDDING_PROVIDER` for an existing store, run `nl2sql index --full`:
+every datasource in a collection must share one embedding model, so the store
+otherwise raises `EmbeddingDimensionMismatchError` (or
+`EmbeddingModelMismatchError` for a different model of the same size).
+
+### Index health and repair
+
+The playground's schema panel reads the schema snapshot; the resolver, which
+picks the database for every question, reads the separate vector index. The two
+can disagree: a folder once had its snapshot intact and 0 entries in its index,
+so the page looked fine while every question failed with
+`SCHEMA_RETRIEVAL_FAILED`. Three things now guard against that:
+
+- **Startup repair.** Every `nl2sql demo` start checks what the index
+  *contains*: it rebuilds when the index is missing or empty, or was built from
+  an older schema version than the latest snapshot. A failed rebuild is
+  reported (the playground still starts, and offers Rebuild) rather than
+  ignored.
+- **Rebuilds never leave an empty index.** A datasource's new entries are
+  written beside its current ones and switched in only when all are written;
+  a failure keeps the previous entries answering questions. See
+  [Indexing](../architecture/indexing.md#rebuilding-without-an-empty-index).
+- **Actionable errors.** With an empty index the resolver says
+  "The vector index is empty ... Re-index with `nl2sql index`", and
+  `nl2sql --env demo doctor` reports the index under **Index**: entries by type,
+  whether each datasource's schema version matches the latest snapshot, and
+  when it was built.
+
+### The search index panel
+
+The playground's left rail opens with **Search index**: entries by type
+(datasource, tables, columns, relationships), the schema version they were
+built from, and when. When the index is empty, missing or out of date, a
+warning under the top bar says what that means for a question, and the panel's
+**Rebuild the index** button becomes the rail's one filled button. **Rebuild**
+is also always available on demand.
+
+- Rebuild re-reads the schema from the database into a new snapshot and
+  rebuilds the Chinook entries beside the current ones; questions keep using
+  the current entries until the new ones are complete, and questions in flight
+  finish before the switch.
+- It shows each step as it runs. The first run downloads the 79 MB embedding
+  model, so it can take a few minutes.
+- **Write descriptions with the LLM** is off by default because it spends
+  tokens on your key; it is unavailable in replay mode.
+- It has the settings panel's guardrails: local only unless `--allow-settings`,
+  and only from the playground page itself.
+
+### Old demo folders
+
+Demo folders are not upgraded in place: a folder written by an older engine
+keeps that engine's defaults (for example an older default model, or no
+`TRACE_MODE` line). New folders get a `nl2sql-demo.json` stamp; when `nl2sql demo`
+starts in a folder stamped by an older engine, or in one with no stamp at all,
+it warns and suggests a fresh `--dir`. The playground's index panel repeats the
+warning.
 
 ### The settings panel
 
@@ -169,6 +228,15 @@ nl2sql --env demo run --no-exec "Which artist has the most albums?"
 
 # Re-index after regenerating or editing the demo configs
 nl2sql --env demo index
+
+# Re-index one datasource only; the others' entries are left untouched
+nl2sql --env demo index --datasource chinook
+
+# After changing the embedding model: rebuild every datasource, then switch
+nl2sql --env demo index --full
+
+# Check the index: entries by type, schema version, when built
+nl2sql --env demo doctor
 ```
 
 The demo's `.env.demo` sets `TRACE_MODE=always`, so every run also writes a
