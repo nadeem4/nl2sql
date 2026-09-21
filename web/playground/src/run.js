@@ -94,3 +94,46 @@ const CHECK_NAMES = {
 export function humanCheck(name) {
   return CHECK_NAMES[name] || String(name).replace(/_/g, " ");
 }
+
+// ---------- node drill-down over a run trace (GET /api/trace/{id}) ----------
+
+// Where the run's trace can be fetched, or null when the run wrote none.
+export function traceUrl(result) {
+  if (!result || !result.trace_path || !result.trace_id) return null;
+  return `/api/trace/${encodeURIComponent(result.trace_id)}`;
+}
+
+export function traceFileName(result) {
+  const path = (result && result.trace_path) || "";
+  return path.split(/[\\/]/).pop();
+}
+
+// One node's executions (attempts, sub-queries), in the order they started.
+export function nodeRuns(trace, name) {
+  const nodes = (trace && trace.nodes) || [];
+  return nodes.filter((n) => n.node === name).sort((a, b) => (a.seq || 0) - (b.seq || 0));
+}
+
+// Text stays text (prompts, SQL); anything structured is indented JSON.
+export function pretty(value) {
+  if (value === null || value === undefined) return "";
+  if (typeof value === "string") return value;
+  return JSON.stringify(value, null, 2);
+}
+
+export function callTokens(call) {
+  return call && call.usage ? call.usage.total_tokens || 0 : null;
+}
+
+// A model answer that is a JSON object or array reads better indented; the text
+// is otherwise shown exactly as the model sent it.
+export function readable(text) {
+  if (typeof text !== "string") return pretty(text);
+  const t = text.trim();
+  if (!(t.startsWith("{") || t.startsWith("["))) return text;
+  try {
+    return JSON.stringify(JSON.parse(t), null, 2);
+  } catch {
+    return text;
+  }
+}

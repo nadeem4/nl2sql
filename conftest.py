@@ -25,3 +25,20 @@ def _reset_embedding_service_cache():
         yield
     finally:
         EmbeddingService.reset()
+
+
+@pytest.fixture(autouse=True)
+def _traces_go_to_a_temp_dir(tmp_path_factory, monkeypatch):
+    """Keep run traces out of the working tree.
+
+    ``TRACE_MODE`` defaults to ``on_failure`` and the default directory is
+    ``traces/`` under the working directory, so every test that drives a
+    failing run would otherwise leave a file in the checkout. The variable is
+    set as well as the attribute so ``reload_settings()`` keeps it.
+    """
+    from nl2sql.common.settings import settings
+
+    directory = str(tmp_path_factory.getbasetemp() / "traces")
+    monkeypatch.setenv("TRACE_DIR", directory)
+    monkeypatch.setattr(settings, "trace_dir", directory)
+    yield

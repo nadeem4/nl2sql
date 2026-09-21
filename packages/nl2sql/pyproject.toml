@@ -36,6 +36,9 @@ dependencies = [
     # cli/main.py and cli/commands/policy.py import it directly; it used to
     # arrive only by way of typer and pydantic.
     "typing_extensions>=4.0",
+    # nl2sql.tracing.replay serves recorded answers through an httpx transport;
+    # it already arrives with openai, but is imported directly.
+    "httpx>=0.23,<1",
 ]
 
 # Every dialect adapter ships in this distribution; an extra only adds the

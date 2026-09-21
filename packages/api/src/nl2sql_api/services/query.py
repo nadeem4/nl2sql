@@ -36,4 +36,5 @@ class QueryService:
             status=result.status,
             timings=result.timings,
             usage=result.usage,
+            trace_path=result.trace_path,
         )

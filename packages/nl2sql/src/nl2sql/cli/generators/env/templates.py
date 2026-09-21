@@ -23,6 +23,11 @@ ENV_SPECIFIC_SETTINGS = {
         "# 136s. The 60s default turned every `nl2sql demo` question in live\n"
         "# mode into a PIPELINE_TIMEOUT.\n"
         "GLOBAL_TIMEOUT_SEC=300\n"
+        "\n# --- Run traces ---\n"
+        "# The demo runs locally for you, so every run writes a trace to traces/:\n"
+        "# each node's inputs and outputs, and each LLM prompt and raw response.\n"
+        "# Inspect one with `nl2sql trace show <file>`; the library default is on_failure.\n"
+        "TRACE_MODE=always\n"
     ),
 }
 

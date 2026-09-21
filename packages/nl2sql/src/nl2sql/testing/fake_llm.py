@@ -59,6 +59,32 @@ def classify_request(body: Dict[str, Any]) -> tuple:
     return mode, name, text
 
 
+def completion(body: Dict[str, Any], mode: str, name: str, payload: Any,
+               usage: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """An OpenAI ``chat.completion`` answering ``body`` with ``payload``.
+
+    ``mode`` and ``name`` come from :func:`classify_request`: a ``tools`` call is
+    answered with a tool call named ``name`` whose arguments are ``payload``
+    (a JSON-serialisable value, or an already-serialised string), a
+    ``json_schema`` call with ``payload`` as JSON content, a plain call with
+    ``payload`` as text. Shared with ``nl2sql.tracing.replay``.
+    """
+    if mode == "tools":
+        arguments = payload if isinstance(payload, str) else json.dumps(payload)
+        msg = {"role": "assistant", "content": None, "tool_calls": [
+            {"id": "call_1", "type": "function", "function": {"name": name, "arguments": arguments}}]}
+        finish = "tool_calls"
+    elif mode == "json_schema":
+        content = payload if isinstance(payload, str) else json.dumps(payload)
+        msg, finish = {"role": "assistant", "content": content}, "stop"
+    else:
+        msg, finish = {"role": "assistant", "content": str(payload)}, "stop"
+    return {"id": "chatcmpl-fake", "object": "chat.completion", "created": int(time.time()),
+            "model": body.get("model", "fake"),
+            "choices": [{"index": 0, "message": msg, "finish_reason": finish}],
+            "usage": usage or DEFAULT_USAGE}
+
+
 @dataclass
 class FakeLLMServer:
     rules: List[Rule]
@@ -97,19 +123,7 @@ class FakeLLMServer:
                     self.wfile.write(out)
                     return
                 payload = rule.payload(text) if callable(rule.payload) else rule.payload
-                if mode == "tools":
-                    msg = {"role": "assistant", "content": None, "tool_calls": [
-                        {"id": "call_1", "type": "function",
-                         "function": {"name": name, "arguments": json.dumps(payload)}}]}
-                    finish = "tool_calls"
-                elif mode == "json_schema":
-                    msg, finish = {"role": "assistant", "content": json.dumps(payload)}, "stop"
-                else:
-                    msg, finish = {"role": "assistant", "content": str(payload)}, "stop"
-                resp = {"id": "chatcmpl-fake", "object": "chat.completion", "created": int(time.time()),
-                        "model": body.get("model", "fake"),
-                        "choices": [{"index": 0, "message": msg, "finish_reason": finish}],
-                        "usage": rule.usage or DEFAULT_USAGE}
+                resp = completion(body, mode, name, payload, rule.usage)
                 out = json.dumps(resp).encode()
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")

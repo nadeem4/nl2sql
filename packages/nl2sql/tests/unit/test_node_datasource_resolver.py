@@ -229,3 +229,20 @@ def test_datasource_resolver_explicit_datasource_override():
     resolved = response.resolved_datasources[0]
     assert resolved.datasource_id == "ds1"
     assert resolved.schema_version == "v7"
+
+
+def test_resolved_metadata_has_a_stable_key_order():
+    """The vector store hands metadata back in no fixed key order, and the
+    decomposer prints it into its prompt. Two runs of the same question then sent
+    different prompts, which a trace replay reports as a divergence."""
+    doc = SimpleNamespace(metadata={"type": "schema.datasource", "schema_version": "v1",
+                                    "id": "schema.datasource:ds1:v1", "datasource_id": "ds1"})
+    ctx = SimpleNamespace(
+        vector_store=SimpleNamespace(retrieve_datasource_candidates=lambda *_a, **_k: [doc]),
+        rbac=SimpleNamespace(get_allowed_datasources=lambda _ctx: ["ds1"]),
+        ds_registry=SimpleNamespace(get_capabilities=lambda _id: {"supports_sql"}, list_ids=lambda: ["ds1"]),
+        schema_store=SimpleNamespace(get_latest_version=lambda _id: "v1"),
+    )
+    result = DatasourceResolverNode(ctx)(GraphState(user_query="q", user_context=UserContext()))
+    [resolved] = result["datasource_resolver_response"].resolved_datasources
+    assert list(resolved.metadata) == ["datasource_id", "id", "schema_version", "type"]

@@ -36,3 +36,6 @@ last_reasoning.json
 
 # Playground UI build dependencies (the built page itself is committed)
 node_modules/
+
+# Run traces (TRACE_MODE); `nl2sql trace show|replay` reads them
+traces/

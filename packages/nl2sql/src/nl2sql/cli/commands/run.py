@@ -170,3 +170,7 @@ def run_pipeline(
         presenter.print_performance_tree(tree, metrics, node_map, tokens_by_node)
 
     presenter.print_usage_summary(result.duration, usage)
+
+    trace_path = final_state.get("trace_path")
+    if trace_path:
+        presenter.print_info(f"Trace written to {trace_path} (inspect: nl2sql trace show <file>)")

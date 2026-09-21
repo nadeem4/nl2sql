@@ -118,6 +118,14 @@ input/cached/output/reasoning tokens per node and for the whole question (cost
 too, if you set `LLM_PRICES`). `result.errors` holds ERROR and
 CRITICAL entries only; warnings live in `result.warnings`.
 
+When a run fails or has to retry, the engine also writes a **run trace** to
+`traces/` (`TRACE_MODE=on_failure` by default; the demo uses `always`): every
+node's inputs and outputs and every LLM prompt and raw response, with secrets
+redacted. `result.trace_path` says where it went. `nl2sql trace show <file>`
+prints its timeline and `nl2sql trace replay <file>` re-runs the pipeline on the
+recorded model answers without calling the model. See
+[Debugging a Run](docs/observability/debugging.md).
+
 Install the drivers you need as extras:
 
 ```bash

@@ -203,6 +203,7 @@ class TokenUsageCallback(BaseCallbackHandler):
         self._lock = threading.Lock()
         self._open: Dict[UUID, tuple] = {}
         self._calls: List[LLMCallUsage] = []
+        self._by_run: Dict[UUID, LLMCallUsage] = {}
 
     def _start(self, run_id: UUID, metadata: Optional[Dict[str, Any]], kwargs: Dict[str, Any]) -> None:
         metadata = metadata or {}
@@ -233,6 +234,7 @@ class TokenUsageCallback(BaseCallbackHandler):
         call.cost = _cost(call, requested, self._prices)
         with self._lock:
             self._calls.append(call)
+            self._by_run[run_id] = call
         if tokens is not None:
             self._emit_metrics(call)
 
@@ -259,6 +261,11 @@ class TokenUsageCallback(BaseCallbackHandler):
             ("total", call.total_tokens),
         ):
             token_usage_counter.add(value, attributes={**base, "type": kind})
+
+    def call_for(self, run_id: UUID) -> Optional[LLMCallUsage]:
+        """The record for one finished LLM run, e.g. for a run trace to attach."""
+        with self._lock:
+            return self._by_run.get(run_id)
 
     def usage(self) -> QuestionUsage:
         """A snapshot of everything recorded so far."""
