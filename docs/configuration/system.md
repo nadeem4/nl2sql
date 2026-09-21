@@ -86,6 +86,7 @@ providers. The check runs on the read path only, so the fix is simply to re-run
 | `SQL_AGENT_RETRY_MAX_DELAY_SEC` | `10.0` | Max delay for SQL agent retries (seconds). |
 | `SQL_AGENT_RETRY_JITTER_SEC` | `0.5` | Max jitter added to SQL agent retry delays (seconds). |
 | `LOGICAL_VALIDATOR_STRICT_COLUMNS` | `false` | Treat missing columns as errors in logical validation. |
+| `RBAC_REFUSAL_NAMES_TABLES` | `false` | Name the role and the forbidden table in the refusal the user sees. Off, the message is "You do not have permission to see the data this question requires."; the table and role are always in the log and the run trace. `nl2sql setup --demo` writes `true` into `.env.demo`. See [Security Model](../security/model.md#strict-refusal). |
 | `TENANT_ID` | `default_tenant` | Default tenant ID for requests. |
 
 ### Observability

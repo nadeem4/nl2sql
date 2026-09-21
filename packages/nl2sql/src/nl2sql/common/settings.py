@@ -127,6 +127,17 @@ class Settings(BaseSettings):
         description="Treat missing columns as errors in logical validation."
     )
 
+    rbac_refusal_names_tables: bool = Field(
+        default=False,
+        validation_alias="RBAC_REFUSAL_NAMES_TABLES",
+        description=(
+            "Name the forbidden table and the role in the refusal the user sees. Off by default: "
+            "naming a table tells an unauthorised user that it exists. The table and role are "
+            "always recorded in the error's details (and so the run trace) and the log. "
+            "The generated demo turns it on, because showing the refusal is its point."
+        ),
+    )
+
     sql_agent_max_retries: int = Field(
         default=3,
         validation_alias="SQL_AGENT_MAX_RETRIES",

@@ -178,7 +178,7 @@ Allowed tables must be namespaced as `datasource.table` or `datasource.*`, and p
 - `LogicalValidatorNode._validate_policy()` in `nl2sql.pipeline.nodes.validator.node`
 
 ### Failure Behavior
-`ValueError` for invalid policy format; `PipelineError` with `SECURITY_VIOLATION` if datasource ID is missing or a table is not allowed.
+`ValueError` for invalid policy format; `PipelineError` with `SECURITY_VIOLATION` if datasource ID is missing or a table is not allowed. An unknown role, or no role, allows nothing and is refused the same way, never with `VALIDATOR_CRASH`. The user-facing refusal names no table unless `RBAC_REFUSAL_NAMES_TABLES` is set; the table and roles are in the error's `details`.
 
 ### Why It Exists
 Ensures access control boundaries are explicit and enforced.

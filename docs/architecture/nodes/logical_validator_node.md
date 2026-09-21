@@ -112,6 +112,13 @@ Side effects:
      `Order.expressions` makes `qualify()` raise.
 3. Run `_validate_policy()` for RBAC enforcement. This always runs, even when
    static validation failed or raised — the security check is never skipped.
+   Each forbidden table yields a `CRITICAL` `SECURITY_VIOLATION` whose message
+   is "You do not have permission to see the data this question requires."
+   (it names nothing), with `details` = `{datasource_id, table, roles}` for the
+   trace, and a warning log line. `RBAC_REFUSAL_NAMES_TABLES=true` puts the role
+   and table in the message instead. An unknown role, or no role, allows no
+   table and is refused the same way. The decision reads only the policy and
+   the plan's table list, never the model's reasoning.
 4. If any errors are `ERROR`/`CRITICAL`, return with errors.
 5. Otherwise return success reasoning.
 6. On exception, emit `VALIDATOR_CRASH`.

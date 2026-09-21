@@ -16,6 +16,13 @@
 - Retrieve candidate tables/columns/relationships from `VectorStore`.
 - Resolve authoritative tables from `SchemaStore`.
 - Fall back to full schema snapshot when retrieval returns no candidates.
+- Strip column statistics (`sample_values`, `min_value`, `max_value`,
+  `distinct_count`, `null_percentage`) from every table the caller's role
+  cannot read, on every path, while keeping its name, columns, types, keys and
+  relationships ("structure yes, data no"). The rule is RBAC's
+  `table_allowed`, the one the logical validator refuses with; with no RBAC in
+  the context, every table is stripped. See
+  [Security Model](../../security/model.md#strict-refusal).
 
 ---
 

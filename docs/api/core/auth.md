@@ -93,4 +93,9 @@ Yes.
 
 ## Behavioral Contracts
 - Policies enforce table namespacing (`datasource.table` or `datasource.*`).
-- Unknown roles yield empty permissions.
+- Unknown roles yield empty permissions, and an empty `roles` list does too;
+  neither raises. An unknown role beside a known one is ignored.
+- `table_allowed(allowed_tables, datasource_id, table)` is the single matching
+  rule (`*`, `datasource.*`, `datasource.table`) used by both the logical
+  validator (to refuse) and the schema retriever (to strip a forbidden table's
+  statistics).
