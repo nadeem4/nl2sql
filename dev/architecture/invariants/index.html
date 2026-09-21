@@ -6222,14 +6222,14 @@
 <hr />
 <h2 id="semantic-only-subqueries-and-post-combine-ops">Semantic-Only Subqueries and Post-Combine Ops</h2>
 <h3 id="definition">Definition</h3>
-<p>Sub-query intents and post-combine operations must not contain SQL tokens or physical schema keywords.</p>
+<p>Sub-query intents and post-combine operations must not contain SQL. Each text field (intent, metric names, filter, group-by and order-by attributes, expected-schema names) is checked on its own and rejected if it opens with a <code>SELECT ... FROM</code> statement, or contains a statement terminator (<code>;</code>) or a comment marker (<code>--</code>, <code>/*</code>, <code>*/</code>). English words that happen to be SQL keywords are allowed: "customers from Brazil" and "tracks where the genre is Rock" are valid intents.</p>
 <h3 id="enforcement-points">Enforcement Points</h3>
 <ul>
 <li><code>SubQuery.validate_semantic_only()</code> in <code>nl2sql.pipeline.nodes.decomposer.schemas</code></li>
 <li><code>PostCombineOp.validate_semantic_only()</code> in <code>nl2sql.pipeline.nodes.decomposer.schemas</code></li>
 </ul>
 <h3 id="failure-behavior">Failure Behavior</h3>
-<p>Raises <code>ValueError</code> on any forbidden token detection.</p>
+<p>Raises <code>ValueError</code> ("contains SQL syntax") when a field matches; the decomposer response fails validation.</p>
 <h3 id="why-it-exists">Why It Exists</h3>
 <p>Prevents physical SQL leakage into semantic planning stages and keeps decomposer output safe to interpret downstream.</p>
 <hr />
@@ -6468,7 +6468,7 @@
 <ul>
 <li>Column existence enforcement can degrade to warnings when <code>logical_validator_strict_columns</code> is disabled, so missing columns do not always block execution.</li>
 <li>Schema version mismatch handling is policy-driven and may only emit warnings (e.g., <code>schema_version_mismatch_policy=warn</code>), so mismatch is not always enforced as a hard failure.</li>
-<li>Semantic-only checks are token based; they block a fixed list of SQL tokens rather than parsing for all possible SQL constructs.</li>
+<li>Semantic-only checks are pattern based: they block a field that opens with <code>SELECT ... FROM</code>, a statement terminator and comment markers, rather than parsing for every possible SQL construct. An intent that literally reads "select ... from ..." is rejected as SQL.</li>
 <li>If the vector store is unavailable, datasource resolution can return a response without errors, relying on downstream stages to detect missing candidates.</li>
 </ul>
 <hr />
