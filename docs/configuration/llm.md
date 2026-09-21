@@ -216,6 +216,19 @@ Here `astplanner` and `refiner` use `default`. The model each call actually
 used is recorded per node in `QueryResult.usage.calls` and in a run trace's
 `llm.by_node` (see [Debugging](../observability/debugging.md)).
 
+In the demo, the playground's **Settings** panel writes exactly these entries
+into `configs/llm.demo.yaml`: choosing a model for a step adds an `agents:`
+entry with the default's provider, `base_url` and `api_key` reference, the
+chosen model, and `temperature: 0.0`, or `temperature: null` for `gpt-5.5` and
+`gpt-5-mini`; choosing "Default" removes the entry. The running engine reloads
+the file, so the change applies to the next question. The panel offers only
+the models in `VERIFIED_MODELS` (`nl2sql/cli/common/api_key.py`), OpenAI only
+for now. See [the settings panel](../getting_started/demo.md#the-settings-panel).
+
+Because a demo step differs from the default only in its model, `nl2sql demo`
+points every `agents:` entry at the same provider, endpoint and key variable as
+`default` when it picks replay or live mode at start-up.
+
 ## Other OpenAI-compatible endpoints
 
 A config-supplied `base_url` always overrides the provider preset. That is what

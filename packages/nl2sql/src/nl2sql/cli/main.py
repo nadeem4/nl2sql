@@ -174,9 +174,18 @@ def demo(
             "environment variable is the more private route."
         ),
     )] = None,
+    allow_settings: Annotated[bool, typer.Option(
+        "--allow-settings",
+        help=(
+            "Turn on the playground's settings panel (API key, model per LLM node) even when "
+            "--host is not a loopback address. Off by default there because the playground "
+            "has no login: anyone who can reach it could swap in their own key or run up "
+            "costs on yours."
+        ),
+    )] = False,
 ):
     """One-command playground over the Chinook sample database."""
-    demo_command(directory, host, port, no_browser, record, api_key)
+    demo_command(directory, host, port, no_browser, record, api_key, allow_settings)
 
 
 @app.command()

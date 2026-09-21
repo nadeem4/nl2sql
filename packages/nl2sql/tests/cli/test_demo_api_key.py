@@ -16,8 +16,9 @@ from nl2sql.cli.main import app
 
 runner = CliRunner()
 
-FAKE_KEY = "sk-test-not-a-real-key-1234"
-FAKE_OPENROUTER_KEY = "sk-or-v1-test-not-a-real-key-5678"
+# Built at run time so no secret scanner mistakes a fixture for a leaked key.
+FAKE_KEY = "-".join(["sk", "test", "not", "a", "real", "key", "1234"])
+FAKE_OPENROUTER_KEY = "-".join(["sk", "or", "v1", "test", "not", "a", "real", "key", "5678"])
 
 
 @pytest.fixture(autouse=True)
@@ -202,6 +203,85 @@ def test_help_states_the_precedence_and_the_argv_caveat():
     assert "Ollama" in text
     assert "replay" in text
     assert "shell history" in text
+
+
+def _served_app(monkeypatch):
+    """Captures the app `demo_command` would serve."""
+    served = {}
+    monkeypatch.setattr("nl2sql.cli.commands.demo._serve",
+                        lambda app, host, port: served.update(app=app, host=host))
+    return served
+
+
+def _settings(app):
+    from fastapi.testclient import TestClient
+
+    return TestClient(app, base_url="http://127.0.0.1:8765").get("/api/settings").json()
+
+
+def test_an_openrouter_key_is_read_from_the_openrouter_variable(tmp_path):
+    """The scaffolded config reads ${env:OPENAI_API_KEY}; OpenRouter needs its own."""
+    result = _run("--dir", str(tmp_path / "d"), "--api-key", FAKE_OPENROUTER_KEY)
+
+    assert result.exit_code == 0, result.output
+    llm = yaml.safe_load((tmp_path / "d" / "configs" / "llm.demo.yaml").read_text())
+    assert llm["default"]["api_key"] == "${env:OPENROUTER_API_KEY}"
+
+
+def test_the_api_key_flag_path_is_unchanged_by_the_settings_panel(tmp_path, monkeypatch):
+    served = _served_app(monkeypatch)
+
+    result = _run("--dir", str(tmp_path / "d"), "--api-key", FAKE_KEY)
+
+    assert result.exit_code == 0, result.output
+    assert "live mode" in _plain(result.output).lower()
+    assert f"OPENAI_API_KEY={FAKE_KEY}" in (tmp_path / "d" / ".env.demo").read_text(encoding="utf-8")
+    body = _settings(served["app"])
+    assert body["available"] is True and body["mode"] == "live"
+    assert body["key"] == {"masked": "sk-...1234", "env_var": "OPENAI_API_KEY"}
+    assert FAKE_KEY not in str(body)
+
+
+@pytest.mark.parametrize("host", ["0.0.0.0", "192.168.1.20"])
+def test_settings_are_off_on_a_public_host_unless_allowed(tmp_path, monkeypatch, host):
+    served = _served_app(monkeypatch)
+
+    assert _run("--dir", str(tmp_path / "d"), "--host", host).exit_code == 0
+    refused = _settings(served["app"])
+    assert _run("--dir", str(tmp_path / "d"), "--host", host, "--allow-settings").exit_code == 0
+    allowed = _settings(served["app"])
+
+    assert refused["available"] is False and "--allow-settings" in refused["reason"]
+    assert allowed["available"] is True
+
+
+def test_settings_are_on_for_the_default_localhost_bind(tmp_path, monkeypatch):
+    served = _served_app(monkeypatch)
+
+    assert _run("--dir", str(tmp_path / "d")).exit_code == 0
+
+    assert served["host"] == "127.0.0.1"
+    assert _settings(served["app"])["available"] is True
+
+
+def test_replay_points_per_node_models_at_the_replay_server_too(tmp_path):
+    """A node chosen in the panel must not reach the real provider in replay."""
+    directory = tmp_path / "d"
+    assert _run("--dir", str(directory), "--api-key", FAKE_KEY).exit_code == 0
+    path = directory / "configs" / "llm.demo.yaml"
+    cfg = yaml.safe_load(path.read_text())
+    cfg["agents"] = {"astplanner": {"provider": "openai", "model": "gpt-4.1", "temperature": 0.0,
+                                    "api_key": "${env:OPENAI_API_KEY}", "name": "astplanner"}}
+    path.write_text(yaml.safe_dump(cfg))
+    (directory / ".env.demo").write_text("OPENAI_API_KEY=\n", encoding="utf-8")
+    os.environ.pop("OPENAI_API_KEY", None)
+
+    result = _run("--dir", str(directory))
+
+    assert "replay mode" in _plain(result.output).lower(), result.output
+    llm = yaml.safe_load(path.read_text())
+    assert llm["agents"]["astplanner"]["base_url"] == llm["default"]["base_url"]
+    assert llm["agents"]["astplanner"]["base_url"].startswith("http://127.0.0.1:")
 
 
 class _StubProxy:

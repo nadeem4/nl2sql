@@ -10,11 +10,15 @@ for everything else about a provider.
 
 from __future__ import annotations
 
+from typing import Dict, Optional
+
 __all__ = [
     "DEFAULT_OPENAI_MODEL",
     "DEFAULT_OPENROUTER_MODEL",
     "OPENAI_ENV",
     "OPENROUTER_ENV",
+    "VERIFIED_MODELS",
+    "VERIFIED_OPENAI_MODELS",
     "default_model_for",
     "env_var_for_key",
     "mask_key",
@@ -30,6 +34,27 @@ OPENROUTER_ENV = "OPENROUTER_API_KEY"
 # matching OpenRouter id for gpt-5.4 has not been verified.
 DEFAULT_OPENAI_MODEL = "gpt-5.4"
 DEFAULT_OPENROUTER_MODEL = "anthropic/claude-sonnet-4.5"
+
+# The models the playground's settings panel offers per LLM node, each with the
+# temperature a node on it is written with. The only list: the page reads it
+# from GET /api/settings. A probe on 2026-09-20 sent the engine's exact
+# parameters (temperature=0, seed=42, strict json_schema) to each on the
+# owner's account. All accepted them, except that gpt-5.5 and gpt-5-mini
+# answer temperature=0 with HTTP 400 and work only without it, so they run at
+# the model's default temperature (None: nothing is sent) and vary more.
+# "Verified" means the parameters are accepted, not that the model plans well;
+# that is eval tier 2's question. Other providers have no list yet: add one
+# here under the provider's name.
+VERIFIED_OPENAI_MODELS: Dict[str, Optional[float]] = {
+    "gpt-5.4": 0.0,
+    "gpt-5.4-mini": 0.0,
+    "gpt-4.1": 0.0,
+    "gpt-4.1-mini": 0.0,
+    "gpt-4o": 0.0,
+    "gpt-5.5": None,
+    "gpt-5-mini": None,
+}
+VERIFIED_MODELS: Dict[str, Dict[str, Optional[float]]] = {"openai": VERIFIED_OPENAI_MODELS}
 
 # OpenRouter's own documented prefix. Anything else is treated as OpenAI,
 # which is the provider every other path already defaults to.

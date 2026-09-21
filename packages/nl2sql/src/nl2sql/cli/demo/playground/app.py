@@ -1,15 +1,20 @@
 """The playground FastAPI app.
 
-Five routes, no state of its own:
+Eight routes:
 
 ``GET  /``                     the built React page
 ``GET  /api/meta``             mode, dataset, the guided questions and the roles
 ``GET  /api/schema``           the indexed schema, so a visitor sees the database first
 ``POST /api/ask``              one ``QueryResult``, plus a ``replay_miss`` flag
 ``GET  /api/trace/{trace_id}`` one run trace, read only from the traces directory
+``GET  /api/settings``         the settings panel: masked key, verified models, one model per node
+``POST /api/settings/key``     save an API key to ``.env.demo`` and switch to live
+``POST /api/settings/models``  write a model per LLM node into ``llm.demo.yaml``
 
-Every pane in the browser is a renderer over ``QueryResult``; nothing is
-computed here that the engine does not already return.
+Every result pane in the browser is a renderer over ``QueryResult``; nothing
+is computed here that the engine does not already return. The only state is
+the settings panel's (see ``settings.py``): the current mode, and the gate that
+keeps a settings change from landing under a running question.
 """
 from __future__ import annotations
 
@@ -17,12 +22,14 @@ import pathlib
 from importlib.resources import files
 from typing import Any, Dict, List, Optional
 
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from nl2sql.auth.models import UserContext
+from nl2sql.cli.demo.playground.settings import SettingsPanel
 from nl2sql.common.settings import settings
 from nl2sql.tracing.document import find_trace
 
@@ -52,6 +59,14 @@ class AskRequest(BaseModel):
     question: str
     role: str = "admin"
     execute: bool = True
+
+
+class KeyRequest(BaseModel):
+    api_key: str
+
+
+class ModelsRequest(BaseModel):
+    models: Dict[str, Optional[str]]
 
 
 def _read_page() -> str:
@@ -126,9 +141,24 @@ def _schema_payload(engine, datasource_id: str) -> Dict[str, Any]:
 
 
 def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset: str,
-              trace_dir: Optional[pathlib.Path] = None) -> FastAPI:
+              trace_dir: Optional[pathlib.Path] = None, project_dir: Optional[pathlib.Path] = None,
+              host: str = "127.0.0.1", allow_settings: bool = False) -> FastAPI:
+    """Builds the playground app over ``engine``.
+
+    ``project_dir``, ``host`` and ``allow_settings`` drive the settings panel:
+    it is on only for a demo project, served on a loopback host or with
+    ``allow_settings``; everywhere else it reports why it is off.
+    """
     app = FastAPI(title="nl2sql playground")
     page = _read_page()
+    panel = SettingsPanel(engine, project_dir, mode, host, allow_settings)
+
+    @app.exception_handler(RequestValidationError)
+    async def _invalid_request(request: Request, exc: RequestValidationError) -> JSONResponse:
+        # FastAPI echoes the offending input by default; for the key route that
+        # input is the key. Keep where and why, drop what.
+        detail = [{"loc": e.get("loc"), "msg": e.get("msg"), "type": e.get("type")} for e in exc.errors()]
+        return JSONResponse(status_code=422, content={"detail": detail})
 
     if STATIC_DIR.is_dir():
         # Harmless when the build inlined everything; needed when it did not.
@@ -140,7 +170,7 @@ def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset
 
     @app.get("/api/meta")
     def meta() -> Dict[str, Any]:
-        return {"mode": mode, "dataset": dataset, "questions": questions, "roles": roles}
+        return {"mode": panel.mode, "dataset": dataset, "questions": questions, "roles": roles}
 
     @app.get("/api/schema")
     def schema(datasource: Optional[str] = None) -> Dict[str, Any]:
@@ -150,16 +180,17 @@ def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset
     def ask(req: AskRequest) -> Dict[str, Any]:
         # Sync on purpose: the engine blocks, so Starlette runs this in a thread
         # instead of stalling the event loop.
-        result = engine.run_query(
-            req.question, execute=req.execute, user_context=UserContext(roles=[req.role])
-        )
+        with panel.gate.run():
+            result = engine.run_query(
+                req.question, execute=req.execute, user_context=UserContext(roles=[req.role])
+            )
         body = result.model_dump(mode="json")
         errors = body.get("errors", [])
         codes = {e.get("error_code") for e in errors}
         missing = bool(codes & REPLAY_MISS_CODES) or any(
             REPLAY_MISS_MARKER in (e.get("message") or "") for e in errors
         )
-        body["replay_miss"] = mode == "replay" and missing
+        body["replay_miss"] = panel.mode == "replay" and missing
         return body
 
     @app.get("/api/trace/{trace_id}")
@@ -175,5 +206,20 @@ def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset
             raise HTTPException(status_code=404, detail="No trace with that id.")
         return FileResponse(path, media_type="application/json", filename=path.name,
                             content_disposition_type="inline")
+
+    @app.get("/api/settings")
+    def read_settings() -> Dict[str, Any]:
+        return panel.read()
+
+    @app.post("/api/settings/key", dependencies=[Depends(panel.guard)])
+    def save_key(req: KeyRequest) -> Dict[str, Any]:
+        # Sync, like /api/ask: the save waits for running questions to finish.
+        panel.save_key(req.api_key)
+        return panel.read()
+
+    @app.post("/api/settings/models", dependencies=[Depends(panel.guard)])
+    def save_models(req: ModelsRequest) -> Dict[str, Any]:
+        panel.set_models(req.models)
+        return panel.read()
 
     return app

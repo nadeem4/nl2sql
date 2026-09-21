@@ -1,11 +1,12 @@
 import React, { useEffect, useRef, useState } from "react";
 import SchemaPanel from "./SchemaPanel.jsx";
 import Run from "./Panes.jsx";
+import Settings from "./Settings.jsx";
 import { deniedTables, planTables } from "./run.js";
 
-const REPLAY_NOTE =
-  "No API key found. The guided questions run from recorded model responses; " +
-  "set OPENAI_API_KEY for free-form questions.";
+const REPLAY_NOTE = "No API key found. The guided questions run from recorded model responses; ";
+const REPLAY_FIX_HERE = "add a key under Settings for free-form questions.";
+const REPLAY_FIX_RESTART = "set OPENAI_API_KEY and restart for free-form questions.";
 
 const DEBUG_KEY = "nl2sql.playground.debug";
 
@@ -44,6 +45,9 @@ export default function App() {
   const [asked, setAsked] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  const [settings, setSettings] = useState(null);
+  const [settingsError, setSettingsError] = useState(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const runRef = useRef(null);
 
   useEffect(() => {
@@ -54,7 +58,14 @@ export default function App() {
       })
       .catch((e) => setError(e.message));
     getJson("/api/schema").then(setSchema).catch((e) => setError(e.message));
+    getJson("/api/settings").then(setSettings).catch((e) => setSettingsError(e.message));
   }, []);
+
+  // A saved key can turn replay into live; the mode line follows the server.
+  const settingsSaved = (next) => {
+    setSettings(next);
+    setMeta((m) => (m ? { ...m, mode: next.mode } : m));
+  };
 
   const ask = async (text) => {
     const q = (text === undefined ? question : text).trim();
@@ -94,6 +105,7 @@ export default function App() {
   const used = planTables(sub && sub.plan);
   const denied = deniedTables(result && result.errors);
   const replay = meta && meta.mode === "replay";
+  const canSet = settings && settings.available;
 
   return (
     <div className="app">
@@ -105,10 +117,27 @@ export default function App() {
         {meta && (
           <p className={`mode mode-${meta.mode}`}>
             <strong>{replay ? "Replay mode." : "Live mode."}</strong>{" "}
-            {replay ? REPLAY_NOTE : "Questions go to the configured model."}
+            {replay ? REPLAY_NOTE + (canSet ? REPLAY_FIX_HERE : REPLAY_FIX_RESTART) : "Questions go to the configured model."}
           </p>
         )}
+        <button
+          id="settings-toggle"
+          className="settings-toggle"
+          aria-expanded={settingsOpen}
+          aria-controls="settings-panel"
+          onClick={() => setSettingsOpen(!settingsOpen)}
+        >
+          Settings
+          {settings && !settings.available && <span className="settings-toggle-off">off</span>}
+        </button>
       </header>
+
+      {settingsOpen && (
+        <section id="settings-panel" className="settings" aria-labelledby="settings-heading">
+          <h2 id="settings-heading" className="visually-hidden">Settings</h2>
+          <Settings settings={settings} error={settingsError} onSaved={settingsSaved} />
+        </section>
+      )}
 
       <main className="layout">
         <section className="composer" aria-labelledby="ask-heading">
