@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=64", "wheel"]
+requires = ["setuptools>=77", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -7,6 +7,11 @@ name = "nl2sql-engine"
 version = "0.1.2" # x-release-please-version
 description = "Natural-language-to-SQL engine, CLI and database adapters"
 readme = "README.md"
+license = "MIT"
+# Copies of the repository-root files: setuptools packs license files only from
+# inside the project directory. The wheel vendors Chinook (MIT) and two OFL
+# fonts, whose notices THIRD_PARTY_NOTICES.md carries.
+license-files = ["LICENSE", "THIRD_PARTY_NOTICES.md"]
 requires-python = ">=3.12"
 dependencies = [
     "SQLAlchemy>=2.0",
@@ -31,7 +36,10 @@ dependencies = [
     "duckdb>=1.5",
     # CLI
     "rich>=13.0.0",
-    "typer[all]>=0.9.0",
+    # typer no longer has an [all] extra; asking for it only warns.
+    "typer>=0.9.0",
+    # cli/commands/demo.py and cli/demo/manager.py read .env files directly.
+    "python-dotenv>=1.0.0",
     "inquirerpy>=0.3.4",
     # cli/main.py and cli/commands/policy.py import it directly; it used to
     # arrive only by way of typer and pydantic.

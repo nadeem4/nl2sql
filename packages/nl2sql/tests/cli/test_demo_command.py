@@ -40,6 +40,75 @@ def test_demo_scaffolds_indexes_and_starts_replay_when_no_key(tmp_path, monkeypa
     assert "replay mode" in result.output.lower()
 
 
+def _replay_demo(tmp_path, monkeypatch, packaged=None):
+    """Runs `nl2sql demo` with no key; returns (flattened output, the served app).
+
+    ``packaged`` stands in for the recordings shipped inside the package, which
+    today are none.
+    """
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    monkeypatch.setattr("nl2sql.cli.commands.demo._ollama_reachable", lambda: False)
+    monkeypatch.setattr("nl2sql.cli.demo.manager.DemoManager.index_demo_data", lambda self: True)
+    monkeypatch.setattr("nl2sql.cli.commands.demo._build_engine", lambda: _StubEngine())
+    served = {}
+    monkeypatch.setattr("nl2sql.cli.commands.demo._serve", lambda app, host, port: served.update(app=app))
+    shipped = tmp_path / "packaged"
+    shipped.mkdir()
+    if packaged is not None:
+        packaged.save(shipped / "chinook.json")
+    monkeypatch.setattr("nl2sql.cli.commands.demo.RECORDINGS", shipped)
+
+    result = runner.invoke(app, ["demo", "--dir", str(tmp_path / "d"), "--no-browser"])
+
+    assert result.exit_code == 0, result.output
+    return " ".join(result.output.split()), served["app"]
+
+
+def _meta(served_app):
+    from fastapi.testclient import TestClient
+
+    return TestClient(served_app).get("/api/meta").json()
+
+
+def test_replay_without_recordings_says_it_cannot_answer(tmp_path, monkeypatch):
+    output, served_app = _replay_demo(tmp_path, monkeypatch)
+
+    assert "Replay mode: no API key found, and replay mode has no recorded answers" in output
+    assert "add an API key in the playground's Settings panel or pass --api-key" in output
+    assert "recorded responses" not in output
+    assert _meta(served_app)["recorded_questions"] == 0
+
+
+def test_replay_reads_the_recordings_written_by_record(tmp_path, monkeypatch):
+    """`--record` writes `<demo>/recordings.json`; replay has to read it back."""
+    from nl2sql.cli.demo.chinook import CHINOOK_QUESTIONS
+    from nl2sql.llm.replay import Recording, ReplayStore
+
+    (tmp_path / "d").mkdir()
+    ReplayStore([Recording("DecomposerResponse", CHINOOK_QUESTIONS[0], {})]).save(
+        tmp_path / "d" / "recordings.json"
+    )
+
+    output, served_app = _replay_demo(tmp_path, monkeypatch)
+
+    assert f"1 of {len(CHINOOK_QUESTIONS)} guided questions answer from recorded responses" in output
+    assert "no recorded answers" not in output
+    assert _meta(served_app)["recorded_questions"] == 1
+
+
+def test_replay_falls_back_to_the_packaged_recordings(tmp_path, monkeypatch):
+    from nl2sql.cli.demo.chinook import CHINOOK_QUESTIONS
+    from nl2sql.llm.replay import Recording, ReplayStore
+
+    packaged = ReplayStore([Recording("DecomposerResponse", q, {}) for q in CHINOOK_QUESTIONS[:2]])
+
+    output, served_app = _replay_demo(tmp_path, monkeypatch, packaged=packaged)
+
+    assert f"2 of {len(CHINOOK_QUESTIONS)} guided questions answer from recorded responses" in output
+    assert _meta(served_app)["recorded_questions"] == 2
+
+
 def test_demo_uses_live_mode_when_key_present(tmp_path, monkeypatch):
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
     monkeypatch.setattr("nl2sql.cli.demo.manager.DemoManager.index_demo_data", lambda self: True)

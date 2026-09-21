@@ -1,11 +1,12 @@
 [build-system]
-requires = ["setuptools>=64", "wheel"]
+requires = ["setuptools>=77", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "nl2sql-adapter-sdk"
 version = "0.1.2" # x-release-please-version
 description = "Shared adapter contracts for NL2SQL"
+license = "MIT"
 requires-python = ">=3.12"
 dependencies = [
     # ConfigDict (contracts.py, schema.py) is pydantic v2 only; the old

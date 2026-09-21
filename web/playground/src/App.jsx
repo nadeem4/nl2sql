@@ -6,9 +6,14 @@ import Run from "./Panes.jsx";
 import Settings from "./Settings.jsx";
 import { deniedTables, planTables } from "./run.js";
 
-const REPLAY_NOTE = "No API key found. The guided questions run from recorded model responses; ";
-const REPLAY_FIX_HERE = "add a key under Settings for free-form questions.";
-const REPLAY_FIX_RESTART = "set OPENAI_API_KEY and restart for free-form questions.";
+// The banner claims recorded answers only when the server loaded some.
+function replayNote(recorded, total, canSet) {
+  const fix = canSet ? "add an API key under Settings or restart with --api-key" : "restart with --api-key";
+  if (!recorded) {
+    return `No API key found, and replay mode has no recorded answers, so no question can be answered. To ask questions, ${fix}.`;
+  }
+  return `No API key found. ${recorded} of ${total} guided questions answer from recorded model responses; for any other question, ${fix}.`;
+}
 
 const DEBUG_KEY = "nl2sql.playground.debug";
 
@@ -154,7 +159,9 @@ export default function App() {
         {meta && (
           <p className={`mode mode-${meta.mode}`}>
             <strong>{replay ? "Replay mode." : "Live mode."}</strong>{" "}
-            {replay ? REPLAY_NOTE + (canSet ? REPLAY_FIX_HERE : REPLAY_FIX_RESTART) : "Questions go to the configured model."}
+            {replay
+              ? replayNote(meta.recorded_questions, (meta.questions || []).length, canSet)
+              : "Questions go to the configured model."}
           </p>
         )}
         <button
@@ -184,7 +191,8 @@ export default function App() {
       {settingsOpen && (
         <section id="settings-panel" className="settings" aria-labelledby="settings-heading">
           <h2 id="settings-heading" className="visually-hidden">Settings</h2>
-          <Settings settings={settings} error={settingsError} onSaved={settingsSaved} />
+          <Settings settings={settings} error={settingsError} onSaved={settingsSaved}
+            recorded={meta ? meta.recorded_questions : 0} />
         </section>
       )}
 

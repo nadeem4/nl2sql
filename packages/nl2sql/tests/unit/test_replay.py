@@ -56,6 +56,18 @@ def test_add_replaces_same_name_and_question():
     assert len(store.rules()) == 1 and store.rules()[0].payload == {"v": 2}
 
 
+def test_covered_counts_the_questions_whose_first_call_is_recorded():
+    # Every question starts with the decomposer, so a question without a
+    # decomposer recording cannot be answered however much else is recorded.
+    store = ReplayStore([
+        Recording("DecomposerResponse", "q1", {}),
+        Recording("PlanModel", "q2", {}),
+        Recording("plain", None, "retry"),
+    ])
+    assert store.covered(["q1", "q2", "q3"]) == ["q1"]
+    assert ReplayStore().covered(["q1"]) == []
+
+
 def test_extract_question_from_each_prompt_shape(rendered_prompts):
     # rendered_prompts: fixture that renders the three real prompt templates with the question "Which artist has the most albums?"
     for text in rendered_prompts:

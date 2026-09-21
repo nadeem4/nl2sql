@@ -98,7 +98,11 @@ changelog and the version it proposes is the release decision.
 1. **`build`** — builds sdists and wheels for all three packages, then
    smoke-installs them into a clean virtualenv and runs `import nl2sql` and
    `nl2sql --help`. These are the same commands as the `build` job in
-   `test.yml`.
+   `test.yml`. The `nl2sql-engine` wheel carries `LICENSE` and
+   `THIRD_PARTY_NOTICES.md` under `dist-info/licenses/`, from copies in
+   `packages/nl2sql/` (setuptools packs license files only from inside the
+   project directory). Edit the root files and copy them over;
+   `tests/unit/test_packaging_metadata.py` fails while the copies differ.
 2. **`pypi`** — `needs: build`, so a wheel that does not install or import
    fails the gate and this never runs. It is a matrix job with one leg per
    package: each leg runs in its own GitHub Environment

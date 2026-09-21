@@ -3,9 +3,11 @@
 Ten routes:
 
 ``GET  /``                     the built React page
-``GET  /api/meta``             mode, dataset, the guided questions and the roles
+``GET  /api/meta``             mode, dataset, the guided questions, the roles and how
+                               many guided questions have replay recordings
 ``GET  /api/schema``           the indexed schema, so a visitor sees the database first
-``POST /api/ask``              one ``QueryResult``, plus a ``replay_miss`` flag
+``POST /api/ask``              one ``QueryResult``, plus a ``replay_miss`` flag; a miss
+                               carries one plain error instead of the raw ones
 ``GET  /api/trace/{trace_id}`` one run trace, read only from the traces directory
 ``GET  /api/settings``         the settings panel: masked key, verified models, one model per node
 ``POST /api/settings/key``     save an API key to ``.env.demo`` and switch to live
@@ -46,6 +48,9 @@ REPLAY_MISS_CODES = {"PLANNING_FAILURE", "MISSING_LLM"}
 # server answers 400 with this marker and the pipeline reports it as
 # ORCHESTRATOR_CRASH, which no error code alone distinguishes from a real crash.
 REPLAY_MISS_MARKER = "fake llm: no rule for"
+
+# What a replay miss answers instead of the replay server's internals.
+REPLAY_MISS_MESSAGE = "No recorded answer for this question. Add an API key to ask it live."
 
 STATIC_DIR = pathlib.Path(str(files("nl2sql.cli.demo.playground") / "static"))
 
@@ -151,8 +156,13 @@ def _schema_payload(engine, datasource_id: str) -> Dict[str, Any]:
 
 def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset: str,
               trace_dir: Optional[pathlib.Path] = None, project_dir: Optional[pathlib.Path] = None,
-              host: str = "127.0.0.1", allow_settings: bool = False) -> FastAPI:
+              host: str = "127.0.0.1", allow_settings: bool = False,
+              recorded_questions: int = 0) -> FastAPI:
     """Builds the playground app over ``engine``.
+
+    ``recorded_questions`` is how many of ``questions`` the loaded replay
+    recordings can answer; ``/api/meta`` reports it so the page claims
+    recorded answers only when there are some.
 
     ``project_dir``, ``host`` and ``allow_settings`` drive the settings panel:
     it is on only for a demo project, served on a loopback host or with
@@ -182,7 +192,8 @@ def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset
 
     @app.get("/api/meta")
     def meta() -> Dict[str, Any]:
-        return {"mode": panel.mode, "dataset": dataset, "questions": questions, "roles": roles}
+        return {"mode": panel.mode, "dataset": dataset, "questions": questions, "roles": roles,
+                "recorded_questions": recorded_questions}
 
     @app.get("/api/schema")
     def schema(datasource: Optional[str] = None) -> Dict[str, Any]:
@@ -203,6 +214,15 @@ def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset
             REPLAY_MISS_MARKER in (e.get("message") or "") for e in errors
         )
         body["replay_miss"] = panel.mode == "replay" and missing
+        if body["replay_miss"]:
+            # The raw errors name the fake server and read as a crash; the
+            # reasoning log and the failed call's usage entry repeat them.
+            body["errors"] = [{"node": "replay", "message": REPLAY_MISS_MESSAGE,
+                               "error_code": "REPLAY_MISS", "severity": "ERROR"}]
+            body["reasoning"] = [r for r in body.get("reasoning", []) if REPLAY_MISS_MARKER not in str(r)]
+            for call in (body.get("usage") or {}).get("calls", []):
+                if REPLAY_MISS_MARKER in (call.get("error") or ""):
+                    call["error"] = REPLAY_MISS_MESSAGE
         return body
 
     @app.get("/api/trace/{trace_id}")

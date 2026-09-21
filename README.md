@@ -57,7 +57,7 @@ engine's one real safety property, made visible.
 | `--host ADDR` | `127.0.0.1` | The bind address. The default binds **localhost only**, so nothing outside your machine can reach it. `0.0.0.0` is for containers and VMs, where localhost is not reachable from outside. The playground has **no authentication**: in live mode anyone who can reach the address can ask questions that spend your API credits. Bind it wide only on a network you trust. |
 | `--port N` | `8765` | The port to serve on. Change it when 8765 is taken, or when you are running two demos at once. |
 | `--no-browser` | off | Do not open a browser tab; just serve and print the URL. Use it over SSH and in containers, where there is no browser to open; in CI and scripts, where a browser would be noise or an error; when you are driving the HTTP API directly rather than the page; and on a demo you restart repeatedly, so each restart does not pile up another tab. |
-| `--record` | off | Run the guided questions through your real provider and save the responses to `recordings.json` in the demo project, so the key-free replay path can answer them later. Needs an API key — a reachable Ollama is not enough, because there is nothing to proxy through. This spends real API credits. |
+| `--record` | off | Run the guided questions through your real provider, save the responses to `recordings.json` in the demo project, and exit without serving. A later `nl2sql demo` with no key on the same `--dir` replays from that file (it wins over any recordings packaged with the engine, and none ship today), so the guided questions answer without a key. A question outside the recording gets "No recorded answer for this question. Add an API key to ask it live." Needs an API key — a reachable Ollama is not enough, because there is nothing to proxy through. This spends real API credits. |
 | `--api-key KEY` | unset | The key for live mode, saved into the demo project's `.env.demo` so later runs from that directory stay live without passing it again. The provider follows the key's shape: `sk-or-…` is OpenRouter, anything else is OpenAI. A key on the command line is visible in your shell history and to `ps`, so exporting the environment variable, or pasting the key into the playground's **Settings** panel, is the more private route. |
 | `--allow-settings` | off | Turn on the playground's **Settings** panel (API key, model per LLM step) when `--host` is not a loopback address. It is off there by default because the playground has no login: anyone who can reach the page could swap in their own key or run up costs on yours. On `127.0.0.1` / `localhost` the panel is always on. |
 
@@ -98,12 +98,16 @@ to one that provider serves. Models that reject `temperature: 0` (such as
 `gpt-5.5`) need `temperature: null`; see
 [LLM configuration](docs/configuration/llm.md#temperature).
 
-With none of them it falls back to *replay* mode, which is meant to answer the
-guided sample questions from recorded model responses — **and no recordings are
-committed yet**. So today the key-free path cannot answer anything: clicking a
-guided question shows "This question has no recording." Until recordings land,
-set a key (or point it at Ollama) if you want the demo to produce an answer; the
-schema view and the playground itself work either way.
+With none of them it falls back to *replay* mode, which answers only from
+recorded model responses: the demo project's own `recordings.json` (written by
+`--record`), else recordings packaged with the engine — **and none ship**. So
+out of the box the key-free path cannot answer anything. The console and the
+playground's mode line say so ("replay mode has no recorded answers") and ask
+for a key, and a question gets "No recorded answer for this question. Add an
+API key to ask it live." When a recording is loaded, both say how many of the
+guided questions it covers. Set a key (or point it at Ollama) if you want the
+demo to produce an answer; the schema view and the playground itself work
+either way.
 
 ---
 
@@ -259,8 +263,9 @@ These are current facts about the code, not a roadmap.
 * **Querying needs an LLM key.** Only indexing is key-free (`EMBEDDING_PROVIDER=local`
   runs an ONNX embedder on your machine). Every question costs at least one
   provider call, and typically several.
-* **The key-free demo answers nothing yet.** Replay mode needs recorded model
-  responses and none are committed; see [above](#what-the-demo-needs-honestly).
+* **The key-free demo answers nothing out of the box.** Replay mode needs recorded
+  model responses and none ship; `nl2sql demo --record` (with a key) writes them
+  into your demo project. See [above](#what-the-demo-needs-honestly).
 * **The S3 and ADLS artifact backends have never been verified against a real
   service.** Their URI construction is unit-tested with the parquet read/write
   calls monkeypatched. No test has ever talked to S3 or ADLS, real or emulated.

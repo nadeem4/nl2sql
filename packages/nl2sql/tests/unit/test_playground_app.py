@@ -6,6 +6,8 @@ from fastapi.testclient import TestClient
 
 from nl2sql.api.query_api import QueryResult, SubQueryResult
 from nl2sql.cli.demo.playground.app import build_app
+
+REPLAY_MISS_MESSAGE = "No recorded answer for this question. Add an API key to ask it live."
 from nl2sql.pipeline.nodes.validator.schemas import ValidationCheck
 from nl2sql_adapter_sdk.schema import (
     ColumnContract,
@@ -103,7 +105,8 @@ def _snapshot() -> SchemaSnapshot:
 def test_meta_and_ask():
     engine = _Engine()
     client = TestClient(build_app(engine, questions=["q1"], roles=["admin", "viewer"], mode="replay", dataset="chinook"))
-    assert client.get("/api/meta").json() == {"mode": "replay", "dataset": "chinook", "questions": ["q1"], "roles": ["admin", "viewer"]}
+    assert client.get("/api/meta").json() == {"mode": "replay", "dataset": "chinook", "questions": ["q1"],
+                                              "roles": ["admin", "viewer"], "recorded_questions": 0}
     r = client.post("/api/ask", json={"question": "q1", "role": "viewer", "execute": False})
     assert r.status_code == 200
     body = r.json()
@@ -164,6 +167,7 @@ def test_ask_flags_a_replay_miss():
     client = TestClient(build_app(_Missing(), questions=[], roles=["admin"], mode="replay", dataset="chinook"))
     body = client.post("/api/ask", json={"question": "q", "role": "admin", "execute": True}).json()
     assert body["replay_miss"] is True
+    assert [e["message"] for e in body["errors"]] == [REPLAY_MISS_MESSAGE]
 
     live = TestClient(build_app(_Missing(), questions=[], roles=["admin"], mode="live", dataset="chinook"))
     assert live.post("/api/ask", json={"question": "q", "role": "admin"}).json()["replay_miss"] is False
@@ -187,10 +191,20 @@ def test_a_missing_recording_is_a_replay_miss_whatever_code_it_surfaces_as():
             }])
 
     client = TestClient(build_app(_NoRule(), questions=[], roles=["admin"], mode="replay", dataset="chinook"))
-    assert client.post("/api/ask", json={"question": "q", "role": "admin"}).json()["replay_miss"] is True
+    reply = client.post("/api/ask", json={"question": "q", "role": "admin"})
+    assert reply.json()["replay_miss"] is True
+    # A plain answer, not the replay server's internals dressed as a crash.
+    assert [e["message"] for e in reply.json()["errors"]] == [REPLAY_MISS_MESSAGE]
+    assert "fake llm" not in reply.text and "ORCHESTRATOR_CRASH" not in reply.text
 
     live = TestClient(build_app(_NoRule(), questions=[], roles=["admin"], mode="live", dataset="chinook"))
     assert live.post("/api/ask", json={"question": "q", "role": "admin"}).json()["replay_miss"] is False
+
+
+def test_meta_says_how_many_guided_questions_have_recordings():
+    client = TestClient(build_app(_Engine(), questions=["q1", "q2"], roles=["admin"], mode="replay",
+                                  dataset="chinook", recorded_questions=1))
+    assert client.get("/api/meta").json()["recorded_questions"] == 1
 
 
 # --- GET /api/trace/{trace_id} -------------------------------------------
