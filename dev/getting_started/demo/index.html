@@ -2598,6 +2598,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../observability/debugging/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Debugging a Run (Traces)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../observability/error-handling/" class="md-nav__link">
         
   
@@ -4100,6 +4128,11 @@ store otherwise raises <code>EmbeddingDimensionMismatchError</code>.</p>
 <a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="c1"># Re-index after regenerating or editing the demo configs</span>
 <a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>index
 </code></pre></div>
+<p>The demo's <code>.env.demo</code> sets <code>TRACE_MODE=always</code>, so every run also writes a
+trace to <code>traces/</code> and prints its path. Inspect one with
+<code>nl2sql --env demo trace show &lt;file&gt;</code>, or re-run it on the recorded model
+answers with <code>nl2sql --env demo trace replay &lt;file&gt;</code>. See
+<a href="../../observability/debugging/">Debugging a Run</a>.</p>
 <p><code>--env &lt;name&gt;</code> loads <code>.env.&lt;name&gt;</code>. To point at an exact file instead, use
 <code>--env-file &lt;path&gt;</code>, which takes precedence over <code>--env</code>. The equivalent
 environment variables (<code>ENV</code> and <code>ENV_FILE_PATH</code>) still work.</p>

@@ -2443,6 +2443,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../observability/debugging/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Debugging a Run (Traces)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../observability/error-handling/" class="md-nav__link">
         
   
@@ -4108,7 +4136,8 @@ No exceptions are raised by <code>run_query</code>; errors are returned in <code
 | <code>artifact_refs</code> | <code>Dict[str, ArtifactRef]</code> | no | Result artifact references keyed by execution node id. |
 | <code>status</code> | <code>str</code> | no | <code>"success"</code>, <code>"error"</code>, <code>"plan_only"</code>, or <code>""</code> when nothing ran. |
 | <code>timings</code> | <code>Dict[str, float]</code> | no | Wall-clock seconds per graph node, plus <code>LangGraph</code> for the whole run. |
-| <code>usage</code> | <code>QuestionUsage</code> | no | LLM calls, tokens and model time per node and for the whole question. See below. |</p>
+| <code>usage</code> | <code>QuestionUsage</code> | no | LLM calls, tokens and model time per node and for the whole question. See below. |
+| <code>trace_path</code> | <code>Optional[str]</code> | no | Where this run's trace file was written, or <code>None</code> when <code>TRACE_MODE</code> did not write one. See <a href="../../../observability/debugging/">Debugging a Run</a>. |</p>
 <p><code>errors</code> holds only <code>ERROR</code> and <code>CRITICAL</code> entries; <code>WARNING</code>-severity pipeline
 errors are appended to <code>warnings</code> as the same summary dict.</p>
 <p><code>status</code> is derived: <code>"error"</code> when any blocking error is present, otherwise

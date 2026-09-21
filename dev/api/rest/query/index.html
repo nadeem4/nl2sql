@@ -2443,6 +2443,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../observability/debugging/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Debugging a Run (Traces)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../observability/error-handling/" class="md-nav__link">
         
   
@@ -4144,6 +4172,12 @@
 <td><code>QuestionUsage</code></td>
 <td>no</td>
 <td>LLM calls, input/cached/output/reasoning tokens and model time per node (<code>nodes</code>) and for the question (<code>total</code>), plus every call (<code>calls</code>). The same model as <code>QueryResult.usage</code>; see <a href="../../core/query/#usage-tokens-calls-and-model-time">the core query API</a>.</td>
+</tr>
+<tr>
+<td><code>trace_path</code></td>
+<td><code>Optional[str]</code></td>
+<td>no</td>
+<td>Where the run's trace file was written on the server, or <code>null</code>. See <a href="../../../observability/debugging/">Debugging a Run</a>.</td>
 </tr>
 </tbody>
 </table>

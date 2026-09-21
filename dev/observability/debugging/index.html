@@ -13,10 +13,10 @@
       
       
       
-        <link rel="prev" href="../sqlalchemy/">
+        <link rel="prev" href="../stack/">
       
       
-        <link rel="next" href="../duckdb/">
+        <link rel="next" href="../error-handling/">
       
       
         
@@ -27,7 +27,7 @@
     
     
       
-        <title>Building Adapters - NL2SQL Platform</title>
+        <title>Debugging a Run (Traces) - NL2SQL Platform</title>
       
     
     
@@ -80,7 +80,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#building-adapters-guide" class="md-skip">
+        <a href="#debugging-a-run-with-traces" class="md-skip">
           Skip to content
         </a>
       
@@ -118,7 +118,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Building Adapters
+              Debugging a Run (Traces)
             
           </span>
         </div>
@@ -294,13 +294,11 @@
   
   
   
-    
-  
   
     
     
-      <li class="md-tabs__item md-tabs__item--active">
-        <a href="../" class="md-tabs__link">
+      <li class="md-tabs__item">
+        <a href="../../adapters/" class="md-tabs__link">
           
   
   
@@ -376,11 +374,13 @@
   
   
   
+    
+  
   
     
     
-      <li class="md-tabs__item">
-        <a href="../../observability/stack/" class="md-tabs__link">
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../stack/" class="md-tabs__link">
           
   
   
@@ -1750,31 +1750,28 @@
       
   
   
-    
   
   
-  
     
     
     
     
-      
-        
-        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
         
           
-          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
             
   
   
@@ -1792,7 +1789,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_5">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1810,7 +1807,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../" class="md-nav__link">
+      <a href="../../adapters/" class="md-nav__link">
         
   
   
@@ -1838,7 +1835,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../architecture/" class="md-nav__link">
+      <a href="../../adapters/architecture/" class="md-nav__link">
         
   
   
@@ -1866,7 +1863,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../sdk/" class="md-nav__link">
+      <a href="../../adapters/sdk/" class="md-nav__link">
         
   
   
@@ -1894,7 +1891,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../sqlalchemy/" class="md-nav__link">
+      <a href="../../adapters/sqlalchemy/" class="md-nav__link">
         
   
   
@@ -1919,37 +1916,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Building Adapters
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../adapters/development/" class="md-nav__link">
         
   
   
@@ -1965,104 +1935,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#implementation-path" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Implementation Path
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#option-1-the-fast-lane-sqlalchemy" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Option 1: The "Fast Lane" (SQLAlchemy)
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Option 1: The &#34;Fast Lane&#34; (SQLAlchemy)">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#example" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Example
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#option-2-the-custom-path-protocol" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Option 2: The "Custom" Path (Protocol)
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Option 2: The &#34;Custom&#34; Path (Protocol)">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#example_1" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Example
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#compliance-testing" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Compliance Testing
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -2075,7 +1947,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../duckdb/" class="md-nav__link">
+      <a href="../../adapters/duckdb/" class="md-nav__link">
         
   
   
@@ -2103,7 +1975,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../mssql/" class="md-nav__link">
+      <a href="../../adapters/mssql/" class="md-nav__link">
         
   
   
@@ -2131,7 +2003,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../mysql/" class="md-nav__link">
+      <a href="../../adapters/mysql/" class="md-nav__link">
         
   
   
@@ -2159,7 +2031,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../postgres/" class="md-nav__link">
+      <a href="../../adapters/postgres/" class="md-nav__link">
         
   
   
@@ -2187,7 +2059,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../sqlite/" class="md-nav__link">
+      <a href="../../adapters/sqlite/" class="md-nav__link">
         
   
   
@@ -2486,28 +2358,31 @@
       
   
   
+    
   
   
+  
     
     
     
     
+      
+        
+        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" checked>
         
           
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_9" >
-        
-          
-          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="">
             
   
   
@@ -2525,7 +2400,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_9">
             <span class="md-nav__icon md-icon"></span>
             
@@ -2543,7 +2418,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../observability/stack/" class="md-nav__link">
+      <a href="../stack/" class="md-nav__link">
         
   
   
@@ -2568,10 +2443,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../../observability/debugging/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Debugging a Run (Traces)
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -2587,6 +2489,126 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#when-a-trace-is-written" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When a trace is written
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-is-in-the-file" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What is in the file
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="What is in the file">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#redaction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Redaction
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#capping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Capping
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reading-a-trace-nl2sql-trace-show" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reading a trace: nl2sql trace show
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#replaying-a-trace-nl2sql-trace-replay" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Replaying a trace: nl2sql trace replay
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Replaying a trace: nl2sql trace replay">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-replay-can-and-cannot-tell-you" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What replay can and cannot tell you
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-playground" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The playground
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -2599,7 +2621,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../observability/error-handling/" class="md-nav__link">
+      <a href="../error-handling/" class="md-nav__link">
         
   
   
@@ -3866,10 +3888,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#implementation-path" class="md-nav__link">
+  <a href="#when-a-trace-is-written" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Implementation Path
+        When a trace is written
       
     </span>
   </a>
@@ -3877,22 +3899,33 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#option-1-the-fast-lane-sqlalchemy" class="md-nav__link">
+  <a href="#what-is-in-the-file" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Option 1: The "Fast Lane" (SQLAlchemy)
+        What is in the file
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Option 1: The &#34;Fast Lane&#34; (SQLAlchemy)">
+    <nav class="md-nav" aria-label="What is in the file">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#example" class="md-nav__link">
+  <a href="#redaction" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Example
+        Redaction
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#capping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Capping
       
     </span>
   </a>
@@ -3905,22 +3938,33 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#option-2-the-custom-path-protocol" class="md-nav__link">
+  <a href="#reading-a-trace-nl2sql-trace-show" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Option 2: The "Custom" Path (Protocol)
+        Reading a trace: nl2sql trace show
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Option 2: The &#34;Custom&#34; Path (Protocol)">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#replaying-a-trace-nl2sql-trace-replay" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Replaying a trace: nl2sql trace replay
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Replaying a trace: nl2sql trace replay">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#example_1" class="md-nav__link">
+  <a href="#what-replay-can-and-cannot-tell-you" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Example
+        What replay can and cannot tell you
       
     </span>
   </a>
@@ -3933,10 +3977,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#compliance-testing" class="md-nav__link">
+  <a href="#the-playground" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Compliance Testing
+        The playground
       
     </span>
   </a>
@@ -3960,83 +4004,217 @@
 
 
 
-<h1 id="building-adapters-guide">Building Adapters Guide</h1>
-<p>The NL2SQL Platform is designed to be extensible. You can build adapters for any datasource, from SQL databases to REST APIs.</p>
-<h2 id="implementation-path">Implementation Path</h2>
-<p>There are two primary ways to build an adapter. Choose the one that fits your target:</p>
+<h1 id="debugging-a-run-with-traces">Debugging a Run with Traces</h1>
+<p>A <strong>run trace</strong> is one JSON file that records everything a single question did
+inside the engine: every node execution in order (retries and parallel
+sub-queries included), the state each node read and the update it returned, its
+errors and warnings, and for every LLM call the exact messages sent, the raw
+response, the parsed result and the token usage. The final <code>QueryResult</code> is in
+it too.</p>
+<p>The point is to run a failing question <strong>once</strong>, then debug it from the file:
+read it, print its timeline, or replay it through the pipeline without calling
+the model again.</p>
+<h2 id="when-a-trace-is-written">When a trace is written</h2>
 <table>
 <thead>
 <tr>
-<th style="text-align: left;">If you are checking...</th>
-<th style="text-align: left;">Use...</th>
-<th style="text-align: left;">Reference</th>
+<th>Setting</th>
+<th>Default</th>
+<th>Meaning</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td style="text-align: left;">A standard SQL Database (Postgres, Oracle, Snowflake)</td>
-<td style="text-align: left;"><code>nl2sql.adapters.sqlalchemy_base</code></td>
-<td style="text-align: left;"><strong><a href="../sqlalchemy/">SQLAlchemy Adapter Reference</a></strong></td>
+<td><code>TRACE_MODE</code></td>
+<td><code>on_failure</code></td>
+<td><code>off</code>, <code>on_failure</code> or <code>always</code>.</td>
 </tr>
 <tr>
-<td style="text-align: left;">A NoSQL DB, REST API, or custom driver</td>
-<td style="text-align: left;">Core adapter protocol</td>
-<td style="text-align: left;"><strong><a href="../sdk/">Adapter Interface Reference</a></strong></td>
+<td><code>TRACE_DIR</code></td>
+<td><code>traces</code></td>
+<td>Directory, relative to the working directory. Add it to <code>.gitignore</code> (this repository does).</td>
+</tr>
+<tr>
+<td><code>TRACE_SAMPLE_ROWS</code></td>
+<td><code>50</code></td>
+<td>Result rows kept in the trace.</td>
+</tr>
+<tr>
+<td><code>TRACE_MAX_FIELD_CHARS</code></td>
+<td><code>20000</code></td>
+<td>Longest string kept in a node's recorded inputs and outputs.</td>
 </tr>
 </tbody>
 </table>
-<h2 id="option-1-the-fast-lane-sqlalchemy">Option 1: The "Fast Lane" (SQLAlchemy)</h2>
-<p>For 95% of use cases, you are connecting to a SQL database that already has a Python SQLAlchemy dialect.</p>
-<p><strong>Use <code>BaseSQLAlchemyAdapter</code></strong>. It handles:</p>
+<p><code>on_failure</code> writes a trace when the run returned errors, needed a retry in any
+sub-query, had a node fail, or did not complete (timeout, cancellation, crash).
+A run that recovered on retry therefore still leaves a trace.</p>
+<p><code>nl2sql demo</code> writes <code>TRACE_MODE=always</code> into the demo's generated <code>.env.demo</code>,
+so every playground question is traced. A demo project generated before this
+setting existed does not have the line; add <code>TRACE_MODE=always</code> to its
+<code>.env.demo</code>, or regenerate it.</p>
+<p>The trace is recorded by a callback that <code>run_with_graph</code> attaches to every
+run, so the CLI, the Python API, the REST API and the playground all produce it.
+Writing a trace never fails a run; a write error is logged as a warning.</p>
+<p>Where the file went is reported back:</p>
 <ul>
-<li>Automatic Schema Introspection (Tables, PKs, FKs)</li>
-<li>Connection Pooling</li>
-<li>Statistic Gathering</li>
-<li>Transaction-based Dry Runs</li>
+<li><code>QueryResult.trace_path</code> (Python API) and <code>trace_path</code> in the REST <code>/query</code>
+  response: the path, or <code>null</code> when no trace was written. <code>trace_id</code> is in the
+  file name.</li>
+<li><code>nl2sql run</code> prints <code>Trace written to &lt;path&gt;</code>.</li>
+<li>The playground shows a <strong>Download trace</strong> link under Cost &amp; time when Debug is on.</li>
 </ul>
-<h3 id="example">Example</h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql.adapters.sqlalchemy_base</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseSQLAlchemyAdapter</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="k">class</span><span class="w"> </span><span class="nc">PostgresAdapter</span><span class="p">(</span><span class="n">BaseSQLAlchemyAdapter</span><span class="p">):</span>
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">construct_uri</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">args</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>        <span class="c1"># Convert args to connection string</span>
-<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>        <span class="k">return</span> <span class="sa">f</span><span class="s2">"postgresql://</span><span class="si">{</span><span class="n">args</span><span class="p">[</span><span class="s1">'user'</span><span class="p">]</span><span class="si">}</span><span class="s2">:</span><span class="si">{</span><span class="n">args</span><span class="p">[</span><span class="s1">'password'</span><span class="p">]</span><span class="si">}</span><span class="s2">@</span><span class="si">{</span><span class="n">args</span><span class="p">[</span><span class="s1">'host'</span><span class="p">]</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">args</span><span class="p">[</span><span class="s1">'database'</span><span class="p">]</span><span class="si">}</span><span class="s2">"</span>
+<p>File names are <code>&lt;UTC timestamp&gt;_&lt;trace_id&gt;.json</code>, so a directory listing sorts
+by time.</p>
+<h2 id="what-is-in-the-file">What is in the file</h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="p">{</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="nt">"trace_format_version"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span><span class="nt">"trace_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"159afe1f-3305-4907-903a-55495d040665"</span><span class="p">,</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">  </span><span class="nt">"started_at"</span><span class="p">:</span><span class="w"> </span><span class="s2">"2026-09-21T16:48:37.324431+00:00"</span><span class="p">,</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">  </span><span class="nt">"finished_at"</span><span class="p">:</span><span class="w"> </span><span class="s2">"2026-09-21T16:48:37.712202+00:00"</span><span class="p">,</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">  </span><span class="nt">"duration_s"</span><span class="p">:</span><span class="w"> </span><span class="mf">0.3878</span><span class="p">,</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">  </span><span class="nt">"outcome"</span><span class="p">:</span><span class="w"> </span><span class="s2">"completed"</span><span class="p">,</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="w">  </span><span class="nt">"failed"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="w">  </span><span class="nt">"error"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="w">  </span><span class="nt">"request"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"question"</span><span class="p">:</span><span class="w"> </span><span class="s2">"How many customers are there?"</span><span class="p">,</span><span class="w"> </span><span class="nt">"roles"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"admin"</span><span class="p">],</span>
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="w">              </span><span class="nt">"tenant_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"default_tenant"</span><span class="p">,</span><span class="w"> </span><span class="nt">"datasource_id"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span><span class="w"> </span><span class="nt">"execute"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">},</span>
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="w">  </span><span class="nt">"engine"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"version"</span><span class="p">:</span><span class="w"> </span><span class="s2">"0.1.2"</span><span class="p">,</span><span class="w"> </span><span class="nt">"git_sha"</span><span class="p">:</span><span class="w"> </span><span class="s2">"2cfe121"</span><span class="p">,</span><span class="w"> </span><span class="nt">"python"</span><span class="p">:</span><span class="w"> </span><span class="s2">"3.13.14"</span><span class="p">},</span>
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="w">  </span><span class="nt">"llm"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"configured"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"default"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"provider"</span><span class="p">:</span><span class="w"> </span><span class="s2">"openai"</span><span class="p">,</span><span class="w"> </span><span class="nt">"model"</span><span class="p">:</span><span class="w"> </span><span class="s2">"gpt-4o"</span><span class="p">,</span><span class="w"> </span><span class="nt">"temperature"</span><span class="p">:</span><span class="w"> </span><span class="mf">0.0</span><span class="p">}},</span>
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="w">          </span><span class="nt">"by_node"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"decomposer"</span><span class="p">:</span><span class="w"> </span><span class="s2">"gpt-4o"</span><span class="p">,</span><span class="w"> </span><span class="nt">"ast_planner"</span><span class="p">:</span><span class="w"> </span><span class="s2">"gpt-4o"</span><span class="p">,</span><span class="w"> </span><span class="nt">"refiner"</span><span class="p">:</span><span class="w"> </span><span class="s2">"gpt-4o"</span><span class="p">,</span>
+<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="w">                      </span><span class="nt">"answer_synthesizer"</span><span class="p">:</span><span class="w"> </span><span class="s2">"gpt-4o"</span><span class="p">}},</span>
+<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a><span class="w">  </span><span class="nt">"settings"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"..."</span><span class="p">:</span><span class="w"> </span><span class="s2">"every setting except those that can hold a credential"</span><span class="p">},</span>
+<a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a><span class="w">  </span><span class="nt">"limits"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"sample_rows"</span><span class="p">:</span><span class="w"> </span><span class="mi">50</span><span class="p">,</span><span class="w"> </span><span class="nt">"max_field_chars"</span><span class="p">:</span><span class="w"> </span><span class="mi">20000</span><span class="p">,</span><span class="w"> </span><span class="nt">"max_list_items"</span><span class="p">:</span><span class="w"> </span><span class="mi">200</span><span class="p">,</span><span class="w"> </span><span class="nt">"note"</span><span class="p">:</span><span class="w"> </span><span class="s2">"..."</span><span class="p">},</span>
+<a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a><span class="w">  </span><span class="nt">"nodes"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"... one entry per node execution, below ..."</span><span class="p">],</span>
+<a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a><span class="w">  </span><span class="nt">"result"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"..."</span><span class="p">:</span><span class="w"> </span><span class="s2">"the QueryResult, rows capped"</span><span class="p">}</span>
+<a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a><span class="p">}</span>
 </code></pre></div>
-<blockquote>
-<p>See the <strong><a href="../sqlalchemy/">SQLAlchemy Adapter Reference</a></strong> for full API details.</p>
-</blockquote>
-<h2 id="option-2-the-custom-path-protocol">Option 2: The "Custom" Path (Protocol)</h2>
-<p>If you need to connect to something else (e.g., ElasticSearch, a CRM API, or a raw SQL driver), implement the core adapter protocol.</p>
-<p><strong>Implement <code>DatasourceAdapterProtocol</code></strong>. You must manually handle:</p>
+<p>One entry of <code>nodes</code> (the planner's second attempt, from a run whose first plan
+named a column that does not exist; long values shortened here):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="p">{</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="nt">"seq"</span><span class="p">:</span><span class="w"> </span><span class="mi">20</span><span class="p">,</span><span class="w"> </span><span class="nt">"end_seq"</span><span class="p">:</span><span class="w"> </span><span class="mi">21</span><span class="p">,</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span><span class="nt">"node"</span><span class="p">:</span><span class="w"> </span><span class="s2">"ast_planner"</span><span class="p">,</span><span class="w"> </span><span class="nt">"sub_query_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"sq_9579d7d41aee"</span><span class="p">,</span><span class="w"> </span><span class="nt">"attempt"</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="nt">"parent"</span><span class="p">:</span><span class="w"> </span><span class="s2">"sql_agent"</span><span class="p">,</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span><span class="nt">"status"</span><span class="p">:</span><span class="w"> </span><span class="s2">"ok"</span><span class="p">,</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">  </span><span class="nt">"started_at"</span><span class="p">:</span><span class="w"> </span><span class="s2">"2026-09-21T16:48:37.683402+00:00"</span><span class="p">,</span><span class="w"> </span><span class="nt">"duration_s"</span><span class="p">:</span><span class="w"> </span><span class="mf">0.0071</span><span class="p">,</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">  </span><span class="nt">"inputs"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"sub_query"</span><span class="p">:</span><span class="w"> </span><span class="s2">"..."</span><span class="p">,</span><span class="w"> </span><span class="nt">"relevant_tables"</span><span class="p">:</span><span class="w"> </span><span class="s2">"..."</span><span class="p">,</span><span class="w"> </span><span class="nt">"errors"</span><span class="p">:</span><span class="w"> </span><span class="s2">"..."</span><span class="p">,</span><span class="w"> </span><span class="nt">"retry_count"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">},</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">  </span><span class="nt">"outputs"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"ast_planner_response"</span><span class="p">:</span><span class="w"> </span><span class="s2">"..."</span><span class="p">,</span><span class="w"> </span><span class="nt">"reasoning"</span><span class="p">:</span><span class="w"> </span><span class="s2">"..."</span><span class="p">,</span><span class="w"> </span><span class="nt">"errors"</span><span class="p">:</span><span class="w"> </span><span class="p">[]},</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">  </span><span class="nt">"errors"</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span><span class="w"> </span><span class="nt">"warnings"</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span><span class="w"> </span><span class="nt">"exception"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="w">  </span><span class="nt">"llm_calls"</span><span class="p">:</span><span class="w"> </span><span class="p">[{</span>
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="w">    </span><span class="nt">"key"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"node"</span><span class="p">:</span><span class="w"> </span><span class="s2">"ast_planner"</span><span class="p">,</span><span class="w"> </span><span class="nt">"sub_query_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"sq_9579d7d41aee"</span><span class="p">,</span><span class="w"> </span><span class="nt">"attempt"</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="nt">"call_index"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">},</span>
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="w">    </span><span class="nt">"model"</span><span class="p">:</span><span class="w"> </span><span class="s2">"gpt-4o"</span><span class="p">,</span>
+<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="w">    </span><span class="nt">"params"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"model"</span><span class="p">:</span><span class="w"> </span><span class="s2">"gpt-4o"</span><span class="p">,</span><span class="w"> </span><span class="nt">"temperature"</span><span class="p">:</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span><span class="w"> </span><span class="nt">"seed"</span><span class="p">:</span><span class="w"> </span><span class="mi">42</span><span class="p">},</span>
+<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="w">    </span><span class="nt">"messages"</span><span class="p">:</span><span class="w"> </span><span class="p">[{</span><span class="nt">"role"</span><span class="p">:</span><span class="w"> </span><span class="s2">"user"</span><span class="p">,</span><span class="w"> </span><span class="nt">"content"</span><span class="p">:</span><span class="w"> </span><span class="s2">"[ROLE]\nYou are a SQL Planner. ..."</span><span class="p">}],</span>
+<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="w">    </span><span class="nt">"prompt_sha256"</span><span class="p">:</span><span class="w"> </span><span class="s2">"63ccb543..."</span><span class="p">,</span>
+<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="w">    </span><span class="nt">"response"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"content"</span><span class="p">:</span><span class="w"> </span><span class="s2">"{\"query_type\": \"READ\", ... \"column_name\": \"CustomerId\" ...}"</span><span class="p">,</span>
+<a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a><span class="w">                 </span><span class="nt">"tool_calls"</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span><span class="w"> </span><span class="nt">"finish_reason"</span><span class="p">:</span><span class="w"> </span><span class="s2">"stop"</span><span class="p">,</span><span class="w"> </span><span class="nt">"model_name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"gpt-4o"</span><span class="p">},</span>
+<a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a><span class="w">    </span><span class="nt">"parsed"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"query_type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"READ"</span><span class="p">,</span><span class="w"> </span><span class="nt">"..."</span><span class="p">:</span><span class="w"> </span><span class="s2">"..."</span><span class="p">},</span>
+<a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a><span class="w">    </span><span class="nt">"usage"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"input_tokens"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="nt">"output_tokens"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="nt">"total_tokens"</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="nt">"..."</span><span class="p">:</span><span class="w"> </span><span class="s2">"..."</span><span class="p">}</span>
+<a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a><span class="w">  </span><span class="p">}]</span>
+<a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a><span class="p">}</span>
+</code></pre></div>
 <ul>
-<li>Fetching and normalizing schema metadata.</li>
-<li>Executing queries and formatting results.</li>
-<li>Implementing safety breakers (<code>row_limit</code>).</li>
+<li><strong><code>seq</code> / <code>attempt</code> / <code>sub_query_id</code></strong>: <code>seq</code> orders executions by start. The
+  attempt counts per node and sub-query, so a retried planner is <code>attempt: 2</code>.
+  Nodes inside the SQL agent carry <code>parent: "sql_agent"</code>.</li>
+<li><strong><code>status</code></strong>: <code>ok</code>, <code>warning</code> (the node returned warnings, such as
+  <code>COLUMN_NOT_FOUND</code> when strict columns are off), <code>error</code> (it returned an ERROR
+  or CRITICAL error, raised, or an LLM call failed) or <code>unfinished</code> (it never
+  ended: the run timed out or was cancelled first).</li>
+<li><strong><code>inputs</code></strong> are the state fields that node reads, not the whole graph state;
+  <strong><code>outputs</code></strong> is the update it returned.</li>
+<li><strong><code>llm_calls</code></strong>: the messages exactly as sent, the model's raw answer (text
+  content, or tool calls with their arguments), what the node parsed it into,
+  and the usage record from <code>TokenUsageCallback</code> (the same record
+  <code>QueryResult.usage.calls</code> reports).</li>
 </ul>
-<h3 id="example_1">Example</h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql.datasources.protocols</span><span class="w"> </span><span class="kn">import</span> <span class="n">DatasourceAdapterProtocol</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql_adapter_sdk.contracts</span><span class="w"> </span><span class="kn">import</span> <span class="n">AdapterRequest</span><span class="p">,</span> <span class="n">ResultFrame</span>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql_adapter_sdk.capabilities</span><span class="w"> </span><span class="kn">import</span> <span class="n">DatasourceCapability</span>
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="k">class</span><span class="w"> </span><span class="nc">MyRestAdapter</span><span class="p">(</span><span class="n">DatasourceAdapterProtocol</span><span class="p">):</span>
-<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">capabilities</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>        <span class="k">return</span> <span class="p">{</span><span class="n">DatasourceCapability</span><span class="o">.</span><span class="n">SUPPORTS_REST</span><span class="p">}</span>
-<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>
-<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">fetch_schema_snapshot</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>        <span class="c1"># call API, return schema</span>
-<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>        <span class="k">pass</span>
-<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>
-<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">execute</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">request</span><span class="p">:</span> <span class="n">AdapterRequest</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ResultFrame</span><span class="p">:</span>
-<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>        <span class="c1"># run request, return rows</span>
-<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>        <span class="k">pass</span>
+<p>The file records what happened, including known reporting defects: a sub-query
+that recovers on retry can still carry <code>status: "error"</code>, and one that exhausts
+its retries on warnings can report <code>"success"</code>.</p>
+<h3 id="redaction">Redaction</h3>
+<p>Every trace is redacted before it is written, with no setting to turn it off:</p>
+<ul>
+<li>every value any secret reference resolved to (<code>${env:...}</code> and the other
+  secret providers), the configured API keys, and the values of environment
+  variables whose names contain <code>KEY</code>, <code>TOKEN</code>, <code>SECRET</code>, <code>PASSWORD</code>,
+  <code>CREDENTIAL</code>, <code>CONNECTION_STRING</code> or <code>AUTH</code>;</li>
+<li>anything shaped like a secret even if the engine never saw the value:
+  <code>sk-...</code> style keys, <code>Bearer ...</code> tokens, the password in
+  <code>scheme://user:password@host</code>, and <code>password=</code>, <code>pwd=</code>, <code>secret=</code>,
+  <code>api_key=</code>, <code>AccountKey=</code>, <code>token=</code> pairs;</li>
+<li>the string value of any key named like <code>api_key</code>, <code>password</code>, <code>secret</code>,
+  <code>authorization</code>, <code>access_key</code>, <code>connection_string</code> or <code>credential(s)</code>;</li>
+<li>the settings snapshot leaves out every setting whose name could hold a
+  credential (<code>openai_api_key</code>, <code>result_artifact_adls_connection_string</code>).</li>
+</ul>
+<p>A test runs a real question with the fake key <code>sk-test-not-a-real-key-1234</code> in
+the environment and asserts that string appears nowhere in the file. Redaction
+is pattern and value based, so treat a trace as internal: it contains your
+prompts, schema and a sample of result rows.</p>
+<h3 id="capping">Capping</h3>
+<p>Node inputs and outputs, and the result, are capped so a trace stays readable:
+result rows (<code>rows</code>, and the aggregator's <code>terminal_results</code>) keep
+<code>TRACE_SAMPLE_ROWS</code> rows, other lists keep 200 items, and strings keep
+<code>TRACE_MAX_FIELD_CHARS</code> characters. Every cut leaves a <code>[truncated]</code> marker
+saying how much was dropped. <strong>LLM messages and raw responses are never cut</strong>,
+because replay needs them whole; a planner prompt on Chinook is about 30 000
+characters, and a whole trace is typically a few hundred kilobytes.</p>
+<h2 id="reading-a-trace-nl2sql-trace-show">Reading a trace: <code>nl2sql trace show</code></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>nl2sql<span class="w"> </span>trace<span class="w"> </span>show<span class="w"> </span>traces/20260921T164837755710Z_159afe1f-....json
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>nl2sql<span class="w"> </span>trace<span class="w"> </span>show<span class="w"> </span>159afe1f-3305-4907-903a-55495d040665<span class="w">   </span><span class="c1"># looks it up in TRACE_DIR</span>
 </code></pre></div>
-<blockquote>
-<p>See the <strong><a href="../sdk/">Adapter Interface Reference</a></strong> for the method signatures and compliance guide.</p>
-</blockquote>
-<h2 id="compliance-testing">Compliance Testing</h2>
-<p>Regardless of which path you choose, your adapter <strong>MUST</strong> pass the compliance test suite to ensure it handles types and errors correctly.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># See Adapter Interface Reference for test setup</span>
+<p>It prints the question, then one row per node execution (nested SQL agent
+nodes indented) with sub-query, attempt, duration, tokens and status, then
+each error or warning, and marks the first failing node with <code>&gt;</code>. A run with no
+failing node but a retry marks the first warning instead, since that is what
+set the retry off.</p>
+<h2 id="replaying-a-trace-nl2sql-trace-replay">Replaying a trace: <code>nl2sql trace replay</code></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>trace<span class="w"> </span>replay<span class="w"> </span>traces/20260921T164837755710Z_159afe1f-....json
 </code></pre></div>
+<p>Replay runs the real pipeline again for the recorded question, roles and
+datasource, but every LLM call is answered from the trace. The engine's chat
+clients are pointed at an in-process transport, so <strong>no request reaches a model
+provider</strong> and no key is needed; the command reports how many recorded calls it
+served. It then compares the replayed <code>QueryResult</code> with the recorded one
+(ignoring ids, timings, usage and artifact paths) and says whether it matches.</p>
+<ul>
+<li><strong>Keying.</strong> Recorded answers are looked up by <code>(node, sub_query_id, attempt,
+  call_index)</code>, never by question text: a retried planner asks the same
+  question twice and gets the answer it got the first time <em>for that attempt</em>,
+  and parallel sub-queries cannot take each other's answers.</li>
+<li><strong>Divergence.</strong> If the replayed run asks for a call the recording does not
+  have, or sends a prompt whose hash differs from the recorded one, replay
+  stops at that call and reports <code>Replay diverged at &lt;node&gt;, sub-query &lt;id&gt;,
+  attempt &lt;n&gt;, LLM call &lt;k&gt;</code>, with a diff of the prompt when it changed. If the
+  run finishes without using a recorded call, that is reported too. This is
+  information, not a crash: everything before that point ran as recorded.</li>
+<li><strong>Exit code</strong>: 0 when the replayed result matches the recording, 1 on a
+  divergence, a different result, or a datasource that cannot be reached.</li>
+</ul>
+<h3 id="what-replay-can-and-cannot-tell-you">What replay can and cannot tell you</h3>
+<ul>
+<li>Replay tests the code <strong>downstream of the model</strong>: parsing, validation, SQL
+  generation, execution, aggregation. It is how you check a fix to that code
+  against a real failure without spending tokens.</li>
+<li>After a <strong>prompt change</strong> the recorded response is stale. Replay reports the
+  node where the prompt diverged; one real run is needed to record a new trace.</li>
+<li>The datasource must be reachable from where you replay, with the same
+  configuration (run it from the same project and <code>--env</code>). Replay says so and
+  stops if it is not. Queries run again, so a database whose data changed
+  gives a different result, and replay reports the difference.</li>
+<li>The datasource resolver and schema retriever still run their vector search,
+  which embeds the question with the configured embedding provider (the local
+  model in the demo; with <code>EMBEDDING_PROVIDER=openai</code> that is an embeddings API
+  call, not a chat model call).</li>
+<li>Redaction applies to the recorded answers too: a model answer that
+  contained something secret-shaped is replayed redacted.</li>
+</ul>
+<h2 id="the-playground">The playground</h2>
+<p>With <strong>Debug</strong> on, each node name in the per-node table under <strong>Cost &amp; time</strong>
+opens that node's record from the trace: every attempt and sub-query, its
+errors and warnings, what it read and returned, and for LLM nodes the exact
+prompt, the raw response and the parsed result. Long text is folded. The page
+fetches the file from <code>GET /api/trace/{trace_id}</code>, which serves only files
+directly inside <code>TRACE_DIR</code> and rejects any id that is not a plain token, so
+<code>../</code> or an absolute path never reaches the filesystem.</p>
 
 
 
