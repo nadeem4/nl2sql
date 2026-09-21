@@ -16,6 +16,21 @@ from nl2sql.context import NL2SQLContext
 logger = get_logger("generator")
 
 
+def ordered(expression: exp.Expression, direction: str) -> exp.Ordered:
+    """Wraps an ORDER BY term the way sqlglot's own parser would.
+
+    ``Select.order_by()`` only wraps its argument in ``exp.Ordered`` when it has
+    to *parse* it; an ``Expression`` is taken as-is and the ``desc`` keyword is
+    dropped. Every term this pipeline emits is already an ``Expression``, so
+    both call sites must build the ``Ordered`` node themselves. Leaving it off
+    silently loses the sort direction in the generator, and puts a bare
+    ``exp.Anonymous`` into ``Order.expressions`` in the validator, where
+    ``qualify()``'s positional-reference expansion reads its string ``this`` as
+    an expression and raises.
+    """
+    return exp.Ordered(this=expression, desc=(direction == "desc"))
+
+
 class SqlVisitor:
     """Visits the PlanModel AST and converts it to sqlglot expressions.
 
@@ -260,7 +275,7 @@ class GeneratorNode:
             query = query.having(visitor.visit(plan.having))
 
         for o in sorted(plan.order_by, key=lambda x: x.ordinal):
-            query = query.order_by(visitor.visit(o.expr), desc=(o.direction == "desc"))
+            query = query.order_by(ordered(visitor.visit(o.expr), o.direction))
 
         query = query.limit(limit)
 
