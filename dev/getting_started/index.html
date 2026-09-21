@@ -3839,10 +3839,11 @@ to use the platform:</p>
 <p>All paths require configuration files. Start with the example configs:</p>
 <ul>
 <li><code>configs/datasources.example.yaml</code> → copy to <code>configs/datasources.yaml</code></li>
-<li><code>configs/llm.example.yaml</code> → copy to <code>configs/llm.yaml</code></li>
 <li><code>configs/policies.example.json</code> → copy to <code>configs/policies.json</code></li>
-<li><code>configs/secrets.example.yaml</code> → copy to <code>configs/secrets.yaml</code> (optional)</li>
 </ul>
+<p>There is no shipped example for <code>configs/llm.yaml</code> or <code>configs/secrets.yaml</code>;
+write them from the schemas in <a href="../configuration/llm/">LLMs</a> and
+<a href="../configuration/secrets/">Secrets</a>, or let <code>nl2sql setup</code> generate them.</p>
 <p>See <code>configuration/system.md</code> for environment variables and defaults.</p>
 
 

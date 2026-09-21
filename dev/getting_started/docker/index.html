@@ -3906,8 +3906,6 @@ needs - it drops <code>.git</code>, virtualenvs, <code>docs/</code>, <code>site/
 the <code>nl2sql-engine</code> distribution; an extra only adds the driver it needs, so add another
 extra to the <code>pip install</code> line in <code>packages/api/Dockerfile</code> to include one -
 for example <code>"./packages/nl2sql[postgres,mysql,mssql]"</code>.</p>
-<p>The demo stack builds this same image as its <code>app</code> service - see
-<a href="../demo/#the-docker-demo-stack">Demo data</a>.</p>
 <h2 id="run-the-api">Run the API</h2>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>docker<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>-p<span class="w"> </span><span class="m">8000</span>:8000<span class="w"> </span>nl2sql-api
 </code></pre></div>
