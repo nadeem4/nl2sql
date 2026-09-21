@@ -1797,6 +1797,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#temperature" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Temperature
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#per-node-models" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Per-node models
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#other-openai-compatible-endpoints" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3976,6 +3998,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#temperature" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Temperature
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#per-node-models" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Per-node models
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#other-openai-compatible-endpoints" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4063,7 +4107,8 @@ optional per-agent overrides.</p>
 <ul>
 <li><code>provider</code>: LLM provider name — <code>openai</code>, <code>openrouter</code> or <code>ollama</code></li>
 <li><code>model</code>: model identifier (required; an empty model is rejected)</li>
-<li><code>temperature</code>: float (defaults to <code>0.0</code>)</li>
+<li><code>temperature</code>: float, or <code>null</code> to send no temperature at all (defaults to
+  <code>0.0</code>; see <a href="#temperature">Temperature</a>)</li>
 <li><code>api_key</code>: optional; can use <code>${env:VAR}</code> or <code>${provider:key}</code></li>
 <li><code>base_url</code>: optional endpoint override (see <a href="#other-openai-compatible-endpoints">Other OpenAI-compatible
   endpoints</a>)</li>
@@ -4101,16 +4146,20 @@ involved. The provider name only selects a preset:</p>
 <p>Any other value raises <code>ValueError: Unsupported LLM provider</code>, naming the valid
 providers.</p>
 <h3 id="openai">OpenAI</h3>
+<p><code>nl2sql setup</code> and <code>nl2sql demo</code> write <code>gpt-5.4</code> as the OpenAI default. On the
+owner's account (probed 2026-09-20) it accepted <code>temperature: 0</code> with a limit of
+500,000 tokens per minute, against 30,000 for the previous default <code>gpt-4o</code> -
+less than one question with a single retry needs (about 33,500 tokens).</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nt">default</span><span class="p">:</span>
 <a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span><span class="nt">provider</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">openai</span>
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">gpt-4o</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">gpt-5.4</span>
 <a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">  </span><span class="nt">temperature</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.0</span>
 <a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">  </span><span class="nt">api_key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${env:OPENAI_API_KEY}</span>
 <a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="nt">agents</span><span class="p">:</span>
 <a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">  </span><span class="nt">indexing_enrichment</span><span class="p">:</span>
 <a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="w">    </span><span class="nt">provider</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">openai</span>
-<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="w">    </span><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">gpt-4o</span>
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="w">    </span><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">gpt-5.4</span>
 <a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="w">    </span><span class="nt">temperature</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.0</span>
 <a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="w">    </span><span class="nt">api_key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${env:OPENAI_API_KEY}</span>
 </code></pre></div>
@@ -4164,16 +4213,124 @@ before relying on it.</p>
 separate path (see <a href="#embeddings-are-a-separate-path">below</a>), and the demo's
 other steps are unchanged.</p>
 </div>
+<h2 id="temperature">Temperature</h2>
+<p>Each agent sends exactly the <code>temperature</code> its config names, and <code>seed=42</code>:</p>
+<ul>
+<li>Omitted, it is <code>0.0</code>, sent with every call. This reduces variance; it does
+  not make output reproducible (see <a href="../../architecture/determinism/">Determinism</a>).</li>
+<li><code>temperature: null</code> sends <strong>no temperature parameter at all</strong>, so the model
+  uses its own default.</li>
+</ul>
+<p>Use <code>null</code> for models that accept only their default. Probed on 2026-09-20 with
+the engine's own parameters (<code>temperature=0</code>, <code>seed=42</code>, strict <code>json_schema</code>):</p>
+<table>
+<thead>
+<tr>
+<th>model</th>
+<th><code>temperature: 0</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>gpt-5.4</code>, <code>gpt-5.4-mini</code>, <code>gpt-4.1</code>, <code>gpt-4.1-mini</code>, <code>gpt-4o</code></td>
+<td>accepted</td>
+</tr>
+<tr>
+<td><code>gpt-5.5</code>, <code>gpt-5-mini</code></td>
+<td>rejected: HTTP 400 <em>"Unsupported value: 'temperature' does not support 0.0 with this model. Only the default (1) value is supported."</em></td>
+</tr>
+</tbody>
+</table>
+<p>The rejected models accepted the same call without <code>temperature</code> (still with
+<code>seed=42</code>), so only the temperature needs to go. When a model rejects it, the
+first LLM call fails with an error that names the model and the agent and says
+what to set, instead of the provider's raw response:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>ValueError: Model 'gpt-5.5' (LLM agent 'default') rejected the temperature
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>parameter (HTTP 400: Unsupported value: 'temperature' does not support 0.0 with
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>this model. Only the default (1) value is supported.) Set 'temperature: null'
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>for agent 'default' in the LLM config file so no temperature is sent to this
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>model.
+</code></pre></div>
+<p>Nothing is retried without the parameter: what the config says is what is sent.</p>
+<div class="admonition note">
+<p class="admonition-title">langchain-openai would drop it silently</p>
+<p><code>langchain-openai</code> removes any temperature other than <code>1</code> from a model whose
+name starts with <code>gpt-5</code> before the request is built, so <code>gpt-5.4</code> would
+never receive the <code>0.0</code> it accepts. The registry sets the configured value
+after the client is constructed, so the config - not the model name -
+decides what is sent.</p>
+</div>
+<h2 id="per-node-models">Per-node models</h2>
+<p>The four pipeline nodes that call a model each ask the registry for their own
+agent name, and fall back to <code>default</code> when it is not configured:</p>
+<table>
+<thead>
+<tr>
+<th>agent name</th>
+<th>node</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>decomposer</code></td>
+<td>splits the question into sub-queries</td>
+</tr>
+<tr>
+<td><code>astplanner</code></td>
+<td>writes the query plan (the largest prompt: it carries the schema)</td>
+</tr>
+<tr>
+<td><code>refiner</code></td>
+<td>explains a failed plan so the planner can retry</td>
+</tr>
+<tr>
+<td><code>answersynthesizer</code></td>
+<td>writes the final answer from the rows</td>
+</tr>
+<tr>
+<td><code>indexing_enrichment</code></td>
+<td>writes schema descriptions during <code>nl2sql index</code> (optional)</td>
+</tr>
+</tbody>
+</table>
+<p>The key under <code>agents</code> is the agent's name; a <code>name:</code> field is not needed. Each
+entry is a complete agent config - nothing is inherited from <code>default</code> - so
+<code>provider</code> and <code>model</code> are required, <code>temperature</code> falls back to <code>0.0</code> (not to
+the default agent's value), and a missing <code>api_key</code> falls back to the provider's
+environment variable. For example, keep <code>gpt-5.4</code> for planning and run the
+cheaper nodes on other models, one of which only accepts its default
+temperature:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="nt">default</span><span class="p">:</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">  </span><span class="nt">provider</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">openai</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">  </span><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">gpt-5.4</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">  </span><span class="nt">temperature</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.0</span>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="w">  </span><span class="nt">api_key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${env:OPENAI_API_KEY}</span>
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="nt">agents</span><span class="p">:</span>
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="w">  </span><span class="nt">decomposer</span><span class="p">:</span>
+<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="w">    </span><span class="nt">provider</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">openai</span>
+<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="w">    </span><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">gpt-5.4-mini</span>
+<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a><span class="w">    </span><span class="nt">temperature</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.0</span>
+<a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a><span class="w">    </span><span class="nt">api_key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${env:OPENAI_API_KEY}</span>
+<a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a><span class="w">  </span><span class="nt">answersynthesizer</span><span class="p">:</span>
+<a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a><span class="w">    </span><span class="nt">provider</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">openai</span>
+<a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a><span class="w">    </span><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">gpt-5-mini</span>
+<a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a><span class="w">    </span><span class="nt">temperature</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">null</span><span class="w">        </span><span class="c1"># gpt-5-mini rejects temperature=0</span>
+<a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a><span class="w">    </span><span class="nt">api_key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${env:OPENAI_API_KEY}</span>
+</code></pre></div>
+<p>Here <code>astplanner</code> and <code>refiner</code> use <code>default</code>. The model each call actually
+used is recorded per node in <code>QueryResult.usage.calls</code> and in a run trace's
+<code>llm.by_node</code> (see <a href="../../observability/debugging/">Debugging</a>).</p>
 <h2 id="other-openai-compatible-endpoints">Other OpenAI-compatible endpoints</h2>
 <p>A config-supplied <code>base_url</code> always overrides the provider preset. That is what
 lets the same code path serve any other OpenAI-compatible endpoint — vLLM,
 LiteLLM, a local proxy — without a new provider:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="nt">default</span><span class="p">:</span>
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span><span class="nt">provider</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">openai</span>
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">  </span><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">meta-llama/Llama-3.1-70B-Instruct</span>
-<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">  </span><span class="nt">api_key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${env:LOCAL_LLM_KEY}</span>
-<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">  </span><span class="nt">base_url</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">http://localhost:8000/v1</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="nt">default</span><span class="p">:</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">  </span><span class="nt">provider</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">openai</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">  </span><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">meta-llama/Llama-3.1-70B-Instruct</span>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="w">  </span><span class="nt">api_key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${env:LOCAL_LLM_KEY}</span>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="w">  </span><span class="nt">base_url</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">http://localhost:8000/v1</span>
 </code></pre></div>
 <p>Pick the provider whose credential behaviour matches the endpoint: <code>openai</code> or
 <code>openrouter</code> if the endpoint expects a key, <code>ollama</code> if it accepts any key.</p>
@@ -4189,9 +4346,9 @@ first time that agent's LLM is requested. Two consequences:</p>
 <li>A missing or wrong key surfaces on the <strong>first LLM call</strong>, not at startup. The
   error names the agent, the provider and the environment variable to set:</li>
 </ul>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>ValueError: LLM agent 'default' uses provider 'openai', which requires an API
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>key, but none could be resolved. Set OPENAI_API_KEY in the environment, or give
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>the agent an 'api_key' in configs/llm.yaml.
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>ValueError: LLM agent 'default' uses provider 'openai', which requires an API
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>key, but none could be resolved. Set OPENAI_API_KEY in the environment, or give
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>the agent an 'api_key' in configs/llm.yaml.
 </code></pre></div>
 <p>Genuine misconfiguration still fails immediately at registration: an unknown
 provider, or an agent with no model.</p>
@@ -4199,8 +4356,8 @@ provider, or an agent with no model.</p>
 <p>Neither OpenRouter nor Ollama covers embeddings — they are not routed through
 <code>LLMRegistry</code> at all. Embeddings come from <code>EmbeddingService</code>, selected with the
 <code>EMBEDDING_PROVIDER</code> environment variable:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nv">OPENROUTER_API_KEY</span><span class="o">=</span>sk-or-...<span class="w">   </span><span class="c1"># chat completions</span>
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="nv">OPENAI_API_KEY</span><span class="o">=</span>sk-...<span class="w">          </span><span class="c1"># embeddings, when EMBEDDING_PROVIDER=openai (default)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="nv">OPENROUTER_API_KEY</span><span class="o">=</span>sk-or-...<span class="w">   </span><span class="c1"># chat completions</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="nv">OPENAI_API_KEY</span><span class="o">=</span>sk-...<span class="w">          </span><span class="c1"># embeddings, when EMBEDDING_PROVIDER=openai (default)</span>
 </code></pre></div>
 <p>Set <code>EMBEDDING_PROVIDER=local</code> to embed with the key-free ONNX
 <code>all-MiniLM-L6-v2</code> model bundled with chromadb, and no <code>OPENAI_API_KEY</code> is needed
@@ -4208,8 +4365,8 @@ for the embedding step. Switching embedding providers requires a re-index. See
 <a href="../system/#embeddings">System configuration → Embeddings</a>.</p>
 <h2 id="notes">Notes</h2>
 <ul>
-<li><code>agents</code> overrides allow you to use specialized models for tasks like
-  indexing enrichment while keeping a single default model for query execution.</li>
+<li><code>agents</code> overrides give individual nodes, or indexing enrichment, their own
+  model and temperature; see <a href="#per-node-models">Per-node models</a>.</li>
 <li><code>indexing_enrichment</code> is optional. Omit it, or leave its key unset, and
   <code>nl2sql index</code> still works - the schema is indexed without LLM-written
   descriptions.</li>

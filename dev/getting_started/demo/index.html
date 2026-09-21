@@ -4088,6 +4088,14 @@ instead of the OpenAI embeddings API. The first indexing run downloads roughly
 <li><code>nl2sql --env demo run "..."</code> calls a chat model, so it needs a working LLM key
   (<code>OPENAI_API_KEY</code>, or an OpenRouter key with <code>configs/llm.demo.yaml</code> pointed at
   <code>provider: openrouter</code>).</li>
+<li>The demo's model is <code>gpt-5.4</code> with <code>temperature: 0.0</code>. It replaced <code>gpt-4o</code>,
+  whose 30,000 tokens-per-minute limit on the owner's account was below one
+  question with a single retry; <code>gpt-5.4</code> had 500,000 and accepts
+  <code>temperature: 0</code>. To use a model that rejects it (<code>gpt-5.5</code>, <code>gpt-5-mini</code>),
+  set <code>temperature: null</code> in <code>configs/llm.demo.yaml</code> - see
+  <a href="../../configuration/llm/#temperature">LLM configuration → Temperature</a>. With an
+  OpenRouter key or Ollama, change <code>model</code> to one that provider serves: live
+  mode switches the provider, not the model name.</li>
 <li>Indexing also runs an optional LLM enrichment pass over the schema. Enrichment
   is best-effort: without a usable chat key it is skipped with an <code>INFO</code> line
   naming the agent, the provider and the variable to set, and the chunks are

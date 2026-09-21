@@ -4088,7 +4088,7 @@
 | --- | --- | --- | --- |
 | <code>provider</code> | <code>str</code> | yes | Provider name: <code>openai</code>, <code>openrouter</code> or <code>ollama</code>. |
 | <code>model</code> | <code>str</code> | yes | Model identifier. |
-| <code>temperature</code> | <code>float</code> | no | Sampling temperature (default <code>0.0</code>). |
+| <code>temperature</code> | <code>Optional[float]</code> | no | Sampling temperature (default <code>0.0</code>). <code>None</code> (<code>null</code> in YAML) sends no temperature parameter, for models that accept only their default. |
 | <code>api_key</code> | <code>Optional[SecretStr]</code> | no | API key or secret reference. |
 | <code>base_url</code> | <code>Optional[str]</code> | no | Endpoint override; defaults to the provider preset (<code>https://openrouter.ai/api/v1</code> for <code>openrouter</code>, <code>http://localhost:11434/v1</code> for <code>ollama</code>). |
 | <code>name</code> | <code>str</code> | no | Agent name (default <code>default</code>). |</p>
@@ -4179,7 +4179,13 @@ Map of LLM name → config (API key excluded).</p>
   OpenAI key even when chat runs through OpenRouter. The embedder is cached per
   provider, so a runtime <code>reload_settings()</code> that changes the provider is
   honoured.</li>
-<li>Determinism: OpenAI LLM is initialized with <code>seed=42</code>.</li>
+<li>Determinism: every client is built with <code>seed=42</code> and the agent's configured
+  <code>temperature</code>, or none when it is <code>null</code> (see
+  <a href="../../../configuration/llm/#temperature">LLM configuration → Temperature</a>).</li>
+<li>A provider's HTTP 400 rejecting <code>temperature</code> is re-raised as a <code>ValueError</code>
+  naming the model and agent and telling you to set <code>temperature: null</code>.</li>
+<li><code>register_llms</code> registers each agent under its key in the mapping, whatever
+  its <code>name</code> field says.</li>
 </ul>
 
 
