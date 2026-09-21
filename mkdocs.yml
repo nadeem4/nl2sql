@@ -128,6 +128,7 @@ nav:
     - Add Execution Backend: extensions/add-execution-backend.md
   - Testing:
     - Testing Architecture: testing/architecture.md
+    - Evaluation Dataset: testing/evaluation-dataset.md
   - API:
     - Overview: api/index.md
     - Core API (Python):
