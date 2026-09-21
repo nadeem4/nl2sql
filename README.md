@@ -331,7 +331,9 @@ nl2sql doctor
 `--env <name>` loads `.env.<name>`; `--env-file <path>` loads an exact file and
 takes precedence over `--env`. `nl2sql --version` prints the installed
 `nl2sql-engine` version. On a failed `run`, only the error message prints by
-default; pass `--verbose`/`-v` for the full traceback.
+default; pass `--verbose`/`-v` for the full traceback. `run` exits 1 when the
+run ends with an ERROR or CRITICAL error (the result's status is `error`), an
+RBAC refusal included; warnings alone still exit 0.
 
 ### The REST API
 
