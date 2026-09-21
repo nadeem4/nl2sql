@@ -20,6 +20,13 @@ Payload = Union[Dict[str, Any], str, Callable[[str], Union[Dict[str, Any], str]]
 
 DEFAULT_USAGE: Dict[str, Any] = {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2}
 
+# OpenAI's HTTP 400 for gpt-5.5 and gpt-5-mini when sent temperature=0, verbatim
+# from a probe on 2026-09-20.
+TEMPERATURE_REJECTED = (
+    "Unsupported value: 'temperature' does not support 0.0 with this model. "
+    "Only the default (1) value is supported."
+)
+
 
 @dataclass
 class Rule:
@@ -87,9 +94,17 @@ def completion(body: Dict[str, Any], mode: str, name: str, payload: Any,
 
 @dataclass
 class FakeLLMServer:
+    """``reject_temperature`` answers any request carrying ``temperature`` with
+    OpenAI's 400 for models that only accept the default, as gpt-5.5 does.
+
+    Each entry in ``calls`` keeps the request ``body`` so tests can check what
+    was actually sent.
+    """
+
     rules: List[Rule]
     host: str = "127.0.0.1"
     port: int = 0
+    reject_temperature: bool = False
     calls: List[Dict[str, Any]] = field(default_factory=list)
     _server: Optional[HTTPServer] = None
     _thread: Optional[threading.Thread] = None
@@ -106,30 +121,33 @@ class FakeLLMServer:
             def log_message(self, *_args):
                 return
 
-            def do_POST(self):
-                body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
-                mode, name, text = classify_request(body)
-                rule = next(
-                    (r for r in outer.rules if r.name == name and (r.when is None or r.when in text)),
-                    None,
-                )
-                outer.calls.append({"name": name, "mode": mode, "matched": rule is not None})
-                if rule is None:
-                    out = json.dumps({"error": {"message": f"fake llm: no rule for {name}"}}).encode()
-                    self.send_response(400)
-                    self.send_header("Content-Type", "application/json")
-                    self.send_header("Content-Length", str(len(out)))
-                    self.end_headers()
-                    self.wfile.write(out)
-                    return
-                payload = rule.payload(text) if callable(rule.payload) else rule.payload
-                resp = completion(body, mode, name, payload, rule.usage)
-                out = json.dumps(resp).encode()
-                self.send_response(200)
+            def _send(self, status: int, payload: Dict[str, Any]) -> None:
+                out = json.dumps(payload).encode()
+                self.send_response(status)
                 self.send_header("Content-Type", "application/json")
                 self.send_header("Content-Length", str(len(out)))
                 self.end_headers()
                 self.wfile.write(out)
+
+            def do_POST(self):
+                body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+                mode, name, text = classify_request(body)
+                if outer.reject_temperature and "temperature" in body:
+                    outer.calls.append({"name": name, "mode": mode, "matched": False, "body": body})
+                    self._send(400, {"error": {"message": TEMPERATURE_REJECTED,
+                                               "type": "invalid_request_error",
+                                               "param": "temperature", "code": "unsupported_value"}})
+                    return
+                rule = next(
+                    (r for r in outer.rules if r.name == name and (r.when is None or r.when in text)),
+                    None,
+                )
+                outer.calls.append({"name": name, "mode": mode, "matched": rule is not None, "body": body})
+                if rule is None:
+                    self._send(400, {"error": {"message": f"fake llm: no rule for {name}"}})
+                    return
+                payload = rule.payload(text) if callable(rule.payload) else rule.payload
+                self._send(200, completion(body, mode, name, payload, rule.usage))
 
         self._server = HTTPServer((self.host, self.port), Handler)
         self._thread = threading.Thread(target=self._server.serve_forever, daemon=True)

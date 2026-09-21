@@ -25,7 +25,7 @@ Fields:
 | --- | --- | --- | --- |
 | `provider` | `str` | yes | Provider name: `openai`, `openrouter` or `ollama`. |
 | `model` | `str` | yes | Model identifier. |
-| `temperature` | `float` | no | Sampling temperature (default `0.0`). |
+| `temperature` | `Optional[float]` | no | Sampling temperature (default `0.0`). `None` (`null` in YAML) sends no temperature parameter, for models that accept only their default. |
 | `api_key` | `Optional[SecretStr]` | no | API key or secret reference. |
 | `base_url` | `Optional[str]` | no | Endpoint override; defaults to the provider preset (`https://openrouter.ai/api/v1` for `openrouter`, `http://localhost:11434/v1` for `ollama`). |
 | `name` | `str` | no | Agent name (default `default`). |
@@ -136,4 +136,10 @@ Map of LLM name → config (API key excluded).
   OpenAI key even when chat runs through OpenRouter. The embedder is cached per
   provider, so a runtime `reload_settings()` that changes the provider is
   honoured.
-- Determinism: OpenAI LLM is initialized with `seed=42`.
+- Determinism: every client is built with `seed=42` and the agent's configured
+  `temperature`, or none when it is `null` (see
+  [LLM configuration → Temperature](../../configuration/llm.md#temperature)).
+- A provider's HTTP 400 rejecting `temperature` is re-raised as a `ValueError`
+  naming the model and agent and telling you to set `temperature: null`.
+- `register_llms` registers each agent under its key in the mapping, whatever
+  its `name` field says.

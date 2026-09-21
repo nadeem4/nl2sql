@@ -59,9 +59,9 @@ by time.
   "request": {"question": "How many customers are there?", "roles": ["admin"],
               "tenant_id": "default_tenant", "datasource_id": null, "execute": true},
   "engine": {"version": "0.1.2", "git_sha": "2cfe121", "python": "3.13.14"},
-  "llm": {"configured": {"default": {"provider": "openai", "model": "gpt-4o", "temperature": 0.0}},
-          "by_node": {"decomposer": "gpt-4o", "ast_planner": "gpt-4o", "refiner": "gpt-4o",
-                      "answer_synthesizer": "gpt-4o"}},
+  "llm": {"configured": {"default": {"provider": "openai", "model": "gpt-5.4", "temperature": 0.0}},
+          "by_node": {"decomposer": "gpt-5.4", "ast_planner": "gpt-5.4", "refiner": "gpt-5.4",
+                      "answer_synthesizer": "gpt-5.4"}},
   "settings": {"...": "every setting except those that can hold a credential"},
   "limits": {"sample_rows": 50, "max_field_chars": 20000, "max_list_items": 200, "note": "..."},
   "nodes": ["... one entry per node execution, below ..."],
@@ -83,12 +83,12 @@ named a column that does not exist; long values shortened here):
   "errors": [], "warnings": [], "exception": null,
   "llm_calls": [{
     "key": {"node": "ast_planner", "sub_query_id": "sq_9579d7d41aee", "attempt": 2, "call_index": 1},
-    "model": "gpt-4o",
-    "params": {"model": "gpt-4o", "temperature": 0.0, "seed": 42},
+    "model": "gpt-5.4",
+    "params": {"model": "gpt-5.4", "temperature": 0.0, "seed": 42},
     "messages": [{"role": "user", "content": "[ROLE]\nYou are a SQL Planner. ..."}],
     "prompt_sha256": "63ccb543...",
     "response": {"content": "{\"query_type\": \"READ\", ... \"column_name\": \"CustomerId\" ...}",
-                 "tool_calls": [], "finish_reason": "stop", "model_name": "gpt-4o"},
+                 "tool_calls": [], "finish_reason": "stop", "model_name": "gpt-5.4"},
     "parsed": {"query_type": "READ", "...": "..."},
     "usage": {"input_tokens": 1, "output_tokens": 1, "total_tokens": 2, "...": "..."}
   }]
@@ -107,7 +107,10 @@ named a column that does not exist; long values shortened here):
 - **`llm_calls`**: the messages exactly as sent, the model's raw answer (text
   content, or tool calls with their arguments), what the node parsed it into,
   and the usage record from `TokenUsageCallback` (the same record
-  `QueryResult.usage.calls` reports).
+  `QueryResult.usage.calls` reports). `params` holds what was sent: an agent
+  configured with `temperature: null` has no `temperature` there, and
+  `llm.configured` shows it as `null`. `model` is the model the provider says
+  answered, per call, so per-node models show up per node in `llm.by_node`.
 
 The file records what happened. A sub-query's `status` reflects its final
 attempt, so one that recovers on retry reports `"success"`; the failed

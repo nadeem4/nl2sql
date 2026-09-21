@@ -227,14 +227,14 @@ class ReplayReport:
 
 def _install_playback_clients(ctx: Any, playback: TracePlayback) -> None:
     """Points every configured agent at the playback transport instead of its provider."""
-    from langchain_openai import ChatOpenAI
+    from nl2sql.llm.registry import build_chat_client
 
     registry = ctx.llm_registry
     http_client = httpx.Client(transport=playback)
     with registry._lock:
         for name, cfg in registry._configs.items():
-            registry.llms[name] = ChatOpenAI(
-                model=cfg.model, api_key="trace-replay", temperature=cfg.temperature, tags=[name], seed=42,
+            registry.llms[name] = build_chat_client(
+                cfg.model, cfg.temperature, api_key="trace-replay", tags=[name],
                 base_url="http://trace-replay.invalid/v1", http_client=http_client, max_retries=0,
             )
 

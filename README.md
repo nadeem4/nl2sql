@@ -75,7 +75,12 @@ Without the flag the demo looks for a key in a fixed order, highest first:
 4. an Ollama daemon answering on `localhost:11434`
 5. replay
 
-The first four run live.
+The first four run live. The demo's model is `gpt-5.4`, set in
+`configs/llm.demo.yaml`; live mode switches the provider to match the key but
+leaves the model name alone, so with an OpenRouter key or Ollama, edit `model`
+to one that provider serves. Models that reject `temperature: 0` (such as
+`gpt-5.5`) need `temperature: null`; see
+[LLM configuration](docs/configuration/llm.md#temperature).
 
 With none of them it falls back to *replay* mode, which is meant to answer the
 guided sample questions from recorded model responses — **and no recordings are
@@ -249,7 +254,8 @@ These are current facts about the code, not a roadmap.
   token usage) exist behind `OBSERVABILITY_EXPORTER`, which defaults to `none`.
   No spans are started anywhere, and there is no Jaeger or Prometheus exporter.
 * **Determinism is structural only.** Stable sub-query and DAG ids, sorted layer
-  order, fixed topology, validation before generation. `temperature=0` and
+  order, fixed topology, validation before generation. `temperature=0` (unless
+  an agent sets `temperature: null`, which models such as `gpt-5.5` require) and
   `seed=42` are pinned, but the seed is best-effort on OpenAI and ignored
   elsewhere: **the model's output is not reproducible.** See
   [Determinism](docs/architecture/determinism.md).

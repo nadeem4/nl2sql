@@ -18,7 +18,15 @@ class LLMGenerator:
             Formatted YAML string.
         """
         dumped_config = config.model_dump(mode="json", exclude_none=True)
-        
+
+        # ``temperature: null`` means "send no temperature". Dropped with the
+        # other None fields, it would reload as the 0.0 default.
+        if config.default.temperature is None:
+            dumped_config["default"]["temperature"] = None
+        for key, agent in (config.agents or {}).items():
+            if agent.temperature is None:
+                dumped_config["agents"][key]["temperature"] = None
+
         yaml_block = yaml.safe_dump(dumped_config, sort_keys=False)
         
         return LLMGenerator.HEADER + yaml_block
