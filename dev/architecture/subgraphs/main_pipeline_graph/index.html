@@ -1958,9 +1958,10 @@ Source file path: <code>packages/nl2sql/src/nl2sql/pipeline/graph.py</code></p>
 <p>Failure exits:
 - <code>datasource_resolver</code> can short-circuit to <code>END</code> via <code>resolver_route</code> when no datasource is resolved/allowed.
 - <code>layer_router</code> can return <code>END</code> if no <code>execution_dag</code> or layers are present.
+- <code>layer_router</code> returns <code>END</code> once every scan has run if none produced an artifact (every sub-query was denied or failed), and whenever the graph was built with <code>execute=False</code>. The aggregator and answer synthesizer are skipped, so the run's errors are the sub-queries' own -- for a policy denial, <code>SECURITY_VIOLATION</code> first -- and no LLM call is spent explaining an empty result.
 - <code>layer_router</code> raises <code>PipelineExecutionError</code> (an <code>NL2SQLError</code> carrying the <code>PipelineError</code> payload on <code>.error</code>) when no compatible subgraph exists for a datasource; this propagates as an exception from the router function. A conditional-edge router may only return routing decisions, so it cannot report the failure as a <code>PipelineError</code> value in state the way a node does.</p>
 <p>Partial completion behavior:
-- If routing cannot schedule any scan-layer work but <code>execution_dag</code> exists, it routes to <code>aggregator</code> directly.
+- If routing cannot schedule any scan-layer work but <code>execution_dag</code> exists and at least one scan produced an artifact, it routes to <code>aggregator</code> directly. If some scans produced artifacts and others did not, the aggregator still runs and reports the missing ones as <code>AGGREGATOR_FAILED</code>.
 - Errors added to <code>GraphState.errors</code> do not automatically stop the graph; the graph relies on routing logic and node behavior for termination.</p>
 <hr/>
 <h2 id="internal-node-composition">Internal Node Composition</h2>
@@ -1998,7 +1999,7 @@ Source file path: <code>packages/nl2sql/src/nl2sql/pipeline/graph.py</code></p>
 <li><code>global_planner</code> builds a deterministic <code>ExecutionDAG</code> from sub-queries and combines.</li>
 <li><code>layer_router</code> inspects the DAG and current <code>artifact_refs</code>:</li>
 <li>If no DAG or layers, returns <code>END</code>.</li>
-<li>If next scan layer is empty, routes to <code>aggregator</code>.</li>
+<li>If next scan layer is empty, routes to <code>aggregator</code> -- or to <code>END</code> when no scan produced an artifact or <code>execute</code> is False.</li>
 <li>For each scan node, resolves a compatible subgraph and sends <code>build_scan_payload</code>.</li>
 <li>Each subgraph execution returns <code>artifact_refs</code>, <code>subgraph_outputs</code>, and <code>errors</code> to <code>GraphState</code>.</li>
 <li><code>layer_router</code> is re-entered until all scan-layer nodes produce artifacts.</li>
@@ -2047,7 +2048,7 @@ Source file path: <code>packages/nl2sql/src/nl2sql/pipeline/graph.py</code></p>
 <hr/>
 <h2 id="known-limitations">Known Limitations</h2>
 <ul>
-<li><code>execute</code> parameter in <code>build_graph()</code> is accepted but not used in graph construction.</li>
+<li><code>execute=False</code> in <code>build_graph()</code> makes <code>layer_router</code> return <code>END</code> instead of dispatching the aggregator, and is passed to the SQL agent subgraph.</li>
 <li>Errors accumulated in <code>GraphState.errors</code> do not alter routing unless explicit routes inspect them.</li>
 <li>No trace/span propagation into logging context, despite trace context helpers existing.</li>
 <li>Merge reducers for <code>artifact_refs</code>/<code>subgraph_outputs</code> overwrite on key conflicts without ordering guarantees.</li>

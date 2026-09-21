@@ -1990,6 +1990,10 @@
 <li>Resolve adapter and dialect.</li>
 <li>Compute effective limit from plan/adapter row limit.</li>
 <li>Traverse AST with <code>SqlVisitor</code> to build <code>sqlglot</code> expression tree.</li>
+<li>Every operator becomes the node sqlglot's parser would build (<code>+</code> -&gt; <code>exp.Add</code>, <code>*</code> -&gt; <code>exp.Mul</code>, <code>IS NOT</code> -&gt; <code>NOT ... IS ...</code>, and so on), wherever it is nested. An operator with no mapping raises; it is never rendered as a function named after the operator.</li>
+<li>An operand that is itself an operator is parenthesised, because sqlglot prints a hand-built tree without adding the parentheses its parser would have seen (<code>(a + b) * c</code> would otherwise print as <code>a + b * c</code>).</li>
+<li><code>/</code> is sqlglot's true division, so on SQLite it renders as <code>CAST(a AS REAL) / b</code> rather than integer division.</li>
+<li>Attach joins. The first table by ordinal is the <code>FROM</code> table. <code>left_alias</code>/<code>right_alias</code> do not say which table is new: each join attaches whichever side is not yet in scope, taking the lowest-ordinal join that touches a table already in scope, so joins may be listed in any order. When the new table is the join's left side, <code>left</code>/<code>right</code> outer joins are mirrored so the same table is preserved. Joined tables keep their <code>schema_name</code>/<code>database</code> qualifiers.</li>
 <li>Render SQL with <code>query.sql(dialect=...)</code>.</li>
 <li>Return <code>GeneratorResponse</code> with SQL and reasoning.</li>
 <li>On exception, emit <code>SQL_GEN_FAILED</code>.</li>
@@ -2016,6 +2020,7 @@
 <ul>
 <li><code>SQL_GEN_FAILED</code></li>
 </ul>
+<p>A malformed join graph is a planning error, not something to guess around. <code>SQL_GEN_FAILED</code> is raised when a join names an undeclared alias, when a join connects two tables that are both already in scope, when a join cannot be reached from the <code>FROM</code> table, or when a declared table is never joined.</p>
 <p>Logs exceptions via <code>logger.exception</code>.</p>
 <hr/>
 <h2 id="retry-idempotency">Retry + Idempotency</h2>
@@ -2050,6 +2055,7 @@
 <h2 id="known-limitations">Known Limitations</h2>
 <ul>
 <li>No SQL optimization beyond AST structure.</li>
+<li><code>PlanModel.distinct</code> and <code>PlanModel.offset</code> are not rendered.</li>
 <li>No dialect fallback if adapter misconfigured.</li>
 </ul>
 <hr/>
