@@ -1,7 +1,8 @@
 from typing import Optional, Any, Dict, Type
 import logging
 from .interfaces import SecretProvider
-from nl2sql.configs.secrets import SecretProviderConfig, AwsSecretConfig, AzureSecretConfig, HashiCorpSecretConfig
+from nl2sql.common.settings import secret_value
+from .models import SecretProviderConfig, AwsSecretConfig, AzureSecretConfig, HashiCorpSecretConfig
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +68,7 @@ class SecretProviderFactory:
         return AzureSecretProvider(
             vault_url=config.vault_url,
             client_id=config.client_id,
-            client_secret=config.client_secret,
+            client_secret=secret_value(config.client_secret),
             tenant_id=config.tenant_id
         )
 
@@ -80,6 +81,6 @@ class SecretProviderFactory:
             
         return HashiCorpSecretProvider(
             url=config.url,
-            token=config.token,
+            token=secret_value(config.token),
             mount_point=config.mount_point
         )

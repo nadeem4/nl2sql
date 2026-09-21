@@ -2,6 +2,9 @@
 from typing import Optional, Dict
 from pydantic import BaseModel, Field, SecretStr, field_serializer
 
+# Serialization context key that makes ``AgentConfig.api_key`` dump its real value.
+REVEAL_SECRETS = "reveal_secrets"
+
 class AgentConfig(BaseModel):
     """Configuration for a specific agent's LLM.
 
@@ -33,8 +36,18 @@ class AgentConfig(BaseModel):
     name: str = Field("default", description="Name of the agent")
 
     @field_serializer("api_key", when_used="json")
-    def _serialize_api_key(self, value):
-        return value.get_secret_value() if value else None
+    def _serialize_api_key(self, value, info):
+        """Masked in JSON unless a config writer asks for the real value.
+
+        ``LLMGenerator`` writes ``llm.yaml`` with ``context={REVEAL_SECRETS: True}``
+        so the file keeps the literal key or the ``${env:...}`` reference; any
+        other JSON dump (a log, a trace, an API response) gets the mask.
+        """
+        if value is None:
+            return None
+        if (info.context or {}).get(REVEAL_SECRETS):
+            return value.get_secret_value()
+        return str(value)
 
 class LLMFileConfig(BaseModel):
     """Global LLM configuration (File Envelope)."""

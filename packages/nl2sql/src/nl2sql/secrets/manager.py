@@ -48,10 +48,15 @@ class SecretManager:
                 if config.type == "env":
                     continue
                 
+                from pydantic import SecretStr
+
                 updates = {}
                 for key, value in config.model_dump(exclude={"id", "type"}).items():
-                    if isinstance(value, str) and value.startswith("${") and value.endswith("}"):
-                        updates[key] = self.resolve(value)
+                    # Credential fields are SecretStr; a reference in one is resolved too.
+                    raw = value.get_secret_value() if isinstance(value, SecretStr) else value
+                    if isinstance(raw, str) and raw.startswith("${") and raw.endswith("}"):
+                        resolved = self.resolve(raw)
+                        updates[key] = SecretStr(resolved) if isinstance(value, SecretStr) else resolved
                 
                 resolved_config = config.model_copy(update=updates)
                 provider = SecretProviderFactory.create(resolved_config)

@@ -3,14 +3,14 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional
 
 import polars as pl
 
-from nl2sql.common.settings import settings
+from nl2sql.common.settings import secret_value, settings
 from nl2sql.execution.contracts import ArtifactRef
 from nl2sql_adapter_sdk.contracts import ResultFrame
 
@@ -28,7 +28,8 @@ class ArtifactStoreConfig:
     s3_prefix: Optional[str] = None
     adls_account: Optional[str] = None
     adls_container: Optional[str] = None
-    adls_connection_string: Optional[str] = None
+    # Plain, for polars' storage options; kept out of the repr so it never prints.
+    adls_connection_string: Optional[str] = field(default=None, repr=False)
 
 
 class ArtifactStore:
@@ -160,6 +161,6 @@ def build_artifact_store() -> ArtifactStore:
             s3_prefix=settings.result_artifact_s3_prefix,
             adls_account=settings.result_artifact_adls_account,
             adls_container=settings.result_artifact_adls_container,
-            adls_connection_string=settings.result_artifact_adls_connection_string,
+            adls_connection_string=secret_value(settings.result_artifact_adls_connection_string),
         )
     )

@@ -35,3 +35,21 @@ Provider-specific fields:
 
 Use `${provider_id:key}` in config files to resolve a secret from a provider.
 Use `${env:VAR}` to read directly from environment variables.
+
+## Secrets never print
+
+Credentials are held as pydantic `SecretStr`, so `repr`, `str`, log lines and
+tracebacks show `**********` instead of the value:
+
+- the settings `OPENAI_API_KEY` and `RESULT_ARTIFACT_ADLS_CONNECTION_STRING`;
+- `api_key` in the LLM config (`AgentConfig`), including `model_dump(mode="json")`
+  and `model_dump_json()`;
+- `client_secret` (Azure) and `token` (HashiCorp) in `secrets.yaml`;
+- datasource connection fields whose name contains `password`, `secret`,
+  `token` or `api_key` (masked in the connection config's `repr`/`str`).
+
+The real value is read only where it is used: building the LLM or embeddings
+client, a database connection, the artifact store's storage options or a
+secret provider's client. Writers of config files (`nl2sql setup`, the demo
+scaffold, the playground Settings panel) still write the literal value or the
+`${env:...}` reference, never the mask.

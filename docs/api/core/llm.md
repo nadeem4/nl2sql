@@ -26,7 +26,7 @@ Fields:
 | `provider` | `str` | yes | Provider name: `openai`, `openrouter` or `ollama`. |
 | `model` | `str` | yes | Model identifier. |
 | `temperature` | `Optional[float]` | no | Sampling temperature (default `0.0`). `None` (`null` in YAML) sends no temperature parameter, for models that accept only their default. |
-| `api_key` | `Optional[SecretStr]` | no | API key or secret reference. |
+| `api_key` | `Optional[SecretStr]` | no | API key or secret reference. Masked in `repr`, `str` and JSON dumps; `LLMGenerator` writes the real value or reference. |
 | `base_url` | `Optional[str]` | no | Endpoint override; defaults to the provider preset (`https://openrouter.ai/api/v1` for `openrouter`, `http://localhost:11434/v1` for `ollama`). |
 | `name` | `str` | no | Agent name (default `default`). |
 

@@ -7,7 +7,7 @@ from langchain_core.embeddings import Embeddings
 from langchain_openai import OpenAIEmbeddings
 
 from nl2sql.common.logger import get_logger
-from nl2sql.common.settings import settings
+from nl2sql.common.settings import secret_value, settings
 
 logger = get_logger(__name__)
 
@@ -162,7 +162,8 @@ class EmbeddingService:
                 provider is selected without an API key.
         """
         if provider == "openai":
-            if not (settings.openai_api_key or os.environ.get("OPENAI_API_KEY")):
+            api_key = secret_value(settings.openai_api_key)
+            if not (api_key or os.environ.get("OPENAI_API_KEY")):
                 raise ValueError(
                     "EMBEDDING_PROVIDER is 'openai' but OPENAI_API_KEY is not set. "
                     "Set the key, or set EMBEDDING_PROVIDER=local to use the "
@@ -170,7 +171,7 @@ class EmbeddingService:
                 )
             return OpenAIEmbeddings(
                 model=settings.embedding_model,
-                api_key=settings.openai_api_key,
+                api_key=api_key or None,
             )
         if provider == "local":
             return LocalEmbeddings()

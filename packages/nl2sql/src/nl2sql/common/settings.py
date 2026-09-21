@@ -1,15 +1,32 @@
-from typing import Dict, Literal, Optional
+from typing import Any, Dict, Literal, Optional
 import os
-from pydantic import AliasChoices, Field
+from pydantic import AliasChoices, Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from nl2sql.common.logger import get_logger
 
 logger = get_logger(__name__)
 
+
+def secret_value(value: Any) -> Optional[str]:
+    """The plain value of a ``SecretStr`` setting, for the one place that uses it.
+
+    Secrets are held as ``SecretStr`` so ``repr``, ``str``, logs and tracebacks
+    show a mask. Call this only where the value is actually needed. A plain
+    string (e.g. a test's monkeypatch) passes through unchanged.
+    """
+    if isinstance(value, SecretStr):
+        return value.get_secret_value()
+    return value
+
+
 class Settings(BaseSettings):
-    """Application configuration settings backed by environment variables."""
-    
-    openai_api_key: Optional[str] = Field(default=None, validation_alias="OPENAI_API_KEY")
+    """Application configuration settings backed by environment variables.
+
+    Credentials are ``SecretStr``: read them with :func:`secret_value` at the
+    point of use, never by printing the settings object.
+    """
+
+    openai_api_key: Optional[SecretStr] = Field(default=None, validation_alias="OPENAI_API_KEY")
     vector_store_path: Optional[str] = Field(
         default="./chroma_db",
         validation_alias="VECTOR_STORE",
@@ -88,7 +105,7 @@ class Settings(BaseSettings):
         validation_alias="RESULT_ARTIFACT_ADLS_CONTAINER",
         description="ADLS container name."
     )
-    result_artifact_adls_connection_string: Optional[str] = Field(
+    result_artifact_adls_connection_string: Optional[SecretStr] = Field(
         default=None,
         validation_alias="RESULT_ARTIFACT_ADLS_CONNECTION_STRING",
         description="ADLS connection string, if using key-based auth."
