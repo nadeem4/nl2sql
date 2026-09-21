@@ -1,19 +1,16 @@
 """Prompts for the Query Decomposer node."""
 
-DECOMPOSER_PROMPT = """
-SYSTEM:
+from langchain_core.prompts import ChatPromptTemplate
+
+# Cache layout: the system message is the stable instructions, the human
+# message the per-question inputs. The system/human boundary is the cache seam.
+DECOMPOSER_SYSTEM_PROMPT = """SYSTEM:
 You are a Semantic Query Decomposer. You output ONLY structured semantic intent.
 
 TASK:
 Decompose the user query into semantic sub-queries and combine groups.
 Your output must be deterministic and strictly follow the JSON contract.
-
-INPUTS:
-User Query:
-{user_query}
-
-Resolved Datasources (id + semantic metadata):
-{resolved_datasources}
+The INPUTS (the user query and the resolved datasources) follow in the next message.
 
 RULES:
 1) Use resolved_datasources metadata to select the most appropriate datasource for each subquery.
@@ -94,3 +91,15 @@ VALIDATION:
 - post_combine_ops.target_group_id must reference an existing group_id.
 - expected_schema must match semantic outputs only.
 """
+
+DECOMPOSER_HUMAN_PROMPT = """INPUTS:
+Resolved Datasources (id + semantic metadata):
+{resolved_datasources}
+
+User Query:
+{user_query}
+"""
+
+DECOMPOSER_PROMPT = ChatPromptTemplate.from_messages(
+    [("system", DECOMPOSER_SYSTEM_PROMPT), ("human", DECOMPOSER_HUMAN_PROMPT)]
+)

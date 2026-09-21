@@ -16,9 +16,16 @@ Keep these rules in mind:
 
 ## 2. Update planner prompt
 
-Update `PLANNER_PROMPT` and examples in:
+Update the prompt and examples in:
 
 - `packages/nl2sql/src/nl2sql/pipeline/nodes/ast_planner/prompts.py`
+
+`PLANNER_PROMPT` is a chat template of two messages. `PLANNER_SYSTEM_PROMPT`
+holds what is the same for every question (instructions, `PLANNER_EXAMPLES`,
+the schema) and `PLANNER_HUMAN_PROMPT` holds what changes per call (expected
+schema, feedback, the question). Keep per-question text out of the system
+message, or the provider's prompt cache stops hitting. See
+[AST Planner: prompt layout](../architecture/nodes/ast_planner_node.md#prompt-layout-and-caching).
 
 Ensure structured output still matches `PlanModel`.
 

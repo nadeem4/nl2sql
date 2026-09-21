@@ -8,14 +8,13 @@ if TYPE_CHECKING:
 from .prompts import REFINER_PROMPT
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.pipeline.nodes.refiner.schemas import RefinerResponse
+from nl2sql.pipeline.nodes.schema_retriever.schema import render_schema_for_prompt
 
 from nl2sql.common.logger import get_logger
 
 logger = get_logger("refiner")
 
 LLMCallable = Union[Callable[[str], str], Runnable]
-
-from langchain_core.prompts import ChatPromptTemplate
 
 from langchain_core.output_parsers import StrOutputParser
 from nl2sql.context import NL2SQLContext
@@ -36,7 +35,7 @@ class RefinerNode:
         """
         self.node_name = self.__class__.__name__.lower().replace('node', '')
         self.llm = ctx.llm_registry.get_llm(self.node_name)
-        self.prompt = ChatPromptTemplate.from_template(REFINER_PROMPT)
+        self.prompt = REFINER_PROMPT
         self.chain = None
         if self.llm is not None:
             self.chain = self.prompt | self.llm | StrOutputParser()
@@ -63,13 +62,7 @@ class RefinerNode:
                     "refiner_response": RefinerResponse(errors=[error]),
                     "errors": [error],
                 }
-            relevant_tables = ""
-            if state.relevant_tables:
-                lines = []
-                for tbl in state.relevant_tables:
-                    lines.append(tbl.model_dump_json(indent=2))
-                    lines.append("---")
-                relevant_tables = "\n".join(lines)
+            relevant_tables = render_schema_for_prompt(state.relevant_tables)
 
             failed_plan_str = "No plan generated."
             if state.ast_planner_response and state.ast_planner_response.plan:

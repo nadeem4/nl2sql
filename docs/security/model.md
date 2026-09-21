@@ -43,7 +43,9 @@ refuses the plan before any SQL exists, and the run ends there.
   the LLM provider or the run trace. The schema retriever decides this with the
   same rule the validator enforces (`table_allowed` in `auth/rbac.py`), on both
   the full-snapshot path and the vector-retrieval path. Column and table
-  descriptions are kept: they are structure. If you let an enrichment step
+  descriptions are kept: they are structure. (For tables the role can read,
+  the prompt carries only `sample_values`; the other statistics stay in the
+  snapshot.) If you let an enrichment step
   write descriptions from real values, those descriptions are not stripped.
 - **A generic message for the user.** The refusal the caller sees is
   "You do not have permission to see the data this question requires." It names

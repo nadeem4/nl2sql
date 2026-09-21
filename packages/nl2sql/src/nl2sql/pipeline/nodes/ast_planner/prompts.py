@@ -1,5 +1,7 @@
 """Prompts and examples for the SQL Planner node."""
 
+from langchain_core.prompts import ChatPromptTemplate
+
 PLANNER_EXAMPLES = """
 Examples:
 
@@ -97,7 +99,12 @@ Plan:
 }
 """
 
-PLANNER_PROMPT = (
+# Cache layout. The system message is everything that is the same for every
+# question on a datasource and role: instructions, examples, then the schema.
+# The human message is everything that changes per call. Providers cache a
+# stable prompt prefix, so the system/human boundary is the single cache seam:
+# keep per-question content out of the system message.
+PLANNER_SYSTEM_PROMPT = (
     "[ROLE]\n"
     "You are a SQL Planner. Your job is to create a structured, executable SQL plan"
     " in the form of a deterministic Abstract Syntax Tree (AST).\n\n"
@@ -111,8 +118,8 @@ PLANNER_PROMPT = (
     "   literal | column | func | binary | unary | case\n"
     "6. Every list MUST contain `ordinal` fields in ascending order starting at 0.\n"
     "7. Order lists to match ordinals (0..N) exactly.\n"
-    "8. For literal values on '=' or 'IN', choose values from column stats if available.\n"
-    "9. If no exact match is available, fall back to LIKE but keep the pattern derived from stats/synonyms.\n\n"
+    "8. For literal values on '=' or 'IN', choose values from a column's sample_values if listed.\n"
+    "9. If no exact match is available, fall back to LIKE but keep the pattern derived from sample_values.\n\n"
 
     "[OUTPUT CONTRACT]\n"
     "- If [EXPECTED_SCHEMA] is provided and non-empty:\n"
@@ -129,10 +136,17 @@ PLANNER_PROMPT = (
     "- Use ISO 8601 dates.\n"
     "- No extra keys beyond the schema.\n\n"
 
-    "[RELEVANT_TABLES]\n{relevant_tables}\n\n"
+    "[EXAMPLES]\n{examples}\n\n"
+    "[RELEVANT_TABLES]\n{relevant_tables}"
+)
+
+PLANNER_HUMAN_PROMPT = (
     "[EXPECTED_SCHEMA]\n{expected_schema}\n\n"
     "[SEMANTIC_CONTEXT]\n{semantic_context}\n\n"
-    "[EXAMPLES]\n{examples}\n\n"
     "[FEEDBACK]\n{feedback}\n\n"
     "[USER_QUERY]\n{user_query}"
+)
+
+PLANNER_PROMPT = ChatPromptTemplate.from_messages(
+    [("system", PLANNER_SYSTEM_PROMPT), ("human", PLANNER_HUMAN_PROMPT)]
 )

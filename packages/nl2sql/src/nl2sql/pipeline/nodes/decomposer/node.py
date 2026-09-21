@@ -1,7 +1,6 @@
 from __future__ import annotations
 from typing import Dict, Any, TYPE_CHECKING
 
-from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import Runnable
 
 if TYPE_CHECKING:
@@ -39,7 +38,7 @@ class DecomposerNode:
         """
         self.node_name = self.__class__.__name__.lower().replace('node', '')
         self.llm = ctx.llm_registry.get_llm(self.node_name)
-        self.prompt = ChatPromptTemplate.from_template(DECOMPOSER_PROMPT)
+        self.prompt = DECOMPOSER_PROMPT
         self.chain = self.prompt | self.llm.with_structured_output(
             DecomposerResponse, method="function_calling"
         )
@@ -77,7 +76,10 @@ class DecomposerNode:
             llm_response: DecomposerResponse = self.chain.invoke(
                 {
                     "user_query": state.user_query,
-                    "resolved_datasources": resolved_payload,
+                    # Sorted keys: nested metadata prints in a fixed order.
+                    "resolved_datasources": json.dumps(
+                        resolved_payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False, default=str
+                    ),
                 }
             )
 

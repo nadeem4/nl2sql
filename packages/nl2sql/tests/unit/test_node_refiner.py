@@ -48,5 +48,5 @@ def test_refiner_sends_the_failed_plan_as_compact_json():
     sent = captured["failed_plan"]
     assert json.loads(sent)["tables"][0]["name"] == "Customers"
     assert json.loads(sent)["select_items"][0]["expr"]["column_name"] == "CustomerId"
-    assert "\n" not in sent  # compact: the refiner prompt is ~8.6k tokens already
+    assert "\n" not in sent  # compact: every token of the refiner prompt is paid on each retry
     assert ":null" not in sent  # no null-valued keys

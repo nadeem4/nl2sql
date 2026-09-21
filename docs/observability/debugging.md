@@ -145,7 +145,7 @@ result rows (`rows`, and the aggregator's `terminal_results`) keep
 `TRACE_SAMPLE_ROWS` rows, other lists keep 200 items, and strings keep
 `TRACE_MAX_FIELD_CHARS` characters. Every cut leaves a `[truncated]` marker
 saying how much was dropped. **LLM messages and raw responses are never cut**,
-because replay needs them whole; a planner prompt on Chinook is about 30 000
+because replay needs them whole; a planner prompt on Chinook is about 12 000
 characters, and a whole trace is typically a few hundred kilobytes.
 
 ## Reading a trace: `nl2sql trace show`
