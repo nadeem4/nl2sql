@@ -219,18 +219,6 @@ These are current facts about the code, not a roadmap.
   transport level; whether a given local model can fill that schema is another
   matter, and small ones frequently cannot. Expect malformed plans and repeated
   refiner loops. See [LLM configuration](docs/configuration/llm.md).
-* **An `ORDER BY` over a function crashes the logical validator.** The validator
-  hands sqlglot's `qualify()` a bare expression instead of an `exp.Ordered`, so
-  any plan that orders by `COUNT(...)` or any other function fails with
-  `VALIDATOR_CRASH`, exhausts the refiner loop and never reaches SQL. That is
-  most "top N by <something>" questions. The generator is unaffected, but
-  validation runs first.
-* **Equality filters are checked against a five-value sample.** The adapter
-  records five sample values per text column and the validator treats them as an
-  exhaustive allowlist for `=` and `IN`, so a correct filter on any other real
-  value is rejected as `INVALID_PLAN_STRUCTURE` and the refiner cannot recover.
-  On a low-cardinality status column this is a useful check; on a name column it
-  is wrong.
 * **`max_bytes` is not enforced.** It is configured, stored and reported, and
   nothing compares it to anything. `row_limit` *is* enforced — the generator
   bakes it into the SQL.
@@ -281,12 +269,14 @@ nl2sql --env demo run --no-exec "Which artist has the most albums?"
 # Ask as a role that is not allowed the answer
 nl2sql --env demo run --role viewer "Who are the top 5 customers by total spend?"
 
-# Check the environment: Python, installed drivers, datasource connectivity
+# Check the environment: Python, installed drivers, datasource connectivity, LLM key
 nl2sql doctor
 ```
 
 `--env <name>` loads `.env.<name>`; `--env-file <path>` loads an exact file and
-takes precedence over `--env`.
+takes precedence over `--env`. `nl2sql --version` prints the installed
+`nl2sql-engine` version. On a failed `run`, only the error message prints by
+default; pass `--verbose`/`-v` for the full traceback.
 
 ### The REST API
 
