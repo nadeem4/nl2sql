@@ -1,0 +1,249 @@
+{
+  "query_type": "READ",
+  "distinct": false,
+  "tables": [
+    {
+      "name": "Genre",
+      "schema_name": null,
+      "database": null,
+      "alias": "t1",
+      "ordinal": 0
+    },
+    {
+      "name": "Track",
+      "schema_name": null,
+      "database": null,
+      "alias": "t2",
+      "ordinal": 1
+    },
+    {
+      "name": "InvoiceLine",
+      "schema_name": null,
+      "database": null,
+      "alias": "t3",
+      "ordinal": 2
+    }
+  ],
+  "joins": [
+    {
+      "left_alias": "t2",
+      "right_alias": "t1",
+      "join_type": "inner",
+      "condition": {
+        "kind": "binary",
+        "value": null,
+        "is_null": false,
+        "alias": null,
+        "column_name": null,
+        "func_name": null,
+        "args": [],
+        "is_aggregate": false,
+        "op": "=",
+        "left": {
+          "kind": "column",
+          "value": null,
+          "is_null": false,
+          "alias": "t2",
+          "column_name": "GenreId",
+          "func_name": null,
+          "args": [],
+          "is_aggregate": false,
+          "op": null,
+          "left": null,
+          "right": null,
+          "expr": null,
+          "whens": [],
+          "else_expr": null
+        },
+        "right": {
+          "kind": "column",
+          "value": null,
+          "is_null": false,
+          "alias": "t1",
+          "column_name": "GenreId",
+          "func_name": null,
+          "args": [],
+          "is_aggregate": false,
+          "op": null,
+          "left": null,
+          "right": null,
+          "expr": null,
+          "whens": [],
+          "else_expr": null
+        },
+        "expr": null,
+        "whens": [],
+        "else_expr": null
+      },
+      "ordinal": 0
+    },
+    {
+      "left_alias": "t3",
+      "right_alias": "t2",
+      "join_type": "inner",
+      "condition": {
+        "kind": "binary",
+        "value": null,
+        "is_null": false,
+        "alias": null,
+        "column_name": null,
+        "func_name": null,
+        "args": [],
+        "is_aggregate": false,
+        "op": "=",
+        "left": {
+          "kind": "column",
+          "value": null,
+          "is_null": false,
+          "alias": "t3",
+          "column_name": "TrackId",
+          "func_name": null,
+          "args": [],
+          "is_aggregate": false,
+          "op": null,
+          "left": null,
+          "right": null,
+          "expr": null,
+          "whens": [],
+          "else_expr": null
+        },
+        "right": {
+          "kind": "column",
+          "value": null,
+          "is_null": false,
+          "alias": "t2",
+          "column_name": "TrackId",
+          "func_name": null,
+          "args": [],
+          "is_aggregate": false,
+          "op": null,
+          "left": null,
+          "right": null,
+          "expr": null,
+          "whens": [],
+          "else_expr": null
+        },
+        "expr": null,
+        "whens": [],
+        "else_expr": null
+      },
+      "ordinal": 1
+    }
+  ],
+  "select_items": [
+    {
+      "expr": {
+        "kind": "column",
+        "value": null,
+        "is_null": false,
+        "alias": "t1",
+        "column_name": "Name",
+        "func_name": null,
+        "args": [],
+        "is_aggregate": false,
+        "op": null,
+        "left": null,
+        "right": null,
+        "expr": null,
+        "whens": [],
+        "else_expr": null
+      },
+      "alias": "genre",
+      "ordinal": 0
+    },
+    {
+      "expr": {
+        "kind": "func",
+        "value": null,
+        "is_null": false,
+        "alias": null,
+        "column_name": null,
+        "func_name": "SUM",
+        "args": [
+          {
+            "kind": "binary",
+            "value": null,
+            "is_null": false,
+            "alias": null,
+            "column_name": null,
+            "func_name": null,
+            "args": [],
+            "is_aggregate": false,
+            "op": "*",
+            "left": {
+              "kind": "column",
+              "value": null,
+              "is_null": false,
+              "alias": "t3",
+              "column_name": "UnitPrice",
+              "func_name": null,
+              "args": [],
+              "is_aggregate": false,
+              "op": null,
+              "left": null,
+              "right": null,
+              "expr": null,
+              "whens": [],
+              "else_expr": null
+            },
+            "right": {
+              "kind": "column",
+              "value": null,
+              "is_null": false,
+              "alias": "t3",
+              "column_name": "Quantity",
+              "func_name": null,
+              "args": [],
+              "is_aggregate": false,
+              "op": null,
+              "left": null,
+              "right": null,
+              "expr": null,
+              "whens": [],
+              "else_expr": null
+            },
+            "expr": null,
+            "whens": [],
+            "else_expr": null
+          }
+        ],
+        "is_aggregate": true,
+        "op": null,
+        "left": null,
+        "right": null,
+        "expr": null,
+        "whens": [],
+        "else_expr": null
+      },
+      "alias": "track_sales",
+      "ordinal": 1
+    }
+  ],
+  "where": null,
+  "group_by": [
+    {
+      "expr": {
+        "kind": "column",
+        "value": null,
+        "is_null": false,
+        "alias": "t1",
+        "column_name": "Name",
+        "func_name": null,
+        "args": [],
+        "is_aggregate": false,
+        "op": null,
+        "left": null,
+        "right": null,
+        "expr": null,
+        "whens": [],
+        "else_expr": null
+      },
+      "ordinal": 0
+    }
+  ],
+  "having": null,
+  "order_by": [],
+  "limit": null,
+  "offset": null,
+  "reasoning": "Join Genre and Track tables on GenreId. Join InvoiceLine and Track tables on TrackId. Group by genre name and sum the product of UnitPrice and Quantity to calculate track sales."
+}

@@ -35,6 +35,12 @@ def build_scan_layer_router(ctx: NL2SQLContext, execute: bool = True):
     When ``execute`` is False the run stops once every scan has produced a
     plan and SQL: aggregation and synthesis need executed rows, so the router
     returns ``END`` instead of dispatching the aggregator.
+
+    For the same reason it also returns ``END`` when every scan has finished
+    and none produced an artifact -- each sub-query was denied or failed.
+    Aggregating would only fail on the missing artifact, and synthesizing
+    would spend an LLM call explaining nothing, so the run's errors stay the
+    sub-queries' own, led by the real cause.
     """
 
     def route_scan_layers(state: GraphState):
@@ -52,7 +58,9 @@ def build_scan_layer_router(ctx: NL2SQLContext, execute: bool = True):
             dag, artifact_refs, completed_scan_ids(state.subgraph_outputs)
         )
         if not target_ids:
-            return [Send("aggregator", state)] if execute else END
+            if not execute or not artifact_refs:
+                return END
+            return [Send("aggregator", state)]
 
         branches = []
         for node_id in target_ids:

@@ -9,7 +9,7 @@ if TYPE_CHECKING:
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.datasources import DatasourceRegistry
 from nl2sql.common.logger import get_logger
-from nl2sql.pipeline.nodes.ast_planner.schemas import PlanModel, Expr
+from nl2sql.pipeline.nodes.ast_planner.schemas import PlanModel, Expr, TableRef
 from nl2sql.pipeline.nodes.generator.schemas import GeneratorResponse
 from nl2sql.context import NL2SQLContext
 
@@ -29,6 +29,51 @@ def ordered(expression: exp.Expression, direction: str) -> exp.Ordered:
     an expression and raises.
     """
     return exp.Ordered(this=expression, desc=(direction == "desc"))
+
+
+_BINARY_NODES = {
+    "=": exp.EQ,
+    "!=": exp.NEQ,
+    ">": exp.GT,
+    "<": exp.LT,
+    ">=": exp.GTE,
+    "<=": exp.LTE,
+    "LIKE": exp.Like,
+    "IS": exp.Is,
+    "+": exp.Add,
+    "-": exp.Sub,
+    "*": exp.Mul,
+    "/": exp.Div,
+    "%": exp.Mod,
+}
+
+
+def _grouped(operand: exp.Expression) -> exp.Expression:
+    """Parenthesises an operand that is itself an operator.
+
+    sqlglot's generator prints a hand-built tree as-is and never adds the
+    parentheses its parser would have seen: ``Mul(Add(a, b), c)`` prints as
+    ``a + b * c``. The plan's tree already encodes the grouping, so any nested
+    operator is wrapped to keep it.
+    """
+    if isinstance(operand, exp.Binary):
+        return exp.Paren(this=operand)
+    return operand
+
+
+_MIRRORED_JOIN = {"left": "right", "right": "left"}
+
+
+def _table(ref: TableRef) -> exp.Table:
+    """Builds a qualified, aliased table reference for the FROM clause."""
+    tbl = exp.Table(this=exp.Identifier(this=ref.name, quoted=False))
+    if ref.schema_name:
+        tbl.set("db", exp.Identifier(this=ref.schema_name, quoted=False))
+    if ref.database:
+        tbl.set("catalog", exp.Identifier(this=ref.database, quoted=False))
+    if ref.alias:
+        tbl.set("alias", exp.TableAlias(this=exp.Identifier(this=ref.alias, quoted=False)))
+    return tbl
 
 
 class SqlVisitor:
@@ -94,7 +139,12 @@ class SqlVisitor:
         )
 
     def _visit_binary(self, expr: Expr) -> exp.Expression:
-        """Converts a binary operation expression to sqlglot."""
+        """Converts a binary operation expression to sqlglot.
+
+        Every operator is built as the sqlglot node its parser would produce.
+        An operator with no mapping is an error: rendering it as a function
+        named after the operator (``*(a, b)``) is never valid SQL.
+        """
         if not expr.left or not expr.right:
             raise ValueError("Binary expression missing operands")
 
@@ -102,23 +152,21 @@ class SqlVisitor:
         right = self.visit(expr.right)
         op = str(expr.op).upper()
 
-        if op == "=": return exp.EQ(this=left, expression=right)
-        if op == "!=": return exp.NEQ(this=left, expression=right)
-        if op == ">": return exp.GT(this=left, expression=right)
-        if op == "<": return exp.LT(this=left, expression=right)
-        if op == ">=": return exp.GTE(this=left, expression=right)
-        if op == "<=": return exp.LTE(this=left, expression=right)
         if op == "AND":
             if isinstance(left, exp.Or): left = exp.Paren(this=left)
             if isinstance(right, exp.Or): right = exp.Paren(this=right)
             return exp.And(this=left, expression=right)
         if op == "OR": return exp.Or(this=left, expression=right)
-        if op == "LIKE": return exp.Like(this=left, expression=right)
         if op == "IN":
             values = right.expressions if isinstance(right, exp.Tuple) else [right]
-            return exp.In(this=left, expressions=values)
+            return exp.In(this=_grouped(left), expressions=values)
+        if op == "IS NOT":
+            return exp.Not(this=exp.Is(this=_grouped(left), expression=_grouped(right)))
 
-        return exp.Anonymous(this=op, expressions=[left, right])
+        node = _BINARY_NODES.get(op)
+        if node is None:
+            raise ValueError(f"Unsupported binary operator: {expr.op}")
+        return node(this=_grouped(left), expression=_grouped(right))
 
     def _visit_unary(self, expr: Expr) -> exp.Expression:
         """Converts a unary operation expression to sqlglot."""
@@ -126,7 +174,7 @@ class SqlVisitor:
         if not target:
             raise ValueError("Unary expression missing target")
 
-        node = self.visit(target)
+        node = _grouped(self.visit(target))
         op = str(expr.op).upper()
 
         if op == "NOT":
@@ -220,6 +268,77 @@ class GeneratorNode:
                 "errors": [error],
             }
 
+    def _attach_joins(
+        self,
+        query: exp.Select,
+        plan: PlanModel,
+        declared: Dict[str, Any],
+        primary_alias: str,
+        visitor: SqlVisitor,
+    ) -> exp.Select:
+        """Adds every joined table to the FROM clause exactly once.
+
+        ``left_alias``/``right_alias`` name the two sides of a join; they do not
+        say which one is new. Each join attaches whichever side is not yet in
+        scope, and joins are taken in dependency order -- the lowest-ordinal
+        join that touches the tables already in scope goes next -- so a plan
+        may list its joins in any order. When the new table is the join's left
+        side an outer join is mirrored, so the table the plan preserves is
+        still the one preserved.
+
+        Raises:
+            ValueError: If a join names an undeclared alias, joins two tables
+                that are already in scope, or cannot be reached from the FROM
+                table; or if a declared table is never joined. Each of these
+                is a malformed plan, and guessing would produce wrong SQL.
+        """
+        pending = sorted(plan.joins, key=lambda x: x.ordinal)
+        for j in pending:
+            for alias in (j.left_alias, j.right_alias):
+                if alias not in declared:
+                    raise ValueError(f"Join references unknown alias {alias}")
+
+        in_scope = {primary_alias}
+        while pending:
+            j = next(
+                (j for j in pending if j.left_alias in in_scope or j.right_alias in in_scope),
+                None,
+            )
+            if j is None:
+                stranded = ", ".join(f"{p.left_alias}-{p.right_alias}" for p in pending)
+                raise ValueError(
+                    f"Join(s) {stranded} do not connect to the FROM table "
+                    f"'{primary_alias}' or to any table joined to it."
+                )
+            if j.left_alias in in_scope and j.right_alias in in_scope:
+                raise ValueError(
+                    f"Join {j.left_alias}-{j.right_alias} joins two tables that are "
+                    "already in the query; each table must be joined exactly once."
+                )
+
+            if j.right_alias in in_scope:
+                new_alias = j.left_alias
+                join_type = _MIRRORED_JOIN.get(j.join_type, j.join_type)
+            else:
+                new_alias = j.right_alias
+                join_type = j.join_type
+
+            query = query.join(
+                _table(declared[new_alias]),
+                on=visitor.visit(j.condition),
+                join_type=join_type,
+            )
+            in_scope.add(new_alias)
+            pending.remove(j)
+
+        unjoined = [alias for alias in declared if alias not in in_scope]
+        if unjoined:
+            raise ValueError(
+                f"Table alias(es) {', '.join(unjoined)} are declared in the plan "
+                "but never joined to the FROM table."
+            )
+        return query
+
     def _generate_sql(self, plan: PlanModel, limit: int, dialect: str) -> str:
         """Internal helper to build and optimize the SQL query."""
         visitor = SqlVisitor()
@@ -235,35 +354,10 @@ class GeneratorNode:
         if not tables:
             raise ValueError("Plan has no tables")
 
+        declared = {t.alias: t for t in tables}
         primary = tables[0]
-        tbl = exp.Table(this=exp.Identifier(this=primary.name, quoted=False))
-
-        if primary.schema_name:
-            tbl.set("db", exp.Identifier(this=primary.schema_name, quoted=False))
-        if primary.database:
-            tbl.set("catalog", exp.Identifier(this=primary.database, quoted=False))
-        if primary.alias:
-            tbl.set("alias", exp.TableAlias(this=exp.Identifier(this=primary.alias, quoted=False)))
-
-        query = query.from_(tbl)
-
-        alias_map = {t.alias: t.name for t in tables}
-
-        for j in sorted(plan.joins, key=lambda x: x.ordinal):
-            name = alias_map.get(j.right_alias)
-            if not name:
-                raise ValueError(f"Join references unknown alias {j.right_alias}")
-
-            right = exp.Table(this=exp.Identifier(this=name, quoted=False))
-            right.set("alias", exp.TableAlias(this=exp.Identifier(this=j.right_alias, quoted=False)))
-
-            condition = visitor.visit(j.condition)
-
-            query = query.join(
-                right,
-                on=condition,
-                join_type=j.join_type
-            )
+        query = query.from_(_table(primary))
+        query = self._attach_joins(query, plan, declared, primary.alias, visitor)
 
         if plan.where:
             query = query.where(visitor.visit(plan.where))

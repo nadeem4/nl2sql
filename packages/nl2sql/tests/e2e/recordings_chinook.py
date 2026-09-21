@@ -6,7 +6,9 @@ second scenario worth having. The manufacturing DDL these replaced declared no
 foreign keys at all, so no end-to-end test ever drove a join through
 `LogicalValidatorNode`'s relationship check.
 """
+import json
 import re
+from pathlib import Path
 
 from nl2sql.testing.fake_llm import Rule
 
@@ -235,5 +237,101 @@ RULES_JAZZ_TRACKS = [
     Rule("DecomposerResponse", JAZZ_TRACKS_DECOMPOSER),
     Rule("PlanModel", JAZZ_TRACKS_PLAN),
     Rule("AggregatedResponse", jazz_tracks_answer),
+    Rule("plain", "Keep the same plan."),
+]
+
+
+# ---------------------------------------------------------------------------
+# A plan a real model wrote, replayed verbatim.
+# ---------------------------------------------------------------------------
+
+GENRE_SALES_DECOMPOSER = {
+    "sub_queries": [{
+        "id": "sq1", "datasource_id": "chinook",
+        "intent": "track sales by genre",
+        "metrics": [{"name": "track_sales", "aggregation": "sum"}],
+        "filters": [], "group_by": [{"attribute": "genre"}],
+        "expected_schema": [{"name": "genre", "dtype": "string"},
+                            {"name": "track_sales", "dtype": "float"}],
+    }],
+    "combine_groups": [{"group_id": "g1", "operation": "standalone",
+                        "inputs": [{"subquery_id": "sq1"}], "join_keys": []}],
+    "post_combine_ops": [], "unmapped_subqueries": [],
+}
+
+# gpt-4o's plan for "Which genre sells the most tracks?", captured from a live
+# run and stored unedited. Every recording above was written by hand, and every
+# one happened to put the new table on the right of each join and to use no
+# arithmetic -- the only shapes the generator handled. This one lists Genre
+# first and joins Track to it with Genre as `right_alias`, and sums
+# `UnitPrice * Quantity`; the generator turned it into SQL SQLite rejected.
+GENRE_SALES_PLAN_GPT4O = json.loads(
+    (Path(__file__).resolve().parents[1] / "fixtures" / "gpt4o_genre_sales_plan.json").read_text(encoding="utf-8")
+)
+
+
+def genre_sales_answer(prompt_text: str) -> dict:
+    """Names the highest-grossing genre among the rows it was shown."""
+    pairs = re.findall(r'"genre":\s*"([^"]+)"[^}]*"track_sales":\s*([0-9.]+)', prompt_text)
+    top = max(pairs, key=lambda p: float(p[1])) if pairs else ("?", "?")
+    return {"summary": f"Top genre: {top[0]} with {top[1]}.", "format_type": "text",
+            "content": f"Top genre: {top[0]} with {top[1]}.", "warnings": []}
+
+
+RULES_GENRE_SALES_GPT4O = [
+    Rule("DecomposerResponse", GENRE_SALES_DECOMPOSER),
+    Rule("PlanModel", GENRE_SALES_PLAN_GPT4O),
+    Rule("AggregatedResponse", genre_sales_answer),
+    Rule("plain", "Keep the same plan."),
+]
+
+
+# ---------------------------------------------------------------------------
+# A query the `viewer` role may not run: Customer and Invoice are sales data.
+# ---------------------------------------------------------------------------
+
+TOP_CUSTOMERS_DECOMPOSER = {
+    "sub_queries": [{
+        "id": "sq1", "datasource_id": "chinook",
+        "intent": "Total spend per customer",
+        "metrics": [{"name": "total_spend", "aggregation": "sum"}],
+        "filters": [], "group_by": [{"attribute": "customer"}],
+        "expected_schema": [{"name": "customer_id", "dtype": "int"},
+                            {"name": "total_spend", "dtype": "float"}],
+    }],
+    "combine_groups": [{"group_id": "g1", "operation": "standalone",
+                        "inputs": [{"subquery_id": "sq1"}], "join_keys": []}],
+    "post_combine_ops": [], "unmapped_subqueries": [],
+}
+
+TOP_CUSTOMERS_PLAN = {
+    "query_type": "READ", "distinct": False,
+    "tables": [
+        {"name": "Customer", "alias": "t1", "ordinal": 0},
+        {"name": "Invoice", "alias": "t2", "ordinal": 1},
+    ],
+    "joins": [{
+        "left_alias": "t2", "right_alias": "t1", "join_type": "inner", "ordinal": 0,
+        "condition": {"kind": "binary", "op": "=",
+                      "left": {"kind": "column", "alias": "t2", "column_name": "CustomerId"},
+                      "right": {"kind": "column", "alias": "t1", "column_name": "CustomerId"}},
+    }],
+    "select_items": [
+        {"ordinal": 0, "alias": "customer_id",
+         "expr": {"kind": "column", "alias": "t1", "column_name": "CustomerId"}},
+        {"ordinal": 1, "alias": "total_spend",
+         "expr": {"kind": "func", "func_name": "SUM", "is_aggregate": True,
+                  "args": [{"kind": "column", "alias": "t2", "column_name": "Total"}]}},
+    ],
+    "group_by": [{"ordinal": 0, "expr": {"kind": "column", "alias": "t1", "column_name": "CustomerId"}}],
+    "order_by": [],
+    "reasoning": "Sum invoice totals per customer.",
+}
+
+RULES_TOP_CUSTOMERS = [
+    Rule("DecomposerResponse", TOP_CUSTOMERS_DECOMPOSER),
+    Rule("PlanModel", TOP_CUSTOMERS_PLAN),
+    Rule("AggregatedResponse", {"summary": "should not be called", "format_type": "text",
+                                "content": "should not be called", "warnings": []}),
     Rule("plain", "Keep the same plan."),
 ]
