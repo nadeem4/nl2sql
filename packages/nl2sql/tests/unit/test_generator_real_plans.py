@@ -30,7 +30,9 @@ import nl2sql
 from nl2sql.pipeline.nodes.ast_planner.schemas import (
     ASTPlannerResponse,
     Expr,
+    GroupByItem,
     JoinSpec,
+    OrderItem,
     PlanModel,
     SelectItem,
     TableRef,
@@ -307,3 +309,139 @@ def test_the_validator_builds_its_query_with_the_same_arithmetic():
 
     assert query.find(exp.Mul) is not None
     assert not [a for a in query.find_all(exp.Anonymous) if a.name == "*"]
+
+
+# --- row order: every query is fully ordered, so LIMIT keeps the same rows ---
+#
+# The generator always appends LIMIT, and SQLite returns rows in no defined
+# order without an ORDER BY, so a truncated result could be a different subset
+# on each run. The generator orders by every selected column (after any ORDER
+# BY the plan asked for), naming aliased columns by alias and never by position.
+
+
+def _single_table_plan(**overrides) -> PlanModel:
+    fields = dict(
+        tables=[TableRef(name="Customer", alias="c", ordinal=0)],
+        select_items=[
+            SelectItem(ordinal=0, expr=_col("c", "Country")),
+            SelectItem(ordinal=1, expr=_col("c", "City"), alias="city"),
+        ],
+    )
+    fields.update(overrides)
+    return PlanModel(**fields)
+
+
+def test_a_plan_without_order_by_is_ordered_by_every_selected_column():
+    sql = _sql(_single_table_plan())
+
+    assert sql == "SELECT c.Country, c.City AS city FROM Customer AS c ORDER BY c.Country, city LIMIT 1000"
+    rows = _run_on_chinook(sql)
+    assert rows == sorted(rows)
+
+
+def test_an_aggregate_with_group_by_is_ordered_by_its_aliases():
+    sql = _sql(PlanModel.model_validate(_captured_plan()))
+
+    assert sql.endswith("GROUP BY t1.Name ORDER BY genre, track_sales LIMIT 1000")
+    rows = _run_on_chinook(sql)
+    assert len(rows) == 24
+    assert [r[0] for r in rows] == sorted(r[0] for r in rows)
+
+
+def test_a_desc_order_by_keeps_its_direction_and_gets_the_other_columns_as_ascending_tie_breakers():
+    raw = _captured_plan()
+    revenue = raw["select_items"][1]["expr"]
+    raw["order_by"] = [{"ordinal": 0, "direction": "desc", "expr": revenue}]
+
+    sql = _sql(PlanModel.model_validate(raw))
+
+    # The ORDER BY term is the ``track_sales`` expression, so only ``genre`` remains.
+    assert sql.endswith("ORDER BY SUM(t3.UnitPrice * t3.Quantity) DESC, genre LIMIT 1000")
+    rows = _run_on_chinook(sql)
+    assert rows[0] == ("Rock", pytest.approx(826.65))
+    assert [r[1] for r in rows] == sorted((r[1] for r in rows), reverse=True)
+
+
+def test_an_order_by_on_a_column_gets_the_remaining_columns_in_select_order():
+    plan = PlanModel(
+        tables=[TableRef(name="Customer", alias="c", ordinal=0)],
+        select_items=[
+            SelectItem(ordinal=0, expr=_col("c", "FirstName"), alias="given"),
+            SelectItem(ordinal=1, expr=_col("c", "Country")),
+            SelectItem(ordinal=2, expr=_col("c", "LastName")),
+        ],
+        order_by=[OrderItem(ordinal=0, direction="desc", expr=_col("c", "Country"))],
+        limit=5,
+    )
+
+    sql = _sql(plan)
+
+    assert sql.endswith("ORDER BY c.Country DESC, given, c.LastName LIMIT 5")
+    assert len(_run_on_chinook(sql)) == 5
+
+
+def test_an_order_by_on_a_select_alias_is_not_repeated_as_a_tie_breaker():
+    plan = _single_table_plan(order_by=[OrderItem(ordinal=0, direction="desc", expr=Expr(kind="column", column_name="city"))])
+
+    sql = _sql(plan)
+
+    assert sql.endswith("ORDER BY city DESC, c.Country LIMIT 1000")
+    assert _run_on_chinook(sql)
+
+
+def test_a_joined_group_by_count_orders_by_every_column_and_runs():
+    count = Expr(kind="func", func_name="COUNT", is_aggregate=True, args=[_col("al", "AlbumId")])
+    plan = PlanModel(
+        tables=[
+            TableRef(name="Artist", alias="ar", ordinal=0),
+            TableRef(name="Album", alias="al", ordinal=1),
+        ],
+        joins=[
+            JoinSpec(
+                left_alias="ar",
+                right_alias="al",
+                ordinal=0,
+                condition=Expr(kind="binary", op="=", left=_col("ar", "ArtistId"), right=_col("al", "ArtistId")),
+            )
+        ],
+        select_items=[
+            SelectItem(ordinal=0, expr=_col("ar", "Name")),
+            SelectItem(ordinal=1, expr=count),
+        ],
+        group_by=[GroupByItem(ordinal=0, expr=_col("ar", "Name"))],
+        order_by=[OrderItem(ordinal=0, direction="desc", expr=count)],
+        limit=10,
+    )
+
+    sql = _sql(plan)
+
+    assert sql.endswith("GROUP BY ar.Name ORDER BY COUNT(al.AlbumId) DESC, ar.Name LIMIT 10")
+    rows = _run_on_chinook(sql)
+    assert rows[0] == ("Iron Maiden", 21)
+    assert len(rows) == 10
+
+
+def test_a_constant_select_item_is_never_an_order_by_term():
+    """``ORDER BY 1`` would be read as a position, not as the number one."""
+    plan = _single_table_plan(
+        select_items=[
+            SelectItem(ordinal=0, expr=_num(7)),
+            SelectItem(ordinal=1, expr=_col("c", "Country")),
+        ]
+    )
+
+    sql = _sql(plan)
+
+    assert sql.endswith("ORDER BY c.Country LIMIT 1000")
+    assert _run_on_chinook(sql)
+
+
+def test_a_truncated_result_is_always_the_same_first_rows():
+    """With LIMIT, the rows kept are the first ones in full select order, every run."""
+    plan = _single_table_plan(limit=10)
+    full = _run_on_chinook("SELECT Country, City FROM Customer")
+
+    runs = [_run_on_chinook(_sql(plan)) for _ in range(5)]
+
+    assert all(run == runs[0] for run in runs)
+    assert runs[0] == sorted(full)[:10]

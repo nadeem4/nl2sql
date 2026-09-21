@@ -77,9 +77,15 @@ Side effects:
    - An operand that is itself an operator is parenthesised, because sqlglot prints a hand-built tree without adding the parentheses its parser would have seen (`(a + b) * c` would otherwise print as `a + b * c`).
    - `/` is sqlglot's true division, so on SQLite it renders as `CAST(a AS REAL) / b` rather than integer division.
 5. Attach joins. The first table by ordinal is the `FROM` table. `left_alias`/`right_alias` do not say which table is new: each join attaches whichever side is not yet in scope, taking the lowest-ordinal join that touches a table already in scope, so joins may be listed in any order. When the new table is the join's left side, `left`/`right` outer joins are mirrored so the same table is preserved. Joined tables keep their `schema_name`/`database` qualifiers.
-6. Render SQL with `query.sql(dialect=...)`.
-7. Return `GeneratorResponse` with SQL and reasoning.
-8. On exception, emit `SQL_GEN_FAILED`.
+6. Order the rows completely. The plan's `ORDER BY` terms come first, with their direction. Every other selected column follows as an ascending tie-breaker, in select order. With no `ORDER BY` in the plan, the query is ordered by every selected column. This does not change what the query means, but without it the `LIMIT` below could keep a different subset of rows on each run.
+   - An aliased item is ordered by its alias (`ORDER BY genre, track_sales`), which stays valid for aggregates under `GROUP BY`. Terms are never positional ordinals.
+   - A select item already used as an `ORDER BY` term, by expression or by alias, is not repeated.
+   - Constant items are skipped: they order nothing, and a bare number would be read as a position.
+   - Tie-breakers keep the dialect's own NULL placement, so no `NULLS LAST` clause is rendered for them.
+   - The logical validator runs on the plan before this step and never sees the tie-breakers.
+7. Apply the effective limit and render SQL with `query.sql(dialect=...)`.
+8. Return `GeneratorResponse` with SQL and reasoning.
+9. On exception, emit `SQL_GEN_FAILED`.
 
 ---
 
@@ -102,6 +108,7 @@ Key contracts:
 
 - Deterministic for a fixed AST and adapter dialect.
 - Ordering is enforced via ordinals and sorted lists.
+- Row order is total: every selected column is an `ORDER BY` term (see step 6), so the same plan run against the same data returns the same rows in the same order, even when `LIMIT` truncates the result.
 
 ---
 
