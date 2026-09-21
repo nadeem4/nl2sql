@@ -3,6 +3,7 @@ import json
 
 from rich.text import Text
 
+from nl2sql.api.query_api import result_from_state
 from nl2sql.datasources import DatasourceRegistry
 from nl2sql.llm import LLMRegistry
 from nl2sql.indexing.vector_store import VectorStore
@@ -174,3 +175,9 @@ def run_pipeline(
     trace_path = final_state.get("trace_path")
     if trace_path:
         presenter.print_info(f"Trace written to {trace_path} (inspect: nl2sql trace show <file>)")
+
+    # The graph can finish without raising and still have failed: an ERROR or
+    # CRITICAL error (an RBAC refusal included) makes the result's status
+    # "error". Warnings alone do not.
+    if result_from_state(final_state).status == "error":
+        sys.exit(1)

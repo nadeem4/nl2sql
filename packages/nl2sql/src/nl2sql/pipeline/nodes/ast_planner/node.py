@@ -73,6 +73,21 @@ class ASTPlannerNode:
                     "user_query": query_text,
                 }
             )
+            if plan is None:
+                # Structured output returns None when the model does not call
+                # the tool; that is a failed plan, not a crash.
+                logger.error("Planner returned no plan.")
+                return {
+                    "ast_planner_response": ASTPlannerResponse(plan=None),
+                    "errors": [
+                        PipelineError(
+                            node=self.node_name,
+                            message="Planner returned no plan.",
+                            severity=ErrorSeverity.ERROR,
+                            error_code=ErrorCode.PLANNING_FAILURE,
+                        )
+                    ],
+                }
 
             return {
                 "ast_planner_response": ASTPlannerResponse(plan=plan),

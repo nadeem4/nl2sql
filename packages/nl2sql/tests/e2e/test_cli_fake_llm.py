@@ -2,6 +2,8 @@ import re
 
 import pytest
 
+from nl2sql.testing.fake_llm import Rule
+
 from .conftest import run_cli
 from .recordings_chinook import (
     RULES_ALBUMS_PER_ARTIST,
@@ -131,3 +133,21 @@ def test_a_denied_query_stops_before_aggregation_and_synthesis(demo_project, fak
     assert "SECURITY_VIOLATION" in r.stdout, r.stdout + r.stderr
     assert "AGGREGATOR_FAILED" not in r.stdout
     assert "AggregatedResponse" not in [c["name"] for c in server.calls]
+    # A refusal is a CRITICAL error and makes the result's status "error", so
+    # a script calling the CLI must see it fail.
+    assert r.returncode == 1, r.stdout + r.stderr
+
+
+@pytest.mark.e2e
+def test_a_run_that_ends_with_pipeline_errors_exits_1(demo_project, fake_llm):
+    """The graph finishing with a CRITICAL error is a failed run.
+
+    A decomposer answer that does not fit the schema ends in
+    ORCHESTRATOR_CRASH. The CLI printed the "Pipeline Errors" table and still
+    exited 0, so a script calling it saw success.
+    """
+    server, env = fake_llm([Rule("DecomposerResponse", {"not": "a decomposition"})])
+    r = run_cli(demo_project, env, "run", "--llm-config", "configs/llm.fake.yaml",
+                "How many customers are there?")
+    assert "ORCHESTRATOR_CRASH" in r.stdout, r.stdout + r.stderr
+    assert r.returncode == 1, r.stdout + r.stderr
