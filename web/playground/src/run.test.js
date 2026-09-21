@@ -1,7 +1,10 @@
 // Run with `npm test` (node's built-in runner; no test dependency).
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { deniedTables, formatSql, nodeLedger, planTables, humanCheck } from "./run.js";
+import {
+  callTokens, deniedTables, formatSql, humanCheck, nodeLedger, nodeRuns, planTables, pretty, readable,
+  traceFileName, traceUrl,
+} from "./run.js";
 
 test("formatSql breaks before each clause, outside string literals", () => {
   const sql =
@@ -81,4 +84,48 @@ test("humanCheck names the three validator checks in plain words", () => {
   assert.equal(humanCheck("structure_and_schema"), "Tables and columns exist");
   assert.equal(humanCheck("policy"), "Role may read these tables");
   assert.equal(humanCheck("something_new"), "something new");
+});
+
+// ---------- node drill-down over a run trace ----------
+const TRACE = {
+  trace_id: "t-1",
+  nodes: [
+    { seq: 1, node: "decomposer", attempt: 1, llm_calls: [] },
+    { seq: 4, node: "ast_planner", attempt: 2, sub_query_id: "sq1", llm_calls: [] },
+    { seq: 2, node: "ast_planner", attempt: 1, sub_query_id: "sq1", llm_calls: [] },
+  ],
+};
+
+test("nodeRuns lists one node's executions in the order they started", () => {
+  assert.deepEqual(nodeRuns(TRACE, "ast_planner").map((n) => n.attempt), [1, 2]);
+  assert.deepEqual(nodeRuns(TRACE, "missing"), []);
+  assert.deepEqual(nodeRuns(null, "ast_planner"), []);
+});
+
+test("traceUrl exists only when the run wrote a trace, and encodes the id", () => {
+  assert.equal(traceUrl({ trace_id: "a b", trace_path: "traces/x_a b.json" }), "/api/trace/a%20b");
+  assert.equal(traceUrl({ trace_id: "t-1", trace_path: null }), null);
+  assert.equal(traceUrl(null), null);
+});
+
+test("traceFileName is the base name of the path, whichever separator it uses", () => {
+  assert.equal(traceFileName({ trace_path: "C:\\demo\\traces\\20260921T1_t-1.json" }), "20260921T1_t-1.json");
+  assert.equal(traceFileName({ trace_path: "traces/20260921T1_t-1.json" }), "20260921T1_t-1.json");
+});
+
+test("pretty keeps text as text and indents structures", () => {
+  assert.equal(pretty("SELECT 1"), "SELECT 1");
+  assert.equal(pretty({ a: 1 }), '{\n  "a": 1\n}');
+  assert.equal(pretty(null), "");
+});
+
+test("callTokens totals a call's usage, or null when none was recorded", () => {
+  assert.equal(callTokens({ usage: { total_tokens: 11300 } }), 11300);
+  assert.equal(callTokens({ usage: null }), null);
+});
+
+test("readable indents a JSON answer and leaves prose alone", () => {
+  assert.equal(readable('{"a": [1]}'), '{\n  "a": [\n    1\n  ]\n}');
+  assert.equal(readable("Use Customer, not Customers."), "Use Customer, not Customers.");
+  assert.equal(readable("42"), "42");
 });

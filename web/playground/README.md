@@ -26,6 +26,13 @@ The React source for the page `nl2sql demo` serves.
   under it and its time includes theirs. Debug is on by default; the choice is
   kept in `localStorage` (`nl2sql.playground.debug`) and the page works the same
   when storage is unavailable.
+- **Node drill-down**: when the run wrote a trace (`trace_path` in the
+  response; the demo writes one for every run), each node name in the Debug
+  table is a button. It fetches the trace once from `GET /api/trace/{trace_id}`
+  and shows that node's executions (attempts and sub-queries) with errors and
+  warnings, the state it read, the update it returned and, for LLM nodes, the
+  exact prompt, the raw response and the parsed result, each folded. A
+  **Download trace** link sits above the table.
 
 Every station renders the `/api/ask` response; nothing is computed server-side
 for the page.
@@ -54,7 +61,7 @@ if you edit anything under `src/`, run `npm run build` and commit
 `static/index.html` in the same change.
 
 `npm test` runs the pure helpers in `src/run.js` (SQL line breaks, the per-node
-ledger, refused-table parsing) with Node's built-in test runner; there is no
+ledger, refused-table parsing, the trace drill-down helpers) with Node's built-in test runner; there is no
 test dependency.
 
 ## Fonts and offline use

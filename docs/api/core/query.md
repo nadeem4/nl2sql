@@ -70,6 +70,7 @@ Fields:
 | `status` | `str` | no | `"success"`, `"error"`, `"plan_only"`, or `""` when nothing ran. |
 | `timings` | `Dict[str, float]` | no | Wall-clock seconds per graph node, plus `LangGraph` for the whole run. |
 | `usage` | `QuestionUsage` | no | LLM calls, tokens and model time per node and for the whole question. See below. |
+| `trace_path` | `Optional[str]` | no | Where this run's trace file was written, or `None` when `TRACE_MODE` did not write one. See [Debugging a Run](../../observability/debugging.md). |
 
 `errors` holds only `ERROR` and `CRITICAL` entries; `WARNING`-severity pipeline
 errors are appended to `warnings` as the same summary dict.

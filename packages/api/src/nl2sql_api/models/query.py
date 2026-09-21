@@ -30,6 +30,7 @@ class QueryResponse(BaseModel):
 
     ``sub_queries[].rows`` carries a capped sample only; the full result set
     lives in artifact storage, addressable through ``artifact_refs``.
+    ``trace_path`` is where the run's trace was written on the server, or None.
     """
     sub_queries: List[SubQueryResponse] = Field(default_factory=list)
     final_answer: Optional[Dict[str, Any]] = None
@@ -41,3 +42,4 @@ class QueryResponse(BaseModel):
     status: str = ""
     timings: Dict[str, float] = Field(default_factory=dict)
     usage: QuestionUsage = Field(default_factory=QuestionUsage)
+    trace_path: Optional[str] = None

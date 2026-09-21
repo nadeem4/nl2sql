@@ -117,6 +117,12 @@ nl2sql --env demo run --no-exec "Which artist has the most albums?"
 nl2sql --env demo index
 ```
 
+The demo's `.env.demo` sets `TRACE_MODE=always`, so every run also writes a
+trace to `traces/` and prints its path. Inspect one with
+`nl2sql --env demo trace show <file>`, or re-run it on the recorded model
+answers with `nl2sql --env demo trace replay <file>`. See
+[Debugging a Run](../observability/debugging.md).
+
 `--env <name>` loads `.env.<name>`. To point at an exact file instead, use
 `--env-file <path>`, which takes precedence over `--env`. The equivalent
 environment variables (`ENV` and `ENV_FILE_PATH`) still work.

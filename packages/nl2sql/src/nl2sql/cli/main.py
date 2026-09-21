@@ -25,6 +25,7 @@ from nl2sql.cli.commands.doctor import doctor_command
 from nl2sql.cli.commands.setup import setup_command
 from nl2sql.cli.commands.install import install_command
 from nl2sql.cli.commands.policy import app as policy_app
+from nl2sql.cli.commands.trace import app as trace_app, replay_command
 from nl2sql.cli.console import configure_output_encoding
 from nl2sql.cli.types import RunConfig
 
@@ -36,6 +37,7 @@ app = typer.Typer(
 )
 
 app.add_typer(policy_app, name="policy", help="Manage RBAC policies and security.")
+app.add_typer(trace_app, name="trace", help="Inspect and replay run traces.")
 
 DatasourceConfigOption = Annotated[Optional[pathlib.Path], typer.Option("--config", help="Path to datasource config YAML")]
 SecretsConfigOption = Annotated[Optional[pathlib.Path], typer.Option("--secrets-config", help="Path to secrets config YAML")]
@@ -103,6 +105,22 @@ def run(
     ctx = NL2SQLContext(ds_config_path, secrets_config_path, llm_config_path, vector_store_path, policies_config_path)
 
     run_pipeline(run_config, ctx)
+
+
+@trace_app.command("replay")
+def trace_replay(
+    target: Annotated[str, typer.Argument(help="A trace file, or a trace id in TRACE_DIR")],
+    ds_config_path: DatasourceConfigOption = None,
+    secrets_config_path: SecretsConfigOption = None,
+    llm_config_path: LLMConfigOption = None,
+    vector_store_path: VectorStoreOption = None,
+    policies_config_path: Annotated[Optional[pathlib.Path], typer.Option("--policies-config", help="Path to policies config")] = None,
+):
+    """
+    Re-run a traced question feeding back the recorded LLM responses (no model calls).
+    """
+    replay_command(target, lambda: NL2SQLContext(ds_config_path, secrets_config_path, llm_config_path,
+                                                 vector_store_path, policies_config_path))
 
 
 @app.command()

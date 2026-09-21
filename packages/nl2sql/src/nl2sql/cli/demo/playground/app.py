@@ -1,11 +1,12 @@
 """The playground FastAPI app.
 
-Four routes, no state of its own:
+Five routes, no state of its own:
 
-``GET  /``            the built React page
-``GET  /api/meta``    mode, dataset, the guided questions and the roles
-``GET  /api/schema``  the indexed schema, so a visitor sees the database first
-``POST /api/ask``     one ``QueryResult``, plus a ``replay_miss`` flag
+``GET  /``                     the built React page
+``GET  /api/meta``             mode, dataset, the guided questions and the roles
+``GET  /api/schema``           the indexed schema, so a visitor sees the database first
+``POST /api/ask``              one ``QueryResult``, plus a ``replay_miss`` flag
+``GET  /api/trace/{trace_id}`` one run trace, read only from the traces directory
 
 Every pane in the browser is a renderer over ``QueryResult``; nothing is
 computed here that the engine does not already return.
@@ -16,12 +17,14 @@ import pathlib
 from importlib.resources import files
 from typing import Any, Dict, List, Optional
 
-from fastapi import FastAPI
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from nl2sql.auth.models import UserContext
+from nl2sql.common.settings import settings
+from nl2sql.tracing.document import find_trace
 
 # The errors replay mode raises when no recording matches the question. The page
 # turns these into "this question has no recording" rather than a crash report.
@@ -122,7 +125,8 @@ def _schema_payload(engine, datasource_id: str) -> Dict[str, Any]:
     return {"datasource_id": datasource_id, "tables": tables}
 
 
-def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset: str) -> FastAPI:
+def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset: str,
+              trace_dir: Optional[pathlib.Path] = None) -> FastAPI:
     app = FastAPI(title="nl2sql playground")
     page = _read_page()
 
@@ -157,5 +161,19 @@ def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset
         )
         body["replay_miss"] = mode == "replay" and missing
         return body
+
+    @app.get("/api/trace/{trace_id}")
+    def trace(trace_id: str) -> FileResponse:
+        """One trace file. The id is validated as a plain token and the file must
+        sit directly in the traces directory, so no path can lead outside it."""
+        directory = pathlib.Path(trace_dir) if trace_dir is not None else pathlib.Path(settings.trace_dir)
+        try:
+            path = find_trace(trace_id, directory)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Not a valid trace id.")
+        if path is None:
+            raise HTTPException(status_code=404, detail="No trace with that id.")
+        return FileResponse(path, media_type="application/json", filename=path.name,
+                            content_disposition_type="inline")
 
     return app

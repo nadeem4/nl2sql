@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useState } from "react";
+import NodeInspector from "./NodeInspector.jsx";
 import { planSections } from "./plan.js";
-import { deniedTables, formatSql, humanCheck, nodeLedger } from "./run.js";
+import { deniedTables, formatSql, humanCheck, nodeLedger, traceFileName, traceUrl } from "./run.js";
 
 // The run reads top to bottom as one sequence: question, plan, checks, SQL,
 // rows, cost. Each station is a renderer over the `/api/ask` response. The
@@ -205,8 +206,33 @@ export const secs = (n) => {
 };
 
 // What the answer cost. The summary is always shown; Debug adds one row per
-// node that ran, code nodes included, in execution order.
-export function UsagePane({ usage, timings, replay, debug, state }) {
+// node that ran, code nodes included, in execution order. When the run wrote a
+// trace, each node name opens that node's internals and the trace downloads.
+export function UsagePane({ usage, timings, replay, debug, state, result }) {
+  const [picked, setPicked] = useState(null);
+  const [trace, setTrace] = useState(null);
+  const [traceError, setTraceError] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const href = traceUrl(result);
+  const pick = async (name) => {
+    if (picked === name) {
+      setPicked(null);
+      return;
+    }
+    setPicked(name);
+    if (trace || loading || !href) return;
+    setLoading(true);
+    setTraceError(null);
+    try {
+      const response = await fetch(href);
+      if (!response.ok) throw new Error(`${href} returned ${response.status}`);
+      setTrace(await response.json());
+    } catch (e) {
+      setTraceError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
   const total = (usage && usage.total) || null;
   const ledger = nodeLedger(usage, timings);
   const wall = timings && timings.LangGraph;
@@ -229,6 +255,15 @@ export function UsagePane({ usage, timings, replay, debug, state }) {
         <div><dt>Total time</dt><dd>{secs(wall)}</dd></div>
         {priced && <div><dt>Cost</dt><dd>${Number(total.cost).toFixed(4)}</dd></div>}
       </dl>
+      {debug && href && (
+        <p className="trace-line">
+          Select a node to see what it read, what it returned and, for a model call, the exact prompt and answer.
+          <a className="download" href={href} download={traceFileName(result)}>Download trace</a>
+        </p>
+      )}
+      {debug && !href && result && (
+        <p className="trace-line">No trace file was kept for this run. Set <code>TRACE_MODE=always</code> to keep one for every run.</p>
+      )}
       {debug && ledger.length > 0 && (
         <div className="table-scroll ledger-wrap" tabIndex={0} role="region" aria-label="Per-node tokens and time">
           <table className="grid ledger">
@@ -250,9 +285,15 @@ export function UsagePane({ usage, timings, replay, debug, state }) {
               {ledger.map((r) => {
                 const u = r.usage;
                 return (
-                  <tr key={r.name} data-node={r.name} data-depth={r.depth} className={u ? "llm" : "code"}>
+                  <tr key={r.name} data-node={r.name} data-depth={r.depth} className={u ? "llm" : "code"}
+                    data-picked={picked === r.name ? "true" : undefined}>
                     <th scope="row">
-                      <span className="node">{r.name}</span>
+                      {href ? (
+                        <button className="node node-link" aria-pressed={picked === r.name} aria-controls="node-inspector"
+                          onClick={() => pick(r.name)}>{r.name}</button>
+                      ) : (
+                        <span className="node">{r.name}</span>
+                      )}
                       {r.retried && <span className="tag">{u.calls} calls, retried</span>}
                       {r.name === "sql_agent" && <span className="tag quiet">includes the nodes below</span>}
                     </th>
@@ -288,6 +329,9 @@ export function UsagePane({ usage, timings, replay, debug, state }) {
             )}
           </table>
         </div>
+      )}
+      {debug && picked && (
+        <NodeInspector name={picked} trace={trace} loading={loading} error={traceError} onClose={() => setPicked(null)} />
       )}
       {replay && (
         <p className="footnote">Replay mode: recorded answers report placeholder token counts, not real usage.</p>
@@ -340,7 +384,8 @@ export default function Run({ asked, result, sub, busy, error, debug, replay }) 
       <ValidationPane sub={sub} result={result} state={s.checks} role={asked && asked.role} />
       <SqlPane sub={sub} state={s.sql} refused={gateFailed} />
       <RowsPane sub={sub} result={result} state={s.rows} />
-      <UsagePane usage={result && result.usage} timings={result && result.timings} replay={replay} debug={debug} state={s.cost} />
+      <UsagePane key={(result && result.trace_id) || "none"} usage={result && result.usage} timings={result && result.timings}
+        replay={replay} debug={debug} state={s.cost} result={result} />
     </div>
   );
 }

@@ -1,4 +1,4 @@
-from typing import Dict, Optional
+from typing import Dict, Literal, Optional
 import os
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -153,6 +153,34 @@ class Settings(BaseSettings):
             "Optional per-model prices per million tokens, as JSON: "
             '{"gpt-4o": {"input": 2.5, "cached_input": 1.25, "output": 10}}. '
             "Without a price for a model, usage reports tokens only (cost is null)."
+        ),
+    )
+
+    trace_mode: Literal["off", "on_failure", "always"] = Field(
+        default="on_failure",
+        validation_alias="TRACE_MODE",
+        description=(
+            "When to write a run trace (every node's inputs, outputs, LLM prompts and raw "
+            "responses) to TRACE_DIR: 'off', 'on_failure' (the run returned errors, needed "
+            "a retry, or did not complete) or 'always'. `nl2sql demo` writes 'always'."
+        ),
+    )
+    trace_dir: str = Field(
+        default="traces",
+        validation_alias="TRACE_DIR",
+        description="Directory run traces are written to, relative to the working directory.",
+    )
+    trace_sample_rows: int = Field(
+        default=50,
+        validation_alias="TRACE_SAMPLE_ROWS",
+        description="Result rows kept in a trace; the rest are dropped with a truncation marker.",
+    )
+    trace_max_field_chars: int = Field(
+        default=20000,
+        validation_alias="TRACE_MAX_FIELD_CHARS",
+        description=(
+            "Longest string kept in a node's recorded inputs and outputs. LLM prompts and "
+            "raw responses are never cut: replay compares them exactly."
         ),
     )
 

@@ -73,7 +73,9 @@ class DatasourceResolverNode:
             schema_version = schema_versions.get(ds_id)
             candidate_datasources[ds_id] = ResolvedDatasource(
                 datasource_id=ds_id,
-                metadata=dict(doc.metadata),
+                # Sorted: the decomposer prints this into its prompt, and the
+                # vector store returns it in no fixed order.
+                metadata=dict(sorted(doc.metadata.items())),
                 schema_version=schema_version,
                 chunk_schema_version=chunk_schema_version,
                 schema_version_mismatch=bool(

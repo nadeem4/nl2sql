@@ -42,6 +42,7 @@ Mirrors `nl2sql.api.query_api.QueryResult` field for field.
 | `status` | `str` | no | `"success"`, `"error"` or `"plan_only"` for the run. |
 | `timings` | `Dict[str, float]` | no | Wall-clock seconds per graph node. |
 | `usage` | `QuestionUsage` | no | LLM calls, input/cached/output/reasoning tokens and model time per node (`nodes`) and for the question (`total`), plus every call (`calls`). The same model as `QueryResult.usage`; see [the core query API](../core/query.md#usage-tokens-calls-and-model-time). |
+| `trace_path` | `Optional[str]` | no | Where the run's trace file was written on the server, or `null`. See [Debugging a Run](../../observability/debugging.md). |
 
 Only a capped sample of the rows is inlined, in `sub_queries[].rows`. The full
 result set is written to artifact storage and addressed through `artifact_refs`

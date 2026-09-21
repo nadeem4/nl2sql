@@ -369,6 +369,61 @@ li[data-flag="denied"] .flag { color: var(--ink); background: var(--well); }
 }
 .footnote { margin-top: 10px; font-size: 13px; color: var(--ink-2); }
 
+/* Node drill-down: a node name in the ledger opens that node's record from the
+   run trace. Same ink, rules and wells as the rest of the run; the accent marks
+   the node being read, as it marks the tables a plan reads. */
+.trace-line { margin-top: 16px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 18px; font-size: 13.5px; color: var(--ink-2); max-width: 90ch; }
+.download {
+  color: var(--accent); font-weight: 600; text-decoration: underline 1px; text-underline-offset: 3px;
+}
+.download:hover { text-decoration-thickness: 2px; }
+.node-link {
+  background: none; border: 0; padding: 0; color: var(--ink); text-align: left;
+  text-decoration: underline dotted var(--rule-strong); text-underline-offset: 3px;
+}
+.ledger tr.code .node-link { color: var(--ink-2); }
+.node-link:hover { color: var(--accent); text-decoration-color: var(--accent); }
+.node-link[aria-pressed="true"] { color: var(--accent); font-weight: 600; text-decoration: none; }
+.ledger tr[data-picked] > th { box-shadow: inset 2px 0 0 var(--accent); }
+
+.inspect { margin-top: 16px; padding: 14px 16px 16px; background: var(--surface); border: 1px solid var(--rule); border-radius: var(--r-well); }
+.inspect-head { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+.inspect-head h4 { margin: 0; font-size: 15px; font-weight: 650; }
+.inspect-head .mono { font-size: 15px; }
+.inspect-sum { color: var(--ink-2); font-size: 13.5px; }
+.inspect-close {
+  margin-left: auto; background: none; border: 1px solid var(--rule-strong); border-radius: var(--r-control);
+  padding: 2px 10px; font-size: 13px; color: var(--ink-2);
+}
+.inspect-close:hover { color: var(--ink); border-color: var(--ink-2); }
+.inspect-run { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--rule); display: grid; gap: 8px; min-width: 0; }
+.run-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; font-size: 14px; color: var(--ink-2); }
+.run-head strong { color: var(--ink); font-weight: 600; }
+.run-head code { color: var(--ink); font-size: 12.5px; }
+.run-status { font-size: 12px; font-weight: 600; color: var(--accent); }
+.inspect-run[data-status="error"] .run-status, .inspect-run[data-status="unfinished"] .run-status { color: var(--fault); }
+.inspect-run[data-status="warning"] .run-status { color: var(--ink); }
+
+.problems { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: max-content minmax(0, 1fr); column-gap: 14px; row-gap: 4px; font-size: 13.5px; }
+.problems li { display: contents; }
+.problem-kind { font-size: 12.5px; font-weight: 600; color: var(--ink-2); }
+.problems li[data-kind="error"] .problem-kind, .problem-text[data-kind="error"] { color: var(--fault); }
+.problem-text { overflow-wrap: anywhere; }
+
+.llm-call { display: grid; gap: 6px; padding-left: 12px; border-left: 2px solid var(--accent-soft); }
+.llm-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; font-size: 13.5px; font-weight: 600; }
+.llm-head span { font-weight: 400; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.llm-head .mono { font-size: 12.5px; }
+
+.fold summary { cursor: pointer; font-size: 13.5px; color: var(--ink); padding: 2px 0; }
+.fold summary:hover { color: var(--accent); }
+.fold-meta { margin-left: 10px; font-size: 12.5px; color: var(--ink-3); }
+.blob {
+  margin: 6px 0 4px; padding: 10px 12px; background: var(--well); border-radius: var(--r-well);
+  font-size: 12.5px; line-height: 1.55; max-height: 360px; overflow: auto;
+  white-space: pre-wrap; overflow-wrap: anywhere;
+}
+
 /* A new answer arrives in order, top to bottom. */
 @media (prefers-reduced-motion: no-preference) {
   .spine[data-outcome="ran"] .station, .spine[data-outcome="refused"] .station {

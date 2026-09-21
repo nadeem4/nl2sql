@@ -37,3 +37,9 @@ def test_demo_env_gives_a_live_pipeline_room_to_finish():
 
 def test_non_demo_env_keeps_the_default_timeout():
     assert "GLOBAL_TIMEOUT_SEC" not in EnvFileGenerator.generate("dev")
+
+
+def test_demo_env_traces_every_run_and_other_envs_keep_the_library_default():
+    """The demo runs locally for its owner, so every run leaves a trace to debug from."""
+    assert "TRACE_MODE=always" in EnvFileGenerator.generate("demo")
+    assert "TRACE_MODE" not in EnvFileGenerator.generate("dev")

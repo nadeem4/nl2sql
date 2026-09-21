@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import concurrent.futures
+import datetime as _dt
 import signal
 import sys
 import threading
+import time
 import traceback
 from typing import Callable, Dict, List, Optional
 
@@ -17,6 +19,8 @@ from nl2sql.pipeline.graph import build_graph
 from nl2sql.pipeline.state import GraphState
 from nl2sql.pipeline.timing import NodeTimingCallback
 from nl2sql.services.callbacks.token_handler import TokenUsageCallback
+from nl2sql.tracing.recorder import TraceRecorder
+from nl2sql.tracing.trace import write_run_trace
 
 
 def _start_keyboard_cancel_listener(
@@ -88,9 +92,17 @@ def run_with_graph(
     execute: bool = True,
     callbacks: Optional[List] = None,
     user_context: UserContext = None,
+    cancellation_token: Optional[CancellationToken] = None,
+    trace_mode: Optional[str] = None,
 ) -> Dict:
-    """Convenience function to run the full pipeline."""
-    token = CancellationToken()
+    """Convenience function to run the full pipeline.
+
+    Every run is recorded by a ``TraceRecorder``; ``TRACE_MODE`` (or
+    ``trace_mode``, which wins) decides whether the trace is written. When it
+    is, the returned state carries ``trace_path``. ``cancellation_token`` lets
+    a caller stop the run (trace replay does, on divergence).
+    """
+    token = cancellation_token or CancellationToken()
     run_done = threading.Event()
     restore_signals = _install_signal_handlers(token)
     _start_keyboard_cancel_listener(token, run_done)
@@ -109,17 +121,47 @@ def run_with_graph(
     timeout_sec = settings.global_timeout_sec
     timing = NodeTimingCallback()
     usage = TokenUsageCallback(prices=settings.llm_prices)
+    recorder = TraceRecorder()
+    started_at = _dt.datetime.now(_dt.timezone.utc).isoformat()
+    t0 = time.perf_counter()
 
     def _telemetry() -> Dict:
         """Timings and token usage so far; also reported for a timed-out or cancelled run."""
         return {"timings": dict(timing.timings), "usage": usage.usage().model_dump(mode="json")}
+
+    def _done(out: Dict, outcome: str, error: Optional[str] = None) -> Dict:
+        """Stamps the trace id and, if the trace was written, where it went."""
+        out.setdefault("trace_id", initial_state.trace_id)
+        path = write_run_trace(
+            trace_mode or settings.trace_mode,
+            trace_id=initial_state.trace_id,
+            request={
+                "question": user_query,
+                "roles": list(getattr(initial_state.user_context, "roles", []) or []),
+                "tenant_id": getattr(initial_state.user_context, "tenant_id", None),
+                "datasource_id": datasource_id,
+                "execute": execute,
+            },
+            started_at=started_at,
+            finished_at=_dt.datetime.now(_dt.timezone.utc).isoformat(),
+            duration_s=round(time.perf_counter() - t0, 4),
+            outcome=outcome,
+            recorder=recorder,
+            usage=usage,
+            ctx=ctx,
+            state=out,
+            error=error,
+        )
+        if path:
+            out["trace_path"] = path
+        return out
 
     def _invoke():
         return graph.invoke(
             initial_state.model_dump(),
             config={
                 "configurable": {"cancellation_token": token},
-                "callbacks": [*(callbacks or []), timing, usage],
+                "callbacks": [*(callbacks or []), timing, usage, recorder],
             },
         )
 
@@ -138,7 +180,7 @@ def run_with_graph(
             # caller is answered now.
             token.cancel()
             error_msg = f"Pipeline execution timed out after {timeout_sec} seconds."
-            return {
+            return _done({
                 "errors": [
                     PipelineError(
                         node="orchestrator",
@@ -149,11 +191,11 @@ def run_with_graph(
                 ],
                 "final_answer": "I apologize, but the request timed out. Please try again with a simpler query.",
                 **_telemetry(),
-            }
+            }, "timeout", error_msg)
 
         # Nodes observe the token and unwind, so a cancelled run returns normally.
         if token.is_cancelled():
-            return {
+            return _done({
                 "errors": [
                     PipelineError(
                         node="orchestrator",
@@ -163,18 +205,18 @@ def run_with_graph(
                     )
                 ],
                 **_telemetry(),
-            }
+            }, "cancelled")
         result = dict(result)
         result.update(_telemetry())
-        return result
+        return _done(result, "completed")
     except PipelineExecutionError as e:
         # Raised where a PipelineError cannot be returned as a value (conditional-edge
         # routers). The payload is already structured, so surface it unchanged: the
         # blanket catch below would relabel it UNKNOWN_ERROR and flip is_retryable.
-        return {"errors": [e.error]}
+        return _done({"errors": [e.error]}, "crashed", e.error.message)
     except Exception as e:
         # Fallback for other runtime crashes
-        return {
+        return _done({
             "errors": [
                 PipelineError(
                     node="orchestrator",
@@ -184,7 +226,7 @@ def run_with_graph(
                     stack_trace=traceback.format_exc(),
                 )
             ]
-        }
+        }, "crashed", f"{type(e).__name__}: {e}")
     finally:
         pool.shutdown(wait=False, cancel_futures=True)
         run_done.set()

@@ -82,3 +82,16 @@ def test_plan_only_run_reports_no_rows(api_client):
     body = response.json()
     assert body["status"] == "plan_only"
     assert body["sub_queries"][0]["rows"] is None
+
+
+def test_the_response_says_where_the_run_trace_was_written(api_client):
+    client, _engine = api_client(QueryResult(status="error", trace_id="t-1",
+                                             trace_path="traces/20260921T101112000000Z_t-1.json"))
+    body = client.post("/api/v1/query", json={"natural_language": "q"}).json()
+    assert body["trace_id"] == "t-1"
+    assert body["trace_path"] == "traces/20260921T101112000000Z_t-1.json"
+
+
+def test_no_trace_path_when_no_trace_was_written(api_client):
+    client, _engine = api_client(QueryResult(status="success"))
+    assert client.post("/api/v1/query", json={"natural_language": "q"}).json()["trace_path"] is None

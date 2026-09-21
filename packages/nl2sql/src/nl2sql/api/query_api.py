@@ -47,7 +47,8 @@ class QueryResult(BaseModel):
     Carries everything a UI renders: the plan, the validation checks, a capped
     row sample, the SQL, per-node timings and the question's LLM token usage.
     The full result set still lives in artifact storage, addressable through
-    ``artifact_refs``.
+    ``artifact_refs``. ``trace_path`` is where this run's trace file was
+    written, or None when ``TRACE_MODE`` did not write one.
     """
     sub_queries: List[SubQueryResult] = Field(default_factory=list)
     final_answer: Optional[Dict[str, Any]] = None
@@ -59,6 +60,7 @@ class QueryResult(BaseModel):
     status: str = Field(default="")
     timings: Dict[str, float] = Field(default_factory=dict)
     usage: QuestionUsage = Field(default_factory=QuestionUsage)
+    trace_path: Optional[str] = None
 
 
 def _field(source: Any, name: str, default: Any = None) -> Any:
@@ -210,6 +212,7 @@ def result_from_state(
         status=_overall_status(sub_queries, errors, state),
         timings=dict(state.get("timings") or {}),
         usage=QuestionUsage.model_validate(state.get("usage") or {}),
+        trace_path=state.get("trace_path"),
     )
 
 

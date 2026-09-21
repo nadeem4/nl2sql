@@ -18,6 +18,13 @@ class SecretManager:
             "env": EnvironmentSecretProvider()
         }
         self._default_provider = "env"
+        # Every value a reference resolved to, so a run trace can redact them.
+        self._resolved: set = set()
+
+    @property
+    def resolved_values(self) -> frozenset:
+        """The secret values this manager has handed out so far."""
+        return frozenset(self._resolved)
 
     def register_provider(self, provider_id: str, provider: SecretProvider) -> None:
         self._providers[provider_id] = provider
@@ -84,6 +91,7 @@ class SecretManager:
             
         val = provider.get_secret(key)
         if val is not None:
+            self._resolved.add(str(val))
             return val
         
         raise ValueError(f"Secret not found: {secret_ref}")

@@ -191,3 +191,54 @@ def test_a_missing_recording_is_a_replay_miss_whatever_code_it_surfaces_as():
 
     live = TestClient(build_app(_NoRule(), questions=[], roles=["admin"], mode="live", dataset="chinook"))
     assert live.post("/api/ask", json={"question": "q", "role": "admin"}).json()["replay_miss"] is False
+
+
+# --- GET /api/trace/{trace_id} -------------------------------------------
+
+_TRACE_ID = "0b8f7d2e-1111-4222-8333-944455556666"
+
+
+def _trace_client(tmp_path):
+    traces = tmp_path / "traces"
+    traces.mkdir()
+    (traces / f"20260921T101112000000Z_{_TRACE_ID}.json").write_text(
+        '{"trace_format_version": 1, "trace_id": "%s", "nodes": []}' % _TRACE_ID, encoding="utf-8")
+    # A file that must stay unreachable: one directory up from the traces.
+    (tmp_path / "20260921T101112000000Z_outside.json").write_text('{"secret": true}', encoding="utf-8")
+    app = build_app(_Engine(), questions=[], roles=["admin"], mode="live", dataset="chinook", trace_dir=traces)
+    return TestClient(app)
+
+
+def test_trace_route_serves_a_trace_from_the_traces_directory(tmp_path):
+    client = _trace_client(tmp_path)
+    response = client.get(f"/api/trace/{_TRACE_ID}")
+    assert response.status_code == 200
+    assert response.json()["trace_id"] == _TRACE_ID
+
+
+def test_trace_route_404s_an_unknown_id(tmp_path):
+    client = _trace_client(tmp_path)
+    assert client.get("/api/trace/does-not-exist").status_code == 404
+
+
+@pytest.mark.parametrize("attack", [
+    "..%2Foutside",
+    "..%2F..%2Fetc%2Fpasswd",
+    "%2E%2E%2Foutside",
+    "..%5Coutside",
+    "C:%5CWindows%5Cwin.ini",
+    "%2Fetc%2Fpasswd",
+    "outside.json",
+    "*",
+])
+def test_trace_route_rejects_path_traversal(tmp_path, attack):
+    client = _trace_client(tmp_path)
+    response = client.get(f"/api/trace/{attack}")
+    assert response.status_code in (400, 404)
+    assert "secret" not in response.text
+
+
+def test_trace_route_never_resolves_a_file_outside_the_directory(tmp_path):
+    client = _trace_client(tmp_path)
+    # "outside" is a valid-looking id, but its file sits one level up.
+    assert client.get("/api/trace/outside").status_code == 404
