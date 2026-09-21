@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sqlglot
 from sqlglot import expressions as exp
+from sqlglot.dialects.dialect import Dialect
 from typing import Dict, Any, List, Union, TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -343,9 +344,11 @@ class GeneratorNode:
         """Internal helper to build and optimize the SQL query."""
         visitor = SqlVisitor()
         query = exp.select()
+        selected = []
 
         for s in sorted(plan.select_items, key=lambda x: x.ordinal):
             e = visitor.visit(s.expr)
+            selected.append((e, s.alias))
             if s.alias:
                 e = exp.Alias(this=e, alias=exp.Identifier(this=s.alias, quoted=False))
             query = query.select(e)
@@ -368,8 +371,27 @@ class GeneratorNode:
         if plan.having:
             query = query.having(visitor.visit(plan.having))
 
+        ordered_on = set()
         for o in sorted(plan.order_by, key=lambda x: x.ordinal):
-            query = query.order_by(ordered(visitor.visit(o.expr), o.direction))
+            term = visitor.visit(o.expr)
+            ordered_on.add(term.sql())
+            query = query.order_by(ordered(term, o.direction))
+
+        # Tie-breakers: without them LIMIT can keep a different subset of rows
+        # on each run. Ordering by every selected column never changes what the
+        # query means. Aliased items are named by alias, never by position, and
+        # constants are skipped (they order nothing, and ``ORDER BY 1`` is a
+        # position). Each keeps the dialect's own NULL placement, so no
+        # ``NULLS LAST`` (or a CASE emulating it) is rendered.
+        nulls_first = Dialect.get_or_raise(dialect).NULL_ORDERING == "nulls_are_small"
+        for e, alias in selected:
+            if not e.find(exp.Column) or (isinstance(e, exp.Column) and e.name == "*"):
+                continue
+            key = exp.Column(this=exp.Identifier(this=alias, quoted=False)) if alias else e
+            if e.sql() in ordered_on or key.sql() in ordered_on:
+                continue
+            ordered_on.add(key.sql())
+            query = query.order_by(exp.Ordered(this=key.copy(), nulls_first=nulls_first))
 
         query = query.limit(limit)
 
