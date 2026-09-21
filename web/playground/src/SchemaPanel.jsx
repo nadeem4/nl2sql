@@ -1,11 +1,10 @@
 import React, { useState } from "react";
 
-// The database, read from the engine's own indexed snapshot -- the same schema
-// the planner was given. Visible before any question is asked.
-export default function SchemaPanel({ schema }) {
+// The database, read from the engine's own indexed snapshot: the same schema
+// the planner is given. Visible before any question is asked. Tables the
+// current plan reads, and tables the role was refused, are marked.
+export default function SchemaPanel({ schema, used = [], denied = [], role }) {
   const [open, setOpen] = useState(() => new Set());
-
-  if (!schema) return <section className="panel"><h2>Database</h2><p className="muted">Loading the schema...</p></section>;
 
   const toggle = (name) =>
     setOpen((prev) => {
@@ -15,11 +14,20 @@ export default function SchemaPanel({ schema }) {
       return next;
     });
 
+  if (!schema) {
+    return (
+      <section className="schema" aria-labelledby="schema-heading">
+        <h2 id="schema-heading">Database</h2>
+        <p className="quiet">Reading the schema.</p>
+      </section>
+    );
+  }
+
   if (!schema.tables.length) {
     return (
-      <section className="panel">
-        <h2>Database</h2>
-        <p className="muted">
+      <section className="schema" aria-labelledby="schema-heading">
+        <h2 id="schema-heading">Database</h2>
+        <p className="quiet">
           No indexed schema for <code>{schema.datasource_id}</code>. Run <code>nl2sql index</code> in the demo
           directory.
         </p>
@@ -27,47 +35,69 @@ export default function SchemaPanel({ schema }) {
     );
   }
 
+  const rows = schema.tables.reduce((n, t) => n + (t.row_count || 0), 0);
+
   return (
-    <section className="panel schema">
-      <h2>
-        Database <span className="muted">{schema.datasource_id}</span>
-        <span className="count">{schema.tables.length} tables</span>
+    <section className="schema" aria-labelledby="schema-heading">
+      <h2 id="schema-heading">
+        Database <code className="ds">{schema.datasource_id}</code>
       </h2>
+      <p className="schema-sum">
+        {schema.tables.length} tables, {rows.toLocaleString()} rows. Open a table for its columns and keys.
+      </p>
       <ul className="tables">
-        {schema.tables.map((table) => (
-          <li key={table.name}>
-            <button className="table-head" onClick={() => toggle(table.name)} aria-expanded={open.has(table.name)}>
-              <span className="chevron">{open.has(table.name) ? "▾" : "▸"}</span>
-              <span className="table-name">{table.name}</span>
-              <span className="muted">{table.columns.length} cols</span>
-              {table.row_count != null && <span className="muted">{table.row_count} rows</span>}
-            </button>
-            {open.has(table.name) && (
-              <div className="table-body">
-                {table.description && <p className="muted">{table.description}</p>}
-                <table>
-                  <tbody>
-                    {table.columns.map((column) => (
-                      <tr key={column.name}>
-                        <td className="col-name">
-                          {column.name}
-                          {column.primary_key && <span className="pk" title="primary key">PK</span>}
-                        </td>
-                        <td className="muted">{column.type}</td>
-                        <td className="muted">{column.nullable ? "" : "not null"}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                {table.foreign_keys.map((fk, i) => (
-                  <p key={i} className="fk">
-                    {fk.columns.join(", ")} &rarr; {fk.references_table}.{fk.references_columns.join(", ")}
-                  </p>
-                ))}
-              </div>
-            )}
-          </li>
-        ))}
+        {schema.tables.map((table) => {
+          const isOpen = open.has(table.name);
+          const refs = [...new Set(table.foreign_keys.map((fk) => fk.references_table))];
+          const flag = denied.includes(table.name) ? "denied" : used.includes(table.name) ? "used" : null;
+          return (
+            <li key={table.name} data-flag={flag || undefined}>
+              <button
+                className="table-head"
+                onClick={() => toggle(table.name)}
+                aria-expanded={isOpen}
+                aria-controls={`cols-${table.name}`}
+              >
+                <span className="caret" aria-hidden="true" />
+                <span className="table-name">{table.name}</span>
+                {flag === "used" && <span className="flag">in plan</span>}
+                {flag === "denied" && <span className="flag">refused{role ? ` for ${role}` : ""}</span>}
+                {table.row_count != null && <span className="table-rows">{table.row_count.toLocaleString()}</span>}
+                {refs.length > 0 && <span className="refs">refers to {refs.join(", ")}</span>}
+              </button>
+              {isOpen && (
+                <div className="table-body" id={`cols-${table.name}`}>
+                  {table.description && <p className="quiet">{table.description}</p>}
+                  <table className="cols">
+                    <caption className="visually-hidden">Columns of {table.name}</caption>
+                    <tbody>
+                      {table.columns.map((column) => (
+                        <tr key={column.name}>
+                          <th scope="row" className="col-name">
+                            {column.name}
+                            {column.primary_key && <span className="pk" title="primary key">key</span>}
+                          </th>
+                          <td className="col-type">{column.type}</td>
+                          <td className="col-null">{column.nullable ? "" : "not null"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {table.foreign_keys.length > 0 && (
+                    <ul className="fks" aria-label="Foreign keys">
+                      {table.foreign_keys.map((fk, i) => (
+                        <li key={i}>
+                          <code>{fk.columns.join(", ")}</code> references{" "}
+                          <code>{fk.references_table}.{fk.references_columns.join(", ")}</code>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+            </li>
+          );
+        })}
       </ul>
     </section>
   );

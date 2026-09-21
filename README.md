@@ -28,14 +28,21 @@ keys), indexes its schema on your machine, serves a playground on
 <http://127.0.0.1:8765/> and opens your browser. Indexing needs no API key; the
 first run downloads a ~79 MB ONNX embedding model.
 
-The page shows, side by side, the retrieved **schema**, the **plan** the model
-produced, the **validation checks** with pass/fail and a reason, the generated
-**SQL**, the **rows**, and a **cost & time** table: LLM calls, tokens and seconds
-per node and for the whole question (in replay mode the token counts are
-placeholders from the recordings, not real usage). A role selector switches between `admin`, `analyst`
-and `viewer`: ask the `viewer` role about customers and the logical validator
+The page opens on the indexed **schema** (every table, its row count, columns,
+keys and the tables it refers to), so you see the database before you ask
+anything. Each answer then reads top to bottom as one run: the **question**, the
+**plan** the model produced, the **checks** the validator ran on it (pass or
+refused, with a reason), the generated **SQL**, the **rows**, and what the
+answer **cost**: LLM calls, tokens and time for the question. The **Debug**
+toggle (on by default, remembered by the browser) adds a per-node breakdown in
+execution order, code nodes included, so you can see where the time goes as
+well as the tokens; a node the model was called on more than once is marked as
+retried. In replay mode the token counts are placeholders from the recordings,
+not real usage. A role selector switches between `admin`, `analyst` and
+`viewer`: ask the `viewer` role about customers and the logical validator
 refuses the plan with a `SECURITY_VIOLATION`, the generator never runs, and the
-SQL pane says so. That is the engine's one real safety property, made visible.
+page says so at the checks, naming the tables the role may not read. That is the
+engine's one real safety property, made visible.
 
 ### `nl2sql demo` options
 
