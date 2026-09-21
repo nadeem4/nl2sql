@@ -69,6 +69,7 @@ Fields:
 | `artifact_refs` | `Dict[str, ArtifactRef]` | no | Result artifact references keyed by execution node id. |
 | `status` | `str` | no | `"success"`, `"error"`, `"plan_only"`, or `""` when nothing ran. |
 | `timings` | `Dict[str, float]` | no | Wall-clock seconds per graph node, plus `LangGraph` for the whole run. |
+| `usage` | `QuestionUsage` | no | LLM calls, tokens and model time per node and for the whole question. See below. |
 
 `errors` holds only `ERROR` and `CRITICAL` entries; `WARNING`-severity pipeline
 errors are appended to `warnings` as the same summary dict.
@@ -116,7 +117,7 @@ model instances for nested values):
 | `sub_queries[].plan` / `.validation` / `.status` / `.retry_count` | `subgraph_outputs[<id>]` |
 | `sub_queries[].rows` | `artifact_store.read_result_frame(subgraph_outputs[<id>].artifact)` |
 | `final_answer` | `answer_synthesizer_response.final_answer` |
-| `errors`, `reasoning`, `warnings`, `trace_id`, `artifact_refs`, `timings` | top-level state |
+| `errors`, `reasoning`, `warnings`, `trace_id`, `artifact_refs`, `timings`, `usage` | top-level state |
 
 `errors` are projected onto a client-safe summary; `stack_trace` and `details` are
 deliberately not exposed.
@@ -130,3 +131,56 @@ when an artifact store is supplied. A failed read is not fatal: `rows` stays
 that `run_with_graph` always attaches. It keys on `metadata["langgraph_node"]`
 where LangGraph provides it, so the keys are node names such as `ast_planner`,
 `logical_validator`, `generator` and `executor`.
+
+### Usage: tokens, calls and model time
+
+`usage` is collected by `TokenUsageCallback`
+(`packages/nl2sql/src/nl2sql/services/callbacks/token_handler.py`), which
+`run_with_graph` attaches to every run, so the Python API, the REST API, the CLI
+and the demo playground all report it. It is also filled in, with whatever had
+been recorded, on a timed-out or cancelled run.
+
+`QuestionUsage`:
+
+| name | type | meaning |
+| --- | --- | --- |
+| `total` | `UsageTotals` | The whole question. |
+| `nodes` | `Dict[str, UsageTotals]` | Keyed by graph node: `decomposer`, `ast_planner`, `refiner`, `answer_synthesizer`. |
+| `calls` | `List[LLMCallUsage]` | Every model call in order, with its `node` and `model`. |
+
+`UsageTotals`:
+
+| name | type | meaning |
+| --- | --- | --- |
+| `calls` | `int` | LLM calls. The planner and refiner run once per retry, so a sub-query retried once shows `ast_planner.calls == 2`. |
+| `input_tokens` | `int` | Prompt tokens, including cached ones. |
+| `cached_input_tokens` | `int` | Input tokens served from the provider's prompt cache (a subset of `input_tokens`). |
+| `cache_write_input_tokens` | `int` | Input tokens written to the prompt cache (Anthropic reports these; OpenAI does not). |
+| `output_tokens` | `int` | Completion tokens, including reasoning ones. |
+| `reasoning_tokens` | `int` | Reasoning ("thinking") tokens (a subset of `output_tokens`). |
+| `total_tokens` | `int` | As the provider reports it; `input + output` if it does not. |
+| `latency_s` | `float` | Seconds spent waiting on the model, summed over calls. The node's wall-clock time, which includes its non-LLM work, is in `timings`. |
+| `cost` | `Optional[float]` | Only when `LLM_PRICES` prices every call counted here; otherwise `null`. |
+
+`LLMCallUsage` has the same token fields plus `node`, `model` (the model the
+provider says served the call, e.g. `gpt-4o-2024-08-06`), `latency_s`, `cost`,
+`usage_reported` and `error`.
+
+Tokens are read from LangChain's `AIMessage.usage_metadata`, which is normalised
+across providers: `input_token_details.cache_read`,
+`input_token_details.cache_creation` and `output_token_details.reasoning`. A
+detail the provider did not report is `0`. A call whose result carried no usage
+at all is recorded with zero tokens and `usage_reported: false`; a failed call is
+recorded with its latency and `error`.
+
+For OpenAI through `langchain-openai` (verified against the pinned 1.6.x by
+`packages/nl2sql/tests/unit/test_fake_llm_server.py`): `prompt_tokens`,
+`completion_tokens`, `total_tokens`, `prompt_tokens_details.cached_tokens` and
+`completion_tokens_details.reasoning_tokens` all arrive. OpenAI's chat
+completions API reports no cache-write count, so `cache_write_input_tokens` is
+`0` there.
+
+Cost is `(input - cached) * input_price + cached * cached_input_price + output * output_price`,
+per million tokens. Prices are looked up by the served model name, then by the
+configured one, by exact match only, so a `gpt-4o` price never prices
+`gpt-4o-mini`. Cache writes are charged at the input price.

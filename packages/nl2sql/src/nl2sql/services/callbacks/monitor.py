@@ -1,14 +1,16 @@
 from nl2sql.services.callbacks.node_handlers import NodeHandler
-from nl2sql.services.callbacks.token_handler import TokenHandler
+from nl2sql.services.callbacks.token_handler import read_usage
 from langchain_core.callbacks import BaseCallbackHandler
 from nl2sql.services.callbacks.presenter import PresenterProtocol
 from typing import Dict, Any
 from langchain_core.outputs import LLMResult
 
 class PipelineMonitorCallback(BaseCallbackHandler):
-    """Callback handler for monitoring pipeline execution and auditing events.
-    
-    Integrates with OpenTelemetry for metrics and EventLogger for audit trails.
+    """Callback handler for CLI progress, node-duration metrics and audit events.
+
+    Token usage is not counted here: ``run_with_graph`` attaches
+    ``TokenUsageCallback`` to every run, which records it into
+    ``QueryResult.usage`` and the ``nl2sql.token.usage`` counter.
     """
     
     def __init__(self, presenter: PresenterProtocol):
@@ -21,7 +23,6 @@ class PipelineMonitorCallback(BaseCallbackHandler):
         )
         
         self.node_handler = NodeHandler(presenter)
-        self.tokens = TokenHandler(self.node_handler.node_metrics)
 
     def on_chain_start(self, serialized: Dict[str, Any], inputs: Dict[str, Any], **kwargs: Any) -> Any:
         """Called when a chain starts."""
@@ -51,15 +52,14 @@ class PipelineMonitorCallback(BaseCallbackHandler):
         
         text_output = ""
         model_name = "unknown"
-        token_usage = {}
-        
+
         if response.generations:
             gen = response.generations[0][0]
             text_output = gen.text
-            
+
         if response.llm_output:
             model_name = response.llm_output.get("model_name", "unknown")
-            token_usage = response.llm_output.get("token_usage", {})
+        token_usage = read_usage(response) or {}
             
         audit_payload = {
             "agent": agent_name,
@@ -74,8 +74,7 @@ class PipelineMonitorCallback(BaseCallbackHandler):
             trace_id=_trace_id_ctx.get(),
             tenant_id=_tenant_id_ctx.get()
         )
-        
-        self.tokens.on_llm_end(response, agent_name=agent_name)
+
 
     def get_status_tree(self):
         self.node_handler.print_tree()

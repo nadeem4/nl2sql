@@ -94,16 +94,52 @@ export function RowsPane({ sub, result }) {
   );
 }
 
-export function Timings({ timings }) {
-  const entries = Object.entries(timings || {});
-  if (!entries.length) return null;
+const num = (n) => Number(n || 0).toLocaleString();
+const secs = (n) => (n === undefined ? "-" : `${Number(n).toFixed(2)}s`);
+
+// Per-node LLM calls, tokens and time, plus the question's totals. Node time is
+// wall-clock (``timings``); LLM time is the part spent waiting on the model.
+export function UsagePane({ usage, timings, replay }) {
+  const nodes = (usage && usage.nodes) || {};
+  const times = timings || {};
+  const names = [...new Set([...Object.keys(times).filter((n) => n !== "LangGraph"), ...Object.keys(nodes)])];
+  if (!names.length) return null;
+  const total = (usage && usage.total) || {};
+  const priced = total.cost !== null && total.cost !== undefined;
+  names.sort((a, b) => (times[b] || 0) - (times[a] || 0));
+  const row = (label, u, seconds, cls) => (
+    <tr key={label} className={cls}>
+      <td>{label}</td>
+      <td>{u ? num(u.calls) : "-"}</td>
+      <td>{u ? num(u.input_tokens) : "-"}</td>
+      <td>{u ? num(u.cached_input_tokens) : "-"}</td>
+      <td>{u ? num(u.output_tokens) : "-"}</td>
+      <td>{u ? num(u.reasoning_tokens) : "-"}</td>
+      <td>{u ? secs(u.latency_s) : "-"}</td>
+      <td>{secs(seconds)}</td>
+      {priced && <td>{u && u.cost !== null ? Number(u.cost).toFixed(4) : "-"}</td>}
+    </tr>
+  );
   return (
-    <footer className="timings">
-      {entries.map(([node, seconds]) => (
-        <span key={node}>
-          {node}: <strong>{Number(seconds).toFixed(2)}s</strong>
-        </span>
-      ))}
-    </footer>
+    <section className="panel" id="pane-usage">
+      <h2>Cost &amp; time</h2>
+      <div className="table-scroll">
+        <table className="rows usage">
+          <thead>
+            <tr>
+              <th>Node</th><th>LLM calls</th><th>Input tok</th><th>Cached</th><th>Output tok</th>
+              <th>Reasoning</th><th>LLM time</th><th>Node time</th>{priced && <th>Cost</th>}
+            </tr>
+          </thead>
+          <tbody>
+            {names.map((n) => row(n, nodes[n], times[n]))}
+            {row("Total", total, times.LangGraph, "total")}
+          </tbody>
+        </table>
+      </div>
+      {replay && (
+        <p className="muted">Replay mode: recorded answers report placeholder token counts, not real usage.</p>
+      )}
+    </section>
   );
 }

@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Dict, Optional
 import os
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -144,6 +144,16 @@ class Settings(BaseSettings):
         default=0.5,
         validation_alias="SQL_AGENT_RETRY_JITTER_SEC",
         description="Max jitter added to SQL agent retry delays (seconds)."
+    )
+
+    llm_prices: Dict[str, Dict[str, float]] = Field(
+        default_factory=dict,
+        validation_alias="LLM_PRICES",
+        description=(
+            "Optional per-model prices per million tokens, as JSON: "
+            '{"gpt-4o": {"input": 2.5, "cached_input": 1.25, "output": 10}}. '
+            "Without a price for a model, usage reports tokens only (cost is null)."
+        ),
     )
 
     observability_exporter: str = Field(

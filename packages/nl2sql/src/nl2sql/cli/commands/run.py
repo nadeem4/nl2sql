@@ -161,10 +161,12 @@ def run_pipeline(
         presenter.print_rows_returned(row_count)
 
 
+    usage = final_state.get("usage") or {}
     if config.show_perf:
         tree, metrics, node_map = monitor.get_performance_tree()
-        presenter.print_performance_tree(tree, metrics, node_map)
-    
-    
-    from nl2sql.common.metrics import TOKEN_LOG
-    presenter.print_cost_summary(result.duration, TOKEN_LOG)
+        tokens_by_node = {
+            node: totals.get("total_tokens", 0) for node, totals in (usage.get("nodes") or {}).items()
+        }
+        presenter.print_performance_tree(tree, metrics, node_map, tokens_by_node)
+
+    presenter.print_usage_summary(result.duration, usage)

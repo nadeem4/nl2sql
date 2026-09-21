@@ -41,6 +41,7 @@ Mirrors `nl2sql.api.query_api.QueryResult` field for field.
 | `artifact_refs` | `Dict[str, Dict[str, Any]]` | no | Result artifact references keyed by execution node id. |
 | `status` | `str` | no | `"success"`, `"error"` or `"plan_only"` for the run. |
 | `timings` | `Dict[str, float]` | no | Wall-clock seconds per graph node. |
+| `usage` | `QuestionUsage` | no | LLM calls, input/cached/output/reasoning tokens and model time per node (`nodes`) and for the question (`total`), plus every call (`calls`). The same model as `QueryResult.usage`; see [the core query API](../core/query.md#usage-tokens-calls-and-model-time). |
 
 Only a capped sample of the rows is inlined, in `sub_queries[].rows`. The full
 result set is written to artifact storage and addressed through `artifact_refs`
@@ -111,9 +112,28 @@ Example response:
     }
   },
   "status": "success",
-  "timings": {"ast_planner": 0.02, "logical_validator": 0.001, "generator": 0.006, "executor": 0.038}
+  "timings": {"ast_planner": 0.02, "logical_validator": 0.001, "generator": 0.006, "executor": 0.038},
+  "usage": {
+    "total": {"calls": 3, "input_tokens": 13200, "cached_input_tokens": 0, "cache_write_input_tokens": 0,
+              "output_tokens": 590, "reasoning_tokens": 0, "total_tokens": 13790, "latency_s": 4.1, "cost": null},
+    "nodes": {
+      "decomposer": {"calls": 1, "input_tokens": 1900, "cached_input_tokens": 0, "cache_write_input_tokens": 0,
+                     "output_tokens": 250, "reasoning_tokens": 0, "total_tokens": 2150, "latency_s": 1.3, "cost": null},
+      "ast_planner": {"calls": 1, "input_tokens": 11000, "cached_input_tokens": 0, "cache_write_input_tokens": 0,
+                      "output_tokens": 300, "reasoning_tokens": 0, "total_tokens": 11300, "latency_s": 2.2, "cost": null},
+      "answer_synthesizer": {"calls": 1, "input_tokens": 300, "cached_input_tokens": 0, "cache_write_input_tokens": 0,
+                             "output_tokens": 40, "reasoning_tokens": 0, "total_tokens": 340, "latency_s": 0.6, "cost": null}
+    },
+    "calls": [
+      {"node": "decomposer", "model": "gpt-4o-2024-08-06", "input_tokens": 1900, "cached_input_tokens": 0,
+       "cache_write_input_tokens": 0, "output_tokens": 250, "reasoning_tokens": 0, "total_tokens": 2150,
+       "latency_s": 1.3, "cost": null, "usage_reported": true, "error": null}
+    ]
+  }
 }
 ```
+
+(Illustrative numbers. `usage.calls` is shortened to one entry; a real response lists all three.)
 
 ## Tests
 

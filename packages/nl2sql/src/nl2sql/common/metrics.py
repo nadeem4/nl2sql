@@ -5,8 +5,8 @@ from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics.export import ConsoleMetricExporter, PeriodicExportingMetricReader
 from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter
 
-# Legacy lists for CLI compatibility
-TOKEN_LOG: List[Dict[str, Any]] = []
+# Per-node latency events from PipelineMonitorCallback. Token usage is per run,
+# in QueryResult.usage (TokenUsageCallback), not in a process-wide list.
 LATENCY_LOG: List[Dict[str, Any]] = []
 
 _meter = metrics.get_meter("nl2sql.core")
@@ -17,7 +17,8 @@ node_duration_histogram = _meter.create_histogram(
 )
 token_usage_counter = _meter.create_counter(
     name="nl2sql.token.usage",
-    description="Number of tokens used by LLM interactions",
+    description="LLM tokens, by node, model, datasource_id and type "
+    "(input, cached_input, cache_write_input, output, reasoning, total)",
     unit="1",
 )
 
@@ -45,6 +46,5 @@ def configure_metrics(exporter_type: str = "none", otlp_endpoint: Optional[str] 
 
 
 def reset_usage():
-    """Resets the token and latency logs."""
-    TOKEN_LOG.clear()
+    """Resets the latency log."""
     LATENCY_LOG.clear()

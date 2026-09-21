@@ -15,6 +15,7 @@ from nl2sql.auth import UserContext
 from nl2sql.common.errors import ErrorSeverity
 from nl2sql.execution.contracts import ArtifactRef
 from nl2sql.pipeline.nodes.validator.schemas import ValidationCheck
+from nl2sql.services.callbacks.token_handler import QuestionUsage
 
 DEFAULT_SAMPLE_ROWS = 50
 
@@ -44,8 +45,9 @@ class QueryResult(BaseModel):
     """Represents the result of a query execution.
 
     Carries everything a UI renders: the plan, the validation checks, a capped
-    row sample, the SQL and per-node timings. The full result set still lives in
-    artifact storage, addressable through ``artifact_refs``.
+    row sample, the SQL, per-node timings and the question's LLM token usage.
+    The full result set still lives in artifact storage, addressable through
+    ``artifact_refs``.
     """
     sub_queries: List[SubQueryResult] = Field(default_factory=list)
     final_answer: Optional[Dict[str, Any]] = None
@@ -56,6 +58,7 @@ class QueryResult(BaseModel):
     artifact_refs: Dict[str, ArtifactRef] = Field(default_factory=dict)
     status: str = Field(default="")
     timings: Dict[str, float] = Field(default_factory=dict)
+    usage: QuestionUsage = Field(default_factory=QuestionUsage)
 
 
 def _field(source: Any, name: str, default: Any = None) -> Any:
@@ -206,6 +209,7 @@ def result_from_state(
         artifact_refs=state.get("artifact_refs") or {},
         status=_overall_status(sub_queries, errors, state),
         timings=dict(state.get("timings") or {}),
+        usage=QuestionUsage.model_validate(state.get("usage") or {}),
     )
 
 

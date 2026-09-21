@@ -132,4 +132,5 @@ pre {
 .status-success { color: var(--ok); }
 .status-error { color: var(--bad); }
 
-.timings { display: flex; flex-wrap: wrap; gap: 14px; font-size: 11px; color: var(--muted); padding: 0 4px; }
+.usage td:not(:first-child), .usage th:not(:first-child) { text-align: right; }
+.usage tr.total td { font-weight: 600; border-bottom: none; }

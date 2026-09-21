@@ -94,6 +94,7 @@ providers. The check runs on the read path only, so the fix is simply to re-run
 | --- | --- | --- |
 | `OBSERVABILITY_EXPORTER` | `none` | Exporter for metrics/traces: `none`, `console`, `otlp`. |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | `—` | Endpoint for OTLP exporter. |
+| `LLM_PRICES` | `{}` | Optional per-model prices per million tokens, as JSON, e.g. `{"gpt-4o": {"input": 2.5, "cached_input": 1.25, "output": 10}}`. `cached_input` defaults to `input`. With no price for a model, `QueryResult.usage` reports tokens only and `cost` is `null`. No prices are built in. |
 
 ### Environment file loading
 

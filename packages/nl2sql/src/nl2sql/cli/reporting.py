@@ -4,8 +4,7 @@ import statistics
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Union
 
-from rich.columns import Columns
-from rich.console import Console, Group
+from rich.console import Console
 from rich.markdown import Markdown
 from rich.markup import escape
 from rich.panel import Panel
@@ -243,124 +242,6 @@ class ConsolePresenter:
     def print_datasource_used(self, ds_id: str) -> None:
         self.console.print(f"[bold blue]Datasource Used:[/bold blue] {escape(str(ds_id))}")
 
-    def print_performance_report(self, latency: Dict[str, Any], token_log: List[Dict[str, Any]]) -> None:
-        renderables = []
-
-        top_table = Table(title="Top Level Performance", show_header=True, header_style="bold magenta", expand=True)
-        top_table.add_column("Metric", style="dim")
-        top_table.add_column("Decomposer", justify="right")
-        top_table.add_column("Aggregator", justify="right")
-
-        datasources = set()
-        for key in latency.keys():
-            if ":" in key:
-                datasources.add(key.split(":")[0])
-        sorted_ds = sorted(list(datasources))
-
-        for ds in sorted_ds:
-            top_table.add_column(f"Exec ({ds})", justify="right")
-        top_table.add_column("Total", justify="right", style="bold")
-
-        lat_decomp = latency.get("decomposer", 0.0)
-        lat_agg = latency.get("aggregator", 0.0)
-
-        lat_row = ["Latency (s)", f"{lat_decomp:.4f}", f"{lat_agg:.4f}"]
-
-        max_branch_latency = 0.0
-        for ds in sorted_ds:
-            val = latency.get(f"{ds}:total", 0.0)
-            lat_row.append(f"{val:.4f}")
-            if val > max_branch_latency:
-                max_branch_latency = val
-
-        total_latency = lat_decomp + lat_agg + max_branch_latency
-        lat_row.append(f"{total_latency:.4f}")
-        top_table.add_row(*lat_row)
-
-        def sum_tokens(agent_prefix=None, ds_id=None):
-            total = 0
-            for entry in token_log:
-                if agent_prefix and entry["agent"].startswith(agent_prefix):
-                    total += entry["total_tokens"]
-                elif ds_id and entry.get("datasource_id") == ds_id:
-                    if not (
-                        entry["agent"].startswith("decomposer")
-                        or entry["agent"].startswith("aggregator")
-                    ):
-                        total += entry["total_tokens"]
-            return total
-
-        tok_decomp = sum_tokens(agent_prefix="decomposer")
-        tok_agg = sum_tokens(agent_prefix="aggregator")
-
-        tok_row = ["Token Usage", str(tok_decomp), str(tok_agg)]
-        total_tokens = tok_decomp + tok_agg
-        for ds in sorted_ds:
-            val = sum_tokens(ds_id=ds)
-            tok_row.append(str(val))
-            total_tokens += val
-        tok_row.append(str(total_tokens))
-        top_table.add_row(*tok_row)
-
-        renderables.append(top_table)
-        renderables.append("\n")
-
-        ai_nodes = {"planner", "intent", "router", "summarizer", "generator", "decomposer", "aggregator"}
-
-        ds_metrics = {}
-        for key, val in latency.items():
-            if ":" in key:
-                parts = key.split(":", 1)
-                ds_id = parts[0]
-                node = parts[1]
-                if node == "total":
-                    continue
-                if ds_id not in ds_metrics:
-                    ds_metrics[ds_id] = {}
-                ds_metrics[ds_id][node] = val
-
-        ds_tables = []
-        for ds_id in sorted_ds:
-            ds_table = Table(title=f"Performance: {ds_id}", show_header=True, header_style="bold cyan", expand=True)
-            ds_table.add_column("Node", style="dim")
-            ds_table.add_column("Type", justify="center")
-            ds_table.add_column("Model", justify="center")
-            ds_table.add_column("Latency (s)", justify="right")
-            ds_table.add_column("Tokens", justify="right")
-
-            metrics = ds_metrics.get(ds_id, {})
-            node_order = ["intent", "planner", "generator", "executor"]
-            other_nodes = sorted([n for n in metrics.keys() if n not in node_order])
-            sorted_nodes = [n for n in node_order if n in metrics] + other_nodes
-
-            for node in sorted_nodes:
-                duration = metrics[node]
-                is_ai = node in ai_nodes
-                node_type = "AI" if is_ai else "Non-AI"
-
-                model_name = "-"
-                tokens = 0
-                if is_ai:
-                    for entry in token_log:
-                        if entry.get("datasource_id") == ds_id and entry["agent"] == node:
-                            model_name = entry["model"]
-                            tokens += entry["total_tokens"]
-
-                ds_table.add_row(
-                    node.capitalize(),
-                    node_type,
-                    model_name,
-                    f"{duration:.4f}",
-                    str(tokens) if is_ai else "-",
-                )
-            ds_tables.append(ds_table)
-
-        if ds_tables:
-            renderables.append(Columns(ds_tables))
-
-        if renderables:
-            self.print_panel(Group(*renderables), title="Performance & Metrics", style="magenta")
-
     def print_execution_tree(
         self,
         user_query: str,
@@ -484,11 +365,14 @@ class ConsolePresenter:
         tree_data: Dict[str, List[str]],
         metrics_data: Dict[str, Any],
         node_map: Optional[Dict[str, str]] = None,
+        tokens_by_node: Optional[Dict[str, int]] = None,
     ) -> None:
+        """``tokens_by_node`` is ``QueryResult.usage`` total tokens keyed by node name."""
         if not tree_data:
             return
         if node_map is None:
             node_map = {}
+        tokens_by_node = tokens_by_node or {}
 
         root_tree = Tree("[bold magenta]Performance Execution Tree[/bold magenta]")
 
@@ -516,8 +400,8 @@ class ConsolePresenter:
                     dur_style = get_dur_style(dur)
                     label += f" [dim]in[/dim] [{dur_style}]{dur:.2f}s[/{dur_style}]"
 
-                    if meta.total_tokens > 0:
-                        label += f" | [cyan]{meta.total_tokens} tok[/cyan]"
+                    if tokens_by_node.get(name):
+                        label += f" | [cyan]{tokens_by_node[name]} tok[/cyan]"
 
                     if meta.error:
                         label += f" [bold red]FAILED: {escape(str(meta.error))}[/bold red]"
@@ -551,8 +435,8 @@ class ConsolePresenter:
                 dur = meta.duration
                 dur_style = get_dur_style(dur)
                 label += f" [dim]in[/dim] [{dur_style}]{dur:.2f}s[/{dur_style}]"
-                if meta.total_tokens > 0:
-                    label += f" | [cyan]{meta.total_tokens} tok[/cyan]"
+                if tokens_by_node.get(name):
+                    label += f" | [cyan]{tokens_by_node[name]} tok[/cyan]"
 
             branch = root_tree.add(label)
             build_branch(r_id, branch, {r_id})
@@ -561,9 +445,18 @@ class ConsolePresenter:
         self.console.print(Panel(root_tree, title="Trace Metrics", border_style="magenta"))
         self.console.print("\n")
 
-    def print_cost_summary(self, total_duration: float, token_log: List[Dict[str, Any]]) -> None:
-        total_tokens = sum(entry["total_tokens"] for entry in token_log)
-        self.console.print(f"[dim]Total Duration: {total_duration:.2f}s | Total Tokens: {total_tokens}[/dim]")
+    def print_usage_summary(self, total_duration: float, usage: Dict[str, Any]) -> None:
+        """One line totalling the question's LLM usage, from ``QueryResult.usage``."""
+        total = (usage or {}).get("total") or {}
+        line = (
+            f"LLM usage: {total.get('calls', 0)} calls | "
+            f"tokens in {total.get('input_tokens', 0)} (cached {total.get('cached_input_tokens', 0)}) "
+            f"out {total.get('output_tokens', 0)} (reasoning {total.get('reasoning_tokens', 0)}) | "
+            f"{total_duration:.2f}s"
+        )
+        if total.get("cost") is not None:
+            line += f" | cost {total['cost']:.4f}"
+        self.console.print(Text(line, style="dim"), soft_wrap=True)
 
     # ------------------------------------------------------------------
     # Benchmarking (benchmark.py)
