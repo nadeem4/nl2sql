@@ -3897,9 +3897,11 @@ to use the platform:</p>
 <li><code>configs/datasources.example.yaml</code> → copy to <code>configs/datasources.yaml</code></li>
 <li><code>configs/policies.example.json</code> → copy to <code>configs/policies.json</code></li>
 </ul>
-<p>There is no shipped example for <code>configs/llm.yaml</code> or <code>configs/secrets.yaml</code>;
-write them from the schemas in <a href="../configuration/llm/">LLMs</a> and
-<a href="../configuration/secrets/">Secrets</a>, or let <code>nl2sql setup</code> generate them.</p>
+<p><code>configs/llm.yaml</code> and <code>configs/secrets.yaml</code> are tracked in the repository as
+examples: an OpenAI default agent, and a secrets file whose providers are all
+commented out. Edit them against the schemas in <a href="../configuration/llm/">LLMs</a>
+and <a href="../configuration/secrets/">Secrets</a>, or let <code>nl2sql setup</code> generate your
+own.</p>
 <p>See <code>configuration/system.md</code> for environment variables and defaults.</p>
 
 

@@ -1784,7 +1784,7 @@
 <li><strong>Schema grounding</strong>: planning is constrained by a schema snapshot retrieved via structured chunks.</li>
 <li><strong>Explicit validation gates</strong>: logical validation enforces schema and RBAC constraints before execution.</li>
 <li><strong>Modularity</strong>: adapters, subgraphs, and executors are capability-driven and replaceable.</li>
-<li><strong>Bounded execution</strong>: every run is capped by a global timeout and carries a per-run cancellation token; the graph itself runs in-process on a thread pool.</li>
+<li><strong>Bounded waiting</strong>: a global timeout bounds how long the caller waits for a run, not how long the work runs (on expiry the caller gets <code>PIPELINE_TIMEOUT</code> and the worker thread winds down in the background); each run carries a per-run cancellation token, and the graph itself runs in-process on a thread pool.</li>
 <li><strong>Observability</strong>: structured logging always; OpenTelemetry metrics and audit events when a caller attaches the pipeline callback (today, only the CLI does). See <a href="observability/stack/">Observability Stack</a>.</li>
 </ul>
 <h2 id="non-functional-goals">Non-functional goals</h2>

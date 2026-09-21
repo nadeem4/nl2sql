@@ -2167,7 +2167,11 @@ changelog and the version it proposes is the release decision.</p>
 <li><strong><code>build</code></strong> — builds sdists and wheels for all three packages, then
    smoke-installs them into a clean virtualenv and runs <code>import nl2sql</code> and
    <code>nl2sql --help</code>. These are the same commands as the <code>build</code> job in
-   <code>test.yml</code>.</li>
+   <code>test.yml</code>. The <code>nl2sql-engine</code> wheel carries <code>LICENSE</code> and
+   <code>THIRD_PARTY_NOTICES.md</code> under <code>dist-info/licenses/</code>, from copies in
+   <code>packages/nl2sql/</code> (setuptools packs license files only from inside the
+   project directory). Edit the root files and copy them over;
+   <code>tests/unit/test_packaging_metadata.py</code> fails while the copies differ.</li>
 <li><strong><code>pypi</code></strong> — <code>needs: build</code>, so a wheel that does not install or import
    fails the gate and this never runs. It is a matrix job with one leg per
    package: each leg runs in its own GitHub Environment
