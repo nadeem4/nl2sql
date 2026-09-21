@@ -2018,7 +2018,13 @@
 <li>An operand that is itself an operator is parenthesised, because sqlglot prints a hand-built tree without adding the parentheses its parser would have seen (<code>(a + b) * c</code> would otherwise print as <code>a + b * c</code>).</li>
 <li><code>/</code> is sqlglot's true division, so on SQLite it renders as <code>CAST(a AS REAL) / b</code> rather than integer division.</li>
 <li>Attach joins. The first table by ordinal is the <code>FROM</code> table. <code>left_alias</code>/<code>right_alias</code> do not say which table is new: each join attaches whichever side is not yet in scope, taking the lowest-ordinal join that touches a table already in scope, so joins may be listed in any order. When the new table is the join's left side, <code>left</code>/<code>right</code> outer joins are mirrored so the same table is preserved. Joined tables keep their <code>schema_name</code>/<code>database</code> qualifiers.</li>
-<li>Render SQL with <code>query.sql(dialect=...)</code>.</li>
+<li>Order the rows completely. The plan's <code>ORDER BY</code> terms come first, with their direction. Every other selected column follows as an ascending tie-breaker, in select order. With no <code>ORDER BY</code> in the plan, the query is ordered by every selected column. This does not change what the query means, but without it the <code>LIMIT</code> below could keep a different subset of rows on each run.</li>
+<li>An aliased item is ordered by its alias (<code>ORDER BY genre, track_sales</code>), which stays valid for aggregates under <code>GROUP BY</code>. Terms are never positional ordinals.</li>
+<li>A select item already used as an <code>ORDER BY</code> term, by expression or by alias, is not repeated.</li>
+<li>Constant items are skipped: they order nothing, and a bare number would be read as a position.</li>
+<li>Tie-breakers keep the dialect's own NULL placement, so no <code>NULLS LAST</code> clause is rendered for them.</li>
+<li>The logical validator runs on the plan before this step and never sees the tie-breakers.</li>
+<li>Apply the effective limit and render SQL with <code>query.sql(dialect=...)</code>.</li>
 <li>Return <code>GeneratorResponse</code> with SQL and reasoning.</li>
 <li>On exception, emit <code>SQL_GEN_FAILED</code>.</li>
 </ol>
@@ -2037,6 +2043,7 @@
 <ul>
 <li>Deterministic for a fixed AST and adapter dialect.</li>
 <li>Ordering is enforced via ordinals and sorted lists.</li>
+<li>Row order is total: every selected column is an <code>ORDER BY</code> term (see step 6), so the same plan run against the same data returns the same rows in the same order, even when <code>LIMIT</code> truncates the result.</li>
 </ul>
 <hr/>
 <h2 id="error-handling">Error Handling</h2>
