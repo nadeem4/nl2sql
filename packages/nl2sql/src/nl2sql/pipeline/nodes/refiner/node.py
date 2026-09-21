@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from typing import Callable, Optional, Union, Dict, Any, TYPE_CHECKING
 from langchain_core.runnables import Runnable
 
@@ -74,10 +73,8 @@ class RefinerNode:
 
             failed_plan_str = "No plan generated."
             if state.ast_planner_response and state.ast_planner_response.plan:
-                try:
-                    failed_plan_str = json.dumps(state.ast_planner_response.plan, indent=2)
-                except:
-                    failed_plan_str = str(state.ast_planner_response.plan)
+                # Compact JSON with no nulls: the refiner prompt is already large.
+                failed_plan_str = state.ast_planner_response.plan.model_dump_json(exclude_none=True)
 
             # Extract messages from PipelineError objects
             errors_str = "\n".join(f"- {e.message}" for e in state.errors)

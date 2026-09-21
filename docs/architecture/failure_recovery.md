@@ -20,7 +20,7 @@ Failure in this system is represented as structured `PipelineError` objects accu
 ### Planning
 - Decomposer LLM failures return `ORCHESTRATOR_CRASH` (critical) and empty responses.
 - AST planner LLM failures return `PLANNING_FAILURE` and a `None` plan.
-- Global planner failures return `PLANNER_FAILED` and `execution_dag=None`.
+- Global planner failures return `PLANNER_FAILED` and no `global_planner_response`; the layer router ends the run.
 
 ### Validation
 - Logical validation returns structured errors for missing tables, columns, invalid plan structure, or security violations.

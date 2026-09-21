@@ -334,3 +334,35 @@ def test_global_planner_unknown_subquery_in_combine_returns_error():
             post_combine_ops=[],
             unmapped_subqueries=[],
         )
+
+
+def test_a_planner_failure_reports_its_own_error_instead_of_crashing():
+    # Duplicate expected_schema names are a real way the decomposer's output
+    # breaks the DAG. The error handler used to build a response the schema
+    # rejects, so the run surfaced "Pipeline crashed" instead of this error.
+    from nl2sql.api.query_api import result_from_state
+    from nl2sql.common.errors import ErrorCode
+
+    response = DecomposerResponse(
+        sub_queries=[
+            SubQuery(
+                id="sq1",
+                intent="customers per country",
+                datasource_id="chinook",
+                expected_schema=[ExpectedColumn(name="country"), ExpectedColumn(name="country")],
+            )
+        ],
+        combine_groups=[],
+    )
+
+    result = GlobalPlannerNode(ctx=None)(GraphState(user_query="q", decomposer_response=response))
+
+    [error] = result["errors"]
+    assert error.error_code == ErrorCode.PLANNER_FAILED
+    assert error.node == "globalplanner"
+    assert "Duplicate columns in schema" in error.message
+    assert result.get("global_planner_response") is None
+
+    query_result = result_from_state({**result, "trace_id": "t"})
+    assert query_result.status == "error"
+    assert query_result.errors[0]["error_code"] == "PLANNER_FAILED"

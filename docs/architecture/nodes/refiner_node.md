@@ -69,7 +69,7 @@ Side effects:
 ## Internal Flow (Step-by-Step)
 
 1. If no LLM configured, emit `MISSING_LLM` and stop.
-2. Serialize relevant tables and failed plan.
+2. Serialize relevant tables, and the failed plan as compact JSON (`model_dump_json(exclude_none=True)`).
 3. Build error and reasoning strings.
 4. Invoke LLM with refinement prompt.
 5. Emit `PLAN_FEEDBACK` warning and return `RefinerResponse`.
