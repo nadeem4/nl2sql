@@ -3270,6 +3270,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#answer-faithfulness" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Answer faithfulness
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#baseline-regression-check" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3296,6 +3307,34 @@
     <span class="md-ellipsis">
       
         How tier 2 is tested
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#retrieval-recall" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Retrieval recall
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Retrieval recall">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#reading-the-numbers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reading the numbers
       
     </span>
   </a>
@@ -4110,6 +4149,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#answer-faithfulness" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Answer faithfulness
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#baseline-regression-check" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4136,6 +4186,34 @@
     <span class="md-ellipsis">
       
         How tier 2 is tested
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#retrieval-recall" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Retrieval recall
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Retrieval recall">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#reading-the-numbers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reading the numbers
       
     </span>
   </a>
@@ -4198,6 +4276,14 @@ answers against.</p>
 <td><a href="#tier-2-the-real-model-end-to-end">Tier 2</a>: the cost cap, the scoreboard, the comparison and the baseline check</td>
 </tr>
 <tr>
+<td><code>packages/nl2sql/src/nl2sql/evaluation/faithfulness.py</code></td>
+<td><a href="#answer-faithfulness">Answer faithfulness</a>: the written answer's numbers and names against the rows</td>
+</tr>
+<tr>
+<td><code>packages/nl2sql/src/nl2sql/evaluation/retrieval_recall.py</code></td>
+<td><a href="#retrieval-recall">Retrieval recall</a>: table and column recall of schema retrieval, no key</td>
+</tr>
+<tr>
 <td><code>packages/nl2sql/src/nl2sql/evaluation/prices.py</code></td>
 <td>The dated price table tier 2 bills every call from</td>
 </tr>
@@ -4216,6 +4302,10 @@ answers against.</p>
 <tr>
 <td><code>benchmarks/results/</code></td>
 <td>Committed tier 2 result records, one per run and config</td>
+</tr>
+<tr>
+<td><code>benchmarks/retrieval/</code></td>
+<td>Committed retrieval recall records, one per run</td>
 </tr>
 <tr>
 <td><code>packages/nl2sql/src/nl2sql/evaluation/evaluator.py</code></td>
@@ -4317,6 +4407,7 @@ an API key and checks that:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>benchmark<span class="w"> </span>--tier<span class="w"> </span><span class="m">1</span><span class="w">        </span><span class="c1"># gold plans, no API key</span>
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>benchmark<span class="w"> </span>--tier<span class="w"> </span><span class="m">2</span><span class="w"> </span>--max-cost<span class="w"> </span><span class="m">5</span><span class="w">   </span><span class="c1"># the real model, scored and priced</span>
 <a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>benchmark<span class="w">                 </span><span class="c1"># full pipeline, the configured LLM</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>benchmark<span class="w"> </span>retrieval<span class="w">       </span><span class="c1"># schema retrieval recall, no API key</span>
 </code></pre></div>
 <p>Each question runs once per role in its <code>expected</code> map (narrow with
 <code>--include-ids</code> and <code>--role</code>; tier 2 runs as <code>admin</code> unless <code>--role</code> says
@@ -4638,25 +4729,78 @@ under <code>configs</code>, and a <code>comparison</code>. Each config has:</p>
 <td>with <code>--passes</code> &gt; 1: the share of questions whose SQL and rows were identical in every pass, and which ones differed</td>
 </tr>
 <tr>
+<td><code>faithfulness</code></td>
+<td><a href="#answer-faithfulness">answer faithfulness</a>: <code>faithful</code> of <code>answers</code> written, the <code>rate</code>, and each <code>unfaithful</code> run with what it stated that the rows do not hold</td>
+</tr>
+<tr>
 <td><code>results</code></td>
-<td>one row per run: status, reason, SQL, cost, latency, tokens, retries</td>
+<td>one row per run: status, reason, SQL, cost, latency, tokens, retries, and <code>faithfulness</code> (<code>null</code> when no answer was written)</td>
 </tr>
 </tbody>
 </table>
 <p><code>comparison.configs</code> is one row per config (accuracy, answerability, cost,
-latency, retries, determinism); <code>comparison.differences</code> lists the questions
-the configs disagree on. The command prints the same as tables:</p>
+latency, retries, determinism, faithfulness); <code>comparison.differences</code> lists
+the questions the configs disagree on. The command prints the same as tables:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>                          Tier 2 scoreboard
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>Config        Cases  Accuracy  Ans. P  Ans. R  Cost     $/question  p50    p95    Retries  Determinism
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>gpt-5.4       8/8    100.0%    100.0%  100.0%  $0.0806  $0.0101     0.08s  0.25s  0        100.0%
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>mini-helpers  8/8    75.0%     100.0%  100.0%  $0.0372  $0.0046     0.09s  0.09s  0        100.0%
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>Config        Cases  Accuracy  Ans. P  Ans. R  Cost     $/question  p50    p95    Retries  Determinism  Faithful
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>gpt-5.4       8/8    100.0%    100.0%  100.0%  $0.0806  $0.0101     0.08s  0.25s  0        100.0%       100.0%
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>mini-helpers  8/8    75.0%     100.0%  100.0%  $0.0372  $0.0046     0.09s  0.09s  0        100.0%       85.7%
 <a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>
 <a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>                  Questions the configs disagree on
 <a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>ID           Role   gpt-5.4  mini-helpers
 <a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>chinook_018  admin  pass     fail
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>
+<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>              Answers stating what the rows do not hold
+<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>Config        ID           Role   Pass  Unsupported
+<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>mini-helpers  chinook_018  admin  1     MPEG audio file
 </code></pre></div>
 <p>(a run against the fake LLM, with one plan deliberately wrong on the second
 server.)</p>
+<h3 id="answer-faithfulness">Answer faithfulness</h3>
+<p>Accuracy scores the rows. The answer synthesizer then writes a sentence about
+them, and that sentence can state a number the rows do not hold while the
+rows are right. Tier 2 checks every written answer (its <code>summary</code> and
+<code>content</code>) against the rows the run returned, deterministically, with no
+model (<code>nl2sql/evaluation/faithfulness.py</code>). It never changes pass or fail.</p>
+<table>
+<thead>
+<tr>
+<th>What the answer writes</th>
+<th>Supported when</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A number: <code>1,297</code>, <code>1234.5</code>, <code>$523.06</code>, <code>-5</code></td>
+<td>It equals a value in the rows at the precision written (<code>523.1</code> and <code>523</code> match <code>523.06</code>; <code>523.60</code> does not), the row count, or the sum of a numeric column</td>
+</tr>
+<tr>
+<td>A percentage: <code>37.2%</code></td>
+<td>As above, or it is a share in the rows times 100 (<code>0.3718</code>)</td>
+</tr>
+<tr>
+<td>A number inside a text cell or the question</td>
+<td>Always: the year of <code>2009-01-01</code>, <code>Symphony No. 5</code>, <code>top 5</code>, <code>in 2013</code></td>
+</tr>
+<tr>
+<td>A quoted (<code>"Jazz"</code>) or bold (<code>**Rock**</code>) name</td>
+<td>A text cell, a column name or the question contains it, or it contains a text cell</td>
+</tr>
+</tbody>
+</table>
+<p>Not read as numbers: ordinals (<code>2nd</code>), list markers (<code>1.</code> at the start of a
+line), numbers glued to a word or identifier (<code>chinook_001</code>, <code>MPEG-4</code>, <code>#7</code>),
+and the month and day of a date. Names are only checked when quoted or bold,
+and bold spans with a digit, ending in <code>:</code> (<code>**Note:**</code>) or longer than six
+words are skipped, so the name check flags little it should not. <code>1,300</code> for
+<code>1297</code>, <code>2013</code> when neither the rows nor the question hold it, and a bold
+genre the rows do not list are unsupported.</p>
+<p>Each result row carries <code>faithfulness</code>: <code>faithful</code>, <code>unsupported_numbers</code> and
+<code>unsupported_entities</code> (as written) and <code>checked</code> (how many numbers and names
+were checked). A refusal or error writes no answer and is <code>null</code>. Read the
+rate with the list: an unfaithful answer is a synthesizer problem to look at,
+not a failed question. Tier 1 does not report it: its fake synthesizer writes
+the same fixed sentence for every question, with nothing to check.</p>
 <h3 id="baseline-regression-check">Baseline regression check</h3>
 <p><code>--baseline PATH</code> compares the run against a committed scoreboard, config by
 config (by name; a config the baseline lacks is skipped). It exits 1 if
@@ -4675,15 +4819,18 @@ make one, run tier 2 on the full set and copy its scoreboard there:</p>
 named <code>&lt;YYYY-MM-DD&gt;_&lt;engine-version&gt;_&lt;config&gt;.json</code> (<code>-2</code>, <code>-3</code>... when the
 name is taken that day). A record holds the UTC date and time, the engine
 version and git commit, the dataset name and the sha256 of
-<code>chinook_gold.yaml</code> (runs on a different gold set are never shown as
+<code>chinook_gold.yaml</code>, taken with LF line endings so a Windows checkout hashes
+the same (runs on a different gold set are never shown as
 comparable), the config name and <code>provider:model</code> per node, the roles and
 passes, the headline metrics (accuracy, answerability precision and recall,
 dollars total and per question, input / cached / output tokens per question,
-p50 and p95 latency, determinism), <code>stopped</code> and <code>partial</code>, and the config's
-full scoreboard.</p>
+p50 and p95 latency, determinism, answer faithfulness), <code>stopped</code> and
+<code>partial</code>, and the config's full scoreboard. <code>publish</code> shows faithfulness in
+both history tables; a record written before it existed shows <code>-</code>.</p>
 <p><code>nl2sql benchmark publish</code> (no key, no network) reads every record and
-rewrites <code>docs/benchmarks.md</code> (every run, newest first, and the latest run per
-config) and the block between <code>&lt;!-- BENCHMARKS:START --&gt;</code> and
+rewrites <code>docs/benchmarks.md</code> (every run, newest first, the latest run per
+config, then every <a href="#retrieval-recall">retrieval recall</a> record in
+<code>benchmarks/retrieval/</code>) and the block between <code>&lt;!-- BENCHMARKS:START --&gt;</code> and
 <code>&lt;!-- BENCHMARKS:END --&gt;</code> in <code>README.md</code>. It reads no clock, so the same
 records always give byte-identical pages. The workflow:</p>
 <ol>
@@ -4702,9 +4849,90 @@ plans with canned usage (cached and reasoning tokens included), one with a
 plan deliberately wrong. It checks the scoring, the comparison and its
 differences, the dollars against the price table, the cap stopping mid-run
 with a partial scoreboard, an unpriced model failing before any call, and two
-passes with the plan cache off. <code>tests/unit/test_tier2_scoreboard.py</code> and
+passes with the plan cache off. Its fake synthesizer writes each answer from
+the gold rows, so the good server's answers are faithful and the bad server's
+answer on its wrong rows is not. <code>tests/unit/test_answer_faithfulness.py</code>
+covers the faithfulness rules with good and bad answers. <code>tests/unit/test_tier2_scoreboard.py</code> and
 <code>tests/cli/test_benchmark_tier2_command.py</code> cover the scoreboard, the
 baseline check, the refusal to start without <code>--max-cost</code> and the exit codes.</p>
+<h2 id="retrieval-recall">Retrieval recall</h2>
+<p>Before the planner sees a schema, the schema retriever picks the tables and
+columns it is given. A column it never sends is one the planner cannot use.
+<code>nl2sql benchmark retrieval</code> measures that, per answerable gold question,
+against <code>needed_tables</code> and <code>needed_columns</code>, with no key, no LLM and no cost:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>benchmark<span class="w"> </span>retrieval<span class="w">                       </span><span class="c1"># writes benchmark_retrieval.json</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>benchmark<span class="w"> </span>retrieval<span class="w"> </span>--record<span class="w">              </span><span class="c1"># also writes a record to benchmarks/retrieval/</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>benchmark<span class="w"> </span>retrieval<span class="w"> </span>--baseline<span class="w"> </span>old.json<span class="w">   </span><span class="c1"># the change against an earlier report or record</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>benchmark<span class="w"> </span>retrieval<span class="w"> </span>--questions<span class="w"> </span>join,chinook_014
+</code></pre></div>
+<p>How it runs (<code>nl2sql/evaluation/retrieval_recall.py</code>):</p>
+<ul>
+<li>Chinook's 11 tables are under <code>SCHEMA_RETRIEVAL_FULL_SNAPSHOT_MAX_TABLES</code>
+  (15), which would send the whole schema without a search, so the limit is
+  set to 0 for the run and the vector search always runs.</li>
+<li>The datasource is the one registered (with several, the top hit of the
+  resolver's own vector search). The resolver's answerability check is an
+  LLM call and is skipped.</li>
+<li>The schema retriever runs as the pipeline runs it (MMR, k 8 table entries,
+  then k 12 column and relationship entries of those tables), on the index
+  and embedder the project has: the demo's is the local ONNX
+  all-MiniLM-L6-v2. Its query is the question alone, since the decomposer
+  that would add filters, groupings and expected columns is an LLM.</li>
+<li>What was sent is read from the retriever's retrieval record
+  (<code>indexing/retrieval_trace.py</code>), the one a run trace keeps: the tables and
+  columns the planner is given. A picked table with no picked column is sent
+  with all its columns, as in the pipeline.</li>
+</ul>
+<p>Per question the report has <code>table_recall</code> (needed tables sent / needed
+tables), <code>column_recall</code> (needed <code>Table.Column</code>s sent / needed), the
+<code>missed_tables</code> and <code>missed_columns</code>, <code>tables_sent</code> and <code>columns_sent</code>, and
+<code>sent</code> (every table and column sent). <code>summary</code> holds the means over
+questions, how many had every needed table (<code>perfect_tables</code>) or column
+(<code>perfect_columns</code>), and the mean tables and columns sent. <code>settings</code> holds
+the k, the MMR settings and the embedder, so two reports are only compared
+like for like. The command prints a row per question and the summary, and
+always exits 0 when it ran: it reports, it does not gate.</p>
+<h3 id="reading-the-numbers">Reading the numbers</h3>
+<p>Read recall with the amount sent: sending all 11 tables would score 100%, so
+a change that raises recall by sending more is not an improvement by itself.
+A missed column is one the planner cannot select, filter or join on. Compare
+runs with <code>--baseline</code>, which prints the change in each mean and every
+question whose recall moved, or with the committed records: each <code>--record</code>
+run is a JSON file in <code>benchmarks/retrieval/</code>, and <code>nl2sql benchmark publish</code>
+lists them newest first in <code>docs/benchmarks.md</code>.</p>
+<p>The committed baseline (2026-09-22, engine 0.1.2, 39 questions):</p>
+<table>
+<thead>
+<tr>
+<th>Table recall</th>
+<th>Column recall</th>
+<th>Every table</th>
+<th>Every column</th>
+<th>Sent on average</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>98.5%</td>
+<td>72.6%</td>
+<td>37 of 39</td>
+<td>15 of 39</td>
+<td>8.3 tables, 24.2 columns</td>
+</tr>
+</tbody>
+</table>
+<p>Most misses are columns of a table that was sent. Once one column entry of
+a table is picked, or a relationship entry adds its key columns, only those
+columns are sent rather than all of them, so <code>Invoice</code> often reaches the
+planner as <code>BillingCountry</code> or a key without <code>Total</code> or <code>InvoiceDate</code>
+(<code>chinook_014</code>, "How much did we earn in each year?", gets <code>Invoice</code> with
+<code>BillingCountry</code> only). The two table misses
+are <code>chinook_009</code> (<code>Customer</code>, <code>Invoice</code>) and <code>chinook_034</code> (<code>Artist</code>).</p>
+<p><code>packages/nl2sql/tests/e2e/test_benchmark_retrieval.py</code> runs the command on
+the generated demo in the key-free integration job and checks that it covers
+every answerable question and writes its report and record, not what the
+recall is. <code>tests/unit/test_retrieval_recall.py</code> covers the scoring, the
+means, the comparison and the records.</p>
 
 
 
