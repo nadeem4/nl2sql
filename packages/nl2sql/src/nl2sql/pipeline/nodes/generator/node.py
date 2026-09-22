@@ -153,8 +153,12 @@ class SqlVisitor:
         return exp.Literal.string(str(val))
 
     def _visit_column(self, expr: Expr) -> exp.Column:
-        """Converts a column expression to sqlglot."""
-        ident = exp.Identifier(this=expr.column_name, quoted=False)
+        """Converts a column expression to sqlglot.
+
+        The name is quoted only when it is not a bare identifier, such as a
+        select alias with spaces referenced from ORDER BY.
+        """
+        ident = exp.to_identifier(expr.column_name)
         if expr.alias:
             return exp.Column(this=ident, table=exp.Identifier(this=expr.alias, quoted=False))
         return exp.Column(this=ident)
@@ -393,7 +397,8 @@ class GeneratorNode:
             e = visitor.visit(s.expr)
             selected.append((e, s.alias))
             if s.alias:
-                e = exp.Alias(this=e, alias=exp.Identifier(this=s.alias, quoted=False))
+                # Quoted only when it is not a bare identifier ("sales support agent").
+                e = exp.Alias(this=e, alias=exp.to_identifier(s.alias))
             query = query.select(e)
 
         tables = sorted(plan.tables, key=lambda x: x.ordinal)
@@ -429,7 +434,7 @@ class GeneratorNode:
         for e, alias in selected:
             if not e.find(exp.Column) or (isinstance(e, exp.Column) and e.name == "*"):
                 continue
-            key = exp.Column(this=exp.Identifier(this=alias, quoted=False)) if alias else e
+            key = exp.Column(this=exp.to_identifier(alias)) if alias else e
             if e.sql() in ordered_on or key.sql() in ordered_on:
                 continue
             ordered_on.add(key.sql())
