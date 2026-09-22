@@ -4,18 +4,19 @@ import pathlib
 import pytest
 
 from nl2sql.evaluation import presets
-from nl2sql.evaluation.tier2 import LLM_NODES, node_agents
+from nl2sql.evaluation.tier2 import node_agents
+from nl2sql.llm.providers import LLM_AGENTS
 
 
 def test_a_verified_model_goes_on_every_llm_node_with_its_provider_key_and_temperature():
     cfg = presets.model_config("gpt-5.4")
     agents = node_agents(cfg)
-    assert set(agents) == set(LLM_NODES)
+    assert set(agents) == set(LLM_AGENTS)
     for agent in agents.values():
         assert (agent.provider, agent.model, agent.temperature) == ("openai", "gpt-5.4", 0.0)
         assert agent.api_key.get_secret_value() == "${env:OPENAI_API_KEY}"
         assert agent.base_url is None
-    assert set(cfg.agents) == set(LLM_NODES.values())
+    assert set(cfg.agents) == set(LLM_AGENTS.values())
     assert cfg.agents["astplanner"].name == "astplanner"
 
 

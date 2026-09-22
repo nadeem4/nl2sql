@@ -207,7 +207,7 @@ configs with one name, `CI` set), 3 when the cap stopped the run early.
 ### `--model` and the presets
 
 `--model MODEL` puts `MODEL` on all five LLM nodes. A model in
-`VERIFIED_MODELS` (`nl2sql/cli/common/api_key.py`: `gpt-5.4`, `gpt-5.4-mini`,
+`VERIFIED_MODELS` (`nl2sql/llm/providers.py`: `gpt-5.4`, `gpt-5.4-mini`,
 `gpt-4.1`, `gpt-4o`, `gpt-5.5`, `gpt-5-mini`, `claude-opus-5`,
 `claude-sonnet-5`, `claude-haiku-4-5`, ...) names its provider and its
 temperature: none is sent where the model rejects one (`gpt-5.5`,
@@ -249,7 +249,7 @@ and another failed (with `--passes` > 1 a question can also be `flaky`). Since
 nl2sql --env demo benchmark --tier 2 --max-cost 10 --model gpt-5.4 --llm mini-helpers --llm claude-planner
 ```
 
-A model that is not in `VERIFIED_MODELS` (`nl2sql/cli/common/api_key.py`) gets
+A model that is not in `VERIFIED_MODELS` (`nl2sql/llm/providers.py`) gets
 a warning: the engine's parameters have not been checked against it.
 
 ### Cost and the cap

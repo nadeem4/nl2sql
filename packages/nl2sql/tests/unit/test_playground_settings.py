@@ -21,7 +21,7 @@ from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
 
 from nl2sql.api.query_api import QueryResult
-from nl2sql.cli.common.api_key import VERIFIED_OPENAI_MODELS, mask_key
+from nl2sql.llm.providers import VERIFIED_OPENAI_MODELS, mask_key
 from nl2sql.cli.commands.demo import _key_from_env_file
 from nl2sql.cli.demo.playground.app import build_app
 from nl2sql.configs import ConfigManager

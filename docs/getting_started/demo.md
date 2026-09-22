@@ -234,7 +234,7 @@ second settings store, and the browser keeps nothing but UI conveniences.
     | `claude-haiku-4-5` | `temperature: 0.0` |
 
     The list lives in one place, `VERIFIED_MODELS` in
-    `nl2sql/cli/common/api_key.py`. It covers OpenAI and Anthropic for now:
+    `nl2sql/llm/providers.py`. It covers OpenAI and Anthropic for now:
     with an OpenRouter key or Ollama as the default the panel says the default
     has no model list, and offers only the other providers whose keys are
     saved.

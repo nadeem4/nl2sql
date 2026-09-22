@@ -10,7 +10,7 @@ import yaml
 from rich.console import Console
 
 from nl2sql.cli.commands import setup as cli_setup
-from nl2sql.cli.common.api_key import DEFAULT_OPENAI_MODEL, default_model_for
+from nl2sql.llm.providers import DEFAULT_OPENAI_MODEL, default_model_for
 from nl2sql.cli.demo import DemoManager
 from nl2sql.cli.generators.llm import LLMGenerator
 from nl2sql.configs import AgentConfig, ConfigManager, LLMFileConfig

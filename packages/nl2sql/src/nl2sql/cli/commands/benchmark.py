@@ -25,12 +25,12 @@ from nl2sql.evaluation.retrieval_recall import compare_reports
 from nl2sql.evaluation.tier2 import (
     DEFAULT_MAX_ACCURACY_DROP,
     DEFAULT_MAX_COST_INCREASE,
-    LLM_NODES,
     check_baseline,
     node_agents,
     select_question_ids,
     unverified_models,
 )
+from nl2sql.llm.providers import LLM_AGENTS
 
 DEFAULT_REPORT_PATH = pathlib.Path("benchmark_report.json")
 DEFAULT_TIER2_REPORT_PATH = pathlib.Path("benchmark_tier2.json")
@@ -112,7 +112,7 @@ def _node_models(cfg: LLMFileConfig) -> str:
     """``gpt-5.4 (every node)``, or each model with the nodes it runs."""
     by_model: Dict[str, List[str]] = {}
     for node, agent in node_agents(cfg).items():
-        by_model.setdefault(agent.model, []).append(LLM_NODES[node])
+        by_model.setdefault(agent.model, []).append(LLM_AGENTS[node])
     if len(by_model) == 1:
         return f"{next(iter(by_model))} (every node)"
     return "; ".join(f"{m} ({', '.join(sorted(nodes))})" for m, nodes in sorted(by_model.items()))

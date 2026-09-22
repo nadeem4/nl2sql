@@ -1,6 +1,6 @@
 # Default Configurations for Demo
 
-from nl2sql.cli.common.api_key import DEFAULT_OPENAI_MODEL
+from nl2sql.llm.providers import DEFAULT_OPENAI_MODEL
 
 DEMO_LLM_CONFIG = {
     "default": {

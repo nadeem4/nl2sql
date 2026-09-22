@@ -6,7 +6,7 @@ These are the one place that decision is made.
 """
 import pytest
 
-from nl2sql.cli.common.api_key import default_model_for, env_var_for_key, mask_key, provider_for_key
+from nl2sql.llm.providers import default_model_for, env_var_for_key, mask_key, provider_for_key
 
 # Built at run time so no secret scanner mistakes a fixture for a leaked key.
 ANTHROPIC_KEY = "-".join(["sk", "ant", "api03", "not", "a", "real", "key"])

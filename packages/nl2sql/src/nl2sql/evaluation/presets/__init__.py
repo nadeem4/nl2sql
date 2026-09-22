@@ -25,8 +25,7 @@ def model_config(spec: str) -> LLMFileConfig:
     ``provider/model``, e.g. ``ollama/llama3``, and runs at temperature 0.
     The key is the provider's ``${env:...}`` variable, which ``--env`` loads.
     """
-    from nl2sql.cli.common.api_key import VERIFIED_MODELS, default_temperature_for
-    from nl2sql.evaluation.tier2 import LLM_NODES
+    from nl2sql.llm.providers import LLM_AGENTS, VERIFIED_MODELS, default_temperature_for
     from nl2sql.llm.registry import PROVIDER_PRESETS
 
     provider = next((p for p, models in VERIFIED_MODELS.items() if spec in models), None)
@@ -44,7 +43,7 @@ def model_config(spec: str) -> LLMFileConfig:
     agent = AgentConfig(provider=provider, model=model, temperature=temperature,
                         api_key="${env:" + key_env + "}" if key_env else None)
     return LLMFileConfig(default=agent,
-                         agents={key: agent.model_copy(update={"name": key}) for key in LLM_NODES.values()})
+                         agents={key: agent.model_copy(update={"name": key}) for key in LLM_AGENTS.values()})
 
 
 def preset_names() -> List[str]:

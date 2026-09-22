@@ -14,7 +14,7 @@ from nl2sql.configs import (
 )
 from nl2sql.configs.secrets import SecretsFileConfig
 
-from nl2sql.cli.common.api_key import env_var_for_key
+from nl2sql.llm.providers import PROVIDER_KEYS, env_var_for_key
 from nl2sql.cli.generators.env import EnvFileGenerator
 from nl2sql.cli.generators.datasources import DatasourceGenerator
 from nl2sql.cli.generators.llm import LLMGenerator
@@ -23,9 +23,6 @@ from nl2sql.cli.generators.policies import PolicyGenerator
 from .chinook import CHINOOK_DATASOURCE, CHINOOK_POLICIES, CHINOOK_QUESTIONS
 from .defaults import DEMO_LLM_CONFIG
 from .stamp import write_stamp
-
-
-PROVIDER_KEYS = ("OPENAI_API_KEY", "OPENROUTER_API_KEY", "ANTHROPIC_API_KEY")
 
 
 def _load_demo_env(env_path: pathlib.Path) -> None:
