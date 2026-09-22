@@ -14,11 +14,6 @@ from nl2sql.pipeline.nodes.validator.node import REFUSAL_MESSAGE
 # exactly half a cent.
 NUMERIC_TOLERANCE = 0.005 + 1e-9
 
-UNANSWERABLE_SKIP_REASON = (
-    "unanswerable: the datasource resolver has no answerability check yet, "
-    "so there is no refusal to score"
-)
-
 OUTCOMES = ("pass", "fail", "skip", "xfail")
 
 Row = Union[Dict[str, Any], Sequence[Any]]
@@ -110,17 +105,22 @@ class ModelEvaluator:
         ``allowed`` passes when the run succeeds and its rows match
         ``gold_result`` (respecting ``order_matters``). ``refused`` passes on
         the RBAC refusal: status ``error``, a ``SECURITY_VIOLATION`` whose
-        message is the generic one, and no rows. ``unanswerable`` is skipped
-        until the resolver can say a question is unanswerable.
+        message is the generic one, and no rows. ``unanswerable`` passes on the
+        datasource resolver's refusal: status ``error`` with
+        ``QUESTION_NOT_ANSWERABLE`` and no rows.
         """
         expected = question.expected[role]
-        if expected == "unanswerable":
-            return "skip", UNANSWERABLE_SKIP_REASON
-
         errors = result.errors
         first_error = f"{errors[0].get('error_code')}: {errors[0].get('message')}" if errors else ""
         row_samples = [sq.rows for sq in result.sub_queries if sq.rows is not None]
         returned_rows = any(sample.total_rows or sample.rows for sample in row_samples)
+
+        if expected == "unanswerable":
+            codes = {e.get("error_code") for e in errors}
+            if returned_rows or result.status != "error" or "QUESTION_NOT_ANSWERABLE" not in codes:
+                return "fail", (f"expected QUESTION_NOT_ANSWERABLE, got status '{result.status}': "
+                                f"{first_error or f'rows={returned_rows}'}")
+            return "pass", ""
 
         if expected == "refused":
             denials = [e for e in errors if e.get("error_code") == "SECURITY_VIOLATION"]

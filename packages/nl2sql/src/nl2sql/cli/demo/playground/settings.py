@@ -45,9 +45,11 @@ logger = get_logger(__name__)
 LLM_CONFIG = Path("configs") / "llm.demo.yaml"
 ENV_FILE = Path(".env.demo")
 
-# The four nodes that call a model, by the agent name the LLM registry knows
+# The five nodes that call a model, by the agent name the LLM registry knows
 # them under, labelled by what they do. Anything not listed uses ``default``.
 LLM_NODES: List[Dict[str, str]] = [
+    {"agent": "datasourceresolver", "label": "Answerability check",
+     "does": "Refuses a question the connected data cannot answer, before anything else runs. A short prompt."},
     {"agent": "decomposer", "label": "Question splitter",
      "does": "Breaks the question into sub-queries. A short prompt."},
     {"agent": "astplanner", "label": "Query planner",

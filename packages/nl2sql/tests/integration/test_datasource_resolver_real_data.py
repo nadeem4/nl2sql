@@ -16,8 +16,23 @@ from nl2sql.common.errors import ErrorCode
 from nl2sql.common.settings import settings
 from nl2sql.context import NL2SQLContext
 from nl2sql.indexing.orchestrator import IndexingOrchestrator
+from nl2sql.llm.models import AgentConfig
 from nl2sql.pipeline.nodes.datasource_resolver.node import DatasourceResolverNode
 from nl2sql.pipeline.state import GraphState
+from nl2sql.testing.fake_llm import FakeLLMServer, Rule
+
+# The resolver's answerability check is an LLM call; a fake model says every
+# question here is about Chinook.
+_JUDGE = FakeLLMServer([Rule("AnswerabilityResponse",
+                             {"answerable_datasource_ids": ["chinook"], "reason": "Chinook data."})])
+
+
+def _use_fake_judge(ctx: NL2SQLContext) -> NL2SQLContext:
+    ctx.llm_registry.register_llm(AgentConfig(
+        provider="openai", model="gpt-4o", name="datasourceresolver",
+        base_url=_JUDGE.base_url, api_key="-".join(["fake", "key"]),
+    ))
+    return ctx
 
 
 def _project_root() -> Path:
@@ -68,7 +83,12 @@ def _write_datasource_config(
 ) -> Path:
     datasource = copy.deepcopy(base_datasource)
     datasource["connection"]["database"] = str(database_path)
-    config = {"version": 1, "datasources": [datasource]}
+    # A second datasource, so the resolver runs its vector search: the schema
+    # version mismatch is between an index entry and the store, and with one
+    # datasource no index entry is read.
+    second = copy.deepcopy(datasource)
+    second["id"] = "chinook_copy"
+    config = {"version": 1, "datasources": [datasource, second]}
     config_path = tmp_path / f"datasources_{uuid.uuid4().hex}.yaml"
     config_path.write_text(yaml.safe_dump(config), encoding="utf-8")
     return config_path
@@ -100,6 +120,8 @@ def indexed_env() -> SimpleNamespace:
     orchestrator = IndexingOrchestrator(ctx)
     for adapter in ctx.ds_registry.list_adapters():
         orchestrator.index_datasource(adapter)
+    _JUDGE.start()
+    _use_fake_judge(ctx)
 
     env = SimpleNamespace(
         ctx=ctx,
@@ -111,14 +133,15 @@ def indexed_env() -> SimpleNamespace:
     try:
         yield env
     finally:
+        _JUDGE.stop()
         monkeypatch.undo()
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
 
-# Chinook is one datasource, so this no longer discriminates between several.
-# What it still covers is the node itself against a real index: that every
-# question resolves to something, that the resolution is inside the role's
-# allowlist, and that the schema version it pins matches the store.
+# Chinook is one datasource, so the resolver takes it without a vector search.
+# What this still covers is the node against real stores: that every question
+# resolves, inside the role's allowlist, with the schema version the store
+# holds, and that the answerability check ran on the real description and tables.
 @pytest.mark.parametrize(
     ("datasource_id", "user_query"),
     [
@@ -149,6 +172,10 @@ def test_datasource_resolver_real_queries(
         latest = indexed_env.ctx.schema_store.get_latest_version(resolved.datasource_id)
         assert resolved.schema_version == latest
 
+    prompt = "\n".join(m["content"] for m in _JUDGE.calls[-1]["body"]["messages"])
+    assert '"id": "chinook"' in prompt and '"InvoiceLine"' in prompt
+    assert prompt.endswith(user_query)
+
 
 def _build_schema_mismatch_context(indexed_env, tmp_path: Path) -> tuple[NL2SQLContext, str]:
     secrets_path = _write_empty_secrets(tmp_path)
@@ -171,12 +198,12 @@ def _build_schema_mismatch_context(indexed_env, tmp_path: Path) -> tuple[NL2SQLC
     monkeypatch.setattr(settings, "schema_store_path", str(tmp_path / "schema_store.db"))
     monkeypatch.setattr(settings, "schema_store_max_versions", 3)
 
-    ctx = NL2SQLContext(
+    ctx = _use_fake_judge(NL2SQLContext(
         **_demo_config_paths(indexed_env.root, secrets_path, ds_config_path=config_path),
         vector_store_path=indexed_env.vector_store_path,
-    )
+    ))
 
-    adapter = ctx.ds_registry.list_adapters()[0]
+    adapter = ctx.ds_registry.get_adapter("chinook")
     snapshot = adapter.fetch_schema_snapshot()
     new_version, _ = ctx.schema_store.register_snapshot(snapshot)
 

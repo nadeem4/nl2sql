@@ -52,8 +52,9 @@ def test_a_rejected_temperature_tells_the_user_what_to_set(demo_project):
     assert "Model 'gpt-5.5'" in flat, out
     assert "temperature: null" in flat, out
     assert "Traceback" not in out
-    # The decomposer is the first LLM call; it failed, so nothing else was asked.
-    assert [c["name"] for c in server.calls] == ["DecomposerResponse"]
+    # The resolver's answerability check is the first LLM call; it failed, so
+    # nothing else was asked.
+    assert [c["name"] for c in server.calls] == ["AnswerabilityResponse"]
 
 
 @pytest.mark.e2e
@@ -77,8 +78,8 @@ def test_per_node_models_and_temperatures_reach_the_wire_and_the_trace(demo_proj
 
     [path] = list(tmp_path.glob("*.json"))
     doc = json.loads(path.read_text(encoding="utf-8"))
-    assert doc["llm"]["by_node"] == {"decomposer": "gpt-5.4", "ast_planner": "gpt-5.5",
-                                     "answer_synthesizer": "gpt-5.4"}
+    assert doc["llm"]["by_node"] == {"datasource_resolver": "gpt-5.4", "decomposer": "gpt-5.4",
+                                     "ast_planner": "gpt-5.5", "answer_synthesizer": "gpt-5.4"}
     assert doc["llm"]["configured"]["astplanner"] == {"provider": "openai", "model": "gpt-5.5",
                                                       "temperature": None}
     params = {call["key"]["node"]: call["params"]
@@ -86,7 +87,8 @@ def test_per_node_models_and_temperatures_reach_the_wire_and_the_trace(demo_proj
     assert "temperature" not in params["ast_planner"]
     assert params["decomposer"]["temperature"] == 0.0
     usage_models = {c["node"]: c["model"] for c in doc["result"]["usage"]["calls"]}
-    assert usage_models == {"decomposer": "gpt-5.4", "ast_planner": "gpt-5.5", "answer_synthesizer": "gpt-5.4"}
+    assert usage_models == {"datasource_resolver": "gpt-5.4", "decomposer": "gpt-5.4",
+                            "ast_planner": "gpt-5.5", "answer_synthesizer": "gpt-5.4"}
 
     # Replay rebuilds each agent's client the same way and serves the recording.
     replay = run_cli(demo_project, _env(), "trace", "replay", str(path))

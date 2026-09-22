@@ -7,7 +7,6 @@ from __future__ import annotations
 
 from nl2sql.api.query_api import QueryResult
 from nl2sql.evaluation.benchmark_runner import BenchmarkRunner
-from nl2sql.evaluation.evaluator import UNANSWERABLE_SKIP_REASON
 from nl2sql.evaluation.gold import GOLD_DATASET_PATH
 from nl2sql.evaluation.types import BenchmarkConfig
 from nl2sql.pipeline.nodes.validator.node import REFUSAL_MESSAGE
@@ -46,12 +45,19 @@ def test_roles_can_be_narrowed(monkeypatch):
     assert calls == [("chinook_007", "viewer")]
 
 
-def test_unanswerable_questions_are_skipped_without_running(monkeypatch):
-    runner, calls = _runner(monkeypatch, ["chinook_040"])
+NOT_ANSWERABLE = QueryResult(status="error", errors=[{
+    "node": "datasourceresolver", "error_code": "QUESTION_NOT_ANSWERABLE", "severity": "ERROR",
+    "message": "This question can't be answered from the connected data (chinook)."}])
+
+
+def test_unanswerable_questions_run_and_pass_on_the_resolvers_refusal(monkeypatch):
+    seen = []
+    runner, calls = _runner(monkeypatch, ["chinook_040"], run=lambda _q, _r: NOT_ANSWERABLE,
+                            before_case=lambda q: seen.append(q.id))
     result = runner.run_dataset()
-    assert calls == []
-    assert {r["status"] for r in result.results} == {"skip"}
-    assert {r["reason"] for r in result.results} == {UNANSWERABLE_SKIP_REASON}
+    assert sorted(calls) == [("chinook_040", r) for r in ("admin", "analyst", "viewer")]
+    assert seen == ["chinook_040"] * 3
+    assert {r["status"] for r in result.results} == {"pass"}
 
 
 def test_a_crashing_run_is_a_failure_not_an_abort(monkeypatch):

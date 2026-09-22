@@ -2,12 +2,17 @@
 
 Each answerable gold question has a hand-written ``PlanModel`` in
 ``datasets/chinook_gold_plans.yaml``. A local ``FakeLLMServer`` stands in for
-every LLM node: the decomposer gets one sub-query whose expected columns are
-the plan's select aliases, the planner gets the gold plan, and the answer
-synthesizer a fixed sentence. Everything else is the real pipeline -- schema
-retrieval, the logical validator (including RBAC), the SQL generator and the
-executor against Chinook -- and the rows are scored against ``gold_result``
-per role. A failure here is a bug in a code node, never in a model.
+every LLM node: the resolver's answerability check gets ``["chinook"]`` for a
+question with gold SQL and ``[]`` for an unanswerable one, the decomposer gets
+one sub-query whose expected columns are the plan's select aliases, the
+planner gets the gold plan, and the answer synthesizer a fixed sentence.
+Everything else is the real pipeline -- the resolver's role check and
+refusal, schema retrieval, the logical validator (including RBAC), the SQL
+generator and the executor against Chinook -- and each case is scored per
+role: rows against ``gold_result``, a refusal against the generic
+``SECURITY_VIOLATION``, an unanswerable question against
+``QUESTION_NOT_ANSWERABLE``. A failure here is a bug in a code node, never in
+a model.
 """
 from __future__ import annotations
 
@@ -35,6 +40,13 @@ def load_gold_plans(path: pathlib.Path = GOLD_PLANS_PATH) -> Dict[str, PlanModel
     """Loads the gold plans, keyed by question id."""
     raw = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     return {qid: PlanModel.model_validate(plan) for qid, plan in raw.items()}
+
+
+def answerability_response(question: GoldQuestion) -> Dict[str, Any]:
+    """The resolver's answerability verdict: Chinook for a question with gold SQL, none otherwise."""
+    if question.gold_sql is None:
+        return {"answerable_datasource_ids": [], "reason": "Gold: no datasource holds this."}
+    return {"answerable_datasource_ids": [DATASOURCE_ID], "reason": "Gold: answerable from Chinook."}
 
 
 def decomposer_response(question: GoldQuestion, plan: PlanModel) -> Dict[str, Any]:
@@ -67,6 +79,7 @@ class GoldPlanLLM:
         self.plans = plans
         self._question: Optional[GoldQuestion] = None
         self.server = FakeLLMServer([
+            Rule("AnswerabilityResponse", lambda _text: answerability_response(self._question)),
             Rule("DecomposerResponse", lambda _text: decomposer_response(self._question, self._plan())),
             Rule("PlanModel", lambda _text: self._plan().model_dump(mode="json", exclude_none=True)),
             Rule("AggregatedResponse", ANSWER),

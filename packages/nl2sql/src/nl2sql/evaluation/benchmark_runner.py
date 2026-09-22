@@ -5,7 +5,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 from nl2sql.api.query_api import QueryResult, result_from_state
 from nl2sql.auth import UserContext
 from nl2sql.context import NL2SQLContext
-from nl2sql.evaluation.evaluator import UNANSWERABLE_SKIP_REASON, ModelEvaluator
+from nl2sql.evaluation.evaluator import ModelEvaluator
 from nl2sql.evaluation.gold import GoldQuestion, load_gold_dataset
 from nl2sql.evaluation.types import BenchmarkConfig
 from nl2sql.pipeline.runtime import run_with_graph
@@ -95,9 +95,6 @@ class BenchmarkRunner:
         row: Dict[str, Any] = {"id": question.id, "question": question.question, "role": role,
                                "expected": expected, "status": "", "reason": "", "sql": "", "rows": None,
                                "gold_rows": len(question.gold_result or [])}
-        if expected == "unanswerable":
-            return {**row, "status": "skip", "reason": UNANSWERABLE_SKIP_REASON}
-
         if self.before_case:
             self.before_case(question)
         try:

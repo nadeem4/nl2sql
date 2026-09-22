@@ -5,7 +5,7 @@ Key-free: results are built by hand as ``QueryResult`` objects.
 from __future__ import annotations
 
 from nl2sql.api.query_api import QueryResult, RowSample, SubQueryResult
-from nl2sql.evaluation.evaluator import UNANSWERABLE_SKIP_REASON, ModelEvaluator
+from nl2sql.evaluation.evaluator import ModelEvaluator
 from nl2sql.evaluation.gold import GoldQuestion
 from nl2sql.pipeline.nodes.validator.node import REFUSAL_MESSAGE
 
@@ -132,9 +132,26 @@ def test_refused_role_fails_on_an_unrelated_error():
     assert ModelEvaluator.score_case(q, "viewer", result)[0] == "fail"
 
 
-def test_unanswerable_is_skipped_with_a_reason():
+NOT_ANSWERABLE = QueryResult(status="error", errors=[{
+    "node": "datasourceresolver", "error_code": "QUESTION_NOT_ANSWERABLE", "severity": "ERROR",
+    "message": "This question can't be answered from the connected data (chinook)."}])
+
+
+def test_unanswerable_passes_on_the_resolvers_refusal():
     q = _question({"admin": "unanswerable"}, gold=None)
-    assert ModelEvaluator.score_case(q, "admin", QueryResult()) == ("skip", UNANSWERABLE_SKIP_REASON)
+    assert ModelEvaluator.score_case(q, "admin", NOT_ANSWERABLE) == ("pass", "")
+
+
+def test_unanswerable_fails_when_the_question_runs():
+    q = _question({"admin": "unanswerable"}, gold=None)
+    status, reason = ModelEvaluator.score_case(q, "admin", _rows_result([["USA", 13]]))
+    assert status == "fail" and "QUESTION_NOT_ANSWERABLE" in reason
+
+
+def test_unanswerable_fails_on_another_error():
+    q = _question({"viewer": "unanswerable"}, gold=None)
+    status, reason = ModelEvaluator.score_case(q, "viewer", _refusal())
+    assert status == "fail" and "SECURITY_VIOLATION" in reason
 
 
 # --- summary ----------------------------------------------------------------

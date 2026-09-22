@@ -77,7 +77,8 @@ Or start the demo without a key and paste one into the playground: **Settings**
 (top right) takes the key, writes it to the same `.env.demo` and switches the
 running demo from replay to live without a restart. The page never shows the key
 again, only a masked form such as `sk-...4f2a`. The same panel picks a model for
-each LLM step (question splitter, query planner, plan repair, answer writer) from
+each LLM step (answerability check, question splitter, query planner, plan
+repair, answer writer) from
 a short list of OpenAI models checked against the engine's parameters, and
 writes the choice to the demo's `configs/llm.demo.yaml`, the file the CLI reads.
 Settings work only when the playground is bound to localhost unless you pass

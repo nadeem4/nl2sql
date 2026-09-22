@@ -36,7 +36,7 @@ Successful completion criteria:
 - Reaches `END` after `answer_synthesizer` when aggregation and synthesis finish without fatal interruptions.
 
 Failure exits:
-- `datasource_resolver` can short-circuit to `END` via `resolver_route` when no datasource is resolved/allowed.
+- `datasource_resolver` can short-circuit to `END` via `resolver_route` when no datasource is resolved/allowed, or when its answerability check refuses the question (`QUESTION_NOT_ANSWERABLE`); no other LLM call runs.
 - `layer_router` can return `END` if no `execution_dag` or layers are present.
 - `layer_router` returns `END` once every scan has run if none produced an artifact (every sub-query was denied or failed), and whenever the graph was built with `execute=False`. The aggregator and answer synthesizer are skipped, so the run's errors are the sub-queries' own -- for a policy denial, `SECURITY_VIOLATION` first -- and no LLM call is spent explaining an empty result.
 - `layer_router` raises `PipelineExecutionError` (an `NL2SQLError` carrying the `PipelineError` payload on `.error`) when no compatible subgraph exists for a datasource; this propagates as an exception from the router function. A conditional-edge router may only return routing decisions, so it cannot report the failure as a `PipelineError` value in state the way a node does.
@@ -50,7 +50,7 @@ Partial completion behavior:
 ## Internal Node Composition
 
 Execution order (nominal path):
-- `datasource_resolver` — `DatasourceResolverNode` — `packages/nl2sql/src/nl2sql/pipeline/nodes/datasource_resolver/node.py` — resolve candidate datasources and RBAC.
+- `datasource_resolver` — `DatasourceResolverNode` — `packages/nl2sql/src/nl2sql/pipeline/nodes/datasource_resolver/node.py` — resolve candidate datasources, RBAC, and the answerability check (an LLM call).
 - `decomposer` — `DecomposerNode` — `packages/nl2sql/src/nl2sql/pipeline/nodes/decomposer/node.py` — decompose query into sub-queries.
 - `global_planner` — `GlobalPlannerNode` — `packages/nl2sql/src/nl2sql/pipeline/nodes/global_planner/node.py` — build execution DAG.
 - `layer_router` — inline lambda + `routes.build_scan_layer_router` — `packages/nl2sql/src/nl2sql/pipeline/routes.py` — route each scan layer to a subgraph or aggregator.
@@ -84,10 +84,10 @@ Field ownership, reducers, and lifecycle are defined in `../graph_state.md`.
 
 ## Step-by-Step Execution Flow
 
-1. `datasource_resolver` resolves candidate datasources using vector search and RBAC.
+1. `datasource_resolver` resolves candidate datasources (vector search only when more than one datasource is registered), filters them by RBAC, then asks the LLM whether any allowed datasource can answer the question.
 2. `resolver_route` decides:
-   - `continue` if allowed datasources exist.
-   - `end` if none exist or response missing.
+   - `continue` if allowed datasources exist and the question was judged answerable.
+   - `end` if none exist, the question is not answerable, or the response is missing.
 3. `decomposer` uses the LLM to produce `SubQuery` objects and combine groups.
 4. `global_planner` builds a deterministic `ExecutionDAG` from sub-queries and combines.
 5. `layer_router` inspects the DAG and current `artifact_refs`:
@@ -122,7 +122,7 @@ See `../failure_recovery.md` for retry scope and recovery behavior.
 
 ## Performance Characteristics
 
-- Blocking calls include LLM requests in `decomposer` and `answer_synthesizer`.
+- Blocking calls include LLM requests in `datasource_resolver`, `decomposer` and `answer_synthesizer`.
 - `global_planner` and `aggregator` are CPU-bound (DAG construction and local aggregation).
 - Subgraph executions are dispatched per scan layer and can run in parallel via LangGraph routing.
 - Overall pipeline is executed on a single-worker thread pool created per run and guarded by `settings.global_timeout_sec`.

@@ -12,6 +12,11 @@ from pathlib import Path
 
 from nl2sql.testing.fake_llm import Rule
 
+# The datasource resolver's answerability check, the first LLM call of every
+# run. Every question below is about Chinook, so each rule set says so.
+ANSWERABLE = Rule("AnswerabilityResponse", {"answerable_datasource_ids": ["chinook"],
+                                            "reason": "The question is about the music store's data."})
+
 COUNT_CUSTOMERS_DECOMPOSER = {
     "sub_queries": [{
         "id": "sq1", "datasource_id": "chinook",
@@ -45,6 +50,7 @@ def count_customers_answer(prompt_text: str) -> dict:
 
 
 RULES_COUNT_CUSTOMERS = [
+    ANSWERABLE,
     Rule("DecomposerResponse", COUNT_CUSTOMERS_DECOMPOSER),
     Rule("PlanModel", COUNT_CUSTOMERS_PLAN),
     Rule("AggregatedResponse", count_customers_answer),
@@ -106,6 +112,7 @@ def albums_per_artist_answer(_prompt_text: str) -> dict:
 
 
 RULES_ALBUMS_PER_ARTIST = [
+    ANSWERABLE,
     Rule("DecomposerResponse", ALBUMS_PER_ARTIST_DECOMPOSER),
     Rule("PlanModel", ALBUMS_PER_ARTIST_PLAN),
     Rule("AggregatedResponse", albums_per_artist_answer),
@@ -176,6 +183,7 @@ def top_genre_answer(prompt_text: str) -> dict:
 
 
 RULES_TOP_GENRE = [
+    ANSWERABLE,
     Rule("DecomposerResponse", TOP_GENRE_DECOMPOSER),
     Rule("PlanModel", TOP_GENRE_PLAN),
     Rule("AggregatedResponse", top_genre_answer),
@@ -234,6 +242,7 @@ def jazz_tracks_answer(prompt_text: str) -> dict:
 
 
 RULES_JAZZ_TRACKS = [
+    ANSWERABLE,
     Rule("DecomposerResponse", JAZZ_TRACKS_DECOMPOSER),
     Rule("PlanModel", JAZZ_TRACKS_PLAN),
     Rule("AggregatedResponse", jazz_tracks_answer),
@@ -279,6 +288,7 @@ def genre_sales_answer(prompt_text: str) -> dict:
 
 
 RULES_GENRE_SALES_GPT4O = [
+    ANSWERABLE,
     Rule("DecomposerResponse", GENRE_SALES_DECOMPOSER),
     Rule("PlanModel", GENRE_SALES_PLAN_GPT4O),
     Rule("AggregatedResponse", genre_sales_answer),
@@ -329,6 +339,7 @@ TOP_CUSTOMERS_PLAN = {
 }
 
 RULES_TOP_CUSTOMERS = [
+    ANSWERABLE,
     Rule("DecomposerResponse", TOP_CUSTOMERS_DECOMPOSER),
     Rule("PlanModel", TOP_CUSTOMERS_PLAN),
     Rule("AggregatedResponse", {"summary": "should not be called", "format_type": "text",

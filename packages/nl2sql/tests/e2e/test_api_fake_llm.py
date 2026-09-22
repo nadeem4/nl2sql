@@ -95,6 +95,45 @@ def test_a_denied_query_reports_the_denial_first(demo_project, fake_llm, monkeyp
     assert "AggregatedResponse" not in [c["name"] for c in server.calls]
 
 
+@pytest.mark.e2e
+def test_an_unanswerable_question_is_refused_after_one_model_call(demo_project, fake_llm, monkeypatch):
+    """No datasource holds the weather: the resolver refuses, and nothing else runs."""
+    from fastapi.testclient import TestClient
+
+    from nl2sql.common.settings import reload_settings
+    from nl2sql.testing.fake_llm import Rule
+    from nl2sql_api.main import app
+
+    unanswerable = Rule("AnswerabilityResponse",
+                        {"answerable_datasource_ids": [], "reason": "Chinook holds no weather data."})
+    server, env = fake_llm([unanswerable] + RULES_COUNT_CUSTOMERS)
+    monkeypatch.chdir(demo_project)
+    for key, value in env.items():
+        monkeypatch.setenv(key, value)
+    monkeypatch.setenv("ENV", "demo")
+    monkeypatch.setenv("LLM_CONFIG", "configs/llm.fake.yaml")
+    reload_settings()
+
+    try:
+        with TestClient(app) as client:
+            response = client.post(
+                "/api/v1/query",
+                json={"natural_language": "What is the weather in Paris?", "user_context": {"roles": ["admin"]}},
+            )
+    finally:
+        reload_settings()
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["status"] == "error"
+    [error] = body["errors"]
+    assert error["error_code"] == "QUESTION_NOT_ANSWERABLE"
+    assert "can't be answered" in error["message"]
+    assert body["sub_queries"] == []
+    assert [c["name"] for c in server.calls] == ["AnswerabilityResponse"]
+    assert not {"decomposer", "ast_planner", "refiner", "answer_synthesizer"} & set(body["timings"])
+
+
 # Magnitudes from a real Chinook run (tiktoken o200k_base): decomposer ~1.9k input
 # tokens, the AST planner ~11k per call (7.7k of it the schema block), the refiner
 # ~8.6k, the synthesizer a few hundred for one row. The planner's second call
@@ -113,7 +152,8 @@ def _rules_with_one_retry():
     """
     from nl2sql.testing.fake_llm import Rule
 
-    from .recordings_chinook import COUNT_CUSTOMERS_DECOMPOSER, COUNT_CUSTOMERS_PLAN, count_customers_answer
+    from .recordings_chinook import (ANSWERABLE, COUNT_CUSTOMERS_DECOMPOSER, COUNT_CUSTOMERS_PLAN,
+                                     count_customers_answer)
 
     bad_plan = {**COUNT_CUSTOMERS_PLAN, "tables": [{"name": "Customers", "alias": "t1", "ordinal": 0}]}
     planner_calls = []
@@ -123,6 +163,7 @@ def _rules_with_one_retry():
         return bad_plan if len(planner_calls) % 2 == 1 else COUNT_CUSTOMERS_PLAN
 
     return [
+        Rule(ANSWERABLE.name, ANSWERABLE.payload, usage=_usage(900, 30, cached=768)),
         Rule("DecomposerResponse", COUNT_CUSTOMERS_DECOMPOSER, usage=_usage(1900, 250)),
         Rule("PlanModel", plan, usage=_usage(11000, 300, cached=7680, reasoning=128)),
         Rule("AggregatedResponse", count_customers_answer, usage=_usage(300, 40)),
@@ -132,7 +173,8 @@ def _rules_with_one_retry():
 
 def _assert_usage(usage):
     nodes = usage["nodes"]
-    assert set(nodes) == {"decomposer", "ast_planner", "refiner", "answer_synthesizer"}
+    assert set(nodes) == {"datasource_resolver", "decomposer", "ast_planner", "refiner", "answer_synthesizer"}
+    assert nodes["datasource_resolver"]["calls"] == 1
     planner = nodes["ast_planner"]
     assert planner["calls"] == 2
     assert (planner["input_tokens"], planner["cached_input_tokens"]) == (22000, 15360)
@@ -141,10 +183,10 @@ def _assert_usage(usage):
     assert nodes["decomposer"]["input_tokens"] == 1900
     assert nodes["answer_synthesizer"]["input_tokens"] == 300
     total = usage["total"]
-    assert total["calls"] == 5
-    assert total["input_tokens"] == 1900 + 22000 + 8600 + 300
-    assert total["cached_input_tokens"] == 15360
-    assert total["output_tokens"] == 250 + 600 + 60 + 40
+    assert total["calls"] == 6
+    assert total["input_tokens"] == 900 + 1900 + 22000 + 8600 + 300
+    assert total["cached_input_tokens"] == 768 + 15360
+    assert total["output_tokens"] == 30 + 250 + 600 + 60 + 40
     assert total["reasoning_tokens"] == 256 + 32
     assert total["total_tokens"] == total["input_tokens"] + total["output_tokens"]
     assert total["latency_s"] > 0

@@ -10,7 +10,6 @@ import json
 
 import pytest
 
-from nl2sql.evaluation.evaluator import UNANSWERABLE_SKIP_REASON
 from nl2sql.evaluation.gold import load_gold_dataset
 
 from .conftest import _base_env, run_cli
@@ -32,13 +31,10 @@ def test_tier1_passes_every_gold_plan_for_every_role(demo_project, tmp_path):
     dataset = load_gold_dataset()
     cases = {(r["id"], r["role"]): r for r in tier1["results"]}
     assert set(cases) == {(q.id, role) for q in dataset for role in q.expected}
-    for q in dataset:
-        for role, expected in q.expected.items():
-            case = cases[(q.id, role)]
-            if expected == "unanswerable":
-                assert (case["status"], case["reason"]) == ("skip", UNANSWERABLE_SKIP_REASON)
-            else:
-                assert case["status"] == "pass", case
+    # Every case runs and passes, the unanswerable ones included: the resolver
+    # refuses them with QUESTION_NOT_ANSWERABLE.
+    assert all(case["status"] == "pass" for case in cases.values()), cases
+    assert tier1["summary"]["total"]["skip"] == 0
 
     # The printed summary names each role.
     for role in ("admin", "analyst", "viewer"):
