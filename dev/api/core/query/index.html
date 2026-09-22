@@ -4251,6 +4251,12 @@ result set lives in artifact storage, addressed through <code>artifact_refs</cod
 <td>no</td>
 <td>Plan/SQL refinement attempts made.</td>
 </tr>
+<tr>
+<td><code>plan_source</code></td>
+<td><code>str</code></td>
+<td>no</td>
+<td><code>"cache"</code> when the plan came from the plan cache (no planner LLM call; still validated, generated and executed), otherwise <code>"llm"</code>. See <a href="../../../architecture/determinism/#the-plan-cache-determinism-from-the-architecture">Determinism → The plan cache</a>.</td>
+</tr>
 </tbody>
 </table>
 <h3 id="rowsample">RowSample</h3>
@@ -4304,8 +4310,12 @@ model instances for nested values):</p>
 <td><code>subgraph_outputs[&lt;id&gt;].sub_query</code></td>
 </tr>
 <tr>
-<td><code>sub_queries[].plan</code> / <code>.validation</code> / <code>.status</code> / <code>.retry_count</code></td>
+<td><code>sub_queries[].plan</code> / <code>.validation</code> / <code>.status</code> / <code>.retry_count</code> / <code>.plan_source</code></td>
 <td><code>subgraph_outputs[&lt;id&gt;]</code></td>
+</tr>
+<tr>
+<td><code>usage.plan_cache_hits</code></td>
+<td>count of <code>sub_queries[]</code> with <code>plan_source == "cache"</code></td>
 </tr>
 <tr>
 <td><code>sub_queries[].rows</code></td>
@@ -4361,6 +4371,11 @@ been recorded, on a timed-out or cancelled run.</p>
 <td><code>calls</code></td>
 <td><code>List[LLMCallUsage]</code></td>
 <td>Every model call in order, with its <code>node</code> and <code>model</code>.</td>
+</tr>
+<tr>
+<td><code>plan_cache_hits</code></td>
+<td><code>int</code></td>
+<td>Sub-queries whose plan came from the plan cache. A hit makes no planner call, so it adds no <code>ast_planner</code> calls or tokens; a question answered entirely from the cache has no <code>ast_planner</code> entry in <code>nodes</code>.</td>
 </tr>
 </tbody>
 </table>

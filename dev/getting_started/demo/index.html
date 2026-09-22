@@ -4387,6 +4387,15 @@ trace to <code>traces/</code> and prints its path. Inspect one with
 <code>nl2sql --env demo trace show &lt;file&gt;</code>, or re-run it on the recorded model
 answers with <code>nl2sql --env demo trace replay &lt;file&gt;</code>. See
 <a href="../../observability/debugging/">Debugging a Run</a>.</p>
+<p>Asking a question a second time reuses the first run's validated plan from the
+plan cache (in <code>data/schema_store.db</code>), so the SQL and rows are the same and the
+planner is not called; the playground's Debug view says "Plan from the plan
+cache". The plan is still validated for the role you ask as. To start fresh:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>cache<span class="w"> </span>clear
+</code></pre></div>
+<p><code>nl2sql demo --record</code> turns the cache off while recording, so every planner
+answer is captured. See
+<a href="../../architecture/determinism/#the-plan-cache-determinism-from-the-architecture">Determinism → The plan cache</a>.</p>
 <p><code>--env &lt;name&gt;</code> loads <code>.env.&lt;name&gt;</code>. To point at an exact file instead, use
 <code>--env-file &lt;path&gt;</code>, which takes precedence over <code>--env</code>. Either flag also
 loads the file's variables into the process environment, so <code>doctor</code> and <code>run</code>

@@ -550,6 +550,15 @@
 </a>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="#plan-cache">
+<span class="md-ellipsis">
+      
+        Plan cache
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="#internal-flow-step-by-step">
 <span class="md-ellipsis">
       
@@ -1858,6 +1867,15 @@
 </a>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="#plan-cache">
+<span class="md-ellipsis">
+      
+        Plan cache
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="#internal-flow-step-by-step">
 <span class="md-ellipsis">
       
@@ -1984,9 +2002,10 @@
 <hr/>
 <h2 id="responsibilities">Responsibilities</h2>
 <ul>
+<li>Serve a pinned plan from the plan cache on a first attempt, without an LLM call.</li>
 <li>Serialize <code>relevant_tables</code> into the planning prompt.</li>
 <li>Pass user intent, expected schema, and error feedback to the LLM.</li>
-<li>Return <code>ASTPlannerResponse</code> with the <code>PlanModel</code>.</li>
+<li>Return <code>ASTPlannerResponse</code> with the <code>PlanModel</code> and its <code>plan_source</code> (<code>"llm"</code> or <code>"cache"</code>).</li>
 </ul>
 <hr/>
 <h2 id="position-in-execution-graph">Position in Execution Graph</h2>
@@ -2025,11 +2044,35 @@
 </ul>
 <p>Side effects:</p>
 <ul>
-<li>LLM invocation via <code>llm_registry</code>.</li>
+<li>LLM invocation via <code>llm_registry</code> (none on a plan cache hit).</li>
+<li>Reads the plan cache in the schema store. It never writes it: the sub-query
+  wrapper stores a plan only after it validated and executed.</li>
 </ul>
+<hr/>
+<h2 id="plan-cache">Plan cache</h2>
+<p>The planner is the call that decides the SQL, so a plan that already passed
+validation and executed is reused
+(<a href="https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/pipeline/plan_cache.py"><code>pipeline/plan_cache.py</code></a>).</p>
+<ul>
+<li><strong>Key:</strong> <code>(normalised sub_query.intent, sub_query.datasource_id, sub_query.schema_version)</code>.
+  Normalisation case-folds, collapses whitespace and strips trailing <code>.?!,;:</code>;
+  the match is exact. No <code>schema_version</code>, no caching.</li>
+<li><strong>Read:</strong> only on a first attempt (<code>retry_count == 0</code> and no errors). A hit
+  returns <code>ASTPlannerResponse(plan=&lt;cached&gt;, plan_source="cache")</code> and makes no
+  LLM call; a retry after a rejected plan always asks the model.</li>
+<li><strong>Never trusted:</strong> the logical validator, generator and executor run on a
+  cached plan exactly as on a fresh one, so RBAC and policy changes apply.</li>
+<li><strong>Written</strong> by <code>wrap_subgraph</code> (<code>pipeline/graph_utils.py</code>) only when the
+  sub-query produced SQL and executed without a blocking error. Refused, failed
+  and plan-only runs are not stored.</li>
+<li><strong>Controls:</strong> <code>PLAN_CACHE_ENABLED</code> (default <code>true</code>) and <code>nl2sql cache clear</code>.</li>
+</ul>
+<p>See <a href="../../determinism/#the-plan-cache-determinism-from-the-architecture">Determinism → The plan cache</a>.</p>
 <hr/>
 <h2 id="internal-flow-step-by-step">Internal Flow (Step-by-Step)</h2>
 <ol>
+<li>On a first attempt, look up the plan cache; on a hit, return the cached plan
+   with <code>plan_source="cache"</code> and stop.</li>
 <li>Render <code>relevant_tables</code> with <code>render_schema_for_prompt</code> (see below).</li>
 <li>Build feedback string from existing errors (compact JSON).</li>
 <li>Build <code>expected_schema</code> payload from sub‑query.</li>

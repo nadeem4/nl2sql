@@ -1804,6 +1804,11 @@ telemetry</strong> on every run, plus <strong>OpenTelemetry metrics</strong> and
 <li><code>nl2sql.token.usage</code> (counter), attributes <code>node</code>, <code>model</code>, <code>datasource_id</code>
   and <code>type</code>: one point per LLM call for each of <code>input</code>, <code>cached_input</code>,
   <code>cache_write_input</code>, <code>output</code>, <code>reasoning</code> and <code>total</code>. Every run.</li>
+<li><code>nl2sql.plan_cache.lookups</code> (counter), attributes <code>result</code> (<code>hit</code> or <code>miss</code>)
+  and <code>datasource_id</code>: one point per plan cache lookup by the AST planner.
+  Every run with <code>PLAN_CACHE_ENABLED</code> on. The per-question view is
+  <code>QueryResult.usage.plan_cache_hits</code> and <code>sub_queries[].plan_source</code>; see
+  <a href="../../architecture/determinism/#the-plan-cache-determinism-from-the-architecture">Determinism → The plan cache</a>.</li>
 </ul>
 <p><code>configure_metrics()</code> is called by <code>PipelineMonitorCallback</code>, so outside the CLI
 no meter provider is installed unless the embedding application installs one;

@@ -4149,13 +4149,23 @@ named a column that does not exist; long values shortened here):</p>
   ended: the run timed out or was cancelled first).</li>
 <li><strong><code>inputs</code></strong> are the state fields that node reads, not the whole graph state;
   <strong><code>outputs</code></strong> is the update it returned.</li>
-<li><strong><code>llm_calls</code></strong>: the messages exactly as sent, the model's raw answer (text
+<li>
+<p><strong><code>llm_calls</code></strong>: the messages exactly as sent, the model's raw answer (text
   content, or tool calls with their arguments), what the node parsed it into,
   and the usage record from <code>TokenUsageCallback</code> (the same record
   <code>QueryResult.usage.calls</code> reports). <code>params</code> holds what was sent: an agent
   configured with <code>temperature: null</code> has no <code>temperature</code> there, and
   <code>llm.configured</code> shows it as <code>null</code>. <code>model</code> is the model the provider says
-  answered, per call, so per-node models show up per node in <code>llm.by_node</code>.</li>
+  answered, per call, so per-node models show up per node in <code>llm.by_node</code>.</p>
+</li>
+<li>
+<p><strong>Plan cache hits.</strong> When a sub-query's plan came from the plan cache, its
+  <code>ast_planner</code> entry has <code>outputs.ast_planner_response.plan_source: "cache"</code>
+  and <code>llm_calls: []</code> (zero planner tokens), and the validator, generator and
+  executor entries follow as usual. The result shows the same thing as
+  <code>result.sub_queries[].plan_source</code> and <code>result.usage.plan_cache_hits</code>. See
+  <a href="../../architecture/determinism/#the-plan-cache-determinism-from-the-architecture">Determinism → The plan cache</a>.</p>
+</li>
 </ul>
 <p>The file records what happened. A sub-query's <code>status</code> reflects its final
 attempt, so one that recovers on retry reports <code>"success"</code>; the failed
@@ -4217,6 +4227,11 @@ served. It then compares the replayed <code>QueryResult</code> with the recorded
   attempt &lt;n&gt;, LLM call &lt;k&gt;</code>, with a diff of the prompt when it changed. If the
   run finishes without using a recorded call, that is reported too. This is
   information, not a crash: everything before that point ran as recorded.</li>
+<li><strong>Plan cache.</strong> Replay makes the LLM calls the recording made. If the
+  recorded planner called the model, replay turns the plan cache off so that
+  call is replayed rather than answered from a plan cached since. If the
+  recorded run used the cache, replay uses it too, and reports a divergence
+  (<code>missing</code>) when the cached plan has since been cleared.</li>
 <li><strong>Exit code</strong>: 0 when the replayed result matches the recording, 1 on a
   divergence, a different result, or a datasource that cannot be reached.</li>
 </ul>

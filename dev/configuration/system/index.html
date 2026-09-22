@@ -2022,7 +2022,7 @@ providers. The check runs on the read path only, so the fix is simply to re-run
 <tr>
 <td><code>SCHEMA_STORE_PATH</code></td>
 <td><code>data/schema_store.db</code></td>
-<td>SQLite database path for schema store persistence.</td>
+<td>SQLite database path for schema store persistence. Also holds the plan cache (<code>plan_cache</code> table).</td>
 </tr>
 <tr>
 <td><code>SCHEMA_STORE_MAX_VERSIONS</code></td>
@@ -2132,6 +2132,11 @@ providers. The check runs on the read path only, so the fix is simply to re-run
 <td><code>LOGICAL_VALIDATOR_STRICT_COLUMNS</code></td>
 <td><code>false</code></td>
 <td>Treat missing columns as errors in logical validation.</td>
+</tr>
+<tr>
+<td><code>PLAN_CACHE_ENABLED</code></td>
+<td><code>true</code></td>
+<td>Reuse a plan that already passed validation and executed, for the same normalised sub-query intent, datasource and schema version, instead of calling the planner LLM. The cached plan is validated again on every use, so RBAC and policy changes still apply. Stored in the schema store (<code>SCHEMA_STORE_PATH</code>); <code>nl2sql cache clear</code> empties it. See <a href="../../architecture/determinism/#the-plan-cache-determinism-from-the-architecture">Determinism → The plan cache</a>.</td>
 </tr>
 <tr>
 <td><code>RBAC_REFUSAL_NAMES_TABLES</code></td>

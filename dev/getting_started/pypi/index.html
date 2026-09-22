@@ -4330,6 +4330,11 @@ See <a href="../../configuration/secrets/">Secrets config</a> for supported prov
 <code>final_answer</code>, <code>errors</code>, <code>warnings</code>, <code>artifact_refs</code>, and a <code>trace_id</code> for
 observability. Result rows are not inlined; they live in artifact storage and are
 addressed through <code>artifact_refs</code>.</p>
+<p>A repeated question reuses its validated plan from the plan cache (no planner
+call, same SQL and rows; still validated every time), and
+<code>sub_query.plan_source</code> says <code>"cache"</code>. Turn it off with
+<code>PLAN_CACHE_ENABLED=false</code>; empty it with <code>nl2sql cache clear</code>. See
+<a href="../../architecture/determinism/#the-plan-cache-determinism-from-the-architecture">Determinism → The plan cache</a>.</p>
 <h2 id="lifecycle-configure-index-query">Lifecycle (configure → index → query)</h2>
 <ol>
 <li>Configure datasources, LLMs, and policies.</li>
