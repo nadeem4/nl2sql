@@ -28,7 +28,7 @@ agents:
 
 Each LLM config supports:
 
-- `provider`: LLM provider name — `openai`, `openrouter` or `ollama`
+- `provider`: LLM provider name — `openai`, `anthropic`, `openrouter` or `ollama`
 - `model`: model identifier (required; an empty model is rejected)
 - `temperature`: float, or `null` to send no temperature at all (defaults to
   `0.0`; see [Temperature](#temperature))
@@ -38,15 +38,19 @@ Each LLM config supports:
 
 ## Providers
 
-All three providers speak the OpenAI wire protocol, so all three are served by
-the same `ChatOpenAI` client with a different base URL — no extra dependency is
-involved. The provider name only selects a preset:
+`openai`, `openrouter` and `ollama` speak the OpenAI wire protocol, so all three
+are served by the same `ChatOpenAI` client with a different base URL — no extra
+dependency is involved. `anthropic` is the exception: Claude is served by
+`langchain-anthropic`'s native `ChatAnthropic` on Anthropic's own Messages API,
+from the optional `anthropic` extra (see [Anthropic (Claude)](#anthropic-claude)).
+The provider name selects a preset:
 
-| provider | default endpoint | API key |
-| --- | --- | --- |
-| `openai` | OpenAI's own API | required (`OPENAI_API_KEY`) |
-| `openrouter` | `https://openrouter.ai/api/v1` | required (`OPENROUTER_API_KEY`) |
-| `ollama` | `http://localhost:11434/v1` | not required |
+| provider | client | default endpoint | API key |
+| --- | --- | --- | --- |
+| `openai` | `ChatOpenAI` | OpenAI's own API | required (`OPENAI_API_KEY`) |
+| `anthropic` | `ChatAnthropic` (extra) | Anthropic's own API | required (`ANTHROPIC_API_KEY`) |
+| `openrouter` | `ChatOpenAI` | `https://openrouter.ai/api/v1` | required (`OPENROUTER_API_KEY`) |
+| `ollama` | `ChatOpenAI` | `http://localhost:11434/v1` | not required |
 
 Any other value raises `ValueError: Unsupported LLM provider`, naming the valid
 providers.
@@ -72,6 +76,77 @@ agents:
     temperature: 0.0
     api_key: ${env:OPENAI_API_KEY}
 ```
+
+### Anthropic (Claude)
+
+Claude runs on Anthropic's own API through `ChatAnthropic`, not through an
+OpenAI-compatibility shim: prompt caching and reliable structured output need
+Anthropic's native API. `langchain-anthropic` is an optional extra:
+
+```bash
+pip install "nl2sql-engine[anthropic]"
+```
+
+Selecting `provider: anthropic` without it fails on the first LLM call with
+`ValueError: ... Install the anthropic extra: pip install "nl2sql-engine[anthropic]"`,
+and `nl2sql doctor` reports the missing extra.
+
+```yaml
+version: 1
+default:
+  provider: anthropic
+  model: claude-opus-5
+  temperature: null          # Claude Opus 5 and Sonnet 5 reject any temperature
+  api_key: ${env:ANTHROPIC_API_KEY}
+```
+
+`nl2sql setup` and `nl2sql demo` write `claude-opus-5` as the Claude default,
+with `temperature: null`. Current models:
+
+| model | `temperature` | minimum cacheable prefix |
+| --- | --- | --- |
+| `claude-opus-5` | rejected (HTTP 400): use `null` | 512 tokens |
+| `claude-sonnet-5` | rejected (HTTP 400): use `null` | 1,024 tokens |
+| `claude-haiku-4-5` | accepted, e.g. `0.0` | 4,096 tokens |
+
+These come from Anthropic's documented model rules, not from a probe on a real
+account. A rejected temperature fails with the same "set `temperature: null`"
+error as OpenAI (see [Temperature](#temperature)).
+
+How the engine uses it:
+
+- **Structured output** is a forced tool call (`with_structured_output`'s
+  `function_calling` method), for every node. Anthropic's native JSON outputs
+  (`output_config.format`) do not accept recursive schemas, and the planner's
+  `PlanModel` is recursive.
+- **Prompt caching.** The planner, refiner and decomposer send a stable system
+  message and a variable human message. For `anthropic` only, the last system
+  block carries `cache_control: {"type": "ephemeral"}` (a 5-minute cache).
+  Anthropic renders tools, then system, then messages, so the breakpoint caches
+  the tool schema and the system prompt; the question follows it. The answer
+  synthesizer sends no system message, so nothing is marked. Other providers
+  send no `cache_control`.
+- **Whether a prefix clears the minimum.** On Chinook the planner's cached
+  prefix is its system prompt (about 3.5k tokens, most of it the retrieved
+  schema) plus the `PlanModel` tool schema (about 2k): above every model's
+  minimum. The decomposer's (about 0.7k of system prompt plus a 1.4k tool
+  schema) and the refiner's (about 2.7k, no tool) clear Opus 5's 512 and
+  Sonnet 5's 1,024 but not Haiku 4.5's 4,096, so on Haiku they are silently
+  not cached. The resolver's answerability check (`datasourceresolver`) is
+  marked the same way, but its prefix (about 260 tokens of system prompt plus a
+  small tool schema) is below every Claude model's minimum, so it is never
+  cached. The decomposer's prefix is the same for every question; the
+  planner's and refiner's include the retrieved tables, so they hit when a
+  sub-query retrieves the same tables again (a retry, or a similar question).
+- **`max_tokens`** is 16,000 per call: every node call is non-streaming, and
+  the SDK refuses a non-streaming call whose `max_tokens` could outlast its
+  timeout.
+- **Usage.** Cache reads and writes are reported as `cached_input_tokens` and
+  `cache_write_input_tokens`, with each input token counted once (see
+  [Query API → usage](../api/core/query.md)).
+
+`nl2sql demo --record` cannot record Claude: the recording proxy and replay
+speak the OpenAI wire format, so it asks for an OpenAI or OpenRouter key.
 
 ### OpenRouter
 
@@ -220,15 +295,19 @@ used is recorded per node in `QueryResult.usage.calls` and in a run trace's
 In the demo, the playground's **Settings** panel writes exactly these entries
 into `configs/llm.demo.yaml`: choosing a model for a step adds an `agents:`
 entry with the default's provider, `base_url` and `api_key` reference, the
-chosen model, and `temperature: 0.0`, or `temperature: null` for `gpt-5.5` and
-`gpt-5-mini`; choosing "Default" removes the entry. The running engine reloads
-the file, so the change applies to the next question. The panel offers only
-the models in `VERIFIED_MODELS` (`nl2sql/cli/common/api_key.py`), OpenAI only
-for now. See [the settings panel](../getting_started/demo.md#the-settings-panel).
+chosen model, and `temperature: 0.0`, or `temperature: null` for `gpt-5.5`,
+`gpt-5-mini`, `claude-opus-5` and `claude-sonnet-5`; choosing "Default"
+removes the entry. The running engine reloads the file, so the change applies
+to the next question. The panel offers only the models in `VERIFIED_MODELS`
+(`nl2sql/cli/common/api_key.py`), for OpenAI and Anthropic only for now. See
+[the settings panel](../getting_started/demo.md#the-settings-panel).
 
 Because a demo step differs from the default only in its model, `nl2sql demo`
 points every `agents:` entry at the same provider, endpoint and key variable as
-`default` when it picks replay or live mode at start-up.
+`default` when it picks replay or live mode at start-up. Moving between OpenAI
+and Anthropic also replaces a model the new provider does not serve (a `gpt-`
+model on Anthropic, a `claude-` one on OpenAI) with that provider's default and
+its temperature.
 
 ## Other OpenAI-compatible endpoints
 
@@ -272,7 +351,7 @@ provider, or an agent with no model.
 
 ## Embeddings are a separate path
 
-Neither OpenRouter nor Ollama covers embeddings — they are not routed through
+None of Anthropic, OpenRouter or Ollama covers embeddings — they are not routed through
 `LLMRegistry` at all. Embeddings come from `EmbeddingService`, selected with the
 `EMBEDDING_PROVIDER` environment variable:
 
@@ -293,6 +372,8 @@ for the embedding step. Switching embedding providers requires a re-index. See
 - `indexing_enrichment` is optional. Omit it, or leave its key unset, and
   `nl2sql index` still works - the schema is indexed without LLM-written
   descriptions.
-- `nl2sql setup` prompts for `openai` and `openrouter`, the two hosted providers
-  it can also collect a key for. To use Ollama, edit `configs/llm.yaml` as shown
-  above — no key prompt applies.
+- `nl2sql setup` prompts for `openai`, `anthropic` and `openrouter`, the hosted
+  providers it can also collect a key for; `setup --api-key` picks the provider
+  from the key's shape (`sk-ant-` is Anthropic, `sk-or-` is OpenRouter, anything
+  else is OpenAI). To use Ollama, edit `configs/llm.yaml` as shown above — no
+  key prompt applies.

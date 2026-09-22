@@ -191,6 +191,25 @@ For OpenAI through `langchain-openai` (verified against the pinned 1.6.x by
 completions API reports no cache-write count, so `cache_write_input_tokens` is
 `0` there.
 
+For Claude through `langchain-anthropic` (`provider: anthropic`; verified
+against the fake Anthropic endpoint by
+`packages/nl2sql/tests/unit/test_llm_anthropic.py`), Anthropic's `usage` maps
+as follows:
+
+| Anthropic `usage` | field here |
+| --- | --- |
+| `cache_read_input_tokens` | `cached_input_tokens` |
+| `cache_creation_input_tokens`, or its per-TTL split `cache_creation.ephemeral_5m_input_tokens` + `ephemeral_1h_input_tokens` | `cache_write_input_tokens` |
+| `input_tokens` + `cache_read_input_tokens` + `cache_creation_input_tokens` | `input_tokens` |
+| `output_tokens` | `output_tokens` |
+
+Anthropic's own `input_tokens` counts only the uncached tail of the prompt;
+`langchain-anthropic` adds the cache reads and writes back, so `input_tokens`
+here is the whole prompt, counted once, and both cache fields stay subsets of
+it. When the write is reported per TTL, `langchain-anthropic` sets the generic
+`cache_creation` detail to `0` and puts the tokens under the TTL keys, which
+are summed here.
+
 Cost is `(input - cached) * input_price + cached * cached_input_price + output * output_price`,
 per million tokens. Prices are looked up by the served model name, then by the
 configured one, by exact match only, so a `gpt-4o` price never prices

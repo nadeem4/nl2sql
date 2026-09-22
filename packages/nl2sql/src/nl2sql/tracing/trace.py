@@ -68,10 +68,10 @@ def collect_secrets(ctx: Any) -> Set[str]:
         manager = getattr(registry, "secret_manager", None)
         found.update(getattr(manager, "resolved_values", None) or ())
     for client in (getattr(getattr(ctx, "llm_registry", None), "llms", None) or {}).values():
-        key = getattr(client, "openai_api_key", None)
-        getter = getattr(key, "get_secret_value", None)
-        if callable(getter) and getter():
-            found.add(getter())
+        for attr in ("openai_api_key", "anthropic_api_key"):
+            getter = getattr(getattr(client, attr, None), "get_secret_value", None)
+            if callable(getter) and getter():
+                found.add(getter())
     return found
 
 

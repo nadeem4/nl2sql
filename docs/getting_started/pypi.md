@@ -122,6 +122,24 @@ default:
   api_key: ${env:OPENROUTER_API_KEY}
 ```
 
+To use Claude on Anthropic's own API, with the system prompts prompt-cached,
+install the `anthropic` extra and point the config at it:
+
+```bash
+pip install "nl2sql-engine[anthropic]"
+```
+
+```yaml
+version: 1
+default:
+  provider: anthropic
+  model: claude-opus-5
+  temperature: null          # Claude Opus 5 rejects a temperature
+  api_key: ${env:ANTHROPIC_API_KEY}
+```
+
+See [LLM configuration → Anthropic](../configuration/llm.md#anthropic-claude).
+
 A local [Ollama](https://ollama.com) daemon is configured the same way, with
 `provider: ollama` and no `api_key`; how well a given local model handles the
 pipeline's structured output varies by model, so see

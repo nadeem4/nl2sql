@@ -33,7 +33,8 @@ function KeyForm({ settings, onSaved, recorded }) {
     try {
       const next = await send("/api/settings/key", { api_key: key });
       setKey("");
-      setStatus(`Saved. Questions now go to ${next.provider === "openrouter" ? "OpenRouter" : "OpenAI"}.`);
+      const names = { openrouter: "OpenRouter", anthropic: "Anthropic" };
+      setStatus(`Saved. Questions now go to ${names[next.provider] || "OpenAI"}.`);
       onSaved(next);
     } catch (err) {
       setFault(err.message);
@@ -72,7 +73,8 @@ function KeyForm({ settings, onSaved, recorded }) {
         </button>
       </div>
       <p className="settings-help" id="settings-key-help">
-        A key starting <code>sk-or-</code> is OpenRouter; any other is OpenAI. It is written to{" "}
+        A key starting <code>sk-ant-</code> is Anthropic, <code>sk-or-</code> is OpenRouter; any
+        other is OpenAI. It is written to{" "}
         <code>{settings.files.env}</code> and the demo switches to live without a restart. On a
         later start, <code>--api-key</code> or a key exported in your shell still wins. The key is
         never shown again, only its last four characters.

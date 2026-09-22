@@ -103,7 +103,10 @@ This covers the embedding step only. The demo is **not** key-free end to end:
 - Both `nl2sql setup --api-key <key>` and `nl2sql demo --api-key <key>` take the
   key on the command line and write it into the generated env file. The provider
   follows the key's shape: a key beginning `sk-or-` is OpenRouter and is stored
-  as `OPENROUTER_API_KEY` with `provider: openrouter`; anything else is OpenAI.
+  as `OPENROUTER_API_KEY` with `provider: openrouter`; a key beginning `sk-ant-`
+  is Anthropic and is stored as `ANTHROPIC_API_KEY` with `provider: anthropic`,
+  model `claude-opus-5` and `temperature: null` (install
+  `nl2sql-engine[anthropic]`); anything else is OpenAI.
   `.env` and `.env.*` are covered by `.gitignore`, but a key passed on the
   command line is visible in shell history and to `ps`, so the environment
   variable remains the more private route.
@@ -186,8 +189,8 @@ right. It edits the same two files the CLI reads, and nothing else: there is no
 second settings store, and the browser keeps nothing but UI conveniences.
 
 - **API key.** Paste a key and press **Save key**. The provider follows the
-  key's shape by the same rule as `--api-key` (`sk-or-` is OpenRouter, anything
-  else OpenAI). The key is written to the demo project's `.env.demo` and the
+  key's shape by the same rule as `--api-key` (`sk-ant-` is Anthropic, `sk-or-`
+  is OpenRouter, anything else OpenAI). The key is written to the demo project's `.env.demo` and the
   running demo switches from replay to live **without a restart**: questions
   already running finish on the model client they started with, then the
   engine's LLM clients are rebuilt from `configs/llm.demo.yaml`. The key is
@@ -210,10 +213,18 @@ second settings store, and the browser keeps nothing but UI conveniences.
     | `gpt-5.4` (the default), `gpt-5.4-mini`, `gpt-4.1`, `gpt-4.1-mini`, `gpt-4o` | `temperature: 0.0` |
     | `gpt-5.5`, `gpt-5-mini` | `temperature: null`: they reject temperature 0, so a step on one runs at the model's default temperature and its answers vary more from run to run |
 
+    With an Anthropic key the list is Claude's. Those entries were not probed
+    on a real account; their temperatures follow Anthropic's documented rules:
+
+    | Model | Written with |
+    | --- | --- |
+    | `claude-opus-5` (the default), `claude-sonnet-5` | `temperature: null`: both reject any temperature |
+    | `claude-haiku-4-5` | `temperature: 0.0` |
+
     The list lives in one place, `VERIFIED_MODELS` in
-    `nl2sql/cli/common/api_key.py`. It is OpenAI-only for now: with an
-    OpenRouter key or Ollama the panel shows the configured model and offers no
-    list.
+    `nl2sql/cli/common/api_key.py`. It covers OpenAI and Anthropic for now:
+    with an OpenRouter key or Ollama the panel shows the configured model and
+    offers no list.
 - **Local only by default.** Settings work only when the playground is bound to
   a loopback address (`127.0.0.1`, `localhost`, `::1`). On `0.0.0.0` or any
   other address the panel says why it is off and the settings routes answer

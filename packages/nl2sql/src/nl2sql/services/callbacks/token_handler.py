@@ -11,12 +11,17 @@ across providers (OpenAI and Anthropic alike):
 * ``input_tokens`` / ``output_tokens`` / ``total_tokens``
 * ``input_token_details.cache_read``      -> ``cached_input_tokens``
 * ``input_token_details.cache_creation``  -> ``cache_write_input_tokens``
+  (plus ``ephemeral_5m_input_tokens`` / ``ephemeral_1h_input_tokens``, where
+  langchain-anthropic puts an Anthropic cache write split by TTL)
 * ``output_token_details.reasoning``      -> ``reasoning_tokens``
 
 A detail the provider did not report is recorded as ``0``. A call whose result
 carries no usage at all is recorded with zero tokens and ``usage_reported=False``
 so a zero is never mistaken for a measurement. Cached and cache-write tokens are
 a subset of ``input_tokens``; reasoning tokens are a subset of ``output_tokens``.
+Anthropic's own ``input_tokens`` excludes cache reads and writes;
+langchain-anthropic adds ``cache_read_input_tokens`` and
+``cache_creation_input_tokens`` back, so each input token is counted once.
 """
 from __future__ import annotations
 
@@ -102,6 +107,11 @@ def _int(value: Any) -> int:
         return 0
 
 
+# When Anthropic reports a cache write per TTL, langchain-anthropic zeroes the
+# generic ``cache_creation`` detail and puts the tokens under these keys.
+_ANTHROPIC_CACHE_WRITE_BY_TTL = ("ephemeral_5m_input_tokens", "ephemeral_1h_input_tokens")
+
+
 def _detail(details: Mapping[str, Any], key: str) -> int:
     """Read a usage detail, including its service-tier-prefixed variants.
 
@@ -131,7 +141,8 @@ def read_usage(response: LLMResult) -> Optional[Dict[str, int]]:
         return {
             "input_tokens": inp,
             "cached_input_tokens": _detail(input_details, "cache_read"),
-            "cache_write_input_tokens": _detail(input_details, "cache_creation"),
+            "cache_write_input_tokens": _detail(input_details, "cache_creation") + sum(
+                _int(input_details.get(k)) for k in _ANTHROPIC_CACHE_WRITE_BY_TTL),
             "output_tokens": out,
             "reasoning_tokens": _detail(output_details, "reasoning"),
             "total_tokens": _int(usage_metadata.get("total_tokens")) or inp + out,

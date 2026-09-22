@@ -3,6 +3,7 @@ from threading import RLock
 from typing import Any, Dict, NamedTuple, Optional
 
 import openai
+from langchain_core.language_models import BaseChatModel
 from langchain_openai import ChatOpenAI
 
 from nl2sql.common.env_hint import active_env_file
@@ -11,7 +12,7 @@ from .models import AgentConfig
 
 
 class ProviderPreset(NamedTuple):
-    """Endpoint and credential defaults for one OpenAI-compatible provider.
+    """Endpoint and credential defaults for one provider.
 
     Attributes:
         base_url: Endpoint the provider is reached on, or None to let the
@@ -35,6 +36,10 @@ class ProviderPreset(NamedTuple):
 # Ollama needs no credential, but ChatOpenAI refuses to construct without an
 # ``api_key`` (``openai.OpenAIError: Missing credentials``), so its preset
 # supplies a placeholder the local daemon ignores.
+#
+# Anthropic is the one exception to the shared wire format: Claude is served
+# natively by ChatAnthropic (the ``anthropic`` extra), because prompt caching
+# and reliable tool-based structured output only work on Anthropic's own API.
 PROVIDER_PRESETS: Dict[str, ProviderPreset] = {
     "openai": ProviderPreset(
         base_url=None,
@@ -49,7 +54,13 @@ PROVIDER_PRESETS: Dict[str, ProviderPreset] = {
         api_key_env=None,
         api_key_placeholder="ollama",
     ),
+    "anthropic": ProviderPreset(
+        base_url=None,
+        api_key_env="ANTHROPIC_API_KEY",
+    ),
 }
+
+ANTHROPIC_EXTRA_HINT = 'Install the anthropic extra: pip install "nl2sql-engine[anthropic]"'
 
 
 SEED = 42
@@ -57,6 +68,16 @@ SEED = 42
 
 def _rejects_temperature(exc: openai.BadRequestError) -> bool:
     return getattr(exc, "param", None) == "temperature" or "'temperature'" in str(exc)
+
+
+def temperature_error(model: str, tags: Optional[list], reason: str) -> ValueError:
+    """The error for a model that refused the configured temperature: what to set, and where."""
+    agent = tags[0] if tags else "default"
+    return ValueError(
+        f"Model '{model}' (LLM agent '{agent}') rejected the temperature "
+        f"parameter (HTTP 400: {reason}) Set 'temperature: null' for agent '{agent}' "
+        "in the LLM config file so no temperature is sent to this model."
+    )
 
 
 class ConfiguredChatOpenAI(ChatOpenAI):
@@ -69,14 +90,8 @@ class ConfiguredChatOpenAI(ChatOpenAI):
     """
 
     def _explain(self, exc: openai.BadRequestError) -> ValueError:
-        agent = self.tags[0] if self.tags else "default"
         body = exc.body if isinstance(exc.body, dict) else {}
-        reason = body.get("message") or str(exc)
-        return ValueError(
-            f"Model '{self.model_name}' (LLM agent '{agent}') rejected the temperature "
-            f"parameter (HTTP 400: {reason}) Set 'temperature: null' for agent '{agent}' "
-            "in the LLM config file so no temperature is sent to this model."
-        )
+        return temperature_error(self.model_name, self.tags, body.get("message") or str(exc))
 
     def _generate(self, *args: Any, **kwargs: Any):
         try:
@@ -181,14 +196,15 @@ class LLMRegistry:
             # A re-registration replaces any client built from the old config.
             self.llms.pop(agent.name, None)
 
-    def get_llm(self, name: str) -> ChatOpenAI:
+    def get_llm(self, name: str) -> BaseChatModel:
         """Returns the client for an agent, building it on first use.
 
         Args:
             name: Agent name; falls back to the 'default' agent.
 
         Returns:
-            ChatOpenAI: The cached client for that agent.
+            BaseChatModel: The cached client for that agent (``ChatOpenAI``, or
+            ``ChatAnthropic`` for the anthropic provider).
 
         Raises:
             ValueError: If neither the named agent nor a 'default' agent is
@@ -214,20 +230,39 @@ class LLMRegistry:
             self.llms[config.name] = client
             return client
 
-    def _build_client(self, agent: AgentConfig) -> ChatOpenAI:
-        """Builds the ChatOpenAI client for one agent from its provider preset.
+    def _build_client(self, agent: AgentConfig) -> BaseChatModel:
+        """Builds the client for one agent from its provider preset.
 
         Args:
             agent: Validated configuration for the agent.
 
         Returns:
-            ChatOpenAI: A client pointed at the configured endpoint.
+            BaseChatModel: A client pointed at the configured endpoint.
+
+        Raises:
+            ValueError: If the provider is 'anthropic' and the extra is missing.
         """
         preset = PROVIDER_PRESETS[agent.provider]
         api_key = self._resolve_api_key(agent, preset)
 
         base_url = agent.base_url or preset.base_url
         kwargs = {"base_url": base_url} if base_url else {}
+
+        if agent.provider == "anthropic":
+            try:
+                from nl2sql.llm.claude import build_claude_client
+            except ImportError as exc:
+                raise ValueError(
+                    f"LLM agent '{agent.name}' uses provider 'anthropic', which needs "
+                    f"langchain-anthropic. {ANTHROPIC_EXTRA_HINT}"
+                ) from exc
+            return build_claude_client(
+                agent.model,
+                agent.temperature,
+                api_key=api_key,
+                tags=[agent.name],
+                **kwargs,
+            )
 
         return build_chat_client(
             agent.model,

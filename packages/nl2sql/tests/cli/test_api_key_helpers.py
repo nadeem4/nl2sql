@@ -6,7 +6,29 @@ These are the one place that decision is made.
 """
 import pytest
 
-from nl2sql.cli.common.api_key import env_var_for_key, mask_key, provider_for_key
+from nl2sql.cli.common.api_key import default_model_for, env_var_for_key, mask_key, provider_for_key
+
+# Built at run time so no secret scanner mistakes a fixture for a leaked key.
+ANTHROPIC_KEY = "-".join(["sk", "ant", "api03", "not", "a", "real", "key"])
+OPENAI_KEY = "-".join(["sk", "proj", "not", "a", "real", "key"])
+# An OpenAI key that merely contains "ant" further in must stay OpenAI.
+OPENAI_KEY_WITH_ANT = "-".join(["sk", "antelope", "not", "a", "real", "key"])
+
+
+@pytest.mark.parametrize(
+    "key, provider",
+    [(ANTHROPIC_KEY, "anthropic"), (OPENAI_KEY, "openai"), (OPENAI_KEY_WITH_ANT, "openai")],
+)
+def test_an_anthropic_key_is_told_apart_from_an_openai_key(key, provider):
+    assert provider_for_key(key) == provider
+
+
+def test_an_anthropic_key_is_stored_as_anthropic_api_key():
+    assert env_var_for_key(ANTHROPIC_KEY) == "ANTHROPIC_API_KEY"
+
+
+def test_the_default_claude_model_is_opus_5():
+    assert default_model_for("anthropic") == "claude-opus-5"
 
 
 @pytest.mark.parametrize(

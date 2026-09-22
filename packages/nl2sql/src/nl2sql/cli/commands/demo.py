@@ -12,7 +12,8 @@ The key is looked for in a fixed order, highest precedence first:
 
 1. ``--api-key`` on the command line, which is also written into the demo
    project's ``.env.demo`` so later runs from that directory stay live
-2. ``OPENAI_API_KEY`` / ``OPENROUTER_API_KEY`` in the process environment
+2. ``OPENAI_API_KEY`` / ``OPENROUTER_API_KEY`` / ``ANTHROPIC_API_KEY`` in the
+   process environment
 3. whichever of those is already recorded in the demo project's ``.env.demo``
 4. a reachable Ollama (live, but nothing to record through)
 5. replay
@@ -36,9 +37,10 @@ from typing import List, Optional, Tuple
 import yaml
 
 from nl2sql.cli.common.api_key import (
-    OPENAI_ENV,
-    OPENROUTER_ENV,
+    default_model_for,
+    default_temperature_for,
     env_var_for_key,
+    env_var_for_provider,
     mask_key,
     provider_for_key,
 )
@@ -65,7 +67,7 @@ DATASET = "chinook"
 # so live mode fell back to `ollama` and enrichment ran with no key. Indexing now
 # keeps a key already set (`manager._load_demo_env`); restoring the keys the mode
 # was chosen from after scaffolding stays as a second guard.
-PROVIDER_KEYS = ("OPENAI_API_KEY", "OPENROUTER_API_KEY")
+PROVIDER_KEYS = ("OPENAI_API_KEY", "OPENROUTER_API_KEY", "ANTHROPIC_API_KEY")
 
 
 def _ollama_reachable() -> bool:
@@ -77,7 +79,7 @@ def _ollama_reachable() -> bool:
 
 
 def detect_llm_mode() -> str:
-    if os.environ.get("OPENAI_API_KEY") or os.environ.get("OPENROUTER_API_KEY") or _ollama_reachable():
+    if any(os.environ.get(name) for name in PROVIDER_KEYS) or _ollama_reachable():
         return "live"
     return "replay"
 
@@ -98,7 +100,9 @@ def live_provider(key: Optional[str], source: str) -> str:
     if not key:
         return "ollama"
     if source == "environment":
-        return "openai" if os.environ.get("OPENAI_API_KEY") == key else "openrouter"
+        for provider in ("openai", "openrouter", "anthropic"):
+            if os.environ.get(env_var_for_provider(provider)) == key:
+                return provider
     return provider_for_key(key)
 
 
@@ -225,12 +229,21 @@ def _point_llm_config_at(directory: pathlib.Path, base_url: Optional[str], provi
     ``${env:OPENAI_API_KEY}``, and a reference names the one variable the
     registry looks in, so an OpenRouter demo kept failing with "no API key"
     while ``OPENROUTER_API_KEY`` was set.
+
+    Moving between OpenAI and Anthropic also moves the model: a ``gpt-`` model
+    means nothing to Anthropic, nor a ``claude-`` one to OpenAI. The model is
+    replaced by the provider's default, with the temperature that model takes.
     """
     path = directory / "configs" / "llm.demo.yaml"
     cfg = yaml.safe_load(path.read_text(encoding="utf-8"))
-    key_variable = {"openai": OPENAI_ENV, "openrouter": OPENROUTER_ENV}.get(provider)
+    key_variable = env_var_for_provider(provider) if provider in ("openai", "openrouter", "anthropic") else None
     for agent in [cfg["default"], *(cfg.get("agents") or {}).values()]:
         agent["provider"] = provider
+        if provider in ("openai", "anthropic") and (
+            (provider == "anthropic") != str(agent.get("model", "")).startswith("claude-")
+        ):
+            agent["model"] = default_model_for(provider)
+            agent["temperature"] = default_temperature_for(provider)
         if key_variable:
             agent["api_key"] = "${env:" + key_variable + "}"
         if base_url:
@@ -256,7 +269,7 @@ def replay_message(recorded: int, total: int, recordings: Optional[pathlib.Path]
     """The console line for replay mode; it claims recorded answers only when there are some."""
     ask = (
         "add an API key in the playground's Settings panel or pass --api-key "
-        "(or set OPENAI_API_KEY or OPENROUTER_API_KEY, or run Ollama)."
+        "(or set OPENAI_API_KEY, OPENROUTER_API_KEY or ANTHROPIC_API_KEY, or run Ollama)."
     )
     if not recorded:
         return (
@@ -335,6 +348,10 @@ def demo_command(
     if record and not resolved_key:
         print_error("--record needs an API key.")
         console.print("Pass --api-key, or set OPENAI_API_KEY or OPENROUTER_API_KEY.")
+        raise SystemExit(1)
+    # The recording proxy and replay speak the OpenAI wire format; Claude does not.
+    if record and live_provider(resolved_key, key_source) not in UPSTREAMS:
+        print_error("--record needs an OpenAI or OpenRouter key: recordings capture the OpenAI wire format.")
         raise SystemExit(1)
 
     preserved = {key: os.environ[key] for key in PROVIDER_KEYS if os.environ.get(key)}

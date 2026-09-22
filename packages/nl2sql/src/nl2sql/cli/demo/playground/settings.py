@@ -260,7 +260,7 @@ class SettingsPanel:
         if not verified:
             raise HTTPException(
                 status_code=400,
-                detail=f"Per-node models can be chosen for OpenAI only for now; this demo uses {provider}.",
+                detail=f"Per-node models can be chosen for OpenAI and Anthropic only for now; this demo uses {provider}.",
             )
         for agent, model in models.items():
             if agent not in _AGENTS:

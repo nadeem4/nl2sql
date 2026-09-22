@@ -21,6 +21,7 @@ the validation checks, the SQL and the rows, with a role selector that shows the
 validator refusing a plan before any SQL is generated.
 
 **Answering a question needs a model**: `OPENAI_API_KEY`, `OPENROUTER_API_KEY`,
+`ANTHROPIC_API_KEY` (Claude, with `pip install "nl2sql-engine[anthropic]"`),
 or a reachable Ollama daemon. The key-free replay mode relies on recorded model
 responses, and none ship, so without one of those the demo can show you the
 schema but cannot answer. `nl2sql demo --record` (with a key) records the guided

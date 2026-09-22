@@ -25,7 +25,7 @@ from .defaults import DEMO_LLM_CONFIG
 from .stamp import write_stamp
 
 
-PROVIDER_KEYS = ("OPENAI_API_KEY", "OPENROUTER_API_KEY")
+PROVIDER_KEYS = ("OPENAI_API_KEY", "OPENROUTER_API_KEY", "ANTHROPIC_API_KEY")
 
 
 def _load_demo_env(env_path: pathlib.Path) -> None:
