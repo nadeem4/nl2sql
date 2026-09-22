@@ -242,5 +242,17 @@ def test_a_record_keeps_each_sub_querys_intent_and_plan_next_to_its_sql():
     record = tier2._record(question, {"id": question.id, "role": "admin", "status": "fail"}, result, 1, 0.0, 0.1)
 
     assert record["plans"] == [{"id": "sq_a", "intent": "artist with most albums", "plan": plan}]
+    assert record["answer"] == ""
+
+
+def test_a_record_keeps_the_answer_text_the_faithfulness_check_read():
+    from nl2sql.api.query_api import QueryResult
+
+    question = load_gold_dataset()[0]
+    result = QueryResult(final_answer={"summary": "Rock leads.", "content": "1. Rock: 835"})
+
+    record = tier2._record(question, {"id": question.id, "role": "admin", "status": "fail"}, result, 1, 0.0, 0.1)
+
+    assert record["answer"] == "Rock leads.\n1. Rock: 835"
     assert tier2._record(question, {"id": question.id, "role": "admin", "status": "fail"}, None, 1, 0.0, 0.1)[
         "plans"] == []
