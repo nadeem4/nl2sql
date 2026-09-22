@@ -27,10 +27,9 @@ def _config_options(command, prefix: str = ""):
     Typer vendors its own click, so this duck-types rather than using
     ``isinstance`` against the ``click`` package.
     """
-    if hasattr(command, "commands"):
-        for name, sub in command.commands.items():
-            yield from _config_options(sub, f"{prefix} {name}".strip())
-        return
+    # A group (``benchmark`` has a ``publish`` subcommand) also has options of its own.
+    for name, sub in getattr(command, "commands", {}).items():
+        yield from _config_options(sub, f"{prefix} {name}".strip())
     for param in command.params:
         if param.param_type_name == "option" and any(
             opt == "--config" or opt.endswith("-config") for opt in param.opts

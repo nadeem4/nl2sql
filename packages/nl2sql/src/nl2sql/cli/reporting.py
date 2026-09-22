@@ -510,6 +510,42 @@ class ConsolePresenter:
             table.add_row(role, *(str(counts.get(o, 0)) for o in ("pass", "fail", "skip", "xfail")))
         self.console.print(table)
 
+    def print_tier2_scoreboard(self, board: Dict[str, Any]) -> None:
+        """Tier 2: tokens by node per config, the configs side by side, and where they differ."""
+        def pct(v):
+            return "-" if v is None else f"{v:.1%}"
+
+        def usd(v):
+            return "-" if v is None else f"${v:.4f}"
+
+        def sec(v):
+            return "-" if v is None else f"{v:.2f}s"
+
+        for name, cfg in board["configs"].items():
+            rows = [[node, t["calls"], t["input_tokens"], t["cached_input_tokens"], t["output_tokens"],
+                     t["reasoning_tokens"], sec((cfg["latency"]["by_node"].get(node) or {}).get("p50"))]
+                    for node, t in sorted(cfg["tokens_by_node"].items())]
+            if rows:
+                self.print_table(rows, title=f"Tokens by node: {name}",
+                                 columns=["Node", "Calls", "Input", "Cached", "Output", "Reasoning", "p50"])
+
+        rows = [[r["config"], f"{board['configs'][r['config']]['completed_cases']}/"
+                 f"{board['configs'][r['config']]['planned_cases']}", pct(r["accuracy"]),
+                 pct(r["answerability_precision"]), pct(r["answerability_recall"]), usd(r["cost_total"]),
+                 usd(r["cost_per_question"]), sec(r["latency_p50"]), sec(r["latency_p95"]), r["retries"],
+                 pct(r["determinism"])] for r in board["comparison"]["configs"]]
+        self.print_table(rows, title="Tier 2 scoreboard", columns=[
+            "Config", "Cases", "Accuracy", "Ans. P", "Ans. R", "Cost", "$/question", "p50", "p95",
+            "Retries", "Determinism"])
+        differences = board["comparison"]["differences"]
+        if differences:
+            names = list(board["configs"])
+            self.print_table([[d["id"], d["role"], *(d["outcomes"].get(n, "-") for n in names)]
+                              for d in differences],
+                             title="Questions the configs disagree on", columns=["ID", "Role", *names])
+        stopped = f"  STOPPED: {board['stopped']}" if board.get("stopped") else ""
+        self.console.print(f"Spent ${board['spent']:.4f} of ${board['max_cost']:.2f} cap{stopped}")
+
     def export_benchmark_report(self, report: Dict[str, Any], path: Path) -> None:
         """Writes the benchmark report as JSON."""
         path.parent.mkdir(parents=True, exist_ok=True)

@@ -70,6 +70,10 @@ class BenchmarkRunner:
         results.sort(key=lambda r: (r["id"], r["role"]))
         return BenchmarkResult(results=results, metrics=ModelEvaluator.summarize(results), iterations=iterations)
 
+    def cases(self) -> List[Tuple[GoldQuestion, str]]:
+        """Every (question, role) pair this runner would run, in dataset order."""
+        return self._cases()
+
     def _cases(self) -> List[Tuple[GoldQuestion, str]]:
         """Every (question, role) pair selected by ``include_ids`` and ``roles``."""
         dataset = load_gold_dataset(self.config.dataset_path)
@@ -91,6 +95,10 @@ class BenchmarkRunner:
 
     def _evaluate_case(self, question: GoldQuestion, role: str) -> Dict[str, Any]:
         """Runs one case and returns its report row."""
+        return self.run_case(question, role)[0]
+
+    def run_case(self, question: GoldQuestion, role: str) -> Tuple[Dict[str, Any], Optional[QueryResult]]:
+        """Runs and scores one case: its report row, and the result (None if the run raised)."""
         expected = question.expected[role]
         row: Dict[str, Any] = {"id": question.id, "question": question.question, "role": role,
                                "expected": expected, "status": "", "reason": "", "sql": "", "rows": None,
@@ -100,10 +108,10 @@ class BenchmarkRunner:
         try:
             result = self._run(question, role)
         except Exception as exc:  # one broken case must not abort the run
-            return {**row, "status": "fail", "reason": f"run raised {type(exc).__name__}: {exc}"}
+            return {**row, "status": "fail", "reason": f"run raised {type(exc).__name__}: {exc}"}, None
 
         status, reason = ModelEvaluator.score_case(question, role, result)
         samples = [sq.rows for sq in result.sub_queries if sq.rows is not None]
         return {**row, "status": status, "reason": reason,
                 "sql": result.sub_queries[0].sql if result.sub_queries else "",
-                "rows": samples[0].total_rows if samples else None}
+                "rows": samples[0].total_rows if samples else None}, result

@@ -367,7 +367,16 @@ nl2sql --env demo run --role viewer "Who are the top 5 customers by total spend?
 # Check the environment: Python, installed drivers, datasource connectivity, LLM key,
 # and the index (entries by type, schema version vs the latest snapshot)
 nl2sql doctor
+
+# Score the engine on the 43 Chinook gold questions. Tier 1 serves hand-written
+# plans from a local fake LLM (no key); tier 2 runs the real model per LLM
+# config, compares the configs, and stops before spend could pass --max-cost.
+nl2sql --env demo benchmark --tier 1
+nl2sql --env demo benchmark --tier 2 --llm gpt-5.4=configs/benchmark/gpt-5.4.yaml --max-cost 5
 ```
+
+See [the evaluation dataset](docs/testing/evaluation-dataset.md) for what each
+tier scores, the tier 2 scoreboard, the price table and the baseline check.
 
 `--env <name>` loads `.env.<name>`; `--env-file <path>` loads an exact file and
 takes precedence over `--env`. The file's variables also go into the process
@@ -402,6 +411,16 @@ forces an unresolvable install while a mismatched major is still rejected.
 
 See [Releasing](docs/development/releasing.md).
 
+## Benchmark results
+
+The latest tier 2 run per LLM config: the real model on the 43 Chinook gold
+questions. `nl2sql benchmark publish` writes this block from the committed
+records in `benchmarks/results/`.
+
+<!-- BENCHMARKS:START -->
+No benchmark runs recorded yet.
+<!-- BENCHMARKS:END -->
+
 ## Documentation
 
 - **[System Architecture](docs/architecture/overview.md)**: runtime topology and core flows
@@ -411,6 +430,7 @@ See [Releasing](docs/development/releasing.md).
 - **[Execution Isolation + Concurrency](docs/execution/isolation.md)**: what the runtime does and does not bound
 - **[Security Model](docs/security/model.md)**: RBAC, and what it is not
 - **[Observability](docs/observability/stack.md)**: metrics, logging, audit events
+- **[Evaluation](docs/testing/evaluation-dataset.md)**: the gold dataset, tier 1 (gold plans, no key) and tier 2 (the real model, with a cost cap)
 - **[Contributing](CONTRIBUTING.md)**: local setup and the test markers
 
 ## Repository structure

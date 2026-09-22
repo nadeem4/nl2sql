@@ -20,7 +20,13 @@ from nl2sql.evaluation.gold import GOLD_DATASET_PATH
 
 # Local CLI Imports
 from nl2sql.cli.commands.indexing import run_indexing
-from nl2sql.cli.commands.benchmark import run_benchmark as exec_benchmark
+from nl2sql.cli.commands.benchmark import (
+    publish_benchmarks as exec_publish,
+    run_benchmark as exec_benchmark,
+    run_tier2_benchmark as exec_tier2_benchmark,
+)
+from nl2sql.evaluation.records import HISTORY_PATH, README_PATH, RESULTS_DIR
+from nl2sql.evaluation.tier2 import DEFAULT_MAX_ACCURACY_DROP, DEFAULT_MAX_COST_INCREASE
 from nl2sql.cli.commands.run import run_pipeline 
 from nl2sql.cli.commands.info import list_available_adapters
 from nl2sql.cli.commands.demo import demo_command
@@ -225,15 +231,62 @@ def list_adapters():
     """
     list_available_adapters()
 
-@app.command()
+benchmark_app = typer.Typer(help="Score the engine against the Chinook gold dataset; `publish` the recorded runs.")
+app.add_typer(benchmark_app, name="benchmark")
+
+
+@benchmark_app.command("publish")
+def benchmark_publish(
+    results_dir: Annotated[pathlib.Path, typer.Option("--results-dir", help="Where the tier 2 result records are")] = RESULTS_DIR,
+    history_path: Annotated[pathlib.Path, typer.Option("--history-path", help="The history page to write")] = HISTORY_PATH,
+    readme_path: Annotated[pathlib.Path, typer.Option("--readme-path", help="The README whose BENCHMARKS block is replaced")] = README_PATH,
+):
+    """
+    Rebuild docs/benchmarks.md and the README results block from the tier 2 records.
+
+    Reads every record in benchmarks/results/; no key, no network, and the
+    same records always give byte-identical output.
+    """
+    exec_publish(results_dir, history_path, readme_path)
+
+
+@benchmark_app.callback(invoke_without_command=True)
 def benchmark(
-    tier: Annotated[Optional[int], typer.Option(
+    ctx: typer.Context,
+    tier:Annotated[Optional[int], typer.Option(
         "--tier",
         help=(
             "1: run the hand-written gold plans through the validator, generator and executor "
-            "with a local fake LLM (no API key). Omit to run the full pipeline with the configured LLM."
+            "with a local fake LLM (no API key). 2: run the real model end to end, per --llm "
+            "config, under a required --max-cost cap. Omit to run the full pipeline with the configured LLM."
         ),
     )] = None,
+    llm: Annotated[Optional[List[str]], typer.Option(
+        "--llm",
+        help="Tier 2: an LLM config to compare, as NAME=PATH to an llm.yaml-format file (repeatable). "
+             "Without it the project's LLM config runs as 'default'.",
+    )] = None,
+    max_cost: Annotated[Optional[float], typer.Option(
+        "--max-cost", help="Tier 2 (required): stop before a question that could take total spend past this many USD.",
+    )] = None,
+    passes: Annotated[int, typer.Option(
+        "--passes", help="Tier 2: run every question this many times per config and report determinism.",
+    )] = 1,
+    questions: Annotated[Optional[List[str]], typer.Option(
+        "--questions", help="Tier 2: only these question ids or tags (repeatable, or comma-separated).",
+    )] = None,
+    baseline: Annotated[Optional[pathlib.Path], typer.Option(
+        "--baseline", help="Tier 2: a committed scoreboard JSON to compare against; exits 1 on a regression.",
+    )] = None,
+    max_accuracy_drop: Annotated[float, typer.Option(
+        "--max-accuracy-drop", help="Tier 2 baseline: largest allowed accuracy drop, as a fraction (0.02 = 2 points).",
+    )] = DEFAULT_MAX_ACCURACY_DROP,
+    max_cost_increase: Annotated[float, typer.Option(
+        "--max-cost-increase", help="Tier 2 baseline: largest allowed rise in cost per question, as a fraction (0.2 = 20%).",
+    )] = DEFAULT_MAX_COST_INCREASE,
+    results_dir: Annotated[pathlib.Path, typer.Option(
+        "--results-dir", help="Tier 2: where to write one result record per config (commit them, then `benchmark publish`).",
+    )] = RESULTS_DIR,
     dataset: Annotated[pathlib.Path, typer.Option(help="Path to the gold dataset YAML")] = GOLD_DATASET_PATH,
     ds_config_path: DatasourceConfigOption = None,
     secrets_config_path: SecretsConfigOption = None,
@@ -243,7 +296,7 @@ def benchmark(
     bench_config_path: Annotated[Optional[pathlib.Path], typer.Option(help="Path to LLM matrix config")] = None,
     iterations: Annotated[int, typer.Option(help="Iterations per test case (tier 1 always runs once)")] = 3,
     include_ids: Annotated[Optional[List[str]], typer.Option(help="Specific Test IDs to run")] = None,
-    role: Annotated[Optional[List[str]], typer.Option("--role", help="Only run as this role (repeatable)")] = None,
+    role: Annotated[Optional[List[str]], typer.Option("--role", help="Only run as this role (repeatable; tier 2 defaults to admin)")] = None,
     export_path: Annotated[Optional[pathlib.Path], typer.Option(help="Where to write the JSON report")] = None,
 ):
     """
@@ -252,7 +305,14 @@ def benchmark(
     Prints a table and a pass/fail/skip summary per role, writes a JSON report
     (benchmark_report.json unless --export-path is given) and exits 1 if any
     case failed.
+
+    Tier 2 writes a scoreboard (benchmark_tier2.json) comparing every --llm
+    config and exits 0 when complete, 1 on a baseline regression, 2 without
+    --max-cost and 3 when the cap stopped it early. Each tier 2 run also
+    writes one result record per config to --results-dir.
     """
+    if ctx.invoked_subcommand:
+        return
     bench_run_config = BenchmarkConfig(
         dataset_path=dataset,
         config_path=ds_config_path,
@@ -267,6 +327,11 @@ def benchmark(
         policies_path=policies_config_path,
     )
 
+    if tier == 2:
+        exec_tier2_benchmark(bench_run_config, llm_specs=llm, max_cost=max_cost, passes=passes,
+                             questions=questions, baseline=baseline, max_accuracy_drop=max_accuracy_drop,
+                             max_cost_increase=max_cost_increase, results_dir=results_dir)
+        return
     exec_benchmark(bench_run_config, tier=tier)
 
 

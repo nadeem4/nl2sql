@@ -129,6 +129,7 @@ nav:
   - Testing:
     - Testing Architecture: testing/architecture.md
     - Evaluation Dataset: testing/evaluation-dataset.md
+    - Benchmark Results: benchmarks.md
   - API:
     - Overview: api/index.md
     - Core API (Python):

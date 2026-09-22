@@ -1,0 +1,9 @@
+# Tier 2 benchmark config: every LLM node on gpt-5.4.
+#   nl2sql --env demo benchmark --tier 2 --llm gpt-5.4=configs/benchmark/gpt-5.4.yaml --max-cost 5
+version: 1
+default:
+  provider: openai
+  model: gpt-5.4
+  temperature: 0.0
+  api_key: ${env:OPENAI_API_KEY}
+agents: {}

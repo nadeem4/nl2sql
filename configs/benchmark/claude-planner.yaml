@@ -1,0 +1,20 @@
+# Tier 2 benchmark config: the planner and refiner on Claude Opus 5 (Anthropic's
+# own API; needs the anthropic extra and ANTHROPIC_API_KEY), the rest on gpt-5.4.
+# Opus 5 rejects sampling parameters, so no temperature is sent to it.
+version: 1
+default:
+  provider: openai
+  model: gpt-5.4
+  temperature: 0.0
+  api_key: ${env:OPENAI_API_KEY}
+agents:
+  astplanner:
+    provider: anthropic
+    model: claude-opus-5
+    temperature: null
+    api_key: ${env:ANTHROPIC_API_KEY}
+  refiner:
+    provider: anthropic
+    model: claude-opus-5
+    temperature: null
+    api_key: ${env:ANTHROPIC_API_KEY}
