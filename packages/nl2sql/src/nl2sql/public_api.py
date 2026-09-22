@@ -20,7 +20,6 @@ from nl2sql.api.auth_api import AuthAPI
 from nl2sql.api.settings_api import SettingsAPI
 from nl2sql.api.result_api import ResultAPI
 from nl2sql.api.policy_api import PolicyAPI
-from nl2sql.api.benchmark_api import BenchmarkAPI
 
 
 class NL2SQL:
@@ -81,7 +80,16 @@ class NL2SQL:
         self.settings = SettingsAPI(self._ctx)
         self.results = ResultAPI(self._ctx)
         self.policy = PolicyAPI(self._ctx)
-        self.benchmark = BenchmarkAPI(self._ctx)
+        self._benchmark = None
+
+    @property
+    def benchmark(self):
+        """The benchmark API, built on first use so ``import nl2sql`` never loads ``nl2sql.evaluation``."""
+        if self._benchmark is None:
+            from nl2sql.api.benchmark_api import BenchmarkAPI
+
+            self._benchmark = BenchmarkAPI(self._ctx)
+        return self._benchmark
 
     @property
     def context(self) -> NL2SQLContext:

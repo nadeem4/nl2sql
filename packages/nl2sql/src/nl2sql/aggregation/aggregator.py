@@ -4,7 +4,7 @@ from typing import Dict, List, Tuple
 
 import polars as pl
 from nl2sql.execution.contracts import ArtifactRef
-from nl2sql.pipeline.nodes.global_planner.schemas import ExecutionDAG, LogicalNode, LogicalEdge
+from nl2sql.execution.dag import ExecutionDAG, LogicalNode, LogicalEdge
 
 from .engines.polars_duckdb import PolarsDuckdbEngine
 

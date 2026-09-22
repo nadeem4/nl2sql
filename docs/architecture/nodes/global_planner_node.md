@@ -164,3 +164,4 @@ Logs failures via `logger.error`.
 
 - `packages/nl2sql/src/nl2sql/pipeline/nodes/global_planner/node.py`
 - `packages/nl2sql/src/nl2sql/pipeline/nodes/global_planner/schemas.py`
+- `packages/nl2sql/src/nl2sql/execution/dag.py` (the DAG models, shared with the aggregation service)

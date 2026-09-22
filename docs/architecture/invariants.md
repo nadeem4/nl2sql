@@ -241,7 +241,7 @@ Post-combine ops must target known combine groups, all edges must reference exis
 
 ### Enforcement Points
 - `GlobalPlannerNode.__call__()` in `nl2sql.pipeline.nodes.global_planner.node`
-- `ExecutionDAG._layered_toposort()` in `nl2sql.pipeline.nodes.global_planner.schemas`
+- `ExecutionDAG._layered_toposort()` in `nl2sql.execution.dag`
 
 ### Failure Behavior
 Raises `ValueError`, leading to `PipelineError` with `PLANNER_FAILED`.
@@ -257,7 +257,7 @@ Ensures deterministic and well-ordered aggregation execution.
 Each relation schema’s column names must be unique.
 
 ### Enforcement Points
-- `RelationSchema.validate_unique_columns()` in `nl2sql.pipeline.nodes.global_planner.schemas`
+- `RelationSchema.validate_unique_columns()` in `nl2sql.execution.dag`
 
 ### Failure Behavior
 Raises `ValueError` during schema validation.
@@ -361,7 +361,7 @@ Ensures latency bounds and prevents hung requests.
 - `packages/nl2sql/src/nl2sql/pipeline/nodes/executor/node.py`
 - `packages/nl2sql/src/nl2sql/execution/executor/sql_executor.py`
 - `packages/nl2sql/src/nl2sql/pipeline/nodes/global_planner/node.py`
-- `packages/nl2sql/src/nl2sql/pipeline/nodes/global_planner/schemas.py`
+- `packages/nl2sql/src/nl2sql/execution/dag.py`
 - `packages/nl2sql/src/nl2sql/aggregation/aggregator.py`
 - `packages/nl2sql/src/nl2sql/context.py`
 - `packages/nl2sql/src/nl2sql/schema/store.py`

@@ -1,5 +1,7 @@
 # nl2sql package
 
+import importlib
+
 from .public_api import NL2SQL, QueryResult
 
 # Also expose individual API modules for more granular access
@@ -11,12 +13,24 @@ from .api.auth_api import AuthAPI
 from .api.settings_api import SettingsAPI
 from .api.result_api import ResultAPI
 from .api.policy_api import PolicyAPI
-from .api.benchmark_api import BenchmarkAPI
 
 # Also expose core models and enums
 from .common.errors import ErrorSeverity, ErrorCode, PipelineError
 from .auth.models import UserContext
-from .evaluation.types import BenchmarkConfig
+
+# The benchmark lives in nl2sql.evaluation, which the runtime never needs, so
+# its names are imported only when first asked for.
+_LAZY = {
+    "BenchmarkAPI": "nl2sql.api.benchmark_api",
+    "BenchmarkConfig": "nl2sql.evaluation.types",
+}
+
+
+def __getattr__(name):
+    if name in _LAZY:
+        return getattr(importlib.import_module(_LAZY[name]), name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
 
 __all__ = [
     "NL2SQL",
