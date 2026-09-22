@@ -2,10 +2,13 @@ from typing import Dict, List, Any, Set
 from threading import RLock
 
 from nl2sql_adapter_sdk.capabilities import DatasourceCapability
+from nl2sql.common.logger import get_logger
 from nl2sql.datasources.discovery import discover_adapters
 from nl2sql.datasources.protocols import DatasourceAdapterProtocol
 from nl2sql.secrets import SecretManager
 from .models import DatasourceConfig, ConnectionConfig, SECRET_ARG_HINTS, _is_secret_arg  # noqa: F401
+
+logger = get_logger(__name__)
 
 # Resolved connection args hold plaintext secrets (see ``resolved_connection``),
 # so anything that renders them -- an API payload, a `doctor` row, a pydantic
@@ -97,6 +100,18 @@ class DatasourceRegistry:
                 normalized.add(str(cap))
         return normalized
 
+    def _read_capabilities(self, ds_id: str, adapter: Any) -> Set[str]:
+        """The adapter's declared capabilities, or none at all if it cannot say.
+
+        Fails closed: an adapter whose ``capabilities()`` is missing or raises
+        registers with no capabilities, so nothing is routed to or executed on it.
+        """
+        try:
+            return self._normalize_capabilities(adapter.capabilities())
+        except Exception as exc:
+            logger.error(f"Failed to get capabilities for datasource '{ds_id}'; it gets none. {exc}")
+            return set()
+
     def register_datasource(self, config: DatasourceConfig) -> DatasourceAdapterProtocol:
         """Registers a new datasource dynamically.
 
@@ -137,14 +152,10 @@ class DatasourceRegistry:
                 raise ValueError(
                     redact_connection_secrets(str(e), connection_args)
                 ) from None
+            capabilities = self._read_capabilities(ds_id, adapter)
             with self._lock:
                 self._adapters[ds_id] = adapter
-                if hasattr(adapter, "capabilities"):
-                    self._capabilities[ds_id] = self._normalize_capabilities(
-                        adapter.capabilities()
-                    )
-                else:
-                    self._capabilities[ds_id] = {DatasourceCapability.SUPPORTS_SQL.value}
+                self._capabilities[ds_id] = capabilities
             return adapter
         else:
             raise ValueError(
@@ -186,6 +197,19 @@ class DatasourceRegistry:
             if datasource_id not in self._capabilities:
                 raise ValueError(f"Unknown datasource ID: {datasource_id}")
             return set(self._capabilities[datasource_id])
+
+    def supports(self, datasource_id: str, *capabilities: Any) -> bool:
+        """True only if the datasource is registered and declares every one of ``capabilities``.
+
+        The one capability check: routing and execution both ask it. An
+        unknown datasource, or one whose adapter could not report its
+        capabilities, supports nothing.
+        """
+        with self._lock:
+            declared = self._capabilities.get(datasource_id)
+        if declared is None:
+            return False
+        return self._normalize_capabilities(capabilities) <= declared
 
     def list_adapters(self) -> List[DatasourceAdapterProtocol]:
         """Returns a list of all registered adapters.

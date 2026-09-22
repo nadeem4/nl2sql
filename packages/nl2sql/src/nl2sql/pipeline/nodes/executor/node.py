@@ -29,20 +29,10 @@ class ExecutorNode:
 
         The SQL executor is the only executor, so a datasource that does not
         declare SUPPORTS_SQL -- or whose adapter cannot report capabilities --
-        gets no executor at all rather than being run as SQL anyway.
+        gets no executor at all rather than being run as SQL anyway. The
+        registry's check fails closed.
         """
-        adapter = self.ds_registry.get_adapter(ds_id)
-        try:
-            capabilities = adapter.capabilities()
-        except Exception as exc:
-            logger.error(f"Failed to get capabilities for datasource '{ds_id}'. {exc}")
-            return False
-
-        normalized = {
-            cap.value if isinstance(cap, DatasourceCapability) else str(cap)
-            for cap in capabilities
-        }
-        return DatasourceCapability.SUPPORTS_SQL.value in normalized
+        return self.ds_registry.supports(ds_id, DatasourceCapability.SUPPORTS_SQL)
 
     def __call__(self, state: SubgraphExecutionState) -> Dict[str, Any]:
         try:

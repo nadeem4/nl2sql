@@ -41,8 +41,7 @@ class SqlExecutorService:
             )
 
         ds_id = request.datasource_id
-        caps = self.ds_registry.get_capabilities(ds_id)
-        if DatasourceCapability.SUPPORTS_SQL.value not in caps:
+        if not self.ds_registry.supports(ds_id, DatasourceCapability.SUPPORTS_SQL):
             errors.append(
                 PipelineError(
                     node="sql_executor",
