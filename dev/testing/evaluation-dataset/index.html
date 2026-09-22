@@ -16,7 +16,7 @@
         <link rel="prev" href="../architecture/">
       
       
-        <link rel="next" href="../../api/">
+        <link rel="next" href="../../benchmarks/">
       
       
         
@@ -3196,10 +3196,121 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#tier-2-the-real-model-end-to-end" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tier 2: the real model, end to end
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Tier 2: the real model, end to end">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#comparing-configs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Comparing configs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cost-and-the-cap" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cost and the cap
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-scoreboard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The scoreboard
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#baseline-regression-check" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Baseline regression check
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#results-over-time" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Results over time
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-tier-2-is-tested" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How tier 2 is tested
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
     </ul>
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../benchmarks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Benchmark Results
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -3925,6 +4036,89 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#tier-2-the-real-model-end-to-end" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tier 2: the real model, end to end
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Tier 2: the real model, end to end">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#comparing-configs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Comparing configs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cost-and-the-cap" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cost and the cap
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-scoreboard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The scoreboard
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#baseline-regression-check" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Baseline regression check
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#results-over-time" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Results over time
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-tier-2-is-tested" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How tier 2 is tested
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -3970,6 +4164,30 @@ answers against.</p>
 <tr>
 <td><code>packages/nl2sql/src/nl2sql/evaluation/tier1.py</code></td>
 <td><code>load_gold_plans()</code>, the gold-plan fake LLM, <code>run_tier1()</code></td>
+</tr>
+<tr>
+<td><code>packages/nl2sql/src/nl2sql/evaluation/tier2.py</code></td>
+<td><a href="#tier-2-the-real-model-end-to-end">Tier 2</a>: the cost cap, the scoreboard, the comparison and the baseline check</td>
+</tr>
+<tr>
+<td><code>packages/nl2sql/src/nl2sql/evaluation/prices.py</code></td>
+<td>The dated price table tier 2 bills every call from</td>
+</tr>
+<tr>
+<td><code>packages/nl2sql/src/nl2sql/evaluation/records.py</code></td>
+<td>Tier 2 result records and <code>nl2sql benchmark publish</code></td>
+</tr>
+<tr>
+<td><code>configs/benchmark/*.yaml</code></td>
+<td>Example LLM configs to compare with tier 2</td>
+</tr>
+<tr>
+<td><code>packages/nl2sql/src/nl2sql/evaluation/baselines/</code></td>
+<td>Where a committed tier 2 baseline scoreboard goes (none yet)</td>
+</tr>
+<tr>
+<td><code>benchmarks/results/</code></td>
+<td>Committed tier 2 result records, one per run and config</td>
 </tr>
 <tr>
 <td><code>packages/nl2sql/src/nl2sql/evaluation/evaluator.py</code></td>
@@ -4069,10 +4287,12 @@ an API key and checks that:</p>
 </ul>
 <h2 id="running-the-benchmark">Running the benchmark</h2>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>benchmark<span class="w"> </span>--tier<span class="w"> </span><span class="m">1</span><span class="w">        </span><span class="c1"># gold plans, no API key</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>benchmark<span class="w">                 </span><span class="c1"># full pipeline, the configured LLM</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>benchmark<span class="w"> </span>--tier<span class="w"> </span><span class="m">2</span><span class="w"> </span>--max-cost<span class="w"> </span><span class="m">5</span><span class="w">   </span><span class="c1"># the real model, scored and priced</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>benchmark<span class="w">                 </span><span class="c1"># full pipeline, the configured LLM</span>
 </code></pre></div>
-<p>Either way every question runs once per role in its <code>expected</code> map (narrow
-with <code>--include-ids</code> and <code>--role</code>), and each run is scored:</p>
+<p>Each question runs once per role in its <code>expected</code> map (narrow with
+<code>--include-ids</code> and <code>--role</code>; tier 2 runs as <code>admin</code> unless <code>--role</code> says
+otherwise), and each run is scored:</p>
 <table>
 <thead>
 <tr>
@@ -4140,6 +4360,323 @@ result, and that the answerability verdict served follows the gold dataset.</p>
 <p>When a gold plan fails, the fault is in the engine or in the plan. Fix an
 engine bug with a regression test; do not change the gold data to make a plan
 pass unless the gold data is itself wrong.</p>
+<h2 id="tier-2-the-real-model-end-to-end">Tier 2: the real model, end to end</h2>
+<p>Tier 2 runs the whole product -- every LLM node on a real model -- on the gold
+questions and scores it with the same runner and scoring as tier 1. It costs
+money, so it never runs in CI (it refuses when <code>CI</code> is set) and never runs
+without a dollar cap. The key comes from the environment or the LLM config
+(<code>${env:...}</code>), never from the command line; traces follow <code>TRACE_MODE</code> as for
+any run.</p>
+<p>The command the owner runs for a first baseline:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>benchmark<span class="w"> </span>--tier<span class="w"> </span><span class="m">2</span><span class="w"> </span>--llm<span class="w"> </span>gpt-5.4<span class="o">=</span>configs/benchmark/gpt-5.4.yaml<span class="w"> </span>--max-cost<span class="w"> </span><span class="m">5</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--max-cost USD</code></td>
+<td>required</td>
+<td>Stop before a question that could take the run's total spend past this</td>
+</tr>
+<tr>
+<td><code>--llm NAME=PATH</code></td>
+<td>the project's LLM config, as <code>default</code></td>
+<td>An LLM config to compare (repeatable). <code>PATH</code> is an ordinary <code>llm.yaml</code>-format file</td>
+</tr>
+<tr>
+<td><code>--role ROLE</code></td>
+<td><code>admin</code></td>
+<td>Run as this role (repeatable)</td>
+</tr>
+<tr>
+<td><code>--passes N</code></td>
+<td><code>1</code></td>
+<td>Run every question N times per config and report determinism</td>
+</tr>
+<tr>
+<td><code>--questions ID_OR_TAG</code></td>
+<td>every question</td>
+<td>Only these question ids or tags (repeatable or comma-separated), e.g. <code>--questions unanswerable,chinook_001</code></td>
+</tr>
+<tr>
+<td><code>--export-path PATH</code></td>
+<td><code>benchmark_tier2.json</code></td>
+<td>Where to write the full scoreboard</td>
+</tr>
+<tr>
+<td><code>--results-dir DIR</code></td>
+<td><code>benchmarks/results</code></td>
+<td>Where to write one result record per config</td>
+</tr>
+<tr>
+<td><code>--baseline PATH</code></td>
+<td>none</td>
+<td>A committed scoreboard to check against (below)</td>
+</tr>
+<tr>
+<td><code>--max-accuracy-drop F</code></td>
+<td><code>0.02</code></td>
+<td>Baseline: largest allowed accuracy drop (0.02 is two points)</td>
+</tr>
+<tr>
+<td><code>--max-cost-increase F</code></td>
+<td><code>0.2</code></td>
+<td>Baseline: largest allowed rise in cost per question (0.2 is 20%)</td>
+</tr>
+</tbody>
+</table>
+<p>The option is <code>--llm</code>, not <code>--config</code>: on every <code>nl2sql</code> command <code>--config</code> is
+the datasource config and <code>--llm-config</code> the single LLM config path.</p>
+<p>Exit codes: 0 when every config ran, 1 on a baseline regression or a failed
+run, 2 on a usage error (no <code>--max-cost</code>, a malformed <code>--llm</code>, <code>CI</code> set), 3
+when the cap stopped the run early.</p>
+<h3 id="comparing-configs">Comparing configs</h3>
+<p>Each <code>--llm</code> config runs on the same questions, one after another, and the
+scoreboard puts them side by side and lists every question one config passed
+and another failed (with <code>--passes</code> &gt; 1 a question can also be <code>flaky</code>). Since
+<a href="../../configuration/llm/">per-node providers</a>, a config can put each LLM node
+(<code>datasourceresolver</code>, <code>decomposer</code>, <code>astplanner</code>, <code>refiner</code>,
+<code>answersynthesizer</code>) on its own provider and model. Three examples are in
+<code>configs/benchmark/</code>:</p>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Planner and refiner</th>
+<th>Resolver, decomposer, synthesizer</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>gpt-5.4.yaml</code></td>
+<td>gpt-5.4</td>
+<td>gpt-5.4</td>
+</tr>
+<tr>
+<td><code>gpt-5.4-mini-helpers.yaml</code></td>
+<td>gpt-5.4</td>
+<td>gpt-5.4-mini</td>
+</tr>
+<tr>
+<td><code>claude-planner.yaml</code></td>
+<td>claude-opus-5 (needs the <code>anthropic</code> extra and <code>ANTHROPIC_API_KEY</code>)</td>
+<td>gpt-5.4</td>
+</tr>
+</tbody>
+</table>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>benchmark<span class="w"> </span>--tier<span class="w"> </span><span class="m">2</span><span class="w"> </span>--max-cost<span class="w"> </span><span class="m">10</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span>--llm<span class="w"> </span>gpt-5.4<span class="o">=</span>configs/benchmark/gpt-5.4.yaml<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span>--llm<span class="w"> </span>mini-helpers<span class="o">=</span>configs/benchmark/gpt-5.4-mini-helpers.yaml<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span>--llm<span class="w"> </span>claude-planner<span class="o">=</span>configs/benchmark/claude-planner.yaml
+</code></pre></div>
+<p>A model that is not in <code>VERIFIED_MODELS</code> (<code>nl2sql/cli/common/api_key.py</code>) gets
+a warning: the engine's parameters have not been checked against it.</p>
+<h3 id="cost-and-the-cap">Cost and the cap</h3>
+<p>Every LLM call is billed from <code>nl2sql/evaluation/prices.py</code>, a committed table
+of USD per 1M tokens, dated with the day it was checked:</p>
+<table>
+<thead>
+<tr>
+<th>Model</th>
+<th>Input</th>
+<th>Cached input</th>
+<th>Cache write</th>
+<th>Output</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>gpt-5.4</td>
+<td>2.50</td>
+<td>0.25</td>
+<td>2.50</td>
+<td>15.00</td>
+<td>OpenAI pricing page, 2026-09-21</td>
+</tr>
+<tr>
+<td>gpt-5.4-mini</td>
+<td>0.75</td>
+<td>0.075</td>
+<td>0.75</td>
+<td>4.50</td>
+<td>OpenAI pricing page, 2026-09-21</td>
+</tr>
+<tr>
+<td>claude-opus-5</td>
+<td>5.00</td>
+<td>0.50</td>
+<td>6.25</td>
+<td>25.00</td>
+<td>Anthropic model table (claude-api skill, cached 2026-06-24)</td>
+</tr>
+<tr>
+<td>claude-sonnet-5</td>
+<td>2.00</td>
+<td>0.20</td>
+<td>2.50</td>
+<td>10.00</td>
+<td>same</td>
+</tr>
+<tr>
+<td>claude-haiku-4-5</td>
+<td>1.00</td>
+<td>0.10</td>
+<td>1.25</td>
+<td>5.00</td>
+<td>same</td>
+</tr>
+</tbody>
+</table>
+<p>A call costs <code>(input - cached - cache_write) x input + cached x cached_input +
+cache_write x cache_write_rate + output x output</code>, from the token counts each
+wire adapter records in <code>QueryResult.usage</code>. Reasoning tokens are part of
+output and billed as output. OpenAI charges nothing extra to write its
+automatic cache; Anthropic bills a cache write at 1.25x input and a read at
+0.1x. Each call is priced by the model its node is configured with, so a dated
+snapshot name in the response still prices correctly.</p>
+<p>Before any call, every model any LLM node of any config would use must have a
+price; a missing one is an error naming the config, node and model. Before
+each question the run adds the dearest question seen so far to the running
+total and stops if that could pass <code>--max-cost</code>. The cap covers the whole run
+(every config and pass), and the first question always runs, so the total can
+exceed the cap only by what one question costs more than the dearest before
+it. The running spend prints after every question. A stopped run still writes
+its scoreboard, marked <code>"stopped": "max_cost"</code>, with <code>completed_cases</code> short
+of <code>planned_cases</code>.</p>
+<p>Tier 2 turns the plan cache off for its run (<code>PLAN_CACHE_ENABLED</code>), so a
+second pass asks the planner again instead of replaying the first, and scores
+refusals against the generic message, as tier 1 does.</p>
+<h3 id="the-scoreboard">The scoreboard</h3>
+<p><code>benchmark_tier2.json</code> holds the run (<code>passes</code>, <code>roles</code>, <code>questions</code>,
+<code>max_cost</code>, <code>spent</code>, <code>stopped</code>, <code>prices_checked_on</code>), one entry per config
+under <code>configs</code>, and a <code>comparison</code>. Each config has:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>What it is</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>models</code></td>
+<td><code>provider:model</code> per LLM node</td>
+</tr>
+<tr>
+<td><code>planned_cases</code>, <code>completed_cases</code></td>
+<td>Cases the run would make, and made</td>
+</tr>
+<tr>
+<td><code>summary</code></td>
+<td>pass/fail counts per role, as tier 1 reports</td>
+</tr>
+<tr>
+<td><code>accuracy</code></td>
+<td><code>overall</code>, <code>by_tag</code> and <code>by_difficulty</code>: passes against the gold result</td>
+</tr>
+<tr>
+<td><code>answerability</code></td>
+<td><code>precision</code> and <code>recall</code> of refusing as unanswerable: true refusals of the four unanswerable questions, false refusals of answerable ones, and missed unanswerables</td>
+</tr>
+<tr>
+<td><code>tokens_by_node</code></td>
+<td>calls, input, cached input, cache write, output and reasoning tokens per node</td>
+</tr>
+<tr>
+<td><code>cost</code></td>
+<td>dollars <code>total</code> and <code>per_question</code> (each result row has its own <code>cost</code>)</td>
+</tr>
+<tr>
+<td><code>latency</code></td>
+<td>p50 and p95 seconds per question, and per node</td>
+</tr>
+<tr>
+<td><code>retries</code></td>
+<td>refiner retries in total, and questions that needed one</td>
+</tr>
+<tr>
+<td><code>errors_by_code</code></td>
+<td>error codes the runs ended with (<code>EXCEPTION</code> for a run that raised)</td>
+</tr>
+<tr>
+<td><code>determinism</code></td>
+<td>with <code>--passes</code> &gt; 1: the share of questions whose SQL and rows were identical in every pass, and which ones differed</td>
+</tr>
+<tr>
+<td><code>results</code></td>
+<td>one row per run: status, reason, SQL, cost, latency, tokens, retries</td>
+</tr>
+</tbody>
+</table>
+<p><code>comparison.configs</code> is one row per config (accuracy, answerability, cost,
+latency, retries, determinism); <code>comparison.differences</code> lists the questions
+the configs disagree on. The command prints the same as tables:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>                          Tier 2 scoreboard
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>Config        Cases  Accuracy  Ans. P  Ans. R  Cost     $/question  p50    p95    Retries  Determinism
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>gpt-5.4       8/8    100.0%    100.0%  100.0%  $0.0806  $0.0101     0.08s  0.25s  0        100.0%
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>mini-helpers  8/8    75.0%     100.0%  100.0%  $0.0372  $0.0046     0.09s  0.09s  0        100.0%
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>                  Questions the configs disagree on
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>ID           Role   gpt-5.4  mini-helpers
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>chinook_018  admin  pass     fail
+</code></pre></div>
+<p>(a run against the fake LLM, with one plan deliberately wrong on the second
+server.)</p>
+<h3 id="baseline-regression-check">Baseline regression check</h3>
+<p><code>--baseline PATH</code> compares the run against a committed scoreboard, config by
+config (by name; a config the baseline lacks is skipped). It exits 1 if
+accuracy drops by more than <code>--max-accuracy-drop</code> or cost per question rises
+by more than <code>--max-cost-increase</code>. Baselines go in
+<code>packages/nl2sql/src/nl2sql/evaluation/baselines/</code>; none is committed yet. To
+make one, run tier 2 on the full set and copy its scoreboard there:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>benchmark<span class="w"> </span>--tier<span class="w"> </span><span class="m">2</span><span class="w"> </span>--llm<span class="w"> </span>gpt-5.4<span class="o">=</span>configs/benchmark/gpt-5.4.yaml<span class="w"> </span>--max-cost<span class="w"> </span><span class="m">5</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span>--export-path<span class="w"> </span>packages/nl2sql/src/nl2sql/evaluation/baselines/gpt-5.4.json
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="c1"># later</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>benchmark<span class="w"> </span>--tier<span class="w"> </span><span class="m">2</span><span class="w"> </span>--llm<span class="w"> </span>gpt-5.4<span class="o">=</span>configs/benchmark/gpt-5.4.yaml<span class="w"> </span>--max-cost<span class="w"> </span><span class="m">5</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">  </span>--baseline<span class="w"> </span>packages/nl2sql/src/nl2sql/evaluation/baselines/gpt-5.4.json
+</code></pre></div>
+<h3 id="results-over-time">Results over time</h3>
+<p>Every tier 2 run also writes one record per config to <code>benchmarks/results/</code>,
+named <code>&lt;YYYY-MM-DD&gt;_&lt;engine-version&gt;_&lt;config&gt;.json</code> (<code>-2</code>, <code>-3</code>... when the
+name is taken that day). A record holds the UTC date and time, the engine
+version and git commit, the dataset name and the sha256 of
+<code>chinook_gold.yaml</code> (runs on a different gold set are never shown as
+comparable), the config name and <code>provider:model</code> per node, the roles and
+passes, the headline metrics (accuracy, answerability precision and recall,
+dollars total and per question, input / cached / output tokens per question,
+p50 and p95 latency, determinism), <code>stopped</code> and <code>partial</code>, and the config's
+full scoreboard.</p>
+<p><code>nl2sql benchmark publish</code> (no key, no network) reads every record and
+rewrites <code>docs/benchmarks.md</code> (every run, newest first, and the latest run per
+config) and the block between <code>&lt;!-- BENCHMARKS:START --&gt;</code> and
+<code>&lt;!-- BENCHMARKS:END --&gt;</code> in <code>README.md</code>. It reads no clock, so the same
+records always give byte-identical pages. The workflow:</p>
+<ol>
+<li>Run tier 2 (it writes the records).</li>
+<li>Commit the new files in <code>benchmarks/results/</code>.</li>
+<li>Run <code>nl2sql benchmark publish</code>.</li>
+<li>Commit the <code>README.md</code> and <code>docs/benchmarks.md</code> changes.</li>
+</ol>
+<p><code>packages/nl2sql/tests/unit/test_benchmark_records.py</code> checks in CI, with no
+key, that the committed README block and <code>docs/benchmarks.md</code> are exactly what
+<code>publish</code> makes from the committed records.</p>
+<h3 id="how-tier-2-is-tested">How tier 2 is tested</h3>
+<p>With no key and no spending: <code>packages/nl2sql/tests/e2e/test_benchmark_tier2_fake_llm.py</code>
+points ordinary LLM config files at two <code>FakeLLMServer</code>s serving the gold
+plans with canned usage (cached and reasoning tokens included), one with a
+plan deliberately wrong. It checks the scoring, the comparison and its
+differences, the dollars against the price table, the cap stopping mid-run
+with a partial scoreboard, an unpriced model failing before any call, and two
+passes with the plan cache off. <code>tests/unit/test_tier2_scoreboard.py</code> and
+<code>tests/cli/test_benchmark_tier2_command.py</code> cover the scoreboard, the
+baseline check, the refusal to start without <code>--max-cost</code> and the exit codes.</p>
 
 
 
