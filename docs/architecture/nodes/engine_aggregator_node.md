@@ -66,6 +66,8 @@ Side effects:
 
 1. Read `execution_dag` and `artifact_refs`.
 2. Invoke `AggregationService.execute(dag, artifact_refs)`.
+   - A `join`/`compare` combine resolves each join key against its frame's columns. A key written with a side or sub-query prefix (`right.customer`, `sq_2.customer`) resolves to the bare column when only that exists; an unknown key is left for polars to report.
+   - A post-combine op (`PolarsDuckdbEngine.post_op`) applies every field it carries, in SQL's order: the reshaping its `operation` names (`aggregate` groups with polars' `group_by`, `project` selects `expected_schema`), then its `filters` (after an aggregate they filter the aggregated rows, as HAVING does), its `order_by`, and its `limit`. A `filter` op with `order_by` and `limit`, as the decomposer's prompt used to show, keeps all three.
 3. Build `AggregatorResponse` with `terminal_results`.
 4. Return success reasoning.
 5. On exception, emit `AGGREGATOR_FAILED`.
@@ -142,6 +144,7 @@ Logs failures via `logger.error`.
 
 - Fails if required artifacts are missing.
 - No streaming or partial aggregation.
+- Several post-combine ops on one combine group are siblings, not a chain: each reads the combine's output and is its own terminal result.
 
 ---
 

@@ -9,6 +9,65 @@ from nl2sql.execution.contracts import ArtifactRef
 from nl2sql.execution.artifacts import build_artifact_store
 
 
+def _column(frame: pl.DataFrame, key: str) -> str:
+    """A join key as a column of ``frame``.
+
+    Models write keys qualified by side or sub-query (``right.customer``,
+    ``sq_2.customer``); the frames have plain column names. An unknown key is
+    returned unchanged, so polars reports it.
+    """
+    if key in frame.columns or not key or "." not in key:
+        return key
+    bare = key.rsplit(".", 1)[1]
+    return bare if bare in frame.columns else key
+
+
+def _filter(rows: pl.DataFrame, filters: List[Dict[str, Any]]) -> pl.DataFrame:
+    for flt in filters:
+        col, op, val = pl.col(flt.get("attribute")), flt.get("operator"), flt.get("value")
+        if op == "=":
+            rows = rows.filter(col == val)
+        elif op == "!=":
+            rows = rows.filter(col != val)
+        elif op == ">":
+            rows = rows.filter(col > val)
+        elif op == ">=":
+            rows = rows.filter(col >= val)
+        elif op == "<":
+            rows = rows.filter(col < val)
+        elif op == "<=":
+            rows = rows.filter(col <= val)
+        elif op == "between" and isinstance(val, list) and len(val) == 2:
+            rows = rows.filter((col >= val[0]) & (col <= val[1]))
+        elif op == "in" and isinstance(val, list):
+            rows = rows.filter(col.is_in(val))
+        elif op == "contains":
+            rows = rows.filter(col.cast(pl.Utf8).str.contains(str(val)))
+    return rows
+
+
+_AGGREGATIONS = {
+    "count": lambda c: c.count(),
+    "sum": lambda c: c.sum(),
+    "avg": lambda c: c.mean(),
+    "min": lambda c: c.min(),
+    "max": lambda c: c.max(),
+}
+
+
+def _aggregate(frame: pl.DataFrame, attributes: Dict[str, Any]) -> pl.DataFrame:
+    group_by = [g.get("attribute") for g in attributes.get("group_by", []) if g.get("attribute")]
+    exprs = [
+        _AGGREGATIONS[m.get("aggregation")](pl.col(m.get("name"))).alias(m.get("name"))
+        for m in attributes.get("metrics", [])
+        if m.get("aggregation") in _AGGREGATIONS
+    ]
+    if group_by:
+        # polars 1.x: group_by (groupby was removed).
+        return frame.group_by(group_by, maintain_order=True).agg(exprs)
+    return frame.select(exprs)
+
+
 class PolarsDuckdbEngine:
     def __init__(self):
         self.artifact_store = build_artifact_store()
@@ -34,16 +93,16 @@ class PolarsDuckdbEngine:
                 return frames[0]
             left = frames[0]
             right = frames[1]
-            left_on = [k.get("left") for k in join_keys]
-            right_on = [k.get("right") for k in join_keys]
+            left_on = [_column(left, k.get("left")) for k in join_keys]
+            right_on = [_column(right, k.get("right")) for k in join_keys]
             return left.join(right, left_on=left_on, right_on=right_on, how="inner", suffix="_right")
         if operation == "compare":
             if len(frames) < 2:
                 return frames[0]
             left = frames[0]
             right = frames[1]
-            left_on = [k.get("left") for k in join_keys]
-            right_on = [k.get("right") for k in join_keys]
+            left_on = [_column(left, k.get("left")) for k in join_keys]
+            right_on = [_column(right, k.get("right")) for k in join_keys]
             joined = left.join(right, left_on=left_on, right_on=right_on, how="inner", suffix="_right")
             diff_cols = []
             for col in left.columns:
@@ -59,67 +118,30 @@ class PolarsDuckdbEngine:
         raise ValueError(f"Unsupported combine operation '{operation}'.")
 
     def post_op(self, operation: str, frame: pl.DataFrame, attributes: Dict[str, Any]) -> pl.DataFrame:
-        if operation == "filter":
-            rows = frame
-            for flt in attributes.get("filters", []):
-                attr = flt.get("attribute")
-                op = flt.get("operator")
-                val = flt.get("value")
-                col = pl.col(attr)
-                if op == "=":
-                    rows = rows.filter(col == val)
-                elif op == "!=":
-                    rows = rows.filter(col != val)
-                elif op == ">":
-                    rows = rows.filter(col > val)
-                elif op == ">=":
-                    rows = rows.filter(col >= val)
-                elif op == "<":
-                    rows = rows.filter(col < val)
-                elif op == "<=":
-                    rows = rows.filter(col <= val)
-                elif op == "between" and isinstance(val, list) and len(val) == 2:
-                    rows = rows.filter((col >= val[0]) & (col <= val[1]))
-                elif op == "in" and isinstance(val, list):
-                    rows = rows.filter(col.is_in(val))
-                elif op == "contains":
-                    rows = rows.filter(col.cast(pl.Utf8).str.contains(str(val)))
-            return rows
+        """Applies one post-combine op, every field it carries, in SQL's order.
+
+        ``operation`` picks the reshaping step (``aggregate`` or ``project``);
+        whatever the operation, the op's filters, order_by and limit are then
+        applied, in that order. A filter after an aggregate filters the
+        aggregated rows, as HAVING does. The decomposer's own example is a
+        ``filter`` op carrying ``order_by`` and ``limit``, so applying only the
+        named field dropped them.
+        """
+        if operation not in {"filter", "aggregate", "project", "sort", "limit"}:
+            raise ValueError(f"Unsupported post-combine operation '{operation}'.")
+        rows = frame
         if operation == "aggregate":
-            group_by = [g.get("attribute") for g in attributes.get("group_by", []) if g.get("attribute")]
-            metrics = attributes.get("metrics", [])
-            agg_exprs = []
-            for metric in metrics:
-                name = metric.get("name")
-                agg = metric.get("aggregation")
-                col = pl.col(name)
-                if agg == "count":
-                    agg_exprs.append(col.count().alias(name))
-                elif agg == "sum":
-                    agg_exprs.append(col.sum().alias(name))
-                elif agg == "avg":
-                    agg_exprs.append(col.mean().alias(name))
-                elif agg == "min":
-                    agg_exprs.append(col.min().alias(name))
-                elif agg == "max":
-                    agg_exprs.append(col.max().alias(name))
-            if group_by:
-                return frame.groupby(group_by).agg(agg_exprs)
-            return frame.select(agg_exprs)
-        if operation == "project":
+            rows = _aggregate(rows, attributes)
+        elif operation == "project":
             columns = [c.get("name") for c in attributes.get("expected_schema", []) if c.get("name")]
-            return frame.select(columns) if columns else frame
-        if operation == "sort":
-            order_by = attributes.get("order_by", [])
-            sort_cols = [o.get("attribute") for o in order_by if o.get("attribute")]
-            descending = [o.get("direction") == "desc" for o in order_by if o.get("attribute")]
-            if sort_cols:
-                return frame.sort(sort_cols, descending=descending)
-            return frame
-        if operation == "limit":
-            limit = attributes.get("limit")
-            return frame.head(limit) if limit is not None else frame
-        raise ValueError(f"Unsupported post-combine operation '{operation}'.")
+            rows = rows.select(columns) if columns else rows
+        rows = _filter(rows, attributes.get("filters", []))
+        order_by = [o for o in attributes.get("order_by", []) if o.get("attribute")]
+        if order_by:
+            rows = rows.sort([o["attribute"] for o in order_by],
+                             descending=[o.get("direction") == "desc" for o in order_by])
+        limit = attributes.get("limit")
+        return rows.head(limit) if limit is not None else rows
 
     def to_rows(self, frame: pl.DataFrame) -> List[Dict[str, Any]]:
         return frame.to_dicts()
