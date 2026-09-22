@@ -10,7 +10,7 @@ project, its source, the version vendored, and the full text of its license.
 - **Project:** Chinook Database
 - **URL:** https://github.com/lerocha/chinook-database
 - **Release tag:** v1.4.5
-- **Vendored file:** `packages/nl2sql/src/nl2sql/cli/demo/data/chinook.sqlite`
+- **Vendored file:** `packages/nl2sql/src/nl2sql/datasets/chinook.sqlite`
   (the `Chinook_Sqlite.sqlite` asset of that release, renamed)
 - **License:** MIT
 

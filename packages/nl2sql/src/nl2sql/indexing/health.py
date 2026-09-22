@@ -20,6 +20,8 @@ from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Optional
 
 from nl2sql.common.logger import get_logger
+from nl2sql.common.settings import settings
+from nl2sql.schema.store import build_schema_store
 
 logger = get_logger(__name__)
 
@@ -191,14 +193,15 @@ def inspect_index_at(
     versions: Dict[str, Optional[str]] = {}
     schema_store_path = Path(schema_store_path)
     if schema_store_path.is_file():
-        from nl2sql.schema.sqlite_store import SqliteSchemaStore
-
-        store = SqliteSchemaStore(schema_store_path)
+        store = build_schema_store(settings.schema_store_backend, settings.schema_store_max_versions,
+                                   path=schema_store_path)
         try:
             ids = set(datasource_ids) | {md.get("datasource_id") for md in metadatas if md}
             versions = {ds: store.get_latest_version(ds) for ds in ids if ds}
         finally:
-            store.close()
+            close = getattr(store, "close", None)
+            if close:
+                close()
 
     return summarize(metadatas, lambda ds: versions.get(ds), datasource_ids,
                      collection_metadata=collection_metadata)

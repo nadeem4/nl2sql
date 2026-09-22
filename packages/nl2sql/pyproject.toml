@@ -29,8 +29,10 @@ dependencies = [
     "opentelemetry-exporter-otlp>=1.20.0",
     "sqlglot>=23.0.0",
     "pydantic-settings>=2.0.0",
-    "pandas>=1.5.0", # For metrics/evals
-    "pyarrow>=14.0.0", # For the parquet artifact store
+    # For the parquet artifact store. The engine never imports it and polars
+    # reads and writes local parquet without it; it stays until the remote
+    # (s3/abfs) artifact store, which no test exercises, is shown not to need it.
+    "pyarrow>=14.0.0",
     "pybreaker>=1.3.0",
     "polars>=1.44",
     "duckdb>=1.5",
@@ -94,7 +96,8 @@ include = ["nl2sql*"]
 
 [tool.setuptools.package-data]
 "*" = ["configs/*.yaml", ".env"]
-"nl2sql.cli.demo" = ["data/*.sqlite", "recordings/*.json"]
+"nl2sql.cli.demo" = ["recordings/*.json"]
+"nl2sql.datasets" = ["*.sqlite"]
 "nl2sql.evaluation" = ["datasets/*.yaml"]
 "nl2sql.evaluation.presets" = ["*.yaml"]
 # The committed Vite build of web/playground: the wheel must carry the finished

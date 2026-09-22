@@ -62,7 +62,7 @@ class DemoManager:
         self.print_step(f"Copying the Chinook database to {db_path}...")
 
         db_path.parent.mkdir(parents=True, exist_ok=True)
-        packaged = importlib.resources.files("nl2sql.cli.demo") / "data" / "chinook.sqlite"
+        packaged = importlib.resources.files("nl2sql.datasets") / "chinook.sqlite"
         with importlib.resources.as_file(packaged) as source:
             shutil.copyfile(source, db_path)
 

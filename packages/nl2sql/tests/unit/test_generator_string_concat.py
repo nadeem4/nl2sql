@@ -32,7 +32,7 @@ from nl2sql.pipeline.nodes.decomposer.schemas import SubQuery
 from nl2sql.pipeline.nodes.generator.node import GeneratorNode, SqlVisitor
 from nl2sql.pipeline.state import SubgraphExecutionState
 
-CHINOOK = Path(nl2sql.__file__).resolve().parent / "cli" / "demo" / "data" / "chinook.sqlite"
+CHINOOK = Path(nl2sql.__file__).resolve().parent / "datasets" / "chinook.sqlite"
 
 
 def _col(alias, name):

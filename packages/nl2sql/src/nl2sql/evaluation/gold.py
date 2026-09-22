@@ -15,8 +15,9 @@ from typing import Any, Literal, Optional
 import yaml
 from pydantic import BaseModel, ConfigDict
 
+from nl2sql.datasets import CHINOOK_DB_PATH
+
 GOLD_DATASET_PATH = pathlib.Path(__file__).parent / "datasets" / "chinook_gold.yaml"
-CHINOOK_DB_PATH = pathlib.Path(__file__).parents[1] / "cli" / "demo" / "data" / "chinook.sqlite"
 
 Outcome = Literal["allowed", "refused", "unanswerable"]
 Difficulty = Literal["easy", "medium", "hard"]

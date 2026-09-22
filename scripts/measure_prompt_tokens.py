@@ -25,7 +25,7 @@ from typing import Callable, Dict, List, Optional, Tuple
 import yaml
 
 REPO = Path(__file__).resolve().parents[1]
-CHINOOK_DB = REPO / "packages" / "nl2sql" / "src" / "nl2sql" / "cli" / "demo" / "data" / "chinook.sqlite"
+CHINOOK_DB = REPO / "packages" / "nl2sql" / "src" / "nl2sql" / "datasets" / "chinook.sqlite"
 QUESTIONS_FILE = REPO / "configs" / "sample_questions.demo.yaml"
 SCHEMA_VERSION = "20260920T000000_0123abcd"
 # What the refiner sees on a typical retry.

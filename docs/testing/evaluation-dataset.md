@@ -1,7 +1,7 @@
 # Chinook Gold Evaluation Dataset
 
 A set of about forty questions about the vendored Chinook database
-(`nl2sql/cli/demo/data/chinook.sqlite`), each with hand-written SQL and the rows
+(`nl2sql/datasets/chinook.sqlite`), each with hand-written SQL and the rows
 that SQL returns. It is the reference an evaluation compares the engine's
 answers against.
 
