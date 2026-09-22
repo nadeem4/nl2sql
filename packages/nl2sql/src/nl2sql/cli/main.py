@@ -47,6 +47,7 @@ app.add_typer(cache_app, name="cache", help="Manage the plan cache (`nl2sql cach
 DatasourceConfigOption = Annotated[Optional[pathlib.Path], typer.Option("--config", help="Path to datasource config YAML")]
 SecretsConfigOption = Annotated[Optional[pathlib.Path], typer.Option("--secrets-config", help="Path to secrets config YAML")]
 LLMConfigOption = Annotated[Optional[pathlib.Path], typer.Option("--llm-config", help="Path to LLM config YAML")]
+PoliciesConfigOption = Annotated[Optional[pathlib.Path], typer.Option("--policies-config", help="Path to policies config JSON")]
 VectorStoreOption = Annotated[Optional[str], typer.Option("--vector-store", help="Path to vector store directory")]
 
 
@@ -97,7 +98,7 @@ def run(
     no_exec: Annotated[bool, typer.Option("--no-exec", help="Skip execution (plan & validate only)")] = False,
     verbose: Annotated[bool, typer.Option("--verbose", "-v", help="Show detailed reasoning")] = False,
     show_perf: Annotated[bool, typer.Option("--show-perf", help="Show performance metrics")] = False,
-    policies_config_path: Annotated[Optional[str], typer.Option("--policies-config", help="Path to policies config")] = None,
+    policies_config_path: PoliciesConfigOption = None,
 ):
     """
     Execute a query against the knowledge graph.
@@ -123,7 +124,7 @@ def trace_replay(
     secrets_config_path: SecretsConfigOption = None,
     llm_config_path: LLMConfigOption = None,
     vector_store_path: VectorStoreOption = None,
-    policies_config_path: Annotated[Optional[pathlib.Path], typer.Option("--policies-config", help="Path to policies config")] = None,
+    policies_config_path: PoliciesConfigOption = None,
 ):
     """
     Re-run a traced question feeding back the recorded LLM responses (no model calls).
@@ -237,7 +238,7 @@ def benchmark(
     secrets_config_path: SecretsConfigOption = None,
     llm_config_path: LLMConfigOption = None,
     vector_store_path: VectorStoreOption = None,
-    policies_config_path: Annotated[Optional[pathlib.Path], typer.Option("--policies-config", help="Path to policies config")] = None,
+    policies_config_path: PoliciesConfigOption = None,
     bench_config_path: Annotated[Optional[pathlib.Path], typer.Option(help="Path to LLM matrix config")] = None,
     iterations: Annotated[int, typer.Option(help="Iterations per test case (tier 1 always runs once)")] = 3,
     include_ids: Annotated[Optional[List[str]], typer.Option(help="Specific Test IDs to run")] = None,

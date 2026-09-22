@@ -19,6 +19,12 @@ Configuration is split into **environment variables** (runtime settings) and **f
 | `VECTOR_STORE` | `./chroma_db` | Persist directory for the vector store. |
 | `VECTOR_STORE_COLLECTION` | `nl2sql_store` | Collection name for schema embeddings. |
 
+On the CLI, `nl2sql run`, `nl2sql index`, `nl2sql benchmark` and
+`nl2sql trace replay` override these paths per command with `--config`
+(datasources), `--llm-config`, `--secrets-config` and `--vector-store`; `run`,
+`benchmark` and `trace replay` also take `--policies-config`. Each file flag
+takes a path, relative to the working directory or absolute.
+
 `NL2SQLContext` validates the vector store configuration before it loads secrets or
 builds the datasource and LLM registries. A blank `VECTOR_STORE_COLLECTION`, or a blank
 `VECTOR_STORE` with no explicit `vector_store_path` argument, raises `ValueError` at
