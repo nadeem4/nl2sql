@@ -3174,6 +3174,28 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#running-the-benchmark" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Running the benchmark
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tier-1-gold-plans-through-the-code-nodes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tier 1: gold plans through the code nodes
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -3881,6 +3903,28 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#running-the-benchmark" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Running the benchmark
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tier-1-gold-plans-through-the-code-nodes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tier 1: gold plans through the code nodes
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -3918,6 +3962,18 @@ answers against.</p>
 <tr>
 <td><code>packages/nl2sql/src/nl2sql/evaluation/gold.py</code></td>
 <td><code>GoldQuestion</code> model, <code>load_gold_dataset()</code>, <code>execute_gold_sql()</code>, <code>regenerate()</code></td>
+</tr>
+<tr>
+<td><code>packages/nl2sql/src/nl2sql/evaluation/datasets/chinook_gold_plans.yaml</code></td>
+<td>A hand-written <code>PlanModel</code> per answerable question, for <a href="#tier-1-gold-plans-through-the-code-nodes">tier 1</a></td>
+</tr>
+<tr>
+<td><code>packages/nl2sql/src/nl2sql/evaluation/tier1.py</code></td>
+<td><code>load_gold_plans()</code>, the gold-plan fake LLM, <code>run_tier1()</code></td>
+</tr>
+<tr>
+<td><code>packages/nl2sql/src/nl2sql/evaluation/evaluator.py</code></td>
+<td>Row comparison (<code>compare_results</code>) and per-role scoring (<code>score_case</code>)</td>
 </tr>
 <tr>
 <td><code>packages/nl2sql/tests/unit/test_chinook_gold_dataset.py</code></td>
@@ -4011,6 +4067,75 @@ an API key and checks that:</p>
   from it;</li>
 <li>the twelve demo questions (<code>CHINOOK_QUESTIONS</code>) are included verbatim.</li>
 </ul>
+<h2 id="running-the-benchmark">Running the benchmark</h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>benchmark<span class="w"> </span>--tier<span class="w"> </span><span class="m">1</span><span class="w">        </span><span class="c1"># gold plans, no API key</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>benchmark<span class="w">                 </span><span class="c1"># full pipeline, the configured LLM</span>
+</code></pre></div>
+<p>Either way every question runs once per role in its <code>expected</code> map (narrow
+with <code>--include-ids</code> and <code>--role</code>), and each run is scored:</p>
+<table>
+<thead>
+<tr>
+<th>Expected</th>
+<th>Passes when</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>allowed</code></td>
+<td>Status <code>success</code>, one result set, and its rows equal <code>gold_result</code></td>
+</tr>
+<tr>
+<td><code>refused</code></td>
+<td>Status <code>error</code>, a <code>SECURITY_VIOLATION</code> whose message is the generic refusal (it names no table), and no rows</td>
+</tr>
+<tr>
+<td><code>unanswerable</code></td>
+<td>Never run: reported as <code>skip</code>, because the datasource resolver has no answerability check yet</td>
+</tr>
+</tbody>
+</table>
+<p>Rows are compared by value, in selected column order: column names and
+aliases are ignored, so <code>SELECT Country AS c</code> matches a gold <code>Country</code>
+column but a swapped column order does not. Numbers match within 0.005,
+because gold values are rounded to two decimals. Strings must be equal, so
+<code>'2009'</code> is not <code>2009</code>. Row order counts only when <code>order_matters</code> is true.</p>
+<p>The command prints one row per question and role, then a pass/fail/skip/xfail
+count per role, writes the whole report as JSON (<code>--export-path</code>, default
+<code>benchmark_report.json</code>) and exits 1 if any case failed. Without <code>--tier</code>,
+<code>--bench-config-path</code> names a YAML map of LLM configs to run in turn; without
+it the context's own LLM config runs once.</p>
+<h2 id="tier-1-gold-plans-through-the-code-nodes">Tier 1: gold plans through the code nodes</h2>
+<p>Tier 1 checks the nodes that are plain code -- the logical validator
+(including RBAC), the SQL generator and the executor -- with no model
+involved. <code>chinook_gold_plans.yaml</code> holds, for every answerable question, a
+hand-written <code>PlanModel</code> (the typed AST the planner emits) that answers it. A
+local <code>FakeLLMServer</code> answers every LLM call: the decomposer gets one
+sub-query on <code>chinook</code> whose expected columns are the plan's select aliases,
+the planner gets the gold plan, the refiner "Keep the same plan." and the
+answer synthesizer a fixed sentence. The rest is the real pipeline on the
+indexed demo, so a failing case is a bug in a code node or in the plan, never
+in a model. Refusals are scored against the default, generic message: the
+demo's <code>.env.demo</code> sets <code>RBAC_REFUSAL_NAMES_TABLES=true</code> so the playground
+can show which table was refused, and tier 1 turns that off for its run.</p>
+<p>Each plan reads exactly the question's <code>needed_tables</code> (the RBAC outcome is
+derived from them) and selects the gold result's columns in order. PlanModel
+has no subqueries, window functions or DISTINCT aggregates, so a few plans
+express the answer differently from <code>gold_sql</code>: anti-joins for "longest
+track per genre" (<code>chinook_008</code>) and "never purchased" (<code>chinook_039</code>),
+conditional sums in HAVING for "jazz but never rock" (<code>chinook_009</code>), and
+<code>COUNT(DISTINCT(x))</code> written as <code>COUNT</code> over a function named <code>DISTINCT</code>
+(<code>chinook_011</code>, <code>chinook_034</code>). The header of the plans file lists these.</p>
+<p>Tier 1 runs on every PR as <code>packages/nl2sql/tests/e2e/test_benchmark_tier1.py</code>,
+in the key-free integration job: it generates the demo, runs
+<code>nl2sql benchmark --tier 1</code> with no API key in the environment, and requires
+every allowed and refused case to pass and every unanswerable case to be
+skipped. <code>packages/nl2sql/tests/unit/test_tier1_gold_plans.py</code> checks in the
+unit job that every answerable question has a plan, that it reads exactly the
+needed tables and selects as many columns as the gold result.</p>
+<p>When a gold plan fails, the fault is in the engine or in the plan. Fix an
+engine bug with a regression test; do not change the gold data to make a plan
+pass unless the gold data is itself wrong.</p>
 
 
 
