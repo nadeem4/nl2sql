@@ -36,6 +36,7 @@ from nl2sql.cli.commands.install import install_command
 from nl2sql.cli.commands.policy import app as policy_app
 from nl2sql.cli.commands.trace import app as trace_app, replay_command
 from nl2sql.cli.commands.cache import app as cache_app
+from nl2sql.cli.commands.feedback import app as feedback_app
 from nl2sql.cli.console import configure_output_encoding
 from nl2sql.cli.types import RunConfig
 
@@ -49,6 +50,7 @@ app = typer.Typer(
 app.add_typer(policy_app, name="policy", help="Manage RBAC policies and security.")
 app.add_typer(trace_app, name="trace", help="Inspect and replay run traces.")
 app.add_typer(cache_app, name="cache", help="Manage the plan cache (`nl2sql cache clear`).")
+app.add_typer(feedback_app, name="feedback", help="Answer feedback and guardrail rates (`nl2sql feedback stats`).")
 
 DatasourceConfigOption = Annotated[Optional[pathlib.Path], typer.Option("--config", help="Path to datasource config YAML")]
 SecretsConfigOption = Annotated[Optional[pathlib.Path], typer.Option("--secrets-config", help="Path to secrets config YAML")]

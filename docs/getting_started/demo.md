@@ -275,6 +275,18 @@ re-ranking model; the "re-ranking" is MMR, explained in
 A run's own retrieval is under **Debug**: open the `datasource_resolver` or
 `schema_retriever` row in the per-node table.
 
+### Rating answers
+
+Below **Cost & time**, each answer asks **Was this answer right?**: **👍 Right**
+or **👎 Wrong**, with an optional note (**Wrong number**, **Wrong table**,
+**Wrong filter**, **Missing rows**, or your own words). The rating is saved in
+the demo's `data/schema_store.db` with the question, role, SQL, the model per
+step and the engine version; never the rows. It is local only, like Settings:
+on a non-loopback `--host` it is off unless `--allow-settings`.
+`FEEDBACK_ENABLED=false` in `.env.demo` turns it off. Read the ratings back, with
+the refusal, retry, error and plan-cache rates, from the CLI (below). See
+[Feedback and Signals](../observability/feedback.md).
+
 ## 3. Use the demo from the CLI
 
 ```bash
@@ -314,6 +326,21 @@ cache". The plan is still validated for the role you ask as. To start fresh:
 ```bash
 nl2sql --env demo cache clear
 ```
+
+The playground's ratings, and the guardrail rates over every rated run and
+kept trace:
+
+```bash
+nl2sql --env demo feedback list               # the ratings, newest first
+nl2sql --env demo feedback stats              # thumbs up/down, refusals, retries, errors, plan cache
+nl2sql --env demo feedback export --good      # thumbs-up runs as draft gold entries, for review
+nl2sql --env demo feedback clear              # delete every rating
+```
+
+`export --good` writes `feedback_gold_drafts.yaml`, never the gold set itself. A
+person must review each draft and run `python -m nl2sql.evaluation.gold` before
+adding it; see
+[Feedback and Signals](../observability/feedback.md#growing-the-gold-set-nl2sql-feedback-export-good).
 
 `nl2sql demo --record` turns the cache off while recording, so every planner
 answer is captured. See

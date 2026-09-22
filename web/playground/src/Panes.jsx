@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import NodeInspector from "./NodeInspector.jsx";
+import Feedback from "./Feedback.jsx";
 import { planSections } from "./plan.js";
 import { deniedTables, formatSql, humanCheck, nodeLedger, traceFileName, traceUrl } from "./run.js";
 
@@ -351,7 +352,7 @@ function list(names) {
   return [...b.slice(0, -1).flatMap((x, i) => (i ? [", ", x] : [x])), " or ", b[b.length - 1]];
 }
 
-export default function Run({ asked, result, sub, busy, error, debug, replay }) {
+export default function Run({ asked, result, sub, busy, error, debug, replay, feedback }) {
   const checks = (sub && sub.validation) || [];
   const gateFailed = checks.some((c) => !c.passed);
   const miss = result && result.replay_miss;
@@ -391,6 +392,7 @@ export default function Run({ asked, result, sub, busy, error, debug, replay }) 
       <RowsPane sub={sub} result={result} state={s.rows} />
       <UsagePane key={(result && result.trace_id) || "none"} usage={result && result.usage} timings={result && result.timings}
         replay={replay} debug={debug} state={s.cost} result={result} />
+      <Feedback key={`rate-${(result && result.trace_id) || "none"}`} result={result} busy={busy} options={feedback} />
     </div>
   );
 }

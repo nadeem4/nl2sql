@@ -286,3 +286,7 @@ runs the same search for any text (see the
 fetches the file from `GET /api/trace/{trace_id}`, which serves only files
 directly inside `TRACE_DIR` and rejects any id that is not a plain token, so
 `../` or an absolute path never reaches the filesystem.
+
+Below the run, **Was this answer right?** records a rating keyed by the same
+trace id; `nl2sql feedback stats` reads the ratings together with the traces in
+`TRACE_DIR`. See [Feedback and Signals](feedback.md).

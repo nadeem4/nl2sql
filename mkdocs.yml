@@ -111,6 +111,7 @@ nav:
   - Observability:
     - Observability Stack: observability/stack.md
     - Debugging a Run (Traces): observability/debugging.md
+    - Feedback and Signals: observability/feedback.md
     - Error Handling + Circuit Breaker: observability/error-handling.md
   - Security:
     - Security Model: security/model.md

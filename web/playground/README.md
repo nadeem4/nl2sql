@@ -55,6 +55,16 @@ The React source for the page `nl2sql demo` serves.
   warnings, the state it read, the update it returned and, for LLM nodes, the
   exact prompt, the raw response and the parsed result, each folded. A
   **Download trace** link sits above the table.
+- **Was this answer right?** (`#feedback`, below Cost & time once a run is
+  back): **👍 Right** (`#feedback-up`) and **👎 Wrong** (`#feedback-down`) save
+  a rating at once through `POST /api/feedback`; a note is optional, from the
+  quick choices or typed (`#feedback-note`, up to 280 characters), saved with
+  **Save note** (`#feedback-save`). The page sends only the trace id, the
+  rating and the note; the server stores the question, role, SQL and models
+  from its own copy of the run. Whether it is on comes from `GET /api/feedback`;
+  where it is off (the same rule as Settings, or `FEEDBACK_ENABLED=false`) a
+  line says why. See
+  [Feedback and Signals](../../docs/observability/feedback.md).
 
 - **Retrieval** (`#retrieval-toggle`, top right beside Settings; the panel is
   `#retrieval-panel`): the Retrieval inspector. Text to embed
@@ -120,7 +130,8 @@ ledger, refused-table parsing, the trace drill-down helpers), `src/settings.js`
 (model options, which nodes changed, which chosen models run without a
 temperature), `src/indexHealth.js` (entry counts in plain words, the status
 line, relative build times) and `src/retrieval.js` (the MMR summary line, picks
-in order, entries passed over, the copyable text form) with Node's built-in test runner; there is no test dependency.
+in order, entries passed over, the copyable text form) and `src/feedback.js`
+(when a run can be rated, the request body, the saved line) with Node's built-in test runner; there is no test dependency.
 
 ## Fonts and offline use
 
@@ -144,8 +155,9 @@ it and proxy or point `fetch` at `http://127.0.0.1:8765` to exercise the real
 API; the app calls `/api/meta`, `/api/schema`, `/api/ask`, `/api/trace/{id}`
 the settings routes (`GET /api/settings`, `POST /api/settings/key`,
 `POST /api/settings/models`) and the index routes (`GET /api/index`,
-`POST /api/index/rebuild`) and the inspector's (`GET /api/retrieval`,
-`POST /api/retrieval`). The settings routes, Rebuild and the inspector refuse a request
+`POST /api/index/rebuild`), the inspector's (`GET /api/retrieval`,
+`POST /api/retrieval`) and feedback's (`GET /api/feedback`, `POST /api/feedback`).
+The settings routes, Rebuild, the inspector and feedback refuse a request
 whose `Origin` is not the page's own, so use them from the page `nl2sql demo`
 serves, not from the Vite dev server.
 
@@ -155,4 +167,5 @@ React and Vite only -- no router, no state library, no component kit, no CSS
 framework, no TypeScript. Plain JSX and plain CSS, kept small enough to read in
 one sitting. Light and dark follow `prefers-color-scheme`; motion is limited to
 the run arriving in order and is off under `prefers-reduced-motion`. The only
-browser storage is the Debug toggle; settings live in the demo project's files.
+browser storage is the Debug toggle; settings live in the demo project's files,
+and ratings in its schema store.
