@@ -3211,6 +3211,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Running the benchmark">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#strict-and-lenient-accuracy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Strict and lenient accuracy
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -4129,6 +4146,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Running the benchmark">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#strict-and-lenient-accuracy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Strict and lenient accuracy
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -4383,7 +4417,7 @@ answers against.</p>
 </tr>
 <tr>
 <td><code>packages/nl2sql/src/nl2sql/evaluation/evaluator.py</code></td>
-<td>Row comparison (<code>compare_results</code>) and per-role scoring (<code>score_case</code>)</td>
+<td>Row comparison (<code>compare_results</code>, <code>compare_results_lenient</code>) and per-role scoring (<code>score_case</code>, <code>score_case_lenient</code>)</td>
 </tr>
 <tr>
 <td><code>packages/nl2sql/tests/unit/test_chinook_gold_dataset.py</code></td>
@@ -4516,6 +4550,76 @@ string that spells one, within the same tolerance, so <code>'2009'</code> is <co
 databases differ in which of the two they return for the same value. Other
 strings must be equal, and two strings compare as strings (<code>'2009'</code> is not
 <code>'2009.0'</code>). Row order counts only when <code>order_matters</code> is true.</p>
+<h3 id="strict-and-lenient-accuracy">Strict and lenient accuracy</h3>
+<p>Tier 2 scores every run twice and reports both, strict first.</p>
+<table>
+<thead>
+<tr>
+<th>Score</th>
+<th>What it is</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Strict</strong></td>
+<td>The execution match above, unchanged: the same columns, in the same order, and the same rows</td>
+</tr>
+<tr>
+<td><strong>Lenient</strong></td>
+<td>Every gold column is answered by <em>some</em> column of the result, wherever it sits</td>
+</tr>
+</tbody>
+</table>
+<p>Strict is the honest headline. Lenient exists because most of what it
+forgives is shape a person would accept: the same two names as
+<code>FirstName, LastName</code> or the other way round, one extra key column, a year
+labelled <code>2009-01-01</code> where the gold set writes <code>2009</code>. Academic and vendor
+practice has moved the same way -- Spider 2.0 counts a prediction correct
+when every gold column vector appears in the result
+(<a href="https://arxiv.org/html/2411.07763v2">paper</a>) and Defog's <code>sql-eval</code> falls
+back to <code>subset_df</code>, matching each gold column's values against some
+generated column with names, types and order ignored
+(<a href="https://defog.ai/blog/open-sourcing-sqleval/">post</a>).</p>
+<p>A run passes leniently when:</p>
+<ul>
+<li>every gold column is matched, as a <strong>multiset of values</strong>, by a <strong>distinct</strong>
+  column of the result, in any position, with column names ignored and the
+  same numeric tolerance;</li>
+<li>the rows of the matched columns then line up as the strict score requires,
+  so values swapped between rows still fail;</li>
+<li>the <strong>row count is equal</strong>, and row order still counts only when
+  <code>order_matters</code>.</li>
+</ul>
+<p>Two guardrails keep it from passing wrong answers:</p>
+<ul>
+<li><strong>A column cap.</strong> The result may carry at most <code>max(2 x gold columns,
+  gold columns + 2)</code> columns: three for a one-column gold answer, four for
+  two, six for three. Without it a <code>SELECT *</code> would pass by carrying the gold
+  columns among many others. Databricks Genie counts any extra column as bad
+  (<a href="https://docs.databricks.com/aws/en/genie/benchmarks">docs</a>), so a cap is
+  the middle ground.</li>
+<li><strong>No constant columns.</strong> Once a result has more than one row, a column
+  whose values are all the same -- all-null included -- may not answer for a
+  gold column: a hard-coded literal has the right height and tells the gold
+  column nothing. On a single row every column is constant, so the rule is
+  off there.</li>
+</ul>
+<p>One value normalisation is added, and only one: <strong>date and period labels</strong>.
+When a gold value is a <code>YYYY</code>, <code>YYYY-MM</code> or <code>YYYY-MM-DD</code> string and the
+predicted value is a date starting with it at a component boundary, the two
+are equal -- <code>'2009'</code> matches <code>'2009-01-01'</code>, <code>'2013-02'</code> matches
+<code>'2013-02-01'</code>. Only the gold side may be the shorter label, only strings are
+read this way (a number is a number, never a year), and nothing else is
+normalised. Anything broader belongs in an alternative gold answer, which is
+reviewed per question and cannot silently widen.</p>
+<p>Lenient is a superset of strict by construction: everything strict accepts is
+accepted. It is not partial credit -- a question passes a score or it does
+not -- and there is no model in either score, so both stay reproducible.</p>
+<p>Every result row carries <code>status</code> and <code>lenient_status</code>, so a question that
+passes one score and not the other is visible per question; the printed
+table shows a <strong>Strict</strong> and a <strong>Lenient</strong> column beside each other, and the
+scoreboard, the records, the README block and
+<a href="../../benchmarks/">docs/benchmarks.md</a> all report both.</p>
 <p>The command prints one row per question and role, then a pass/fail/skip/xfail
 count per role, writes the whole report as JSON (<code>--export-path</code>, default
 <code>benchmark_report.json</code>) and exits 1 if any case failed. Without <code>--tier</code>,
@@ -4794,7 +4898,7 @@ under <code>configs</code>, and a <code>comparison</code>. Each config has:</p>
 </tr>
 <tr>
 <td><code>accuracy</code></td>
-<td><code>overall</code>, <code>by_tag</code> and <code>by_difficulty</code>: passes against the gold result</td>
+<td><code>overall</code> (strict) and <code>lenient</code>, then <code>by_tag</code> and <code>by_difficulty</code>, each with both counts and both rates</td>
 </tr>
 <tr>
 <td><code>answerability</code></td>
@@ -4830,7 +4934,7 @@ under <code>configs</code>, and a <code>comparison</code>. Each config has:</p>
 </tr>
 <tr>
 <td><code>results</code></td>
-<td>one row per run: status, reason, SQL, cost, latency, tokens, retries, <code>faithfulness</code> (<code>null</code> when no answer was written), and <code>plans</code>: each sub-query's <code>id</code>, <code>intent</code> and <code>plan</code> (the <code>PlanModel</code> JSON the SQL was generated from, <code>null</code> if planning failed), so a wrong answer can be traced to the plan; and <code>answer</code>, the text the answer synthesizer wrote (summary, then content), which the faithfulness check read</td>
+<td>one row per run: <code>status</code> and <code>reason</code> (strict), <code>lenient_status</code> and <code>lenient_reason</code>, SQL, cost, latency, tokens, retries, <code>faithfulness</code> (<code>null</code> when no answer was written), and <code>plans</code>: each sub-query's <code>id</code>, <code>intent</code> and <code>plan</code> (the <code>PlanModel</code> JSON the SQL was generated from, <code>null</code> if planning failed), so a wrong answer can be traced to the plan; and <code>answer</code>, the text the answer synthesizer wrote (summary, then content), which the faithfulness check read</td>
 </tr>
 </tbody>
 </table>
@@ -4961,7 +5065,7 @@ name is taken. Every record holds:</p>
 </tr>
 <tr>
 <td><code>metrics</code></td>
-<td>Tier 2: accuracy, answerability precision and recall, dollars total and per question, input / cached / output tokens per question, p50 and p95 latency, determinism, answer faithfulness. Retrieval: the report's <code>summary</code></td>
+<td>Tier 2: accuracy (strict) and lenient_accuracy, answerability precision and recall, dollars total and per question, input / cached / output tokens per question, p50 and p95 latency, determinism, answer faithfulness. Retrieval: the report's <code>summary</code></td>
 </tr>
 <tr>
 <td>tier 2 only</td>
