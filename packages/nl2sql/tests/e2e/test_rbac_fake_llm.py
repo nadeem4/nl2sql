@@ -80,8 +80,8 @@ def test_a_viewer_is_refused_without_seeing_or_leaking_forbidden_data(demo_proje
     prompt = _planner_prompts(server)
     for probe in PROBES:
         assert probe not in prompt
-    assert '\\"name\\": \\"Customer\\"' in prompt and '\\"name\\": \\"Invoice\\"' in prompt
-    assert '\\"name\\": \\"Email\\"' in prompt and '\\"name\\": \\"Total\\"' in prompt
+    assert '\\"name\\":\\"Customer\\"' in prompt and '\\"name\\":\\"Invoice\\"' in prompt
+    assert '\\"name\\":\\"Email\\"' in prompt and '\\"name\\":\\"Total\\"' in prompt
     assert "sample_values" in prompt  # readable tables (Track, Album, ...) keep theirs
 
     # (b) The written trace carries none of it either.
@@ -117,16 +117,19 @@ def test_the_generated_demo_opts_into_naming_tables(demo_project):
 
 
 @pytest.mark.e2e
-def test_admin_planner_still_receives_full_statistics(demo_project, tmp_path):
+def test_admin_planner_still_receives_sample_values(demo_project, tmp_path):
     server, r = _ask(demo_project, tmp_path, RULES_COUNT_CUSTOMERS, "admin", "llm.rbac-admin.yaml",
                      question="How many customers are there?")
     assert r.returncode == 0, r.stdout + r.stderr
 
+    # A readable table keeps its sample_values; the other statistics are never
+    # sent to any role (they stay in the snapshot), so the min_value probe is absent.
     prompt = _planner_prompts(server)
-    for probe in PROBES:
-        assert probe in prompt
-    for stat in ("null_percentage", "distinct_count", "min_value", "max_value", "sample_values"):
-        assert stat in prompt
+    sample_probe, min_value_probe = PROBES
+    assert sample_probe in prompt and "sample_values" in prompt
+    assert min_value_probe not in prompt
+    for stat in ("null_percentage", "distinct_count", "min_value", "max_value"):
+        assert stat not in prompt
 
 
 @pytest.mark.e2e

@@ -88,7 +88,7 @@ def test_a_run_writes_a_trace_with_every_node_its_llm_calls_and_no_secret(demo_p
     assert decomposer["response"]["tool_calls"][0]["name"] == "DecomposerResponse"
     assert json.loads(planner["response"]["content"])["tables"][0]["name"] == "Customer"
     assert planner["parsed"]["tables"][0]["name"] == "Customer"
-    assert "How many customers" in planner["messages"][0]["content"]
+    assert "How many customers" in planner["messages"][-1]["content"]  # the question is in the last (human) message
     assert synthesizer["parsed"]["summary"] == "There are 59 customers."
 
     [sub] = doc["result"]["sub_queries"]
@@ -139,8 +139,8 @@ def test_a_run_that_retries_is_traced_on_failure_with_both_planner_attempts(fail
     first, second = (n["llm_calls"][0] for n in planner)
     assert json.loads(first["response"]["content"])["select_items"][0]["expr"]["args"][0]["column_name"] == "CustomerIdd"
     # The retry's prompt carries the validator's feedback; the first one did not.
-    assert "CustomerIdd" in second["messages"][0]["content"]
-    assert "CustomerIdd" not in first["messages"][0]["content"]
+    assert "CustomerIdd" in second["messages"][-1]["content"]
+    assert "CustomerIdd" not in first["messages"][-1]["content"]
 
     [validator_1, _validator_2] = [n for n in doc["nodes"] if n["node"] == "logical_validator"]
     assert any(e["error_code"] == "COLUMN_NOT_FOUND" for e in validator_1["errors"] + validator_1["warnings"])
