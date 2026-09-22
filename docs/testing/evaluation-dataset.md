@@ -19,7 +19,7 @@ answers against.
 | `packages/nl2sql/src/nl2sql/evaluation/presets/` | `--model` configs and the built-in `--llm` presets (`*.yaml`, shipped in the wheel) |
 | `packages/nl2sql/src/nl2sql/evaluation/baselines/` | Where a committed tier 2 baseline scoreboard goes (none yet) |
 | `benchmarks/<kind>/<database>/` | Committed result records: `tier2/` one per run and config, `retrieval/` one per run ([layout](#results-over-time)) |
-| `packages/nl2sql/src/nl2sql/evaluation/evaluator.py` | Row comparison (`compare_results`) and per-role scoring (`score_case`) |
+| `packages/nl2sql/src/nl2sql/evaluation/evaluator.py` | Row comparison (`compare_results`, `compare_results_lenient`) and per-role scoring (`score_case`, `score_case_lenient`) |
 | `packages/nl2sql/tests/unit/test_chinook_gold_dataset.py` | Key-free checks, part of the normal unit suite |
 
 ## Format
@@ -105,6 +105,69 @@ string that spells one, within the same tolerance, so `'2009'` is `2009`:
 databases differ in which of the two they return for the same value. Other
 strings must be equal, and two strings compare as strings (`'2009'` is not
 `'2009.0'`). Row order counts only when `order_matters` is true.
+
+### Strict and lenient accuracy
+
+Tier 2 scores every run twice and reports both, strict first.
+
+| Score | What it is |
+| --- | --- |
+| **Strict** | The execution match above, unchanged: the same columns, in the same order, and the same rows |
+| **Lenient** | Every gold column is answered by *some* column of the result, wherever it sits |
+
+Strict is the honest headline. Lenient exists because most of what it
+forgives is shape a person would accept: the same two names as
+`FirstName, LastName` or the other way round, one extra key column, a year
+labelled `2009-01-01` where the gold set writes `2009`. Academic and vendor
+practice has moved the same way -- Spider 2.0 counts a prediction correct
+when every gold column vector appears in the result
+([paper](https://arxiv.org/html/2411.07763v2)) and Defog's `sql-eval` falls
+back to `subset_df`, matching each gold column's values against some
+generated column with names, types and order ignored
+([post](https://defog.ai/blog/open-sourcing-sqleval/)).
+
+A run passes leniently when:
+
+- every gold column is matched, as a **multiset of values**, by a **distinct**
+  column of the result, in any position, with column names ignored and the
+  same numeric tolerance;
+- the rows of the matched columns then line up as the strict score requires,
+  so values swapped between rows still fail;
+- the **row count is equal**, and row order still counts only when
+  `order_matters`.
+
+Two guardrails keep it from passing wrong answers:
+
+- **A column cap.** The result may carry at most `max(2 x gold columns,
+  gold columns + 2)` columns: three for a one-column gold answer, four for
+  two, six for three. Without it a `SELECT *` would pass by carrying the gold
+  columns among many others. Databricks Genie counts any extra column as bad
+  ([docs](https://docs.databricks.com/aws/en/genie/benchmarks)), so a cap is
+  the middle ground.
+- **No constant columns.** Once a result has more than one row, a column
+  whose values are all the same -- all-null included -- may not answer for a
+  gold column: a hard-coded literal has the right height and tells the gold
+  column nothing. On a single row every column is constant, so the rule is
+  off there.
+
+One value normalisation is added, and only one: **date and period labels**.
+When a gold value is a `YYYY`, `YYYY-MM` or `YYYY-MM-DD` string and the
+predicted value is a date starting with it at a component boundary, the two
+are equal -- `'2009'` matches `'2009-01-01'`, `'2013-02'` matches
+`'2013-02-01'`. Only the gold side may be the shorter label, only strings are
+read this way (a number is a number, never a year), and nothing else is
+normalised. Anything broader belongs in an alternative gold answer, which is
+reviewed per question and cannot silently widen.
+
+Lenient is a superset of strict by construction: everything strict accepts is
+accepted. It is not partial credit -- a question passes a score or it does
+not -- and there is no model in either score, so both stay reproducible.
+
+Every result row carries `status` and `lenient_status`, so a question that
+passes one score and not the other is visible per question; the printed
+table shows a **Strict** and a **Lenient** column beside each other, and the
+scoreboard, the records, the README block and
+[docs/benchmarks.md](../benchmarks.md) all report both.
 
 The command prints one row per question and role, then a pass/fail/skip/xfail
 count per role, writes the whole report as JSON (`--export-path`, default
@@ -301,7 +364,7 @@ under `configs`, and a `comparison`. Each config has:
 | `models` | `provider:model` per LLM node |
 | `planned_cases`, `completed_cases` | Cases the run would make, and made |
 | `summary` | pass/fail counts per role, as tier 1 reports |
-| `accuracy` | `overall`, `by_tag` and `by_difficulty`: passes against the gold result |
+| `accuracy` | `overall` (strict) and `lenient`, then `by_tag` and `by_difficulty`, each with both counts and both rates |
 | `answerability` | `precision` and `recall` of refusing as unanswerable: true refusals of the four unanswerable questions, false refusals of answerable ones, and missed unanswerables |
 | `tokens_by_node` | calls, input, cached input, cache write, output and reasoning tokens per node |
 | `cost` | dollars `total` and `per_question` (each result row has its own `cost`) |
@@ -310,7 +373,7 @@ under `configs`, and a `comparison`. Each config has:
 | `errors_by_code` | error codes the runs ended with (`EXCEPTION` for a run that raised) |
 | `determinism` | with `--passes` > 1: the share of questions whose SQL and rows were identical in every pass, and which ones differed |
 | `faithfulness` | [answer faithfulness](#answer-faithfulness): `faithful` of `answers` written, the `rate`, and each `unfaithful` run with what it stated that the rows do not hold |
-| `results` | one row per run: status, reason, SQL, cost, latency, tokens, retries, `faithfulness` (`null` when no answer was written), and `plans`: each sub-query's `id`, `intent` and `plan` (the `PlanModel` JSON the SQL was generated from, `null` if planning failed), so a wrong answer can be traced to the plan; and `answer`, the text the answer synthesizer wrote (summary, then content), which the faithfulness check read |
+| `results` | one row per run: `status` and `reason` (strict), `lenient_status` and `lenient_reason`, SQL, cost, latency, tokens, retries, `faithfulness` (`null` when no answer was written), and `plans`: each sub-query's `id`, `intent` and `plan` (the `PlanModel` JSON the SQL was generated from, `null` if planning failed), so a wrong answer can be traced to the plan; and `answer`, the text the answer synthesizer wrote (summary, then content), which the faithfulness check read |
 
 `comparison.configs` is one row per config (accuracy, answerability, cost,
 latency, retries, determinism, faithfulness); `comparison.differences` lists
@@ -405,7 +468,7 @@ name is taken. Every record holds:
 | `dataset` | `chinook_gold.yaml`'s name and sha256, taken with LF line endings so a Windows checkout hashes the same |
 | `database` | `datasource_id`, `engine` (`sqlite`), `schema_fingerprint` (a hash of the latest indexed schema snapshot's tables, columns, types and keys, so re-indexing an unchanged database keeps it) and the `tables` and `columns` counts |
 | `config` | The config name, and for tier 2 `provider:model` per node |
-| `metrics` | Tier 2: accuracy, answerability precision and recall, dollars total and per question, input / cached / output tokens per question, p50 and p95 latency, determinism, answer faithfulness. Retrieval: the report's `summary` |
+| `metrics` | Tier 2: accuracy (strict) and lenient_accuracy, answerability precision and recall, dollars total and per question, input / cached / output tokens per question, p50 and p95 latency, determinism, answer faithfulness. Retrieval: the report's `summary` |
 | tier 2 only | `roles`, `passes`, `stopped`, `partial` and the config's full `scoreboard` |
 | retrieval only | `settings` and the full `report` |
 

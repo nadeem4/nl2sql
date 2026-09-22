@@ -67,11 +67,11 @@ and determinism: [docs/benchmarks.md](docs/benchmarks.md).
 <!-- BENCHMARKS:START -->
 ### Tier 2: English questions answered correctly
 
-The real model end to end on the Chinook gold questions. Accuracy is the share whose rows match the gold answer, or that are refused where the gold set expects a refusal; faithfulness is the share of written answers whose numbers and names come from the rows.
+The real model end to end on the Chinook gold questions. Accuracy is the strict share whose rows match the gold answer exactly, or that are refused where the gold set expects a refusal; lenient allows extra and reordered columns and date labels; faithfulness is the share of written answers whose numbers and names come from the rows.
 
-| Config | Database | Date (UTC) | Commit | Accuracy | Faithfulness | $/question | Δ vs previous |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| gpt-5.4 | chinook | 2026-09-22 | 27cad30 | 58.1% | 87.5% | $0.0202 | accuracy +16.3 pp, faithfulness -6.9 pp, $/question -$0.0034 |
+| Config | Database | Date (UTC) | Commit | Accuracy (strict) | Accuracy (lenient) | Faithfulness | $/question | Δ vs previous |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| gpt-5.4 | chinook | 2026-09-22 | 27cad30 | 58.1% | - | 87.5% | $0.0202 | accuracy +16.3 pp, faithfulness -6.9 pp, $/question -$0.0034 |
 
 ### Retrieval recall
 

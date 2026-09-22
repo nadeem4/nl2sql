@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import itertools
 import math
-from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
+import re
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import sqlglot
 
@@ -54,6 +56,88 @@ def _same_value(got: Any, want: Any) -> bool:
 
 def _same_row(got: List[Any], want: List[Any]) -> bool:
     return len(got) == len(want) and all(_same_value(g, w) for g, w in zip(got, want))
+
+
+# -- the lenient comparison -------------------------------------------------
+#
+# Spider 2.0 counts a prediction correct when every gold column vector appears
+# in the result (https://arxiv.org/html/2411.07763v2), and Defog's sql-eval
+# falls back to ``subset_df``, matching each gold column's values against some
+# generated column with names, types and positions ignored
+# (https://defog.ai/blog/open-sourcing-sqleval/). The lenient score here is
+# that rule, with two guardrails against the false positives it can let in.
+
+# A gold period label: a year, a year and month, or a full date.
+_PERIOD_LABEL = re.compile(r"^\d{4}(-\d{2}){0,2}$")
+# The predicted value it may be compared with: a date, optionally with a time.
+_DATE_VALUE = re.compile(r"^\d{4}-\d{2}-\d{2}")
+
+
+def _same_period(got: Any, want: Any) -> bool:
+    """A gold period label against a predicted date that starts with it.
+
+    ``'2009'`` matches ``'2009-01-01'`` and ``'2013-02'`` matches
+    ``'2013-02-01'``: the same period, labelled by its first day rather than
+    truncated. Only the gold side may be the shorter label, only strings are
+    read this way (a number is a number, never a year), and the prefix must end
+    on a component boundary, so ``'2009-1'`` matches nothing.
+    """
+    if not isinstance(got, str) or not isinstance(want, str):
+        return False
+    if not _PERIOD_LABEL.match(want) or not _DATE_VALUE.match(got):
+        return False
+    return got == want or got.startswith(want + "-")
+
+
+def _same_value_lenient(got: Any, want: Any) -> bool:
+    return _same_value(got, want) or _same_period(got, want)
+
+
+def _same_row_lenient(got: List[Any], want: List[Any]) -> bool:
+    return len(got) == len(want) and all(_same_value_lenient(g, w) for g, w in zip(got, want))
+
+
+def _rows_match(got: List[List[Any]], want: List[List[Any]], order_matters: bool) -> bool:
+    """``compare_results``' row rule, with period labels normalised."""
+    if order_matters:
+        return all(_same_row_lenient(g, w) for g, w in zip(got, want))
+    unused = list(want)
+    for row in got:
+        match = next((i for i, w in enumerate(unused) if _same_row_lenient(row, w)), None)
+        if match is None:
+            return False
+        unused.pop(match)
+    return True
+
+
+def _column(rows: Sequence[List[Any]], index: int) -> List[Any]:
+    return [row[index] for row in rows]
+
+
+def _is_constant(column: Sequence[Any]) -> bool:
+    """Every value the same, all-null included. One row makes every column constant."""
+    return all(_same_value(v, column[0]) for v in column[1:])
+
+
+def _column_can_match(got: List[Any], want: List[Any]) -> bool:
+    """Whether a result column could stand in for a gold column.
+
+    Its values must be the gold column's as a multiset. A constant or all-null
+    result column is refused outright once there is more than one row: it has
+    the right height and tells the gold column nothing, so a hard-coded
+    literal must not be read as a computed one. On a single row every column
+    is constant and the rule is off; the column cap and the values carry it
+    there.
+    """
+    if len(got) > 1 and _is_constant(got):
+        return False
+    unused = list(got)
+    for value in want:
+        match = next((i for i, g in enumerate(unused) if _same_value_lenient(g, value)), None)
+        if match is None:
+            return False
+        unused.pop(match)
+    return True
 
 
 class ModelEvaluator:
@@ -121,8 +205,62 @@ class ModelEvaluator:
         return True
 
     @staticmethod
+    def lenient_column_cap(gold_columns: int) -> int:
+        """How many columns a lenient match lets a result carry: ``2x`` the gold's, or two more.
+
+        Whichever is larger, so a one-column gold answer may come back with up
+        to three columns and a three-column one with up to six. Without a cap a
+        ``SELECT *`` would pass by carrying the gold columns among many others;
+        Databricks Genie counts any extra column as bad, so a cap is the middle
+        ground (https://docs.databricks.com/aws/en/genie/benchmarks).
+        """
+        return max(2 * gold_columns, gold_columns + 2)
+
+    @staticmethod
+    def compare_results_lenient(
+        generated_rows: Sequence[Row],
+        expected_rows: Sequence[Row],
+        order_matters: bool = False,
+    ) -> bool:
+        """Whether every gold column is answered by a distinct column of the result.
+
+        Everything :meth:`compare_results` accepts is accepted here. Beyond it,
+        a result may carry its columns in another order and carry extra ones,
+        up to :meth:`lenient_column_cap`; each gold column must be matched, as
+        a multiset of values, by a distinct result column, and the rows of the
+        matched columns must then line up as ``compare_results`` requires --
+        so values swapped between rows still fail. A constant or all-null
+        result column may only answer for a constant gold column. Gold period
+        labels are read against dates (``'2009'`` is ``'2009-01-01'``);
+        nothing else is normalised. The row count must be equal, and row order
+        still counts only when ``order_matters``.
+        """
+        if ModelEvaluator.compare_results(generated_rows, expected_rows, order_matters):
+            return True
+        got = [_values(r) for r in generated_rows]
+        want = [_values(r) for r in expected_rows]
+        if len(got) != len(want) or not want:
+            return False
+
+        width, gold_width = len(got[0]), len(want[0])
+        if gold_width > width or width > ModelEvaluator.lenient_column_cap(gold_width):
+            return False
+
+        columns = [_column(got, i) for i in range(width)]
+        candidates = [[i for i in range(width) if _column_can_match(columns[i], _column(want, j))]
+                      for j in range(gold_width)]
+        if any(not c for c in candidates):
+            return False
+        for picks in itertools.product(*candidates):
+            if len(set(picks)) != gold_width:
+                continue
+            if _rows_match([[row[i] for i in picks] for row in got], want, order_matters):
+                return True
+        return False
+
+    @staticmethod
     def score_case(question: GoldQuestion, role: str, result: QueryResult) -> Tuple[str, str]:
-        """Scores one run of ``question`` as ``role``: ``(status, reason)``.
+        """Scores one run of ``question`` as ``role`` strictly: ``(status, reason)``.
 
         ``allowed`` passes when the run succeeds and its rows match
         ``gold_result`` (respecting ``order_matters``). ``refused`` passes on
@@ -131,6 +269,20 @@ class ModelEvaluator:
         datasource resolver's refusal: status ``error`` with
         ``QUESTION_NOT_ANSWERABLE`` and no rows.
         """
+        return ModelEvaluator._score(question, role, result, ModelEvaluator.compare_results)
+
+    @staticmethod
+    def score_case_lenient(question: GoldQuestion, role: str, result: QueryResult) -> Tuple[str, str]:
+        """Scores one run as :meth:`score_case` does, with :meth:`compare_results_lenient`.
+
+        Only the rows of an ``allowed`` question are read differently; a
+        refusal is scored exactly as the strict score reads it.
+        """
+        return ModelEvaluator._score(question, role, result, ModelEvaluator.compare_results_lenient)
+
+    @staticmethod
+    def _score(question: GoldQuestion, role: str, result: QueryResult,
+               compare: Callable[..., bool]) -> Tuple[str, str]:
         expected = question.expected[role]
         errors = result.errors
         first_error = f"{errors[0].get('error_code')}: {errors[0].get('message')}" if errors else ""
@@ -160,7 +312,7 @@ class ModelEvaluator:
             return "fail", f"expected one result set, got {len(row_samples)}"
         sample = row_samples[0]
         gold = question.gold_result or []
-        if not ModelEvaluator.compare_results(sample.rows, gold, order_matters=question.order_matters):
+        if not compare(sample.rows, gold, order_matters=question.order_matters):
             return "fail", f"rows differ from gold_result ({len(sample.rows)} rows, gold has {len(gold)})"
         return "pass", ""
 

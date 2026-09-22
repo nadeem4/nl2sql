@@ -100,8 +100,9 @@ def test_the_built_in_presets_are_priced_verified_and_keyless():
 
 def _rec(qid, status, *, expected="allowed", tags=("join",), difficulty="easy", pass_no=1, cost=0.01,
          latency=1.0, sql="SELECT 1", digest="d", refused_unanswerable=False, retries=0, errors=(),
-         nodes=None, timings=None):
+         nodes=None, timings=None, lenient=None):
     return {"id": qid, "role": "admin", "pass": pass_no, "expected": expected, "status": status, "reason": "",
+            "lenient_status": lenient or status, "lenient_reason": "",
             "tags": list(tags), "difficulty": difficulty, "cost": cost, "latency_s": latency, "sql": sql,
             "rows_digest": digest, "refused_unanswerable": refused_unanswerable, "retries": retries,
             "error_codes": list(errors), "tokens_by_node": nodes or {}, "timings": timings or {}}
@@ -116,10 +117,19 @@ def test_scoreboard_reports_accuracy_overall_by_tag_and_by_difficulty():
     ]
     board = tier2.score_config(records, passes=1)
     assert board["accuracy"]["overall"] == pytest.approx(0.75)
-    assert board["accuracy"]["by_tag"]["join"] == {"pass": 1, "total": 2, "accuracy": 0.5}
+    assert board["accuracy"]["by_tag"]["join"] == {"pass": 1, "lenient_pass": 1, "total": 2,
+                                                   "accuracy": 0.5, "lenient_accuracy": 0.5}
     assert board["accuracy"]["by_difficulty"]["hard"]["accuracy"] == 0.5
     assert board["errors_by_code"] == {"EXECUTION_ERROR": 1}
     assert board["determinism"] is None
+
+
+def test_scoreboard_reports_a_lenient_accuracy_beside_the_strict_one():
+    records = [_rec("a", "pass"), _rec("b", "fail", lenient="pass"), _rec("c", "fail"), _rec("d", "fail")]
+    board = tier2.score_config(records, passes=1)
+    assert board["accuracy"]["overall"] == 0.25
+    assert board["accuracy"]["lenient"] == 0.5
+    assert tier2.compare({"x": board})["configs"][0]["lenient_accuracy"] == 0.5
 
 
 def test_answerability_precision_counts_false_refusals_and_recall_counts_missed_unanswerables():

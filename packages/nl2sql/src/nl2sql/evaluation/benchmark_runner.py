@@ -101,17 +101,22 @@ class BenchmarkRunner:
         """Runs and scores one case: its report row, and the result (None if the run raised)."""
         expected = question.expected[role]
         row: Dict[str, Any] = {"id": question.id, "question": question.question, "role": role,
-                               "expected": expected, "status": "", "reason": "", "sql": "", "rows": None,
+                               "expected": expected, "status": "", "reason": "",
+                               "lenient_status": "", "lenient_reason": "", "sql": "", "rows": None,
                                "gold_rows": len(question.gold_result or [])}
         if self.before_case:
             self.before_case(question)
         try:
             result = self._run(question, role)
         except Exception as exc:  # one broken case must not abort the run
-            return {**row, "status": "fail", "reason": f"run raised {type(exc).__name__}: {exc}"}, None
+            reason = f"run raised {type(exc).__name__}: {exc}"
+            return {**row, "status": "fail", "reason": reason,
+                    "lenient_status": "fail", "lenient_reason": reason}, None
 
         status, reason = ModelEvaluator.score_case(question, role, result)
+        lenient_status, lenient_reason = ModelEvaluator.score_case_lenient(question, role, result)
         samples = [sq.rows for sq in result.sub_queries if sq.rows is not None]
         return {**row, "status": status, "reason": reason,
+                "lenient_status": lenient_status, "lenient_reason": lenient_reason,
                 "sql": result.sub_queries[0].sql if result.sub_queries else "",
                 "rows": samples[0].total_rows if samples else None}, result

@@ -483,18 +483,25 @@ class ConsolePresenter:
     def print_benchmark_results(self, results: List[Dict[str, Any]], title: str = "Evaluation Results") -> None:
         """One row per (question, role) run: expected outcome, status and why."""
         styles = {"pass": "green", "fail": "red", "skip": "yellow", "xfail": "magenta"}
+        # Tier 2 scores each run twice; tier 1 rows carry only the strict status.
+        scored_leniently = any(r.get("lenient_status") for r in results)
         table = Table(title=title, show_header=True, header_style="bold magenta", expand=True)
         table.add_column("ID", style="cyan", no_wrap=True)
         table.add_column("Role", no_wrap=True)
         table.add_column("Expected", no_wrap=True)
-        table.add_column("Status", justify="center", no_wrap=True)
+        table.add_column("Strict" if scored_leniently else "Status", justify="center", no_wrap=True)
+        if scored_leniently:
+            table.add_column("Lenient", justify="center", no_wrap=True)
         table.add_column("Rows", justify="right", no_wrap=True)
         table.add_column("Reason", justify="left", overflow="fold")
 
+        def cell(status: str) -> str:
+            return f"[{styles.get(status, 'white')}]{status.upper()}[/{styles.get(status, 'white')}]"
+
         for r in results:
-            style = styles.get(r["status"], "white")
             rows = "-" if r.get("rows") is None else f"{r['rows']}/{r.get('gold_rows', '-')}"
-            table.add_row(r["id"], r["role"], r["expected"], f"[{style}]{r['status'].upper()}[/{style}]",
+            lenient = [cell(r.get("lenient_status") or r["status"])] if scored_leniently else []
+            table.add_row(r["id"], r["role"], r["expected"], cell(r["status"]), *lenient,
                           rows, Text(str(r.get("reason") or "")))
 
         self.console.print(table)
@@ -531,11 +538,12 @@ class ConsolePresenter:
 
         rows = [[r["config"], f"{board['configs'][r['config']]['completed_cases']}/"
                  f"{board['configs'][r['config']]['planned_cases']}", pct(r["accuracy"]),
+                 pct(r.get("lenient_accuracy")),
                  pct(r["answerability_precision"]), pct(r["answerability_recall"]), usd(r["cost_total"]),
                  usd(r["cost_per_question"]), sec(r["latency_p50"]), sec(r["latency_p95"]), r["retries"],
                  pct(r["determinism"]), pct(r.get("faithfulness"))] for r in board["comparison"]["configs"]]
         self.print_table(rows, title="Tier 2 scoreboard", columns=[
-            "Config", "Cases", "Accuracy", "Ans. P", "Ans. R", "Cost", "$/question", "p50", "p95",
+            "Config", "Cases", "Strict", "Lenient", "Ans. P", "Ans. R", "Cost", "$/question", "p50", "p95",
             "Retries", "Determinism", "Faithful"])
         unfaithful = [[name, u["id"], u["role"], u["pass"], ", ".join(u["unsupported_numbers"] + u["unsupported_entities"])]
                       for name, cfg in board["configs"].items()

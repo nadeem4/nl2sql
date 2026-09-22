@@ -113,7 +113,13 @@ def test_two_configs_are_scored_priced_and_compared(demo_env, servers, tmp_path)
     assert good_board["completed_cases"] == good_board["planned_cases"] == len(QUESTIONS)
     assert good_board["accuracy"]["overall"] == 1.0
     assert bad_board["accuracy"]["overall"] == pytest.approx(0.75)
-    assert bad_board["accuracy"]["by_tag"]["single-table"] == {"pass": 1, "total": 2, "accuracy": 0.5}
+    # The deliberately wrong plan answers a different question, so the lenient
+    # score rejects it too: lenient forgives shape, never a wrong answer.
+    assert good_board["accuracy"]["lenient"] == 1.0
+    assert bad_board["accuracy"]["lenient"] == pytest.approx(0.75)
+    assert bad_board["accuracy"]["by_tag"]["single-table"] == {
+        "pass": 1, "lenient_pass": 1, "total": 2, "accuracy": 0.5, "lenient_accuracy": 0.5}
+    assert all(r["lenient_status"] for r in bad_board["results"])
     assert good_board["answerability"] == {"true_refusals": 1, "false_refusals": 0, "missed_unanswerable": 0,
                                            "precision": 1.0, "recall": 1.0}
     assert good_board["models"]["astplanner"] == "openai:gpt-5.4"
