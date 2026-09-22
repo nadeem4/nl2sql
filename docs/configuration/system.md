@@ -109,6 +109,12 @@ providers. The check runs on the read path only, so the fix is simply to re-run
 | `ENV` | `—` | Environment name used to load `.env.{ENV}`. |
 | `APP_ENV` | `—` | Alternate environment name used to load `.env.{APP_ENV}`. |
 
+On the CLI, `--env <name>` sets `ENV` and `--env-file <path>` sets
+`ENV_FILE_PATH`. Either flag also loads that file into the process environment
+(`load_dotenv(..., override=False)`), because `nl2sql doctor`, the LLM
+registry and `${env:VAR}` references read `os.environ` rather than settings. A
+variable already exported in the shell wins over the file.
+
 From Python, `NL2SQL(env="demo")` sets `ENV` and `NL2SQL(env_file=path)` sets
 `ENV_FILE_PATH`, reloading settings before any configuration path is resolved.
 

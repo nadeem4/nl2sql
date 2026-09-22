@@ -334,7 +334,10 @@ nl2sql doctor
 ```
 
 `--env <name>` loads `.env.<name>`; `--env-file <path>` loads an exact file and
-takes precedence over `--env`. `nl2sql --version` prints the installed
+takes precedence over `--env`. The file's variables also go into the process
+environment, so `doctor` and `run` find an `OPENAI_API_KEY` kept only in the
+file; a variable already exported in your shell wins over the file.
+`nl2sql --version` prints the installed
 `nl2sql-engine` version. On a failed `run`, only the error message prints by
 default; pass `--verbose`/`-v` for the full traceback. `run` exits 1 when the
 run ends with an ERROR or CRITICAL error (the result's status is `error`), an

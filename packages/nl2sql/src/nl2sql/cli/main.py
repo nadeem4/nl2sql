@@ -8,8 +8,10 @@ import pathlib
 import json
 from typing import Optional, List
 from typing_extensions import Annotated
+from dotenv import load_dotenv
 
 # Core Library Imports
+from nl2sql.common.env_hint import active_env_file
 from nl2sql.common.logger import configure_logging
 from nl2sql.common.settings import reload_settings, settings
 from nl2sql.context import NL2SQLContext
@@ -74,6 +76,10 @@ def global_callback(
     if env_file:
         os.environ["ENV_FILE_PATH"] = str(env_file)
     if env or env_file:
+        # pydantic-settings reads the file into `settings` only, but doctor,
+        # the LLM registry and `${env:VAR}` references read os.environ. A
+        # variable already exported in the shell wins over the file.
+        load_dotenv(active_env_file(), override=False)
         reload_settings()
 
 @app.command()
