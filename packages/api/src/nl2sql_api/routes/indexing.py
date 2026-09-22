@@ -67,7 +67,9 @@ def clear_index(
 def get_index_status(
     service: IndexingSvc
 ):
-    """Placeholder: `status: "operational"` and the registered datasource ids. It does not read the vector store."""
+    """The vector index's health: `status` (`ok`, `empty`, `stale` or `missing`), entry counts by
+    type, when it was built, the embedding model, one entry per registered datasource and any
+    problems found. Read from the live index; the same report the playground shows."""
     try:
         return service.get_index_status()
     except Exception as e:

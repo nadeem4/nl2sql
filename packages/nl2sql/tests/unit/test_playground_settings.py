@@ -25,6 +25,7 @@ from nl2sql.llm.providers import VERIFIED_OPENAI_MODELS, mask_key
 from nl2sql.cli.commands.demo import _key_from_env_file
 from nl2sql.cli.demo.playground.app import build_app
 from nl2sql.configs import ConfigManager
+from nl2sql import NL2SQL, DatasourceAPI, LLM_API
 from nl2sql.llm import LLMRegistry
 from nl2sql.secrets import SecretManager
 
@@ -77,7 +78,8 @@ def _llm_yaml(project):
 class _Context:
     def __init__(self, project):
         self.schema_store = None
-        self.ds_registry = None
+        self.vector_store = None
+        self.ds_registry = type("R", (), {"list_ids": staticmethod(lambda: [])})()
         self.llm_registry = LLMRegistry(SecretManager())
         cfg = ConfigManager().load_llm(project / "configs" / "llm.demo.yaml")
         agents = dict(cfg.agents or {})
@@ -85,11 +87,13 @@ class _Context:
         self.llm_registry.register_llms(agents)
 
 
-class _Engine:
-    """Runs no pipeline; reports which planner client a run would have used."""
+class _Engine(NL2SQL):
+    """The real facade; runs no pipeline, reports which planner client a run would have used."""
 
     def __init__(self, project):
-        self.context = _Context(project)
+        self._ctx = _Context(project)
+        self.datasource = DatasourceAPI(self._ctx)
+        self.llm = LLM_API(self._ctx)
         self.used = []
         self.release = None
         self.entered = threading.Event()
@@ -262,7 +266,7 @@ def test_a_failed_save_does_not_echo_the_key(project, monkeypatch):
     def _boom(path, key):
         raise OSError(f"cannot write {key} to {path}")
 
-    monkeypatch.setattr("nl2sql.cli.demo.playground.settings._persist_api_key", _boom)
+    monkeypatch.setattr("nl2sql.cli.demo.playground.settings.persist_api_key", _boom)
     _, client = _app(project)
 
     response = client.post("/api/settings/key", json={"api_key": FAKE_KEY})

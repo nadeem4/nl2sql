@@ -24,14 +24,12 @@ from __future__ import annotations
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from fastapi import HTTPException
 
 from nl2sql.cli.demo.stamp import engine_version, outdated_warning, read_stamp
 from nl2sql.common.logger import get_logger
-from nl2sql.indexing.health import inspect_vector_store
-from nl2sql.indexing.rebuild import rebuild_index
 
 logger = get_logger(__name__)
 
@@ -57,19 +55,8 @@ class IndexPanel:
 
     # --- reading ---------------------------------------------------------------
 
-    def _context(self):
-        return getattr(self.engine, "context", None)
-
     def health(self) -> Dict[str, Any]:
-        ctx = self._context()
-        store = getattr(ctx, "vector_store", None)
-        if store is None:
-            return {"status": "missing", "total": 0, "counts": {}, "built_at": None,
-                    "embedding_model": None, "datasources": [],
-                    "problems": ["This playground has no vector index configured."]}
-        registry = getattr(ctx, "ds_registry", None)
-        ids: List[str] = [a.datasource_id for a in registry.list_adapters()] if registry else []
-        return inspect_vector_store(store, getattr(ctx, "schema_store", None), ids).to_dict()
+        return self.engine.index_health()
 
     def _folder(self) -> Optional[Dict[str, Any]]:
         if self.project_dir is None:
@@ -125,8 +112,7 @@ class IndexPanel:
 
     def _run(self, enrich: bool) -> None:
         try:
-            result = rebuild_index(
-                self._context(),
+            result = self.engine.rebuild_index(
                 enrich=enrich,
                 datasource_ids=[self.datasource_id],
                 on_progress=self._step,

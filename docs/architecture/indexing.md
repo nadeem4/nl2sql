@@ -71,7 +71,8 @@ flowchart TD
   `rebuild_index(..., switch_guard=...)`. The playground passes its `RunGate`, so
   questions in flight finish first.
 - `nl2sql.indexing.rebuild.rebuild_index` is the one entry point for
-  `nl2sql index`, the demo's startup repair and the playground's Rebuild.
+  `nl2sql index`, the demo's startup repair and the playground's Rebuild (through
+  `NL2SQL.rebuild_index`).
 
 ### One embedding model per collection
 
@@ -97,8 +98,9 @@ no entries, its entries were built from an older schema version than the latest
 snapshot, or the configured embedding model differs), `ok`. It reports entry
 counts by type, the schema version per datasource, when each was built and the
 recorded embedding model. `nl2sql doctor` prints it under **Index**,
-`nl2sql demo` rebuilds at startup when it is not `ok`, and the playground shows
-it with a Rebuild button.
+`nl2sql demo` rebuilds at startup when it is not `ok`, and the playground and
+`GET /api/v1/index/status` show it (through `NL2SQL.index_health`), the playground
+with a Rebuild button.
 
 ## Chunking strategy (as implemented)
 
@@ -192,7 +194,7 @@ search (the query, the pool with similarity, Chroma distance and type, the
 picks in order with the score each won with, and what was dropped). The record
 comes from numbers MMR computes anyway, so it costs no second search. Nodes put
 it in their run trace (see [Debugging a run](../observability/debugging.md#retrieval)),
-and the playground's Retrieval inspector (`VectorStore.inspect`) runs the same
+and the playground's Retrieval inspector (`NL2SQL.inspect_retrieval`) runs the same
 search for any text, with k, lambda, entry types and datasource exposed. That
 inspector is the tool for chunking experiments: change the chunks, rebuild,
 search the same text, and diff the **Copy as text** output.

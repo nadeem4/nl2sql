@@ -35,9 +35,8 @@ import yaml
 from fastapi import HTTPException, Request
 
 from nl2sql.llm.providers import LLM_AGENTS, PROVIDER_KEYS, VERIFIED_MODELS, env_var_for_key, mask_key, provider_for_key
-from nl2sql.cli.commands.demo import _persist_api_key, _point_llm_config_at
+from nl2sql.cli.demo.llm_config import persist_api_key, point_llm_config_at
 from nl2sql.common.logger import get_logger
-from nl2sql.configs import ConfigManager
 from nl2sql.llm.registry import PROVIDER_PRESETS
 
 logger = get_logger(__name__)
@@ -248,10 +247,7 @@ class SettingsPanel:
 
     def _reload(self) -> None:
         """Rebuilds the registry from the YAML the CLI reads."""
-        cfg = ConfigManager().load_llm(self._llm_path)
-        agents = dict(cfg.agents or {})
-        agents["default"] = cfg.default
-        self.engine.context.llm_registry.replace_llms(agents)
+        self.engine.reload_llm_config(self._llm_path)
 
     def save_key(self, key: str) -> None:
         """Saves ``key`` to ``.env.demo`` and switches the demo to live on it."""
@@ -266,7 +262,7 @@ class SettingsPanel:
         variable = env_var_for_key(key)
         with self.gate.change():
             try:
-                _persist_api_key(self.project_dir / ENV_FILE, key)
+                persist_api_key(self.project_dir / ENV_FILE, key)
                 os.environ[variable] = key
                 if self.mode != "live":
                     # The replay placeholder in OPENAI_API_KEY is not a key and
@@ -275,7 +271,7 @@ class SettingsPanel:
                     for other in PROVIDER_KEYS:
                         if other != variable:
                             os.environ.pop(other, None)
-                _point_llm_config_at(self.project_dir, None, provider=provider_for_key(key))
+                point_llm_config_at(self.project_dir, None, provider=provider_for_key(key))
                 self._reload()
             except Exception as exc:
                 # The exception's text may quote the key; only its type is kept.

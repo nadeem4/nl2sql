@@ -67,6 +67,28 @@ The public facade delegates to modular APIs with the same signatures:
 `check_permissions`, `get_allowed_resources`, `get_current_settings`,
 `get_setting`, `validate_configuration`.
 
+### Schema, index and retrieval
+
+What a client shows about the index, as methods on `NL2SQL` itself. The
+playground and `nl2sql-api` both use them, and neither reaches into
+`engine.context`; `tests/unit/test_cli_demo_boundaries.py` holds the playground
+to that.
+
+| method | returns | meaning |
+| --- | --- | --- |
+| `get_schema(datasource_id)` | `dict` | The indexed schema as the planner is given it: `{"datasource_id", "tables": [...]}`, tables sorted by name, each with `name`, `schema`, `row_count`, `description`, `columns` (`name`, `type`, `nullable`, `primary_key`, `description`) and `foreign_keys` (`columns`, `references_table`, `references_columns`). Read from the latest schema snapshot, not the database; before the first index `tables` is empty. |
+| `index_health()` | `dict` | `status` (`ok`, `empty`, `stale`, `missing`), `total`, `counts` by entry type, `built_at`, `embedding_model`, one entry per registered datasource (`entries`, `index_version`, `snapshot_version`, `built_at`) and `problems`. `missing` when no vector store is configured. |
+| `rebuild_index(datasource_ids=None, enrich=False, full=False, on_progress=None, switch_guard=None)` | `RebuildResult` | Rebuilds the vector entries beside the live ones, then switches; the current entries answer questions until then. `enrich` asks the LLM for descriptions and spends tokens, so it is off by default. `on_progress` gets a sentence before each step; `switch_guard` is a context manager factory held around each switch. The result has `ok`, `stats`, `empty` and `errors`. |
+| `inspect_retrieval(query, k=8, lambda_mult=None, types=None, datasource_id=None)` | `dict` | One MMR search of the live index, as the engine runs it: the pool with scores, the picks in order and what was dropped. `types` limits the entry types (`schema.table`, ...). Raises `LookupError` when no vector store is configured. |
+| `reload_llm_config(config_path)` | `None` | Replaces every configured LLM with the file's, as one step: agents the file no longer names fall back to `default`. An invalid file leaves the current configuration in place. |
+
+```python
+engine = NL2SQL(env="demo")
+engine.get_schema("chinook")["tables"][0]["name"]      # 'Album'
+engine.index_health()["status"]                         # 'ok'
+engine.inspect_retrieval("top customers", k=4)["picks"]
+```
+
 ### Top-level exports
 
 Clients import everything they need from `nl2sql` itself, never from an engine

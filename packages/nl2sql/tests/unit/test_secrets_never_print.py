@@ -234,10 +234,10 @@ def test_demo_scaffold_writes_the_real_key_and_the_reference(tmp_path):
 
 
 def test_persisted_panel_key_is_the_real_value(tmp_path):
-    from nl2sql.cli.commands.demo import _persist_api_key
+    from nl2sql.cli.demo.llm_config import persist_api_key
 
     env_file = tmp_path / ".env.demo"
     env_file.write_text("OPENAI_API_KEY=\n", encoding="utf-8")
-    _persist_api_key(env_file, FAKE_KEY)
+    persist_api_key(env_file, FAKE_KEY)
     assert env_file.read_text(encoding="utf-8") == f"OPENAI_API_KEY={FAKE_KEY}\n"
 

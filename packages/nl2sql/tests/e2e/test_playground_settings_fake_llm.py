@@ -11,7 +11,7 @@ import pytest
 
 pytest.importorskip("fastapi")
 
-from nl2sql.cli.commands.demo import _point_llm_config_at  # noqa: E402
+from nl2sql.cli.demo.llm_config import point_llm_config_at  # noqa: E402
 from nl2sql.testing.fake_llm import FakeLLMServer  # noqa: E402
 
 from .recordings_chinook import RULES_COUNT_CUSTOMERS  # noqa: E402
@@ -31,7 +31,7 @@ def test_a_key_saved_in_the_panel_turns_replay_into_live(demo_project, tmp_path,
     shutil.copytree(demo_project, project)
     replay = FakeLLMServer([]).start()  # records nothing: every question misses
     live = FakeLLMServer(RULES_COUNT_CUSTOMERS).start()
-    _point_llm_config_at(project, replay.base_url)
+    point_llm_config_at(project, replay.base_url)
 
     monkeypatch.chdir(project)
     monkeypatch.setenv("ENV", "demo")

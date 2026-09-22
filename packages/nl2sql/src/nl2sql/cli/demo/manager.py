@@ -170,7 +170,7 @@ class DemoManager:
         reload_settings()
 
         from nl2sql.context import NL2SQLContext
-        from nl2sql.cli.commands.indexing import run_indexing
+        from nl2sql.cli.common.indexing import run_indexing
 
         try:
             ctx = NL2SQLContext(

@@ -17,7 +17,7 @@ from fastapi.testclient import TestClient
 from langchain_core.documents import Document
 from langchain_core.embeddings import FakeEmbeddings
 
-from nl2sql.cli.demo.playground import index_panel
+from nl2sql import NL2SQL
 from nl2sql.cli.demo.playground.app import build_app
 from nl2sql.indexing import rebuild as rebuild_module
 from nl2sql.indexing.vector_store import VectorStore
@@ -42,7 +42,8 @@ class _Context:
     def __init__(self, tmp_path):
         self.vector_store = VectorStore("nl2sql_store", str(tmp_path / "vs"), embeddings=FakeEmbeddings(size=8))
         self.schema_store = _Snapshots()
-        self.ds_registry = type("R", (), {"list_adapters": staticmethod(lambda: [_Adapter()])})()
+        self.ds_registry = type("R", (), {"list_ids": staticmethod(lambda: ["chinook"]),
+                                          "list_adapters": staticmethod(lambda: [_Adapter()])})()
         self.llm_registry = None
 
 
@@ -58,9 +59,14 @@ class _Chunk:
         return {"type": self.type, "datasource_id": "chinook", "schema_version": "v1", "table": self._text}
 
 
-class _Engine:
+class _Engine(NL2SQL):
+    """The real facade over a live vector store in ``tmp_path``."""
+
     def __init__(self, tmp_path):
-        self.context = _Context(tmp_path)
+        self._ctx = _Context(tmp_path)
+
+    def list_datasources(self):
+        return ["chinook"]
 
 
 @pytest.fixture
@@ -181,7 +187,7 @@ def test_a_second_rebuild_while_one_runs_is_refused(tmp_path, monkeypatch):
         release.wait(5)
         return rebuild_module.RebuildResult(ok=True)
 
-    monkeypatch.setattr(index_panel, "rebuild_index", _slow)
+    monkeypatch.setattr(rebuild_module, "rebuild_index", _slow)
     _, client = _client(tmp_path)
 
     assert client.post("/api/index/rebuild", json={}).status_code == 202
@@ -198,7 +204,7 @@ def test_the_switch_waits_for_questions_in_flight(tmp_path, monkeypatch):
             events.append("switched")
         return rebuild_module.RebuildResult(ok=True)
 
-    monkeypatch.setattr(index_panel, "rebuild_index", _fake)
+    monkeypatch.setattr(rebuild_module, "rebuild_index", _fake)
     engine = _Engine(tmp_path)
     app = build_app(engine, questions=[], roles=["admin"], mode="replay", dataset="chinook",
                     project_dir=tmp_path, host="127.0.0.1")

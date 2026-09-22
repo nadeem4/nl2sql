@@ -262,7 +262,7 @@ With none of them, `/api/v1/query` answers HTTP 401.
 | `POST` | `/api/v1/index/{datasource_id}` | Index one datasource's schema |
 | `POST` | `/api/v1/index-all` | Index every registered datasource |
 | `DELETE` | `/api/v1/index` | Clear the vector store |
-| `GET` | `/api/v1/index/status` | Placeholder status: the registered datasource ids |
+| `GET` | `/api/v1/index/status` | Index health: status, entries by type, embedding model and problems per datasource |
 
 ```bash
 curl -X POST http://localhost:8000/api/v1/query \

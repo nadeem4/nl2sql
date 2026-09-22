@@ -276,6 +276,9 @@ class _StubEngine:
     def run_query(self, *args, **kwargs):  # pragma: no cover - not exercised here
         raise AssertionError("the stub engine does not run queries")
 
+    def list_datasources(self):
+        return []
+
 
 class _StubContext:
     def __init__(self):
