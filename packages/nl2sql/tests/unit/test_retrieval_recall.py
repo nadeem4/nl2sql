@@ -68,21 +68,19 @@ def _report(table=0.9, column=0.6):
 
 def test_a_retrieval_record_holds_the_run_the_settings_and_the_means(tmp_path):
     path = records.write_retrieval_record(_report(), tmp_path, recorded_at=WHEN, engine_version="0.9.0",
-                                            git_commit="abc")
-    assert path.name == "2026-09-21_0.9.0_retrieval.json"
+                                          code={"git_commit": "abc1234def", "git_dirty": False})
+    assert path.relative_to(tmp_path).as_posix() == "retrieval/unknown/2026-09-21_abc1234_retrieval.json"
     [rec] = records.load_records(tmp_path)
     assert rec["kind"] == "retrieval" and rec["metrics"]["table_recall"] == 0.9
     assert rec["settings"]["table_k"] == 8 and rec["dataset"]["name"] == "chinook_gold.yaml"
 
 
 def test_publish_adds_a_retrieval_section_newest_first(tmp_path):
-    records.write_retrieval_record(_report(0.8), tmp_path / "r", recorded_at=WHEN.replace(day=20),
-                                   engine_version="0.8.0", git_commit=None)
-    records.write_retrieval_record(_report(0.9), tmp_path / "r", recorded_at=WHEN, engine_version="0.9.0",
-                                   git_commit=None)
-    page = records.render_history([], records.load_records(tmp_path / "r"))
+    for when, recall in ((WHEN.replace(day=20), 0.8), (WHEN, 0.9)):
+        records.write_retrieval_record(_report(recall), tmp_path / "r", recorded_at=when, engine_version="0.9.0",
+                                       code={})
+    page = records.render_history(records.load_records(tmp_path / "r"))
     section = page.split("## Retrieval recall")[1]
     assert section.index("90.0%") < section.index("80.0%")
     assert "k 8 tables / 12 planning" in section
-    assert records.EMPTY in page.split("## Retrieval recall")[0]
-    assert "## Retrieval recall" not in records.render_history([], [])
+    assert "## Retrieval recall" not in records.render_history([])

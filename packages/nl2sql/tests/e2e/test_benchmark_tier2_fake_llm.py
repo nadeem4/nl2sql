@@ -173,3 +173,22 @@ def test_two_passes_plan_afresh_and_report_determinism(demo_env, servers, tmp_pa
     determinism = board["configs"]["good"]["determinism"]
     assert determinism == {"identical": len(QUESTIONS), "questions": len(QUESTIONS), "share": 1.0, "differing": []}
     assert board["configs"]["good"]["completed_cases"] == 2 * len(QUESTIONS)
+
+
+def test_a_model_config_runs_on_every_node_and_records_the_database(demo_env, servers, monkeypatch):
+    # `--model gpt-5.4` builds a config on the openai preset, so no base_url is written;
+    # the OpenAI client's own OPENAI_BASE_URL variable points it at the fake server.
+    from nl2sql.evaluation.presets import model_config
+
+    good, _ = servers
+    monkeypatch.setenv("OPENAI_BASE_URL", good.server.base_url)
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-fake-tier2")
+    board = _run(demo_env, {"gpt-5.4": model_config("gpt-5.4")}, servers=servers)
+
+    cfg = board["configs"]["gpt-5.4"]
+    assert cfg["accuracy"]["overall"] == 1.0 and cfg["completed_cases"] == len(QUESTIONS)
+    assert set(cfg["models"].values()) == {"openai:gpt-5.4"}
+    assert good.server.calls
+    database = board["database"]
+    assert (database["datasource_id"], database["engine"]) == ("chinook", "sqlite")
+    assert database["tables"] == 11 and len(database["schema_fingerprint"]) == 16

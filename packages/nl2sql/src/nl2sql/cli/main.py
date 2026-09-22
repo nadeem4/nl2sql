@@ -21,12 +21,13 @@ from nl2sql.evaluation.gold import GOLD_DATASET_PATH
 # Local CLI Imports
 from nl2sql.cli.commands.indexing import run_indexing
 from nl2sql.cli.commands.benchmark import (
+    print_presets as exec_presets,
     publish_benchmarks as exec_publish,
     run_benchmark as exec_benchmark,
     run_retrieval_benchmark as exec_retrieval,
     run_tier2_benchmark as exec_tier2_benchmark,
 )
-from nl2sql.evaluation.records import HISTORY_PATH, README_PATH, RESULTS_DIR, RETRIEVAL_DIR
+from nl2sql.evaluation.records import BENCHMARKS_DIR, HISTORY_PATH, README_PATH
 from nl2sql.evaluation.tier2 import DEFAULT_MAX_ACCURACY_DROP, DEFAULT_MAX_COST_INCREASE
 from nl2sql.cli.commands.run import run_pipeline 
 from nl2sql.cli.commands.info import list_available_adapters
@@ -240,19 +241,31 @@ app.add_typer(benchmark_app, name="benchmark")
 
 @benchmark_app.command("publish")
 def benchmark_publish(
-    results_dir: Annotated[pathlib.Path, typer.Option("--results-dir", help="Where the tier 2 result records are")] = RESULTS_DIR,
+    sources: Annotated[Optional[List[pathlib.Path]], typer.Option(
+        "--from", help="Another project folder (repeatable): copy its records not already here into --results-dir "
+                       "first. A record already here with different content is a conflict and is never overwritten.",
+    )] = None,
+    results_dir: Annotated[pathlib.Path, typer.Option("--results-dir", help="The benchmarks folder holding the records")] = BENCHMARKS_DIR,
     history_path: Annotated[pathlib.Path, typer.Option("--history-path", help="The history page to write")] = HISTORY_PATH,
     readme_path: Annotated[pathlib.Path, typer.Option("--readme-path", help="The README whose BENCHMARKS block is replaced")] = README_PATH,
-    retrieval_dir: Annotated[pathlib.Path, typer.Option("--retrieval-dir", help="Where the retrieval recall records are")] = RETRIEVAL_DIR,
 ):
     """
     Rebuild docs/benchmarks.md and the README results block from the recorded runs.
 
-    Reads every tier 2 record in benchmarks/results/ and retrieval recall
-    record in benchmarks/retrieval/; no key, no network, and the same records
-    always give byte-identical output.
+    Run from the repo root. Reads every record in benchmarks/<kind>/<database>/;
+    no key, no network, and the same records always give byte-identical output.
+    `--from <demo folder>` first pulls in the records a run from that folder wrote.
+    Exits 1 on a conflict.
     """
-    exec_publish(results_dir, history_path, readme_path, retrieval_dir)
+    exec_publish(results_dir, history_path, readme_path, sources)
+
+
+@benchmark_app.command("presets")
+def benchmark_presets():
+    """
+    List the built-in tier 2 LLM configs (`--llm NAME`) and the model on each node.
+    """
+    exec_presets()
 
 
 @benchmark_app.command("retrieval")
@@ -261,15 +274,19 @@ def benchmark_retrieval(
         "--questions", help="Only these question ids or tags (repeatable, or comma-separated).",
     )] = None,
     record: Annotated[bool, typer.Option(
-        "--record", help="Also write a result record to --results-dir (commit it, then `benchmark publish`).",
+        "--record", help="Also write a result record under --results-dir (then `benchmark publish` from the repo).",
     )] = False,
-    results_dir: Annotated[pathlib.Path, typer.Option(
-        "--results-dir", help="Where --record writes the retrieval recall record.",
-    )] = RETRIEVAL_DIR,
+    results_dir: Annotated[Optional[pathlib.Path], typer.Option(
+        "--results-dir", help="The benchmarks folder --record writes under, as retrieval/<database>/ "
+                              "(default: <project>/benchmarks).",
+    )] = None,
+    note: Annotated[Optional[str], typer.Option(
+        "--note", help="A short label for what changed in this run, e.g. \"slim prompts\"; kept in the record.",
+    )] = None,
     baseline: Annotated[Optional[pathlib.Path], typer.Option(
         "--baseline", help="An earlier report or record to compare with: prints the change in each mean and every question that moved.",
     )] = None,
-    export_path: Annotated[Optional[pathlib.Path], typer.Option(help="Where to write the JSON report (benchmark_retrieval.json)")] = None,
+    export_path: Annotated[Optional[pathlib.Path], typer.Option(help="Where to write the JSON report (default: <project>/benchmark_retrieval.json)")] = None,
     dataset: Annotated[pathlib.Path, typer.Option(help="Path to the gold dataset YAML")] = GOLD_DATASET_PATH,
     ds_config_path: DatasourceConfigOption = None,
     secrets_config_path: SecretsConfigOption = None,
@@ -283,12 +300,13 @@ def benchmark_retrieval(
     Forces the vector search (the full-snapshot limit is set to 0), runs the
     schema retriever on each answerable question and scores what it sends
     the planner against the question's needed_tables and needed_columns.
-    Report-only: exits 0 whatever the recall.
+    Report-only: exits 0 whatever the recall. <project> is the folder of the
+    env file --env selects: the current folder for `--env demo`.
     """
     exec_retrieval(BenchmarkConfig(dataset_path=dataset, config_path=ds_config_path, llm_config_path=llm_config_path,
                                    export_path=export_path, vector_store_path=vector_store_path,
                                    secrets_path=secrets_config_path, policies_path=policies_config_path),
-                   questions=questions, record=record, results_dir=results_dir, baseline=baseline)
+                   questions=questions, record=record, results_dir=results_dir, baseline=baseline, note=note)
 
 
 @benchmark_app.callback(invoke_without_command=True)
@@ -298,14 +316,25 @@ def benchmark(
         "--tier",
         help=(
             "1: run the hand-written gold plans through the validator, generator and executor "
-            "with a local fake LLM (no API key). 2: run the real model end to end, per --llm "
+            "with a local fake LLM (no API key). 2: run the real model end to end, per --model / --llm "
             "config, under a required --max-cost cap. Omit to run the full pipeline with the configured LLM."
         ),
     )] = None,
+    model: Annotated[Optional[List[str]], typer.Option(
+        "--model",
+        help="Tier 2: a model to put on every LLM node, named in the scoreboard by itself (repeatable). "
+             "A verified model (gpt-5.4, claude-opus-5, ...) names its provider; any other is provider/model, "
+             "e.g. openrouter/meta-llama/llama-3.3-70b-instruct or ollama/llama3. The key comes from the "
+             "provider's variable, which --env loads.",
+    )] = None,
     llm: Annotated[Optional[List[str]], typer.Option(
         "--llm",
-        help="Tier 2: an LLM config to compare, as NAME=PATH to an llm.yaml-format file (repeatable). "
-             "Without it the project's LLM config runs as 'default'.",
+        help="Tier 2: an LLM config to compare (repeatable): a built-in preset by name (`benchmark presets`; "
+             "mini-helpers is gpt-5.4-mini-helpers), a PATH.yaml named by its stem, or NAME=PATH. "
+             "Combines with --model. With neither, the project's LLM config runs as 'default'.",
+    )] = None,
+    note: Annotated[Optional[str], typer.Option(
+        "--note", help="Tier 2: a short label for what changed in this run, e.g. \"slim prompts\"; kept in each record.",
     )] = None,
     max_cost: Annotated[Optional[float], typer.Option(
         "--max-cost", help="Tier 2 (required): stop before a question that could take total spend past this many USD.",
@@ -325,9 +354,10 @@ def benchmark(
     max_cost_increase: Annotated[float, typer.Option(
         "--max-cost-increase", help="Tier 2 baseline: largest allowed rise in cost per question, as a fraction (0.2 = 20%).",
     )] = DEFAULT_MAX_COST_INCREASE,
-    results_dir: Annotated[pathlib.Path, typer.Option(
-        "--results-dir", help="Tier 2: where to write one result record per config (commit them, then `benchmark publish`).",
-    )] = RESULTS_DIR,
+    results_dir: Annotated[Optional[pathlib.Path], typer.Option(
+        "--results-dir", help="Tier 2: the benchmarks folder one record per config is written under, as "
+                              "tier2/<database>/ (default: <project>/benchmarks).",
+    )] = None,
     dataset: Annotated[pathlib.Path, typer.Option(help="Path to the gold dataset YAML")] = GOLD_DATASET_PATH,
     ds_config_path: DatasourceConfigOption = None,
     secrets_config_path: SecretsConfigOption = None,
@@ -338,7 +368,8 @@ def benchmark(
     iterations: Annotated[int, typer.Option(help="Iterations per test case (tier 1 always runs once)")] = 3,
     include_ids: Annotated[Optional[List[str]], typer.Option(help="Specific Test IDs to run")] = None,
     role: Annotated[Optional[List[str]], typer.Option("--role", help="Only run as this role (repeatable; tier 2 defaults to admin)")] = None,
-    export_path: Annotated[Optional[pathlib.Path], typer.Option(help="Where to write the JSON report")] = None,
+    export_path: Annotated[Optional[pathlib.Path], typer.Option(
+        help="Where to write the JSON report (tier 2 default: <project>/benchmark_tier2.json)")] = None,
 ):
     """
     Score the engine against the Chinook gold dataset, per question and role.
@@ -347,10 +378,13 @@ def benchmark(
     (benchmark_report.json unless --export-path is given) and exits 1 if any
     case failed.
 
-    Tier 2 writes a scoreboard (benchmark_tier2.json) comparing every --llm
-    config and exits 0 when complete, 1 on a baseline regression, 2 without
-    --max-cost and 3 when the cap stopped it early. Each tier 2 run also
-    writes one result record per config to --results-dir.
+    Tier 2, from the demo folder: `nl2sql --env demo benchmark --tier 2 --model gpt-5.4 --max-cost 5`.
+    It prints its plan, then writes a scoreboard comparing every --model and
+    --llm config to <project>/benchmark_tier2.json and one record per config
+    under <project>/benchmarks/tier2/<database>/, where <project> is the folder
+    of the env file --env selects (the current folder for `--env demo`).
+    Exits 0 when complete, 1 on a baseline regression, 2 without --max-cost
+    and 3 when the cap stopped it early.
     """
     if ctx.invoked_subcommand:
         return
@@ -369,9 +403,9 @@ def benchmark(
     )
 
     if tier == 2:
-        exec_tier2_benchmark(bench_run_config, llm_specs=llm, max_cost=max_cost, passes=passes,
+        exec_tier2_benchmark(bench_run_config, llm_specs=llm, model_specs=model, max_cost=max_cost, passes=passes,
                              questions=questions, baseline=baseline, max_accuracy_drop=max_accuracy_drop,
-                             max_cost_increase=max_cost_increase, results_dir=results_dir)
+                             max_cost_increase=max_cost_increase, results_dir=results_dir, note=note)
         return
     exec_benchmark(bench_run_config, tier=tier)
 

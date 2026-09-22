@@ -1,20 +1,25 @@
-"""Tier 2 result records, and the pages ``nl2sql benchmark publish`` builds from them.
+"""Benchmark result records, and the pages ``nl2sql benchmark publish`` builds from them.
 
-Every tier 2 run writes one record per config to ``benchmarks/results/``:
-``<YYYY-MM-DD>_<engine-version>_<config>.json``, with ``-2``, ``-3``... when
-that name is taken. A record holds when the run was, on which engine and
-dataset (the gold file's sha256, so runs on different gold sets are never
-read as comparable), which model each node ran on, the headline metrics and
-the config's full scoreboard (answer faithfulness included; records written
-before it existed show a dash). The owner commits records.
+Every tier 2 run writes one record per config and ``benchmark retrieval
+--record`` writes one record, under a ``benchmarks/`` folder::
 
-``nl2sql benchmark retrieval --record`` writes a retrieval recall record to
-``benchmarks/retrieval/``, named ``<YYYY-MM-DD>_<engine-version>_retrieval.json``.
+    benchmarks/<kind>/<database>/<YYYY-MM-DD>_<shortsha>_<config>.json
 
-``publish`` reads every record and writes ``docs/benchmarks.md`` (every run,
-newest first, plus the latest run per config, then the retrieval recall
-runs) and the block between the README's ``BENCHMARKS`` markers. It reads no clock and calls nothing, so the
-same records always give byte-identical pages.
+``kind`` is ``tier2`` or ``retrieval``, ``database`` the datasource id and
+``shortsha`` the engine commit the run used (``-2``, ``-3``... when the name
+is taken). A record holds when the run was, the code (``git_commit`` and
+``git_dirty``, resolved from the installed package's own checkout), the gold
+dataset (its sha256), the database (datasource id, engine and a schema
+fingerprint), an optional ``note``, the headline metrics and the full report.
+Records are never edited: writing, ``publish`` and ``publish --from`` all
+refuse to overwrite one.
+
+Two runs are comparable when they share the kind, the dataset sha and the
+schema fingerprint (and, for tier 2, the roles). ``publish`` groups the
+history by kind and database, lists runs newest first with the change
+against the previous comparable run of the same config, and marks a run that
+starts a new series. It reads no clock and calls nothing, so the same
+records always give byte-identical pages.
 """
 from __future__ import annotations
 
@@ -25,32 +30,58 @@ import json
 import pathlib
 import re
 import subprocess
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
-RESULTS_DIR = pathlib.Path("benchmarks") / "results"
-RETRIEVAL_DIR = pathlib.Path("benchmarks") / "retrieval"
+BENCHMARKS_DIR = pathlib.Path("benchmarks")
 HISTORY_PATH = pathlib.Path("docs") / "benchmarks.md"
 README_PATH = pathlib.Path("README.md")
 START = "<!-- BENCHMARKS:START -->"
 END = "<!-- BENCHMARKS:END -->"
 EMPTY = "No benchmark runs recorded yet."
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
+UNKNOWN = "unknown"
+UNKNOWN_DATABASE = {"datasource_id": UNKNOWN, "engine": UNKNOWN, "schema_fingerprint": UNKNOWN,
+                    "tables": None, "columns": None}
+KIND_TITLES = {"tier2": "Tier 2", "retrieval": "Retrieval recall"}
+# The metrics a run is judged by, with how a change in each is written.
+HEADLINE = {"tier2": [("accuracy", "accuracy", "pp"), ("faithfulness", "faithfulness", "pp"),
+                      ("cost_per_question", "$/question", "usd")],
+            "retrieval": [("table_recall", "tables", "pp"), ("column_recall", "columns", "pp")]}
 
 
 def installed_engine_version() -> str:
     try:
         return importlib.metadata.version("nl2sql-engine")
     except importlib.metadata.PackageNotFoundError:
-        return "unknown"
+        return UNKNOWN
 
 
-def current_git_commit() -> Optional[str]:
-    """The checked-out commit, or None outside a git checkout."""
+def _git(root: pathlib.Path, *args: str) -> Optional[str]:
     try:
-        out = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True, timeout=10)
+        out = subprocess.run(["git", "-C", str(root), *args], capture_output=True, text=True, timeout=10)
     except (OSError, subprocess.SubprocessError):
         return None
-    return (out.stdout.strip() or None) if out.returncode == 0 else None
+    return out.stdout if out.returncode == 0 else None
+
+
+def code_version(start: Optional[pathlib.Path] = None) -> Dict[str, Any]:
+    """``{git_commit, git_dirty}`` of the checkout the engine is installed from.
+
+    Walks up from ``start`` (the ``nl2sql`` package itself by default) to the
+    folder holding ``.git``, so a run from a project folder outside the repo
+    still names the engine's commit. ``git_dirty`` ignores untracked files.
+    Both are ``"unknown"`` for a wheel install or without git.
+    """
+    if start is None:
+        import nl2sql
+        start = pathlib.Path(nl2sql.__file__)
+    start = pathlib.Path(start).resolve()
+    root = next((d for d in [start, *start.parents] if (d / ".git").exists()), None)
+    sha = _git(root, "rev-parse", "HEAD") if root else None
+    status = _git(root, "status", "--porcelain", "--untracked-files=no") if sha else None
+    if not sha or status is None:
+        return {"git_commit": UNKNOWN, "git_dirty": UNKNOWN}
+    return {"git_commit": sha.strip(), "git_dirty": bool(status.strip())}
 
 
 def dataset_id(path: pathlib.Path) -> Dict[str, str]:
@@ -59,11 +90,53 @@ def dataset_id(path: pathlib.Path) -> Dict[str, str]:
     return {"name": pathlib.Path(path).name, "sha256": hashlib.sha256(data).hexdigest()}
 
 
+def database_identity(ctx) -> Dict[str, Any]:
+    """The database a run used: datasource id, engine, a schema fingerprint and the table and column counts.
+
+    The fingerprint hashes the latest indexed schema snapshot (tables,
+    columns, types, keys), so re-indexing an unchanged database keeps it.
+    Several datasources are joined with ``+``.
+    """
+    from nl2sql.schema.protocol import generate_schema_fingerprint
+
+    parts = []
+    for ds_id in sorted(ctx.ds_registry.list_ids()):
+        snapshot = ctx.schema_store.get_latest_snapshot(ds_id)
+        if snapshot is None:
+            parts.append((ds_id, UNKNOWN, UNKNOWN, None, None))
+            continue
+        contract = snapshot.contract
+        parts.append((ds_id, str(contract.engine_type), generate_schema_fingerprint(contract)[:16],
+                      len(contract.tables), sum(len(t.columns) for t in contract.tables.values())))
+    if not parts:
+        return dict(UNKNOWN_DATABASE)
+    fingerprints = [p[2] for p in parts]
+    fingerprint = (fingerprints[0] if len(parts) == 1 else UNKNOWN if UNKNOWN in fingerprints
+                   else hashlib.sha256("+".join(fingerprints).encode()).hexdigest()[:16])
+    counts = [p[3] for p in parts], [p[4] for p in parts]
+    return {"datasource_id": "+".join(p[0] for p in parts),
+            "engine": "+".join(sorted({p[1] for p in parts})),
+            "schema_fingerprint": fingerprint,
+            "tables": None if None in counts[0] else sum(counts[0]),
+            "columns": None if None in counts[1] else sum(counts[1])}
+
+
+def _stamp(recorded_at: dt.datetime) -> str:
+    return recorded_at.astimezone(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _common(kind: str, *, recorded_at: dt.datetime, engine_version: str, code: Dict[str, Any],
+            dataset: pathlib.Path, database: Optional[Dict[str, Any]], note: Optional[str]) -> Dict[str, Any]:
+    return {"schema": SCHEMA_VERSION, "kind": kind, "recorded_at": _stamp(recorded_at),
+            "engine_version": engine_version, "git_commit": code.get("git_commit") or UNKNOWN,
+            "git_dirty": code.get("git_dirty", UNKNOWN), "note": note or None,
+            "dataset": dataset_id(dataset), "database": database or dict(UNKNOWN_DATABASE)}
+
+
 def make_record(board: Dict[str, Any], name: str, *, recorded_at: dt.datetime, engine_version: str,
-                git_commit: Optional[str]) -> Dict[str, Any]:
+                code: Dict[str, Any], note: Optional[str] = None) -> Dict[str, Any]:
     """The record for config ``name`` of a tier 2 scoreboard."""
     cfg = board["configs"][name]
-    dataset = pathlib.Path(board["dataset"])
     cases = cfg["completed_cases"]
     tokens = cfg["tokens_by_node"].values()
 
@@ -71,11 +144,8 @@ def make_record(board: Dict[str, Any], name: str, *, recorded_at: dt.datetime, e
         return round(sum(t[field] for t in tokens) / cases, 1) if cases else None
 
     return {
-        "schema": SCHEMA_VERSION,
-        "recorded_at": recorded_at.astimezone(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "engine_version": engine_version,
-        "git_commit": git_commit,
-        "dataset": dataset_id(dataset),
+        **_common("tier2", recorded_at=recorded_at, engine_version=engine_version, code=code,
+                  dataset=pathlib.Path(board["dataset"]), database=board.get("database"), note=note),
         "config": {"name": name, "models": cfg["models"]},
         "roles": board["roles"],
         "passes": board["passes"],
@@ -99,76 +169,188 @@ def make_record(board: Dict[str, Any], name: str, *, recorded_at: dt.datetime, e
     }
 
 
+def make_retrieval_record(report: Dict[str, Any], *, recorded_at: dt.datetime, engine_version: str,
+                          code: Dict[str, Any], note: Optional[str] = None) -> Dict[str, Any]:
+    """The record of a retrieval recall report."""
+    return {
+        **_common("retrieval", recorded_at=recorded_at, engine_version=engine_version, code=code,
+                  dataset=pathlib.Path(report["dataset"]), database=report.get("database"), note=note),
+        "config": {"name": "retrieval"},
+        "settings": report["settings"], "metrics": report["summary"],
+        # The dataset is named above; its local path would differ on every machine.
+        "report": {k: v for k, v in report.items() if k not in ("dataset", "database")},
+    }
+
+
 def _slug(text: str) -> str:
-    return re.sub(r"[^A-Za-z0-9._-]+", "-", text).strip("-") or "config"
+    return re.sub(r"[^A-Za-z0-9._-]+", "-", str(text)).strip("-") or "config"
 
 
-def write_records(board: Dict[str, Any], results_dir: pathlib.Path = RESULTS_DIR, *,
+def record_relpath(record: Dict[str, Any]) -> pathlib.Path:
+    """Where a record lives under ``benchmarks/``, without a clash suffix."""
+    sha = record.get("git_commit") or UNKNOWN
+    stem = f"{record['recorded_at'][:10]}_{sha[:7] if sha != UNKNOWN else UNKNOWN}_{_slug(record['config']['name'])}"
+    return pathlib.Path(record["kind"]) / _slug(record["database"]["datasource_id"]) / f"{stem}.json"
+
+
+def _dump(record: Dict[str, Any]) -> str:
+    return json.dumps(record, indent=2, ensure_ascii=False, default=str) + "\n"
+
+
+def _write_new(benchmarks_dir: pathlib.Path, record: Dict[str, Any]) -> pathlib.Path:
+    """Writes ``record`` to a new file, never over an existing one; returns its path."""
+    rel = record_relpath(record)
+    folder = pathlib.Path(benchmarks_dir) / rel.parent
+    folder.mkdir(parents=True, exist_ok=True)
+    n = 1
+    while True:
+        path = folder / (rel.name if n == 1 else f"{rel.stem}-{n}.json")
+        try:
+            with open(path, "x", encoding="utf-8", newline="\n") as f:
+                f.write(_dump(record))
+            return path
+        except FileExistsError:
+            n += 1
+
+
+def write_records(board: Dict[str, Any], benchmarks_dir: pathlib.Path = BENCHMARKS_DIR, *,
                   recorded_at: Optional[dt.datetime] = None, engine_version: Optional[str] = None,
-                  git_commit: Optional[str] = None) -> List[pathlib.Path]:
+                  code: Optional[Dict[str, Any]] = None, note: Optional[str] = None) -> List[pathlib.Path]:
     """Writes one record per config in ``board``; returns the paths written."""
     recorded_at = recorded_at or dt.datetime.now(dt.timezone.utc)
     version = engine_version or installed_engine_version()
-    results_dir = pathlib.Path(results_dir)
-    results_dir.mkdir(parents=True, exist_ok=True)
-    written = []
-    for name in board["configs"]:
-        stem = f"{recorded_at.astimezone(dt.timezone.utc):%Y-%m-%d}_{_slug(version)}_{_slug(name)}"
-        path, n = results_dir / f"{stem}.json", 1
-        while path.exists():
-            n += 1
-            path = results_dir / f"{stem}-{n}.json"
-        record = make_record(board, name, recorded_at=recorded_at, engine_version=version, git_commit=git_commit)
-        path.write_text(json.dumps(record, indent=2, ensure_ascii=False, default=str) + "\n",
-                        encoding="utf-8", newline="\n")
-        written.append(path)
-    return written
+    code = code if code is not None else code_version()
+    return [_write_new(benchmarks_dir, make_record(board, name, recorded_at=recorded_at, engine_version=version,
+                                                   code=code, note=note))
+            for name in board["configs"]]
 
 
-def write_retrieval_record(report: Dict[str, Any], results_dir: pathlib.Path = RETRIEVAL_DIR, *,
+def write_retrieval_record(report: Dict[str, Any], benchmarks_dir: pathlib.Path = BENCHMARKS_DIR, *,
                            recorded_at: Optional[dt.datetime] = None, engine_version: Optional[str] = None,
-                           git_commit: Optional[str] = None) -> pathlib.Path:
-    """Writes a retrieval recall report's record, ``<date>_<version>_retrieval.json``; returns its path."""
-    recorded_at = recorded_at or dt.datetime.now(dt.timezone.utc)
-    version = engine_version or installed_engine_version()
-    dataset = pathlib.Path(report["dataset"])
-    record = {
-        "schema": SCHEMA_VERSION, "kind": "retrieval",
-        "recorded_at": recorded_at.astimezone(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "engine_version": version, "git_commit": git_commit,
-        "dataset": dataset_id(dataset),
-        "settings": report["settings"], "metrics": report["summary"],
-        # The dataset is named above; its local path would differ on every machine.
-        "report": {k: v for k, v in report.items() if k != "dataset"},
-    }
-    results_dir = pathlib.Path(results_dir)
-    results_dir.mkdir(parents=True, exist_ok=True)
-    stem = f"{recorded_at.astimezone(dt.timezone.utc):%Y-%m-%d}_{_slug(version)}_retrieval"
-    path, n = results_dir / f"{stem}.json", 1
-    while path.exists():
-        n += 1
-        path = results_dir / f"{stem}-{n}.json"
-    path.write_text(json.dumps(record, indent=2, ensure_ascii=False, default=str) + "\n",
-                    encoding="utf-8", newline="\n")
-    return path
+                           code: Optional[Dict[str, Any]] = None, note: Optional[str] = None) -> pathlib.Path:
+    """Writes a retrieval recall report's record; returns its path."""
+    record = make_retrieval_record(report, recorded_at=recorded_at or dt.datetime.now(dt.timezone.utc),
+                                   engine_version=engine_version or installed_engine_version(),
+                                   code=code if code is not None else code_version(), note=note)
+    return _write_new(benchmarks_dir, record)
 
 
-def load_records(results_dir: pathlib.Path = RESULTS_DIR) -> List[Dict[str, Any]]:
-    """Every record in ``results_dir``, newest first (ties broken by file name)."""
-    results_dir = pathlib.Path(results_dir)
-    if not results_dir.is_dir():
-        return []
+def _record_files(benchmarks_dir: pathlib.Path) -> List[pathlib.Path]:
+    """Every ``<kind>/<database>/*.json`` under ``benchmarks_dir``."""
+    return sorted(pathlib.Path(benchmarks_dir).glob("*/*/*.json"))
+
+
+def load_records(benchmarks_dir: pathlib.Path = BENCHMARKS_DIR) -> List[Dict[str, Any]]:
+    """Every record under ``benchmarks_dir``, newest first (ties broken by file name)."""
     loaded = []
-    for path in results_dir.glob("*.json"):
+    for path in _record_files(benchmarks_dir):
         record = json.loads(path.read_text(encoding="utf-8"))
-        record["_file"] = path.name
+        record["_file"] = path.relative_to(benchmarks_dir).as_posix()
         loaded.append(record)
     return _newest_first(loaded)
+
+
+def import_records(sources: Sequence[pathlib.Path], benchmarks_dir: pathlib.Path = BENCHMARKS_DIR
+                   ) -> Dict[str, List[str]]:
+    """Copies records from other projects' ``benchmarks/`` folders into ``benchmarks_dir``.
+
+    A source is a project folder (its ``benchmarks/`` is read) or a
+    ``benchmarks/`` folder itself. A record already present with the same
+    bytes is skipped; one with the same path and other content is a conflict
+    and is left alone. Records from before the current layout are skipped.
+    Returns ``{"copied": [...], "identical": [...], "conflicts": [...], "old_format": [...]}``.
+    """
+    outcome: Dict[str, List[str]] = {"copied": [], "identical": [], "conflicts": [], "old_format": []}
+    for source in sources:
+        source = pathlib.Path(source)
+        root = source / "benchmarks" if (source / "benchmarks").is_dir() else source
+        for path in sorted(root.rglob("*.json")):
+            data = path.read_bytes()
+            try:
+                record = json.loads(data.decode("utf-8"))
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                continue
+            if not isinstance(record, dict) or record.get("schema", 1) < SCHEMA_VERSION:
+                outcome["old_format"].append(str(path))
+                continue
+            target = pathlib.Path(benchmarks_dir) / record_relpath(record).parent / path.name
+            rel = target.relative_to(benchmarks_dir).as_posix()
+            if target.exists():
+                same = target.read_bytes().replace(b"\r\n", b"\n") == data.replace(b"\r\n", b"\n")
+                outcome["identical" if same else "conflicts"].append(rel)
+                continue
+            target.parent.mkdir(parents=True, exist_ok=True)
+            with open(target, "xb") as f:
+                f.write(data)
+            outcome["copied"].append(rel)
+    return outcome
 
 
 def _newest_first(recs: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return sorted(recs, key=lambda r: (r["recorded_at"], r.get("_file", "")), reverse=True)
 
+
+# -- comparing runs ---------------------------------------------------------
+
+def line_key(r: Dict[str, Any]) -> Tuple[str, str, str]:
+    """The runs a record is compared with over time: same kind, database and config."""
+    return r["kind"], r["database"]["datasource_id"], r["config"]["name"]
+
+
+def series_key(r: Dict[str, Any]) -> Tuple:
+    """What must match for two runs to be comparable: dataset, schema, and for tier 2 the roles."""
+    roles = tuple(r.get("roles") or []) if r["kind"] == "tier2" else ()
+    return r["kind"], r["dataset"]["sha256"], r["database"]["schema_fingerprint"], roles
+
+
+def comparable(a: Dict[str, Any], b: Dict[str, Any]) -> bool:
+    return series_key(a) == series_key(b)
+
+
+def previous_runs(recs: Sequence[Dict[str, Any]]) -> Dict[int, Optional[Dict[str, Any]]]:
+    """For each record (by ``id``), the run just before it on the same kind, database and config."""
+    previous: Dict[int, Optional[Dict[str, Any]]] = {}
+    last: Dict[Tuple, Dict[str, Any]] = {}
+    for r in reversed(_newest_first(recs)):
+        previous[id(r)] = last.get(line_key(r))
+        last[line_key(r)] = r
+    return previous
+
+
+def deltas(new: Dict[str, Any], old: Dict[str, Any]) -> Dict[str, Optional[float]]:
+    """The change in each headline metric, ``new`` minus ``old``; None where either is missing."""
+    out = {}
+    for field, _, _ in HEADLINE[new["kind"]]:
+        a, b = new["metrics"].get(field), old["metrics"].get(field)
+        out[field] = None if a is None or b is None else round(a - b, 6)
+    return out
+
+
+def _series_break(new: Dict[str, Any], old: Dict[str, Any]) -> str:
+    changed = [label for label, same in (
+        ("dataset", new["dataset"]["sha256"] == old["dataset"]["sha256"]),
+        ("schema", new["database"]["schema_fingerprint"] == old["database"]["schema_fingerprint"]),
+        ("roles", series_key(new)[3] == series_key(old)[3])) if not same]
+    return f"new series ({', '.join(changed)} changed)"
+
+
+def describe_change(new: Dict[str, Any], old: Optional[Dict[str, Any]]) -> str:
+    """The Δ cell: the change against the previous run, or why there is none."""
+    if old is None:
+        return "first run"
+    if not comparable(new, old):
+        return _series_break(new, old)
+    parts = []
+    for field, label, unit in HEADLINE[new["kind"]]:
+        d = deltas(new, old)[field]
+        if d is None:
+            continue
+        parts.append(f"{label} {d * 100:+.1f} pp" if unit == "pp"
+                     else f"{label} {'+' if d >= 0 else '-'}${abs(d):.4f}")
+    return ", ".join(parts) or "-"
+
+
+# -- rendering --------------------------------------------------------------
 
 def _pct(v: Optional[float]) -> str:
     return "-" if v is None else f"{v:.1%}"
@@ -197,6 +379,20 @@ def _dataset(r: Dict[str, Any]) -> str:
     return f"{r['dataset']['name']} @{r['dataset']['sha256'][:8]}"
 
 
+def _schema(r: Dict[str, Any]) -> str:
+    fp = r["database"]["schema_fingerprint"]
+    return fp if fp == UNKNOWN else f"@{fp[:8]}"
+
+
+def _commit(r: Dict[str, Any]) -> str:
+    sha = r.get("git_commit") or UNKNOWN
+    return UNKNOWN if sha == UNKNOWN else sha[:7] + (" (dirty)" if r.get("git_dirty") is True else "")
+
+
+def _when(r: Dict[str, Any]) -> str:
+    return r["recorded_at"].replace("T", " ").rstrip("Z")
+
+
 def _status(r: Dict[str, Any]) -> str:
     return f"partial ({r['stopped']})" if r.get("stopped") else ("partial" if r.get("partial") else "complete")
 
@@ -207,71 +403,101 @@ def _table(header: Sequence[str], rows: List[Sequence[str]]) -> str:
     return "\n".join(lines)
 
 
-def _latest_per_config(recs: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """The newest record for each (config, dataset) pair, sorted by config name."""
+def _latest_per_line(recs: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """The newest record for each (kind, database, config), in that order."""
     latest: Dict[tuple, Dict[str, Any]] = {}
     for r in _newest_first(recs):
-        latest.setdefault((r["config"]["name"], r["dataset"]["sha256"]), r)
-    return [latest[k] for k in sorted(latest)]
+        latest.setdefault(line_key(r), r)
+    order = list(KIND_TITLES)
+    return [latest[k] for k in sorted(latest, key=lambda k: (order.index(k[0]) if k[0] in order else 99, k))]
 
 
-def render_retrieval(recs: Sequence[Dict[str, Any]]) -> str:
-    """The retrieval recall section: every recorded run, newest first; empty without runs."""
-    if not recs:
-        return ""
-    table = _table(
-        ["Date (UTC)", "Version", "Commit", "Dataset", "Search", "Embedding", "Questions", "Table recall",
-         "Column recall", "Tables / columns sent"],
-        [[r["recorded_at"].replace("T", " ").rstrip("Z"), r["engine_version"], (r.get("git_commit") or "-")[:8],
-          _dataset(r), f"k {r['settings']['table_k']} tables / {r['settings']['planning_k']} planning",
+def _headline(r: Dict[str, Any]) -> str:
+    m = r["metrics"]
+    if r["kind"] == "tier2":
+        return (f"accuracy {_pct(m['accuracy'])}, faithfulness {_pct(m.get('faithfulness'))}, "
+                f"{_usd(m['cost_per_question'])}/question")
+    return f"tables {_pct(m['table_recall'])}, columns {_pct(m['column_recall'])}"
+
+
+def _groups(recs: Sequence[Dict[str, Any]]) -> List[Tuple[Tuple[str, str], List[Dict[str, Any]]]]:
+    """Records grouped by (kind, database), tier 2 first, each group newest first."""
+    groups: Dict[Tuple[str, str], List[Dict[str, Any]]] = {}
+    for r in _newest_first(recs):
+        groups.setdefault((r["kind"], r["database"]["datasource_id"]), []).append(r)
+    order = list(KIND_TITLES)
+    return sorted(groups.items(), key=lambda kv: (order.index(kv[0][0]) if kv[0][0] in order else 99, kv[0]))
+
+
+def _group_heading(kind: str, group: List[Dict[str, Any]]) -> str:
+    db = group[0]["database"]
+    size = "" if db.get("tables") is None else f", {db['tables']} tables / {db['columns']} columns"
+    return f"## {KIND_TITLES.get(kind, kind)}: {db['datasource_id']} ({db['engine']}{size})"
+
+
+def _tier2_section(group: List[Dict[str, Any]], previous) -> str:
+    latest = _table(
+        ["Config", "Date (UTC)", "Commit", "Accuracy", "Faithfulness", "$/question", "Δ vs previous", "Note"],
+        [[r["config"]["name"], r["recorded_at"][:10], _commit(r), _pct(r["metrics"]["accuracy"]),
+          _pct(r["metrics"].get("faithfulness")), _usd(r["metrics"]["cost_per_question"]),
+          describe_change(r, previous[id(r)]), r.get("note") or "-"] for r in _latest_per_line(group)])
+    runs = _table(
+        ["Date (UTC)", "Commit", "Note", "Config", "Models", "Dataset", "Schema", "Roles", "Passes", "Accuracy",
+         "Faithfulness", "$/question", "Δ vs previous", "Answerability P / R",
+         "Tokens/question (in / cached / out)", "p50", "p95", "Determinism", "Status"],
+        [[_when(r), _commit(r), r.get("note") or "-", r["config"]["name"], _models(r["config"]["models"]),
+          _dataset(r), _schema(r), ", ".join(r["roles"] or []), r["passes"], _pct(r["metrics"]["accuracy"]),
+          _pct(r["metrics"].get("faithfulness")), _usd(r["metrics"]["cost_per_question"]),
+          describe_change(r, previous[id(r)]),
+          f"{_pct(r['metrics']['answerability_precision'])} / {_pct(r['metrics']['answerability_recall'])}",
+          _tokens(r["metrics"]["tokens_per_question"]), _sec(r["metrics"]["latency_p50"]),
+          _sec(r["metrics"]["latency_p95"]), _pct(r["metrics"]["determinism"]), _status(r)] for r in group])
+    return f"### Latest per config\n\n{latest}\n\n### All runs\n\n{runs}\n"
+
+
+def _retrieval_section(group: List[Dict[str, Any]], previous) -> str:
+    runs = _table(
+        ["Date (UTC)", "Commit", "Note", "Dataset", "Schema", "Search", "Embedding", "Questions", "Table recall",
+         "Column recall", "Δ vs previous", "Tables / columns sent"],
+        [[_when(r), _commit(r), r.get("note") or "-", _dataset(r), _schema(r),
+          f"k {r['settings']['table_k']} tables / {r['settings']['planning_k']} planning",
           r["settings"]["embedding"], r["metrics"]["questions"], _pct(r["metrics"]["table_recall"]),
-          _pct(r["metrics"]["column_recall"]), f"{r['metrics']['tables_sent']:.1f} / {r['metrics']['columns_sent']:.1f}"]
-         for r in _newest_first(recs)])
-    return ("\n## Retrieval recall\n\n"
-            "`nl2sql benchmark retrieval --record`: the share of each answerable gold question's needed\n"
+          _pct(r["metrics"]["column_recall"]), describe_change(r, previous[id(r)]),
+          f"{r['metrics']['tables_sent']:.1f} / {r['metrics']['columns_sent']:.1f}"] for r in group])
+    return ("`nl2sql benchmark retrieval --record`: the share of each answerable gold question's needed\n"
             "tables and columns that schema retrieval sends the planner, with the vector search forced on\n"
             "and no LLM. Mean over questions; tables and columns sent are means too.\n\n"
-            f"{table}\n")
+            f"{runs}\n")
 
 
-def render_history(recs: Sequence[Dict[str, Any]], retrieval: Sequence[Dict[str, Any]] = ()) -> str:
-    """``docs/benchmarks.md``: the latest run per config, every run newest first, then retrieval recall."""
+def render_history(recs: Sequence[Dict[str, Any]]) -> str:
+    """``docs/benchmarks.md``: per kind and database, the latest runs and every run newest first."""
     head = ("# Benchmark Results\n\n"
-            "Tier 2 runs of the engine on the Chinook gold questions with a real model, one row per\n"
-            "run and LLM config. Generated by `nl2sql benchmark publish` from the records in\n"
-            "`benchmarks/results/`; do not edit by hand. Runs on a different gold dataset (another\n"
-            "`@sha`) are not comparable. See [the evaluation dataset](testing/evaluation-dataset.md).\n")
+            "Recorded benchmark runs of the engine on the Chinook gold questions. Generated by\n"
+            "`nl2sql benchmark publish` from the records in `benchmarks/`; do not edit by hand.\n"
+            "Grouped by benchmark and database, newest first. \"Δ vs previous\" is the change against the\n"
+            "previous run of the same config; runs on another gold dataset (`@sha`), another schema or,\n"
+            "for tier 2, other roles are not comparable and start a new series. See\n"
+            "[the evaluation dataset](testing/evaluation-dataset.md).\n")
     if not recs:
-        return f"{head}\n{EMPTY}\n{render_retrieval(retrieval)}"
-    latest = _table(
-        ["Config", "Dataset", "Date (UTC)", "Version", "Accuracy", "$/question", "Tokens/question (in / cached / out)",
-         "p50", "Determinism", "Faithfulness"],
-        [[r["config"]["name"], _dataset(r), r["recorded_at"][:10], r["engine_version"],
-          _pct(r["metrics"]["accuracy"]), _usd(r["metrics"]["cost_per_question"]),
-          _tokens(r["metrics"]["tokens_per_question"]), _sec(r["metrics"]["latency_p50"]),
-          _pct(r["metrics"]["determinism"]), _pct(r["metrics"].get("faithfulness"))]
-         for r in _latest_per_config(recs)])
-    runs = _table(
-        ["Date (UTC)", "Version", "Commit", "Config", "Models", "Dataset", "Roles", "Passes", "Accuracy",
-         "Answerability P / R", "$/question", "Tokens/question (in / cached / out)", "p50", "p95", "Determinism",
-         "Faithfulness", "Status"],
-        [[r["recorded_at"].replace("T", " ").rstrip("Z"), r["engine_version"], (r.get("git_commit") or "-")[:8],
-          r["config"]["name"], _models(r["config"]["models"]), _dataset(r), ", ".join(r["roles"] or []),
-          r["passes"], _pct(r["metrics"]["accuracy"]),
-          f"{_pct(r['metrics']['answerability_precision'])} / {_pct(r['metrics']['answerability_recall'])}",
-          _usd(r["metrics"]["cost_per_question"]), _tokens(r["metrics"]["tokens_per_question"]),
-          _sec(r["metrics"]["latency_p50"]), _sec(r["metrics"]["latency_p95"]), _pct(r["metrics"]["determinism"]),
-          _pct(r["metrics"].get("faithfulness")), _status(r)] for r in _newest_first(recs)])
-    return f"{head}\n## Latest per config\n\n{latest}\n\n## All runs\n\n{runs}\n{render_retrieval(retrieval)}"
+        return f"{head}\n{EMPTY}\n"
+    previous = previous_runs(recs)
+    sections = []
+    for (kind, _), group in _groups(recs):
+        body = _tier2_section(group, previous) if kind == "tier2" else _retrieval_section(group, previous)
+        sections.append(f"{_group_heading(kind, group)}\n\n{body}")
+    return head + "\n" + "\n".join(sections)
 
 
 def render_readme_block(recs: Sequence[Dict[str, Any]]) -> str:
-    """The README block: the latest run per config, and a link to the full history."""
+    """The README block: the latest run per benchmark, database and config, and a link to the history."""
     if not recs:
         return f"{START}\n{EMPTY}\n{END}"
-    table = _table(["Date (UTC)", "Version", "Config", "Accuracy", "$/question"],
-                   [[r["recorded_at"][:10], r["engine_version"], r["config"]["name"], _pct(r["metrics"]["accuracy"]),
-                     _usd(r["metrics"]["cost_per_question"])] for r in _latest_per_config(recs)])
+    previous = previous_runs(recs)
+    table = _table(["Benchmark", "Database", "Config", "Date (UTC)", "Commit", "Result", "Δ vs previous"],
+                   [[KIND_TITLES.get(r["kind"], r["kind"]), r["database"]["datasource_id"], r["config"]["name"],
+                     r["recorded_at"][:10], _commit(r), _headline(r), describe_change(r, previous[id(r)])]
+                    for r in _latest_per_line(recs)])
     return f"{START}\n{table}\n\nFull history: [docs/benchmarks.md](docs/benchmarks.md)\n{END}"
 
 
@@ -283,15 +509,17 @@ def replace_block(text: str, block: str) -> str:
     return text[:start] + block + text[end + len(END):]
 
 
-def publish(results_dir: pathlib.Path = RESULTS_DIR, history_path: pathlib.Path = HISTORY_PATH,
-            readme_path: pathlib.Path = README_PATH, retrieval_dir: pathlib.Path = RETRIEVAL_DIR) -> int:
-    """Rewrites the history page and the README block from the records; returns how many there are."""
-    recs = load_records(results_dir)
-    retrieval = load_records(retrieval_dir)
+def publish(benchmarks_dir: pathlib.Path = BENCHMARKS_DIR, history_path: pathlib.Path = HISTORY_PATH,
+            readme_path: pathlib.Path = README_PATH) -> int:
+    """Rewrites the history page and the README block from the records; returns how many there are.
+
+    Reads the records only; it never writes one.
+    """
+    recs = load_records(benchmarks_dir)
     history_path = pathlib.Path(history_path)
     history_path.parent.mkdir(parents=True, exist_ok=True)
-    history_path.write_text(render_history(recs, retrieval), encoding="utf-8", newline="\n")
+    history_path.write_text(render_history(recs), encoding="utf-8", newline="\n")
     readme_path = pathlib.Path(readme_path)
     readme_path.write_text(replace_block(readme_path.read_text(encoding="utf-8"), render_readme_block(recs)),
                            encoding="utf-8", newline="\n")
-    return len(recs) + len(retrieval)
+    return len(recs)
