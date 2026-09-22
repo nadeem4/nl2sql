@@ -160,6 +160,12 @@ class SettingsPanel:
         granted), not with its own Origin, and -- on a loopback bind -- not
         through a DNS name rebound to 127.0.0.1.
         """
+        self.guard_read(request)
+        if request.headers.get("content-type", "").split(";")[0].strip().lower() != "application/json":
+            raise HTTPException(status_code=415, detail="Send settings as JSON.")
+
+    def guard_read(self, request: Request) -> None:
+        """The guard without the JSON rule, for a read of local-only data (the feedback list)."""
         if not self.available:
             raise HTTPException(status_code=403, detail=self.reason)
         host_header = request.headers.get("host", "")
@@ -168,8 +174,6 @@ class SettingsPanel:
             raise HTTPException(status_code=403, detail="Settings can be changed only from the playground page itself.")
         if self.loopback_only and not is_loopback(urlsplit(f"//{host_header}").hostname or ""):
             raise HTTPException(status_code=403, detail="Open the playground as localhost or 127.0.0.1 to change settings.")
-        if request.headers.get("content-type", "").split(";")[0].strip().lower() != "application/json":
-            raise HTTPException(status_code=415, detail="Send settings as JSON.")
 
     # --- reading ---------------------------------------------------------------
 

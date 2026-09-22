@@ -61,6 +61,7 @@ export default function App() {
   const [retrieval, setRetrieval] = useState(null);
   const [retrievalError, setRetrievalError] = useState(null);
   const [retrievalOpen, setRetrievalOpen] = useState(false);
+  const [feedback, setFeedback] = useState(null);
   const runRef = useRef(null);
 
   useEffect(() => {
@@ -74,6 +75,8 @@ export default function App() {
     getJson("/api/settings").then(setSettings).catch((e) => setSettingsError(e.message));
     getJson("/api/index").then(setIndex).catch((e) => setIndexError(e.message));
     getJson("/api/retrieval").then(setRetrieval).catch((e) => setRetrievalError(e.message));
+    // Without it the rating control stays hidden; nothing else depends on it.
+    getJson("/api/feedback").then(setFeedback).catch(() => {});
   }, []);
 
   // While a rebuild runs, follow its steps; when it ends, re-read the schema,
@@ -291,6 +294,7 @@ export default function App() {
             error={error}
             debug={debug}
             replay={replay}
+            feedback={feedback}
           />
         </section>
       </main>

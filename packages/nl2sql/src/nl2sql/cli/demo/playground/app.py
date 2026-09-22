@@ -1,6 +1,6 @@
 """The playground FastAPI app.
 
-Twelve routes:
+Fourteen routes:
 
 ``GET  /``                     the built React page
 ``GET  /api/meta``             mode, dataset, the guided questions, the roles and how
@@ -18,18 +18,24 @@ Twelve routes:
 ``GET  /api/retrieval``        whether the Retrieval inspector is on, and its choices
 ``POST /api/retrieval``        one MMR search of the live index: the pool with scores,
                                the picks in order, and what was dropped
+``GET  /api/feedback``         whether answer feedback is on, the counts and the ratings
+``POST /api/feedback``         rate a run this playground answered: up or down, and a note
 
 Every result pane in the browser is a renderer over ``QueryResult``; nothing
 is computed here that the engine does not already return. The only state is
 the settings panel's (see ``settings.py``): the current mode, and the gate that
 keeps a settings change from landing under a running question; and the index
-panel's (see ``index_panel.py``): the one rebuild that may be running.
+panel's (see ``index_panel.py``): the one rebuild that may be running; and the
+last runs it answered, so a rating is stored with what the server returned
+rather than what a page claims (see ``nl2sql.feedback``).
 """
 from __future__ import annotations
 
 import pathlib
+import threading
+from collections import OrderedDict
 from importlib.resources import files
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Literal, Optional, Union
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
@@ -41,7 +47,9 @@ from nl2sql.auth.models import UserContext
 from nl2sql.cli.demo.playground.index_panel import IndexPanel
 from nl2sql.cli.demo.playground.settings import SettingsPanel
 from nl2sql.common.settings import settings
-from nl2sql.tracing.document import find_trace
+from nl2sql.feedback import NOTE_MAX_CHARS, FeedbackStore, run_record, run_signals
+from nl2sql.tracing.document import find_trace, load_trace
+from nl2sql.tracing.trace import _llm_configs, engine_info
 
 # The errors replay mode raises when no recording matches the question. The page
 # turns these into "this question has no recording" rather than a crash report.
@@ -103,6 +111,37 @@ class RetrievalRequest(BaseModel):
     lambda_mult: float = Field(default=0.7, ge=0.0, le=1.0)
     types: List[str] = Field(default_factory=list)
     datasource_id: Optional[str] = None
+
+
+class FeedbackRequest(BaseModel):
+    trace_id: str = Field(min_length=1, max_length=64, pattern=r"^[A-Za-z0-9][A-Za-z0-9_-]*$")
+    rating: Literal["up", "down"]
+    note: Optional[str] = Field(default=None, max_length=NOTE_MAX_CHARS)
+
+
+# How many answered runs the playground remembers for rating.
+RECENT_RUNS = 200
+
+
+def _feedback_off_reason(panel) -> Optional[str]:
+    """Why answer feedback is off, in its own words; the gate is the settings panel's."""
+    if not settings.feedback_enabled:
+        return "Feedback is turned off (FEEDBACK_ENABLED=false)."
+    if panel.available:
+        return None
+    if panel.project_dir is None:
+        return "Feedback is available in the playground that nl2sql demo starts."
+    return (
+        f"This playground is bound to {panel.host}, which other machines can reach, and it has no "
+        "login. Feedback keeps the question and SQL of every rated run, and anyone who can open this "
+        "page could read or add to it. Restart it on 127.0.0.1, or pass --allow-settings if you trust "
+        "everyone who can reach it."
+    )
+
+
+def _engine_version() -> str:
+    info = engine_info()
+    return f"{info['version']} ({info['git_sha']})" if info.get("git_sha") else str(info["version"])
 
 
 def _retrieval_off_reason(panel) -> Optional[str]:
@@ -210,6 +249,31 @@ def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset
     index_panel = IndexPanel(engine, panel, _default_datasource(engine, dataset), project_dir)
     app.state.settings_panel = panel
     app.state.index_panel = index_panel
+    # trace id -> what feedback would store for that run; never its rows.
+    recent: "OrderedDict[str, Dict[str, Any]]" = OrderedDict()
+    recent_lock = threading.Lock()
+
+    def trace_directory() -> pathlib.Path:
+        return pathlib.Path(trace_dir) if trace_dir is not None else pathlib.Path(settings.trace_dir)
+
+    def feedback_guard(request: Request) -> None:
+        # Local only, exactly like Settings and Rebuild.
+        reason = _feedback_off_reason(panel)
+        if reason:
+            raise HTTPException(status_code=403, detail=reason)
+        panel.guard(request)
+
+    def remember(req: AskRequest, body: Dict[str, Any]) -> None:
+        if not body.get("trace_id") or _feedback_off_reason(panel):
+            return
+        record = run_record(body, question=req.question, role=req.role,
+                            llm_configs=_llm_configs(getattr(engine, "context", None)),
+                            engine_version=_engine_version())
+        with recent_lock:
+            recent[record["trace_id"]] = record
+            recent.move_to_end(record["trace_id"])
+            while len(recent) > RECENT_RUNS:
+                recent.popitem(last=False)
 
     def retrieval_guard(request: Request) -> None:
         # Local only, exactly like Settings and Rebuild: the same guard, with
@@ -267,21 +331,64 @@ def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset
             for call in (body.get("usage") or {}).get("calls", []):
                 if REPLAY_MISS_MARKER in (call.get("error") or ""):
                     call["error"] = REPLAY_MISS_MESSAGE
+        remember(req, body)
         return body
 
     @app.get("/api/trace/{trace_id}")
     def trace(trace_id: str) -> FileResponse:
         """One trace file. The id is validated as a plain token and the file must
         sit directly in the traces directory, so no path can lead outside it."""
-        directory = pathlib.Path(trace_dir) if trace_dir is not None else pathlib.Path(settings.trace_dir)
         try:
-            path = find_trace(trace_id, directory)
+            path = find_trace(trace_id, trace_directory())
         except ValueError:
             raise HTTPException(status_code=400, detail="Not a valid trace id.")
         if path is None:
             raise HTTPException(status_code=404, detail="No trace with that id.")
         return FileResponse(path, media_type="application/json", filename=path.name,
                             content_disposition_type="inline")
+
+    @app.get("/api/feedback")
+    def read_feedback(request: Request) -> Dict[str, Any]:
+        reason = _feedback_off_reason(panel)
+        if reason:
+            return {"available": False, "reason": reason}
+        panel.guard_read(request)
+        path = pathlib.Path(settings.schema_store_path)
+        if not path.exists():
+            return {"available": True, "reason": None, "counts": {"up": 0, "down": 0}, "entries": []}
+        store = FeedbackStore(path)
+        try:
+            return {"available": True, "reason": None, "counts": store.counts(), "entries": store.list(limit=50)}
+        finally:
+            store.close()
+
+    @app.post("/api/feedback", dependencies=[Depends(feedback_guard)])
+    def save_feedback(req: FeedbackRequest) -> Dict[str, Any]:
+        """Rates a run this playground answered. What is stored comes from the
+        server's own record of the run; the page sends only the id, the rating
+        and the note."""
+        with recent_lock:
+            record = dict(recent[req.trace_id]) if req.trace_id in recent else None
+        if record is None:
+            raise HTTPException(status_code=404,
+                                detail="Ask a question first: feedback rates a run this playground answered.")
+        try:
+            path = find_trace(req.trace_id, trace_directory())
+            if path is not None:
+                # The trace also sees validator rejections a retry fixed.
+                doc = load_trace(path)
+                record.update(run_signals(doc.get("result") or {}, doc))
+                if "SECURITY_VIOLATION" in record["error_codes"]:
+                    record["sql"] = []
+        except (ValueError, OSError):
+            pass  # the run's own signals stand
+        store = FeedbackStore(pathlib.Path(settings.schema_store_path))
+        try:
+            saved = store.save(record, rating=req.rating, note=req.note)
+            counts = store.counts()
+        finally:
+            store.close()
+        return {"saved": saved, "counts": counts}
 
     @app.get("/api/settings")
     def read_settings() -> Dict[str, Any]:

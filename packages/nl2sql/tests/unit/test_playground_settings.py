@@ -199,6 +199,9 @@ def _every_route_response(client, trace_id="0b8f7d2e-1111-4222-8333-944455556666
         ("POST", "/api/index/rebuild"): lambda: client.post("/api/index/rebuild", json={"enrich": False}),
         ("GET", "/api/retrieval"): lambda: client.get("/api/retrieval"),
         ("POST", "/api/retrieval"): lambda: client.post("/api/retrieval", json={"query": "q1"}),
+        ("GET", "/api/feedback"): lambda: client.get("/api/feedback"),
+        ("POST", "/api/feedback"): lambda: client.post(
+            "/api/feedback", json={"trace_id": trace_id, "rating": "up", "note": "wrong number"}),
     }
     declared = {
         (method, route.path)

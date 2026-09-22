@@ -425,6 +425,41 @@ li[data-flag="denied"] .flag { color: var(--ink); background: var(--well); }
 }
 .footnote { margin-top: 10px; font-size: 13px; color: var(--ink-2); }
 
+/* Rating the answer: after the run, below the spine's last station, with no
+   mark of its own. It is the reader's verdict, not a pipeline step. A pressed
+   rating takes the accent, as a passed check does. */
+.rate { margin-top: 4px; padding: 16px 0 4px; border-top: 1px solid var(--rule); }
+.rate-head { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 16px; }
+.rate-head h3 { font-size: 15px; font-weight: 600; }
+.rate-buttons { display: inline-flex; gap: 8px; }
+.rate-btn {
+  display: inline-flex; align-items: center; gap: 7px; padding: 5px 12px; font-size: 14px;
+  background: var(--surface); color: var(--ink); border: 1px solid var(--rule-strong); border-radius: var(--r-control);
+  transition: border-color .15s ease, transform .1s ease;
+}
+.rate-btn:hover:not(:disabled) { border-color: var(--ink); }
+.rate-btn:active:not(:disabled) { transform: translateY(1px); }
+.rate-btn[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); font-weight: 600; }
+.rate-btn:disabled { color: var(--ink-3); border-color: var(--rule); }
+.rate-saved { font-size: 13.5px; color: var(--ink-2); }
+.rate-note { margin-top: 12px; display: grid; gap: 8px; max-width: 60ch; }
+.rate-note label { font-size: 13.5px; color: var(--ink-2); }
+.rate-choices { display: flex; flex-wrap: wrap; gap: 6px; }
+.rate-choice {
+  padding: 3px 10px; font-size: 13px; color: var(--ink); background: var(--well);
+  border: 1px solid transparent; border-radius: var(--r-control);
+}
+.rate-choice:hover { border-color: var(--rule-strong); }
+.rate-choice[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
+.rate-entry { display: flex; gap: 8px; }
+.rate-entry input {
+  flex: 1; min-width: 0; padding: 6px 10px; font: inherit; font-size: 14px; color: var(--ink);
+  background: var(--surface); border: 1px solid var(--rule-strong); border-radius: var(--r-control);
+}
+.rate-entry input::placeholder { color: var(--ink-3); }
+.rate-help, .rate-off { margin-top: 10px; font-size: 12.5px; color: var(--ink-3); max-width: 80ch; }
+.rate-help code { font-size: 12px; color: var(--ink-2); }
+
 /* Node drill-down: a node name in the ledger opens that node's record from the
    run trace. Same ink, rules and wells as the rest of the run; the accent marks
    the node being read, as it marks the tables a plan reads. */
@@ -663,4 +698,5 @@ li[data-flag="denied"] .flag { color: var(--ink); background: var(--well); }
   .settings-foot { flex-wrap: wrap; }
   .knob input[type="range"] { width: 100%; }
   .knob-lambda { width: 100%; }
+  .rate-entry { flex-direction: column; }
 }

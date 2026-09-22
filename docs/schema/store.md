@@ -41,6 +41,8 @@ Schema versions are timestamped and include a fingerprint prefix (e.g., `YYYYMMD
 
 The store also holds the **plan cache**: validated, executed plans keyed by `(normalised sub-query intent, datasource_id, schema_version)`, in the `plan_cache` table of the SQLite store (a dict in the in-memory one). Evicting a schema version deletes its cached plans; `nl2sql cache clear` deletes them all and keeps the snapshots. See [Determinism → The plan cache](../architecture/determinism.md#the-plan-cache-determinism-from-the-architecture).
 
+The same SQLite file holds the playground's answer ratings, in a `feedback` table (one row per rated run; questions and SQL, never rows). It is written whatever `SCHEMA_STORE_BACKEND` is, at `SCHEMA_STORE_PATH`; `nl2sql feedback clear` empties it and nothing else. See [Feedback and Signals](../observability/feedback.md).
+
 The fingerprint covers **structure only** (tables, columns, keys). Registering a snapshot whose structure matches an existing version returns that version unchanged, so anything keyed on it (the plan cache) stays valid, but the stored **metadata** (statistics, descriptions, enrichment) is replaced by the new snapshot's and the version becomes the latest again. The snapshot store and the chunks built from the same snapshot therefore always agree.
 
 ## Retrieval and authority

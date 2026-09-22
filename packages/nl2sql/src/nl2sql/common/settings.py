@@ -143,6 +143,17 @@ class Settings(BaseSettings):
         ),
     )
 
+    feedback_enabled: bool = Field(
+        default=True,
+        validation_alias="FEEDBACK_ENABLED",
+        description=(
+            "Let the playground record a thumbs up or down, with an optional note, for a run. "
+            "Stored in the schema store's `feedback` table: the question, role, status, SQL, error "
+            "codes and the model per node, never result rows or sample values. Local only, like "
+            "Settings. `nl2sql feedback clear` empties it."
+        ),
+    )
+
     schema_retrieval_full_snapshot_max_tables: int = Field(
         default=15,
         validation_alias="SCHEMA_RETRIEVAL_FULL_SNAPSHOT_MAX_TABLES",
