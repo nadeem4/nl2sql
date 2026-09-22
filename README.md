@@ -74,12 +74,12 @@ directory are live without passing it again. `.env.demo` is covered by
 `.gitignore`.
 
 Or start the demo without a key and paste one into the playground: **Settings**
-(top right) takes the key, writes it to the same `.env.demo` and switches the
-running demo from replay to live without a restart. The page never shows the key
-again, only a masked form such as `sk-...4f2a`. The same panel picks a model for
-each LLM step (answerability check, question splitter, query planner, plan
-repair, answer writer) from
-a short list of OpenAI or Claude models checked against the engine's parameters, and
+(top right) takes the key, one per provider, writes it to the same `.env.demo`
+and switches the running demo from replay to live without a restart. The page
+never shows a key again, only a masked form such as `sk-...4f2a`. The same panel
+picks a provider and a model for each LLM step (answerability check, question
+splitter, query planner, plan repair, answer writer) from a short list of
+OpenAI and Claude models, offering a provider once its key is saved, and
 writes the choice to the demo's `configs/llm.demo.yaml`, the file the CLI reads.
 Settings work only when the playground is bound to localhost unless you pass
 `--allow-settings`; see [the demo guide](docs/getting_started/demo.md#the-settings-panel).
@@ -174,20 +174,24 @@ SQLite needs no extra: its driver is in the standard library.
 
 ### LLM providers
 
-`configs/llm.yaml` picks the provider per agent:
+The engine is model-agnostic. `configs/llm.yaml` picks a provider per agent,
+so each pipeline step can run on a different one (the planner on Claude, the
+rest on OpenAI, say):
 
-| provider | key | notes |
-| --- | --- | --- |
-| `openai` | `OPENAI_API_KEY` | the default; `gpt-5.4` |
-| `anthropic` | `ANTHROPIC_API_KEY` | Claude on Anthropic's own API: `pip install "nl2sql-engine[anthropic]"`; `claude-opus-5` with `temperature: null` |
-| `openrouter` | `OPENROUTER_API_KEY` | OpenAI-compatible gateway to other vendors' models |
-| `ollama` | none | local models; small ones struggle with the recursive plan schema |
+| provider | wire type | key | notes |
+| --- | --- | --- | --- |
+| `openai` | `openai` | `OPENAI_API_KEY` | the default; `gpt-5.4` |
+| `anthropic` | `anthropic` | `ANTHROPIC_API_KEY` | Claude on Anthropic's own API: `pip install "nl2sql-engine[anthropic]"`; `claude-opus-5` with `temperature: null` |
+| `openrouter` | `openai` | `OPENROUTER_API_KEY` | OpenAI-compatible gateway to other vendors' models |
+| `ollama` | `openai` | none | local models; small ones struggle with the recursive plan schema |
 
-Claude runs through `langchain-anthropic`'s native client, not an
-OpenAI-compatible shim, so the planner, refiner and decomposer system prompts
-are prompt-cached (a `cache_control` breakpoint on the system message) and cache
-reads and writes show up in `result.usage`. See
-[LLM configuration](docs/configuration/llm.md#anthropic-claude).
+Each wire type has one small adapter (`nl2sql/llm/wires/`) that builds its
+client and owns its structured-output method, prompt-cache marking and usage
+reading. Claude therefore runs through `langchain-anthropic`'s native client,
+not an OpenAI-compatible shim: its system prompts carry a `cache_control`
+breakpoint, and cache reads and writes show up in `result.usage`. A provider
+on an existing wire type is one preset; a new wire type is one adapter. See
+[LLM configuration](docs/configuration/llm.md#providers-and-wire-types).
 
 ---
 

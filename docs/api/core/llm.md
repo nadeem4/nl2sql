@@ -110,17 +110,25 @@ Map of LLM name → config (API key excluded).
   `openrouter` and `ollama`, held in `PROVIDER_PRESETS` in `llm/registry.py`;
   anything else raises `ValueError: Unsupported LLM provider`, naming the valid
   ones.
-- `openai`, `openrouter` and `ollama` are served by `ChatOpenAI` and differ only
-  by preset: `openai` uses the client's own default endpoint, `openrouter`
-  defaults to `https://openrouter.ai/api/v1`, `ollama` to
-  `http://localhost:11434/v1`. A config-supplied `base_url` overrides the preset,
-  which also lets the same path serve any other OpenAI-compatible endpoint (vLLM,
-  LiteLLM, a local proxy).
-- `anthropic` is served by `CachingChatAnthropic` (`llm/claude.py`), a
-  `langchain-anthropic` `ChatAnthropic` that puts
-  `cache_control: {"type": "ephemeral"}` on the last system block and sends
-  `max_tokens=16000`. It needs the `nl2sql-engine[anthropic]` extra; without it
-  the first `get_llm()` raises a `ValueError` naming the extra. See
+- Each preset names a wire type (`ProviderPreset.wire`), and the client is
+  built by that wire's adapter in `llm/wires/` (`WIRES[preset.wire].build_client`).
+  The `Wire` protocol (`llm/wires/base.py`) is `build_client(model, temperature,
+  **kwargs)`, `structured_output_method`, `mark_cache(payload)` and
+  `read_usage(response)`. `wires.structured(llm, schema)` is how every node asks
+  for structured output; `wires.wire_of(llm)` picks the adapter from the client.
+  See [LLM configuration → Providers and wire types](../../configuration/llm.md#providers-and-wire-types).
+- `openai`, `openrouter` and `ollama` are on the `openai` wire, served by
+  `ConfiguredChatOpenAI` (`llm/wires/openai.py`), and differ only by preset:
+  `openai` uses the client's own default endpoint, `openrouter` defaults to
+  `https://openrouter.ai/api/v1`, `ollama` to `http://localhost:11434/v1`. A
+  config-supplied `base_url` overrides the preset, which also lets the same path
+  serve any other OpenAI-compatible endpoint (vLLM, LiteLLM, a local proxy).
+- `anthropic` is on the `anthropic` wire, served by `CachingChatAnthropic`
+  (`llm/wires/anthropic_client.py`), a `langchain-anthropic` `ChatAnthropic`
+  whose requests go through the adapter's `mark_cache` (a
+  `cache_control: {"type": "ephemeral"}` breakpoint on the last system block),
+  with `max_tokens=16000`. It needs the `nl2sql-engine[anthropic]` extra;
+  without it the first `get_llm()` raises a `ValueError` naming the extra. See
   [LLM configuration → Anthropic](../../configuration/llm.md#anthropic-claude).
 - `openai`, `anthropic` and `openrouter` require an API key (`OPENAI_API_KEY`,
   `ANTHROPIC_API_KEY`, `OPENROUTER_API_KEY`); `ollama` does not, and its preset

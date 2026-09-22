@@ -177,10 +177,13 @@ been recorded, on a timed-out or cancelled run.
 provider says served the call, e.g. `gpt-4o-2024-08-06`), `latency_s`, `cost`,
 `usage_reported` and `error`.
 
-Tokens are read from LangChain's `AIMessage.usage_metadata`, which is normalised
-across providers: `input_token_details.cache_read`,
-`input_token_details.cache_creation` and `output_token_details.reasoning`. A
-detail the provider did not report is `0`. A call whose result carried no usage
+Tokens are read by the adapter of the wire type that served the call
+(`read_usage` in `nl2sql/llm/wires/openai.py` or `anthropic.py`), picked by the
+`model_provider` the client stamps on the response; `TokenUsageCallback` only
+asks it. Both read LangChain's `AIMessage.usage_metadata`
+(`input_token_details.cache_read`, `input_token_details.cache_creation`,
+`output_token_details.reasoning`) into the same fields, and differ where their
+providers differ, as below. A detail the provider did not report is `0`. A call whose result carried no usage
 at all is recorded with zero tokens and `usage_reported: false`; a failed call is
 recorded with its latency and `error`.
 
@@ -193,7 +196,8 @@ completions API reports no cache-write count, so `cache_write_input_tokens` is
 
 For Claude through `langchain-anthropic` (`provider: anthropic`; verified
 against the fake Anthropic endpoint by
-`packages/nl2sql/tests/unit/test_llm_anthropic.py`), Anthropic's `usage` maps
+`packages/nl2sql/tests/unit/test_llm_wire_contract.py`, which runs the same
+usage tests against both wires), Anthropic's `usage` maps
 as follows:
 
 | Anthropic `usage` | field here |

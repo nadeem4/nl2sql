@@ -188,33 +188,44 @@ The playground that `nl2sql demo` serves has a **Settings** button at the top
 right. It edits the same two files the CLI reads, and nothing else: there is no
 second settings store, and the browser keeps nothing but UI conveniences.
 
-- **API key.** Paste a key and press **Save key**. The provider follows the
-  key's shape by the same rule as `--api-key` (`sk-ant-` is Anthropic, `sk-or-`
-  is OpenRouter, anything else OpenAI). The key is written to the demo project's `.env.demo` and the
+- **API keys, one per provider.** Paste a key and press **Save key**. The
+  provider follows the key's shape by the same rule as `--api-key` (`sk-ant-`
+  is Anthropic, `sk-or-` is OpenRouter, anything else OpenAI). The key is
+  written to the demo project's `.env.demo`, replacing that provider's previous
+  key and keeping the others, and the default moves to that provider. The
   running demo switches from replay to live **without a restart**: questions
   already running finish on the model client they started with, then the
-  engine's LLM clients are rebuilt from `configs/llm.demo.yaml`. The key is
-  write-only: no response, log line, trace or error carries it, only a masked
-  form such as `sk-...4f2a`. On a later start the precedence above still holds,
-  so `--api-key` or a key exported in your shell wins over the saved one.
-- **A model for each LLM step.** One selector each for the answerability check
-  (`datasourceresolver`), question splitter (`decomposer`), query planner (`astplanner`), plan repair (`refiner`) and
-  answer writer (`answersynthesizer`), each with a "Default" option that uses
-  the `default` agent. A choice is written to `configs/llm.demo.yaml` under
-  `agents:`, with the default's provider, endpoint and key reference, and takes
-  effect on the next question. The list is short on purpose. On 2026-09-20 each
-  model was sent the engine's exact parameters (`temperature=0`, `seed=42`,
-  strict `json_schema`) and worked with them, two of them only once the
-  temperature was left out. That says the model accepts the engine's calls, not
-  how well it plans, which is the evaluation's question:
+  engine's LLM clients are rebuilt from `configs/llm.demo.yaml`. Keys are
+  write-only: no response, log line, trace or error carries one, only a masked
+  form such as `sk-...4f2a` per provider. On a later start the precedence above
+  still holds, so `--api-key` or a key exported in your shell wins over a saved
+  one, and every saved key is loaded so each step finds its own.
+- **A provider and a model for each LLM step.** One selector each for the
+  answerability check (`datasourceresolver`), question splitter (`decomposer`),
+  query planner (`astplanner`), plan repair (`refiner`) and answer writer
+  (`answersynthesizer`). Each has a "Default" option that uses the `default`
+  agent, then one group of models per provider. A provider with no saved key is
+  listed but cannot be chosen, and a step already on a provider whose key is
+  gone says so under its selector. A choice is written to
+  `configs/llm.demo.yaml` under `agents:` with its `provider`, `model` and
+  temperature. It takes the default's endpoint and key reference when it is on
+  the default's provider, and its own provider's `${env:...}` reference
+  otherwise. It takes effect on the next question, and a step put on another
+  provider stays there when the default moves. The list is short on purpose. On
+  2026-09-20 each OpenAI model was sent the engine's parameters of the time
+  (`temperature=0`, `seed=42`, strict `json_schema`) and worked with them, two
+  of them only once the temperature was left out. The engine now asks every
+  model for a tool call instead, as it already did for every node but the
+  planner. That says the model accepts the engine's calls, not how well it
+  plans, which is the evaluation's question:
 
     | Model | Written with |
     | --- | --- |
     | `gpt-5.4` (the default), `gpt-5.4-mini`, `gpt-4.1`, `gpt-4.1-mini`, `gpt-4o` | `temperature: 0.0` |
     | `gpt-5.5`, `gpt-5-mini` | `temperature: null`: they reject temperature 0, so a step on one runs at the model's default temperature and its answers vary more from run to run |
 
-    With an Anthropic key the list is Claude's. Those entries were not probed
-    on a real account; their temperatures follow Anthropic's documented rules:
+    Claude's list was not probed on a real account; its temperatures follow
+    Anthropic's documented rules:
 
     | Model | Written with |
     | --- | --- |
@@ -223,8 +234,9 @@ second settings store, and the browser keeps nothing but UI conveniences.
 
     The list lives in one place, `VERIFIED_MODELS` in
     `nl2sql/cli/common/api_key.py`. It covers OpenAI and Anthropic for now:
-    with an OpenRouter key or Ollama the panel shows the configured model and
-    offers no list.
+    with an OpenRouter key or Ollama as the default the panel says the default
+    has no model list, and offers only the other providers whose keys are
+    saved.
 - **Local only by default.** Settings work only when the playground is bound to
   a loopback address (`127.0.0.1`, `localhost`, `::1`). On `0.0.0.0` or any
   other address the panel says why it is off and the settings routes answer
