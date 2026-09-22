@@ -11,10 +11,13 @@ The data is entirely synthetic -- nothing is downloaded, and no third-party
 dataset is involved. Only the customer names and email addresses are read
 from ``chinook.sqlite`` so the identities line up.
 
-Generation is deterministic: a fixed seed, a fixed customer ordering, fixed
-timestamps and an explicit ``VACUUM`` mean a regeneration is byte-identical
-to the committed files. ``tests/unit/test_demo_datasets.py`` regenerates into
-a temporary folder and compares the bytes.
+Generation is deterministic: a fixed seed, a fixed customer ordering and an
+explicit ``VACUUM`` mean a regeneration produces exactly the same rows, and
+byte-identical files on the same SQLite build. Across builds the bytes can
+differ (page layout and the header's library version) while the content is
+the same, so ``tests/unit/test_demo_datasets.py`` compares the rows against
+the committed databases and checks the bytes only between two runs in one
+interpreter.
 
 Run it with::
 

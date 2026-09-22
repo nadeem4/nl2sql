@@ -87,7 +87,7 @@ cases a question can trip over are present on purpose:
 ## Regenerating
 
 Both generated databases come from one committed script with a fixed seed, so
-a regeneration is byte-identical to what is committed here:
+a regeneration reproduces exactly what is committed here:
 
 ```bash
 python scripts/generate_demo_datasets.py
@@ -98,5 +98,11 @@ rewrites `support.sqlite` and `webanalytics.sqlite` in place. Pass `--target`
 to write them somewhere else.
 
 `packages/nl2sql/tests/unit/test_demo_datasets.py` regenerates into a
-temporary folder and asserts the bytes match the committed files, so changing
-the script or the seed without committing the result fails the test suite.
+temporary folder and asserts the result matches the committed databases, so
+changing the script or the seed without committing the result fails the test
+suite. It compares the schema and every row rather than the raw bytes: two
+SQLite builds can encode the same rows differently (page layout, and the
+header's library version), so a byte comparison against a committed file
+passes only on the build that wrote it. Byte-level reproducibility is checked
+where it is meaningful — between two runs in one interpreter, which is what
+catches an unseeded `random`, a clock read or a dict-ordering dependency.

@@ -1,10 +1,21 @@
 """The two generated demo databases match a fresh generation, and hold the shapes we claim.
 
-``scripts/generate_demo_datasets.py`` is deterministic: a fixed seed, a fixed
-customer ordering and an explicit VACUUM. Regenerating into a temporary folder
-must therefore reproduce the committed files byte for byte -- if it does not,
-either the script changed without the databases being regenerated, or the
-generation is no longer deterministic. Both should fail here.
+``scripts/generate_demo_datasets.py`` is deterministic: a fixed seed and a
+fixed customer ordering, so it produces exactly the same rows every time.
+Regenerating into a temporary folder must reproduce the committed databases --
+if it does not, the script changed without the databases being regenerated.
+
+That comparison is on *content*, not on the file's bytes. Two SQLite builds can
+encode the same rows into different bytes (page layout, freelist, the header's
+library version), so a byte comparison against the committed file passes on the
+machine that generated it and fails on another Python's bundled SQLite. What is
+worth pinning is that the committed database holds exactly the rows the
+committed script produces, which is what ``_content`` compares.
+
+Byte-level reproducibility is still checked, just where it is meaningful:
+``test_two_generations_in_a_row_are_byte_identical`` generates twice in this
+same interpreter, which is what would catch an unseeded ``random``, a clock
+read or a dict-ordering dependency creeping into the generator.
 """
 from __future__ import annotations
 
@@ -51,14 +62,46 @@ def _sha256(path: pathlib.Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def _content(path: pathlib.Path) -> tuple:
+    """Everything the database holds: its schema, and every row of every table.
+
+    Rows come back in rowid order, which is insertion order for these tables,
+    so two databases built from the same script compare equal here whatever
+    bytes the local SQLite chose to write them as.
+    """
+    con = sqlite3.connect(f"file:{path.as_posix()}?mode=ro", uri=True)
+    try:
+        schema = tuple(con.execute(
+            "SELECT type, name, sql FROM sqlite_master ORDER BY type, name").fetchall())
+        tables = [r[0] for r in con.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")]
+        rows = tuple((t, tuple(con.execute(f'SELECT * FROM "{t}" ORDER BY rowid')))
+                     for t in tables)
+    finally:
+        con.close()
+    return schema, rows
+
+
 @pytest.mark.parametrize("committed", [SUPPORT_DB_PATH, WEBANALYTICS_DB_PATH],
                          ids=lambda p: p.stem)
 def test_the_committed_database_matches_a_fresh_generation(committed, regenerated):
     fresh = regenerated[committed.name]
-    assert _sha256(fresh) == _sha256(committed), (
+    assert _content(fresh) == _content(committed), (
         f"{committed.name} differs from a fresh generation. Re-run "
         "`python scripts/generate_demo_datasets.py` and commit the result."
     )
+
+
+@pytest.mark.parametrize("name", ["support.sqlite", "webanalytics.sqlite"])
+def test_two_generations_in_a_row_are_byte_identical(name, generator, regenerated, tmp_path):
+    """The generator itself is deterministic: no clock, no unseeded randomness.
+
+    Same interpreter, so the same SQLite writes both and the bytes are
+    comparable -- unlike the committed file, which another build may have
+    encoded differently.
+    """
+    generator.generate(tmp_path, CHINOOK_DB_PATH)
+    assert _sha256(tmp_path / name) == _sha256(regenerated[name])
 
 
 @pytest.mark.parametrize("path", [SUPPORT_DB_PATH, WEBANALYTICS_DB_PATH],
