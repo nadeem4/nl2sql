@@ -23,6 +23,16 @@ Source: `packages/api/src/nl2sql_api/dependencies.py`
 - Service providers (`DatasourceService`, `QueryService`, `LLMService`,
   `IndexingService`, `HealthService`) are created per-request with the engine.
 
+## Interactive docs
+
+FastAPI serves Swagger UI at `/docs`, ReDoc at `/redoc` and the OpenAPI schema at
+`/openapi.json`, with a summary, description and tag on every route. Start the
+server from the folder holding your env file and configs:
+
+```bash
+ENV=demo nl2sql-api --host 127.0.0.1 --port 8000   # then open http://localhost:8000/docs
+```
+
 ## API Index
 
 | API | Router Path | Purpose |

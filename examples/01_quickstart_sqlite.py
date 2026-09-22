@@ -17,10 +17,11 @@ Then run this script from that same directory, because the generated datasource
 config uses a relative path.
 """
 
-from nl2sql import NL2SQL
+from nl2sql import NL2SQL, UserContext
 
 engine = NL2SQL(env="demo")
-result = engine.run_query("How many customers are there?")
+# The role decides which tables the plan may read; `admin` may read them all.
+result = engine.run_query("How many customers are there?", user_context=UserContext(roles=["admin"]))
 
 for sq in result.sub_queries:
     print(sq.sql)

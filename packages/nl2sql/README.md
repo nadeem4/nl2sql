@@ -1,128 +1,112 @@
 # nl2sql-engine
 
-Ask a database questions in English. The model writes a **typed plan**, never
+Ask a database questions in English. The model writes a typed query plan, never
 SQL text; the plan is checked against the real schema and the caller's role
 before any SQL is generated.
 
-This distribution is the whole engine: the LangGraph pipeline, the `nl2sql`
-CLI, and the database adapters (PostgreSQL, MySQL, SQL Server, SQLite, DuckDB).
+This distribution is the engine: the LangGraph pipeline, the `nl2sql` CLI with
+its browser playground, and the database adapters (PostgreSQL, MySQL, SQL
+Server, SQLite, DuckDB). The REST server is the separate `nl2sql-api` package.
+Full README and docs: <https://github.com/nadeem4/nl2sql>.
 
-## Try it
+![The nl2sql playground: the search index and schema on the left, a question with its plan and checks on the right](https://raw.githubusercontent.com/nadeem4/nl2sql/main/docs/assets/screenshots/playground-overview.png)
+
+## How it works
+
+- The question is checked for answerability, split into sub-queries, and each
+  gets the part of the schema it needs.
+- The model returns a typed plan (a Pydantic `PlanModel`), never SQL.
+- The logical validator checks every table and column against the schema,
+  joins against the declared foreign keys, and every table against the caller's
+  role (RBAC). A refused plan never becomes SQL.
+- Only a plan that passes is rendered to SQL, deterministically, with `sqlglot`,
+  then executed and summarised.
+
+## Quickstart
+
+Requires Python 3.12 or newer.
 
 ```bash
 pip install "nl2sql-engine[demo]"
 nl2sql demo
 ```
 
-That scaffolds a demo project, copies in the Chinook sample database, indexes
-its schema locally (no API key needed — a small ONNX embedder runs on your
-machine) and opens a browser playground showing the retrieved schema, the plan,
-the validation checks, the SQL and the rows, with a role selector that shows the
-validator refusing a plan before any SQL is generated.
+That writes a demo project into `./nl2sql-demo` with the Chinook sample
+database, indexes its schema locally (no key; the first run downloads a ~79 MB
+ONNX embedding model) and opens the playground on <http://127.0.0.1:8765/>.
 
-**Answering a question needs a model**: `OPENAI_API_KEY`, `OPENROUTER_API_KEY`,
-`ANTHROPIC_API_KEY` (Claude, with `pip install "nl2sql-engine[anthropic]"`),
-or a reachable Ollama daemon. The key-free replay mode relies on recorded model
-responses, and none ship, so without one of those the demo can show you the
-schema but cannot answer. `nl2sql demo --record` (with a key) records the guided
-questions into the demo project's `recordings.json`, and later key-free runs of
-that project replay them.
+**Answering a question needs a model:** `--api-key`, or `OPENAI_API_KEY`,
+`OPENROUTER_API_KEY` or `ANTHROPIC_API_KEY` in the environment (Claude needs
+`pip install "nl2sql-engine[demo,anthropic]"`), a key pasted into the
+playground's Settings panel, or a reachable Ollama. Without one the demo runs
+in replay mode, which has no recorded answers out of the box, so it can show the
+schema and the index but answers nothing. `nl2sql demo --record` (with an
+OpenAI or OpenRouter key) records the guided questions for later key-free runs.
 
-## Install
+The playground shows each answer's plan, validation checks, SQL, rows and cost,
+a per-node Debug view, a Retrieval inspector over the live index, and a
+right/wrong rating per answer.
+
+## CLI
+
+From the demo folder (`cd nl2sql-demo`):
 
 ```bash
-# Engine, CLI and adapters; sqlite works out of the box
-pip install nl2sql-engine
-
-# Add the drivers for selected dialects
-pip install "nl2sql-engine[mysql,mssql]"
-
-# Every database driver. Adapters only -- this does not include
-# [demo], [aws], [azure] or [hashicorp].
-pip install "nl2sql-engine[all]"
+nl2sql --env demo run "How many customers do we have, by country?"
+nl2sql --env demo run --role viewer "Who are the top 5 customers by total spend?"   # refused
+nl2sql --env demo run --no-exec "Which artist has the most albums?"                 # plan only
+nl2sql --env demo index                       # re-index the schema
+nl2sql --env demo doctor                      # check drivers, connectivity, key and index
+nl2sql --env demo benchmark --tier 1          # gold plans, no key
+nl2sql --env demo benchmark --tier 2 --model gpt-5.4 --max-cost 5
+nl2sql --env demo benchmark retrieval         # retrieval recall, no key
+nl2sql --env demo feedback stats              # ratings and guardrail rates
 ```
 
-Requires Python 3.12+.
+Every command: [CLI reference](https://github.com/nadeem4/nl2sql#cli-reference).
 
-## Use it
+## Python
 
 ```python
-from nl2sql import NL2SQL
+from nl2sql import NL2SQL, UserContext
 
-engine = NL2SQL(env="demo")
-result = engine.run_query("How many customers are there?")
-
+engine = NL2SQL(env="demo")          # loads .env.demo from the working directory
+result = engine.run_query(
+    "How many customers are there?",
+    user_context=UserContext(roles=["admin"]),
+)
 for sq in result.sub_queries:
-    print(sq.sql)
-    print([c.name for c in sq.validation if c.passed])
-    print(sq.rows.rows[:5] if sq.rows else "plan only")
-print(result.final_answer["summary"])
+    print(sq.sql, [c.name for c in sq.validation if c.passed])
+print(result.final_answer["summary"] if result.final_answer else result.errors)
 ```
+
+Pass a `user_context` with a role: with none, `run_query` currently raises a
+validation error, and an unknown role is refused.
+
+## Install extras
 
 ```bash
-nl2sql setup --demo                       # write the Chinook demo project
-nl2sql --env demo index                    # index the schemas
-nl2sql --env demo run "..."                # ask a question
-nl2sql --env demo run --no-exec "..."      # plan and validate, touch no database
-nl2sql doctor                              # diagnose the environment
+pip install "nl2sql-engine[postgres]"        # or [mysql], [mssql], [duckdb]
+pip install "nl2sql-engine[all]"             # every database driver; not [demo] or [anthropic]
 ```
 
-`QueryResult` carries, per sub-query, the plan, the validation checks with
-pass/fail and a reason, a capped row sample with the true total, the SQL, a
-status and a retry count; and per run, an overall status and per-node timings.
+SQLite needs no extra.
 
-## How it works
+## Security
 
-The pipeline is a compiled LangGraph: datasource resolver → decomposer → global
-planner → layer router, with a SQL-agent subgraph of schema retriever → AST
-planner → logical validator → generator → executor, plus a refiner loop for
-retryable failures.
+- The LLM provider receives the question, the schema the planner needs, sample
+  column values of tables the role may read, and the result rows (for the
+  written answer).
+- RBAC is a per-role table allowlist; a plan touching a forbidden table is
+  refused. No column masking or row-level security.
+- Read-only is not enforced by the executor: only SELECTs are generated, but
+  connections are not opened read-only. Give the engine a read-only database
+  user.
+- No authentication: the caller supplies the role.
 
-The safety property is the order of those last three. The model's target is a
-recursive Pydantic `PlanModel`, not a SQL string. `LogicalValidatorNode`
-resolves every column against the retrieved schema snapshot with
-`sqlglot.optimizer.qualify`, matches joins against declared foreign keys, and
-checks every table against the caller's role policy. Only a plan that passes
-reaches the generator, which renders SQL with `sqlglot` from `exp.select()`. A
-plan that fails never becomes SQL, and the checks come back in the result so a
-UI can show which gate refused it.
+## Status
 
-`query_type` is `Literal["READ"]`, so only SELECTs can be produced. That is
-structural: the executor does not inspect the SQL and connections are not opened
-read-only on any dialect, so **grant the engine a read-only database user**.
-
-## What it does not do
-
-- **No authentication.** The role is supplied by the caller (`--role`, or
-  `user_context` on the REST API). Put your own auth in front of anything you
-  expose and derive the role from it.
-- **No process sandbox.** The graph runs in-process on a one-worker thread pool
-  per run; a driver-level crash takes the process with it. `GLOBAL_TIMEOUT_SEC`
-  bounds how long the *caller* waits, not how long the work runs.
-- **No distributed tracing.** OpenTelemetry *metrics* (node duration, token
-  usage) exist behind `OBSERVABILITY_EXPORTER`, which defaults to `none`. No
-  spans are started; there is no Jaeger or Prometheus exporter.
-- **No row-level security or column masking.** RBAC is a per-role allowlist of
-  datasources and `datasource.table` strings.
-- **`max_bytes` is not enforced** — it is configured and reported only.
-  `row_limit` is enforced, in the generated SQL.
-
-## Public API
-
-`NL2SQL` is the facade. Modular sub-APIs hang off it: `engine.query`,
-`engine.datasource`, `engine.llm`, `engine.indexing`, `engine.settings`,
-`engine.results`, `engine.policy`, `engine.benchmark`.
-
-Exported types: `NL2SQL`, `QueryResult`, `UserContext`, `ErrorSeverity`,
-`ErrorCode`, `PipelineError`, `BenchmarkConfig`, and the modular API classes.
-
-## Versioning
-
-`nl2sql-adapter-sdk`, `nl2sql-engine` and `nl2sql-api` share one version number
-and are released together, pinned to each other with `~=0.1`.
-
-## Documentation
-
-Full documentation, including the known limitations of each subsystem, is in the
-repository at <https://github.com/nadeem4/nl2sql> and on the published MkDocs
-site.
+0.1.x. `nl2sql-adapter-sdk`, `nl2sql-engine` and `nl2sql-api` share one version
+and are released together. Known limitations, benchmark results and the
+roadmap: <https://github.com/nadeem4/nl2sql#project-status-limitations-and-roadmap>.
+MIT licensed.

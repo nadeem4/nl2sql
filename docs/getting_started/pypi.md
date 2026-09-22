@@ -268,8 +268,8 @@ for sub_query in result.sub_queries:
 
 The `QueryResult` includes `sub_queries` (each with its generated `sql`),
 `final_answer`, `errors`, `warnings`, `artifact_refs`, and a `trace_id` for
-observability. Result rows are not inlined; they live in artifact storage and are
-addressed through `artifact_refs`.
+observability. Each sub-query carries a capped sample of its rows (`rows`); the
+full result set lives in artifact storage and is addressed through `artifact_refs`.
 
 A repeated question reuses its validated plan from the plan cache (no planner
 call, same SQL and rows; still validated every time), and

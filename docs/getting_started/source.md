@@ -40,7 +40,7 @@ Start from `configs/datasources.example.yaml` and `configs/policies.example.json
 Python API:
 
 ```bash
-python -c "from nl2sql import NL2SQL; print(NL2SQL().run_query('hello'))"
+python -c "from nl2sql import NL2SQL, UserContext; print(NL2SQL().run_query('hello', user_context=UserContext(roles=['admin'])))"
 ```
 
 API service (Docker):

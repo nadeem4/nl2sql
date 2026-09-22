@@ -1,85 +1,37 @@
 # NL2SQL API
 
-API layer for the NL2SQL engine that provides a REST interface to the core functionality.
-
-## Two-Tier API Architecture
-
-NL2SQL provides a two-tier API architecture:
-
-### 1. Core API (Python)
-- **Location**: Core package (`nl2sql`)
-- **Interface**: Direct Python class interface (`NL2SQL` class)
-- **Use Case**: Direct Python integration, embedded applications
-- **Access**: Import and use directly in Python code
-
-### 2. REST API (HTTP) - This Package
-- **Location**: API package (`nl2sql-api`) - This package
-- **Interface**: HTTP REST endpoints
-- **Use Case**: Remote clients, web applications, TypeScript CLI
-- **Access**: HTTP requests to API endpoints
-
-This REST API package serves as a bridge between external HTTP clients and the core NL2SQL engine, using the core's public API internally.
-
-## Overview
-
-This package provides a FastAPI-based REST API that uses the NL2SQL core's public API to interact with the NL2SQL engine over HTTP. It serves as a bridge between external clients (such as the TypeScript CLI) and the core engine functionality.
-
-## Architecture
-
-The API package leverages the NL2SQL core's public API layer (`NL2SQL` class), ensuring clean separation between the API service and the core engine implementation. The service layer uses the core's public methods like `run_query()`, `list_datasources()`, and schema access through `engine.context.schema_store`.
-
-## Features
-
-- RESTful API endpoints for natural language to SQL conversion
-- Datasource and LLM management endpoints
-- Health and readiness checks
-- Proper error handling and response formatting
-- Lazy initialization to avoid configuration issues during import
-- Integration with the core's public API layer
-
-## Endpoints
-
-### Query Endpoints
-- `POST /api/v1/query` - Execute a natural language query
-- `GET /api/v1/health` - Health check endpoint
-- `GET /api/v1/ready` - Readiness check endpoint
-
-### Datasource Management Endpoints
-- `POST /api/v1/datasource` - Add a new datasource programmatically
-- `GET /api/v1/datasource` - List all registered datasources
-- `GET /api/v1/datasource/{datasource_id}` - Get details of a specific datasource
-- `DELETE /api/v1/datasource/{datasource_id}` - Remove a datasource (not currently supported)
-
-### LLM Management Endpoints
-- `POST /api/v1/llm` - Configure an LLM programmatically
-- `GET /api/v1/llm` - List all configured LLMs
-- `GET /api/v1/llm/{llm_name}` - Get details of a specific LLM
-
-### Indexing Management Endpoints
-- `POST /api/v1/index/{datasource_id}` - Index schema for a specific datasource
-- `POST /api/v1/index-all` - Index schema for all registered datasources
-- `DELETE /api/v1/index` - Clear the vector store index
-- `GET /api/v1/index/status` - Get the status of the index
+FastAPI REST service for the NL2SQL engine (`nl2sql-engine`). It builds one
+`NL2SQL` engine at startup, from the same env file and configs as the CLI, and
+serves it under `/api/v1`.
 
 ## Running the API
 
 ```bash
-pip install -e .
-nl2sql-api --host 0.0.0.0 --port 8000 --reload
+pip install nl2sql-api
+ENV=demo nl2sql-api --host 127.0.0.1 --port 8000 [--reload]
+# or: python -m nl2sql_api.server ..., or: uvicorn nl2sql_api.main:app
 ```
 
-Or using the server script directly:
+Start it from the folder holding the env file and configs (the demo's use
+relative paths). Interactive docs: Swagger UI at `/docs`, ReDoc at `/redoc`,
+the schema at `/openapi.json`. There is no authentication; the RBAC role comes
+from `user_context` in the request.
 
-```bash
-python -m nl2sql_api.server --host 0.0.0.0 --port 8000 --reload
-```
+## Endpoints
 
-## Development
+- `POST /api/v1/query` - Ask a question (send `user_context`, e.g. `{"roles": ["admin"]}`)
+- `GET /api/v1/health` - Liveness check
+- `GET /api/v1/ready` - Readiness check (does not yet check dependencies)
+- `POST /api/v1/datasource` - Register a datasource in the running process
+- `GET /api/v1/datasource` - List registered datasource ids
+- `GET /api/v1/datasource/{datasource_id}` - Check a datasource is registered
+- `DELETE /api/v1/datasource/{datasource_id}` - Not supported yet (answers `success: false`)
+- `POST /api/v1/llm` - Configure an LLM in the running process
+- `GET /api/v1/llm` - List configured LLMs
+- `GET /api/v1/llm/{llm_name}` - Get one configured LLM
+- `POST /api/v1/index/{datasource_id}` - Index one datasource's schema
+- `POST /api/v1/index-all` - Index every registered datasource
+- `DELETE /api/v1/index` - Clear the vector store
+- `GET /api/v1/index/status` - Placeholder status (the registered datasource ids)
 
-Install in development mode:
-
-```bash
-pip install -e .
-```
-
-For detailed API documentation, see [API_DOCS.md](API_DOCS.md).
+Reference: <https://github.com/nadeem4/nl2sql/blob/main/docs/api/rest/index.md>.

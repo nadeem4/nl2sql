@@ -233,7 +233,11 @@ def test_history_groups_by_benchmark_then_database_newest_first(tmp_path):
     assert "tables +5.0 pp, columns +0.0 pp" in retrieval and "first run" in retrieval
     block = records.render_readme_block(records.load_records(tmp_path))
     assert "docs/benchmarks.md" in block and "2026-09-19" not in block
-    assert "| Retrieval recall | chinook | retrieval |" in block and "| Tier 2 | northwind | gpt-5.4 |" in block
+    tier2_part, retrieval_part = block.split(records.README_RETRIEVAL_HEADING)
+    assert records.README_TIER2_HEADING in tier2_part
+    assert "| gpt-5.4 | chinook | 2026-09-20 |" in tier2_part and "| gpt-5.4 | northwind | 2026-09-21 |" in tier2_part
+    assert "| mini | chinook | 2026-09-21 |" in tier2_part and "table_recall" not in tier2_part
+    assert "| chinook | 2026-09-20 | abcdef1 | 95.0% | 70.0% |" in retrieval_part
 
 
 def test_publish_is_byte_identical_whatever_order_the_records_are_read_in(tmp_path):
@@ -256,8 +260,17 @@ def test_a_record_without_faithfulness_shows_a_dash(tmp_path):
 
 def test_the_empty_state(tmp_path):
     assert records.EMPTY in records.render_history([])
-    assert records.EMPTY in records.render_readme_block([])
+    block = records.render_readme_block([])
+    assert records.TIER2_EMPTY in block and records.RETRIEVAL_EMPTY in block
+    assert block.index(records.README_TIER2_HEADING) < block.index(records.README_RETRIEVAL_HEADING)
     assert records.load_records(tmp_path / "missing") == []
+
+
+def test_the_readme_block_says_when_one_benchmark_has_no_run_yet(tmp_path):
+    records.write_retrieval_record(_retrieval_report(), tmp_path, recorded_at=WHEN, engine_version="0.9.0", code=CODE)
+    block = records.render_readme_block(records.load_records(tmp_path))
+    assert records.TIER2_EMPTY in block and records.RETRIEVAL_EMPTY not in block
+    assert "| chinook | 2026-09-21 | abcdef1 | 90.0% | 70.0% | first run |" in block
 
 
 def test_publish_replaces_only_the_readme_block_and_never_touches_a_record(tmp_path):
@@ -268,7 +281,7 @@ def test_publish_replaces_only_the_readme_block_and_never_touches_a_record(tmp_p
     history = tmp_path / "docs" / "benchmarks.md"
     assert records.publish(tmp_path / "benchmarks", history, readme) == 2
     text = readme.read_text(encoding="utf-8")
-    assert text.startswith("# Title\n\nbefore\n") and text.endswith("after\n") and "old" not in text
+    assert text.startswith("# Title\n\nbefore\n") and text.endswith("after\n") and "\nold\n" not in text
     assert "mini" in text and history.read_text(encoding="utf-8").startswith("# Benchmark Results")
     assert {p: p.read_bytes() for p in paths} == before
 
