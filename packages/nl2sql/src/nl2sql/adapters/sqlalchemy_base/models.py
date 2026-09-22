@@ -1,15 +1,9 @@
-from pydantic import BaseModel, Field, ConfigDict
-from typing import List, Optional, Any
+from pydantic import BaseModel
+from typing import Optional, Any
 
+# Results and errors use the SDK's ResultFrame and ResultError
+# (nl2sql_adapter_sdk.contracts); these are the SQL-only extras.
 
-class QueryResult(BaseModel):
-    """Normalized results from a datasource execution."""
-    columns: List[str]
-    rows: List[List[Any]]
-    row_count: int
-    raw: Optional[Any] = None
-    execution_time_ms: Optional[float] = None
-    bytes_returned: Optional[int] = None
 
 class DryRunResult(BaseModel):
     """Result of a query validation/dry-run."""
@@ -27,10 +21,3 @@ class CostEstimate(BaseModel):
     estimated_cost: float
     estimated_rows: int
     estimated_time_ms: Optional[float] = None
-
-class AdapterError(BaseModel):
-    """Standardized error envelope for adapter failures."""
-    code: str
-    message: str
-    retriable: bool
-    raw: Optional[Any] = None

@@ -42,7 +42,7 @@ from nl2sql.pipeline.nodes.generator.node import GeneratorNode, SqlVisitor
 from nl2sql.pipeline.state import SubgraphExecutionState
 
 FIXTURE = Path(__file__).resolve().parents[1] / "fixtures" / "gpt4o_genre_sales_plan.json"
-CHINOOK = Path(nl2sql.__file__).resolve().parent / "cli" / "demo" / "data" / "chinook.sqlite"
+CHINOOK = Path(nl2sql.__file__).resolve().parent / "datasets" / "chinook.sqlite"
 
 
 def _captured_plan() -> dict:

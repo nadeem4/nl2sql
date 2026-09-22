@@ -1,6 +1,6 @@
 """Chinook demo dataset: datasource, policies and guided questions.
 
-The database itself is vendored at ``nl2sql/cli/demo/data/chinook.sqlite`` and
+The database itself is vendored at ``nl2sql/datasets/chinook.sqlite`` and
 is copied into the demo project by :meth:`DemoManager.setup_chinook`. See
 ``THIRD_PARTY_NOTICES.md`` at the repository root for its license.
 """

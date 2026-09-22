@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import math
-from typing import Any, Dict, List, Sequence, Tuple, Union
+from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
 import sqlglot
 
@@ -60,8 +60,11 @@ class ModelEvaluator:
     """Evaluates the correctness of AI-generated SQL and its execution results."""
 
     @staticmethod
-    def compare_sql_semantic(generated_sql: str, expected_sql: str) -> bool:
+    def compare_sql_semantic(generated_sql: str, expected_sql: str, dialect: Optional[str] = None) -> bool:
         """Compares two SQL queries semantically by normalizing them to ASTs.
+
+        ``dialect`` is the datasource's sqlglot dialect (``adapter.get_dialect()``);
+        without it, T-SQL's ``TOP`` and ``[ident]`` or MySQL's backticks misparse.
 
         Raises:
             ValueError: If either SQL query is invalid or unparseable.
@@ -73,16 +76,16 @@ class ModelEvaluator:
             return True
 
         try:
-            gen_ast = sqlglot.parse_one(generated_sql)
+            gen_ast = sqlglot.parse_one(generated_sql, read=dialect)
         except Exception as e:
             raise ValueError(f"Generated SQL is invalid/unparseable: {e}")
 
         try:
-            exp_ast = sqlglot.parse_one(expected_sql)
+            exp_ast = sqlglot.parse_one(expected_sql, read=dialect)
         except Exception as e:
             raise ValueError(f"Ground Truth SQL is invalid/unparseable: {e}")
 
-        return gen_ast.sql() == exp_ast.sql()
+        return gen_ast.sql(dialect=dialect) == exp_ast.sql(dialect=dialect)
 
     @staticmethod
     def compare_results(
