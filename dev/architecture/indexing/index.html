@@ -521,6 +521,15 @@
 </a>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="#retrieval-mmr-not-a-re-ranking-model">
+<span class="md-ellipsis">
+      
+        Retrieval: MMR, not a re-ranking model
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="#tenant-isolation-current-state">
 <span class="md-ellipsis">
       
@@ -1955,6 +1964,15 @@
 </a>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="#retrieval-mmr-not-a-re-ranking-model">
+<span class="md-ellipsis">
+      
+        Retrieval: MMR, not a re-ranking model
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="#tenant-isolation-current-state">
 <span class="md-ellipsis">
       
@@ -2132,6 +2150,82 @@ it with a Rebuild button.</p>
 <li>Retrieval uses the <code>SubQuery.schema_version</code> when available; otherwise latest snapshot.</li>
 <li>MMR ranking may introduce non-determinism in ordering for similar scores.</li>
 </ul>
+<h2 id="retrieval-mmr-not-a-re-ranking-model">Retrieval: MMR, not a re-ranking model</h2>
+<p>Every vector search in the engine is one maximal marginal relevance (MMR)
+search over the one Chroma collection, <code>nl2sql_store</code>, which holds every
+datasource (Chinook: 1 datasource, 11 table, 64 column and 11 relationship
+entries, 87 in all). There is <strong>no re-ranking model</strong>. What is sometimes called
+re-ranking is this:</p>
+<ol>
+<li>Embed the query text with the collection's embedder (the local
+   <code>all-MiniLM-L6-v2</code> costs nothing per query).</li>
+<li>Fetch the pool: the <code>fetch_k = 4 * k</code> entries nearest to it, filtered by
+   entry type, datasource and active build.</li>
+<li>Pick <code>k</code> of them one at a time. The first pick is the entry most similar to
+   the query (cosine similarity). Every later pick is the pool entry with the
+   highest
+   <code>0.7 * similarity(entry, query) - 0.3 * max similarity(entry, earlier picks)</code>,
+   so an entry that nearly repeats an earlier pick loses to a less similar one
+   that adds something. <code>lambda_mult = 0.7</code> is the weight on similarity.</li>
+</ol>
+<p>The documents come back in pool order (nearest first), not pick order, exactly
+as <code>Chroma.max_marginal_relevance_search</code> returns them.</p>
+<table>
+<thead>
+<tr>
+<th>Caller</th>
+<th>Search</th>
+<th>Entry types</th>
+<th>k</th>
+<th>Pool</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>DatasourceResolverNode</code></td>
+<td><code>datasources</code></td>
+<td>datasource</td>
+<td>5</td>
+<td>20</td>
+</tr>
+<tr>
+<td><code>SchemaRetrieverNode</code></td>
+<td><code>tables</code></td>
+<td>table, metric</td>
+<td>8</td>
+<td>32</td>
+</tr>
+<tr>
+<td><code>SchemaRetrieverNode</code>, when <code>tables</code> finds nothing</td>
+<td><code>columns</code></td>
+<td>column</td>
+<td>8</td>
+<td>32</td>
+</tr>
+<tr>
+<td><code>SchemaRetrieverNode</code>, over the tables found</td>
+<td><code>planning</code></td>
+<td>column, relationship</td>
+<td>12</td>
+<td>48</td>
+</tr>
+</tbody>
+</table>
+<p>The schema retriever runs none of these when the schema has
+<code>SCHEMA_RETRIEVAL_FULL_SNAPSHOT_MAX_TABLES</code> tables or fewer (15 by default, so
+Chinook's 11 are always sent whole); the resolver runs none when the request
+names a <code>datasource_id</code> or only one datasource is registered (the Chinook demo).</p>
+<p><code>nl2sql.indexing.retrieval_trace.mmr_search</code> is the one implementation: it
+makes the Chroma query and calls the same <code>maximal_marginal_relevance</code>
+function Chroma's method does, and returns the documents with a record of the
+search (the query, the pool with similarity, Chroma distance and type, the
+picks in order with the score each won with, and what was dropped). The record
+comes from numbers MMR computes anyway, so it costs no second search. Nodes put
+it in their run trace (see <a href="../../observability/debugging/#retrieval">Debugging a run</a>),
+and the playground's Retrieval inspector (<code>VectorStore.inspect</code>) runs the same
+search for any text, with k, lambda, entry types and datasource exposed. That
+inspector is the tool for chunking experiments: change the chunks, rebuild,
+search the same text, and diff the <strong>Copy as text</strong> output.</p>
 <h2 id="tenant-isolation-current-state">Tenant isolation (current state)</h2>
 <p>Tenant scoping is <strong>not implemented</strong> in indexing:</p>
 <ul>
@@ -2163,7 +2257,8 @@ it with a Rebuild button.</p>
 <ul>
 <li>Embedding uses <code>EmbeddingService</code>: OpenAI embeddings by default, or the local
   ONNX <code>all-MiniLM-L6-v2</code> model when <code>EMBEDDING_PROVIDER=local</code>.</li>
-<li>Vector search uses Chroma MMR (<code>lambda_mult=0.7</code>, <code>fetch_k = 4*k</code>).</li>
+<li>Vector search is MMR (<code>lambda_mult=0.7</code>, <code>fetch_k = 4*k</code>); see
+  <a href="#retrieval-mmr-not-a-re-ranking-model">Retrieval</a>.</li>
 <li>No caching or sharding layers are implemented.</li>
 <li>Index refresh re-embeds every entry of the datasource being re-indexed; other
   datasources are untouched.</li>

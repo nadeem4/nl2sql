@@ -2529,6 +2529,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#retrieval" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Retrieval
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#redaction" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3939,6 +3950,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#retrieval" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Retrieval
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#redaction" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4167,6 +4189,56 @@ named a column that does not exist; long values shortened here):</p>
   <a href="../../architecture/determinism/#the-plan-cache-determinism-from-the-architecture">Determinism → The plan cache</a>.</p>
 </li>
 </ul>
+<h3 id="retrieval">Retrieval</h3>
+<p>The <code>datasource_resolver</code> and <code>schema_retriever</code> entries carry a <code>retrieval</code>
+object in <code>outputs</code>: what the vector search retrieved and how MMR chose among it
+(the engine has no re-ranking model; see
+<a href="../../architecture/indexing/#retrieval-mmr-not-a-re-ranking-model">Indexing</a>).</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nt">"retrieval"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span><span class="nt">"skipped"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span><span class="nt">"query"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Tracks sold per genre, highest first\ngroup_by: genre name ..."</span><span class="p">,</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">  </span><span class="nt">"searches"</span><span class="p">:</span><span class="w"> </span><span class="p">[{</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">    </span><span class="nt">"search"</span><span class="p">:</span><span class="w"> </span><span class="s2">"tables"</span><span class="p">,</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">    </span><span class="nt">"filter"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"datasource_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"chinook"</span><span class="p">,</span><span class="w"> </span><span class="nt">"types"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"schema.table"</span><span class="p">,</span><span class="w"> </span><span class="s2">"schema.metric"</span><span class="p">]},</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">    </span><span class="nt">"k"</span><span class="p">:</span><span class="w"> </span><span class="mi">8</span><span class="p">,</span><span class="w"> </span><span class="nt">"fetch_k"</span><span class="p">:</span><span class="w"> </span><span class="mi">32</span><span class="p">,</span><span class="w"> </span><span class="nt">"lambda_mult"</span><span class="p">:</span><span class="w"> </span><span class="mf">0.7</span><span class="p">,</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="w">    </span><span class="nt">"pool"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="w">      </span><span class="p">{</span><span class="nt">"rank"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="nt">"id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"schema.table:[main].[Track]:&lt;version&gt;"</span><span class="p">,</span><span class="w"> </span><span class="nt">"label"</span><span class="p">:</span><span class="w"> </span><span class="s2">"[main].[Track]"</span><span class="p">,</span>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="w">       </span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"schema.table"</span><span class="p">,</span><span class="w"> </span><span class="nt">"datasource_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"chinook"</span><span class="p">,</span><span class="w"> </span><span class="nt">"table"</span><span class="p">:</span><span class="w"> </span><span class="s2">"[main].[Track]"</span><span class="p">,</span><span class="w"> </span><span class="nt">"column"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="w">       </span><span class="nt">"similarity"</span><span class="p">:</span><span class="w"> </span><span class="mf">0.5651</span><span class="p">,</span><span class="w"> </span><span class="nt">"distance"</span><span class="p">:</span><span class="w"> </span><span class="mf">0.8698</span><span class="p">,</span>
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="w">       </span><span class="nt">"picked"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span><span class="w"> </span><span class="nt">"pick_order"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="nt">"mmr_score"</span><span class="p">:</span><span class="w"> </span><span class="mf">0.5651</span><span class="p">,</span><span class="w"> </span><span class="nt">"redundancy"</span><span class="p">:</span><span class="w"> </span><span class="mf">0.0</span><span class="p">}</span>
+<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="w">    </span><span class="p">],</span>
+<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="w">    </span><span class="nt">"picks"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"&lt;ids in the order MMR picked them&gt;"</span><span class="p">],</span>
+<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a><span class="w">    </span><span class="nt">"dropped"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"&lt;ids of the pool entries not picked&gt;"</span><span class="p">]</span>
+<a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a><span class="w">  </span><span class="p">}],</span>
+<a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a><span class="w">  </span><span class="nt">"tables"</span><span class="p">:</span><span class="w"> </span><span class="p">[{</span><span class="nt">"table"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Track"</span><span class="p">,</span><span class="w"> </span><span class="nt">"columns"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"Name"</span><span class="p">,</span><span class="w"> </span><span class="s2">"GenreId"</span><span class="p">]}]</span>
+<a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a><span class="p">}</span>
+</code></pre></div>
+<ul>
+<li><strong><code>query</code></strong> is the text actually embedded: the question for the resolver, and
+  for the schema retriever the sub-query's intent, filters, group-by, expected
+  columns and metrics, one per line.</li>
+<li><strong><code>pool</code></strong> is every candidate, nearest first. <code>similarity</code> is the cosine
+  similarity MMR uses; <code>distance</code> is Chroma's (squared L2). <code>pick_order</code> is the
+  order MMR picked in, <code>mmr_score</code> the score the pick won with, and
+  <code>redundancy</code> its similarity to the closest earlier pick.</li>
+<li><strong><code>searches</code></strong> lists each search in order; the schema retriever runs <code>tables</code>
+  (or <code>columns</code> when that finds nothing), then <code>planning</code> over the tables found.</li>
+<li><strong><code>tables</code></strong> (schema retriever) is what survived: the tables and columns sent
+  to the planner.</li>
+<li><strong><code>skipped: true</code></strong> with a <code>reason</code> means no search ran: the schema is small
+  enough to send whole (Chinook, with 11 tables, always is), only one
+  datasource is registered (<code>"single datasource: vector search skipped"</code>; the
+  Chinook demo always is), the request named a <code>datasource_id</code>, or there is no
+  vector store. The resolver's answerability check is an LLM call, so it is in
+  that entry's <code>llm_calls</code>, not in <code>retrieval</code>.</li>
+</ul>
+<p>The record carries entry ids and names, never an entry's embedded text, which
+for a column holds its statistics and sample values. It follows the prompt's
+rule, "structure yes, data no": a column entry of a table the run's role
+cannot read keeps its name, rank and whether it was picked, and its scores are
+<code>null</code> with a <code>withheld</code> note, because a similarity to text that contains
+sample values says something about those values. The record is built from the
+numbers MMR computes anyway, so it is always there and costs no extra search.</p>
 <p>The file records what happened. A sub-query's <code>status</code> reflects its final
 attempt, so one that recovers on retry reports <code>"success"</code>; the failed
 attempts stay in the node entries and in the result's <code>warnings</code>.</p>
@@ -4199,8 +4271,8 @@ saying how much was dropped. <strong>LLM messages and raw responses are never cu
 because replay needs them whole; a planner prompt on Chinook is about 12 000
 characters, and a whole trace is typically a few hundred kilobytes.</p>
 <h2 id="reading-a-trace-nl2sql-trace-show">Reading a trace: <code>nl2sql trace show</code></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>nl2sql<span class="w"> </span>trace<span class="w"> </span>show<span class="w"> </span>traces/20260921T164837755710Z_159afe1f-....json
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>nl2sql<span class="w"> </span>trace<span class="w"> </span>show<span class="w"> </span>159afe1f-3305-4907-903a-55495d040665<span class="w">   </span><span class="c1"># looks it up in TRACE_DIR</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>nl2sql<span class="w"> </span>trace<span class="w"> </span>show<span class="w"> </span>traces/20260921T164837755710Z_159afe1f-....json
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>nl2sql<span class="w"> </span>trace<span class="w"> </span>show<span class="w"> </span>159afe1f-3305-4907-903a-55495d040665<span class="w">   </span><span class="c1"># looks it up in TRACE_DIR</span>
 </code></pre></div>
 <p>It prints the question, then one row per node execution (nested SQL agent
 nodes indented) with sub-query, attempt, duration, tokens and status, then
@@ -4208,7 +4280,7 @@ each error or warning, and marks the first failing node with <code>&gt;</code>. 
 failing node but a retry marks the first warning instead, since that is what
 set the retry off.</p>
 <h2 id="replaying-a-trace-nl2sql-trace-replay">Replaying a trace: <code>nl2sql trace replay</code></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>trace<span class="w"> </span>replay<span class="w"> </span>traces/20260921T164837755710Z_159afe1f-....json
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>trace<span class="w"> </span>replay<span class="w"> </span>traces/20260921T164837755710Z_159afe1f-....json
 </code></pre></div>
 <p>Replay runs the real pipeline again for the recorded question, roles and
 datasource, but every LLM call is answered from the trace. The engine's chat
@@ -4257,7 +4329,13 @@ served. It then compares the replayed <code>QueryResult</code> with the recorded
 <p>With <strong>Debug</strong> on, each node name in the per-node table under <strong>Cost &amp; time</strong>
 opens that node's record from the trace: every attempt and sub-query, its
 errors and warnings, what it read and returned, and for LLM nodes the exact
-prompt, the raw response and the parsed result. Long text is folded. The page
+prompt, the raw response and the parsed result. Long text is folded. For the
+<code>datasource_resolver</code> and <code>schema_retriever</code> nodes it also shows the retrieval
+record as a table: the pool nearest first, picks marked with their MMR order,
+dropped entries greyed, and a line naming the entries MMR passed over because
+they repeat an earlier pick. The <strong>Retrieval</strong> inspector at the top of the page
+runs the same search for any text (see the
+<a href="../../getting_started/demo/#the-retrieval-inspector">demo guide</a>). The page
 fetches the file from <code>GET /api/trace/{trace_id}</code>, which serves only files
 directly inside <code>TRACE_DIR</code> and rejects any id that is not a plain token, so
 <code>../</code> or an absolute path never reaches the filesystem.</p>

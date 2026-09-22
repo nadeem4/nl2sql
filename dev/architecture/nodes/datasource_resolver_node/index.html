@@ -2167,6 +2167,12 @@ flowchart LR
 <li>Logger: <code>datasource_resolver</code></li>
 <li>The answerability call is recorded like every LLM call: usage under node <code>datasource_resolver</code> in <code>QueryResult.usage</code>, and in the run trace keyed by node, sub-query, attempt and call.</li>
 <li>Vector retrieval uses <code>VECTOR_BREAKER</code> at the vector store layer.</li>
+<li>Returns a <code>retrieval</code> record in its update for the run trace: the query
+  embedded and the datasource search's pool with scores, MMR picks and drops;
+  or <code>skipped: true</code> and why (an explicit <code>datasource_id</code>, a single registered
+  datasource, no vector store). The answerability check is not part of it: it
+  is an LLM call and is traced as one.
+  See <a href="../../../observability/debugging/#retrieval">Debugging a run</a>.</li>
 </ul>
 <hr/>
 <h2 id="configuration">Configuration</h2>
