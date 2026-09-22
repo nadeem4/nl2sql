@@ -147,12 +147,21 @@ def test_a_run_stopped_by_the_cap_exits_three_with_the_partial_scoreboard(tmp_pa
 def test_baseline_check_passes_and_fails(tmp_path):
     baseline = tmp_path / "baseline.json"
     baseline.write_text(json.dumps(_board()), encoding="utf-8")
-    assert _invoke(tmp_path, "--max-cost", "5", "--baseline", str(baseline)).exit_code == 0
-
-    _FakeAPI.board = _board(statuses=("fail", "fail"))
     out = _invoke(tmp_path, "--max-cost", "5", "--baseline", str(baseline))
-    assert out.exit_code == 1
-    assert "accuracy fell" in out.output
+    assert out.exit_code == 0
+    assert "Against the baseline" in out.output
+
+    # One question of two flips to failing: within --max-regressions, and
+    # McNemar on a single discordant pair says nothing, so the run passes.
+    _FakeAPI.board = _board(statuses=("fail", "fail"))
+    assert _invoke(tmp_path, "--max-cost", "5", "--baseline", str(baseline)).exit_code == 0
+    out = _invoke(tmp_path, "--max-cost", "5", "--baseline", str(baseline), "--max-regressions", "0")
+    assert out.exit_code == 1 and "flipped from pass to fail" in out.output
+
+    # The deprecated flat gate still works when it is asked for, with a warning.
+    out = _invoke(tmp_path, "--max-cost", "5", "--baseline", str(baseline), "--max-accuracy-drop", "0.02")
+    assert out.exit_code == 1 and "accuracy fell" in out.output
+    assert "deprecated" in out.output
 
     _FakeAPI.board = _board(cost=0.05)
     out = _invoke(tmp_path, "--max-cost", "5", "--baseline", str(baseline), "--max-cost-increase", "5")

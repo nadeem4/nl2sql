@@ -40,9 +40,17 @@ from nl2sql.services.callbacks.token_handler import QuestionUsage
 _TOKEN_FIELDS = ("calls", "input_tokens", "cached_input_tokens", "cache_write_input_tokens",
                  "output_tokens", "reasoning_tokens")
 
-# Defaults for the baseline check: 2 accuracy points, 20% more per question.
-DEFAULT_MAX_ACCURACY_DROP = 0.02
+# Defaults for the baseline check: at most two questions may flip to failing, a
+# drop must be significant at p < 0.05, and cost per question may rise 20%.
+DEFAULT_MAX_REGRESSIONS = 2
+DEFAULT_ALPHA = 0.05
 DEFAULT_MAX_COST_INCREASE = 0.20
+# Deprecated: the old gate's largest allowed accuracy drop. At n = 43 two points
+# is smaller than one question (2.3), so it fired on run-to-run noise. It is
+# only applied when ``--max-accuracy-drop`` is passed explicitly.
+DEFAULT_MAX_ACCURACY_DROP = 0.02
+# 1.96 is the two-sided 95% normal quantile.
+Z_95 = 1.959963984540054
 
 
 class UnknownPriceError(ValueError):
@@ -153,6 +161,44 @@ def _share(num: int, den: int) -> Optional[float]:
     return round(num / den, 4) if den else None
 
 
+def _interval(successes: int, total: int) -> Optional[List[float]]:
+    bounds = wilson_interval(successes, total)
+    return None if bounds is None else [round(b, 4) for b in bounds]
+
+
+def wilson_interval(successes: int, total: int, z: float = Z_95) -> Optional[Tuple[float, float]]:
+    """The Wilson score interval for ``successes`` of ``total``; None for no runs.
+
+    A point estimate hides how little 43 questions can settle: 25/43 is 58.1%
+    with a 95% interval of 43.3%-71.6%, so a few points either way is noise.
+    Wilson rather than the normal approximation because it stays inside
+    [0, 1] and behaves at 0 and 100%
+    (https://www.anthropic.com/research/statistical-approach-to-model-evals).
+    """
+    if total <= 0:
+        return None
+    p = successes / total
+    denominator = 1 + z * z / total
+    centre = (p + z * z / (2 * total)) / denominator
+    half = z * math.sqrt(p * (1 - p) / total + z * z / (4 * total * total)) / denominator
+    return max(0.0, centre - half), min(1.0, centre + half)
+
+
+def mcnemar_exact(pass_to_fail: int, fail_to_pass: int) -> float:
+    """McNemar's exact two-sided p-value for the questions that flipped.
+
+    The questions both runs got right, and both got wrong, carry no
+    information about a change; only the discordant pairs do. Under "the two
+    runs are equally good" each flip is a fair coin, so the p-value is the
+    two-sided binomial tail. With no flips at all it is 1.0.
+    """
+    n = pass_to_fail + fail_to_pass
+    if n == 0:
+        return 1.0
+    tail = sum(math.comb(n, i) for i in range(min(pass_to_fail, fail_to_pass) + 1))
+    return min(1.0, 2 * tail / (2 ** n))
+
+
 def _lenient(record: Dict[str, Any]) -> str:
     """A run's lenient status; a record written before lenient scoring has only the strict one."""
     return record.get("lenient_status") or record["status"]
@@ -167,6 +213,35 @@ def _pass_rate(records: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
 
 def _key(record: Dict[str, Any]) -> str:
     return f"{record['id']}/{record['role']}"
+
+
+def _by_question(records: Sequence[Dict[str, Any]]) -> Dict[str, List[Dict[str, Any]]]:
+    runs: Dict[str, List[Dict[str, Any]]] = {}
+    for r in records:
+        runs.setdefault(_key(r), []).append(r)
+    return runs
+
+
+def _reliable(records: Sequence[Dict[str, Any]], lenient: bool = False) -> Dict[str, bool]:
+    """Per question, whether **every** pass passed: the pass^k rule."""
+    status = _lenient if lenient else (lambda r: r["status"])
+    return {q: all(status(r) == "pass" for r in runs) for q, runs in _by_question(records).items()}
+
+
+def _pass_k(records: Sequence[Dict[str, Any]], passes: int) -> Optional[Dict[str, Any]]:
+    """pass^k: the share of questions that passed in every one of ``passes`` runs.
+
+    Mean accuracy counts runs, so a question that passes twice of three times
+    lifts it; pass^k counts questions and a flaky one never counts
+    (tau-bench, https://arxiv.org/abs/2406.12045). Reported only when a run
+    made more than one pass.
+    """
+    if passes <= 1:
+        return None
+    strict, lenient = _reliable(records), _reliable(records, lenient=True)
+    return {"k": passes, "questions": len(strict),
+            "strict": _share(sum(strict.values()), len(strict)),
+            "lenient": _share(sum(lenient.values()), len(lenient))}
 
 
 def score_config(records: List[Dict[str, Any]], passes: int) -> Dict[str, Any]:
@@ -221,14 +296,23 @@ def score_config(records: List[Dict[str, Any]], passes: int) -> Dict[str, Any]:
     }
 
     total_cost = sum(r["cost"] for r in records)
+    overall = _pass_rate(records)
     return {
         "summary": ModelEvaluator.summarize(records),
         # Strict first: today's execution match, column count and order included.
         # Lenient beside it allows extra and reordered columns and normalised
         # period labels (``ModelEvaluator.compare_results_lenient``).
         "accuracy": {
-            "overall": _pass_rate(records)["accuracy"],
-            "lenient": _pass_rate(records)["lenient_accuracy"],
+            "overall": overall["accuracy"],
+            "lenient": overall["lenient_accuracy"],
+            # A 95% Wilson interval on each: at n = 43 it is about +-14 points,
+            # so a few points' difference between runs says nothing. It is taken
+            # over the runs scored, so with several passes the runs of one
+            # question are not independent and the interval reads narrower than
+            # it is; pass^k below counts questions and does not.
+            "interval": _interval(overall["pass"], overall["total"]),
+            "lenient_interval": _interval(overall["lenient_pass"], overall["total"]),
+            "pass_k": _pass_k(records, passes),
             "by_tag": {t: _pass_rate(rs) for t, rs in sorted(by_tag.items())},
             "by_difficulty": {d: _pass_rate(rs) for d, rs in sorted(by_difficulty.items())},
         },
@@ -284,25 +368,77 @@ def compare(boards: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
     return {"configs": rows, "differences": differences}
 
 
-def check_baseline(scoreboard: Dict[str, Any], baseline: Dict[str, Any], *,
-                   max_accuracy_drop: float = DEFAULT_MAX_ACCURACY_DROP,
-                   max_cost_increase: float = DEFAULT_MAX_COST_INCREASE) -> List[str]:
-    """Each regression against ``baseline``, for every config both scoreboards name.
+def question_flips(records: Sequence[Dict[str, Any]], baseline_records: Sequence[Dict[str, Any]]
+                   ) -> Dict[str, Any]:
+    """Which questions both runs ran flipped, each way, and McNemar's p-value.
 
-    Accuracy may drop by at most ``max_accuracy_drop`` (a fraction: 0.02 is two
-    points); cost per question may rise by at most ``max_cost_increase`` (a
-    fraction of the baseline's: 0.2 is 20%).
+    A question counts as passed when **every** pass passed, so a question that
+    is flaky now and was solid before reads as a regression. Only questions
+    both runs ran are compared.
     """
-    problems = []
+    now, before = _reliable(records), _reliable(baseline_records)
+    shared = sorted(set(now) & set(before))
+    pass_to_fail = [q for q in shared if before[q] and not now[q]]
+    fail_to_pass = [q for q in shared if now[q] and not before[q]]
+    return {"questions": len(shared), "pass_to_fail": pass_to_fail, "fail_to_pass": fail_to_pass,
+            "p_value": round(mcnemar_exact(len(pass_to_fail), len(fail_to_pass)), 6)}
+
+
+def compare_with_baseline(scoreboard: Dict[str, Any], baseline: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
+    """Per config both scoreboards name, the run against the baseline question by question.
+
+    A single run of 43 questions has a 95% interval about 14 points wide, so
+    the headline difference is read alongside the questions that actually
+    flipped and McNemar's exact test on them
+    (https://www.anthropic.com/research/statistical-approach-to-model-evals).
+    """
+    out: Dict[str, Dict[str, Any]] = {}
     for name, board in scoreboard.get("configs", {}).items():
         base = baseline.get("configs", {}).get(name)
         if not base:
             continue
-        acc, base_acc = board["accuracy"]["overall"], base["accuracy"]["overall"]
-        if acc is not None and base_acc is not None and base_acc - acc > max_accuracy_drop:
-            problems.append(f"{name}: accuracy fell from {base_acc:.1%} to {acc:.1%} "
-                            f"(allowed drop {max_accuracy_drop:.1%})")
-        cost, base_cost = board["cost"]["per_question"], base["cost"]["per_question"]
+        out[name] = {
+            **question_flips(board.get("results") or [], base.get("results") or []),
+            "accuracy": board["accuracy"]["overall"], "baseline_accuracy": base["accuracy"]["overall"],
+            "lenient": board["accuracy"].get("lenient"), "baseline_lenient": base["accuracy"].get("lenient"),
+            "interval": board["accuracy"].get("interval"),
+            "cost_per_question": board["cost"]["per_question"],
+            "baseline_cost_per_question": base["cost"]["per_question"],
+        }
+    return out
+
+
+def check_baseline(scoreboard: Dict[str, Any], baseline: Dict[str, Any], *,
+                   max_regressions: int = DEFAULT_MAX_REGRESSIONS,
+                   alpha: float = DEFAULT_ALPHA,
+                   max_cost_increase: float = DEFAULT_MAX_COST_INCREASE,
+                   max_accuracy_drop: Optional[float] = None) -> List[str]:
+    """Each regression against ``baseline``, for every config both scoreboards name.
+
+    A run fails when more than ``max_regressions`` questions flipped from
+    passing to failing, or when the flips are one-sided enough for McNemar's
+    exact test to put them below ``alpha``. Cost per question may still rise
+    by at most ``max_cost_increase``.
+
+    ``max_accuracy_drop`` is the deprecated flat gate and is only applied when
+    it is passed: at n = 43 its old default of two points was smaller than one
+    question, so it fired on run-to-run noise.
+    """
+    problems = []
+    for name, diff in compare_with_baseline(scoreboard, baseline).items():
+        lost, gained, p = len(diff["pass_to_fail"]), len(diff["fail_to_pass"]), diff["p_value"]
+        if lost > max_regressions:
+            problems.append(f"{name}: {lost} question{'s' if lost != 1 else ''} flipped from pass to fail "
+                            f"(allowed {max_regressions}): {', '.join(diff['pass_to_fail'])}")
+        elif lost > gained and p < alpha:
+            problems.append(f"{name}: {lost} questions flipped to fail and {gained} the other way, "
+                            f"a significant drop (McNemar p={p:.3f} < {alpha})")
+        if max_accuracy_drop is not None:
+            acc, base_acc = diff["accuracy"], diff["baseline_accuracy"]
+            if acc is not None and base_acc is not None and base_acc - acc > max_accuracy_drop:
+                problems.append(f"{name}: accuracy fell from {base_acc:.1%} to {acc:.1%} "
+                                f"(allowed drop {max_accuracy_drop:.1%}, --max-accuracy-drop is deprecated)")
+        cost, base_cost = diff["cost_per_question"], diff["baseline_cost_per_question"]
         if cost is not None and base_cost and (cost - base_cost) / base_cost > max_cost_increase:
             problems.append(f"{name}: cost per question rose from ${base_cost:.4f} to ${cost:.4f} "
                             f"(allowed rise {max_cost_increase:.0%})")

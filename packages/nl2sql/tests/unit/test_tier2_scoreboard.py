@@ -266,3 +266,119 @@ def test_a_record_keeps_the_answer_text_the_faithfulness_check_read():
     assert record["answer"] == "Rock leads.\n1. Rock: 835"
     assert tier2._record(question, {"id": question.id, "role": "admin", "status": "fail"}, None, 1, 0.0, 0.1)[
         "plans"] == []
+
+
+# --- statistics ------------------------------------------------------------
+
+def test_the_wilson_interval_on_known_counts():
+    # n = 43 is the gold set: 25/43 is 58.1%, and the interval is about +-14 pp.
+    lo, hi = tier2.wilson_interval(25, 43)
+    assert (round(lo, 3), round(hi, 3)) == (0.433, 0.716)
+    assert [round(b, 3) for b in tier2.wilson_interval(18, 43)] == [0.284, 0.567]
+    # The ends stay inside [0, 1] and never collapse to a point.
+    assert tier2.wilson_interval(0, 10)[0] == 0.0
+    assert tier2.wilson_interval(10, 10)[1] == pytest.approx(1.0)
+    assert tier2.wilson_interval(10, 10)[0] < 1.0
+    assert tier2.wilson_interval(0, 0) is None
+
+
+def test_mcnemars_exact_test_on_a_constructed_table():
+    # Only the discordant pairs count: ten questions lost and none gained is
+    # 2 * (1/2)^10; five each way is no evidence at all.
+    assert tier2.mcnemar_exact(10, 0) == pytest.approx(2 / 1024)
+    assert tier2.mcnemar_exact(5, 5) == 1.0
+    assert tier2.mcnemar_exact(8, 1) == pytest.approx(2 * 10 / 512)
+    assert tier2.mcnemar_exact(1, 8) == pytest.approx(2 * 10 / 512)  # symmetric
+    assert tier2.mcnemar_exact(0, 0) == 1.0
+    assert tier2.mcnemar_exact(2, 0) == pytest.approx(0.5)
+
+
+def test_the_scoreboard_records_an_interval_for_both_scores():
+    records = [_rec("a", "pass"), _rec("b", "fail", lenient="pass"), _rec("c", "fail"), _rec("d", "fail")]
+    accuracy = tier2.score_config(records, passes=1)["accuracy"]
+    assert accuracy["interval"] == [round(b, 4) for b in tier2.wilson_interval(1, 4)]
+    assert accuracy["lenient_interval"] == [round(b, 4) for b in tier2.wilson_interval(2, 4)]
+
+
+def test_pass_k_counts_a_question_reliable_only_when_every_pass_passed():
+    records = [_rec("a", "pass", pass_no=1), _rec("a", "pass", pass_no=2),
+               _rec("b", "pass", pass_no=1), _rec("b", "fail", pass_no=2, lenient="pass"),
+               _rec("c", "fail", pass_no=1), _rec("c", "fail", pass_no=2)]
+    board = tier2.score_config(records, passes=2)
+    # Mean accuracy counts runs: 3 of 6. pass^2 counts questions: only "a".
+    assert board["accuracy"]["overall"] == 0.5
+    assert board["accuracy"]["pass_k"] == {"k": 2, "questions": 3, "strict": 0.3333, "lenient": 0.6667}
+    assert tier2.score_config([_rec("a", "pass")], passes=1)["accuracy"]["pass_k"] is None
+
+
+# --- comparing with a baseline, question by question -------------------------
+
+def _run(*statuses, passes=1):
+    """A one-config scoreboard whose questions take the given statuses in turn."""
+    runs = [_rec(f"q{i}", s, pass_no=p) for p in range(1, passes + 1) for i, s in enumerate(statuses)]
+    board = tier2.score_config(runs, passes=passes)
+    board.update(planned_cases=len(runs), completed_cases=len(runs))
+    return {"configs": {"default": board}}
+
+
+def test_the_baseline_comparison_lists_the_questions_that_flipped_each_way():
+    now = _run("pass", "fail", "pass", "fail")
+    before = _run("pass", "pass", "fail", "fail")
+    [(name, diff)] = tier2.compare_with_baseline(now, before).items()
+    assert name == "default"
+    assert diff["pass_to_fail"] == ["q1/admin"] and diff["fail_to_pass"] == ["q2/admin"]
+    assert diff["questions"] == 4
+    assert diff["p_value"] == 1.0
+    assert diff["accuracy"] == 0.5 and diff["baseline_accuracy"] == 0.5
+
+
+def test_the_baseline_comparison_uses_only_the_questions_both_runs_ran():
+    now = {"configs": {"default": tier2.score_config([_rec("q0", "fail")], passes=1)}}
+    before = {"configs": {"default": tier2.score_config([_rec("q0", "pass"), _rec("q9", "pass")], passes=1)}}
+    diff = tier2.compare_with_baseline(now, before)["default"]
+    assert diff["questions"] == 1 and diff["pass_to_fail"] == ["q0/admin"]
+
+
+# --- the regression gate -----------------------------------------------------
+
+def _gate(now, before, **kwargs):
+    return tier2.check_baseline(now, before, **kwargs)
+
+
+def test_the_gate_stays_quiet_when_a_small_drop_is_not_significant():
+    # Two questions lost, one gained: p = 1.0 at n = 3 discordant pairs.
+    now = _run("fail", "fail", "pass", *["pass"] * 40)
+    before = _run("pass", "pass", "fail", *["pass"] * 40)
+    assert _gate(now, before) == []
+
+
+def test_the_gate_fires_when_more_than_max_regressions_questions_flipped_to_fail():
+    now = _run("fail", "fail", "fail", *["pass"] * 40)
+    before = _run("pass", "pass", "pass", *["pass"] * 40)
+    problems = _gate(now, before, max_regressions=2)
+    assert len(problems) == 1 and "3 question" in problems[0] and "allowed 2" in problems[0]
+    assert _gate(now, before, max_regressions=3) == []
+
+
+def test_the_gate_fires_on_a_statistically_significant_drop():
+    # Eight lost, one gained: McNemar's exact p is 0.039.
+    now = _run(*["fail"] * 8, "pass", *["pass"] * 34)
+    before = _run(*["pass"] * 8, "fail", *["pass"] * 34)
+    problems = _gate(now, before, max_regressions=99)
+    assert len(problems) == 1 and "p=0.039" in problems[0]
+
+
+def test_a_two_point_drop_no_longer_fires_the_gate_on_its_own():
+    # One question of 43 is 2.3 points; the old --max-accuracy-drop of 0.02
+    # fired on it, which at n = 43 is noise.
+    now = _run("fail", *["pass"] * 42)
+    before = _run(*["pass"] * 43)
+    assert _gate(now, before) == []
+    assert "accuracy fell" in _gate(now, before, max_accuracy_drop=0.02)[0]
+
+
+def test_the_cost_check_is_unchanged():
+    now, before = _run("pass"), _run("pass")
+    now["configs"]["default"]["cost"]["per_question"] = 0.02
+    before["configs"]["default"]["cost"]["per_question"] = 0.01
+    assert "cost per question rose" in _gate(now, before, max_cost_increase=0.2)[0]

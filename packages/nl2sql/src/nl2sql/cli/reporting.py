@@ -536,15 +536,34 @@ class ConsolePresenter:
                 self.print_table(rows, title=f"Tokens by node: {name}",
                                  columns=["Node", "Calls", "Input", "Cached", "Output", "Reasoning", "p50"])
 
-        rows = [[r["config"], f"{board['configs'][r['config']]['completed_cases']}/"
-                 f"{board['configs'][r['config']]['planned_cases']}", pct(r["accuracy"]),
-                 pct(r.get("lenient_accuracy")),
-                 pct(r["answerability_precision"]), pct(r["answerability_recall"]), usd(r["cost_total"]),
-                 usd(r["cost_per_question"]), sec(r["latency_p50"]), sec(r["latency_p95"]), r["retries"],
-                 pct(r["determinism"]), pct(r.get("faithfulness"))] for r in board["comparison"]["configs"]]
-        self.print_table(rows, title="Tier 2 scoreboard", columns=[
+        def ci(value, interval):
+            """``58.1% [43.3-71.6]``: the share with its 95% Wilson interval."""
+            if value is None or not interval:
+                return pct(value)
+            return f"{value:.1%} [{interval[0]:.1%}-{interval[1]:.1%}]".replace("%]", "]").replace("%-", "-")
+
+        rows = []
+        for r in board["comparison"]["configs"]:
+            cfg = board["configs"][r["config"]]
+            accuracy = cfg["accuracy"]
+            rows.append([r["config"], f"{cfg['completed_cases']}/{cfg['planned_cases']}",
+                         ci(r["accuracy"], accuracy.get("interval")),
+                         ci(r.get("lenient_accuracy"), accuracy.get("lenient_interval")),
+                         pct(r["answerability_precision"]), pct(r["answerability_recall"]), usd(r["cost_total"]),
+                         usd(r["cost_per_question"]), sec(r["latency_p50"]), sec(r["latency_p95"]), r["retries"],
+                         pct(r["determinism"]), pct(r.get("faithfulness"))])
+        self.print_table(rows, title="Tier 2 scoreboard (accuracy with its 95% interval)", columns=[
             "Config", "Cases", "Strict", "Lenient", "Ans. P", "Ans. R", "Cost", "$/question", "p50", "p95",
             "Retries", "Determinism", "Faithful"])
+        # pass^k: a question counts only when every pass passed, which mean
+        # accuracy hides (https://arxiv.org/abs/2406.12045).
+        reliability = [[name, cfg["accuracy"]["pass_k"]["questions"], pct(cfg["accuracy"]["pass_k"]["strict"]),
+                        pct(cfg["accuracy"]["pass_k"]["lenient"])]
+                       for name, cfg in board["configs"].items() if cfg["accuracy"].get("pass_k")]
+        if reliability:
+            k = board["passes"]
+            self.print_table(reliability, title=f"pass^{k}: questions that passed in every one of {k} passes",
+                             columns=["Config", "Questions", f"Strict pass^{k}", f"Lenient pass^{k}"])
         unfaithful = [[name, u["id"], u["role"], u["pass"], ", ".join(u["unsupported_numbers"] + u["unsupported_entities"])]
                       for name, cfg in board["configs"].items()
                       for u in (cfg.get("faithfulness") or {}).get("unfaithful", [])]
@@ -559,6 +578,26 @@ class ConsolePresenter:
                              title="Questions the configs disagree on", columns=["ID", "Role", *names])
         stopped = f"  STOPPED: {board['stopped']}" if board.get("stopped") else ""
         self.console.print(f"Spent ${board['spent']:.4f} of ${board['max_cost']:.2f} cap{stopped}")
+
+    def print_baseline_comparison(self, comparison: Dict[str, Any]) -> None:
+        """The run against its baseline question by question: what flipped, and whether it means anything."""
+        def pct(v):
+            return "-" if v is None else f"{v:.1%}"
+
+        if not comparison:
+            return
+        self.print_table(
+            [[name, f"{pct(d['baseline_accuracy'])} -> {pct(d['accuracy'])}",
+              f"{pct(d['baseline_lenient'])} -> {pct(d['lenient'])}", d["questions"],
+              len(d["pass_to_fail"]), len(d["fail_to_pass"]), f"{d['p_value']:.3f}"]
+             for name, d in comparison.items()],
+            title="Against the baseline, question by question",
+            columns=["Config", "Strict", "Lenient", "Questions", "Pass -> fail", "Fail -> pass", "McNemar p"])
+        flipped = [[name, q, "pass -> fail" if q in d["pass_to_fail"] else "fail -> pass"]
+                   for name, d in comparison.items()
+                   for q in sorted(d["pass_to_fail"] + d["fail_to_pass"])]
+        if flipped:
+            self.print_table(flipped, title="Questions that flipped", columns=["Config", "Question", "Change"])
 
     def export_benchmark_report(self, report: Dict[str, Any], path: Path) -> None:
         """Writes the benchmark report as JSON."""

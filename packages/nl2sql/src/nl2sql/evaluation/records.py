@@ -165,6 +165,9 @@ def make_record(board: Dict[str, Any], name: str, *, recorded_at: dt.datetime, e
             "cases": cases,
             "accuracy": cfg["accuracy"]["overall"],
             "lenient_accuracy": cfg["accuracy"].get("lenient"),
+            "accuracy_interval": cfg["accuracy"].get("interval"),
+            "lenient_accuracy_interval": cfg["accuracy"].get("lenient_interval"),
+            "pass_k": cfg["accuracy"].get("pass_k"),
             "answerability_precision": cfg["answerability"]["precision"],
             "answerability_recall": cfg["answerability"]["recall"],
             "cost_total": cfg["cost"]["total"],
@@ -347,8 +350,30 @@ def _series_break(new: Dict[str, Any], old: Dict[str, Any]) -> str:
     return f"new series ({', '.join(changed)} changed)"
 
 
-def describe_change(new: Dict[str, Any], old: Optional[Dict[str, Any]]) -> str:
-    """The Δ cell: the change against the previous run, or why there is none."""
+def flips(new: Dict[str, Any], old: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """The questions that flipped between two tier 2 records, and McNemar's p-value.
+
+    Read from each record's committed scoreboard, so the history page can say
+    how many questions actually moved rather than only how the headline did.
+    None for a record with no per-question results (a retrieval run, or one
+    written before they were kept).
+    """
+    from nl2sql.evaluation.tier2 import question_flips
+
+    now = (new.get("scoreboard") or {}).get("results")
+    before = (old.get("scoreboard") or {}).get("results")
+    if not now or not before:
+        return None
+    return question_flips(now, before)
+
+
+def describe_change(new: Dict[str, Any], old: Optional[Dict[str, Any]], *, show_flips: bool = False) -> str:
+    """The Δ cell: the change against the previous run, or why there is none.
+
+    With ``show_flips`` the headline deltas are followed by how many questions
+    flipped each way and McNemar's exact p-value on them, which is what says
+    whether a difference of a few points means anything at n = 43.
+    """
     if old is None:
         return "first run"
     if not comparable(new, old):
@@ -360,6 +385,10 @@ def describe_change(new: Dict[str, Any], old: Optional[Dict[str, Any]]) -> str:
             continue
         parts.append(f"{label} {d * 100:+.1f} pp" if unit == "pp"
                      else f"{label} {'+' if d >= 0 else '-'}${abs(d):.4f}")
+    moved = flips(new, old) if show_flips else None
+    if moved is not None:
+        lost, gained = len(moved["pass_to_fail"]), len(moved["fail_to_pass"])
+        parts.append(f"{lost} flipped to fail, {gained} to pass (McNemar p={moved['p_value']:.3f})")
     return ", ".join(parts) or "-"
 
 
@@ -369,8 +398,21 @@ def _pct(v: Optional[float]) -> str:
     return "-" if v is None else f"{v:.1%}"
 
 
+def _ci(value: Optional[float], interval: Optional[Sequence[float]]) -> str:
+    """``58.1% [43.3-71.6]``: the share with its 95% interval, or just the share."""
+    if value is None or not interval:
+        return _pct(value)
+    return f"{value:.1%} [{interval[0]:.1%}-{interval[1]:.1%}]".replace("%]", "]").replace("%-", "-")
+
+
 def _usd(v: Optional[float]) -> str:
     return "-" if v is None else f"${v:.4f}"
+
+
+def _passes(r: Dict[str, Any]) -> str:
+    """``3 (pass^3 61.0%)``: how many passes, and the share of questions that passed every one."""
+    pass_k = (r["metrics"].get("pass_k") or {}) if r["kind"] == "tier2" else {}
+    return f"{r['passes']} (pass^{pass_k['k']} {_pct(pass_k['strict'])})" if pass_k else str(r["passes"])
 
 
 def _sec(v: Optional[float]) -> str:
@@ -442,22 +484,25 @@ def _group_heading(kind: str, group: List[Dict[str, Any]]) -> str:
 
 def _tier2_section(group: List[Dict[str, Any]], previous) -> str:
     latest = _table(
-        ["Config", "Date (UTC)", "Commit", "Accuracy (strict)", "Accuracy (lenient)", "Faithfulness",
-         "$/question", "Δ vs previous", "Note"],
-        [[r["config"]["name"], r["recorded_at"][:10], _commit(r), _pct(r["metrics"]["accuracy"]),
-          _pct(r["metrics"].get("lenient_accuracy")),
+        ["Config", "Date (UTC)", "Commit", "Accuracy (strict, 95% CI)", "Accuracy (lenient, 95% CI)",
+         "Faithfulness", "$/question", "Δ vs previous", "Note"],
+        [[r["config"]["name"], r["recorded_at"][:10], _commit(r),
+          _ci(r["metrics"]["accuracy"], r["metrics"].get("accuracy_interval")),
+          _ci(r["metrics"].get("lenient_accuracy"), r["metrics"].get("lenient_accuracy_interval")),
           _pct(r["metrics"].get("faithfulness")), _usd(r["metrics"]["cost_per_question"]),
-          describe_change(r, previous[id(r)]), r.get("note") or "-"] for r in _latest_per_line(group)])
+          describe_change(r, previous[id(r)], show_flips=True), r.get("note") or "-"]
+         for r in _latest_per_line(group)])
     runs = _table(
         ["Date (UTC)", "Commit", "Note", "Config", "Models", "Dataset", "Schema", "Roles", "Passes",
-         "Accuracy (strict)", "Accuracy (lenient)",
+         "Accuracy (strict, 95% CI)", "Accuracy (lenient, 95% CI)",
          "Faithfulness", "$/question", "Δ vs previous", "Answerability P / R",
          "Tokens/question (in / cached / out)", "p50", "p95", "Determinism", "Status"],
         [[_when(r), _commit(r), r.get("note") or "-", r["config"]["name"], _models(r["config"]["models"]),
-          _dataset(r), _schema(r), ", ".join(r["roles"] or []), r["passes"], _pct(r["metrics"]["accuracy"]),
-          _pct(r["metrics"].get("lenient_accuracy")),
+          _dataset(r), _schema(r), ", ".join(r["roles"] or []), _passes(r),
+          _ci(r["metrics"]["accuracy"], r["metrics"].get("accuracy_interval")),
+          _ci(r["metrics"].get("lenient_accuracy"), r["metrics"].get("lenient_accuracy_interval")),
           _pct(r["metrics"].get("faithfulness")), _usd(r["metrics"]["cost_per_question"]),
-          describe_change(r, previous[id(r)]),
+          describe_change(r, previous[id(r)], show_flips=True),
           f"{_pct(r['metrics']['answerability_precision'])} / {_pct(r['metrics']['answerability_recall'])}",
           _tokens(r["metrics"]["tokens_per_question"]), _sec(r["metrics"]["latency_p50"]),
           _sec(r["metrics"]["latency_p95"]), _pct(r["metrics"]["determinism"]), _status(r)] for r in group])
@@ -484,9 +529,12 @@ def render_history(recs: Sequence[Dict[str, Any]]) -> str:
     head = ("# Benchmark Results\n\n"
             "Recorded benchmark runs of the engine on the Chinook gold questions. Generated by\n"
             "`nl2sql benchmark publish` from the records in `benchmarks/`; do not edit by hand.\n"
-            "Grouped by benchmark and database, newest first. \"Δ vs previous\" is the change against the\n"
-            "previous run of the same config; runs on another gold dataset (`@sha`), another schema or,\n"
-            "for tier 2, other roles are not comparable and start a new series. See\n"
+            "Grouped by benchmark and database, newest first. Accuracy is given with its 95% Wilson\n"
+            "interval. \"Δ vs previous\" is the change against the previous run of the same config, and\n"
+            "for tier 2 how many questions flipped each way with McNemar's exact p-value on them: at 43\n"
+            "questions a few points either way is noise, so read the flips and the p-value rather than\n"
+            "the headline. Runs on another gold dataset (`@sha`), another schema or, for tier 2, other\n"
+            "roles are not comparable and start a new series. See\n"
             "[the evaluation dataset](testing/evaluation-dataset.md).\n")
     if not recs:
         return f"{head}\n{EMPTY}\n"
@@ -511,7 +559,8 @@ def render_readme_block(recs: Sequence[Dict[str, Any]]) -> str:
         ["Config", "Database", "Date (UTC)", "Commit", "Accuracy (strict)", "Accuracy (lenient)",
          "Faithfulness", "$/question", "Δ vs previous"],
         [[r["config"]["name"], r["database"]["datasource_id"], r["recorded_at"][:10], _commit(r),
-          _pct(r["metrics"]["accuracy"]), _pct(r["metrics"].get("lenient_accuracy")),
+          _ci(r["metrics"]["accuracy"], r["metrics"].get("accuracy_interval")),
+          _pct(r["metrics"].get("lenient_accuracy")),
           _pct(r["metrics"].get("faithfulness")),
           _usd(r["metrics"]["cost_per_question"]), describe_change(r, previous[id(r)])] for r in tier2],
     ) if tier2 else TIER2_EMPTY
