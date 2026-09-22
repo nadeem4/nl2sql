@@ -442,6 +442,7 @@ gold questions, with the change against that config's previous comparable run.
 <!-- BENCHMARKS:START -->
 | Benchmark | Database | Config | Date (UTC) | Commit | Result | Δ vs previous |
 | --- | --- | --- | --- | --- | --- | --- |
+| Tier 2 | chinook | gpt-5.4 | 2026-09-22 | 1a8101d | accuracy 41.9%, faithfulness 94.4%, $0.0236/question | first run |
 | Retrieval recall | chinook | retrieval | 2026-09-22 | 571cd16 | tables 98.5%, columns 72.6% | first run |
 
 Full history: [docs/benchmarks.md](docs/benchmarks.md)
