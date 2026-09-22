@@ -69,7 +69,7 @@ def test_a_record_holds_when_what_on_which_code_data_and_database_and_the_headli
                                                               "decomposer": "openai:gpt-5.4-mini"}}
     assert record["roles"] == ["admin"] and record["passes"] == 2
     m = record["metrics"]
-    assert m["accuracy"] == 0.5 and m["cost_per_question"] == 0.02
+    assert m["accuracy"] == 0.5 and m["lenient_accuracy"] == 0.5 and m["cost_per_question"] == 0.02
     assert m["tokens_per_question"] == {"input": 1000, "cached": 400, "output": 100}
     assert m["latency_p50"] == 1.5 and m["determinism"] == 1.0
     assert m["faithfulness"] == 0.5
@@ -191,8 +191,10 @@ def test_the_change_against_the_previous_run_of_the_same_config(tmp_path):
     previous = records.previous_runs(recs)
     old = previous[id(newest_gpt)]
     assert old["recorded_at"].startswith("2026-09-19")
-    assert records.deltas(newest_gpt, old) == {"accuracy": 0.5, "faithfulness": 0.5, "cost_per_question": -0.01}
-    assert records.describe_change(newest_gpt, old) == "accuracy +50.0 pp, faithfulness +50.0 pp, $/question -$0.0100"
+    assert records.deltas(newest_gpt, old) == {"accuracy": 0.5, "lenient_accuracy": 0.5, "faithfulness": 0.5,
+                                               "cost_per_question": -0.01}
+    assert records.describe_change(newest_gpt, old) == ("accuracy +50.0 pp, lenient +50.0 pp, "
+                                                        "faithfulness +50.0 pp, $/question -$0.0100")
     mini = next(r for r in recs if r["config"]["name"] == "mini")
     assert previous[id(mini)] is None and records.describe_change(mini, None) == "first run"
 

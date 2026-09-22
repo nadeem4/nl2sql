@@ -39,9 +39,10 @@ START = "<!-- BENCHMARKS:START -->"
 END = "<!-- BENCHMARKS:END -->"
 EMPTY = "No benchmark runs recorded yet."
 README_TIER2_HEADING = "### Tier 2: English questions answered correctly"
-README_TIER2_INTRO = ("The real model end to end on the Chinook gold questions. Accuracy is the share whose rows "
-                      "match the gold answer, or that are refused where the gold set expects a refusal; "
-                      "faithfulness is the share of written answers whose numbers and names come from the rows.")
+README_TIER2_INTRO = ("The real model end to end on the Chinook gold questions. Accuracy is the strict share whose "
+                      "rows match the gold answer exactly, or that are refused where the gold set expects a "
+                      "refusal; lenient allows extra and reordered columns and date labels; faithfulness is the "
+                      "share of written answers whose numbers and names come from the rows.")
 TIER2_EMPTY = ("No tier 2 run recorded yet. Run one from a demo folder with "
                "`nl2sql --env demo benchmark --tier 2 --model gpt-5.4 --max-cost 5`, "
                "then `nl2sql benchmark publish --from <demo folder>` from the repo.")
@@ -55,8 +56,8 @@ UNKNOWN_DATABASE = {"datasource_id": UNKNOWN, "engine": UNKNOWN, "schema_fingerp
                     "tables": None, "columns": None}
 KIND_TITLES = {"tier2": "Tier 2", "retrieval": "Retrieval recall"}
 # The metrics a run is judged by, with how a change in each is written.
-HEADLINE = {"tier2": [("accuracy", "accuracy", "pp"), ("faithfulness", "faithfulness", "pp"),
-                      ("cost_per_question", "$/question", "usd")],
+HEADLINE = {"tier2": [("accuracy", "accuracy", "pp"), ("lenient_accuracy", "lenient", "pp"),
+                      ("faithfulness", "faithfulness", "pp"), ("cost_per_question", "$/question", "usd")],
             "retrieval": [("table_recall", "tables", "pp"), ("column_recall", "columns", "pp")]}
 
 
@@ -163,6 +164,7 @@ def make_record(board: Dict[str, Any], name: str, *, recorded_at: dt.datetime, e
         "metrics": {
             "cases": cases,
             "accuracy": cfg["accuracy"]["overall"],
+            "lenient_accuracy": cfg["accuracy"].get("lenient"),
             "answerability_precision": cfg["answerability"]["precision"],
             "answerability_recall": cfg["answerability"]["recall"],
             "cost_total": cfg["cost"]["total"],
@@ -440,16 +442,20 @@ def _group_heading(kind: str, group: List[Dict[str, Any]]) -> str:
 
 def _tier2_section(group: List[Dict[str, Any]], previous) -> str:
     latest = _table(
-        ["Config", "Date (UTC)", "Commit", "Accuracy", "Faithfulness", "$/question", "Δ vs previous", "Note"],
+        ["Config", "Date (UTC)", "Commit", "Accuracy (strict)", "Accuracy (lenient)", "Faithfulness",
+         "$/question", "Δ vs previous", "Note"],
         [[r["config"]["name"], r["recorded_at"][:10], _commit(r), _pct(r["metrics"]["accuracy"]),
+          _pct(r["metrics"].get("lenient_accuracy")),
           _pct(r["metrics"].get("faithfulness")), _usd(r["metrics"]["cost_per_question"]),
           describe_change(r, previous[id(r)]), r.get("note") or "-"] for r in _latest_per_line(group)])
     runs = _table(
-        ["Date (UTC)", "Commit", "Note", "Config", "Models", "Dataset", "Schema", "Roles", "Passes", "Accuracy",
+        ["Date (UTC)", "Commit", "Note", "Config", "Models", "Dataset", "Schema", "Roles", "Passes",
+         "Accuracy (strict)", "Accuracy (lenient)",
          "Faithfulness", "$/question", "Δ vs previous", "Answerability P / R",
          "Tokens/question (in / cached / out)", "p50", "p95", "Determinism", "Status"],
         [[_when(r), _commit(r), r.get("note") or "-", r["config"]["name"], _models(r["config"]["models"]),
           _dataset(r), _schema(r), ", ".join(r["roles"] or []), r["passes"], _pct(r["metrics"]["accuracy"]),
+          _pct(r["metrics"].get("lenient_accuracy")),
           _pct(r["metrics"].get("faithfulness")), _usd(r["metrics"]["cost_per_question"]),
           describe_change(r, previous[id(r)]),
           f"{_pct(r['metrics']['answerability_precision'])} / {_pct(r['metrics']['answerability_recall'])}",
@@ -502,9 +508,11 @@ def render_readme_block(recs: Sequence[Dict[str, Any]]) -> str:
     tier2 = [r for r in latest if r["kind"] == "tier2"]
     retrieval = [r for r in latest if r["kind"] == "retrieval"]
     tier2_body = _table(
-        ["Config", "Database", "Date (UTC)", "Commit", "Accuracy", "Faithfulness", "$/question", "Δ vs previous"],
+        ["Config", "Database", "Date (UTC)", "Commit", "Accuracy (strict)", "Accuracy (lenient)",
+         "Faithfulness", "$/question", "Δ vs previous"],
         [[r["config"]["name"], r["database"]["datasource_id"], r["recorded_at"][:10], _commit(r),
-          _pct(r["metrics"]["accuracy"]), _pct(r["metrics"].get("faithfulness")),
+          _pct(r["metrics"]["accuracy"]), _pct(r["metrics"].get("lenient_accuracy")),
+          _pct(r["metrics"].get("faithfulness")),
           _usd(r["metrics"]["cost_per_question"]), describe_change(r, previous[id(r)])] for r in tier2],
     ) if tier2 else TIER2_EMPTY
     retrieval_body = _table(

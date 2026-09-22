@@ -153,9 +153,16 @@ def _share(num: int, den: int) -> Optional[float]:
     return round(num / den, 4) if den else None
 
 
+def _lenient(record: Dict[str, Any]) -> str:
+    """A run's lenient status; a record written before lenient scoring has only the strict one."""
+    return record.get("lenient_status") or record["status"]
+
+
 def _pass_rate(records: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
     passed = sum(r["status"] == "pass" for r in records)
-    return {"pass": passed, "total": len(records), "accuracy": _share(passed, len(records))}
+    lenient = sum(_lenient(r) == "pass" for r in records)
+    return {"pass": passed, "lenient_pass": lenient, "total": len(records),
+            "accuracy": _share(passed, len(records)), "lenient_accuracy": _share(lenient, len(records))}
 
 
 def _key(record: Dict[str, Any]) -> str:
@@ -216,8 +223,12 @@ def score_config(records: List[Dict[str, Any]], passes: int) -> Dict[str, Any]:
     total_cost = sum(r["cost"] for r in records)
     return {
         "summary": ModelEvaluator.summarize(records),
+        # Strict first: today's execution match, column count and order included.
+        # Lenient beside it allows extra and reordered columns and normalised
+        # period labels (``ModelEvaluator.compare_results_lenient``).
         "accuracy": {
             "overall": _pass_rate(records)["accuracy"],
+            "lenient": _pass_rate(records)["lenient_accuracy"],
             "by_tag": {t: _pass_rate(rs) for t, rs in sorted(by_tag.items())},
             "by_difficulty": {d: _pass_rate(rs) for d, rs in sorted(by_difficulty.items())},
         },
@@ -252,6 +263,7 @@ def _outcome(statuses: List[str]) -> str:
 def compare(boards: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
     """Configs side by side, and each question at least two configs scored differently."""
     rows = [{"config": name, "cases": len(b["results"]), "accuracy": b["accuracy"]["overall"],
+             "lenient_accuracy": b["accuracy"]["lenient"],
              "answerability_precision": b["answerability"]["precision"],
              "answerability_recall": b["answerability"]["recall"],
              "cost_total": b["cost"]["total"], "cost_per_question": b["cost"]["per_question"],
