@@ -7,6 +7,20 @@ previous run of the same config; runs on another gold dataset (`@sha`), another 
 for tier 2, other roles are not comparable and start a new series. See
 [the evaluation dataset](testing/evaluation-dataset.md).
 
+## Tier 2: chinook (sqlite, 11 tables / 64 columns)
+
+### Latest per config
+
+| Config | Date (UTC) | Commit | Accuracy | Faithfulness | $/question | Δ vs previous | Note |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| gpt-5.4 | 2026-09-22 | 1a8101d | 41.9% | 94.4% | $0.0236 | first run | first gpt-5.4 baseline run |
+
+### All runs
+
+| Date (UTC) | Commit | Note | Config | Models | Dataset | Schema | Roles | Passes | Accuracy | Faithfulness | $/question | Δ vs previous | Answerability P / R | Tokens/question (in / cached / out) | p50 | p95 | Determinism | Status |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 2026-09-22 04:41:56 | 1a8101d | first gpt-5.4 baseline run | gpt-5.4 | openai:gpt-5.4 (answersynthesizer, astplanner, datasourceresolver, decomposer, refiner) | chinook_gold.yaml @7d104084 | @ceed80fe | admin | 1 | 41.9% | 94.4% | $0.0236 | first run | 100.0% / 75.0% | 11,222 / 6,153 / 627 | 6.62s | 8.96s | - | complete |
+
 ## Retrieval recall: chinook (sqlite, 11 tables / 64 columns)
 
 `nl2sql benchmark retrieval --record`: the share of each answerable gold question's needed
