@@ -3956,10 +3956,16 @@
 <li>Expression kinds must pass <code>model_post_init</code> validation.</li>
 </ul>
 <h2 id="2-update-planner-prompt">2. Update planner prompt</h2>
-<p>Update <code>PLANNER_PROMPT</code> and examples in:</p>
+<p>Update the prompt and examples in:</p>
 <ul>
 <li><code>packages/nl2sql/src/nl2sql/pipeline/nodes/ast_planner/prompts.py</code></li>
 </ul>
+<p><code>PLANNER_PROMPT</code> is a chat template of two messages. <code>PLANNER_SYSTEM_PROMPT</code>
+holds what is the same for every question (instructions, <code>PLANNER_EXAMPLES</code>,
+the schema) and <code>PLANNER_HUMAN_PROMPT</code> holds what changes per call (expected
+schema, feedback, the question). Keep per-question text out of the system
+message, or the provider's prompt cache stops hitting. See
+<a href="../../architecture/nodes/ast_planner_node/#prompt-layout-and-caching">AST Planner: prompt layout</a>.</p>
 <p>Ensure structured output still matches <code>PlanModel</code>.</p>
 <h2 id="3-update-validator-logic">3. Update validator logic</h2>
 <p>The logical validator enforces:</p>

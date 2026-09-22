@@ -4186,7 +4186,7 @@ result rows (<code>rows</code>, and the aggregator's <code>terminal_results</cod
 <code>TRACE_SAMPLE_ROWS</code> rows, other lists keep 200 items, and strings keep
 <code>TRACE_MAX_FIELD_CHARS</code> characters. Every cut leaves a <code>[truncated]</code> marker
 saying how much was dropped. <strong>LLM messages and raw responses are never cut</strong>,
-because replay needs them whole; a planner prompt on Chinook is about 30 000
+because replay needs them whole; a planner prompt on Chinook is about 12 000
 characters, and a whole trace is typically a few hundred kilobytes.</p>
 <h2 id="reading-a-trace-nl2sql-trace-show">Reading a trace: <code>nl2sql trace show</code></h2>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>nl2sql<span class="w"> </span>trace<span class="w"> </span>show<span class="w"> </span>traces/20260921T164837755710Z_159afe1f-....json

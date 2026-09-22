@@ -2010,7 +2010,7 @@
 <ol>
 <li>Validate resolver response; raise if no resolved datasources.</li>
 <li>Build <code>resolved_payload</code> and <code>schema_version_map</code>.</li>
-<li>Invoke LLM chain with <code>user_query</code> and resolved datasources.</li>
+<li>Invoke LLM chain with <code>user_query</code> and resolved datasources. The prompt is two messages: the system message holds the fixed instructions and output format (cacheable), the human message holds the resolved datasources (as JSON with sorted keys) and then the question.</li>
 <li>For each LLM sub‑query:</li>
 <li>Validate datasource existence and RBAC allowance.</li>
 <li>Assign deterministic ID via <code>_stable_id()</code>.</li>

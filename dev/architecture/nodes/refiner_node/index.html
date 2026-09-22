@@ -2010,9 +2010,9 @@
 <h2 id="internal-flow-step-by-step">Internal Flow (Step-by-Step)</h2>
 <ol>
 <li>If no LLM configured, emit <code>MISSING_LLM</code> and stop.</li>
-<li>Serialize relevant tables, and the failed plan as compact JSON (<code>model_dump_json(exclude_none=True)</code>).</li>
+<li>Render relevant tables with <code>render_schema_for_prompt</code> (the planner's compact schema block, only <code>sample_values</code> from the column stats), and the failed plan as compact JSON (<code>model_dump_json(exclude_none=True)</code>).</li>
 <li>Build error and reasoning strings.</li>
-<li>Invoke LLM with refinement prompt.</li>
+<li>Invoke LLM with refinement prompt. It is two messages: the system message holds the instructions and then the schema (stable, so the provider can cache it); the human message holds the question, failed plan, errors and reasoning. On Chinook the prompt is about 2,600 tokens (was about 8,000), 2,500 of them a prefix shared across questions.</li>
 <li>Emit <code>PLAN_FEEDBACK</code> warning and return <code>RefinerResponse</code>.</li>
 <li>On exception, emit <code>REFINER_FAILED</code>.</li>
 </ol>
