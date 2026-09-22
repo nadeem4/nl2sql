@@ -198,15 +198,20 @@ class SqlVisitor:
         return exp.Paren(this=node)
 
     def _visit_case(self, expr: Expr) -> exp.Case:
-        """Converts a CASE expression to sqlglot."""
+        """Converts a CASE expression to sqlglot.
+
+        A CASE branch is ``exp.If``, as sqlglot's parser builds it.
+        ``exp.When`` is MERGE's WHEN clause: used here it printed every branch
+        as ``THEN`` with nothing after it.
+        """
         when_list = []
 
         if expr.whens:
-            for w in expr.whens:
+            for w in sorted(expr.whens, key=lambda x: x.ordinal):
                 when_list.append(
-                    exp.When(
+                    exp.If(
                         this=self.visit(w.condition),
-                        then=self.visit(w.result)
+                        true=self.visit(w.result)
                     )
                 )
 

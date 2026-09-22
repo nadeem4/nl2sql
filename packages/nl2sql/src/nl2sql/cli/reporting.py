@@ -1,6 +1,4 @@
-import csv
 import json
-import statistics
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Union
 
@@ -482,215 +480,41 @@ class ConsolePresenter:
         self.console.print("\n")
         self.console.print(table)
 
-    def print_dataset_benchmark_results(
-        self,
-        results: List[Dict[str, Any]],
-        iterations: int = 1,
-        routing_only: bool = False,
-    ) -> None:
-        if iterations > 1:
-            self._print_pass_k_table(results, iterations)
-        else:
-            self._print_standard_table(results, routing_only)
-
-    def _print_pass_k_table(self, results: List[Dict[str, Any]], iterations: int) -> None:
-        grouped = {}
-        for r in results:
-            qid = r["id"]
-            if qid not in grouped:
-                grouped[qid] = []
-            grouped[qid].append(r)
-
-        table = Table(
-            title=f"Evaluation Results (Pass@{iterations})",
-            show_header=True,
-            header_style="bold magenta",
-            expand=True,
-        )
+    def print_benchmark_results(self, results: List[Dict[str, Any]], title: str = "Evaluation Results") -> None:
+        """One row per (question, role) run: expected outcome, status and why."""
+        styles = {"pass": "green", "fail": "red", "skip": "yellow", "xfail": "magenta"}
+        table = Table(title=title, show_header=True, header_style="bold magenta", expand=True)
         table.add_column("ID", style="cyan", no_wrap=True)
-        table.add_column("Success Rate", justify="right")
-        table.add_column("Route Stab.", justify="right")
-        table.add_column("Exec Acc.", justify="right")
-        table.add_column("Sem Acc.", justify="right")
-        table.add_column("Avg Latency", justify="right")
-        table.add_column("Errors", justify="left", overflow="ellipsis")
+        table.add_column("Role", no_wrap=True)
+        table.add_column("Expected", no_wrap=True)
+        table.add_column("Status", justify="center", no_wrap=True)
+        table.add_column("Rows", justify="right", no_wrap=True)
+        table.add_column("Reason", justify="left", overflow="fold")
 
-        for qid, runs in grouped.items():
-            n = len(runs)
-            success_count = sum(1 for r in runs if r["status"] == "PASS")
-            success_rate = (success_count / n) * 100
-
-            ds_counts = {}
-            for r in runs:
-                ds = r.get("actual_ds", "None")
-                ds_counts[ds] = ds_counts.get(ds, 0) + 1
-            most_common_ds = max(ds_counts, key=ds_counts.get)
-            stability_rate = (ds_counts[most_common_ds] / n) * 100
-
-            sql_match_count = sum(1 for r in runs if r.get("sql_match") is True)
-            exec_acc = (sql_match_count / n) * 100
-
-            sem_match_count = sum(1 for r in runs if r.get("semantic_sql_match") is True)
-            sem_acc = (sem_match_count / n) * 100
-
-            avg_latency = statistics.mean([r.get("routing_latency", 0) for r in runs])
-
-            errors_set = {r["error"] for r in runs if r.get("error")}
-            error_str = str(list(errors_set)[0]) if errors_set else "-"
-            if len(error_str) > 30:
-                error_str = error_str[:27] + "..."
-
-            sr_style = "green" if success_rate == 100 else "yellow" if success_rate >= 50 else "red"
-
-            table.add_row(
-                Text(str(qid)),
-                f"[{sr_style}]{success_rate:.0f}%[/{sr_style}]",
-                f"{stability_rate:.0f}%",
-                f"{exec_acc:.0f}%",
-                f"{sem_acc:.0f}%",
-                f"{avg_latency:.2f}s",
-                Text(error_str),
-            )
+        for r in results:
+            style = styles.get(r["status"], "white")
+            rows = "-" if r.get("rows") is None else f"{r['rows']}/{r.get('gold_rows', '-')}"
+            table.add_row(r["id"], r["role"], r["expected"], f"[{style}]{r['status'].upper()}[/{style}]",
+                          rows, Text(str(r.get("reason") or "")))
 
         self.console.print(table)
 
-    def _print_standard_table(self, results: List[Dict[str, Any]], routing_only: bool) -> None:
-        table = Table(title="Evaluation Results", show_header=True, header_style="bold magenta", expand=True)
-        table.add_column("ID", style="cyan", no_wrap=True)
-        table.add_column("Status", justify="center")
-        table.add_column("Route", justify="center")
-        table.add_column("Layer", justify="center")
-
-        if not routing_only:
-            table.add_column("SQL Match", justify="center")
-            table.add_column("Sem Match", justify="center")
-            table.add_column("Rows", justify="right")
-        else:
-            table.add_column("Got/Exp DS", justify="left")
-
-        table.add_column("Reasoning", justify="left", max_width=40, overflow="ellipsis")
-        table.add_column("L1 Score", justify="right")
-        table.add_column("Tokens", justify="right")
-        table.add_column("Latency", justify="right")
-        table.add_column("Candidates", justify="left")
-
-        for r in results:
-            status_style = "green" if r["status"] == "PASS" else "red"
-            route_icon = "YES" if r["routing_match"] else "NO"
-
-            layer_raw = r.get("routing_layer", "unknown")
-            layer_map = {"layer_1": "L1", "layer_2": "L2", "layer_3": "L3", "fallback": "FB"}
-            layer_str = layer_map.get(layer_raw, layer_raw)
-
-            cols = [r["id"], f"[{status_style}]{r['status']}[/{status_style}]", route_icon, layer_str]
-
-            if not routing_only:
-                sql_icon = "YES" if r.get("sql_match") else "NO" if r.get("sql_match") is not None else "-"
-                sem_icon = (
-                    "YES"
-                    if r.get("semantic_sql_match")
-                    else "NO"
-                    if r.get("semantic_sql_match") is not None
-                    else "-"
-                )
-
-                rows_info = f"{r.get('gen_rows', '-')} / {r.get('exp_rows', '-')}"
-                cols.extend([sql_icon, sem_icon, rows_info])
-            else:
-                ds_info = f"{r.get('actual_ds')} / {r.get('expected_ds')}"
-                cols.append(ds_info)
-
-            reasoning = r.get("routing_reasoning", "-")
-            tokens = str(r.get("routing_tokens", "-"))
-            latency_val = r.get("routing_latency", 0)
-            latency_str = f"{latency_val:.2f}s" if isinstance(latency_val, (int, float)) else "-"
-            score_val = r.get("l1_score", 0.0)
-            score_str = f"{score_val:.3f}" if isinstance(score_val, (int, float)) else "-"
-
-            candidates = r.get("candidates", [])
-            cand_str = ""
-            if candidates:
-                cand_str = ", ".join([f"{c['id']}({c['score']:.2f})" for c in candidates[:3]])
-                if len(candidates) > 3:
-                    cand_str += "..."
-
-            cols.extend([Text(str(reasoning)), score_str, tokens, latency_str, cand_str])
-
-            table.add_row(*cols)
-
+    def print_benchmark_summary(self, metrics: Dict[str, Any]) -> None:
+        """Pass/fail/skip/xfail counts per role, then the total."""
+        table = Table(title="Summary", show_header=True, header_style="bold magenta")
+        table.add_column("Role", style="cyan")
+        for outcome in ("pass", "fail", "skip", "xfail"):
+            table.add_column(outcome.upper(), justify="right")
+        rows = sorted(metrics.get("by_role", {}).items()) + [("total", metrics.get("total", {}))]
+        for role, counts in rows:
+            table.add_row(role, *(str(counts.get(o, 0)) for o in ("pass", "fail", "skip", "xfail")))
         self.console.print(table)
 
-    def print_metrics_summary(
-        self,
-        metrics: Dict[str, Any],
-        results: List[Dict[str, Any]],
-        routing_only: bool = False,
-    ) -> None:
-        routing_acc = metrics.get("routing_accuracy", 0.0)
-        self.console.print(f"\n[bold]Routing Accuracy:[/bold]   {routing_acc:.1f}%")
-
-        self.console.print("\n[bold]Routing Layer Breakdown:[/bold]")
-        layer_counts = metrics.get("layer_distribution", {})
-        layer_pcts = metrics.get("layer_percentages", {})
-
-        for layer, count in layer_counts.items():
-            pct = layer_pcts.get(layer, 0.0)
-            self.console.print(f"  - {layer.replace('_', ' ').title()}: {count} ({pct:.1f}%)")
-
-        if not routing_only:
-            sql_acc = metrics.get("execution_accuracy", 0.0)
-            sem_acc = metrics.get("semantic_sql_accuracy", 0.0)
-            valid_sql_rate = metrics.get("valid_sql_rate", 0.0)
-            self.console.print(f"\n[bold]Execution Accuracy:[/bold]    {sql_acc:.1f}%")
-            self.console.print(f"[bold]Semantic SQL Accuracy:[/bold] {sem_acc:.1f}%")
-            self.console.print(f"[bold]Valid SQL Rate:[/bold]        {valid_sql_rate:.1f}%")
-
-        errors = [r for r in results if r["status"] in ["ERROR", "GT_FAIL", "EXEC_FAIL", "INVALID_GT", "INVALID_SQL"]]
-        if errors:
-            unique_errors = {}
-            for e in errors:
-                unique_errors[f"{e['id']}: {e.get('error')}"] = e
-
-            self.console.print("\n[bold red]Top Errors:[/bold red]")
-            for k in list(unique_errors.keys())[:5]:
-                self.console.print(Text(k))
-
-    def export_results(self, results: List[Dict[str, Any]], path: Path) -> None:
-        export_data = []
-        for r in results:
-            item = {
-                "id": r.get("id"),
-                "question": r.get("question", ""),
-                "status": r.get("status"),
-                "generated_sql": r.get("gen_sql"),
-                "expected_sql": r.get("exp_sql"),
-                "sql_match": r.get("sql_match"),
-                "semantic_match": r.get("semantic_sql_match"),
-                "routing_match": r.get("routing_match"),
-                "datasource": r.get("actual_ds"),
-                "expected_datasource": r.get("expected_ds"),
-                "error": r.get("error"),
-            }
-            export_data.append(item)
-
-        if path.suffix.lower() == ".json":
-            with open(path, "w", encoding="utf-8") as f:
-                json.dump(export_data, f, indent=2, default=str)
-            self.console.print(f"\n[bold green]Results exported to {escape(str(path))}[/bold green]")
-        elif path.suffix.lower() == ".csv":
-            if not export_data:
-                self.console.print(f"\n[yellow]No results to export.[/yellow]")
-            else:
-                keys = export_data[0].keys()
-                with open(path, "w", newline="", encoding="utf-8") as f:
-                    writer = csv.DictWriter(f, fieldnames=keys)
-                    writer.writeheader()
-                    writer.writerows(export_data)
-                self.console.print(f"\n[bold green]Results exported to {escape(str(path))}[/bold green]")
-        else:
-            self.console.print(
-                f"\n[bold red]Unsupported export format: {escape(str(path.suffix))}. Use .json or .csv[/bold red]"
-            )
+    def export_benchmark_report(self, report: Dict[str, Any], path: Path) -> None:
+        """Writes the benchmark report as JSON."""
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(report, indent=2, default=str, ensure_ascii=False), encoding="utf-8")
+        self.console.print(f"\n[bold green]Report written to {escape(str(path))}[/bold green]")
 
     # ------------------------------------------------------------------
     # Indexing (indexing.py)

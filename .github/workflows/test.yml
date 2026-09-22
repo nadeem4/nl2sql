@@ -79,7 +79,9 @@ jobs:
       # physical validation and the local embedder -- plus tests/e2e, which
       # generates its own Chinook demo in a temp directory and drives the whole
       # graph through `nl2sql.testing.fake_llm`, an OpenAI-compatible fake, so
-      # a full question-to-answer run is covered here with no API key.
+      # a full question-to-answer run is covered here with no API key. That
+      # includes the tier 1 benchmark: every hand-written gold plan through
+      # the validator, generator and executor, once per demo role.
       - name: Run key-free integration tests
         run: pytest -m "integration and not llm"
 
