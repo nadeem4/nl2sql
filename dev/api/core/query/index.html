@@ -4189,7 +4189,7 @@ sub-query carries a capped row sample alongside its artifact reference.</p>
 | <code>natural_language</code> | <code>str</code> | yes | User query. |
 | <code>datasource_id</code> | <code>Optional[str]</code> | no | Datasource override; otherwise resolved. |
 | <code>execute</code> | <code>bool</code> | no | Whether to execute SQL against datasource. |
-| <code>user_context</code> | <code>Optional[UserContext]</code> | no | RBAC context. |</p>
+| <code>user_context</code> | <code>Optional[UserContext]</code> | no | RBAC context. Pass one with a role: omitting it currently raises a pydantic <code>ValidationError</code> (the graph state does not accept <code>None</code>), and a role the policy does not know is refused. |</p>
 <p>Returns:
 <code>QueryResult</code>, built from the pipeline graph state by <code>result_from_state</code>.</p>
 <p>Raises:

@@ -3985,7 +3985,7 @@ library. <code>pip install --group dev</code> (pip 25.1 or newer) installs the P
 <p>Start from <code>configs/datasources.example.yaml</code> and <code>configs/policies.example.json</code>.</p>
 <h2 id="run-locally">Run locally</h2>
 <p>Python API:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>python<span class="w"> </span>-c<span class="w"> </span><span class="s2">"from nl2sql import NL2SQL; print(NL2SQL().run_query('hello'))"</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>python<span class="w"> </span>-c<span class="w"> </span><span class="s2">"from nl2sql import NL2SQL, UserContext; print(NL2SQL().run_query('hello', user_context=UserContext(roles=['admin'])))"</span>
 </code></pre></div>
 <p>API service (Docker):</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>docker<span class="w"> </span>build<span class="w"> </span>-f<span class="w"> </span>packages/api/Dockerfile<span class="w"> </span>-t<span class="w"> </span>nl2sql-api<span class="w"> </span>.

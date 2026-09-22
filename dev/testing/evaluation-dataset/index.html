@@ -4984,8 +4984,10 @@ config on the same database: the change in accuracy, faithfulness (in
 percentage points) and dollars per question for tier 2, in table and column
 recall for retrieval. When the dataset, the schema or the roles changed, the
 run starts a new series and the cell says so, e.g. <code>new series (schema
-changed)</code>; a config's first run says <code>first run</code>. The README block shows the
-latest run per benchmark, database and config with the same Δ.</p>
+changed)</code>; a config's first run says <code>first run</code>. The README block has two
+headed tables, tier 2 accuracy (latest run per config and database) and then
+retrieval recall (latest run per database), with the same Δ; a benchmark with
+no recorded run says so under its heading.</p>
 <h4 id="publishing">Publishing</h4>
 <p><code>nl2sql benchmark publish</code> (no key, no network), run from the repo root,
 reads every record in <code>benchmarks/&lt;kind&gt;/&lt;database&gt;/</code> and rewrites

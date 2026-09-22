@@ -4396,8 +4396,8 @@ See <a href="../../configuration/secrets/">Secrets config</a> for supported prov
 </code></pre></div>
 <p>The <code>QueryResult</code> includes <code>sub_queries</code> (each with its generated <code>sql</code>),
 <code>final_answer</code>, <code>errors</code>, <code>warnings</code>, <code>artifact_refs</code>, and a <code>trace_id</code> for
-observability. Result rows are not inlined; they live in artifact storage and are
-addressed through <code>artifact_refs</code>.</p>
+observability. Each sub-query carries a capped sample of its rows (<code>rows</code>); the
+full result set lives in artifact storage and is addressed through <code>artifact_refs</code>.</p>
 <p>A repeated question reuses its validated plan from the plan cache (no planner
 call, same SQL and rows; still validated every time), and
 <code>sub_query.plan_source</code> says <code>"cache"</code>. Turn it off with

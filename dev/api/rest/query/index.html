@@ -4108,7 +4108,7 @@
 <td><code>user_context</code></td>
 <td><code>Optional[Dict[str, Any]]</code></td>
 <td>no</td>
-<td>RBAC context payload.</td>
+<td>RBAC context payload, e.g. <code>{"roles": ["admin"]}</code>. Send one: a request without it currently fails with HTTP 500.</td>
 </tr>
 </tbody>
 </table>

@@ -3700,6 +3700,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#interactive-docs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Interactive docs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#api-index" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4006,6 +4017,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#interactive-docs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Interactive docs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#api-index" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4092,6 +4114,12 @@ engine over HTTP. Implementation lives in <code>packages/api/src/nl2sql_api/</co
 <li>Service providers (<code>DatasourceService</code>, <code>QueryService</code>, <code>LLMService</code>,
   <code>IndexingService</code>, <code>HealthService</code>) are created per-request with the engine.</li>
 </ul>
+<h2 id="interactive-docs">Interactive docs</h2>
+<p>FastAPI serves Swagger UI at <code>/docs</code>, ReDoc at <code>/redoc</code> and the OpenAPI schema at
+<code>/openapi.json</code>, with a summary, description and tag on every route. Start the
+server from the folder holding your env file and configs:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nv">ENV</span><span class="o">=</span>demo<span class="w"> </span>nl2sql-api<span class="w"> </span>--host<span class="w"> </span><span class="m">127</span>.0.0.1<span class="w"> </span>--port<span class="w"> </span><span class="m">8000</span><span class="w">   </span><span class="c1"># then open http://localhost:8000/docs</span>
+</code></pre></div>
 <h2 id="api-index">API Index</h2>
 <table>
 <thead>
@@ -4146,7 +4174,7 @@ one environment variable of its own.</p>
 <p><code>NL2SQL_API_CORS_ORIGINS</code> is a comma-separated list of the browser origins
 allowed to call the API cross-origin. Each entry is a full origin (scheme, host
 and, if non-default, port); surrounding whitespace is ignored.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">NL2SQL_API_CORS_ORIGINS</span><span class="o">=</span><span class="s2">"https://bi.corp.example,http://localhost:3000"</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">NL2SQL_API_CORS_ORIGINS</span><span class="o">=</span><span class="s2">"https://bi.corp.example,http://localhost:3000"</span>
 </code></pre></div>
 <p>With one or more origins configured, only those origins are accepted and
 credentialed requests (cookies, <code>Authorization</code>) are permitted.</p>
