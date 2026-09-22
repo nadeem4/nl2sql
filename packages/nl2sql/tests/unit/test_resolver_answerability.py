@@ -65,7 +65,7 @@ class SpyStore:
         self.searches = []
         self.ds_ids = list(ds_ids)
 
-    def retrieve_datasource_candidates(self, query, k=5):
+    def retrieve_datasource_candidates(self, query, k=5, explain=None):
         self.searches.append(query)
         return [_doc(ds_id) for ds_id in self.ds_ids]
 
