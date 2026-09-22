@@ -3198,6 +3198,45 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#tier-2-chinook-sqlite-11-tables-64-columns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tier 2: chinook (sqlite, 11 tables / 64 columns)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Tier 2: chinook (sqlite, 11 tables / 64 columns)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#latest-per-config" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Latest per config
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#all-runs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        All runs
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#retrieval-recall-chinook-sqlite-11-tables-64-columns" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3883,6 +3922,45 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#tier-2-chinook-sqlite-11-tables-64-columns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tier 2: chinook (sqlite, 11 tables / 64 columns)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Tier 2: chinook (sqlite, 11 tables / 64 columns)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#latest-per-config" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Latest per config
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#all-runs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        All runs
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#retrieval-recall-chinook-sqlite-11-tables-64-columns" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3917,6 +3995,83 @@ Grouped by benchmark and database, newest first. "Δ vs previous" is the change 
 previous run of the same config; runs on another gold dataset (<code>@sha</code>), another schema or,
 for tier 2, other roles are not comparable and start a new series. See
 <a href="../testing/evaluation-dataset/">the evaluation dataset</a>.</p>
+<h2 id="tier-2-chinook-sqlite-11-tables-64-columns">Tier 2: chinook (sqlite, 11 tables / 64 columns)</h2>
+<h3 id="latest-per-config">Latest per config</h3>
+<table>
+<thead>
+<tr>
+<th>Config</th>
+<th>Date (UTC)</th>
+<th>Commit</th>
+<th>Accuracy</th>
+<th>Faithfulness</th>
+<th>$/question</th>
+<th>Δ vs previous</th>
+<th>Note</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>gpt-5.4</td>
+<td>2026-09-22</td>
+<td>1a8101d</td>
+<td>41.9%</td>
+<td>94.4%</td>
+<td>$0.0236</td>
+<td>first run</td>
+<td>first gpt-5.4 baseline run</td>
+</tr>
+</tbody>
+</table>
+<h3 id="all-runs">All runs</h3>
+<table>
+<thead>
+<tr>
+<th>Date (UTC)</th>
+<th>Commit</th>
+<th>Note</th>
+<th>Config</th>
+<th>Models</th>
+<th>Dataset</th>
+<th>Schema</th>
+<th>Roles</th>
+<th>Passes</th>
+<th>Accuracy</th>
+<th>Faithfulness</th>
+<th>$/question</th>
+<th>Δ vs previous</th>
+<th>Answerability P / R</th>
+<th>Tokens/question (in / cached / out)</th>
+<th>p50</th>
+<th>p95</th>
+<th>Determinism</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>2026-09-22 04:41:56</td>
+<td>1a8101d</td>
+<td>first gpt-5.4 baseline run</td>
+<td>gpt-5.4</td>
+<td>openai:gpt-5.4 (answersynthesizer, astplanner, datasourceresolver, decomposer, refiner)</td>
+<td>chinook_gold.yaml @7d104084</td>
+<td>@ceed80fe</td>
+<td>admin</td>
+<td>1</td>
+<td>41.9%</td>
+<td>94.4%</td>
+<td>$0.0236</td>
+<td>first run</td>
+<td>100.0% / 75.0%</td>
+<td>11,222 / 6,153 / 627</td>
+<td>6.62s</td>
+<td>8.96s</td>
+<td>-</td>
+<td>complete</td>
+</tr>
+</tbody>
+</table>
 <h2 id="retrieval-recall-chinook-sqlite-11-tables-64-columns">Retrieval recall: chinook (sqlite, 11 tables / 64 columns)</h2>
 <p><code>nl2sql benchmark retrieval --record</code>: the share of each answerable gold question's needed
 tables and columns that schema retrieval sends the planner, with the vector search forced on
