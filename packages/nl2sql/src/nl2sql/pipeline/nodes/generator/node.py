@@ -76,6 +76,42 @@ def _grouped(operand: exp.Expression) -> exp.Expression:
 
 _MIRRORED_JOIN = {"left": "right", "right": "left"}
 
+# Portable date parts, built as sqlglot's typed nodes so each dialect renders
+# its own spelling (``EXTRACT(YEAR FROM x)`` on Postgres, ``YEAR(x)`` on MySQL).
+_DATE_PARTS = {"YEAR": exp.Year, "MONTH": exp.Month, "DAY": exp.Day}
+_TRUNC_UNITS = {"YEAR", "MONTH", "DAY"}
+
+# SQLite has none of them and sqlglot does not translate them, so they are
+# rewritten with the functions SQLite has, keeping their meaning: a date part
+# is an integer, a truncated date is the first day of its period.
+_SQLITE_PART_FORMAT = {exp.Year: "%Y", exp.Month: "%m", exp.Day: "%d"}
+_SQLITE_TRUNC_MODIFIER = {"YEAR": "start of year", "MONTH": "start of month"}
+
+
+def _date_function(name: str, args: List[exp.Expression]) -> exp.Expression | None:
+    """The typed node for a portable date function, or None to keep it as written."""
+    if name in _DATE_PARTS and len(args) == 1:
+        return _DATE_PARTS[name](this=args[0])
+    unit = args[0].name.upper() if args and isinstance(args[0], exp.Literal) and args[0].is_string else None
+    if name == "EXTRACT" and len(args) == 2 and unit in _DATE_PARTS:
+        return _DATE_PARTS[unit](this=args[1])
+    if name == "DATE_TRUNC" and len(args) == 2 and unit in _TRUNC_UNITS:
+        return exp.TimestampTrunc(this=args[1], unit=exp.Var(this=unit))
+    return None
+
+
+def _sqlite_dates(node: exp.Expression) -> exp.Expression:
+    """Rewrites a typed date node with SQLite's STRFTIME and DATE (a ``transform`` callback)."""
+    fmt = _SQLITE_PART_FORMAT.get(type(node))
+    if fmt:
+        strftime = exp.Anonymous(this="STRFTIME", expressions=[exp.Literal.string(fmt), node.this])
+        return exp.Cast(this=strftime, to=exp.DataType.build("INTEGER"))
+    if isinstance(node, exp.TimestampTrunc):
+        modifier = _SQLITE_TRUNC_MODIFIER.get(node.unit.name.upper())
+        args = [node.this] + ([exp.Literal.string(modifier)] if modifier else [])
+        return exp.Anonymous(this="DATE", expressions=args)
+    return node
+
 
 def _table(ref: TableRef) -> exp.Table:
     """Builds a qualified, aliased table reference for the FROM clause."""
@@ -147,6 +183,9 @@ class SqlVisitor:
             return exp.Tuple(expressions=[self.visit(arg) for arg in expr.args])
 
         args = [self.visit(arg) for arg in expr.args]
+        date_node = None if expr.distinct else _date_function(str(expr.func_name).upper(), args)
+        if date_node is not None:
+            return date_node
         if expr.distinct:
             # FUNC(DISTINCT a, b), the tree sqlglot's parser builds for it.
             args = [exp.Distinct(expressions=args)]
@@ -413,5 +452,8 @@ class GeneratorNode:
             query = query.order_by(exp.Ordered(this=key.copy(), nulls_first=default_nulls_first(False, dialect)))
 
         query = query.limit(limit)
+
+        if dialect == "sqlite":
+            query = query.transform(_sqlite_dates)
 
         return query.sql(dialect=dialect)

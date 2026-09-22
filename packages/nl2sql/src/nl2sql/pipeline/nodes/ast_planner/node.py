@@ -3,7 +3,7 @@ import traceback
 from typing import Any, Dict, Optional, TYPE_CHECKING
 from langchain_core.runnables import Runnable
 
-from .prompts import PLANNER_PROMPT, PLANNER_EXAMPLES
+from .prompts import PLANNER_PROMPT, PLANNER_EXAMPLES, dialect_notes
 from .schemas import PlanModel, ASTPlannerResponse
 from nl2sql.pipeline.nodes.schema_retriever.schema import render_schema_for_prompt
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
@@ -40,9 +40,20 @@ class ASTPlannerNode:
         # validated and executed (nl2sql.pipeline.graph_utils).
         self.plan_cache = PlanCache(getattr(ctx, "schema_store", None))
         self.llm = ctx.llm_registry.get_llm(self.node_name)
+        self.ds_registry = getattr(ctx, "ds_registry", None)
 
         self.prompt = PLANNER_PROMPT
         self.chain = self.prompt | structured(self.llm, PlanModel)
+
+    def _dialect(self, datasource_id: Optional[str]) -> Optional[str]:
+        """The SQL dialect of the datasource being planned for, or None when unknown."""
+        if not datasource_id or self.ds_registry is None:
+            return None
+        try:
+            return self.ds_registry.get_dialect(datasource_id)
+        except Exception:
+            logger.warning("No dialect for datasource %s; planning without one.", datasource_id)
+            return None
 
     def _cached(self, state: SubgraphExecutionState) -> Optional[Dict[str, Any]]:
         """The update for a cache hit, or None to ask the model.
@@ -96,6 +107,7 @@ class ASTPlannerNode:
                 expected_schema = [c.model_dump() for c in state.sub_query.expected_schema]
             plan: PlanModel = self.chain.invoke(
                 {
+                    "dialect_notes": dialect_notes(self._dialect(state.sub_query.datasource_id if state.sub_query else None)),
                     "relevant_tables": relevant_tables,
                     "examples": PLANNER_EXAMPLES,
                     "feedback": feedback,

@@ -115,8 +115,16 @@ caches a stable prefix of 1,024+ tokens automatically):
 
 | Message | Content | Changes |
 | --- | --- | --- |
-| system (`PLANNER_SYSTEM_PROMPT`) | role, instructions, output contract, constraints, `PLANNER_EXAMPLES`, then `[RELEVANT_TABLES]` | only when the schema or the caller's role changes |
+| system (`PLANNER_SYSTEM_PROMPT`) | role, instructions, output contract, constraints (including the target SQL dialect), `PLANNER_EXAMPLES`, then `[RELEVANT_TABLES]` | only when the schema, the datasource or the caller's role changes |
 | human (`PLANNER_HUMAN_PROMPT`) | `[EXPECTED_SCHEMA]`, `[SEMANTIC_CONTEXT]`, `[FEEDBACK]`, `[USER_QUERY]` | every call |
+
+The constraints name the sub-query's datasource dialect (from
+`ds_registry.get_dialect`), because function names in a plan are written the
+way the target database spells them. For SQLite they also say that dates are
+text and there is no `DATE_TRUNC`, `YEAR`, `MONTH` or `EXTRACT`: a period is
+labelled with `STRFTIME('%Y', col)` or `STRFTIME('%Y-%m', col)`. The generator
+still renders those portable functions correctly if a plan uses them (see
+[GeneratorNode](generator_node.md)).
 
 The examples come before the schema so that the instructions and examples
 (about 1,300 tokens) stay cacheable even when vector retrieval picks a

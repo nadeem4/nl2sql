@@ -154,7 +154,8 @@ PLANNER_SYSTEM_PROMPT = (
     "- Do NOT hallucinate tables or columns.\n"
     "- Do NOT output text, ONLY the JSON object.\n"
     "- Use ISO 8601 dates.\n"
-    "- No extra keys beyond the schema.\n\n"
+    "- No extra keys beyond the schema.\n"
+    "{dialect_notes}\n"
 
     "[EXAMPLES]\n{examples}\n\n"
     "[RELEVANT_TABLES]\n{relevant_tables}"
@@ -167,6 +168,25 @@ PLANNER_HUMAN_PROMPT = (
     "[USER_QUERY]\n{user_query}"
 )
 
+# What the planner is told about the database it plans for. Function names in a
+# plan are written as the target database spells them, so the planner needs the
+# dialect; SQLite gets its date functions spelled out because it has none of
+# the usual ones.
+_SQLITE_NOTES = (
+    "   SQLite stores dates as text and has no DATE_TRUNC, YEAR, MONTH or EXTRACT."
+    " Group or label by a period with STRFTIME: STRFTIME('%Y', col) for a year,"
+    " STRFTIME('%Y-%m', col) for a month, STRFTIME('%Y-%m-%d', col) for a day.\n"
+)
+
+
+def dialect_notes(dialect: str | None) -> str:
+    """The [CONSTRAINTS] lines naming the target SQL dialect, empty when it is unknown."""
+    if not dialect:
+        return ""
+    notes = f"- Target SQL dialect: {dialect}. Use only functions it has.\n"
+    return notes + (_SQLITE_NOTES if dialect == "sqlite" else "")
+
+
 PLANNER_PROMPT = ChatPromptTemplate.from_messages(
     [("system", PLANNER_SYSTEM_PROMPT), ("human", PLANNER_HUMAN_PROMPT)]
-)
+).partial(dialect_notes="")
