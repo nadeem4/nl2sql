@@ -141,7 +141,7 @@ def test_an_unknown_role_is_refused_cleanly(demo_project, tmp_path):
     RBAC grants such a caller no datasource, so the resolver refuses before a
     plan exists; the validator-level refusal for the same callers is pinned in
     ``tests/unit/test_rbac_strict_refusal.py``. (The CLI cannot pass an empty
-    role list; the REST test below does.)
+    role list; through the REST API no role is a 401, see the test below.)
     """
     server, r = _ask(demo_project, tmp_path, _top_customers_rules(), "ghost", "llm.rbac-ghost.yaml")
     _text, doc = _only_trace(tmp_path)
@@ -153,8 +153,10 @@ def test_an_unknown_role_is_refused_cleanly(demo_project, tmp_path):
 
 
 @pytest.mark.e2e
-@pytest.mark.parametrize("roles", [["ghost"], []], ids=["unknown-role", "no-role"])
-def test_an_unknown_or_empty_role_list_is_refused_cleanly_through_the_api(demo_project, monkeypatch, roles):
+@pytest.mark.parametrize("role", ["ghost", ""], ids=["unknown-role", "no-role"])
+def test_an_unknown_or_empty_role_list_is_refused_cleanly_through_the_api(demo_project, monkeypatch, role):
+    """An unknown role reaches the engine and is refused; no role at all never
+    reaches it: the API's auth dependency answers 401 first."""
     from fastapi.testclient import TestClient
 
     pytest.importorskip("nl2sql_api")
@@ -167,15 +169,20 @@ def test_an_unknown_or_empty_role_list_is_refused_cleanly_through_the_api(demo_p
         monkeypatch.setenv(key, value)
     monkeypatch.setenv("ENV", "demo")
     monkeypatch.setenv("LLM_CONFIG", "configs/llm.rbac-api.yaml")
+    monkeypatch.setenv("NL2SQL_API_ROLE_HEADER", "X-NL2SQL-Role")
     reload_settings()
     try:
         with TestClient(app) as client:
-            response = client.post("/api/v1/query",
-                                   json={"natural_language": QUESTION, "user_context": {"roles": roles}})
+            response = client.post("/api/v1/query", json={"natural_language": QUESTION},
+                                   headers={"X-NL2SQL-Role": role})
     finally:
         server.stop()
         reload_settings()
 
+    if not role:
+        assert response.status_code == 401, response.text
+        assert server.calls == []
+        return
     assert response.status_code == 200, response.text
     body = response.json()
     codes = [e["error_code"] for e in body["errors"]]

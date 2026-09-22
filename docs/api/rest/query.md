@@ -10,7 +10,7 @@ Source: `packages/api/src/nl2sql_api/models/query.py`
 | `natural_language` | `str` | yes | User query. |
 | `datasource_id` | `Optional[str]` | no | Datasource override. |
 | `execute` | `bool` | no | Execute SQL against datasource (default `true`). |
-| `user_context` | `Optional[Dict[str, Any]]` | no | RBAC context payload, e.g. `{"roles": ["admin"]}`. Send one: a request without it currently fails with HTTP 500. |
+| `user_context` | `Optional[Dict[str, Any]]` | no | Ignored unless `NL2SQL_API_TRUST_BODY_ROLE=true` (local testing only); then an RBAC payload such as `{"roles": ["admin"]}`. See [Caller role](index.md#caller-role). |
 
 ### `SubQueryResponse`
 
@@ -64,7 +64,9 @@ Request model: `QueryRequest`
 Response model: `QueryResponse`
 
 Execution flow:
-- Converts `user_context` to `UserContext` when present.
+- The `get_user_context` dependency supplies the caller's `UserContext` (see
+  [Caller role](index.md#caller-role)); with no role it answers `HTTP 401`
+  before the engine runs.
 - Delegates to `engine.run_query(...)`, which returns a `QueryResult`.
 - Returns that `QueryResult` as a `QueryResponse` (its subclass); there is no field mapping.
 
@@ -76,6 +78,7 @@ Errors:
 - Pipeline failures are a normal `HTTP 200` carrying `errors`; they are not HTTP failures.
 - Genuinely unexpected failures return `HTTP 500` with a generic detail; the
   traceback is logged server-side rather than returned to the client.
+- No role for the request returns `HTTP 401` with a message naming the settings.
 - An invalid request body returns `HTTP 422` (FastAPI validation).
 
 Example response:
@@ -147,5 +150,7 @@ Example response:
 
 `packages/api/tests/test_query_routes.py` and
 `packages/api/tests/test_query_response_shape.py` cover this endpoint with FastAPI's
-`TestClient` and a stubbed engine (`get_engine` dependency override), so no
-datasource, LLM or network access is required.
+`TestClient` and a stubbed engine (`get_engine` dependency override) and a stubbed
+caller (`get_user_context` override, role `admin`), so no datasource, LLM or
+network access is required. `packages/api/tests/test_auth.py` covers the role
+sources and the 401.

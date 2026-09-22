@@ -227,14 +227,25 @@ The `nl2sql-api` package serves the engine over HTTP with FastAPI. It builds one
 ```bash
 pip install nl2sql-api
 cd nl2sql-demo                               # the configs use relative paths
-ENV=demo nl2sql-api --host 127.0.0.1 --port 8000
-# or: ENV=demo uvicorn nl2sql_api.main:app --port 8000
+ENV=demo NL2SQL_API_ROLE=admin nl2sql-api --host 127.0.0.1 --port 8000
+# or: ENV=demo NL2SQL_API_ROLE=admin uvicorn nl2sql_api.main:app --port 8000
 ```
 
 Full interactive docs at `http://localhost:8000/docs` (Swagger UI), with ReDoc
-at `/redoc` and the schema at `/openapi.json`. There is **no authentication**:
-the role comes from the request. Browser access from other origins is off unless
-listed in `NL2SQL_API_CORS_ORIGINS`.
+at `/redoc` and the schema at `/openapi.json`. Browser access from other origins
+is off unless listed in `NL2SQL_API_CORS_ORIGINS`.
+
+The API does not authenticate callers itself, and it never takes the RBAC role
+from the request body. The role comes from one of these settings, first match
+wins:
+
+| Setting | Role source |
+| --- | --- |
+| `NL2SQL_API_ROLE_HEADER=X-NL2SQL-Role` | A header set by a trusted proxy that authenticates the caller. Comma-separated values are several roles. |
+| `NL2SQL_API_ROLE=admin` | One static role for every request. |
+| `NL2SQL_API_TRUST_BODY_ROLE=true` | Dev only: `user_context` in the body. Any client can pick any role, so the server logs a warning at startup. |
+
+With none of them, `/api/v1/query` answers HTTP 401.
 
 | Method | Path | Purpose |
 | --- | --- | --- |
@@ -256,15 +267,14 @@ listed in `NL2SQL_API_CORS_ORIGINS`.
 ```bash
 curl -X POST http://localhost:8000/api/v1/query \
   -H "Content-Type: application/json" \
-  -d '{"natural_language": "How many customers are there?", "user_context": {"roles": ["admin"]}}'
+  -d '{"natural_language": "How many customers are there?"}'
 ```
 
 The response has `status`, `sub_queries` (each with `plan`, `validation`, `sql`,
 `rows`, `status` and `plan_source`), `final_answer`, `errors`, `warnings`,
 `timings`, `usage` and `trace_path`. A pipeline failure, a refusal included,
 comes back as HTTP 200 with `status: "error"` and the reason in `errors`.
-Always send `user_context` with a role: a request without it currently fails
-with HTTP 500. Reference: [REST API](docs/api/rest/index.md).
+Reference: [REST API](docs/api/rest/index.md).
 
 ## Python SDK
 
@@ -351,8 +361,10 @@ step can have its own provider and model under `agents`: `datasourceresolver`,
   `SELECT` and the generator only builds one, but the executor does not inspect
   the SQL and connections are not opened read-only on any dialect. **Give the
   engine a read-only database user.**
-- **No authentication** in the CLI, playground or REST API. The role is supplied
-  by the caller; put your own auth in front and derive the role from it.
+- **No authentication** in the CLI, playground or REST API. The CLI and
+  playground take the role from the caller. The REST API takes it from a trusted
+  proxy header or a static setting, never from the body unless a dev flag is
+  on; put your own auth in the proxy and derive the role from it.
 - `GLOBAL_TIMEOUT_SEC` bounds how long the caller waits, not how long the work
   runs; the graph runs in-process with no sandbox.
 
@@ -399,8 +411,9 @@ Known limitations:
 - The S3 and ADLS result backends have not been verified against a real service.
 - No distributed tracing: OpenTelemetry metrics only, off by default. Audit
   events are emitted only by the CLI.
-- The REST API has no authentication, and `run_query` without a `user_context`
-  raises instead of refusing.
+- The REST API does not authenticate callers: it takes the role from a trusted
+  proxy header or a static setting. `run_query` without a `user_context` raises
+  instead of refusing.
 
 Roadmap: using the engine on your own database (bring-your-own-database setup
 beyond the Chinook demo) is planned. The `setup` wizard and the adapters exist,

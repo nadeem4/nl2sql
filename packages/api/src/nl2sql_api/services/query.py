@@ -6,11 +6,8 @@ class QueryService:
     def __init__(self, engine: NL2SQL):
         self.engine = engine
 
-    def execute_query(self, request: QueryRequest) -> QueryResponse:
-        user_context = None
-        if request.user_context:
-            user_context = UserContext(**request.user_context)
-
+    def execute_query(self, request: QueryRequest, user_context: UserContext) -> QueryResponse:
+        """Run the question as ``user_context``, which the auth dependency supplies."""
         result = self.engine.run_query(
             request.natural_language,
             datasource_id=request.datasource_id,

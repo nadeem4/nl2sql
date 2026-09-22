@@ -37,8 +37,11 @@ docker run --rm -p 8000:8000 nl2sql-api
 To set environment selection:
 
 ```bash
-docker run --rm -p 8000:8000 -e ENV=demo nl2sql-api
+docker run --rm -p 8000:8000 -e ENV=demo -e NL2SQL_API_ROLE=admin nl2sql-api
 ```
+
+`NL2SQL_API_ROLE` pins the RBAC role for every request; without a role setting
+the query route answers HTTP 401. See [Caller role](../api/rest/index.md#caller-role).
 
 ## Configuration
 

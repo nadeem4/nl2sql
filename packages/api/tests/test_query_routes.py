@@ -74,7 +74,6 @@ def test_execute_query_forwards_request_options(api_client):
             "natural_language": "revenue by region",
             "datasource_id": "warehouse",
             "execute": False,
-            "user_context": {"user_id": "u-1"},
         },
     )
 
@@ -82,7 +81,8 @@ def test_execute_query_forwards_request_options(api_client):
     assert call["natural_language"] == "revenue by region"
     assert call["datasource_id"] == "warehouse"
     assert call["execute"] is False
-    assert call["user_context"].user_id == "u-1"
+    # The role comes from the auth dependency (stubbed to admin), not the body.
+    assert call["user_context"].roles == ["admin"]
 
 
 def test_pipeline_errors_are_a_200_response(api_client):

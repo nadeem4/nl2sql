@@ -27,6 +27,8 @@ Source: `packages/api/src/nl2sql_api/dependencies.py`
 - `get_engine(request)` returns the singleton `NL2SQL` instance.
 - Service providers (`DatasourceService`, `QueryService`, `LLMService`,
   `IndexingService`, `HealthService`) are created per-request with the engine.
+- `get_user_context(request)` (in `nl2sql_api/auth.py`) returns the caller's
+  `UserContext`; see [Caller role](#caller-role).
 
 ## Interactive docs
 
@@ -65,7 +67,7 @@ event loop.
 
 The REST API inherits all configuration from the Core engine. Beyond the runtime
 server options in `nl2sql_api.server` (`--host`, `--port`, `--reload`), it reads
-one environment variable of its own.
+these environment variables of its own.
 
 ### CORS origins
 
@@ -88,3 +90,32 @@ read once at import time, so changing it requires restarting the server.
 This setting governs the browser same-origin policy only. Non-browser clients --
 `curl`, server-side callers, the Python SDK -- do not send an `Origin` header and
 are unaffected by it; use authentication and network controls to restrict those.
+
+### Caller role
+
+The engine enforces RBAC; the API only decides which role a request carries. It
+does not authenticate callers, and it never takes the role from the request body
+unless a dev flag says so. The `get_user_context` dependency reads, first match
+wins:
+
+| Variable | Role source |
+| --- | --- |
+| `NL2SQL_API_ROLE_HEADER` | The name of a header a trusted proxy sets, e.g. `X-NL2SQL-Role`. Comma-separated values are several roles. Configure it only when the proxy authenticates the caller and overwrites the header on every request; otherwise any client can pick its own role. |
+| `NL2SQL_API_ROLE` | One static role for every request, e.g. `admin` for a single-tenant deployment or the demo. |
+| `NL2SQL_API_TRUST_BODY_ROLE` | `true` takes `user_context` from the request body, as the API did before. For local testing only: any client can choose any role. The server logs a warning at startup when it is on. |
+
+With no role from any of them, `POST /api/v1/query` answers `HTTP 401` with a
+message naming these variables; the engine never runs. The variables are read
+on each request.
+
+```bash
+# Demo: every request runs as admin.
+ENV=demo NL2SQL_API_ROLE=admin nl2sql-api --port 8000
+
+# Behind an authenticating proxy that sets X-NL2SQL-Role.
+NL2SQL_API_ROLE_HEADER=X-NL2SQL-Role nl2sql-api --port 8000
+```
+
+This is a seam, not an auth provider: to integrate one, override the
+`get_user_context` dependency (`app.dependency_overrides[get_user_context] = ...`)
+or put the provider in the proxy.
