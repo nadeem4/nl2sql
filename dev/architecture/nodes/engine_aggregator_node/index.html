@@ -2031,6 +2031,8 @@
 <ol>
 <li>Read <code>execution_dag</code> and <code>artifact_refs</code>.</li>
 <li>Invoke <code>AggregationService.execute(dag, artifact_refs)</code>.</li>
+<li>A <code>join</code>/<code>compare</code> combine resolves each join key against its frame's columns. A key written with a side or sub-query prefix (<code>right.customer</code>, <code>sq_2.customer</code>) resolves to the bare column when only that exists; an unknown key is left for polars to report.</li>
+<li>A post-combine op (<code>PolarsDuckdbEngine.post_op</code>) applies every field it carries, in SQL's order: the reshaping its <code>operation</code> names (<code>aggregate</code> groups with polars' <code>group_by</code>, <code>project</code> selects <code>expected_schema</code>), then its <code>filters</code> (after an aggregate they filter the aggregated rows, as HAVING does), its <code>order_by</code>, and its <code>limit</code>. A <code>filter</code> op with <code>order_by</code> and <code>limit</code>, as the decomposer's prompt used to show, keeps all three.</li>
 <li>Build <code>AggregatorResponse</code> with <code>terminal_results</code>.</li>
 <li>Return success reasoning.</li>
 <li>On exception, emit <code>AGGREGATOR_FAILED</code>.</li>
@@ -2092,6 +2094,7 @@
 <ul>
 <li>Fails if required artifacts are missing.</li>
 <li>No streaming or partial aggregation.</li>
+<li>Several post-combine ops on one combine group are siblings, not a chain: each reads the combine's output and is its own terminal result.</li>
 </ul>
 <hr/>
 <h2 id="related-code">Related Code</h2>

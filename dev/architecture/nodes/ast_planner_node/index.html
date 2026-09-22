@@ -2051,6 +2051,12 @@
 <ul>
 <li><code>sub_query.intent</code> (required)</li>
 <li><code>sub_query.expected_schema</code> (optional)</li>
+<li><code>sub_query.metrics</code>, <code>filters</code>, <code>group_by</code>, <code>order_by</code>, <code>limit</code>: rendered by
+  <code>semantic_context_of()</code> as compact JSON into <code>[SEMANTIC_CONTEXT]</code> (empty when
+  the sub-query has none). The system message tells the model to apply all of
+  it, filters on a metric as <code>having</code>, <code>order_by</code> as the plan's <code>order_by</code> and
+  <code>limit</code> as the plan's <code>limit</code>, and that a most/least/top-N question needs an
+  <code>order_by</code> on the ranked value and a <code>limit</code>; one example shows it.</li>
 <li><code>relevant_tables</code> (required for schema grounding)</li>
 <li><code>errors</code> (optional feedback for retries)</li>
 </ul>
@@ -2079,6 +2085,10 @@ validation and executed is reused
 (<a href="https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/pipeline/plan_cache.py"><code>pipeline/plan_cache.py</code></a>).</p>
 <ul>
 <li><strong>Key:</strong> <code>(normalised sub_query.intent, sub_query.datasource_id, sub_query.schema_version)</code>.
+  When the sub-query has an <code>order_by</code> or <code>limit</code>, they are appended to the
+  intent part (<code>... | order_by=album_count desc | limit=1</code>), so a top-1 and a
+  top-5 of the same intent are different entries while plain intents keep
+  their existing keys.
   Normalisation case-folds, collapses whitespace and strips trailing <code>.?!,;:</code>;
   the match is exact. No <code>schema_version</code>, no caching.</li>
 <li><strong>Read:</strong> only on a first attempt (<code>retry_count == 0</code> and no errors). A hit

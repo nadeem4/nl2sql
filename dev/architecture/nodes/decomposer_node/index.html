@@ -2034,10 +2034,11 @@
 <ol>
 <li>Validate resolver response; raise if no resolved datasources.</li>
 <li>Build <code>resolved_payload</code> and <code>schema_version_map</code>.</li>
-<li>Invoke LLM chain with <code>user_query</code> and resolved datasources. The prompt is two messages: the system message holds the fixed instructions and output format (cacheable), the human message holds the resolved datasources (as JSON with sorted keys) and then the question.</li>
+<li>Invoke LLM chain with <code>user_query</code> and resolved datasources. The prompt is two messages: the system message holds the fixed instructions and output format (cacheable), the human message holds the resolved datasources (as JSON with sorted keys) and then the question. A sub-query carries its own <code>filters</code> (a threshold on a metric included), <code>order_by</code> and <code>limit</code>: "the artist with the most albums" is <code>order_by album_count desc, limit 1</code>. <code>post_combine_ops</code> are only for operations across two or more combined sub-queries, and the prompt's example has none.</li>
+<li><code>fold_single_input_ops()</code> then moves every <code>filter</code>, <code>sort</code> and <code>limit</code> op on a combine group with one sub-query (used by no other group) into that sub-query: filters are appended, <code>order_by</code> terms appended, and the smallest limit kept. With one input there is nothing to combine, and left as post-combine ops they reached only the aggregated answer, never the sub-query's SQL or rows (the first gpt-5.4 tier 2 run returned every row for ten superlative and top-N questions this way). A group with an <code>aggregate</code> or <code>project</code> op is left to the aggregator.</li>
 <li>For each LLM sub‑query:</li>
 <li>Validate datasource existence and RBAC allowance.</li>
-<li>Assign deterministic ID via <code>_stable_id()</code>.</li>
+<li>Assign deterministic ID via <code>_stable_id()</code>, over the intent, metrics, filters, group_by, order_by, limit and expected schema.</li>
 <li>Attach schema version.</li>
 <li>Remap combine groups to stable sub‑query IDs.</li>
 <li>Assign deterministic IDs to post‑combine ops.</li>

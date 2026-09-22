@@ -4827,7 +4827,7 @@ under <code>configs</code>, and a <code>comparison</code>. Each config has:</p>
 </tr>
 <tr>
 <td><code>results</code></td>
-<td>one row per run: status, reason, SQL, cost, latency, tokens, retries, and <code>faithfulness</code> (<code>null</code> when no answer was written)</td>
+<td>one row per run: status, reason, SQL, cost, latency, tokens, retries, <code>faithfulness</code> (<code>null</code> when no answer was written), and <code>plans</code>: each sub-query's <code>id</code>, <code>intent</code> and <code>plan</code> (the <code>PlanModel</code> JSON the SQL was generated from, <code>null</code> if planning failed), so a wrong answer can be traced to the plan; and <code>answer</code>, the text the answer synthesizer wrote (summary, then content), which the faithfulness check read</td>
 </tr>
 </tbody>
 </table>
