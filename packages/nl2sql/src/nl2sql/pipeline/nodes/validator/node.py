@@ -10,6 +10,7 @@ from sqlglot.optimizer.qualify import qualify
 if TYPE_CHECKING:
     from nl2sql.pipeline.state import SubgraphExecutionState
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
+from nl2sql.pipeline.nodes.ast_planner.functions import ALLOWED_FUNCTIONS, is_allowed_function
 from nl2sql.pipeline.nodes.ast_planner.schemas import PlanModel, Expr
 from nl2sql.pipeline.nodes.generator.node import SqlVisitor, ordered
 from nl2sql.context import NL2SQLContext
@@ -27,6 +28,25 @@ _MAX_HINTED_COLUMNS = 15
 # It names nothing, so it reveals nothing about what exists; the table and
 # role go to the log and, through the error's details, the run trace.
 REFUSAL_MESSAGE = "You do not have permission to see the data this question requires."
+
+
+def _plan_exprs(plan: PlanModel):
+    """Every expression node in the plan, nested ones included."""
+    def walk(node: Optional[Expr]):
+        if not node:
+            return
+        yield node
+        for child in (*node.args, node.left, node.right, node.expr, node.else_expr):
+            yield from walk(child)
+        for when in node.whens:
+            yield from walk(when.condition)
+            yield from walk(when.result)
+
+    roots = [s.expr for s in plan.select_items] + [g.expr for g in plan.group_by]
+    roots += [o.expr for o in plan.order_by] + [j.condition for j in plan.joins]
+    roots += [plan.where, plan.having]
+    for root in roots:
+        yield from walk(root)
 
 
 class ValidationSqlVisitor(SqlVisitor):
@@ -417,33 +437,45 @@ class LogicalValidatorNode:
         ``COUNT(DISTINCT(x))`` only happens to parse as a distinct count;
         DISTINCT is a flag on the aggregate, not a function.
         """
-        def walk(node: Optional[Expr]):
-            if not node:
-                return
-            yield node
-            for child in (*node.args, node.left, node.right, node.expr, node.else_expr):
-                yield from walk(child)
-            for when in node.whens:
-                yield from walk(when.condition)
-                yield from walk(when.result)
-
-        roots = [s.expr for s in plan.select_items] + [g.expr for g in plan.group_by]
-        roots += [o.expr for o in plan.order_by] + [j.condition for j in plan.joins]
-        roots += [plan.where, plan.having]
-        for root in roots:
-            for node in walk(root):
-                if node.kind == "func" and str(node.func_name).strip().upper() == "DISTINCT":
-                    return PipelineError(
-                        node="logical_validator",
-                        message=(
-                            "DISTINCT is not a function. For COUNT(DISTINCT x), set "
-                            "distinct: true on the COUNT expression; for SELECT DISTINCT, "
-                            "set the plan's distinct: true."
-                        ),
-                        severity=ErrorSeverity.ERROR,
-                        error_code=ErrorCode.INVALID_PLAN_STRUCTURE,
-                    )
+        for node in _plan_exprs(plan):
+            if node.kind == "func" and str(node.func_name).strip().upper() == "DISTINCT":
+                return PipelineError(
+                    node="logical_validator",
+                    message=(
+                        "DISTINCT is not a function. For COUNT(DISTINCT x), set "
+                        "distinct: true on the COUNT expression; for SELECT DISTINCT, "
+                        "set the plan's distinct: true."
+                    ),
+                    severity=ErrorSeverity.ERROR,
+                    error_code=ErrorCode.INVALID_PLAN_STRUCTURE,
+                )
         return None
+
+    @staticmethod
+    def _unsupported_functions(plan: PlanModel) -> List[PipelineError]:
+        """Rejects every function name outside the plan language's list.
+
+        ``func_name`` is model text that becomes the function's name in the
+        SQL, so only a plain identifier naming a known read-only function is
+        let through. DISTINCT has its own, more specific message.
+        """
+        rejected: List[str] = []
+        for node in _plan_exprs(plan):
+            name = str(node.func_name or "")
+            if node.kind != "func" or name.strip().upper() == "DISTINCT" or is_allowed_function(name):
+                continue
+            if name not in rejected:
+                rejected.append(name)
+        allowed = ", ".join(sorted(ALLOWED_FUNCTIONS - {"TUPLE", "LIST"}))
+        return [
+            PipelineError(
+                node="logical_validator",
+                message=f"Function {name!r} is not supported. Use one of: {allowed}.",
+                severity=ErrorSeverity.ERROR,
+                error_code=ErrorCode.UNSUPPORTED_FUNCTION,
+            )
+            for name in rejected
+        ]
 
     def _validate_policy(self, state: SubgraphExecutionState) -> list[PipelineError]:
         """Validates that the query adheres to access control policies.
@@ -517,6 +549,7 @@ class LogicalValidatorNode:
         - Alias uniqueness.
         - Join alias validity.
         - No function named DISTINCT (it is the ``distinct`` flag).
+        - Every other function name is a known one (``ast_planner.functions``).
         - Column existence and scoping (via sqlglot's qualify optimizer).
         """
         plan: PlanModel = state.ast_planner_response.plan if state.ast_planner_response else None
@@ -560,6 +593,8 @@ class LogicalValidatorNode:
         distinct_err = self._distinct_function(plan)
         if distinct_err:
             errors.append(distinct_err)
+
+        errors.extend(self._unsupported_functions(plan))
 
         if state.sub_query and state.sub_query.expected_schema:
             expected_names = [c.name for c in state.sub_query.expected_schema if c.name]

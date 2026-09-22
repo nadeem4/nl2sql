@@ -119,6 +119,22 @@ Prevents ambiguous column resolution.
 
 ---
 
+## Plan Functions Are Known Functions
+
+### Definition
+Every `func` expression names a function from `ALLOWED_FUNCTIONS` in `nl2sql.pipeline.nodes.ast_planner.functions`, written as a plain identifier (any case).
+
+### Enforcement Points
+- `LogicalValidatorNode._unsupported_functions()` in `nl2sql.pipeline.nodes.validator.node`
+
+### Failure Behavior
+Returns `PipelineError` with `UNSUPPORTED_FUNCTION` (severity `ERROR`, so the refiner can retry).
+
+### Why It Exists
+`func_name` is model text that becomes the function's name in the SQL. Without the check, any text, including a second statement, reached the query.
+
+---
+
 ## Expected Schema Must Match Select List
 
 ### Definition

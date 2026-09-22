@@ -105,6 +105,13 @@ Side effects:
    - `_distinct_function()` rejects a `func` expr named `DISTINCT` with
      `INVALID_PLAN_STRUCTURE`: `COUNT(DISTINCT x)` is `distinct: true` on the
      COUNT expr, and `SELECT DISTINCT` is `PlanModel.distinct`.
+   - `_unsupported_functions()` rejects every other `func` name that is not a
+     plain identifier (`^[A-Za-z_][A-Za-z0-9_]*$`) naming a function in
+     `ast_planner.functions.ALLOWED_FUNCTIONS` (read-only aggregates and
+     scalar functions, any case), with `UNSUPPORTED_FUNCTION` at `ERROR`
+     severity, so the refiner retries with the list in the message.
+     `func_name` becomes the function's name in the SQL, so this is what keeps
+     model text such as `SELECT 1); DELETE FROM T; --` out of it.
    - `_validate_columns()` builds the plan's `sqlglot` tree and runs
      `qualify(..., validate_qualify_columns=True)`. On failure each distinct
      column reference is re-probed so every bad reference is reported, and
@@ -157,6 +164,7 @@ Emits `PipelineError` with:
 
 - `MISSING_PLAN`
 - `INVALID_PLAN_STRUCTURE`
+- `UNSUPPORTED_FUNCTION`
 - `SECURITY_VIOLATION`
 - `TABLE_NOT_FOUND`, `COLUMN_NOT_FOUND`
 - `JOIN_TABLE_NOT_IN_PLAN`
