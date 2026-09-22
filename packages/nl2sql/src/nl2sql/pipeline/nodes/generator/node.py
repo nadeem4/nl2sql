@@ -61,6 +61,24 @@ _BINARY_NODES = {
 }
 
 
+def _is_text(operand: exp.Expression) -> bool:
+    """Whether an operand is known to be a string: a non-numeric string literal or a concatenation.
+
+    A column's type is not known here, so ``a + b`` on two columns stays
+    addition; a ``'1.5'`` literal is a number written as a string.
+    """
+    if isinstance(operand, exp.Paren):
+        return _is_text(operand.this)
+    if isinstance(operand, exp.DPipe):
+        return True
+    if isinstance(operand, exp.Literal) and operand.is_string:
+        try:
+            float(operand.this)
+        except ValueError:
+            return True
+    return False
+
+
 def _grouped(operand: exp.Expression) -> exp.Expression:
     """Parenthesises an operand that is itself an operator.
 
@@ -176,6 +194,11 @@ class SqlVisitor:
             return exp.In(this=_grouped(left), expressions=values)
         if op == "IS NOT":
             return exp.Not(this=exp.Is(this=_grouped(left), expression=_grouped(right)))
+        # String concatenation, rendered as the dialect's own (``||``,
+        # ``CONCAT()`` or T-SQL's ``+``). ``+`` with a string operand can only
+        # mean this: SQLite would add the two as numbers and return 0.
+        if op == "||" or (op == "+" and (_is_text(left) or _is_text(right))):
+            return exp.DPipe(this=_grouped(left), expression=_grouped(right), safe=True)
 
         node = _BINARY_NODES.get(op)
         if node is None:

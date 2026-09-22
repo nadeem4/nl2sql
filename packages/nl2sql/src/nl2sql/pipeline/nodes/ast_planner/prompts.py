@@ -134,6 +134,7 @@ PLANNER_SYSTEM_PROMPT = (
     "4. Define joins using ONLY table aliases (left_alias/right_alias).\n"
     "5. Build Expr trees using:\n"
     "   literal | column | func | binary | unary | case\n"
+    "   Join strings (a full name, a label) with the binary op \"||\", never \"+\".\n"
     "6. Every list MUST contain `ordinal` fields in ascending order starting at 0.\n"
     "7. Order lists to match ordinals (0..N) exactly.\n"
     "8. For literal values on '=' or 'IN', choose values from a column's sample_values if listed.\n"
