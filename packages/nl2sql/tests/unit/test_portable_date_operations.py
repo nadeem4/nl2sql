@@ -40,7 +40,7 @@ from nl2sql.pipeline.nodes.generator.node import GeneratorNode
 from nl2sql.pipeline.nodes.validator.node import LogicalValidatorNode
 from nl2sql.pipeline.state import SubgraphExecutionState
 
-CHINOOK = Path(nl2sql.__file__).resolve().parent / "cli" / "demo" / "data" / "chinook.sqlite"
+from nl2sql.datasets import CHINOOK_DB_PATH as CHINOOK
 DATE = Expr(kind="column", alias="t1", column_name="InvoiceDate")
 
 
