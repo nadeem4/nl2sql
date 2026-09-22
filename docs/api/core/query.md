@@ -104,6 +104,7 @@ result set lives in artifact storage, addressed through `artifact_refs`.
 | `rows` | `Optional[RowSample]` | no | Capped row sample; `None` when nothing executed or the artifact could not be read. |
 | `status` | `str` | no | `"success"` or `"error"` for this sub-query, from its final attempt: `"success"` when it ended with SQL and, if executed, a result; otherwise `"error"`. A retry that recovers reports `"success"`. |
 | `retry_count` | `int` | no | Plan/SQL refinement attempts made. |
+| `plan_source` | `str` | no | `"cache"` when the plan came from the plan cache (no planner LLM call; still validated, generated and executed), otherwise `"llm"`. See [Determinism → The plan cache](../../architecture/determinism.md#the-plan-cache-determinism-from-the-architecture). |
 
 ### RowSample
 
@@ -122,7 +123,8 @@ model instances for nested values):
 | --- | --- |
 | `sub_queries[].sql` | `subgraph_outputs[<id>].sql_draft` |
 | `sub_queries[].id` / `.intent` / `.datasource_id` / `.schema_version` | `subgraph_outputs[<id>].sub_query` |
-| `sub_queries[].plan` / `.validation` / `.status` / `.retry_count` | `subgraph_outputs[<id>]` |
+| `sub_queries[].plan` / `.validation` / `.status` / `.retry_count` / `.plan_source` | `subgraph_outputs[<id>]` |
+| `usage.plan_cache_hits` | count of `sub_queries[]` with `plan_source == "cache"` |
 | `sub_queries[].rows` | `artifact_store.read_result_frame(subgraph_outputs[<id>].artifact)` |
 | `final_answer` | `answer_synthesizer_response.final_answer` |
 | `errors`, `reasoning`, `warnings`, `trace_id`, `artifact_refs`, `timings`, `usage` | top-level state |
@@ -155,6 +157,7 @@ been recorded, on a timed-out or cancelled run.
 | `total` | `UsageTotals` | The whole question. |
 | `nodes` | `Dict[str, UsageTotals]` | Keyed by graph node: `decomposer`, `ast_planner`, `refiner`, `answer_synthesizer`. |
 | `calls` | `List[LLMCallUsage]` | Every model call in order, with its `node` and `model`. |
+| `plan_cache_hits` | `int` | Sub-queries whose plan came from the plan cache. A hit makes no planner call, so it adds no `ast_planner` calls or tokens; a question answered entirely from the cache has no `ast_planner` entry in `nodes`. |
 
 `UsageTotals`:
 

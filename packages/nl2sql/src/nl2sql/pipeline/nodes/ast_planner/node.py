@@ -9,6 +9,7 @@ from nl2sql.pipeline.nodes.schema_retriever.schema import render_schema_for_prom
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.common.logger import get_logger
 from nl2sql.context import NL2SQLContext
+from nl2sql.pipeline.plan_cache import PlanCache
 
 if TYPE_CHECKING:
     from nl2sql.pipeline.state import SubgraphExecutionState
@@ -34,10 +35,38 @@ class ASTPlannerNode:
             ctx (NL2SQLContext): The context of the pipeline.
         """
         self.node_name = self.__class__.__name__.lower().replace('node', '')
+        # Plans are read here and written by the sub-query wrapper once one has
+        # validated and executed (nl2sql.pipeline.graph_utils).
+        self.plan_cache = PlanCache(getattr(ctx, "schema_store", None))
         self.llm = ctx.llm_registry.get_llm(self.node_name)
 
         self.prompt = PLANNER_PROMPT
         self.chain = self.prompt | self.llm.with_structured_output(PlanModel)
+
+    def _cached(self, state: SubgraphExecutionState) -> Optional[Dict[str, Any]]:
+        """The update for a cache hit, or None to ask the model.
+
+        Only a first attempt reads the cache: a retry means this sub-query's
+        plan was just rejected, and serving the cached one again would loop.
+        """
+        if state.retry_count or state.errors:
+            return None
+        plan = self.plan_cache.get(state.sub_query)
+        if plan is None:
+            return None
+        logger.info("Plan served from the plan cache; it is validated again before use.")
+        return {
+            "ast_planner_response": ASTPlannerResponse(plan=plan, plan_source="cache"),
+            "reasoning": [
+                {
+                    "node": self.node_name,
+                    "content": [
+                        "Plan served from the plan cache (no planner LLM call); it is validated again.",
+                        f"Tables: {', '.join(t.name for t in plan.tables)}",
+                    ],
+                }
+            ],
+        }
 
     def __call__(self, state: SubgraphExecutionState) -> Dict[str, Any]:
         """Executes the planning node.
@@ -50,6 +79,10 @@ class ASTPlannerNode:
                 and any 'errors' encountered.
         """
         try:
+            cached = self._cached(state)
+            if cached is not None:
+                return cached
+
             relevant_tables = render_schema_for_prompt(state.relevant_tables)
 
             feedback = ""

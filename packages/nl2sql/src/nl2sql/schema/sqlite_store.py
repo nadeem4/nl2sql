@@ -5,6 +5,7 @@ import json
 import logging
 from pathlib import Path
 import sqlite3
+import time
 from typing import List, Optional, Tuple
 
 from nl2sql_adapter_sdk.schema import (
@@ -61,6 +62,21 @@ class SqliteSchemaStore:
             """
             CREATE INDEX IF NOT EXISTS idx_schema_snapshots_created_at
             ON schema_snapshots (datasource_id, created_at);
+            """
+        )
+        # The plan cache (nl2sql.pipeline.plan_cache): plans that validated and
+        # executed, keyed by the normalised sub-query intent, the datasource and
+        # the schema version, so a changed schema misses.
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS plan_cache (
+                question_key TEXT NOT NULL,
+                datasource_id TEXT NOT NULL,
+                schema_version TEXT NOT NULL,
+                plan_json TEXT NOT NULL,
+                created_at INTEGER NOT NULL,
+                PRIMARY KEY (question_key, datasource_id, schema_version)
+            );
             """
         )
         self._connection.commit()
@@ -206,6 +222,32 @@ class SqliteSchemaStore:
             return None
         return snapshot.metadata.tables.get(table_key)
 
+    # -- plan cache ------------------------------------------------------------
+    def get_cached_plan(self, question_key: str, datasource_id: str, schema_version: str) -> Optional[str]:
+        row = self._connection.execute(
+            """
+            SELECT plan_json FROM plan_cache
+            WHERE question_key = ? AND datasource_id = ? AND schema_version = ?;
+            """,
+            (question_key, datasource_id, schema_version),
+        ).fetchone()
+        return row[0] if row else None
+
+    def put_cached_plan(self, question_key: str, datasource_id: str, schema_version: str, plan_json: str) -> None:
+        with self._connection:
+            self._connection.execute(
+                """
+                INSERT OR REPLACE INTO plan_cache (
+                    question_key, datasource_id, schema_version, plan_json, created_at
+                ) VALUES (?, ?, ?, ?, ?);
+                """,
+                (question_key, datasource_id, schema_version, plan_json, int(time.time())),
+            )
+
+    def clear_plan_cache(self) -> int:
+        with self._connection:
+            return self._connection.execute("DELETE FROM plan_cache;").rowcount
+
     def _get_version_by_fingerprint(
         self, datasource_id: str, fingerprint: str
     ) -> Optional[str]:
@@ -242,6 +284,11 @@ class SqliteSchemaStore:
                 DELETE FROM schema_snapshots
                 WHERE datasource_id = ? AND schema_version = ?;
                 """,
+                [(datasource_id, version) for version in evicted_versions],
+            )
+            # A plan for an evicted version can never be hit again.
+            self._connection.executemany(
+                "DELETE FROM plan_cache WHERE datasource_id = ? AND schema_version = ?;",
                 [(datasource_id, version) for version in evicted_versions],
             )
 

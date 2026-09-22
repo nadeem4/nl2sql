@@ -83,11 +83,16 @@ class LLMCallUsage(BaseModel):
 
 
 class QuestionUsage(BaseModel):
-    """What one question cost: totals, per-node roll-ups and every call."""
+    """What one question cost: totals, per-node roll-ups and every call.
+
+    ``plan_cache_hits`` counts the sub-queries whose plan came from the plan
+    cache; each one made no planner call, so it adds no tokens here.
+    """
 
     total: UsageTotals = Field(default_factory=UsageTotals)
     nodes: Dict[str, UsageTotals] = Field(default_factory=dict)
     calls: List[LLMCallUsage] = Field(default_factory=list)
+    plan_cache_hits: int = 0
 
 
 def _int(value: Any) -> int:

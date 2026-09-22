@@ -366,6 +366,9 @@ def demo_command(
         proxy = RecordingProxy(upstream, resolved_key, store).start()
         _point_llm_config_at(directory, proxy.base_url, provider="openai")
         os.environ["OPENAI_API_KEY"] = os.environ.get("OPENAI_API_KEY") or "proxy"
+        # A plan served from the plan cache makes no planner call, so nothing
+        # would be recorded for replay to answer with.
+        os.environ["PLAN_CACHE_ENABLED"] = "false"
         console.print("[bold]Recording mode:[/bold] running the sample questions through the real provider.")
     elif mode == "replay":
         recordings = replay_recordings(directory)

@@ -25,6 +25,7 @@ Source: `packages/api/src/nl2sql_api/models/query.py`
 | `rows` | `Optional[Dict[str, Any]]` | no | Capped row sample (`columns`, `rows`, `total_rows`). |
 | `status` | `str` | no | `"success"` or `"error"` for this sub-query, from its final attempt: `"success"` when it ended with SQL and, if executed, a result; otherwise `"error"`. A retry that recovers reports `"success"`. |
 | `retry_count` | `int` | no | Plan/SQL refinement attempts made. |
+| `plan_source` | `str` | no | `"cache"` when the plan came from the plan cache (no planner call; still validated and executed), otherwise `"llm"`. |
 
 ### `QueryResponse`
 
@@ -41,7 +42,7 @@ Mirrors `nl2sql.api.query_api.QueryResult` field for field.
 | `artifact_refs` | `Dict[str, Dict[str, Any]]` | no | Result artifact references keyed by execution node id. |
 | `status` | `str` | no | `"success"`, `"error"` or `"plan_only"` for the run. |
 | `timings` | `Dict[str, float]` | no | Wall-clock seconds per graph node. |
-| `usage` | `QuestionUsage` | no | LLM calls, input/cached/output/reasoning tokens and model time per node (`nodes`) and for the question (`total`), plus every call (`calls`). The same model as `QueryResult.usage`; see [the core query API](../core/query.md#usage-tokens-calls-and-model-time). |
+| `usage` | `QuestionUsage` | no | LLM calls, input/cached/output/reasoning tokens and model time per node (`nodes`) and for the question (`total`), plus every call (`calls`) and the number of plans served from the plan cache (`plan_cache_hits`). The same model as `QueryResult.usage`; see [the core query API](../core/query.md#usage-tokens-calls-and-model-time). |
 | `trace_path` | `Optional[str]` | no | Where the run's trace file was written on the server, or `null`. See [Debugging a Run](../../observability/debugging.md). |
 
 Only a capped sample of the rows is inlined, in `sub_queries[].rows`. The full
@@ -92,7 +93,8 @@ Example response:
       ],
       "rows": {"columns": ["customer", "revenue"], "rows": [["acme", 42]], "total_rows": 5},
       "status": "success",
-      "retry_count": 0
+      "retry_count": 0,
+      "plan_source": "llm"
     }
   ],
   "final_answer": {
@@ -129,7 +131,8 @@ Example response:
       {"node": "decomposer", "model": "gpt-4o-2024-08-06", "input_tokens": 1900, "cached_input_tokens": 0,
        "cache_write_input_tokens": 0, "output_tokens": 250, "reasoning_tokens": 0, "total_tokens": 2150,
        "latency_s": 1.3, "cost": null, "usage_reported": true, "error": null}
-    ]
+    ],
+    "plan_cache_hits": 0
   }
 }
 ```

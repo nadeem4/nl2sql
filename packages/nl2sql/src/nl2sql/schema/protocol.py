@@ -91,3 +91,13 @@ class SchemaStore(Protocol):
         table_key: str,
     ) -> Optional[TableMetadata]:
         ...
+
+    # The plan cache (nl2sql.pipeline.plan_cache) lives beside the snapshots.
+    def get_cached_plan(self, question_key: str, datasource_id: str, schema_version: str) -> Optional[str]:
+        ...
+
+    def put_cached_plan(self, question_key: str, datasource_id: str, schema_version: str, plan_json: str) -> None:
+        ...
+
+    def clear_plan_cache(self) -> int:
+        ...

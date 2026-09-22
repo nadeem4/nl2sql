@@ -112,6 +112,13 @@ named a column that does not exist; long values shortened here):
   `llm.configured` shows it as `null`. `model` is the model the provider says
   answered, per call, so per-node models show up per node in `llm.by_node`.
 
+- **Plan cache hits.** When a sub-query's plan came from the plan cache, its
+  `ast_planner` entry has `outputs.ast_planner_response.plan_source: "cache"`
+  and `llm_calls: []` (zero planner tokens), and the validator, generator and
+  executor entries follow as usual. The result shows the same thing as
+  `result.sub_queries[].plan_source` and `result.usage.plan_cache_hits`. See
+  [Determinism → The plan cache](../architecture/determinism.md#the-plan-cache-determinism-from-the-architecture).
+
 The file records what happened. A sub-query's `status` reflects its final
 attempt, so one that recovers on retry reports `"success"`; the failed
 attempts stay in the node entries and in the result's `warnings`.
@@ -184,6 +191,11 @@ served. It then compares the replayed `QueryResult` with the recorded one
   attempt <n>, LLM call <k>`, with a diff of the prompt when it changed. If the
   run finishes without using a recorded call, that is reported too. This is
   information, not a crash: everything before that point ran as recorded.
+- **Plan cache.** Replay makes the LLM calls the recording made. If the
+  recorded planner called the model, replay turns the plan cache off so that
+  call is replayed rather than answered from a plan cached since. If the
+  recorded run used the cache, replay uses it too, and reports a divergence
+  (`missing`) when the cached plan has since been cleared.
 - **Exit code**: 0 when the replayed result matches the recording, 1 on a
   divergence, a different result, or a datasource that cannot be reached.
 

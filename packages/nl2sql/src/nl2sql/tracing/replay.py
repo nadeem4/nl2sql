@@ -248,6 +248,23 @@ class _AfterDivergence(logging.Filter):
         return self._playback.divergence is None
 
 
+def recorded_plan_cache_hit(doc: Dict[str, Any]) -> bool:
+    """Whether the recorded run took any plan from the plan cache.
+
+    A replay must make the LLM calls the recording made. When the recorded
+    planner called the model, the replay turns the cache off so that call is
+    replayed rather than answered from a plan cached since; when the recording
+    used the cache, the replay needs it.
+    """
+    for node in doc.get("nodes") or []:
+        if node.get("node") != "ast_planner":
+            continue
+        response = (node.get("outputs") or {}).get("ast_planner_response") or {}
+        if isinstance(response, dict) and response.get("plan_source") == "cache":
+            return True
+    return False
+
+
 def replay_trace(doc: Dict[str, Any], ctx: Any) -> ReplayReport:
     """Re-runs the traced question, answering every LLM call from the recording."""
     from nl2sql.api.query_api import result_from_state
@@ -262,9 +279,11 @@ def replay_trace(doc: Dict[str, Any], ctx: Any) -> ReplayReport:
                                **({"tenant_id": request["tenant_id"]} if request.get("tenant_id") else {}))
 
     # Retry back-off only waits; the recorded answers do not depend on it.
-    saved = {k: getattr(settings, k) for k in ("sql_agent_retry_base_delay_sec", "sql_agent_retry_jitter_sec")}
-    for k in saved:
+    saved = {k: getattr(settings, k)
+             for k in ("sql_agent_retry_base_delay_sec", "sql_agent_retry_jitter_sec", "plan_cache_enabled")}
+    for k in ("sql_agent_retry_base_delay_sec", "sql_agent_retry_jitter_sec"):
         setattr(settings, k, 0.0)
+    settings.plan_cache_enabled = saved["plan_cache_enabled"] and recorded_plan_cache_hit(doc)
     # Once the run has diverged, the nodes log the refused call as a failure with
     # a stack trace. That is the replay stopping, not a fault: the report says so.
     quiet = _AfterDivergence(playback)

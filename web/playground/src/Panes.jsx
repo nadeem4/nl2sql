@@ -261,6 +261,11 @@ export function UsagePane({ usage, timings, replay, debug, state, result }) {
           <a className="download" href={href} download={traceFileName(result)}>Download trace</a>
         </p>
       )}
+      {debug && result && (result.sub_queries || []).some((s) => s.plan_source === "cache") && (
+        <p className="trace-line" id="plan-cache-hit">
+          Plan from the plan cache: no planner call. It was validated again for this role before it ran.
+        </p>
+      )}
       {debug && !href && result && (
         <p className="trace-line">No trace file was kept for this run. Set <code>TRACE_MODE=always</code> to keep one for every run.</p>
       )}

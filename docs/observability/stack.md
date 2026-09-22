@@ -53,6 +53,11 @@ sequenceDiagram
 - `nl2sql.token.usage` (counter), attributes `node`, `model`, `datasource_id`
   and `type`: one point per LLM call for each of `input`, `cached_input`,
   `cache_write_input`, `output`, `reasoning` and `total`. Every run.
+- `nl2sql.plan_cache.lookups` (counter), attributes `result` (`hit` or `miss`)
+  and `datasource_id`: one point per plan cache lookup by the AST planner.
+  Every run with `PLAN_CACHE_ENABLED` on. The per-question view is
+  `QueryResult.usage.plan_cache_hits` and `sub_queries[].plan_source`; see
+  [Determinism → The plan cache](../architecture/determinism.md#the-plan-cache-determinism-from-the-architecture).
 
 `configure_metrics()` is called by `PipelineMonitorCallback`, so outside the CLI
 no meter provider is installed unless the embedding application installs one;

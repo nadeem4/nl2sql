@@ -222,6 +222,44 @@ def test_record_needs_a_key_even_when_ollama_is_running(tmp_path, monkeypatch):
     assert "OPENAI_API_KEY" in result.output
 
 
+def test_record_turns_the_plan_cache_off_so_every_planner_answer_is_recorded(tmp_path, monkeypatch):
+    """A cached plan makes no planner call, so replay would have nothing to answer with."""
+    from types import SimpleNamespace
+
+    from nl2sql.common.settings import settings
+
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-" + "fake-record-test")
+    monkeypatch.setattr("nl2sql.cli.commands.demo._ollama_reachable", lambda: False)
+    monkeypatch.setattr("nl2sql.cli.demo.manager.DemoManager.index_demo_data", lambda self: True)
+
+    class _Proxy:
+        base_url = "http://127.0.0.1:9/v1"
+
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def start(self):
+            return self
+
+        def stop(self):
+            pass
+
+    seen = []
+
+    class _Recorder(_StubEngine):
+        def run_query(self, *args, **kwargs):
+            seen.append(settings.plan_cache_enabled)
+            return SimpleNamespace(status="success")
+
+    monkeypatch.setattr("nl2sql.cli.commands.demo.RecordingProxy", _Proxy)
+    monkeypatch.setattr("nl2sql.cli.commands.demo._build_engine", lambda: _Recorder())
+
+    result = runner.invoke(app, ["demo", "--dir", str(tmp_path / "d"), "--no-browser", "--record"])
+
+    assert result.exit_code == 0, result.output
+    assert seen and not any(seen)
+
+
 class _StubEngine:
     """Stands in for `NL2SQL()`; the command only reads policies off it."""
 

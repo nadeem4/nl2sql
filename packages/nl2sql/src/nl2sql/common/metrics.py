@@ -21,6 +21,11 @@ token_usage_counter = _meter.create_counter(
     "(input, cached_input, cache_write_input, output, reasoning, total)",
     unit="1",
 )
+plan_cache_counter = _meter.create_counter(
+    name="nl2sql.plan_cache.lookups",
+    description="Plan cache lookups, by result (hit, miss) and datasource_id",
+    unit="1",
+)
 
 
 def configure_metrics(exporter_type: str = "none", otlp_endpoint: Optional[str] = None):

@@ -253,6 +253,12 @@ The `QueryResult` includes `sub_queries` (each with its generated `sql`),
 observability. Result rows are not inlined; they live in artifact storage and are
 addressed through `artifact_refs`.
 
+A repeated question reuses its validated plan from the plan cache (no planner
+call, same SQL and rows; still validated every time), and
+`sub_query.plan_source` says `"cache"`. Turn it off with
+`PLAN_CACHE_ENABLED=false`; empty it with `nl2sql cache clear`. See
+[Determinism → The plan cache](../architecture/determinism.md#the-plan-cache-determinism-from-the-architecture).
+
 ## Lifecycle (configure → index → query)
 
 1. Configure datasources, LLMs, and policies.

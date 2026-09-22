@@ -119,6 +119,7 @@ class InMemorySchemaStore:
     def __init__(self, max_versions: int = 3):
         self._contracts = SchemaContractStore(max_versions=max_versions)
         self._metadata = SchemaMetadataStore()
+        self._plans: Dict[Tuple[str, str, str], str] = {}
 
     def register_snapshot(self, snapshot: SchemaSnapshot) -> Tuple[str, List[str]]:
         schema_version, evicted_versions = self._contracts.register(snapshot.contract)
@@ -126,6 +127,9 @@ class InMemorySchemaStore:
 
         for evicted_version in evicted_versions:
             self._metadata.delete(snapshot.contract.datasource_id, evicted_version)
+            # A plan for an evicted version can never be hit again.
+            for key in [k for k in self._plans if k[1:] == (snapshot.contract.datasource_id, evicted_version)]:
+                del self._plans[key]
 
         return schema_version, evicted_versions
 
@@ -171,3 +175,15 @@ class InMemorySchemaStore:
         if not metadata:
             return None
         return metadata.tables.get(table_key)
+
+    # -- plan cache (see nl2sql.pipeline.plan_cache) --------------------------
+    def get_cached_plan(self, question_key: str, datasource_id: str, schema_version: str) -> Optional[str]:
+        return self._plans.get((question_key, datasource_id, schema_version))
+
+    def put_cached_plan(self, question_key: str, datasource_id: str, schema_version: str, plan_json: str) -> None:
+        self._plans[(question_key, datasource_id, schema_version)] = plan_json
+
+    def clear_plan_cache(self) -> int:
+        count = len(self._plans)
+        self._plans.clear()
+        return count

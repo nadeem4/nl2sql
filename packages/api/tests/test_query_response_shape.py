@@ -66,6 +66,19 @@ def test_query_response_carries_plan_validation_rows_status_and_timings(api_clie
     assert body["usage"]["nodes"]["ast_planner"]["cached_input_tokens"] == 7680
 
 
+def test_the_response_says_when_a_plan_came_from_the_plan_cache(api_client):
+    client, _engine = api_client(QueryResult(
+        sub_queries=[SubQueryResult(id="sq1", sql="SELECT 1", status="success", plan_source="cache")],
+        status="success",
+        usage=QuestionUsage(plan_cache_hits=1),
+    ))
+
+    body = client.post("/api/v1/query", json={"natural_language": "q"}).json()
+
+    assert body["sub_queries"][0]["plan_source"] == "cache"
+    assert body["usage"]["plan_cache_hits"] == 1
+
+
 def test_plan_only_run_reports_no_rows(api_client):
     client, _engine = api_client(
         QueryResult(
