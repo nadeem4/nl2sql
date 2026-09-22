@@ -227,3 +227,32 @@ def test_baseline_check_fails_on_an_accuracy_drop_or_a_cost_rise():
 def test_baseline_check_skips_configs_the_baseline_does_not_have():
     assert tier2.check_baseline({"configs": {"new": _board(0.1, 9)["configs"]["default"]}}, _board(0.9, 0.01),
                                 max_accuracy_drop=0.02, max_cost_increase=0.2) == []
+
+
+def test_a_record_keeps_each_sub_querys_intent_and_plan_next_to_its_sql():
+    # The first gpt-5.4 record had only the SQL, so a missing LIMIT could not be
+    # told apart from a plan that never asked for one.
+    from nl2sql.api.query_api import QueryResult, SubQueryResult
+
+    question = load_gold_dataset()[0]
+    plan = {"tables": [{"name": "Artist", "alias": "t1", "ordinal": 0}], "limit": 1}
+    result = QueryResult(sub_queries=[SubQueryResult(id="sq_a", intent="artist with most albums",
+                                                     sql="SELECT 1", plan=plan)])
+
+    record = tier2._record(question, {"id": question.id, "role": "admin", "status": "fail"}, result, 1, 0.0, 0.1)
+
+    assert record["plans"] == [{"id": "sq_a", "intent": "artist with most albums", "plan": plan}]
+    assert record["answer"] == ""
+
+
+def test_a_record_keeps_the_answer_text_the_faithfulness_check_read():
+    from nl2sql.api.query_api import QueryResult
+
+    question = load_gold_dataset()[0]
+    result = QueryResult(final_answer={"summary": "Rock leads.", "content": "1. Rock: 835"})
+
+    record = tier2._record(question, {"id": question.id, "role": "admin", "status": "fail"}, result, 1, 0.0, 0.1)
+
+    assert record["answer"] == "Rock leads.\n1. Rock: 835"
+    assert tier2._record(question, {"id": question.id, "role": "admin", "status": "fail"}, None, 1, 0.0, 0.1)[
+        "plans"] == []

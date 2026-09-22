@@ -140,6 +140,12 @@ def _record(question: GoldQuestion, row: Dict[str, Any], result: Optional[QueryR
         "tokens_by_node": {node: {f: getattr(t, f) for f in _TOKEN_FIELDS} for node, t in usage.nodes.items()},
         "timings": dict(result.timings) if result else {},
         "faithfulness": _faithfulness(question, result),
+        # Each sub-query's intent and plan next to the SQL, so a wrong answer can
+        # be traced to the plan the model wrote, and the answer the faithfulness
+        # check read, so a flagged number can be seen in place.
+        "plans": [{"id": sq.id, "intent": sq.intent, "plan": sq.plan}
+                  for sq in (result.sub_queries if result else [])],
+        "answer": answer_text(result.final_answer) if result else "",
     }
 
 

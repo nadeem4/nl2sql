@@ -307,7 +307,7 @@ under `configs`, and a `comparison`. Each config has:
 | `errors_by_code` | error codes the runs ended with (`EXCEPTION` for a run that raised) |
 | `determinism` | with `--passes` > 1: the share of questions whose SQL and rows were identical in every pass, and which ones differed |
 | `faithfulness` | [answer faithfulness](#answer-faithfulness): `faithful` of `answers` written, the `rate`, and each `unfaithful` run with what it stated that the rows do not hold |
-| `results` | one row per run: status, reason, SQL, cost, latency, tokens, retries, and `faithfulness` (`null` when no answer was written) |
+| `results` | one row per run: status, reason, SQL, cost, latency, tokens, retries, `faithfulness` (`null` when no answer was written), and `plans`: each sub-query's `id`, `intent` and `plan` (the `PlanModel` JSON the SQL was generated from, `null` if planning failed), so a wrong answer can be traced to the plan; and `answer`, the text the answer synthesizer wrote (summary, then content), which the faithfulness check read |
 
 `comparison.configs` is one row per config (accuracy, answerability, cost,
 latency, retries, determinism, faithfulness); `comparison.differences` lists
