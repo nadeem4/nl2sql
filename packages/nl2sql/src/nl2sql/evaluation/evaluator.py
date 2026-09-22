@@ -311,10 +311,15 @@ class ModelEvaluator:
         if len(row_samples) != 1:
             return "fail", f"expected one result set, got {len(row_samples)}"
         sample = row_samples[0]
-        gold = question.gold_result or []
-        if not compare(sample.rows, gold, order_matters=question.order_matters):
-            return "fail", f"rows differ from gold_result ({len(sample.rows)} rows, gold has {len(gold)})"
-        return "pass", ""
+        # The gold answer, then every reviewed alternative: any one matching passes.
+        answers = question.answers()
+        if any(compare(sample.rows, a, order_matters=question.order_matters) for a in answers):
+            return "pass", ""
+        gold = answers[0]
+        extra = len(answers) - 1
+        alternatives = f" and {extra} alternative{'s' if extra != 1 else ''}" if extra else ""
+        return "fail", (f"rows differ from gold_result{alternatives} "
+                        f"({len(sample.rows)} rows, gold has {len(gold)})")
 
     @staticmethod
     def summarize(results: List[Dict[str, Any]]) -> Dict[str, Any]:

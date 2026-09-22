@@ -289,3 +289,50 @@ def test_score_case_lenient_scores_refusals_exactly_as_strict_does():
     assert ModelEvaluator.score_case_lenient(q, "viewer", _rows_result([["USA", 13]]))[0] == "fail"
     u = _question({"admin": "unanswerable"}, gold=None)
     assert ModelEvaluator.score_case_lenient(u, "admin", NOT_ANSWERABLE) == ("pass", "")
+
+
+# --- alternative gold answers -----------------------------------------------
+
+
+def _with_alternatives(*alternatives, gold=GOLD, order_matters=True) -> GoldQuestion:
+    return GoldQuestion(
+        id="q1", question="How many customers by country?", difficulty="easy", tags=[],
+        needed_tables=["Customer"], needed_columns=[], expected={"admin": "allowed"},
+        order_matters=order_matters, gold_sql="SELECT 1", gold_result=gold,
+        alt_gold_sql=["SELECT 2"] * len(alternatives), alt_gold_result=list(alternatives),
+    )
+
+
+JOINED = [{"customer": "USA 13"}, {"customer": "Canada 8"}]
+
+
+def test_a_result_matching_an_alternative_passes_strictly():
+    q = _with_alternatives(JOINED)
+    result = _rows_result([["USA 13"], ["Canada 8"]])
+    assert ModelEvaluator.score_case(q, "admin", result) == ("pass", "")
+    assert ModelEvaluator.score_case_lenient(q, "admin", result) == ("pass", "")
+
+
+def test_any_one_of_several_alternatives_is_enough():
+    q = _with_alternatives([{"n": 1}], [{"n": 2}], gold=[{"n": 3}])
+    assert ModelEvaluator.score_case(q, "admin", _rows_result([[2]]))[0] == "pass"
+    assert ModelEvaluator.score_case(q, "admin", _rows_result([[4]]))[0] == "fail"
+
+
+def test_the_gold_answer_still_passes_when_alternatives_exist():
+    q = _with_alternatives(JOINED)
+    assert ModelEvaluator.score_case(q, "admin", _rows_result([["USA", 13], ["Canada", 8]])) == ("pass", "")
+
+
+def test_a_lenient_score_reads_the_alternatives_leniently_too():
+    # The alternative's one column, with a key column alongside it.
+    q = _with_alternatives(JOINED)
+    result = _rows_result([["USA 13", 1], ["Canada 8", 2]])
+    assert ModelEvaluator.score_case(q, "admin", result)[0] == "fail"
+    assert ModelEvaluator.score_case_lenient(q, "admin", result)[0] == "pass"
+
+
+def test_a_failure_says_how_many_answers_were_tried():
+    q = _with_alternatives(JOINED)
+    status, reason = ModelEvaluator.score_case(q, "admin", _rows_result([["nope"]]))
+    assert status == "fail" and "1 alternative" in reason

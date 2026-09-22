@@ -162,3 +162,66 @@ def test_questions_containing_from_and_where():
     words = [set(q.question.lower().replace("?", " ").split()) for q in DATASET]
     assert any("from" in w for w in words)
     assert any("where" in w for w in words)
+
+
+# --- alternative gold answers -----------------------------------------------
+
+WITH_ALTERNATIVES = [q for q in DATASET if q.alt_gold_sql]
+ALTERNATIVES = [(q, i) for q in WITH_ALTERNATIVES for i in range(len(q.alt_gold_sql))]
+
+
+def test_some_questions_carry_a_reviewed_alternative_answer():
+    assert WITH_ALTERNATIVES, "no question has an alternative gold answer"
+
+
+@pytest.mark.parametrize("q,i", ALTERNATIVES, ids=lambda v: v.id if isinstance(v, GoldQuestion) else str(v))
+def test_every_alt_gold_sql_reproduces_its_committed_result(q: GoldQuestion, i: int):
+    actual = execute_gold_sql(q.alt_gold_sql[i])
+    expected = q.alt_gold_result[i]
+    if q.order_matters:
+        assert actual == expected
+    else:
+        assert _sorted_rows(actual) == _sorted_rows(expected)
+
+
+@pytest.mark.parametrize("q,i", ALTERNATIVES, ids=lambda v: v.id if isinstance(v, GoldQuestion) else str(v))
+def test_an_alternative_answers_the_same_question_from_the_same_tables(q: GoldQuestion, i: int):
+    # An alternative is another reading or another shape of the same answer,
+    # never a question needing data the gold answer does not.
+    tree = sqlglot.parse_one(q.alt_gold_sql[i], read="sqlite")
+    ctes = {c.alias for c in tree.find_all(exp.CTE)}
+    assert {t.name for t in tree.find_all(exp.Table)} - ctes <= set(q.needed_tables), q.id
+
+
+def test_alternative_results_are_small_enough_to_read_and_never_empty():
+    for q in WITH_ALTERNATIVES:
+        for i, rows in enumerate(q.alt_gold_result):
+            assert 0 < len(rows) <= 25, f"{q.id}[{i}]"
+
+
+def test_an_alternative_never_repeats_the_gold_answer():
+    for q in WITH_ALTERNATIVES:
+        for i, rows in enumerate(q.alt_gold_result):
+            assert _sorted_rows(rows) != _sorted_rows(q.gold_result), f"{q.id}[{i}] is the gold answer again"
+
+
+def test_answers_puts_the_gold_answer_first_then_the_alternatives():
+    q = WITH_ALTERNATIVES[0]
+    assert q.answers() == [q.gold_result, *q.alt_gold_result]
+    plain = next(x for x in DATASET if not x.alt_gold_sql and x.gold_sql)
+    assert plain.answers() == [plain.gold_result]
+
+
+def test_an_alternative_without_its_generated_result_is_rejected():
+    bad = WITH_ALTERNATIVES[0].model_dump()
+    bad["alt_gold_result"] = None
+    with pytest.raises(ValueError, match="alt_gold_result"):
+        GoldQuestion.model_validate(bad)
+
+
+def test_an_unanswerable_question_cannot_carry_an_alternative():
+    bad = next(q for q in DATASET if q.gold_sql is None).model_dump()
+    bad["alt_gold_sql"] = ["SELECT 1"]
+    bad["alt_gold_result"] = [[{"x": 1}]]
+    with pytest.raises(ValueError, match="unanswerable"):
+        GoldQuestion.model_validate(bad)

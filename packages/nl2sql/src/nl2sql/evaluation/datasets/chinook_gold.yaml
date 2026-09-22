@@ -58,6 +58,20 @@
   - {FirstName: Luis, LastName: Rojas, total_spend: 46.62}
   - {FirstName: Ladislav, LastName: Kovács, total_spend: 45.62}
   - {FirstName: Hugh, LastName: O'Reilly, total_spend: 45.62}
+  alt_gold_sql:
+  - |
+    SELECT c.FirstName || ' ' || c.LastName AS customer, ROUND(SUM(i.Total), 2) AS total_spend
+    FROM Customer c
+    JOIN Invoice i ON i.CustomerId = c.CustomerId
+    GROUP BY c.CustomerId
+    ORDER BY total_spend DESC, c.CustomerId
+    LIMIT 5
+  alt_gold_result:
+  - - {customer: Helena Holý, total_spend: 49.62}
+    - {customer: Richard Cunningham, total_spend: 47.62}
+    - {customer: Luis Rojas, total_spend: 46.62}
+    - {customer: Ladislav Kovács, total_spend: 45.62}
+    - {customer: Hugh O'Reilly, total_spend: 45.62}
 
 - id: chinook_003
   question: Which artist has the most albums?
@@ -97,6 +111,18 @@
   - {year: '2011', revenue: 469.58}
   - {year: '2012', revenue: 477.53}
   - {year: '2013', revenue: 450.58}
+  alt_gold_sql:
+  - |
+    SELECT strftime('%Y-01-01', InvoiceDate) AS year, ROUND(SUM(Total), 2) AS revenue
+    FROM Invoice
+    GROUP BY year
+    ORDER BY year
+  alt_gold_result:
+  - - {year: '2009-01-01', revenue: 449.46}
+    - {year: '2010-01-01', revenue: 481.45}
+    - {year: '2011-01-01', revenue: 469.58}
+    - {year: '2012-01-01', revenue: 477.53}
+    - {year: '2013-01-01', revenue: 450.58}
 
 - id: chinook_005
   question: Which genre sells the most tracks?
@@ -173,6 +199,16 @@
   - {FirstName: Jane, LastName: Peacock, customer_count: 21}
   - {FirstName: Margaret, LastName: Park, customer_count: 20}
   - {FirstName: Steve, LastName: Johnson, customer_count: 18}
+  alt_gold_sql:
+  - |
+    SELECT e.FirstName || ' ' || e.LastName AS employee, COUNT(c.CustomerId) AS customer_count
+    FROM Employee e
+    JOIN Customer c ON c.SupportRepId = e.EmployeeId
+    GROUP BY e.EmployeeId
+    ORDER BY customer_count DESC, e.EmployeeId
+    LIMIT 1
+  alt_gold_result:
+  - - {employee: Jane Peacock, customer_count: 21}
 
 - id: chinook_008
   question: What is the longest track in each genre?
@@ -267,6 +303,24 @@
   - {month: 2013-10, revenue: 22.77}
   - {month: 2013-11, revenue: 0.99}
   - {month: 2013-12, revenue: 7.92}
+  alt_gold_sql:
+  - |
+    SELECT strftime('%Y-%m-01', i.InvoiceDate) AS month, ROUND(SUM(i.Total), 2) AS revenue
+    FROM Invoice i
+    JOIN Customer c ON c.CustomerId = i.CustomerId
+    WHERE c.Country = 'USA' AND i.InvoiceDate >= '2013-01-01' AND i.InvoiceDate < '2014-01-01'
+    GROUP BY month
+    ORDER BY month
+  alt_gold_result:
+  - - {month: '2013-02-01', revenue: 13.86}
+    - {month: '2013-04-01', revenue: 18.81}
+    - {month: '2013-05-01', revenue: 0.99}
+    - {month: '2013-07-01', revenue: 14.85}
+    - {month: '2013-08-01', revenue: 0.99}
+    - {month: '2013-09-01', revenue: 3.96}
+    - {month: '2013-10-01', revenue: 22.77}
+    - {month: '2013-11-01', revenue: 0.99}
+    - {month: '2013-12-01', revenue: 7.92}
 
 - id: chinook_011
   question: Which playlists contain tracks from more than three genres?
@@ -312,6 +366,20 @@
   - {FirstName: Luis, LastName: Rojas, total_spend: 46.62}
   - {FirstName: Ladislav, LastName: Kovács, total_spend: 45.62}
   - {FirstName: Hugh, LastName: O'Reilly, total_spend: 45.62}
+  alt_gold_sql:
+  - |
+    SELECT c.FirstName || ' ' || c.LastName AS customer, ROUND(SUM(i.Total), 2) AS total_spend
+    FROM Customer c
+    JOIN Invoice i ON i.CustomerId = c.CustomerId
+    GROUP BY c.CustomerId
+    ORDER BY total_spend DESC, c.CustomerId
+    LIMIT 5
+  alt_gold_result:
+  - - {customer: Helena Holý, total_spend: 49.62}
+    - {customer: Richard Cunningham, total_spend: 47.62}
+    - {customer: Luis Rojas, total_spend: 46.62}
+    - {customer: Ladislav Kovács, total_spend: 45.62}
+    - {customer: Hugh O'Reilly, total_spend: 45.62}
 
 - id: chinook_013
   question: Show me the five customers who have spent the most money.
@@ -334,6 +402,20 @@
   - {FirstName: Luis, LastName: Rojas, total_spend: 46.62}
   - {FirstName: Ladislav, LastName: Kovács, total_spend: 45.62}
   - {FirstName: Hugh, LastName: O'Reilly, total_spend: 45.62}
+  alt_gold_sql:
+  - |
+    SELECT c.FirstName || ' ' || c.LastName AS customer, ROUND(SUM(i.Total), 2) AS total_spend
+    FROM Customer c
+    JOIN Invoice i ON i.CustomerId = c.CustomerId
+    GROUP BY c.CustomerId
+    ORDER BY total_spend DESC, c.CustomerId
+    LIMIT 5
+  alt_gold_result:
+  - - {customer: Helena Holý, total_spend: 49.62}
+    - {customer: Richard Cunningham, total_spend: 47.62}
+    - {customer: Luis Rojas, total_spend: 46.62}
+    - {customer: Ladislav Kovács, total_spend: 45.62}
+    - {customer: Hugh O'Reilly, total_spend: 45.62}
 
 - id: chinook_014
   question: How much did we earn in each year?
@@ -355,6 +437,18 @@
   - {year: '2011', revenue: 469.58}
   - {year: '2012', revenue: 477.53}
   - {year: '2013', revenue: 450.58}
+  alt_gold_sql:
+  - |
+    SELECT strftime('%Y-01-01', InvoiceDate) AS year, ROUND(SUM(Total), 2) AS revenue
+    FROM Invoice
+    GROUP BY year
+    ORDER BY year
+  alt_gold_result:
+  - - {year: '2009-01-01', revenue: 449.46}
+    - {year: '2010-01-01', revenue: 481.45}
+    - {year: '2011-01-01', revenue: 469.58}
+    - {year: '2012-01-01', revenue: 477.53}
+    - {year: '2013-01-01', revenue: 450.58}
 
 - id: chinook_015
   question: Give me the yearly sales totals.
@@ -376,6 +470,18 @@
   - {year: '2011', revenue: 469.58}
   - {year: '2012', revenue: 477.53}
   - {year: '2013', revenue: 450.58}
+  alt_gold_sql:
+  - |
+    SELECT strftime('%Y-01-01', InvoiceDate) AS year, ROUND(SUM(Total), 2) AS revenue
+    FROM Invoice
+    GROUP BY year
+    ORDER BY year
+  alt_gold_result:
+  - - {year: '2009-01-01', revenue: 449.46}
+    - {year: '2010-01-01', revenue: 481.45}
+    - {year: '2011-01-01', revenue: 469.58}
+    - {year: '2012-01-01', revenue: 477.53}
+    - {year: '2013-01-01', revenue: 450.58}
 
 - id: chinook_016
   question: Name the artist with the largest number of albums.
@@ -484,6 +590,17 @@
   - {FirstName: Hannah, LastName: Schneider, City: Berlin}
   - {FirstName: Fynn, LastName: Zimmermann, City: Frankfurt}
   - {FirstName: Niklas, LastName: Schröder, City: Berlin}
+  alt_gold_sql:
+  - |
+    SELECT FirstName || ' ' || LastName AS customer, City
+    FROM Customer
+    WHERE Country = 'Germany'
+    ORDER BY CustomerId
+  alt_gold_result:
+  - - {customer: Leonie Köhler, City: Stuttgart}
+    - {customer: Hannah Schneider, City: Berlin}
+    - {customer: Fynn Zimmermann, City: Frankfurt}
+    - {customer: Niklas Schröder, City: Berlin}
 
 - id: chinook_022
   question: List the customers where the country is Canada, with their email addresses.
@@ -507,6 +624,21 @@
   - {FirstName: Martha, LastName: Silk, Email: marthasilk@gmail.com}
   - {FirstName: Aaron, LastName: Mitchell, Email: aaronmitchell@yahoo.ca}
   - {FirstName: Ellie, LastName: Sullivan, Email: ellie.sullivan@shaw.ca}
+  alt_gold_sql:
+  - |
+    SELECT FirstName || ' ' || LastName AS customer, Email
+    FROM Customer
+    WHERE Country = 'Canada'
+    ORDER BY CustomerId
+  alt_gold_result:
+  - - {customer: François Tremblay, Email: ftremblay@gmail.com}
+    - {customer: Mark Philips, Email: mphilips12@shaw.ca}
+    - {customer: Jennifer Peterson, Email: jenniferp@rogers.ca}
+    - {customer: Robert Brown, Email: robbrown@shaw.ca}
+    - {customer: Edward Francis, Email: edfrancis@yachoo.ca}
+    - {customer: Martha Silk, Email: marthasilk@gmail.com}
+    - {customer: Aaron Mitchell, Email: aaronmitchell@yahoo.ca}
+    - {customer: Ellie Sullivan, Email: ellie.sullivan@shaw.ca}
 
 - id: chinook_023
   question: How many tracks are on the album From The Muddy Banks Of The Wishkah [Live]?
@@ -577,6 +709,20 @@
   - {FirstName: Luis, LastName: Rojas, total_spend: 46.62}
   - {FirstName: Ladislav, LastName: Kovács, total_spend: 45.62}
   - {FirstName: Hugh, LastName: O'Reilly, total_spend: 45.62}
+  alt_gold_sql:
+  - |
+    SELECT c.FirstName || ' ' || c.LastName AS customer, ROUND(SUM(i.Total), 2) AS total_spend
+    FROM Customer c
+    JOIN Invoice i ON i.CustomerId = c.CustomerId
+    GROUP BY c.CustomerId
+    HAVING SUM(i.Total) > 45
+    ORDER BY total_spend DESC, c.CustomerId
+  alt_gold_result:
+  - - {customer: Helena Holý, total_spend: 49.62}
+    - {customer: Richard Cunningham, total_spend: 47.62}
+    - {customer: Luis Rojas, total_spend: 46.62}
+    - {customer: Ladislav Kovács, total_spend: 45.62}
+    - {customer: Hugh O'Reilly, total_spend: 45.62}
 
 - id: chinook_027
   question: How many invoices were issued in March 2010?
@@ -625,6 +771,16 @@
     LIMIT 1
   gold_result:
   - {month: 2011-04, revenue: 51.62}
+  alt_gold_sql:
+  - |
+    SELECT strftime('%Y-%m-01', InvoiceDate) AS month, ROUND(SUM(Total), 2) AS revenue
+    FROM Invoice
+    WHERE InvoiceDate >= '2011-01-01' AND InvoiceDate < '2012-01-01'
+    GROUP BY month
+    ORDER BY revenue DESC, month
+    LIMIT 1
+  alt_gold_result:
+  - - {month: '2011-04-01', revenue: 51.62}
 
 - id: chinook_030
   question: What are the top 3 countries by number of customers?
@@ -776,6 +932,14 @@
     WHERE e.FirstName = 'Jane' AND e.LastName = 'Peacock'
   gold_result:
   - {FirstName: Nancy, LastName: Edwards}
+  alt_gold_sql:
+  - |
+    SELECT m.FirstName || ' ' || m.LastName AS manager
+    FROM Employee e
+    JOIN Employee m ON m.EmployeeId = e.ReportsTo
+    WHERE e.FirstName = 'Jane' AND e.LastName = 'Peacock'
+  alt_gold_result:
+  - - {manager: Nancy Edwards}
 
 - id: chinook_037
   question: Which sales support agent brought in the most revenue from their customers?
@@ -796,6 +960,17 @@
     LIMIT 1
   gold_result:
   - {FirstName: Jane, LastName: Peacock, revenue: 833.04}
+  alt_gold_sql:
+  - |
+    SELECT e.FirstName || ' ' || e.LastName AS agent, ROUND(SUM(i.Total), 2) AS revenue
+    FROM Employee e
+    JOIN Customer c ON c.SupportRepId = e.EmployeeId
+    JOIN Invoice i ON i.CustomerId = c.CustomerId
+    GROUP BY e.EmployeeId
+    ORDER BY revenue DESC, e.EmployeeId
+    LIMIT 1
+  alt_gold_result:
+  - - {agent: Jane Peacock, revenue: 833.04}
 
 - id: chinook_038
   question: What are the five longest tracks and how long are they in minutes?
