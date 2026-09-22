@@ -1213,6 +1213,18 @@
 </a>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="../../observability/feedback/">
+<span class="md-ellipsis">
+    
+  
+    Feedback and Signals
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="../../observability/error-handling/">
 <span class="md-ellipsis">
     
@@ -2165,6 +2177,11 @@ providers. The check runs on the read path only, so the fix is simply to re-run
 <td><code>PLAN_CACHE_ENABLED</code></td>
 <td><code>true</code></td>
 <td>Reuse a plan that already passed validation and executed, for the same normalised sub-query intent, datasource and schema version, instead of calling the planner LLM. The cached plan is validated again on every use, so RBAC and policy changes still apply. Stored in the schema store (<code>SCHEMA_STORE_PATH</code>); <code>nl2sql cache clear</code> empties it. See <a href="../../architecture/determinism/#the-plan-cache-determinism-from-the-architecture">Determinism → The plan cache</a>.</td>
+</tr>
+<tr>
+<td><code>FEEDBACK_ENABLED</code></td>
+<td><code>true</code></td>
+<td>Let the playground record a thumbs up or down, with an optional note, for a run. Stored in the schema store's <code>feedback</code> table (<code>SCHEMA_STORE_PATH</code>): question, role, status, SQL, error codes, the model per node and the engine version, never result rows or sample values. Local only, like Settings. <code>nl2sql feedback clear</code> empties it. See <a href="../../observability/feedback/">Feedback and Signals</a>.</td>
 </tr>
 <tr>
 <td><code>RBAC_REFUSAL_NAMES_TABLES</code></td>

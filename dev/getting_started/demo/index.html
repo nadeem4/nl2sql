@@ -1690,6 +1690,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#rating-answers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rating answers
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -2661,6 +2672,34 @@
     
   
     Debugging a Run (Traces)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../observability/feedback/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feedback and Signals
   
 
     
@@ -4114,6 +4153,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#rating-answers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rating answers
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -4474,6 +4524,16 @@ re-ranking model; the "re-ranking" is MMR, explained in
 </ul>
 <p>A run's own retrieval is under <strong>Debug</strong>: open the <code>datasource_resolver</code> or
 <code>schema_retriever</code> row in the per-node table.</p>
+<h3 id="rating-answers">Rating answers</h3>
+<p>Below <strong>Cost &amp; time</strong>, each answer asks <strong>Was this answer right?</strong>: <strong>👍 Right</strong>
+or <strong>👎 Wrong</strong>, with an optional note (<strong>Wrong number</strong>, <strong>Wrong table</strong>,
+<strong>Wrong filter</strong>, <strong>Missing rows</strong>, or your own words). The rating is saved in
+the demo's <code>data/schema_store.db</code> with the question, role, SQL, the model per
+step and the engine version; never the rows. It is local only, like Settings:
+on a non-loopback <code>--host</code> it is off unless <code>--allow-settings</code>.
+<code>FEEDBACK_ENABLED=false</code> in <code>.env.demo</code> turns it off. Read the ratings back, with
+the refusal, retry, error and plan-cache rates, from the CLI (below). See
+<a href="../../observability/feedback/">Feedback and Signals</a>.</p>
 <h2 id="3-use-the-demo-from-the-cli">3. Use the demo from the CLI</h2>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># Run a query against the demo</span>
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>run<span class="w"> </span><span class="s2">"How many customers do we have, by country?"</span>
@@ -4507,6 +4567,17 @@ planner is not called; the playground's Debug view says "Plan from the plan
 cache". The plan is still validated for the role you ask as. To start fresh:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>cache<span class="w"> </span>clear
 </code></pre></div>
+<p>The playground's ratings, and the guardrail rates over every rated run and
+kept trace:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>feedback<span class="w"> </span>list<span class="w">               </span><span class="c1"># the ratings, newest first</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>feedback<span class="w"> </span>stats<span class="w">              </span><span class="c1"># thumbs up/down, refusals, retries, errors, plan cache</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>feedback<span class="w"> </span><span class="nb">export</span><span class="w"> </span>--good<span class="w">      </span><span class="c1"># thumbs-up runs as draft gold entries, for review</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>feedback<span class="w"> </span>clear<span class="w">              </span><span class="c1"># delete every rating</span>
+</code></pre></div>
+<p><code>export --good</code> writes <code>feedback_gold_drafts.yaml</code>, never the gold set itself. A
+person must review each draft and run <code>python -m nl2sql.evaluation.gold</code> before
+adding it; see
+<a href="../../observability/feedback/#growing-the-gold-set-nl2sql-feedback-export-good">Feedback and Signals</a>.</p>
 <p><code>nl2sql demo --record</code> turns the cache off while recording, so every planner
 answer is captured. See
 <a href="../../architecture/determinism/#the-plan-cache-determinism-from-the-architecture">Determinism → The plan cache</a>.</p>

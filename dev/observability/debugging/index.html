@@ -16,7 +16,7 @@
         <link rel="prev" href="../stack/">
       
       
-        <link rel="next" href="../error-handling/">
+        <link rel="next" href="../feedback/">
       
       
         
@@ -2632,6 +2632,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../feedback/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feedback and Signals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../error-handling/" class="md-nav__link">
         
   
@@ -4367,6 +4395,9 @@ runs the same search for any text (see the
 fetches the file from <code>GET /api/trace/{trace_id}</code>, which serves only files
 directly inside <code>TRACE_DIR</code> and rejects any id that is not a plain token, so
 <code>../</code> or an absolute path never reaches the filesystem.</p>
+<p>Below the run, <strong>Was this answer right?</strong> records a rating keyed by the same
+trace id; <code>nl2sql feedback stats</code> reads the ratings together with the traces in
+<code>TRACE_DIR</code>. See <a href="../feedback/">Feedback and Signals</a>.</p>
 
 
 
