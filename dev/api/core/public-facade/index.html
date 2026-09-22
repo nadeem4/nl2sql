@@ -3439,6 +3439,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#schema-index-and-retrieval" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Schema, index and retrieval
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#top-level-exports" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4028,6 +4039,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#schema-index-and-retrieval" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Schema, index and retrieval
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#top-level-exports" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4115,6 +4137,52 @@ modular APIs through a single class.</p>
 <code>list_llms</code>, <code>get_llm</code>, <code>index_datasource</code>, <code>index_all_datasources</code>, <code>clear_index</code>,
 <code>check_permissions</code>, <code>get_allowed_resources</code>, <code>get_current_settings</code>,
 <code>get_setting</code>, <code>validate_configuration</code>.</p>
+<h3 id="schema-index-and-retrieval">Schema, index and retrieval</h3>
+<p>What a client shows about the index, as methods on <code>NL2SQL</code> itself. The
+playground and <code>nl2sql-api</code> both use them, and neither reaches into
+<code>engine.context</code>; <code>tests/unit/test_cli_demo_boundaries.py</code> holds the playground
+to that.</p>
+<table>
+<thead>
+<tr>
+<th>method</th>
+<th>returns</th>
+<th>meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>get_schema(datasource_id)</code></td>
+<td><code>dict</code></td>
+<td>The indexed schema as the planner is given it: <code>{"datasource_id", "tables": [...]}</code>, tables sorted by name, each with <code>name</code>, <code>schema</code>, <code>row_count</code>, <code>description</code>, <code>columns</code> (<code>name</code>, <code>type</code>, <code>nullable</code>, <code>primary_key</code>, <code>description</code>) and <code>foreign_keys</code> (<code>columns</code>, <code>references_table</code>, <code>references_columns</code>). Read from the latest schema snapshot, not the database; before the first index <code>tables</code> is empty.</td>
+</tr>
+<tr>
+<td><code>index_health()</code></td>
+<td><code>dict</code></td>
+<td><code>status</code> (<code>ok</code>, <code>empty</code>, <code>stale</code>, <code>missing</code>), <code>total</code>, <code>counts</code> by entry type, <code>built_at</code>, <code>embedding_model</code>, one entry per registered datasource (<code>entries</code>, <code>index_version</code>, <code>snapshot_version</code>, <code>built_at</code>) and <code>problems</code>. <code>missing</code> when no vector store is configured.</td>
+</tr>
+<tr>
+<td><code>rebuild_index(datasource_ids=None, enrich=False, full=False, on_progress=None, switch_guard=None)</code></td>
+<td><code>RebuildResult</code></td>
+<td>Rebuilds the vector entries beside the live ones, then switches; the current entries answer questions until then. <code>enrich</code> asks the LLM for descriptions and spends tokens, so it is off by default. <code>on_progress</code> gets a sentence before each step; <code>switch_guard</code> is a context manager factory held around each switch. The result has <code>ok</code>, <code>stats</code>, <code>empty</code> and <code>errors</code>.</td>
+</tr>
+<tr>
+<td><code>inspect_retrieval(query, k=8, lambda_mult=None, types=None, datasource_id=None)</code></td>
+<td><code>dict</code></td>
+<td>One MMR search of the live index, as the engine runs it: the pool with scores, the picks in order and what was dropped. <code>types</code> limits the entry types (<code>schema.table</code>, ...). Raises <code>LookupError</code> when no vector store is configured.</td>
+</tr>
+<tr>
+<td><code>reload_llm_config(config_path)</code></td>
+<td><code>None</code></td>
+<td>Replaces every configured LLM with the file's, as one step: agents the file no longer names fall back to <code>default</code>. An invalid file leaves the current configuration in place.</td>
+</tr>
+</tbody>
+</table>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">engine</span> <span class="o">=</span> <span class="n">NL2SQL</span><span class="p">(</span><span class="n">env</span><span class="o">=</span><span class="s2">"demo"</span><span class="p">)</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="n">engine</span><span class="o">.</span><span class="n">get_schema</span><span class="p">(</span><span class="s2">"chinook"</span><span class="p">)[</span><span class="s2">"tables"</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="s2">"name"</span><span class="p">]</span>      <span class="c1"># 'Album'</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">engine</span><span class="o">.</span><span class="n">index_health</span><span class="p">()[</span><span class="s2">"status"</span><span class="p">]</span>                         <span class="c1"># 'ok'</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="n">engine</span><span class="o">.</span><span class="n">inspect_retrieval</span><span class="p">(</span><span class="s2">"top customers"</span><span class="p">,</span> <span class="n">k</span><span class="o">=</span><span class="mi">4</span><span class="p">)[</span><span class="s2">"picks"</span><span class="p">]</span>
+</code></pre></div>
 <h3 id="top-level-exports">Top-level exports</h3>
 <p>Clients import everything they need from <code>nl2sql</code> itself, never from an engine
 submodule: <code>NL2SQL</code>, <code>QueryResult</code>, <code>SubQueryResult</code>, <code>RowSample</code>,

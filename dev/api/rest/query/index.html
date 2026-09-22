@@ -4108,7 +4108,7 @@
 <td><code>user_context</code></td>
 <td><code>Optional[Dict[str, Any]]</code></td>
 <td>no</td>
-<td>RBAC context payload, e.g. <code>{"roles": ["admin"]}</code>. Send one: a request without it currently fails with HTTP 500.</td>
+<td>Ignored unless <code>NL2SQL_API_TRUST_BODY_ROLE=true</code> (local testing only); then an RBAC payload such as <code>{"roles": ["admin"]}</code>. See <a href="../#caller-role">Caller role</a>.</td>
 </tr>
 </tbody>
 </table>
@@ -4282,7 +4282,9 @@ result set is written to artifact storage and addressed through <code>artifact_r
 <p>Request model: <code>QueryRequest</code></p>
 <p>Response model: <code>QueryResponse</code></p>
 <p>Execution flow:
-- Converts <code>user_context</code> to <code>UserContext</code> when present.
+- The <code>get_user_context</code> dependency supplies the caller's <code>UserContext</code> (see
+  <a href="../#caller-role">Caller role</a>); with no role it answers <code>HTTP 401</code>
+  before the engine runs.
 - Delegates to <code>engine.run_query(...)</code>, which returns a <code>QueryResult</code>.
 - Returns that <code>QueryResult</code> as a <code>QueryResponse</code> (its subclass); there is no field mapping.</p>
 <p>The handler is declared with <code>def</code>, not <code>async def</code>: the pipeline performs blocking
@@ -4292,6 +4294,7 @@ event loop.</p>
 - Pipeline failures are a normal <code>HTTP 200</code> carrying <code>errors</code>; they are not HTTP failures.
 - Genuinely unexpected failures return <code>HTTP 500</code> with a generic detail; the
   traceback is logged server-side rather than returned to the client.
+- No role for the request returns <code>HTTP 401</code> with a message naming the settings.
 - An invalid request body returns <code>HTTP 422</code> (FastAPI validation).</p>
 <p>Example response:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="p">{</span>
@@ -4357,8 +4360,10 @@ event loop.</p>
 <h2 id="tests">Tests</h2>
 <p><code>packages/api/tests/test_query_routes.py</code> and
 <code>packages/api/tests/test_query_response_shape.py</code> cover this endpoint with FastAPI's
-<code>TestClient</code> and a stubbed engine (<code>get_engine</code> dependency override), so no
-datasource, LLM or network access is required.</p>
+<code>TestClient</code> and a stubbed engine (<code>get_engine</code> dependency override) and a stubbed
+caller (<code>get_user_context</code> override, role <code>admin</code>), so no datasource, LLM or
+network access is required. <code>packages/api/tests/test_auth.py</code> covers the role
+sources and the 401.</p>
 
 
 
