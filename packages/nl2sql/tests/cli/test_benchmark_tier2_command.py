@@ -100,6 +100,22 @@ def test_tier2_runs_each_named_config_and_writes_the_scoreboard(tmp_path):
     assert len(written) == 2 and written[0].endswith("_a.json") and written[1].endswith("_b.json")
 
 
+def test_the_scoreboard_prints_faithfulness_and_each_unfaithful_answer(tmp_path):
+    good, bad = _record("q0", "pass"), _record("q1", "pass")
+    good["faithfulness"] = {"faithful": True, "unsupported_numbers": [], "unsupported_entities": [], "checked": 2}
+    bad["faithfulness"] = {"faithful": False, "unsupported_numbers": ["1,300"], "unsupported_entities": ["Jazz"],
+                           "checked": 3}
+    board = tier2.score_config([good, bad], passes=1)
+    board.update(models={}, planned_cases=2, completed_cases=2)
+    _FakeAPI.board = {**_board(), "configs": {"a": board}, "comparison": tier2.compare({"a": board})}
+    out = runner.invoke(app, ["benchmark", "--tier", "2", "--export-path", str(tmp_path / "t2.json"),
+                              "--results-dir", str(tmp_path / "results"), "--max-cost", "5"],
+                        env={"COLUMNS": "250"})
+    assert out.exit_code == 0, out.output
+    assert "Faithful" in out.output and "50.0%" in out.output
+    assert "1,300, Jazz" in out.output
+
+
 def test_publish_writes_the_history_page_and_the_readme_block(tmp_path):
     readme = tmp_path / "README.md"
     readme.write_text("x\n<!-- BENCHMARKS:START -->\nold\n<!-- BENCHMARKS:END -->\n", encoding="utf-8")

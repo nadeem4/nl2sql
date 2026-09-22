@@ -30,6 +30,7 @@ from nl2sql.configs.llm import AgentConfig, LLMFileConfig
 from nl2sql.context import NL2SQLContext
 from nl2sql.evaluation.benchmark_runner import BenchmarkRunner
 from nl2sql.evaluation.evaluator import ModelEvaluator
+from nl2sql.evaluation.faithfulness import answer_text, check_answer
 from nl2sql.evaluation.gold import GoldQuestion
 from nl2sql.evaluation.prices import PRICES, PRICES_CHECKED_ON, ModelPrice, call_cost
 from nl2sql.evaluation.types import BenchmarkConfig
@@ -113,6 +114,17 @@ def _digest(result: Optional[QueryResult]) -> str:
     return hashlib.sha1(json.dumps(rows, default=str).encode()).hexdigest()
 
 
+def _faithfulness(question: GoldQuestion, result: Optional[QueryResult]) -> Optional[Dict[str, Any]]:
+    """The written answer checked against the rows it came from; None when no answer was written."""
+    text = answer_text(result.final_answer) if result else ""
+    if not text:
+        return None
+    samples = [sq.rows for sq in result.sub_queries if sq.rows is not None]
+    return check_answer(text, columns=[c for s in samples for c in s.columns],
+                        rows=[r for s in samples for r in s.rows], question=question.question,
+                        row_counts=[s.total_rows for s in samples])
+
+
 def _record(question: GoldQuestion, row: Dict[str, Any], result: Optional[QueryResult], pass_no: int,
             cost: float, latency: float) -> Dict[str, Any]:
     """One run's row in the scoreboard: the runner's report row plus what tier 2 measures."""
@@ -127,6 +139,7 @@ def _record(question: GoldQuestion, row: Dict[str, Any], result: Optional[QueryR
         "retries": sum(sq.retry_count for sq in (result.sub_queries if result else [])),
         "tokens_by_node": {node: {f: getattr(t, f) for f in _TOKEN_FIELDS} for node, t in usage.nodes.items()},
         "timings": dict(result.timings) if result else {},
+        "faithfulness": _faithfulness(question, result),
     }
 
 
@@ -192,6 +205,18 @@ def score_config(records: List[Dict[str, Any]], passes: int) -> Dict[str, Any]:
         determinism = {"identical": len(runs) - len(differing), "questions": len(runs),
                        "share": _share(len(runs) - len(differing), len(runs)), "differing": differing}
 
+    # Separate from accuracy: whether the written answer's numbers and names
+    # come from the rows, over every run that wrote an answer.
+    answered = [r for r in records if r.get("faithfulness")]
+    faithful = sum(r["faithfulness"]["faithful"] for r in answered)
+    faithfulness = {
+        "faithful": faithful, "answers": len(answered), "rate": _share(faithful, len(answered)),
+        "unfaithful": [{"id": r["id"], "role": r["role"], "pass": r["pass"],
+                        "unsupported_numbers": r["faithfulness"]["unsupported_numbers"],
+                        "unsupported_entities": r["faithfulness"]["unsupported_entities"]}
+                       for r in answered if not r["faithfulness"]["faithful"]],
+    }
+
     total_cost = sum(r["cost"] for r in records)
     return {
         "summary": ModelEvaluator.summarize(records),
@@ -217,6 +242,7 @@ def score_config(records: List[Dict[str, Any]], passes: int) -> Dict[str, Any]:
                     "questions_with_retries": sum(r["retries"] > 0 for r in records)},
         "errors_by_code": errors,
         "determinism": determinism,
+        "faithfulness": faithfulness,
         "results": records,
     }
 
@@ -235,7 +261,8 @@ def compare(boards: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
              "cost_total": b["cost"]["total"], "cost_per_question": b["cost"]["per_question"],
              "latency_p50": b["latency"]["question"]["p50"], "latency_p95": b["latency"]["question"]["p95"],
              "retries": b["retries"]["total"],
-             "determinism": (b["determinism"] or {}).get("share")} for name, b in boards.items()]
+             "determinism": (b["determinism"] or {}).get("share"),
+             "faithfulness": (b.get("faithfulness") or {}).get("rate")} for name, b in boards.items()]
 
     outcomes: Dict[tuple, Dict[str, List[str]]] = {}
     for name, b in boards.items():

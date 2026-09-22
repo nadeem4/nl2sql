@@ -17,6 +17,8 @@ def _rec(qid, status, pass_no=1):
             "sql": "SELECT 1", "rows": 1, "gold_rows": 1, "pass": pass_no, "tags": ["join"], "difficulty": "easy",
             "cost": 0.02, "latency_s": 1.5, "rows_digest": "d", "error_codes": [], "refused_unanswerable": False,
             "retries": 0, "timings": {},
+            "faithfulness": {"faithful": status == "pass", "unsupported_numbers": [] if status == "pass" else ["9"],
+                             "unsupported_entities": [], "checked": 1},
             "tokens_by_node": {"ast_planner": {"calls": 1, "input_tokens": 1000, "cached_input_tokens": 400,
                                                "cache_write_input_tokens": 0, "output_tokens": 100,
                                                "reasoning_tokens": 20}}}
@@ -49,6 +51,7 @@ def test_a_record_holds_when_what_on_which_data_and_the_headline_metrics():
     assert m["accuracy"] == 0.5 and m["cost_per_question"] == 0.02
     assert m["tokens_per_question"] == {"input": 1000, "cached": 400, "output": 100}
     assert m["latency_p50"] == 1.5 and m["determinism"] == 1.0
+    assert m["faithfulness"] == 0.5
     assert record["stopped"] is None and record["partial"] is False
     assert record["scoreboard"]["accuracy"]["overall"] == 0.5
 
@@ -94,6 +97,11 @@ def test_history_lists_runs_newest_first_and_the_latest_run_per_config(tmp_path)
     latest = page.split("## Latest per config")[1].split("## All runs")[0]
     assert "2026-09-20" in latest and "2026-09-19" not in latest  # gpt-5.4's newest only
     assert "50.0%" in latest and "100.0%" in latest
+    assert "| Faithfulness |" in page.split("## All runs")[0] and "| Faithfulness |" in runs
+    # A record written before faithfulness existed shows a dash.
+    old = records.load_records(tmp_path)[0]
+    del old["metrics"]["faithfulness"]
+    assert records.render_history([old])
     block = records.render_readme_block(records.load_records(tmp_path))
     assert "docs/benchmarks.md" in block and "2026-09-19" not in block
 

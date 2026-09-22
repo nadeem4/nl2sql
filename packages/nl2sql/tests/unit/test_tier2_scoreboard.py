@@ -172,6 +172,43 @@ def test_comparison_lists_each_config_and_the_questions_they_disagree_on():
     assert comparison["differences"] == [{"id": "b", "role": "admin", "outcomes": {"good": "pass", "bad": "fail"}}]
 
 
+def _faith(faithful, unsupported=()):
+    return {"faithful": faithful, "unsupported_numbers": list(unsupported), "unsupported_entities": [],
+            "checked": 1}
+
+
+def test_faithfulness_is_a_rate_over_answers_and_flags_each_unfaithful_one_without_touching_accuracy():
+    a, b, c, d = (_rec("a", "pass"), _rec("b", "pass"), _rec("c", "fail"),
+                  _rec("d", "pass", expected="unanswerable", refused_unanswerable=True))
+    a["faithfulness"], b["faithfulness"], c["faithfulness"] = _faith(True), _faith(False, ["1,300"]), _faith(True)
+    d["faithfulness"] = None  # a refusal writes no answer
+    board = tier2.score_config([a, b, c, d], passes=1)
+    assert board["faithfulness"] == {"faithful": 2, "answers": 3, "rate": pytest.approx(0.6667),
+                                     "unfaithful": [{"id": "b", "role": "admin", "pass": 1,
+                                                     "unsupported_numbers": ["1,300"], "unsupported_entities": []}]}
+    assert board["accuracy"]["overall"] == 0.75
+    assert tier2.compare({"x": board})["configs"][0]["faithfulness"] == pytest.approx(0.6667)
+
+
+def test_faithfulness_is_none_when_no_answer_was_checked():
+    board = tier2.score_config([_rec("a", "pass")], passes=1)
+    assert board["faithfulness"] == {"faithful": 0, "answers": 0, "rate": None, "unfaithful": []}
+
+
+def test_a_record_checks_the_answer_against_the_rows_it_returned():
+    from nl2sql.api.query_api import QueryResult, RowSample, SubQueryResult
+
+    question = load_gold_dataset()[0]
+    result = QueryResult(
+        sub_queries=[SubQueryResult(rows=RowSample(columns=["Genre", "Tracks"], rows=[["Rock", 1297]], total_rows=1))],
+        final_answer={"summary": "Rock has 1,300 tracks.", "content": "Rock: 1297"})
+    record = tier2._record(question, {"id": question.id, "role": "admin", "status": "pass"}, result, 1, 0.0, 0.1)
+    assert record["faithfulness"]["faithful"] is False
+    assert record["faithfulness"]["unsupported_numbers"] == ["1,300"]
+    assert tier2._record(question, {"id": question.id, "role": "admin", "status": "fail"}, None, 1, 0.0, 0.1)[
+        "faithfulness"] is None
+
+
 # --- baseline -----------------------------------------------------------------------
 
 def _board(accuracy, per_question):

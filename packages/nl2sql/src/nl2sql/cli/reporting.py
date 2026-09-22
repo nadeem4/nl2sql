@@ -533,10 +533,16 @@ class ConsolePresenter:
                  f"{board['configs'][r['config']]['planned_cases']}", pct(r["accuracy"]),
                  pct(r["answerability_precision"]), pct(r["answerability_recall"]), usd(r["cost_total"]),
                  usd(r["cost_per_question"]), sec(r["latency_p50"]), sec(r["latency_p95"]), r["retries"],
-                 pct(r["determinism"])] for r in board["comparison"]["configs"]]
+                 pct(r["determinism"]), pct(r.get("faithfulness"))] for r in board["comparison"]["configs"]]
         self.print_table(rows, title="Tier 2 scoreboard", columns=[
             "Config", "Cases", "Accuracy", "Ans. P", "Ans. R", "Cost", "$/question", "p50", "p95",
-            "Retries", "Determinism"])
+            "Retries", "Determinism", "Faithful"])
+        unfaithful = [[name, u["id"], u["role"], u["pass"], ", ".join(u["unsupported_numbers"] + u["unsupported_entities"])]
+                      for name, cfg in board["configs"].items()
+                      for u in (cfg.get("faithfulness") or {}).get("unfaithful", [])]
+        if unfaithful:
+            self.print_table(unfaithful, title="Answers stating what the rows do not hold",
+                             columns=["Config", "ID", "Role", "Pass", "Unsupported"])
         differences = board["comparison"]["differences"]
         if differences:
             names = list(board["configs"])

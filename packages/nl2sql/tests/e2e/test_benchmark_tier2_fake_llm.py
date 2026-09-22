@@ -27,6 +27,20 @@ NODE_KEY = {"datasource_resolver": "datasourceresolver", "ast_planner": "astplan
             "answer_synthesizer": "answersynthesizer"}
 
 
+def _written_answer(llm: GoldPlanLLM):
+    """A synthesizer answer written from the gold rows: the row count and the first row.
+
+    On the right rows it is faithful. On the bad server's wrong rows for
+    ``WRONG`` it names media types the rows do not hold.
+    """
+    def payload(_text):
+        gold = llm._question.gold_result or []
+        first = [f"**{v}**" if isinstance(v, str) else f"{v:,}" for v in (gold[0].values() if gold else [])]
+        text = f"There are {len(gold)} rows; the first is {', '.join(first)}."
+        return {"summary": text, "format_type": "text", "content": text, "warnings": []}
+    return payload
+
+
 def _gold_llm(wrong: bool) -> GoldPlanLLM:
     plans = load_gold_plans()
     if wrong:
@@ -34,6 +48,8 @@ def _gold_llm(wrong: bool) -> GoldPlanLLM:
     llm = GoldPlanLLM(plans)
     for rule in llm.server.rules:
         rule.usage = USAGE
+        if rule.name == "AggregatedResponse":
+            rule.payload = _written_answer(llm)
     return llm
 
 
@@ -111,8 +127,15 @@ def test_two_configs_are_scored_priced_and_compared(demo_env, servers, tmp_path)
     assert board["spent"] == pytest.approx(good_board["cost"]["total"] + bad_board["cost"]["total"])
     assert spend == sorted(spend) and spend[-1] == pytest.approx(board["spent"])
 
+    # Faithfulness is separate from accuracy: the unanswerable question writes no answer.
+    assert good_board["faithfulness"] == {"faithful": 3, "answers": 3, "rate": 1.0, "unfaithful": []}
+    assert bad_board["faithfulness"]["rate"] == pytest.approx(0.6667)
+    [unfaithful] = bad_board["faithfulness"]["unfaithful"]
+    assert unfaithful["id"] == WRONG and unfaithful["unsupported_entities"]
+
     comparison = board["comparison"]
     assert [row["config"] for row in comparison["configs"]] == ["good", "bad"]
+    assert [row["faithfulness"] for row in comparison["configs"]] == [1.0, pytest.approx(0.6667)]
     assert comparison["differences"] == [{"id": WRONG, "role": "admin", "outcomes": {"good": "pass", "bad": "fail"}}]
 
 

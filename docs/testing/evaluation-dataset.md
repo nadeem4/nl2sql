@@ -12,6 +12,7 @@ answers against.
 | `packages/nl2sql/src/nl2sql/evaluation/datasets/chinook_gold_plans.yaml` | A hand-written `PlanModel` per answerable question, for [tier 1](#tier-1-gold-plans-through-the-code-nodes) |
 | `packages/nl2sql/src/nl2sql/evaluation/tier1.py` | `load_gold_plans()`, the gold-plan fake LLM, `run_tier1()` |
 | `packages/nl2sql/src/nl2sql/evaluation/tier2.py` | [Tier 2](#tier-2-the-real-model-end-to-end): the cost cap, the scoreboard, the comparison and the baseline check |
+| `packages/nl2sql/src/nl2sql/evaluation/faithfulness.py` | [Answer faithfulness](#answer-faithfulness): the written answer's numbers and names against the rows |
 | `packages/nl2sql/src/nl2sql/evaluation/prices.py` | The dated price table tier 2 bills every call from |
 | `packages/nl2sql/src/nl2sql/evaluation/records.py` | Tier 2 result records and `nl2sql benchmark publish` |
 | `configs/benchmark/*.yaml` | Example LLM configs to compare with tier 2 |
@@ -261,25 +262,60 @@ under `configs`, and a `comparison`. Each config has:
 | `retries` | refiner retries in total, and questions that needed one |
 | `errors_by_code` | error codes the runs ended with (`EXCEPTION` for a run that raised) |
 | `determinism` | with `--passes` > 1: the share of questions whose SQL and rows were identical in every pass, and which ones differed |
-| `results` | one row per run: status, reason, SQL, cost, latency, tokens, retries |
+| `faithfulness` | [answer faithfulness](#answer-faithfulness): `faithful` of `answers` written, the `rate`, and each `unfaithful` run with what it stated that the rows do not hold |
+| `results` | one row per run: status, reason, SQL, cost, latency, tokens, retries, and `faithfulness` (`null` when no answer was written) |
 
 `comparison.configs` is one row per config (accuracy, answerability, cost,
-latency, retries, determinism); `comparison.differences` lists the questions
-the configs disagree on. The command prints the same as tables:
+latency, retries, determinism, faithfulness); `comparison.differences` lists
+the questions the configs disagree on. The command prints the same as tables:
 
 ```
                           Tier 2 scoreboard
-Config        Cases  Accuracy  Ans. P  Ans. R  Cost     $/question  p50    p95    Retries  Determinism
-gpt-5.4       8/8    100.0%    100.0%  100.0%  $0.0806  $0.0101     0.08s  0.25s  0        100.0%
-mini-helpers  8/8    75.0%     100.0%  100.0%  $0.0372  $0.0046     0.09s  0.09s  0        100.0%
+Config        Cases  Accuracy  Ans. P  Ans. R  Cost     $/question  p50    p95    Retries  Determinism  Faithful
+gpt-5.4       8/8    100.0%    100.0%  100.0%  $0.0806  $0.0101     0.08s  0.25s  0        100.0%       100.0%
+mini-helpers  8/8    75.0%     100.0%  100.0%  $0.0372  $0.0046     0.09s  0.09s  0        100.0%       85.7%
 
                   Questions the configs disagree on
 ID           Role   gpt-5.4  mini-helpers
 chinook_018  admin  pass     fail
+
+              Answers stating what the rows do not hold
+Config        ID           Role   Pass  Unsupported
+mini-helpers  chinook_018  admin  1     MPEG audio file
 ```
 
 (a run against the fake LLM, with one plan deliberately wrong on the second
 server.)
+
+### Answer faithfulness
+
+Accuracy scores the rows. The answer synthesizer then writes a sentence about
+them, and that sentence can state a number the rows do not hold while the
+rows are right. Tier 2 checks every written answer (its `summary` and
+`content`) against the rows the run returned, deterministically, with no
+model (`nl2sql/evaluation/faithfulness.py`). It never changes pass or fail.
+
+| What the answer writes | Supported when |
+| --- | --- |
+| A number: `1,297`, `1234.5`, `$523.06`, `-5` | It equals a value in the rows at the precision written (`523.1` and `523` match `523.06`; `523.60` does not), the row count, or the sum of a numeric column |
+| A percentage: `37.2%` | As above, or it is a share in the rows times 100 (`0.3718`) |
+| A number inside a text cell or the question | Always: the year of `2009-01-01`, `Symphony No. 5`, `top 5`, `in 2013` |
+| A quoted (`"Jazz"`) or bold (`**Rock**`) name | A text cell, a column name or the question contains it, or it contains a text cell |
+
+Not read as numbers: ordinals (`2nd`), list markers (`1.` at the start of a
+line), numbers glued to a word or identifier (`chinook_001`, `MPEG-4`, `#7`),
+and the month and day of a date. Names are only checked when quoted or bold,
+and bold spans with a digit, ending in `:` (`**Note:**`) or longer than six
+words are skipped, so the name check flags little it should not. `1,300` for
+`1297`, `2013` when neither the rows nor the question hold it, and a bold
+genre the rows do not list are unsupported.
+
+Each result row carries `faithfulness`: `faithful`, `unsupported_numbers` and
+`unsupported_entities` (as written) and `checked` (how many numbers and names
+were checked). A refusal or error writes no answer and is `null`. Read the
+rate with the list: an unfaithful answer is a synthesizer problem to look at,
+not a failed question. Tier 1 does not report it: its fake synthesizer writes
+the same fixed sentence for every question, with nothing to check.
 
 ### Baseline regression check
 
@@ -308,8 +344,9 @@ version and git commit, the dataset name and the sha256 of
 comparable), the config name and `provider:model` per node, the roles and
 passes, the headline metrics (accuracy, answerability precision and recall,
 dollars total and per question, input / cached / output tokens per question,
-p50 and p95 latency, determinism), `stopped` and `partial`, and the config's
-full scoreboard.
+p50 and p95 latency, determinism, answer faithfulness), `stopped` and
+`partial`, and the config's full scoreboard. `publish` shows faithfulness in
+both history tables; a record written before it existed shows `-`.
 
 `nl2sql benchmark publish` (no key, no network) reads every record and
 rewrites `docs/benchmarks.md` (every run, newest first, and the latest run per
@@ -334,6 +371,9 @@ plans with canned usage (cached and reasoning tokens included), one with a
 plan deliberately wrong. It checks the scoring, the comparison and its
 differences, the dollars against the price table, the cap stopping mid-run
 with a partial scoreboard, an unpriced model failing before any call, and two
-passes with the plan cache off. `tests/unit/test_tier2_scoreboard.py` and
+passes with the plan cache off. Its fake synthesizer writes each answer from
+the gold rows, so the good server's answers are faithful and the bad server's
+answer on its wrong rows is not. `tests/unit/test_answer_faithfulness.py`
+covers the faithfulness rules with good and bad answers. `tests/unit/test_tier2_scoreboard.py` and
 `tests/cli/test_benchmark_tier2_command.py` cover the scoreboard, the
 baseline check, the refusal to start without `--max-cost` and the exit codes.

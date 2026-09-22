@@ -5,7 +5,8 @@ Every tier 2 run writes one record per config to ``benchmarks/results/``:
 that name is taken. A record holds when the run was, on which engine and
 dataset (the gold file's sha256, so runs on different gold sets are never
 read as comparable), which model each node ran on, the headline metrics and
-the config's full scoreboard. The owner commits records.
+the config's full scoreboard (answer faithfulness included; records written
+before it existed show a dash). The owner commits records.
 
 ``publish`` reads every record and writes ``docs/benchmarks.md`` (every run,
 newest first, plus the latest run per config) and the block between the
@@ -80,6 +81,7 @@ def make_record(board: Dict[str, Any], name: str, *, recorded_at: dt.datetime, e
             "latency_p50": cfg["latency"]["question"]["p50"],
             "latency_p95": cfg["latency"]["question"]["p95"],
             "determinism": (cfg["determinism"] or {}).get("share"),
+            "faithfulness": (cfg.get("faithfulness") or {}).get("rate"),
         },
         "stopped": board["stopped"],
         "partial": bool(board["stopped"]) or cases < cfg["planned_cases"],
@@ -186,22 +188,23 @@ def render_history(recs: Sequence[Dict[str, Any]]) -> str:
         return f"{head}\n{EMPTY}\n"
     latest = _table(
         ["Config", "Dataset", "Date (UTC)", "Version", "Accuracy", "$/question", "Tokens/question (in / cached / out)",
-         "p50", "Determinism"],
+         "p50", "Determinism", "Faithfulness"],
         [[r["config"]["name"], _dataset(r), r["recorded_at"][:10], r["engine_version"],
           _pct(r["metrics"]["accuracy"]), _usd(r["metrics"]["cost_per_question"]),
           _tokens(r["metrics"]["tokens_per_question"]), _sec(r["metrics"]["latency_p50"]),
-          _pct(r["metrics"]["determinism"])] for r in _latest_per_config(recs)])
+          _pct(r["metrics"]["determinism"]), _pct(r["metrics"].get("faithfulness"))]
+         for r in _latest_per_config(recs)])
     runs = _table(
         ["Date (UTC)", "Version", "Commit", "Config", "Models", "Dataset", "Roles", "Passes", "Accuracy",
          "Answerability P / R", "$/question", "Tokens/question (in / cached / out)", "p50", "p95", "Determinism",
-         "Status"],
+         "Faithfulness", "Status"],
         [[r["recorded_at"].replace("T", " ").rstrip("Z"), r["engine_version"], (r.get("git_commit") or "-")[:8],
           r["config"]["name"], _models(r["config"]["models"]), _dataset(r), ", ".join(r["roles"] or []),
           r["passes"], _pct(r["metrics"]["accuracy"]),
           f"{_pct(r['metrics']['answerability_precision'])} / {_pct(r['metrics']['answerability_recall'])}",
           _usd(r["metrics"]["cost_per_question"]), _tokens(r["metrics"]["tokens_per_question"]),
           _sec(r["metrics"]["latency_p50"]), _sec(r["metrics"]["latency_p95"]), _pct(r["metrics"]["determinism"]),
-          _status(r)] for r in _newest_first(recs)])
+          _pct(r["metrics"].get("faithfulness")), _status(r)] for r in _newest_first(recs)])
     return f"{head}\n## Latest per config\n\n{latest}\n\n## All runs\n\n{runs}\n"
 
 
