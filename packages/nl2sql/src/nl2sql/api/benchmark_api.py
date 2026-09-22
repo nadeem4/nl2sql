@@ -15,7 +15,7 @@ import yaml
 from nl2sql.configs.llm import LLMFileConfig
 from nl2sql.context import NL2SQLContext
 from nl2sql.evaluation.benchmark_runner import BenchmarkRunner, BenchmarkResult
-from nl2sql.evaluation.gold import load_gold_dataset
+from nl2sql.evaluation.gold import dataset_datasources, load_gold_dataset
 from nl2sql.evaluation.records import database_identity
 from nl2sql.evaluation.retrieval_recall import run_retrieval_recall
 from nl2sql.evaluation.tier1 import run_tier1
@@ -93,9 +93,13 @@ class BenchmarkAPI:
         See :mod:`nl2sql.evaluation.retrieval_recall`. ``questions`` narrows
         the run to these question ids or tags. Returns the report.
         """
-        ids = select_question_ids(load_gold_dataset(config.dataset_path), questions) if questions else None
+        dataset = load_gold_dataset(config.dataset_path)
+        ids = select_question_ids(dataset, questions) if questions else None
         ctx = self._context(config)
-        return {**run_retrieval_recall(ctx, config.dataset_path, ids), "database": database_identity(ctx)}
+        # The whole dataset names the database, so narrowing the run to a few
+        # questions leaves the record's identity -- and its series -- alone.
+        return {**run_retrieval_recall(ctx, config.dataset_path, ids),
+                "database": database_identity(ctx, dataset_datasources(dataset))}
 
     def tier2_configs(
         self, config: BenchmarkConfig,
@@ -128,13 +132,13 @@ class BenchmarkAPI:
         See :mod:`nl2sql.evaluation.tier2`. ``questions`` narrows the run to
         these question ids or tags. Returns the scoreboard.
         """
+        dataset = load_gold_dataset(config.dataset_path)
         if questions:
-            ids = select_question_ids(load_gold_dataset(config.dataset_path), questions)
-            config = config.model_copy(update={"include_ids": ids})
+            config = config.model_copy(update={"include_ids": select_question_ids(dataset, questions)})
         ctx = self._context(config)
         board = run_tier2(ctx, config, llm_configs, max_cost=max_cost, passes=passes,
                           before_case=before_case, on_case=on_case)
-        return {**board, "database": database_identity(ctx)}
+        return {**board, "database": database_identity(ctx, dataset_datasources(dataset))}
 
     @staticmethod
     def _load_llm_configs(config: BenchmarkConfig) -> Dict[str, LLMFileConfig]:

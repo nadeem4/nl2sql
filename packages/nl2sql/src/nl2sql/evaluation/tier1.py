@@ -2,10 +2,11 @@
 
 Each answerable gold question has a hand-written ``PlanModel`` in
 ``datasets/chinook_gold_plans.yaml``. A local ``FakeLLMServer`` stands in for
-every LLM node: the resolver's answerability check gets ``["chinook"]`` for a
-question with gold SQL and ``[]`` for an unanswerable one, the decomposer gets
-one sub-query whose expected columns are the plan's select aliases, the
-planner gets the gold plan, and the answer synthesizer a fixed sentence.
+every LLM node: the resolver's answerability check gets the question's own
+datasource (``["chinook"]`` for this set) for a question with gold SQL and
+``[]`` for an unanswerable one, the decomposer gets one sub-query whose
+expected columns are the plan's select aliases, the planner gets the gold
+plan, and the answer synthesizer a fixed sentence.
 Everything else is the real pipeline -- the resolver's role check and
 refusal, schema retrieval, the logical validator (including RBAC), the SQL
 generator and the executor against Chinook -- and each case is scored per
@@ -31,7 +32,6 @@ from nl2sql.pipeline.nodes.ast_planner.schemas import PlanModel
 from nl2sql.testing.fake_llm import FakeLLMServer, Rule
 
 GOLD_PLANS_PATH = pathlib.Path(__file__).parent / "datasets" / "chinook_gold_plans.yaml"
-DATASOURCE_ID = "chinook"
 
 ANSWER = {"summary": "Gold plan answer.", "format_type": "text", "content": "Gold plan answer.", "warnings": []}
 
@@ -43,21 +43,27 @@ def load_gold_plans(path: pathlib.Path = GOLD_PLANS_PATH) -> Dict[str, PlanModel
 
 
 def answerability_response(question: GoldQuestion) -> Dict[str, Any]:
-    """The resolver's answerability verdict: Chinook for a question with gold SQL, none otherwise."""
+    """The resolver's verdict: the question's own datasource when it has gold SQL, none otherwise.
+
+    Naming the gold entry's datasource rather than whatever the context has
+    registered keeps the run on the database the question is about, however
+    many others sit beside it.
+    """
     if question.gold_sql is None:
         return {"answerable_datasource_ids": [], "reason": "Gold: no datasource holds this."}
-    return {"answerable_datasource_ids": [DATASOURCE_ID], "reason": "Gold: answerable from Chinook."}
+    return {"answerable_datasource_ids": [question.datasource],
+            "reason": f"Gold: answerable from {question.datasource}."}
 
 
 def decomposer_response(question: GoldQuestion, plan: PlanModel) -> Dict[str, Any]:
-    """One standalone sub-query on Chinook whose expected columns are the plan's aliases.
+    """One standalone sub-query on the question's datasource, whose expected columns are the plan's aliases.
 
     The validator requires the plan's select aliases to equal the sub-query's
     ``expected_schema`` names, so they are derived from the plan.
     """
     return {
         "sub_queries": [{
-            "id": "sq1", "datasource_id": DATASOURCE_ID, "intent": question.question,
+            "id": "sq1", "datasource_id": question.datasource, "intent": question.question,
             "metrics": [], "filters": [], "group_by": [],
             "expected_schema": [{"name": s.alias} for s in sorted(plan.select_items, key=lambda s: s.ordinal)],
         }],

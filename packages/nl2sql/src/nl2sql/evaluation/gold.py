@@ -6,12 +6,17 @@
 question or any of its SQL, regenerate the results with::
 
     python -m nl2sql.evaluation.gold
+
+Every question names the datasource it is asked against; the Chinook set
+leaves it at the default, ``chinook``. That is what a benchmark run is
+identified and scored by -- the demo registers other databases beside
+Chinook, and they are none of this dataset's business.
 """
 from __future__ import annotations
 
 import pathlib
 import sqlite3
-from typing import Any, Literal, Optional
+from typing import Any, Literal, Optional, Sequence
 
 import yaml
 from pydantic import BaseModel, ConfigDict, model_validator
@@ -19,6 +24,7 @@ from pydantic import BaseModel, ConfigDict, model_validator
 from nl2sql.datasets import CHINOOK_DB_PATH
 
 GOLD_DATASET_PATH = pathlib.Path(__file__).parent / "datasets" / "chinook_gold.yaml"
+DEFAULT_DATASOURCE_ID = "chinook"
 
 Outcome = Literal["allowed", "refused", "unanswerable"]
 Difficulty = Literal["easy", "medium", "hard"]
@@ -34,6 +40,7 @@ class GoldQuestion(BaseModel):
     difficulty: Difficulty
     tags: list[str]
     paraphrase_group: Optional[str] = None
+    datasource: str = DEFAULT_DATASOURCE_ID
     needed_tables: list[str]
     needed_columns: list[str]
     expected: dict[str, Outcome]
@@ -66,6 +73,16 @@ def load_gold_dataset(path: pathlib.Path = GOLD_DATASET_PATH) -> list[GoldQuesti
     """Load and validate the dataset."""
     raw = yaml.safe_load(path.read_text(encoding="utf-8"))
     return [GoldQuestion.model_validate(item) for item in raw]
+
+
+def dataset_datasources(dataset: Sequence[GoldQuestion]) -> list[str]:
+    """The distinct datasources the dataset's questions name, sorted.
+
+    A run is identified by these, not by everything the context happens to
+    have registered, so registering another database alongside Chinook leaves
+    the Chinook series comparable.
+    """
+    return sorted({q.datasource for q in dataset})
 
 
 def execute_gold_sql(sql: str, db_path: pathlib.Path = CHINOOK_DB_PATH) -> list[dict[str, Any]]:
@@ -115,6 +132,9 @@ def regenerate(path: pathlib.Path = GOLD_DATASET_PATH, db_path: pathlib.Path = C
     for item in items:
         if item["paraphrase_group"] is None:
             del item["paraphrase_group"]
+        # Written only where a question is asked against something else.
+        if item["datasource"] == DEFAULT_DATASOURCE_ID:
+            del item["datasource"]
         if not item["alt_gold_sql"]:
             del item["alt_gold_sql"]
             del item["alt_gold_result"]

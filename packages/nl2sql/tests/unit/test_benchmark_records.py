@@ -10,7 +10,7 @@ from types import SimpleNamespace
 import pytest
 
 from nl2sql.evaluation import records, tier2
-from nl2sql.evaluation.gold import GOLD_DATASET_PATH
+from nl2sql.evaluation.gold import GOLD_DATASET_PATH, dataset_datasources, load_gold_dataset
 
 REPO = pathlib.Path(__file__).resolve().parents[4]
 WHEN = dt.datetime(2026, 9, 21, 14, 5, 6, tzinfo=dt.timezone.utc)
@@ -144,25 +144,65 @@ def test_the_git_commit_comes_from_the_package_checkout_not_the_current_folder(t
     assert len(records.code_version()["git_commit"]) == 40
 
 
-def test_database_identity_fingerprints_the_latest_schema_snapshot():
-    columns = {"a": object(), "b": object()}
-    contract = SimpleNamespace(datasource_id="chinook", engine_type="sqlite",
-                               tables={"t1": SimpleNamespace(columns=columns, foreign_keys=[]),
-                                       "t2": SimpleNamespace(columns={"c": object()}, foreign_keys=[])})
-    snapshots = {"chinook": SimpleNamespace(contract=contract)}
-    ctx = SimpleNamespace(ds_registry=SimpleNamespace(list_ids=lambda: ["chinook"]),
-                          schema_store=SimpleNamespace(get_latest_snapshot=snapshots.get))
+def _snapshot(ds_id, tables, columns):
+    """A schema snapshot with ``tables`` tables holding ``columns`` columns between them."""
+    per = [columns // tables + (i < columns % tables) for i in range(tables)]
+    return SimpleNamespace(contract=SimpleNamespace(
+        datasource_id=ds_id, engine_type="sqlite",
+        tables={f"t{i}": SimpleNamespace(columns={f"c{j}": object() for j in range(n)}, foreign_keys=[])
+                for i, n in enumerate(per)}))
+
+
+def _demo_ctx():
+    """The demo as it stands: Chinook exactly as the committed runs saw it, and the two new databases beside it."""
+    snapshots = {"chinook": _snapshot("chinook", CHINOOK["tables"], CHINOOK["columns"]),
+                 "support": _snapshot("support", 4, 30), "webanalytics": _snapshot("webanalytics", 5, 34)}
+    return SimpleNamespace(ds_registry=SimpleNamespace(list_ids=lambda: sorted(snapshots)),
+                           schema_store=SimpleNamespace(get_latest_snapshot=snapshots.get))
+
+
+def _fingerprinted_per_datasource(monkeypatch):
+    """Fingerprint each contract by its datasource, Chinook's being the one the committed runs recorded."""
     import nl2sql.schema.protocol as protocol
-    original = protocol.generate_schema_fingerprint
-    protocol.generate_schema_fingerprint = lambda c: "f" * 64
-    try:
-        assert records.database_identity(ctx) == {"datasource_id": "chinook", "engine": "sqlite",
-                                                  "schema_fingerprint": "f" * 16, "tables": 2, "columns": 3}
-    finally:
-        protocol.generate_schema_fingerprint = original
+    digests = {"chinook": CHINOOK["schema_fingerprint"].ljust(64, "0")}
+    monkeypatch.setattr(protocol, "generate_schema_fingerprint",
+                        lambda c: digests.get(c.datasource_id, hashlib.sha256(c.datasource_id.encode()).hexdigest()))
+
+
+def test_database_identity_fingerprints_the_latest_schema_snapshot(monkeypatch):
+    import nl2sql.schema.protocol as protocol
+    ctx = SimpleNamespace(ds_registry=SimpleNamespace(list_ids=lambda: ["chinook"]),
+                          schema_store=SimpleNamespace(get_latest_snapshot={
+                              "chinook": _snapshot("chinook", 2, 3)}.get))
+    monkeypatch.setattr(protocol, "generate_schema_fingerprint", lambda c: "f" * 64)
+    assert records.database_identity(ctx) == {"datasource_id": "chinook", "engine": "sqlite",
+                                              "schema_fingerprint": "f" * 16, "tables": 2, "columns": 3}
     empty = SimpleNamespace(ds_registry=SimpleNamespace(list_ids=lambda: ["x"]),
                             schema_store=SimpleNamespace(get_latest_snapshot=lambda _id: None))
     assert records.database_identity(empty)["schema_fingerprint"] == "unknown"
+
+
+def test_the_identity_is_the_datasets_own_datasources_not_every_registered_one(monkeypatch):
+    """With the demo's three databases registered, a Chinook gold run is still `chinook`."""
+    _fingerprinted_per_datasource(monkeypatch)
+    ctx = _demo_ctx()
+    identity = records.database_identity(ctx, dataset_datasources(load_gold_dataset()))
+    # Byte for byte what the two committed tier 2 runs and the retrieval run recorded.
+    assert identity == CHINOOK
+    for path in sorted((REPO / "benchmarks").glob("*/chinook/*.json")):
+        committed = json.loads(path.read_text(encoding="utf-8"))
+        assert committed["database"] == identity, path
+        fresh = {**committed, "database": identity}
+        assert records.series_key(fresh) == records.series_key(committed)
+        assert records.record_relpath(fresh).parent.as_posix() == f"{committed['kind']}/chinook"
+    # Left to itself it still describes everything registered, which is what a
+    # run really spanning three databases would want.
+    assert records.database_identity(ctx)["datasource_id"] == "chinook+support+webanalytics"
+
+
+def test_the_gold_set_names_one_datasource():
+    assert dataset_datasources(load_gold_dataset()) == ["chinook"]
+    assert {q.datasource for q in load_gold_dataset()} == {"chinook"}
 
 
 def _write(root, day, name="gpt-5.4", statuses=("pass", "fail"), database=CHINOOK, roles=("admin",), cost=0.02,

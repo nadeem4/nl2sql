@@ -11,7 +11,9 @@ benchmarks/<kind>/<database>/<YYYY-MM-DD>_<shortsha>_<config>.json
 ```
 
 - `kind`: `tier2` (the real model, one file per config) or `retrieval` (schema retrieval recall).
-- `database`: the datasource id, e.g. `chinook`.
+- `database`: the datasource id the gold dataset names, e.g. `chinook` - not
+  every datasource the project has registered, so the demo's `support` and
+  `webanalytics` leave a Chinook run's file, identity and series alone.
 - `shortsha`: the engine commit the run used; `unknown` for a wheel install.
 - `config`: the config name (`gpt-5.4`, `gpt-5.4-mini-helpers`, ...), or `retrieval`.
 - `-2`, `-3`... when the name is taken.

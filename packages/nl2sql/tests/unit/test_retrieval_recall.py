@@ -4,6 +4,7 @@ The run against the indexed demo with the local embedder is
 ``tests/e2e/test_benchmark_retrieval.py``.
 """
 import datetime as dt
+from types import SimpleNamespace
 
 import pytest
 
@@ -40,8 +41,44 @@ def test_the_summary_is_the_mean_over_questions_and_lists_the_worst_first():
                {"id": "c", "table_recall": 1.0, "column_recall": 0.5, "tables_sent": 3, "columns_sent": 8}]
     summary = rr.summarize(results)
     assert summary == {"questions": 3, "table_recall": 0.8333, "column_recall": 0.5833,
-                       "perfect_tables": 2, "perfect_columns": 1, "tables_sent": 3.0, "columns_sent": 8.0}
+                       "perfect_tables": 2, "perfect_columns": 1, "tables_sent": 3.0, "columns_sent": 8.0,
+                       "datasource_top1_accuracy": None}
     assert [r["id"] for r in rr.worst(results, 2)] == ["b", "c"]
+
+
+def test_the_top1_share_counts_the_questions_the_router_would_have_sent_elsewhere():
+    """Recall is scored on the gold entry's datasource; where the router disagrees is its own metric."""
+    results = [{"id": "a", "table_recall": 1.0, "column_recall": 1.0, "tables_sent": 2, "columns_sent": 10,
+                "datasource_id": "chinook", "retrieved_datasource_id": "chinook"},
+               {"id": "b", "table_recall": 1.0, "column_recall": 1.0, "tables_sent": 2, "columns_sent": 10,
+                "datasource_id": "chinook", "retrieved_datasource_id": "support"},
+               {"id": "c", "table_recall": 1.0, "column_recall": 1.0, "tables_sent": 2, "columns_sent": 10,
+                "datasource_id": "chinook", "retrieved_datasource_id": None}]
+    summary = rr.summarize(results)
+    # Every question was scored on Chinook all the same: recall is untouched.
+    assert summary["table_recall"] == 1.0 and summary["column_recall"] == 1.0
+    assert summary["datasource_top1_accuracy"] == 0.3333
+
+
+def test_every_question_is_scored_against_the_datasource_its_gold_entry_names():
+    """The retriever is asked about the gold datasource, whatever the vector search ranks first."""
+    asked = []
+    ctx = SimpleNamespace(ds_registry=SimpleNamespace(list_ids=lambda: ["chinook", "support", "webanalytics"]),
+                          vector_store=SimpleNamespace(
+                              FETCH_MULTIPLIER=4, LAMBDA_MULT=0.7, embeddings=None,
+                              retrieve_datasource_candidates=lambda q, k: [
+                                  SimpleNamespace(metadata={"datasource_id": "support"})]))
+    monkey = pytest.MonkeyPatch()
+    monkey.setattr(rr, "_sent", lambda _ctx, q, ds_id: asked.append((q.id, ds_id)) or {})
+    try:
+        report = rr.run_retrieval_recall(ctx, question_ids=["chinook_002"])
+    finally:
+        monkey.undo()
+    [(qid, datasource_id)] = asked
+    assert (qid, datasource_id) == ("chinook_002", "chinook")
+    [result] = report["results"]
+    assert result["datasource_id"] == "chinook" and result["retrieved_datasource_id"] == "support"
+    assert report["summary"]["datasource_top1_accuracy"] == 0.0
 
 
 def test_comparing_two_reports_gives_the_deltas_and_each_question_that_moved():

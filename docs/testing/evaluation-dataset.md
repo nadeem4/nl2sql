@@ -33,6 +33,7 @@ The file is a YAML list. Each entry:
 | `difficulty` | `easy`, `medium` or `hard` |
 | `tags` | Categories: `single-table`, `filter`, `join`, `multi-join`, `aggregation`, `having`, `order-limit`, `ties`, `date`, `paraphrase`, `keyword-in-question`, `keyword-in-value`, `rbac-denial`, `unanswerable` |
 | `paraphrase_group` | Optional. Questions with the same intent share this id and the same `gold_result`, for determinism checks |
+| `datasource` | The database the question is asked against. Defaults to `chinook` and is written out only where a question differs, so the file - and its sha256 - are unchanged. It is what the run is scored and identified by, so the demo's other databases do not widen it |
 | `needed_tables` | Exactly the tables `gold_sql` reads, for retrieval recall |
 | `needed_columns` | `Table.Column` names the answer needs, for retrieval recall |
 | `expected` | Per demo role (`admin`, `analyst`, `viewer`): `allowed`, `refused` or `unanswerable` |
@@ -83,7 +84,10 @@ an API key and checks that:
   in `gold_sql`;
 - every role in `expected` exists in the demo policy and each outcome follows
   from it;
-- the twelve demo questions (`CHINOOK_QUESTIONS`) are included verbatim.
+- Chinook's twelve guided questions (`CHINOOK_QUESTIONS`) are included
+  verbatim. The demo offers twenty in all (`DEMO_QUESTIONS`); the other eight
+  ask about `support` and `webanalytics`, which this Chinook-only gold set does
+  not cover.
 
 ## Running the benchmark
 
@@ -590,7 +594,7 @@ name is taken. Every record holds:
 | `git_commit`, `git_dirty` | The engine's commit and whether its tracked files had uncommitted changes. Found by walking up from the installed `nl2sql` package to its `.git`, so a run from the demo folder of an editable install still names the repo commit; `"unknown"` for a wheel install or without git, never null |
 | `note` | `--note`: what changed, e.g. `"slim prompts"` (null without one) |
 | `dataset` | `chinook_gold.yaml`'s name and sha256, taken with LF line endings so a Windows checkout hashes the same |
-| `database` | `datasource_id`, `engine` (`sqlite`), `schema_fingerprint` (a hash of the latest indexed schema snapshot's tables, columns, types and keys, so re-indexing an unchanged database keeps it) and the `tables` and `columns` counts |
+| `database` | `datasource_id`, `engine` (`sqlite`), `schema_fingerprint` (a hash of the latest indexed schema snapshot's tables, columns, types and keys, so re-indexing an unchanged database keeps it) and the `tables` and `columns` counts. Built from the datasources the gold dataset's questions name, not from every datasource the project registered: the demo registers three and this set asks about Chinook, so a run there is still `chinook` with Chinook's fingerprint, and stays in the series recorded before the other two existed. Several datasources (a dataset that spans them) are joined with `+` |
 | `config` | The config name, and for tier 2 `provider:model` per node |
 | `metrics` | Tier 2: accuracy (strict) and lenient_accuracy with their 95% intervals, `pass_k`, answerability precision and recall, dollars total and per question, input / cached / output tokens per question, p50 and p95 latency, determinism, answer faithfulness. Retrieval: the report's `summary` |
 | tier 2 only | `roles`, `passes`, `stopped`, `partial` and the config's full `scoreboard` |
@@ -690,9 +694,11 @@ How it runs (`nl2sql/evaluation/retrieval_recall.py`):
 - Chinook's 11 tables are under `SCHEMA_RETRIEVAL_FULL_SNAPSHOT_MAX_TABLES`
   (15), which would send the whole schema without a search, so the limit is
   set to 0 for the run and the vector search always runs.
-- The datasource is the one registered (with several, the top hit of the
-  resolver's own vector search). The resolver's answerability check is an
-  LLM call and is skipped.
+- Each question is scored against the datasource its gold entry names, which
+  for this set is always `chinook`, whatever else the project has registered.
+  Which datasource the resolver's own vector search would have ranked first
+  is reported separately as `datasource_top1_accuracy`; its answerability
+  check is an LLM call and is skipped.
 - The schema retriever runs as the pipeline runs it (MMR, k 8 table entries,
   then k 12 column and relationship entries of those tables), on the index
   and embedder the project has: the demo's is the local ONNX
@@ -706,9 +712,14 @@ How it runs (`nl2sql/evaluation/retrieval_recall.py`):
 Per question the report has `table_recall` (needed tables sent / needed
 tables), `column_recall` (needed `Table.Column`s sent / needed), the
 `missed_tables` and `missed_columns`, `tables_sent` and `columns_sent`, and
-`sent` (every table and column sent). `summary` holds the means over
-questions, how many had every needed table (`perfect_tables`) or column
-(`perfect_columns`), and the mean tables and columns sent. `settings` holds
+`sent` (every table and column sent), plus the `datasource_id` it was scored
+against and the `retrieved_datasource_id` the vector search ranked first.
+`summary` holds the means over questions, how many had every needed table
+(`perfect_tables`) or column (`perfect_columns`), the mean tables and columns
+sent, and `datasource_top1_accuracy`, the share of questions whose top
+candidate was the datasource the gold entry names. With one datasource
+registered there is nothing to choose and it is 1.0; the demo registers
+three, so it measures the router. `settings` holds
 the k, the MMR settings and the embedder, so two reports are only compared
 like for like. The command prints a row per question and the summary, and
 always exits 0 when it ran: it reports, it does not gate.

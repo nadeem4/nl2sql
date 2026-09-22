@@ -14,6 +14,12 @@ fingerprint), an optional ``note``, the headline metrics and the full report.
 Records are never edited: writing, ``publish`` and ``publish --from`` all
 refuse to overwrite one.
 
+The database is the one the *dataset* names, not everything the context has
+registered: the demo registers three databases and the gold set asks about
+one, so a run there is still filed under ``chinook`` with Chinook's
+fingerprint, and stays comparable with the runs recorded before the other
+two existed.
+
 Two runs are comparable when they share the kind, the dataset sha and the
 schema fingerprint (and, for tier 2, the roles). ``publish`` groups the
 history by kind and database, lists runs newest first with the change
@@ -102,17 +108,25 @@ def dataset_id(path: pathlib.Path) -> Dict[str, str]:
     return {"name": pathlib.Path(path).name, "sha256": hashlib.sha256(data).hexdigest()}
 
 
-def database_identity(ctx) -> Dict[str, Any]:
+def database_identity(ctx, datasource_ids: Optional[Sequence[str]] = None) -> Dict[str, Any]:
     """The database a run used: datasource id, engine, a schema fingerprint and the table and column counts.
 
     The fingerprint hashes the latest indexed schema snapshot (tables,
     columns, types, keys), so re-indexing an unchanged database keeps it.
     Several datasources are joined with ``+``.
+
+    ``datasource_ids`` are the ones the run actually used -- the gold
+    dataset's, from :func:`nl2sql.evaluation.gold.dataset_datasources` -- and
+    every caller passes them. Registering another database beside Chinook
+    must not rename the run or move its fingerprint, or the history would
+    split into a new series. Without them every registered datasource is
+    described, which is right only when the run really used all of them.
     """
     from nl2sql.schema.protocol import generate_schema_fingerprint
 
+    ids = sorted(set(datasource_ids)) if datasource_ids is not None else sorted(ctx.ds_registry.list_ids())
     parts = []
-    for ds_id in sorted(ctx.ds_registry.list_ids()):
+    for ds_id in ids:
         snapshot = ctx.schema_store.get_latest_snapshot(ds_id)
         if snapshot is None:
             parts.append((ds_id, UNKNOWN, UNKNOWN, None, None))
