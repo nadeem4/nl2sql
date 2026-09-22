@@ -1,6 +1,5 @@
 from typing import Dict, Any
 from sqlalchemy import create_engine, inspect, text
-from sqlalchemy.dialects import postgresql
 from nl2sql.adapters.sqlalchemy_base import (
     DryRunResult,
     QueryPlan,
@@ -107,7 +106,8 @@ class PostgresAdapter(BaseSQLAlchemyAdapter):
             return CostEstimate(estimated_cost=0.0, estimated_rows=0)
 
     def get_dialect(self) -> str:
-        return postgresql.dialect.name
+        # A sqlglot dialect name (SQLAlchemy calls it "postgresql").
+        return "postgres"
 
 
     @property
