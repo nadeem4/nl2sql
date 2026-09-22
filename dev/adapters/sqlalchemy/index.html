@@ -4144,7 +4144,13 @@
 <h4 id="connect"><code>connect()</code></h4>
 <p>Override to provide custom connection arguments (e.g., timeouts, isolation levels).</p>
 <h4 id="get_dialect-str"><code>get_dialect() -&gt; str</code></h4>
-<p>Returns the logical dialect name. Defaults to the engine driver name.</p>
+<p>Returns the <strong>sqlglot</strong> dialect name the engine renders SQL in: <code>postgres</code>,
+<code>tsql</code>, <code>mysql</code>, <code>duckdb</code>, <code>sqlite</code>, or any other name
+<code>sqlglot.Dialect.get_or_raise</code> accepts. It is not the SQLAlchemy dialect name
+(<code>postgresql</code>, <code>mssql</code>), which sqlglot rejects. The base class raises
+<code>NotImplementedError</code>, so every adapter must implement it.
+<code>tests/adapters/unit/test_adapter_dialect_names.py</code> checks every adapter
+registered under the <code>nl2sql.adapters</code> entry point.</p>
 <h4 id="explainsql-str-cost_estimatesql-str"><code>explain(sql: str)</code> / <code>cost_estimate(sql: str)</code></h4>
 <p>The base class provides stubs. Override these to implement database-specific optimization logic (e.g., <code>EXPLAIN ANALYZE</code>).</p>
 
