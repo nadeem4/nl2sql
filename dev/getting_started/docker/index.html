@@ -4022,10 +4022,8 @@ for example <code>"./packages/nl2sql[postgres,mysql,mssql]"</code>.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>docker<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>-p<span class="w"> </span><span class="m">8000</span>:8000<span class="w"> </span>nl2sql-api
 </code></pre></div>
 <p>To set environment selection:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>docker<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>-p<span class="w"> </span><span class="m">8000</span>:8000<span class="w"> </span>-e<span class="w"> </span><span class="nv">ENV</span><span class="o">=</span>demo<span class="w"> </span>-e<span class="w"> </span><span class="nv">NL2SQL_API_ROLE</span><span class="o">=</span>admin<span class="w"> </span>nl2sql-api
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>docker<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>-p<span class="w"> </span><span class="m">8000</span>:8000<span class="w"> </span>-e<span class="w"> </span><span class="nv">ENV</span><span class="o">=</span>demo<span class="w"> </span>nl2sql-api
 </code></pre></div>
-<p><code>NL2SQL_API_ROLE</code> pins the RBAC role for every request; without a role setting
-the query route answers HTTP 401. See <a href="../../api/rest/#caller-role">Caller role</a>.</p>
 <h2 id="configuration">Configuration</h2>
 <p>Mount or bake your config files into the container:</p>
 <ul>

@@ -3755,17 +3755,6 @@
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#caller-role" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Caller role
-      
-    </span>
-  </a>
-  
-</li>
-        
       </ul>
     </nav>
   
@@ -4083,17 +4072,6 @@
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#caller-role" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Caller role
-      
-    </span>
-  </a>
-  
-</li>
-        
       </ul>
     </nav>
   
@@ -4140,8 +4118,6 @@ engine over HTTP. Implementation lives in <code>packages/api/src/nl2sql_api/</co
 <li><code>get_engine(request)</code> returns the singleton <code>NL2SQL</code> instance.</li>
 <li>Service providers (<code>DatasourceService</code>, <code>QueryService</code>, <code>LLMService</code>,
   <code>IndexingService</code>, <code>HealthService</code>) are created per-request with the engine.</li>
-<li><code>get_user_context(request)</code> (in <code>nl2sql_api/auth.py</code>) returns the caller's
-  <code>UserContext</code>; see <a href="#caller-role">Caller role</a>.</li>
 </ul>
 <h2 id="interactive-docs">Interactive docs</h2>
 <p>FastAPI serves Swagger UI at <code>/docs</code>, ReDoc at <code>/redoc</code> and the OpenAPI schema at
@@ -4198,7 +4174,7 @@ event loop.</p>
 <h2 id="configuration">Configuration</h2>
 <p>The REST API inherits all configuration from the Core engine. Beyond the runtime
 server options in <code>nl2sql_api.server</code> (<code>--host</code>, <code>--port</code>, <code>--reload</code>), it reads
-these environment variables of its own.</p>
+one environment variable of its own.</p>
 <h3 id="cors-origins">CORS origins</h3>
 <p><code>NL2SQL_API_CORS_ORIGINS</code> is a comma-separated list of the browser origins
 allowed to call the API cross-origin. Each entry is a full origin (scheme, host
@@ -4214,45 +4190,6 @@ read once at import time, so changing it requires restarting the server.</p>
 <p>This setting governs the browser same-origin policy only. Non-browser clients --
 <code>curl</code>, server-side callers, the Python SDK -- do not send an <code>Origin</code> header and
 are unaffected by it; use authentication and network controls to restrict those.</p>
-<h3 id="caller-role">Caller role</h3>
-<p>The engine enforces RBAC; the API only decides which role a request carries. It
-does not authenticate callers, and it never takes the role from the request body
-unless a dev flag says so. The <code>get_user_context</code> dependency reads, first match
-wins:</p>
-<table>
-<thead>
-<tr>
-<th>Variable</th>
-<th>Role source</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>NL2SQL_API_ROLE_HEADER</code></td>
-<td>The name of a header a trusted proxy sets, e.g. <code>X-NL2SQL-Role</code>. Comma-separated values are several roles. Configure it only when the proxy authenticates the caller and overwrites the header on every request; otherwise any client can pick its own role.</td>
-</tr>
-<tr>
-<td><code>NL2SQL_API_ROLE</code></td>
-<td>One static role for every request, e.g. <code>admin</code> for a single-tenant deployment or the demo.</td>
-</tr>
-<tr>
-<td><code>NL2SQL_API_TRUST_BODY_ROLE</code></td>
-<td><code>true</code> takes <code>user_context</code> from the request body, as the API did before. For local testing only: any client can choose any role. The server logs a warning at startup when it is on.</td>
-</tr>
-</tbody>
-</table>
-<p>With no role from any of them, <code>POST /api/v1/query</code> answers <code>HTTP 401</code> with a
-message naming these variables; the engine never runs. The variables are read
-on each request.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># Demo: every request runs as admin.</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="nv">ENV</span><span class="o">=</span>demo<span class="w"> </span><span class="nv">NL2SQL_API_ROLE</span><span class="o">=</span>admin<span class="w"> </span>nl2sql-api<span class="w"> </span>--port<span class="w"> </span><span class="m">8000</span>
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="c1"># Behind an authenticating proxy that sets X-NL2SQL-Role.</span>
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="nv">NL2SQL_API_ROLE_HEADER</span><span class="o">=</span>X-NL2SQL-Role<span class="w"> </span>nl2sql-api<span class="w"> </span>--port<span class="w"> </span><span class="m">8000</span>
-</code></pre></div>
-<p>This is a seam, not an auth provider: to integrate one, override the
-<code>get_user_context</code> dependency (<code>app.dependency_overrides[get_user_context] = ...</code>)
-or put the provider in the proxy.</p>
 
 
 

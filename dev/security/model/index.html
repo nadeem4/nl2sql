@@ -1822,22 +1822,17 @@ any SQL exists. That is the one security property this engine provides. It is
 not authentication, it is not containment, and it is not row- or column-level
 security.</p>
 <h2 id="the-role-is-supplied-by-the-caller">The role is supplied by the caller</h2>
-<p>There is <strong>no authentication anywhere in this project</strong>. Where the role comes
-from depends on the client:</p>
+<p>There is <strong>no authentication anywhere in this project</strong>. The role is whatever
+the caller says it is:</p>
 <ul>
 <li>CLI: <code>nl2sql run --role &lt;id&gt;</code>, defaulting to <code>admin</code>.</li>
-<li>Python API: <code>UserContext(roles=[...])</code>, whatever the calling code passes.</li>
-<li>REST API: the <code>get_user_context</code> dependency
-  (<code>packages/api/src/nl2sql_api/auth.py</code>). It reads a header set by a trusted
-  proxy (<code>NL2SQL_API_ROLE_HEADER</code>) or a static role (<code>NL2SQL_API_ROLE</code>), and
-  answers <code>HTTP 401</code> when neither gives one. The body's <code>user_context</code> counts
-  only with the dev flag <code>NL2SQL_API_TRUST_BODY_ROLE=true</code>, which logs a
-  warning at startup. See <a href="../../api/rest/#caller-role">Caller role</a>.</li>
+<li>Python API and REST API: <code>UserContext(roles=[...])</code>. The REST layer reads it
+  straight out of the request body (<code>packages/api/src/nl2sql_api/services/query.py</code>)
+  and no route declares an auth dependency.</li>
 </ul>
-<p>The REST API still does not verify who the caller is. <strong>If you expose this
-service, put your own authentication in a proxy in front of it, derive the role
-from that, and have the proxy overwrite the role header on every request</strong>;
-otherwise any client can send the header itself. An empty <code>roles</code> list
+<p>So any client that can reach the REST API can assert <code>{"roles": ["admin"]}</code>.
+<strong>If you expose this service, you must put your own authentication in front of
+it and derive the role from that</strong>, never from user input. An empty <code>roles</code> list
 denies everything, which is the correct default for an unauthenticated caller.</p>
 <p>A role name that is not present in the policy file grants nothing, exactly like
 an empty <code>roles</code> list. <code>RBAC</code> skips it, so the caller is refused with a normal

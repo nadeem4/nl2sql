@@ -2105,8 +2105,7 @@ flowchart TD
   <code>rebuild_index(..., switch_guard=...)</code>. The playground passes its <code>RunGate</code>, so
   questions in flight finish first.</li>
 <li><code>nl2sql.indexing.rebuild.rebuild_index</code> is the one entry point for
-  <code>nl2sql index</code>, the demo's startup repair and the playground's Rebuild (through
-  <code>NL2SQL.rebuild_index</code>).</li>
+  <code>nl2sql index</code>, the demo's startup repair and the playground's Rebuild.</li>
 </ul>
 <h3 id="one-embedding-model-per-collection">One embedding model per collection</h3>
 <p>A query is embedded once, in one space, so every datasource in a collection
@@ -2129,9 +2128,8 @@ no entries, its entries were built from an older schema version than the latest
 snapshot, or the configured embedding model differs), <code>ok</code>. It reports entry
 counts by type, the schema version per datasource, when each was built and the
 recorded embedding model. <code>nl2sql doctor</code> prints it under <strong>Index</strong>,
-<code>nl2sql demo</code> rebuilds at startup when it is not <code>ok</code>, and the playground and
-<code>GET /api/v1/index/status</code> show it (through <code>NL2SQL.index_health</code>), the playground
-with a Rebuild button.</p>
+<code>nl2sql demo</code> rebuilds at startup when it is not <code>ok</code>, and the playground shows
+it with a Rebuild button.</p>
 <h2 id="chunking-strategy-as-implemented">Chunking strategy (as implemented)</h2>
 <p>Chunking is aligned to planning intent:</p>
 <ul>
@@ -2248,7 +2246,7 @@ search (the query, the pool with similarity, Chroma distance and type, the
 picks in order with the score each won with, and what was dropped). The record
 comes from numbers MMR computes anyway, so it costs no second search. Nodes put
 it in their run trace (see <a href="../../observability/debugging/#retrieval">Debugging a run</a>),
-and the playground's Retrieval inspector (<code>NL2SQL.inspect_retrieval</code>) runs the same
+and the playground's Retrieval inspector (<code>VectorStore.inspect</code>) runs the same
 search for any text, with k, lambda, entry types and datasource exposed. That
 inspector is the tool for chunking experiments: change the chunks, rebuild,
 search the same text, and diff the <strong>Copy as text</strong> output.</p>
