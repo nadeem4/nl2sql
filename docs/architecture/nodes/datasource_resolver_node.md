@@ -198,6 +198,12 @@ Exceptions are caught at the node boundary and logged with `logger.error`.
 - Logger: `datasource_resolver`
 - The answerability call is recorded like every LLM call: usage under node `datasource_resolver` in `QueryResult.usage`, and in the run trace keyed by node, sub-query, attempt and call.
 - Vector retrieval uses `VECTOR_BREAKER` at the vector store layer.
+- Returns a `retrieval` record in its update for the run trace: the query
+  embedded and the datasource search's pool with scores, MMR picks and drops;
+  or `skipped: true` and why (an explicit `datasource_id`, a single registered
+  datasource, no vector store). The answerability check is not part of it: it
+  is an LLM call and is traced as one.
+  See [Debugging a run](../../observability/debugging.md#retrieval).
 
 ---
 

@@ -140,6 +140,13 @@ Key contracts:
 
 - Logger: `schema_retriever`
 - Emits reasoning and warnings on fallback paths.
+- Returns a `retrieval` record in its update (not a state field, so LangGraph
+  drops it; the run trace keeps it): the query text embedded, each search's
+  pool with scores, the MMR picks in order and what was dropped, and the tables
+  and columns sent to the planner; or, when the schema is small enough to send
+  whole, `skipped: true` and why. Column entries of a table the role cannot read
+  keep their name and rank but lose their scores (their embedded text holds
+  sample values). See [Debugging a run](../../observability/debugging.md#retrieval).
 
 ---
 

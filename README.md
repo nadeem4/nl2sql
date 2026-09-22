@@ -42,8 +42,12 @@ answer **cost**: LLM calls, tokens and time for the question. The **Debug**
 toggle (on by default, remembered by the browser) adds a per-node breakdown in
 execution order, code nodes included, so you can see where the time goes as
 well as the tokens; a node the model was called on more than once is marked as
-retried. In replay mode the token counts are placeholders from the recordings,
-not real usage. A role selector switches between `admin`, `analyst` and
+retried. Open the `datasource_resolver` or `schema_retriever` row to see what
+the vector search retrieved: the text embedded, every entry in the pool with its
+similarity, the entries MMR picked in order, and what it dropped. The
+**Retrieval** button at the top runs the same search for any text against the
+live index, with lambda, k, entry types and datasource as knobs. In replay mode
+the token counts are placeholders from the recordings, not real usage. A role selector switches between `admin`, `analyst` and
 `viewer`: ask the `viewer` role about customers and the logical validator
 refuses the plan with a `SECURITY_VIOLATION`, the generator never runs, and the
 page says so at the checks, naming the tables the role may not read. That is the
@@ -59,7 +63,7 @@ engine's one real safety property, made visible.
 | `--no-browser` | off | Do not open a browser tab; just serve and print the URL. Use it over SSH and in containers, where there is no browser to open; in CI and scripts, where a browser would be noise or an error; when you are driving the HTTP API directly rather than the page; and on a demo you restart repeatedly, so each restart does not pile up another tab. |
 | `--record` | off | Run the guided questions through your real provider, save the responses to `recordings.json` in the demo project, and exit without serving. A later `nl2sql demo` with no key on the same `--dir` replays from that file (it wins over any recordings packaged with the engine, and none ship today), so the guided questions answer without a key. A question outside the recording gets "No recorded answer for this question. Add an API key to ask it live." Needs an API key — a reachable Ollama is not enough, because there is nothing to proxy through. It needs an OpenAI or OpenRouter key: recordings capture the OpenAI wire format, so a Claude key is refused. This spends real API credits. |
 | `--api-key KEY` | unset | The key for live mode, saved into the demo project's `.env.demo` so later runs from that directory stay live without passing it again. The provider follows the key's shape: `sk-ant-…` is Anthropic (Claude, needs the `anthropic` extra), `sk-or-…` is OpenRouter, anything else is OpenAI. A key on the command line is visible in your shell history and to `ps`, so exporting the environment variable, or pasting the key into the playground's **Settings** panel, is the more private route. |
-| `--allow-settings` | off | Turn on the playground's **Settings** panel (API key, model per LLM step) when `--host` is not a loopback address. It is off there by default because the playground has no login: anyone who can reach the page could swap in their own key or run up costs on yours. On `127.0.0.1` / `localhost` the panel is always on. |
+| `--allow-settings` | off | Turn on the playground's **Settings** panel (API key, model per LLM step), **Rebuild** and the **Retrieval** inspector when `--host` is not a loopback address. They are off there by default because the playground has no login: anyone who can reach the page could swap in their own key, run up costs on yours, or read every index entry (column statistics and sample values included). On `127.0.0.1` / `localhost` they are always on. |
 
 ### What the demo needs, honestly
 

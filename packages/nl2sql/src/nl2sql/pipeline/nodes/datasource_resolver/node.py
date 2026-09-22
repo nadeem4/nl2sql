@@ -198,6 +198,32 @@ class DatasourceResolverNode:
         )
 
     def __call__(self, state: GraphState) -> Dict[str, Any]:
+        searches: list[Dict[str, Any]] = []
+        out = self._resolve(state, searches)
+        out["retrieval"] = self._retrieval(state, searches)
+        return out
+
+    def _retrieval(self, state: GraphState, searches: list[Dict[str, Any]]) -> Dict[str, Any]:
+        """What the vector search retrieved, for the run trace, or why it did not run.
+
+        Not a state field: LangGraph drops the key, the trace keeps the node's
+        whole return. It names datasources and entry ids, never entry text.
+        """
+        if searches:
+            return {"skipped": False, "query": state.user_query, "searches": searches}
+        if state.datasource_id:
+            return {"skipped": True, "reason": "An explicit datasource_id was given, so no search ran."}
+        try:
+            single = len(self.ds_registry.list_ids()) == 1
+        except Exception:
+            single = False
+        if single:
+            return {"skipped": True, "reason": "single datasource: vector search skipped"}
+        if not self.vector_store:
+            return {"skipped": True, "reason": "No vector store is configured."}
+        return {"skipped": False, "query": state.user_query, "searches": []}
+
+    def _resolve(self, state: GraphState, searches: list[Dict[str, Any]]) -> Dict[str, Any]:
         try:
             registered_ids = self.ds_registry.list_ids()
             if state.datasource_id:
@@ -231,7 +257,9 @@ class DatasourceResolverNode:
                         severity=ErrorSeverity.ERROR,
                         error_code=ErrorCode.SCHEMA_RETRIEVAL_FAILED,
                     )
-                candidate_docs = self.vector_store.retrieve_datasource_candidates(state.user_query, k=5)
+                candidate_docs = self.vector_store.retrieve_datasource_candidates(
+                    state.user_query, k=5, explain=searches
+                )
                 candidates = list(self._get_candidate_datasources(candidate_docs).values())
                 if not candidates:
                     message = "No datasource candidates resolved."

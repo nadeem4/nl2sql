@@ -119,6 +119,60 @@ named a column that does not exist; long values shortened here):
   `result.sub_queries[].plan_source` and `result.usage.plan_cache_hits`. See
   [Determinism → The plan cache](../architecture/determinism.md#the-plan-cache-determinism-from-the-architecture).
 
+### Retrieval
+
+The `datasource_resolver` and `schema_retriever` entries carry a `retrieval`
+object in `outputs`: what the vector search retrieved and how MMR chose among it
+(the engine has no re-ranking model; see
+[Indexing](../architecture/indexing.md#retrieval-mmr-not-a-re-ranking-model)).
+
+```json
+"retrieval": {
+  "skipped": false,
+  "query": "Tracks sold per genre, highest first\ngroup_by: genre name ...",
+  "searches": [{
+    "search": "tables",
+    "filter": {"datasource_id": "chinook", "types": ["schema.table", "schema.metric"]},
+    "k": 8, "fetch_k": 32, "lambda_mult": 0.7,
+    "pool": [
+      {"rank": 1, "id": "schema.table:[main].[Track]:<version>", "label": "[main].[Track]",
+       "type": "schema.table", "datasource_id": "chinook", "table": "[main].[Track]", "column": null,
+       "similarity": 0.5651, "distance": 0.8698,
+       "picked": true, "pick_order": 1, "mmr_score": 0.5651, "redundancy": 0.0}
+    ],
+    "picks": ["<ids in the order MMR picked them>"],
+    "dropped": ["<ids of the pool entries not picked>"]
+  }],
+  "tables": [{"table": "Track", "columns": ["Name", "GenreId"]}]
+}
+```
+
+- **`query`** is the text actually embedded: the question for the resolver, and
+  for the schema retriever the sub-query's intent, filters, group-by, expected
+  columns and metrics, one per line.
+- **`pool`** is every candidate, nearest first. `similarity` is the cosine
+  similarity MMR uses; `distance` is Chroma's (squared L2). `pick_order` is the
+  order MMR picked in, `mmr_score` the score the pick won with, and
+  `redundancy` its similarity to the closest earlier pick.
+- **`searches`** lists each search in order; the schema retriever runs `tables`
+  (or `columns` when that finds nothing), then `planning` over the tables found.
+- **`tables`** (schema retriever) is what survived: the tables and columns sent
+  to the planner.
+- **`skipped: true`** with a `reason` means no search ran: the schema is small
+  enough to send whole (Chinook, with 11 tables, always is), only one
+  datasource is registered (`"single datasource: vector search skipped"`; the
+  Chinook demo always is), the request named a `datasource_id`, or there is no
+  vector store. The resolver's answerability check is an LLM call, so it is in
+  that entry's `llm_calls`, not in `retrieval`.
+
+The record carries entry ids and names, never an entry's embedded text, which
+for a column holds its statistics and sample values. It follows the prompt's
+rule, "structure yes, data no": a column entry of a table the run's role
+cannot read keeps its name, rank and whether it was picked, and its scores are
+`null` with a `withheld` note, because a similarity to text that contains
+sample values says something about those values. The record is built from the
+numbers MMR computes anyway, so it is always there and costs no extra search.
+
 The file records what happened. A sub-query's `status` reflects its final
 attempt, so one that recovers on retry reports `"success"`; the failed
 attempts stay in the node entries and in the result's `warnings`.
@@ -222,7 +276,13 @@ served. It then compares the replayed `QueryResult` with the recorded one
 With **Debug** on, each node name in the per-node table under **Cost & time**
 opens that node's record from the trace: every attempt and sub-query, its
 errors and warnings, what it read and returned, and for LLM nodes the exact
-prompt, the raw response and the parsed result. Long text is folded. The page
+prompt, the raw response and the parsed result. Long text is folded. For the
+`datasource_resolver` and `schema_retriever` nodes it also shows the retrieval
+record as a table: the pool nearest first, picks marked with their MMR order,
+dropped entries greyed, and a line naming the entries MMR passed over because
+they repeat an earlier pick. The **Retrieval** inspector at the top of the page
+runs the same search for any text (see the
+[demo guide](../getting_started/demo.md#the-retrieval-inspector)). The page
 fetches the file from `GET /api/trace/{trace_id}`, which serves only files
 directly inside `TRACE_DIR` and rejects any id that is not a plain token, so
 `../` or an absolute path never reaches the filesystem.

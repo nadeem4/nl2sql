@@ -1,6 +1,6 @@
 """The playground FastAPI app.
 
-Ten routes:
+Twelve routes:
 
 ``GET  /``                     the built React page
 ``GET  /api/meta``             mode, dataset, the guided questions, the roles and how
@@ -15,6 +15,9 @@ Ten routes:
 ``GET  /api/index``            index health (entries by type, schema version, when built)
                                and the state of a running rebuild
 ``POST /api/index/rebuild``    rebuild the datasource's snapshot and vector entries
+``GET  /api/retrieval``        whether the Retrieval inspector is on, and its choices
+``POST /api/retrieval``        one MMR search of the live index: the pool with scores,
+                               the picks in order, and what was dropped
 
 Every result pane in the browser is a renderer over ``QueryResult``; nothing
 is computed here that the engine does not already return. The only state is
@@ -32,7 +35,7 @@ from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from nl2sql.auth.models import UserContext
 from nl2sql.cli.demo.playground.index_panel import IndexPanel
@@ -88,6 +91,32 @@ class ModelsRequest(BaseModel):
 
 class RebuildRequest(BaseModel):
     enrich: bool = False
+
+
+# The entry types the index holds, in the order the inspector lists them.
+ENTRY_TYPES = ["schema.datasource", "schema.table", "schema.column", "schema.relationship", "schema.metric"]
+
+
+class RetrievalRequest(BaseModel):
+    query: str = Field(min_length=1, max_length=2000)
+    k: int = Field(default=8, ge=1, le=50)
+    lambda_mult: float = Field(default=0.7, ge=0.0, le=1.0)
+    types: List[str] = Field(default_factory=list)
+    datasource_id: Optional[str] = None
+
+
+def _retrieval_off_reason(panel) -> Optional[str]:
+    """Why the inspector is off, in its own words; the gate is the settings panel's."""
+    if panel.available:
+        return None
+    if panel.project_dir is None:
+        return "The Retrieval inspector is available in the playground that nl2sql demo starts."
+    return (
+        f"This playground is bound to {panel.host}, which other machines can reach, and it has no "
+        "login. The inspector shows every index entry, including column statistics and sample "
+        "values, to anyone who can open this page. Restart it on 127.0.0.1, or pass "
+        "--allow-settings if you trust everyone who can reach it."
+    )
 
 
 def _read_page() -> str:
@@ -182,6 +211,14 @@ def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset
     app.state.settings_panel = panel
     app.state.index_panel = index_panel
 
+    def retrieval_guard(request: Request) -> None:
+        # Local only, exactly like Settings and Rebuild: the same guard, with
+        # the inspector's own reason when it is off.
+        reason = _retrieval_off_reason(panel)
+        if reason:
+            raise HTTPException(status_code=403, detail=reason)
+        panel.guard(request)
+
     @app.exception_handler(RequestValidationError)
     async def _invalid_request(request: Request, exc: RequestValidationError) -> JSONResponse:
         # FastAPI echoes the offending input by default; for the key route that
@@ -272,5 +309,35 @@ def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset
         # --allow-settings, and only from the playground page itself.
         index_panel.start(req.enrich)
         return index_panel.read()
+
+    @app.get("/api/retrieval")
+    def retrieval_options() -> Dict[str, Any]:
+        from nl2sql.indexing.vector_store import VectorStore
+
+        return {
+            "available": panel.available,
+            "reason": _retrieval_off_reason(panel),
+            "datasource_id": index_panel.datasource_id,
+            "datasources": [d["datasource_id"] for d in index_panel.health().get("datasources", [])],
+            "types": ENTRY_TYPES,
+            "defaults": {"k": 8, "lambda_mult": VectorStore.LAMBDA_MULT,
+                         "fetch_multiplier": VectorStore.FETCH_MULTIPLIER},
+        }
+
+    @app.post("/api/retrieval", dependencies=[Depends(retrieval_guard)])
+    def retrieval(req: RetrievalRequest) -> Dict[str, Any]:
+        """One MMR search of the live index, as the engine runs it. It reads index
+        metadata only; the embedder is local, so it costs nothing."""
+        unknown = sorted(set(req.types) - set(ENTRY_TYPES))
+        if unknown:
+            raise HTTPException(status_code=422, detail=f"Unknown entry types: {', '.join(unknown)}.")
+        store = getattr(getattr(engine, "context", None), "vector_store", None)
+        if store is None:
+            raise HTTPException(status_code=409, detail="This playground has no vector index configured.")
+        try:
+            return store.inspect(req.query, k=req.k, lambda_mult=req.lambda_mult,
+                                 types=req.types, datasource_id=req.datasource_id or None)
+        except Exception as exc:  # a model mismatch, an unreadable collection
+            raise HTTPException(status_code=409, detail=str(exc))
 
     return app

@@ -56,6 +56,24 @@ The React source for the page `nl2sql demo` serves.
   exact prompt, the raw response and the parsed result, each folded. A
   **Download trace** link sits above the table.
 
+- **Retrieval** (`#retrieval-toggle`, top right beside Settings; the panel is
+  `#retrieval-panel`): the Retrieval inspector. Text to embed
+  (`#retrieval-query`), **Search** (`#retrieval-search`), picks `k`
+  (`#retrieval-k`, the pool is shown as `4 * k`), lambda (`#retrieval-lambda`),
+  a datasource filter (`#retrieval-datasource`) and one checkbox per entry type
+  (`#retrieval-type-table`, `-column`, `-datasource`, `-join`, `-metric`). It
+  posts to `POST /api/retrieval`; after the first search every knob searches
+  again. The result (`#retrieval-result`) is the pool nearest first, with
+  similarity, MMR pick order, the score each pick won with and its overlap with
+  earlier picks, each entry's embedded text, and **Copy as text**
+  (`#retrieval-copy`) for diffing two runs. A failure shows `#retrieval-error`.
+  Where it is off (the same rule as Settings) it says why
+  (`#retrieval-unavailable`).
+- **Retrieval in the drill-down**: for `datasource_resolver` and
+  `schema_retriever`, the node drill-down also shows the run's retrieval record
+  from the trace: the text embedded, each search's pool with the picks marked,
+  the entries MMR passed over, and the tables sent to the planner; or why no
+  search ran.
 - **Settings** (`#settings-toggle`, top right; the panel is `#settings-panel`):
   shut until asked for, and it pushes the page down rather than covering the
   run. **API key** (`#settings-key`, `#settings-save-key`) shows the key in use
@@ -100,8 +118,9 @@ if you edit anything under `src/`, run `npm run build` and commit
 `npm test` runs the pure helpers in `src/run.js` (SQL line breaks, the per-node
 ledger, refused-table parsing, the trace drill-down helpers), `src/settings.js`
 (model options, which nodes changed, which chosen models run without a
-temperature) and `src/indexHealth.js` (entry counts in plain words, the status
-line, relative build times) with Node's built-in test runner; there is no test dependency.
+temperature), `src/indexHealth.js` (entry counts in plain words, the status
+line, relative build times) and `src/retrieval.js` (the MMR summary line, picks
+in order, entries passed over, the copyable text form) with Node's built-in test runner; there is no test dependency.
 
 ## Fonts and offline use
 
@@ -125,7 +144,8 @@ it and proxy or point `fetch` at `http://127.0.0.1:8765` to exercise the real
 API; the app calls `/api/meta`, `/api/schema`, `/api/ask`, `/api/trace/{id}`
 the settings routes (`GET /api/settings`, `POST /api/settings/key`,
 `POST /api/settings/models`) and the index routes (`GET /api/index`,
-`POST /api/index/rebuild`). The settings routes and Rebuild refuse a request
+`POST /api/index/rebuild`) and the inspector's (`GET /api/retrieval`,
+`POST /api/retrieval`). The settings routes, Rebuild and the inspector refuse a request
 whose `Origin` is not the page's own, so use them from the page `nl2sql demo`
 serves, not from the Vite dev server.
 

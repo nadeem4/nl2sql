@@ -102,6 +102,16 @@ def test_a_run_writes_a_trace_with_every_node_its_llm_calls_and_no_secret(demo_p
     assert sub["rows"]["rows"] == [[59]]
     assert doc["failed"] is False
 
+    # Retrieval: the demo has one datasource and 11 tables, so neither node searched,
+    # and each says why.
+    [resolver] = [n for n in doc["nodes"] if n["node"] == "datasource_resolver"]
+    assert resolver["outputs"]["retrieval"] == {"skipped": True,
+                                                "reason": "single datasource: vector search skipped"}
+    [retriever] = [n for n in doc["nodes"] if n["node"] == "schema_retriever"]
+    retrieval = retriever["outputs"]["retrieval"]
+    assert retrieval["skipped"] is True and "11 tables" in retrieval["reason"]
+    assert len(retrieval["tables"]) == 11
+
 
 def _retry_rules():
     """The first plan counts a column that does not exist; the second is right."""

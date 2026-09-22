@@ -198,10 +198,11 @@ def demo(
     allow_settings: Annotated[bool, typer.Option(
         "--allow-settings",
         help=(
-            "Turn on the playground's settings panel (API key, model per LLM node) even when "
-            "--host is not a loopback address. Off by default there because the playground "
-            "has no login: anyone who can reach it could swap in their own key or run up "
-            "costs on yours."
+            "Turn on the playground's settings panel (API key, model per LLM node), Rebuild "
+            "and the Retrieval inspector even when --host is not a loopback address. Off by "
+            "default there because the playground has no login: anyone who can reach it could "
+            "swap in their own key, run up costs on yours, or read every index entry, column "
+            "statistics and sample values included."
         ),
     )] = False,
 ):

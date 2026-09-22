@@ -22,9 +22,10 @@ The key is looked for in a fixed order, highest precedence first:
 write a key down, and both write only to ``.env.demo``, through
 :func:`_persist_api_key`. A key saved in the panel takes effect at once, and on
 the next start it sits at step 3 of the order above. No path echoes a key: the
-console and the playground show at most a masked form. The panel is on only
-for a loopback ``--host`` unless ``--allow-settings`` is given; the playground
-never writes to the demo database.
+console and the playground show at most a masked form. The panel (and, by the
+same gate, Rebuild and the Retrieval inspector) is on only for a loopback
+``--host`` unless ``--allow-settings`` is given; the playground never writes to
+the demo database.
 """
 from __future__ import annotations
 

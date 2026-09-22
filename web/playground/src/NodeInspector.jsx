@@ -1,5 +1,6 @@
 import React from "react";
 import { callTokens, nodeRuns, pretty, readable } from "./run.js";
+import { RetrievalRecord } from "./Retrieval.jsx";
 
 // One node's internals, read from the run's trace file: every execution of the
 // node (attempts, sub-queries), what it read and wrote, its errors, and for an
@@ -98,6 +99,7 @@ export default function NodeInspector({ name, trace, loading, error, onClose }) 
             <span className="run-status">{run.status}</span>
           </p>
           <Problems run={run} />
+          <RetrievalRecord retrieval={run.outputs && run.outputs.retrieval} />
           {(run.llm_calls || []).map((call, i) => <LlmCall key={i} call={call} />)}
           <Fold label="Inputs" value={run.inputs && Object.keys(run.inputs).length ? run.inputs : null} meta="state fields the node read" />
           <Fold label="Outputs" value={run.outputs} meta="the update the node returned" />
