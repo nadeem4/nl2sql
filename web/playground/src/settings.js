@@ -1,5 +1,5 @@
 // Pure helpers for the settings panel. The providers and their model lists
-// live on the server (nl2sql/cli/common/api_key.py) and arrive from
+// live on the server (nl2sql/llm/providers.py) and arrive from
 // GET /api/settings; nothing here names a model or a provider.
 
 // A step's choice as one <select> value: "provider:model", or "" for the default.

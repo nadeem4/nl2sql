@@ -6,11 +6,12 @@ from rich.panel import Panel
 from InquirerPy import inquirer
 from InquirerPy.validator import NumberValidator
 
-from nl2sql.cli.common.api_key import (
+from nl2sql.llm.providers import (
     ANTHROPIC_ENV,
     DEFAULT_ANTHROPIC_MODEL,
     DEFAULT_OPENAI_MODEL,
     DEFAULT_OPENROUTER_MODEL,
+    OPENROUTER_ENV,
     default_model_for,
     default_temperature_for,
     env_var_for_key,
@@ -229,7 +230,7 @@ def _configure_llm(config_manager: ConfigManager, api_key: Optional[str] = None)
             message="OpenRouter model identifier (e.g. anthropic/claude-sonnet-4.5):",
             default=DEFAULT_OPENROUTER_MODEL
         ).execute()
-        env_var = "OPENROUTER_API_KEY"
+        env_var = OPENROUTER_ENV
         os.environ[env_var] = api_key  # available to the rest of this session
         default_agent = AgentConfig(
             provider="openrouter",

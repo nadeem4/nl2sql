@@ -34,17 +34,9 @@ from nl2sql.evaluation.faithfulness import answer_text, check_answer
 from nl2sql.evaluation.gold import GoldQuestion
 from nl2sql.evaluation.prices import PRICES, PRICES_CHECKED_ON, ModelPrice, call_cost
 from nl2sql.evaluation.types import BenchmarkConfig
+from nl2sql.llm.providers import LLM_AGENTS, VERIFIED_MODELS
 from nl2sql.services.callbacks.token_handler import QuestionUsage
 
-# The pipeline's LLM nodes: the graph node name usage is recorded under, and
-# the agent key the LLM config names it by.
-LLM_NODES: Dict[str, str] = {
-    "datasource_resolver": "datasourceresolver",
-    "decomposer": "decomposer",
-    "ast_planner": "astplanner",
-    "refiner": "refiner",
-    "answer_synthesizer": "answersynthesizer",
-}
 _TOKEN_FIELDS = ("calls", "input_tokens", "cached_input_tokens", "cache_write_input_tokens",
                  "output_tokens", "reasoning_tokens")
 
@@ -60,12 +52,12 @@ class UnknownPriceError(ValueError):
 def node_agents(cfg: LLMFileConfig) -> Dict[str, AgentConfig]:
     """The agent each LLM node will run on: its own entry, else the default."""
     agents = cfg.agents or {}
-    return {node: agents.get(key) or cfg.default for node, key in LLM_NODES.items()}
+    return {node: agents.get(key) or cfg.default for node, key in LLM_AGENTS.items()}
 
 
 def check_prices(llm_configs: Dict[str, LLMFileConfig], prices: Dict[str, ModelPrice] = PRICES) -> None:
     """Raises before any call if a model some LLM node would call has no price."""
-    missing = [f"{name}/{LLM_NODES[node]}: {agent.model}"
+    missing = [f"{name}/{LLM_AGENTS[node]}: {agent.model}"
                for name, cfg in llm_configs.items()
                for node, agent in node_agents(cfg).items() if agent.model not in prices]
     if missing:
@@ -76,9 +68,7 @@ def check_prices(llm_configs: Dict[str, LLMFileConfig], prices: Dict[str, ModelP
 
 def unverified_models(llm_configs: Dict[str, LLMFileConfig]) -> List[str]:
     """A warning per (config, node) whose model is not in ``VERIFIED_MODELS`` for its provider."""
-    from nl2sql.cli.common.api_key import VERIFIED_MODELS
-
-    return [f"{name}/{LLM_NODES[node]}: {agent.provider} model '{agent.model}' is not in VERIFIED_MODELS; "
+    return [f"{name}/{LLM_AGENTS[node]}: {agent.provider} model '{agent.model}' is not in VERIFIED_MODELS; "
             "the engine's parameters have not been checked against it."
             for name, cfg in llm_configs.items()
             for node, agent in node_agents(cfg).items()
@@ -371,7 +361,7 @@ def run_tier2(
     boards = {}
     for name, cfg in llm_configs.items():
         board = score_config(records[name], passes)
-        board["models"] = {LLM_NODES[n]: f"{a.provider}:{a.model}" for n, a in node_agents(cfg).items()}
+        board["models"] = {LLM_AGENTS[n]: f"{a.provider}:{a.model}" for n, a in node_agents(cfg).items()}
         board["planned_cases"], board["completed_cases"] = planned, len(records[name])
         boards[name] = board
     return {

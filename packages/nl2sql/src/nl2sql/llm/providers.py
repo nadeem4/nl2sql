@@ -1,25 +1,30 @@
-"""One rule for a key handed to the CLI: which provider, which variable, and
-how to show it without showing it.
+"""What the engine knows about providers and models beyond how to call them.
 
-``nl2sql setup --api-key`` and ``nl2sql demo --api-key`` both take a raw key on
-the command line. Neither asks which provider it belongs to: OpenRouter issues
-keys prefixed ``sk-or-``, Anthropic ``sk-ant-``, and OpenAI neither, so the
-shape answers it. That is
-the whole abstraction -- the provider preset table stays the source of truth
-for everything else about a provider.
+``PROVIDER_PRESETS`` (``llm/registry.py``) is the source of truth for a
+provider's endpoint and key variable; everything here is derived from it or
+sits next to it: which provider a raw key belongs to, the model a new config
+starts with, the models whose parameters have been checked, and the agent name
+each LLM node of the pipeline runs under. The CLI, the playground, evaluation
+and the REST API all read it from here.
 """
 
 from __future__ import annotations
 
-from typing import Dict, Optional
+from typing import Dict, Optional, Tuple
+
+from .registry import PROVIDER_PRESETS
 
 __all__ = [
     "ANTHROPIC_ENV",
     "DEFAULT_ANTHROPIC_MODEL",
     "DEFAULT_OPENAI_MODEL",
     "DEFAULT_OPENROUTER_MODEL",
+    "KEYED_PROVIDERS",
+    "LLM_AGENTS",
     "OPENAI_ENV",
     "OPENROUTER_ENV",
+    "PROVIDER_KEYS",
+    "UPSTREAMS",
     "VERIFIED_ANTHROPIC_MODELS",
     "VERIFIED_MODELS",
     "VERIFIED_OPENAI_MODELS",
@@ -31,9 +36,32 @@ __all__ = [
     "provider_for_key",
 ]
 
-OPENAI_ENV = "OPENAI_API_KEY"
-OPENROUTER_ENV = "OPENROUTER_API_KEY"
-ANTHROPIC_ENV = "ANTHROPIC_API_KEY"
+OPENAI_ENV = PROVIDER_PRESETS["openai"].api_key_env
+OPENROUTER_ENV = PROVIDER_PRESETS["openrouter"].api_key_env
+ANTHROPIC_ENV = PROVIDER_PRESETS["anthropic"].api_key_env
+
+# The providers a key selects, and the variables they read it from, in preset order.
+KEYED_PROVIDERS: Tuple[str, ...] = tuple(name for name, p in PROVIDER_PRESETS.items() if p.api_key_env)
+PROVIDER_KEYS: Tuple[str, ...] = tuple(PROVIDER_PRESETS[name].api_key_env for name in KEYED_PROVIDERS)
+
+# Where a keyed OpenAI-wire provider is reached. OpenAI's preset leaves
+# base_url unset so the client keeps its own default (and OPENAI_BASE_URL);
+# the demo's recording proxy needs the address spelled out.
+_OPENAI_BASE_URL = "https://api.openai.com/v1"
+UPSTREAMS: Dict[str, str] = {
+    name: PROVIDER_PRESETS[name].base_url or _OPENAI_BASE_URL
+    for name in KEYED_PROVIDERS if PROVIDER_PRESETS[name].wire == "openai"
+}
+
+# The pipeline's LLM nodes: the graph node name usage is recorded under, and
+# the agent key the LLM config names it by. Anything not listed uses ``default``.
+LLM_AGENTS: Dict[str, str] = {
+    "datasource_resolver": "datasourceresolver",
+    "decomposer": "decomposer",
+    "ast_planner": "astplanner",
+    "refiner": "refiner",
+    "answer_synthesizer": "answersynthesizer",
+}
 
 # The model a config written by `setup` or `demo` starts with. gpt-5.4 accepts
 # temperature=0 and had 500,000 tokens/min on the owner's account (gpt-4o: 30,000,
@@ -41,6 +69,8 @@ ANTHROPIC_ENV = "ANTHROPIC_API_KEY"
 # matching OpenRouter id for gpt-5.4 has not been verified.
 DEFAULT_OPENAI_MODEL = "gpt-5.4"
 DEFAULT_OPENROUTER_MODEL = "anthropic/claude-sonnet-4.5"
+# Anthropic's current flagship, and the default its own documentation gives.
+DEFAULT_ANTHROPIC_MODEL = "claude-opus-5"
 
 # The models the playground's settings panel offers per LLM node, each with the
 # temperature a node on it is written with. The only list: the page reads it
@@ -75,14 +105,10 @@ VERIFIED_MODELS: Dict[str, Dict[str, Optional[float]]] = {
     "anthropic": VERIFIED_ANTHROPIC_MODELS,
 }
 
-# Anthropic's current flagship, and the default its own documentation gives.
-DEFAULT_ANTHROPIC_MODEL = "claude-opus-5"
-
 # Each provider's own documented prefix. Anthropic's ``sk-ant-`` and
 # OpenRouter's ``sk-or-`` are both also ``sk-``, so they are checked before
 # falling back to OpenAI, the provider every other path already defaults to.
 _PREFIXES = (("sk-ant-", "anthropic"), ("sk-or-", "openrouter"))
-_ENV_VARS = {"openai": OPENAI_ENV, "openrouter": OPENROUTER_ENV, "anthropic": ANTHROPIC_ENV}
 _DEFAULT_MODELS = {"openai": DEFAULT_OPENAI_MODEL, "openrouter": DEFAULT_OPENROUTER_MODEL,
                    "anthropic": DEFAULT_ANTHROPIC_MODEL}
 
@@ -104,7 +130,8 @@ def default_temperature_for(provider: str) -> Optional[float]:
 
 def env_var_for_provider(provider: str) -> str:
     """Returns the environment variable ``provider`` reads its key from."""
-    return _ENV_VARS.get(provider, OPENAI_ENV)
+    preset = PROVIDER_PRESETS.get(provider)
+    return (preset.api_key_env if preset else None) or OPENAI_ENV
 
 
 def env_var_for_key(key: str) -> str:

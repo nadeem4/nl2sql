@@ -345,7 +345,7 @@ takes: `0.0`, or `null` for `gpt-5.5`, `gpt-5-mini`, `claude-opus-5` and
 provider's own `${env:...}` reference and no `base_url`. Choosing "Default"
 removes the entry. The running engine reloads the file, so the change applies
 to the next question. The panel offers the providers and models in
-`VERIFIED_MODELS` (`nl2sql/cli/common/api_key.py`), OpenAI and Anthropic for
+`VERIFIED_MODELS` (`nl2sql/llm/providers.py`), OpenAI and Anthropic for
 now, and a provider only once its key is saved. See
 [the settings panel](../getting_started/demo.md#the-settings-panel).
 

@@ -34,8 +34,8 @@ from urllib.parse import urlsplit
 import yaml
 from fastapi import HTTPException, Request
 
-from nl2sql.cli.common.api_key import VERIFIED_MODELS, env_var_for_key, mask_key, provider_for_key
-from nl2sql.cli.commands.demo import PROVIDER_KEYS, _persist_api_key, _point_llm_config_at
+from nl2sql.llm.providers import LLM_AGENTS, PROVIDER_KEYS, VERIFIED_MODELS, env_var_for_key, mask_key, provider_for_key
+from nl2sql.cli.commands.demo import _persist_api_key, _point_llm_config_at
 from nl2sql.common.logger import get_logger
 from nl2sql.configs import ConfigManager
 from nl2sql.llm.registry import PROVIDER_PRESETS
@@ -45,19 +45,21 @@ logger = get_logger(__name__)
 LLM_CONFIG = Path("configs") / "llm.demo.yaml"
 ENV_FILE = Path(".env.demo")
 
-# The five nodes that call a model, by the agent name the LLM registry knows
-# them under, labelled by what they do. Anything not listed uses ``default``.
+# What each LLM node does, for the page. The nodes and their agent names are
+# ``LLM_AGENTS``; anything not listed there uses ``default``.
+_NODE_TEXT = {
+    "datasource_resolver": ("Answerability check",
+                            "Refuses a question the connected data cannot answer, before anything else runs. "
+                            "A short prompt."),
+    "decomposer": ("Question splitter", "Breaks the question into sub-queries. A short prompt."),
+    "ast_planner": ("Query planner",
+                    "Turns each sub-query into a plan. Decides whether the SQL is right; most of the tokens."),
+    "refiner": ("Plan repair", "Rewrites a plan the validator rejected. Runs only on a retry."),
+    "answer_synthesizer": ("Answer writer", "Summarises the rows in a sentence. A short prompt."),
+}
 LLM_NODES: List[Dict[str, str]] = [
-    {"agent": "datasourceresolver", "label": "Answerability check",
-     "does": "Refuses a question the connected data cannot answer, before anything else runs. A short prompt."},
-    {"agent": "decomposer", "label": "Question splitter",
-     "does": "Breaks the question into sub-queries. A short prompt."},
-    {"agent": "astplanner", "label": "Query planner",
-     "does": "Turns each sub-query into a plan. Decides whether the SQL is right; most of the tokens."},
-    {"agent": "refiner", "label": "Plan repair",
-     "does": "Rewrites a plan the validator rejected. Runs only on a retry."},
-    {"agent": "answersynthesizer", "label": "Answer writer",
-     "does": "Summarises the rows in a sentence. A short prompt."},
+    {"agent": agent, "label": _NODE_TEXT[node][0], "does": _NODE_TEXT[node][1]}
+    for node, agent in LLM_AGENTS.items()
 ]
 _AGENTS = {node["agent"] for node in LLM_NODES}
 

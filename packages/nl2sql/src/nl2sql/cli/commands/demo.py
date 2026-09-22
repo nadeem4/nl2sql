@@ -37,7 +37,10 @@ from typing import List, Optional, Tuple
 
 import yaml
 
-from nl2sql.cli.common.api_key import (
+from nl2sql.llm.providers import (
+    KEYED_PROVIDERS,
+    PROVIDER_KEYS,
+    UPSTREAMS,
     default_model_for,
     default_temperature_for,
     env_var_for_key,
@@ -52,6 +55,7 @@ from nl2sql.cli.demo.chinook import CHINOOK_QUESTIONS
 from nl2sql.cli.demo.stamp import outdated_warning
 from rich.markup import escape
 from nl2sql.common.settings import reload_settings
+from nl2sql.llm.registry import PROVIDER_PRESETS
 from nl2sql.llm.replay import RecordingProxy, ReplayStore
 from nl2sql.testing.fake_llm import FakeLLMServer
 
@@ -67,13 +71,18 @@ DATASET = "chinook"
 # it with `override=True`, which blanked a real key already in the environment,
 # so live mode fell back to `ollama` and enrichment ran with no key. Indexing now
 # keeps a key already set (`manager._load_demo_env`); restoring the keys the mode
-# was chosen from after scaffolding stays as a second guard.
-PROVIDER_KEYS = ("OPENAI_API_KEY", "OPENROUTER_API_KEY", "ANTHROPIC_API_KEY")
+# was chosen from after scaffolding stays as a second guard. Those keys are
+# ``PROVIDER_KEYS``; it, ``UPSTREAMS`` (where the recording proxy forwards each
+# OpenAI-wire provider) and ``KEYED_PROVIDERS`` (the providers a saved key can
+# select) all come from the provider presets in ``nl2sql.llm``.
+
+# Ollama's own API sits next to the OpenAI-compatible /v1 its preset names.
+OLLAMA_TAGS_URL = PROVIDER_PRESETS["ollama"].base_url.rsplit("/v1", 1)[0] + "/api/tags"
 
 
 def _ollama_reachable() -> bool:
     try:
-        with urllib.request.urlopen("http://localhost:11434/api/tags", timeout=1.0) as response:
+        with urllib.request.urlopen(OLLAMA_TAGS_URL, timeout=1.0) as response:
             return response.status == 200
     except Exception:
         return False
@@ -83,14 +92,6 @@ def detect_llm_mode() -> str:
     if any(os.environ.get(name) for name in PROVIDER_KEYS) or _ollama_reachable():
         return "live"
     return "replay"
-
-
-UPSTREAMS = {
-    "openai": "https://api.openai.com/v1",
-    "openrouter": "https://openrouter.ai/api/v1",
-}
-# The providers a saved key can select.
-KEYED_PROVIDERS = (*UPSTREAMS, "anthropic")
 
 
 def live_provider(key: Optional[str], source: str) -> str:

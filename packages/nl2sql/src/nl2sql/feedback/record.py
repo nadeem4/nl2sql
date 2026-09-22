@@ -13,6 +13,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Mapping, Optional
 
+from nl2sql.llm.providers import LLM_AGENTS
+
 # The error codes that mean the engine refused the question, rather than failed.
 REFUSAL_CODES = ("SECURITY_VIOLATION", "QUESTION_NOT_ANSWERABLE")
 
@@ -51,8 +53,8 @@ def run_signals(result: Mapping[str, Any], trace: Optional[Mapping[str, Any]] = 
 
 
 def _agent(node: str) -> str:
-    # The LLM registry names agents without underscores: ast_planner -> astplanner.
-    return node.replace("_", "")
+    """The agent name the LLM config knows ``node`` under (ast_planner -> astplanner)."""
+    return LLM_AGENTS.get(node, node)
 
 
 def models_by_node(result: Mapping[str, Any], llm_configs: Mapping[str, Mapping[str, Any]]) -> Dict[str, Dict[str, Any]]:
