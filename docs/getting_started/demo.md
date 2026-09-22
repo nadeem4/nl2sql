@@ -48,7 +48,7 @@ Setup then runs schema indexing once, automatically, and exits `1` if it fails.
 For the browser playground instead of the CLI, `nl2sql demo` does the same
 scaffolding in `./nl2sql-demo` and serves a page over it. See the
 [README](https://github.com/nadeem4/nl2sql#try-it) for its flags, and
-[the settings panel](#the-settings-panel) for entering a key and choosing
+[the Settings page](#the-settings-page) for entering a key and choosing
 models from the page.
 
 ### The schemas
@@ -198,7 +198,7 @@ is also always available on demand.
   model, so it can take a few minutes.
 - **Write descriptions with the LLM** is off by default because it spends
   tokens on your key; it is unavailable in replay mode.
-- It has the settings panel's guardrails (so does the
+- It has the Settings page's guardrails (so does the
   [Retrieval inspector](#the-retrieval-inspector)): local only unless `--allow-settings`,
   and only from the playground page itself.
 
@@ -211,10 +211,21 @@ starts in a folder stamped by an older engine, or in one with no stamp at all,
 it warns and suggests a fresh `--dir`. The playground's index panel repeats the
 warning.
 
-### The settings panel
+### Pages
 
-The playground that `nl2sql demo` serves has a **Settings** button at the top
-right. It edits the same two files the CLI reads, and nothing else: there is no
+The playground is three pages, named across the top of every one of them:
+**Ask**, **Settings** and **Retrieval**. Each is a route in the address bar --
+`#/`, `#/settings` and `#/retrieval` -- so a reload stays where you were, a
+link can be pasted to someone else, and Back and Forward walk the pages you
+visited. A route nobody serves lands on Ask. The nav marks the page you are on,
+and marks Settings or Retrieval when the server has it off; the page itself
+then says why. Moving between pages keeps the question, the answer and the
+Debug choice: they belong to the visit, not to the page.
+
+### The Settings page
+
+The playground that `nl2sql demo` serves has a **Settings** page in the header
+nav. It edits the same two files the CLI reads, and nothing else: there is no
 second settings store, and the browser keeps nothing but UI conveniences.
 
 - **API keys, one per provider.** Paste a key and press **Save key**. The
@@ -277,9 +288,8 @@ second settings store, and the browser keeps nothing but UI conveniences.
 
 ### The Retrieval inspector
 
-The **Retrieval** button next to Settings opens a panel that embeds any text
-with the local model and runs the engine's own vector search against the live
-index: the pool of nearest entries with their similarity, the entries MMR picks
+**Retrieval** is the third page in the header nav. It embeds any text with the
+local model and runs the engine's own vector search against the live index: the pool of nearest entries with their similarity, the entries MMR picks
 in order, the score each won with, and what was dropped. There is no
 re-ranking model; the "re-ranking" is MMR, explained in
 [Indexing](../architecture/indexing.md#retrieval-mmr-not-a-re-ranking-model).
@@ -443,7 +453,7 @@ Whether a given question is answered correctly depends on the model; see
 
 Re-running `nl2sql setup --demo` overwrites all three databases under `data/`
 and the `configs/*.demo.*` files with fresh copies. An existing `.env.demo` is
-overwritten too, so a key recorded there is lost - pass `--api-key` again, save it in the playground's Settings panel, or
+overwritten too, so a key recorded there is lost - pass `--api-key` again, save it on the playground's Settings page, or
 re-add it afterwards.
 
 ## The datasets that are not here
