@@ -35,6 +35,7 @@ def engine(monkeypatch, tmp_path) -> NL2SQL:
 
     monkeypatch.setattr(settings, "vector_store_collection_name", "nl2sql_store")
     monkeypatch.setattr(settings, "vector_store_path", "")
+    monkeypatch.setattr(settings, "schema_store_path", str(tmp_path / "schema_store.db"))
     monkeypatch.setattr(settings, "embedding_provider", "local")
     monkeypatch.setattr(settings, "openai_api_key", "")
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
@@ -77,6 +78,7 @@ def _write_demo_env_file(path: Path, tmp_path: Path) -> None:
                 "EMBEDDING_PROVIDER=local",
                 f"VECTOR_STORE={tmp_path.as_posix()}",
                 "VECTOR_STORE_COLLECTION=nl2sql_store",
+                f"SCHEMA_STORE_PATH={(tmp_path / 'schema_store.db').as_posix()}",
                 f"DATASOURCE_CONFIG={(root / 'configs' / 'datasources.demo.yaml').as_posix()}",
                 f"LLM_CONFIG={(root / 'configs' / 'llm.demo.yaml').as_posix()}",
                 f"POLICIES_CONFIG={(root / 'configs' / 'policies.demo.json').as_posix()}",
@@ -100,6 +102,7 @@ _ENV_VARS_TOUCHED = (
     "EMBEDDING_PROVIDER",
     "VECTOR_STORE",
     "VECTOR_STORE_COLLECTION",
+    "SCHEMA_STORE_PATH",
     "DATASOURCE_CONFIG",
     "LLM_CONFIG",
     "POLICIES_CONFIG",

@@ -17,7 +17,7 @@ from nl2sql.context import NL2SQLContext
 logger = get_logger("generator")
 
 
-def ordered(expression: exp.Expression, direction: str) -> exp.Ordered:
+def ordered(expression: exp.Expression, direction: str, dialect: str | None = None) -> exp.Ordered:
     """Wraps an ORDER BY term the way sqlglot's own parser would.
 
     ``Select.order_by()`` only wraps its argument in ``exp.Ordered`` when it has
@@ -28,8 +28,20 @@ def ordered(expression: exp.Expression, direction: str) -> exp.Ordered:
     ``exp.Anonymous`` into ``Order.expressions`` in the validator, where
     ``qualify()``'s positional-reference expansion reads its string ``this`` as
     an expression and raises.
+
+    ``nulls_first`` is set to the dialect's own default for the direction, as
+    the parser does, so no ``NULLS FIRST``/``NULLS LAST`` (or, on T-SQL and
+    MySQL, a ``CASE`` emulating it) is rendered and NULLs stay where the
+    database puts them.
     """
-    return exp.Ordered(this=expression, desc=(direction == "desc"))
+    desc = direction == "desc"
+    return exp.Ordered(this=expression, desc=desc, nulls_first=default_nulls_first(desc, dialect))
+
+
+def default_nulls_first(desc: bool, dialect: str | None) -> bool:
+    """Where ``dialect`` puts NULLs for this sort direction when told nothing."""
+    null_ordering = Dialect.get_or_raise(dialect).NULL_ORDERING
+    return null_ordering != "nulls_are_last" and (null_ordering == "nulls_are_small") != desc
 
 
 _BINARY_NODES = {
@@ -375,7 +387,7 @@ class GeneratorNode:
         for o in sorted(plan.order_by, key=lambda x: x.ordinal):
             term = visitor.visit(o.expr)
             ordered_on.add(term.sql())
-            query = query.order_by(ordered(term, o.direction))
+            query = query.order_by(ordered(term, o.direction, dialect))
 
         # Tie-breakers: without them LIMIT can keep a different subset of rows
         # on each run. Ordering by every selected column never changes what the
@@ -383,7 +395,6 @@ class GeneratorNode:
         # constants are skipped (they order nothing, and ``ORDER BY 1`` is a
         # position). Each keeps the dialect's own NULL placement, so no
         # ``NULLS LAST`` (or a CASE emulating it) is rendered.
-        nulls_first = Dialect.get_or_raise(dialect).NULL_ORDERING == "nulls_are_small"
         for e, alias in selected:
             if not e.find(exp.Column) or (isinstance(e, exp.Column) and e.name == "*"):
                 continue
@@ -391,7 +402,7 @@ class GeneratorNode:
             if e.sql() in ordered_on or key.sql() in ordered_on:
                 continue
             ordered_on.add(key.sql())
-            query = query.order_by(exp.Ordered(this=key.copy(), nulls_first=nulls_first))
+            query = query.order_by(exp.Ordered(this=key.copy(), nulls_first=default_nulls_first(False, dialect)))
 
         query = query.limit(limit)
 

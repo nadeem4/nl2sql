@@ -49,8 +49,8 @@ def _captured_plan() -> dict:
     return json.loads(FIXTURE.read_text(encoding="utf-8"))
 
 
-def _generate(plan: PlanModel) -> dict:
-    adapter = SimpleNamespace(row_limit=1000, get_dialect=lambda: "sqlite")
+def _generate(plan: PlanModel, dialect: str = "sqlite") -> dict:
+    adapter = SimpleNamespace(row_limit=1000, get_dialect=lambda: dialect)
     ctx = SimpleNamespace(ds_registry=SimpleNamespace(get_adapter=lambda _id: adapter))
     state = SubgraphExecutionState(
         trace_id="t",
@@ -60,8 +60,8 @@ def _generate(plan: PlanModel) -> dict:
     return GeneratorNode(ctx)(state)
 
 
-def _sql(plan: PlanModel) -> str:
-    result = _generate(plan)
+def _sql(plan: PlanModel, dialect: str = "sqlite") -> str:
+    result = _generate(plan, dialect)
     assert not result.get("errors"), result.get("errors")
     return result["generator_response"].sql_draft
 
@@ -445,3 +445,59 @@ def test_a_truncated_result_is_always_the_same_first_rows():
 
     assert all(run == runs[0] for run in runs)
     assert runs[0] == sorted(full)[:10]
+
+
+# --- NULL placement: the plan's own ORDER BY keeps the dialect's default -----
+#
+# Plan terms used to be built without ``nulls_first``, so sqlglot rendered the
+# base dialect's placement: ``x ASC NULLS LAST`` on SQLite (moving NULLs from
+# where SQLite puts them), and on T-SQL and MySQL a ``CASE WHEN ... IS NULL``
+# emulation, which is invalid when the term is a select alias.
+
+
+def _mixed_direction_plan() -> PlanModel:
+    return PlanModel(
+        tables=[TableRef(name="Customer", alias="c", ordinal=0)],
+        select_items=[
+            SelectItem(ordinal=0, expr=_col("c", "Country")),
+            SelectItem(ordinal=1, expr=_col("c", "City"), alias="city"),
+            SelectItem(ordinal=2, expr=_col("c", "LastName")),
+        ],
+        order_by=[
+            OrderItem(ordinal=0, direction="asc", expr=Expr(kind="column", column_name="city")),
+            OrderItem(ordinal=1, direction="desc", expr=_col("c", "Country")),
+        ],
+        limit=5,
+    )
+
+
+@pytest.mark.parametrize(
+    "dialect, expected",
+    [
+        ("sqlite", "SELECT c.Country, c.City AS city, c.LastName FROM Customer AS c "
+                   "ORDER BY city ASC, c.Country DESC, c.LastName LIMIT 5"),
+        ("postgres", "SELECT c.Country, c.City AS city, c.LastName FROM Customer AS c "
+                     "ORDER BY city ASC, c.Country DESC, c.LastName LIMIT 5"),
+        ("tsql", "SELECT TOP 5 c.Country, c.City AS city, c.LastName FROM Customer AS c "
+                 "ORDER BY city ASC, c.Country DESC, c.LastName"),
+        ("mysql", "SELECT c.Country, c.City AS city, c.LastName FROM Customer AS c "
+                  "ORDER BY city ASC, c.Country DESC, c.LastName LIMIT 5"),
+    ],
+)
+def test_plan_order_by_terms_keep_the_dialects_default_null_placement(dialect, expected):
+    sql = _sql(_mixed_direction_plan(), dialect)
+
+    assert sql == expected
+    assert "NULLS" not in sql and "CASE" not in sql
+
+
+def test_an_ascending_plan_order_by_puts_nulls_where_sqlite_does():
+    plan = _single_table_plan(
+        select_items=[SelectItem(ordinal=0, expr=_col("c", "Company"), alias="company")],
+        order_by=[OrderItem(ordinal=0, direction="asc", expr=_col("c", "Company"))],
+    )
+
+    rows = _run_on_chinook(_sql(plan))
+
+    assert rows == _run_on_chinook("SELECT Company FROM Customer ORDER BY Company")
+    assert rows[0] == (None,)

@@ -115,3 +115,27 @@ def test_an_equality_filter_on_a_real_value_outside_the_sample_is_not_rejected()
     result = LogicalValidatorNode(_ctx())(_state(plan, tables))
 
     assert ErrorCode.INVALID_PLAN_STRUCTURE not in _codes(result), [e.message for e in result["errors"]]
+
+
+def test_ascending_order_by_terms_validate_with_the_dialects_null_placement():
+    """Plan terms now carry ``nulls_first``; the validator must still accept them."""
+    tables = [Table(name="orders", columns=[Column(name="id", type="int"), Column(name="city", type="text")])]
+    count = Expr(kind="func", func_name="COUNT", is_aggregate=True,
+                 args=[Expr(kind="column", alias="o", column_name="id")])
+    plan = PlanModel(
+        query_type="READ",
+        tables=[TableRef(name="orders", alias="o", ordinal=0)],
+        select_items=[
+            SelectItem(ordinal=0, expr=Expr(kind="column", alias="o", column_name="city")),
+            SelectItem(ordinal=1, alias="n", expr=count),
+        ],
+        group_by=[GroupByItem(ordinal=0, expr=Expr(kind="column", alias="o", column_name="city"))],
+        order_by=[
+            OrderItem(ordinal=0, direction="asc", expr=count),
+            OrderItem(ordinal=1, direction="asc", expr=Expr(kind="column", alias="o", column_name="city")),
+        ],
+    )
+
+    result = LogicalValidatorNode(_ctx())(_state(plan, tables))
+
+    assert _codes(result) == [], _codes(result)

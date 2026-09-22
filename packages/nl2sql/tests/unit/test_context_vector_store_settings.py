@@ -21,6 +21,12 @@ def _demo_config_paths(root: Path, secrets_config_path: Path) -> dict[str, Path]
     }
 
 
+@pytest.fixture(autouse=True)
+def schema_store_in_tmp(monkeypatch, tmp_path):
+    """Keep the context's schema store out of the working directory."""
+    monkeypatch.setattr(settings, "schema_store_path", str(tmp_path / "schema_store.db"))
+
+
 def _write_empty_secrets(tmp_path: Path) -> Path:
     secrets_path = tmp_path / "secrets.yaml"
     secrets_path.write_text("version: 1\nproviders: []\n", encoding="utf-8")
