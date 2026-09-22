@@ -8,9 +8,12 @@ read as comparable), which model each node ran on, the headline metrics and
 the config's full scoreboard (answer faithfulness included; records written
 before it existed show a dash). The owner commits records.
 
+``nl2sql benchmark retrieval --record`` writes a retrieval recall record to
+``benchmarks/retrieval/``, named ``<YYYY-MM-DD>_<engine-version>_retrieval.json``.
+
 ``publish`` reads every record and writes ``docs/benchmarks.md`` (every run,
-newest first, plus the latest run per config) and the block between the
-README's ``BENCHMARKS`` markers. It reads no clock and calls nothing, so the
+newest first, plus the latest run per config, then the retrieval recall
+runs) and the block between the README's ``BENCHMARKS`` markers. It reads no clock and calls nothing, so the
 same records always give byte-identical pages.
 """
 from __future__ import annotations
@@ -25,6 +28,7 @@ import subprocess
 from typing import Any, Dict, List, Optional, Sequence
 
 RESULTS_DIR = pathlib.Path("benchmarks") / "results"
+RETRIEVAL_DIR = pathlib.Path("benchmarks") / "retrieval"
 HISTORY_PATH = pathlib.Path("docs") / "benchmarks.md"
 README_PATH = pathlib.Path("README.md")
 START = "<!-- BENCHMARKS:START -->"
@@ -49,6 +53,12 @@ def current_git_commit() -> Optional[str]:
     return (out.stdout.strip() or None) if out.returncode == 0 else None
 
 
+def dataset_id(path: pathlib.Path) -> Dict[str, str]:
+    """The gold file's name and sha256, of its LF bytes: a Windows checkout's CRLF gives the same hash."""
+    data = pathlib.Path(path).read_bytes().replace(b"\r\n", b"\n")
+    return {"name": pathlib.Path(path).name, "sha256": hashlib.sha256(data).hexdigest()}
+
+
 def make_record(board: Dict[str, Any], name: str, *, recorded_at: dt.datetime, engine_version: str,
                 git_commit: Optional[str]) -> Dict[str, Any]:
     """The record for config ``name`` of a tier 2 scoreboard."""
@@ -65,7 +75,7 @@ def make_record(board: Dict[str, Any], name: str, *, recorded_at: dt.datetime, e
         "recorded_at": recorded_at.astimezone(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "engine_version": engine_version,
         "git_commit": git_commit,
-        "dataset": {"name": dataset.name, "sha256": hashlib.sha256(dataset.read_bytes()).hexdigest()},
+        "dataset": dataset_id(dataset),
         "config": {"name": name, "models": cfg["models"]},
         "roles": board["roles"],
         "passes": board["passes"],
@@ -113,6 +123,34 @@ def write_records(board: Dict[str, Any], results_dir: pathlib.Path = RESULTS_DIR
                         encoding="utf-8", newline="\n")
         written.append(path)
     return written
+
+
+def write_retrieval_record(report: Dict[str, Any], results_dir: pathlib.Path = RETRIEVAL_DIR, *,
+                           recorded_at: Optional[dt.datetime] = None, engine_version: Optional[str] = None,
+                           git_commit: Optional[str] = None) -> pathlib.Path:
+    """Writes a retrieval recall report's record, ``<date>_<version>_retrieval.json``; returns its path."""
+    recorded_at = recorded_at or dt.datetime.now(dt.timezone.utc)
+    version = engine_version or installed_engine_version()
+    dataset = pathlib.Path(report["dataset"])
+    record = {
+        "schema": SCHEMA_VERSION, "kind": "retrieval",
+        "recorded_at": recorded_at.astimezone(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "engine_version": version, "git_commit": git_commit,
+        "dataset": dataset_id(dataset),
+        "settings": report["settings"], "metrics": report["summary"],
+        # The dataset is named above; its local path would differ on every machine.
+        "report": {k: v for k, v in report.items() if k != "dataset"},
+    }
+    results_dir = pathlib.Path(results_dir)
+    results_dir.mkdir(parents=True, exist_ok=True)
+    stem = f"{recorded_at.astimezone(dt.timezone.utc):%Y-%m-%d}_{_slug(version)}_retrieval"
+    path, n = results_dir / f"{stem}.json", 1
+    while path.exists():
+        n += 1
+        path = results_dir / f"{stem}-{n}.json"
+    path.write_text(json.dumps(record, indent=2, ensure_ascii=False, default=str) + "\n",
+                    encoding="utf-8", newline="\n")
+    return path
 
 
 def load_records(results_dir: pathlib.Path = RESULTS_DIR) -> List[Dict[str, Any]]:
@@ -177,15 +215,34 @@ def _latest_per_config(recs: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return [latest[k] for k in sorted(latest)]
 
 
-def render_history(recs: Sequence[Dict[str, Any]]) -> str:
-    """``docs/benchmarks.md``: the latest run per config, then every run, newest first."""
+def render_retrieval(recs: Sequence[Dict[str, Any]]) -> str:
+    """The retrieval recall section: every recorded run, newest first; empty without runs."""
+    if not recs:
+        return ""
+    table = _table(
+        ["Date (UTC)", "Version", "Commit", "Dataset", "Search", "Embedding", "Questions", "Table recall",
+         "Column recall", "Tables / columns sent"],
+        [[r["recorded_at"].replace("T", " ").rstrip("Z"), r["engine_version"], (r.get("git_commit") or "-")[:8],
+          _dataset(r), f"k {r['settings']['table_k']} tables / {r['settings']['planning_k']} planning",
+          r["settings"]["embedding"], r["metrics"]["questions"], _pct(r["metrics"]["table_recall"]),
+          _pct(r["metrics"]["column_recall"]), f"{r['metrics']['tables_sent']:.1f} / {r['metrics']['columns_sent']:.1f}"]
+         for r in _newest_first(recs)])
+    return ("\n## Retrieval recall\n\n"
+            "`nl2sql benchmark retrieval --record`: the share of each answerable gold question's needed\n"
+            "tables and columns that schema retrieval sends the planner, with the vector search forced on\n"
+            "and no LLM. Mean over questions; tables and columns sent are means too.\n\n"
+            f"{table}\n")
+
+
+def render_history(recs: Sequence[Dict[str, Any]], retrieval: Sequence[Dict[str, Any]] = ()) -> str:
+    """``docs/benchmarks.md``: the latest run per config, every run newest first, then retrieval recall."""
     head = ("# Benchmark Results\n\n"
             "Tier 2 runs of the engine on the Chinook gold questions with a real model, one row per\n"
             "run and LLM config. Generated by `nl2sql benchmark publish` from the records in\n"
             "`benchmarks/results/`; do not edit by hand. Runs on a different gold dataset (another\n"
             "`@sha`) are not comparable. See [the evaluation dataset](testing/evaluation-dataset.md).\n")
     if not recs:
-        return f"{head}\n{EMPTY}\n"
+        return f"{head}\n{EMPTY}\n{render_retrieval(retrieval)}"
     latest = _table(
         ["Config", "Dataset", "Date (UTC)", "Version", "Accuracy", "$/question", "Tokens/question (in / cached / out)",
          "p50", "Determinism", "Faithfulness"],
@@ -205,7 +262,7 @@ def render_history(recs: Sequence[Dict[str, Any]]) -> str:
           _usd(r["metrics"]["cost_per_question"]), _tokens(r["metrics"]["tokens_per_question"]),
           _sec(r["metrics"]["latency_p50"]), _sec(r["metrics"]["latency_p95"]), _pct(r["metrics"]["determinism"]),
           _pct(r["metrics"].get("faithfulness")), _status(r)] for r in _newest_first(recs)])
-    return f"{head}\n## Latest per config\n\n{latest}\n\n## All runs\n\n{runs}\n"
+    return f"{head}\n## Latest per config\n\n{latest}\n\n## All runs\n\n{runs}\n{render_retrieval(retrieval)}"
 
 
 def render_readme_block(recs: Sequence[Dict[str, Any]]) -> str:
@@ -227,13 +284,14 @@ def replace_block(text: str, block: str) -> str:
 
 
 def publish(results_dir: pathlib.Path = RESULTS_DIR, history_path: pathlib.Path = HISTORY_PATH,
-            readme_path: pathlib.Path = README_PATH) -> int:
+            readme_path: pathlib.Path = README_PATH, retrieval_dir: pathlib.Path = RETRIEVAL_DIR) -> int:
     """Rewrites the history page and the README block from the records; returns how many there are."""
     recs = load_records(results_dir)
+    retrieval = load_records(retrieval_dir)
     history_path = pathlib.Path(history_path)
     history_path.parent.mkdir(parents=True, exist_ok=True)
-    history_path.write_text(render_history(recs), encoding="utf-8", newline="\n")
+    history_path.write_text(render_history(recs, retrieval), encoding="utf-8", newline="\n")
     readme_path = pathlib.Path(readme_path)
     readme_path.write_text(replace_block(readme_path.read_text(encoding="utf-8"), render_readme_block(recs)),
                            encoding="utf-8", newline="\n")
-    return len(recs)
+    return len(recs) + len(retrieval)

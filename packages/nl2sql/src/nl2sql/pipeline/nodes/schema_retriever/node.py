@@ -21,6 +21,11 @@ logger = get_logger("schema_retriever")
 class SchemaRetrieverNode:
     """Retrieves relevant schema chunks for planning context."""
 
+    # Entries MMR picks: tables (or columns, when no table matches), then the
+    # columns and relationships of the picked tables.
+    TABLE_K = 8
+    PLANNING_K = 12
+
     def __init__(self, ctx: NL2SQLContext):
         self.node_name = self.__class__.__name__.lower().replace("node", "")
         self.vector_store = ctx.vector_store
@@ -244,7 +249,7 @@ class SchemaRetrieverNode:
 
             if self.vector_store:
                 schema_docs = self.vector_store.retrieve_schema_context(
-                    query, datasource_id, k=8, explain=searches
+                    query, datasource_id, k=self.TABLE_K, explain=searches
                 )
                 if schema_docs:
                     for doc in schema_docs:
@@ -253,7 +258,7 @@ class SchemaRetrieverNode:
                             tables[table].update([])
                 else:
                     column_docs = self.vector_store.retrieve_column_candidates(
-                        query, datasource_id, k=8, explain=searches
+                        query, datasource_id, k=self.TABLE_K, explain=searches
                     )
                     for doc in column_docs:
                         table = doc.metadata.get("table")
@@ -267,7 +272,7 @@ class SchemaRetrieverNode:
             planning_docs = []
             if self.vector_store and tables:
                 planning_docs = self.vector_store.retrieve_planning_context(
-                    query, datasource_id, list(tables.keys()), k=12, explain=searches
+                    query, datasource_id, list(tables.keys()), k=self.PLANNING_K, explain=searches
                 )
 
             for doc in planning_docs:

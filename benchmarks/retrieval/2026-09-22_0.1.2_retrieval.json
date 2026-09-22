@@ -1,0 +1,2226 @@
+{
+  "schema": 1,
+  "kind": "retrieval",
+  "recorded_at": "2026-09-22T03:39:36Z",
+  "engine_version": "0.1.2",
+  "git_commit": null,
+  "dataset": {
+    "name": "chinook_gold.yaml",
+    "sha256": "7d104084a9f335fdad010848218ebcc826536cd86efb886aac7e8d256242a4fc"
+  },
+  "settings": {
+    "table_k": 8,
+    "planning_k": 12,
+    "fetch_multiplier": 4,
+    "lambda_mult": 0.7,
+    "full_snapshot_max_tables": 0,
+    "embedding": "all-MiniLM-L6-v2",
+    "query": "question"
+  },
+  "metrics": {
+    "questions": 39,
+    "table_recall": 0.9846,
+    "column_recall": 0.7257,
+    "perfect_tables": 37,
+    "perfect_columns": 15,
+    "tables_sent": 8.2564,
+    "columns_sent": 24.1795
+  },
+  "report": {
+    "kind": "retrieval",
+    "settings": {
+      "table_k": 8,
+      "planning_k": 12,
+      "fetch_multiplier": 4,
+      "lambda_mult": 0.7,
+      "full_snapshot_max_tables": 0,
+      "embedding": "all-MiniLM-L6-v2",
+      "query": "question"
+    },
+    "summary": {
+      "questions": 39,
+      "table_recall": 0.9846,
+      "column_recall": 0.7257,
+      "perfect_tables": 37,
+      "perfect_columns": 15,
+      "tables_sent": 8.2564,
+      "columns_sent": 24.1795
+    },
+    "results": [
+      {
+        "id": "chinook_001",
+        "question": "How many customers do we have, by country?",
+        "table_recall": 1.0,
+        "column_recall": 0.5,
+        "missed_tables": [],
+        "missed_columns": [
+          "Customer.CustomerId"
+        ],
+        "tables_sent": 8,
+        "columns_sent": 32,
+        "sent": {
+          "Artist": [
+            "ArtistId",
+            "Name"
+          ],
+          "Customer": [
+            "Address",
+            "City",
+            "Company",
+            "Country",
+            "Email",
+            "Fax",
+            "LastName",
+            "Phone",
+            "PostalCode",
+            "SupportRepId"
+          ],
+          "Employee": [
+            "EmployeeId"
+          ],
+          "Invoice": [
+            "BillingCountry"
+          ],
+          "InvoiceLine": [
+            "InvoiceId",
+            "InvoiceLineId",
+            "Quantity",
+            "TrackId",
+            "UnitPrice"
+          ],
+          "MediaType": [
+            "MediaTypeId",
+            "Name"
+          ],
+          "PlaylistTrack": [
+            "PlaylistId",
+            "TrackId"
+          ],
+          "Track": [
+            "AlbumId",
+            "Bytes",
+            "Composer",
+            "GenreId",
+            "MediaTypeId",
+            "Milliseconds",
+            "Name",
+            "TrackId",
+            "UnitPrice"
+          ]
+        },
+        "datasource_id": "chinook"
+      },
+      {
+        "id": "chinook_002",
+        "question": "Who are the top 5 customers by total spend?",
+        "table_recall": 1.0,
+        "column_recall": 0.6,
+        "missed_tables": [],
+        "missed_columns": [
+          "Customer.FirstName",
+          "Invoice.Total"
+        ],
+        "tables_sent": 9,
+        "columns_sent": 27,
+        "sent": {
+          "Album": [
+            "AlbumId",
+            "ArtistId",
+            "Title"
+          ],
+          "Artist": [
+            "ArtistId",
+            "Name"
+          ],
+          "Customer": [
+            "Address",
+            "City",
+            "Company",
+            "CustomerId",
+            "Email",
+            "Fax",
+            "LastName",
+            "Phone",
+            "SupportRepId"
+          ],
+          "Employee": [
+            "EmployeeId"
+          ],
+          "Invoice": [
+            "BillingCity",
+            "CustomerId"
+          ],
+          "InvoiceLine": [
+            "InvoiceId",
+            "InvoiceLineId",
+            "Quantity",
+            "TrackId",
+            "UnitPrice"
+          ],
+          "MediaType": [
+            "MediaTypeId",
+            "Name"
+          ],
+          "PlaylistTrack": [
+            "PlaylistId",
+            "TrackId"
+          ],
+          "Track": [
+            "Composer"
+          ]
+        },
+        "datasource_id": "chinook"
+      },
+      {
+        "id": "chinook_003",
+        "question": "Which artist has the most albums?",
+        "table_recall": 1.0,
+        "column_recall": 1.0,
+        "missed_tables": [],
+        "missed_columns": [],
+        "tables_sent": 8,
+        "columns_sent": 21,
+        "sent": {
+          "Album": [
+            "AlbumId",
+            "ArtistId",
+            "Title"
+          ],
+          "Artist": [
+            "ArtistId",
+            "Name"
+          ],
+          "Genre": [
+            "GenreId"
+          ],
+          "Invoice": [
+            "BillingAddress",
+            "BillingCity",
+            "BillingCountry",
+            "BillingPostalCode",
+            "BillingState",
+            "CustomerId",
+            "InvoiceDate",
+            "InvoiceId",
+            "Total"
+          ],
+          "MediaType": [
+            "Name"
+          ],
+          "Playlist": [
+            "PlaylistId"
+          ],
+          "PlaylistTrack": [
+            "PlaylistId"
+          ],
+          "Track": [
+            "AlbumId",
+            "Composer",
+            "GenreId"
+          ]
+        },
+        "datasource_id": "chinook"
+      },
+      {
+        "id": "chinook_004",
+        "question": "What is the total revenue per year?",
+        "table_recall": 1.0,
+        "column_recall": 0.5,
+        "missed_tables": [],
+        "missed_columns": [
+          "Invoice.Total"
+        ],
+        "tables_sent": 8,
+        "columns_sent": 17,
+        "sent": {
+          "Album": [
+            "Title"
+          ],
+          "Artist": [
+            "ArtistId",
+            "Name"
+          ],
+          "Customer": [
+            "Fax"
+          ],
+          "Employee": [
+            "Title"
+          ],
+          "Invoice": [
+            "BillingAddress",
+            "BillingCity",
+            "BillingCountry",
+            "BillingPostalCode",
+            "BillingState",
+            "InvoiceDate",
+            "InvoiceId"
+          ],
+          "InvoiceLine": [
+            "InvoiceId",
+            "UnitPrice"
+          ],
+          "MediaType": [
+            "MediaTypeId",
+            "Name"
+          ],
+          "Track": [
+            "UnitPrice"
+          ]
+        },
+        "datasource_id": "chinook"
+      },
+      {
+        "id": "chinook_005",
+        "question": "Which genre sells the most tracks?",
+        "table_recall": 1.0,
+        "column_recall": 0.6667,
+        "missed_tables": [],
+        "missed_columns": [
+          "Genre.Name",
+          "InvoiceLine.Quantity"
+        ],
+        "tables_sent": 8,
+        "columns_sent": 14,
+        "sent": {
+          "Album": [
+            "AlbumId",
+            "ArtistId",
+            "Title"
+          ],
+          "Artist": [
+            "ArtistId"
+          ],
+          "Genre": [
+            "GenreId"
+          ],
+          "InvoiceLine": [
+            "TrackId"
+          ],
+          "MediaType": [
+            "MediaTypeId"
+          ],
+          "Playlist": [
+            "Name"
+          ],
+          "PlaylistTrack": [
+            "TrackId"
+          ],
+          "Track": [
+            "AlbumId",
+            "Composer",
+            "GenreId",
+            "MediaTypeId",
+            "TrackId"
+          ]
+        },
+        "datasource_id": "chinook"
+      },
+      {
+        "id": "chinook_006",
+        "question": "What is the average invoice total by billing country?",
+        "table_recall": 1.0,
+        "column_recall": 1.0,
+        "missed_tables": [],
+        "missed_columns": [],
+        "tables_sent": 8,
+        "columns_sent": 43,
+        "sent": {
+          "Artist": [
+            "ArtistId",
+            "Name"
+          ],
+          "Customer": [
+            "CustomerId"
+          ],
+          "Employee": [
+            "Address",
+            "BirthDate",
+            "City",
+            "Country",
+            "Email",
+            "EmployeeId",
+            "Fax",
+            "FirstName",
+            "HireDate",
+            "LastName",
+            "Phone",
+            "PostalCode",
+            "ReportsTo",
+            "State",
+            "Title"
+          ],
+          "Invoice": [
+            "BillingAddress",
+            "BillingCity",
+            "BillingCountry",
+            "BillingPostalCode",
+            "BillingState",
+            "CustomerId",
+            "InvoiceDate",
+            "InvoiceId",
+            "Total"
+          ],
+          "InvoiceLine": [
+            "InvoiceId",
+            "TrackId",
+            "UnitPrice"
+          ],
+          "MediaType": [
+            "MediaTypeId",
+            "Name"
+          ],
+          "Playlist": [
+            "Name",
+            "PlaylistId"
+          ],
+          "Track": [
+            "AlbumId",
+            "Bytes",
+            "Composer",
+            "GenreId",
+            "MediaTypeId",
+            "Milliseconds",
+            "Name",
+            "TrackId",
+            "UnitPrice"
+          ]
+        },
+        "datasource_id": "chinook"
+      },
+      {
+        "id": "chinook_007",
+        "question": "Which employees support the most customers?",
+        "table_recall": 1.0,
+        "column_recall": 0.6,
+        "missed_tables": [],
+        "missed_columns": [
+          "Employee.FirstName",
+          "Employee.LastName"
+        ],
+        "tables_sent": 8,
+        "columns_sent": 33,
+        "sent": {
+          "Artist": [
+            "ArtistId",
+            "Name"
+          ],
+          "Customer": [
+            "Address",
+            "Company",
+            "CustomerId",
+            "Email",
+            "Fax",
+            "Phone",
+            "SupportRepId"
+          ],
+          "Employee": [
+            "Email",
+            "EmployeeId",
+            "Fax",
+            "ReportsTo",
+            "Title"
+          ],
+          "Invoice": [
+            "CustomerId"
+          ],
+          "InvoiceLine": [
+            "InvoiceId",
+            "InvoiceLineId",
+            "Quantity",
+            "TrackId",
+            "UnitPrice"
+          ],
+          "MediaType": [
+            "MediaTypeId",
+            "Name"
+          ],
+          "PlaylistTrack": [
+            "PlaylistId",
+            "TrackId"
+          ],
+          "Track": [
+            "AlbumId",
+            "Bytes",
+            "Composer",
+            "GenreId",
+            "MediaTypeId",
+            "Milliseconds",
+            "Name",
+            "TrackId",
+            "UnitPrice"
+          ]
+        },
+        "datasource_id": "chinook"
+      },
+      {
+        "id": "chinook_008",
+        "question": "What is the longest track in each genre?",
+        "table_recall": 1.0,
+        "column_recall": 0.6667,
+        "missed_tables": [],
+        "missed_columns": [
+          "Genre.Name",
+          "Track.Milliseconds"
+        ],
+        "tables_sent": 8,
+        "columns_sent": 16,
+        "sent": {
+          "Album": [
+            "AlbumId",
+            "ArtistId",
+            "Title"
+          ],
+          "Artist": [
+            "ArtistId"
+          ],
+          "Genre": [
+            "GenreId"
+          ],
+          "InvoiceLine": [
+            "TrackId"
+          ],
+          "MediaType": [
+            "MediaTypeId"
+          ],
+          "Playlist": [
+            "Name"
+          ],
+          "PlaylistTrack": [
+            "TrackId"
+          ],
+          "Track": [
+            "AlbumId",
+            "Bytes",
+            "Composer",
+            "GenreId",
+            "MediaTypeId",
+            "Name",
+            "TrackId"
+          ]
+        },
+        "datasource_id": "chinook"
+      },
+      {
+        "id": "chinook_009",
+        "question": "Which customers bought jazz tracks but never rock?",
+        "table_recall": 0.6,
+        "column_recall": 0.3636,
+        "missed_tables": [
+          "Customer",
+          "Invoice"
+        ],
+        "missed_columns": [
+          "Customer.CustomerId",
+          "Customer.FirstName",
+          "Customer.LastName",
+          "Invoice.InvoiceId",
+          "Invoice.CustomerId",
+          "InvoiceLine.InvoiceId",
+          "Genre.Name"
+        ],
+        "tables_sent": 8,
+        "columns_sent": 14,
+        "sent": {
+          "Album": [
+            "AlbumId",
+            "ArtistId",
+            "Title"
+          ],
+          "Artist": [
+            "ArtistId"
+          ],
+          "Genre": [
+            "GenreId"
+          ],
+          "InvoiceLine": [
+            "TrackId"
+          ],
+          "MediaType": [
+            "MediaTypeId",
+            "Name"
+          ],
+          "Playlist": [
+            "Name"
+          ],
+          "PlaylistTrack": [
+            "TrackId"
+          ],
+          "Track": [
+            "AlbumId",
+            "Composer",
+            "GenreId",
+            "TrackId"
+          ]
+        },
+        "datasource_id": "chinook"
+      },
+      {
+        "id": "chinook_010",
+        "question": "What was the monthly revenue in 2013 for customers in the USA?",
+        "table_recall": 1.0,
+        "column_recall": 0.8,
+        "missed_tables": [],
+        "missed_columns": [
+          "Invoice.Total"
+        ],
+        "tables_sent": 8,
+        "columns_sent": 28,
+        "sent": {
+          "Artist": [
+            "ArtistId",
+            "Name"
+          ],
+          "Customer": [
+            "Address",
+            "Company",
+            "Country",
+            "CustomerId",
+            "Email",
+            "Fax",
+            "Phone",
+            "SupportRepId"
+          ],
+          "Employee": [
+            "EmployeeId"
+          ],
+          "Invoice": [
+            "BillingCountry",
+            "CustomerId",
+            "InvoiceDate"
+          ],
+          "InvoiceLine": [
+            "UnitPrice"
+          ],
+          "MediaType": [
+            "MediaTypeId",
+            "Name"
+          ],
+          "Playlist": [
+            "Name",
+            "PlaylistId"
+          ],
+          "Track": [
+            "AlbumId",
+            "Bytes",
+            "Composer",
+            "GenreId",
+            "MediaTypeId",
+            "Milliseconds",
+            "Name",
+            "TrackId",
+            "UnitPrice"
+          ]
+        },
+        "datasource_id": "chinook"
+      },
+      {
+        "id": "chinook_011",
+        "question": "Which playlists contain tracks from more than three genres?",
+        "table_recall": 1.0,
+        "column_recall": 1.0,
+        "missed_tables": [],
+        "missed_columns": [],
+        "tables_sent": 8,
+        "columns_sent": 25,
+        "sent": {
+          "Album": [
+            "AlbumId",
+            "ArtistId",
+            "Title"
+          ],
+          "Artist": [
+            "ArtistId"
+          ],
+          "Genre": [
+            "GenreId"
+          ],
+          "Invoice": [
+            "BillingAddress",
+            "BillingCity",
+            "BillingCountry",
+            "BillingPostalCode",
+            "BillingState",
+            "CustomerId",
+            "InvoiceDate",
+            "InvoiceId",
+            "Total"
+          ],
+          "MediaType": [
+            "MediaTypeId",
+            "Name"
+          ],
+          "Playlist": [
+            "Name",
+            "PlaylistId"
+          ],
+          "PlaylistTrack": [
+            "PlaylistId",
+            "TrackId"
+          ],
+          "Track": [
+            "AlbumId",
+            "Composer",
+            "GenreId",
+            "MediaTypeId",
+            "TrackId"
+          ]
+        },
+        "datasource_id": "chinook"
+      },
+      {
+        "id": "chinook_012",
+        "question": "Who are the top customers by total spend?",
+        "table_recall": 1.0,
+        "column_recall": 0.6,
+        "missed_tables": [],
+        "missed_columns": [
+          "Customer.FirstName",
+          "Invoice.Total"
+        ],
+        "tables_sent": 9,
+        "columns_sent": 27,
+        "sent": {
+          "Album": [
+            "AlbumId",
+            "ArtistId",
+            "Title"
+          ],
+          "Artist": [
+            "ArtistId",
+            "Name"
+          ],
+          "Customer": [
+            "Address",
+            "City",
+            "Company",
+            "CustomerId",
+            "Email",
+            "Fax",
+            "LastName",
+            "Phone",
+            "SupportRepId"
+          ],
+          "Employee": [
+            "EmployeeId"
+          ],
+          "Invoice": [
+            "BillingAddress",
+            "CustomerId"
+          ],
+          "InvoiceLine": [
+            "InvoiceId",
+            "InvoiceLineId",
+            "Quantity",
+            "TrackId",
+            "UnitPrice"
+          ],
+          "MediaType": [
+            "MediaTypeId",
+            "Name"
+          ],
+          "PlaylistTrack": [
+            "PlaylistId",
+            "TrackId"
+          ],
+          "Track": [
+            "Composer"
+          ]
+        },
+        "datasource_id": "chinook"
+      },
+      {
+        "id": "chinook_013",
+        "question": "Show me the five customers who have spent the most money.",
+        "table_recall": 1.0,
+        "column_recall": 0.6,
+        "missed_tables": [],
+        "missed_columns": [
+          "Customer.LastName",
+          "Invoice.Total"
+        ],
+        "tables_sent": 8,
+        "columns_sent": 24,
+        "sent": {
+          "Artist": [
+            "ArtistId",
+            "Name"
+          ],
+          "Customer": [
+            "Address",
+            "City",
+            "Company",
+            "CustomerId",
+            "Email",
+            "Fax",
+            "FirstName",
+            "Phone",
+            "SupportRepId"
+          ],
+          "Employee": [
+            "EmployeeId"
+          ],
+          "Invoice": [
+            "BillingCity",
+            "CustomerId"
+          ],
+          "InvoiceLine": [
+            "InvoiceId",
+            "InvoiceLineId",
+            "Quantity",
+            "TrackId",
+            "UnitPrice"
+          ],
+          "MediaType": [
+            "MediaTypeId",
+            "Name"
+          ],
+          "PlaylistTrack": [
+            "PlaylistId",
+            "TrackId"
+          ],
+          "Track": [
+            "Composer"
+          ]
+        },
+        "datasource_id": "chinook"
+      },
+      {
+        "id": "chinook_014",
+        "question": "How much did we earn in each year?",
+        "table_recall": 1.0,
+        "column_recall": 0.0,
+        "missed_tables": [],
+        "missed_columns": [
+          "Invoice.InvoiceDate",
+          "Invoice.Total"
+        ],
+        "tables_sent": 8,
+        "columns_sent": 31,
+        "sent": {
+          "Artist": [
+            "ArtistId",
+            "Name"
+          ],
+          "Customer": [
+            "Address",
+            "City",
+            "Company",
+            "Country",
+            "CustomerId",
+            "Email",
+            "Fax",
+            "FirstName",
+            "LastName",
+            "Phone",
+            "PostalCode",
+            "State",
+            "SupportRepId"
+          ],
+          "Employee": [
+            "City",
+            "Email",
+            "EmployeeId",
+            "Fax",
+            "FirstName",
+            "HireDate",
+            "Phone",
+            "ReportsTo",
+            "Title"
+          ],
+          "Invoice": [
+            "BillingCountry"
+          ],
+          "InvoiceLine": [
+            "UnitPrice"
+          ],
+          "MediaType": [
+            "MediaTypeId",
+            "Name"
+          ],
+          "Playlist": [
+            "Name",
+            "PlaylistId"
+          ],
+          "Track": [
+            "UnitPrice"
+          ]
+        },
+        "datasource_id": "chinook"
+      },
+      {
+        "id": "chinook_015",
+        "question": "Give me the yearly sales totals.",
+        "table_recall": 1.0,
+        "column_recall": 0.5,
+        "missed_tables": [],
+        "missed_columns": [
+          "Invoice.Total"
+        ],
+        "tables_sent": 8,
+        "columns_sent": 17,
+        "sent": {
+          "Album": [
+            "Title"
+          ],
+          "Customer": [
+            "City",
+            "CustomerId",
+            "Fax"
+          ],
+          "Employee": [
+            "ReportsTo",
+            "Title"
+          ],
+          "Genre": [
+            "GenreId",
+            "Name"
+          ],
+          "Invoice": [
+            "BillingAddress",
+            "BillingCountry",
+            "BillingState",
+            "CustomerId",
+            "InvoiceDate"
+          ],
+          "InvoiceLine": [
+            "UnitPrice"
+          ],
+          "Playlist": [
+            "Name",
+            "PlaylistId"
+          ],
+          "Track": [
+            "UnitPrice"
+          ]
+        },
+        "datasource_id": "chinook"
+      },
+      {
+        "id": "chinook_016",
+        "question": "Name the artist with the largest number of albums.",
+        "table_recall": 1.0,
+        "column_recall": 1.0,
+        "missed_tables": [],
+        "missed_columns": [],
+        "tables_sent": 8,
+        "columns_sent": 21,
+        "sent": {
+          "Album": [
+            "AlbumId",
+            "ArtistId",
+            "Title"
+          ],
+          "Artist": [
+            "ArtistId",
+            "Name"
+          ],
+          "Genre": [
+            "GenreId"
+          ],
+          "Invoice": [
+            "BillingAddress",
+            "BillingCity",
+            "BillingCountry",
+            "BillingPostalCode",
+            "BillingState",
+            "CustomerId",
+            "InvoiceDate",
+            "InvoiceId",
+            "Total"
+          ],
+          "MediaType": [
+            "Name"
+          ],
+          "Playlist": [
+            "PlaylistId"
+          ],
+          "PlaylistTrack": [
+            "PlaylistId"
+          ],
+          "Track": [
+            "AlbumId",
+            "Composer",
+            "GenreId"
+          ]
+        },
+        "datasource_id": "chinook"
+      },
+      {
+        "id": "chinook_017",
+        "question": "Which musician released more albums than anyone else in the catalog?",
+        "table_recall": 1.0,
+        "column_recall": 1.0,
+        "missed_tables": [],
+        "missed_columns": [],
+        "tables_sent": 8,
+        "columns_sent": 22,
+        "sent": {
+          "Album": [
+            "AlbumId",
+            "ArtistId",
+            "Title"
+          ],
+          "Artist": [
+            "ArtistId",
+            "Name"
+          ],
+          "Genre": [
+            "GenreId"
+          ],
+          "Invoice": [
+            "BillingAddress",
+            "BillingCity",
+            "BillingCountry",
+            "BillingPostalCode",
+            "BillingState",
+            "CustomerId",
+            "InvoiceDate",
+            "InvoiceId",
+            "Total"
+          ],
+          "MediaType": [
+            "Name"
+          ],
+          "Playlist": [
+            "Name",
+            "PlaylistId"
+          ],
+          "PlaylistTrack": [
+            "PlaylistId"
+          ],
+          "Track": [
+            "AlbumId",
+            "Composer",
+            "GenreId"
+          ]
+        },
+        "datasource_id": "chinook"
+      },
+      {
+        "id": "chinook_018",
+        "question": "List all the media types.",
+        "table_recall": 1.0,
+        "column_recall": 1.0,
+        "missed_tables": [],
+        "missed_columns": [],
+        "tables_sent": 9,
+        "columns_sent": 16,
+        "sent": {
+          "Album": [
+            "ArtistId",
+            "Title"
+          ],
+          "Artist": [
+            "ArtistId"
+          ],
+          "Customer": [
+            "CustomerId"
+          ],
+          "Genre": [
+            "GenreId",
+            "Name"
+          ],
+          "Invoice": [
+            "CustomerId"
+          ],
+          "MediaType": [
+            "MediaTypeId",
+            "Name"
+          ],
+          "Playlist": [
+            "Name",
+            "PlaylistId"
+          ],
+          "PlaylistTrack": [
+            "PlaylistId",
+            "TrackId"
+          ],
+          "Track": [
+            "GenreId",
+            "MediaTypeId",
+            "TrackId"
+          ]
+        },
+        "datasource_id": "chinook"
+      },
+      {
+        "id": "chinook_019",
+        "question": "How many tracks are longer than ten minutes?",
+        "table_recall": 1.0,
+        "column_recall": 1.0,
+        "missed_tables": [],
+        "missed_columns": [],
+        "tables_sent": 9,
+        "columns_sent": 32,
+        "sent": {
+          "Album": [
+            "AlbumId"
+          ],
+          "Artist": [
+            "ArtistId",
+            "Name"
+          ],
+          "Employee": [
+            "Address",
+            "BirthDate",
+            "City",
+            "Country",
+            "Email",
+            "EmployeeId",
+            "Fax",
+            "FirstName",
+            "HireDate",
+            "LastName",
+            "Phone",
+            "PostalCode",
+            "ReportsTo",
+            "State",
+            "Title"
+          ],
+          "Genre": [
+            "GenreId"
+          ],
+          "InvoiceLine": [
+            "TrackId"
+          ],
+          "MediaType": [
+            "MediaTypeId"
+          ],
+          "Playlist": [
+            "Name",
+            "PlaylistId"
+          ],
+          "PlaylistTrack": [
+            "TrackId"
+          ],
+          "Track": [
+            "AlbumId",
+            "Bytes",
+            "Composer",
+            "GenreId",
+            "MediaTypeId",
+            "Milliseconds",
+            "Name",
+            "TrackId"
+          ]
+        },
+        "datasource_id": "chinook"
+      },
+      {
+        "id": "chinook_020",
+        "question": "Which tracks are from the album Let There Be Rock?",
+        "table_recall": 1.0,
+        "column_recall": 1.0,
+        "missed_tables": [],
+        "missed_columns": [],
+        "tables_sent": 8,
+        "columns_sent": 25,
+        "sent": {
+          "Album": [
+            "AlbumId",
+            "ArtistId",
+            "Title"
+          ],
+          "Artist": [
+            "ArtistId"
+          ],
+          "Genre": [
+            "GenreId"
+          ],
+          "Invoice": [
+            "BillingAddress",
+            "BillingCity",
+            "BillingCountry",
+            "BillingPostalCode",
+            "BillingState",
+            "CustomerId",
+            "InvoiceDate",
+            "InvoiceId",
+            "Total"
+          ],
+          "MediaType": [
+            "MediaTypeId"
+          ],
+          "Playlist": [
+            "Name",
+            "PlaylistId"
+          ],
+          "PlaylistTrack": [
+            "TrackId"
+          ],
+          "Track": [
+            "AlbumId",
+            "Bytes",
+            "Composer",
+            "GenreId",
+            "MediaTypeId",
+            "Name",
+            "TrackId"
+          ]
+        },
+        "datasource_id": "chinook"
+      },
+      {
+        "id": "chinook_021",
+        "question": "Where do our customers from Germany live?",
+        "table_recall": 1.0,
+        "column_recall": 0.75,
+        "missed_tables": [],
+        "missed_columns": [
+          "Customer.FirstName"
+        ],
+        "tables_sent": 8,
+        "columns_sent": 34,
+        "sent": {
+          "Artist": [
+            "ArtistId",
+            "Name"
+          ],
+          "Customer": [
+            "Address",
+            "City",
+            "Country",
+            "CustomerId",
+            "Email",
+            "LastName",
+            "PostalCode",
+            "SupportRepId"
+          ],
+          "Employee": [
+            "Address",
+            "EmployeeId"
+          ],
+          "Invoice": [
+            "BillingAddress",
+            "BillingCity",
+            "BillingCountry",
+            "CustomerId"
+          ],
+          "InvoiceLine": [
+            "InvoiceId",
+            "InvoiceLineId",
+            "Quantity",
+            "TrackId",
+            "UnitPrice"
+          ],
+          "MediaType": [
+            "MediaTypeId",
+            "Name"
+          ],
+          "Playlist": [
+            "Name",
+            "PlaylistId"
+          ],
+          "Track": [
+            "AlbumId",
+            "Bytes",
+            "Composer",
+            "GenreId",
+            "MediaTypeId",
+            "Milliseconds",
+            "Name",
+            "TrackId",
+            "UnitPrice"
+          ]
+        },
+        "datasource_id": "chinook"
+      },
+      {
+        "id": "chinook_022",
+        "question": "List the customers where the country is Canada, with their email addresses.",
+        "table_recall": 1.0,
+        "column_recall": 0.5,
+        "missed_tables": [],
+        "missed_columns": [
+          "Customer.FirstName",
+          "Customer.LastName"
+        ],
+        "tables_sent": 8,
+        "columns_sent": 34,
+        "sent": {
+          "Artist": [
+            "ArtistId",
+            "Name"
+          ],
+          "Customer": [
+            "Address",
+            "Company",
+            "Country",
+            "CustomerId",
+            "Email",
+            "Phone",
+            "PostalCode",
+            "SupportRepId"
+          ],
+          "Employee": [
+            "Address",
+            "Country",
+            "Email",
+            "EmployeeId"
+          ],
+          "Invoice": [
+            "BillingCountry",
+            "CustomerId"
+          ],
+          "InvoiceLine": [
+            "InvoiceId",
+            "InvoiceLineId",
+            "Quantity",
+            "TrackId",
+            "UnitPrice"
+          ],
+          "MediaType": [
+            "MediaTypeId",
+            "Name"
+          ],
+          "PlaylistTrack": [
+            "PlaylistId",
+            "TrackId"
+          ],
+          "Track": [
+            "AlbumId",
+            "Bytes",
+            "Composer",
+            "GenreId",
+            "MediaTypeId",
+            "Milliseconds",
+            "Name",
+            "TrackId",
+            "UnitPrice"
+          ]
+        },
+        "datasource_id": "chinook"
+      },
+      {
+        "id": "chinook_023",
+        "question": "How many tracks are on the album From The Muddy Banks Of The Wishkah [Live]?",
+        "table_recall": 1.0,
+        "column_recall": 1.0,
+        "missed_tables": [],
+        "missed_columns": [],
+        "tables_sent": 8,
+        "columns_sent": 16,
+        "sent": {
+          "Album": [
+            "AlbumId",
+            "ArtistId",
+            "Title"
+          ],
+          "Artist": [
+            "ArtistId"
+          ],
+          "Genre": [
+            "GenreId"
+          ],
+          "Invoice": [
+            "BillingAddress"
+          ],
+          "InvoiceLine": [
+            "TrackId"
+          ],
+          "MediaType": [
+            "MediaTypeId",
+            "Name"
+          ],
+          "PlaylistTrack": [
+            "TrackId"
+          ],
+          "Track": [
+            "AlbumId",
+            "Bytes",
+            "Composer",
+            "GenreId",
+            "Name",
+            "TrackId"
+          ]
+        },
+        "datasource_id": "chinook"
+      },
+      {
+        "id": "chinook_024",
+        "question": "Which artist recorded the album Somewhere in Time?",
+        "table_recall": 1.0,
+        "column_recall": 0.75,
+        "missed_tables": [],
+        "missed_columns": [
+          "Artist.Name"
+        ],
+        "tables_sent": 8,
+        "columns_sent": 15,
+        "sent": {
+          "Album": [
+            "AlbumId",
+            "ArtistId",
+            "Title"
+          ],
+          "Artist": [
+            "ArtistId"
+          ],
+          "Genre": [
+            "GenreId"
+          ],
+          "Invoice": [
+            "InvoiceDate"
+          ],
+          "MediaType": [
+            "Name"
+          ],
+          "Playlist": [
+            "Name",
+            "PlaylistId"
+          ],
+          "PlaylistTrack": [
+            "TrackId"
+          ],
+          "Track": [
+            "AlbumId",
+            "Composer",
+            "GenreId",
+            "Milliseconds",
+            "TrackId"
+          ]
+        },
+        "datasource_id": "chinook"
+      },
+      {
+        "id": "chinook_025",
+        "question": "Which artists have more than ten albums?",
+        "table_recall": 1.0,
+        "column_recall": 1.0,
+        "missed_tables": [],
+        "missed_columns": [],
+        "tables_sent": 8,
+        "columns_sent": 23,
+        "sent": {
+          "Album": [
+            "AlbumId",
+            "ArtistId",
+            "Title"
+          ],
+          "Artist": [
+            "ArtistId",
+            "Name"
+          ],
+          "Genre": [
+            "GenreId"
+          ],
+          "Invoice": [
+            "BillingAddress",
+            "BillingCity",
+            "BillingCountry",
+            "BillingPostalCode",
+            "BillingState",
+            "CustomerId",
+            "InvoiceDate",
+            "InvoiceId",
+            "Total"
+          ],
+          "MediaType": [
+            "MediaTypeId",
+            "Name"
+          ],
+          "Playlist": [
+            "Name",
+            "PlaylistId"
+          ],
+          "PlaylistTrack": [
+            "PlaylistId"
+          ],
+          "Track": [
+            "AlbumId",
+            "Composer",
+            "GenreId"
+          ]
+        },
+        "datasource_id": "chinook"
+      },
+      {
+        "id": "chinook_026",
+        "question": "Which customers have spent more than 45 dollars in total?",
+        "table_recall": 1.0,
+        "column_recall": 0.6,
+        "missed_tables": [],
+        "missed_columns": [
+          "Customer.LastName",
+          "Invoice.Total"
+        ],
+        "tables_sent": 8,
+        "columns_sent": 33,
+        "sent": {
+          "Artist": [
+            "ArtistId",
+            "Name"
+          ],
+          "Customer": [
+            "Address",
+            "City",
+            "Company",
+            "CustomerId",
+            "Email",
+            "Fax",
+            "FirstName",
+            "Phone",
+            "State",
+            "SupportRepId"
+          ],
+          "Employee": [
+            "EmployeeId"
+          ],
+          "Invoice": [
+            "BillingCountry",
+            "CustomerId"
+          ],
+          "InvoiceLine": [
+            "InvoiceId",
+            "InvoiceLineId",
+            "Quantity",
+            "TrackId",
+            "UnitPrice"
+          ],
+          "MediaType": [
+            "MediaTypeId",
+            "Name"
+          ],
+          "PlaylistTrack": [
+            "PlaylistId",
+            "TrackId"
+          ],
+          "Track": [
+            "AlbumId",
+            "Bytes",
+            "Composer",
+            "GenreId",
+            "MediaTypeId",
+            "Milliseconds",
+            "Name",
+            "TrackId",
+            "UnitPrice"
+          ]
+        },
+        "datasource_id": "chinook"
+      },
+      {
+        "id": "chinook_027",
+        "question": "How many invoices were issued in March 2010?",
+        "table_recall": 1.0,
+        "column_recall": 1.0,
+        "missed_tables": [],
+        "missed_columns": [],
+        "tables_sent": 8,
+        "columns_sent": 20,
+        "sent": {
+          "Album": [
+            "AlbumId",
+            "ArtistId",
+            "Title"
+          ],
+          "Customer": [
+            "CustomerId"
+          ],
+          "Employee": [
+            "Email"
+          ],
+          "Invoice": [
+            "BillingAddress",
+            "BillingCity",
+            "BillingCountry",
+            "BillingPostalCode",
+            "BillingState",
+            "CustomerId",
+            "InvoiceDate",
+            "InvoiceId"
+          ],
+          "InvoiceLine": [
+            "InvoiceId",
+            "TrackId"
+          ],
+          "MediaType": [
+            "MediaTypeId",
+            "Name"
+          ],
+          "PlaylistTrack": [
+            "PlaylistId",
+            "TrackId"
+          ],
+          "Track": [
+            "TrackId"
+          ]
+        },
+        "datasource_id": "chinook"
+      },
+      {
+        "id": "chinook_028",
+        "question": "What was the total revenue in the fourth quarter of 2012?",
+        "table_recall": 1.0,
+        "column_recall": 0.5,
+        "missed_tables": [],
+        "missed_columns": [
+          "Invoice.Total"
+        ],
+        "tables_sent": 8,
+        "columns_sent": 18,
+        "sent": {
+          "Album": [
+            "Title"
+          ],
+          "Employee": [
+            "Email",
+            "Fax",
+            "Title"
+          ],
+          "Genre": [
+            "GenreId",
+            "Name"
+          ],
+          "Invoice": [
+            "BillingAddress",
+            "BillingCountry",
+            "BillingPostalCode",
+            "BillingState",
+            "InvoiceDate"
+          ],
+          "InvoiceLine": [
+            "TrackId"
+          ],
+          "MediaType": [
+            "MediaTypeId",
+            "Name"
+          ],
+          "PlaylistTrack": [
+            "PlaylistId",
+            "TrackId"
+          ],
+          "Track": [
+            "Bytes",
+            "TrackId"
+          ]
+        },
+        "datasource_id": "chinook"
+      },
+      {
+        "id": "chinook_029",
+        "question": "Which month of 2011 had the highest revenue?",
+        "table_recall": 1.0,
+        "column_recall": 0.5,
+        "missed_tables": [],
+        "missed_columns": [
+          "Invoice.Total"
+        ],
+        "tables_sent": 9,
+        "columns_sent": 19,
+        "sent": {
+          "Album": [
+            "Title"
+          ],
+          "Artist": [
+            "ArtistId",
+            "Name"
+          ],
+          "Customer": [
+            "CustomerId"
+          ],
+          "Employee": [
+            "Email",
+            "Fax",
+            "HireDate",
+            "ReportsTo"
+          ],
+          "Invoice": [
+            "BillingAddress",
+            "BillingCountry",
+            "BillingPostalCode",
+            "CustomerId",
+            "InvoiceDate"
+          ],
+          "InvoiceLine": [
+            "UnitPrice"
+          ],
+          "MediaType": [
+            "MediaTypeId",
+            "Name"
+          ],
+          "Playlist": [
+            "Name",
+            "PlaylistId"
+          ],
+          "Track": [
+            "UnitPrice"
+          ]
+        },
+        "datasource_id": "chinook"
+      },
+      {
+        "id": "chinook_030",
+        "question": "What are the top 3 countries by number of customers?",
+        "table_recall": 1.0,
+        "column_recall": 0.5,
+        "missed_tables": [],
+        "missed_columns": [
+          "Customer.CustomerId"
+        ],
+        "tables_sent": 8,
+        "columns_sent": 34,
+        "sent": {
+          "Album": [
+            "AlbumId",
+            "ArtistId",
+            "Title"
+          ],
+          "Customer": [
+            "Address",
+            "City",
+            "Company",
+            "Country",
+            "Email",
+            "Fax",
+            "LastName",
+            "Phone",
+            "State",
+            "SupportRepId"
+          ],
+          "Employee": [
+            "Country",
+            "EmployeeId"
+          ],
+          "Invoice": [
+            "BillingCountry"
+          ],
+          "InvoiceLine": [
+            "InvoiceId",
+            "InvoiceLineId",
+            "Quantity",
+            "TrackId",
+            "UnitPrice"
+          ],
+          "MediaType": [
+            "MediaTypeId",
+            "Name"
+          ],
+          "PlaylistTrack": [
+            "PlaylistId",
+            "TrackId"
+          ],
+          "Track": [
+            "AlbumId",
+            "Bytes",
+            "Composer",
+            "GenreId",
+            "MediaTypeId",
+            "Milliseconds",
+            "Name",
+            "TrackId",
+            "UnitPrice"
+          ]
+        },
+        "datasource_id": "chinook"
+      },
+      {
+        "id": "chinook_031",
+        "question": "What is the total revenue per genre?",
+        "table_recall": 1.0,
+        "column_recall": 0.4286,
+        "missed_tables": [],
+        "missed_columns": [
+          "Track.TrackId",
+          "InvoiceLine.TrackId",
+          "InvoiceLine.UnitPrice",
+          "InvoiceLine.Quantity"
+        ],
+        "tables_sent": 9,
+        "columns_sent": 14,
+        "sent": {
+          "Album": [
+            "ArtistId",
+            "Title"
+          ],
+          "Artist": [
+            "ArtistId",
+            "Name"
+          ],
+          "Genre": [
+            "GenreId",
+            "Name"
+          ],
+          "Invoice": [
+            "BillingCountry",
+            "InvoiceId"
+          ],
+          "InvoiceLine": [
+            "InvoiceId"
+          ],
+          "MediaType": [
+            "Name"
+          ],
+          "Playlist": [
+            "PlaylistId"
+          ],
+          "PlaylistTrack": [
+            "PlaylistId"
+          ],
+          "Track": [
+            "Composer",
+            "GenreId"
+          ]
+        },
+        "datasource_id": "chinook"
+      },
+      {
+        "id": "chinook_032",
+        "question": "Which artist has earned the most revenue?",
+        "table_recall": 1.0,
+        "column_recall": 0.5556,
+        "missed_tables": [],
+        "missed_columns": [
+          "Track.TrackId",
+          "InvoiceLine.TrackId",
+          "InvoiceLine.UnitPrice",
+          "InvoiceLine.Quantity"
+        ],
+        "tables_sent": 8,
+        "columns_sent": 16,
+        "sent": {
+          "Album": [
+            "AlbumId",
+            "ArtistId",
+            "Title"
+          ],
+          "Artist": [
+            "ArtistId",
+            "Name"
+          ],
+          "Genre": [
+            "GenreId"
+          ],
+          "Invoice": [
+            "BillingAddress",
+            "InvoiceId"
+          ],
+          "InvoiceLine": [
+            "InvoiceId"
+          ],
+          "MediaType": [
+            "MediaTypeId",
+            "Name"
+          ],
+          "Playlist": [
+            "Name"
+          ],
+          "Track": [
+            "AlbumId",
+            "Composer",
+            "GenreId",
+            "UnitPrice"
+          ]
+        },
+        "datasource_id": "chinook"
+      },
+      {
+        "id": "chinook_033",
+        "question": "How many tracks of each media type are in the Grunge playlist?",
+        "table_recall": 1.0,
+        "column_recall": 1.0,
+        "missed_tables": [],
+        "missed_columns": [],
+        "tables_sent": 8,
+        "columns_sent": 25,
+        "sent": {
+          "Album": [
+            "AlbumId",
+            "ArtistId",
+            "Title"
+          ],
+          "Artist": [
+            "ArtistId"
+          ],
+          "Genre": [
+            "GenreId"
+          ],
+          "Invoice": [
+            "BillingAddress",
+            "BillingCity",
+            "BillingCountry",
+            "BillingPostalCode",
+            "BillingState",
+            "CustomerId",
+            "InvoiceDate",
+            "InvoiceId",
+            "Total"
+          ],
+          "MediaType": [
+            "MediaTypeId",
+            "Name"
+          ],
+          "Playlist": [
+            "Name",
+            "PlaylistId"
+          ],
+          "PlaylistTrack": [
+            "PlaylistId",
+            "TrackId"
+          ],
+          "Track": [
+            "AlbumId",
+            "Composer",
+            "GenreId",
+            "MediaTypeId",
+            "TrackId"
+          ]
+        },
+        "datasource_id": "chinook"
+      },
+      {
+        "id": "chinook_034",
+        "question": "How many different customers bought at least one track by AC/DC?",
+        "table_recall": 0.8,
+        "column_recall": 0.5,
+        "missed_tables": [
+          "Artist"
+        ],
+        "missed_columns": [
+          "Artist.ArtistId",
+          "Artist.Name",
+          "Album.ArtistId",
+          "InvoiceLine.InvoiceId",
+          "Invoice.InvoiceId"
+        ],
+        "tables_sent": 9,
+        "columns_sent": 15,
+        "sent": {
+          "Album": [
+            "AlbumId"
+          ],
+          "Customer": [
+            "Company",
+            "CustomerId",
+            "SupportRepId"
+          ],
+          "Employee": [
+            "EmployeeId"
+          ],
+          "Genre": [
+            "GenreId"
+          ],
+          "Invoice": [
+            "CustomerId"
+          ],
+          "InvoiceLine": [
+            "TrackId"
+          ],
+          "MediaType": [
+            "Name"
+          ],
+          "PlaylistTrack": [
+            "TrackId"
+          ],
+          "Track": [
+            "AlbumId",
+            "Composer",
+            "GenreId",
+            "TrackId",
+            "UnitPrice"
+          ]
+        },
+        "datasource_id": "chinook"
+      },
+      {
+        "id": "chinook_035",
+        "question": "How many employees does the company have?",
+        "table_recall": 1.0,
+        "column_recall": 1.0,
+        "missed_tables": [],
+        "missed_columns": [],
+        "tables_sent": 8,
+        "columns_sent": 41,
+        "sent": {
+          "Artist": [
+            "ArtistId",
+            "Name"
+          ],
+          "Customer": [
+            "Address",
+            "Company",
+            "SupportRepId"
+          ],
+          "Employee": [
+            "Address",
+            "Email",
+            "EmployeeId",
+            "Fax",
+            "LastName",
+            "Phone",
+            "ReportsTo",
+            "State",
+            "Title"
+          ],
+          "Invoice": [
+            "BillingAddress",
+            "BillingCity",
+            "BillingCountry",
+            "BillingPostalCode",
+            "BillingState",
+            "CustomerId",
+            "InvoiceDate",
+            "InvoiceId",
+            "Total"
+          ],
+          "InvoiceLine": [
+            "InvoiceId",
+            "InvoiceLineId",
+            "Quantity",
+            "TrackId",
+            "UnitPrice"
+          ],
+          "MediaType": [
+            "MediaTypeId",
+            "Name"
+          ],
+          "PlaylistTrack": [
+            "PlaylistId",
+            "TrackId"
+          ],
+          "Track": [
+            "AlbumId",
+            "Bytes",
+            "Composer",
+            "GenreId",
+            "MediaTypeId",
+            "Milliseconds",
+            "Name",
+            "TrackId",
+            "UnitPrice"
+          ]
+        },
+        "datasource_id": "chinook"
+      },
+      {
+        "id": "chinook_036",
+        "question": "Who does Jane Peacock report to?",
+        "table_recall": 1.0,
+        "column_recall": 0.75,
+        "missed_tables": [],
+        "missed_columns": [
+          "Employee.FirstName"
+        ],
+        "tables_sent": 9,
+        "columns_sent": 21,
+        "sent": {
+          "Album": [
+            "AlbumId"
+          ],
+          "Artist": [
+            "ArtistId",
+            "Name"
+          ],
+          "Customer": [
+            "Email",
+            "PostalCode",
+            "SupportRepId"
+          ],
+          "Employee": [
+            "Address",
+            "EmployeeId",
+            "Fax",
+            "LastName",
+            "ReportsTo"
+          ],
+          "Genre": [
+            "GenreId",
+            "Name"
+          ],
+          "Invoice": [
+            "BillingCity",
+            "InvoiceDate"
+          ],
+          "MediaType": [
+            "MediaTypeId"
+          ],
+          "PlaylistTrack": [
+            "PlaylistId",
+            "TrackId"
+          ],
+          "Track": [
+            "AlbumId",
+            "Composer",
+            "MediaTypeId"
+          ]
+        },
+        "datasource_id": "chinook"
+      },
+      {
+        "id": "chinook_037",
+        "question": "Which sales support agent brought in the most revenue from their customers?",
+        "table_recall": 1.0,
+        "column_recall": 0.5714,
+        "missed_tables": [],
+        "missed_columns": [
+          "Employee.FirstName",
+          "Employee.LastName",
+          "Invoice.Total"
+        ],
+        "tables_sent": 8,
+        "columns_sent": 22,
+        "sent": {
+          "Artist": [
+            "ArtistId",
+            "Name"
+          ],
+          "Customer": [
+            "Address",
+            "Company",
+            "CustomerId",
+            "Email",
+            "Fax",
+            "SupportRepId"
+          ],
+          "Employee": [
+            "EmployeeId",
+            "Title"
+          ],
+          "Invoice": [
+            "BillingAddress",
+            "BillingPostalCode",
+            "CustomerId",
+            "InvoiceId"
+          ],
+          "InvoiceLine": [
+            "InvoiceId",
+            "TrackId",
+            "UnitPrice"
+          ],
+          "MediaType": [
+            "MediaTypeId",
+            "Name"
+          ],
+          "PlaylistTrack": [
+            "PlaylistId",
+            "TrackId"
+          ],
+          "Track": [
+            "TrackId"
+          ]
+        },
+        "datasource_id": "chinook"
+      },
+      {
+        "id": "chinook_038",
+        "question": "What are the five longest tracks and how long are they in minutes?",
+        "table_recall": 1.0,
+        "column_recall": 1.0,
+        "missed_tables": [],
+        "missed_columns": [],
+        "tables_sent": 9,
+        "columns_sent": 32,
+        "sent": {
+          "Album": [
+            "AlbumId"
+          ],
+          "Artist": [
+            "ArtistId",
+            "Name"
+          ],
+          "Employee": [
+            "Address",
+            "BirthDate",
+            "City",
+            "Country",
+            "Email",
+            "EmployeeId",
+            "Fax",
+            "FirstName",
+            "HireDate",
+            "LastName",
+            "Phone",
+            "PostalCode",
+            "ReportsTo",
+            "State",
+            "Title"
+          ],
+          "Genre": [
+            "GenreId"
+          ],
+          "InvoiceLine": [
+            "TrackId"
+          ],
+          "MediaType": [
+            "MediaTypeId"
+          ],
+          "Playlist": [
+            "Name",
+            "PlaylistId"
+          ],
+          "PlaylistTrack": [
+            "TrackId"
+          ],
+          "Track": [
+            "AlbumId",
+            "Bytes",
+            "Composer",
+            "GenreId",
+            "MediaTypeId",
+            "Milliseconds",
+            "Name",
+            "TrackId"
+          ]
+        },
+        "datasource_id": "chinook"
+      },
+      {
+        "id": "chinook_039",
+        "question": "How many tracks have never been purchased?",
+        "table_recall": 1.0,
+        "column_recall": 1.0,
+        "missed_tables": [],
+        "missed_columns": [],
+        "tables_sent": 9,
+        "columns_sent": 26,
+        "sent": {
+          "Album": [
+            "AlbumId",
+            "Title"
+          ],
+          "Artist": [
+            "ArtistId",
+            "Name"
+          ],
+          "Genre": [
+            "GenreId"
+          ],
+          "Invoice": [
+            "BillingAddress",
+            "BillingCity",
+            "BillingCountry",
+            "BillingPostalCode",
+            "BillingState",
+            "CustomerId",
+            "InvoiceDate",
+            "InvoiceId",
+            "Total"
+          ],
+          "InvoiceLine": [
+            "TrackId"
+          ],
+          "MediaType": [
+            "MediaTypeId"
+          ],
+          "Playlist": [
+            "Name",
+            "PlaylistId"
+          ],
+          "PlaylistTrack": [
+            "TrackId"
+          ],
+          "Track": [
+            "AlbumId",
+            "Bytes",
+            "Composer",
+            "GenreId",
+            "MediaTypeId",
+            "Name",
+            "TrackId"
+          ]
+        },
+        "datasource_id": "chinook"
+      }
+    ]
+  }
+}

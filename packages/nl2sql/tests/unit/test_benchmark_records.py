@@ -43,7 +43,8 @@ def test_a_record_holds_when_what_on_which_data_and_the_headline_metrics():
     assert record["recorded_at"] == "2026-09-21T14:05:06Z"
     assert record["engine_version"] == "0.9.0" and record["git_commit"] == "abc123"
     assert record["dataset"] == {"name": "chinook_gold.yaml",
-                                 "sha256": hashlib.sha256(GOLD_DATASET_PATH.read_bytes()).hexdigest()}
+                                 "sha256": hashlib.sha256(GOLD_DATASET_PATH.read_bytes().replace(b"\r\n", b"\n"))
+                                 .hexdigest()}
     assert record["config"] == {"name": "gpt-5.4", "models": {"astplanner": "openai:gpt-5.4",
                                                               "decomposer": "openai:gpt-5.4-mini"}}
     assert record["roles"] == ["admin"] and record["passes"] == 2
@@ -54,6 +55,13 @@ def test_a_record_holds_when_what_on_which_data_and_the_headline_metrics():
     assert m["faithfulness"] == 0.5
     assert record["stopped"] is None and record["partial"] is False
     assert record["scoreboard"]["accuracy"]["overall"] == 0.5
+
+
+def test_the_dataset_hash_ignores_line_endings(tmp_path):
+    lf, crlf = tmp_path / "lf.yaml", tmp_path / "crlf.yaml"
+    lf.write_bytes(b"- id: a\n- id: b\n")
+    crlf.write_bytes(b"- id: a\r\n- id: b\r\n")
+    assert records.dataset_id(lf)["sha256"] == records.dataset_id(crlf)["sha256"]
 
 
 def test_a_stopped_run_is_recorded_as_partial():
@@ -125,8 +133,10 @@ def test_publish_replaces_only_the_readme_block(tmp_path):
 
 def test_the_committed_pages_match_what_publish_generates_from_the_committed_records():
     committed = records.load_records(REPO / records.RESULTS_DIR)
+    retrieval = records.load_records(REPO / records.RETRIEVAL_DIR)
     history = (REPO / records.HISTORY_PATH).read_text(encoding="utf-8")
     readme = (REPO / records.README_PATH).read_text(encoding="utf-8")
-    assert history == records.render_history(committed), "run `nl2sql benchmark publish` and commit the result"
+    assert history == records.render_history(committed, retrieval), \
+        "run `nl2sql benchmark publish` and commit the result"
     assert readme == records.replace_block(readme, records.render_readme_block(committed)), \
         "run `nl2sql benchmark publish` and commit the result"

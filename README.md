@@ -378,6 +378,9 @@ nl2sql doctor
 nl2sql --env demo benchmark --tier 1
 nl2sql --env demo benchmark --tier 2 --llm gpt-5.4=configs/benchmark/gpt-5.4.yaml --max-cost 5
 
+# Table and column recall of schema retrieval on the gold questions (no key)
+nl2sql --env demo benchmark retrieval
+
 # Playground ratings and guardrail rates (thumbs up/down, refusals by code,
 # refiner retries, validator failures, errors by code, plan-cache hit rate);
 # `export --good` writes thumbs-up runs as draft gold entries for review
@@ -386,7 +389,9 @@ nl2sql --env demo feedback export --good
 ```
 
 See [the evaluation dataset](docs/testing/evaluation-dataset.md) for what each
-tier scores, the tier 2 scoreboard, the price table and the baseline check.
+tier scores, the tier 2 scoreboard (accuracy, answerability, cost, latency,
+determinism and whether each written answer's numbers come from the rows),
+retrieval recall, the price table and the baseline check.
 
 `--env <name>` loads `.env.<name>`; `--env-file <path>` loads an exact file and
 takes precedence over `--env`. The file's variables also go into the process

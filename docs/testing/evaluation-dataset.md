@@ -13,11 +13,13 @@ answers against.
 | `packages/nl2sql/src/nl2sql/evaluation/tier1.py` | `load_gold_plans()`, the gold-plan fake LLM, `run_tier1()` |
 | `packages/nl2sql/src/nl2sql/evaluation/tier2.py` | [Tier 2](#tier-2-the-real-model-end-to-end): the cost cap, the scoreboard, the comparison and the baseline check |
 | `packages/nl2sql/src/nl2sql/evaluation/faithfulness.py` | [Answer faithfulness](#answer-faithfulness): the written answer's numbers and names against the rows |
+| `packages/nl2sql/src/nl2sql/evaluation/retrieval_recall.py` | [Retrieval recall](#retrieval-recall): table and column recall of schema retrieval, no key |
 | `packages/nl2sql/src/nl2sql/evaluation/prices.py` | The dated price table tier 2 bills every call from |
 | `packages/nl2sql/src/nl2sql/evaluation/records.py` | Tier 2 result records and `nl2sql benchmark publish` |
 | `configs/benchmark/*.yaml` | Example LLM configs to compare with tier 2 |
 | `packages/nl2sql/src/nl2sql/evaluation/baselines/` | Where a committed tier 2 baseline scoreboard goes (none yet) |
 | `benchmarks/results/` | Committed tier 2 result records, one per run and config |
+| `benchmarks/retrieval/` | Committed retrieval recall records, one per run |
 | `packages/nl2sql/src/nl2sql/evaluation/evaluator.py` | Row comparison (`compare_results`) and per-role scoring (`score_case`) |
 | `packages/nl2sql/tests/unit/test_chinook_gold_dataset.py` | Key-free checks, part of the normal unit suite |
 
@@ -83,6 +85,7 @@ an API key and checks that:
 nl2sql --env demo benchmark --tier 1        # gold plans, no API key
 nl2sql --env demo benchmark --tier 2 --max-cost 5   # the real model, scored and priced
 nl2sql --env demo benchmark                 # full pipeline, the configured LLM
+nl2sql --env demo benchmark retrieval       # schema retrieval recall, no API key
 ```
 
 Each question runs once per role in its `expected` map (narrow with
@@ -340,7 +343,8 @@ Every tier 2 run also writes one record per config to `benchmarks/results/`,
 named `<YYYY-MM-DD>_<engine-version>_<config>.json` (`-2`, `-3`... when the
 name is taken that day). A record holds the UTC date and time, the engine
 version and git commit, the dataset name and the sha256 of
-`chinook_gold.yaml` (runs on a different gold set are never shown as
+`chinook_gold.yaml`, taken with LF line endings so a Windows checkout hashes
+the same (runs on a different gold set are never shown as
 comparable), the config name and `provider:model` per node, the roles and
 passes, the headline metrics (accuracy, answerability precision and recall,
 dollars total and per question, input / cached / output tokens per question,
@@ -349,8 +353,9 @@ p50 and p95 latency, determinism, answer faithfulness), `stopped` and
 both history tables; a record written before it existed shows `-`.
 
 `nl2sql benchmark publish` (no key, no network) reads every record and
-rewrites `docs/benchmarks.md` (every run, newest first, and the latest run per
-config) and the block between `<!-- BENCHMARKS:START -->` and
+rewrites `docs/benchmarks.md` (every run, newest first, the latest run per
+config, then every [retrieval recall](#retrieval-recall) record in
+`benchmarks/retrieval/`) and the block between `<!-- BENCHMARKS:START -->` and
 `<!-- BENCHMARKS:END -->` in `README.md`. It reads no clock, so the same
 records always give byte-identical pages. The workflow:
 
@@ -377,3 +382,75 @@ answer on its wrong rows is not. `tests/unit/test_answer_faithfulness.py`
 covers the faithfulness rules with good and bad answers. `tests/unit/test_tier2_scoreboard.py` and
 `tests/cli/test_benchmark_tier2_command.py` cover the scoreboard, the
 baseline check, the refusal to start without `--max-cost` and the exit codes.
+
+## Retrieval recall
+
+Before the planner sees a schema, the schema retriever picks the tables and
+columns it is given. A column it never sends is one the planner cannot use.
+`nl2sql benchmark retrieval` measures that, per answerable gold question,
+against `needed_tables` and `needed_columns`, with no key, no LLM and no cost:
+
+```bash
+nl2sql --env demo benchmark retrieval                       # writes benchmark_retrieval.json
+nl2sql --env demo benchmark retrieval --record              # also writes a record to benchmarks/retrieval/
+nl2sql --env demo benchmark retrieval --baseline old.json   # the change against an earlier report or record
+nl2sql --env demo benchmark retrieval --questions join,chinook_014
+```
+
+How it runs (`nl2sql/evaluation/retrieval_recall.py`):
+
+- Chinook's 11 tables are under `SCHEMA_RETRIEVAL_FULL_SNAPSHOT_MAX_TABLES`
+  (15), which would send the whole schema without a search, so the limit is
+  set to 0 for the run and the vector search always runs.
+- The datasource is the one registered (with several, the top hit of the
+  resolver's own vector search). The resolver's answerability check is an
+  LLM call and is skipped.
+- The schema retriever runs as the pipeline runs it (MMR, k 8 table entries,
+  then k 12 column and relationship entries of those tables), on the index
+  and embedder the project has: the demo's is the local ONNX
+  all-MiniLM-L6-v2. Its query is the question alone, since the decomposer
+  that would add filters, groupings and expected columns is an LLM.
+- What was sent is read from the retriever's retrieval record
+  (`indexing/retrieval_trace.py`), the one a run trace keeps: the tables and
+  columns the planner is given. A picked table with no picked column is sent
+  with all its columns, as in the pipeline.
+
+Per question the report has `table_recall` (needed tables sent / needed
+tables), `column_recall` (needed `Table.Column`s sent / needed), the
+`missed_tables` and `missed_columns`, `tables_sent` and `columns_sent`, and
+`sent` (every table and column sent). `summary` holds the means over
+questions, how many had every needed table (`perfect_tables`) or column
+(`perfect_columns`), and the mean tables and columns sent. `settings` holds
+the k, the MMR settings and the embedder, so two reports are only compared
+like for like. The command prints a row per question and the summary, and
+always exits 0 when it ran: it reports, it does not gate.
+
+### Reading the numbers
+
+Read recall with the amount sent: sending all 11 tables would score 100%, so
+a change that raises recall by sending more is not an improvement by itself.
+A missed column is one the planner cannot select, filter or join on. Compare
+runs with `--baseline`, which prints the change in each mean and every
+question whose recall moved, or with the committed records: each `--record`
+run is a JSON file in `benchmarks/retrieval/`, and `nl2sql benchmark publish`
+lists them newest first in `docs/benchmarks.md`.
+
+The committed baseline (2026-09-22, engine 0.1.2, 39 questions):
+
+| Table recall | Column recall | Every table | Every column | Sent on average |
+| --- | --- | --- | --- | --- |
+| 98.5% | 72.6% | 37 of 39 | 15 of 39 | 8.3 tables, 24.2 columns |
+
+Most misses are columns of a table that was sent. Once one column entry of
+a table is picked, or a relationship entry adds its key columns, only those
+columns are sent rather than all of them, so `Invoice` often reaches the
+planner as `BillingCountry` or a key without `Total` or `InvoiceDate`
+(`chinook_014`, "How much did we earn in each year?", gets `Invoice` with
+`BillingCountry` only). The two table misses
+are `chinook_009` (`Customer`, `Invoice`) and `chinook_034` (`Artist`).
+
+`packages/nl2sql/tests/e2e/test_benchmark_retrieval.py` runs the command on
+the generated demo in the key-free integration job and checks that it covers
+every answerable question and writes its report and record, not what the
+recall is. `tests/unit/test_retrieval_recall.py` covers the scoring, the
+means, the comparison and the records.
