@@ -44,3 +44,21 @@ class DatasourceAdapterProtocol(Protocol):
     def test_connection(self) -> bool:
         """Test if the connection to the datasource can be established."""
         ...
+
+
+@runtime_checkable
+class SqlRenderingAdapterProtocol(Protocol):
+    """Optional hook: render the engine's finished SQL for this database.
+
+    The engine builds each query as a sqlglot expression tree and, when the
+    adapter has ``render_sql``, hands it the tree to render. Without the hook
+    the engine renders ``expression.sql(dialect=adapter.get_dialect())``, so
+    existing adapters keep working. Override it only to rewrite what sqlglot
+    cannot express for the database, and keep the result types every adapter
+    returns: a date part (``DATE_PART``) is an INTEGER, and a truncated date
+    (``DATE_TRUNC``) is an ISO date string ``YYYY-MM-DD``.
+    """
+
+    def render_sql(self, expression: Any) -> str:
+        """Return the SQL text for ``expression`` (a ``sqlglot.exp.Expression``)."""
+        ...

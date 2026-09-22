@@ -169,6 +169,12 @@ DISTINCT in the plan language: `PlanModel.distinct: true` is `SELECT DISTINCT`,
 and a `func` expr with `distinct: true` is a distinct aggregate such as
 `COUNT(DISTINCT x)`. The system message's instructions and one of its examples
 say so; a function named `DISTINCT` is rejected by the logical validator.
+
+Dates in the plan language are two portable functions, described once in the
+system message and the same for every database: `DATE_PART(unit, date)`, an
+integer, and `DATE_TRUNC(unit, date)`, the period's first day as `YYYY-MM-DD`,
+with the unit a string literal `year`, `quarter`, `month` or `day`. The prompt
+names no database; each adapter renders the functions (see the generator).
 Subqueries and window functions are not in the language; `offset` is accepted
 but not rendered.
 

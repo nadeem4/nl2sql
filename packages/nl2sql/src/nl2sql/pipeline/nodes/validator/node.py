@@ -10,7 +10,12 @@ from sqlglot.optimizer.qualify import qualify
 if TYPE_CHECKING:
     from nl2sql.pipeline.state import SubgraphExecutionState
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
-from nl2sql.pipeline.nodes.ast_planner.functions import ALLOWED_FUNCTIONS, is_allowed_function
+from nl2sql.pipeline.nodes.ast_planner.functions import (
+    ALLOWED_FUNCTIONS,
+    DATE_UNITS,
+    date_operation,
+    is_allowed_function,
+)
 from nl2sql.pipeline.nodes.ast_planner.schemas import PlanModel, Expr
 from nl2sql.pipeline.nodes.generator.node import SqlVisitor, ordered
 from nl2sql.context import NL2SQLContext
@@ -452,6 +457,30 @@ class LogicalValidatorNode:
         return None
 
     @staticmethod
+    def _date_operations(plan: PlanModel) -> Optional[PipelineError]:
+        """Rejects a date operation whose unit or shape is not the portable one."""
+        for node in _plan_exprs(plan):
+            if node.kind != "func":
+                continue
+            date = date_operation(node.func_name, node.args)
+            if date is None:
+                continue
+            _, unit, operand = date
+            if unit in DATE_UNITS and operand is not None:
+                continue
+            return PipelineError(
+                node="logical_validator",
+                message=(
+                    f"Unsupported date operation {node.func_name}. Dates use DATE_PART(unit, date), "
+                    "an integer, or DATE_TRUNC(unit, date), a 'YYYY-MM-DD' date; the unit is a string "
+                    f"literal, one of: {', '.join(DATE_UNITS)}."
+                ),
+                severity=ErrorSeverity.ERROR,
+                error_code=ErrorCode.INVALID_PLAN_STRUCTURE,
+            )
+        return None
+
+    @staticmethod
     def _unsupported_functions(plan: PlanModel) -> List[PipelineError]:
         """Rejects every function name outside the plan language's list.
 
@@ -550,6 +579,7 @@ class LogicalValidatorNode:
         - Join alias validity.
         - No function named DISTINCT (it is the ``distinct`` flag).
         - Every other function name is a known one (``ast_planner.functions``).
+        - Date operations name a portable unit (year, quarter, month, day).
         - Column existence and scoping (via sqlglot's qualify optimizer).
         """
         plan: PlanModel = state.ast_planner_response.plan if state.ast_planner_response else None
@@ -595,6 +625,10 @@ class LogicalValidatorNode:
             errors.append(distinct_err)
 
         errors.extend(self._unsupported_functions(plan))
+
+        date_err = self._date_operations(plan)
+        if date_err:
+            errors.append(date_err)
 
         if state.sub_query and state.sub_query.expected_schema:
             expected_names = [c.name for c in state.sub_query.expected_schema if c.name]
