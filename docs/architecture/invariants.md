@@ -194,7 +194,7 @@ Only datasources permitted by RBAC may be selected or resolved.
 - `DatasourceResolverNode._get_allowed_datasource_ids()` and `__call__()` in `nl2sql.pipeline.nodes.datasource_resolver.node`
 
 ### Failure Behavior
-Returns `PipelineError` with `SECURITY_VIOLATION` if no allowed datasource is available.
+Returns `PipelineError` with `SECURITY_VIOLATION` if no allowed datasource is available. The check runs before the resolver's answerability LLM call, so a denied caller triggers no model call and the model only ever sees datasources the role may read. It runs on every path, including the single-datasource shortcut that skips the vector search.
 
 ### Why It Exists
 Prevents execution against unauthorized datasources.

@@ -14,7 +14,8 @@ Failure in this system is represented as structured `PipelineError` objects accu
 
 ### Retrieval
 - Vector store calls are wrapped by `VECTOR_BREAKER`; breaker open or retrieval errors propagate into resolver or schema retriever.
-- Resolver returns `SCHEMA_RETRIEVAL_FAILED` if no candidate datasources are found.
+- Resolver returns `SCHEMA_RETRIEVAL_FAILED` if no candidate datasources are found, or if more than one datasource is registered and there is no vector store. With one datasource registered it runs no vector search.
+- Resolver returns `QUESTION_NOT_ANSWERABLE` when its answerability check finds no allowed datasource can answer the question; the run ends before the decomposer. A failed answerability call returns `SCHEMA_RETRIEVAL_FAILED` with the model's error.
 - Schema retriever falls back to full schema snapshot if vector retrieval yields no tables; if schema store returns `None`, it silently returns an empty table list.
 
 ### Planning

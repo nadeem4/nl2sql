@@ -17,6 +17,7 @@ from nl2sql.testing.fake_llm import FakeLLMServer, Rule
 
 from .conftest import _base_env, run_cli
 from .recordings_chinook import (
+    ANSWERABLE,
     COUNT_CUSTOMERS_DECOMPOSER,
     COUNT_CUSTOMERS_PLAN,
     RULES_COUNT_CUSTOMERS,
@@ -75,16 +76,20 @@ def test_a_run_writes_a_trace_with_every_node_its_llm_calls_and_no_secret(demo_p
     assert doc["request"] == {"question": QUESTION, "roles": ["admin"], "tenant_id": "default_tenant",
                               "datasource_id": None, "execute": True}
     assert NODES <= {n["node"] for n in doc["nodes"]}
-    assert doc["llm"]["by_node"] == {"decomposer": "gpt-4o", "ast_planner": "gpt-4o",
-                                     "answer_synthesizer": "gpt-4o"}
+    assert doc["llm"]["by_node"] == {"datasource_resolver": "gpt-4o", "decomposer": "gpt-4o",
+                                     "ast_planner": "gpt-4o", "answer_synthesizer": "gpt-4o"}
 
     calls = _llm_calls(doc)
-    assert [c["key"]["node"] for c in calls] == ["decomposer", "ast_planner", "answer_synthesizer"]
+    assert [c["key"]["node"] for c in calls] == ["datasource_resolver", "decomposer", "ast_planner",
+                                                 "answer_synthesizer"]
     for call in calls:
         assert call["messages"] and call["messages"][0]["content"]
         assert call["usage"]["total_tokens"] == 2  # the fake reports 1 + 1 per call
         assert call["model"].startswith("gpt-4o")
-    decomposer, planner, synthesizer = calls
+    resolver, decomposer, planner, synthesizer = calls
+    assert resolver["response"]["tool_calls"][0]["name"] == "AnswerabilityResponse"
+    assert resolver["parsed"]["answerable_datasource_ids"] == ["chinook"]
+    assert resolver["messages"][-1]["content"].endswith(QUESTION)
     assert decomposer["response"]["tool_calls"][0]["name"] == "DecomposerResponse"
     assert json.loads(planner["response"]["content"])["tables"][0]["name"] == "Customer"
     assert planner["parsed"]["tables"][0]["name"] == "Customer"
@@ -107,6 +112,7 @@ def _retry_rules():
         return bad_plan if len(plans) == 1 else COUNT_CUSTOMERS_PLAN
 
     return [
+        ANSWERABLE,
         Rule("DecomposerResponse", COUNT_CUSTOMERS_DECOMPOSER),
         Rule("PlanModel", plan),
         Rule("AggregatedResponse", count_customers_answer),
@@ -161,7 +167,7 @@ def test_replay_reproduces_the_run_with_zero_model_calls(failing_run):
     assert r.returncode == 0, out + r.stderr
     assert len(failing_run.server.calls) == calls_before  # the model endpoint was never called
     assert "0 model calls" in out
-    assert "5 recorded LLM calls served" in out
+    assert "6 recorded LLM calls served" in out
     assert "matches the recording" in out
     assert "Traceback" not in out + r.stderr
 

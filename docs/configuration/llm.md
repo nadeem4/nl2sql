@@ -173,11 +173,12 @@ Nothing is retried without the parameter: what the config says is what is sent.
 
 ## Per-node models
 
-The four pipeline nodes that call a model each ask the registry for their own
+The five pipeline nodes that call a model each ask the registry for their own
 agent name, and fall back to `default` when it is not configured:
 
 | agent name | node |
 | --- | --- |
+| `datasourceresolver` | checks that the connected data can answer the question at all (one short call; refuses with `QUESTION_NOT_ANSWERABLE`) |
 | `decomposer` | splits the question into sub-queries |
 | `astplanner` | writes the query plan (the largest prompt: it carries the schema) |
 | `refiner` | explains a failed plan so the planner can retry |

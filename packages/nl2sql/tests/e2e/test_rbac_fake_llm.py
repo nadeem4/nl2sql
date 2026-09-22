@@ -17,6 +17,7 @@ from nl2sql.testing.fake_llm import Rule
 
 from .conftest import _base_env, run_cli
 from .recordings_chinook import (
+    ANSWERABLE,
     RULES_COUNT_CUSTOMERS,
     TOP_CUSTOMERS_DECOMPOSER,
     TOP_CUSTOMERS_PLAN,
@@ -53,6 +54,7 @@ def _only_trace(trace_dir):
 
 def _top_customers_rules(plan=None):
     return [
+        ANSWERABLE,
         Rule("DecomposerResponse", TOP_CUSTOMERS_DECOMPOSER),
         Rule("PlanModel", plan or TOP_CUSTOMERS_PLAN),
         Rule("AggregatedResponse", {"summary": "should not be called", "format_type": "text",
@@ -146,7 +148,8 @@ def test_an_unknown_role_is_refused_cleanly(demo_project, tmp_path):
     codes = [e["error_code"] for e in doc["result"]["errors"]]
     assert "SECURITY_VIOLATION" in codes, codes
     assert not {"VALIDATOR_CRASH", "SCHEMA_RETRIEVAL_FAILED", "ORCHESTRATOR_CRASH"} & set(codes), codes
-    assert "PlanModel" not in [c["name"] for c in server.calls]
+    # Refused by the resolver's role check, before any model call at all.
+    assert server.calls == []
 
 
 @pytest.mark.e2e

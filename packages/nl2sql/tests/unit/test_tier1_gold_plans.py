@@ -8,7 +8,8 @@ from __future__ import annotations
 import pytest
 
 from nl2sql.evaluation.gold import load_gold_dataset
-from nl2sql.evaluation.tier1 import decomposer_response, load_gold_plans
+from nl2sql.evaluation.tier1 import answerability_response, decomposer_response, load_gold_plans
+from nl2sql.pipeline.nodes.datasource_resolver.schemas import AnswerabilityResponse
 from nl2sql.pipeline.nodes.ast_planner.schemas import PlanModel
 from nl2sql.pipeline.nodes.decomposer.schemas import DecomposerResponse
 
@@ -36,6 +37,12 @@ def test_plan_reads_exactly_the_needed_tables(q):
 def test_plan_selects_as_many_columns_as_the_gold_result(q):
     if q.gold_result:
         assert len(PLANS[q.id].select_items) == len(q.gold_result[0])
+
+
+@pytest.mark.parametrize("q", DATASET, ids=lambda q: q.id)
+def test_the_answerability_verdict_follows_the_gold_dataset(q):
+    verdict = AnswerabilityResponse.model_validate(answerability_response(q))
+    assert verdict.answerable_datasource_ids == ([] if q.gold_sql is None else ["chinook"])
 
 
 @pytest.mark.parametrize("q", ANSWERABLE, ids=lambda q: q.id)

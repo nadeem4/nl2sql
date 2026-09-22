@@ -13,6 +13,16 @@ class ResolvedDatasource(BaseModel):
     schema_version_mismatch: bool = False
 
 
+class AnswerabilityResponse(BaseModel):
+    """The answerability check's verdict. An empty list means no datasource can answer."""
+
+    answerable_datasource_ids: List[str] = Field(
+        default_factory=list,
+        description="Ids of the datasources that could answer the question. Empty only if none can.",
+    )
+    reason: str = Field(default="", description="One short sentence explaining the verdict.")
+
+
 class DatasourceResolverResponse(BaseModel):
     resolved_datasources: List[ResolvedDatasource] = Field(default_factory=list)
     allowed_datasource_ids: List[str] = Field(default_factory=list)

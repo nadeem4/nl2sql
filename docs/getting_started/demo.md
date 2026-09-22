@@ -128,7 +128,9 @@ otherwise raises `EmbeddingDimensionMismatchError` (or
 ### Index health and repair
 
 The playground's schema panel reads the schema snapshot; the resolver, which
-picks the database for every question, reads the separate vector index. The two
+picks the database for every question when more than one is registered, reads
+the separate vector index (with only Chinook registered it skips the search, but
+the schema retriever still reads the index). The two
 can disagree: a folder once had its snapshot intact and 0 entries in its index,
 so the page looked fine while every question failed with
 `SCHEMA_RETRIEVAL_FAILED`. Three things now guard against that:
@@ -192,8 +194,8 @@ second settings store, and the browser keeps nothing but UI conveniences.
   write-only: no response, log line, trace or error carries it, only a masked
   form such as `sk-...4f2a`. On a later start the precedence above still holds,
   so `--api-key` or a key exported in your shell wins over the saved one.
-- **A model for each LLM step.** One selector each for the question splitter
-  (`decomposer`), query planner (`astplanner`), plan repair (`refiner`) and
+- **A model for each LLM step.** One selector each for the answerability check
+  (`datasourceresolver`), question splitter (`decomposer`), query planner (`astplanner`), plan repair (`refiner`) and
   answer writer (`answersynthesizer`), each with a "Default" option that uses
   the `default` agent. A choice is written to `configs/llm.demo.yaml` under
   `agents:`, with the default's provider, endpoint and key reference, and takes

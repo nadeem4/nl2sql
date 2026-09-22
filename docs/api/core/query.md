@@ -155,7 +155,7 @@ been recorded, on a timed-out or cancelled run.
 | name | type | meaning |
 | --- | --- | --- |
 | `total` | `UsageTotals` | The whole question. |
-| `nodes` | `Dict[str, UsageTotals]` | Keyed by graph node: `decomposer`, `ast_planner`, `refiner`, `answer_synthesizer`. |
+| `nodes` | `Dict[str, UsageTotals]` | Keyed by graph node: `datasource_resolver` (the answerability check), `decomposer`, `ast_planner`, `refiner`, `answer_synthesizer`. |
 | `calls` | `List[LLMCallUsage]` | Every model call in order, with its `node` and `model`. |
 | `plan_cache_hits` | `int` | Sub-queries whose plan came from the plan cache. A hit makes no planner call, so it adds no `ast_planner` calls or tokens; a question answered entirely from the cache has no `ast_planner` entry in `nodes`. |
 
