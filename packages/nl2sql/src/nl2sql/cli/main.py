@@ -28,7 +28,7 @@ from nl2sql.cli.commands.benchmark import (
     run_tier2_benchmark as exec_tier2_benchmark,
 )
 from nl2sql.evaluation.records import BENCHMARKS_DIR, HISTORY_PATH, README_PATH
-from nl2sql.evaluation.tier2 import DEFAULT_MAX_ACCURACY_DROP, DEFAULT_MAX_COST_INCREASE
+from nl2sql.evaluation.tier2 import DEFAULT_MAX_COST_INCREASE, DEFAULT_MAX_REGRESSIONS
 from nl2sql.cli.commands.run import run_pipeline 
 from nl2sql.cli.commands.info import list_available_adapters
 from nl2sql.cli.commands.demo import demo_command
@@ -340,7 +340,8 @@ def benchmark(
         "--max-cost", help="Tier 2 (required): stop before a question that could take total spend past this many USD.",
     )] = None,
     passes: Annotated[int, typer.Option(
-        "--passes", help="Tier 2: run every question this many times per config and report determinism.",
+        "--passes", help="Tier 2: run every question this many times per config and report determinism and "
+                         "pass^N (a question counts only when every pass passed). Use --passes 3 for a baseline.",
     )] = 1,
     questions: Annotated[Optional[List[str]], typer.Option(
         "--questions", help="Tier 2: only these question ids or tags (repeatable, or comma-separated).",
@@ -348,9 +349,15 @@ def benchmark(
     baseline: Annotated[Optional[pathlib.Path], typer.Option(
         "--baseline", help="Tier 2: a committed scoreboard JSON to compare against; exits 1 on a regression.",
     )] = None,
-    max_accuracy_drop: Annotated[float, typer.Option(
-        "--max-accuracy-drop", help="Tier 2 baseline: largest allowed accuracy drop, as a fraction (0.02 = 2 points).",
-    )] = DEFAULT_MAX_ACCURACY_DROP,
+    max_regressions: Annotated[int, typer.Option(
+        "--max-regressions", help="Tier 2 baseline: how many questions may flip from pass to fail before the run "
+                                  "fails. A smaller, statistically significant drop fails too.",
+    )] = DEFAULT_MAX_REGRESSIONS,
+    max_accuracy_drop: Annotated[Optional[float], typer.Option(
+        "--max-accuracy-drop", help="Deprecated: a flat accuracy drop gate, as a fraction (0.02 = 2 points). At 43 "
+                                    "questions that is less than one question, so it fires on noise. Use "
+                                    "--max-regressions.",
+    )] = None,
     max_cost_increase: Annotated[float, typer.Option(
         "--max-cost-increase", help="Tier 2 baseline: largest allowed rise in cost per question, as a fraction (0.2 = 20%).",
     )] = DEFAULT_MAX_COST_INCREASE,
@@ -404,7 +411,8 @@ def benchmark(
 
     if tier == 2:
         exec_tier2_benchmark(bench_run_config, llm_specs=llm, model_specs=model, max_cost=max_cost, passes=passes,
-                             questions=questions, baseline=baseline, max_accuracy_drop=max_accuracy_drop,
+                             questions=questions, baseline=baseline, max_regressions=max_regressions,
+                             max_accuracy_drop=max_accuracy_drop,
                              max_cost_increase=max_cost_increase, results_dir=results_dir, note=note)
         return
     exec_benchmark(bench_run_config, tier=tier)

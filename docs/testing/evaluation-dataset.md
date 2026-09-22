@@ -302,12 +302,13 @@ and then, from the repo, `nl2sql benchmark publish --from <demo folder>`
 | `--llm SPEC` | none | An LLM config to compare (repeatable): a preset name, `PATH.yaml` (named by the file stem) or `NAME=PATH`. With no `--model` or `--llm`, the project's LLM config runs as `default` |
 | `--note TEXT` | none | A short label for what changed, e.g. `"slim prompts"`, kept in each record and shown in the history |
 | `--role ROLE` | `admin` | Run as this role (repeatable) |
-| `--passes N` | `1` | Run every question N times per config and report determinism |
+| `--passes N` | `1` | Run every question N times per config and report determinism and pass^N. Use `--passes 3` for a baseline |
 | `--questions ID_OR_TAG` | every question | Only these question ids or tags (repeatable or comma-separated), e.g. `--questions unanswerable,chinook_001` |
 | `--export-path PATH` | `<project>/benchmark_tier2.json` | Where to write the full scoreboard |
 | `--results-dir DIR` | `<project>/benchmarks` | The benchmarks folder; one record per config goes in `DIR/tier2/<database>/` |
 | `--baseline PATH` | none | A committed scoreboard to check against (below) |
-| `--max-accuracy-drop F` | `0.02` | Baseline: largest allowed accuracy drop (0.02 is two points) |
+| `--max-regressions N` | `2` | Baseline: how many questions may flip from pass to fail before the run fails; a smaller but significant drop fails too |
+| `--max-accuracy-drop F` | none | Deprecated: a flat accuracy drop gate. Smaller than one question at n = 43, so it fired on noise. Only applied when passed |
 | `--max-cost-increase F` | `0.2` | Baseline: largest allowed rise in cost per question (0.2 is 20%) |
 
 `<project>` is the folder of the env file the run is configured from: for
@@ -425,7 +426,7 @@ under `configs`, and a `comparison`. Each config has:
 | `models` | `provider:model` per LLM node |
 | `planned_cases`, `completed_cases` | Cases the run would make, and made |
 | `summary` | pass/fail counts per role, as tier 1 reports |
-| `accuracy` | `overall` (strict) and `lenient`, then `by_tag` and `by_difficulty`, each with both counts and both rates |
+| `accuracy` | `overall` (strict) and `lenient`, each with a 95% Wilson `interval`; `pass_k` when `--passes` > 1; then `by_tag` and `by_difficulty`, each with both counts and both rates |
 | `answerability` | `precision` and `recall` of refusing as unanswerable: true refusals of the four unanswerable questions, false refusals of answerable ones, and missed unanswerables |
 | `tokens_by_node` | calls, input, cached input, cache write, output and reasoning tokens per node |
 | `cost` | dollars `total` and `per_question` (each result row has its own `cost`) |
@@ -436,15 +437,15 @@ under `configs`, and a `comparison`. Each config has:
 | `faithfulness` | [answer faithfulness](#answer-faithfulness): `faithful` of `answers` written, the `rate`, and each `unfaithful` run with what it stated that the rows do not hold |
 | `results` | one row per run: `status` and `reason` (strict), `lenient_status` and `lenient_reason`, SQL, cost, latency, tokens, retries, `faithfulness` (`null` when no answer was written), and `plans`: each sub-query's `id`, `intent` and `plan` (the `PlanModel` JSON the SQL was generated from, `null` if planning failed), so a wrong answer can be traced to the plan; and `answer`, the text the answer synthesizer wrote (summary, then content), which the faithfulness check read |
 
-`comparison.configs` is one row per config (accuracy, answerability, cost,
+`comparison.configs` is one row per config (strict and lenient accuracy, answerability, cost,
 latency, retries, determinism, faithfulness); `comparison.differences` lists
 the questions the configs disagree on. The command prints the same as tables:
 
 ```
-                          Tier 2 scoreboard
-Config        Cases  Accuracy  Ans. P  Ans. R  Cost     $/question  p50    p95    Retries  Determinism  Faithful
-gpt-5.4       8/8    100.0%    100.0%  100.0%  $0.0806  $0.0101     0.08s  0.25s  0        100.0%       100.0%
-mini-helpers  8/8    75.0%     100.0%  100.0%  $0.0372  $0.0046     0.09s  0.09s  0        100.0%       85.7%
+              Tier 2 scoreboard (accuracy with its 95% interval)
+Config        Cases  Strict             Lenient            Ans. P  Ans. R  Cost     $/question  p50    p95    Retries  Determinism  Faithful
+gpt-5.4       8/8    100.0% [67.6-100]  100.0% [67.6-100]  100.0%  100.0%  $0.0806  $0.0101     0.08s  0.25s  0        100.0%       100.0%
+mini-helpers  8/8    75.0% [40.9-92.9]  87.5% [52.9-97.8]  100.0%  100.0%  $0.0372  $0.0046     0.09s  0.09s  0        100.0%       85.7%
 
                   Questions the configs disagree on
 ID           Role   gpt-5.4  mini-helpers
@@ -488,19 +489,81 @@ rate with the list: an unfaithful answer is a synthesizer problem to look at,
 not a failed question. Tier 1 does not report it: its fake synthesizer writes
 the same fixed sentence for every question, with nothing to check.
 
-### Baseline regression check
+### Reading a run: intervals, flips and pass^k
 
-`--baseline PATH` compares the run against a committed scoreboard, config by
-config (by name; a config the baseline lacks is skipped). It exits 1 if
-accuracy drops by more than `--max-accuracy-drop` or cost per question rises
-by more than `--max-cost-increase`. Baselines go in
-`packages/nl2sql/src/nl2sql/evaluation/baselines/`; none is committed yet. To
-make one, run tier 2 on the full set and copy its scoreboard there:
+Forty-three questions cannot settle much on their own. 25 of 43 is 58.1%, and
+its 95% Wilson interval is **43.3%-71.6%** -- about fourteen points either
+way. Every run therefore prints and records that interval next to both
+scores, written `58.1% [43.3-71.6]`, and the gate below is built on the
+questions that moved rather than on the headline
+([Anthropic, *A statistical approach to model
+evals*](https://www.anthropic.com/research/statistical-approach-to-model-evals)).
+The interval is taken over the runs a config scored, so with `--passes` above
+one the runs of a single question are not independent and it reads narrower
+than it really is; pass^k below counts questions and does not.
+
+**Compare two runs question by question, not headline to headline.** The same
+43 questions are run both times, so the runs are paired and most of the
+variance cancels. `--baseline PATH` prints, per config:
+
+- the strict and lenient accuracy of each run, side by side;
+- how many questions went **pass -> fail** and how many **fail -> pass**, and
+  which ones;
+- **McNemar's exact two-sided p-value** on those flips. Questions both runs
+  got right, and both got wrong, say nothing about a change; only the
+  discordant pairs do, and under "the two runs are equally good" each flip is
+  a fair coin. Ten lost and none gained is p = 0.002; five each way is p = 1.0.
+
+A question counts as passed only when **every** pass passed, so with
+`--passes 3` a question that has become flaky reads as a regression.
+
+`docs/benchmarks.md` carries the same thing in its "Δ vs previous" column:
+the headline deltas, then `3 flipped to fail, 1 to pass (McNemar p=0.625)`.
+The README block keeps the deltas only.
+
+#### The regression gate
+
+`--baseline` exits 1 when, for any config both scoreboards name:
+
+| Check | Default | Why |
+| --- | --- | --- |
+| More than `--max-regressions` questions flipped from pass to fail | 2 | A handful of named questions is something a person can go and read |
+| The flips are one-sided enough that McNemar's exact p < 0.05 | - | A small but real drop should not pass because it is under the count |
+| Cost per question rose by more than `--max-cost-increase` | 0.2 | Unchanged |
+
+`--max-accuracy-drop` is **deprecated**. It failed a run when accuracy fell by
+more than a flat fraction, two points by default -- and at n = 43 one question
+is 2.3 points, so the gate was tighter than the resolution of the benchmark
+and fired on run-to-run noise. It still works when it is passed explicitly,
+with a warning, and is no longer applied unless it is.
+
+#### `--passes` and pass^k
+
+`--passes` is 1 for an ordinary run: one pass is enough to see where the
+engine stands, and every call costs money. Run a **baseline** with
+`--passes 3`, so the run it is compared against is not a single sample:
 
 ```bash
-nl2sql --env demo benchmark --tier 2 --model gpt-5.4 --max-cost 5 \
+nl2sql --env demo benchmark --tier 2 --model gpt-5.4 --passes 3 --max-cost 15 \
   --export-path <repo>/packages/nl2sql/src/nl2sql/evaluation/baselines/gpt-5.4.json
-# later
+```
+
+With more than one pass the run also reports **pass^k**: the share of
+questions that passed in *every* pass, for both scores, beside mean accuracy.
+Mean accuracy counts runs, so a question that passes two times of three still
+lifts it; pass^k counts questions, and a flaky one never counts. It is the
+number to read when asking whether the engine can be relied on rather than
+how often it happens to be right ([tau-bench](https://arxiv.org/abs/2406.12045)).
+`determinism` stays what it was: whether the SQL and rows were identical
+across passes, which is a stricter thing than passing every time.
+
+#### Where baselines live
+
+`packages/nl2sql/src/nl2sql/evaluation/baselines/`; none is committed yet. A
+run is compared config by config, by name, and a config the baseline lacks is
+skipped:
+
+```bash
 nl2sql --env demo benchmark --tier 2 --model gpt-5.4 --max-cost 5 \
   --baseline <repo>/packages/nl2sql/src/nl2sql/evaluation/baselines/gpt-5.4.json
 ```
@@ -529,7 +592,7 @@ name is taken. Every record holds:
 | `dataset` | `chinook_gold.yaml`'s name and sha256, taken with LF line endings so a Windows checkout hashes the same |
 | `database` | `datasource_id`, `engine` (`sqlite`), `schema_fingerprint` (a hash of the latest indexed schema snapshot's tables, columns, types and keys, so re-indexing an unchanged database keeps it) and the `tables` and `columns` counts |
 | `config` | The config name, and for tier 2 `provider:model` per node |
-| `metrics` | Tier 2: accuracy (strict) and lenient_accuracy, answerability precision and recall, dollars total and per question, input / cached / output tokens per question, p50 and p95 latency, determinism, answer faithfulness. Retrieval: the report's `summary` |
+| `metrics` | Tier 2: accuracy (strict) and lenient_accuracy with their 95% intervals, `pass_k`, answerability precision and recall, dollars total and per question, input / cached / output tokens per question, p50 and p95 latency, determinism, answer faithfulness. Retrieval: the report's `summary` |
 | tier 2 only | `roles`, `passes`, `stopped`, `partial` and the config's full `scoreboard` |
 | retrieval only | `settings` and the full `report` |
 
@@ -545,14 +608,19 @@ Two runs are comparable when they share the benchmark kind, the dataset sha
 and the schema fingerprint, and for tier 2 the roles. `docs/benchmarks.md`
 groups the history by benchmark, then database, and lists each group's runs
 newest first. "Δ vs previous" compares a run with the previous run of the same
-config on the same database: the change in accuracy, faithfulness (in
-percentage points) and dollars per question for tier 2, in table and column
-recall for retrieval. When the dataset, the schema or the roles changed, the
+config on the same database: the change in strict accuracy, lenient accuracy
+and faithfulness (in percentage points) and dollars per question for tier 2,
+in table and column recall for retrieval. For tier 2 it then says how many
+questions flipped each way and McNemar's exact p-value on them, read from the
+two records' committed per-question results -- `3 flipped to fail, 1 to pass
+(McNemar p=0.625)`. When the dataset, the schema or the roles changed, the
 run starts a new series and the cell says so, e.g. `new series (schema
 changed)`; a config's first run says `first run`. The README block has two
 headed tables, tier 2 accuracy (latest run per config and database) and then
-retrieval recall (latest run per database), with the same Δ; a benchmark with
-no recorded run says so under its heading.
+retrieval recall (latest run per database), with the headline deltas only; a
+benchmark with no recorded run says so under its heading. Accuracy in the
+history page carries its 95% interval, and the Passes column carries pass^k
+when a run made more than one pass.
 
 #### Publishing
 
@@ -593,8 +661,10 @@ the board records. Its fake synthesizer writes each answer from
 the gold rows, so the good server's answers are faithful and the bad server's
 answer on its wrong rows is not. `tests/unit/test_answer_faithfulness.py`
 covers the faithfulness rules with good and bad answers. `tests/unit/test_tier2_scoreboard.py` and
-`tests/cli/test_benchmark_tier2_command.py` cover the scoreboard, the
-baseline check, the refusal to start without `--max-cost`, the exit codes,
+`tests/cli/test_benchmark_tier2_command.py` cover the scoreboard, the lenient
+score, the Wilson interval on known counts, McNemar's exact test on a
+constructed table, pass^k, the gate firing and not firing, the deprecated
+`--max-accuracy-drop`, the refusal to start without `--max-cost`, the exit codes,
 `--model` and `--llm` resolution, the plan, the project-relative outputs,
 `benchmark presets` and `publish --from`. `tests/unit/test_benchmark_presets.py`
 covers the per-node `--model` config and preset lookup, and
