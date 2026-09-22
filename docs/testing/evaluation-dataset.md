@@ -8,7 +8,7 @@ answers against.
 | File | What it holds |
 | --- | --- |
 | `packages/nl2sql/src/nl2sql/evaluation/datasets/chinook_gold.yaml` | The dataset |
-| `packages/nl2sql/src/nl2sql/evaluation/gold.py` | `GoldQuestion` model, `load_gold_dataset()`, `execute_gold_sql()`, `regenerate()` |
+| `packages/nl2sql/src/nl2sql/evaluation/gold.py` | `GoldQuestion` model (with `alt_gold_sql`), `load_gold_dataset()`, `execute_gold_sql()`, `regenerate()` |
 | `packages/nl2sql/src/nl2sql/evaluation/datasets/chinook_gold_plans.yaml` | A hand-written `PlanModel` per answerable question, for [tier 1](#tier-1-gold-plans-through-the-code-nodes) |
 | `packages/nl2sql/src/nl2sql/evaluation/tier1.py` | `load_gold_plans()`, the gold-plan fake LLM, `run_tier1()` |
 | `packages/nl2sql/src/nl2sql/evaluation/tier2.py` | [Tier 2](#tier-2-the-real-model-end-to-end): the cost cap, the scoreboard, the comparison and the baseline check |
@@ -39,6 +39,8 @@ The file is a YAML list. Each entry:
 | `order_matters` | Whether a comparison should respect row order |
 | `gold_sql` | Hand-written SQLite SQL, or `null` for an unanswerable question |
 | `gold_result` | Rows `gold_sql` returns, as a list of `{column: value}` maps. Generated, never typed. `null` when `gold_sql` is `null` |
+| `alt_gold_sql` | Optional. [Reviewed alternative answers](#alternative-gold-answers) to the same question, each hand-written SQLite SQL |
+| `alt_gold_result` | The rows each `alt_gold_sql` returns, in the same order. Generated, never typed. Omitted with `alt_gold_sql` |
 
 `expected` follows the demo policy in `nl2sql/cli/demo/chinook.py`
 (`CHINOOK_POLICIES`): a role gets `refused` when any of `needed_tables` is
@@ -52,16 +54,18 @@ the `ties` tag. When the tie is only about order, `order_matters` is `false`.
 
 ## Regenerating the results
 
-`gold_result` is always produced by running `gold_sql` against the database.
-After adding or editing a question, set its `gold_result` to `null` (or leave
+`gold_result` and `alt_gold_result` are always produced by running `gold_sql`
+and each `alt_gold_sql` against the database. After adding or editing a
+question, an alternative or any SQL, set its `gold_result` to `null` (or leave
 it stale) and run:
 
 ```bash
 python -m nl2sql.evaluation.gold
 ```
 
-It re-executes every `gold_sql`, rewrites the file in its canonical layout and
-prints how many results it wrote. Commit the rewritten file.
+It re-executes every `gold_sql` and every `alt_gold_sql`, rewrites the file in
+its canonical layout and prints how many results it wrote. A question with no
+alternatives carries neither field. Commit the rewritten file.
 
 ## What the tests check
 
@@ -71,6 +75,9 @@ an API key and checks that:
 - every entry validates against `GoldQuestion` and ids are unique;
 - every `gold_sql` reproduces its committed `gold_result`, and the committed
   file is byte-for-byte what the generator writes;
+- every `alt_gold_sql` reproduces its committed `alt_gold_result` the same
+  way, reads no table outside `needed_tables`, returns between one and
+  twenty-five rows, and is not the gold answer written again;
 - paraphrase groups share one result;
 - every needed table and column exists, and `needed_tables` equals the tables
   in `gold_sql`;
@@ -93,7 +100,7 @@ otherwise), and each run is scored:
 
 | Expected | Passes when |
 | --- | --- |
-| `allowed` | Status `success`, one result set, and its rows equal `gold_result` |
+| `allowed` | Status `success`, one result set, and its rows equal `gold_result` or any [alternative](#alternative-gold-answers) |
 | `refused` | Status `error`, a `SECURITY_VIOLATION` whose message is the generic refusal (it names no table), and no rows |
 | `unanswerable` | Status `error`, a `QUESTION_NOT_ANSWERABLE` from the datasource resolver's answerability check, and no rows |
 
@@ -168,6 +175,60 @@ passes one score and not the other is visible per question; the printed
 table shows a **Strict** and a **Lenient** column beside each other, and the
 scoreboard, the records, the README block and
 [docs/benchmarks.md](../benchmarks.md) all report both.
+
+### Alternative gold answers
+
+A question can have more than one right answer. "Who are the top 5 customers
+by total spend?" is answered just as well with the name in one column as with
+`FirstName` and `LastName` side by side; "What is the total revenue per year?"
+is answered with the year written `2009` or `2009-01-01`. `alt_gold_sql` holds
+those other answers, one SQL each, executed and committed exactly as
+`gold_sql` is. A run passes -- strictly or leniently -- when its rows match the
+gold answer **or any alternative**.
+
+This is how the field handles multiple right answers. Snowflake has humans
+pick every correct answer out of several models' SQL
+([post](https://www.snowflake.com/en/blog/engineering/cortex-analyst-text-to-sql-accuracy-bi/));
+LinkedIn reports that about 60% of its benchmark questions now have several
+answers and that without them it *"underreported recall by 10-15%"*
+([post](https://www.linkedin.com/blog/engineering/ai/practical-text-to-sql-for-data-analytics));
+Spider 2.0 supports multiple gold files per task
+([paper](https://arxiv.org/html/2411.07763v2)).
+
+#### When to add one, and when not to
+
+Prefer an alternative to loosening the comparator. An alternative is written
+down, reviewed once, and only ever affects the question it sits on; a looser
+rule applies to all forty-three at once and can quietly start passing wrong
+answers. The [lenient score](#strict-and-lenient-accuracy) is deliberately
+narrow for the same reason.
+
+Add one when **all** of these hold:
+
+1. A real run produced it. Alternatives come from SQL a model actually wrote,
+   not from shapes someone imagined it might write.
+2. A person has **read the rows** and would accept them as an answer to the
+   question as written.
+3. It is the same question, from the same tables: an alternative may not read
+   a table outside `needed_tables`, and the test enforces that.
+4. It is deterministic -- ties broken on a key, as `gold_sql` does.
+
+Do not add one when the answer is a *different* question, however reasonable
+it looks. Two from the run this was built on, both refused:
+
+- *"Where do our customers from Germany live?"* answered with three distinct
+  cities. It drops the customers, so it cannot say who lives where. The
+  alternative kept for `chinook_021` is the gold answer with the name in one
+  column, not this.
+- *"Who are the top customers by total spend?"* answered with one row. "Top
+  customers" is a list with no N; one row answers "who is the top customer",
+  a different question. `chinook_007` is not the same case: *"which employees
+  support the **most** customers"* carries a superlative, and the one employee
+  who holds the maximum is a fair reading of it, so that one is kept.
+
+Write the SQL into `alt_gold_sql`, run `python -m nl2sql.evaluation.gold` to
+generate `alt_gold_result`, read the rows it wrote, and commit both. Never
+type an alternative's rows by hand.
 
 The command prints one row per question and role, then a pass/fail/skip/xfail
 count per role, writes the whole report as JSON (`--export-path`, default
