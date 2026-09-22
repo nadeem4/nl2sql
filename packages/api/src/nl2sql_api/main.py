@@ -7,6 +7,7 @@ from importlib.metadata import PackageNotFoundError, version
 from .routes import query, health, datasource, llm, indexing
 from fastapi.middleware.cors import CORSMiddleware
 from nl2sql import NL2SQL, configure_logging
+from .auth import warn_if_body_role_trusted
 
 
 @asynccontextmanager
@@ -19,6 +20,7 @@ async def lifespan(app: FastAPI):
     engine = NL2SQL()
     if engine.get_setting("observability_exporter") == "otlp":
         configure_logging(level="INFO", json_format=True)
+    warn_if_body_role_trusted()
     app.state.engine = engine
     yield
 

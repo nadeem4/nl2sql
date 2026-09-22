@@ -12,6 +12,12 @@ pytest.importorskip("nl2sql_api")
 from .recordings_chinook import RULES_COUNT_CUSTOMERS, RULES_TOP_CUSTOMERS  # noqa: E402
 
 
+@pytest.fixture(autouse=True)
+def _role_from_a_trusted_proxy_header(monkeypatch):
+    """The API takes the role from a proxy header, as a deployment would."""
+    monkeypatch.setenv("NL2SQL_API_ROLE_HEADER", "X-NL2SQL-Role")
+
+
 @pytest.mark.e2e
 def test_query_route_returns_sql(demo_project, fake_llm, monkeypatch):
     from fastapi.testclient import TestClient
@@ -32,10 +38,8 @@ def test_query_route_returns_sql(demo_project, fake_llm, monkeypatch):
         with TestClient(app) as client:
             response = client.post(
                 "/api/v1/query",
-                json={
-                    "natural_language": "How many customers are there?",
-                    "user_context": {"roles": ["admin"]},
-                },
+                json={"natural_language": "How many customers are there?"},
+                headers={"X-NL2SQL-Role": "admin"},
             )
     finally:
         reload_settings()
@@ -77,10 +81,8 @@ def test_a_denied_query_reports_the_denial_first(demo_project, fake_llm, monkeyp
         with TestClient(app) as client:
             response = client.post(
                 "/api/v1/query",
-                json={
-                    "natural_language": "Who are the top customers by total spend?",
-                    "user_context": {"roles": ["viewer"]},
-                },
+                json={"natural_language": "Who are the top customers by total spend?"},
+                headers={"X-NL2SQL-Role": "viewer"},
             )
     finally:
         reload_settings()
@@ -118,7 +120,8 @@ def test_an_unanswerable_question_is_refused_after_one_model_call(demo_project, 
         with TestClient(app) as client:
             response = client.post(
                 "/api/v1/query",
-                json={"natural_language": "What is the weather in Paris?", "user_context": {"roles": ["admin"]}},
+                json={"natural_language": "What is the weather in Paris?"},
+                headers={"X-NL2SQL-Role": "admin"},
             )
     finally:
         reload_settings()
@@ -221,7 +224,8 @@ def test_usage_reaches_query_result_and_the_rest_response(demo_project, fake_llm
                 "How many customers are there?", user_context=UserContext(roles=["admin"]))
             response = client.post(
                 "/api/v1/query",
-                json={"natural_language": "How many customers are there?", "user_context": {"roles": ["admin"]}},
+                json={"natural_language": "How many customers are there?"},
+                headers={"X-NL2SQL-Role": "admin"},
             )
     finally:
         reload_settings()

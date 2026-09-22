@@ -8,18 +8,23 @@ serves it under `/api/v1`.
 
 ```bash
 pip install nl2sql-api
-ENV=demo nl2sql-api --host 127.0.0.1 --port 8000 [--reload]
+ENV=demo NL2SQL_API_ROLE=admin nl2sql-api --host 127.0.0.1 --port 8000 [--reload]
 # or: python -m nl2sql_api.server ..., or: uvicorn nl2sql_api.main:app
 ```
 
 Start it from the folder holding the env file and configs (the demo's use
 relative paths). Interactive docs: Swagger UI at `/docs`, ReDoc at `/redoc`,
-the schema at `/openapi.json`. There is no authentication; the RBAC role comes
-from `user_context` in the request.
+the schema at `/openapi.json`.
+
+The API does not authenticate callers and never takes the RBAC role from the
+request body. Set one of: `NL2SQL_API_ROLE_HEADER` (a header a trusted proxy
+sets), `NL2SQL_API_ROLE` (one static role) or, for local testing only,
+`NL2SQL_API_TRUST_BODY_ROLE=true` (the body's `user_context`; logs a warning).
+With none, `/api/v1/query` answers HTTP 401.
 
 ## Endpoints
 
-- `POST /api/v1/query` - Ask a question (send `user_context`, e.g. `{"roles": ["admin"]}`)
+- `POST /api/v1/query` - Ask a question as the configured role
 - `GET /api/v1/health` - Liveness check
 - `GET /api/v1/ready` - Readiness check (does not yet check dependencies)
 - `POST /api/v1/datasource` - Register a datasource in the running process

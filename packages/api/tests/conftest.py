@@ -1,6 +1,8 @@
 import pytest
 from fastapi.testclient import TestClient
 
+from nl2sql import UserContext
+from nl2sql_api.auth import get_user_context
 from nl2sql_api.dependencies import get_engine
 from nl2sql_api.main import app
 
@@ -31,13 +33,17 @@ def api_client():
     """Build a TestClient plus the StubEngine backing it.
 
     ``TestClient`` is used without its context manager so the app lifespan (which
-    would construct a real NL2SQL engine) never runs.
+    would construct a real NL2SQL engine) never runs. With ``authenticated``
+    (the default) the caller holds the ``admin`` role; pass False to exercise
+    the real ``get_user_context`` dependency.
     """
     clients = []
 
-    def _make(run_query_result=None):
+    def _make(run_query_result=None, authenticated=True):
         engine = StubEngine(run_query_result)
         app.dependency_overrides[get_engine] = lambda: engine
+        if authenticated:
+            app.dependency_overrides[get_user_context] = lambda: UserContext(roles=["admin"])
         client = TestClient(app)
         clients.append(client)
         return client, engine
