@@ -10,7 +10,7 @@ run:
   canonical JSON, not counters or UUIDs ([`decomposer/node.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/pipeline/nodes/decomposer/node.py), [`global_planner/node.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/pipeline/nodes/global_planner/node.py)). The same decomposition always yields the same ids.
 - **Sorted layer order.** The topological sort sorts each ready set and each
   dependent set, so the execution layers of a given DAG are fixed
-  ([`global_planner/schemas.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/pipeline/nodes/global_planner/schemas.py)).
+  ([`execution/dag.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/execution/dag.py)).
 - **Fixed graph topology.** The node sequence is compiled, not chosen by the
   model; only the retry loop varies, and only in how many times it runs.
 - **Validation before generation.** The AST is checked against the retrieved
@@ -102,7 +102,7 @@ gives every result a total row order.
 
 ### Planner and DAG Construction
 - Deterministic: Global planner sorts nodes and edges by IDs and roles before constructing the DAG, then hashes a sorted JSON payload to produce a stable `dag_id` for a given logical plan ([`pipeline/nodes/global_planner/node.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/pipeline/nodes/global_planner/node.py)).
-- Deterministic: DAG layers are computed with a topological sort that sorts ready nodes and dependents, yielding stable layer ordering given the same node/edge sets ([`pipeline/nodes/global_planner/schemas.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/pipeline/nodes/global_planner/schemas.py)).
+- Deterministic: DAG layers are computed with a topological sort that sorts ready nodes and dependents, yielding stable layer ordering given the same node/edge sets ([`execution/dag.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/execution/dag.py)).
 - Non-deterministic: The AST planner is LLM-driven; the PlanModel content is not stabilized inside the node ([`pipeline/nodes/ast_planner/node.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/pipeline/nodes/ast_planner/node.py)).
 - Deterministic (conditional): Once a sub-query's plan has validated and executed, the plan cache pins it: the same normalised intent, datasource and schema version reuse that plan without a planner call, and it is validated again on every use (see [The plan cache](#the-plan-cache-determinism-from-the-architecture)).
 - Deterministic: Generated SQL always has a total row order. The generator always appends `LIMIT`, so it also orders by every selected column: after the plan's own `ORDER BY` terms, the remaining selected columns follow as ascending tie-breakers, in select order. Aliased items are ordered by alias, never by position, and constants are skipped. Given the same plan and data, a truncated result is always the same rows in the same order ([`pipeline/nodes/generator/node.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/pipeline/nodes/generator/node.py)).
