@@ -2219,6 +2219,11 @@ providers. The check runs on the read path only, so the fix is simply to re-run
 </tr>
 </tbody>
 </table>
+<p>On the CLI, <code>--env &lt;name&gt;</code> sets <code>ENV</code> and <code>--env-file &lt;path&gt;</code> sets
+<code>ENV_FILE_PATH</code>. Either flag also loads that file into the process environment
+(<code>load_dotenv(..., override=False)</code>), because <code>nl2sql doctor</code>, the LLM
+registry and <code>${env:VAR}</code> references read <code>os.environ</code> rather than settings. A
+variable already exported in the shell wins over the file.</p>
 <p>From Python, <code>NL2SQL(env="demo")</code> sets <code>ENV</code> and <code>NL2SQL(env_file=path)</code> sets
 <code>ENV_FILE_PATH</code>, reloading settings before any configuration path is resolved.</p>
 <h2 id="config-manager-flow">Config manager flow</h2>

@@ -4388,8 +4388,12 @@ trace to <code>traces/</code> and prints its path. Inspect one with
 answers with <code>nl2sql --env demo trace replay &lt;file&gt;</code>. See
 <a href="../../observability/debugging/">Debugging a Run</a>.</p>
 <p><code>--env &lt;name&gt;</code> loads <code>.env.&lt;name&gt;</code>. To point at an exact file instead, use
-<code>--env-file &lt;path&gt;</code>, which takes precedence over <code>--env</code>. The equivalent
-environment variables (<code>ENV</code> and <code>ENV_FILE_PATH</code>) still work.</p>
+<code>--env-file &lt;path&gt;</code>, which takes precedence over <code>--env</code>. Either flag also
+loads the file's variables into the process environment, so <code>doctor</code> and <code>run</code>
+find a key kept only in <code>.env.demo</code>; a variable already exported in your shell
+wins over the file. The equivalent environment variables (<code>ENV</code> and
+<code>ENV_FILE_PATH</code>) still work, but setting them yourself only feeds the settings
+object; use the flags when the file holds your key.</p>
 <p>Note: the demo datasource config uses a relative database path
 (<code>data/chinook.sqlite</code>), so run the CLI from the directory you ran
 <code>nl2sql setup --demo</code> in.</p>

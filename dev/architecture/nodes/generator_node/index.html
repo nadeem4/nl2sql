@@ -2022,7 +2022,7 @@
 <li>An aliased item is ordered by its alias (<code>ORDER BY genre, track_sales</code>), which stays valid for aggregates under <code>GROUP BY</code>. Terms are never positional ordinals.</li>
 <li>A select item already used as an <code>ORDER BY</code> term, by expression or by alias, is not repeated.</li>
 <li>Constant items are skipped: they order nothing, and a bare number would be read as a position.</li>
-<li>Tie-breakers keep the dialect's own NULL placement, so no <code>NULLS LAST</code> clause is rendered for them.</li>
+<li>Every term, the plan's own and the tie-breakers, keeps the dialect's default NULL placement for its direction, so no <code>NULLS FIRST</code>/<code>NULLS LAST</code> clause is rendered (nor, on T-SQL and MySQL, a <code>CASE WHEN ... IS NULL</code> emulation, which is invalid when the term is an alias). For example, a plan ordering by <code>city</code> ascending and <code>c.Country</code> descending renders <code>ORDER BY city ASC, c.Country DESC, c.LastName</code> on SQLite, Postgres, T-SQL and MySQL alike.</li>
 <li>The logical validator runs on the plan before this step and never sees the tie-breakers.</li>
 <li>Apply the effective limit and render SQL with <code>query.sql(dialect=...)</code>.</li>
 <li>Return <code>GeneratorResponse</code> with SQL and reasoning.</li>
