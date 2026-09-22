@@ -118,12 +118,12 @@ can show which table was refused, and tier 1 turns that off for its run.
 
 Each plan reads exactly the question's `needed_tables` (the RBAC outcome is
 derived from them) and selects the gold result's columns in order. PlanModel
-has no subqueries, window functions or DISTINCT aggregates, so a few plans
-express the answer differently from `gold_sql`: anti-joins for "longest
-track per genre" (`chinook_008`) and "never purchased" (`chinook_039`),
-conditional sums in HAVING for "jazz but never rock" (`chinook_009`), and
-`COUNT(DISTINCT(x))` written as `COUNT` over a function named `DISTINCT`
-(`chinook_011`, `chinook_034`). The header of the plans file lists these.
+has no subqueries or window functions, so a few plans express the answer
+differently from `gold_sql`: anti-joins for "longest track per genre"
+(`chinook_008`) and "never purchased" (`chinook_039`), and conditional sums
+in HAVING for "jazz but never rock" (`chinook_009`). The header of the plans
+file lists these. `chinook_011` and `chinook_034` use `COUNT(DISTINCT x)`
+through the aggregate's `distinct: true` flag.
 
 Tier 1 runs on every PR as `packages/nl2sql/tests/e2e/test_benchmark_tier1.py`,
 in the key-free integration job: it generates the demo, runs

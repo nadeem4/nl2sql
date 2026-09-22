@@ -26,7 +26,7 @@ Signature:
 Parameters:
 | name | type | required | meaning |
 | --- | --- | --- | --- |
-| `ds_config_path` | `Optional[Union[str, pathlib.Path]]` | no | Datasource config path override. |
+| `ds_config_path` | `Optional[Union[str, pathlib.Path]]` | no | Datasource config path override. Indexing reads each datasource's `description` from this file too. |
 | `secrets_config_path` | `Optional[Union[str, pathlib.Path]]` | no | Secrets config path override. |
 | `llm_config_path` | `Optional[Union[str, pathlib.Path]]` | no | LLM config path override. |
 | `vector_store_path` | `Optional[Union[str, pathlib.Path]]` | no | Vector store persistence path override. |

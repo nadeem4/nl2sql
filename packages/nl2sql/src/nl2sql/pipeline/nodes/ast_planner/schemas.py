@@ -33,6 +33,8 @@ class Expr(BaseModel):
         func_name (Optional[str]): Name of the function.
         args (List[Expr]): Arguments for function expressions.
         is_aggregate (bool): Whether the function is an aggregate function.
+        distinct (bool): Apply the function to distinct argument values,
+            e.g. ``COUNT(DISTINCT x)``. Only valid when ``kind`` is ``func``.
         op (Optional[str]): Operator for binary or unary expressions.
         left (Optional[Expr]): Left operand for binary expressions.
         right (Optional[Expr]): Right operand for binary expressions.
@@ -56,6 +58,8 @@ class Expr(BaseModel):
     func_name: Optional[str] = None
     args: List["Expr"] = Field(default_factory=list)
     is_aggregate: bool = False
+    # FUNC(DISTINCT args), e.g. COUNT(DISTINCT x). Only valid on kind "func".
+    distinct: bool = False
 
     # OPERATORS
     op: Optional[
@@ -90,6 +94,9 @@ class Expr(BaseModel):
 
         if k == "func" and not self.func_name:
             raise ValueError("func_name is required for func expression")
+
+        if self.distinct and k != "func":
+            raise ValueError("distinct is only valid on a func expression")
 
         if k == "binary":
             if not (self.left and self.right):

@@ -76,6 +76,7 @@ Side effects:
    - Every operator becomes the node sqlglot's parser would build (`+` -> `exp.Add`, `*` -> `exp.Mul`, `IS NOT` -> `NOT ... IS ...`, and so on), wherever it is nested. An operator with no mapping raises; it is never rendered as a function named after the operator.
    - An operand that is itself an operator is parenthesised, because sqlglot prints a hand-built tree without adding the parentheses its parser would have seen (`(a + b) * c` would otherwise print as `a + b * c`).
    - `/` is sqlglot's true division, so on SQLite it renders as `CAST(a AS REAL) / b` rather than integer division.
+   - A `func` expr with `distinct: true` wraps its arguments in `exp.Distinct`, so `{"kind": "func", "func_name": "COUNT", "is_aggregate": true, "distinct": true, "args": [x]}` renders as `COUNT(DISTINCT x)`. `PlanModel.distinct: true` renders `SELECT DISTINCT`.
 5. Attach joins. The first table by ordinal is the `FROM` table. `left_alias`/`right_alias` do not say which table is new: each join attaches whichever side is not yet in scope, taking the lowest-ordinal join that touches a table already in scope, so joins may be listed in any order. When the new table is the join's left side, `left`/`right` outer joins are mirrored so the same table is preserved. Joined tables keep their `schema_name`/`database` qualifiers.
 6. Order the rows completely. The plan's `ORDER BY` terms come first, with their direction. Every other selected column follows as an ascending tie-breaker, in select order. With no `ORDER BY` in the plan, the query is ordered by every selected column. This does not change what the query means, but without it the `LIMIT` below could keep a different subset of rows on each run.
    - An aliased item is ordered by its alias (`ORDER BY genre, track_sales`), which stays valid for aggregates under `GROUP BY`. Terms are never positional ordinals.
@@ -161,7 +162,8 @@ Logs exceptions via `logger.exception`.
 ## Known Limitations
 
 - No SQL optimization beyond AST structure.
-- `PlanModel.distinct` and `PlanModel.offset` are not rendered.
+- `PlanModel.offset` is not rendered.
+- The plan language has no subqueries or window functions.
 - No dialect fallback if adapter misconfigured.
 
 ---

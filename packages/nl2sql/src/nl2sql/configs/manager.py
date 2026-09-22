@@ -24,22 +24,33 @@ class ConfigManager:
     persist real credentials in plaintext.
     """
 
-    def __init__(self, project_root: Optional[pathlib.Path] = None):
+    def __init__(
+        self,
+        project_root: Optional[pathlib.Path] = None,
+        ds_config_path: Optional[pathlib.Path] = None,
+        llm_config_path: Optional[pathlib.Path] = None,
+        policies_config_path: Optional[pathlib.Path] = None,
+        secrets_config_path: Optional[pathlib.Path] = None,
+    ):
         """
         Args:
-            project_root: Optional override for project root. 
+            project_root: Optional override for project root.
                           If None, uses settings paths or CWD resolution strategy.
+            ds_config_path, llm_config_path, policies_config_path,
+            secrets_config_path: Explicit file paths. Each replaces the settings
+                path the no-argument loaders and lookups such as
+                ``get_datasource_description`` read.
         """
         self.project_root = project_root
-        
+
         # Resolve root: Use override, or CWD
         root = self.project_root or pathlib.Path.cwd()
-        
+
         # Default paths from settings if not overridden
-        self._ds_path = root / settings.datasource_config_path
-        self._llm_path = root / settings.llm_config_path
-        self._policy_path = root / settings.policies_config_path
-        self._secrets_path = root / settings.secrets_config_path
+        self._ds_path = pathlib.Path(ds_config_path) if ds_config_path else root / settings.datasource_config_path
+        self._llm_path = pathlib.Path(llm_config_path) if llm_config_path else root / settings.llm_config_path
+        self._policy_path = pathlib.Path(policies_config_path) if policies_config_path else root / settings.policies_config_path
+        self._secrets_path = pathlib.Path(secrets_config_path) if secrets_config_path else root / settings.secrets_config_path
         self._sample_questions_path = root / settings.sample_questions_path
 
     def ensure_config_dirs(self) -> None:

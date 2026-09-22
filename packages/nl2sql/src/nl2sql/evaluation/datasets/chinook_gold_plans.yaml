@@ -4,12 +4,10 @@
 #
 # Every plan reads exactly the question's needed_tables and selects the gold
 # result's columns in order; aliases are free (rows are compared by value).
-# PlanModel has no subqueries, window functions or DISTINCT aggregates, so:
+# PlanModel has no subqueries or window functions, so:
 #   chinook_008 (longest track per genre) is an anti-join: LEFT JOIN a longer
 #     track of the same genre and keep rows where none exists.
 #   chinook_009 (jazz but never rock) counts genres per customer in HAVING.
-#   chinook_011 and chinook_034 write COUNT(DISTINCT x) as COUNT over a
-#     function named DISTINCT, which renders as COUNT(DISTINCT(x)).
 #   chinook_039 (never purchased) is an anti-join on InvoiceLine.
 
 chinook_001:
@@ -303,14 +301,14 @@ chinook_011:
   select_items:
   - {ordinal: 0, alias: playlist_id, expr: {kind: column, alias: t1, column_name: PlaylistId}}
   - {ordinal: 1, alias: playlist_name, expr: {kind: column, alias: t1, column_name: Name}}
-  - {ordinal: 2, alias: genre_count, expr: {kind: func, func_name: COUNT, is_aggregate: true, args: [{kind: func, func_name: DISTINCT, args: [{kind: column, alias: t3, column_name: GenreId}]}]}}
+  - {ordinal: 2, alias: genre_count, expr: {kind: func, func_name: COUNT, is_aggregate: true, distinct: true, args: [{kind: column, alias: t3, column_name: GenreId}]}}
   group_by:
   - {ordinal: 0, expr: {kind: column, alias: t1, column_name: PlaylistId}}
   - {ordinal: 1, expr: {kind: column, alias: t1, column_name: Name}}
   having:
     kind: binary
     op: '>'
-    left: {kind: func, func_name: COUNT, is_aggregate: true, args: [{kind: func, func_name: DISTINCT, args: [{kind: column, alias: t3, column_name: GenreId}]}]}
+    left: {kind: func, func_name: COUNT, is_aggregate: true, distinct: true, args: [{kind: column, alias: t3, column_name: GenreId}]}
     right: {kind: literal, value: 3}
   order_by:
   - {ordinal: 0, direction: asc, expr: {kind: column, alias: t1, column_name: PlaylistId}}
@@ -664,7 +662,7 @@ chinook_034:
     ordinal: 3
     condition: {kind: binary, op: '=', left: {kind: column, alias: t4, column_name: ArtistId}, right: {kind: column, alias: t5, column_name: ArtistId}}
   select_items:
-  - {ordinal: 0, alias: customer_count, expr: {kind: func, func_name: COUNT, is_aggregate: true, args: [{kind: func, func_name: DISTINCT, args: [{kind: column, alias: t1, column_name: CustomerId}]}]}}
+  - {ordinal: 0, alias: customer_count, expr: {kind: func, func_name: COUNT, is_aggregate: true, distinct: true, args: [{kind: column, alias: t1, column_name: CustomerId}]}}
   where: {kind: binary, op: '=', left: {kind: column, alias: t5, column_name: Name}, right: {kind: literal, value: AC/DC}}
   reasoning: Count distinct customers on invoices with an AC/DC track.
 

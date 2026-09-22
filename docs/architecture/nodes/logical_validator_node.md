@@ -102,6 +102,9 @@ Side effects:
    - `_resolve_plan_tables()` maps each plan alias to its schema columns and
      emits `TABLE_NOT_FOUND` for unknown tables. This stays hand-written
      because `qualify()` silently ignores relations absent from its schema.
+   - `_distinct_function()` rejects a `func` expr named `DISTINCT` with
+     `INVALID_PLAN_STRUCTURE`: `COUNT(DISTINCT x)` is `distinct: true` on the
+     COUNT expr, and `SELECT DISTINCT` is `PlanModel.distinct`.
    - `_validate_columns()` builds the plan's `sqlglot` tree and runs
      `qualify(..., validate_qualify_columns=True)`. On failure each distinct
      column reference is re-probed so every bad reference is reported, and

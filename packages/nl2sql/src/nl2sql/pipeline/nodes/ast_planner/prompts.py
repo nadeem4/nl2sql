@@ -97,6 +97,24 @@ Plan:
     }
   ]
 }
+
+User Query: "How many different customers placed orders?"
+
+Plan:
+{
+  "reasoning": "Count distinct customer ids on orders.",
+  "tables": [
+    {"name": "orders", "alias": "t1", "ordinal": 0}
+  ],
+  "joins": [],
+  "select_items": [
+    {
+      "ordinal": 0,
+      "expr": {"kind": "func", "func_name": "COUNT", "args": [{"kind": "column", "alias": "t1", "column_name": "user_id"}], "is_aggregate": true, "distinct": true},
+      "alias": "customer_count"
+    }
+  ]
+}
 """
 
 # Cache layout. The system message is everything that is the same for every
@@ -119,7 +137,9 @@ PLANNER_SYSTEM_PROMPT = (
     "6. Every list MUST contain `ordinal` fields in ascending order starting at 0.\n"
     "7. Order lists to match ordinals (0..N) exactly.\n"
     "8. For literal values on '=' or 'IN', choose values from a column's sample_values if listed.\n"
-    "9. If no exact match is available, fall back to LIKE but keep the pattern derived from sample_values.\n\n"
+    "9. If no exact match is available, fall back to LIKE but keep the pattern derived from sample_values.\n"
+    "10. For COUNT(DISTINCT x), set \"distinct\": true on the COUNT func expr; for SELECT DISTINCT,"
+    " set the plan's \"distinct\": true. DISTINCT is never a func_name.\n\n"
 
     "[OUTPUT CONTRACT]\n"
     "- If [EXPECTED_SCHEMA] is provided and non-empty:\n"
