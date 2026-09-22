@@ -1,13 +1,32 @@
 {
-  "schema": 1,
+  "schema": 2,
   "kind": "retrieval",
   "recorded_at": "2026-09-22T03:39:36Z",
   "engine_version": "0.1.2",
-  "git_commit": null,
+  "git_commit": "571cd16451e96ed0d6e155d16131a926c4e2c953",
+  "git_dirty": "unknown",
+  "note": "first retrieval baseline",
   "dataset": {
     "name": "chinook_gold.yaml",
     "sha256": "7d104084a9f335fdad010848218ebcc826536cd86efb886aac7e8d256242a4fc"
   },
+  "database": {
+    "datasource_id": "chinook",
+    "engine": "sqlite",
+    "schema_fingerprint": "ceed80fefde051bd",
+    "tables": 11,
+    "columns": 64
+  },
+  "config": {
+    "name": "retrieval"
+  },
+  "backfilled": [
+    "git_commit",
+    "git_dirty",
+    "note",
+    "database",
+    "config"
+  ],
   "settings": {
     "table_k": 8,
     "planning_k": 12,

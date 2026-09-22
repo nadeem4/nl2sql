@@ -15,11 +15,10 @@ answers against.
 | `packages/nl2sql/src/nl2sql/evaluation/faithfulness.py` | [Answer faithfulness](#answer-faithfulness): the written answer's numbers and names against the rows |
 | `packages/nl2sql/src/nl2sql/evaluation/retrieval_recall.py` | [Retrieval recall](#retrieval-recall): table and column recall of schema retrieval, no key |
 | `packages/nl2sql/src/nl2sql/evaluation/prices.py` | The dated price table tier 2 bills every call from |
-| `packages/nl2sql/src/nl2sql/evaluation/records.py` | Tier 2 result records and `nl2sql benchmark publish` |
-| `configs/benchmark/*.yaml` | Example LLM configs to compare with tier 2 |
+| `packages/nl2sql/src/nl2sql/evaluation/records.py` | Result records, comparable runs, `nl2sql benchmark publish` and `--from` |
+| `packages/nl2sql/src/nl2sql/evaluation/presets/` | `--model` configs and the built-in `--llm` presets (`*.yaml`, shipped in the wheel) |
 | `packages/nl2sql/src/nl2sql/evaluation/baselines/` | Where a committed tier 2 baseline scoreboard goes (none yet) |
-| `benchmarks/results/` | Committed tier 2 result records, one per run and config |
-| `benchmarks/retrieval/` | Committed retrieval recall records, one per run |
+| `benchmarks/<kind>/<database>/` | Committed result records: `tier2/` one per run and config, `retrieval/` one per run ([layout](#results-over-time)) |
 | `packages/nl2sql/src/nl2sql/evaluation/evaluator.py` | Row comparison (`compare_results`) and per-role scoring (`score_case`) |
 | `packages/nl2sql/tests/unit/test_chinook_gold_dataset.py` | Key-free checks, part of the normal unit suite |
 
@@ -159,53 +158,95 @@ without a dollar cap. The key comes from the environment or the LLM config
 (`${env:...}`), never from the command line; traces follow `TRACE_MODE` as for
 any run.
 
-The command the owner runs for a first baseline:
+The commands the owner runs, from the demo folder:
 
 ```bash
-nl2sql --env demo benchmark --tier 2 --llm gpt-5.4=configs/benchmark/gpt-5.4.yaml --max-cost 5
+nl2sql --env demo benchmark --tier 2 --model gpt-5.4 --max-cost 5                        # a run
+nl2sql --env demo benchmark --tier 2 --model gpt-5.4 --llm mini-helpers --max-cost 10    # a comparison
 ```
+
+and then, from the repo, `nl2sql benchmark publish --from <demo folder>`
+([results over time](#results-over-time)).
 
 | Option | Default | Meaning |
 | --- | --- | --- |
 | `--max-cost USD` | required | Stop before a question that could take the run's total spend past this |
-| `--llm NAME=PATH` | the project's LLM config, as `default` | An LLM config to compare (repeatable). `PATH` is an ordinary `llm.yaml`-format file |
+| `--model MODEL` | none | A model to put on every LLM node, named in the scoreboard by itself (repeatable; below) |
+| `--llm SPEC` | none | An LLM config to compare (repeatable): a preset name, `PATH.yaml` (named by the file stem) or `NAME=PATH`. With no `--model` or `--llm`, the project's LLM config runs as `default` |
+| `--note TEXT` | none | A short label for what changed, e.g. `"slim prompts"`, kept in each record and shown in the history |
 | `--role ROLE` | `admin` | Run as this role (repeatable) |
 | `--passes N` | `1` | Run every question N times per config and report determinism |
 | `--questions ID_OR_TAG` | every question | Only these question ids or tags (repeatable or comma-separated), e.g. `--questions unanswerable,chinook_001` |
-| `--export-path PATH` | `benchmark_tier2.json` | Where to write the full scoreboard |
-| `--results-dir DIR` | `benchmarks/results` | Where to write one result record per config |
+| `--export-path PATH` | `<project>/benchmark_tier2.json` | Where to write the full scoreboard |
+| `--results-dir DIR` | `<project>/benchmarks` | The benchmarks folder; one record per config goes in `DIR/tier2/<database>/` |
 | `--baseline PATH` | none | A committed scoreboard to check against (below) |
 | `--max-accuracy-drop F` | `0.02` | Baseline: largest allowed accuracy drop (0.02 is two points) |
 | `--max-cost-increase F` | `0.2` | Baseline: largest allowed rise in cost per question (0.2 is 20%) |
 
+`<project>` is the folder of the env file the run is configured from: for
+`--env demo` that is `./.env.demo`, so the current folder; with `--env-file
+PATH` it is that file's folder.
+
 The option is `--llm`, not `--config`: on every `nl2sql` command `--config` is
 the datasource config and `--llm-config` the single LLM config path.
 
+Before anything is spent, the run prints its plan and carries on without a
+prompt (the cap is the safety):
+
+```
+Plan: 43 questions x role admin x 1 pass, cap $10.00
+  gpt-5.4: gpt-5.4 (every node)
+  gpt-5.4-mini-helpers: gpt-5.4 (astplanner, refiner); gpt-5.4-mini (answersynthesizer, datasourceresolver, decomposer)
+  Records: C:\demo\benchmarks\tier2  Scoreboard: C:\demo\benchmark_tier2.json
+```
+
 Exit codes: 0 when every config ran, 1 on a baseline regression or a failed
-run, 2 on a usage error (no `--max-cost`, a malformed `--llm`, `CI` set), 3
-when the cap stopped the run early.
+run, 2 on a usage error (no `--max-cost`, an unknown `--model` or `--llm`, two
+configs with one name, `CI` set), 3 when the cap stopped the run early.
+
+### `--model` and the presets
+
+`--model MODEL` puts `MODEL` on all five LLM nodes. A model in
+`VERIFIED_MODELS` (`nl2sql/cli/common/api_key.py`: `gpt-5.4`, `gpt-5.4-mini`,
+`gpt-4.1`, `gpt-4o`, `gpt-5.5`, `gpt-5-mini`, `claude-opus-5`,
+`claude-sonnet-5`, `claude-haiku-4-5`, ...) names its provider and its
+temperature: none is sent where the model rejects one (`gpt-5.5`,
+`gpt-5-mini`, `claude-opus-5`, `claude-sonnet-5`). Any other model is written
+`provider/model` (`openrouter/meta-llama/llama-3.3-70b-instruct`,
+`ollama/llama3`) and runs at temperature 0 (none for `anthropic`); a bare
+unknown model is a usage error. The key is the provider's `${env:...}`
+variable (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `OPENROUTER_API_KEY`), which
+`--env demo` loads from `.env.demo`. No `base_url` is written, so the provider
+preset's endpoint is used.
+
+`--llm NAME` picks a preset, a config file shipped inside the package.
+`nl2sql benchmark presets` lists them:
+
+```
+Tier 2 presets (--llm NAME):
+  claude-planner: claude-opus-5 (astplanner, refiner); gpt-5.4 (answersynthesizer, datasourceresolver, decomposer)
+  gpt-5.4: gpt-5.4 (every node)
+  gpt-5.4-mini-helpers: gpt-5.4 (astplanner, refiner); gpt-5.4-mini (answersynthesizer, datasourceresolver, decomposer)
+```
+
+A preset matches by its full name or a `-`-separated suffix, so `--llm
+mini-helpers` is `gpt-5.4-mini-helpers`, and the scoreboard names it by its
+full name. `claude-planner` needs the `anthropic` extra and
+`ANTHROPIC_API_KEY`. `--llm PATH.yaml` runs your own file under its stem, and
+`--llm NAME=PATH` under `NAME`. `--model` and `--llm` combine: every one
+becomes a config in one comparison, `--model`s first.
 
 ### Comparing configs
 
-Each `--llm` config runs on the same questions, one after another, and the
+Each config runs on the same questions, one after another, and the
 scoreboard puts them side by side and lists every question one config passed
 and another failed (with `--passes` > 1 a question can also be `flaky`). Since
 [per-node providers](../configuration/llm.md), a config can put each LLM node
 (`datasourceresolver`, `decomposer`, `astplanner`, `refiner`,
-`answersynthesizer`) on its own provider and model. Three examples are in
-`configs/benchmark/`:
-
-| File | Planner and refiner | Resolver, decomposer, synthesizer |
-| --- | --- | --- |
-| `gpt-5.4.yaml` | gpt-5.4 | gpt-5.4 |
-| `gpt-5.4-mini-helpers.yaml` | gpt-5.4 | gpt-5.4-mini |
-| `claude-planner.yaml` | claude-opus-5 (needs the `anthropic` extra and `ANTHROPIC_API_KEY`) | gpt-5.4 |
+`answersynthesizer`) on its own provider and model, as the presets do:
 
 ```bash
-nl2sql --env demo benchmark --tier 2 --max-cost 10 \
-  --llm gpt-5.4=configs/benchmark/gpt-5.4.yaml \
-  --llm mini-helpers=configs/benchmark/gpt-5.4-mini-helpers.yaml \
-  --llm claude-planner=configs/benchmark/claude-planner.yaml
+nl2sql --env demo benchmark --tier 2 --max-cost 10 --model gpt-5.4 --llm mini-helpers --llm claude-planner
 ```
 
 A model that is not in `VERIFIED_MODELS` (`nl2sql/cli/common/api_key.py`) gets
@@ -330,43 +371,83 @@ by more than `--max-cost-increase`. Baselines go in
 make one, run tier 2 on the full set and copy its scoreboard there:
 
 ```bash
-nl2sql --env demo benchmark --tier 2 --llm gpt-5.4=configs/benchmark/gpt-5.4.yaml --max-cost 5 \
-  --export-path packages/nl2sql/src/nl2sql/evaluation/baselines/gpt-5.4.json
+nl2sql --env demo benchmark --tier 2 --model gpt-5.4 --max-cost 5 \
+  --export-path <repo>/packages/nl2sql/src/nl2sql/evaluation/baselines/gpt-5.4.json
 # later
-nl2sql --env demo benchmark --tier 2 --llm gpt-5.4=configs/benchmark/gpt-5.4.yaml --max-cost 5 \
-  --baseline packages/nl2sql/src/nl2sql/evaluation/baselines/gpt-5.4.json
+nl2sql --env demo benchmark --tier 2 --model gpt-5.4 --max-cost 5 \
+  --baseline <repo>/packages/nl2sql/src/nl2sql/evaluation/baselines/gpt-5.4.json
 ```
 
 ### Results over time
 
-Every tier 2 run also writes one record per config to `benchmarks/results/`,
-named `<YYYY-MM-DD>_<engine-version>_<config>.json` (`-2`, `-3`... when the
-name is taken that day). A record holds the UTC date and time, the engine
-version and git commit, the dataset name and the sha256 of
-`chinook_gold.yaml`, taken with LF line endings so a Windows checkout hashes
-the same (runs on a different gold set are never shown as
-comparable), the config name and `provider:model` per node, the roles and
-passes, the headline metrics (accuracy, answerability precision and recall,
-dollars total and per question, input / cached / output tokens per question,
-p50 and p95 latency, determinism, answer faithfulness), `stopped` and
-`partial`, and the config's full scoreboard. `publish` shows faithfulness in
-both history tables; a record written before it existed shows `-`.
+Every tier 2 run writes one record per config, and `benchmark retrieval
+--record` one record, under the project's `benchmarks/` folder:
 
-`nl2sql benchmark publish` (no key, no network) reads every record and
-rewrites `docs/benchmarks.md` (every run, newest first, the latest run per
-config, then every [retrieval recall](#retrieval-recall) record in
-`benchmarks/retrieval/`) and the block between `<!-- BENCHMARKS:START -->` and
+```
+benchmarks/<kind>/<database>/<YYYY-MM-DD>_<shortsha>_<config>.json
+```
+
+`kind` is `tier2` or `retrieval`, `database` the datasource id (`chinook`),
+`shortsha` the first seven characters of the engine commit and `config` the
+config name (`retrieval` for a retrieval run). `-2`, `-3`... are added when the
+name is taken. Every record holds:
+
+| Field | What it is |
+| --- | --- |
+| `schema`, `kind` | The record format (2) and the benchmark |
+| `recorded_at` | UTC date and time |
+| `engine_version` | The installed `nl2sql-engine` version (the same for every run until a release) |
+| `git_commit`, `git_dirty` | The engine's commit and whether its tracked files had uncommitted changes. Found by walking up from the installed `nl2sql` package to its `.git`, so a run from the demo folder of an editable install still names the repo commit; `"unknown"` for a wheel install or without git, never null |
+| `note` | `--note`: what changed, e.g. `"slim prompts"` (null without one) |
+| `dataset` | `chinook_gold.yaml`'s name and sha256, taken with LF line endings so a Windows checkout hashes the same |
+| `database` | `datasource_id`, `engine` (`sqlite`), `schema_fingerprint` (a hash of the latest indexed schema snapshot's tables, columns, types and keys, so re-indexing an unchanged database keeps it) and the `tables` and `columns` counts |
+| `config` | The config name, and for tier 2 `provider:model` per node |
+| `metrics` | Tier 2: accuracy, answerability precision and recall, dollars total and per question, input / cached / output tokens per question, p50 and p95 latency, determinism, answer faithfulness. Retrieval: the report's `summary` |
+| tier 2 only | `roles`, `passes`, `stopped`, `partial` and the config's full `scoreboard` |
+| retrieval only | `settings` and the full `report` |
+
+Records are never edited after writing: a run writes a new file, and
+`publish` and `publish --from` refuse to overwrite one. The first retrieval
+baseline was written before this layout and was moved into it with its
+database, the commit that added it and the note "first retrieval baseline"
+filled in (listed in its `backfilled` field).
+
+#### Comparable runs
+
+Two runs are comparable when they share the benchmark kind, the dataset sha
+and the schema fingerprint, and for tier 2 the roles. `docs/benchmarks.md`
+groups the history by benchmark, then database, and lists each group's runs
+newest first. "Δ vs previous" compares a run with the previous run of the same
+config on the same database: the change in accuracy, faithfulness (in
+percentage points) and dollars per question for tier 2, in table and column
+recall for retrieval. When the dataset, the schema or the roles changed, the
+run starts a new series and the cell says so, e.g. `new series (schema
+changed)`; a config's first run says `first run`. The README block shows the
+latest run per benchmark, database and config with the same Δ.
+
+#### Publishing
+
+`nl2sql benchmark publish` (no key, no network), run from the repo root,
+reads every record in `benchmarks/<kind>/<database>/` and rewrites
+`docs/benchmarks.md` and the block between `<!-- BENCHMARKS:START -->` and
 `<!-- BENCHMARKS:END -->` in `README.md`. It reads no clock, so the same
-records always give byte-identical pages. The workflow:
+records always give byte-identical pages. `--from DIR` (repeatable) first
+copies the records of another project folder (its `benchmarks/`) that the
+repo lacks: one already here with the same content is skipped, one with the
+same name and other content is reported as a conflict, left as it is, and
+makes the command exit 1 after publishing. Records in the old layout are
+skipped with a warning. The workflow:
 
-1. Run tier 2 (it writes the records).
-2. Commit the new files in `benchmarks/results/`.
-3. Run `nl2sql benchmark publish`.
-4. Commit the `README.md` and `docs/benchmarks.md` changes.
+1. From the demo folder: `nl2sql --env demo benchmark --tier 2 --model gpt-5.4 --max-cost 5`.
+2. From the repo: `nl2sql benchmark publish --from <demo folder>`.
+3. Commit the new records in `benchmarks/` with the `README.md` and
+   `docs/benchmarks.md` changes.
 
+`benchmarks/README.md` repeats the layout and workflow next to the records.
 `packages/nl2sql/tests/unit/test_benchmark_records.py` checks in CI, with no
 key, that the committed README block and `docs/benchmarks.md` are exactly what
-`publish` makes from the committed records.
+`publish` makes from the committed records, and that every committed record
+sits where its fields say.
 
 ### How tier 2 is tested
 
@@ -376,12 +457,20 @@ plans with canned usage (cached and reasoning tokens included), one with a
 plan deliberately wrong. It checks the scoring, the comparison and its
 differences, the dollars against the price table, the cap stopping mid-run
 with a partial scoreboard, an unpriced model failing before any call, and two
-passes with the plan cache off. Its fake synthesizer writes each answer from
+passes with the plan cache off. A `--model gpt-5.4` config writes no
+`base_url`, so its test points the OpenAI client at the fake server with the
+client's own `OPENAI_BASE_URL` variable, and checks the database identity
+the board records. Its fake synthesizer writes each answer from
 the gold rows, so the good server's answers are faithful and the bad server's
 answer on its wrong rows is not. `tests/unit/test_answer_faithfulness.py`
 covers the faithfulness rules with good and bad answers. `tests/unit/test_tier2_scoreboard.py` and
 `tests/cli/test_benchmark_tier2_command.py` cover the scoreboard, the
-baseline check, the refusal to start without `--max-cost` and the exit codes.
+baseline check, the refusal to start without `--max-cost`, the exit codes,
+`--model` and `--llm` resolution, the plan, the project-relative outputs,
+`benchmark presets` and `publish --from`. `tests/unit/test_benchmark_presets.py`
+covers the per-node `--model` config and preset lookup, and
+`tests/unit/test_benchmark_records.py` the records, the git commit lookup,
+comparability, the Δ and series breaks.
 
 ## Retrieval recall
 
@@ -391,8 +480,8 @@ columns it is given. A column it never sends is one the planner cannot use.
 against `needed_tables` and `needed_columns`, with no key, no LLM and no cost:
 
 ```bash
-nl2sql --env demo benchmark retrieval                       # writes benchmark_retrieval.json
-nl2sql --env demo benchmark retrieval --record              # also writes a record to benchmarks/retrieval/
+nl2sql --env demo benchmark retrieval                       # writes <project>/benchmark_retrieval.json
+nl2sql --env demo benchmark retrieval --record --note "k 10"  # also writes a record to <project>/benchmarks/retrieval/<database>/
 nl2sql --env demo benchmark retrieval --baseline old.json   # the change against an earlier report or record
 nl2sql --env demo benchmark retrieval --questions join,chinook_014
 ```
@@ -432,8 +521,9 @@ a change that raises recall by sending more is not an improvement by itself.
 A missed column is one the planner cannot select, filter or join on. Compare
 runs with `--baseline`, which prints the change in each mean and every
 question whose recall moved, or with the committed records: each `--record`
-run is a JSON file in `benchmarks/retrieval/`, and `nl2sql benchmark publish`
-lists them newest first in `docs/benchmarks.md`.
+run is a JSON file in `benchmarks/retrieval/<database>/`, and `nl2sql
+benchmark publish` lists them newest first in `docs/benchmarks.md`, with the
+change in each recall against the previous comparable run.
 
 The committed baseline (2026-09-22, engine 0.1.2, 39 questions):
 

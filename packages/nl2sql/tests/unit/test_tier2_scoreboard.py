@@ -79,14 +79,10 @@ def test_questions_are_selected_by_id_or_tag():
         tier2.select_question_ids(dataset, ["nope"])
 
 
-def test_the_example_benchmark_configs_are_priced_verified_and_keyless():
-    import pathlib
+def test_the_built_in_presets_are_priced_verified_and_keyless():
+    from nl2sql.evaluation.presets import list_presets
 
-    import yaml
-
-    folder = pathlib.Path(__file__).resolve().parents[4] / "configs" / "benchmark"
-    configs = {p.stem: LLMFileConfig.model_validate(yaml.safe_load(p.read_text(encoding="utf-8")))
-               for p in sorted(folder.glob("*.yaml"))}
+    configs = dict(list_presets())
     assert set(configs) == {"gpt-5.4", "gpt-5.4-mini-helpers", "claude-planner"}
     tier2.check_prices(configs)
     assert tier2.unverified_models(configs) == []

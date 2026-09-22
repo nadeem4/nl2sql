@@ -373,13 +373,19 @@ nl2sql --env demo run --role viewer "Who are the top 5 customers by total spend?
 nl2sql doctor
 
 # Score the engine on the 43 Chinook gold questions. Tier 1 serves hand-written
-# plans from a local fake LLM (no key); tier 2 runs the real model per LLM
-# config, compares the configs, and stops before spend could pass --max-cost.
+# plans from a local fake LLM (no key); tier 2 runs the real model per config,
+# compares the configs, and stops before spend could pass --max-cost. Run from
+# the demo folder: results land in it (benchmark_tier2.json, benchmarks/).
 nl2sql --env demo benchmark --tier 1
-nl2sql --env demo benchmark --tier 2 --llm gpt-5.4=configs/benchmark/gpt-5.4.yaml --max-cost 5
+nl2sql --env demo benchmark --tier 2 --model gpt-5.4 --max-cost 5
+nl2sql --env demo benchmark --tier 2 --model gpt-5.4 --llm mini-helpers --max-cost 10
+nl2sql benchmark presets                       # the built-in --llm configs
 
 # Table and column recall of schema retrieval on the gold questions (no key)
 nl2sql --env demo benchmark retrieval
+
+# From the repo: pull the demo folder's records in and rebuild the history
+nl2sql benchmark publish --from <demo folder>
 
 # Playground ratings and guardrail rates (thumbs up/down, refusals by code,
 # refiner retries, validator failures, errors by code, plan-cache hit rate);
@@ -428,12 +434,17 @@ See [Releasing](docs/development/releasing.md).
 
 ## Benchmark results
 
-The latest tier 2 run per LLM config: the real model on the 43 Chinook gold
-questions. `nl2sql benchmark publish` writes this block from the committed
-records in `benchmarks/results/`.
+The latest recorded run per benchmark, database and config, on the 43 Chinook
+gold questions, with the change against that config's previous comparable run.
+`nl2sql benchmark publish` writes this block from the committed records in
+`benchmarks/` (see [benchmarks/README.md](benchmarks/README.md)).
 
 <!-- BENCHMARKS:START -->
-No benchmark runs recorded yet.
+| Benchmark | Database | Config | Date (UTC) | Commit | Result | Δ vs previous |
+| --- | --- | --- | --- | --- | --- | --- |
+| Retrieval recall | chinook | retrieval | 2026-09-22 | 571cd16 | tables 98.5%, columns 72.6% | first run |
+
+Full history: [docs/benchmarks.md](docs/benchmarks.md)
 <!-- BENCHMARKS:END -->
 
 ## Documentation

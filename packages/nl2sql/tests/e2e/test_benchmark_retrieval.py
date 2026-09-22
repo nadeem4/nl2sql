@@ -5,6 +5,7 @@ runs over every answerable gold question and writes its report and record,
 not what the recall is.
 """
 import json
+import pathlib
 
 import pytest
 
@@ -12,12 +13,14 @@ from nl2sql.evaluation.gold import load_gold_dataset
 
 from .conftest import _base_env, run_cli
 
+REPO = pathlib.Path(__file__).resolve().parents[4]
+
 
 @pytest.mark.e2e
 def test_retrieval_recall_runs_over_every_answerable_question(demo_project, tmp_path):
     report_path, results = tmp_path / "retrieval.json", tmp_path / "records"
     proc = run_cli(demo_project, _base_env(), "benchmark", "retrieval", "--export-path", str(report_path),
-                   "--record", "--results-dir", str(results), timeout=900)
+                   "--record", "--note", "e2e", "--results-dir", str(results), timeout=900)
     assert proc.returncode == 0, proc.stdout + proc.stderr
 
     report = json.loads(report_path.read_text(encoding="utf-8"))
@@ -32,5 +35,18 @@ def test_retrieval_recall_runs_over_every_answerable_question(demo_project, tmp_
     assert report["summary"]["questions"] == len(answerable)
     assert "Schema retrieval recall" in proc.stdout and "table recall" in proc.stdout
 
-    [record] = list(results.glob("*_retrieval.json"))
-    assert json.loads(record.read_text(encoding="utf-8"))["metrics"] == report["summary"]
+    [record] = list(results.glob("retrieval/chinook/*_retrieval.json"))
+    body = json.loads(record.read_text(encoding="utf-8"))
+    assert body["metrics"] == report["summary"] and body["note"] == "e2e"
+    # The committed baseline's backfilled database identity is the demo's own.
+    baseline = REPO / "benchmarks" / "retrieval" / "chinook" / "2026-09-22_571cd16_retrieval.json"
+    assert body["database"] == report["database"] == json.loads(baseline.read_text(encoding="utf-8"))["database"]
+
+
+@pytest.mark.e2e
+def test_the_report_lands_in_the_project_folder_by_default(demo_project):
+    report = demo_project / "benchmark_retrieval.json"
+    report.unlink(missing_ok=True)
+    proc = run_cli(demo_project, _base_env(), "benchmark", "retrieval", "--questions", "chinook_001", timeout=900)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert json.loads(report.read_text(encoding="utf-8"))["summary"]["questions"] == 1
