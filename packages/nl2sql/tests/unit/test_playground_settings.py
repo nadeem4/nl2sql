@@ -478,7 +478,7 @@ def test_a_provider_without_a_key_cannot_be_chosen(project, monkeypatch):
 
     assert providers["anthropic"]["usable"] is False
     assert response.status_code == 400
-    assert "Anthropic key" in response.json()["detail"]
+    assert "key for Anthropic" in response.json()["detail"]
     assert (project / "configs" / "llm.demo.yaml").read_text(encoding="utf-8") == before
 
 

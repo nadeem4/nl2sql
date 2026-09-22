@@ -233,7 +233,7 @@ class SettingsPanel:
         unavailable = None
         if provider and not self._usable(provider, default_provider):
             label = PROVIDER_LABELS.get(provider, provider)
-            unavailable = (f"{label} has no key, so this step cannot run. Save a {label} key above, "
+            unavailable = (f"{label} has no key, so this step cannot run. Save a key for {label} above, "
                            "or choose another provider for it.")
         return {**node, "provider": provider, "model": entry.get("model") if entry else None,
                 "unavailable": unavailable}
@@ -336,5 +336,5 @@ class SettingsPanel:
             )
         if not self._usable(provider, default_provider):
             label = PROVIDER_LABELS.get(provider, provider)
-            raise HTTPException(status_code=400, detail=f"Save a {label} key before putting a step on {label}.")
+            raise HTTPException(status_code=400, detail=f"Save a key for {label} before putting a step on it.")
         return provider, model
