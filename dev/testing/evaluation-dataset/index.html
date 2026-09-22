@@ -3237,6 +3237,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#-model-and-the-presets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        --model and the presets
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#comparing-configs" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3299,6 +3310,34 @@
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Results over time">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#comparable-runs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Comparable runs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#publishing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Publishing
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
         
@@ -4116,6 +4155,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#-model-and-the-presets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        --model and the presets
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#comparing-configs" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4178,6 +4228,34 @@
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Results over time">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#comparable-runs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Comparable runs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#publishing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Publishing
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
         
@@ -4289,23 +4367,19 @@ answers against.</p>
 </tr>
 <tr>
 <td><code>packages/nl2sql/src/nl2sql/evaluation/records.py</code></td>
-<td>Tier 2 result records and <code>nl2sql benchmark publish</code></td>
+<td>Result records, comparable runs, <code>nl2sql benchmark publish</code> and <code>--from</code></td>
 </tr>
 <tr>
-<td><code>configs/benchmark/*.yaml</code></td>
-<td>Example LLM configs to compare with tier 2</td>
+<td><code>packages/nl2sql/src/nl2sql/evaluation/presets/</code></td>
+<td><code>--model</code> configs and the built-in <code>--llm</code> presets (<code>*.yaml</code>, shipped in the wheel)</td>
 </tr>
 <tr>
 <td><code>packages/nl2sql/src/nl2sql/evaluation/baselines/</code></td>
 <td>Where a committed tier 2 baseline scoreboard goes (none yet)</td>
 </tr>
 <tr>
-<td><code>benchmarks/results/</code></td>
-<td>Committed tier 2 result records, one per run and config</td>
-</tr>
-<tr>
-<td><code>benchmarks/retrieval/</code></td>
-<td>Committed retrieval recall records, one per run</td>
+<td><code>benchmarks/&lt;kind&gt;/&lt;database&gt;/</code></td>
+<td>Committed result records: <code>tier2/</code> one per run and config, <code>retrieval/</code> one per run (<a href="#results-over-time">layout</a>)</td>
 </tr>
 <tr>
 <td><code>packages/nl2sql/src/nl2sql/evaluation/evaluator.py</code></td>
@@ -4486,9 +4560,12 @@ money, so it never runs in CI (it refuses when <code>CI</code> is set) and never
 without a dollar cap. The key comes from the environment or the LLM config
 (<code>${env:...}</code>), never from the command line; traces follow <code>TRACE_MODE</code> as for
 any run.</p>
-<p>The command the owner runs for a first baseline:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>benchmark<span class="w"> </span>--tier<span class="w"> </span><span class="m">2</span><span class="w"> </span>--llm<span class="w"> </span>gpt-5.4<span class="o">=</span>configs/benchmark/gpt-5.4.yaml<span class="w"> </span>--max-cost<span class="w"> </span><span class="m">5</span>
+<p>The commands the owner runs, from the demo folder:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>benchmark<span class="w"> </span>--tier<span class="w"> </span><span class="m">2</span><span class="w"> </span>--model<span class="w"> </span>gpt-5.4<span class="w"> </span>--max-cost<span class="w"> </span><span class="m">5</span><span class="w">                        </span><span class="c1"># a run</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>benchmark<span class="w"> </span>--tier<span class="w"> </span><span class="m">2</span><span class="w"> </span>--model<span class="w"> </span>gpt-5.4<span class="w"> </span>--llm<span class="w"> </span>mini-helpers<span class="w"> </span>--max-cost<span class="w"> </span><span class="m">10</span><span class="w">    </span><span class="c1"># a comparison</span>
 </code></pre></div>
+<p>and then, from the repo, <code>nl2sql benchmark publish --from &lt;demo folder&gt;</code>
+(<a href="#results-over-time">results over time</a>).</p>
 <table>
 <thead>
 <tr>
@@ -4504,9 +4581,19 @@ any run.</p>
 <td>Stop before a question that could take the run's total spend past this</td>
 </tr>
 <tr>
-<td><code>--llm NAME=PATH</code></td>
-<td>the project's LLM config, as <code>default</code></td>
-<td>An LLM config to compare (repeatable). <code>PATH</code> is an ordinary <code>llm.yaml</code>-format file</td>
+<td><code>--model MODEL</code></td>
+<td>none</td>
+<td>A model to put on every LLM node, named in the scoreboard by itself (repeatable; below)</td>
+</tr>
+<tr>
+<td><code>--llm SPEC</code></td>
+<td>none</td>
+<td>An LLM config to compare (repeatable): a preset name, <code>PATH.yaml</code> (named by the file stem) or <code>NAME=PATH</code>. With no <code>--model</code> or <code>--llm</code>, the project's LLM config runs as <code>default</code></td>
+</tr>
+<tr>
+<td><code>--note TEXT</code></td>
+<td>none</td>
+<td>A short label for what changed, e.g. <code>"slim prompts"</code>, kept in each record and shown in the history</td>
 </tr>
 <tr>
 <td><code>--role ROLE</code></td>
@@ -4525,13 +4612,13 @@ any run.</p>
 </tr>
 <tr>
 <td><code>--export-path PATH</code></td>
-<td><code>benchmark_tier2.json</code></td>
+<td><code>&lt;project&gt;/benchmark_tier2.json</code></td>
 <td>Where to write the full scoreboard</td>
 </tr>
 <tr>
 <td><code>--results-dir DIR</code></td>
-<td><code>benchmarks/results</code></td>
-<td>Where to write one result record per config</td>
+<td><code>&lt;project&gt;/benchmarks</code></td>
+<td>The benchmarks folder; one record per config goes in <code>DIR/tier2/&lt;database&gt;/</code></td>
 </tr>
 <tr>
 <td><code>--baseline PATH</code></td>
@@ -4550,49 +4637,55 @@ any run.</p>
 </tr>
 </tbody>
 </table>
+<p><code>&lt;project&gt;</code> is the folder of the env file the run is configured from: for
+<code>--env demo</code> that is <code>./.env.demo</code>, so the current folder; with <code>--env-file
+PATH</code> it is that file's folder.</p>
 <p>The option is <code>--llm</code>, not <code>--config</code>: on every <code>nl2sql</code> command <code>--config</code> is
 the datasource config and <code>--llm-config</code> the single LLM config path.</p>
+<p>Before anything is spent, the run prints its plan and carries on without a
+prompt (the cap is the safety):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>Plan: 43 questions x role admin x 1 pass, cap $10.00
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>  gpt-5.4: gpt-5.4 (every node)
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>  gpt-5.4-mini-helpers: gpt-5.4 (astplanner, refiner); gpt-5.4-mini (answersynthesizer, datasourceresolver, decomposer)
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>  Records: C:\demo\benchmarks\tier2  Scoreboard: C:\demo\benchmark_tier2.json
+</code></pre></div>
 <p>Exit codes: 0 when every config ran, 1 on a baseline regression or a failed
-run, 2 on a usage error (no <code>--max-cost</code>, a malformed <code>--llm</code>, <code>CI</code> set), 3
-when the cap stopped the run early.</p>
+run, 2 on a usage error (no <code>--max-cost</code>, an unknown <code>--model</code> or <code>--llm</code>, two
+configs with one name, <code>CI</code> set), 3 when the cap stopped the run early.</p>
+<h3 id="-model-and-the-presets"><code>--model</code> and the presets</h3>
+<p><code>--model MODEL</code> puts <code>MODEL</code> on all five LLM nodes. A model in
+<code>VERIFIED_MODELS</code> (<code>nl2sql/cli/common/api_key.py</code>: <code>gpt-5.4</code>, <code>gpt-5.4-mini</code>,
+<code>gpt-4.1</code>, <code>gpt-4o</code>, <code>gpt-5.5</code>, <code>gpt-5-mini</code>, <code>claude-opus-5</code>,
+<code>claude-sonnet-5</code>, <code>claude-haiku-4-5</code>, ...) names its provider and its
+temperature: none is sent where the model rejects one (<code>gpt-5.5</code>,
+<code>gpt-5-mini</code>, <code>claude-opus-5</code>, <code>claude-sonnet-5</code>). Any other model is written
+<code>provider/model</code> (<code>openrouter/meta-llama/llama-3.3-70b-instruct</code>,
+<code>ollama/llama3</code>) and runs at temperature 0 (none for <code>anthropic</code>); a bare
+unknown model is a usage error. The key is the provider's <code>${env:...}</code>
+variable (<code>OPENAI_API_KEY</code>, <code>ANTHROPIC_API_KEY</code>, <code>OPENROUTER_API_KEY</code>), which
+<code>--env demo</code> loads from <code>.env.demo</code>. No <code>base_url</code> is written, so the provider
+preset's endpoint is used.</p>
+<p><code>--llm NAME</code> picks a preset, a config file shipped inside the package.
+<code>nl2sql benchmark presets</code> lists them:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>Tier 2 presets (--llm NAME):
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>  claude-planner: claude-opus-5 (astplanner, refiner); gpt-5.4 (answersynthesizer, datasourceresolver, decomposer)
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>  gpt-5.4: gpt-5.4 (every node)
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>  gpt-5.4-mini-helpers: gpt-5.4 (astplanner, refiner); gpt-5.4-mini (answersynthesizer, datasourceresolver, decomposer)
+</code></pre></div>
+<p>A preset matches by its full name or a <code>-</code>-separated suffix, so <code>--llm
+mini-helpers</code> is <code>gpt-5.4-mini-helpers</code>, and the scoreboard names it by its
+full name. <code>claude-planner</code> needs the <code>anthropic</code> extra and
+<code>ANTHROPIC_API_KEY</code>. <code>--llm PATH.yaml</code> runs your own file under its stem, and
+<code>--llm NAME=PATH</code> under <code>NAME</code>. <code>--model</code> and <code>--llm</code> combine: every one
+becomes a config in one comparison, <code>--model</code>s first.</p>
 <h3 id="comparing-configs">Comparing configs</h3>
-<p>Each <code>--llm</code> config runs on the same questions, one after another, and the
+<p>Each config runs on the same questions, one after another, and the
 scoreboard puts them side by side and lists every question one config passed
 and another failed (with <code>--passes</code> &gt; 1 a question can also be <code>flaky</code>). Since
 <a href="../../configuration/llm/">per-node providers</a>, a config can put each LLM node
 (<code>datasourceresolver</code>, <code>decomposer</code>, <code>astplanner</code>, <code>refiner</code>,
-<code>answersynthesizer</code>) on its own provider and model. Three examples are in
-<code>configs/benchmark/</code>:</p>
-<table>
-<thead>
-<tr>
-<th>File</th>
-<th>Planner and refiner</th>
-<th>Resolver, decomposer, synthesizer</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>gpt-5.4.yaml</code></td>
-<td>gpt-5.4</td>
-<td>gpt-5.4</td>
-</tr>
-<tr>
-<td><code>gpt-5.4-mini-helpers.yaml</code></td>
-<td>gpt-5.4</td>
-<td>gpt-5.4-mini</td>
-</tr>
-<tr>
-<td><code>claude-planner.yaml</code></td>
-<td>claude-opus-5 (needs the <code>anthropic</code> extra and <code>ANTHROPIC_API_KEY</code>)</td>
-<td>gpt-5.4</td>
-</tr>
-</tbody>
-</table>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>benchmark<span class="w"> </span>--tier<span class="w"> </span><span class="m">2</span><span class="w"> </span>--max-cost<span class="w"> </span><span class="m">10</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span>--llm<span class="w"> </span>gpt-5.4<span class="o">=</span>configs/benchmark/gpt-5.4.yaml<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span>--llm<span class="w"> </span>mini-helpers<span class="o">=</span>configs/benchmark/gpt-5.4-mini-helpers.yaml<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span>--llm<span class="w"> </span>claude-planner<span class="o">=</span>configs/benchmark/claude-planner.yaml
+<code>answersynthesizer</code>) on its own provider and model, as the presets do:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>benchmark<span class="w"> </span>--tier<span class="w"> </span><span class="m">2</span><span class="w"> </span>--max-cost<span class="w"> </span><span class="m">10</span><span class="w"> </span>--model<span class="w"> </span>gpt-5.4<span class="w"> </span>--llm<span class="w"> </span>mini-helpers<span class="w"> </span>--llm<span class="w"> </span>claude-planner
 </code></pre></div>
 <p>A model that is not in <code>VERIFIED_MODELS</code> (<code>nl2sql/cli/common/api_key.py</code>) gets
 a warning: the engine's parameters have not been checked against it.</p>
@@ -4741,18 +4834,18 @@ under <code>configs</code>, and a <code>comparison</code>. Each config has:</p>
 <p><code>comparison.configs</code> is one row per config (accuracy, answerability, cost,
 latency, retries, determinism, faithfulness); <code>comparison.differences</code> lists
 the questions the configs disagree on. The command prints the same as tables:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>                          Tier 2 scoreboard
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>Config        Cases  Accuracy  Ans. P  Ans. R  Cost     $/question  p50    p95    Retries  Determinism  Faithful
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>gpt-5.4       8/8    100.0%    100.0%  100.0%  $0.0806  $0.0101     0.08s  0.25s  0        100.0%       100.0%
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>mini-helpers  8/8    75.0%     100.0%  100.0%  $0.0372  $0.0046     0.09s  0.09s  0        100.0%       85.7%
-<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>
-<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>                  Questions the configs disagree on
-<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>ID           Role   gpt-5.4  mini-helpers
-<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>chinook_018  admin  pass     fail
-<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>
-<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>              Answers stating what the rows do not hold
-<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>Config        ID           Role   Pass  Unsupported
-<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>mini-helpers  chinook_018  admin  1     MPEG audio file
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>                          Tier 2 scoreboard
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>Config        Cases  Accuracy  Ans. P  Ans. R  Cost     $/question  p50    p95    Retries  Determinism  Faithful
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>gpt-5.4       8/8    100.0%    100.0%  100.0%  $0.0806  $0.0101     0.08s  0.25s  0        100.0%       100.0%
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>mini-helpers  8/8    75.0%     100.0%  100.0%  $0.0372  $0.0046     0.09s  0.09s  0        100.0%       85.7%
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>                  Questions the configs disagree on
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>ID           Role   gpt-5.4  mini-helpers
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>chinook_018  admin  pass     fail
+<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>
+<a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>              Answers stating what the rows do not hold
+<a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a>Config        ID           Role   Pass  Unsupported
+<a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a>mini-helpers  chinook_018  admin  1     MPEG audio file
 </code></pre></div>
 <p>(a run against the fake LLM, with one plan deliberately wrong on the second
 server.)</p>
@@ -4808,40 +4901,113 @@ accuracy drops by more than <code>--max-accuracy-drop</code> or cost per questio
 by more than <code>--max-cost-increase</code>. Baselines go in
 <code>packages/nl2sql/src/nl2sql/evaluation/baselines/</code>; none is committed yet. To
 make one, run tier 2 on the full set and copy its scoreboard there:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>benchmark<span class="w"> </span>--tier<span class="w"> </span><span class="m">2</span><span class="w"> </span>--llm<span class="w"> </span>gpt-5.4<span class="o">=</span>configs/benchmark/gpt-5.4.yaml<span class="w"> </span>--max-cost<span class="w"> </span><span class="m">5</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span>--export-path<span class="w"> </span>packages/nl2sql/src/nl2sql/evaluation/baselines/gpt-5.4.json
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="c1"># later</span>
-<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>benchmark<span class="w"> </span>--tier<span class="w"> </span><span class="m">2</span><span class="w"> </span>--llm<span class="w"> </span>gpt-5.4<span class="o">=</span>configs/benchmark/gpt-5.4.yaml<span class="w"> </span>--max-cost<span class="w"> </span><span class="m">5</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">  </span>--baseline<span class="w"> </span>packages/nl2sql/src/nl2sql/evaluation/baselines/gpt-5.4.json
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>benchmark<span class="w"> </span>--tier<span class="w"> </span><span class="m">2</span><span class="w"> </span>--model<span class="w"> </span>gpt-5.4<span class="w"> </span>--max-cost<span class="w"> </span><span class="m">5</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span>--export-path<span class="w"> </span>&lt;repo&gt;/packages/nl2sql/src/nl2sql/evaluation/baselines/gpt-5.4.json
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="c1"># later</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>benchmark<span class="w"> </span>--tier<span class="w"> </span><span class="m">2</span><span class="w"> </span>--model<span class="w"> </span>gpt-5.4<span class="w"> </span>--max-cost<span class="w"> </span><span class="m">5</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">  </span>--baseline<span class="w"> </span>&lt;repo&gt;/packages/nl2sql/src/nl2sql/evaluation/baselines/gpt-5.4.json
 </code></pre></div>
 <h3 id="results-over-time">Results over time</h3>
-<p>Every tier 2 run also writes one record per config to <code>benchmarks/results/</code>,
-named <code>&lt;YYYY-MM-DD&gt;_&lt;engine-version&gt;_&lt;config&gt;.json</code> (<code>-2</code>, <code>-3</code>... when the
-name is taken that day). A record holds the UTC date and time, the engine
-version and git commit, the dataset name and the sha256 of
-<code>chinook_gold.yaml</code>, taken with LF line endings so a Windows checkout hashes
-the same (runs on a different gold set are never shown as
-comparable), the config name and <code>provider:model</code> per node, the roles and
-passes, the headline metrics (accuracy, answerability precision and recall,
-dollars total and per question, input / cached / output tokens per question,
-p50 and p95 latency, determinism, answer faithfulness), <code>stopped</code> and
-<code>partial</code>, and the config's full scoreboard. <code>publish</code> shows faithfulness in
-both history tables; a record written before it existed shows <code>-</code>.</p>
-<p><code>nl2sql benchmark publish</code> (no key, no network) reads every record and
-rewrites <code>docs/benchmarks.md</code> (every run, newest first, the latest run per
-config, then every <a href="#retrieval-recall">retrieval recall</a> record in
-<code>benchmarks/retrieval/</code>) and the block between <code>&lt;!-- BENCHMARKS:START --&gt;</code> and
+<p>Every tier 2 run writes one record per config, and <code>benchmark retrieval
+--record</code> one record, under the project's <code>benchmarks/</code> folder:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>benchmarks/&lt;kind&gt;/&lt;database&gt;/&lt;YYYY-MM-DD&gt;_&lt;shortsha&gt;_&lt;config&gt;.json
+</code></pre></div>
+<p><code>kind</code> is <code>tier2</code> or <code>retrieval</code>, <code>database</code> the datasource id (<code>chinook</code>),
+<code>shortsha</code> the first seven characters of the engine commit and <code>config</code> the
+config name (<code>retrieval</code> for a retrieval run). <code>-2</code>, <code>-3</code>... are added when the
+name is taken. Every record holds:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>What it is</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>schema</code>, <code>kind</code></td>
+<td>The record format (2) and the benchmark</td>
+</tr>
+<tr>
+<td><code>recorded_at</code></td>
+<td>UTC date and time</td>
+</tr>
+<tr>
+<td><code>engine_version</code></td>
+<td>The installed <code>nl2sql-engine</code> version (the same for every run until a release)</td>
+</tr>
+<tr>
+<td><code>git_commit</code>, <code>git_dirty</code></td>
+<td>The engine's commit and whether its tracked files had uncommitted changes. Found by walking up from the installed <code>nl2sql</code> package to its <code>.git</code>, so a run from the demo folder of an editable install still names the repo commit; <code>"unknown"</code> for a wheel install or without git, never null</td>
+</tr>
+<tr>
+<td><code>note</code></td>
+<td><code>--note</code>: what changed, e.g. <code>"slim prompts"</code> (null without one)</td>
+</tr>
+<tr>
+<td><code>dataset</code></td>
+<td><code>chinook_gold.yaml</code>'s name and sha256, taken with LF line endings so a Windows checkout hashes the same</td>
+</tr>
+<tr>
+<td><code>database</code></td>
+<td><code>datasource_id</code>, <code>engine</code> (<code>sqlite</code>), <code>schema_fingerprint</code> (a hash of the latest indexed schema snapshot's tables, columns, types and keys, so re-indexing an unchanged database keeps it) and the <code>tables</code> and <code>columns</code> counts</td>
+</tr>
+<tr>
+<td><code>config</code></td>
+<td>The config name, and for tier 2 <code>provider:model</code> per node</td>
+</tr>
+<tr>
+<td><code>metrics</code></td>
+<td>Tier 2: accuracy, answerability precision and recall, dollars total and per question, input / cached / output tokens per question, p50 and p95 latency, determinism, answer faithfulness. Retrieval: the report's <code>summary</code></td>
+</tr>
+<tr>
+<td>tier 2 only</td>
+<td><code>roles</code>, <code>passes</code>, <code>stopped</code>, <code>partial</code> and the config's full <code>scoreboard</code></td>
+</tr>
+<tr>
+<td>retrieval only</td>
+<td><code>settings</code> and the full <code>report</code></td>
+</tr>
+</tbody>
+</table>
+<p>Records are never edited after writing: a run writes a new file, and
+<code>publish</code> and <code>publish --from</code> refuse to overwrite one. The first retrieval
+baseline was written before this layout and was moved into it with its
+database, the commit that added it and the note "first retrieval baseline"
+filled in (listed in its <code>backfilled</code> field).</p>
+<h4 id="comparable-runs">Comparable runs</h4>
+<p>Two runs are comparable when they share the benchmark kind, the dataset sha
+and the schema fingerprint, and for tier 2 the roles. <code>docs/benchmarks.md</code>
+groups the history by benchmark, then database, and lists each group's runs
+newest first. "Δ vs previous" compares a run with the previous run of the same
+config on the same database: the change in accuracy, faithfulness (in
+percentage points) and dollars per question for tier 2, in table and column
+recall for retrieval. When the dataset, the schema or the roles changed, the
+run starts a new series and the cell says so, e.g. <code>new series (schema
+changed)</code>; a config's first run says <code>first run</code>. The README block shows the
+latest run per benchmark, database and config with the same Δ.</p>
+<h4 id="publishing">Publishing</h4>
+<p><code>nl2sql benchmark publish</code> (no key, no network), run from the repo root,
+reads every record in <code>benchmarks/&lt;kind&gt;/&lt;database&gt;/</code> and rewrites
+<code>docs/benchmarks.md</code> and the block between <code>&lt;!-- BENCHMARKS:START --&gt;</code> and
 <code>&lt;!-- BENCHMARKS:END --&gt;</code> in <code>README.md</code>. It reads no clock, so the same
-records always give byte-identical pages. The workflow:</p>
+records always give byte-identical pages. <code>--from DIR</code> (repeatable) first
+copies the records of another project folder (its <code>benchmarks/</code>) that the
+repo lacks: one already here with the same content is skipped, one with the
+same name and other content is reported as a conflict, left as it is, and
+makes the command exit 1 after publishing. Records in the old layout are
+skipped with a warning. The workflow:</p>
 <ol>
-<li>Run tier 2 (it writes the records).</li>
-<li>Commit the new files in <code>benchmarks/results/</code>.</li>
-<li>Run <code>nl2sql benchmark publish</code>.</li>
-<li>Commit the <code>README.md</code> and <code>docs/benchmarks.md</code> changes.</li>
+<li>From the demo folder: <code>nl2sql --env demo benchmark --tier 2 --model gpt-5.4 --max-cost 5</code>.</li>
+<li>From the repo: <code>nl2sql benchmark publish --from &lt;demo folder&gt;</code>.</li>
+<li>Commit the new records in <code>benchmarks/</code> with the <code>README.md</code> and
+   <code>docs/benchmarks.md</code> changes.</li>
 </ol>
-<p><code>packages/nl2sql/tests/unit/test_benchmark_records.py</code> checks in CI, with no
+<p><code>benchmarks/README.md</code> repeats the layout and workflow next to the records.
+<code>packages/nl2sql/tests/unit/test_benchmark_records.py</code> checks in CI, with no
 key, that the committed README block and <code>docs/benchmarks.md</code> are exactly what
-<code>publish</code> makes from the committed records.</p>
+<code>publish</code> makes from the committed records, and that every committed record
+sits where its fields say.</p>
 <h3 id="how-tier-2-is-tested">How tier 2 is tested</h3>
 <p>With no key and no spending: <code>packages/nl2sql/tests/e2e/test_benchmark_tier2_fake_llm.py</code>
 points ordinary LLM config files at two <code>FakeLLMServer</code>s serving the gold
@@ -4849,21 +5015,29 @@ plans with canned usage (cached and reasoning tokens included), one with a
 plan deliberately wrong. It checks the scoring, the comparison and its
 differences, the dollars against the price table, the cap stopping mid-run
 with a partial scoreboard, an unpriced model failing before any call, and two
-passes with the plan cache off. Its fake synthesizer writes each answer from
+passes with the plan cache off. A <code>--model gpt-5.4</code> config writes no
+<code>base_url</code>, so its test points the OpenAI client at the fake server with the
+client's own <code>OPENAI_BASE_URL</code> variable, and checks the database identity
+the board records. Its fake synthesizer writes each answer from
 the gold rows, so the good server's answers are faithful and the bad server's
 answer on its wrong rows is not. <code>tests/unit/test_answer_faithfulness.py</code>
 covers the faithfulness rules with good and bad answers. <code>tests/unit/test_tier2_scoreboard.py</code> and
 <code>tests/cli/test_benchmark_tier2_command.py</code> cover the scoreboard, the
-baseline check, the refusal to start without <code>--max-cost</code> and the exit codes.</p>
+baseline check, the refusal to start without <code>--max-cost</code>, the exit codes,
+<code>--model</code> and <code>--llm</code> resolution, the plan, the project-relative outputs,
+<code>benchmark presets</code> and <code>publish --from</code>. <code>tests/unit/test_benchmark_presets.py</code>
+covers the per-node <code>--model</code> config and preset lookup, and
+<code>tests/unit/test_benchmark_records.py</code> the records, the git commit lookup,
+comparability, the Δ and series breaks.</p>
 <h2 id="retrieval-recall">Retrieval recall</h2>
 <p>Before the planner sees a schema, the schema retriever picks the tables and
 columns it is given. A column it never sends is one the planner cannot use.
 <code>nl2sql benchmark retrieval</code> measures that, per answerable gold question,
 against <code>needed_tables</code> and <code>needed_columns</code>, with no key, no LLM and no cost:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>benchmark<span class="w"> </span>retrieval<span class="w">                       </span><span class="c1"># writes benchmark_retrieval.json</span>
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>benchmark<span class="w"> </span>retrieval<span class="w"> </span>--record<span class="w">              </span><span class="c1"># also writes a record to benchmarks/retrieval/</span>
-<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>benchmark<span class="w"> </span>retrieval<span class="w"> </span>--baseline<span class="w"> </span>old.json<span class="w">   </span><span class="c1"># the change against an earlier report or record</span>
-<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>benchmark<span class="w"> </span>retrieval<span class="w"> </span>--questions<span class="w"> </span>join,chinook_014
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>benchmark<span class="w"> </span>retrieval<span class="w">                       </span><span class="c1"># writes &lt;project&gt;/benchmark_retrieval.json</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>benchmark<span class="w"> </span>retrieval<span class="w"> </span>--record<span class="w"> </span>--note<span class="w"> </span><span class="s2">"k 10"</span><span class="w">  </span><span class="c1"># also writes a record to &lt;project&gt;/benchmarks/retrieval/&lt;database&gt;/</span>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>benchmark<span class="w"> </span>retrieval<span class="w"> </span>--baseline<span class="w"> </span>old.json<span class="w">   </span><span class="c1"># the change against an earlier report or record</span>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>benchmark<span class="w"> </span>retrieval<span class="w"> </span>--questions<span class="w"> </span>join,chinook_014
 </code></pre></div>
 <p>How it runs (<code>nl2sql/evaluation/retrieval_recall.py</code>):</p>
 <ul>
@@ -4898,8 +5072,9 @@ a change that raises recall by sending more is not an improvement by itself.
 A missed column is one the planner cannot select, filter or join on. Compare
 runs with <code>--baseline</code>, which prints the change in each mean and every
 question whose recall moved, or with the committed records: each <code>--record</code>
-run is a JSON file in <code>benchmarks/retrieval/</code>, and <code>nl2sql benchmark publish</code>
-lists them newest first in <code>docs/benchmarks.md</code>.</p>
+run is a JSON file in <code>benchmarks/retrieval/&lt;database&gt;/</code>, and <code>nl2sql
+benchmark publish</code> lists them newest first in <code>docs/benchmarks.md</code>, with the
+change in each recall against the previous comparable run.</p>
 <p>The committed baseline (2026-09-22, engine 0.1.2, 39 questions):</p>
 <table>
 <thead>
