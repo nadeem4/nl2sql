@@ -3225,6 +3225,34 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#alternative-gold-answers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Alternative gold answers
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Alternative gold answers">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#when-to-add-one-and-when-not-to" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When to add one, and when not to
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -3309,13 +3337,52 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#baseline-regression-check" class="md-nav__link">
+  <a href="#reading-a-run-intervals-flips-and-passk" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Baseline regression check
+        Reading a run: intervals, flips and pass^k
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Reading a run: intervals, flips and pass^k">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-regression-gate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The regression gate
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#-passes-and-passk" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        --passes and pass^k
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#where-baselines-live" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where baselines live
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
         
@@ -4160,6 +4227,34 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#alternative-gold-answers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Alternative gold answers
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Alternative gold answers">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#when-to-add-one-and-when-not-to" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When to add one, and when not to
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -4244,13 +4339,52 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#baseline-regression-check" class="md-nav__link">
+  <a href="#reading-a-run-intervals-flips-and-passk" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Baseline regression check
+        Reading a run: intervals, flips and pass^k
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Reading a run: intervals, flips and pass^k">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-regression-gate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The regression gate
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#-passes-and-passk" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        --passes and pass^k
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#where-baselines-live" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where baselines live
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
         
@@ -4373,7 +4507,7 @@ answers against.</p>
 </tr>
 <tr>
 <td><code>packages/nl2sql/src/nl2sql/evaluation/gold.py</code></td>
-<td><code>GoldQuestion</code> model, <code>load_gold_dataset()</code>, <code>execute_gold_sql()</code>, <code>regenerate()</code></td>
+<td><code>GoldQuestion</code> model (with <code>alt_gold_sql</code>), <code>load_gold_dataset()</code>, <code>execute_gold_sql()</code>, <code>regenerate()</code></td>
 </tr>
 <tr>
 <td><code>packages/nl2sql/src/nl2sql/evaluation/datasets/chinook_gold_plans.yaml</code></td>
@@ -4479,6 +4613,14 @@ answers against.</p>
 <td><code>gold_result</code></td>
 <td>Rows <code>gold_sql</code> returns, as a list of <code>{column: value}</code> maps. Generated, never typed. <code>null</code> when <code>gold_sql</code> is <code>null</code></td>
 </tr>
+<tr>
+<td><code>alt_gold_sql</code></td>
+<td>Optional. <a href="#alternative-gold-answers">Reviewed alternative answers</a> to the same question, each hand-written SQLite SQL</td>
+</tr>
+<tr>
+<td><code>alt_gold_result</code></td>
+<td>The rows each <code>alt_gold_sql</code> returns, in the same order. Generated, never typed. Omitted with <code>alt_gold_sql</code></td>
+</tr>
 </tbody>
 </table>
 <p><code>expected</code> follows the demo policy in <code>nl2sql/cli/demo/chinook.py</code>
@@ -4490,13 +4632,15 @@ exactly the questions some role is refused.</p>
 <code>Country</code> and so on) so the result is deterministic, and the question carries
 the <code>ties</code> tag. When the tie is only about order, <code>order_matters</code> is <code>false</code>.</p>
 <h2 id="regenerating-the-results">Regenerating the results</h2>
-<p><code>gold_result</code> is always produced by running <code>gold_sql</code> against the database.
-After adding or editing a question, set its <code>gold_result</code> to <code>null</code> (or leave
+<p><code>gold_result</code> and <code>alt_gold_result</code> are always produced by running <code>gold_sql</code>
+and each <code>alt_gold_sql</code> against the database. After adding or editing a
+question, an alternative or any SQL, set its <code>gold_result</code> to <code>null</code> (or leave
 it stale) and run:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>python<span class="w"> </span>-m<span class="w"> </span>nl2sql.evaluation.gold
 </code></pre></div>
-<p>It re-executes every <code>gold_sql</code>, rewrites the file in its canonical layout and
-prints how many results it wrote. Commit the rewritten file.</p>
+<p>It re-executes every <code>gold_sql</code> and every <code>alt_gold_sql</code>, rewrites the file in
+its canonical layout and prints how many results it wrote. A question with no
+alternatives carries neither field. Commit the rewritten file.</p>
 <h2 id="what-the-tests-check">What the tests check</h2>
 <p><code>pytest packages/nl2sql/tests/unit/test_chinook_gold_dataset.py</code> runs without
 an API key and checks that:</p>
@@ -4504,6 +4648,9 @@ an API key and checks that:</p>
 <li>every entry validates against <code>GoldQuestion</code> and ids are unique;</li>
 <li>every <code>gold_sql</code> reproduces its committed <code>gold_result</code>, and the committed
   file is byte-for-byte what the generator writes;</li>
+<li>every <code>alt_gold_sql</code> reproduces its committed <code>alt_gold_result</code> the same
+  way, reads no table outside <code>needed_tables</code>, returns between one and
+  twenty-five rows, and is not the gold answer written again;</li>
 <li>paraphrase groups share one result;</li>
 <li>every needed table and column exists, and <code>needed_tables</code> equals the tables
   in <code>gold_sql</code>;</li>
@@ -4530,7 +4677,7 @@ otherwise), and each run is scored:</p>
 <tbody>
 <tr>
 <td><code>allowed</code></td>
-<td>Status <code>success</code>, one result set, and its rows equal <code>gold_result</code></td>
+<td>Status <code>success</code>, one result set, and its rows equal <code>gold_result</code> or any <a href="#alternative-gold-answers">alternative</a></td>
 </tr>
 <tr>
 <td><code>refused</code></td>
@@ -4620,6 +4767,54 @@ passes one score and not the other is visible per question; the printed
 table shows a <strong>Strict</strong> and a <strong>Lenient</strong> column beside each other, and the
 scoreboard, the records, the README block and
 <a href="../../benchmarks/">docs/benchmarks.md</a> all report both.</p>
+<h3 id="alternative-gold-answers">Alternative gold answers</h3>
+<p>A question can have more than one right answer. "Who are the top 5 customers
+by total spend?" is answered just as well with the name in one column as with
+<code>FirstName</code> and <code>LastName</code> side by side; "What is the total revenue per year?"
+is answered with the year written <code>2009</code> or <code>2009-01-01</code>. <code>alt_gold_sql</code> holds
+those other answers, one SQL each, executed and committed exactly as
+<code>gold_sql</code> is. A run passes -- strictly or leniently -- when its rows match the
+gold answer <strong>or any alternative</strong>.</p>
+<p>This is how the field handles multiple right answers. Snowflake has humans
+pick every correct answer out of several models' SQL
+(<a href="https://www.snowflake.com/en/blog/engineering/cortex-analyst-text-to-sql-accuracy-bi/">post</a>);
+LinkedIn reports that about 60% of its benchmark questions now have several
+answers and that without them it <em>"underreported recall by 10-15%"</em>
+(<a href="https://www.linkedin.com/blog/engineering/ai/practical-text-to-sql-for-data-analytics">post</a>);
+Spider 2.0 supports multiple gold files per task
+(<a href="https://arxiv.org/html/2411.07763v2">paper</a>).</p>
+<h4 id="when-to-add-one-and-when-not-to">When to add one, and when not to</h4>
+<p>Prefer an alternative to loosening the comparator. An alternative is written
+down, reviewed once, and only ever affects the question it sits on; a looser
+rule applies to all forty-three at once and can quietly start passing wrong
+answers. The <a href="#strict-and-lenient-accuracy">lenient score</a> is deliberately
+narrow for the same reason.</p>
+<p>Add one when <strong>all</strong> of these hold:</p>
+<ol>
+<li>A real run produced it. Alternatives come from SQL a model actually wrote,
+   not from shapes someone imagined it might write.</li>
+<li>A person has <strong>read the rows</strong> and would accept them as an answer to the
+   question as written.</li>
+<li>It is the same question, from the same tables: an alternative may not read
+   a table outside <code>needed_tables</code>, and the test enforces that.</li>
+<li>It is deterministic -- ties broken on a key, as <code>gold_sql</code> does.</li>
+</ol>
+<p>Do not add one when the answer is a <em>different</em> question, however reasonable
+it looks. Two from the run this was built on, both refused:</p>
+<ul>
+<li><em>"Where do our customers from Germany live?"</em> answered with three distinct
+  cities. It drops the customers, so it cannot say who lives where. The
+  alternative kept for <code>chinook_021</code> is the gold answer with the name in one
+  column, not this.</li>
+<li><em>"Who are the top customers by total spend?"</em> answered with one row. "Top
+  customers" is a list with no N; one row answers "who is the top customer",
+  a different question. <code>chinook_007</code> is not the same case: <em>"which employees
+  support the </em><em>most</em><em> customers"</em> carries a superlative, and the one employee
+  who holds the maximum is a fair reading of it, so that one is kept.</li>
+</ul>
+<p>Write the SQL into <code>alt_gold_sql</code>, run <code>python -m nl2sql.evaluation.gold</code> to
+generate <code>alt_gold_result</code>, read the rows it wrote, and commit both. Never
+type an alternative's rows by hand.</p>
 <p>The command prints one row per question and role, then a pass/fail/skip/xfail
 count per role, writes the whole report as JSON (<code>--export-path</code>, default
 <code>benchmark_report.json</code>) and exits 1 if any case failed. Without <code>--tier</code>,
@@ -4710,7 +4905,7 @@ any run.</p>
 <tr>
 <td><code>--passes N</code></td>
 <td><code>1</code></td>
-<td>Run every question N times per config and report determinism</td>
+<td>Run every question N times per config and report determinism and pass^N. Use <code>--passes 3</code> for a baseline</td>
 </tr>
 <tr>
 <td><code>--questions ID_OR_TAG</code></td>
@@ -4733,9 +4928,14 @@ any run.</p>
 <td>A committed scoreboard to check against (below)</td>
 </tr>
 <tr>
+<td><code>--max-regressions N</code></td>
+<td><code>2</code></td>
+<td>Baseline: how many questions may flip from pass to fail before the run fails; a smaller but significant drop fails too</td>
+</tr>
+<tr>
 <td><code>--max-accuracy-drop F</code></td>
-<td><code>0.02</code></td>
-<td>Baseline: largest allowed accuracy drop (0.02 is two points)</td>
+<td>none</td>
+<td>Deprecated: a flat accuracy drop gate. Smaller than one question at n = 43, so it fired on noise. Only applied when passed</td>
 </tr>
 <tr>
 <td><code>--max-cost-increase F</code></td>
@@ -4898,7 +5098,7 @@ under <code>configs</code>, and a <code>comparison</code>. Each config has:</p>
 </tr>
 <tr>
 <td><code>accuracy</code></td>
-<td><code>overall</code> (strict) and <code>lenient</code>, then <code>by_tag</code> and <code>by_difficulty</code>, each with both counts and both rates</td>
+<td><code>overall</code> (strict) and <code>lenient</code>, each with a 95% Wilson <code>interval</code>; <code>pass_k</code> when <code>--passes</code> &gt; 1; then <code>by_tag</code> and <code>by_difficulty</code>, each with both counts and both rates</td>
 </tr>
 <tr>
 <td><code>answerability</code></td>
@@ -4938,13 +5138,13 @@ under <code>configs</code>, and a <code>comparison</code>. Each config has:</p>
 </tr>
 </tbody>
 </table>
-<p><code>comparison.configs</code> is one row per config (accuracy, answerability, cost,
+<p><code>comparison.configs</code> is one row per config (strict and lenient accuracy, answerability, cost,
 latency, retries, determinism, faithfulness); <code>comparison.differences</code> lists
 the questions the configs disagree on. The command prints the same as tables:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>                          Tier 2 scoreboard
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>Config        Cases  Accuracy  Ans. P  Ans. R  Cost     $/question  p50    p95    Retries  Determinism  Faithful
-<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>gpt-5.4       8/8    100.0%    100.0%  100.0%  $0.0806  $0.0101     0.08s  0.25s  0        100.0%       100.0%
-<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>mini-helpers  8/8    75.0%     100.0%  100.0%  $0.0372  $0.0046     0.09s  0.09s  0        100.0%       85.7%
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>              Tier 2 scoreboard (accuracy with its 95% interval)
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>Config        Cases  Strict             Lenient            Ans. P  Ans. R  Cost     $/question  p50    p95    Retries  Determinism  Faithful
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>gpt-5.4       8/8    100.0% [67.6-100]  100.0% [67.6-100]  100.0%  100.0%  $0.0806  $0.0101     0.08s  0.25s  0        100.0%       100.0%
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>mini-helpers  8/8    75.0% [40.9-92.9]  87.5% [52.9-97.8]  100.0%  100.0%  $0.0372  $0.0046     0.09s  0.09s  0        100.0%       85.7%
 <a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>
 <a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>                  Questions the configs disagree on
 <a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>ID           Role   gpt-5.4  mini-helpers
@@ -5001,23 +5201,93 @@ were checked). A refusal or error writes no answer and is <code>null</code>. Rea
 rate with the list: an unfaithful answer is a synthesizer problem to look at,
 not a failed question. Tier 1 does not report it: its fake synthesizer writes
 the same fixed sentence for every question, with nothing to check.</p>
-<h3 id="baseline-regression-check">Baseline regression check</h3>
-<p><code>--baseline PATH</code> compares the run against a committed scoreboard, config by
-config (by name; a config the baseline lacks is skipped). It exits 1 if
-accuracy drops by more than <code>--max-accuracy-drop</code> or cost per question rises
-by more than <code>--max-cost-increase</code>. Baselines go in
-<code>packages/nl2sql/src/nl2sql/evaluation/baselines/</code>; none is committed yet. To
-make one, run tier 2 on the full set and copy its scoreboard there:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>benchmark<span class="w"> </span>--tier<span class="w"> </span><span class="m">2</span><span class="w"> </span>--model<span class="w"> </span>gpt-5.4<span class="w"> </span>--max-cost<span class="w"> </span><span class="m">5</span><span class="w"> </span><span class="se">\</span>
+<h3 id="reading-a-run-intervals-flips-and-passk">Reading a run: intervals, flips and pass^k</h3>
+<p>Forty-three questions cannot settle much on their own. 25 of 43 is 58.1%, and
+its 95% Wilson interval is <strong>43.3%-71.6%</strong> -- about fourteen points either
+way. Every run therefore prints and records that interval next to both
+scores, written <code>58.1% [43.3-71.6]</code>, and the gate below is built on the
+questions that moved rather than on the headline
+(<a href="https://www.anthropic.com/research/statistical-approach-to-model-evals">Anthropic, <em>A statistical approach to model
+evals</em></a>).
+The interval is taken over the runs a config scored, so with <code>--passes</code> above
+one the runs of a single question are not independent and it reads narrower
+than it really is; pass^k below counts questions and does not.</p>
+<p><strong>Compare two runs question by question, not headline to headline.</strong> The same
+43 questions are run both times, so the runs are paired and most of the
+variance cancels. <code>--baseline PATH</code> prints, per config:</p>
+<ul>
+<li>the strict and lenient accuracy of each run, side by side;</li>
+<li>how many questions went <strong>pass -&gt; fail</strong> and how many <strong>fail -&gt; pass</strong>, and
+  which ones;</li>
+<li><strong>McNemar's exact two-sided p-value</strong> on those flips. Questions both runs
+  got right, and both got wrong, say nothing about a change; only the
+  discordant pairs do, and under "the two runs are equally good" each flip is
+  a fair coin. Ten lost and none gained is p = 0.002; five each way is p = 1.0.</li>
+</ul>
+<p>A question counts as passed only when <strong>every</strong> pass passed, so with
+<code>--passes 3</code> a question that has become flaky reads as a regression.</p>
+<p><code>docs/benchmarks.md</code> carries the same thing in its "Δ vs previous" column:
+the headline deltas, then <code>3 flipped to fail, 1 to pass (McNemar p=0.625)</code>.
+The README block keeps the deltas only.</p>
+<h4 id="the-regression-gate">The regression gate</h4>
+<p><code>--baseline</code> exits 1 when, for any config both scoreboards name:</p>
+<table>
+<thead>
+<tr>
+<th>Check</th>
+<th>Default</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>More than <code>--max-regressions</code> questions flipped from pass to fail</td>
+<td>2</td>
+<td>A handful of named questions is something a person can go and read</td>
+</tr>
+<tr>
+<td>The flips are one-sided enough that McNemar's exact p &lt; 0.05</td>
+<td>-</td>
+<td>A small but real drop should not pass because it is under the count</td>
+</tr>
+<tr>
+<td>Cost per question rose by more than <code>--max-cost-increase</code></td>
+<td>0.2</td>
+<td>Unchanged</td>
+</tr>
+</tbody>
+</table>
+<p><code>--max-accuracy-drop</code> is <strong>deprecated</strong>. It failed a run when accuracy fell by
+more than a flat fraction, two points by default -- and at n = 43 one question
+is 2.3 points, so the gate was tighter than the resolution of the benchmark
+and fired on run-to-run noise. It still works when it is passed explicitly,
+with a warning, and is no longer applied unless it is.</p>
+<h4 id="-passes-and-passk"><code>--passes</code> and pass^k</h4>
+<p><code>--passes</code> is 1 for an ordinary run: one pass is enough to see where the
+engine stands, and every call costs money. Run a <strong>baseline</strong> with
+<code>--passes 3</code>, so the run it is compared against is not a single sample:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>benchmark<span class="w"> </span>--tier<span class="w"> </span><span class="m">2</span><span class="w"> </span>--model<span class="w"> </span>gpt-5.4<span class="w"> </span>--passes<span class="w"> </span><span class="m">3</span><span class="w"> </span>--max-cost<span class="w"> </span><span class="m">15</span><span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span>--export-path<span class="w"> </span>&lt;repo&gt;/packages/nl2sql/src/nl2sql/evaluation/baselines/gpt-5.4.json
-<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="c1"># later</span>
-<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>benchmark<span class="w"> </span>--tier<span class="w"> </span><span class="m">2</span><span class="w"> </span>--model<span class="w"> </span>gpt-5.4<span class="w"> </span>--max-cost<span class="w"> </span><span class="m">5</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">  </span>--baseline<span class="w"> </span>&lt;repo&gt;/packages/nl2sql/src/nl2sql/evaluation/baselines/gpt-5.4.json
+</code></pre></div>
+<p>With more than one pass the run also reports <strong>pass^k</strong>: the share of
+questions that passed in <em>every</em> pass, for both scores, beside mean accuracy.
+Mean accuracy counts runs, so a question that passes two times of three still
+lifts it; pass^k counts questions, and a flaky one never counts. It is the
+number to read when asking whether the engine can be relied on rather than
+how often it happens to be right (<a href="https://arxiv.org/abs/2406.12045">tau-bench</a>).
+<code>determinism</code> stays what it was: whether the SQL and rows were identical
+across passes, which is a stricter thing than passing every time.</p>
+<h4 id="where-baselines-live">Where baselines live</h4>
+<p><code>packages/nl2sql/src/nl2sql/evaluation/baselines/</code>; none is committed yet. A
+run is compared config by config, by name, and a config the baseline lacks is
+skipped:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>benchmark<span class="w"> </span>--tier<span class="w"> </span><span class="m">2</span><span class="w"> </span>--model<span class="w"> </span>gpt-5.4<span class="w"> </span>--max-cost<span class="w"> </span><span class="m">5</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">  </span>--baseline<span class="w"> </span>&lt;repo&gt;/packages/nl2sql/src/nl2sql/evaluation/baselines/gpt-5.4.json
 </code></pre></div>
 <h3 id="results-over-time">Results over time</h3>
 <p>Every tier 2 run writes one record per config, and <code>benchmark retrieval
 --record</code> one record, under the project's <code>benchmarks/</code> folder:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>benchmarks/&lt;kind&gt;/&lt;database&gt;/&lt;YYYY-MM-DD&gt;_&lt;shortsha&gt;_&lt;config&gt;.json
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>benchmarks/&lt;kind&gt;/&lt;database&gt;/&lt;YYYY-MM-DD&gt;_&lt;shortsha&gt;_&lt;config&gt;.json
 </code></pre></div>
 <p><code>kind</code> is <code>tier2</code> or <code>retrieval</code>, <code>database</code> the datasource id (<code>chinook</code>),
 <code>shortsha</code> the first seven characters of the engine commit and <code>config</code> the
@@ -5065,7 +5335,7 @@ name is taken. Every record holds:</p>
 </tr>
 <tr>
 <td><code>metrics</code></td>
-<td>Tier 2: accuracy (strict) and lenient_accuracy, answerability precision and recall, dollars total and per question, input / cached / output tokens per question, p50 and p95 latency, determinism, answer faithfulness. Retrieval: the report's <code>summary</code></td>
+<td>Tier 2: accuracy (strict) and lenient_accuracy with their 95% intervals, <code>pass_k</code>, answerability precision and recall, dollars total and per question, input / cached / output tokens per question, p50 and p95 latency, determinism, answer faithfulness. Retrieval: the report's <code>summary</code></td>
 </tr>
 <tr>
 <td>tier 2 only</td>
@@ -5087,14 +5357,19 @@ filled in (listed in its <code>backfilled</code> field).</p>
 and the schema fingerprint, and for tier 2 the roles. <code>docs/benchmarks.md</code>
 groups the history by benchmark, then database, and lists each group's runs
 newest first. "Δ vs previous" compares a run with the previous run of the same
-config on the same database: the change in accuracy, faithfulness (in
-percentage points) and dollars per question for tier 2, in table and column
-recall for retrieval. When the dataset, the schema or the roles changed, the
+config on the same database: the change in strict accuracy, lenient accuracy
+and faithfulness (in percentage points) and dollars per question for tier 2,
+in table and column recall for retrieval. For tier 2 it then says how many
+questions flipped each way and McNemar's exact p-value on them, read from the
+two records' committed per-question results -- <code>3 flipped to fail, 1 to pass
+(McNemar p=0.625)</code>. When the dataset, the schema or the roles changed, the
 run starts a new series and the cell says so, e.g. <code>new series (schema
 changed)</code>; a config's first run says <code>first run</code>. The README block has two
 headed tables, tier 2 accuracy (latest run per config and database) and then
-retrieval recall (latest run per database), with the same Δ; a benchmark with
-no recorded run says so under its heading.</p>
+retrieval recall (latest run per database), with the headline deltas only; a
+benchmark with no recorded run says so under its heading. Accuracy in the
+history page carries its 95% interval, and the Passes column carries pass^k
+when a run made more than one pass.</p>
 <h4 id="publishing">Publishing</h4>
 <p><code>nl2sql benchmark publish</code> (no key, no network), run from the repo root,
 reads every record in <code>benchmarks/&lt;kind&gt;/&lt;database&gt;/</code> and rewrites
@@ -5131,8 +5406,10 @@ the board records. Its fake synthesizer writes each answer from
 the gold rows, so the good server's answers are faithful and the bad server's
 answer on its wrong rows is not. <code>tests/unit/test_answer_faithfulness.py</code>
 covers the faithfulness rules with good and bad answers. <code>tests/unit/test_tier2_scoreboard.py</code> and
-<code>tests/cli/test_benchmark_tier2_command.py</code> cover the scoreboard, the
-baseline check, the refusal to start without <code>--max-cost</code>, the exit codes,
+<code>tests/cli/test_benchmark_tier2_command.py</code> cover the scoreboard, the lenient
+score, the Wilson interval on known counts, McNemar's exact test on a
+constructed table, pass^k, the gate firing and not firing, the deprecated
+<code>--max-accuracy-drop</code>, the refusal to start without <code>--max-cost</code>, the exit codes,
 <code>--model</code> and <code>--llm</code> resolution, the plan, the project-relative outputs,
 <code>benchmark presets</code> and <code>publish --from</code>. <code>tests/unit/test_benchmark_presets.py</code>
 covers the per-node <code>--model</code> config and preset lookup, and
@@ -5143,10 +5420,10 @@ comparability, the Δ and series breaks.</p>
 columns it is given. A column it never sends is one the planner cannot use.
 <code>nl2sql benchmark retrieval</code> measures that, per answerable gold question,
 against <code>needed_tables</code> and <code>needed_columns</code>, with no key, no LLM and no cost:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>benchmark<span class="w"> </span>retrieval<span class="w">                       </span><span class="c1"># writes &lt;project&gt;/benchmark_retrieval.json</span>
-<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>benchmark<span class="w"> </span>retrieval<span class="w"> </span>--record<span class="w"> </span>--note<span class="w"> </span><span class="s2">"k 10"</span><span class="w">  </span><span class="c1"># also writes a record to &lt;project&gt;/benchmarks/retrieval/&lt;database&gt;/</span>
-<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>benchmark<span class="w"> </span>retrieval<span class="w"> </span>--baseline<span class="w"> </span>old.json<span class="w">   </span><span class="c1"># the change against an earlier report or record</span>
-<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>benchmark<span class="w"> </span>retrieval<span class="w"> </span>--questions<span class="w"> </span>join,chinook_014
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>benchmark<span class="w"> </span>retrieval<span class="w">                       </span><span class="c1"># writes &lt;project&gt;/benchmark_retrieval.json</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>benchmark<span class="w"> </span>retrieval<span class="w"> </span>--record<span class="w"> </span>--note<span class="w"> </span><span class="s2">"k 10"</span><span class="w">  </span><span class="c1"># also writes a record to &lt;project&gt;/benchmarks/retrieval/&lt;database&gt;/</span>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>benchmark<span class="w"> </span>retrieval<span class="w"> </span>--baseline<span class="w"> </span>old.json<span class="w">   </span><span class="c1"># the change against an earlier report or record</span>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>benchmark<span class="w"> </span>retrieval<span class="w"> </span>--questions<span class="w"> </span>join,chinook_014
 </code></pre></div>
 <p>How it runs (<code>nl2sql/evaluation/retrieval_recall.py</code>):</p>
 <ul>
