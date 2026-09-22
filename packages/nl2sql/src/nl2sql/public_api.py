@@ -212,3 +212,91 @@ class NL2SQL:
         Validate the current configuration.
         """
         return self.settings.validate_configuration()
+
+    # Schema, index and retrieval: what the playground and nl2sql-api show.
+    # Imports are local so ``import nl2sql`` stays light.
+
+    def get_schema(self, datasource_id: str) -> dict:
+        """
+        The datasource's indexed schema, exactly as the planner is given it.
+
+        Tables sorted by name, each with its columns (type, nullable, primary
+        key, description), foreign keys, row count and description. Read from
+        the latest schema snapshot, not the database; before the first index
+        ``tables`` is empty.
+        """
+        from nl2sql.schema.view import schema_view
+
+        store = self._ctx.schema_store
+        snapshot = store.get_latest_snapshot(datasource_id) if store is not None else None
+        return schema_view(datasource_id, snapshot)
+
+    def index_health(self) -> dict:
+        """
+        Health of the vector index: ``status`` (``ok``, ``empty``, ``stale`` or
+        ``missing``), entry counts by type, when it was built, the embedding
+        model, one entry per registered datasource and any problems found.
+        """
+        from nl2sql.indexing.health import IndexHealth, inspect_vector_store
+
+        store = self._ctx.vector_store
+        if store is None:
+            return IndexHealth(status="missing", problems=["No vector index is configured."]).to_dict()
+        registry = self._ctx.ds_registry
+        ids = registry.list_ids() if registry is not None else []
+        return inspect_vector_store(store, self._ctx.schema_store, ids).to_dict()
+
+    def rebuild_index(self, datasource_ids=None, enrich: bool = False, full: bool = False,
+                      on_progress=None, switch_guard=None):
+        """
+        Rebuild the vector index beside the live one, then switch to it.
+
+        The current entries keep answering questions until the new ones are
+        complete. ``enrich`` asks the LLM for descriptions and spends tokens,
+        so it is off unless asked for. ``on_progress`` is called with a
+        sentence before each step; ``switch_guard`` is a context manager
+        factory held around each switch. Returns a ``RebuildResult``
+        (``ok``, ``stats``, ``empty``, ``errors``).
+        """
+        from nl2sql.indexing import rebuild
+
+        return rebuild.rebuild_index(
+            self._ctx,
+            enrich=enrich,
+            datasource_ids=datasource_ids,
+            full=full,
+            on_progress=on_progress,
+            switch_guard=switch_guard,
+        )
+
+    def inspect_retrieval(self, query: str, k: int = 8, lambda_mult: Optional[float] = None,
+                          types=None, datasource_id: Optional[str] = None) -> dict:
+        """
+        One MMR search of the live index, as the engine runs it: the candidate
+        pool with scores, the picks in order and what was dropped. ``types``
+        limits the entry types (``schema.table`` ...). It reads index metadata
+        only and needs no LLM.
+
+        Raises:
+            LookupError: when no vector index is configured.
+        """
+        store = self._ctx.vector_store
+        if store is None:
+            raise LookupError("There is no vector index configured.")
+        kwargs = {"lambda_mult": lambda_mult} if lambda_mult is not None else {}
+        return store.inspect(query, k=k, types=types, datasource_id=datasource_id, **kwargs)
+
+    def reload_llm_config(self, config_path: Union[str, pathlib.Path]) -> None:
+        """
+        Replace every configured LLM with those in ``config_path``, as one step.
+
+        Unlike ``configure_llm_from_config`` this also forgets agents the file
+        no longer names, so they fall back to ``default``. An invalid file
+        leaves the current configuration in place.
+        """
+        from nl2sql.configs import ConfigManager
+
+        cfg = ConfigManager().load_llm(pathlib.Path(config_path))
+        agents = dict(cfg.agents or {})
+        agents["default"] = cfg.default
+        self._ctx.llm_registry.replace_llms(agents)

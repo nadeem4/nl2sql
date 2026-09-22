@@ -33,7 +33,7 @@ def seen(monkeypatch):
         except ValueError:
             captured["enrichment_llm"] = False
 
-    monkeypatch.setattr("nl2sql.cli.commands.indexing.run_indexing", _run_indexing)
+    monkeypatch.setattr("nl2sql.cli.common.indexing.run_indexing", _run_indexing)
     return captured
 
 

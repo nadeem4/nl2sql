@@ -49,7 +49,7 @@ from nl2sql.cli.demo.playground.settings import SettingsPanel
 from nl2sql.common.settings import settings
 from nl2sql.feedback import NOTE_MAX_CHARS, FeedbackStore, run_record, run_signals
 from nl2sql.tracing.document import find_trace, load_trace
-from nl2sql.tracing.trace import _llm_configs, engine_info
+from nl2sql.tracing.trace import engine_info
 
 # The errors replay mode raises when no recording matches the question. The page
 # turns these into "this question has no recording" rather than a crash report.
@@ -168,65 +168,14 @@ def _read_page() -> str:
 
 def _default_datasource(engine, dataset: str) -> str:
     """The datasource the schema panel shows when the caller names none."""
-    registry = getattr(getattr(engine, "context", None), "ds_registry", None)
-    adapters = registry.list_adapters() if registry is not None else []
-    ids = [a.datasource_id for a in adapters]
+    ids = list(engine.list_datasources() or [])
     return dataset if dataset in ids else (ids[0] if ids else dataset)
 
 
-def _columns(table_contract, table_metadata) -> List[Dict[str, Any]]:
-    out: List[Dict[str, Any]] = []
-    for name, column in table_contract.columns.items():
-        column_metadata = table_metadata.columns.get(name) if table_metadata else None
-        out.append(
-            {
-                "name": name,
-                "type": column.data_type,
-                "nullable": bool(column.is_nullable),
-                "primary_key": bool(column.is_primary_key),
-                "description": (column_metadata.description if column_metadata else None) or "",
-            }
-        )
-    return out
-
-
-def _foreign_keys(table_contract) -> List[Dict[str, Any]]:
-    return [
-        {
-            "columns": list(fk.constrained_columns),
-            "references_table": fk.referred_table.table_name,
-            "references_columns": list(fk.referred_columns),
-        }
-        for fk in table_contract.foreign_keys
-    ]
-
-
-def _schema_payload(engine, datasource_id: str) -> Dict[str, Any]:
-    """Projects the engine's own indexed snapshot onto something renderable.
-
-    This reads the schema store the indexer wrote, not the database file: what
-    the page shows is exactly what the planner was given.
-    """
-    store = getattr(getattr(engine, "context", None), "schema_store", None)
-    snapshot = store.get_latest_snapshot(datasource_id) if store is not None else None
-    if snapshot is None:
-        return {"datasource_id": datasource_id, "tables": []}
-
-    tables: List[Dict[str, Any]] = []
-    for table_key, table_contract in snapshot.contract.tables.items():
-        table_metadata = snapshot.metadata.tables.get(table_key)
-        tables.append(
-            {
-                "name": table_contract.table.table_name,
-                "schema": table_contract.table.schema_name,
-                "row_count": table_metadata.row_count if table_metadata else None,
-                "description": (table_metadata.description if table_metadata else None) or "",
-                "columns": _columns(table_contract, table_metadata),
-                "foreign_keys": _foreign_keys(table_contract),
-            }
-        )
-    tables.sort(key=lambda t: t["name"])
-    return {"datasource_id": datasource_id, "tables": tables}
+def _llm_configs(engine) -> Dict[str, Any]:
+    """Provider, model and temperature per configured agent, for a feedback record."""
+    return {name: {key: (config or {}).get(key) for key in ("provider", "model", "temperature")}
+            for name, config in (engine.list_llms() or {}).items()}
 
 
 def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset: str,
@@ -267,7 +216,7 @@ def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset
         if not body.get("trace_id") or _feedback_off_reason(panel):
             return
         record = run_record(body, question=req.question, role=req.role,
-                            llm_configs=_llm_configs(getattr(engine, "context", None)),
+                            llm_configs=_llm_configs(engine),
                             engine_version=_engine_version())
         with recent_lock:
             recent[record["trace_id"]] = record
@@ -305,7 +254,7 @@ def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset
 
     @app.get("/api/schema")
     def schema(datasource: Optional[str] = None) -> Dict[str, Any]:
-        return _schema_payload(engine, datasource or _default_datasource(engine, dataset))
+        return engine.get_schema(datasource or _default_datasource(engine, dataset))
 
     @app.post("/api/ask")
     def ask(req: AskRequest) -> Dict[str, Any]:
@@ -438,13 +387,10 @@ def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset
         unknown = sorted(set(req.types) - set(ENTRY_TYPES))
         if unknown:
             raise HTTPException(status_code=422, detail=f"Unknown entry types: {', '.join(unknown)}.")
-        store = getattr(getattr(engine, "context", None), "vector_store", None)
-        if store is None:
-            raise HTTPException(status_code=409, detail="This playground has no vector index configured.")
         try:
-            return store.inspect(req.query, k=req.k, lambda_mult=req.lambda_mult,
-                                 types=req.types, datasource_id=req.datasource_id or None)
-        except Exception as exc:  # a model mismatch, an unreadable collection
+            return engine.inspect_retrieval(req.query, k=req.k, lambda_mult=req.lambda_mult,
+                                            types=req.types, datasource_id=req.datasource_id or None)
+        except Exception as exc:  # no index, a model mismatch, an unreadable collection
             raise HTTPException(status_code=409, detail=str(exc))
 
     return app

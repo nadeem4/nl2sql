@@ -11,6 +11,7 @@ import pytest
 pytest.importorskip("fastapi")
 from fastapi.testclient import TestClient
 
+from nl2sql import NL2SQL
 from nl2sql.api.query_api import QueryResult, SubQueryResult
 from nl2sql.cli.demo.playground.app import build_app
 from nl2sql.common.settings import settings
@@ -19,12 +20,17 @@ from nl2sql.feedback import FeedbackStore
 TRACE_ID = "0b8f7d2e-1111-4222-8333-944455556666"
 
 
-class _Engine:
+class _Engine(NL2SQL):
+    """The real facade over an empty context; only ``run_query`` is scripted."""
+
     def __init__(self):
-        self.context = type("Ctx", (), {})()
-        self.context.schema_store = None
-        self.context.ds_registry = None
-        self.context.llm_registry = None
+        self._ctx = type("Ctx", (), {"schema_store": None, "vector_store": None, "ds_registry": None})()
+
+    def list_datasources(self):
+        return []
+
+    def list_llms(self):
+        return {}
 
     def run_query(self, natural_language, datasource_id=None, execute=True, user_context=None):
         return QueryResult(trace_id=TRACE_ID, status="success", sub_queries=[SubQueryResult(

@@ -157,7 +157,7 @@ def test_index_demo_data_reports_a_failed_run_instead_of_exiting(tmp_path, monke
     def _failing(ctx, enrich=True):
         raise SystemExit(1)
 
-    monkeypatch.setattr("nl2sql.cli.commands.indexing.run_indexing", _failing)
+    monkeypatch.setattr("nl2sql.cli.common.indexing.run_indexing", _failing)
     monkeypatch.setattr("nl2sql.context.NL2SQLContext", lambda **kwargs: object())
 
     assert manager.index_demo_data() is False

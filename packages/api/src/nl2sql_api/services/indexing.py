@@ -20,11 +20,5 @@ class IndexingService:
         return {"success": True, "message": "Index cleared successfully"}
 
     def get_index_status(self) -> Dict[str, Any]:
-        """Get the status of the index."""
-        # This would typically return information about the vector store
-        # For now, we'll return a placeholder
-        return {
-            "status": "operational",
-            "indexed_datasources": self.engine.list_datasources(),
-            "total_indexes": len(self.engine.list_datasources())  # Placeholder
-        }
+        """The vector index's health, as ``NL2SQL.index_health`` reports it."""
+        return self.engine.index_health()

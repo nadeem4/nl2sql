@@ -20,7 +20,7 @@ The key is looked for in a fixed order, highest precedence first:
 
 ``--api-key`` and the playground's settings panel are the only sources that
 write a key down, and both write only to ``.env.demo``, through
-:func:`_persist_api_key`. A key saved in the panel takes effect at once, and on
+:func:`nl2sql.cli.demo.llm_config.persist_api_key`. A key saved in the panel takes effect at once, and on
 the next start it sits at step 3 of the order above. No path echoes a key: the
 console and the playground show at most a masked form. The panel (and, by the
 same gate, Rebuild and the Retrieval inspector) is on only for a loopback
@@ -41,8 +41,6 @@ from nl2sql.llm.providers import (
     KEYED_PROVIDERS,
     PROVIDER_KEYS,
     UPSTREAMS,
-    default_model_for,
-    default_temperature_for,
     env_var_for_key,
     env_var_for_provider,
     mask_key,
@@ -52,6 +50,8 @@ from nl2sql.cli.common.decorators import handle_cli_errors
 from nl2sql.cli.console import console, print_error, print_step, print_success
 from nl2sql.cli.demo import DemoManager
 from nl2sql.cli.demo.chinook import CHINOOK_QUESTIONS
+from nl2sql.cli.demo.llm_config import persist_api_key as _persist_api_key
+from nl2sql.cli.demo.llm_config import point_llm_config_at as _point_llm_config_at
 from nl2sql.cli.demo.stamp import outdated_warning
 from rich.markup import escape
 from nl2sql.common.settings import reload_settings
@@ -154,35 +154,6 @@ def resolve_api_key(api_key: Optional[str], env_file: pathlib.Path) -> Tuple[Opt
     return None, "none"
 
 
-def _persist_api_key(path: pathlib.Path, key: str) -> None:
-    """Records the key in the demo project's ``.env.demo``, one key per provider.
-
-    Every assignment of this key's variable is replaced by the one new line;
-    other providers' keys stay, so a node on another provider keeps working.
-    Empty placeholders of other providers are dropped: an empty
-    ``OPENAI_API_KEY=`` left below a real value would blank it again when
-    indexing loads the file with ``override=True``.
-    """
-    variable = env_var_for_key(key)
-    lines = path.read_text(encoding="utf-8").splitlines() if path.exists() else []
-
-    kept: List[str] = []
-    written = False
-    for line in lines:
-        name, _, value = line.partition("=")
-        if name.strip() in PROVIDER_KEYS and (name.strip() == variable or not value.strip()):
-            if name.strip() == variable and not written:
-                kept.append(f"{variable}={key}")
-                written = True
-            continue
-        kept.append(line)
-    if not written:
-        kept.append(f"{variable}={key}")
-
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text("\n".join(kept) + "\n", encoding="utf-8")
-
-
 _INDEX_STATE = {
     "missing": "No vector index yet",
     "empty": "The vector index is empty",
@@ -220,55 +191,6 @@ def prepare_project(directory: pathlib.Path) -> pathlib.Path:
                 "in the playground or run: nl2sql --env demo index"
             )
     return directory
-
-
-def _point_agent_at(agent: dict, provider: str, base_url: Optional[str]) -> None:
-    """Points one agent entry at ``provider``: its key reference, model and endpoint.
-
-    The key reference follows the provider. The scaffolded config reads
-    ``${env:OPENAI_API_KEY}``, and a reference names the one variable the
-    registry looks in, so an OpenRouter demo kept failing with "no API key"
-    while ``OPENROUTER_API_KEY`` was set.
-
-    Moving between OpenAI and Anthropic also moves the model: a ``gpt-`` model
-    means nothing to Anthropic, nor a ``claude-`` one to OpenAI. The model is
-    replaced by the provider's default, with the temperature that model takes.
-    """
-    agent["provider"] = provider
-    if provider in ("openai", "anthropic") and (
-        (provider == "anthropic") != str(agent.get("model", "")).startswith("claude-")
-    ):
-        agent["model"] = default_model_for(provider)
-        agent["temperature"] = default_temperature_for(provider)
-    if provider in ("openai", "openrouter", "anthropic"):
-        agent["api_key"] = "${env:" + env_var_for_provider(provider) + "}"
-    if base_url:
-        agent["base_url"] = base_url
-    else:
-        agent.pop("base_url", None)
-
-
-def _point_llm_config_at(directory: pathlib.Path, base_url: Optional[str], provider: str = "openai") -> None:
-    """Points the default agent at ``provider``, and the per-node agents that follow it.
-
-    With a ``base_url`` (replay and record, where one fake or proxy serves
-    everything) every per-node agent follows too: in replay mode a node left on
-    a real provider would be sent the ``replay`` placeholder as its key.
-
-    Live (no ``base_url``), the provider a per-node agent was given stays: a
-    step put on Claude stays on Claude when the default moves to OpenAI. Only
-    an agent with no provider, or one on the replay or record endpoint the
-    default was on, follows the default.
-    """
-    path = directory / "configs" / "llm.demo.yaml"
-    cfg = yaml.safe_load(path.read_text(encoding="utf-8"))
-    shared_endpoint = cfg["default"].get("base_url")
-    _point_agent_at(cfg["default"], provider, base_url)
-    for agent in (cfg.get("agents") or {}).values():
-        follows = (bool(base_url) or not agent.get("provider")
-                   or (shared_endpoint is not None and agent.get("base_url") == shared_endpoint))
-        _point_agent_at(agent, provider if follows else agent["provider"], base_url)
-    path.write_text(yaml.safe_dump(cfg, sort_keys=False), encoding="utf-8")
 
 
 def _load_saved_keys(path: pathlib.Path) -> None:

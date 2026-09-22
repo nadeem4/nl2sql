@@ -4,6 +4,7 @@ import pytest
 fastapi = pytest.importorskip("fastapi")
 from fastapi.testclient import TestClient
 
+from nl2sql import NL2SQL
 from nl2sql.api.query_api import QueryResult, SubQueryResult
 from nl2sql.cli.demo.playground.app import build_app
 
@@ -22,10 +23,15 @@ from nl2sql_adapter_sdk.schema import (
 )
 
 
-class _Engine:
+class _Engine(NL2SQL):
+    """The real facade over a stub schema store; ``run_query`` is scripted."""
+
     def __init__(self, snapshot=None, datasources=("chinook",)):
         self.calls = []
-        self.context = _Context(snapshot, datasources)
+        self._ctx = _Context(snapshot, datasources)
+
+    def list_datasources(self):
+        return self._ctx.ds_registry.list_ids()
 
     def run_query(self, natural_language, datasource_id=None, execute=True, user_context=None):
         self.calls.append((natural_language, execute, user_context.roles))
@@ -37,6 +43,7 @@ class _Engine:
 class _Context:
     def __init__(self, snapshot, datasources):
         self.schema_store = _SchemaStore(snapshot)
+        self.vector_store = None
         self.ds_registry = _Registry(datasources)
 
 
@@ -57,8 +64,8 @@ class _Registry:
     def __init__(self, datasources):
         self._adapters = [_Adapter(d) for d in datasources]
 
-    def list_adapters(self):
-        return list(self._adapters)
+    def list_ids(self):
+        return [a.datasource_id for a in self._adapters]
 
 
 def _snapshot() -> SchemaSnapshot:

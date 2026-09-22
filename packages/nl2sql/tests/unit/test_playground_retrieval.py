@@ -11,14 +11,11 @@ import pytest
 pytest.importorskip("fastapi")
 from fastapi.testclient import TestClient
 
+from nl2sql import NL2SQL
 from nl2sql.cli.demo.playground.app import build_app
 from nl2sql.indexing.vector_store import VectorStore
 
 from test_retrieval_trace import QUESTION, _store  # noqa: E402  (same directory)
-
-
-class _Adapter:
-    datasource_id = "chinook"
 
 
 class _Snapshots:
@@ -29,13 +26,17 @@ class _Snapshots:
         return None
 
 
-class _Engine:
+class _Engine(NL2SQL):
+    """The real facade over a live vector store and a stub schema store."""
+
     def __init__(self, store):
-        self.context = type("Ctx", (), {})()
-        self.context.vector_store = store
-        self.context.schema_store = _Snapshots()
-        self.context.ds_registry = type("R", (), {"list_adapters": staticmethod(lambda: [_Adapter()])})()
-        self.context.llm_registry = None
+        self._ctx = type("Ctx", (), {})()
+        self._ctx.vector_store = store
+        self._ctx.schema_store = _Snapshots()
+        self._ctx.ds_registry = type("R", (), {"list_ids": staticmethod(lambda: ["chinook"])})()
+
+    def list_datasources(self):
+        return ["chinook"]
 
 
 def _client(tmp_path, host="127.0.0.1", allow_settings=False, store="filled"):

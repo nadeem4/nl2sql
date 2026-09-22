@@ -24,7 +24,7 @@ def test_index_demo_data_hands_a_context_to_run_indexing(demo_project, monkeypat
         captured.append((ctx, enrich))
 
     monkeypatch.setattr(
-        "nl2sql.cli.commands.indexing.run_indexing", fake_run_indexing
+        "nl2sql.cli.common.indexing.run_indexing", fake_run_indexing
     )
 
     assert demo_project.index_demo_data() is True
@@ -38,7 +38,7 @@ def test_index_demo_data_hands_a_context_to_run_indexing(demo_project, monkeypat
 def test_index_demo_data_context_points_at_demo_config(demo_project, monkeypatch, tmp_path):
     captured = []
     monkeypatch.setattr(
-        "nl2sql.cli.commands.indexing.run_indexing", lambda ctx, enrich=True: captured.append(ctx)
+        "nl2sql.cli.common.indexing.run_indexing", lambda ctx, enrich=True: captured.append(ctx)
     )
 
     assert demo_project.index_demo_data() is True
