@@ -4123,12 +4123,12 @@ demo's <code>.env.demo</code> sets <code>RBAC_REFUSAL_NAMES_TABLES=true</code> s
 can show which table was refused, and tier 1 turns that off for its run.</p>
 <p>Each plan reads exactly the question's <code>needed_tables</code> (the RBAC outcome is
 derived from them) and selects the gold result's columns in order. PlanModel
-has no subqueries, window functions or DISTINCT aggregates, so a few plans
-express the answer differently from <code>gold_sql</code>: anti-joins for "longest
-track per genre" (<code>chinook_008</code>) and "never purchased" (<code>chinook_039</code>),
-conditional sums in HAVING for "jazz but never rock" (<code>chinook_009</code>), and
-<code>COUNT(DISTINCT(x))</code> written as <code>COUNT</code> over a function named <code>DISTINCT</code>
-(<code>chinook_011</code>, <code>chinook_034</code>). The header of the plans file lists these.</p>
+has no subqueries or window functions, so a few plans express the answer
+differently from <code>gold_sql</code>: anti-joins for "longest track per genre"
+(<code>chinook_008</code>) and "never purchased" (<code>chinook_039</code>), and conditional sums
+in HAVING for "jazz but never rock" (<code>chinook_009</code>). The header of the plans
+file lists these. <code>chinook_011</code> and <code>chinook_034</code> use <code>COUNT(DISTINCT x)</code>
+through the aggregate's <code>distinct: true</code> flag.</p>
 <p>Tier 1 runs on every PR as <code>packages/nl2sql/tests/e2e/test_benchmark_tier1.py</code>,
 in the key-free integration job: it generates the demo, runs
 <code>nl2sql benchmark --tier 1</code> with no API key in the environment, and requires

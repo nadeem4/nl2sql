@@ -2017,6 +2017,7 @@
 <li>Every operator becomes the node sqlglot's parser would build (<code>+</code> -&gt; <code>exp.Add</code>, <code>*</code> -&gt; <code>exp.Mul</code>, <code>IS NOT</code> -&gt; <code>NOT ... IS ...</code>, and so on), wherever it is nested. An operator with no mapping raises; it is never rendered as a function named after the operator.</li>
 <li>An operand that is itself an operator is parenthesised, because sqlglot prints a hand-built tree without adding the parentheses its parser would have seen (<code>(a + b) * c</code> would otherwise print as <code>a + b * c</code>).</li>
 <li><code>/</code> is sqlglot's true division, so on SQLite it renders as <code>CAST(a AS REAL) / b</code> rather than integer division.</li>
+<li>A <code>func</code> expr with <code>distinct: true</code> wraps its arguments in <code>exp.Distinct</code>, so <code>{"kind": "func", "func_name": "COUNT", "is_aggregate": true, "distinct": true, "args": [x]}</code> renders as <code>COUNT(DISTINCT x)</code>. <code>PlanModel.distinct: true</code> renders <code>SELECT DISTINCT</code>.</li>
 <li>Attach joins. The first table by ordinal is the <code>FROM</code> table. <code>left_alias</code>/<code>right_alias</code> do not say which table is new: each join attaches whichever side is not yet in scope, taking the lowest-ordinal join that touches a table already in scope, so joins may be listed in any order. When the new table is the join's left side, <code>left</code>/<code>right</code> outer joins are mirrored so the same table is preserved. Joined tables keep their <code>schema_name</code>/<code>database</code> qualifiers.</li>
 <li>Order the rows completely. The plan's <code>ORDER BY</code> terms come first, with their direction. Every other selected column follows as an ascending tie-breaker, in select order. With no <code>ORDER BY</code> in the plan, the query is ordered by every selected column. This does not change what the query means, but without it the <code>LIMIT</code> below could keep a different subset of rows on each run.</li>
 <li>An aliased item is ordered by its alias (<code>ORDER BY genre, track_sales</code>), which stays valid for aggregates under <code>GROUP BY</code>. Terms are never positional ordinals.</li>
@@ -2086,7 +2087,8 @@
 <h2 id="known-limitations">Known Limitations</h2>
 <ul>
 <li>No SQL optimization beyond AST structure.</li>
-<li><code>PlanModel.distinct</code> and <code>PlanModel.offset</code> are not rendered.</li>
+<li><code>PlanModel.offset</code> is not rendered.</li>
+<li>The plan language has no subqueries or window functions.</li>
 <li>No dialect fallback if adapter misconfigured.</li>
 </ul>
 <hr/>

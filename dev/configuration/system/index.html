@@ -1955,6 +1955,17 @@
 </tr>
 </tbody>
 </table>
+<p>On the CLI, <code>nl2sql run</code>, <code>nl2sql index</code>, <code>nl2sql benchmark</code> and
+<code>nl2sql trace replay</code> override these paths per command with <code>--config</code>
+(datasources), <code>--llm-config</code>, <code>--secrets-config</code> and <code>--vector-store</code>; <code>run</code>,
+<code>benchmark</code> and <code>trace replay</code> also take <code>--policies-config</code>. Each file flag
+takes a path, relative to the working directory or absolute.</p>
+<p>From Python, the same overrides are the <code>NL2SQL(...)</code> / <code>NL2SQLContext(...)</code>
+arguments <code>ds_config_path</code>, <code>llm_config_path</code>, <code>secrets_config_path</code>,
+<code>policies_config_path</code> and <code>vector_store_path</code>. The context hands the explicit
+file paths to its <code>ConfigManager</code>, so lookups made later, such as the
+datasource description indexing stores for the resolver, read the same files
+the context loaded rather than the settings paths.</p>
 <p><code>NL2SQLContext</code> validates the vector store configuration before it loads secrets or
 builds the datasource and LLM registries. A blank <code>VECTOR_STORE_COLLECTION</code>, or a blank
 <code>VECTOR_STORE</code> with no explicit <code>vector_store_path</code> argument, raises <code>ValueError</code> at

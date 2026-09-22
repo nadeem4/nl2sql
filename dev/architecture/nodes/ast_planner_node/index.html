@@ -2106,7 +2106,7 @@ caches a stable prefix of 1,024+ tokens automatically):</p>
 </tbody>
 </table>
 <p>The examples come before the schema so that the instructions and examples
-(about 1,100 tokens) stay cacheable even when vector retrieval picks a
+(about 1,300 tokens) stay cacheable even when vector retrieval picks a
 different set of tables per question. The system/human boundary is the single
 cache seam: keep per-question content out of the system message.</p>
 <p>The schema block (<code>render_schema_for_prompt</code> in
@@ -2154,6 +2154,12 @@ statistics only <code>sample_values</code> is sent (it helps match literal filte
 <li><code>PlanModel</code></li>
 <li><code>ASTPlannerResponse</code></li>
 </ul>
+<p>DISTINCT in the plan language: <code>PlanModel.distinct: true</code> is <code>SELECT DISTINCT</code>,
+and a <code>func</code> expr with <code>distinct: true</code> is a distinct aggregate such as
+<code>COUNT(DISTINCT x)</code>. The system message's instructions and one of its examples
+say so; a function named <code>DISTINCT</code> is rejected by the logical validator.
+Subqueries and window functions are not in the language; <code>offset</code> is accepted
+but not rendered.</p>
 <hr/>
 <h2 id="determinism-guarantees">Determinism Guarantees</h2>
 <ul>

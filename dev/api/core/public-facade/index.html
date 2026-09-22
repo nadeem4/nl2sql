@@ -4006,7 +4006,7 @@ modular APIs through a single class.</p>
 <p>Parameters:
 | name | type | required | meaning |
 | --- | --- | --- | --- |
-| <code>ds_config_path</code> | <code>Optional[Union[str, pathlib.Path]]</code> | no | Datasource config path override. |
+| <code>ds_config_path</code> | <code>Optional[Union[str, pathlib.Path]]</code> | no | Datasource config path override. Indexing reads each datasource's <code>description</code> from this file too. |
 | <code>secrets_config_path</code> | <code>Optional[Union[str, pathlib.Path]]</code> | no | Secrets config path override. |
 | <code>llm_config_path</code> | <code>Optional[Union[str, pathlib.Path]]</code> | no | LLM config path override. |
 | <code>vector_store_path</code> | <code>Optional[Union[str, pathlib.Path]]</code> | no | Vector store persistence path override. |
