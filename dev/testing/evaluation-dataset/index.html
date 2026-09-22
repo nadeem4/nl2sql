@@ -4654,7 +4654,7 @@ run, 2 on a usage error (no <code>--max-cost</code>, an unknown <code>--model</c
 configs with one name, <code>CI</code> set), 3 when the cap stopped the run early.</p>
 <h3 id="-model-and-the-presets"><code>--model</code> and the presets</h3>
 <p><code>--model MODEL</code> puts <code>MODEL</code> on all five LLM nodes. A model in
-<code>VERIFIED_MODELS</code> (<code>nl2sql/cli/common/api_key.py</code>: <code>gpt-5.4</code>, <code>gpt-5.4-mini</code>,
+<code>VERIFIED_MODELS</code> (<code>nl2sql/llm/providers.py</code>: <code>gpt-5.4</code>, <code>gpt-5.4-mini</code>,
 <code>gpt-4.1</code>, <code>gpt-4o</code>, <code>gpt-5.5</code>, <code>gpt-5-mini</code>, <code>claude-opus-5</code>,
 <code>claude-sonnet-5</code>, <code>claude-haiku-4-5</code>, ...) names its provider and its
 temperature: none is sent where the model rejects one (<code>gpt-5.5</code>,
@@ -4687,7 +4687,7 @@ and another failed (with <code>--passes</code> &gt; 1 a question can also be <co
 <code>answersynthesizer</code>) on its own provider and model, as the presets do:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>benchmark<span class="w"> </span>--tier<span class="w"> </span><span class="m">2</span><span class="w"> </span>--max-cost<span class="w"> </span><span class="m">10</span><span class="w"> </span>--model<span class="w"> </span>gpt-5.4<span class="w"> </span>--llm<span class="w"> </span>mini-helpers<span class="w"> </span>--llm<span class="w"> </span>claude-planner
 </code></pre></div>
-<p>A model that is not in <code>VERIFIED_MODELS</code> (<code>nl2sql/cli/common/api_key.py</code>) gets
+<p>A model that is not in <code>VERIFIED_MODELS</code> (<code>nl2sql/llm/providers.py</code>) gets
 a warning: the engine's parameters have not been checked against it.</p>
 <h3 id="cost-and-the-cap">Cost and the cap</h3>
 <p>Every LLM call is billed from <code>nl2sql/evaluation/prices.py</code>, a committed table

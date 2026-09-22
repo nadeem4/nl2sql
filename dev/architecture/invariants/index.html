@@ -6605,7 +6605,7 @@
 <h3 id="enforcement-points_14">Enforcement Points</h3>
 <ul>
 <li><code>GlobalPlannerNode.__call__()</code> in <code>nl2sql.pipeline.nodes.global_planner.node</code></li>
-<li><code>ExecutionDAG._layered_toposort()</code> in <code>nl2sql.pipeline.nodes.global_planner.schemas</code></li>
+<li><code>ExecutionDAG._layered_toposort()</code> in <code>nl2sql.execution.dag</code></li>
 </ul>
 <h3 id="failure-behavior_14">Failure Behavior</h3>
 <p>Raises <code>ValueError</code>, leading to <code>PipelineError</code> with <code>PLANNER_FAILED</code>.</p>
@@ -6617,7 +6617,7 @@
 <p>Each relation schema’s column names must be unique.</p>
 <h3 id="enforcement-points_15">Enforcement Points</h3>
 <ul>
-<li><code>RelationSchema.validate_unique_columns()</code> in <code>nl2sql.pipeline.nodes.global_planner.schemas</code></li>
+<li><code>RelationSchema.validate_unique_columns()</code> in <code>nl2sql.execution.dag</code></li>
 </ul>
 <h3 id="failure-behavior_15">Failure Behavior</h3>
 <p>Raises <code>ValueError</code> during schema validation.</p>
@@ -6700,7 +6700,7 @@
 <li><code>packages/nl2sql/src/nl2sql/pipeline/nodes/executor/node.py</code></li>
 <li><code>packages/nl2sql/src/nl2sql/execution/executor/sql_executor.py</code></li>
 <li><code>packages/nl2sql/src/nl2sql/pipeline/nodes/global_planner/node.py</code></li>
-<li><code>packages/nl2sql/src/nl2sql/pipeline/nodes/global_planner/schemas.py</code></li>
+<li><code>packages/nl2sql/src/nl2sql/execution/dag.py</code></li>
 <li><code>packages/nl2sql/src/nl2sql/aggregation/aggregator.py</code></li>
 <li><code>packages/nl2sql/src/nl2sql/context.py</code></li>
 <li><code>packages/nl2sql/src/nl2sql/schema/store.py</code></li>
