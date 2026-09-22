@@ -9,6 +9,7 @@ Configuration is split into **environment variables** (runtime settings) and **f
 | Env var | Default | Description |
 | --- | --- | --- |
 | `OPENAI_API_KEY` | `—` | OpenAI API key (held as `SecretStr`: never printed). Used for chat when `provider: openai`, and for embeddings when `EMBEDDING_PROVIDER=openai` (the default). |
+| `ANTHROPIC_API_KEY` | `—` | Anthropic API key, read when an agent has `provider: anthropic` and no `api_key` of its own (needs the `anthropic` extra). Chat only: Anthropic serves no embeddings. |
 | `EMBEDDING_PROVIDER` | `openai` | Embedding backend: `openai` (needs `OPENAI_API_KEY`) or `local` (key-free ONNX `all-MiniLM-L6-v2` bundled with chromadb). |
 | `EMBEDDING_MODEL` | `text-embedding-3-small` | OpenAI embedding model. Ignored when `EMBEDDING_PROVIDER=local`. |
 | `LLM_CONFIG` | `configs/llm.yaml` | Path to the LLM config file. |
@@ -56,7 +57,7 @@ Notes on the `local` provider:
   minutes; a log line is emitted before the download starts.
 - **Embeddings only.** This removes the API key requirement from the embedding
   step. It does not make querying key-free — answering a question still needs a
-  chat model (OpenAI or OpenRouter).
+  chat model (OpenAI, Anthropic or OpenRouter).
 
 **Switching providers requires a re-index.** The two providers produce vectors of
 different dimensionality, so an existing Chroma collection cannot be read with the

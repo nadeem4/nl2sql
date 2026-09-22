@@ -23,7 +23,7 @@ Source:
 Fields:
 | name | type | required | meaning |
 | --- | --- | --- | --- |
-| `provider` | `str` | yes | Provider name: `openai`, `openrouter` or `ollama`. |
+| `provider` | `str` | yes | Provider name: `openai`, `anthropic`, `openrouter` or `ollama`. |
 | `model` | `str` | yes | Model identifier. |
 | `temperature` | `Optional[float]` | no | Sampling temperature (default `0.0`). `None` (`null` in YAML) sends no temperature parameter, for models that accept only their default. |
 | `api_key` | `Optional[SecretStr]` | no | API key or secret reference. Masked in `repr`, `str` and JSON dumps; `LLMGenerator` writes the real value or reference. |
@@ -106,15 +106,32 @@ Returns:
 Map of LLM name → config (API key excluded).
 
 ## Behavioral Contracts
-- Providers supported in the core registry are `openai`, `openrouter` and
-  `ollama`, held in `PROVIDER_PRESETS` in `llm/registry.py`; anything else raises
-  `ValueError: Unsupported LLM provider`, naming the valid ones.
-- All three are served by `ChatOpenAI` and differ only by preset: `openai` uses
-  the client's own default endpoint, `openrouter` defaults to
+- Providers supported in the core registry are `openai`, `anthropic`,
+  `openrouter` and `ollama`, held in `PROVIDER_PRESETS` in `llm/registry.py`;
+  anything else raises `ValueError: Unsupported LLM provider`, naming the valid
+  ones.
+- Each preset names a wire type (`ProviderPreset.wire`), and the client is
+  built by that wire's adapter in `llm/wires/` (`WIRES[preset.wire].build_client`).
+  The `Wire` protocol (`llm/wires/base.py`) is `build_client(model, temperature,
+  **kwargs)`, `structured_output_method`, `mark_cache(payload)` and
+  `read_usage(response)`. `wires.structured(llm, schema)` is how every node asks
+  for structured output; `wires.wire_of(llm)` picks the adapter from the client.
+  See [LLM configuration → Providers and wire types](../../configuration/llm.md#providers-and-wire-types).
+- `openai`, `openrouter` and `ollama` are on the `openai` wire, served by
+  `ConfiguredChatOpenAI` (`llm/wires/openai.py`), and differ only by preset:
+  `openai` uses the client's own default endpoint, `openrouter` defaults to
   `https://openrouter.ai/api/v1`, `ollama` to `http://localhost:11434/v1`. A
   config-supplied `base_url` overrides the preset, which also lets the same path
   serve any other OpenAI-compatible endpoint (vLLM, LiteLLM, a local proxy).
-- `openai` and `openrouter` require an API key; `ollama` does not, and its preset
+- `anthropic` is on the `anthropic` wire, served by `CachingChatAnthropic`
+  (`llm/wires/anthropic_client.py`), a `langchain-anthropic` `ChatAnthropic`
+  whose requests go through the adapter's `mark_cache` (a
+  `cache_control: {"type": "ephemeral"}` breakpoint on the last system block),
+  with `max_tokens=16000`. It needs the `nl2sql-engine[anthropic]` extra;
+  without it the first `get_llm()` raises a `ValueError` naming the extra. See
+  [LLM configuration → Anthropic](../../configuration/llm.md#anthropic-claude).
+- `openai`, `anthropic` and `openrouter` require an API key (`OPENAI_API_KEY`,
+  `ANTHROPIC_API_KEY`, `OPENROUTER_API_KEY`); `ollama` does not, and its preset
   supplies the placeholder key `ChatOpenAI` insists on.
 - Clients are built lazily. `register_llm()` validates the provider and model and
   stores the config; `get_llm()` builds the client on first use and caches it
@@ -136,7 +153,8 @@ Map of LLM name → config (API key excluded).
   OpenAI key even when chat runs through OpenRouter. The embedder is cached per
   provider, so a runtime `reload_settings()` that changes the provider is
   honoured.
-- Determinism: every client is built with `seed=42` and the agent's configured
+- Determinism: every OpenAI-protocol client is built with `seed=42` (Anthropic
+  has no seed parameter), and every client with the agent's configured
   `temperature`, or none when it is `null` (see
   [LLM configuration → Temperature](../../configuration/llm.md#temperature)).
 - A provider's HTTP 400 rejecting `temperature` is re-raised as a `ValueError`

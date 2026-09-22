@@ -7,9 +7,12 @@ from InquirerPy import inquirer
 from InquirerPy.validator import NumberValidator
 
 from nl2sql.cli.common.api_key import (
+    ANTHROPIC_ENV,
+    DEFAULT_ANTHROPIC_MODEL,
     DEFAULT_OPENAI_MODEL,
     DEFAULT_OPENROUTER_MODEL,
     default_model_for,
+    default_temperature_for,
     env_var_for_key,
     provider_for_key,
 )
@@ -135,6 +138,14 @@ from nl2sql.configs import LLMFileConfig, AgentConfig
 from nl2sql.cli.generators.llm import LLMGenerator
 
 
+def _warn_if_anthropic_extra_missing() -> None:
+    """Claude needs the optional langchain-anthropic; say so now, not on the first query."""
+    if not check_package("langchain_anthropic"):
+        from nl2sql.llm.wires.anthropic import EXTRA_HINT as ANTHROPIC_EXTRA_HINT
+
+        console.print(f"[yellow]Note:[/yellow] {escape(ANTHROPIC_EXTRA_HINT)}")
+
+
 def _configure_llm(config_manager: ConfigManager, api_key: Optional[str] = None):
     """Interactively configures LLM."""
     if LLM_CONFIG.exists():
@@ -153,12 +164,15 @@ def _configure_llm(config_manager: ConfigManager, api_key: Optional[str] = None)
          default_agent = AgentConfig(
             provider=provider,
             model=default_model_for(provider),
+            temperature=default_temperature_for(provider),
             api_key=f"${{env:{env_var_for_key(api_key)}}}"
          )
          llm_config = LLMFileConfig(default=default_agent)
          content = LLMGenerator.generate(llm_config)
          _write_config_file(LLM_CONFIG, content)
-         if provider == "openrouter":
+         if provider == "anthropic":
+             _warn_if_anthropic_extra_missing()
+         if provider in ("openrouter", "anthropic"):
              console.print(
                  "[yellow]Note:[/yellow] embeddings still go through OpenAI, so "
                  "[cyan]nl2sql index[/cyan] needs OPENAI_API_KEY as well."
@@ -171,13 +185,34 @@ def _configure_llm(config_manager: ConfigManager, api_key: Optional[str] = None)
     # else lets setup succeed and then fails on the first query.
     provider = inquirer.select(
         message="Select Provider:",
-        choices=["openai", "openrouter"],
+        choices=["openai", "anthropic", "openrouter"],
         default="openai"
     ).execute()
 
     default_agent = None
 
-    if provider == "openai":
+    if provider == "anthropic":
+        console.print(
+            "[dim]Claude runs on Anthropic's own API, with the planner's system "
+            "prompt cached between calls.[/dim]"
+        )
+        api_key = inquirer.secret(message="Anthropic API Key:").execute()
+        env_var = ANTHROPIC_ENV
+        os.environ[env_var] = api_key  # available to the rest of this session
+        default_agent = AgentConfig(
+            provider="anthropic",
+            model=DEFAULT_ANTHROPIC_MODEL,
+            # Claude Opus 5 rejects any temperature with HTTP 400.
+            temperature=None,
+            api_key=f"${{env:{env_var}}}"
+        )
+        console.print(f"[dim]Will save the key as: ${{env:{env_var}}}[/dim]")
+        _warn_if_anthropic_extra_missing()
+        console.print(
+            "[yellow]Note:[/yellow] embeddings still go through OpenAI, so "
+            "[cyan]nl2sql index[/cyan] needs OPENAI_API_KEY as well."
+        )
+    elif provider == "openai":
         api_key = inquirer.secret(message="OpenAI API Key:").execute()
         default_agent = AgentConfig(
             provider="openai",

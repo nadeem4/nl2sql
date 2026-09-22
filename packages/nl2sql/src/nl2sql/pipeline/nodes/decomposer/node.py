@@ -11,6 +11,7 @@ from .prompts import DECOMPOSER_PROMPT
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.common.logger import get_logger
 from nl2sql.context import NL2SQLContext
+from nl2sql.llm.wires import structured
 import hashlib
 import json
 
@@ -39,9 +40,7 @@ class DecomposerNode:
         self.node_name = self.__class__.__name__.lower().replace('node', '')
         self.llm = ctx.llm_registry.get_llm(self.node_name)
         self.prompt = DECOMPOSER_PROMPT
-        self.chain = self.prompt | self.llm.with_structured_output(
-            DecomposerResponse, method="function_calling"
-        )
+        self.chain = self.prompt | structured(self.llm, DecomposerResponse)
 
     def _stable_id(self, prefix: str, payload: Dict[str, Any]) -> str:
         data = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True)

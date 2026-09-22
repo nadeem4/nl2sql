@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { changedModels, choicesFrom, modelOptions, variableModels } from "./settings.js";
+import { changedModels, choicesFrom, modelGroups, variableModels } from "./settings.js";
 
 // Sends JSON and returns the parsed reply; a refusal carries the server's own
 // sentence in `detail`, which is what the panel shows.
@@ -17,12 +17,20 @@ async function send(url, body) {
   return reply;
 }
 
+const PROVIDER_NAMES = { openai: "OpenAI", openrouter: "OpenRouter", anthropic: "Anthropic" };
+
 function KeyForm({ settings, onSaved, recorded }) {
   const [key, setKey] = useState("");
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState(null);
   const [fault, setFault] = useState(null);
   const current = settings.key && settings.key.masked;
+  // One key per provider; the default's may be one without a model list.
+  const saved = (settings.providers || []).filter((p) => p.masked);
+  if (current && !saved.some((p) => p.env_var === settings.key.env_var)) {
+    saved.unshift({ id: settings.provider, label: PROVIDER_NAMES[settings.provider] || settings.provider,
+                    masked: current, env_var: settings.key.env_var });
+  }
 
   const save = async (e) => {
     e.preventDefault();
@@ -33,7 +41,7 @@ function KeyForm({ settings, onSaved, recorded }) {
     try {
       const next = await send("/api/settings/key", { api_key: key });
       setKey("");
-      setStatus(`Saved. Questions now go to ${next.provider === "openrouter" ? "OpenRouter" : "OpenAI"}.`);
+      setStatus(`Saved. Questions now go to ${PROVIDER_NAMES[next.provider] || "OpenAI"}.`);
       onSaved(next);
     } catch (err) {
       setFault(err.message);
@@ -44,18 +52,24 @@ function KeyForm({ settings, onSaved, recorded }) {
 
   return (
     <form className="settings-block" onSubmit={save} aria-labelledby="settings-key-heading">
-      <h3 id="settings-key-heading">API key</h3>
-      <p className="settings-current" id="settings-key-current">
-        {current ? (
-          <>In use: <code>{current}</code> from <code>{settings.key.env_var}</code></>
-        ) : (
-          recorded
+      <h3 id="settings-key-heading">API keys</h3>
+      {saved.length ? (
+        <ul className="settings-current settings-keys" id="settings-key-current">
+          {saved.map((p) => (
+            <li key={p.env_var}>
+              {p.label}: <code>{p.masked}</code> from <code>{p.env_var}</code>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="settings-current" id="settings-key-current">
+          {recorded
             ? `No key in use. ${recorded} guided ${recorded === 1 ? "question answers" : "questions answer"} from recordings.`
-            : "No key in use, and there are no recorded answers. Paste a key to ask questions."
-        )}
-      </p>
+            : "No key in use, and there are no recorded answers. Paste a key to ask questions."}
+        </p>
+      )}
       <label className="settings-label" htmlFor="settings-key">
-        {current ? "Replace it with" : "Paste a key"}
+        {saved.length ? "Add or replace a key" : "Paste a key"}
       </label>
       <div className="settings-row">
         <input
@@ -72,10 +86,12 @@ function KeyForm({ settings, onSaved, recorded }) {
         </button>
       </div>
       <p className="settings-help" id="settings-key-help">
-        A key starting <code>sk-or-</code> is OpenRouter; any other is OpenAI. It is written to{" "}
-        <code>{settings.files.env}</code> and the demo switches to live without a restart. On a
-        later start, <code>--api-key</code> or a key exported in your shell still wins. The key is
-        never shown again, only its last four characters.
+        A key starting <code>sk-ant-</code> is Anthropic, <code>sk-or-</code> is OpenRouter; any
+        other is OpenAI. Each provider keeps one key, written to{" "}
+        <code>{settings.files.env}</code>, and the default moves to the provider of the key you
+        save, without a restart. Steps put on another provider stay there. On a later start,{" "}
+        <code>--api-key</code> or a key exported in your shell still wins. A key is never shown
+        again, only its last four characters.
       </p>
       <p className="settings-status" role="status">{status}</p>
       {fault && <p className="fault">{fault}</p>}
@@ -84,16 +100,17 @@ function KeyForm({ settings, onSaved, recorded }) {
 }
 
 function ModelsForm({ settings, onSaved }) {
-  const [choices, setChoices] = useState(() => choicesFrom(settings.nodes));
+  const providers = settings.providers || [];
+  const [choices, setChoices] = useState(() => choicesFrom(settings.nodes, settings.provider));
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState(null);
   const [fault, setFault] = useState(null);
-  const hasList = settings.models.length > 0;
-  const options = modelOptions(settings.models, settings.default_model);
-  const changes = changedModels(settings.nodes, choices);
-  const loose = variableModels(settings.models, choices);
+  const hasList = providers.some((p) => p.usable && p.models.length > 0);
+  const groups = modelGroups(providers, settings.default_model);
+  const changes = changedModels(settings.nodes, choices, settings.provider);
+  const loose = variableModels(providers, choices);
 
-  useEffect(() => setChoices(choicesFrom(settings.nodes)), [settings.nodes]);
+  useEffect(() => setChoices(choicesFrom(settings.nodes, settings.provider)), [settings.nodes, settings.provider]);
 
   const save = async (e) => {
     e.preventDefault();
@@ -114,8 +131,8 @@ function ModelsForm({ settings, onSaved }) {
 
   return (
     <form className="settings-block" onSubmit={save} aria-labelledby="settings-models-heading">
-      <h3 id="settings-models-heading">Model for each step</h3>
-      {!hasList && <p className="notice">{settings.models_note}</p>}
+      <h3 id="settings-models-heading">Provider and model for each step</h3>
+      {settings.models_note && <p className="notice">{settings.models_note}</p>}
       <ul className="model-rows">
         {settings.nodes.map((node) => (
           <li key={node.agent}>
@@ -127,12 +144,23 @@ function ModelsForm({ settings, onSaved }) {
               id={`model-${node.agent}`}
               value={choices[node.agent] || ""}
               disabled={!hasList}
+              aria-invalid={node.unavailable ? true : undefined}
+              aria-describedby={node.unavailable ? `model-${node.agent}-unavailable` : undefined}
               onChange={(e) => setChoices({ ...choices, [node.agent]: e.target.value })}
             >
-              {options.map((o) => (
-                <option key={o.value} value={o.value}>{o.label}</option>
-              ))}
+              {groups.map((g) =>
+                g.label === null ? (
+                  g.options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)
+                ) : (
+                  <optgroup key={g.label} label={g.label} disabled={g.disabled}>
+                    {g.options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </optgroup>
+                ),
+              )}
             </select>
+            {node.unavailable && (
+              <p className="model-unavailable" id={`model-${node.agent}-unavailable`}>{node.unavailable}</p>
+            )}
           </li>
         ))}
       </ul>
@@ -150,9 +178,10 @@ function ModelsForm({ settings, onSaved }) {
             {busy ? "Saving" : "Save models"}
           </button>
           <p className="settings-help">
-            Written to <code>{settings.files.llm}</code>, the file the CLI reads. Each model here
-            worked with the engine's parameters in a check on 2026-09-20; whether it plans well is for
-            the evaluation to show.
+            Written to <code>{settings.files.llm}</code>, the file the CLI reads. The OpenAI models
+            worked with the engine's parameters in a check on 2026-09-20; the Claude ones follow
+            Anthropic's documented parameter rules. Whether a model plans well is for the evaluation
+            to show.
           </p>
         </div>
       )}

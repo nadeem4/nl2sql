@@ -87,11 +87,11 @@ def test_configured_base_url_overrides_the_ollama_default():
 def test_unknown_provider_is_rejected_at_registration_and_names_the_valid_ones():
     registry = _registry()
     with pytest.raises(ValueError) as exc:
-        registry.register_llm(AgentConfig(provider="anthropic", model="claude"))
+        registry.register_llm(AgentConfig(provider="gemini", model="gemini-pro"))
 
     message = str(exc.value)
-    assert "anthropic" in message
-    for provider in ("openai", "openrouter", "ollama"):
+    assert "gemini" in message
+    for provider in ("openai", "openrouter", "ollama", "anthropic"):
         assert provider in message
 
 

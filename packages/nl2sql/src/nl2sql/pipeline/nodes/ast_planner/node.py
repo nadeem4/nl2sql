@@ -9,6 +9,7 @@ from nl2sql.pipeline.nodes.schema_retriever.schema import render_schema_for_prom
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.common.logger import get_logger
 from nl2sql.context import NL2SQLContext
+from nl2sql.llm.wires import structured
 from nl2sql.pipeline.plan_cache import PlanCache
 
 if TYPE_CHECKING:
@@ -41,7 +42,7 @@ class ASTPlannerNode:
         self.llm = ctx.llm_registry.get_llm(self.node_name)
 
         self.prompt = PLANNER_PROMPT
-        self.chain = self.prompt | self.llm.with_structured_output(PlanModel)
+        self.chain = self.prompt | structured(self.llm, PlanModel)
 
     def _cached(self, state: SubgraphExecutionState) -> Optional[Dict[str, Any]]:
         """The update for a cache hit, or None to ask the model.

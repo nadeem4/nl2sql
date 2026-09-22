@@ -23,6 +23,7 @@ def _stay_put(tmp_path, monkeypatch):
 def test_demo_scaffolds_indexes_and_starts_replay_when_no_key(tmp_path, monkeypatch):
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     monkeypatch.setattr("nl2sql.cli.commands.demo._ollama_reachable", lambda: False)
     monkeypatch.setattr("nl2sql.cli.demo.manager.DemoManager.index_demo_data", lambda self: True)
     launched = {}
@@ -48,6 +49,7 @@ def _replay_demo(tmp_path, monkeypatch, packaged=None):
     """
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     monkeypatch.setattr("nl2sql.cli.commands.demo._ollama_reachable", lambda: False)
     monkeypatch.setattr("nl2sql.cli.demo.manager.DemoManager.index_demo_data", lambda self: True)
     monkeypatch.setattr("nl2sql.cli.commands.demo._build_engine", lambda: _StubEngine())
@@ -133,6 +135,7 @@ def test_indexing_runs_from_inside_the_demo_directory(tmp_path, monkeypatch):
 
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     monkeypatch.setattr("nl2sql.cli.commands.demo._ollama_reachable", lambda: False)
     seen = {}
     monkeypatch.setattr(
@@ -160,6 +163,7 @@ def test_indexing_cannot_blank_the_real_api_key(tmp_path, monkeypatch):
 
     monkeypatch.setenv("OPENAI_API_KEY", "sk-real")
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
 
     def _blanking_index(self):
         os.environ["OPENAI_API_KEY"] = ""  # what load_dotenv(override=True) does
@@ -182,6 +186,7 @@ def test_detect_llm_mode_reads_the_environment(monkeypatch):
     monkeypatch.setattr(demo, "_ollama_reachable", lambda: False)
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     assert demo.detect_llm_mode() == "replay"
 
     monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or")
@@ -195,6 +200,7 @@ def test_detect_llm_mode_reads_the_environment(monkeypatch):
 def test_record_without_a_key_is_refused(tmp_path, monkeypatch):
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     monkeypatch.setattr("nl2sql.cli.commands.demo._ollama_reachable", lambda: False)
     monkeypatch.setattr("nl2sql.cli.demo.manager.DemoManager.index_demo_data", lambda self: True)
 
@@ -213,6 +219,7 @@ def test_record_needs_a_key_even_when_ollama_is_running(tmp_path, monkeypatch):
     """
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     monkeypatch.setattr("nl2sql.cli.commands.demo._ollama_reachable", lambda: True)
     monkeypatch.setattr("nl2sql.cli.demo.manager.DemoManager.index_demo_data", lambda self: True)
 

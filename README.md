@@ -57,8 +57,8 @@ engine's one real safety property, made visible.
 | `--host ADDR` | `127.0.0.1` | The bind address. The default binds **localhost only**, so nothing outside your machine can reach it. `0.0.0.0` is for containers and VMs, where localhost is not reachable from outside. The playground has **no authentication**: in live mode anyone who can reach the address can ask questions that spend your API credits. Bind it wide only on a network you trust. |
 | `--port N` | `8765` | The port to serve on. Change it when 8765 is taken, or when you are running two demos at once. |
 | `--no-browser` | off | Do not open a browser tab; just serve and print the URL. Use it over SSH and in containers, where there is no browser to open; in CI and scripts, where a browser would be noise or an error; when you are driving the HTTP API directly rather than the page; and on a demo you restart repeatedly, so each restart does not pile up another tab. |
-| `--record` | off | Run the guided questions through your real provider, save the responses to `recordings.json` in the demo project, and exit without serving. A later `nl2sql demo` with no key on the same `--dir` replays from that file (it wins over any recordings packaged with the engine, and none ship today), so the guided questions answer without a key. A question outside the recording gets "No recorded answer for this question. Add an API key to ask it live." Needs an API key — a reachable Ollama is not enough, because there is nothing to proxy through. This spends real API credits. |
-| `--api-key KEY` | unset | The key for live mode, saved into the demo project's `.env.demo` so later runs from that directory stay live without passing it again. The provider follows the key's shape: `sk-or-…` is OpenRouter, anything else is OpenAI. A key on the command line is visible in your shell history and to `ps`, so exporting the environment variable, or pasting the key into the playground's **Settings** panel, is the more private route. |
+| `--record` | off | Run the guided questions through your real provider, save the responses to `recordings.json` in the demo project, and exit without serving. A later `nl2sql demo` with no key on the same `--dir` replays from that file (it wins over any recordings packaged with the engine, and none ship today), so the guided questions answer without a key. A question outside the recording gets "No recorded answer for this question. Add an API key to ask it live." Needs an API key — a reachable Ollama is not enough, because there is nothing to proxy through. It needs an OpenAI or OpenRouter key: recordings capture the OpenAI wire format, so a Claude key is refused. This spends real API credits. |
+| `--api-key KEY` | unset | The key for live mode, saved into the demo project's `.env.demo` so later runs from that directory stay live without passing it again. The provider follows the key's shape: `sk-ant-…` is Anthropic (Claude, needs the `anthropic` extra), `sk-or-…` is OpenRouter, anything else is OpenAI. A key on the command line is visible in your shell history and to `ps`, so exporting the environment variable, or pasting the key into the playground's **Settings** panel, is the more private route. |
 | `--allow-settings` | off | Turn on the playground's **Settings** panel (API key, model per LLM step) when `--host` is not a loopback address. It is off there by default because the playground has no login: anyone who can reach the page could swap in their own key or run up costs on yours. On `127.0.0.1` / `localhost` the panel is always on. |
 
 ### What the demo needs, honestly
@@ -74,12 +74,12 @@ directory are live without passing it again. `.env.demo` is covered by
 `.gitignore`.
 
 Or start the demo without a key and paste one into the playground: **Settings**
-(top right) takes the key, writes it to the same `.env.demo` and switches the
-running demo from replay to live without a restart. The page never shows the key
-again, only a masked form such as `sk-...4f2a`. The same panel picks a model for
-each LLM step (answerability check, question splitter, query planner, plan
-repair, answer writer) from
-a short list of OpenAI models checked against the engine's parameters, and
+(top right) takes the key, one per provider, writes it to the same `.env.demo`
+and switches the running demo from replay to live without a restart. The page
+never shows a key again, only a masked form such as `sk-...4f2a`. The same panel
+picks a provider and a model for each LLM step (answerability check, question
+splitter, query planner, plan repair, answer writer) from a short list of
+OpenAI and Claude models, offering a provider once its key is saved, and
 writes the choice to the demo's `configs/llm.demo.yaml`, the file the CLI reads.
 Settings work only when the playground is bound to localhost unless you pass
 `--allow-settings`; see [the demo guide](docs/getting_started/demo.md#the-settings-panel).
@@ -87,15 +87,16 @@ Settings work only when the playground is bound to localhost unless you pass
 Without the flag the demo looks for a key in a fixed order, highest first:
 
 1. `--api-key`
-2. `OPENAI_API_KEY` or `OPENROUTER_API_KEY` in the environment
+2. `OPENAI_API_KEY`, `OPENROUTER_API_KEY` or `ANTHROPIC_API_KEY` in the environment
 3. whichever of those is already in the demo project's `.env.demo`
 4. an Ollama daemon answering on `localhost:11434`
 5. replay
 
 The first four run live. The demo's model is `gpt-5.4`, set in
-`configs/llm.demo.yaml`; live mode switches the provider to match the key but
-leaves the model name alone, so with an OpenRouter key or Ollama, edit `model`
-to one that provider serves. Models that reject `temperature: 0` (such as
+`configs/llm.demo.yaml`. With an Anthropic key live mode switches it to
+`claude-opus-5` (with `temperature: null`); otherwise it switches the provider
+to match the key but leaves the model name alone, so with an OpenRouter key or
+Ollama, edit `model` to one that provider serves. Models that reject `temperature: 0` (such as
 `gpt-5.5`) need `temperature: null`; see
 [LLM configuration](docs/configuration/llm.md#temperature).
 
@@ -170,6 +171,27 @@ pip install "nl2sql-engine[all]"     # every database driver -- adapters only,
 ```
 
 SQLite needs no extra: its driver is in the standard library.
+
+### LLM providers
+
+The engine is model-agnostic. `configs/llm.yaml` picks a provider per agent,
+so each pipeline step can run on a different one (the planner on Claude, the
+rest on OpenAI, say):
+
+| provider | wire type | key | notes |
+| --- | --- | --- | --- |
+| `openai` | `openai` | `OPENAI_API_KEY` | the default; `gpt-5.4` |
+| `anthropic` | `anthropic` | `ANTHROPIC_API_KEY` | Claude on Anthropic's own API: `pip install "nl2sql-engine[anthropic]"`; `claude-opus-5` with `temperature: null` |
+| `openrouter` | `openai` | `OPENROUTER_API_KEY` | OpenAI-compatible gateway to other vendors' models |
+| `ollama` | `openai` | none | local models; small ones struggle with the recursive plan schema |
+
+Each wire type has one small adapter (`nl2sql/llm/wires/`) that builds its
+client and owns its structured-output method, prompt-cache marking and usage
+reading. Claude therefore runs through `langchain-anthropic`'s native client,
+not an OpenAI-compatible shim: its system prompts carry a `cache_control`
+breakpoint, and cache reads and writes show up in `result.usage`. A provider
+on an existing wire type is one preset; a new wire type is one adapter. See
+[LLM configuration](docs/configuration/llm.md#providers-and-wire-types).
 
 ---
 
@@ -314,8 +336,9 @@ needs no API key: `.env.demo` sets `EMBEDDING_PROVIDER=local`, and the LLM
 enrichment pass over the schema is optional and simply skipped without one. A
 key is needed to *query* the demo, so pass one with `--api-key` or fill in
 `OPENAI_API_KEY` in `.env.demo` first. `setup --api-key` and `demo --api-key`
-read the key the same way: the provider follows the key's shape, and an `sk-or-`
-key is stored as `OPENROUTER_API_KEY` with `provider: openrouter`.
+read the key the same way: the provider follows the key's shape, an `sk-or-`
+key is stored as `OPENROUTER_API_KEY` with `provider: openrouter`, and an
+`sk-ant-` key as `ANTHROPIC_API_KEY` with `provider: anthropic`.
 
 Chinook is the only demo dataset. `--lite` and `--docker` chose between a
 generated manufacturing dataset and the same data in a Compose stack; both are

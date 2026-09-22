@@ -53,6 +53,9 @@ dependencies = [
 # database driver it needs to connect. sqlite needs none -- the driver is in
 # the standard library -- so it has no extra.
 [project.optional-dependencies]
+# Claude through Anthropic's own Messages API (`provider: anthropic`). Not a
+# core dependency: every other provider speaks the OpenAI wire format.
+anthropic = ["langchain-anthropic>=1.7,<2"]
 aws = ["boto3"]
 azure = ["azure-identity", "azure-keyvault-secrets"]
 # The browser playground `nl2sql demo` serves. The built page ships inside the

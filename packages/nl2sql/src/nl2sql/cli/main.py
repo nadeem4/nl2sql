@@ -189,8 +189,8 @@ def demo(
         help=(
             "API key for live mode, saved into the demo project's .env.demo so later runs "
             "from that directory stay live. The provider follows the key shape: an sk-or- key "
-            "is OpenRouter, anything else is OpenAI. Precedence: --api-key, then "
-            "OPENAI_API_KEY/OPENROUTER_API_KEY in the environment, then .env.demo, then Ollama, "
+            "is OpenRouter, an sk-ant- key is Anthropic, anything else is OpenAI. Precedence: --api-key, then "
+            "OPENAI_API_KEY/OPENROUTER_API_KEY/ANTHROPIC_API_KEY in the environment, then .env.demo, then Ollama, "
             "then replay. A key on argv is visible in shell history and to ps, so the "
             "environment variable is the more private route."
         ),

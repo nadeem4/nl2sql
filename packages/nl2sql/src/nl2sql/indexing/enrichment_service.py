@@ -8,6 +8,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from nl2sql.schema import SchemaSnapshot
 from nl2sql_adapter_sdk.schema import TableMetadata, ColumnMetadata
 from nl2sql.common.logger import get_logger
+from nl2sql.llm.wires import structured
 
 logger = get_logger("indexing_enrichment")
 
@@ -286,9 +287,7 @@ def enrich_schema_snapshot(
         llm = llm_registry.get_llm(ENRICHMENT_LLM_NAME)
         evidence = build_evidence(snapshot, datasource_description, existing_questions)
         prompt = ChatPromptTemplate.from_template(ENRICHMENT_PROMPT)
-        chain = prompt | llm.with_structured_output(
-            SchemaEnrichment, method="function_calling"
-        )
+        chain = prompt | structured(llm, SchemaEnrichment)
         enrichment = chain.invoke({"evidence_json": evidence})
     except ValueError as exc:
         # No usable LLM is configured - typically no API key. Expected on the

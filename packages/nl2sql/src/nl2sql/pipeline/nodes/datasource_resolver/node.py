@@ -12,6 +12,7 @@ from nl2sql.auth import UserContext
 from nl2sql.common.logger import get_logger
 from nl2sql.context import NL2SQLContext
 from nl2sql.common.settings import settings
+from nl2sql.llm.wires import structured
 from .prompts import ANSWERABILITY_PROMPT
 from .schemas import AnswerabilityResponse, DatasourceResolverResponse, ResolvedDatasource
 
@@ -43,9 +44,7 @@ class DatasourceResolverNode:
         self.schema_store = ctx.schema_store
         # Registered as agent "datasourceresolver"; falls back to "default".
         self.llm = ctx.llm_registry.get_llm(self.node_name)
-        self.answerability_chain = ANSWERABILITY_PROMPT | (
-            self.llm.with_structured_output(AnswerabilityResponse, method="function_calling")
-        )
+        self.answerability_chain = ANSWERABILITY_PROMPT | structured(self.llm, AnswerabilityResponse)
 
     def _index_is_empty(self) -> bool:
         is_empty = getattr(self.vector_store, "is_empty", None)

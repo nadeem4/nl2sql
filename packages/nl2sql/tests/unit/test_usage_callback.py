@@ -18,8 +18,9 @@ def _start(cb, node, run_id, model="gpt-4o"):
     )
 
 
-def _chat_result(usage=None, model="gpt-4o-2024-08-06", llm_output=None):
-    msg = AIMessage(content="ok", usage_metadata=usage, response_metadata={"model_name": model})
+def _chat_result(usage=None, model="gpt-4o-2024-08-06", llm_output=None, provider=None):
+    meta = {"model_name": model, **({"model_provider": provider} if provider else {})}
+    msg = AIMessage(content="ok", usage_metadata=usage, response_metadata=meta)
     return LLMResult(generations=[[ChatGeneration(message=msg)]], llm_output=llm_output)
 
 
@@ -82,6 +83,23 @@ def test_anthropic_shaped_usage_reads_cache_writes_too():
     assert call.cached_input_tokens == 100
     assert call.cache_write_input_tokens == 200
     assert call.reasoning_tokens == 0
+
+
+def test_anthropic_cache_writes_split_by_ttl_are_counted_once():
+    # langchain-anthropic zeroes the generic ``cache_creation`` when Anthropic
+    # reports the write per TTL, and puts the tokens under the TTL keys.
+    cb = TokenUsageCallback()
+    run = uuid.uuid4()
+    _start(cb, "ast_planner", run, model="claude-opus-5")
+    cb.on_llm_end(_chat_result({
+        "input_tokens": 3540, "output_tokens": 120, "total_tokens": 3660,
+        "input_token_details": {"cache_read": 0, "cache_creation": 0,
+                                "ephemeral_5m_input_tokens": 3000, "ephemeral_1h_input_tokens": 500},
+    }, model="claude-opus-5", provider="anthropic"), run_id=run)
+
+    [call] = cb.usage().calls
+    assert call.cache_write_input_tokens == 3500
+    assert call.input_tokens == 3540
 
 
 def test_missing_details_are_zero_and_missing_usage_is_flagged():

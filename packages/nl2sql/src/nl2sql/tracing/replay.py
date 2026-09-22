@@ -227,7 +227,7 @@ class ReplayReport:
 
 def _install_playback_clients(ctx: Any, playback: TracePlayback) -> None:
     """Points every configured agent at the playback transport instead of its provider."""
-    from nl2sql.llm.registry import build_chat_client
+    from nl2sql.llm.wires.openai import build_chat_client
 
     registry = ctx.llm_registry
     http_client = httpx.Client(transport=playback)

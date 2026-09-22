@@ -61,6 +61,8 @@ LLM_NODES: List[Dict[str, str]] = [
 ]
 _AGENTS = {node["agent"] for node in LLM_NODES}
 
+PROVIDER_LABELS = {"openai": "OpenAI", "anthropic": "Anthropic", "openrouter": "OpenRouter", "ollama": "Ollama"}
+
 # Letters, digits, '-' and '_' only: the key is written into a dotenv file, so
 # nothing that could end the line or start a comment gets through.
 _KEY_SHAPE = re.compile(r"^[A-Za-z0-9_-]{20,}$")
@@ -189,27 +191,52 @@ class SettingsPanel:
         agents = cfg.get("agents") or {}
         verified = VERIFIED_MODELS.get(provider, {})
 
-        preset = PROVIDER_PRESETS.get(provider)
-        env_var = preset.api_key_env if preset else None
-        active = os.environ.get(env_var) if (env_var and self.mode == "live") else None
-
         return {
             "available": True,
             "mode": self.mode,
             "provider": provider,
             "default_model": default.get("model"),
-            "key": {"masked": mask_key(active) if active else None, "env_var": env_var},
+            "key": self._key(provider),
             "models": [{"id": model, "temperature": temp} for model, temp in verified.items()],
             "models_note": None if verified else (
-                f"The model list is OpenAI-only for now. Every node uses "
+                f"Model lists exist for OpenAI and Anthropic only for now. Every node uses "
                 f"{default.get('model')} from {LLM_CONFIG.as_posix()}."
             ),
-            "nodes": [
-                {**node, "model": (agents.get(node["agent"]) or {}).get("model")}
-                for node in LLM_NODES
+            # Every provider a node can be put on, one key each.
+            "providers": [
+                {"id": name, "label": PROVIDER_LABELS.get(name, name), **self._key(name),
+                 "usable": self._usable(name, provider),
+                 "models": [{"id": model, "temperature": temp} for model, temp in models.items()]}
+                for name, models in VERIFIED_MODELS.items()
             ],
+            "nodes": [self._node(node, agents.get(node["agent"]) or {}, provider) for node in LLM_NODES],
             "files": {"llm": LLM_CONFIG.as_posix(), "env": ENV_FILE.as_posix()},
         }
+
+    def _key(self, provider: str) -> Dict[str, Optional[str]]:
+        """A provider's key as the panel may show it: masked, and the variable it is in."""
+        preset = PROVIDER_PRESETS.get(provider)
+        env_var = preset.api_key_env if preset else None
+        active = os.environ.get(env_var) if (env_var and self.mode == "live") else None
+        return {"masked": mask_key(active) if active else None, "env_var": env_var}
+
+    def _usable(self, provider: str, default_provider: str) -> bool:
+        """Whether a node can run on ``provider`` right now.
+
+        The default's provider always can: in replay mode it is the recording
+        server. Any other provider needs its own key, in live mode.
+        """
+        return provider == default_provider or self._key(provider)["masked"] is not None
+
+    def _node(self, node: Dict[str, str], entry: Dict[str, Any], default_provider: str) -> Dict[str, Any]:
+        provider = entry.get("provider") if entry else None
+        unavailable = None
+        if provider and not self._usable(provider, default_provider):
+            label = PROVIDER_LABELS.get(provider, provider)
+            unavailable = (f"{label} has no key, so this step cannot run. Save a key for {label} above, "
+                           "or choose another provider for it.")
+        return {**node, "provider": provider, "model": entry.get("model") if entry else None,
+                "unavailable": unavailable}
 
     # --- writing ---------------------------------------------------------------
 
@@ -235,11 +262,13 @@ class SettingsPanel:
             try:
                 _persist_api_key(self.project_dir / ENV_FILE, key)
                 os.environ[variable] = key
-                # The replay placeholder in OPENAI_API_KEY, or a key for the
-                # other provider, must not be sent with the new provider.
-                for other in PROVIDER_KEYS:
-                    if other != variable:
-                        os.environ.pop(other, None)
+                if self.mode != "live":
+                    # The replay placeholder in OPENAI_API_KEY is not a key and
+                    # must not be sent to a real provider. Live, other
+                    # providers' keys stay: a node may be on one of them.
+                    for other in PROVIDER_KEYS:
+                        if other != variable:
+                            os.environ.pop(other, None)
                 _point_llm_config_at(self.project_dir, None, provider=provider_for_key(key))
                 self._reload()
             except Exception as exc:
@@ -251,40 +280,61 @@ class SettingsPanel:
                 ) from None
             self.mode = "live"
 
-    def set_models(self, models: Dict[str, Optional[str]]) -> None:
-        """Writes one model per node into ``llm.demo.yaml``; ``None`` means the default."""
-        cfg = self._load()
-        default = cfg.get("default") or {}
-        provider = default.get("provider", "openai")
-        verified = VERIFIED_MODELS.get(provider)
-        if not verified:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Per-node models can be chosen for OpenAI only for now; this demo uses {provider}.",
-            )
-        for agent, model in models.items():
-            if agent not in _AGENTS:
-                raise HTTPException(status_code=400, detail=f"'{agent}' is not an LLM node.")
-            if model is not None and model not in verified:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"'{model}' is not on the verified list: {', '.join(verified)}.",
-                )
+    def set_models(self, models: Dict[str, Any]) -> None:
+        """Writes a provider and a model per node into ``llm.demo.yaml``.
+
+        Each value is ``None`` (use the default agent), a model name (on the
+        default's provider), or ``{"provider": ..., "model": ...}``.
+        """
+        default_provider = (self._load().get("default") or {}).get("provider", "openai")
+        choices = {agent: self._choice(agent, value, default_provider) for agent, value in models.items()}
 
         with self.gate.change():
             cfg = self._load()
             default = cfg.get("default") or {}
             agents = cfg.get("agents") or {}
-            for agent, model in models.items():
-                if model is None:
+            for agent, choice in choices.items():
+                if choice is None:
                     agents.pop(agent, None)
                     continue
-                # A node differs from the default only in its model and the
-                # temperature that model accepts; endpoint and key follow it.
-                entry = {"provider": default.get("provider"), "model": model,
-                         "temperature": verified[model], "api_key": default.get("api_key"),
-                         "base_url": default.get("base_url"), "name": agent}
+                provider, model = choice
+                if provider == default.get("provider"):
+                    # On the default's provider a node differs from the default
+                    # only in its model and the temperature that model accepts;
+                    # endpoint and key follow the default.
+                    api_key, base_url = default.get("api_key"), default.get("base_url")
+                else:
+                    api_key, base_url = "${env:" + PROVIDER_PRESETS[provider].api_key_env + "}", None
+                entry = {"provider": provider, "model": model,
+                         "temperature": VERIFIED_MODELS[provider][model], "api_key": api_key,
+                         "base_url": base_url, "name": agent}
                 agents[agent] = {k: v for k, v in entry.items() if v is not None or k == "temperature"}
             cfg["agents"] = agents
             self._llm_path.write_text(yaml.safe_dump(cfg, sort_keys=False), encoding="utf-8")
             self._reload()
+
+    def _choice(self, agent: str, value: Any, default_provider: str) -> Optional[tuple]:
+        """Validates one node's choice as ``(provider, model)``, or None for the default."""
+        if agent not in _AGENTS:
+            raise HTTPException(status_code=400, detail=f"'{agent}' is not an LLM node.")
+        if value is None:
+            return None
+        if isinstance(value, dict):
+            provider, model = value.get("provider") or default_provider, value.get("model")
+        else:
+            provider, model = default_provider, value
+        verified = VERIFIED_MODELS.get(provider)
+        if not verified:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Per-node models can be chosen for OpenAI and Anthropic only for now, not {provider}.",
+            )
+        if model not in verified:
+            raise HTTPException(
+                status_code=400,
+                detail=f"'{model}' is not on the verified list for {provider}: {', '.join(verified)}.",
+            )
+        if not self._usable(provider, default_provider):
+            label = PROVIDER_LABELS.get(provider, provider)
+            raise HTTPException(status_code=400, detail=f"Save a key for {label} before putting a step on it.")
+        return provider, model

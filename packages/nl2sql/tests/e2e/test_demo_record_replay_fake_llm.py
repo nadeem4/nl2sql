@@ -35,6 +35,7 @@ def test_record_then_replay_with_no_key(demo_project, tmp_path, monkeypatch):
     monkeypatch.setenv("EMBEDDING_PROVIDER", "local")
     monkeypatch.setenv("OPENAI_API_KEY", FAKE_KEY)
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     monkeypatch.setattr("nl2sql.cli.commands.demo._ollama_reachable", lambda: False)
     provider = FakeLLMServer(RULES_COUNT_CUSTOMERS).start()
     monkeypatch.setattr("nl2sql.cli.commands.demo.UPSTREAMS", {"openai": provider.base_url})
