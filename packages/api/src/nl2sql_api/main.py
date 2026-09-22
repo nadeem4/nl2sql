@@ -6,20 +6,20 @@ from importlib.metadata import PackageNotFoundError, version
 
 from .routes import query, health, datasource, llm, indexing
 from fastapi.middleware.cors import CORSMiddleware
-from nl2sql import NL2SQL
-from nl2sql.common.logger import configure_logging
-from nl2sql.common.settings import settings
+from nl2sql import NL2SQL, configure_logging
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # The library no longer configures logging on import, so the application
-    # entry point owns it - before anything that logs is constructed.
-    configure_logging(
-        level="INFO",
-        json_format=(settings.observability_exporter == "otlp"),
-    )
-    app.state.engine = NL2SQL()
+    # entry point owns it - before anything that logs is constructed. The
+    # exporter is read through the facade once the engine has loaded settings;
+    # an OTLP deployment then switches to JSON logs.
+    configure_logging(level="INFO")
+    engine = NL2SQL()
+    if engine.get_setting("observability_exporter") == "otlp":
+        configure_logging(level="INFO", json_format=True)
+    app.state.engine = engine
     yield
 
 

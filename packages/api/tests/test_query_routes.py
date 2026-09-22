@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from nl2sql.api.query_api import QueryResult, SubQueryResult
+from nl2sql import QueryResult, SubQueryResult
 from nl2sql.execution.contracts import ArtifactRef
 
 

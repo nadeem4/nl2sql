@@ -1,8 +1,8 @@
 """The HTTP response mirrors every field a UI renders off ``QueryResult``."""
 
-from nl2sql.api.query_api import QueryResult, RowSample, SubQueryResult
+from nl2sql import QueryResult, QuestionUsage, RowSample, SubQueryResult
 from nl2sql.pipeline.nodes.validator.schemas import ValidationCheck
-from nl2sql.services.callbacks.token_handler import LLMCallUsage, QuestionUsage, UsageTotals
+from nl2sql.services.callbacks.token_handler import LLMCallUsage, UsageTotals
 
 
 def _stub_result() -> QueryResult:

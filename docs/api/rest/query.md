@@ -13,6 +13,9 @@ Source: `packages/api/src/nl2sql_api/models/query.py`
 | `user_context` | `Optional[Dict[str, Any]]` | no | RBAC context payload, e.g. `{"roles": ["admin"]}`. Send one: a request without it currently fails with HTTP 500. |
 
 ### `SubQueryResponse`
+
+Derives from `nl2sql.SubQueryResult`, so it has exactly the engine's fields.
+
 | field | type | required | meaning |
 | --- | --- | --- | --- |
 | `id` | `str` | no | Sub-query identifier. |
@@ -21,25 +24,26 @@ Source: `packages/api/src/nl2sql_api/models/query.py`
 | `datasource_id` | `str` | no | Datasource the sub-query targets. |
 | `schema_version` | `str` | no | Schema version used for planning. |
 | `plan` | `Optional[Dict[str, Any]]` | no | The validated plan, dumped. |
-| `validation` | `List[Dict[str, Any]]` | no | Validation checks (`name`, `passed`, `message`). |
-| `rows` | `Optional[Dict[str, Any]]` | no | Capped row sample (`columns`, `rows`, `total_rows`). |
+| `validation` | `List[ValidationCheck]` | no | Validation checks (`name`, `passed`, `message`). |
+| `rows` | `Optional[RowSample]` | no | Capped row sample (`columns`, `rows`, `total_rows`). |
 | `status` | `str` | no | `"success"` or `"error"` for this sub-query, from its final attempt: `"success"` when it ended with SQL and, if executed, a result; otherwise `"error"`. A retry that recovers reports `"success"`. |
 | `retry_count` | `int` | no | Plan/SQL refinement attempts made. |
 | `plan_source` | `str` | no | `"cache"` when the plan came from the plan cache (no planner call; still validated and executed), otherwise `"llm"`. |
 
 ### `QueryResponse`
 
-Mirrors `nl2sql.api.query_api.QueryResult` field for field.
+Derives from `nl2sql.QueryResult` (only `sub_queries` is narrowed to
+`SubQueryResponse`), so the HTTP response cannot drift from what the engine returns.
 
 | field | type | required | meaning |
 | --- | --- | --- | --- |
 | `sub_queries` | `List[SubQueryResponse]` | no | One entry per decomposed sub-query, each with its SQL. |
 | `final_answer` | `Optional[Dict[str, Any]]` | no | Answer synthesizer payload (`summary`, `format_type`, `content`). |
 | `errors` | `List[Dict[str, Any]]` | no | Pipeline errors (`node`, `message`, `error_code`, `severity`). |
-| `trace_id` | `Optional[str]` | no | Trace identifier. |
+| `trace_id` | `str` | no | Trace identifier. |
 | `reasoning` | `List[Dict[str, Any]]` | no | Reasoning events/logs. |
 | `warnings` | `List[Dict[str, Any]]` | no | Warning events/logs. |
-| `artifact_refs` | `Dict[str, Dict[str, Any]]` | no | Result artifact references keyed by execution node id. |
+| `artifact_refs` | `Dict[str, ArtifactRef]` | no | Result artifact references keyed by execution node id. |
 | `status` | `str` | no | `"success"`, `"error"` or `"plan_only"` for the run. |
 | `timings` | `Dict[str, float]` | no | Wall-clock seconds per graph node. |
 | `usage` | `QuestionUsage` | no | LLM calls, input/cached/output/reasoning tokens and model time per node (`nodes`) and for the question (`total`), plus every call (`calls`) and the number of plans served from the plan cache (`plan_cache_hits`). The same model as `QueryResult.usage`; see [the core query API](../core/query.md#usage-tokens-calls-and-model-time). |
@@ -62,7 +66,7 @@ Response model: `QueryResponse`
 Execution flow:
 - Converts `user_context` to `UserContext` when present.
 - Delegates to `engine.run_query(...)`, which returns a `QueryResult`.
-- Maps the `QueryResult` field-for-field into `QueryResponse`.
+- Returns that `QueryResult` as a `QueryResponse` (its subclass); there is no field mapping.
 
 The handler is declared with `def`, not `async def`: the pipeline performs blocking
 LLM and database calls, so Starlette runs it in its threadpool instead of on the
