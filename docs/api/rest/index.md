@@ -9,7 +9,12 @@ engine over HTTP. Implementation lives in `packages/api/src/nl2sql_api/`.
 
 Source: `packages/api/src/nl2sql_api/main.py`
 
-- `lifespan` initializes a single `NL2SQL` engine and stores it in `app.state.engine`.
+- `lifespan` configures logging, initializes a single `NL2SQL` engine and stores it
+  in `app.state.engine`. When `observability_exporter` is `otlp` (read through
+  `engine.get_setting`), logs switch to JSON.
+- The package imports the engine only through the top-level `nl2sql` namespace
+  (`from nl2sql import NL2SQL, QueryResult, UserContext, configure_logging, ...`),
+  never an engine submodule. `packages/api/tests/test_architecture.py` enforces it.
 - Routers are included under `/api/v1`.
 - CORS is restricted to the origins listed in `NL2SQL_API_CORS_ORIGINS`
   (see [CORS origins](#cors-origins)); with none configured, no cross-origin

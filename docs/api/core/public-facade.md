@@ -66,3 +66,11 @@ The public facade delegates to modular APIs with the same signatures:
 `list_llms`, `get_llm`, `index_datasource`, `index_all_datasources`, `clear_index`,
 `check_permissions`, `get_allowed_resources`, `get_current_settings`,
 `get_setting`, `validate_configuration`.
+
+### Top-level exports
+
+Clients import everything they need from `nl2sql` itself, never from an engine
+submodule: `NL2SQL`, `QueryResult`, `SubQueryResult`, `RowSample`,
+`QuestionUsage`, `UserContext`, `configure_logging`, the error types
+(`PipelineError`, `ErrorCode`, `ErrorSeverity`) and the modular API classes.
+The REST API (`nl2sql-api`) is held to this rule by an architecture test.

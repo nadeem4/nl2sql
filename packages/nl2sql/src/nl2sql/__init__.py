@@ -2,6 +2,12 @@
 
 from .public_api import NL2SQL, QueryResult
 
+# The shapes a client renders and the hooks an application entry point needs,
+# so REST and SDK clients never import engine submodules.
+from .api.query_api import SubQueryResult, RowSample
+from .services.callbacks.token_handler import QuestionUsage
+from .common.logger import configure_logging
+
 # Also expose individual API modules for more granular access
 from .api.query_api import QueryAPI
 from .api.datasource_api import DatasourceAPI
@@ -34,5 +40,9 @@ __all__ = [
     "ErrorCode",
     "PipelineError",
     "UserContext",
+    "SubQueryResult",
+    "RowSample",
+    "QuestionUsage",
+    "configure_logging",
     "BenchmarkConfig",
 ]
