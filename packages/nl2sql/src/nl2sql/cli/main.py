@@ -23,9 +23,10 @@ from nl2sql.cli.commands.indexing import run_indexing
 from nl2sql.cli.commands.benchmark import (
     publish_benchmarks as exec_publish,
     run_benchmark as exec_benchmark,
+    run_retrieval_benchmark as exec_retrieval,
     run_tier2_benchmark as exec_tier2_benchmark,
 )
-from nl2sql.evaluation.records import HISTORY_PATH, README_PATH, RESULTS_DIR
+from nl2sql.evaluation.records import HISTORY_PATH, README_PATH, RESULTS_DIR, RETRIEVAL_DIR
 from nl2sql.evaluation.tier2 import DEFAULT_MAX_ACCURACY_DROP, DEFAULT_MAX_COST_INCREASE
 from nl2sql.cli.commands.run import run_pipeline 
 from nl2sql.cli.commands.info import list_available_adapters
@@ -242,14 +243,52 @@ def benchmark_publish(
     results_dir: Annotated[pathlib.Path, typer.Option("--results-dir", help="Where the tier 2 result records are")] = RESULTS_DIR,
     history_path: Annotated[pathlib.Path, typer.Option("--history-path", help="The history page to write")] = HISTORY_PATH,
     readme_path: Annotated[pathlib.Path, typer.Option("--readme-path", help="The README whose BENCHMARKS block is replaced")] = README_PATH,
+    retrieval_dir: Annotated[pathlib.Path, typer.Option("--retrieval-dir", help="Where the retrieval recall records are")] = RETRIEVAL_DIR,
 ):
     """
-    Rebuild docs/benchmarks.md and the README results block from the tier 2 records.
+    Rebuild docs/benchmarks.md and the README results block from the recorded runs.
 
-    Reads every record in benchmarks/results/; no key, no network, and the
-    same records always give byte-identical output.
+    Reads every tier 2 record in benchmarks/results/ and retrieval recall
+    record in benchmarks/retrieval/; no key, no network, and the same records
+    always give byte-identical output.
     """
-    exec_publish(results_dir, history_path, readme_path)
+    exec_publish(results_dir, history_path, readme_path, retrieval_dir)
+
+
+@benchmark_app.command("retrieval")
+def benchmark_retrieval(
+    questions: Annotated[Optional[List[str]], typer.Option(
+        "--questions", help="Only these question ids or tags (repeatable, or comma-separated).",
+    )] = None,
+    record: Annotated[bool, typer.Option(
+        "--record", help="Also write a result record to --results-dir (commit it, then `benchmark publish`).",
+    )] = False,
+    results_dir: Annotated[pathlib.Path, typer.Option(
+        "--results-dir", help="Where --record writes the retrieval recall record.",
+    )] = RETRIEVAL_DIR,
+    baseline: Annotated[Optional[pathlib.Path], typer.Option(
+        "--baseline", help="An earlier report or record to compare with: prints the change in each mean and every question that moved.",
+    )] = None,
+    export_path: Annotated[Optional[pathlib.Path], typer.Option(help="Where to write the JSON report (benchmark_retrieval.json)")] = None,
+    dataset: Annotated[pathlib.Path, typer.Option(help="Path to the gold dataset YAML")] = GOLD_DATASET_PATH,
+    ds_config_path: DatasourceConfigOption = None,
+    secrets_config_path: SecretsConfigOption = None,
+    llm_config_path: LLMConfigOption = None,
+    vector_store_path: VectorStoreOption = None,
+    policies_config_path: PoliciesConfigOption = None,
+):
+    """
+    Table and column recall of schema retrieval on the gold questions; no key, no LLM, no cost.
+
+    Forces the vector search (the full-snapshot limit is set to 0), runs the
+    schema retriever on each answerable question and scores what it sends
+    the planner against the question's needed_tables and needed_columns.
+    Report-only: exits 0 whatever the recall.
+    """
+    exec_retrieval(BenchmarkConfig(dataset_path=dataset, config_path=ds_config_path, llm_config_path=llm_config_path,
+                                   export_path=export_path, vector_store_path=vector_store_path,
+                                   secrets_path=secrets_config_path, policies_path=policies_config_path),
+                   questions=questions, record=record, results_dir=results_dir, baseline=baseline)
 
 
 @benchmark_app.callback(invoke_without_command=True)

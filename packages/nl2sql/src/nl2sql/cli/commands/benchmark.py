@@ -10,7 +10,15 @@ from nl2sql import BenchmarkAPI, BenchmarkConfig
 from nl2sql.cli.common.decorators import handle_cli_errors
 from nl2sql.cli.reporting import ConsolePresenter
 from nl2sql.evaluation.benchmark_runner import BenchmarkResult
-from nl2sql.evaluation.records import RESULTS_DIR, current_git_commit, publish, write_records
+from nl2sql.evaluation.records import (
+    RESULTS_DIR,
+    RETRIEVAL_DIR,
+    current_git_commit,
+    publish,
+    write_records,
+    write_retrieval_record,
+)
+from nl2sql.evaluation.retrieval_recall import compare_reports
 from nl2sql.evaluation.tier2 import (
     DEFAULT_MAX_ACCURACY_DROP,
     DEFAULT_MAX_COST_INCREASE,
@@ -20,6 +28,7 @@ from nl2sql.evaluation.tier2 import (
 
 DEFAULT_REPORT_PATH = pathlib.Path("benchmark_report.json")
 DEFAULT_TIER2_REPORT_PATH = pathlib.Path("benchmark_tier2.json")
+DEFAULT_RETRIEVAL_REPORT_PATH = pathlib.Path("benchmark_retrieval.json")
 
 # Tier 2 exit codes beyond 0 (complete) and 1 (baseline regression or a failed run).
 EXIT_USAGE = 2
@@ -157,9 +166,60 @@ def run_tier2_benchmark(
 
 
 @handle_cli_errors
-def publish_benchmarks(results_dir: pathlib.Path, history_path: pathlib.Path, readme_path: pathlib.Path) -> None:
+def run_retrieval_benchmark(
+    config: BenchmarkConfig,
+    *,
+    questions: Optional[List[str]] = None,
+    record: bool = False,
+    results_dir: pathlib.Path = RETRIEVAL_DIR,
+    baseline: Optional[pathlib.Path] = None,
+) -> None:
+    """Reports table and column recall of schema retrieval on the gold set; no key, no LLM, no cost.
+
+    Report-only: exits 0 whatever the recall, 1 only if the run failed.
+    """
+    presenter = ConsolePresenter()
+    questions = [q.strip() for item in (questions or []) for q in item.split(",") if q.strip()]
+    try:
+        report = BenchmarkAPI().run_retrieval(config, questions or None)
+    except Exception as e:
+        presenter.print_error(f"Retrieval benchmark failed: {e}")
+        sys.exit(1)
+
+    def pct(v):
+        return "-" if v is None else f"{v:.1%}"
+
+    results = sorted(report["results"], key=lambda r: r["id"])
+    presenter.print_table(
+        [[r["id"], pct(r["table_recall"]), pct(r["column_recall"]), r["tables_sent"], r["columns_sent"],
+          ", ".join(r["missed_columns"]) or "-"] for r in results],
+        title="Schema retrieval recall", columns=["ID", "Tables", "Columns", "Tables sent", "Columns sent", "Missed"])
+    s, st = report["summary"], report["settings"]
+    presenter.console.print(
+        f"{s['questions']} questions, k {st['table_k']} tables / {st['planning_k']} planning, {escape(st['embedding'])}: "
+        f"table recall {pct(s['table_recall'])} ({s['perfect_tables']} complete), "
+        f"column recall {pct(s['column_recall'])} ({s['perfect_columns']} complete), "
+        f"{s['tables_sent']:.1f} tables / {s['columns_sent']:.1f} columns sent on average")
+    if baseline is not None:
+        old = json.loads(pathlib.Path(baseline).read_text(encoding="utf-8"))
+        diff = compare_reports(report, old.get("report", old))  # a report, or a record holding one
+        presenter.console.print("Against baseline: " + ", ".join(f"{k} {v:+g}" for k, v in diff["summary"].items()))
+        if diff["moved"]:
+            presenter.print_table([[m["id"], f"{pct(m['table_recall'][0])} -> {pct(m['table_recall'][1])}",
+                                    f"{pct(m['column_recall'][0])} -> {pct(m['column_recall'][1])}"]
+                                   for m in diff["moved"]],
+                                  title="Questions whose recall changed", columns=["ID", "Tables", "Columns"])
+    presenter.export_benchmark_report(report, config.export_path or DEFAULT_RETRIEVAL_REPORT_PATH)
+    if record:
+        path = write_retrieval_record(report, results_dir, git_commit=current_git_commit())
+        presenter.print_info(f"Result record: {escape(str(path))}")
+
+
+@handle_cli_errors
+def publish_benchmarks(results_dir: pathlib.Path, history_path: pathlib.Path, readme_path: pathlib.Path,
+                       retrieval_dir: pathlib.Path = RETRIEVAL_DIR) -> None:
     """Rewrites the history page and the README's BENCHMARKS block from the result records."""
-    count = publish(results_dir, history_path, readme_path)
+    count = publish(results_dir, history_path, readme_path, retrieval_dir)
     ConsolePresenter().print_success(
-        f"Published {count} record(s) from {escape(str(results_dir))} to {escape(str(history_path))} "
-        f"and {escape(str(readme_path))}.")
+        f"Published {count} record(s) from {escape(str(results_dir))} and {escape(str(retrieval_dir))} "
+        f"to {escape(str(history_path))} and {escape(str(readme_path))}.")

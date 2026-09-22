@@ -16,6 +16,7 @@ from nl2sql.configs.llm import LLMFileConfig
 from nl2sql.context import NL2SQLContext
 from nl2sql.evaluation.benchmark_runner import BenchmarkRunner, BenchmarkResult
 from nl2sql.evaluation.gold import load_gold_dataset
+from nl2sql.evaluation.retrieval_recall import run_retrieval_recall
 from nl2sql.evaluation.tier1 import run_tier1
 from nl2sql.evaluation.tier2 import run_tier2, select_question_ids
 from nl2sql.evaluation.types import BenchmarkConfig
@@ -84,6 +85,15 @@ class BenchmarkAPI:
         replaced by the gold-plan fake for the rest of this API's life.
         """
         return run_tier1(self._context(config), config)
+
+    def run_retrieval(self, config: BenchmarkConfig, questions: Optional[List[str]] = None) -> Dict[str, Any]:
+        """Table and column recall of schema retrieval on the gold questions: no key, no LLM, no cost.
+
+        See :mod:`nl2sql.evaluation.retrieval_recall`. ``questions`` narrows
+        the run to these question ids or tags. Returns the report.
+        """
+        ids = select_question_ids(load_gold_dataset(config.dataset_path), questions) if questions else None
+        return run_retrieval_recall(self._context(config), config.dataset_path, ids)
 
     def tier2_configs(
         self, config: BenchmarkConfig, llm_config_paths: Optional[Dict[str, pathlib.Path]] = None,
