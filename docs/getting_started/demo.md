@@ -253,8 +253,12 @@ answers with `nl2sql --env demo trace replay <file>`. See
 [Debugging a Run](../observability/debugging.md).
 
 `--env <name>` loads `.env.<name>`. To point at an exact file instead, use
-`--env-file <path>`, which takes precedence over `--env`. The equivalent
-environment variables (`ENV` and `ENV_FILE_PATH`) still work.
+`--env-file <path>`, which takes precedence over `--env`. Either flag also
+loads the file's variables into the process environment, so `doctor` and `run`
+find a key kept only in `.env.demo`; a variable already exported in your shell
+wins over the file. The equivalent environment variables (`ENV` and
+`ENV_FILE_PATH`) still work, but setting them yourself only feeds the settings
+object; use the flags when the file holds your key.
 
 Note: the demo datasource config uses a relative database path
 (`data/chinook.sqlite`), so run the CLI from the directory you ran

@@ -81,7 +81,7 @@ Example response:
     {
       "id": "sq-1",
       "intent": "top customers by revenue",
-      "sql": "SELECT customer, SUM(revenue) FROM sales GROUP BY customer ORDER BY 2 DESC LIMIT 5",
+      "sql": "SELECT s.customer, SUM(s.revenue) AS revenue FROM sales AS s GROUP BY s.customer ORDER BY SUM(s.revenue) DESC, s.customer LIMIT 5",
       "datasource_id": "warehouse",
       "schema_version": "v3",
       "plan": {"tables": [{"name": "sales", "alias": "s", "ordinal": 0}]},
