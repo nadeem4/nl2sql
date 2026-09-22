@@ -71,12 +71,7 @@ def resolve_subgraph(
     datasource without that capability resolves to None so the caller fails
     instead of routing it into SQL generation.
     """
-    try:
-        caps = ctx.ds_registry.get_capabilities(datasource_id)
-    except Exception:
-        return None
-
-    if SQL_AGENT_REQUIRED_CAPABILITIES.issubset(caps):
+    if ctx.ds_registry.supports(datasource_id, *SQL_AGENT_REQUIRED_CAPABILITIES):
         return SQL_AGENT_SUBGRAPH
     return None
 

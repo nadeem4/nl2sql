@@ -17,12 +17,11 @@ from unittest.mock import MagicMock
 
 
 def _ctx_with_capabilities(capabilities_by_id):
-    def get_capabilities(ds_id):
-        if ds_id not in capabilities_by_id:
-            raise ValueError(f"Unknown datasource ID: {ds_id}")
-        return set(capabilities_by_id[ds_id])
+    # Mirrors DatasourceRegistry.supports: an unknown datasource supports nothing.
+    def supports(ds_id, *capabilities):
+        return ds_id in capabilities_by_id and set(capabilities) <= set(capabilities_by_id[ds_id])
 
-    return SimpleNamespace(ds_registry=SimpleNamespace(get_capabilities=get_capabilities))
+    return SimpleNamespace(ds_registry=SimpleNamespace(supports=supports))
 
 
 def test_resolve_subgraph_selects_sql_agent_for_sql_capable_datasource():

@@ -15,7 +15,7 @@ Use `ExecutorRequest`/`ExecutorResponse` as the contract.
 ## 2. Wire the executor
 
 Construct the executor in `ExecutorNode.__init__` and select it in `__call__`
-based on the adapter's capabilities. `ExecutorNode._supports_sql()` shows the
+based on the datasource's capabilities, asked through `DatasourceRegistry.supports()`. `ExecutorNode._supports_sql()` shows the
 existing check: a datasource whose adapter does not declare the required
 capability must get no executor rather than being run anyway.
 
