@@ -160,6 +160,46 @@ class SchemaRetrieverNode:
 
         return tables_out
 
+    @staticmethod
+    def _withhold_unreadable(
+        searches: List[Dict[str, Any]],
+        snapshot: Optional[SchemaSnapshot],
+        readable: Callable[[TableRef], bool],
+    ) -> None:
+        """Structure yes, data no, in the trace too.
+
+        A column entry's embedded text carries the column's statistics and
+        sample values, so its similarity to the question says something about
+        that data. For a table the role cannot read, the entry keeps its name,
+        rank and whether it was picked, and loses its scores.
+        """
+        tables = snapshot.contract.tables if snapshot else {}
+        for search in searches:
+            for entry in search.get("pool", []):
+                if entry.get("type") != "schema.column":
+                    continue
+                contract = tables.get(entry.get("table"))
+                if contract is not None and readable(contract.table):
+                    continue
+                entry.update(similarity=None, distance=None, mmr_score=None, redundancy=None,
+                             withheld="The role cannot read this table's data.")
+
+    @staticmethod
+    def _retrieval(query: str, searches: List[Dict[str, Any]], tables_out: List[Table],
+                   reason: Optional[str] = None) -> Dict[str, Any]:
+        """What the vector searches retrieved and what survived, for the run trace.
+
+        Not a state field: LangGraph drops the key, the trace keeps the node's
+        whole return.
+        """
+        record: Dict[str, Any] = {"skipped": reason is not None}
+        if reason is not None:
+            record["reason"] = reason
+        else:
+            record.update(query=query, searches=searches)
+        record["tables"] = [{"table": t.name, "columns": [c.name for c in t.columns]} for t in tables_out]
+        return record
+
     def __call__(self, state: SubgraphExecutionState) -> Dict[str, Any]:
         try:
             sub_query = state.sub_query
@@ -179,6 +219,13 @@ class SchemaRetrieverNode:
                 )
                 return {
                     "relevant_tables": tables_out,
+                    "retrieval": self._retrieval(
+                        query, [], tables_out,
+                        reason=(
+                            f"The schema has {len(snapshot.contract.tables)} tables (limit {limit}), "
+                            "so the full schema is sent without retrieval."
+                        ),
+                    ),
                     "reasoning": [
                         {
                             "node": self.node_name,
@@ -191,12 +238,13 @@ class SchemaRetrieverNode:
                 }
 
             tables: Dict[str, Set[str]] = defaultdict(set)
+            searches: List[Dict[str, Any]] = []
             schema_docs = []
             column_docs = []
 
             if self.vector_store:
                 schema_docs = self.vector_store.retrieve_schema_context(
-                    query, datasource_id, k=8
+                    query, datasource_id, k=8, explain=searches
                 )
                 if schema_docs:
                     for doc in schema_docs:
@@ -205,7 +253,7 @@ class SchemaRetrieverNode:
                             tables[table].update([])
                 else:
                     column_docs = self.vector_store.retrieve_column_candidates(
-                        query, datasource_id, k=8
+                        query, datasource_id, k=8, explain=searches
                     )
                     for doc in column_docs:
                         table = doc.metadata.get("table")
@@ -219,7 +267,7 @@ class SchemaRetrieverNode:
             planning_docs = []
             if self.vector_store and tables:
                 planning_docs = self.vector_store.retrieve_planning_context(
-                    query, datasource_id, list(tables.keys()), k=12
+                    query, datasource_id, list(tables.keys()), k=12, explain=searches
                 )
 
             for doc in planning_docs:
@@ -238,6 +286,8 @@ class SchemaRetrieverNode:
                     if to_table:
                         tables[to_table].update(doc.metadata.get("to_columns"))
 
+            self._withhold_unreadable(searches, snapshot, readable)
+
             if not tables:
                 relevant_tables = self._build_tables_from_snapshot(
                     snapshot,
@@ -247,6 +297,10 @@ class SchemaRetrieverNode:
                 )
                 return {
                     "relevant_tables": relevant_tables,
+                    "retrieval": self._retrieval(
+                        query, searches, relevant_tables,
+                        reason=None if self.vector_store else "No vector store is configured.",
+                    ),
                     "reasoning": [
                         {
                             "node": self.node_name,
@@ -273,6 +327,7 @@ class SchemaRetrieverNode:
 
             return {
                 "relevant_tables": relevant_tables,
+                "retrieval": self._retrieval(query, searches, relevant_tables),
                 "reasoning": [
                     {
                         "node": self.node_name,

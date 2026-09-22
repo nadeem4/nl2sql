@@ -15,6 +15,7 @@ from nl2sql.indexing.embeddings import (
 from nl2sql.common.exceptions import NL2SQLError
 from nl2sql.common.logger import get_logger
 from .models import BaseChunk
+from .retrieval_trace import mmr_search
 
 logger = get_logger(__name__)
 
@@ -469,10 +470,51 @@ class VectorStore:
             for chunk in chunks
         ]
 
+    # --- retrieval -------------------------------------------------------------
+    #
+    # Every search is MMR (see ``nl2sql.indexing.retrieval_trace``): fetch the
+    # ``k * FETCH_MULTIPLIER`` nearest entries, then pick ``k`` trading relevance
+    # (LAMBDA_MULT) against difference from what is already picked. Each
+    # ``retrieve_*`` method takes an optional ``explain`` list; when given, the
+    # search's record (the query, the pool with scores, the picks in order and
+    # what was dropped) is appended to it for the run trace.
+
+    FETCH_MULTIPLIER = 4
+    LAMBDA_MULT = 0.7
+
+    def _mmr(
+        self,
+        search: str,
+        query: str,
+        where: Optional[Dict[str, Any]],
+        k: int,
+        explain: Optional[List[Dict[str, Any]]],
+        scope: Dict[str, Any],
+    ) -> List[Document]:
+        from nl2sql.common.resilience import VECTOR_BREAKER
+
+        @VECTOR_BREAKER
+        def _execute():
+            return mmr_search(
+                self.vectorstore._collection,
+                self.embeddings,
+                query,
+                k=k,
+                fetch_k=k * self.FETCH_MULTIPLIER,
+                lambda_mult=self.LAMBDA_MULT,
+                where=where,
+            )
+
+        docs, record = _execute()
+        if explain is not None:
+            explain.append({"search": search, "filter": scope, **record})
+        return self._public(docs)
+
     def retrieve_datasource_candidates(
         self,
         query: str,
         k: int = 3,
+        explain: Optional[List[Dict[str, Any]]] = None,
     ) -> List[Document]:
         """
         Retrieves candidate datasources for a user query.
@@ -480,32 +522,21 @@ class VectorStore:
         Args:
             query: User query.
             k: Number of datasource candidates to retrieve.
+            explain: When given, the search's record is appended to it.
 
         Returns:
             Retrieved datasource documents.
         """
         self.initialize_if_not_exists()
-        from nl2sql.common.resilience import VECTOR_BREAKER
-
         where = self._and({"type": "schema.datasource"}, self._active_filter())
-
-        @VECTOR_BREAKER
-        def _execute():
-            return self.vectorstore.max_marginal_relevance_search(
-                query,
-                k=k,
-                fetch_k=k * 4,
-                lambda_mult=0.7,
-                filter=where,
-            )
-
-        return self._public(_execute())
+        return self._mmr("datasources", query, where, k, explain, {"types": ["schema.datasource"]})
 
     def retrieve_schema_context(
         self,
         query: str,
         datasource_id: str,
         k: int = 8,
+        explain: Optional[List[Dict[str, Any]]] = None,
     ) -> List[Document]:
         """
         Retrieves schema-level context for a datasource.
@@ -514,37 +545,26 @@ class VectorStore:
             query: User query.
             datasource_id: Selected datasource identifier.
             k: Number of schema documents to retrieve.
+            explain: When given, the search's record is appended to it.
 
         Returns:
             Retrieved schema documents.
         """
         self.initialize_if_not_exists()
-        from nl2sql.common.resilience import VECTOR_BREAKER
-
-
+        types = ["schema.table", "schema.metric"]
         where = self._and(
             {"datasource_id": datasource_id},
-            {"type": {"$in": ["schema.table", "schema.metric"]}},
+            {"type": {"$in": types}},
             self._active_filter(datasource_id),
         )
-
-        @VECTOR_BREAKER
-        def _execute():
-            return self.vectorstore.max_marginal_relevance_search(
-                query,
-                k=k,
-                fetch_k=k * 4,
-                lambda_mult=0.7,
-                filter=where,
-            )
-
-        return self._public(_execute())
+        return self._mmr("tables", query, where, k, explain, {"datasource_id": datasource_id, "types": types})
 
     def retrieve_column_candidates(
         self,
         query: str,
         datasource_id: str,
         k: int = 8,
+        explain: Optional[List[Dict[str, Any]]] = None,
     ) -> List[Document]:
         """
         Retrieves candidate column documents for a datasource.
@@ -553,31 +573,19 @@ class VectorStore:
             query: User query.
             datasource_id: Selected datasource identifier.
             k: Number of column documents to retrieve.
+            explain: When given, the search's record is appended to it.
 
         Returns:
             Retrieved column documents.
         """
-        from nl2sql.common.resilience import VECTOR_BREAKER
-
         self.initialize_if_not_exists()
-
         where = self._and(
             {"datasource_id": datasource_id},
             {"type": "schema.column"},
             self._active_filter(datasource_id),
         )
-
-        @VECTOR_BREAKER
-        def _execute():
-            return self.vectorstore.max_marginal_relevance_search(
-                query,
-                k=k,
-                fetch_k=k * 4,
-                lambda_mult=0.7,
-                filter=where,
-            )
-
-        return self._public(_execute())
+        return self._mmr("columns", query, where, k, explain,
+                         {"datasource_id": datasource_id, "types": ["schema.column"]})
 
     def retrieve_planning_context(
         self,
@@ -585,6 +593,7 @@ class VectorStore:
         datasource_id: str,
         tables: List[str],
         k: int = 12,
+        explain: Optional[List[Dict[str, Any]]] = None,
     ) -> List[Document]:
         """
         Retrieves planning-level context for selected tables.
@@ -594,29 +603,57 @@ class VectorStore:
             datasource_id: Selected datasource identifier.
             tables: Fully qualified table names.
             k: Number of planning documents to retrieve.
+            explain: When given, the search's record is appended to it.
 
         Returns:
             Retrieved planning documents.
         """
-        from nl2sql.common.resilience import VECTOR_BREAKER
-
         self.initialize_if_not_exists()
-    
+        types = ["schema.column", "schema.relationship"]
         where = self._and(
             {"datasource_id": datasource_id},
-            {"type": {"$in": ["schema.column", "schema.relationship"]}},
+            {"type": {"$in": types}},
             {"table": {"$in": tables}},
             self._active_filter(datasource_id),
         )
+        return self._mmr("planning", query, where, k, explain,
+                         {"datasource_id": datasource_id, "types": types, "tables": list(tables)})
 
-        @VECTOR_BREAKER
-        def _execute():
-            return self.vectorstore.max_marginal_relevance_search(
-                query,
-                k=k,
-                fetch_k=k * 4,
-                lambda_mult=0.7,
-                filter=where,
-            )
+    def inspect(
+        self,
+        query: str,
+        k: int = 8,
+        lambda_mult: float = LAMBDA_MULT,
+        types: Optional[List[str]] = None,
+        datasource_id: Optional[str] = None,
+        fetch_k: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """One MMR search over any entry types, for the playground's inspector.
 
-        return self._public(_execute())
+        The same search the engine runs, with the knobs exposed and each
+        entry's embedded text included. It reads the active builds only.
+
+        Args:
+            query: Text to embed.
+            k: How many entries MMR picks.
+            lambda_mult: Weight on relevance, 0 to 1.
+            types: Entry types to include (``schema.table`` ...); all when empty.
+            datasource_id: Only this datasource's entries, when given.
+            fetch_k: Pool size; ``k * FETCH_MULTIPLIER`` when not given.
+
+        Returns:
+            The search record (see ``retrieval_trace.mmr_search``).
+        """
+        self.initialize_if_not_exists()
+        fetch_k = fetch_k or k * self.FETCH_MULTIPLIER
+        clauses = [
+            {"type": {"$in": list(types)}} if types else None,
+            {"datasource_id": datasource_id} if datasource_id else None,
+            self._active_filter(datasource_id),
+        ]
+        where = self._and(*clauses) if any(clauses) else None
+        _, record = mmr_search(
+            self.vectorstore._collection, self.embeddings, query,
+            k=k, fetch_k=fetch_k, lambda_mult=lambda_mult, where=where, with_text=True,
+        )
+        return {"filter": {"datasource_id": datasource_id, "types": list(types or [])}, **record}

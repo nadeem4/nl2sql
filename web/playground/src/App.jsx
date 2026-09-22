@@ -4,6 +4,7 @@ import IndexPanel from "./IndexPanel.jsx";
 import { needsRebuild } from "./indexHealth.js";
 import Run from "./Panes.jsx";
 import Settings from "./Settings.jsx";
+import RetrievalInspector from "./Retrieval.jsx";
 import { deniedTables, planTables } from "./run.js";
 
 // The banner claims recorded answers only when the server loaded some.
@@ -57,6 +58,9 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [index, setIndex] = useState(null);
   const [indexError, setIndexError] = useState(null);
+  const [retrieval, setRetrieval] = useState(null);
+  const [retrievalError, setRetrievalError] = useState(null);
+  const [retrievalOpen, setRetrievalOpen] = useState(false);
   const runRef = useRef(null);
 
   useEffect(() => {
@@ -69,6 +73,7 @@ export default function App() {
     getJson("/api/schema").then(setSchema).catch((e) => setError(e.message));
     getJson("/api/settings").then(setSettings).catch((e) => setSettingsError(e.message));
     getJson("/api/index").then(setIndex).catch((e) => setIndexError(e.message));
+    getJson("/api/retrieval").then(setRetrieval).catch((e) => setRetrievalError(e.message));
   }, []);
 
   // While a rebuild runs, follow its steps; when it ends, re-read the schema,
@@ -165,6 +170,16 @@ export default function App() {
           </p>
         )}
         <button
+          id="retrieval-toggle"
+          className="settings-toggle"
+          aria-expanded={retrievalOpen}
+          aria-controls="retrieval-panel"
+          onClick={() => setRetrievalOpen(!retrievalOpen)}
+        >
+          Retrieval
+          {retrieval && !retrieval.available && <span className="settings-toggle-off">off</span>}
+        </button>
+        <button
           id="settings-toggle"
           className="settings-toggle"
           aria-expanded={settingsOpen}
@@ -193,6 +208,18 @@ export default function App() {
           <h2 id="settings-heading" className="visually-hidden">Settings</h2>
           <Settings settings={settings} error={settingsError} onSaved={settingsSaved}
             recorded={meta ? meta.recorded_questions : 0} />
+        </section>
+      )}
+
+      {retrievalOpen && (
+        <section id="retrieval-panel" className="settings" aria-labelledby="retrieval-heading">
+          <h2 id="retrieval-heading" className="retrieval-heading">Retrieval inspector</h2>
+          <p className="settings-help retrieval-intro">
+            Embeds any text with the local model and runs the engine's search against the live index: the nearest
+            entries with their similarity, then the ones MMR picks, trading similarity against overlap with earlier
+            picks. There is no re-ranking model. Nothing here calls the LLM.
+          </p>
+          <RetrievalInspector options={retrieval} error={retrievalError} question={question} />
         </section>
       )}
 

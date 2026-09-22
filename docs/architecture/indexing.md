@@ -151,6 +151,52 @@ Metadata is consumed by `SchemaRetrieverNode` to construct `Table` objects for p
 - Retrieval uses the `SubQuery.schema_version` when available; otherwise latest snapshot.
 - MMR ranking may introduce non-determinism in ordering for similar scores.
 
+## Retrieval: MMR, not a re-ranking model
+
+Every vector search in the engine is one maximal marginal relevance (MMR)
+search over the one Chroma collection, `nl2sql_store`, which holds every
+datasource (Chinook: 1 datasource, 11 table, 64 column and 11 relationship
+entries, 87 in all). There is **no re-ranking model**. What is sometimes called
+re-ranking is this:
+
+1. Embed the query text with the collection's embedder (the local
+   `all-MiniLM-L6-v2` costs nothing per query).
+2. Fetch the pool: the `fetch_k = 4 * k` entries nearest to it, filtered by
+   entry type, datasource and active build.
+3. Pick `k` of them one at a time. The first pick is the entry most similar to
+   the query (cosine similarity). Every later pick is the pool entry with the
+   highest
+   `0.7 * similarity(entry, query) - 0.3 * max similarity(entry, earlier picks)`,
+   so an entry that nearly repeats an earlier pick loses to a less similar one
+   that adds something. `lambda_mult = 0.7` is the weight on similarity.
+
+The documents come back in pool order (nearest first), not pick order, exactly
+as `Chroma.max_marginal_relevance_search` returns them.
+
+| Caller | Search | Entry types | k | Pool |
+| --- | --- | --- | --- | --- |
+| `DatasourceResolverNode` | `datasources` | datasource | 5 | 20 |
+| `SchemaRetrieverNode` | `tables` | table, metric | 8 | 32 |
+| `SchemaRetrieverNode`, when `tables` finds nothing | `columns` | column | 8 | 32 |
+| `SchemaRetrieverNode`, over the tables found | `planning` | column, relationship | 12 | 48 |
+
+The schema retriever runs none of these when the schema has
+`SCHEMA_RETRIEVAL_FULL_SNAPSHOT_MAX_TABLES` tables or fewer (15 by default, so
+Chinook's 11 are always sent whole); the resolver runs none when the request
+names a `datasource_id` or only one datasource is registered (the Chinook demo).
+
+`nl2sql.indexing.retrieval_trace.mmr_search` is the one implementation: it
+makes the Chroma query and calls the same `maximal_marginal_relevance`
+function Chroma's method does, and returns the documents with a record of the
+search (the query, the pool with similarity, Chroma distance and type, the
+picks in order with the score each won with, and what was dropped). The record
+comes from numbers MMR computes anyway, so it costs no second search. Nodes put
+it in their run trace (see [Debugging a run](../observability/debugging.md#retrieval)),
+and the playground's Retrieval inspector (`VectorStore.inspect`) runs the same
+search for any text, with k, lambda, entry types and datasource exposed. That
+inspector is the tool for chunking experiments: change the chunks, rebuild,
+search the same text, and diff the **Copy as text** output.
+
 ## Tenant isolation (current state)
 
 Tenant scoping is **not implemented** in indexing:
@@ -184,7 +230,8 @@ Current failure behaviors:
 
 - Embedding uses `EmbeddingService`: OpenAI embeddings by default, or the local
   ONNX `all-MiniLM-L6-v2` model when `EMBEDDING_PROVIDER=local`.
-- Vector search uses Chroma MMR (`lambda_mult=0.7`, `fetch_k = 4*k`).
+- Vector search is MMR (`lambda_mult=0.7`, `fetch_k = 4*k`); see
+  [Retrieval](#retrieval-mmr-not-a-re-ranking-model).
 - No caching or sharding layers are implemented.
 - Index refresh re-embeds every entry of the datasource being re-indexed; other
   datasources are untouched.

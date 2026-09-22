@@ -170,7 +170,8 @@ is also always available on demand.
   model, so it can take a few minutes.
 - **Write descriptions with the LLM** is off by default because it spends
   tokens on your key; it is unavailable in replay mode.
-- It has the settings panel's guardrails: local only unless `--allow-settings`,
+- It has the settings panel's guardrails (so does the
+  [Retrieval inspector](#the-retrieval-inspector)): local only unless `--allow-settings`,
   and only from the playground page itself.
 
 ### Old demo folders
@@ -245,6 +246,34 @@ second settings store, and the browser keeps nothing but UI conveniences.
   it on anyway, for a network you trust. Changes are also refused from another
   site's page (a foreign `Origin`), through a hostname that is not a loopback
   name, or in anything but JSON.
+
+### The Retrieval inspector
+
+The **Retrieval** button next to Settings opens a panel that embeds any text
+with the local model and runs the engine's own vector search against the live
+index: the pool of nearest entries with their similarity, the entries MMR picks
+in order, the score each won with, and what was dropped. There is no
+re-ranking model; the "re-ranking" is MMR, explained in
+[Indexing](../architecture/indexing.md#retrieval-mmr-not-a-re-ranking-model).
+
+- **Knobs.** Picks (`k`, the pool is `4 * k`), lambda (the engine uses 0.7; 1
+  is plain nearest-neighbour order, 0 favours entries unlike earlier picks),
+  which entry types to include, and a datasource filter. After the first
+  search, each change searches again. Each entry shows the text that was
+  embedded for it.
+- **Free.** The embedder is local; nothing here calls the LLM.
+- **For chunking experiments.** Change the chunking, press Rebuild, search the
+  same text, and diff the **Copy as text** output of the two runs: one
+  fixed-width line per entry (rank, pick or drop, similarity, MMR score, type,
+  name).
+- **Local only**, like Settings and Rebuild, because it shows every index entry,
+  column statistics and sample values included, with no role filter: on a
+  non-loopback `--host` it is off (`POST /api/retrieval` answers `403`) unless
+  `--allow-settings` is given, and it refuses another site's page, a
+  non-loopback hostname and anything but JSON.
+
+A run's own retrieval is under **Debug**: open the `datasource_resolver` or
+`schema_retriever` row in the per-node table.
 
 ## 3. Use the demo from the CLI
 
