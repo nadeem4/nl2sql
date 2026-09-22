@@ -88,6 +88,8 @@ UPSTREAMS = {
     "openai": "https://api.openai.com/v1",
     "openrouter": "https://openrouter.ai/api/v1",
 }
+# The providers a saved key can select.
+KEYED_PROVIDERS = (*UPSTREAMS, "anthropic")
 
 
 def live_provider(key: Optional[str], source: str) -> str:
@@ -151,13 +153,13 @@ def resolve_api_key(api_key: Optional[str], env_file: pathlib.Path) -> Tuple[Opt
 
 
 def _persist_api_key(path: pathlib.Path, key: str) -> None:
-    """Records the key in the demo project's ``.env.demo``.
+    """Records the key in the demo project's ``.env.demo``, one key per provider.
 
-    Both provider assignments are replaced by the single one this key needs.
-    Leaving the shipped empty ``OPENAI_API_KEY=`` placeholder below a real
-    value would blank it again when indexing loads the file with
-    ``override=True``, and leaving a stale key for the other provider would win
-    the precedence order on the next run.
+    Every assignment of this key's variable is replaced by the one new line;
+    other providers' keys stay, so a node on another provider keeps working.
+    Empty placeholders of other providers are dropped: an empty
+    ``OPENAI_API_KEY=`` left below a real value would blank it again when
+    indexing loads the file with ``override=True``.
     """
     variable = env_var_for_key(key)
     lines = path.read_text(encoding="utf-8").splitlines() if path.exists() else []
@@ -165,8 +167,9 @@ def _persist_api_key(path: pathlib.Path, key: str) -> None:
     kept: List[str] = []
     written = False
     for line in lines:
-        if line.split("=", 1)[0].strip() in PROVIDER_KEYS:
-            if not written:
+        name, _, value = line.partition("=")
+        if name.strip() in PROVIDER_KEYS and (name.strip() == variable or not value.strip()):
+            if name.strip() == variable and not written:
                 kept.append(f"{variable}={key}")
                 written = True
             continue
@@ -217,15 +220,10 @@ def prepare_project(directory: pathlib.Path) -> pathlib.Path:
     return directory
 
 
-def _point_llm_config_at(directory: pathlib.Path, base_url: Optional[str], provider: str = "openai") -> None:
-    """Points the default agent, and every per-node agent, at one endpoint.
+def _point_agent_at(agent: dict, provider: str, base_url: Optional[str]) -> None:
+    """Points one agent entry at ``provider``: its key reference, model and endpoint.
 
-    A per-node entry (written by the playground's settings panel) differs from
-    the default only in its model, so it follows the default's provider and
-    endpoint: in replay mode a node left on the real provider would be sent the
-    ``replay`` placeholder as its key.
-
-    The key reference follows the provider too. The scaffolded config reads
+    The key reference follows the provider. The scaffolded config reads
     ``${env:OPENAI_API_KEY}``, and a reference names the one variable the
     registry looks in, so an OpenRouter demo kept failing with "no API key"
     while ``OPENROUTER_API_KEY`` was set.
@@ -234,23 +232,64 @@ def _point_llm_config_at(directory: pathlib.Path, base_url: Optional[str], provi
     means nothing to Anthropic, nor a ``claude-`` one to OpenAI. The model is
     replaced by the provider's default, with the temperature that model takes.
     """
+    agent["provider"] = provider
+    if provider in ("openai", "anthropic") and (
+        (provider == "anthropic") != str(agent.get("model", "")).startswith("claude-")
+    ):
+        agent["model"] = default_model_for(provider)
+        agent["temperature"] = default_temperature_for(provider)
+    if provider in ("openai", "openrouter", "anthropic"):
+        agent["api_key"] = "${env:" + env_var_for_provider(provider) + "}"
+    if base_url:
+        agent["base_url"] = base_url
+    else:
+        agent.pop("base_url", None)
+
+
+def _point_llm_config_at(directory: pathlib.Path, base_url: Optional[str], provider: str = "openai") -> None:
+    """Points the default agent at ``provider``, and the per-node agents that follow it.
+
+    With a ``base_url`` (replay and record, where one fake or proxy serves
+    everything) every per-node agent follows too: in replay mode a node left on
+    a real provider would be sent the ``replay`` placeholder as its key.
+
+    Live (no ``base_url``), the provider a per-node agent was given stays: a
+    step put on Claude stays on Claude when the default moves to OpenAI. Only
+    an agent with no provider, or one on the replay or record endpoint the
+    default was on, follows the default.
+    """
     path = directory / "configs" / "llm.demo.yaml"
     cfg = yaml.safe_load(path.read_text(encoding="utf-8"))
-    key_variable = env_var_for_provider(provider) if provider in ("openai", "openrouter", "anthropic") else None
-    for agent in [cfg["default"], *(cfg.get("agents") or {}).values()]:
-        agent["provider"] = provider
-        if provider in ("openai", "anthropic") and (
-            (provider == "anthropic") != str(agent.get("model", "")).startswith("claude-")
-        ):
-            agent["model"] = default_model_for(provider)
-            agent["temperature"] = default_temperature_for(provider)
-        if key_variable:
-            agent["api_key"] = "${env:" + key_variable + "}"
-        if base_url:
-            agent["base_url"] = base_url
-        else:
-            agent.pop("base_url", None)
+    shared_endpoint = cfg["default"].get("base_url")
+    _point_agent_at(cfg["default"], provider, base_url)
+    for agent in (cfg.get("agents") or {}).values():
+        follows = (bool(base_url) or not agent.get("provider")
+                   or (shared_endpoint is not None and agent.get("base_url") == shared_endpoint))
+        _point_agent_at(agent, provider if follows else agent["provider"], base_url)
     path.write_text(yaml.safe_dump(cfg, sort_keys=False), encoding="utf-8")
+
+
+def _load_saved_keys(path: pathlib.Path) -> None:
+    """Puts every provider key saved in ``.env.demo`` into the environment.
+
+    A node the settings panel put on another provider reads that provider's
+    key. A key already exported wins, and the shipped empty placeholders are
+    skipped, so nothing is blanked.
+    """
+    if not path.exists():
+        return
+    from dotenv import dotenv_values
+
+    for name, value in dotenv_values(path).items():
+        if name in PROVIDER_KEYS and (value or "").strip() and not os.environ.get(name):
+            os.environ[name] = value.strip()
+
+
+def _default_provider(directory: pathlib.Path) -> Optional[str]:
+    path = directory / "configs" / "llm.demo.yaml"
+    if not path.exists():
+        return None
+    return (yaml.safe_load(path.read_text(encoding="utf-8")) or {}).get("default", {}).get("provider")
 
 
 def replay_recordings(directory: pathlib.Path) -> Optional[pathlib.Path]:
@@ -396,7 +435,13 @@ def demo_command(
         os.environ["OPENAI_API_KEY"] = "replay"
         console.print(replay_message(recorded_questions, len(CHINOOK_QUESTIONS), recordings))
     else:
+        _load_saved_keys(env_file)
         provider = live_provider(resolved_key, key_source)
+        configured = _default_provider(directory)
+        if key_source == "env-file" and configured in KEYED_PROVIDERS and os.environ.get(
+                env_var_for_provider(configured)):
+            # Several keys saved: the default stays on the provider it was set to.
+            provider = configured
         _point_llm_config_at(directory, None, provider=provider)
         console.print(f"[bold]Live mode:[/bold] using {provider}.")
 

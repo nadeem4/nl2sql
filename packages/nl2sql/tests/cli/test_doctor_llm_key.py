@@ -55,6 +55,7 @@ def test_doctor_reports_a_key_present_without_printing_it(tmp_path, monkeypatch)
     monkeypatch.setenv("COLUMNS", "200")
     monkeypatch.setenv("OPENAI_API_KEY", fake_key)
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     DemoManager(Console(quiet=True), tmp_path).setup_chinook(api_key=fake_key)
 
     result = runner.invoke(app, ["--env", "demo", "doctor"])

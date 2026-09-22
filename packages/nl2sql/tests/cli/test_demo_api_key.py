@@ -25,9 +25,12 @@ FAKE_ANTHROPIC_KEY = "-".join(["sk", "ant", "api03", "test", "not", "a", "real",
 @pytest.fixture(autouse=True)
 def _isolated(monkeypatch):
     """`demo_command` chdirs and writes ENV; put both back afterwards."""
-    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
-    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
-    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    # The command writes provider keys into os.environ. delenv on an absent
+    # variable records nothing to restore, so set each first: whatever the
+    # command writes is then removed afterwards instead of leaking.
+    for name in ("OPENAI_API_KEY", "OPENROUTER_API_KEY", "ANTHROPIC_API_KEY"):
+        monkeypatch.setenv(name, "")
+        monkeypatch.delenv(name)
     # monkeypatch records ENV here, so the command's own os.environ write is
     # rolled back at teardown.
     monkeypatch.delenv("ENV", raising=False)
@@ -214,6 +217,30 @@ def test_an_anthropic_key_in_the_environment_selects_claude(tmp_path, monkeypatc
 
     assert result.exit_code == 0, result.output
     assert "using anthropic" in _plain(result.output).lower(), result.output
+
+
+def test_a_restart_keeps_every_saved_key_and_each_steps_provider(tmp_path):
+    directory = tmp_path / "d"
+    assert _run("--dir", str(directory), "--api-key", FAKE_KEY).exit_code == 0
+    # What the settings panel leaves after an Anthropic key and a Claude planner.
+    with open(directory / ".env.demo", "a", encoding="utf-8") as env_demo:
+        env_demo.write(f"ANTHROPIC_API_KEY={FAKE_ANTHROPIC_KEY}\n")
+    path = directory / "configs" / "llm.demo.yaml"
+    cfg = yaml.safe_load(path.read_text())
+    cfg["agents"] = {"astplanner": {"provider": "anthropic", "model": "claude-opus-5", "temperature": None,
+                                    "api_key": "${env:ANTHROPIC_API_KEY}", "name": "astplanner"}}
+    path.write_text(yaml.safe_dump(cfg))
+    os.environ.pop("OPENAI_API_KEY", None)
+
+    result = _run("--dir", str(directory))
+
+    assert result.exit_code == 0, result.output
+    assert "using openai" in _plain(result.output).lower()
+    assert os.environ["ANTHROPIC_API_KEY"] == FAKE_ANTHROPIC_KEY
+    cfg = yaml.safe_load(path.read_text())
+    assert cfg["default"]["provider"] == "openai"
+    assert cfg["agents"]["astplanner"]["provider"] == "anthropic"
+    assert cfg["agents"]["astplanner"]["api_key"] == "${env:ANTHROPIC_API_KEY}"
 
 
 def test_record_refuses_an_anthropic_key(tmp_path, monkeypatch):

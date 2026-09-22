@@ -31,6 +31,7 @@ from nl2sql.secrets import SecretManager
 # Built at run time so no scanner mistakes a test fixture for a leaked key.
 FAKE_KEY = "-".join(["sk", "proj", "settingspanel" + "x" * 24 + "4f2a"])
 FAKE_OPENROUTER_KEY = "-".join(["sk", "or", "v1", "settingspanel" + "y" * 24 + "9b1c"])
+FAKE_ANTHROPIC_KEY = "-".join(["sk", "ant", "api03", "settingspanel" + "z" * 24 + "7d3e"])
 REPLAY_URL = "http://127.0.0.1:9/v1"
 
 _ANSI = re.compile(r"\x1b\[[0-9;]*m")
@@ -44,7 +45,12 @@ def _plain(text: str) -> str:
 def _replay_environment(monkeypatch):
     """What `nl2sql demo` leaves in the environment in replay mode."""
     monkeypatch.setenv("OPENAI_API_KEY", "replay")
-    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    # Saving a key writes os.environ directly. delenv on an absent variable
+    # records nothing to restore, so set it first: the key a test saves is
+    # then removed afterwards instead of leaking into later tests.
+    for name in ("OPENROUTER_API_KEY", "ANTHROPIC_API_KEY"):
+        monkeypatch.setenv(name, "")
+        monkeypatch.delenv(name)
     monkeypatch.delenv("OPENAI_API_BASE", raising=False)
     monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
 
@@ -409,6 +415,114 @@ def test_models_cannot_be_chosen_for_a_provider_without_a_verified_list(project)
 
     assert read["models"] == [] and read["default_model"] == "llama3.1"
     assert response.status_code == 400
+
+
+# --- a provider per node ---------------------------------------------------------
+
+
+def _live_on_openai(project, monkeypatch, anthropic_key=True):
+    """A live demo on OpenAI, with an Anthropic key saved too (or not)."""
+    cfg = _llm_yaml(project)
+    cfg["default"].pop("base_url")
+    (project / "configs" / "llm.demo.yaml").write_text(yaml.safe_dump(cfg), encoding="utf-8")
+    monkeypatch.setenv("OPENAI_API_KEY", FAKE_KEY)
+    if anthropic_key:
+        monkeypatch.setenv("ANTHROPIC_API_KEY", FAKE_ANTHROPIC_KEY)
+    else:
+        monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    return _app(project, mode="live")
+
+
+def test_a_node_can_be_put_on_another_provider(project, monkeypatch):
+    pytest.importorskip("langchain_anthropic")
+    engine, client = _live_on_openai(project, monkeypatch)
+
+    response = client.post("/api/settings/models", json={
+        "models": {"astplanner": {"provider": "anthropic", "model": "claude-opus-5"}}})
+
+    assert response.status_code == 200, response.text
+    entry = _llm_yaml(project)["agents"]["astplanner"]
+    # The node's own provider, key reference and temperature; not the default's.
+    assert entry["provider"] == "anthropic" and entry["model"] == "claude-opus-5"
+    assert entry["api_key"] == "${env:ANTHROPIC_API_KEY}"
+    assert entry["temperature"] is None and "base_url" not in entry
+    assert _llm_yaml(project)["default"]["provider"] == "openai"
+    # Applied without a restart, through the anthropic wire.
+    assert engine.context.llm_registry.get_llm("astplanner")._llm_type == "anthropic-chat"
+    assert engine.context.llm_registry.get_llm("decomposer")._llm_type == "openai-chat"
+    node = {n["agent"]: n for n in response.json()["nodes"]}["astplanner"]
+    assert (node["provider"], node["model"], node["unavailable"]) == ("anthropic", "claude-opus-5", None)
+    _assert_no_key(response.text, FAKE_ANTHROPIC_KEY)
+
+
+def test_the_read_lists_every_provider_with_its_own_masked_key(project, monkeypatch):
+    _, client = _live_on_openai(project, monkeypatch)
+
+    providers = {p["id"]: p for p in client.get("/api/settings").json()["providers"]}
+
+    assert set(providers) == {"openai", "anthropic"}
+    assert providers["anthropic"]["masked"] == mask_key(FAKE_ANTHROPIC_KEY)
+    assert providers["anthropic"]["env_var"] == "ANTHROPIC_API_KEY"
+    assert providers["anthropic"]["usable"] is True
+    assert [m["id"] for m in providers["anthropic"]["models"]] == ["claude-opus-5", "claude-sonnet-5",
+                                                                 "claude-haiku-4-5"]
+
+
+def test_a_provider_without_a_key_cannot_be_chosen(project, monkeypatch):
+    _, client = _live_on_openai(project, monkeypatch, anthropic_key=False)
+    before = (project / "configs" / "llm.demo.yaml").read_text(encoding="utf-8")
+
+    providers = {p["id"]: p for p in client.get("/api/settings").json()["providers"]}
+    response = client.post("/api/settings/models", json={
+        "models": {"astplanner": {"provider": "anthropic", "model": "claude-opus-5"}}})
+
+    assert providers["anthropic"]["usable"] is False
+    assert response.status_code == 400
+    assert "Anthropic key" in response.json()["detail"]
+    assert (project / "configs" / "llm.demo.yaml").read_text(encoding="utf-8") == before
+
+
+def test_a_node_whose_provider_has_no_key_is_shown_unavailable(project, monkeypatch):
+    cfg = _llm_yaml(project)
+    cfg["agents"] = {"astplanner": {"provider": "anthropic", "model": "claude-opus-5", "temperature": None,
+                                    "api_key": "${env:ANTHROPIC_API_KEY}", "name": "astplanner"}}
+    (project / "configs" / "llm.demo.yaml").write_text(yaml.safe_dump(cfg), encoding="utf-8")
+    _, client = _live_on_openai(project, monkeypatch, anthropic_key=False)
+
+    nodes = {n["agent"]: n for n in client.get("/api/settings").json()["nodes"]}
+
+    assert "Anthropic has no key" in nodes["astplanner"]["unavailable"]
+    assert nodes["decomposer"]["unavailable"] is None
+
+
+def test_a_second_key_keeps_the_first_and_the_nodes_on_its_provider(project, monkeypatch):
+    pytest.importorskip("langchain_anthropic")
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    engine, client = _app(project)
+    assert client.post("/api/settings/key", json={"api_key": FAKE_KEY}).status_code == 200
+    assert client.post("/api/settings/key", json={"api_key": FAKE_ANTHROPIC_KEY}).status_code == 200
+    assert client.post("/api/settings/models", json={"models": {"astplanner": "claude-sonnet-5",
+                                                                  "decomposer": {"provider": "openai",
+                                                                                 "model": "gpt-4.1"}}}).status_code == 200
+
+    # One key per provider, in the environment and in .env.demo.
+    assert os.environ["OPENAI_API_KEY"] == FAKE_KEY
+    assert os.environ["ANTHROPIC_API_KEY"] == FAKE_ANTHROPIC_KEY
+    env_demo = (project / ".env.demo").read_text(encoding="utf-8")
+    assert f"OPENAI_API_KEY={FAKE_KEY}" in env_demo and f"ANTHROPIC_API_KEY={FAKE_ANTHROPIC_KEY}" in env_demo
+    cfg = _llm_yaml(project)
+    # The default moved to the provider of the last key saved; the OpenAI step stayed.
+    assert cfg["default"]["provider"] == "anthropic"
+    assert cfg["agents"]["astplanner"]["provider"] == "anthropic"
+    assert cfg["agents"]["decomposer"] == {"provider": "openai", "model": "gpt-4.1", "temperature": 0.0,
+                                           "api_key": "${env:OPENAI_API_KEY}", "name": "decomposer"}
+    assert engine.context.llm_registry.get_llm("decomposer").openai_api_key.get_secret_value() == FAKE_KEY
+
+    # Saving the OpenAI key again moves the default back; the Claude step stays on Claude.
+    assert client.post("/api/settings/key", json={"api_key": FAKE_KEY}).status_code == 200
+    cfg = _llm_yaml(project)
+    assert cfg["default"]["provider"] == "openai"
+    assert cfg["agents"]["astplanner"]["provider"] == "anthropic"
 
 
 def test_the_settings_read_names_every_llm_node(project):

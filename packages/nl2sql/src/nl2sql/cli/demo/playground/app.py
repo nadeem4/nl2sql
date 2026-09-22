@@ -26,7 +26,7 @@ from __future__ import annotations
 
 import pathlib
 from importlib.resources import files
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
@@ -75,8 +75,15 @@ class KeyRequest(BaseModel):
     api_key: str
 
 
+class NodeChoice(BaseModel):
+    provider: str
+    model: str
+
+
 class ModelsRequest(BaseModel):
-    models: Dict[str, Optional[str]]
+    # Per node: None (the default agent), a model on the default's provider,
+    # or a provider and a model.
+    models: Dict[str, Union[NodeChoice, str, None]]
 
 
 class RebuildRequest(BaseModel):
@@ -251,7 +258,8 @@ def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset
 
     @app.post("/api/settings/models", dependencies=[Depends(panel.guard)])
     def save_models(req: ModelsRequest) -> Dict[str, Any]:
-        panel.set_models(req.models)
+        panel.set_models({agent: value.model_dump() if isinstance(value, NodeChoice) else value
+                          for agent, value in req.models.items()})
         return panel.read()
 
     @app.get("/api/index")
