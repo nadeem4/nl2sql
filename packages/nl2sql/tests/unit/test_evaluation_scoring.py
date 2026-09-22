@@ -45,8 +45,20 @@ def test_none_and_mixed_types_compare_without_raising():
     assert not compare([["x", 2.5], [None, 2]], gold, order_matters=False)
 
 
-def test_strings_are_not_numbers():
-    assert not compare([[2009]], [{"year": "2009"}])
+def test_a_numeric_string_matches_the_number_it_spells():
+    # SQLite's STRFTIME('%Y', ...) returns '2009' where another database returns 2009.
+    assert compare([[2009]], [{"year": "2009"}])
+    assert compare([["2009"]], [{"year": 2009}])
+    assert compare([[" 49.62 "]], [{"total": 49.624}])
+    assert not compare([["2010"]], [{"year": 2009}])
+
+
+def test_non_numeric_strings_are_not_numbers():
+    assert not compare([["2009-01"]], [{"month": 2009}])
+    assert not compare([["nan"]], [{"x": float("nan")}])
+    assert not compare([[True]], [{"x": "1"}])
+    # Two strings still compare as strings.
+    assert not compare([["2009"]], [{"year": "2009.0"}])
 
 
 def test_row_and_column_counts_must_match():

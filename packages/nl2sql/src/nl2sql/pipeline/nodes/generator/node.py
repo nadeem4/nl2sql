@@ -10,6 +10,7 @@ if TYPE_CHECKING:
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.datasources import DatasourceRegistry
 from nl2sql.common.logger import get_logger
+from nl2sql.pipeline.nodes.ast_planner.functions import DATE_UNITS, date_operation
 from nl2sql.pipeline.nodes.ast_planner.schemas import PlanModel, Expr, TableRef
 from nl2sql.pipeline.nodes.generator.schemas import GeneratorResponse
 from nl2sql.context import NL2SQLContext
@@ -92,6 +93,20 @@ def _grouped(operand: exp.Expression) -> exp.Expression:
     return operand
 
 
+def portable_date(kind: str, unit: str, operand: exp.Expression) -> exp.Expression:
+    """A date operation as sqlglot's typed nodes, with the same result type everywhere.
+
+    ``part`` is ``CAST(EXTRACT(unit FROM x) AS INT)``: an integer. ``trunc`` is
+    the truncated date formatted as ``YYYY-MM-DD``: a string. sqlglot renders
+    both natively for most dialects; an adapter rewrites what its database
+    lacks in ``render_sql`` (SQLite has neither ``EXTRACT`` nor a truncation).
+    """
+    var = exp.Var(this=unit.upper())
+    if kind == "part":
+        return exp.Cast(this=exp.Extract(this=var, expression=operand), to=exp.DataType.build("INT"))
+    return exp.TimeToStr(this=exp.TimestampTrunc(this=operand, unit=var), format=exp.Literal.string("%Y-%m-%d"))
+
+
 _MIRRORED_JOIN = {"left": "right", "right": "left"}
 
 
@@ -168,11 +183,30 @@ class SqlVisitor:
         if str(expr.func_name).upper() in ("TUPLE", "LIST"):
             return exp.Tuple(expressions=[self.visit(arg) for arg in expr.args])
 
+        date = date_operation(expr.func_name, expr.args)
+        if date is not None:
+            kind, unit, operand = date
+            if unit not in DATE_UNITS or operand is None:
+                raise ValueError(
+                    f"Unsupported date operation {expr.func_name}: use DATE_PART(unit, date) or "
+                    f"DATE_TRUNC(unit, date) with unit one of {', '.join(DATE_UNITS)}."
+                )
+            return portable_date(kind, unit, self.visit(operand))
+
         args = [self.visit(arg) for arg in expr.args]
         if expr.distinct:
             # FUNC(DISTINCT a, b), the tree sqlglot's parser builds for it.
             args = [exp.Distinct(expressions=args)]
-        return exp.Anonymous(this=expr.func_name, expressions=args)
+        # A known name becomes sqlglot's typed node (LENGTH is LEN on T-SQL);
+        # any other allowed name stays as written.
+        try:
+            node = exp.func(expr.func_name, *args)
+        except Exception:
+            return exp.Anonymous(this=expr.func_name, expressions=args)
+        if isinstance(node, exp.Binary):
+            # MOD(a, b) is built as a % b: keep an operand's own grouping.
+            node = node.__class__(this=_grouped(node.this), expression=_grouped(node.expression))
+        return node
 
     def _visit_binary(self, expr: Expr) -> exp.Expression:
         """Converts a binary operation expression to sqlglot.
@@ -289,7 +323,12 @@ class GeneratorNode:
             row_limit = adapter.row_limit or 1000
             limit = min(int(plan.limit or row_limit), row_limit)
 
-            sql = self._generate_sql(plan, limit, dialect)
+            query = self._build_query(plan, limit, dialect)
+            # The adapter renders the finished tree: its database's own spelling
+            # of anything sqlglot cannot express. An adapter without the hook
+            # renders in its dialect.
+            render_sql = getattr(adapter, "render_sql", None)
+            sql = render_sql(query) if callable(render_sql) else query.sql(dialect=dialect)
 
             response = GeneratorResponse(
                 sql_draft=sql,
@@ -385,8 +424,8 @@ class GeneratorNode:
             )
         return query
 
-    def _generate_sql(self, plan: PlanModel, limit: int, dialect: str) -> str:
-        """Internal helper to build and optimize the SQL query."""
+    def _build_query(self, plan: PlanModel, limit: int, dialect: str) -> exp.Select:
+        """Builds the query as a sqlglot tree; the adapter renders it."""
         visitor = SqlVisitor()
         query = exp.select()
         if plan.distinct:
@@ -440,6 +479,4 @@ class GeneratorNode:
             ordered_on.add(key.sql())
             query = query.order_by(exp.Ordered(this=key.copy(), nulls_first=default_nulls_first(False, dialect)))
 
-        query = query.limit(limit)
-
-        return query.sql(dialect=dialect)
+        return query.limit(limit)

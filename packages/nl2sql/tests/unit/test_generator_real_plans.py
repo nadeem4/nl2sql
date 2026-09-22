@@ -253,7 +253,7 @@ def test_every_arithmetic_operator_renders_as_sql_arithmetic(op, node, expected)
     in_a_function = SqlVisitor().visit(Expr(kind="func", func_name="SUM", args=[binary]))
 
     assert isinstance(top_level, node)
-    assert isinstance(in_a_function.expressions[0], node)
+    assert isinstance(in_a_function, exp.Sum) and isinstance(in_a_function.this, node)
     assert _run_on_chinook(f"SELECT {top_level.sql(dialect='sqlite')}") == [(expected,)]
 
 

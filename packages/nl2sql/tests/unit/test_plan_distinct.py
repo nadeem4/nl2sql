@@ -89,7 +89,8 @@ def test_distinct_is_only_valid_on_a_function():
 def test_count_distinct_renders_as_a_distinct_aggregate(dialect):
     sql = _sql(_plan(_count_distinct()), dialect)
 
-    assert "COUNT(DISTINCT t1.CustomerId)" in sql
+    # sqlglot spells a count COUNT_BIG on T-SQL, as its own parser does.
+    assert ("COUNT_BIG" if dialect == "tsql" else "COUNT") + "(DISTINCT t1.CustomerId)" in sql
     count = sqlglot.parse_one(sql, read=dialect).find(exp.Count)
     assert isinstance(count.this, exp.Distinct)
 

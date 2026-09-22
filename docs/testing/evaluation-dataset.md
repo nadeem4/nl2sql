@@ -100,8 +100,11 @@ otherwise), and each run is scored:
 Rows are compared by value, in selected column order: column names and
 aliases are ignored, so `SELECT Country AS c` matches a gold `Country`
 column but a swapped column order does not. Numbers match within 0.005,
-because gold values are rounded to two decimals. Strings must be equal, so
-`'2009'` is not `2009`. Row order counts only when `order_matters` is true.
+because gold values are rounded to two decimals. A number also matches a
+string that spells one, within the same tolerance, so `'2009'` is `2009`:
+databases differ in which of the two they return for the same value. Other
+strings must be equal, and two strings compare as strings (`'2009'` is not
+`'2009.0'`). Row order counts only when `order_matters` is true.
 
 The command prints one row per question and role, then a pass/fail/skip/xfail
 count per role, writes the whole report as JSON (`--export-path`, default

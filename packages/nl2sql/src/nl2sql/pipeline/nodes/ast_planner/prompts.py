@@ -177,7 +177,12 @@ PLANNER_SYSTEM_PROMPT = (
     " (on an aggregated metric, as having), its order_by as the plan's order_by, and its limit as"
     " the plan's limit.\n"
     "12. A question for the most, least, highest, lowest, top N or bottom N rows needs an order_by on"
-    " the ranked value (desc for most/highest/top) and a limit (1 for a single answer, N for top N).\n\n"
+    " the ranked value (desc for most/highest/top) and a limit (1 for a single answer, N for top N).\n"
+    "13. For any date grouping or filtering, use only the two portable date functions:\n"
+    "   DATE_PART(unit, date) returns an integer (DATE_PART('year', d) = 2011);\n"
+    "   DATE_TRUNC(unit, date) returns the period's first day as 'YYYY-MM-DD'.\n"
+    "   The unit is a string literal first argument: 'year', 'quarter', 'month' or 'day'.\n"
+    "   Never use any other date or time function.\n\n"
 
     "[OUTPUT CONTRACT]\n"
     "- If [EXPECTED_SCHEMA] is provided and non-empty:\n"

@@ -10,6 +10,41 @@ from nl2sql.adapters.sqlalchemy_base import (
 
 from pydantic import BaseModel, Field
 from typing import Optional
+import sqlglot
+from sqlglot import exp
+
+# SQLite has no EXTRACT and no date truncation. Each template reads the date
+# with STRFTIME/DATE; ``__x__`` stands for the operand. The engine wraps a
+# date part in CAST(... AS INT) and a truncation in a YYYY-MM-DD format, so
+# the types match every other adapter.
+_DATE_PARTS = {
+    "YEAR": "STRFTIME('%Y', __x__)",
+    "QUARTER": "(CAST(STRFTIME('%m', __x__) AS INTEGER) + 2) / 3",
+    "MONTH": "STRFTIME('%m', __x__)",
+    "DAY": "STRFTIME('%d', __x__)",
+}
+_DATE_TRUNCS = {
+    "YEAR": "DATE(__x__, 'start of year')",
+    "QUARTER": "DATE(__x__, 'start of month', '-' || ((CAST(STRFTIME('%m', __x__) AS INTEGER) - 1) % 3) || ' months')",
+    "MONTH": "DATE(__x__, 'start of month')",
+    "DAY": "DATE(__x__)",
+}
+
+
+def _from_template(template: str, operand: exp.Expression) -> exp.Expression:
+    tree = sqlglot.parse_one(template, read="sqlite")
+    return tree.transform(
+        lambda node: operand.copy() if isinstance(node, exp.Column) and node.name == "__x__" else node
+    )
+
+
+def _sqlite_dates(node: exp.Expression) -> exp.Expression:
+    """Rewrites the engine's portable date nodes with SQLite's date functions."""
+    if isinstance(node, exp.Extract) and node.name.upper() in _DATE_PARTS:
+        return _from_template(_DATE_PARTS[node.name.upper()], node.expression)
+    if isinstance(node, exp.TimestampTrunc) and node.unit and node.unit.name.upper() in _DATE_TRUNCS:
+        return _from_template(_DATE_TRUNCS[node.unit.name.upper()], node.this)
+    return node
 
 class SqliteConnectionConfig(BaseModel):
     """Strict configuration schema for SQLite adapter."""
@@ -82,6 +117,10 @@ class SqliteAdapter(BaseSQLAlchemyAdapter):
 
     def get_dialect(self) -> str:
         return sqlite.dialect.name
+
+    def render_sql(self, expression: exp.Expression) -> str:
+        """sqlglot's SQLite rendering, with date parts and truncation rewritten."""
+        return expression.copy().transform(_sqlite_dates).sql(dialect=self.get_dialect())
 
     @property
     def exclude_schemas(self) -> set[str]:

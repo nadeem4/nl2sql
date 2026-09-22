@@ -28,9 +28,27 @@ def _is_number(value: Any) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool)
 
 
+def _as_number(value: Any) -> Any:
+    """``value`` as a float if it is a number or a string spelling a finite one, else None."""
+    if _is_number(value):
+        return float(value)
+    if isinstance(value, str):
+        try:
+            number = float(value.strip())
+        except ValueError:
+            return None
+        return number if math.isfinite(number) else None
+    return None
+
+
 def _same_value(got: Any, want: Any) -> bool:
-    if _is_number(got) and _is_number(want):
-        return math.isclose(float(got), float(want), rel_tol=0.0, abs_tol=NUMERIC_TOLERANCE)
+    # A number matches a string that spells it ('2009' == 2009): databases differ
+    # in which of the two a date part or a computed value comes back as. Two
+    # strings still compare as strings.
+    if _is_number(got) or _is_number(want):
+        g, w = _as_number(got), _as_number(want)
+        if g is not None and w is not None:
+            return math.isclose(g, w, rel_tol=0.0, abs_tol=NUMERIC_TOLERANCE)
     return type(got) is type(want) and got == want
 
 
@@ -77,8 +95,9 @@ class ModelEvaluator:
         Column names and aliases are ignored: each row is compared as its
         values in selected order, so ``SELECT Country AS c`` matches a gold
         ``Country`` column but a swapped column order does not. Numbers match
-        within ``NUMERIC_TOLERANCE``; anything else must be equal and of the
-        same type, so ``'2009'`` is not ``2009``. Without ``order_matters``
+        within ``NUMERIC_TOLERANCE``, and a number matches a string that spells
+        one, so ``'2009'`` is ``2009``; anything else must be equal and of the
+        same type. Without ``order_matters``
         each generated row is paired with one unused equal gold row, which
         needs no sorting and so copes with ``None`` and mixed types.
         """

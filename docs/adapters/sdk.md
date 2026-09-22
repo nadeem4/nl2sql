@@ -56,6 +56,37 @@ Returns the execution plan.
 
 Returns cost/row estimates. Advertised via the `SUPPORTS_COST_ESTIMATE` capability; the pipeline does not currently call it.
 
+### Optional hook: `render_sql(expression)`
+
+`nl2sql_adapter_sdk.protocols.SqlRenderingAdapterProtocol`. The engine builds
+every query as a sqlglot expression tree and, when the adapter has
+`render_sql`, passes it the finished tree and executes the text it returns.
+Without the hook the engine renders `expression.sql(dialect=adapter.get_dialect())`,
+so an adapter written before the hook keeps working. `BaseSQLAlchemyAdapter`
+implements that same default.
+
+Override it only for what sqlglot cannot express for your database. The
+SQLite adapter, for example, rewrites `EXTRACT` and date truncation with
+`STRFTIME` and `DATE(x, 'start of month')`. Postgres, MySQL, SQL Server and
+DuckDB use the default.
+
+`get_dialect()` must return a sqlglot dialect name (`postgres`, `tsql`,
+`mysql`, `duckdb`, `sqlite`, ...), not the SQLAlchemy name.
+
+### Result types every adapter returns
+
+These are part of the contract, so the same plan gives the same values on
+every database:
+
+| Plan operation | Result type | Example |
+| :--- | :--- | :--- |
+| `DATE_PART(unit, date)`, unit `year`, `quarter`, `month`, `day` | INTEGER | `2011` |
+| `DATE_TRUNC(unit, date)`, same units | ISO date string `YYYY-MM-DD` | `'2011-04-01'` |
+
+The engine already wraps a date part in `CAST(... AS INT)` and a truncation
+in a `YYYY-MM-DD` format; an adapter that rewrites the inner nodes keeps
+those wrappers.
+
 ---
 
 ## Compliance Testing

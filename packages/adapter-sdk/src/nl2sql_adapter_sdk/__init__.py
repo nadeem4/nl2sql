@@ -2,7 +2,7 @@
 
 from .capabilities import DatasourceCapability
 from .contracts import AdapterRequest, ResultError, ResultFrame
-from .protocols import DatasourceAdapterProtocol
+from .protocols import DatasourceAdapterProtocol, SqlRenderingAdapterProtocol
 from .schema import (
     TableRef,
     ColumnStatistics,
@@ -23,6 +23,7 @@ __all__ = [
     "ResultError",
     "ResultFrame",
     "DatasourceAdapterProtocol",
+    "SqlRenderingAdapterProtocol",
     "TableRef",
     "ColumnStatistics",
     "ColumnMetadata",

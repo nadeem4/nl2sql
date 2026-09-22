@@ -458,6 +458,16 @@ class BaseSQLAlchemyAdapter:
     def get_dialect(self) -> str:
         raise NotImplementedError(f"Adapter {self.__class__.__name__} must implement get_dialect")
 
+    def render_sql(self, expression: Any) -> str:
+        """Renders the engine's finished sqlglot tree as this database's SQL.
+
+        The default is sqlglot's own rendering for ``get_dialect()``. Override
+        it to rewrite what sqlglot cannot express for the database, keeping the
+        result types in the SDK contract (a date part is an integer, a
+        truncated date a ``YYYY-MM-DD`` string).
+        """
+        return expression.sql(dialect=self.get_dialect())
+
     def cost_estimate(self, sql: str) -> CostEstimate:
         raise NotImplementedError(f"Adapter {self.__class__.__name__} must implement cost_estimate")
     
