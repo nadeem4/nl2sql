@@ -174,6 +174,9 @@ def test_datasource_resolver_real_queries(
 
     prompt = "\n".join(m["content"] for m in _JUDGE.calls[-1]["body"]["messages"])
     assert '"id": "chinook"' in prompt and '"InvoiceLine"' in prompt
+    # The description comes from the explicit datasource config the fixture
+    # writes, not the settings path (tracker 54.1).
+    assert "Chinook digital music store" in prompt
     assert prompt.endswith(user_query)
 
 

@@ -82,7 +82,14 @@ class NL2SQLContext:
                 "Pass vector_store_path or set vector_store_path in settings."
             )
 
-        cm = ConfigManager()
+        # Indexing reads the datasource description through this manager, so
+        # it must see the same files the context loads, not the settings paths.
+        cm = ConfigManager(
+            ds_config_path=ds_config_path,
+            llm_config_path=llm_config_path,
+            policies_config_path=policies_config_path,
+            secrets_config_path=secrets_config_path,
+        )
         self.tenant_id = settings.tenant_id
         self.config_manager = cm
 
