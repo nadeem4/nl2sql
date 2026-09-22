@@ -146,10 +146,11 @@ class SqlVisitor:
         if str(expr.func_name).upper() in ("TUPLE", "LIST"):
             return exp.Tuple(expressions=[self.visit(arg) for arg in expr.args])
 
-        return exp.Anonymous(
-            this=expr.func_name,
-            expressions=[self.visit(arg) for arg in expr.args]
-        )
+        args = [self.visit(arg) for arg in expr.args]
+        if expr.distinct:
+            # FUNC(DISTINCT a, b), the tree sqlglot's parser builds for it.
+            args = [exp.Distinct(expressions=args)]
+        return exp.Anonymous(this=expr.func_name, expressions=args)
 
     def _visit_binary(self, expr: Expr) -> exp.Expression:
         """Converts a binary operation expression to sqlglot.
@@ -361,6 +362,8 @@ class GeneratorNode:
         """Internal helper to build and optimize the SQL query."""
         visitor = SqlVisitor()
         query = exp.select()
+        if plan.distinct:
+            query = query.distinct()
         selected = []
 
         for s in sorted(plan.select_items, key=lambda x: x.ordinal):

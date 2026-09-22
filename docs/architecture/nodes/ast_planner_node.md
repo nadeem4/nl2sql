@@ -119,7 +119,7 @@ caches a stable prefix of 1,024+ tokens automatically):
 | human (`PLANNER_HUMAN_PROMPT`) | `[EXPECTED_SCHEMA]`, `[SEMANTIC_CONTEXT]`, `[FEEDBACK]`, `[USER_QUERY]` | every call |
 
 The examples come before the schema so that the instructions and examples
-(about 1,100 tokens) stay cacheable even when vector retrieval picks a
+(about 1,300 tokens) stay cacheable even when vector retrieval picks a
 different set of tables per question. The system/human boundary is the single
 cache seam: keep per-question content out of the system message.
 
@@ -154,6 +154,13 @@ Key contracts:
 
 - `PlanModel`
 - `ASTPlannerResponse`
+
+DISTINCT in the plan language: `PlanModel.distinct: true` is `SELECT DISTINCT`,
+and a `func` expr with `distinct: true` is a distinct aggregate such as
+`COUNT(DISTINCT x)`. The system message's instructions and one of its examples
+say so; a function named `DISTINCT` is rejected by the logical validator.
+Subqueries and window functions are not in the language; `offset` is accepted
+but not rendered.
 
 ---
 

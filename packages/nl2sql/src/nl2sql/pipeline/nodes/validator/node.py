@@ -410,6 +410,41 @@ class LogicalValidatorNode:
             seen.add(t.alias)
         return None
 
+    @staticmethod
+    def _distinct_function(plan: PlanModel) -> Optional[PipelineError]:
+        """Rejects a function named DISTINCT.
+
+        ``COUNT(DISTINCT(x))`` only happens to parse as a distinct count;
+        DISTINCT is a flag on the aggregate, not a function.
+        """
+        def walk(node: Optional[Expr]):
+            if not node:
+                return
+            yield node
+            for child in (*node.args, node.left, node.right, node.expr, node.else_expr):
+                yield from walk(child)
+            for when in node.whens:
+                yield from walk(when.condition)
+                yield from walk(when.result)
+
+        roots = [s.expr for s in plan.select_items] + [g.expr for g in plan.group_by]
+        roots += [o.expr for o in plan.order_by] + [j.condition for j in plan.joins]
+        roots += [plan.where, plan.having]
+        for root in roots:
+            for node in walk(root):
+                if node.kind == "func" and str(node.func_name).strip().upper() == "DISTINCT":
+                    return PipelineError(
+                        node="logical_validator",
+                        message=(
+                            "DISTINCT is not a function. For COUNT(DISTINCT x), set "
+                            "distinct: true on the COUNT expression; for SELECT DISTINCT, "
+                            "set the plan's distinct: true."
+                        ),
+                        severity=ErrorSeverity.ERROR,
+                        error_code=ErrorCode.INVALID_PLAN_STRUCTURE,
+                    )
+        return None
+
     def _validate_policy(self, state: SubgraphExecutionState) -> list[PipelineError]:
         """Validates that the query adheres to access control policies.
 
@@ -481,6 +516,7 @@ class LogicalValidatorNode:
         - Ordinal integrity.
         - Alias uniqueness.
         - Join alias validity.
+        - No function named DISTINCT (it is the ``distinct`` flag).
         - Column existence and scoping (via sqlglot's qualify optimizer).
         """
         plan: PlanModel = state.ast_planner_response.plan if state.ast_planner_response else None
@@ -520,6 +556,10 @@ class LogicalValidatorNode:
         alias_err = self._alias_collision(plan)
         if alias_err:
             errors.append(alias_err)
+
+        distinct_err = self._distinct_function(plan)
+        if distinct_err:
+            errors.append(distinct_err)
 
         if state.sub_query and state.sub_query.expected_schema:
             expected_names = [c.name for c in state.sub_query.expected_schema if c.name]
