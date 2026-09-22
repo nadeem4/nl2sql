@@ -4010,7 +4010,7 @@ directly and gates it on the datasource declaring <code>supports_sql</code>.</p>
 <p>Use <code>ExecutorRequest</code>/<code>ExecutorResponse</code> as the contract.</p>
 <h2 id="2-wire-the-executor">2. Wire the executor</h2>
 <p>Construct the executor in <code>ExecutorNode.__init__</code> and select it in <code>__call__</code>
-based on the adapter's capabilities. <code>ExecutorNode._supports_sql()</code> shows the
+based on the datasource's capabilities, asked through <code>DatasourceRegistry.supports()</code>. <code>ExecutorNode._supports_sql()</code> shows the
 existing check: a datasource whose adapter does not declare the required
 capability must get no executor rather than being run anyway.</p>
 <h2 id="3-update-routing-if-needed">3. Update routing (if needed)</h2>
