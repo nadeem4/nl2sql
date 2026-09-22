@@ -23,6 +23,10 @@
   `table_allowed`, the one the logical validator refuses with; with no RBAC in
   the context, every table is stripped. See
   [Security Model](../../security/model.md#strict-refusal).
+- The tables it returns keep every statistic, but the planner and refiner
+  prompts render them with `render_schema_for_prompt` (`schema.py`), which
+  sends only `sample_values`. See
+  [AST Planner: prompt layout](ast_planner_node.md#prompt-layout-and-caching).
 
 ---
 

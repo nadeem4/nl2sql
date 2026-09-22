@@ -13,8 +13,13 @@ QUESTION = "Which artist has the most albums?"
 
 
 def _render(template: str, **values) -> str:
-    """Render a real prompt template the way its node does."""
-    messages = ChatPromptTemplate.from_template(template).format_messages(**values)
+    """Render a real prompt template the way its node does.
+
+    The planner and decomposer prompts are system + human chat templates; the
+    synthesizer's is still a single string template.
+    """
+    prompt = ChatPromptTemplate.from_template(template) if isinstance(template, str) else template
+    messages = prompt.format_messages(**values)
     return "\n".join(str(m.content) for m in messages)
 
 

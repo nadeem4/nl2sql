@@ -69,7 +69,7 @@ Side effects:
 
 1. Validate resolver response; raise if no resolved datasources.
 2. Build `resolved_payload` and `schema_version_map`.
-3. Invoke LLM chain with `user_query` and resolved datasources.
+3. Invoke LLM chain with `user_query` and resolved datasources. The prompt is two messages: the system message holds the fixed instructions and output format (cacheable), the human message holds the resolved datasources (as JSON with sorted keys) and then the question.
 4. For each LLM sub‑query:
    - Validate datasource existence and RBAC allowance.
    - Assign deterministic ID via `_stable_id()`.

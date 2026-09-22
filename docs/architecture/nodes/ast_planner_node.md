@@ -71,12 +71,46 @@ Side effects:
 
 ## Internal Flow (Step-by-Step)
 
-1. Serialize `relevant_tables` to JSON text.
-2. Build feedback string from existing errors.
+1. Render `relevant_tables` with `render_schema_for_prompt` (see below).
+2. Build feedback string from existing errors (compact JSON).
 3. Build `expected_schema` payload from sub‑query.
 4. Invoke the LLM chain with prompt + structured output (`PlanModel`).
 5. Return `ASTPlannerResponse` with plan and reasoning.
 6. On exception, emit `PLANNING_FAILURE` error and return `plan=None`.
+
+---
+
+## Prompt layout and caching
+
+The prompt is two messages, so providers can cache the stable part (OpenAI
+caches a stable prefix of 1,024+ tokens automatically):
+
+| Message | Content | Changes |
+| --- | --- | --- |
+| system (`PLANNER_SYSTEM_PROMPT`) | role, instructions, output contract, constraints, `PLANNER_EXAMPLES`, then `[RELEVANT_TABLES]` | only when the schema or the caller's role changes |
+| human (`PLANNER_HUMAN_PROMPT`) | `[EXPECTED_SCHEMA]`, `[SEMANTIC_CONTEXT]`, `[FEEDBACK]`, `[USER_QUERY]` | every call |
+
+The examples come before the schema so that the instructions and examples
+(about 1,100 tokens) stay cacheable even when vector retrieval picks a
+different set of tables per question. The system/human boundary is the single
+cache seam: keep per-question content out of the system message.
+
+The schema block (`render_schema_for_prompt` in
+`schema_retriever/schema.py`) is one compact JSON object per table, tables
+sorted by name and keys sorted, so the same snapshot and role render
+byte-identically. It drops empty fields and `schema_version`. Of the column
+statistics only `sample_values` is sent (it helps match literal filters such as
+`'Rock'` or `'USA'`); `min_value`, `max_value`, `null_percentage` and
+`distinct_count` stay in the snapshot.
+
+Measured on Chinook with tiktoken `o200k_base`, 12 demo questions, no LLM call
+(`python scripts/measure_prompt_tokens.py`):
+
+| | before | after |
+| --- | --- | --- |
+| planner prompt | 8,921 tokens | 3,495 tokens |
+| schema block | 7,754 tokens | 2,324 tokens |
+| prefix identical across questions | 8,122 tokens | 3,460 tokens |
 
 ---
 

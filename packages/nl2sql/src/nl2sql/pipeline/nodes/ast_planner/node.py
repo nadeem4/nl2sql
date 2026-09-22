@@ -2,10 +2,10 @@ from __future__ import annotations
 import traceback
 from typing import Any, Dict, Optional, TYPE_CHECKING
 from langchain_core.runnables import Runnable
-from langchain_core.prompts import ChatPromptTemplate
 
 from .prompts import PLANNER_PROMPT, PLANNER_EXAMPLES
 from .schemas import PlanModel, ASTPlannerResponse
+from nl2sql.pipeline.nodes.schema_retriever.schema import render_schema_for_prompt
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.common.logger import get_logger
 from nl2sql.context import NL2SQLContext
@@ -36,7 +36,7 @@ class ASTPlannerNode:
         self.node_name = self.__class__.__name__.lower().replace('node', '')
         self.llm = ctx.llm_registry.get_llm(self.node_name)
 
-        self.prompt = ChatPromptTemplate.from_template(PLANNER_PROMPT)
+        self.prompt = PLANNER_PROMPT
         self.chain = self.prompt | self.llm.with_structured_output(PlanModel)
 
     def __call__(self, state: SubgraphExecutionState) -> Dict[str, Any]:
@@ -50,14 +50,11 @@ class ASTPlannerNode:
                 and any 'errors' encountered.
         """
         try:
-            relevant_tables = '\n'.join(
-                t.model_dump_json(indent=2) for t in state.relevant_tables
-            )
-
+            relevant_tables = render_schema_for_prompt(state.relevant_tables)
 
             feedback = ""
             if state.errors:
-                feedback = "\n".join(e.model_dump_json(indent=2) for e in state.errors)
+                feedback = "\n".join(e.model_dump_json(exclude_none=True) for e in state.errors)
 
             query_text = state.sub_query.intent if state.sub_query else ""
             expected_schema = []

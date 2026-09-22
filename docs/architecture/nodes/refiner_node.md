@@ -69,9 +69,9 @@ Side effects:
 ## Internal Flow (Step-by-Step)
 
 1. If no LLM configured, emit `MISSING_LLM` and stop.
-2. Serialize relevant tables, and the failed plan as compact JSON (`model_dump_json(exclude_none=True)`).
+2. Render relevant tables with `render_schema_for_prompt` (the planner's compact schema block, only `sample_values` from the column stats), and the failed plan as compact JSON (`model_dump_json(exclude_none=True)`).
 3. Build error and reasoning strings.
-4. Invoke LLM with refinement prompt.
+4. Invoke LLM with refinement prompt. It is two messages: the system message holds the instructions and then the schema (stable, so the provider can cache it); the human message holds the question, failed plan, errors and reasoning. On Chinook the prompt is about 2,600 tokens (was about 8,000), 2,500 of them a prefix shared across questions.
 5. Emit `PLAN_FEEDBACK` warning and return `RefinerResponse`.
 6. On exception, emit `REFINER_FAILED`.
 
