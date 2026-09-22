@@ -32,13 +32,17 @@ Response (illustrative):
 ```json
 {
   "status": "ok",
-  "total": 87,
-  "counts": {"schema.column": 64, "schema.datasource": 1, "schema.relationship": 11, "schema.table": 11},
+  "total": 162,
+  "counts": {"schema.column": 121, "schema.datasource": 3, "schema.relationship": 18, "schema.table": 20},
   "built_at": "2026-09-22T12:35:42+00:00",
   "embedding_model": "all-MiniLM-L6-v2",
   "datasources": [
     {"datasource_id": "chinook", "entries": 87, "index_version": "20260922123542_ceed8",
-     "snapshot_version": "20260922123542_ceed8", "built_at": "2026-09-22T12:35:42+00:00"}
+     "snapshot_version": "20260922123542_ceed8", "built_at": "2026-09-22T12:35:42+00:00"},
+    {"datasource_id": "support", "entries": 36, "index_version": "...",
+     "snapshot_version": "...", "built_at": "2026-09-22T12:35:42+00:00"},
+    {"datasource_id": "webanalytics", "entries": 39, "index_version": "...",
+     "snapshot_version": "...", "built_at": "2026-09-22T12:35:42+00:00"}
   ],
   "problems": []
 }

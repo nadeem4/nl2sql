@@ -15,10 +15,13 @@ from langchain_core.embeddings import FakeEmbeddings
 
 from nl2sql.cli.commands import demo as demo_cmd
 from nl2sql.cli.demo import stamp
+from nl2sql.cli.demo.datasets import DEMO_DATABASES
 from nl2sql.indexing.vector_store import VectorStore
 from nl2sql.schema.sqlite_store import SqliteSchemaStore
 
 _ANSI = re.compile(r"\x1b\[[0-9;]*m")
+
+DEMO_DATASOURCE_IDS = [ds_id for ds_id, _, _ in DEMO_DATABASES]
 
 
 def _plain(text: str) -> str:
@@ -49,21 +52,28 @@ def project(tmp_path, calls, monkeypatch):
 
 
 def _index(directory, version=None):
+    """An index holding one datasource chunk per demo datasource.
+
+    Health is judged across every datasource the demo registers, so a partial
+    index -- one covering only chinook -- is correctly reported as stale.
+    """
     store = VectorStore("nl2sql_store", str(directory / "data" / "vector_store_demo"),
                         embeddings=FakeEmbeddings(size=8))
     if version:
         store.vectorstore.add_documents([
-            Document(page_content="Datasource: chinook",
-                     metadata={"type": "schema.datasource", "datasource_id": "chinook", "schema_version": version}),
+            Document(page_content=f"Datasource: {ds_id}",
+                     metadata={"type": "schema.datasource", "datasource_id": ds_id, "schema_version": version})
+            for ds_id in DEMO_DATASOURCE_IDS
         ])
     return store
 
 
 def _snapshot(directory, version):
     store = SqliteSchemaStore(directory / "data" / "schema_store.db")
-    store._connection.execute(
-        "INSERT INTO schema_snapshots VALUES ('chinook', ?, 'f', '{}', '{}', 1)", (version,)
-    )
+    for ds_id in DEMO_DATASOURCE_IDS:
+        store._connection.execute(
+            "INSERT INTO schema_snapshots VALUES (?, ?, 'f', '{}', '{}', 1)", (ds_id, version)
+        )
     store._connection.commit()
     store.close()
 
@@ -101,6 +111,21 @@ def test_a_healthy_index_is_left_alone(project, calls):
     demo_cmd.prepare_project(project)
 
     assert calls["count"] == 0
+
+
+def test_an_index_missing_a_datasource_is_rebuilt(project, calls):
+    """A demo folder indexed before the second and third databases existed."""
+    store = VectorStore("nl2sql_store", str(project / "data" / "vector_store_demo"),
+                        embeddings=FakeEmbeddings(size=8))
+    store.vectorstore.add_documents([
+        Document(page_content="Datasource: chinook",
+                 metadata={"type": "schema.datasource", "datasource_id": "chinook", "schema_version": "v1"}),
+    ])
+    _snapshot(project, "v1")
+
+    demo_cmd.prepare_project(project)
+
+    assert calls["count"] == 1
 
 
 def test_a_failed_repair_is_reported_not_ignored(project, calls, capsys):
@@ -152,7 +177,7 @@ def test_index_demo_data_reports_a_failed_run_instead_of_exiting(tmp_path, monke
 
     monkeypatch.chdir(tmp_path)
     manager = DemoManager(console, tmp_path)
-    manager.setup_chinook()
+    manager.setup_demo()
 
     def _failing(ctx, enrich=True):
         raise SystemExit(1)

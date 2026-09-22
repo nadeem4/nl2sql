@@ -157,8 +157,9 @@ Metadata is consumed by `SchemaRetrieverNode` to construct `Table` objects for p
 
 Every vector search in the engine is one maximal marginal relevance (MMR)
 search over the one Chroma collection, `nl2sql_store`, which holds every
-datasource (Chinook: 1 datasource, 11 table, 64 column and 11 relationship
-entries, 87 in all). There is **no re-ranking model**. What is sometimes called
+datasource (the demo's three databases: 3 datasource, 20 table, 121 column and
+18 relationship entries, 162 in all, of which Chinook is 87). There is **no
+re-ranking model**. What is sometimes called
 re-ranking is this:
 
 1. Embed the query text with the collection's embedder (the local
@@ -184,8 +185,10 @@ as `Chroma.max_marginal_relevance_search` returns them.
 
 The schema retriever runs none of these when the schema has
 `SCHEMA_RETRIEVAL_FULL_SNAPSHOT_MAX_TABLES` tables or fewer (15 by default, so
-Chinook's 11 are always sent whole); the resolver runs none when the request
-names a `datasource_id` or only one datasource is registered (the Chinook demo).
+each of the demo's three schemas, at 11, 4 and 5 tables, is always sent whole);
+the resolver runs none when the request names a `datasource_id` or only one
+datasource is registered. The demo is no longer such a case: with three
+datasources registered, the resolver searches on every question.
 
 `nl2sql.indexing.retrieval_trace.mmr_search` is the one implementation: it
 makes the Chroma query and calls the same `maximal_marginal_relevance`

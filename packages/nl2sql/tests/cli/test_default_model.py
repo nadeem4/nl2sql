@@ -28,7 +28,7 @@ def test_openai_default_model_is_gpt_5_4():
 
 
 def test_the_demo_writes_gpt_5_4_with_temperature_zero(tmp_path):
-    DemoManager(Console(), tmp_path).setup_chinook()
+    DemoManager(Console(), tmp_path).setup_demo()
     llm = yaml.safe_load((tmp_path / "configs" / "llm.demo.yaml").read_text(encoding="utf-8"))
     assert llm["default"]["model"] == "gpt-5.4"
     assert llm["default"]["temperature"] == 0.0

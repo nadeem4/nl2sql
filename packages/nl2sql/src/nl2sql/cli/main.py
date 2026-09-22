@@ -178,7 +178,7 @@ def doctor():
 
 @app.command()
 def setup(
-    demo: Annotated[bool, typer.Option("--demo", help="Scaffold the Chinook demo project instead of running the wizard")] = False,
+    demo: Annotated[bool, typer.Option("--demo", help="Scaffold the demo project (chinook, support and webanalytics) instead of running the wizard")] = False,
     api_key: Annotated[Optional[str], typer.Option("--api-key", help="API Key for LLM provider (e.g. OpenAI)")] = None,
 ):
     """

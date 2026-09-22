@@ -49,7 +49,7 @@ from nl2sql.llm.providers import (
 from nl2sql.cli.common.decorators import handle_cli_errors
 from nl2sql.cli.console import console, print_error, print_step, print_success
 from nl2sql.cli.demo import DemoManager
-from nl2sql.cli.demo.chinook import CHINOOK_QUESTIONS
+from nl2sql.cli.demo.datasets import DEMO_QUESTIONS
 from nl2sql.cli.demo.llm_config import persist_api_key as _persist_api_key
 from nl2sql.cli.demo.llm_config import point_llm_config_at as _point_llm_config_at
 from nl2sql.cli.demo.stamp import outdated_warning
@@ -63,8 +63,9 @@ RECORDINGS = pathlib.Path(__file__).resolve().parent.parent / "demo" / "recordin
 
 INSTALL_HINT = 'Install the demo extra: pip install "nl2sql-engine[demo]"'
 
-# The only demo dataset. Kept as a name rather than inlined because the
-# playground, the replay recordings and the scaffolding all key off it.
+# The demo's lead dataset. Three databases are registered (see
+# `nl2sql.cli.demo.datasets`); this one names the packaged recording file and
+# the datasource the playground's schema panel opens on.
 DATASET = "chinook"
 
 # `.env.demo` ships an empty `OPENAI_API_KEY=` placeholder. Indexing used to load
@@ -171,8 +172,8 @@ def prepare_project(directory: pathlib.Path) -> pathlib.Path:
     directory.mkdir(parents=True, exist_ok=True)
     manager = DemoManager(console, directory)
     if not (directory / "configs" / "datasources.demo.yaml").exists():
-        print_step(f"Writing the {DATASET} demo project to {directory}")
-        manager.setup_chinook()
+        print_step(f"Writing the demo project to {directory}")
+        manager.setup_demo()
     else:
         warning = outdated_warning(directory)
         if warning:
@@ -353,11 +354,11 @@ def demo_command(
     elif mode == "replay":
         recordings = replay_recordings(directory)
         store = ReplayStore.load(recordings) if recordings else ReplayStore()
-        recorded_questions = len(store.covered(CHINOOK_QUESTIONS))
+        recorded_questions = len(store.covered(DEMO_QUESTIONS))
         replay_server = FakeLLMServer(store.rules()).start()
         _point_llm_config_at(directory, replay_server.base_url)
         os.environ["OPENAI_API_KEY"] = "replay"
-        console.print(replay_message(recorded_questions, len(CHINOOK_QUESTIONS), recordings))
+        console.print(replay_message(recorded_questions, len(DEMO_QUESTIONS), recordings))
     else:
         _load_saved_keys(env_file)
         provider = live_provider(resolved_key, key_source)
@@ -378,7 +379,7 @@ def demo_command(
         raise SystemExit(1)
 
     engine = _build_engine()
-    questions = list(CHINOOK_QUESTIONS)
+    questions = list(DEMO_QUESTIONS)
     roles = list(engine.context.policies_cfg.roles)
 
     if record:

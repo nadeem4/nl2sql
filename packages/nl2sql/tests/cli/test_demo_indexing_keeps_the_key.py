@@ -40,7 +40,7 @@ def seen(monkeypatch):
 def _project(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     manager = DemoManager(Console(quiet=True), tmp_path)
-    manager.setup_chinook()  # writes the empty OPENAI_API_KEY= placeholder
+    manager.setup_demo()  # writes the empty OPENAI_API_KEY= placeholder
     assert "OPENAI_API_KEY=\n" in (tmp_path / ".env.demo").read_text(encoding="utf-8")
     return manager
 

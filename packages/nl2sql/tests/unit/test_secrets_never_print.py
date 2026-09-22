@@ -225,7 +225,7 @@ def test_demo_scaffold_writes_the_real_key_and_the_reference(tmp_path):
 
     from nl2sql.cli.demo.manager import DemoManager
 
-    DemoManager(Console(quiet=True), tmp_path).setup_chinook(api_key=FAKE_KEY)
+    DemoManager(Console(quiet=True), tmp_path).setup_demo(api_key=FAKE_KEY)
     env_text = (tmp_path / ".env.demo").read_text(encoding="utf-8")
     assert f"OPENAI_API_KEY={FAKE_KEY}" in env_text
     llm = yaml.safe_load((tmp_path / "configs" / "llm.demo.yaml").read_text(encoding="utf-8"))

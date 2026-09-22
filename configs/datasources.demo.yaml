@@ -9,3 +9,24 @@ datasources:
     type: sqlite
     database: data/chinook.sqlite
   options: {}
+- id: support
+  description: 'Help-desk ticketing system: tickets, the messages exchanged on them,
+    the agents who handle them, ticket status (open, pending, escalated, resolved,
+    closed), priority, category, opened and closed timestamps, resolution times and
+    satisfaction scores.'
+  connection:
+    type: sqlite
+    database: data/support.sqlite
+  options: {}
+- id: webanalytics
+  description: 'Website traffic analytics: visitor sessions with their duration and
+    bounce flag, the pages viewed in each session and time on page, the referrer domain
+    and marketing channel (direct, organic, paid, social, email, referral) that brought
+    the visit, the device, browser and operating system used, and conversion events
+    such as signup, trial started, newsletter signup and purchase. Signed-in sessions
+    carry the customer_email and customer_id of the same customers as the chinook
+    music store; anonymous sessions do not.'
+  connection:
+    type: sqlite
+    database: data/webanalytics.sqlite
+  options: {}

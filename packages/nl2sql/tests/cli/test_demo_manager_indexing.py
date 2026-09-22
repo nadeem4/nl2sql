@@ -13,7 +13,7 @@ def demo_project(tmp_path, monkeypatch):
     """A throwaway project root with a complete Chinook demo already generated."""
     monkeypatch.chdir(tmp_path)
     manager = DemoManager(Console(), tmp_path)
-    manager.setup_chinook(api_key="test-key")
+    manager.setup_demo(api_key="test-key")
     return manager
 
 
@@ -44,7 +44,8 @@ def test_index_demo_data_context_points_at_demo_config(demo_project, monkeypatch
     assert demo_project.index_demo_data() is True
 
     ctx = captured[0]
-    assert sorted(a.datasource_id for a in ctx.ds_registry.list_adapters()) == ["chinook"]
+    assert sorted(a.datasource_id for a in ctx.ds_registry.list_adapters()) == [
+        "chinook", "support", "webanalytics"]
     assert str(tmp_path) in str(ctx.vector_store.persist_directory)
 
 

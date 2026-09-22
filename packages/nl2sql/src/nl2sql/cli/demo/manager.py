@@ -20,7 +20,12 @@ from nl2sql.cli.generators.datasources import DatasourceGenerator
 from nl2sql.cli.generators.llm import LLMGenerator
 from nl2sql.cli.generators.policies import PolicyGenerator
 
-from .chinook import CHINOOK_DATASOURCE, CHINOOK_POLICIES, CHINOOK_QUESTIONS
+from .datasets import (
+    DEMO_DATABASES,
+    DEMO_DATASOURCES,
+    DEMO_POLICIES,
+    DEMO_QUESTIONS_BY_DATASOURCE,
+)
 from .defaults import DEMO_LLM_CONFIG
 from .stamp import write_stamp
 
@@ -40,7 +45,7 @@ def _load_demo_env(env_path: pathlib.Path) -> None:
 
 
 class DemoManager:
-    """Creates the demo project: the Chinook database, its configs and `.env.demo`."""
+    """Creates the demo project: the three demo databases, their configs and `.env.demo`."""
 
     def __init__(self, console: Console, project_root: pathlib.Path):
         self.console = console
@@ -56,18 +61,24 @@ class DemoManager:
     def print_error(self, msg: str):
         self.console.print(f"[red][ERROR] {escape(str(msg))}[/red]")
 
-    def setup_chinook(self, api_key: Optional[str] = None):
-        """Sets up the Chinook (digital music store) demo environment."""
-        db_path = self.project_root / "data" / "chinook.sqlite"
-        self.print_step(f"Copying the Chinook database to {db_path}...")
+    def setup_demo(self, api_key: Optional[str] = None):
+        """Sets up the demo environment: three linked sample databases.
 
-        db_path.parent.mkdir(parents=True, exist_ok=True)
-        packaged = importlib.resources.files("nl2sql.datasets") / "chinook.sqlite"
-        with importlib.resources.as_file(packaged) as source:
-            shutil.copyfile(source, db_path)
+        ``chinook`` (a digital music store), ``support`` (its help desk) and
+        ``webanalytics`` (its website traffic). The latter two are synthetic and
+        share Chinook's customer names and email addresses.
+        """
+        data_dir = self.project_root / "data"
+        data_dir.mkdir(parents=True, exist_ok=True)
+        for _, file_name, _ in DEMO_DATABASES:
+            db_path = data_dir / file_name
+            self.print_step(f"Copying {file_name} to {db_path}...")
+            packaged = importlib.resources.files("nl2sql.datasets") / file_name
+            with importlib.resources.as_file(packaged) as source:
+                shutil.copyfile(source, db_path)
 
         self.print_step("Writing datasources config...")
-        ds_configs = [DatasourceConfig(**CHINOOK_DATASOURCE)]
+        ds_configs = [DatasourceConfig(**config) for config in DEMO_DATASOURCES]
         file_config = DatasourceFileConfig(datasources=ds_configs)
         content = DatasourceGenerator.generate(file_config)
         ds_path = self.project_root / "configs" / "datasources.demo.yaml"
@@ -75,7 +86,7 @@ class DemoManager:
         with open(ds_path, "w", encoding="utf-8") as f:
             f.write(content)
 
-        self._write_common_artifacts(CHINOOK_POLICIES, {"chinook": CHINOOK_QUESTIONS})
+        self._write_common_artifacts(DEMO_POLICIES, DEMO_QUESTIONS_BY_DATASOURCE)
 
         self.print_step("Writing .env.demo configuration...")
         secrets = {}
@@ -88,7 +99,9 @@ class DemoManager:
             f.write(env_content)
 
         write_stamp(self.project_root)
-        self.print_success("Chinook Demo Setup Complete")
+        self.print_success(
+            "Demo Setup Complete: " + ", ".join(ds_id for ds_id, _, _ in DEMO_DATABASES)
+        )
 
     def _write_common_artifacts(self, policies: Dict[str, Any], questions: Dict[str, List[str]]):
         """Writes policies, sample questions and the LLM config."""

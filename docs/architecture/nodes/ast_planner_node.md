@@ -141,7 +141,7 @@ statistics only `sample_values` is sent (it helps match literal filters such as
 `'Rock'` or `'USA'`); `min_value`, `max_value`, `null_percentage` and
 `distinct_count` stay in the snapshot.
 
-Measured on Chinook with tiktoken `o200k_base`, 12 demo questions, no LLM call
+Measured on Chinook with tiktoken `o200k_base`, its 12 demo questions, no LLM call
 (`python scripts/measure_prompt_tokens.py`):
 
 | | before | after |
