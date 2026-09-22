@@ -11,6 +11,12 @@ answers against.
 | `packages/nl2sql/src/nl2sql/evaluation/gold.py` | `GoldQuestion` model, `load_gold_dataset()`, `execute_gold_sql()`, `regenerate()` |
 | `packages/nl2sql/src/nl2sql/evaluation/datasets/chinook_gold_plans.yaml` | A hand-written `PlanModel` per answerable question, for [tier 1](#tier-1-gold-plans-through-the-code-nodes) |
 | `packages/nl2sql/src/nl2sql/evaluation/tier1.py` | `load_gold_plans()`, the gold-plan fake LLM, `run_tier1()` |
+| `packages/nl2sql/src/nl2sql/evaluation/tier2.py` | [Tier 2](#tier-2-the-real-model-end-to-end): the cost cap, the scoreboard, the comparison and the baseline check |
+| `packages/nl2sql/src/nl2sql/evaluation/prices.py` | The dated price table tier 2 bills every call from |
+| `packages/nl2sql/src/nl2sql/evaluation/records.py` | Tier 2 result records and `nl2sql benchmark publish` |
+| `configs/benchmark/*.yaml` | Example LLM configs to compare with tier 2 |
+| `packages/nl2sql/src/nl2sql/evaluation/baselines/` | Where a committed tier 2 baseline scoreboard goes (none yet) |
+| `benchmarks/results/` | Committed tier 2 result records, one per run and config |
 | `packages/nl2sql/src/nl2sql/evaluation/evaluator.py` | Row comparison (`compare_results`) and per-role scoring (`score_case`) |
 | `packages/nl2sql/tests/unit/test_chinook_gold_dataset.py` | Key-free checks, part of the normal unit suite |
 
@@ -74,11 +80,13 @@ an API key and checks that:
 
 ```bash
 nl2sql --env demo benchmark --tier 1        # gold plans, no API key
+nl2sql --env demo benchmark --tier 2 --max-cost 5   # the real model, scored and priced
 nl2sql --env demo benchmark                 # full pipeline, the configured LLM
 ```
 
-Either way every question runs once per role in its `expected` map (narrow
-with `--include-ids` and `--role`), and each run is scored:
+Each question runs once per role in its `expected` map (narrow with
+`--include-ids` and `--role`; tier 2 runs as `admin` unless `--role` says
+otherwise), and each run is scored:
 
 | Expected | Passes when |
 | --- | --- |
@@ -137,3 +145,195 @@ result, and that the answerability verdict served follows the gold dataset.
 When a gold plan fails, the fault is in the engine or in the plan. Fix an
 engine bug with a regression test; do not change the gold data to make a plan
 pass unless the gold data is itself wrong.
+
+## Tier 2: the real model, end to end
+
+Tier 2 runs the whole product -- every LLM node on a real model -- on the gold
+questions and scores it with the same runner and scoring as tier 1. It costs
+money, so it never runs in CI (it refuses when `CI` is set) and never runs
+without a dollar cap. The key comes from the environment or the LLM config
+(`${env:...}`), never from the command line; traces follow `TRACE_MODE` as for
+any run.
+
+The command the owner runs for a first baseline:
+
+```bash
+nl2sql --env demo benchmark --tier 2 --llm gpt-5.4=configs/benchmark/gpt-5.4.yaml --max-cost 5
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `--max-cost USD` | required | Stop before a question that could take the run's total spend past this |
+| `--llm NAME=PATH` | the project's LLM config, as `default` | An LLM config to compare (repeatable). `PATH` is an ordinary `llm.yaml`-format file |
+| `--role ROLE` | `admin` | Run as this role (repeatable) |
+| `--passes N` | `1` | Run every question N times per config and report determinism |
+| `--questions ID_OR_TAG` | every question | Only these question ids or tags (repeatable or comma-separated), e.g. `--questions unanswerable,chinook_001` |
+| `--export-path PATH` | `benchmark_tier2.json` | Where to write the full scoreboard |
+| `--results-dir DIR` | `benchmarks/results` | Where to write one result record per config |
+| `--baseline PATH` | none | A committed scoreboard to check against (below) |
+| `--max-accuracy-drop F` | `0.02` | Baseline: largest allowed accuracy drop (0.02 is two points) |
+| `--max-cost-increase F` | `0.2` | Baseline: largest allowed rise in cost per question (0.2 is 20%) |
+
+The option is `--llm`, not `--config`: on every `nl2sql` command `--config` is
+the datasource config and `--llm-config` the single LLM config path.
+
+Exit codes: 0 when every config ran, 1 on a baseline regression or a failed
+run, 2 on a usage error (no `--max-cost`, a malformed `--llm`, `CI` set), 3
+when the cap stopped the run early.
+
+### Comparing configs
+
+Each `--llm` config runs on the same questions, one after another, and the
+scoreboard puts them side by side and lists every question one config passed
+and another failed (with `--passes` > 1 a question can also be `flaky`). Since
+[per-node providers](../configuration/llm.md), a config can put each LLM node
+(`datasourceresolver`, `decomposer`, `astplanner`, `refiner`,
+`answersynthesizer`) on its own provider and model. Three examples are in
+`configs/benchmark/`:
+
+| File | Planner and refiner | Resolver, decomposer, synthesizer |
+| --- | --- | --- |
+| `gpt-5.4.yaml` | gpt-5.4 | gpt-5.4 |
+| `gpt-5.4-mini-helpers.yaml` | gpt-5.4 | gpt-5.4-mini |
+| `claude-planner.yaml` | claude-opus-5 (needs the `anthropic` extra and `ANTHROPIC_API_KEY`) | gpt-5.4 |
+
+```bash
+nl2sql --env demo benchmark --tier 2 --max-cost 10 \
+  --llm gpt-5.4=configs/benchmark/gpt-5.4.yaml \
+  --llm mini-helpers=configs/benchmark/gpt-5.4-mini-helpers.yaml \
+  --llm claude-planner=configs/benchmark/claude-planner.yaml
+```
+
+A model that is not in `VERIFIED_MODELS` (`nl2sql/cli/common/api_key.py`) gets
+a warning: the engine's parameters have not been checked against it.
+
+### Cost and the cap
+
+Every LLM call is billed from `nl2sql/evaluation/prices.py`, a committed table
+of USD per 1M tokens, dated with the day it was checked:
+
+| Model | Input | Cached input | Cache write | Output | Source |
+| --- | --- | --- | --- | --- | --- |
+| gpt-5.4 | 2.50 | 0.25 | 2.50 | 15.00 | OpenAI pricing page, 2026-09-21 |
+| gpt-5.4-mini | 0.75 | 0.075 | 0.75 | 4.50 | OpenAI pricing page, 2026-09-21 |
+| claude-opus-5 | 5.00 | 0.50 | 6.25 | 25.00 | Anthropic model table (claude-api skill, cached 2026-06-24) |
+| claude-sonnet-5 | 2.00 | 0.20 | 2.50 | 10.00 | same |
+| claude-haiku-4-5 | 1.00 | 0.10 | 1.25 | 5.00 | same |
+
+A call costs `(input - cached - cache_write) x input + cached x cached_input +
+cache_write x cache_write_rate + output x output`, from the token counts each
+wire adapter records in `QueryResult.usage`. Reasoning tokens are part of
+output and billed as output. OpenAI charges nothing extra to write its
+automatic cache; Anthropic bills a cache write at 1.25x input and a read at
+0.1x. Each call is priced by the model its node is configured with, so a dated
+snapshot name in the response still prices correctly.
+
+Before any call, every model any LLM node of any config would use must have a
+price; a missing one is an error naming the config, node and model. Before
+each question the run adds the dearest question seen so far to the running
+total and stops if that could pass `--max-cost`. The cap covers the whole run
+(every config and pass), and the first question always runs, so the total can
+exceed the cap only by what one question costs more than the dearest before
+it. The running spend prints after every question. A stopped run still writes
+its scoreboard, marked `"stopped": "max_cost"`, with `completed_cases` short
+of `planned_cases`.
+
+Tier 2 turns the plan cache off for its run (`PLAN_CACHE_ENABLED`), so a
+second pass asks the planner again instead of replaying the first, and scores
+refusals against the generic message, as tier 1 does.
+
+### The scoreboard
+
+`benchmark_tier2.json` holds the run (`passes`, `roles`, `questions`,
+`max_cost`, `spent`, `stopped`, `prices_checked_on`), one entry per config
+under `configs`, and a `comparison`. Each config has:
+
+| Field | What it is |
+| --- | --- |
+| `models` | `provider:model` per LLM node |
+| `planned_cases`, `completed_cases` | Cases the run would make, and made |
+| `summary` | pass/fail counts per role, as tier 1 reports |
+| `accuracy` | `overall`, `by_tag` and `by_difficulty`: passes against the gold result |
+| `answerability` | `precision` and `recall` of refusing as unanswerable: true refusals of the four unanswerable questions, false refusals of answerable ones, and missed unanswerables |
+| `tokens_by_node` | calls, input, cached input, cache write, output and reasoning tokens per node |
+| `cost` | dollars `total` and `per_question` (each result row has its own `cost`) |
+| `latency` | p50 and p95 seconds per question, and per node |
+| `retries` | refiner retries in total, and questions that needed one |
+| `errors_by_code` | error codes the runs ended with (`EXCEPTION` for a run that raised) |
+| `determinism` | with `--passes` > 1: the share of questions whose SQL and rows were identical in every pass, and which ones differed |
+| `results` | one row per run: status, reason, SQL, cost, latency, tokens, retries |
+
+`comparison.configs` is one row per config (accuracy, answerability, cost,
+latency, retries, determinism); `comparison.differences` lists the questions
+the configs disagree on. The command prints the same as tables:
+
+```
+                          Tier 2 scoreboard
+Config        Cases  Accuracy  Ans. P  Ans. R  Cost     $/question  p50    p95    Retries  Determinism
+gpt-5.4       8/8    100.0%    100.0%  100.0%  $0.0806  $0.0101     0.08s  0.25s  0        100.0%
+mini-helpers  8/8    75.0%     100.0%  100.0%  $0.0372  $0.0046     0.09s  0.09s  0        100.0%
+
+                  Questions the configs disagree on
+ID           Role   gpt-5.4  mini-helpers
+chinook_018  admin  pass     fail
+```
+
+(a run against the fake LLM, with one plan deliberately wrong on the second
+server.)
+
+### Baseline regression check
+
+`--baseline PATH` compares the run against a committed scoreboard, config by
+config (by name; a config the baseline lacks is skipped). It exits 1 if
+accuracy drops by more than `--max-accuracy-drop` or cost per question rises
+by more than `--max-cost-increase`. Baselines go in
+`packages/nl2sql/src/nl2sql/evaluation/baselines/`; none is committed yet. To
+make one, run tier 2 on the full set and copy its scoreboard there:
+
+```bash
+nl2sql --env demo benchmark --tier 2 --llm gpt-5.4=configs/benchmark/gpt-5.4.yaml --max-cost 5 \
+  --export-path packages/nl2sql/src/nl2sql/evaluation/baselines/gpt-5.4.json
+# later
+nl2sql --env demo benchmark --tier 2 --llm gpt-5.4=configs/benchmark/gpt-5.4.yaml --max-cost 5 \
+  --baseline packages/nl2sql/src/nl2sql/evaluation/baselines/gpt-5.4.json
+```
+
+### Results over time
+
+Every tier 2 run also writes one record per config to `benchmarks/results/`,
+named `<YYYY-MM-DD>_<engine-version>_<config>.json` (`-2`, `-3`... when the
+name is taken that day). A record holds the UTC date and time, the engine
+version and git commit, the dataset name and the sha256 of
+`chinook_gold.yaml` (runs on a different gold set are never shown as
+comparable), the config name and `provider:model` per node, the roles and
+passes, the headline metrics (accuracy, answerability precision and recall,
+dollars total and per question, input / cached / output tokens per question,
+p50 and p95 latency, determinism), `stopped` and `partial`, and the config's
+full scoreboard.
+
+`nl2sql benchmark publish` (no key, no network) reads every record and
+rewrites `docs/benchmarks.md` (every run, newest first, and the latest run per
+config) and the block between `<!-- BENCHMARKS:START -->` and
+`<!-- BENCHMARKS:END -->` in `README.md`. It reads no clock, so the same
+records always give byte-identical pages. The workflow:
+
+1. Run tier 2 (it writes the records).
+2. Commit the new files in `benchmarks/results/`.
+3. Run `nl2sql benchmark publish`.
+4. Commit the `README.md` and `docs/benchmarks.md` changes.
+
+`packages/nl2sql/tests/unit/test_benchmark_records.py` checks in CI, with no
+key, that the committed README block and `docs/benchmarks.md` are exactly what
+`publish` makes from the committed records.
+
+### How tier 2 is tested
+
+With no key and no spending: `packages/nl2sql/tests/e2e/test_benchmark_tier2_fake_llm.py`
+points ordinary LLM config files at two `FakeLLMServer`s serving the gold
+plans with canned usage (cached and reasoning tokens included), one with a
+plan deliberately wrong. It checks the scoring, the comparison and its
+differences, the dollars against the price table, the cap stopping mid-run
+with a partial scoreboard, an unpriced model failing before any call, and two
+passes with the plan cache off. `tests/unit/test_tier2_scoreboard.py` and
+`tests/cli/test_benchmark_tier2_command.py` cover the scoreboard, the
+baseline check, the refusal to start without `--max-cost` and the exit codes.

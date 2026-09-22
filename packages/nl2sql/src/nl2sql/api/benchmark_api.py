@@ -8,14 +8,16 @@ from __future__ import annotations
 
 import pathlib
 from dataclasses import dataclass
-from typing import Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import yaml
 
 from nl2sql.configs.llm import LLMFileConfig
 from nl2sql.context import NL2SQLContext
 from nl2sql.evaluation.benchmark_runner import BenchmarkRunner, BenchmarkResult
+from nl2sql.evaluation.gold import load_gold_dataset
 from nl2sql.evaluation.tier1 import run_tier1
+from nl2sql.evaluation.tier2 import run_tier2, select_question_ids
 from nl2sql.evaluation.types import BenchmarkConfig
 
 
@@ -82,6 +84,41 @@ class BenchmarkAPI:
         replaced by the gold-plan fake for the rest of this API's life.
         """
         return run_tier1(self._context(config), config)
+
+    def tier2_configs(
+        self, config: BenchmarkConfig, llm_config_paths: Optional[Dict[str, pathlib.Path]] = None,
+    ) -> Dict[str, LLMFileConfig]:
+        """The named LLM configs tier 2 compares, or the context's own one as ``default``.
+
+        Each path is an LLM config in the normal ``llm.yaml`` format. Loading
+        one makes no model call.
+        """
+        manager = self._context(config).config_manager
+        if not llm_config_paths:
+            return {"default": manager.load_llm()}
+        return {name: manager.load_llm(pathlib.Path(path)) for name, path in llm_config_paths.items()}
+
+    def run_tier2(
+        self,
+        config: BenchmarkConfig,
+        llm_configs: Dict[str, LLMFileConfig],
+        *,
+        max_cost: float,
+        passes: int = 1,
+        questions: Optional[List[str]] = None,
+        before_case=None,
+        on_case=None,
+    ) -> Dict[str, Any]:
+        """Run the real model end to end on the gold questions, per config, under a dollar cap.
+
+        See :mod:`nl2sql.evaluation.tier2`. ``questions`` narrows the run to
+        these question ids or tags. Returns the scoreboard.
+        """
+        if questions:
+            ids = select_question_ids(load_gold_dataset(config.dataset_path), questions)
+            config = config.model_copy(update={"include_ids": ids})
+        return run_tier2(self._context(config), config, llm_configs, max_cost=max_cost, passes=passes,
+                         before_case=before_case, on_case=on_case)
 
     @staticmethod
     def _load_llm_configs(config: BenchmarkConfig) -> Dict[str, LLMFileConfig]:

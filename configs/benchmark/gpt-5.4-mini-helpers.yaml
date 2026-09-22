@@ -1,0 +1,19 @@
+# Tier 2 benchmark config: the planner and refiner on gpt-5.4; the resolver,
+# decomposer and answer synthesizer on gpt-5.4-mini (the default).
+version: 1
+default:
+  provider: openai
+  model: gpt-5.4-mini
+  temperature: 0.0
+  api_key: ${env:OPENAI_API_KEY}
+agents:
+  astplanner:
+    provider: openai
+    model: gpt-5.4
+    temperature: 0.0
+    api_key: ${env:OPENAI_API_KEY}
+  refiner:
+    provider: openai
+    model: gpt-5.4
+    temperature: 0.0
+    api_key: ${env:OPENAI_API_KEY}
