@@ -3438,6 +3438,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#top-level-exports" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Top-level exports
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -4016,6 +4027,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#top-level-exports" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Top-level exports
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -4093,6 +4115,12 @@ modular APIs through a single class.</p>
 <code>list_llms</code>, <code>get_llm</code>, <code>index_datasource</code>, <code>index_all_datasources</code>, <code>clear_index</code>,
 <code>check_permissions</code>, <code>get_allowed_resources</code>, <code>get_current_settings</code>,
 <code>get_setting</code>, <code>validate_configuration</code>.</p>
+<h3 id="top-level-exports">Top-level exports</h3>
+<p>Clients import everything they need from <code>nl2sql</code> itself, never from an engine
+submodule: <code>NL2SQL</code>, <code>QueryResult</code>, <code>SubQueryResult</code>, <code>RowSample</code>,
+<code>QuestionUsage</code>, <code>UserContext</code>, <code>configure_logging</code>, the error types
+(<code>PipelineError</code>, <code>ErrorCode</code>, <code>ErrorSeverity</code>) and the modular API classes.
+The REST API (<code>nl2sql-api</code>) is held to this rule by an architecture test.</p>
 
 
 

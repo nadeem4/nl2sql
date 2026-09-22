@@ -4113,6 +4113,7 @@
 </tbody>
 </table>
 <h3 id="subqueryresponse"><code>SubQueryResponse</code></h3>
+<p>Derives from <code>nl2sql.SubQueryResult</code>, so it has exactly the engine's fields.</p>
 <table>
 <thead>
 <tr>
@@ -4161,13 +4162,13 @@
 </tr>
 <tr>
 <td><code>validation</code></td>
-<td><code>List[Dict[str, Any]]</code></td>
+<td><code>List[ValidationCheck]</code></td>
 <td>no</td>
 <td>Validation checks (<code>name</code>, <code>passed</code>, <code>message</code>).</td>
 </tr>
 <tr>
 <td><code>rows</code></td>
-<td><code>Optional[Dict[str, Any]]</code></td>
+<td><code>Optional[RowSample]</code></td>
 <td>no</td>
 <td>Capped row sample (<code>columns</code>, <code>rows</code>, <code>total_rows</code>).</td>
 </tr>
@@ -4192,7 +4193,8 @@
 </tbody>
 </table>
 <h3 id="queryresponse"><code>QueryResponse</code></h3>
-<p>Mirrors <code>nl2sql.api.query_api.QueryResult</code> field for field.</p>
+<p>Derives from <code>nl2sql.QueryResult</code> (only <code>sub_queries</code> is narrowed to
+<code>SubQueryResponse</code>), so the HTTP response cannot drift from what the engine returns.</p>
 <table>
 <thead>
 <tr>
@@ -4223,7 +4225,7 @@
 </tr>
 <tr>
 <td><code>trace_id</code></td>
-<td><code>Optional[str]</code></td>
+<td><code>str</code></td>
 <td>no</td>
 <td>Trace identifier.</td>
 </tr>
@@ -4241,7 +4243,7 @@
 </tr>
 <tr>
 <td><code>artifact_refs</code></td>
-<td><code>Dict[str, Dict[str, Any]]</code></td>
+<td><code>Dict[str, ArtifactRef]</code></td>
 <td>no</td>
 <td>Result artifact references keyed by execution node id.</td>
 </tr>
@@ -4282,7 +4284,7 @@ result set is written to artifact storage and addressed through <code>artifact_r
 <p>Execution flow:
 - Converts <code>user_context</code> to <code>UserContext</code> when present.
 - Delegates to <code>engine.run_query(...)</code>, which returns a <code>QueryResult</code>.
-- Maps the <code>QueryResult</code> field-for-field into <code>QueryResponse</code>.</p>
+- Returns that <code>QueryResult</code> as a <code>QueryResponse</code> (its subclass); there is no field mapping.</p>
 <p>The handler is declared with <code>def</code>, not <code>async def</code>: the pipeline performs blocking
 LLM and database calls, so Starlette runs it in its threadpool instead of on the
 event loop.</p>

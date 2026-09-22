@@ -1851,7 +1851,7 @@ same normalised counts as <code>QueryResult.usage</code>). Treat
 this as a debugging trace of model calls made through the CLI, not as a
 compliance audit trail.</p>
 <h2 id="structured-logging">Structured logging</h2>
-<p>Logging is configured at import time; JSON formatting is enabled when <code>Settings.observability_exporter == "otlp"</code>. Trace and tenant context helpers exist (<code>trace_context</code>, <code>tenant_context</code>), but the pipeline does not set them; callers must establish context if they want trace/tenant IDs in logs.</p>
+<p>The library does not configure logging on import; the application entry point calls <code>nl2sql.configure_logging</code> (the REST API does it in its lifespan). JSON formatting is enabled when <code>Settings.observability_exporter == "otlp"</code>. Trace and tenant context helpers exist (<code>trace_context</code>, <code>tenant_context</code>), but the pipeline does not set them; callers must establish context if they want trace/tenant IDs in logs.</p>
 <h2 id="source-references">Source references</h2>
 <ul>
 <li>Metrics: <code>packages/nl2sql/src/nl2sql/common/metrics.py</code></li>
