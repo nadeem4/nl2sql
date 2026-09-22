@@ -2048,6 +2048,28 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#optional-hook-render_sqlexpression" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Optional hook: render_sql(expression)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#result-types-every-adapter-returns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Result types every adapter returns
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -4133,6 +4155,28 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#optional-hook-render_sqlexpression" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Optional hook: render_sql(expression)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#result-types-every-adapter-returns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Result types every adapter returns
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -4229,6 +4273,46 @@
 <p>Returns the execution plan.</p>
 <h4 id="cost_estimatesql-str"><code>cost_estimate(sql: str)</code></h4>
 <p>Returns cost/row estimates. Advertised via the <code>SUPPORTS_COST_ESTIMATE</code> capability; the pipeline does not currently call it.</p>
+<h3 id="optional-hook-render_sqlexpression">Optional hook: <code>render_sql(expression)</code></h3>
+<p><code>nl2sql_adapter_sdk.protocols.SqlRenderingAdapterProtocol</code>. The engine builds
+every query as a sqlglot expression tree and, when the adapter has
+<code>render_sql</code>, passes it the finished tree and executes the text it returns.
+Without the hook the engine renders <code>expression.sql(dialect=adapter.get_dialect())</code>,
+so an adapter written before the hook keeps working. <code>BaseSQLAlchemyAdapter</code>
+implements that same default.</p>
+<p>Override it only for what sqlglot cannot express for your database. The
+SQLite adapter, for example, rewrites <code>EXTRACT</code> and date truncation with
+<code>STRFTIME</code> and <code>DATE(x, 'start of month')</code>. Postgres, MySQL, SQL Server and
+DuckDB use the default.</p>
+<p><code>get_dialect()</code> must return a sqlglot dialect name (<code>postgres</code>, <code>tsql</code>,
+<code>mysql</code>, <code>duckdb</code>, <code>sqlite</code>, ...), not the SQLAlchemy name.</p>
+<h3 id="result-types-every-adapter-returns">Result types every adapter returns</h3>
+<p>These are part of the contract, so the same plan gives the same values on
+every database:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Plan operation</th>
+<th style="text-align: left;">Result type</th>
+<th style="text-align: left;">Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>DATE_PART(unit, date)</code>, unit <code>year</code>, <code>quarter</code>, <code>month</code>, <code>day</code></td>
+<td style="text-align: left;">INTEGER</td>
+<td style="text-align: left;"><code>2011</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>DATE_TRUNC(unit, date)</code>, same units</td>
+<td style="text-align: left;">ISO date string <code>YYYY-MM-DD</code></td>
+<td style="text-align: left;"><code>'2011-04-01'</code></td>
+</tr>
+</tbody>
+</table>
+<p>The engine already wraps a date part in <code>CAST(... AS INT)</code> and a truncation
+in a <code>YYYY-MM-DD</code> format; an adapter that rewrites the inner nodes keeps
+those wrappers.</p>
 <hr />
 <h2 id="compliance-testing">Compliance Testing</h2>
 <p>All adapters should pass the compliance test suite (schema introspection, type mapping,

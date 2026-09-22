@@ -2191,7 +2191,12 @@ statistics only <code>sample_values</code> is sent (it helps match literal filte
 <p>DISTINCT in the plan language: <code>PlanModel.distinct: true</code> is <code>SELECT DISTINCT</code>,
 and a <code>func</code> expr with <code>distinct: true</code> is a distinct aggregate such as
 <code>COUNT(DISTINCT x)</code>. The system message's instructions and one of its examples
-say so; a function named <code>DISTINCT</code> is rejected by the logical validator.
+say so; a function named <code>DISTINCT</code> is rejected by the logical validator.</p>
+<p>Dates in the plan language are two portable functions, described once in the
+system message and the same for every database: <code>DATE_PART(unit, date)</code>, an
+integer, and <code>DATE_TRUNC(unit, date)</code>, the period's first day as <code>YYYY-MM-DD</code>,
+with the unit a string literal <code>year</code>, <code>quarter</code>, <code>month</code> or <code>day</code>. The prompt
+names no database; each adapter renders the functions (see the generator).
 Subqueries and window functions are not in the language; <code>offset</code> is accepted
 but not rendered.</p>
 <hr/>
