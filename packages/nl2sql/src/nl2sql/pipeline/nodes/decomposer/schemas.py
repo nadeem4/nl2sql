@@ -53,6 +53,10 @@ class SubQuery(BaseModel):
     metrics: List[MetricSpec] = Field(default_factory=list)
     filters: List[FilterSpec] = Field(default_factory=list)
     group_by: List[GroupBySpec] = Field(default_factory=list)
+    # Ranking and top-N of this sub-query's own rows ("the artist with the
+    # most albums" is order_by album_count desc, limit 1).
+    order_by: List[OrderBySpec] = Field(default_factory=list)
+    limit: Optional[int] = None
     expected_schema: List[ExpectedColumn] = Field(default_factory=list)
     schema_version: Optional[str] = None
 
@@ -63,6 +67,7 @@ class SubQuery(BaseModel):
             *(m.name for m in self.metrics),
             *(f.attribute for f in self.filters),
             *(g.attribute for g in self.group_by),
+            *(o.attribute for o in self.order_by),
             *(c.name for c in self.expected_schema),
         ):
             raise ValueError("SubQuery contains SQL syntax.")

@@ -64,6 +64,14 @@ class PlanCache:
         question = normalize_question(sub_query.intent)
         if not question:
             return None
+        # The same intent ranked or cut differently is a different plan. Keyed
+        # only when present, so entries for plain intents keep hitting.
+        order_by = getattr(sub_query, "order_by", None) or []
+        limit = getattr(sub_query, "limit", None)
+        if order_by:
+            question += " | order_by=" + ",".join(f"{o.attribute} {o.direction}" for o in order_by)
+        if limit is not None:
+            question += f" | limit={limit}"
         return question, sub_query.datasource_id, sub_query.schema_version
 
     def get(self, sub_query: Any) -> Optional[PlanModel]:

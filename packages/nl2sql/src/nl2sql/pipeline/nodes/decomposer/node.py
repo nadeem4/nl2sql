@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Dict, Any, TYPE_CHECKING
+from typing import Dict, Any, List, TYPE_CHECKING
 
 from langchain_core.runnables import Runnable
 
@@ -17,6 +17,55 @@ import json
 
 logger = get_logger("decomposer")
 
+
+
+# Post-combine ops that are the SQL of a single sub-query: WHERE/HAVING,
+# ORDER BY and LIMIT. An aggregate or project op re-shapes the rows, so a
+# group with one of those is left to the aggregator.
+_FOLDABLE_OPS = {"filter", "sort", "limit"}
+
+
+def fold_single_input_ops(response: DecomposerResponse) -> DecomposerResponse:
+    """Moves filter/sort/limit ops on a one-sub-query group into that sub-query.
+
+    With one input there is nothing to combine, so the ops are the sub-query's
+    own filters, ranking and top-N. Left as post-combine ops they reach only
+    the aggregated answer, never the sub-query's SQL or rows. Every op on such
+    a group targets the combine node directly (they are not chained), so
+    folding them all is the only reading that applies all of them.
+    """
+    uses: Dict[str, int] = {}
+    for group in response.combine_groups:
+        for inp in group.inputs:
+            uses[inp.subquery_id] = uses.get(inp.subquery_id, 0) + 1
+    ops_by_group: Dict[str, List[PostCombineOp]] = {}
+    for op in response.post_combine_ops:
+        ops_by_group.setdefault(op.target_group_id, []).append(op)
+
+    sub_queries = {sq.id: sq for sq in response.sub_queries}
+    folded_groups = set()
+    for group in response.combine_groups:
+        ops = ops_by_group.get(group.group_id, [])
+        if not ops or len(group.inputs) != 1 or any(op.operation not in _FOLDABLE_OPS for op in ops):
+            continue
+        sq = sub_queries.get(group.inputs[0].subquery_id)
+        if sq is None or uses.get(sq.id) != 1:
+            continue
+        filters, order_by, limit = list(sq.filters), list(sq.order_by), sq.limit
+        for op in ops:
+            filters += [f for f in op.filters if f not in filters]
+            order_by += [o for o in op.order_by if o not in order_by]
+            if op.limit is not None:
+                limit = op.limit if limit is None else min(limit, op.limit)
+        sub_queries[sq.id] = sq.model_copy(update={"filters": filters, "order_by": order_by, "limit": limit})
+        folded_groups.add(group.group_id)
+
+    if not folded_groups:
+        return response
+    return response.model_copy(update={
+        "sub_queries": [sub_queries[sq.id] for sq in response.sub_queries],
+        "post_combine_ops": [op for op in response.post_combine_ops if op.target_group_id not in folded_groups],
+    })
 
 
 class DecomposerNode:
@@ -82,6 +131,8 @@ class DecomposerNode:
                 }
             )
 
+            llm_response = fold_single_input_ops(llm_response)
+
             final_sub_queries = []
             unmapped = []
             allowed_ids = set(resolver_response.allowed_datasource_ids)
@@ -128,6 +179,8 @@ class DecomposerNode:
                         "metrics": [m.model_dump() for m in llm_sq.metrics],
                         "filters": [f.model_dump() for f in llm_sq.filters],
                         "group_by": [g.model_dump() for g in llm_sq.group_by],
+                        "order_by": [o.model_dump() for o in llm_sq.order_by],
+                        "limit": llm_sq.limit,
                         "expected_schema": [c.model_dump() for c in llm_sq.expected_schema],
                     },
                 )
@@ -139,6 +192,8 @@ class DecomposerNode:
                     metrics=llm_sq.metrics,
                     filters=llm_sq.filters,
                     group_by=llm_sq.group_by,
+                    order_by=llm_sq.order_by,
+                    limit=llm_sq.limit,
                     expected_schema=llm_sq.expected_schema,
                     schema_version=schema_version_map.get(datasource_id),
                 )

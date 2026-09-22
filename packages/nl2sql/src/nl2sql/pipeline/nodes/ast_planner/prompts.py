@@ -98,6 +98,38 @@ Plan:
   ]
 }
 
+User Query: "Which region has the highest total revenue?"
+Semantic Context:
+{"group_by": [{"attribute": "region"}], "limit": 1, "metrics": [{"aggregation": "sum", "name": "total_revenue"}], "order_by": [{"attribute": "total_revenue", "direction": "desc"}]}
+
+Plan:
+{
+  "reasoning": "Sum revenue per region, highest first, keep one row.",
+  "tables": [
+    {"name": "orders", "alias": "t1", "ordinal": 0}
+  ],
+  "joins": [],
+  "select_items": [
+    {"ordinal": 0, "expr": {"kind": "column", "alias": "t1", "column_name": "region"}, "alias": "region"},
+    {
+      "ordinal": 1,
+      "expr": {"kind": "func", "func_name": "SUM", "args": [{"kind": "column", "alias": "t1", "column_name": "revenue"}], "is_aggregate": true},
+      "alias": "total_revenue"
+    }
+  ],
+  "group_by": [
+    {"ordinal": 0, "expr": {"kind": "column", "alias": "t1", "column_name": "region"}}
+  ],
+  "order_by": [
+    {
+      "ordinal": 0,
+      "direction": "desc",
+      "expr": {"kind": "func", "func_name": "SUM", "args": [{"kind": "column", "alias": "t1", "column_name": "revenue"}], "is_aggregate": true}
+    }
+  ],
+  "limit": 1
+}
+
 User Query: "How many different customers placed orders?"
 
 Plan:
@@ -140,7 +172,12 @@ PLANNER_SYSTEM_PROMPT = (
     "8. For literal values on '=' or 'IN', choose values from a column's sample_values if listed.\n"
     "9. If no exact match is available, fall back to LIKE but keep the pattern derived from sample_values.\n"
     "10. For COUNT(DISTINCT x), set \"distinct\": true on the COUNT func expr; for SELECT DISTINCT,"
-    " set the plan's \"distinct\": true. DISTINCT is never a func_name.\n\n"
+    " set the plan's \"distinct\": true. DISTINCT is never a func_name.\n"
+    "11. [SEMANTIC_CONTEXT] is the query's structured intent. Apply every part of it: its filters"
+    " (on an aggregated metric, as having), its order_by as the plan's order_by, and its limit as"
+    " the plan's limit.\n"
+    "12. A question for the most, least, highest, lowest, top N or bottom N rows needs an order_by on"
+    " the ranked value (desc for most/highest/top) and a limit (1 for a single answer, N for top N).\n\n"
 
     "[OUTPUT CONTRACT]\n"
     "- If [EXPECTED_SCHEMA] is provided and non-empty:\n"

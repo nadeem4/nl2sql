@@ -17,8 +17,10 @@ RULES:
 2) If an intent cannot be mapped to any resolved datasource, emit it under unmapped_subqueries.
 3) SubQueries must contain ONLY semantic intent:
    - metrics
-   - filters
+   - filters (a threshold on a metric, such as "spent more than 45", is a filter too)
    - group_by
+   - order_by and limit: a question for the most, least, highest, lowest, top N or bottom N
+     rows orders by the ranked metric (desc for most/highest/top) and limits to 1 or N
 4) Do NOT emit:
    - SQL
    - table names
@@ -32,7 +34,8 @@ RULES:
    - union
 6) For join or compare:
    - include join_keys as left/right semantic attribute pairs.
-7) Any filters, metrics, group_by, order_by, or limits that apply AFTER a combine must be emitted in post_combine_ops.
+7) post_combine_ops are only for operations across two or more combined sub-queries. A question answered
+   by one sub-query puts all of its filters, order_by and limit on that sub-query and emits no post_combine_ops.
 8) expected_schema must be derived strictly from semantic intent (metrics + group_by) and be minimal.
    It defines the semantic output contract for downstream aggregation, not physical columns.
 9) Do not invent attributes not implied by the user query or datasource metadata.
@@ -46,10 +49,15 @@ Return JSON exactly matching this structure:
     {{
       "id": "sq_1",
       "datasource_id": "ds_sales",
-      "intent": "total revenue by region last quarter",
+      "intent": "the ten regions with the highest revenue over 1000 last quarter",
       "metrics": [{{"name": "total_revenue", "aggregation": "sum"}}],
-      "filters": [{{"attribute": "time_period", "operator": "=", "value": "last_quarter"}}],
+      "filters": [
+        {{"attribute": "time_period", "operator": "=", "value": "last_quarter"}},
+        {{"attribute": "total_revenue", "operator": ">", "value": 1000}}
+      ],
       "group_by": [{{"attribute": "region"}}],
+      "order_by": [{{"attribute": "total_revenue", "direction": "desc"}}],
+      "limit": 10,
       "expected_schema": [
         {{"name": "region", "dtype": "string"}},
         {{"name": "total_revenue", "dtype": "float"}}
@@ -66,22 +74,7 @@ Return JSON exactly matching this structure:
       "join_keys": []
     }}
   ],
-  "post_combine_ops": [
-    {{
-      "op_id": "op_1",
-      "target_group_id": "cg_1",
-      "operation": "filter",
-      "filters": [{{"attribute": "total_revenue", "operator": ">", "value": 1000}}],
-      "metrics": [],
-      "group_by": [],
-      "order_by": [{{"attribute": "total_revenue", "direction": "desc"}}],
-      "limit": 10,
-      "expected_schema": [
-        {{"name": "region", "dtype": "string"}},
-        {{"name": "total_revenue", "dtype": "float"}}
-      ]
-    }}
-  ],
+  "post_combine_ops": [],
   "unmapped_subqueries": []
 }}
 
