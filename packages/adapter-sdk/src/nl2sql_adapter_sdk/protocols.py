@@ -32,7 +32,12 @@ class DatasourceAdapterProtocol(Protocol):
         ...
 
     def get_dialect(self) -> str:
-        """Return the normalized dialect string (SQL adapters)."""
+        """Return the sqlglot dialect name the engine renders SQL in (SQL adapters).
+
+        It must be a name ``sqlglot.Dialect.get_or_raise`` accepts, such as
+        ``postgres``, ``tsql``, ``mysql``, ``duckdb`` or ``sqlite``, not the
+        SQLAlchemy dialect name (``postgresql``, ``mssql``).
+        """
         ...
 
 

@@ -1,6 +1,5 @@
 from typing import Any, List, Dict
 from sqlalchemy import create_engine, text, inspect
-from sqlalchemy.dialects import mssql
 from nl2sql.adapters.sqlalchemy_base import (
     CostEstimate,
     DryRunResult,
@@ -88,7 +87,8 @@ class MssqlAdapter(BaseSQLAlchemyAdapter):
 
     def get_dialect(self) -> str:
         """MSSQL uses T-SQL dialect."""
-        return mssql.dialect.name
+        # A sqlglot dialect name (SQLAlchemy calls it "mssql").
+        return "tsql"
 
     def cost_estimate(self, sql: str) -> CostEstimate:
         import re

@@ -36,7 +36,13 @@ Override to provide custom connection arguments (e.g., timeouts, isolation level
 
 #### `get_dialect() -> str`
 
-Returns the logical dialect name. Defaults to the engine driver name.
+Returns the **sqlglot** dialect name the engine renders SQL in: `postgres`,
+`tsql`, `mysql`, `duckdb`, `sqlite`, or any other name
+`sqlglot.Dialect.get_or_raise` accepts. It is not the SQLAlchemy dialect name
+(`postgresql`, `mssql`), which sqlglot rejects. The base class raises
+`NotImplementedError`, so every adapter must implement it.
+`tests/adapters/unit/test_adapter_dialect_names.py` checks every adapter
+registered under the `nl2sql.adapters` entry point.
 
 #### `explain(sql: str)` / `cost_estimate(sql: str)`
 
