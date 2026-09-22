@@ -6,7 +6,8 @@ from rich.table import Table
 from rich.panel import Panel
 from nl2sql.common.env_hint import active_env_file
 from nl2sql.configs.manager import ConfigManager
-from nl2sql.llm.registry import ANTHROPIC_EXTRA_HINT, PROVIDER_PRESETS
+from nl2sql.llm.registry import PROVIDER_PRESETS
+from nl2sql.llm.wires.anthropic import EXTRA_HINT as ANTHROPIC_EXTRA_HINT
 from nl2sql.cli.console import console, print_success, print_error
 from nl2sql.cli.config import ADAPTER_DRIVERS, KNOWN_ADAPTERS
 from nl2sql.cli.checks import check_package, verify_connectivity
@@ -78,7 +79,7 @@ def doctor_command():
                 f"Set it in {active_env_file()} or the environment, "
                 "or pass --api-key to nl2sql setup or nl2sql demo."
             )
-        if agent.provider == "anthropic" and not check_package("langchain_anthropic"):
+        if preset is not None and preset.wire == "anthropic" and not check_package("langchain_anthropic"):
             print_error(f"MISSING: LLM provider anthropic needs langchain-anthropic. {ANTHROPIC_EXTRA_HINT}")
     except Exception as exc:
         print_error(f"LLM configuration could not be loaded: {exc}")

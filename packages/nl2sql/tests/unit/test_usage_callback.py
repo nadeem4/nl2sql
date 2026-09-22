@@ -18,8 +18,9 @@ def _start(cb, node, run_id, model="gpt-4o"):
     )
 
 
-def _chat_result(usage=None, model="gpt-4o-2024-08-06", llm_output=None):
-    msg = AIMessage(content="ok", usage_metadata=usage, response_metadata={"model_name": model})
+def _chat_result(usage=None, model="gpt-4o-2024-08-06", llm_output=None, provider=None):
+    meta = {"model_name": model, **({"model_provider": provider} if provider else {})}
+    msg = AIMessage(content="ok", usage_metadata=usage, response_metadata=meta)
     return LLMResult(generations=[[ChatGeneration(message=msg)]], llm_output=llm_output)
 
 
@@ -94,7 +95,7 @@ def test_anthropic_cache_writes_split_by_ttl_are_counted_once():
         "input_tokens": 3540, "output_tokens": 120, "total_tokens": 3660,
         "input_token_details": {"cache_read": 0, "cache_creation": 0,
                                 "ephemeral_5m_input_tokens": 3000, "ephemeral_1h_input_tokens": 500},
-    }, model="claude-opus-5"), run_id=run)
+    }, model="claude-opus-5", provider="anthropic"), run_id=run)
 
     [call] = cb.usage().calls
     assert call.cache_write_input_tokens == 3500

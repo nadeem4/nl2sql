@@ -5,23 +5,16 @@ LangChain callback, not a node concern, because ``with_structured_output(...)``
 hands the node a parsed Pydantic object and the ``AIMessage`` that carried the
 usage never reaches it; ``on_llm_end`` still sees the raw generation.
 
-Usage is read from ``AIMessage.usage_metadata``, the shape LangChain normalises
-across providers (OpenAI and Anthropic alike):
-
-* ``input_tokens`` / ``output_tokens`` / ``total_tokens``
-* ``input_token_details.cache_read``      -> ``cached_input_tokens``
-* ``input_token_details.cache_creation``  -> ``cache_write_input_tokens``
-  (plus ``ephemeral_5m_input_tokens`` / ``ephemeral_1h_input_tokens``, where
-  langchain-anthropic puts an Anthropic cache write split by TTL)
-* ``output_token_details.reasoning``      -> ``reasoning_tokens``
+What a response's usage means depends on its wire type, so it is read by that
+wire's adapter (``nl2sql.llm.wires``), picked by the ``model_provider`` the
+client stamps on the message. Every adapter fills the same fields:
+``input_tokens``, ``cached_input_tokens``, ``cache_write_input_tokens``,
+``output_tokens``, ``reasoning_tokens`` and ``total_tokens``.
 
 A detail the provider did not report is recorded as ``0``. A call whose result
 carries no usage at all is recorded with zero tokens and ``usage_reported=False``
 so a zero is never mistaken for a measurement. Cached and cache-write tokens are
 a subset of ``input_tokens``; reasoning tokens are a subset of ``output_tokens``.
-Anthropic's own ``input_tokens`` excludes cache reads and writes;
-langchain-anthropic adds ``cache_read_input_tokens`` and
-``cache_creation_input_tokens`` back, so each input token is counted once.
 """
 from __future__ import annotations
 
@@ -36,6 +29,7 @@ from pydantic import BaseModel, Field
 
 from nl2sql.common.context import current_datasource_id
 from nl2sql.common.metrics import token_usage_counter
+from nl2sql.llm.wires import wire_named
 
 # Per-model prices, per million tokens: {"input": .., "output": .., "cached_input": ..}.
 Prices = Mapping[str, Mapping[str, float]]
@@ -100,68 +94,23 @@ class QuestionUsage(BaseModel):
     plan_cache_hits: int = 0
 
 
-def _int(value: Any) -> int:
-    try:
-        return int(value or 0)
-    except (TypeError, ValueError):
-        return 0
-
-
-# When Anthropic reports a cache write per TTL, langchain-anthropic zeroes the
-# generic ``cache_creation`` detail and puts the tokens under these keys.
-_ANTHROPIC_CACHE_WRITE_BY_TTL = ("ephemeral_5m_input_tokens", "ephemeral_1h_input_tokens")
-
-
-def _detail(details: Mapping[str, Any], key: str) -> int:
-    """Read a usage detail, including its service-tier-prefixed variants.
-
-    langchain-openai writes ``priority_cache_read`` rather than ``cache_read``
-    for priority/flex tier calls.
-    """
-    return sum(_int(v) for k, v in (details or {}).items() if k == key or k.endswith(f"_{key}"))
+def _provider(response: LLMResult) -> Optional[str]:
+    """The wire that served the call: the ``model_provider`` its client stamped on the message."""
+    for generations in response.generations or []:
+        for generation in generations:
+            meta = getattr(getattr(generation, "message", None), "response_metadata", None) or {}
+            if meta.get("model_provider"):
+                return str(meta["model_provider"])
+    return None
 
 
 def read_usage(response: LLMResult) -> Optional[Dict[str, int]]:
-    """Token counts from a chat model result, or None if it reports no usage."""
-    usage_metadata = None
-    for generations in response.generations or []:
-        for generation in generations:
-            message = getattr(generation, "message", None)
-            usage_metadata = getattr(message, "usage_metadata", None)
-            if usage_metadata:
-                break
-        if usage_metadata:
-            break
+    """Token counts from a chat model result, or None if it reports no usage.
 
-    if usage_metadata:
-        input_details = usage_metadata.get("input_token_details") or {}
-        output_details = usage_metadata.get("output_token_details") or {}
-        inp = _int(usage_metadata.get("input_tokens"))
-        out = _int(usage_metadata.get("output_tokens"))
-        return {
-            "input_tokens": inp,
-            "cached_input_tokens": _detail(input_details, "cache_read"),
-            "cache_write_input_tokens": _detail(input_details, "cache_creation") + sum(
-                _int(input_details.get(k)) for k in _ANTHROPIC_CACHE_WRITE_BY_TTL),
-            "output_tokens": out,
-            "reasoning_tokens": _detail(output_details, "reasoning"),
-            "total_tokens": _int(usage_metadata.get("total_tokens")) or inp + out,
-        }
-
-    # A plain (non-chat) LLM only reports the provider's raw usage object.
-    legacy = (response.llm_output or {}).get("token_usage") or (response.llm_output or {}).get("usage")
-    if legacy:
-        inp = _int(legacy.get("prompt_tokens") or legacy.get("input_tokens"))
-        out = _int(legacy.get("completion_tokens") or legacy.get("output_tokens"))
-        return {
-            "input_tokens": inp,
-            "cached_input_tokens": _int((legacy.get("prompt_tokens_details") or {}).get("cached_tokens")),
-            "cache_write_input_tokens": 0,
-            "output_tokens": out,
-            "reasoning_tokens": _int((legacy.get("completion_tokens_details") or {}).get("reasoning_tokens")),
-            "total_tokens": _int(legacy.get("total_tokens")) or inp + out,
-        }
-    return None
+    Each wire type's adapter knows its own usage shape; the call is read by the
+    adapter of the provider that served it (OpenAI's when none is stamped).
+    """
+    return wire_named(_provider(response)).read_usage(response)
 
 
 def _model_name(response: LLMResult) -> str:

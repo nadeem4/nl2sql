@@ -141,7 +141,7 @@ from nl2sql.cli.generators.llm import LLMGenerator
 def _warn_if_anthropic_extra_missing() -> None:
     """Claude needs the optional langchain-anthropic; say so now, not on the first query."""
     if not check_package("langchain_anthropic"):
-        from nl2sql.llm.registry import ANTHROPIC_EXTRA_HINT
+        from nl2sql.llm.wires.anthropic import EXTRA_HINT as ANTHROPIC_EXTRA_HINT
 
         console.print(f"[yellow]Note:[/yellow] {escape(ANTHROPIC_EXTRA_HINT)}")
 

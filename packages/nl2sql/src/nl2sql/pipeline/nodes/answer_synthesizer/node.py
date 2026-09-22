@@ -11,6 +11,7 @@ if TYPE_CHECKING:
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.common.logger import get_logger
 from nl2sql.context import NL2SQLContext
+from nl2sql.llm.wires import structured
 from .schemas import AggregatedResponse, AnswerSynthesizerResponse
 from .prompts import ANSWER_SYNTHESIZER_PROMPT
 
@@ -24,9 +25,7 @@ class AnswerSynthesizerNode:
         self.node_name = self.__class__.__name__.lower().replace("node", "")
         self.llm = ctx.llm_registry.get_llm(self.node_name)
         self.prompt = ChatPromptTemplate.from_template(ANSWER_SYNTHESIZER_PROMPT)
-        self.chain = self.prompt | self.llm.with_structured_output(
-            AggregatedResponse, method="function_calling"
-        )
+        self.chain = self.prompt | structured(self.llm, AggregatedResponse)
 
     def _serialize_result(self, result: Any) -> str:
         try:
