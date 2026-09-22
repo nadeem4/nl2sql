@@ -4091,7 +4091,7 @@ with <code>--include-ids</code> and <code>--role</code>), and each run is scored
 </tr>
 <tr>
 <td><code>unanswerable</code></td>
-<td>Never run: reported as <code>skip</code>, because the datasource resolver has no answerability check yet</td>
+<td>Status <code>error</code>, a <code>QUESTION_NOT_ANSWERABLE</code> from the datasource resolver's answerability check, and no rows</td>
 </tr>
 </tbody>
 </table>
@@ -4110,7 +4110,10 @@ it the context's own LLM config runs once.</p>
 (including RBAC), the SQL generator and the executor -- with no model
 involved. <code>chinook_gold_plans.yaml</code> holds, for every answerable question, a
 hand-written <code>PlanModel</code> (the typed AST the planner emits) that answers it. A
-local <code>FakeLLMServer</code> answers every LLM call: the decomposer gets one
+local <code>FakeLLMServer</code> answers every LLM call: the datasource resolver's
+answerability check gets <code>["chinook"]</code> for a question with <code>gold_sql</code> and an
+empty list for an unanswerable one (so the resolver's refusal is what is
+scored), the decomposer gets one
 sub-query on <code>chinook</code> whose expected columns are the plan's select aliases,
 the planner gets the gold plan, the refiner "Keep the same plan." and the
 answer synthesizer a fixed sentence. The rest is the real pipeline on the
@@ -4129,10 +4132,11 @@ conditional sums in HAVING for "jazz but never rock" (<code>chinook_009</code>),
 <p>Tier 1 runs on every PR as <code>packages/nl2sql/tests/e2e/test_benchmark_tier1.py</code>,
 in the key-free integration job: it generates the demo, runs
 <code>nl2sql benchmark --tier 1</code> with no API key in the environment, and requires
-every allowed and refused case to pass and every unanswerable case to be
-skipped. <code>packages/nl2sql/tests/unit/test_tier1_gold_plans.py</code> checks in the
-unit job that every answerable question has a plan, that it reads exactly the
-needed tables and selects as many columns as the gold result.</p>
+every case -- allowed, refused and unanswerable, for every role -- to pass,
+with none skipped. <code>packages/nl2sql/tests/unit/test_tier1_gold_plans.py</code>
+checks in the unit job that every answerable question has a plan, that it
+reads exactly the needed tables and selects as many columns as the gold
+result, and that the answerability verdict served follows the gold dataset.</p>
 <p>When a gold plan fails, the fault is in the engine or in the plan. Fix an
 engine bug with a regression test; do not change the gold data to make a plan
 pass unless the gold data is itself wrong.</p>

@@ -6392,7 +6392,7 @@
 <li><code>DatasourceResolverNode._get_allowed_datasource_ids()</code> and <code>__call__()</code> in <code>nl2sql.pipeline.nodes.datasource_resolver.node</code></li>
 </ul>
 <h3 id="failure-behavior_11">Failure Behavior</h3>
-<p>Returns <code>PipelineError</code> with <code>SECURITY_VIOLATION</code> if no allowed datasource is available.</p>
+<p>Returns <code>PipelineError</code> with <code>SECURITY_VIOLATION</code> if no allowed datasource is available. The check runs before the resolver's answerability LLM call, so a denied caller triggers no model call and the model only ever sees datasources the role may read. It runs on every path, including the single-datasource shortcut that skips the vector search.</p>
 <h3 id="why-it-exists_11">Why It Exists</h3>
 <p>Prevents execution against unauthorized datasources.</p>
 <hr />

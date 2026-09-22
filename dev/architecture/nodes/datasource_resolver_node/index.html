@@ -569,6 +569,28 @@
       
     </span>
 </a>
+<nav aria-label="Internal Flow (Step-by-Step)" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#order-of-checks">
+<span class="md-ellipsis">
+      
+        Order of checks
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#answerability-check">
+<span class="md-ellipsis">
+      
+        Answerability check
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
 </li>
 <li class="md-nav__item">
 <a class="md-nav__link" href="#contracts-interfaces">
@@ -1856,6 +1878,28 @@
       
     </span>
 </a>
+<nav aria-label="Internal Flow (Step-by-Step)" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#order-of-checks">
+<span class="md-ellipsis">
+      
+        Order of checks
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#answerability-check">
+<span class="md-ellipsis">
+      
+        Answerability check
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
 </li>
 <li class="md-nav__item">
 <a class="md-nav__link" href="#contracts-interfaces">
@@ -1957,8 +2001,9 @@
 <h1 id="datasourceresolvernode">DatasourceResolverNode</h1>
 <h2 id="overview">Overview</h2>
 <ul>
-<li>Resolves candidate datasources from the user query using vector search or an explicit datasource override.</li>
-<li>Enforces RBAC and schema version mismatch policy before planning.</li>
+<li>Picks the datasources a question goes to: an explicit override, the only registered datasource, or a vector search when more than one is registered.</li>
+<li>Enforces RBAC and the schema version mismatch policy before planning.</li>
+<li>Refuses a question no datasource can answer, with one small structured LLM call, before the decomposer runs.</li>
 <li>Sits at the entry of the control graph and gates the pipeline.</li>
 <li>Class: <code>DatasourceResolverNode</code></li>
 <li>Source: <code>packages/nl2sql/src/nl2sql/pipeline/nodes/datasource_resolver/node.py</code></li>
@@ -1966,10 +2011,16 @@
 <hr/>
 <h2 id="responsibilities">Responsibilities</h2>
 <ul>
-<li>Resolve datasource candidates via <code>VectorStore.retrieve_datasource_candidates()</code>.</li>
+<li>Choose candidate datasources:<ul>
+<li>an explicit <code>datasource_id</code> is used as given;</li>
+<li>with exactly one datasource registered, that one is used and no vector search runs;</li>
+<li>otherwise <code>VectorStore.retrieve_datasource_candidates()</code> ranks them.</li>
+</ul>
+</li>
 <li>Validate datasource IDs against the registered adapter list.</li>
 <li>Enforce RBAC datasource access.</li>
-<li>Detect schema version mismatches and apply configured policy.</li>
+<li>Detect schema version mismatches and apply the configured policy.</li>
+<li>Judge answerability over the allowed candidates, and refuse with <code>QUESTION_NOT_ANSWERABLE</code> when none can answer.</li>
 <li>Populate <code>DatasourceResolverResponse</code> in <code>GraphState</code>.</li>
 </ul>
 <hr/>
@@ -1978,31 +2029,35 @@
 - Entry point (no upstream nodes).</p>
 <p>Downstream:
 - <code>DecomposerNode</code> if resolution succeeds.
-- Terminates early if no allowed datasources.</p>
+- Terminates early (<code>END</code>) if no datasource is allowed, or the question is not answerable.</p>
 <p>Trigger conditions:
 - Always executed as the control graph entry node.</p>
-<pre class="mermaid"><code>flowchart LR
-    Resolver[DatasourceResolverNode] --&gt; Decomposer[DecomposerNode]</code></pre>
+<pre class="mermaid"><code>%%{init: {"theme": "neutral"}}%%
+flowchart LR
+    Resolver[DatasourceResolverNode] --&gt;|answerable and allowed| Decomposer[DecomposerNode]
+    Resolver --&gt;|denied or not answerable| EndNode[END]</code></pre>
 <hr/>
 <h2 id="inputs">Inputs</h2>
 <p>From <code>GraphState</code>:</p>
 <ul>
-<li><code>user_query</code> (str, required): used for vector retrieval when no override provided.</li>
+<li><code>user_query</code> (str, required): the question; used for vector retrieval (more than one datasource) and for the answerability check.</li>
 <li><code>datasource_id</code> (Optional[str]): explicit override for datasource selection.</li>
 <li><code>user_context</code> (<code>UserContext</code>, required): RBAC enforcement.</li>
 </ul>
 <p>Context dependencies (<code>NL2SQLContext</code>):</p>
 <ul>
-<li><code>vector_store</code> (optional): if missing, resolver returns empty response.</li>
-<li><code>ds_registry</code>: adapter registry for supported IDs and capabilities.</li>
-<li><code>schema_store</code>: used to look up latest schema versions.</li>
-<li><code>rbac</code>: used to filter allowed datasources.</li>
+<li><code>vector_store</code>: needed only when more than one datasource is registered and no override is given; missing then, the resolver returns <code>SCHEMA_RETRIEVAL_FAILED</code>.</li>
+<li><code>ds_registry</code>: adapter registry for registered IDs.</li>
+<li><code>schema_store</code>: latest schema versions, and the latest snapshot's description and table list for the answerability check.</li>
+<li><code>rbac</code>: filters allowed datasources.</li>
+<li><code>llm_registry</code>: the answerability check's model, agent name <code>datasourceresolver</code> (falls back to <code>default</code>).</li>
 </ul>
 <p>Validation performed:</p>
 <ul>
-<li>Datasource override must exist in registry.</li>
-<li>RBAC must allow datasource.</li>
+<li>Datasource override must exist in the registry.</li>
+<li>RBAC must allow at least one candidate.</li>
 <li>Version mismatch policy enforced via <code>settings.schema_version_mismatch_policy</code>.</li>
+<li>At least one allowed candidate must be judged able to answer.</li>
 </ul>
 <hr/>
 <h2 id="outputs">Outputs</h2>
@@ -2010,75 +2065,114 @@
 <ul>
 <li><code>datasource_resolver_response</code> (<code>DatasourceResolverResponse</code>)</li>
 <li><code>errors</code> (list of <code>PipelineError</code>) on failure</li>
-<li><code>reasoning</code> and <code>warnings</code> for diagnostics</li>
+<li><code>reasoning</code> (how the candidates were chosen, and the answerability reason) and <code>warnings</code></li>
 </ul>
 <p>Side effects:</p>
 <ul>
-<li>None beyond vector store retrieval and registry lookups.</li>
+<li>One LLM call (the answerability check) once the role check passes.</li>
+<li>A vector store retrieval when more than one datasource is registered and no override is given.</li>
 </ul>
 <hr/>
 <h2 id="internal-flow-step-by-step">Internal Flow (Step-by-Step)</h2>
 <ol>
-<li>If <code>state.datasource_id</code> is set, validate that it exists in the registry.</li>
-<li>If override is valid, check RBAC access; return error on violation.</li>
-<li>If no override and <code>vector_store</code> is missing, return empty response with reasoning.</li>
-<li>Retrieve datasource candidates with <code>VectorStore.retrieve_datasource_candidates()</code>.</li>
-<li>Convert candidate documents into <code>ResolvedDatasource</code> entries.</li>
-<li>Filter to allowed datasources using RBAC.</li>
-<li>Apply schema version mismatch policy (<code>fail</code> or <code>warn</code>).</li>
-<li>Return <code>DatasourceResolverResponse</code> with resolved, allowed, and unsupported IDs.</li>
-<li>On exceptions, log and return <code>SCHEMA_RETRIEVAL_FAILED</code> error.</li>
+<li>Candidates:<ul>
+<li><code>state.datasource_id</code> set: it must be registered (<code>INVALID_STATE</code> otherwise); it is the only candidate.</li>
+<li>Exactly one datasource registered: it is the only candidate; no vector search.</li>
+<li>Otherwise: the vector store must exist (<code>SCHEMA_RETRIEVAL_FAILED</code> otherwise); <code>retrieve_datasource_candidates(k=5)</code> gives the candidates, and none is <code>SCHEMA_RETRIEVAL_FAILED</code> (with a re-index hint when the index is empty).</li>
+</ul>
+</li>
+<li>Role check: candidates the role may not read are dropped. None left is a <code>CRITICAL</code> <code>SECURITY_VIOLATION</code>, and no model call is made.</li>
+<li>Schema version mismatch policy (<code>fail</code> returns <code>INVALID_STATE</code>; <code>warn</code> adds a warning).</li>
+<li>Answerability check over the <strong>allowed</strong> candidates only (see below). An empty verdict returns <code>QUESTION_NOT_ANSWERABLE</code>.</li>
+<li>Return <code>DatasourceResolverResponse</code> with resolved, allowed and unsupported IDs.</li>
+<li>On exceptions (including a failed model call), log and return <code>SCHEMA_RETRIEVAL_FAILED</code> with the exception text.</li>
 </ol>
+<p>Adding a second datasource restores the vector search with no other change.</p>
+<h3 id="order-of-checks">Order of checks</h3>
+<p>The role check runs before the answerability check, so:</p>
+<ul>
+<li>a caller with no allowed datasource gets the RBAC refusal and the model is never asked;</li>
+<li>the model sees only datasources the role may read;</li>
+<li>a question that is answerable but touches tables the role may not read passes this node and is refused by <code>LogicalValidatorNode</code>'s table policy, as before.</li>
+</ul>
+<h3 id="answerability-check">Answerability check</h3>
+<p>A structured call (<code>AnswerabilityResponse</code>: <code>answerable_datasource_ids</code>, <code>reason</code>) with this prompt (<code>datasource_resolver/prompts.py</code>). The system message:</p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-0-1" id="__codelineno-0-1" name="__codelineno-0-1"></a>You check whether a question can be answered from the datasources below, before any SQL is planned. For each datasource you see its description and the tables it holds, not its data.
+<a href="#__codelineno-0-2" id="__codelineno-0-2" name="__codelineno-0-2"></a>
+<a href="#__codelineno-0-3" id="__codelineno-0-3" name="__codelineno-0-3"></a>Rules:
+<a href="#__codelineno-0-4" id="__codelineno-0-4" name="__codelineno-0-4"></a>1. List the id of every datasource that could hold data relevant to the question, even partly. A question that needs several datasources lists all of them.
+<a href="#__codelineno-0-5" id="__codelineno-0-5" name="__codelineno-0-5"></a>2. Be conservative. When you are unsure, treat the question as answerable and list the datasources that might answer it. Refusing a question that could have been answered is worse than running one that finds nothing.
+<a href="#__codelineno-0-6" id="__codelineno-0-6" name="__codelineno-0-6"></a>3. Return an empty list only when the question is clearly about something none of these datasources hold, such as the weather, general knowledge, or small talk.
+<a href="#__codelineno-0-7" id="__codelineno-0-7" name="__codelineno-0-7"></a>4. Use only ids from the list below.
+<a href="#__codelineno-0-8" id="__codelineno-0-8" name="__codelineno-0-8"></a>5. Give the reason in one short sentence.
+<a href="#__codelineno-0-9" id="__codelineno-0-9" name="__codelineno-0-9"></a>
+<a href="#__codelineno-0-10" id="__codelineno-0-10" name="__codelineno-0-10"></a>Datasources (JSON):
+<a href="#__codelineno-0-11" id="__codelineno-0-11" name="__codelineno-0-11"></a>{datasources}
+</code></pre></div>
+<p>The human message:</p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-1-1" id="__codelineno-1-1" name="__codelineno-1-1"></a>User Query:
+<a href="#__codelineno-1-2" id="__codelineno-1-2" name="__codelineno-1-2"></a>{user_query}
+</code></pre></div>
+<ul>
+<li><code>{datasources}</code> is a JSON list, one entry per allowed candidate, sorted by id, with sorted keys: <code>description</code> (the datasource description from the latest schema snapshot, which indexing takes from the datasources config) and <code>tables</code> (sorted bare table names).</li>
+<li>The instructions and datasources come first (the system message) and the question last (the human message), so the prompt is byte-identical across questions up to the question and a provider's prompt cache can serve the prefix. OpenAI caches only prompts of 1,024 tokens or more, so with one small datasource nothing is cached; the prefix grows, and becomes cacheable, with more datasources.</li>
+<li>The verdict is used only to refuse: a non-empty list lets every allowed candidate through to the decomposer unchanged.</li>
+<li>For Chinook the rendered prompt is about 260 tokens (<code>o200k_base</code>), plus the <code>AnswerabilityResponse</code> function schema.</li>
+</ul>
 <hr/>
 <h2 id="contracts-interfaces">Contracts &amp; Interfaces</h2>
 <p>Implements a LangGraph node callable:</p>
-<div class="highlight"><pre><span></span><code><a href="#__codelineno-0-1" id="__codelineno-0-1" name="__codelineno-0-1"></a>def __call__(self, state: GraphState) -&gt; Dict[str, Any]
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-2-1" id="__codelineno-2-1" name="__codelineno-2-1"></a>def __call__(self, state: GraphState) -&gt; Dict[str, Any]
 </code></pre></div>
 <p>Key contracts:</p>
 <ul>
 <li><code>DatasourceResolverResponse</code></li>
 <li><code>ResolvedDatasource</code></li>
+<li><code>AnswerabilityResponse</code></li>
 <li><code>PipelineError</code></li>
 </ul>
 <hr/>
 <h2 id="determinism-guarantees">Determinism Guarantees</h2>
 <ul>
-<li>Deterministic for a fixed <code>datasource_id</code> override.</li>
-<li>Non-deterministic ranking may occur due to vector retrieval behavior.</li>
+<li>Candidate choice is deterministic for an override or a single datasource.</li>
+<li>Vector ranking may vary with more than one datasource.</li>
+<li>The answerability prompt is serialized deterministically; the verdict is a model call at the configured temperature and seed.</li>
 </ul>
 <hr/>
 <h2 id="error-handling">Error Handling</h2>
 <p>Emits <code>PipelineError</code> with:</p>
 <ul>
-<li><code>INVALID_STATE</code> (missing/unknown datasource override)</li>
+<li><code>INVALID_STATE</code> (unknown datasource override; schema version mismatch under <code>fail</code>)</li>
 <li><code>SECURITY_VIOLATION</code> (RBAC denial)</li>
-<li><code>SCHEMA_RETRIEVAL_FAILED</code> (no candidates or exceptions)</li>
+<li><code>QUESTION_NOT_ANSWERABLE</code> (<code>ERROR</code>: no allowed datasource can answer the question; <code>QueryResult.status</code> is <code>error</code>)</li>
+<li><code>SCHEMA_RETRIEVAL_FAILED</code> (no candidates, no vector store with several datasources, or exceptions)</li>
 </ul>
 <p>Exceptions are caught at the node boundary and logged with <code>logger.error</code>.</p>
 <hr/>
 <h2 id="retry-idempotency">Retry + Idempotency</h2>
 <ul>
 <li>No internal retry logic.</li>
-<li>Idempotent for the same input state, except vector retrieval ranking may vary.</li>
+<li>Idempotent for the same input state, except vector retrieval ranking and the model's verdict may vary.</li>
 </ul>
 <hr/>
 <h2 id="performance-characteristics">Performance Characteristics</h2>
 <ul>
-<li>External dependency on vector store retrieval (MMR search).</li>
-<li>RBAC checks are in-memory operations.</li>
-<li>Schema version lookups are store reads.</li>
+<li>One small LLM call per question once the role check passes; it saves the decomposer, planner and synthesizer calls on every unanswerable question.</li>
+<li>A vector store retrieval (MMR search) only with more than one datasource.</li>
+<li>RBAC checks are in-memory operations; schema lookups are store reads.</li>
 </ul>
 <hr/>
 <h2 id="observability">Observability</h2>
 <ul>
 <li>Logger: <code>datasource_resolver</code></li>
-<li>Adds reasoning and warnings to <code>GraphState</code> for downstream diagnostics.</li>
+<li>The answerability call is recorded like every LLM call: usage under node <code>datasource_resolver</code> in <code>QueryResult.usage</code>, and in the run trace keyed by node, sub-query, attempt and call.</li>
 <li>Vector retrieval uses <code>VECTOR_BREAKER</code> at the vector store layer.</li>
 </ul>
 <hr/>
 <h2 id="configuration">Configuration</h2>
 <ul>
 <li><code>settings.schema_version_mismatch_policy</code> (<code>warn</code> or <code>fail</code>)</li>
+<li>LLM agent <code>datasourceresolver</code> in the LLM config (optional; see <a href="../../../configuration/llm/#per-node-models">LLM configuration</a>)</li>
 </ul>
 <hr/>
 <h2 id="extension-points">Extension Points</h2>
@@ -2089,14 +2183,14 @@
 <hr/>
 <h2 id="known-limitations">Known Limitations</h2>
 <ul>
-<li>Vector store absence results in an empty resolver response (no fallback).</li>
 <li>Tenant scoping is not implemented in vector retrieval.</li>
-<li>Override path calls <code>_get_latest_schema_version</code>, which is not defined in this class (would raise if executed as-is).</li>
+<li>The answerability check sees table names, not columns or data, so it refuses only questions clearly outside every datasource.</li>
 </ul>
 <hr/>
 <h2 id="related-code">Related Code</h2>
 <ul>
 <li><code>packages/nl2sql/src/nl2sql/pipeline/nodes/datasource_resolver/node.py</code></li>
+<li><code>packages/nl2sql/src/nl2sql/pipeline/nodes/datasource_resolver/prompts.py</code></li>
 <li><code>packages/nl2sql/src/nl2sql/pipeline/nodes/datasource_resolver/schemas.py</code></li>
 </ul>
 </article>

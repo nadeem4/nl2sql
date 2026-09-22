@@ -4728,7 +4728,8 @@
 <h3 id="retrieval">Retrieval</h3>
 <ul>
 <li>Vector store calls are wrapped by <code>VECTOR_BREAKER</code>; breaker open or retrieval errors propagate into resolver or schema retriever.</li>
-<li>Resolver returns <code>SCHEMA_RETRIEVAL_FAILED</code> if no candidate datasources are found.</li>
+<li>Resolver returns <code>SCHEMA_RETRIEVAL_FAILED</code> if no candidate datasources are found, or if more than one datasource is registered and there is no vector store. With one datasource registered it runs no vector search.</li>
+<li>Resolver returns <code>QUESTION_NOT_ANSWERABLE</code> when its answerability check finds no allowed datasource can answer the question; the run ends before the decomposer. A failed answerability call returns <code>SCHEMA_RETRIEVAL_FAILED</code> with the model's error.</li>
 <li>Schema retriever falls back to full schema snapshot if vector retrieval yields no tables; if schema store returns <code>None</code>, it silently returns an empty table list.</li>
 </ul>
 <h3 id="planning">Planning</h3>

@@ -1765,7 +1765,8 @@
 <li><code>node</code>, <code>message</code>, <code>severity</code>, <code>error_code</code></li>
 <li><code>is_retryable</code> derived from severity and error code</li>
 </ul>
-<p>Common error codes include <code>MISSING_SQL</code>, <code>EXECUTION_FAILED</code>, <code>PIPELINE_TIMEOUT</code>, <code>SECURITY_VIOLATION</code>.</p>
+<p>Common error codes include <code>MISSING_SQL</code>, <code>EXECUTION_FAILED</code>, <code>PIPELINE_TIMEOUT</code>, <code>SECURITY_VIOLATION</code>, <code>QUESTION_NOT_ANSWERABLE</code>.</p>
+<p><code>QUESTION_NOT_ANSWERABLE</code> (severity <code>ERROR</code>) comes from the datasource resolver when its answerability check finds that no datasource the role may read can answer the question, such as "what is the weather in Paris?". The run ends before the decomposer: no decomposer, planner, refiner or synthesizer call is made, <code>QueryResult.status</code> is <code>error</code>, and the message tells the user the question can't be answered from the connected data. The check is told to answer "answerable" when unsure. See <a href="../../architecture/nodes/datasource_resolver_node/#answerability-check">DatasourceResolverNode</a>.</p>
 <h2 id="circuit-breaker">Circuit breaker</h2>
 <p><code>create_breaker()</code> configures <code>pybreaker.CircuitBreaker</code> instances with observability hooks. The system defines exactly one:</p>
 <ul>

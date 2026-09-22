@@ -1980,7 +1980,7 @@ Source file path: <code>packages/nl2sql/src/nl2sql/pipeline/graph.py</code></p>
 <p>Successful completion criteria:
 - Reaches <code>END</code> after <code>answer_synthesizer</code> when aggregation and synthesis finish without fatal interruptions.</p>
 <p>Failure exits:
-- <code>datasource_resolver</code> can short-circuit to <code>END</code> via <code>resolver_route</code> when no datasource is resolved/allowed.
+- <code>datasource_resolver</code> can short-circuit to <code>END</code> via <code>resolver_route</code> when no datasource is resolved/allowed, or when its answerability check refuses the question (<code>QUESTION_NOT_ANSWERABLE</code>); no other LLM call runs.
 - <code>layer_router</code> can return <code>END</code> if no <code>execution_dag</code> or layers are present.
 - <code>layer_router</code> returns <code>END</code> once every scan has run if none produced an artifact (every sub-query was denied or failed), and whenever the graph was built with <code>execute=False</code>. The aggregator and answer synthesizer are skipped, so the run's errors are the sub-queries' own -- for a policy denial, <code>SECURITY_VIOLATION</code> first -- and no LLM call is spent explaining an empty result.
 - <code>layer_router</code> raises <code>PipelineExecutionError</code> (an <code>NL2SQLError</code> carrying the <code>PipelineError</code> payload on <code>.error</code>) when no compatible subgraph exists for a datasource; this propagates as an exception from the router function. A conditional-edge router may only return routing decisions, so it cannot report the failure as a <code>PipelineError</code> value in state the way a node does.</p>
@@ -1990,7 +1990,7 @@ Source file path: <code>packages/nl2sql/src/nl2sql/pipeline/graph.py</code></p>
 <hr/>
 <h2 id="internal-node-composition">Internal Node Composition</h2>
 <p>Execution order (nominal path):
-- <code>datasource_resolver</code> — <code>DatasourceResolverNode</code> — <code>packages/nl2sql/src/nl2sql/pipeline/nodes/datasource_resolver/node.py</code> — resolve candidate datasources and RBAC.
+- <code>datasource_resolver</code> — <code>DatasourceResolverNode</code> — <code>packages/nl2sql/src/nl2sql/pipeline/nodes/datasource_resolver/node.py</code> — resolve candidate datasources, RBAC, and the answerability check (an LLM call).
 - <code>decomposer</code> — <code>DecomposerNode</code> — <code>packages/nl2sql/src/nl2sql/pipeline/nodes/decomposer/node.py</code> — decompose query into sub-queries.
 - <code>global_planner</code> — <code>GlobalPlannerNode</code> — <code>packages/nl2sql/src/nl2sql/pipeline/nodes/global_planner/node.py</code> — build execution DAG.
 - <code>layer_router</code> — inline lambda + <code>routes.build_scan_layer_router</code> — <code>packages/nl2sql/src/nl2sql/pipeline/routes.py</code> — route each scan layer to a subgraph or aggregator.
@@ -2015,10 +2015,10 @@ Source file path: <code>packages/nl2sql/src/nl2sql/pipeline/graph.py</code></p>
 <hr/>
 <h2 id="step-by-step-execution-flow">Step-by-Step Execution Flow</h2>
 <ol>
-<li><code>datasource_resolver</code> resolves candidate datasources using vector search and RBAC.</li>
+<li><code>datasource_resolver</code> resolves candidate datasources (vector search only when more than one datasource is registered), filters them by RBAC, then asks the LLM whether any allowed datasource can answer the question.</li>
 <li><code>resolver_route</code> decides:</li>
-<li><code>continue</code> if allowed datasources exist.</li>
-<li><code>end</code> if none exist or response missing.</li>
+<li><code>continue</code> if allowed datasources exist and the question was judged answerable.</li>
+<li><code>end</code> if none exist, the question is not answerable, or the response is missing.</li>
 <li><code>decomposer</code> uses the LLM to produce <code>SubQuery</code> objects and combine groups.</li>
 <li><code>global_planner</code> builds a deterministic <code>ExecutionDAG</code> from sub-queries and combines.</li>
 <li><code>layer_router</code> inspects the DAG and current <code>artifact_refs</code>:</li>
@@ -2043,7 +2043,7 @@ Source file path: <code>packages/nl2sql/src/nl2sql/pipeline/graph.py</code></p>
 <hr/>
 <h2 id="performance-characteristics">Performance Characteristics</h2>
 <ul>
-<li>Blocking calls include LLM requests in <code>decomposer</code> and <code>answer_synthesizer</code>.</li>
+<li>Blocking calls include LLM requests in <code>datasource_resolver</code>, <code>decomposer</code> and <code>answer_synthesizer</code>.</li>
 <li><code>global_planner</code> and <code>aggregator</code> are CPU-bound (DAG construction and local aggregation).</li>
 <li>Subgraph executions are dispatched per scan layer and can run in parallel via LangGraph routing.</li>
 <li>Overall pipeline is executed on a single-worker thread pool created per run and guarded by <code>settings.global_timeout_sec</code>.</li>

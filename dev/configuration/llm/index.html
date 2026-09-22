@@ -4289,7 +4289,7 @@ after the client is constructed, so the config - not the model name -
 decides what is sent.</p>
 </div>
 <h2 id="per-node-models">Per-node models</h2>
-<p>The four pipeline nodes that call a model each ask the registry for their own
+<p>The five pipeline nodes that call a model each ask the registry for their own
 agent name, and fall back to <code>default</code> when it is not configured:</p>
 <table>
 <thead>
@@ -4299,6 +4299,10 @@ agent name, and fall back to <code>default</code> when it is not configured:</p>
 </tr>
 </thead>
 <tbody>
+<tr>
+<td><code>datasourceresolver</code></td>
+<td>checks that the connected data can answer the question at all (one short call; refuses with <code>QUESTION_NOT_ANSWERABLE</code>)</td>
+</tr>
 <tr>
 <td><code>decomposer</code></td>
 <td>splits the question into sub-queries</td>
