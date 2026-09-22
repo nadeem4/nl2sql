@@ -296,8 +296,9 @@ again reuses the validated plan from the plan cache (`sq.plan_source == "cache"`
 still validated for the caller's role.
 
 `NL2SQL` also exposes `engine.query`, `engine.datasource`, `engine.llm`,
-`engine.indexing`, `engine.policy`, `engine.settings`, `engine.results` and
-`engine.benchmark`. See [the public facade](docs/api/core/public-facade.md) and
+`engine.indexing`, `engine.auth`, `engine.policy`, `engine.settings`,
+`engine.results` and `engine.benchmark`. See
+[the public facade](docs/api/core/public-facade.md) and
 [`examples/`](examples/).
 
 ## Configuration

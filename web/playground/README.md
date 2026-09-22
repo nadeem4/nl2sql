@@ -90,9 +90,10 @@ The React source for the page `nl2sql demo` serves.
   only in masked form (`#settings-key-current`); saving one writes it to the
   demo project's `.env.demo` and turns replay into live without a restart, and
   the mode line follows. **Model for each step** has one selector per LLM node
-  (`#model-decomposer`, `#model-astplanner`, `#model-refiner`,
-  `#model-answersynthesizer`) with a Default option, and **Save models**
-  (`#settings-save-models`) writes the changed ones to `configs/llm.demo.yaml`.
+  (`#model-datasourceresolver`, `#model-decomposer`, `#model-astplanner`,
+  `#model-refiner`, `#model-answersynthesizer`) with a Default option, and
+  **Save models** (`#settings-save-models`) writes the changed ones to
+  `configs/llm.demo.yaml`.
   Choosing a model that runs without a temperature shows
   `#settings-temperature-note`. The model list comes from `GET /api/settings`;
   the page names no model itself. When the server has settings off (a
