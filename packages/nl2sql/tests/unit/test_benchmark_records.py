@@ -340,3 +340,41 @@ def test_the_committed_pages_match_what_publish_generates_from_the_committed_rec
     assert history == records.render_history(committed), "run `nl2sql benchmark publish` and commit the result"
     assert readme == records.replace_block(readme, records.render_readme_block(committed)), \
         "run `nl2sql benchmark publish` and commit the result"
+
+
+# --- statistics in the record and in the history -----------------------------
+
+
+def test_a_record_keeps_the_interval_for_both_scores_and_pass_k():
+    record = records.make_record(_board(passes=2), "gpt-5.4", recorded_at=WHEN, engine_version="1", code=CODE)
+    m = record["metrics"]
+    assert m["accuracy_interval"] == [round(b, 4) for b in tier2.wilson_interval(2, 4)]
+    assert m["lenient_accuracy_interval"] == m["accuracy_interval"]
+    # Both passes score the same here, so half the questions pass every pass.
+    assert m["pass_k"] == {"k": 2, "questions": 2, "strict": 0.5, "lenient": 0.5}
+    assert records.make_record(_board(), "gpt-5.4", recorded_at=WHEN, engine_version="1",
+                               code=CODE)["metrics"]["pass_k"] is None
+
+
+def test_the_history_delta_names_the_questions_that_flipped_and_the_p_value(tmp_path):
+    _write(tmp_path, 19, statuses=("fail", "fail", "fail", "pass"))
+    _write(tmp_path, 20, statuses=("pass", "pass", "pass", "pass"))
+    recs = records.load_records(tmp_path)
+    newest = recs[0]
+    old = records.previous_runs(recs)[id(newest)]
+
+    assert records.flips(newest, old) == {"questions": 4, "pass_to_fail": [],
+                                          "fail_to_pass": ["q0/admin", "q1/admin", "q2/admin"],
+                                          "p_value": 0.25}
+    change = records.describe_change(newest, old, show_flips=True)
+    assert "0 flipped to fail, 3 to pass (McNemar p=0.250)" in change
+    # The README block keeps the headline deltas only.
+    assert "flipped" not in records.describe_change(newest, old)
+
+
+def test_a_record_without_per_question_results_has_no_flips(tmp_path):
+    _write(tmp_path, 19)
+    _write(tmp_path, 20)
+    recs = records.load_records(tmp_path)
+    stripped = {**recs[0], "scoreboard": {}}
+    assert records.flips(stripped, recs[1]) is None

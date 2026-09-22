@@ -23,9 +23,10 @@ from nl2sql.evaluation.records import (
 )
 from nl2sql.evaluation.retrieval_recall import compare_reports
 from nl2sql.evaluation.tier2 import (
-    DEFAULT_MAX_ACCURACY_DROP,
     DEFAULT_MAX_COST_INCREASE,
+    DEFAULT_MAX_REGRESSIONS,
     check_baseline,
+    compare_with_baseline,
     node_agents,
     select_question_ids,
     unverified_models,
@@ -142,7 +143,8 @@ def run_tier2_benchmark(
     passes: int = 1,
     questions: Optional[List[str]] = None,
     baseline: Optional[pathlib.Path] = None,
-    max_accuracy_drop: float = DEFAULT_MAX_ACCURACY_DROP,
+    max_regressions: int = DEFAULT_MAX_REGRESSIONS,
+    max_accuracy_drop: Optional[float] = None,
     max_cost_increase: float = DEFAULT_MAX_COST_INCREASE,
     results_dir: Optional[pathlib.Path] = None,
     note: Optional[str] = None,
@@ -210,7 +212,13 @@ def run_tier2_benchmark(
         presenter.print_info(f"Result record: {escape(str(path))}")
 
     if baseline is not None:
-        problems = check_baseline(board, json.loads(pathlib.Path(baseline).read_text(encoding="utf-8")),
+        if max_accuracy_drop is not None:
+            presenter.print_warning(
+                "--max-accuracy-drop is deprecated: at 43 questions two points is less than one question, "
+                "so it fires on noise. The gate is --max-regressions plus McNemar's test.")
+        old = json.loads(pathlib.Path(baseline).read_text(encoding="utf-8"))
+        presenter.print_baseline_comparison(compare_with_baseline(board, old))
+        problems = check_baseline(board, old, max_regressions=max_regressions,
                                   max_accuracy_drop=max_accuracy_drop, max_cost_increase=max_cost_increase)
         for problem in problems:
             presenter.print_error(f"Regression: {problem}")
