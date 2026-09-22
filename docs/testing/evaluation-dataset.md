@@ -422,8 +422,10 @@ config on the same database: the change in accuracy, faithfulness (in
 percentage points) and dollars per question for tier 2, in table and column
 recall for retrieval. When the dataset, the schema or the roles changed, the
 run starts a new series and the cell says so, e.g. `new series (schema
-changed)`; a config's first run says `first run`. The README block shows the
-latest run per benchmark, database and config with the same Δ.
+changed)`; a config's first run says `first run`. The README block has two
+headed tables, tier 2 accuracy (latest run per config and database) and then
+retrieval recall (latest run per database), with the same Δ; a benchmark with
+no recorded run says so under its heading.
 
 #### Publishing
 

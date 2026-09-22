@@ -3,15 +3,16 @@ from typing import Dict, Any, Annotated
 
 from nl2sql_api.dependencies import get_indexing_service
 from nl2sql_api.services import IndexingService
-router = APIRouter()
+router = APIRouter(tags=["indexing"])
 
 IndexingSvc = Annotated[IndexingService, Depends(get_indexing_service)]
 
-@router.post("/index/{datasource_id}", response_model=Dict[str, Any])
+@router.post("/index/{datasource_id}", response_model=Dict[str, Any], summary="Index one datasource")
 def index_datasource(
     datasource_id: str,
     service: IndexingSvc
 ):
+    """Index one datasource's schema into the vector store; returns the indexing stats."""
     try:
         result = service.index_datasource(datasource_id)
 
@@ -28,10 +29,11 @@ def index_datasource(
         )
 
 
-@router.post("/index-all", response_model=Dict[str, Any])
+@router.post("/index-all", response_model=Dict[str, Any], summary="Index every datasource")
 def index_all_datasources(
     service: IndexingSvc
 ):
+    """Index every registered datasource; returns the stats per datasource."""
     try:
         results = service.index_all_datasources()
 
@@ -47,10 +49,11 @@ def index_all_datasources(
         )
 
 
-@router.delete("/index", response_model=Dict[str, Any])
+@router.delete("/index", response_model=Dict[str, Any], summary="Clear the index")
 def clear_index(
     service: IndexingSvc
 ):
+    """Remove every entry from the vector store. Questions need a re-index before they can be answered."""
     try:
         return service.clear_index()
     except Exception as e:
@@ -60,10 +63,11 @@ def clear_index(
         )
 
 
-@router.get("/index/status", response_model=Dict[str, Any])
+@router.get("/index/status", response_model=Dict[str, Any], summary="Index status")
 def get_index_status(
     service: IndexingSvc
 ):
+    """Placeholder: `status: "operational"` and the registered datasource ids. It does not read the vector store."""
     try:
         return service.get_index_status()
     except Exception as e:

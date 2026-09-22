@@ -125,7 +125,7 @@ def test_publish_writes_the_history_page_and_the_readme_block(tmp_path):
             "--readme-path", str(readme)]
     out = runner.invoke(app, args)
     assert out.exit_code == 0, out.output
-    assert "No benchmark runs recorded yet." in readme.read_text(encoding="utf-8")
+    assert "No tier 2 run recorded yet." in readme.read_text(encoding="utf-8")
     first = history.read_bytes()
     assert runner.invoke(app, args).exit_code == 0 and history.read_bytes() == first
     assert _FakeAPI.calls == []
@@ -261,4 +261,4 @@ def test_publish_from_another_project_copies_new_records_and_reports_a_conflict(
     assert "Conflict: tier2/chinook/2026-09-21_abcdef1_b.json" in out.output
     assert json.loads(mine.read_text(encoding="utf-8"))["note"] == "mine"
     assert (repo / "benchmarks" / "tier2" / "chinook" / "2026-09-21_abcdef1_a.json").exists()
-    assert "| Tier 2 | chinook | a |" in readme.read_text(encoding="utf-8")
+    assert "| a | chinook |" in readme.read_text(encoding="utf-8")

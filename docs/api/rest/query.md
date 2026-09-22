@@ -10,7 +10,7 @@ Source: `packages/api/src/nl2sql_api/models/query.py`
 | `natural_language` | `str` | yes | User query. |
 | `datasource_id` | `Optional[str]` | no | Datasource override. |
 | `execute` | `bool` | no | Execute SQL against datasource (default `true`). |
-| `user_context` | `Optional[Dict[str, Any]]` | no | RBAC context payload. |
+| `user_context` | `Optional[Dict[str, Any]]` | no | RBAC context payload, e.g. `{"roles": ["admin"]}`. Send one: a request without it currently fails with HTTP 500. |
 
 ### `SubQueryResponse`
 | field | type | required | meaning |

@@ -38,6 +38,17 @@ README_PATH = pathlib.Path("README.md")
 START = "<!-- BENCHMARKS:START -->"
 END = "<!-- BENCHMARKS:END -->"
 EMPTY = "No benchmark runs recorded yet."
+README_TIER2_HEADING = "### Tier 2: English questions answered correctly"
+README_TIER2_INTRO = ("The real model end to end on the Chinook gold questions. Accuracy is the share whose rows "
+                      "match the gold answer, or that are refused where the gold set expects a refusal; "
+                      "faithfulness is the share of written answers whose numbers and names come from the rows.")
+TIER2_EMPTY = ("No tier 2 run recorded yet. Run one from a demo folder with "
+               "`nl2sql --env demo benchmark --tier 2 --model gpt-5.4 --max-cost 5`, "
+               "then `nl2sql benchmark publish --from <demo folder>` from the repo.")
+README_RETRIEVAL_HEADING = "### Retrieval recall"
+README_RETRIEVAL_INTRO = ("The share of each answerable gold question's needed tables and columns that schema "
+                          "retrieval sends the planner, with no LLM involved.")
+RETRIEVAL_EMPTY = "No retrieval run recorded yet: `nl2sql --env demo benchmark retrieval --record`."
 SCHEMA_VERSION = 2
 UNKNOWN = "unknown"
 UNKNOWN_DATABASE = {"datasource_id": UNKNOWN, "engine": UNKNOWN, "schema_fingerprint": UNKNOWN,
@@ -412,14 +423,6 @@ def _latest_per_line(recs: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return [latest[k] for k in sorted(latest, key=lambda k: (order.index(k[0]) if k[0] in order else 99, k))]
 
 
-def _headline(r: Dict[str, Any]) -> str:
-    m = r["metrics"]
-    if r["kind"] == "tier2":
-        return (f"accuracy {_pct(m['accuracy'])}, faithfulness {_pct(m.get('faithfulness'))}, "
-                f"{_usd(m['cost_per_question'])}/question")
-    return f"tables {_pct(m['table_recall'])}, columns {_pct(m['column_recall'])}"
-
-
 def _groups(recs: Sequence[Dict[str, Any]]) -> List[Tuple[Tuple[str, str], List[Dict[str, Any]]]]:
     """Records grouped by (kind, database), tier 2 first, each group newest first."""
     groups: Dict[Tuple[str, str], List[Dict[str, Any]]] = {}
@@ -490,15 +493,29 @@ def render_history(recs: Sequence[Dict[str, Any]]) -> str:
 
 
 def render_readme_block(recs: Sequence[Dict[str, Any]]) -> str:
-    """The README block: the latest run per benchmark, database and config, and a link to the history."""
-    if not recs:
-        return f"{START}\n{EMPTY}\n{END}"
-    previous = previous_runs(recs)
-    table = _table(["Benchmark", "Database", "Config", "Date (UTC)", "Commit", "Result", "Δ vs previous"],
-                   [[KIND_TITLES.get(r["kind"], r["kind"]), r["database"]["datasource_id"], r["config"]["name"],
-                     r["recorded_at"][:10], _commit(r), _headline(r), describe_change(r, previous[id(r)])]
-                    for r in _latest_per_line(recs)])
-    return f"{START}\n{table}\n\nFull history: [docs/benchmarks.md](docs/benchmarks.md)\n{END}"
+    """The README block: tier 2 accuracy then retrieval recall, latest run per database and config.
+
+    Each benchmark gets its own heading and table, and says so when it has no run yet.
+    """
+    previous = previous_runs(recs) if recs else {}
+    latest = _latest_per_line(recs)
+    tier2 = [r for r in latest if r["kind"] == "tier2"]
+    retrieval = [r for r in latest if r["kind"] == "retrieval"]
+    tier2_body = _table(
+        ["Config", "Database", "Date (UTC)", "Commit", "Accuracy", "Faithfulness", "$/question", "Δ vs previous"],
+        [[r["config"]["name"], r["database"]["datasource_id"], r["recorded_at"][:10], _commit(r),
+          _pct(r["metrics"]["accuracy"]), _pct(r["metrics"].get("faithfulness")),
+          _usd(r["metrics"]["cost_per_question"]), describe_change(r, previous[id(r)])] for r in tier2],
+    ) if tier2 else TIER2_EMPTY
+    retrieval_body = _table(
+        ["Database", "Date (UTC)", "Commit", "Table recall", "Column recall", "Δ vs previous"],
+        [[r["database"]["datasource_id"], r["recorded_at"][:10], _commit(r), _pct(r["metrics"]["table_recall"]),
+          _pct(r["metrics"]["column_recall"]), describe_change(r, previous[id(r)])] for r in retrieval],
+    ) if retrieval else RETRIEVAL_EMPTY
+    parts = [README_TIER2_HEADING, README_TIER2_INTRO, tier2_body,
+             README_RETRIEVAL_HEADING, README_RETRIEVAL_INTRO, retrieval_body,
+             "Full history: [docs/benchmarks.md](docs/benchmarks.md)"]
+    return START + "\n" + "\n\n".join(parts) + "\n" + END
 
 
 def replace_block(text: str, block: str) -> str:

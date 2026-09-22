@@ -32,7 +32,7 @@ Parameters:
 | `natural_language` | `str` | yes | User query. |
 | `datasource_id` | `Optional[str]` | no | Datasource override; otherwise resolved. |
 | `execute` | `bool` | no | Whether to execute SQL against datasource. |
-| `user_context` | `Optional[UserContext]` | no | RBAC context. |
+| `user_context` | `Optional[UserContext]` | no | RBAC context. Pass one with a role: omitting it currently raises a pydantic `ValidationError` (the graph state does not accept `None`), and a role the policy does not know is refused. |
 
 Returns:
 `QueryResult`, built from the pipeline graph state by `result_from_state`.
