@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -17,6 +17,8 @@ class SubgraphOutput(BaseModel):
     subgraph_name: Optional[str] = None
     retry_count: int = 0
     plan: Optional[PlanModel] = None
+    # "cache" when the final plan came from the plan cache, not the planner LLM.
+    plan_source: Literal["llm", "cache"] = "llm"
     sql_draft: Optional[str] = None
     artifact: Optional[ArtifactRef] = None
     errors: List[PipelineError] = Field(default_factory=list)

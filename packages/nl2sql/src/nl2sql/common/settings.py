@@ -132,6 +132,17 @@ class Settings(BaseSettings):
         description="Action when chunk schema_version differs from SchemaStore: warn, fail, or ignore."
     )
 
+    plan_cache_enabled: bool = Field(
+        default=True,
+        validation_alias="PLAN_CACHE_ENABLED",
+        description=(
+            "Reuse a plan that already passed validation and executed, for the same "
+            "sub-query intent, datasource and schema version, instead of calling the planner "
+            "LLM. The cached plan is validated again on every use. Stored in the schema store; "
+            "`nl2sql cache clear` empties it."
+        ),
+    )
+
     schema_retrieval_full_snapshot_max_tables: int = Field(
         default=15,
         validation_alias="SCHEMA_RETRIEVAL_FULL_SNAPSHOT_MAX_TABLES",

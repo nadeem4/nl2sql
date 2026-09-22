@@ -42,7 +42,10 @@ The React source for the page `nl2sql demo` serves.
   table follows: one row per node that ran, in execution order, code nodes
   included, with calls, input, cached, output and reasoning tokens, LLM time and
   node wall-clock time. The SQL agent is a subgraph, so its nodes are nested
-  under it and its time includes theirs. Debug is on by default; the choice is
+  under it and its time includes theirs. When a sub-query's plan came from the
+  plan cache (`plan_source: "cache"` in `/api/ask`), Debug also shows
+  `#plan-cache-hit`: no planner call was made, and the plan was validated again
+  for the role. Debug is on by default; the choice is
   kept in `localStorage` (`nl2sql.playground.debug`) and the page works the same
   when storage is unavailable.
 - **Node drill-down**: when the run wrote a trace (`trace_path` in the

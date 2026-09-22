@@ -23,6 +23,7 @@ class SubQueryResponse(BaseModel):
     rows: Optional[Dict[str, Any]] = None
     status: str = ""
     retry_count: int = 0
+    plan_source: str = "llm"
 
 
 class QueryResponse(BaseModel):

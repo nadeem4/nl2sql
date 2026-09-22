@@ -26,6 +26,19 @@ def _base_env() -> dict:
     return env
 
 
+@pytest.fixture(autouse=True)
+def _no_shared_plan_cache(monkeypatch):
+    """The demo project's schema store is shared by every test in the session.
+
+    With the plan cache on, a question one test asked would skip the planner in
+    the next, so the outcome would depend on test order. The cache is off here
+    (``_base_env`` copies ``os.environ`` into every CLI run) and
+    ``test_plan_cache_fake_llm`` turns it on against a private store copy.
+    """
+    monkeypatch.setenv("PLAN_CACHE_ENABLED", "false")
+    monkeypatch.setattr(settings, "plan_cache_enabled", False)
+
+
 @pytest.fixture(scope="session")
 def demo_project(tmp_path_factory):
     """A generated Chinook demo (one SQLite DB, indexed locally, no key)."""

@@ -7,6 +7,7 @@ from langchain_core.runnables import Runnable, RunnableConfig
 from nl2sql.common.errors import ErrorCode, ErrorSeverity, PipelineError
 from nl2sql.context import NL2SQLContext
 from nl2sql.pipeline.nodes.global_planner.schemas import ExecutionDAG
+from nl2sql.pipeline.plan_cache import PlanCache
 from nl2sql.pipeline.state import GraphState, SubgraphExecutionState
 from nl2sql.pipeline.subgraphs import SubgraphOutput
 from nl2sql_adapter_sdk.capabilities import DatasourceCapability
@@ -174,12 +175,23 @@ def wrap_subgraph(
                     error_code=ErrorCode.MISSING_SQL if not sql_draft else ErrorCode.EXECUTION_FAILED,
                 )
             )
+        plan = planner_response.plan if planner_response else None
+        plan_source = planner_response.plan_source if planner_response else "llm"
+        # Only a plan that passed validation and executed is cached; a refused,
+        # failed or plan-only one never is. A cache hit is already stored.
+        executed_cleanly = executor_response is not None and not any(
+            e.severity in (ErrorSeverity.ERROR, ErrorSeverity.CRITICAL) for e in executor_response.errors
+        )
+        if succeeded and execute and executed_cleanly and plan is not None and plan_source == "llm":
+            PlanCache(getattr(ctx, "schema_store", None)).put(sub_query, plan)
+
         subgraph_output = SubgraphOutput(
             sub_query=sub_query,
             subgraph_name=subgraph_name,
             subgraph_id=subgraph_id,
             retry_count=retry_count,
-            plan=planner_response.plan if planner_response else None,
+            plan=plan,
+            plan_source=plan_source,
             sql_draft=sql_draft,
             artifact=artifact,
             errors=errors,

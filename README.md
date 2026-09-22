@@ -151,6 +151,14 @@ prints its timeline and `nl2sql trace replay <file>` re-runs the pipeline on the
 recorded model answers without calling the model. See
 [Debugging a Run](docs/observability/debugging.md).
 
+Asking the same question again reuses the plan that already validated and
+executed (the **plan cache**, keyed on the sub-query's intent, datasource and
+schema version), so the repeat gives the same SQL and rows with no planner
+call. The cached plan is validated again every time, so roles and policy
+changes still apply. `sq.plan_source` says `"cache"` or `"llm"`;
+`PLAN_CACHE_ENABLED=false` turns it off and `nl2sql cache clear` empties it.
+See [Determinism](docs/architecture/determinism.md#the-plan-cache-determinism-from-the-architecture).
+
 Install the drivers you need as extras:
 
 ```bash

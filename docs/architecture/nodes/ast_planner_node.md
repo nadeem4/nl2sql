@@ -12,9 +12,10 @@
 
 ## Responsibilities
 
+- Serve a pinned plan from the plan cache on a first attempt, without an LLM call.
 - Serialize `relevant_tables` into the planning prompt.
 - Pass user intent, expected schema, and error feedback to the LLM.
-- Return `ASTPlannerResponse` with the `PlanModel`.
+- Return `ASTPlannerResponse` with the `PlanModel` and its `plan_source` (`"llm"` or `"cache"`).
 
 ---
 
@@ -65,12 +66,39 @@ Mutations to `SubgraphExecutionState`:
 
 Side effects:
 
-- LLM invocation via `llm_registry`.
+- LLM invocation via `llm_registry` (none on a plan cache hit).
+- Reads the plan cache in the schema store. It never writes it: the sub-query
+  wrapper stores a plan only after it validated and executed.
+
+---
+
+## Plan cache
+
+The planner is the call that decides the SQL, so a plan that already passed
+validation and executed is reused
+([`pipeline/plan_cache.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/pipeline/plan_cache.py)).
+
+- **Key:** `(normalised sub_query.intent, sub_query.datasource_id, sub_query.schema_version)`.
+  Normalisation case-folds, collapses whitespace and strips trailing `.?!,;:`;
+  the match is exact. No `schema_version`, no caching.
+- **Read:** only on a first attempt (`retry_count == 0` and no errors). A hit
+  returns `ASTPlannerResponse(plan=<cached>, plan_source="cache")` and makes no
+  LLM call; a retry after a rejected plan always asks the model.
+- **Never trusted:** the logical validator, generator and executor run on a
+  cached plan exactly as on a fresh one, so RBAC and policy changes apply.
+- **Written** by `wrap_subgraph` (`pipeline/graph_utils.py`) only when the
+  sub-query produced SQL and executed without a blocking error. Refused, failed
+  and plan-only runs are not stored.
+- **Controls:** `PLAN_CACHE_ENABLED` (default `true`) and `nl2sql cache clear`.
+
+See [Determinism → The plan cache](../determinism.md#the-plan-cache-determinism-from-the-architecture).
 
 ---
 
 ## Internal Flow (Step-by-Step)
 
+0. On a first attempt, look up the plan cache; on a hit, return the cached plan
+   with `plan_source="cache"` and stop.
 1. Render `relevant_tables` with `render_schema_for_prompt` (see below).
 2. Build feedback string from existing errors (compact JSON).
 3. Build `expected_schema` payload from sub‑query.

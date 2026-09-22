@@ -228,6 +228,8 @@ class PlanModel(BaseModel):
 
 class ASTPlannerResponse(BaseModel):
     plan: Optional[PlanModel] = None
+    # "cache" when the plan came from the plan cache and no LLM call was made.
+    plan_source: Literal["llm", "cache"] = "llm"
 
 
 # Fix forward references

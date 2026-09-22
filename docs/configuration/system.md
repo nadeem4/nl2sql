@@ -58,7 +58,7 @@ providers. The check runs on the read path only, so the fix is simply to re-run
 | Env var | Default | Description |
 | --- | --- | --- |
 | `SCHEMA_STORE_BACKEND` | `sqlite` | Schema store backend identifier. |
-| `SCHEMA_STORE_PATH` | `data/schema_store.db` | SQLite database path for schema store persistence. |
+| `SCHEMA_STORE_PATH` | `data/schema_store.db` | SQLite database path for schema store persistence. Also holds the plan cache (`plan_cache` table). |
 | `SCHEMA_STORE_MAX_VERSIONS` | `3` | Max schema versions retained per datasource. |
 | `RESULT_ARTIFACT_BACKEND` | `local` | Artifact backend: `local`, `s3`, `adls`. |
 | `RESULT_ARTIFACT_BASE_URI` | `./artifacts` | Base URI or path for artifact storage. |
@@ -86,6 +86,7 @@ providers. The check runs on the read path only, so the fix is simply to re-run
 | `SQL_AGENT_RETRY_MAX_DELAY_SEC` | `10.0` | Max delay for SQL agent retries (seconds). |
 | `SQL_AGENT_RETRY_JITTER_SEC` | `0.5` | Max jitter added to SQL agent retry delays (seconds). |
 | `LOGICAL_VALIDATOR_STRICT_COLUMNS` | `false` | Treat missing columns as errors in logical validation. |
+| `PLAN_CACHE_ENABLED` | `true` | Reuse a plan that already passed validation and executed, for the same normalised sub-query intent, datasource and schema version, instead of calling the planner LLM. The cached plan is validated again on every use, so RBAC and policy changes still apply. Stored in the schema store (`SCHEMA_STORE_PATH`); `nl2sql cache clear` empties it. See [Determinism → The plan cache](../architecture/determinism.md#the-plan-cache-determinism-from-the-architecture). |
 | `RBAC_REFUSAL_NAMES_TABLES` | `false` | Name the role and the forbidden table in the refusal the user sees. Off, the message is "You do not have permission to see the data this question requires."; the table and role are always in the log and the run trace. `nl2sql setup --demo` writes `true` into `.env.demo`. See [Security Model](../security/model.md#strict-refusal). |
 | `TENANT_ID` | `default_tenant` | Default tenant ID for requests. |
 

@@ -39,6 +39,9 @@ class SubQueryResult(BaseModel):
     rows: Optional[RowSample] = None
     status: str = Field(default="")
     retry_count: int = Field(default=0)
+    # "cache" when the plan came from the plan cache (no planner LLM call; it
+    # was still validated, generated and executed), else "llm".
+    plan_source: str = Field(default="llm")
 
 
 class QueryResult(BaseModel):
@@ -159,6 +162,7 @@ def _sub_query_results(
                 rows=rows,
                 status=_field(output, "status", "") or "",
                 retry_count=int(_field(output, "retry_count", 0) or 0),
+                plan_source=_field(output, "plan_source", "llm") or "llm",
             )
         )
     return results
@@ -200,6 +204,8 @@ def result_from_state(
             errors.append(summary)
 
     sub_queries = _sub_query_results(state, artifact_store, sample_rows, warnings)
+    usage = QuestionUsage.model_validate(state.get("usage") or {})
+    usage.plan_cache_hits = sum(1 for sq in sub_queries if sq.plan_source == "cache")
 
     return QueryResult(
         sub_queries=sub_queries,
@@ -211,7 +217,7 @@ def result_from_state(
         artifact_refs=state.get("artifact_refs") or {},
         status=_overall_status(sub_queries, errors, state),
         timings=dict(state.get("timings") or {}),
-        usage=QuestionUsage.model_validate(state.get("usage") or {}),
+        usage=usage,
         trace_path=state.get("trace_path"),
     )
 
