@@ -69,10 +69,11 @@ Side effects:
 
 1. Validate resolver response; raise if no resolved datasources.
 2. Build `resolved_payload` and `schema_version_map`.
-3. Invoke LLM chain with `user_query` and resolved datasources. The prompt is two messages: the system message holds the fixed instructions and output format (cacheable), the human message holds the resolved datasources (as JSON with sorted keys) and then the question.
+3. Invoke LLM chain with `user_query` and resolved datasources. The prompt is two messages: the system message holds the fixed instructions and output format (cacheable), the human message holds the resolved datasources (as JSON with sorted keys) and then the question. A sub-query carries its own `filters` (a threshold on a metric included), `order_by` and `limit`: "the artist with the most albums" is `order_by album_count desc, limit 1`. `post_combine_ops` are only for operations across two or more combined sub-queries, and the prompt's example has none.
+   - `fold_single_input_ops()` then moves every `filter`, `sort` and `limit` op on a combine group with one sub-query (used by no other group) into that sub-query: filters are appended, `order_by` terms appended, and the smallest limit kept. With one input there is nothing to combine, and left as post-combine ops they reached only the aggregated answer, never the sub-query's SQL or rows (the first gpt-5.4 tier 2 run returned every row for ten superlative and top-N questions this way). A group with an `aggregate` or `project` op is left to the aggregator.
 4. For each LLM sub‑query:
    - Validate datasource existence and RBAC allowance.
-   - Assign deterministic ID via `_stable_id()`.
+   - Assign deterministic ID via `_stable_id()`, over the intent, metrics, filters, group_by, order_by, limit and expected schema.
    - Attach schema version.
 5. Remap combine groups to stable sub‑query IDs.
 6. Assign deterministic IDs to post‑combine ops.

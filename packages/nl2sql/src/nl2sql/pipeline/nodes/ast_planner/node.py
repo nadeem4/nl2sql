@@ -1,4 +1,5 @@
 from __future__ import annotations
+import json
 import traceback
 from typing import Any, Dict, Optional, TYPE_CHECKING
 from langchain_core.runnables import Runnable
@@ -16,6 +17,25 @@ if TYPE_CHECKING:
     from nl2sql.pipeline.state import SubgraphExecutionState
 
 logger = get_logger("planner")
+
+
+def semantic_context_of(sub_query: Any) -> str:
+    """The sub-query's structured intent, as the planner's [SEMANTIC_CONTEXT].
+
+    The intent text alone can drop what the decomposer said structurally, such
+    as a ranking and a limit, so the planner gets the fields too.
+    """
+    if sub_query is None:
+        return ""
+    fields = {
+        "metrics": [m.model_dump(exclude_none=True) for m in sub_query.metrics],
+        "filters": [f.model_dump() for f in sub_query.filters],
+        "group_by": [g.model_dump() for g in sub_query.group_by],
+        "order_by": [o.model_dump() for o in sub_query.order_by],
+        "limit": sub_query.limit,
+    }
+    fields = {k: v for k, v in fields.items() if v not in ([], None)}
+    return json.dumps(fields, sort_keys=True, ensure_ascii=False, default=str) if fields else ""
 
 
 class ASTPlannerNode:
@@ -91,6 +111,7 @@ class ASTPlannerNode:
                 feedback = "\n".join(e.model_dump_json(exclude_none=True) for e in state.errors)
 
             query_text = state.sub_query.intent if state.sub_query else ""
+            semantic_context = semantic_context_of(state.sub_query)
             expected_schema = []
             if state.sub_query and state.sub_query.expected_schema:
                 expected_schema = [c.model_dump() for c in state.sub_query.expected_schema]
@@ -100,7 +121,7 @@ class ASTPlannerNode:
                     "examples": PLANNER_EXAMPLES,
                     "feedback": feedback,
                     "expected_schema": expected_schema,
-                    "semantic_context": "",
+                    "semantic_context": semantic_context,
                     "user_query": query_text,
                 }
             )

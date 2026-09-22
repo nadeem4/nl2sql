@@ -47,6 +47,12 @@ From `SubgraphExecutionState`:
 
 - `sub_query.intent` (required)
 - `sub_query.expected_schema` (optional)
+- `sub_query.metrics`, `filters`, `group_by`, `order_by`, `limit`: rendered by
+  `semantic_context_of()` as compact JSON into `[SEMANTIC_CONTEXT]` (empty when
+  the sub-query has none). The system message tells the model to apply all of
+  it, filters on a metric as `having`, `order_by` as the plan's `order_by` and
+  `limit` as the plan's `limit`, and that a most/least/top-N question needs an
+  `order_by` on the ranked value and a `limit`; one example shows it.
 - `relevant_tables` (required for schema grounding)
 - `errors` (optional feedback for retries)
 
@@ -79,6 +85,10 @@ validation and executed is reused
 ([`pipeline/plan_cache.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/pipeline/plan_cache.py)).
 
 - **Key:** `(normalised sub_query.intent, sub_query.datasource_id, sub_query.schema_version)`.
+  When the sub-query has an `order_by` or `limit`, they are appended to the
+  intent part (`... | order_by=album_count desc | limit=1`), so a top-1 and a
+  top-5 of the same intent are different entries while plain intents keep
+  their existing keys.
   Normalisation case-folds, collapses whitespace and strips trailing `.?!,;:`;
   the match is exact. No `schema_version`, no caching.
 - **Read:** only on a first attempt (`retry_count == 0` and no errors). A hit
