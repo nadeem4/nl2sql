@@ -1747,22 +1747,44 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#providers" class="md-nav__link">
+  <a href="#providers-and-wire-types" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Providers
+        Providers and wire types
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Providers">
+    <nav class="md-nav" aria-label="Providers and wire types">
       <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#adding-a-provider" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Adding a provider
+      
+    </span>
+  </a>
+  
+</li>
         
           <li class="md-nav__item">
   <a href="#openai" class="md-nav__link">
     <span class="md-ellipsis">
       
         OpenAI
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#anthropic-claude" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Anthropic (Claude)
       
     </span>
   </a>
@@ -3976,22 +3998,44 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#providers" class="md-nav__link">
+  <a href="#providers-and-wire-types" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Providers
+        Providers and wire types
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Providers">
+    <nav class="md-nav" aria-label="Providers and wire types">
       <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#adding-a-provider" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Adding a provider
+      
+    </span>
+  </a>
+  
+</li>
         
           <li class="md-nav__item">
   <a href="#openai" class="md-nav__link">
     <span class="md-ellipsis">
       
         OpenAI
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#anthropic-claude" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Anthropic (Claude)
       
     </span>
   </a>
@@ -4133,7 +4177,7 @@ optional per-agent overrides.</p>
 </ul>
 <p>Each LLM config supports:</p>
 <ul>
-<li><code>provider</code>: LLM provider name — <code>openai</code>, <code>openrouter</code> or <code>ollama</code></li>
+<li><code>provider</code>: LLM provider name — <code>openai</code>, <code>anthropic</code>, <code>openrouter</code> or <code>ollama</code></li>
 <li><code>model</code>: model identifier (required; an empty model is rejected)</li>
 <li><code>temperature</code>: float, or <code>null</code> to send no temperature at all (defaults to
   <code>0.0</code>; see <a href="#temperature">Temperature</a>)</li>
@@ -4141,14 +4185,76 @@ optional per-agent overrides.</p>
 <li><code>base_url</code>: optional endpoint override (see <a href="#other-openai-compatible-endpoints">Other OpenAI-compatible
   endpoints</a>)</li>
 </ul>
-<h2 id="providers">Providers</h2>
-<p>All three providers speak the OpenAI wire protocol, so all three are served by
-the same <code>ChatOpenAI</code> client with a different base URL — no extra dependency is
-involved. The provider name only selects a preset:</p>
+<h2 id="providers-and-wire-types">Providers and wire types</h2>
+<p>The engine is model-agnostic. A <em>provider</em> is a preset: an endpoint, the
+environment variable its key comes from, and the <em>wire type</em> it speaks, which
+is the HTTP protocol on the wire. Everything that differs between wire types
+lives in one adapter per wire type, in <code>nl2sql/llm/wires/</code>:</p>
+<table>
+<thead>
+<tr>
+<th>wire type</th>
+<th>adapter</th>
+<th>client</th>
+<th>providers</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>openai</code></td>
+<td><code>wires/openai.py</code></td>
+<td><code>ChatOpenAI</code></td>
+<td><code>openai</code>, <code>openrouter</code>, <code>ollama</code>, and any OpenAI-compatible endpoint</td>
+</tr>
+<tr>
+<td><code>anthropic</code></td>
+<td><code>wires/anthropic.py</code></td>
+<td><code>ChatAnthropic</code> (the <code>anthropic</code> extra)</td>
+<td><code>anthropic</code></td>
+</tr>
+</tbody>
+</table>
+<p>Each adapter owns four things, so neither the registry nor the nodes know which
+wire they are on:</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th><code>openai</code> wire</th>
+<th><code>anthropic</code> wire</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Client</strong></td>
+<td><code>ConfiguredChatOpenAI</code>, <code>seed=42</code></td>
+<td><code>CachingChatAnthropic</code>, <code>max_tokens=16000</code></td>
+</tr>
+<tr>
+<td><strong>Structured output</strong></td>
+<td>tool call (<code>function_calling</code>)</td>
+<td>forced tool call (<code>function_calling</code>)</td>
+</tr>
+<tr>
+<td><strong>Prompt caching</strong></td>
+<td>nothing to mark: OpenAI caches long prefixes by itself</td>
+<td><code>cache_control</code> on the last system block</td>
+</tr>
+<tr>
+<td><strong>Usage</strong></td>
+<td><code>prompt_tokens_details.cached_tokens</code> → cached; no cache writes reported</td>
+<td>cache reads and writes, see <a href="../../api/core/query/">Query API → usage</a></td>
+</tr>
+</tbody>
+</table>
+<p>Both adapters also turn a model's HTTP 400 on <code>temperature</code> into the same
+"set <code>temperature: null</code>" error (see <a href="#temperature">Temperature</a>).</p>
+<p>The providers:</p>
 <table>
 <thead>
 <tr>
 <th>provider</th>
+<th>wire type</th>
 <th>default endpoint</th>
 <th>API key</th>
 </tr>
@@ -4156,28 +4262,58 @@ involved. The provider name only selects a preset:</p>
 <tbody>
 <tr>
 <td><code>openai</code></td>
+<td><code>openai</code></td>
 <td>OpenAI's own API</td>
 <td>required (<code>OPENAI_API_KEY</code>)</td>
 </tr>
 <tr>
+<td><code>anthropic</code></td>
+<td><code>anthropic</code></td>
+<td>Anthropic's own API</td>
+<td>required (<code>ANTHROPIC_API_KEY</code>)</td>
+</tr>
+<tr>
 <td><code>openrouter</code></td>
+<td><code>openai</code></td>
 <td><code>https://openrouter.ai/api/v1</code></td>
 <td>required (<code>OPENROUTER_API_KEY</code>)</td>
 </tr>
 <tr>
 <td><code>ollama</code></td>
+<td><code>openai</code></td>
 <td><code>http://localhost:11434/v1</code></td>
 <td>not required</td>
 </tr>
 </tbody>
 </table>
 <p>Any other value raises <code>ValueError: Unsupported LLM provider</code>, naming the valid
-providers.</p>
+providers. Every agent picks its own provider, so one question can use several;
+see <a href="#per-node-models">Per-node models</a>.</p>
+<h3 id="adding-a-provider">Adding a provider</h3>
+<ul>
+<li><strong>A provider that speaks an existing wire type</strong> (a gateway, a hosted
+  OpenAI-compatible service) is one entry in <code>PROVIDER_PRESETS</code> in
+  <code>nl2sql/llm/registry.py</code>: its endpoint, key variable and <code>wire</code>. Nothing else
+  changes. For a one-off endpoint you don't even need that: set <code>base_url</code> on an
+  <code>openai</code> agent (see
+  <a href="#other-openai-compatible-endpoints">Other OpenAI-compatible endpoints</a>).</li>
+<li><strong>A new wire type</strong> (Gemini, Bedrock) is one new adapter module in
+  <code>nl2sql/llm/wires/</code> implementing the <code>Wire</code> protocol in <code>wires/base.py</code>
+  (<code>build_client</code>, <code>structured_output_method</code>, <code>mark_cache</code>, <code>read_usage</code>), one
+  entry in <code>WIRES</code> in <code>wires/__init__.py</code>, and presets that name it. Add a case
+  to <code>CASES</code> in <code>tests/unit/test_llm_wire_contract.py</code>. The contract suite then
+  runs every structured-output call, usage, cache and key test against it.</li>
+</ul>
 <h3 id="openai">OpenAI</h3>
 <p><code>nl2sql setup</code> and <code>nl2sql demo</code> write <code>gpt-5.4</code> as the OpenAI default. On the
 owner's account (probed 2026-09-20) it accepted <code>temperature: 0</code> with a limit of
 500,000 tokens per minute, against 30,000 for the previous default <code>gpt-4o</code> -
 less than one question with a single retry needs (about 33,500 tokens).</p>
+<p>Every node asks for structured output as a tool call. The planner used to use
+<code>langchain-openai</code>'s default, a <code>json_schema</code> response format; it now uses a
+tool call like the other nodes, because that is what the openai wire's
+adapter uses for every node, and what OpenRouter's and Ollama's models support
+most widely.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nt">default</span><span class="p">:</span>
 <a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span><span class="nt">provider</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">openai</span>
@@ -4191,38 +4327,120 @@ less than one question with a single retry needs (about 33,500 tokens).</p>
 <a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="w">    </span><span class="nt">temperature</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.0</span>
 <a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="w">    </span><span class="nt">api_key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${env:OPENAI_API_KEY}</span>
 </code></pre></div>
+<h3 id="anthropic-claude">Anthropic (Claude)</h3>
+<p>Claude runs on Anthropic's own API through <code>ChatAnthropic</code>, not through an
+OpenAI-compatibility shim: prompt caching and reliable structured output need
+Anthropic's native API. <code>langchain-anthropic</code> is an optional extra:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"nl2sql-engine[anthropic]"</span>
+</code></pre></div>
+<p>Selecting <code>provider: anthropic</code> without it fails on the first LLM call with
+<code>ValueError: ... Install the anthropic extra: pip install "nl2sql-engine[anthropic]"</code>,
+and <code>nl2sql doctor</code> reports the missing extra.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="nt">default</span><span class="p">:</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span><span class="nt">provider</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">anthropic</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">claude-opus-5</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">  </span><span class="nt">temperature</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">null</span><span class="w">          </span><span class="c1"># Claude Opus 5 and Sonnet 5 reject any temperature</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">  </span><span class="nt">api_key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${env:ANTHROPIC_API_KEY}</span>
+</code></pre></div>
+<p><code>nl2sql setup</code> and <code>nl2sql demo</code> write <code>claude-opus-5</code> as the Claude default,
+with <code>temperature: null</code>. Current models:</p>
+<table>
+<thead>
+<tr>
+<th>model</th>
+<th><code>temperature</code></th>
+<th>minimum cacheable prefix</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>claude-opus-5</code></td>
+<td>rejected (HTTP 400): use <code>null</code></td>
+<td>512 tokens</td>
+</tr>
+<tr>
+<td><code>claude-sonnet-5</code></td>
+<td>rejected (HTTP 400): use <code>null</code></td>
+<td>1,024 tokens</td>
+</tr>
+<tr>
+<td><code>claude-haiku-4-5</code></td>
+<td>accepted, e.g. <code>0.0</code></td>
+<td>4,096 tokens</td>
+</tr>
+</tbody>
+</table>
+<p>These come from Anthropic's documented model rules, not from a probe on a real
+account. A rejected temperature fails with the same "set <code>temperature: null</code>"
+error as OpenAI (see <a href="#temperature">Temperature</a>).</p>
+<p>How the engine uses it:</p>
+<ul>
+<li><strong>Structured output</strong> is a forced tool call (<code>with_structured_output</code>'s
+  <code>function_calling</code> method), for every node. Anthropic's native JSON outputs
+  (<code>output_config.format</code>) do not accept recursive schemas, and the planner's
+  <code>PlanModel</code> is recursive.</li>
+<li><strong>Prompt caching.</strong> The resolver, decomposer, planner and refiner send a
+  stable system message and a variable human message. On the <code>anthropic</code> wire
+  only, the last system
+  block carries <code>cache_control: {"type": "ephemeral"}</code> (a 5-minute cache).
+  Anthropic renders tools, then system, then messages, so the breakpoint caches
+  the tool schema and the system prompt; the question follows it. The answer
+  synthesizer sends no system message, so nothing is marked. Other providers
+  send no <code>cache_control</code>.</li>
+<li><strong>Whether a prefix clears the minimum.</strong> On Chinook the planner's cached
+  prefix is its system prompt (about 3.5k tokens, most of it the retrieved
+  schema) plus the <code>PlanModel</code> tool schema (about 2k): above every model's
+  minimum. The decomposer's (about 0.7k of system prompt plus a 1.4k tool
+  schema) and the refiner's (about 2.7k, no tool) clear Opus 5's 512 and
+  Sonnet 5's 1,024 but not Haiku 4.5's 4,096, so on Haiku they are silently
+  not cached. The resolver's answerability check (<code>datasourceresolver</code>) is
+  marked the same way, but its prefix (about 260 tokens of system prompt plus a
+  small tool schema) is below every Claude model's minimum, so it is never
+  cached. The decomposer's prefix is the same for every question; the
+  planner's and refiner's include the retrieved tables, so they hit when a
+  sub-query retrieves the same tables again (a retry, or a similar question).</li>
+<li><strong><code>max_tokens</code></strong> is 16,000 per call: every node call is non-streaming, and
+  the SDK refuses a non-streaming call whose <code>max_tokens</code> could outlast its
+  timeout.</li>
+<li><strong>Usage.</strong> Cache reads and writes are reported as <code>cached_input_tokens</code> and
+  <code>cache_write_input_tokens</code>, with each input token counted once (see
+  <a href="../../api/core/query/">Query API → usage</a>).</li>
+</ul>
+<p><code>nl2sql demo --record</code> cannot record Claude: the recording proxy and replay
+speak the OpenAI wire format, so it asks for an OpenAI or OpenRouter key.</p>
 <h3 id="openrouter">OpenRouter</h3>
 <p><a href="https://openrouter.ai">OpenRouter</a> is an OpenAI-compatible gateway: a single
 API key reaches Anthropic, Google, Meta and hundreds of other models. Models are
 named <code>&lt;vendor&gt;/&lt;model&gt;</code>, for example <code>anthropic/claude-sonnet-4.5</code> or
 <code>google/gemini-2.5-pro</code>.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="nt">default</span><span class="p">:</span>
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span><span class="nt">provider</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">openrouter</span>
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">  </span><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">anthropic/claude-sonnet-4.5</span>
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">  </span><span class="nt">temperature</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.0</span>
-<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">  </span><span class="nt">api_key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${env:OPENROUTER_API_KEY}</span>
-<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="nt">agents</span><span class="p">:</span>
-<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="w">  </span><span class="nt">indexing_enrichment</span><span class="p">:</span>
-<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="w">    </span><span class="nt">provider</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">openrouter</span>
-<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="w">    </span><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">anthropic/claude-sonnet-4.5</span>
-<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="w">    </span><span class="nt">temperature</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.0</span>
-<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="w">    </span><span class="nt">api_key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${env:OPENROUTER_API_KEY}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="nt">default</span><span class="p">:</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span><span class="nt">provider</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">openrouter</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">  </span><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">anthropic/claude-sonnet-4.5</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">  </span><span class="nt">temperature</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.0</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">  </span><span class="nt">api_key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${env:OPENROUTER_API_KEY}</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="nt">agents</span><span class="p">:</span>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="w">  </span><span class="nt">indexing_enrichment</span><span class="p">:</span>
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="w">    </span><span class="nt">provider</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">openrouter</span>
+<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="w">    </span><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">anthropic/claude-sonnet-4.5</span>
+<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="w">    </span><span class="nt">temperature</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.0</span>
+<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a><span class="w">    </span><span class="nt">api_key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${env:OPENROUTER_API_KEY}</span>
 </code></pre></div>
 <h3 id="ollama">Ollama</h3>
 <p><a href="https://ollama.com">Ollama</a> exposes an OpenAI-compatible API on
 <code>http://localhost:11434/v1</code>, so it needs no <code>api_key</code> and no <code>base_url</code>: start
 the daemon, pull a model, and point <code>configs/llm.yaml</code> at it.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="nt">default</span><span class="p">:</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span><span class="nt">provider</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ollama</span>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">llama3.1</span>
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">  </span><span class="nt">temperature</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.0</span>
-<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="nt">agents</span><span class="p">:</span>
-<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="w">  </span><span class="nt">indexing_enrichment</span><span class="p">:</span>
-<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="w">    </span><span class="nt">provider</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ollama</span>
-<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="w">    </span><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">llama3.1</span>
-<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="w">    </span><span class="nt">temperature</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.0</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="nt">default</span><span class="p">:</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">  </span><span class="nt">provider</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ollama</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">  </span><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">llama3.1</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">  </span><span class="nt">temperature</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.0</span>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="nt">agents</span><span class="p">:</span>
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="w">  </span><span class="nt">indexing_enrichment</span><span class="p">:</span>
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="w">    </span><span class="nt">provider</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ollama</span>
+<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="w">    </span><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">llama3.1</span>
+<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="w">    </span><span class="nt">temperature</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.0</span>
 </code></pre></div>
 <p>Set <code>base_url</code> if the daemon is not on <code>localhost:11434</code> (a remote box, or a
 different port).</p>
@@ -4250,7 +4468,8 @@ other steps are unchanged.</p>
   uses its own default.</li>
 </ul>
 <p>Use <code>null</code> for models that accept only their default. Probed on 2026-09-20 with
-the engine's own parameters (<code>temperature=0</code>, <code>seed=42</code>, strict <code>json_schema</code>):</p>
+the engine's parameters of the time (<code>temperature=0</code>, <code>seed=42</code>, strict
+<code>json_schema</code>; the planner now sends a tool call instead):</p>
 <table>
 <thead>
 <tr>
@@ -4273,11 +4492,11 @@ the engine's own parameters (<code>temperature=0</code>, <code>seed=42</code>, s
 <code>seed=42</code>), so only the temperature needs to go. When a model rejects it, the
 first LLM call fails with an error that names the model and the agent and says
 what to set, instead of the provider's raw response:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>ValueError: Model 'gpt-5.5' (LLM agent 'default') rejected the temperature
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>parameter (HTTP 400: Unsupported value: 'temperature' does not support 0.0 with
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>this model. Only the default (1) value is supported.) Set 'temperature: null'
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>for agent 'default' in the LLM config file so no temperature is sent to this
-<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>model.
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>ValueError: Model 'gpt-5.5' (LLM agent 'default') rejected the temperature
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>parameter (HTTP 400: Unsupported value: 'temperature' does not support 0.0 with
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>this model. Only the default (1) value is supported.) Set 'temperature: null'
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>for agent 'default' in the LLM config file so no temperature is sent to this
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>model.
 </code></pre></div>
 <p>Nothing is retried without the parameter: what the config says is what is sent.</p>
 <div class="admonition note">
@@ -4329,51 +4548,63 @@ agent name, and fall back to <code>default</code> when it is not configured:</p>
 entry is a complete agent config - nothing is inherited from <code>default</code> - so
 <code>provider</code> and <code>model</code> are required, <code>temperature</code> falls back to <code>0.0</code> (not to
 the default agent's value), and a missing <code>api_key</code> falls back to the provider's
-environment variable. For example, keep <code>gpt-5.4</code> for planning and run the
-cheaper nodes on other models, one of which only accepts its default
-temperature:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="nt">default</span><span class="p">:</span>
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">  </span><span class="nt">provider</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">openai</span>
-<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">  </span><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">gpt-5.4</span>
-<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">  </span><span class="nt">temperature</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.0</span>
-<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="w">  </span><span class="nt">api_key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${env:OPENAI_API_KEY}</span>
-<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="nt">agents</span><span class="p">:</span>
-<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="w">  </span><span class="nt">decomposer</span><span class="p">:</span>
-<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="w">    </span><span class="nt">provider</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">openai</span>
-<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="w">    </span><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">gpt-5.4-mini</span>
-<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a><span class="w">    </span><span class="nt">temperature</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.0</span>
-<a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a><span class="w">    </span><span class="nt">api_key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${env:OPENAI_API_KEY}</span>
-<a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a><span class="w">  </span><span class="nt">answersynthesizer</span><span class="p">:</span>
-<a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a><span class="w">    </span><span class="nt">provider</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">openai</span>
-<a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a><span class="w">    </span><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">gpt-5-mini</span>
-<a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a><span class="w">    </span><span class="nt">temperature</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">null</span><span class="w">        </span><span class="c1"># gpt-5-mini rejects temperature=0</span>
-<a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a><span class="w">    </span><span class="nt">api_key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${env:OPENAI_API_KEY}</span>
+environment variable. Each node can be on a different provider, and so a
+different wire type. For example, plan on Claude and run everything else on
+OpenAI, with one cheaper node that only accepts its default temperature:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="nt">default</span><span class="p">:</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">  </span><span class="nt">provider</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">openai</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">  </span><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">gpt-5.4</span>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">  </span><span class="nt">temperature</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.0</span>
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="w">  </span><span class="nt">api_key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${env:OPENAI_API_KEY}</span>
+<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="nt">agents</span><span class="p">:</span>
+<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a><span class="w">  </span><span class="nt">astplanner</span><span class="p">:</span>
+<a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a><span class="w">    </span><span class="nt">provider</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">anthropic</span>
+<a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a><span class="w">    </span><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">claude-opus-5</span>
+<a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a><span class="w">    </span><span class="nt">temperature</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">null</span><span class="w">        </span><span class="c1"># Claude Opus 5 rejects a temperature</span>
+<a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a><span class="w">    </span><span class="nt">api_key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${env:ANTHROPIC_API_KEY}</span>
+<a id="__codelineno-7-13" name="__codelineno-7-13" href="#__codelineno-7-13"></a><span class="w">  </span><span class="nt">answersynthesizer</span><span class="p">:</span>
+<a id="__codelineno-7-14" name="__codelineno-7-14" href="#__codelineno-7-14"></a><span class="w">    </span><span class="nt">provider</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">openai</span>
+<a id="__codelineno-7-15" name="__codelineno-7-15" href="#__codelineno-7-15"></a><span class="w">    </span><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">gpt-5-mini</span>
+<a id="__codelineno-7-16" name="__codelineno-7-16" href="#__codelineno-7-16"></a><span class="w">    </span><span class="nt">temperature</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">null</span><span class="w">        </span><span class="c1"># gpt-5-mini rejects temperature=0</span>
+<a id="__codelineno-7-17" name="__codelineno-7-17" href="#__codelineno-7-17"></a><span class="w">    </span><span class="nt">api_key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${env:OPENAI_API_KEY}</span>
 </code></pre></div>
-<p>Here <code>astplanner</code> and <code>refiner</code> use <code>default</code>. The model each call actually
-used is recorded per node in <code>QueryResult.usage.calls</code> and in a run trace's
-<code>llm.by_node</code> (see <a href="../../observability/debugging/">Debugging</a>).</p>
+<p>Here <code>datasourceresolver</code>, <code>decomposer</code> and <code>refiner</code> use <code>default</code>. Each node
+keeps its own key, endpoint and cache behaviour: the planner's system prompt is
+cache-marked for Anthropic, the others are sent unmarked to OpenAI. The model
+each call actually used is recorded per node in <code>QueryResult.usage.calls</code> and
+in a run trace's <code>llm.by_node</code> (see <a href="../../observability/debugging/">Debugging</a>).</p>
 <p>In the demo, the playground's <strong>Settings</strong> panel writes exactly these entries
-into <code>configs/llm.demo.yaml</code>: choosing a model for a step adds an <code>agents:</code>
-entry with the default's provider, <code>base_url</code> and <code>api_key</code> reference, the
-chosen model, and <code>temperature: 0.0</code>, or <code>temperature: null</code> for <code>gpt-5.5</code> and
-<code>gpt-5-mini</code>; choosing "Default" removes the entry. The running engine reloads
-the file, so the change applies to the next question. The panel offers only
-the models in <code>VERIFIED_MODELS</code> (<code>nl2sql/cli/common/api_key.py</code>), OpenAI only
-for now. See <a href="../../getting_started/demo/#the-settings-panel">the settings panel</a>.</p>
-<p>Because a demo step differs from the default only in its model, <code>nl2sql demo</code>
-points every <code>agents:</code> entry at the same provider, endpoint and key variable as
-<code>default</code> when it picks replay or live mode at start-up.</p>
+into <code>configs/llm.demo.yaml</code>. Choosing a provider and a model for a step adds
+an <code>agents:</code> entry with <code>provider</code>, <code>model</code> and the temperature that model
+takes: <code>0.0</code>, or <code>null</code> for <code>gpt-5.5</code>, <code>gpt-5-mini</code>, <code>claude-opus-5</code> and
+<code>claude-sonnet-5</code>. A step on the default's provider takes the default's
+<code>base_url</code> and <code>api_key</code> reference; a step on another provider gets that
+provider's own <code>${env:...}</code> reference and no <code>base_url</code>. Choosing "Default"
+removes the entry. The running engine reloads the file, so the change applies
+to the next question. The panel offers the providers and models in
+<code>VERIFIED_MODELS</code> (<code>nl2sql/cli/common/api_key.py</code>), OpenAI and Anthropic for
+now, and a provider only once its key is saved. See
+<a href="../../getting_started/demo/#the-settings-panel">the settings panel</a>.</p>
+<p>When <code>nl2sql demo</code> picks replay or live mode at start-up it points <code>default</code>
+at the chosen provider. In replay and record mode every <code>agents:</code> entry
+follows, because one fake or proxy serves every call. In live mode a step
+keeps the provider it was given; only an entry with no provider, or one left
+on the replay endpoint, follows the default. Moving an entry between OpenAI
+and Anthropic replaces a model the new provider does not serve (a <code>gpt-</code> model
+on Anthropic, a <code>claude-</code> one on OpenAI) with that provider's default and its
+temperature. Every provider key saved in <code>.env.demo</code> is loaded at start-up, so
+each step finds its own.</p>
 <h2 id="other-openai-compatible-endpoints">Other OpenAI-compatible endpoints</h2>
 <p>A config-supplied <code>base_url</code> always overrides the provider preset. That is what
 lets the same code path serve any other OpenAI-compatible endpoint — vLLM,
 LiteLLM, a local proxy — without a new provider:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="nt">default</span><span class="p">:</span>
-<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">  </span><span class="nt">provider</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">openai</span>
-<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">  </span><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">meta-llama/Llama-3.1-70B-Instruct</span>
-<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="w">  </span><span class="nt">api_key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${env:LOCAL_LLM_KEY}</span>
-<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="w">  </span><span class="nt">base_url</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">http://localhost:8000/v1</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="nt">default</span><span class="p">:</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">  </span><span class="nt">provider</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">openai</span>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">  </span><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">meta-llama/Llama-3.1-70B-Instruct</span>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="w">  </span><span class="nt">api_key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${env:LOCAL_LLM_KEY}</span>
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="w">  </span><span class="nt">base_url</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">http://localhost:8000/v1</span>
 </code></pre></div>
 <p>Pick the provider whose credential behaviour matches the endpoint: <code>openai</code> or
 <code>openrouter</code> if the endpoint expects a key, <code>ollama</code> if it accepts any key.</p>
@@ -4389,18 +4620,18 @@ first time that agent's LLM is requested. Two consequences:</p>
 <li>A missing or wrong key surfaces on the <strong>first LLM call</strong>, not at startup. The
   error names the agent, the provider and the environment variable to set:</li>
 </ul>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>ValueError: LLM agent 'default' uses provider 'openai', which requires an API
-<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>key, but none could be resolved. Set OPENAI_API_KEY in the environment, or give
-<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>the agent an 'api_key' in configs/llm.yaml.
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>ValueError: LLM agent 'default' uses provider 'openai', which requires an API
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>key, but none could be resolved. Set OPENAI_API_KEY in the environment, or give
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>the agent an 'api_key' in configs/llm.yaml.
 </code></pre></div>
 <p>Genuine misconfiguration still fails immediately at registration: an unknown
 provider, or an agent with no model.</p>
 <h2 id="embeddings-are-a-separate-path">Embeddings are a separate path</h2>
-<p>Neither OpenRouter nor Ollama covers embeddings — they are not routed through
+<p>None of Anthropic, OpenRouter or Ollama covers embeddings — they are not routed through
 <code>LLMRegistry</code> at all. Embeddings come from <code>EmbeddingService</code>, selected with the
 <code>EMBEDDING_PROVIDER</code> environment variable:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="nv">OPENROUTER_API_KEY</span><span class="o">=</span>sk-or-...<span class="w">   </span><span class="c1"># chat completions</span>
-<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="nv">OPENAI_API_KEY</span><span class="o">=</span>sk-...<span class="w">          </span><span class="c1"># embeddings, when EMBEDDING_PROVIDER=openai (default)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="nv">OPENROUTER_API_KEY</span><span class="o">=</span>sk-or-...<span class="w">   </span><span class="c1"># chat completions</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="nv">OPENAI_API_KEY</span><span class="o">=</span>sk-...<span class="w">          </span><span class="c1"># embeddings, when EMBEDDING_PROVIDER=openai (default)</span>
 </code></pre></div>
 <p>Set <code>EMBEDDING_PROVIDER=local</code> to embed with the key-free ONNX
 <code>all-MiniLM-L6-v2</code> model bundled with chromadb, and no <code>OPENAI_API_KEY</code> is needed
@@ -4413,9 +4644,11 @@ for the embedding step. Switching embedding providers requires a re-index. See
 <li><code>indexing_enrichment</code> is optional. Omit it, or leave its key unset, and
   <code>nl2sql index</code> still works - the schema is indexed without LLM-written
   descriptions.</li>
-<li><code>nl2sql setup</code> prompts for <code>openai</code> and <code>openrouter</code>, the two hosted providers
-  it can also collect a key for. To use Ollama, edit <code>configs/llm.yaml</code> as shown
-  above — no key prompt applies.</li>
+<li><code>nl2sql setup</code> prompts for <code>openai</code>, <code>anthropic</code> and <code>openrouter</code>, the hosted
+  providers it can also collect a key for; <code>setup --api-key</code> picks the provider
+  from the key's shape (<code>sk-ant-</code> is Anthropic, <code>sk-or-</code> is OpenRouter, anything
+  else is OpenAI). To use Ollama, edit <code>configs/llm.yaml</code> as shown above — no
+  key prompt applies.</li>
 </ul>
 
 

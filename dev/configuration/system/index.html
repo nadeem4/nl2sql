@@ -1909,6 +1909,11 @@
 <td>OpenAI API key (held as <code>SecretStr</code>: never printed). Used for chat when <code>provider: openai</code>, and for embeddings when <code>EMBEDDING_PROVIDER=openai</code> (the default).</td>
 </tr>
 <tr>
+<td><code>ANTHROPIC_API_KEY</code></td>
+<td><code>—</code></td>
+<td>Anthropic API key, read when an agent has <code>provider: anthropic</code> and no <code>api_key</code> of its own (needs the <code>anthropic</code> extra). Chat only: Anthropic serves no embeddings.</td>
+</tr>
+<tr>
 <td><code>EMBEDDING_PROVIDER</code></td>
 <td><code>openai</code></td>
 <td>Embedding backend: <code>openai</code> (needs <code>OPENAI_API_KEY</code>) or <code>local</code> (key-free ONNX <code>all-MiniLM-L6-v2</code> bundled with chromadb).</td>
@@ -2006,7 +2011,7 @@ and how queries are embedded during retrieval:</p>
   minutes; a log line is emitted before the download starts.</li>
 <li><strong>Embeddings only.</strong> This removes the API key requirement from the embedding
   step. It does not make querying key-free — answering a question still needs a
-  chat model (OpenAI or OpenRouter).</li>
+  chat model (OpenAI, Anthropic or OpenRouter).</li>
 </ul>
 <p><strong>Switching providers requires a re-index.</strong> The two providers produce vectors of
 different dimensionality, so an existing Chroma collection cannot be read with the

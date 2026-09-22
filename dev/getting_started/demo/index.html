@@ -4234,7 +4234,10 @@ instead of the OpenAI embeddings API. The first indexing run downloads roughly
 <li>Both <code>nl2sql setup --api-key &lt;key&gt;</code> and <code>nl2sql demo --api-key &lt;key&gt;</code> take the
   key on the command line and write it into the generated env file. The provider
   follows the key's shape: a key beginning <code>sk-or-</code> is OpenRouter and is stored
-  as <code>OPENROUTER_API_KEY</code> with <code>provider: openrouter</code>; anything else is OpenAI.
+  as <code>OPENROUTER_API_KEY</code> with <code>provider: openrouter</code>; a key beginning <code>sk-ant-</code>
+  is Anthropic and is stored as <code>ANTHROPIC_API_KEY</code> with <code>provider: anthropic</code>,
+  model <code>claude-opus-5</code> and <code>temperature: null</code> (install
+  <code>nl2sql-engine[anthropic]</code>); anything else is OpenAI.
   <code>.env</code> and <code>.env.*</code> are covered by <code>.gitignore</code>, but a key passed on the
   command line is visible in shell history and to <code>ps</code>, so the environment
   variable remains the more private route.</li>
@@ -4310,26 +4313,37 @@ warning.</p>
 right. It edits the same two files the CLI reads, and nothing else: there is no
 second settings store, and the browser keeps nothing but UI conveniences.</p>
 <ul>
-<li><strong>API key.</strong> Paste a key and press <strong>Save key</strong>. The provider follows the
-  key's shape by the same rule as <code>--api-key</code> (<code>sk-or-</code> is OpenRouter, anything
-  else OpenAI). The key is written to the demo project's <code>.env.demo</code> and the
+<li><strong>API keys, one per provider.</strong> Paste a key and press <strong>Save key</strong>. The
+  provider follows the key's shape by the same rule as <code>--api-key</code> (<code>sk-ant-</code>
+  is Anthropic, <code>sk-or-</code> is OpenRouter, anything else OpenAI). The key is
+  written to the demo project's <code>.env.demo</code>, replacing that provider's previous
+  key and keeping the others, and the default moves to that provider. The
   running demo switches from replay to live <strong>without a restart</strong>: questions
   already running finish on the model client they started with, then the
-  engine's LLM clients are rebuilt from <code>configs/llm.demo.yaml</code>. The key is
-  write-only: no response, log line, trace or error carries it, only a masked
-  form such as <code>sk-...4f2a</code>. On a later start the precedence above still holds,
-  so <code>--api-key</code> or a key exported in your shell wins over the saved one.</li>
+  engine's LLM clients are rebuilt from <code>configs/llm.demo.yaml</code>. Keys are
+  write-only: no response, log line, trace or error carries one, only a masked
+  form such as <code>sk-...4f2a</code> per provider. On a later start the precedence above
+  still holds, so <code>--api-key</code> or a key exported in your shell wins over a saved
+  one, and every saved key is loaded so each step finds its own.</li>
 <li>
-<p><strong>A model for each LLM step.</strong> One selector each for the answerability check
-  (<code>datasourceresolver</code>), question splitter (<code>decomposer</code>), query planner (<code>astplanner</code>), plan repair (<code>refiner</code>) and
-  answer writer (<code>answersynthesizer</code>), each with a "Default" option that uses
-  the <code>default</code> agent. A choice is written to <code>configs/llm.demo.yaml</code> under
-  <code>agents:</code>, with the default's provider, endpoint and key reference, and takes
-  effect on the next question. The list is short on purpose. On 2026-09-20 each
-  model was sent the engine's exact parameters (<code>temperature=0</code>, <code>seed=42</code>,
-  strict <code>json_schema</code>) and worked with them, two of them only once the
-  temperature was left out. That says the model accepts the engine's calls, not
-  how well it plans, which is the evaluation's question:</p>
+<p><strong>A provider and a model for each LLM step.</strong> One selector each for the
+  answerability check (<code>datasourceresolver</code>), question splitter (<code>decomposer</code>),
+  query planner (<code>astplanner</code>), plan repair (<code>refiner</code>) and answer writer
+  (<code>answersynthesizer</code>). Each has a "Default" option that uses the <code>default</code>
+  agent, then one group of models per provider. A provider with no saved key is
+  listed but cannot be chosen, and a step already on a provider whose key is
+  gone says so under its selector. A choice is written to
+  <code>configs/llm.demo.yaml</code> under <code>agents:</code> with its <code>provider</code>, <code>model</code> and
+  temperature. It takes the default's endpoint and key reference when it is on
+  the default's provider, and its own provider's <code>${env:...}</code> reference
+  otherwise. It takes effect on the next question, and a step put on another
+  provider stays there when the default moves. The list is short on purpose. On
+  2026-09-20 each OpenAI model was sent the engine's parameters of the time
+  (<code>temperature=0</code>, <code>seed=42</code>, strict <code>json_schema</code>) and worked with them, two
+  of them only once the temperature was left out. The engine now asks every
+  model for a tool call instead, as it already did for every node but the
+  planner. That says the model accepts the engine's calls, not how well it
+  plans, which is the evaluation's question:</p>
 <table>
 <thead>
 <tr>
@@ -4348,10 +4362,31 @@ second settings store, and the browser keeps nothing but UI conveniences.</p>
 </tr>
 </tbody>
 </table>
+<p>Claude's list was not probed on a real account; its temperatures follow
+Anthropic's documented rules:</p>
+<table>
+<thead>
+<tr>
+<th>Model</th>
+<th>Written with</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>claude-opus-5</code> (the default), <code>claude-sonnet-5</code></td>
+<td><code>temperature: null</code>: both reject any temperature</td>
+</tr>
+<tr>
+<td><code>claude-haiku-4-5</code></td>
+<td><code>temperature: 0.0</code></td>
+</tr>
+</tbody>
+</table>
 <p>The list lives in one place, <code>VERIFIED_MODELS</code> in
-<code>nl2sql/cli/common/api_key.py</code>. It is OpenAI-only for now: with an
-OpenRouter key or Ollama the panel shows the configured model and offers no
-list.
+<code>nl2sql/cli/common/api_key.py</code>. It covers OpenAI and Anthropic for now:
+with an OpenRouter key or Ollama as the default the panel says the default
+has no model list, and offers only the other providers whose keys are
+saved.
 - <strong>Local only by default.</strong> Settings work only when the playground is bound to
   a loopback address (<code>127.0.0.1</code>, <code>localhost</code>, <code>::1</code>). On <code>0.0.0.0</code> or any
   other address the panel says why it is off and the settings routes answer

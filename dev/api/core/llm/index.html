@@ -4114,7 +4114,7 @@
 <p>Fields:
 | name | type | required | meaning |
 | --- | --- | --- | --- |
-| <code>provider</code> | <code>str</code> | yes | Provider name: <code>openai</code>, <code>openrouter</code> or <code>ollama</code>. |
+| <code>provider</code> | <code>str</code> | yes | Provider name: <code>openai</code>, <code>anthropic</code>, <code>openrouter</code> or <code>ollama</code>. |
 | <code>model</code> | <code>str</code> | yes | Model identifier. |
 | <code>temperature</code> | <code>Optional[float]</code> | no | Sampling temperature (default <code>0.0</code>). <code>None</code> (<code>null</code> in YAML) sends no temperature parameter, for models that accept only their default. |
 | <code>api_key</code> | <code>Optional[SecretStr]</code> | no | API key or secret reference. Masked in <code>repr</code>, <code>str</code> and JSON dumps; <code>LLMGenerator</code> writes the real value or reference. |
@@ -4177,15 +4177,32 @@ LLM configuration (API key excluded). Falls back to <code>default</code> if not 
 Map of LLM name → config (API key excluded).</p>
 <h2 id="behavioral-contracts">Behavioral Contracts</h2>
 <ul>
-<li>Providers supported in the core registry are <code>openai</code>, <code>openrouter</code> and
-  <code>ollama</code>, held in <code>PROVIDER_PRESETS</code> in <code>llm/registry.py</code>; anything else raises
-  <code>ValueError: Unsupported LLM provider</code>, naming the valid ones.</li>
-<li>All three are served by <code>ChatOpenAI</code> and differ only by preset: <code>openai</code> uses
-  the client's own default endpoint, <code>openrouter</code> defaults to
+<li>Providers supported in the core registry are <code>openai</code>, <code>anthropic</code>,
+  <code>openrouter</code> and <code>ollama</code>, held in <code>PROVIDER_PRESETS</code> in <code>llm/registry.py</code>;
+  anything else raises <code>ValueError: Unsupported LLM provider</code>, naming the valid
+  ones.</li>
+<li>Each preset names a wire type (<code>ProviderPreset.wire</code>), and the client is
+  built by that wire's adapter in <code>llm/wires/</code> (<code>WIRES[preset.wire].build_client</code>).
+  The <code>Wire</code> protocol (<code>llm/wires/base.py</code>) is <code>build_client(model, temperature,
+  **kwargs)</code>, <code>structured_output_method</code>, <code>mark_cache(payload)</code> and
+  <code>read_usage(response)</code>. <code>wires.structured(llm, schema)</code> is how every node asks
+  for structured output; <code>wires.wire_of(llm)</code> picks the adapter from the client.
+  See <a href="../../../configuration/llm/#providers-and-wire-types">LLM configuration → Providers and wire types</a>.</li>
+<li><code>openai</code>, <code>openrouter</code> and <code>ollama</code> are on the <code>openai</code> wire, served by
+  <code>ConfiguredChatOpenAI</code> (<code>llm/wires/openai.py</code>), and differ only by preset:
+  <code>openai</code> uses the client's own default endpoint, <code>openrouter</code> defaults to
   <code>https://openrouter.ai/api/v1</code>, <code>ollama</code> to <code>http://localhost:11434/v1</code>. A
   config-supplied <code>base_url</code> overrides the preset, which also lets the same path
   serve any other OpenAI-compatible endpoint (vLLM, LiteLLM, a local proxy).</li>
-<li><code>openai</code> and <code>openrouter</code> require an API key; <code>ollama</code> does not, and its preset
+<li><code>anthropic</code> is on the <code>anthropic</code> wire, served by <code>CachingChatAnthropic</code>
+  (<code>llm/wires/anthropic_client.py</code>), a <code>langchain-anthropic</code> <code>ChatAnthropic</code>
+  whose requests go through the adapter's <code>mark_cache</code> (a
+  <code>cache_control: {"type": "ephemeral"}</code> breakpoint on the last system block),
+  with <code>max_tokens=16000</code>. It needs the <code>nl2sql-engine[anthropic]</code> extra;
+  without it the first <code>get_llm()</code> raises a <code>ValueError</code> naming the extra. See
+  <a href="../../../configuration/llm/#anthropic-claude">LLM configuration → Anthropic</a>.</li>
+<li><code>openai</code>, <code>anthropic</code> and <code>openrouter</code> require an API key (<code>OPENAI_API_KEY</code>,
+  <code>ANTHROPIC_API_KEY</code>, <code>OPENROUTER_API_KEY</code>); <code>ollama</code> does not, and its preset
   supplies the placeholder key <code>ChatOpenAI</code> insists on.</li>
 <li>Clients are built lazily. <code>register_llm()</code> validates the provider and model and
   stores the config; <code>get_llm()</code> builds the client on first use and caches it
@@ -4207,7 +4224,8 @@ Map of LLM name → config (API key excluded).</p>
   OpenAI key even when chat runs through OpenRouter. The embedder is cached per
   provider, so a runtime <code>reload_settings()</code> that changes the provider is
   honoured.</li>
-<li>Determinism: every client is built with <code>seed=42</code> and the agent's configured
+<li>Determinism: every OpenAI-protocol client is built with <code>seed=42</code> (Anthropic
+  has no seed parameter), and every client with the agent's configured
   <code>temperature</code>, or none when it is <code>null</code> (see
   <a href="../../../configuration/llm/#temperature">LLM configuration → Temperature</a>).</li>
 <li>A provider's HTTP 400 rejecting <code>temperature</code> is re-raised as a <code>ValueError</code>

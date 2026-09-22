@@ -4439,10 +4439,13 @@ been recorded, on a timed-out or cancelled run.</p>
 <p><code>LLMCallUsage</code> has the same token fields plus <code>node</code>, <code>model</code> (the model the
 provider says served the call, e.g. <code>gpt-4o-2024-08-06</code>), <code>latency_s</code>, <code>cost</code>,
 <code>usage_reported</code> and <code>error</code>.</p>
-<p>Tokens are read from LangChain's <code>AIMessage.usage_metadata</code>, which is normalised
-across providers: <code>input_token_details.cache_read</code>,
-<code>input_token_details.cache_creation</code> and <code>output_token_details.reasoning</code>. A
-detail the provider did not report is <code>0</code>. A call whose result carried no usage
+<p>Tokens are read by the adapter of the wire type that served the call
+(<code>read_usage</code> in <code>nl2sql/llm/wires/openai.py</code> or <code>anthropic.py</code>), picked by the
+<code>model_provider</code> the client stamps on the response; <code>TokenUsageCallback</code> only
+asks it. Both read LangChain's <code>AIMessage.usage_metadata</code>
+(<code>input_token_details.cache_read</code>, <code>input_token_details.cache_creation</code>,
+<code>output_token_details.reasoning</code>) into the same fields, and differ where their
+providers differ, as below. A detail the provider did not report is <code>0</code>. A call whose result carried no usage
 at all is recorded with zero tokens and <code>usage_reported: false</code>; a failed call is
 recorded with its latency and <code>error</code>.</p>
 <p>For OpenAI through <code>langchain-openai</code> (verified against the pinned 1.6.x by
@@ -4451,6 +4454,43 @@ recorded with its latency and <code>error</code>.</p>
 <code>completion_tokens_details.reasoning_tokens</code> all arrive. OpenAI's chat
 completions API reports no cache-write count, so <code>cache_write_input_tokens</code> is
 <code>0</code> there.</p>
+<p>For Claude through <code>langchain-anthropic</code> (<code>provider: anthropic</code>; verified
+against the fake Anthropic endpoint by
+<code>packages/nl2sql/tests/unit/test_llm_wire_contract.py</code>, which runs the same
+usage tests against both wires), Anthropic's <code>usage</code> maps
+as follows:</p>
+<table>
+<thead>
+<tr>
+<th>Anthropic <code>usage</code></th>
+<th>field here</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>cache_read_input_tokens</code></td>
+<td><code>cached_input_tokens</code></td>
+</tr>
+<tr>
+<td><code>cache_creation_input_tokens</code>, or its per-TTL split <code>cache_creation.ephemeral_5m_input_tokens</code> + <code>ephemeral_1h_input_tokens</code></td>
+<td><code>cache_write_input_tokens</code></td>
+</tr>
+<tr>
+<td><code>input_tokens</code> + <code>cache_read_input_tokens</code> + <code>cache_creation_input_tokens</code></td>
+<td><code>input_tokens</code></td>
+</tr>
+<tr>
+<td><code>output_tokens</code></td>
+<td><code>output_tokens</code></td>
+</tr>
+</tbody>
+</table>
+<p>Anthropic's own <code>input_tokens</code> counts only the uncached tail of the prompt;
+<code>langchain-anthropic</code> adds the cache reads and writes back, so <code>input_tokens</code>
+here is the whole prompt, counted once, and both cache fields stay subsets of
+it. When the write is reported per TTL, <code>langchain-anthropic</code> sets the generic
+<code>cache_creation</code> detail to <code>0</code> and puts the tokens under the TTL keys, which
+are summed here.</p>
 <p>Cost is <code>(input - cached) * input_price + cached * cached_input_price + output * output_price</code>,
 per million tokens. Prices are looked up by the served model name, then by the
 configured one, by exact match only, so a <code>gpt-4o</code> price never prices
