@@ -183,3 +183,38 @@ def test_generator_emits_the_requested_sort_direction():
     sql = node(state)["generator_response"].sql_draft.upper()
 
     assert "ORDER BY COUNT(U.ID) DESC" in sql
+
+
+def test_generator_keeps_the_then_result_of_a_case():
+    """Every CASE used to print ``THEN  ELSE``: the result was dropped.
+
+    The visitor built ``exp.When``, which is MERGE's WHEN clause; a CASE branch
+    is ``exp.If``. Found by the tier 1 gold plan for chinook_009.
+    """
+    from nl2sql.pipeline.nodes.ast_planner.schemas import CaseWhen
+    import sqlite3
+
+    adapter = SimpleNamespace(row_limit=5, max_bytes=1000, get_dialect=lambda: "sqlite")
+    ctx = SimpleNamespace(ds_registry=SimpleNamespace(get_adapter=lambda _id: adapter))
+    node = GeneratorNode(ctx)
+
+    is_jazz = Expr(kind="binary", op="=", left=_col("u", "genre"), right=Expr(kind="literal", value="Jazz"))
+    case = Expr(kind="case", whens=[CaseWhen(ordinal=0, condition=is_jazz, result=Expr(kind="literal", value=1))],
+                else_expr=Expr(kind="literal", value=0))
+    plan = PlanModel(
+        tables=[TableRef(name="users", alias="u", ordinal=0)],
+        select_items=[SelectItem(expr=case, alias="is_jazz", ordinal=0)],
+    )
+    state = SubgraphExecutionState(
+        trace_id="t",
+        sub_query=SubQuery(id="sq1", datasource_id="ds1", intent="q"),
+        ast_planner_response=ASTPlannerResponse(plan=plan),
+    )
+
+    sql = node(state)["generator_response"].sql_draft
+
+    assert "CASE WHEN u.genre = 'Jazz' THEN 1 ELSE 0 END" in sql
+    con = sqlite3.connect(":memory:")
+    con.execute("CREATE TABLE users (genre TEXT)")
+    con.executemany("INSERT INTO users VALUES (?)", [("Jazz",), ("Rock",)])
+    assert sorted(r[0] for r in con.execute(sql)) == [0, 1]

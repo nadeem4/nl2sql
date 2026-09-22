@@ -1,0 +1,757 @@
+# Hand-written PlanModel (the planner's typed AST) for every answerable question
+# in chinook_gold.yaml, keyed by question id. Tier 1 serves these through a fake
+# LLM, so the validator, generator and executor are what is under test.
+#
+# Every plan reads exactly the question's needed_tables and selects the gold
+# result's columns in order; aliases are free (rows are compared by value).
+# PlanModel has no subqueries, window functions or DISTINCT aggregates, so:
+#   chinook_008 (longest track per genre) is an anti-join: LEFT JOIN a longer
+#     track of the same genre and keep rows where none exists.
+#   chinook_009 (jazz but never rock) counts genres per customer in HAVING.
+#   chinook_011 and chinook_034 write COUNT(DISTINCT x) as COUNT over a
+#     function named DISTINCT, which renders as COUNT(DISTINCT(x)).
+#   chinook_039 (never purchased) is an anti-join on InvoiceLine.
+
+chinook_001:
+  tables: [{name: Customer, alias: t1, ordinal: 0}]
+  select_items:
+  - {ordinal: 0, alias: country, expr: {kind: column, alias: t1, column_name: Country}}
+  - {ordinal: 1, alias: customer_count, expr: {kind: func, func_name: COUNT, is_aggregate: true, args: [{kind: column, alias: t1, column_name: CustomerId}]}}
+  group_by:
+  - {ordinal: 0, expr: {kind: column, alias: t1, column_name: Country}}
+  order_by:
+  - {ordinal: 0, direction: desc, expr: {kind: func, func_name: COUNT, is_aggregate: true, args: [{kind: column, alias: t1, column_name: CustomerId}]}}
+  - {ordinal: 1, direction: asc, expr: {kind: column, alias: t1, column_name: Country}}
+  reasoning: Count customers per country.
+
+chinook_002: &top_customers
+  tables:
+  - {name: Customer, alias: t1, ordinal: 0}
+  - {name: Invoice, alias: t2, ordinal: 1}
+  joins:
+  - left_alias: t1
+    right_alias: t2
+    join_type: inner
+    ordinal: 0
+    condition: {kind: binary, op: '=', left: {kind: column, alias: t1, column_name: CustomerId}, right: {kind: column, alias: t2, column_name: CustomerId}}
+  select_items:
+  - {ordinal: 0, alias: first_name, expr: {kind: column, alias: t1, column_name: FirstName}}
+  - {ordinal: 1, alias: last_name, expr: {kind: column, alias: t1, column_name: LastName}}
+  - ordinal: 2
+    alias: total_spend
+    expr: {kind: func, func_name: ROUND, args: [{kind: func, func_name: SUM, is_aggregate: true, args: [{kind: column, alias: t2, column_name: Total}]}, {kind: literal, value: 2}]}
+  group_by:
+  - {ordinal: 0, expr: {kind: column, alias: t1, column_name: CustomerId}}
+  - {ordinal: 1, expr: {kind: column, alias: t1, column_name: FirstName}}
+  - {ordinal: 2, expr: {kind: column, alias: t1, column_name: LastName}}
+  order_by:
+  - ordinal: 0
+    direction: desc
+    expr: {kind: func, func_name: ROUND, args: [{kind: func, func_name: SUM, is_aggregate: true, args: [{kind: column, alias: t2, column_name: Total}]}, {kind: literal, value: 2}]}
+  - {ordinal: 1, direction: asc, expr: {kind: column, alias: t1, column_name: CustomerId}}
+  limit: 5
+  reasoning: Sum invoice totals per customer and keep the five largest.
+
+chinook_003: &artist_most_albums
+  tables:
+  - {name: Artist, alias: t1, ordinal: 0}
+  - {name: Album, alias: t2, ordinal: 1}
+  joins:
+  - left_alias: t1
+    right_alias: t2
+    join_type: inner
+    ordinal: 0
+    condition: {kind: binary, op: '=', left: {kind: column, alias: t1, column_name: ArtistId}, right: {kind: column, alias: t2, column_name: ArtistId}}
+  select_items:
+  - {ordinal: 0, alias: artist_name, expr: {kind: column, alias: t1, column_name: Name}}
+  - {ordinal: 1, alias: album_count, expr: {kind: func, func_name: COUNT, is_aggregate: true, args: [{kind: column, alias: t2, column_name: AlbumId}]}}
+  group_by:
+  - {ordinal: 0, expr: {kind: column, alias: t1, column_name: ArtistId}}
+  - {ordinal: 1, expr: {kind: column, alias: t1, column_name: Name}}
+  order_by:
+  - {ordinal: 0, direction: desc, expr: {kind: func, func_name: COUNT, is_aggregate: true, args: [{kind: column, alias: t2, column_name: AlbumId}]}}
+  - {ordinal: 1, direction: asc, expr: {kind: column, alias: t1, column_name: ArtistId}}
+  limit: 1
+  reasoning: Count albums per artist and keep the largest.
+
+chinook_004: &revenue_per_year
+  tables: [{name: Invoice, alias: t1, ordinal: 0}]
+  select_items:
+  - {ordinal: 0, alias: invoice_year, expr: {kind: func, func_name: STRFTIME, args: [{kind: literal, value: '%Y'}, {kind: column, alias: t1, column_name: InvoiceDate}]}}
+  - ordinal: 1
+    alias: revenue
+    expr: {kind: func, func_name: ROUND, args: [{kind: func, func_name: SUM, is_aggregate: true, args: [{kind: column, alias: t1, column_name: Total}]}, {kind: literal, value: 2}]}
+  group_by:
+  - {ordinal: 0, expr: {kind: func, func_name: STRFTIME, args: [{kind: literal, value: '%Y'}, {kind: column, alias: t1, column_name: InvoiceDate}]}}
+  order_by:
+  - {ordinal: 0, direction: asc, expr: {kind: func, func_name: STRFTIME, args: [{kind: literal, value: '%Y'}, {kind: column, alias: t1, column_name: InvoiceDate}]}}
+  reasoning: Sum invoice totals per invoice year.
+
+chinook_005:
+  tables:
+  - {name: InvoiceLine, alias: t1, ordinal: 0}
+  - {name: Track, alias: t2, ordinal: 1}
+  - {name: Genre, alias: t3, ordinal: 2}
+  joins:
+  - left_alias: t1
+    right_alias: t2
+    join_type: inner
+    ordinal: 0
+    condition: {kind: binary, op: '=', left: {kind: column, alias: t1, column_name: TrackId}, right: {kind: column, alias: t2, column_name: TrackId}}
+  - left_alias: t2
+    right_alias: t3
+    join_type: inner
+    ordinal: 1
+    condition: {kind: binary, op: '=', left: {kind: column, alias: t2, column_name: GenreId}, right: {kind: column, alias: t3, column_name: GenreId}}
+  select_items:
+  - {ordinal: 0, alias: genre_name, expr: {kind: column, alias: t3, column_name: Name}}
+  - {ordinal: 1, alias: tracks_sold, expr: {kind: func, func_name: SUM, is_aggregate: true, args: [{kind: column, alias: t1, column_name: Quantity}]}}
+  group_by:
+  - {ordinal: 0, expr: {kind: column, alias: t3, column_name: GenreId}}
+  - {ordinal: 1, expr: {kind: column, alias: t3, column_name: Name}}
+  order_by:
+  - {ordinal: 0, direction: desc, expr: {kind: func, func_name: SUM, is_aggregate: true, args: [{kind: column, alias: t1, column_name: Quantity}]}}
+  - {ordinal: 1, direction: asc, expr: {kind: column, alias: t3, column_name: GenreId}}
+  limit: 1
+  reasoning: Sum quantities sold per genre and keep the largest.
+
+chinook_006:
+  tables: [{name: Invoice, alias: t1, ordinal: 0}]
+  select_items:
+  - {ordinal: 0, alias: billing_country, expr: {kind: column, alias: t1, column_name: BillingCountry}}
+  - ordinal: 1
+    alias: avg_invoice_total
+    expr: {kind: func, func_name: ROUND, args: [{kind: func, func_name: AVG, is_aggregate: true, args: [{kind: column, alias: t1, column_name: Total}]}, {kind: literal, value: 2}]}
+  group_by:
+  - {ordinal: 0, expr: {kind: column, alias: t1, column_name: BillingCountry}}
+  order_by:
+  - {ordinal: 0, direction: asc, expr: {kind: column, alias: t1, column_name: BillingCountry}}
+  reasoning: Average invoice total per billing country.
+
+chinook_007:
+  tables:
+  - {name: Employee, alias: t1, ordinal: 0}
+  - {name: Customer, alias: t2, ordinal: 1}
+  joins:
+  - left_alias: t1
+    right_alias: t2
+    join_type: inner
+    ordinal: 0
+    condition: {kind: binary, op: '=', left: {kind: column, alias: t1, column_name: EmployeeId}, right: {kind: column, alias: t2, column_name: SupportRepId}}
+  select_items:
+  - {ordinal: 0, alias: first_name, expr: {kind: column, alias: t1, column_name: FirstName}}
+  - {ordinal: 1, alias: last_name, expr: {kind: column, alias: t1, column_name: LastName}}
+  - {ordinal: 2, alias: customer_count, expr: {kind: func, func_name: COUNT, is_aggregate: true, args: [{kind: column, alias: t2, column_name: CustomerId}]}}
+  group_by:
+  - {ordinal: 0, expr: {kind: column, alias: t1, column_name: EmployeeId}}
+  - {ordinal: 1, expr: {kind: column, alias: t1, column_name: FirstName}}
+  - {ordinal: 2, expr: {kind: column, alias: t1, column_name: LastName}}
+  order_by:
+  - {ordinal: 0, direction: desc, expr: {kind: func, func_name: COUNT, is_aggregate: true, args: [{kind: column, alias: t2, column_name: CustomerId}]}}
+  - {ordinal: 1, direction: asc, expr: {kind: column, alias: t1, column_name: EmployeeId}}
+  reasoning: Count supported customers per employee, most first.
+
+chinook_008:
+  tables:
+  - {name: Track, alias: t1, ordinal: 0}
+  - {name: Genre, alias: t2, ordinal: 1}
+  - {name: Track, alias: t3, ordinal: 2}
+  joins:
+  - left_alias: t1
+    right_alias: t2
+    join_type: inner
+    ordinal: 0
+    condition: {kind: binary, op: '=', left: {kind: column, alias: t1, column_name: GenreId}, right: {kind: column, alias: t2, column_name: GenreId}}
+  - left_alias: t2
+    right_alias: t3
+    join_type: left
+    ordinal: 1
+    condition:
+      kind: binary
+      op: AND
+      left: {kind: binary, op: '=', left: {kind: column, alias: t2, column_name: GenreId}, right: {kind: column, alias: t3, column_name: GenreId}}
+      right:
+        kind: binary
+        op: OR
+        left: {kind: binary, op: '>', left: {kind: column, alias: t3, column_name: Milliseconds}, right: {kind: column, alias: t1, column_name: Milliseconds}}
+        right:
+          kind: binary
+          op: AND
+          left: {kind: binary, op: '=', left: {kind: column, alias: t3, column_name: Milliseconds}, right: {kind: column, alias: t1, column_name: Milliseconds}}
+          right: {kind: binary, op: '<', left: {kind: column, alias: t3, column_name: TrackId}, right: {kind: column, alias: t1, column_name: TrackId}}
+  select_items:
+  - {ordinal: 0, alias: genre, expr: {kind: column, alias: t2, column_name: Name}}
+  - {ordinal: 1, alias: track, expr: {kind: column, alias: t1, column_name: Name}}
+  - {ordinal: 2, alias: milliseconds, expr: {kind: column, alias: t1, column_name: Milliseconds}}
+  where: {kind: binary, op: IS, left: {kind: column, alias: t3, column_name: TrackId}, right: {kind: literal, is_null: true}}
+  order_by:
+  - {ordinal: 0, direction: asc, expr: {kind: column, alias: t2, column_name: Name}}
+  reasoning: Keep each track for which no longer track (ties to the lower TrackId) exists in its genre.
+
+chinook_009:
+  tables:
+  - {name: Customer, alias: t1, ordinal: 0}
+  - {name: Invoice, alias: t2, ordinal: 1}
+  - {name: InvoiceLine, alias: t3, ordinal: 2}
+  - {name: Track, alias: t4, ordinal: 3}
+  - {name: Genre, alias: t5, ordinal: 4}
+  joins:
+  - left_alias: t1
+    right_alias: t2
+    join_type: inner
+    ordinal: 0
+    condition: {kind: binary, op: '=', left: {kind: column, alias: t1, column_name: CustomerId}, right: {kind: column, alias: t2, column_name: CustomerId}}
+  - left_alias: t2
+    right_alias: t3
+    join_type: inner
+    ordinal: 1
+    condition: {kind: binary, op: '=', left: {kind: column, alias: t2, column_name: InvoiceId}, right: {kind: column, alias: t3, column_name: InvoiceId}}
+  - left_alias: t3
+    right_alias: t4
+    join_type: inner
+    ordinal: 2
+    condition: {kind: binary, op: '=', left: {kind: column, alias: t3, column_name: TrackId}, right: {kind: column, alias: t4, column_name: TrackId}}
+  - left_alias: t4
+    right_alias: t5
+    join_type: inner
+    ordinal: 3
+    condition: {kind: binary, op: '=', left: {kind: column, alias: t4, column_name: GenreId}, right: {kind: column, alias: t5, column_name: GenreId}}
+  select_items:
+  - {ordinal: 0, alias: first_name, expr: {kind: column, alias: t1, column_name: FirstName}}
+  - {ordinal: 1, alias: last_name, expr: {kind: column, alias: t1, column_name: LastName}}
+  group_by:
+  - {ordinal: 0, expr: {kind: column, alias: t1, column_name: CustomerId}}
+  - {ordinal: 1, expr: {kind: column, alias: t1, column_name: FirstName}}
+  - {ordinal: 2, expr: {kind: column, alias: t1, column_name: LastName}}
+  having:
+    kind: binary
+    op: AND
+    left:
+      kind: binary
+      op: '>'
+      left:
+        kind: func
+        func_name: SUM
+        is_aggregate: true
+        args:
+        - kind: case
+          whens: [{ordinal: 0, condition: {kind: binary, op: '=', left: {kind: column, alias: t5, column_name: Name}, right: {kind: literal, value: Jazz}}, result: {kind: literal, value: 1}}]
+          else_expr: {kind: literal, value: 0}
+      right: {kind: literal, value: 0}
+    right:
+      kind: binary
+      op: '='
+      left:
+        kind: func
+        func_name: SUM
+        is_aggregate: true
+        args:
+        - kind: case
+          whens: [{ordinal: 0, condition: {kind: binary, op: '=', left: {kind: column, alias: t5, column_name: Name}, right: {kind: literal, value: Rock}}, result: {kind: literal, value: 1}}]
+          else_expr: {kind: literal, value: 0}
+      right: {kind: literal, value: 0}
+  order_by:
+  - {ordinal: 0, direction: asc, expr: {kind: column, alias: t1, column_name: CustomerId}}
+  reasoning: Per customer, count purchased Jazz and Rock lines; keep those with Jazz and no Rock.
+
+chinook_010:
+  tables:
+  - {name: Invoice, alias: t1, ordinal: 0}
+  - {name: Customer, alias: t2, ordinal: 1}
+  joins:
+  - left_alias: t1
+    right_alias: t2
+    join_type: inner
+    ordinal: 0
+    condition: {kind: binary, op: '=', left: {kind: column, alias: t1, column_name: CustomerId}, right: {kind: column, alias: t2, column_name: CustomerId}}
+  select_items:
+  - {ordinal: 0, alias: invoice_month, expr: {kind: func, func_name: STRFTIME, args: [{kind: literal, value: '%Y-%m'}, {kind: column, alias: t1, column_name: InvoiceDate}]}}
+  - ordinal: 1
+    alias: revenue
+    expr: {kind: func, func_name: ROUND, args: [{kind: func, func_name: SUM, is_aggregate: true, args: [{kind: column, alias: t1, column_name: Total}]}, {kind: literal, value: 2}]}
+  where:
+    kind: binary
+    op: AND
+    left:
+      kind: binary
+      op: AND
+      left: {kind: binary, op: '=', left: {kind: column, alias: t2, column_name: Country}, right: {kind: literal, value: USA}}
+      right: {kind: binary, op: '>=', left: {kind: column, alias: t1, column_name: InvoiceDate}, right: {kind: literal, value: '2013-01-01'}}
+    right: {kind: binary, op: '<', left: {kind: column, alias: t1, column_name: InvoiceDate}, right: {kind: literal, value: '2014-01-01'}}
+  group_by:
+  - {ordinal: 0, expr: {kind: func, func_name: STRFTIME, args: [{kind: literal, value: '%Y-%m'}, {kind: column, alias: t1, column_name: InvoiceDate}]}}
+  order_by:
+  - {ordinal: 0, direction: asc, expr: {kind: func, func_name: STRFTIME, args: [{kind: literal, value: '%Y-%m'}, {kind: column, alias: t1, column_name: InvoiceDate}]}}
+  reasoning: Sum 2013 invoice totals of USA customers per month.
+
+chinook_011:
+  tables:
+  - {name: Playlist, alias: t1, ordinal: 0}
+  - {name: PlaylistTrack, alias: t2, ordinal: 1}
+  - {name: Track, alias: t3, ordinal: 2}
+  joins:
+  - left_alias: t1
+    right_alias: t2
+    join_type: inner
+    ordinal: 0
+    condition: {kind: binary, op: '=', left: {kind: column, alias: t1, column_name: PlaylistId}, right: {kind: column, alias: t2, column_name: PlaylistId}}
+  - left_alias: t2
+    right_alias: t3
+    join_type: inner
+    ordinal: 1
+    condition: {kind: binary, op: '=', left: {kind: column, alias: t2, column_name: TrackId}, right: {kind: column, alias: t3, column_name: TrackId}}
+  select_items:
+  - {ordinal: 0, alias: playlist_id, expr: {kind: column, alias: t1, column_name: PlaylistId}}
+  - {ordinal: 1, alias: playlist_name, expr: {kind: column, alias: t1, column_name: Name}}
+  - {ordinal: 2, alias: genre_count, expr: {kind: func, func_name: COUNT, is_aggregate: true, args: [{kind: func, func_name: DISTINCT, args: [{kind: column, alias: t3, column_name: GenreId}]}]}}
+  group_by:
+  - {ordinal: 0, expr: {kind: column, alias: t1, column_name: PlaylistId}}
+  - {ordinal: 1, expr: {kind: column, alias: t1, column_name: Name}}
+  having:
+    kind: binary
+    op: '>'
+    left: {kind: func, func_name: COUNT, is_aggregate: true, args: [{kind: func, func_name: DISTINCT, args: [{kind: column, alias: t3, column_name: GenreId}]}]}
+    right: {kind: literal, value: 3}
+  order_by:
+  - {ordinal: 0, direction: asc, expr: {kind: column, alias: t1, column_name: PlaylistId}}
+  reasoning: Count distinct genres per playlist and keep those above three.
+
+chinook_012: *top_customers
+
+chinook_013: *top_customers
+
+chinook_014: *revenue_per_year
+
+chinook_015: *revenue_per_year
+
+chinook_016: *artist_most_albums
+
+chinook_017: *artist_most_albums
+
+chinook_018:
+  tables: [{name: MediaType, alias: t1, ordinal: 0}]
+  select_items:
+  - {ordinal: 0, alias: media_type, expr: {kind: column, alias: t1, column_name: Name}}
+  order_by:
+  - {ordinal: 0, direction: asc, expr: {kind: column, alias: t1, column_name: Name}}
+  reasoning: List media type names.
+
+chinook_019:
+  tables: [{name: Track, alias: t1, ordinal: 0}]
+  select_items:
+  - {ordinal: 0, alias: track_count, expr: {kind: func, func_name: COUNT, is_aggregate: true, args: [{kind: column, alias: t1, column_name: TrackId}]}}
+  where: {kind: binary, op: '>', left: {kind: column, alias: t1, column_name: Milliseconds}, right: {kind: literal, value: 600000}}
+  reasoning: Count tracks longer than 600000 ms.
+
+chinook_020:
+  tables:
+  - {name: Track, alias: t1, ordinal: 0}
+  - {name: Album, alias: t2, ordinal: 1}
+  joins:
+  - left_alias: t1
+    right_alias: t2
+    join_type: inner
+    ordinal: 0
+    condition: {kind: binary, op: '=', left: {kind: column, alias: t1, column_name: AlbumId}, right: {kind: column, alias: t2, column_name: AlbumId}}
+  select_items:
+  - {ordinal: 0, alias: track_name, expr: {kind: column, alias: t1, column_name: Name}}
+  where: {kind: binary, op: '=', left: {kind: column, alias: t2, column_name: Title}, right: {kind: literal, value: Let There Be Rock}}
+  order_by:
+  - {ordinal: 0, direction: asc, expr: {kind: column, alias: t1, column_name: TrackId}}
+  reasoning: Tracks of the album titled Let There Be Rock.
+
+chinook_021:
+  tables: [{name: Customer, alias: t1, ordinal: 0}]
+  select_items:
+  - {ordinal: 0, alias: first_name, expr: {kind: column, alias: t1, column_name: FirstName}}
+  - {ordinal: 1, alias: last_name, expr: {kind: column, alias: t1, column_name: LastName}}
+  - {ordinal: 2, alias: city, expr: {kind: column, alias: t1, column_name: City}}
+  where: {kind: binary, op: '=', left: {kind: column, alias: t1, column_name: Country}, right: {kind: literal, value: Germany}}
+  order_by:
+  - {ordinal: 0, direction: asc, expr: {kind: column, alias: t1, column_name: CustomerId}}
+  reasoning: Name and city of customers in Germany.
+
+chinook_022:
+  tables: [{name: Customer, alias: t1, ordinal: 0}]
+  select_items:
+  - {ordinal: 0, alias: first_name, expr: {kind: column, alias: t1, column_name: FirstName}}
+  - {ordinal: 1, alias: last_name, expr: {kind: column, alias: t1, column_name: LastName}}
+  - {ordinal: 2, alias: email, expr: {kind: column, alias: t1, column_name: Email}}
+  where: {kind: binary, op: '=', left: {kind: column, alias: t1, column_name: Country}, right: {kind: literal, value: Canada}}
+  order_by:
+  - {ordinal: 0, direction: asc, expr: {kind: column, alias: t1, column_name: CustomerId}}
+  reasoning: Name and email of customers in Canada.
+
+chinook_023:
+  tables:
+  - {name: Track, alias: t1, ordinal: 0}
+  - {name: Album, alias: t2, ordinal: 1}
+  joins:
+  - left_alias: t1
+    right_alias: t2
+    join_type: inner
+    ordinal: 0
+    condition: {kind: binary, op: '=', left: {kind: column, alias: t1, column_name: AlbumId}, right: {kind: column, alias: t2, column_name: AlbumId}}
+  select_items:
+  - {ordinal: 0, alias: track_count, expr: {kind: func, func_name: COUNT, is_aggregate: true, args: [{kind: column, alias: t1, column_name: TrackId}]}}
+  where: {kind: binary, op: '=', left: {kind: column, alias: t2, column_name: Title}, right: {kind: literal, value: 'From The Muddy Banks Of The Wishkah [Live]'}}
+  reasoning: Count tracks on the named album.
+
+chinook_024:
+  tables:
+  - {name: Album, alias: t1, ordinal: 0}
+  - {name: Artist, alias: t2, ordinal: 1}
+  joins:
+  - left_alias: t1
+    right_alias: t2
+    join_type: inner
+    ordinal: 0
+    condition: {kind: binary, op: '=', left: {kind: column, alias: t1, column_name: ArtistId}, right: {kind: column, alias: t2, column_name: ArtistId}}
+  select_items:
+  - {ordinal: 0, alias: artist_name, expr: {kind: column, alias: t2, column_name: Name}}
+  where: {kind: binary, op: '=', left: {kind: column, alias: t1, column_name: Title}, right: {kind: literal, value: Somewhere in Time}}
+  reasoning: Artist of the album titled Somewhere in Time.
+
+chinook_025:
+  tables:
+  - {name: Artist, alias: t1, ordinal: 0}
+  - {name: Album, alias: t2, ordinal: 1}
+  joins:
+  - left_alias: t1
+    right_alias: t2
+    join_type: inner
+    ordinal: 0
+    condition: {kind: binary, op: '=', left: {kind: column, alias: t1, column_name: ArtistId}, right: {kind: column, alias: t2, column_name: ArtistId}}
+  select_items:
+  - {ordinal: 0, alias: artist_name, expr: {kind: column, alias: t1, column_name: Name}}
+  - {ordinal: 1, alias: album_count, expr: {kind: func, func_name: COUNT, is_aggregate: true, args: [{kind: column, alias: t2, column_name: AlbumId}]}}
+  group_by:
+  - {ordinal: 0, expr: {kind: column, alias: t1, column_name: ArtistId}}
+  - {ordinal: 1, expr: {kind: column, alias: t1, column_name: Name}}
+  having: {kind: binary, op: '>', left: {kind: func, func_name: COUNT, is_aggregate: true, args: [{kind: column, alias: t2, column_name: AlbumId}]}, right: {kind: literal, value: 10}}
+  order_by:
+  - {ordinal: 0, direction: desc, expr: {kind: func, func_name: COUNT, is_aggregate: true, args: [{kind: column, alias: t2, column_name: AlbumId}]}}
+  - {ordinal: 1, direction: asc, expr: {kind: column, alias: t1, column_name: ArtistId}}
+  reasoning: Artists with more than ten albums.
+
+chinook_026:
+  tables:
+  - {name: Customer, alias: t1, ordinal: 0}
+  - {name: Invoice, alias: t2, ordinal: 1}
+  joins:
+  - left_alias: t1
+    right_alias: t2
+    join_type: inner
+    ordinal: 0
+    condition: {kind: binary, op: '=', left: {kind: column, alias: t1, column_name: CustomerId}, right: {kind: column, alias: t2, column_name: CustomerId}}
+  select_items:
+  - {ordinal: 0, alias: first_name, expr: {kind: column, alias: t1, column_name: FirstName}}
+  - {ordinal: 1, alias: last_name, expr: {kind: column, alias: t1, column_name: LastName}}
+  - ordinal: 2
+    alias: total_spend
+    expr: {kind: func, func_name: ROUND, args: [{kind: func, func_name: SUM, is_aggregate: true, args: [{kind: column, alias: t2, column_name: Total}]}, {kind: literal, value: 2}]}
+  group_by:
+  - {ordinal: 0, expr: {kind: column, alias: t1, column_name: CustomerId}}
+  - {ordinal: 1, expr: {kind: column, alias: t1, column_name: FirstName}}
+  - {ordinal: 2, expr: {kind: column, alias: t1, column_name: LastName}}
+  having: {kind: binary, op: '>', left: {kind: func, func_name: SUM, is_aggregate: true, args: [{kind: column, alias: t2, column_name: Total}]}, right: {kind: literal, value: 45}}
+  reasoning: Customers whose invoice totals sum to more than 45.
+
+chinook_027:
+  tables: [{name: Invoice, alias: t1, ordinal: 0}]
+  select_items:
+  - {ordinal: 0, alias: invoice_count, expr: {kind: func, func_name: COUNT, is_aggregate: true, args: [{kind: column, alias: t1, column_name: InvoiceId}]}}
+  where:
+    kind: binary
+    op: AND
+    left: {kind: binary, op: '>=', left: {kind: column, alias: t1, column_name: InvoiceDate}, right: {kind: literal, value: '2010-03-01'}}
+    right: {kind: binary, op: '<', left: {kind: column, alias: t1, column_name: InvoiceDate}, right: {kind: literal, value: '2010-04-01'}}
+  reasoning: Count invoices dated in March 2010.
+
+chinook_028:
+  tables: [{name: Invoice, alias: t1, ordinal: 0}]
+  select_items:
+  - ordinal: 0
+    alias: revenue
+    expr: {kind: func, func_name: ROUND, args: [{kind: func, func_name: SUM, is_aggregate: true, args: [{kind: column, alias: t1, column_name: Total}]}, {kind: literal, value: 2}]}
+  where:
+    kind: binary
+    op: AND
+    left: {kind: binary, op: '>=', left: {kind: column, alias: t1, column_name: InvoiceDate}, right: {kind: literal, value: '2012-10-01'}}
+    right: {kind: binary, op: '<', left: {kind: column, alias: t1, column_name: InvoiceDate}, right: {kind: literal, value: '2013-01-01'}}
+  reasoning: Sum invoice totals in Q4 2012.
+
+chinook_029:
+  tables: [{name: Invoice, alias: t1, ordinal: 0}]
+  select_items:
+  - {ordinal: 0, alias: invoice_month, expr: {kind: func, func_name: STRFTIME, args: [{kind: literal, value: '%Y-%m'}, {kind: column, alias: t1, column_name: InvoiceDate}]}}
+  - ordinal: 1
+    alias: revenue
+    expr: {kind: func, func_name: ROUND, args: [{kind: func, func_name: SUM, is_aggregate: true, args: [{kind: column, alias: t1, column_name: Total}]}, {kind: literal, value: 2}]}
+  where:
+    kind: binary
+    op: AND
+    left: {kind: binary, op: '>=', left: {kind: column, alias: t1, column_name: InvoiceDate}, right: {kind: literal, value: '2011-01-01'}}
+    right: {kind: binary, op: '<', left: {kind: column, alias: t1, column_name: InvoiceDate}, right: {kind: literal, value: '2012-01-01'}}
+  group_by:
+  - {ordinal: 0, expr: {kind: func, func_name: STRFTIME, args: [{kind: literal, value: '%Y-%m'}, {kind: column, alias: t1, column_name: InvoiceDate}]}}
+  order_by:
+  - ordinal: 0
+    direction: desc
+    expr: {kind: func, func_name: ROUND, args: [{kind: func, func_name: SUM, is_aggregate: true, args: [{kind: column, alias: t1, column_name: Total}]}, {kind: literal, value: 2}]}
+  - {ordinal: 1, direction: asc, expr: {kind: func, func_name: STRFTIME, args: [{kind: literal, value: '%Y-%m'}, {kind: column, alias: t1, column_name: InvoiceDate}]}}
+  limit: 1
+  reasoning: Monthly 2011 revenue, highest first.
+
+chinook_030:
+  tables: [{name: Customer, alias: t1, ordinal: 0}]
+  select_items:
+  - {ordinal: 0, alias: country, expr: {kind: column, alias: t1, column_name: Country}}
+  - {ordinal: 1, alias: customer_count, expr: {kind: func, func_name: COUNT, is_aggregate: true, args: [{kind: column, alias: t1, column_name: CustomerId}]}}
+  group_by:
+  - {ordinal: 0, expr: {kind: column, alias: t1, column_name: Country}}
+  order_by:
+  - {ordinal: 0, direction: desc, expr: {kind: func, func_name: COUNT, is_aggregate: true, args: [{kind: column, alias: t1, column_name: CustomerId}]}}
+  - {ordinal: 1, direction: asc, expr: {kind: column, alias: t1, column_name: Country}}
+  limit: 3
+  reasoning: Three countries with the most customers.
+
+chinook_031:
+  tables:
+  - {name: InvoiceLine, alias: t1, ordinal: 0}
+  - {name: Track, alias: t2, ordinal: 1}
+  - {name: Genre, alias: t3, ordinal: 2}
+  joins:
+  - left_alias: t1
+    right_alias: t2
+    join_type: inner
+    ordinal: 0
+    condition: {kind: binary, op: '=', left: {kind: column, alias: t1, column_name: TrackId}, right: {kind: column, alias: t2, column_name: TrackId}}
+  - left_alias: t2
+    right_alias: t3
+    join_type: inner
+    ordinal: 1
+    condition: {kind: binary, op: '=', left: {kind: column, alias: t2, column_name: GenreId}, right: {kind: column, alias: t3, column_name: GenreId}}
+  select_items:
+  - {ordinal: 0, alias: genre_name, expr: {kind: column, alias: t3, column_name: Name}}
+  - ordinal: 1
+    alias: revenue
+    expr:
+      kind: func
+      func_name: ROUND
+      args:
+      - kind: func
+        func_name: SUM
+        is_aggregate: true
+        args: [{kind: binary, op: '*', left: {kind: column, alias: t1, column_name: UnitPrice}, right: {kind: column, alias: t1, column_name: Quantity}}]
+      - {kind: literal, value: 2}
+  group_by:
+  - {ordinal: 0, expr: {kind: column, alias: t3, column_name: GenreId}}
+  - {ordinal: 1, expr: {kind: column, alias: t3, column_name: Name}}
+  reasoning: Sum price times quantity per genre.
+
+chinook_032:
+  tables:
+  - {name: InvoiceLine, alias: t1, ordinal: 0}
+  - {name: Track, alias: t2, ordinal: 1}
+  - {name: Album, alias: t3, ordinal: 2}
+  - {name: Artist, alias: t4, ordinal: 3}
+  joins:
+  - left_alias: t1
+    right_alias: t2
+    join_type: inner
+    ordinal: 0
+    condition: {kind: binary, op: '=', left: {kind: column, alias: t1, column_name: TrackId}, right: {kind: column, alias: t2, column_name: TrackId}}
+  - left_alias: t2
+    right_alias: t3
+    join_type: inner
+    ordinal: 1
+    condition: {kind: binary, op: '=', left: {kind: column, alias: t2, column_name: AlbumId}, right: {kind: column, alias: t3, column_name: AlbumId}}
+  - left_alias: t3
+    right_alias: t4
+    join_type: inner
+    ordinal: 2
+    condition: {kind: binary, op: '=', left: {kind: column, alias: t3, column_name: ArtistId}, right: {kind: column, alias: t4, column_name: ArtistId}}
+  select_items:
+  - {ordinal: 0, alias: artist_name, expr: {kind: column, alias: t4, column_name: Name}}
+  - ordinal: 1
+    alias: revenue
+    expr:
+      kind: func
+      func_name: ROUND
+      args:
+      - kind: func
+        func_name: SUM
+        is_aggregate: true
+        args: [{kind: binary, op: '*', left: {kind: column, alias: t1, column_name: UnitPrice}, right: {kind: column, alias: t1, column_name: Quantity}}]
+      - {kind: literal, value: 2}
+  group_by:
+  - {ordinal: 0, expr: {kind: column, alias: t4, column_name: ArtistId}}
+  - {ordinal: 1, expr: {kind: column, alias: t4, column_name: Name}}
+  order_by:
+  - ordinal: 0
+    direction: desc
+    expr:
+      kind: func
+      func_name: ROUND
+      args:
+      - kind: func
+        func_name: SUM
+        is_aggregate: true
+        args: [{kind: binary, op: '*', left: {kind: column, alias: t1, column_name: UnitPrice}, right: {kind: column, alias: t1, column_name: Quantity}}]
+      - {kind: literal, value: 2}
+  - {ordinal: 1, direction: asc, expr: {kind: column, alias: t4, column_name: ArtistId}}
+  limit: 1
+  reasoning: Sum price times quantity per artist and keep the largest.
+
+chinook_033:
+  tables:
+  - {name: Playlist, alias: t1, ordinal: 0}
+  - {name: PlaylistTrack, alias: t2, ordinal: 1}
+  - {name: Track, alias: t3, ordinal: 2}
+  - {name: MediaType, alias: t4, ordinal: 3}
+  joins:
+  - left_alias: t1
+    right_alias: t2
+    join_type: inner
+    ordinal: 0
+    condition: {kind: binary, op: '=', left: {kind: column, alias: t1, column_name: PlaylistId}, right: {kind: column, alias: t2, column_name: PlaylistId}}
+  - left_alias: t2
+    right_alias: t3
+    join_type: inner
+    ordinal: 1
+    condition: {kind: binary, op: '=', left: {kind: column, alias: t2, column_name: TrackId}, right: {kind: column, alias: t3, column_name: TrackId}}
+  - left_alias: t3
+    right_alias: t4
+    join_type: inner
+    ordinal: 2
+    condition: {kind: binary, op: '=', left: {kind: column, alias: t3, column_name: MediaTypeId}, right: {kind: column, alias: t4, column_name: MediaTypeId}}
+  select_items:
+  - {ordinal: 0, alias: media_type, expr: {kind: column, alias: t4, column_name: Name}}
+  - {ordinal: 1, alias: track_count, expr: {kind: func, func_name: COUNT, is_aggregate: true, args: [{kind: column, alias: t3, column_name: TrackId}]}}
+  where: {kind: binary, op: '=', left: {kind: column, alias: t1, column_name: Name}, right: {kind: literal, value: Grunge}}
+  group_by:
+  - {ordinal: 0, expr: {kind: column, alias: t4, column_name: MediaTypeId}}
+  - {ordinal: 1, expr: {kind: column, alias: t4, column_name: Name}}
+  reasoning: Count Grunge playlist tracks per media type.
+
+chinook_034:
+  tables:
+  - {name: Invoice, alias: t1, ordinal: 0}
+  - {name: InvoiceLine, alias: t2, ordinal: 1}
+  - {name: Track, alias: t3, ordinal: 2}
+  - {name: Album, alias: t4, ordinal: 3}
+  - {name: Artist, alias: t5, ordinal: 4}
+  joins:
+  - left_alias: t1
+    right_alias: t2
+    join_type: inner
+    ordinal: 0
+    condition: {kind: binary, op: '=', left: {kind: column, alias: t1, column_name: InvoiceId}, right: {kind: column, alias: t2, column_name: InvoiceId}}
+  - left_alias: t2
+    right_alias: t3
+    join_type: inner
+    ordinal: 1
+    condition: {kind: binary, op: '=', left: {kind: column, alias: t2, column_name: TrackId}, right: {kind: column, alias: t3, column_name: TrackId}}
+  - left_alias: t3
+    right_alias: t4
+    join_type: inner
+    ordinal: 2
+    condition: {kind: binary, op: '=', left: {kind: column, alias: t3, column_name: AlbumId}, right: {kind: column, alias: t4, column_name: AlbumId}}
+  - left_alias: t4
+    right_alias: t5
+    join_type: inner
+    ordinal: 3
+    condition: {kind: binary, op: '=', left: {kind: column, alias: t4, column_name: ArtistId}, right: {kind: column, alias: t5, column_name: ArtistId}}
+  select_items:
+  - {ordinal: 0, alias: customer_count, expr: {kind: func, func_name: COUNT, is_aggregate: true, args: [{kind: func, func_name: DISTINCT, args: [{kind: column, alias: t1, column_name: CustomerId}]}]}}
+  where: {kind: binary, op: '=', left: {kind: column, alias: t5, column_name: Name}, right: {kind: literal, value: AC/DC}}
+  reasoning: Count distinct customers on invoices with an AC/DC track.
+
+chinook_035:
+  tables: [{name: Employee, alias: t1, ordinal: 0}]
+  select_items:
+  - {ordinal: 0, alias: employee_count, expr: {kind: func, func_name: COUNT, is_aggregate: true, args: [{kind: column, alias: t1, column_name: EmployeeId}]}}
+  reasoning: Count employees.
+
+chinook_036:
+  tables:
+  - {name: Employee, alias: t1, ordinal: 0}
+  - {name: Employee, alias: t2, ordinal: 1}
+  joins:
+  - left_alias: t1
+    right_alias: t2
+    join_type: inner
+    ordinal: 0
+    condition: {kind: binary, op: '=', left: {kind: column, alias: t1, column_name: ReportsTo}, right: {kind: column, alias: t2, column_name: EmployeeId}}
+  select_items:
+  - {ordinal: 0, alias: manager_first_name, expr: {kind: column, alias: t2, column_name: FirstName}}
+  - {ordinal: 1, alias: manager_last_name, expr: {kind: column, alias: t2, column_name: LastName}}
+  where:
+    kind: binary
+    op: AND
+    left: {kind: binary, op: '=', left: {kind: column, alias: t1, column_name: FirstName}, right: {kind: literal, value: Jane}}
+    right: {kind: binary, op: '=', left: {kind: column, alias: t1, column_name: LastName}, right: {kind: literal, value: Peacock}}
+  reasoning: Join Jane Peacock to the employee she reports to.
+
+chinook_037:
+  tables:
+  - {name: Employee, alias: t1, ordinal: 0}
+  - {name: Customer, alias: t2, ordinal: 1}
+  - {name: Invoice, alias: t3, ordinal: 2}
+  joins:
+  - left_alias: t1
+    right_alias: t2
+    join_type: inner
+    ordinal: 0
+    condition: {kind: binary, op: '=', left: {kind: column, alias: t1, column_name: EmployeeId}, right: {kind: column, alias: t2, column_name: SupportRepId}}
+  - left_alias: t2
+    right_alias: t3
+    join_type: inner
+    ordinal: 1
+    condition: {kind: binary, op: '=', left: {kind: column, alias: t2, column_name: CustomerId}, right: {kind: column, alias: t3, column_name: CustomerId}}
+  select_items:
+  - {ordinal: 0, alias: first_name, expr: {kind: column, alias: t1, column_name: FirstName}}
+  - {ordinal: 1, alias: last_name, expr: {kind: column, alias: t1, column_name: LastName}}
+  - ordinal: 2
+    alias: revenue
+    expr: {kind: func, func_name: ROUND, args: [{kind: func, func_name: SUM, is_aggregate: true, args: [{kind: column, alias: t3, column_name: Total}]}, {kind: literal, value: 2}]}
+  group_by:
+  - {ordinal: 0, expr: {kind: column, alias: t1, column_name: EmployeeId}}
+  - {ordinal: 1, expr: {kind: column, alias: t1, column_name: FirstName}}
+  - {ordinal: 2, expr: {kind: column, alias: t1, column_name: LastName}}
+  order_by:
+  - ordinal: 0
+    direction: desc
+    expr: {kind: func, func_name: ROUND, args: [{kind: func, func_name: SUM, is_aggregate: true, args: [{kind: column, alias: t3, column_name: Total}]}, {kind: literal, value: 2}]}
+  - {ordinal: 1, direction: asc, expr: {kind: column, alias: t1, column_name: EmployeeId}}
+  limit: 1
+  reasoning: Sum invoice totals of each support rep's customers and keep the largest.
+
+chinook_038:
+  tables: [{name: Track, alias: t1, ordinal: 0}]
+  select_items:
+  - {ordinal: 0, alias: track_name, expr: {kind: column, alias: t1, column_name: Name}}
+  - ordinal: 1
+    alias: minutes
+    expr: {kind: func, func_name: ROUND, args: [{kind: binary, op: '/', left: {kind: column, alias: t1, column_name: Milliseconds}, right: {kind: literal, value: 60000.0}}, {kind: literal, value: 2}]}
+  order_by:
+  - {ordinal: 0, direction: desc, expr: {kind: column, alias: t1, column_name: Milliseconds}}
+  - {ordinal: 1, direction: asc, expr: {kind: column, alias: t1, column_name: TrackId}}
+  limit: 5
+  reasoning: Five longest tracks with their length in minutes.
+
+chinook_039:
+  tables:
+  - {name: Track, alias: t1, ordinal: 0}
+  - {name: InvoiceLine, alias: t2, ordinal: 1}
+  joins:
+  - left_alias: t1
+    right_alias: t2
+    join_type: left
+    ordinal: 0
+    condition: {kind: binary, op: '=', left: {kind: column, alias: t1, column_name: TrackId}, right: {kind: column, alias: t2, column_name: TrackId}}
+  select_items:
+  - {ordinal: 0, alias: track_count, expr: {kind: func, func_name: COUNT, is_aggregate: true, args: [{kind: column, alias: t1, column_name: TrackId}]}}
+  where: {kind: binary, op: IS, left: {kind: column, alias: t2, column_name: InvoiceLineId}, right: {kind: literal, is_null: true}}
+  reasoning: Count tracks with no invoice line.

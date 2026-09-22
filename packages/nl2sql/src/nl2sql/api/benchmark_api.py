@@ -12,16 +12,11 @@ from typing import Dict, Optional
 
 import yaml
 
-from nl2sql.common.settings import settings
-from nl2sql.configs import ConfigManager
-from nl2sql.configs.llm import LLMFileConfig, AgentConfig
+from nl2sql.configs.llm import LLMFileConfig
 from nl2sql.context import NL2SQLContext
-from nl2sql.datasources import DatasourceRegistry
 from nl2sql.evaluation.benchmark_runner import BenchmarkRunner, BenchmarkResult
+from nl2sql.evaluation.tier1 import run_tier1
 from nl2sql.evaluation.types import BenchmarkConfig
-from nl2sql.indexing.vector_store import VectorStore
-from nl2sql.llm import LLMRegistry
-from nl2sql.secrets import SecretManager
 
 
 @dataclass
@@ -39,6 +34,17 @@ class BenchmarkAPI:
     def __init__(self, ctx: Optional[NL2SQLContext] = None):
         self._ctx = ctx
 
+    def _context(self, config: BenchmarkConfig) -> NL2SQLContext:
+        if self._ctx is None:
+            self._ctx = NL2SQLContext(
+                ds_config_path=config.config_path,
+                secrets_config_path=config.secrets_path,
+                llm_config_path=config.llm_config_path,
+                vector_store_path=pathlib.Path(config.vector_store_path) if config.vector_store_path else None,
+                policies_config_path=config.policies_path,
+            )
+        return self._ctx
+
     def run_matrix(
         self,
         config: BenchmarkConfig,
@@ -46,69 +52,46 @@ class BenchmarkAPI:
         progress_callback=None,
     ) -> BenchmarkMatrixResult:
         """
-        Run a benchmark suite against one or more LLM configs.
+        Run the gold dataset through the full pipeline with a real LLM.
+
+        With ``bench_config_path`` each LLM config it names is run in turn;
+        otherwise the context's own LLM config is used once, as ``default``.
 
         Args:
             config: Benchmark configuration (dataset, datasource config, etc.).
             progress_callback: Optional progress iterator wrapper.
         """
-        cm = self._ctx.config_manager if self._ctx else ConfigManager()
+        ctx = self._context(config)
+        llm_configs = self._load_llm_configs(config)
+        if not llm_configs:
+            runner = BenchmarkRunner(config, ctx)
+            return BenchmarkMatrixResult({"default": runner.run_dataset(progress_callback=progress_callback)})
 
-        secret_manager = SecretManager()
-        secrets_path = config.secrets_path or settings.secrets_config_path
-        if secrets_path and pathlib.Path(secrets_path).exists():
-            secret_configs = cm.load_secrets(pathlib.Path(secrets_path))
-            if secret_configs:
-                secret_manager.configure(secret_configs)
-
-        config_path = pathlib.Path(config.config_path) if config.config_path else pathlib.Path(settings.datasource_config_path)
-        ds_configs = cm.load_datasources(config_path)
-        ds_registry = DatasourceRegistry(secret_manager)
-        ds_registry.register_datasources(ds_configs)
-
-        vector_store = VectorStore(
-            collection_name=settings.vector_store_collection_name,
-            persist_directory=config.vector_store_path or settings.vector_store_path,
-        )
-
-        llm_configs = self._load_llm_configs(config, cm)
         results: Dict[str, BenchmarkResult] = {}
-
         for name, llm_cfg in llm_configs.items():
-            llm_registry = LLMRegistry(secret_manager)
-            agents = llm_cfg.agents or {}
+            agents = dict(llm_cfg.agents or {})
             agents["default"] = llm_cfg.default
-            llm_registry.register_llms(agents)
-
-            runner = BenchmarkRunner(config, ds_registry, vector_store, llm_registry)
-            results[name] = runner.run_dataset(
-                config_name=name,
-                progress_callback=progress_callback,
-            )
-
+            ctx.llm_registry.replace_llms(agents)
+            results[name] = BenchmarkRunner(config, ctx).run_dataset(progress_callback=progress_callback)
         return BenchmarkMatrixResult(results_by_config=results)
 
-    def _load_llm_configs(self, config: BenchmarkConfig, cm: ConfigManager) -> Dict[str, LLMFileConfig]:
-        llm_configs: Dict[str, LLMFileConfig] = {}
+    def run_tier1(self, config: BenchmarkConfig) -> BenchmarkResult:
+        """Run the hand-written gold plans through the code nodes, with no API key.
 
-        if config.bench_config_path and pathlib.Path(config.bench_config_path).exists():
-            bench_data = yaml.safe_load(pathlib.Path(config.bench_config_path).read_text()) or {}
-            for name, cfg_data in bench_data.items():
-                if isinstance(cfg_data, dict):
-                    llm_configs[name] = LLMFileConfig.model_validate(cfg_data)
+        See :mod:`nl2sql.evaluation.tier1`. The context's LLM registry is
+        replaced by the gold-plan fake for the rest of this API's life.
+        """
+        return run_tier1(self._context(config), config)
 
-        if not llm_configs:
-            if config.llm_config_path and pathlib.Path(config.llm_config_path).exists():
-                llm_configs["default"] = cm.load_llm(pathlib.Path(config.llm_config_path))
-            else:
-                llm_configs["default"] = LLMFileConfig(
-                    default=AgentConfig(provider="openai", model="gpt-5.4")
-                )
-
-        if config.stub_llm:
-            for llm_cfg in llm_configs.values():
-                llm_cfg.default.provider = "stub"
-                for agent_cfg in llm_cfg.agents.values():
-                    agent_cfg.provider = "stub"
-
-        return llm_configs
+    @staticmethod
+    def _load_llm_configs(config: BenchmarkConfig) -> Dict[str, LLMFileConfig]:
+        """The named LLM configs in ``bench_config_path``, or none."""
+        path = config.bench_config_path
+        if not path or not pathlib.Path(path).exists():
+            return {}
+        bench_data = yaml.safe_load(pathlib.Path(path).read_text(encoding="utf-8")) or {}
+        return {
+            name: LLMFileConfig.model_validate(cfg_data)
+            for name, cfg_data in bench_data.items()
+            if isinstance(cfg_data, dict)
+        }

@@ -14,6 +14,7 @@ from nl2sql.common.logger import configure_logging
 from nl2sql.common.settings import reload_settings, settings
 from nl2sql.context import NL2SQLContext
 from nl2sql import BenchmarkConfig
+from nl2sql.evaluation.gold import GOLD_DATASET_PATH
 
 # Local CLI Imports
 from nl2sql.cli.commands.indexing import run_indexing
@@ -216,36 +217,47 @@ def list_adapters():
 
 @app.command()
 def benchmark(
-    dataset: Annotated[pathlib.Path, typer.Option(help="Path to golden dataset YAML")],
+    tier: Annotated[Optional[int], typer.Option(
+        "--tier",
+        help=(
+            "1: run the hand-written gold plans through the validator, generator and executor "
+            "with a local fake LLM (no API key). Omit to run the full pipeline with the configured LLM."
+        ),
+    )] = None,
+    dataset: Annotated[pathlib.Path, typer.Option(help="Path to the gold dataset YAML")] = GOLD_DATASET_PATH,
     ds_config_path: DatasourceConfigOption = None,
     secrets_config_path: SecretsConfigOption = None,
+    llm_config_path: LLMConfigOption = None,
     vector_store_path: VectorStoreOption = None,
+    policies_config_path: Annotated[Optional[pathlib.Path], typer.Option("--policies-config", help="Path to policies config")] = None,
     bench_config_path: Annotated[Optional[pathlib.Path], typer.Option(help="Path to LLM matrix config")] = None,
-    iterations: Annotated[int, typer.Option(help="Iterations per test case")] = 3,
-    routing_only: Annotated[bool, typer.Option(help="Verify routing only, skip SQL execution")] = False,
+    iterations: Annotated[int, typer.Option(help="Iterations per test case (tier 1 always runs once)")] = 3,
     include_ids: Annotated[Optional[List[str]], typer.Option(help="Specific Test IDs to run")] = None,
-    export_path: Annotated[Optional[pathlib.Path], typer.Option(help="Export results to JSON/CSV")] = None,
+    role: Annotated[Optional[List[str]], typer.Option("--role", help="Only run as this role (repeatable)")] = None,
+    export_path: Annotated[Optional[pathlib.Path], typer.Option(help="Where to write the JSON report")] = None,
 ):
     """
-    Run accuracy benchmarks against a golden dataset.
+    Score the engine against the Chinook gold dataset, per question and role.
+
+    Prints a table and a pass/fail/skip summary per role, writes a JSON report
+    (benchmark_report.json unless --export-path is given) and exits 1 if any
+    case failed.
     """
-
-
     bench_run_config = BenchmarkConfig(
         dataset_path=dataset,
         config_path=ds_config_path,
         bench_config_path=bench_config_path,
-        llm_config_path=None, # Matrix uses bench_config
+        llm_config_path=llm_config_path,
         iterations=iterations,
-        routing_only=routing_only,
         include_ids=include_ids,
+        roles=role,
         export_path=export_path,
         vector_store_path=vector_store_path,
         secrets_path=secrets_config_path,
-        stub_llm=False,
+        policies_path=policies_config_path,
     )
-    
-    exec_benchmark(bench_run_config)
+
+    exec_benchmark(bench_run_config, tier=tier)
 
 
 def main():
