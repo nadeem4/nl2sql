@@ -36,6 +36,7 @@ class Expr(BaseModel):
         distinct (bool): Apply the function to distinct argument values,
             e.g. ``COUNT(DISTINCT x)``. Only valid when ``kind`` is ``func``.
         op (Optional[str]): Operator for binary or unary expressions.
+            ``||`` concatenates strings in every dialect.
         left (Optional[Expr]): Left operand for binary expressions.
         right (Optional[Expr]): Right operand for binary expressions.
         expr (Optional[Expr]): Operand for unary expressions.
@@ -65,7 +66,7 @@ class Expr(BaseModel):
     op: Optional[
         Literal[
             "=", "!=", ">", "<", ">=", "<=",
-            "+", "-", "*", "/", "%",
+            "+", "-", "*", "/", "%", "||",
             "AND", "OR", "LIKE", "IN",
             "NOT", "IS", "IS NOT"
         ]
