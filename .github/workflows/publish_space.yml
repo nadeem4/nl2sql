@@ -1,0 +1,262 @@
+# Deploys the hosted playground (`nl2sql demo --hosted`) to its Hugging Face
+# Space, `nadeem4nk/nl2sql-demo`.
+#
+# `deploy/huggingface/` is a Space root: a Dockerfile that needs no build
+# context and a README whose front-matter is the Space configuration. This
+# workflow mirrors that folder onto the Space's root, which is where the Hub
+# looks for both, and then waits for the build.
+#
+# The Space holds no API key and this workflow never gives it one: hosted mode
+# takes each visitor's own key, per request. The only credential here is the
+# Hugging Face *write* token, read from the `HF_TOKEN` repository secret.
+name: Publish Space
+
+on:
+  workflow_dispatch:
+    inputs:
+      space_id:
+        description: The Space to deploy to, as owner/name.
+        required: false
+        default: nadeem4nk/nl2sql-demo
+      token_secret:
+        description: Name of the repository secret holding the Hugging Face write token.
+        required: false
+        default: HF_TOKEN
+  push:
+    branches:
+      - main
+    # Only the three things the Space is actually built from: its own root,
+    # the engine the image installs from this branch, and the playground the
+    # engine serves. A docs-only merge changes none of them and must not spend
+    # ten minutes rebuilding the image.
+    paths:
+      - deploy/huggingface/**
+      - packages/nl2sql/**
+      - web/playground/**
+      - .github/workflows/publish_space.yml
+
+# One deploy at a time. A run superseded by a newer push is cancelled rather
+# than left to race the newer one to the Space's main branch.
+concurrency:
+  group: publish-space
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      SPACE_ID: ${{ inputs.space_id || 'nadeem4nk/nl2sql-demo' }}
+      # `huggingface_hub` reads HF_TOKEN from the environment, so no step has
+      # to pass a token as an argument. On a fork, or before the secret is
+      # added, this is empty and the job skips below.
+      HF_TOKEN: ${{ secrets[inputs.token_secret || 'HF_TOKEN'] }}
+      # Pinned: this job is a deploy, and a hub release should not change what
+      # it does without a commit here.
+      HUGGINGFACE_HUB_PIN: huggingface_hub==1.32.0
+      SPACE_BUILD_TIMEOUT_SEC: "1800"
+    steps:
+      - uses: actions/checkout@v4
+
+      # A fork has no access to the secret, and neither does this repository
+      # before the owner adds it. Either way that is not a failure: say so and
+      # leave the job green.
+      - name: Look for the Hugging Face token
+        id: token
+        run: |
+          set -euo pipefail
+          if [ -n "${HF_TOKEN:-}" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "No Hugging Face token in this repository (secret '${TOKEN_SECRET}' is unset), so the Space is not deployed."
+            echo "Add a write token from https://huggingface.co/settings/tokens at https://github.com/nadeem4/nl2sql/settings/secrets/actions to enable this workflow."
+            {
+              echo "### Hugging Face Space not deployed"
+              echo ""
+              echo "The \`${TOKEN_SECRET}\` secret is not available to this run, so nothing was pushed."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+        env:
+          TOKEN_SECRET: ${{ inputs.token_secret || 'HF_TOKEN' }}
+
+      - uses: actions/setup-python@v5
+        if: steps.token.outputs.present == 'true'
+        with:
+          python-version: "3.12"
+
+      - name: Install the Hugging Face hub client
+        if: steps.token.outputs.present == 'true'
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          pip install "$HUGGINGFACE_HUB_PIN"
+
+      # `exist_ok` means an existing Space is left exactly as it is: the Hub
+      # ignores visibility, SDK and hardware on a create that conflicts, so a
+      # Space someone upgraded or made private is not reset by a deploy.
+      - name: Create the Space if it does not exist
+        if: steps.token.outputs.present == 'true'
+        run: |
+          python - <<'PY'
+          import os
+
+          from huggingface_hub import create_repo
+
+          repo_id = os.environ["SPACE_ID"]
+          url = create_repo(
+              repo_id=repo_id,
+              repo_type="space",
+              space_sdk="docker",
+              private=False,
+              exist_ok=True,
+          )
+          print(f"Space: {url}")
+          PY
+
+      # Why a fresh working copy of the Space rather than `git subtree split`:
+      # a split rewrites this repository's history for the prefix into a
+      # synthetic one that shares no commits with whatever the Space already
+      # has, so the very first push -- against the initial commit the Hub
+      # creates with the Space -- is already a non-fast-forward and every
+      # deploy would need `--force`, throwing the Space's history away. It also
+      # needs `fetch-depth: 0` and gets slower as this repository grows.
+      # Fetching the Space's own main and committing on top of it fast-forwards
+      # every time, keeps every earlier deploy in the Space's log, and reads
+      # three small files instead of the whole repository.
+      - name: Push deploy/huggingface as the Space root
+        id: push
+        if: steps.token.outputs.present == 'true'
+        run: |
+          set -euo pipefail
+
+          work="$RUNNER_TEMP/space"
+          rm -rf "$work"
+          mkdir -p "$work"
+          cd "$work"
+          git init --quiet --initial-branch=main
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # The token lives in this one shell variable and is expanded straight
+          # into the git command line; it is never echoed, never traced (no
+          # `set -x` above), and never written to .git/config -- which is why
+          # the remote is passed to each command instead of being added.
+          remote="https://user:$HF_TOKEN@huggingface.co/spaces/$SPACE_ID"
+
+          if git ls-remote --exit-code --heads "$remote" main >/dev/null 2>&1; then
+            git fetch --quiet "$remote" main
+            git reset --quiet --hard FETCH_HEAD
+            echo "Building on the Space's existing main."
+          else
+            echo "The Space has no main branch yet; this deploy creates it."
+          fi
+
+          # Mirror the folder onto the root, so a file deleted here is deleted
+          # there. `.gitattributes` is the Hub's own (its LFS rules) and stays.
+          find . -mindepth 1 -maxdepth 1 ! -name .git ! -name .gitattributes -exec rm -rf {} +
+          cp -R "$GITHUB_WORKSPACE/deploy/huggingface/." .
+
+          git add -A
+          if git diff --cached --quiet; then
+            echo "The Space root already matches deploy/huggingface at $GITHUB_SHA; nothing to push."
+            echo "pushed=false" >> "$GITHUB_OUTPUT"
+          else
+            git commit --quiet -m "Deploy deploy/huggingface from $GITHUB_REPOSITORY@$GITHUB_SHA"
+            git push --quiet "$remote" HEAD:refs/heads/main
+            echo "Pushed $GITHUB_SHA to https://huggingface.co/spaces/$SPACE_ID"
+            echo "pushed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Wait for the Space to build
+        if: steps.token.outputs.present == 'true'
+        env:
+          PUSHED: ${{ steps.push.outputs.pushed }}
+        run: |
+          python - <<'PY'
+          import os
+          import sys
+          import time
+
+          from huggingface_hub import HfApi
+
+          repo_id = os.environ["SPACE_ID"]
+          pushed = os.environ.get("PUSHED") == "true"
+          timeout = int(os.environ["SPACE_BUILD_TIMEOUT_SEC"])
+          api = HfApi()
+
+          WORKING = {"BUILDING", "APP_STARTING", "RUNNING_BUILDING", "RUNNING_APP_STARTING"}
+          LIVE = {"RUNNING", "RUNNING_BUILDING", "RUNNING_APP_STARTING"}
+          BROKEN = {"BUILD_ERROR", "CONFIG_ERROR", "RUNTIME_ERROR", "NO_APP_FILE"}
+          HALTED = {"PAUSED", "STOPPED", "DELETING"}
+
+          # The Hub takes a moment to notice the push, so a stage read straight
+          # after it still describes the *previous* build. Only after the Space
+          # has been seen working does RUNNING mean this deploy is up.
+          grace = time.time() + 180 if pushed else 0.0
+          deadline = time.time() + timeout
+          seen_working = not pushed
+          last = None
+
+
+          def tail_of_the_build_log() -> str:
+              try:
+                  lines = list(api.fetch_space_logs(repo_id, build=True))
+              except Exception as exc:  # the endpoint is best effort
+                  return f"(could not read the build log: {exc})"
+              return "".join(lines[-50:]) or "(the build log was empty)"
+
+
+          while True:
+              stage = api.get_space_runtime(repo_id).stage
+              stage = getattr(stage, "value", stage)
+              if stage != last:
+                  print(f"stage: {stage}", flush=True)
+                  last = stage
+
+              if stage in WORKING:
+                  seen_working = True
+              if stage in BROKEN:
+                  print(f"The Space is {stage}. The last of its build log:\n")
+                  print(tail_of_the_build_log())
+                  sys.exit(1)
+              if stage in HALTED:
+                  print(f"The Space is {stage}, so it will not come up on its own.")
+                  sys.exit(1)
+              if stage == "RUNNING" and seen_working:
+                  break
+              if not seen_working and time.time() > grace:
+                  # The push landed but the Hub never started a build -- the
+                  # commit changed nothing it rebuilds for. Whatever is up is
+                  # what this commit describes.
+                  if stage in LIVE:
+                      break
+                  seen_working = True
+              if time.time() > deadline:
+                  print(f"Gave up after {timeout}s with the Space in {stage}.")
+                  print(tail_of_the_build_log())
+                  sys.exit(1)
+              time.sleep(15)
+
+          print(f"The Space is running: https://huggingface.co/spaces/{repo_id}")
+          PY
+
+      - name: Summarise the deploy
+        if: steps.token.outputs.present == 'true' && success()
+        run: |
+          set -euo pipefail
+          subdomain="$(echo "$SPACE_ID" | tr '/' '-' | tr '[:upper:]' '[:lower:]')"
+          {
+            echo "### Hugging Face Space deployed"
+            echo ""
+            echo "| | |"
+            echo "| --- | --- |"
+            echo "| Space | https://huggingface.co/spaces/$SPACE_ID |"
+            echo "| Playground | https://$subdomain.hf.space |"
+            echo "| Commit | \`$GITHUB_SHA\` |"
+            echo "| Pushed | ${PUSHED:-false} |"
+          } >> "$GITHUB_STEP_SUMMARY"
+        env:
+          PUSHED: ${{ steps.push.outputs.pushed }}

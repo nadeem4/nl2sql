@@ -43,8 +43,14 @@ Source and documentation: <https://github.com/nadeem4/nl2sql>.
 
 Everything the Space needs is in this one folder: the `Dockerfile` builds the
 image with no build context from the repository, and the front-matter above is
-the Space configuration. Nothing here holds a secret, and no agent performs the
-deploy.
+the Space configuration. Nothing here holds a secret.
+
+**Normally this is automatic.** `.github/workflows/publish_space.yml` in the
+repository creates the Space if it is missing, mirrors this folder onto its
+root, and waits for the build -- on every push to `main` that touches this
+folder, the engine or the playground, and on demand from the Actions tab. It
+needs one repository secret, `HF_TOKEN`, holding a Hugging Face write token.
+The steps below are the same thing by hand, for when that is not available.
 
 **1. Create the Space.** At <https://huggingface.co/new-space>, under the
 `nadeem4nk` account:

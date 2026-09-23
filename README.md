@@ -151,8 +151,9 @@ databases: the server holds no API key, each visitor pastes their own into the
 page, the browser keeps it and sends it with each question, and it is used in
 memory for that question only. Settings, Rebuild, answer ratings and `--record`
 are refused there, the sample databases are opened read-only, and questions are
-rate limited per visitor and capped per session. See
-[Hosted demo](docs/deployment/hosted-demo.md).
+rate limited per visitor and capped per session. `deploy/huggingface/` is that
+demo as a Hugging Face Space, deployed from `main` by the **Publish Space**
+workflow. See [Hosted demo](docs/deployment/hosted-demo.md).
 
 ## Screenshots
 
