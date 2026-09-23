@@ -30,6 +30,14 @@ a container turns it on.
 
 ## What the visitor's key does, and does not do
 
+A visitor who has not pasted one yet is told so before they ask. The **Ask**
+page opens on a short state saying the demo runs on their own key, that it
+stays in this browser tab and is never stored on the server, with a link to
+**Settings**; the question box and the guided questions are disabled until
+there is a key, so a click cannot fail with a `401` the visitor had no way to
+see coming. The moment a key is saved the state clears and everything enables,
+with no reload. None of this appears in local mode.
+
 The visitor pastes a key on the **Settings** page. From there:
 
 1. **The browser keeps it**, in that tab's `sessionStorage`. Closing the tab
@@ -68,7 +76,9 @@ What it does **not** do:
   sample databases shipped with the engine.
 
 A question with no key answers `401` with a sentence telling the visitor to add
-one under Settings. A malformed key answers `400` without quoting what was sent.
+one under Settings; the page holds the controls closed before it comes to that,
+so the `401` is the guard rather than the first thing a visitor meets. A
+malformed key answers `400` without quoting what was sent.
 
 ## Limits
 
@@ -99,6 +109,11 @@ keyed by address, is what holds the pace down in the meantime.
 before the server starts). `--api-key` is refused too: a server-side key is the
 one thing hosted mode is built to avoid, and any provider key exported into the
 process is cleared at start-up so nothing can fall back to it.
+
+Rebuild being off is said on the page rather than left as a gap: the index
+panel reports that the index was built before the demo started and which
+databases it covers, and where the button would be it prints the server's own
+reason -- rebuilding writes to disk and the sample data never changes.
 
 **On:** asking the twenty guided questions or any other question, the schema
 view, the per-node **Debug** drill-down with its traces, and the retrieval

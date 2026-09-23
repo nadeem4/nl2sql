@@ -6,6 +6,7 @@ import Run from "./Panes.jsx";
 import Settings from "./Settings.jsx";
 import RetrievalInspector from "./Retrieval.jsx";
 import { guidedGroups } from "./questions.js";
+import { NO_KEY_REASON, needsKey } from "./firstRun.js";
 import { askHeaders, readKey, writeKey } from "./hostedKey.js";
 import { createRouter, hashFor, navItems, pageFor, pageFromHash } from "./router.js";
 import { deniedTables, planTables } from "./run.js";
@@ -177,7 +178,7 @@ export default function App() {
 
   const ask = async (text) => {
     const q = (text === undefined ? question : text).trim();
-    if (!q || busy) return;
+    if (!q || busy || needsKey(meta, apiKey)) return;
     setQuestion(q);
     setAsked({ question: q, role, planOnly });
     setBusy(true);
@@ -224,6 +225,9 @@ export default function App() {
   // say, and until it answers the rail keeps the single-database wording.
   const databases = index ? sourceNames(index.health).length : 1;
   const onAsk = page === "ask";
+  // Hosted, with no key in this tab: the page says so and holds the question
+  // box and the guided questions closed instead of letting a click fail.
+  const noKey = needsKey(meta, apiKey);
   const groups = guidedGroups(meta);
   const current = pageFor(page);
   const nav = navItems(page, {
@@ -308,6 +312,18 @@ export default function App() {
           <div className="layout">
             <section className="composer" aria-labelledby="ask-heading">
               <h2 id="ask-heading" className="visually-hidden">Ask</h2>
+              {noKey && (
+                <div className="first-run" id="first-run">
+                  <h3>Add your API key to ask a question</h3>
+                  <p id="first-run-why">
+                    {/* The promise the code keeps; `hostedKey.js` is where it is kept. */}
+                    This demo runs on your own API key. It stays in this browser tab, travels with each
+                    question and is never stored on the server. The sample databases and their search
+                    index are already built, so the key is the only thing missing.
+                  </p>
+                  <a className="first-run-go" href={hashFor("settings")}>Add your key</a>
+                </div>
+              )}
               {/* The page title above already says Ask. With one database this
                   names it; with three the resolver picks, so it must not. */}
               <label className="question-label" htmlFor="question">
@@ -320,6 +336,9 @@ export default function App() {
                 rows={2}
                 value={question}
                 placeholder="Which genre sells the most tracks?"
+                disabled={noKey}
+                title={noKey ? NO_KEY_REASON : undefined}
+                aria-describedby={noKey ? "first-run-why" : undefined}
                 onChange={(e) => setQuestion(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) ask();
@@ -343,7 +362,9 @@ export default function App() {
                   Debug
                   <span className="hint">per-node tokens and time</span>
                 </label>
-                <button className="ask" onClick={() => ask()} disabled={busy || !question.trim()}>
+                <button className="ask" onClick={() => ask()} disabled={busy || noKey || !question.trim()}
+                  title={noKey ? NO_KEY_REASON : undefined}
+                  aria-describedby={noKey ? "first-run-why" : undefined}>
                   {busy ? "Asking" : "Ask"}
                   <kbd aria-hidden="true">Ctrl Enter</kbd>
                 </button>
@@ -362,7 +383,9 @@ export default function App() {
                       <ul aria-labelledby={groups.length > 1 ? `guided-${group.datasource}` : undefined}>
                         {group.questions.map((q) => (
                           <li key={q}>
-                            <button className="guided-q" onClick={() => ask(q)} disabled={busy}>{q}</button>
+                            <button className="guided-q" onClick={() => ask(q)} disabled={busy || noKey}
+                              title={noKey ? NO_KEY_REASON : undefined}
+                              aria-describedby={noKey ? "first-run-why" : undefined}>{q}</button>
                           </li>
                         ))}
                       </ul>
@@ -373,7 +396,7 @@ export default function App() {
             </section>
 
             <aside className="rail">
-              <IndexPanel index={index} error={indexError} onRebuild={rebuildIndex} />
+              <IndexPanel index={index} error={indexError} onRebuild={rebuildIndex} hosted={hosted} />
               <SchemaPanel schema={schema} used={used} denied={denied} role={asked && asked.role}
                 databases={databases} />
             </aside>

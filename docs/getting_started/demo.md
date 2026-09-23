@@ -211,6 +211,11 @@ filled button. **Rebuild** is also always available on demand.
 - It has the Settings page's guardrails (so does the
   [Retrieval inspector](#the-retrieval-inspector)): local only unless `--allow-settings`,
   and only from the playground page itself.
+- On the [hosted demo](../deployment/hosted-demo.md) there is no button at all.
+  The panel says instead that the index was built before the demo started and
+  which databases it covers, and prints the server's own reason where the
+  button would be: rebuilding writes to disk, and the sample data never
+  changes.
 
 ### Old demo folders
 
@@ -297,8 +302,11 @@ second settings store, and the browser keeps nothing but UI conveniences.
   name, or in anything but JSON.
 - **Hosted mode is a third state.** With `nl2sql demo --hosted` the page shows a
   key form that writes only to this browser tab's `sessionStorage`; the settings
-  routes stay refused because there is nothing on the server to save. See
-  [Hosted demo](../deployment/hosted-demo.md).
+  routes stay refused because there is nothing on the server to save. The Ask
+  page there opens by saying a key is needed and holds the question box and the
+  guided questions closed until one is saved, so a new visitor is not left to
+  discover it by asking. Locally there is nothing to announce, and nothing is
+  shown. See [Hosted demo](../deployment/hosted-demo.md).
 
 ### The Retrieval inspector
 

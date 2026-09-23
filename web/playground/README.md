@@ -44,6 +44,17 @@ page says exactly that, plus the limits from `meta.limits` and how to run the
 demo locally instead. Rebuild and answer ratings are off, and the retrieval
 inspector stays on. See [Hosted demo](../../docs/deployment/hosted-demo.md).
 
+**Hosted, before a key** (`needsKey` in `src/firstRun.js`: `meta.hosted` and
+nothing in this tab's `sessionStorage`), the Ask page opens with `#first-run`
+above the question box -- what the demo needs, what happens to the key, and a
+link to `#/settings` -- and holds the question box, **Ask** and every guided
+question disabled, each carrying `#first-run-why` as its `aria-describedby`.
+Saving a key in Settings clears all of it on the next render, with no reload:
+`App` holds the key in state, so nothing has to be reloaded to see it. In local
+mode none of this appears -- there a key is already configured, or replay
+answers from recordings, and a wall would be in the way of someone who has
+nothing to do.
+
 `src/router.test.js` covers the default route, deep links, an unknown route,
 Back and Forward, and that routing touches nothing but the hash.
 
@@ -63,8 +74,11 @@ Back and Forward, and that routing touches nothing but the hash.
   schema version (`#index-version`) and when it was built (`#index-built`). The
   index covers every database, so the heading names one only when there is one;
   with several, `#index-sources` lists them ("Covers chinook, support and
-  webanalytics", from `sourceNames` and `joinNames` in `indexHealth.js`) and
-  Rebuild's help names the single database it rebuilds.
+  webanalytics", from `coverageLine` in `indexHealth.js`) and
+  Rebuild's help names the single database it rebuilds. Hosted, that line is
+  always printed and says the index was built before anyone arrived ("Built
+  before this demo started, covering chinook, support and webanalytics"), so
+  the missing Rebuild reads as a decision rather than as something broken.
   When the index is empty, missing or out of date, the panel turns to the fault
   colour, a stale index lists why, and a warning under the top bar
   (`#index-warning`) puts the keyboard on the button, or, from another page,
@@ -73,8 +87,11 @@ Back and Forward, and that routing touches nothing but the hash.
   `GET /api/index` for its steps (`#index-progress`) until it ends, then
   re-reads the schema. **Write descriptions with the LLM** (`#index-enrich`) is
   off by default and disabled without a key. A failure shows `#index-error`.
-  Where Rebuild is off (a non-loopback `--host` without `--allow-settings`) the
-  panel says why (`#index-unavailable`). A demo folder written by an older
+  Where Rebuild is off (a non-loopback `--host` without `--allow-settings`, or
+  the hosted demo) the panel says why in the server's own words
+  (`#index-unavailable`, `rebuild.reason` from `/api/index`); hosted, that
+  sentence already says the sample data never changes and what to run instead,
+  so the terminal command is left off. A demo folder written by an older
   engine shows `#index-folder-warning`.
 - **Mode line** (top bar): live or replay. In replay it states how many guided
   questions the loaded recordings answer (`recorded_questions` from
@@ -191,7 +208,8 @@ ledger, refused-table parsing, the trace drill-down helpers), `src/settings.js`
 temperature), `src/indexHealth.js` (entry counts in plain words, the status
 line, relative build times), `src/router.js` (which page a hash names, the nav
 rows, and the router over `hashchange`), `src/questions.js` (the guided
-questions grouped by datasource) and `src/retrieval.js` (the MMR summary line, picks
+questions grouped by datasource), `src/firstRun.js` (when the hosted demo has
+to ask for a key before it takes a question) and `src/retrieval.js` (the MMR summary line, picks
 in order, entries passed over, the copyable text form) and `src/feedback.js`
 (when a run can be rated, the request body, the saved line) with Node's built-in test runner; there is no test dependency.
 

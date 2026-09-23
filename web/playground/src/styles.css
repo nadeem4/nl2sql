@@ -175,6 +175,24 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 /* ---------- composer ---------- */
 
+/* The hosted demo before a key: the one thing a new visitor has to do, said
+   above the question box rather than after a click that would fail. Quiet
+   ground in the accent, one filled control, and nothing else competing. */
+.first-run {
+  margin-bottom: 18px; padding: 15px 18px 17px;
+  background: var(--accent-soft); border-radius: var(--r-well);
+  max-width: 68ch; display: grid; gap: 7px; justify-items: start;
+}
+.first-run h3 { font-size: 17px; letter-spacing: -0.012em; }
+.first-run p { font-size: 14px; color: var(--ink-2); text-wrap: pretty; }
+.first-run-go {
+  margin-top: 3px; padding: 7px 16px; border-radius: var(--r-control);
+  background: var(--ink); color: var(--paper);
+  font-size: 14px; font-weight: 600; text-decoration: none;
+  transition: filter .15s ease;
+}
+.first-run-go:hover { filter: brightness(1.3); }
+
 .question-label { display: block; font-weight: 600; font-size: 15px; margin-bottom: 8px; }
 
 textarea {
@@ -185,6 +203,7 @@ textarea {
 }
 textarea::placeholder { color: var(--ink-3); }
 textarea:focus-visible { outline-offset: 0; border-color: var(--focus); }
+textarea:disabled { background: var(--well); color: var(--ink-3); border-color: var(--rule); cursor: default; }
 
 .controls { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 22px; margin-top: 12px; }
 .field { display: flex; align-items: center; gap: 8px; }
