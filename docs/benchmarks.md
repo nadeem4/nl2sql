@@ -16,12 +16,13 @@ roles are not comparable and start a new series. See
 
 | Config | Date (UTC) | Commit | Accuracy (strict, 95% CI) | Accuracy (lenient, 95% CI) | Faithfulness | $/question | Δ vs previous | Note |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| gpt-5.4 | 2026-09-22 | 27cad30 | 58.1% | - | 87.5% | $0.0202 | accuracy +16.3 pp, faithfulness -6.9 pp, $/question -$0.0034, 0 flipped to fail, 7 to pass (McNemar p=0.016) | after baseline fixes |
+| gpt-5.4 | 2026-09-23 | de42c40 | 79.1% [64.8-88.6] | 79.1% [64.8-88.6] | 86.8% | $0.0194 | new series (dataset changed) | new scoring |
 
 ### All runs
 
 | Date (UTC) | Commit | Note | Config | Models | Dataset | Schema | Roles | Passes | Accuracy (strict, 95% CI) | Accuracy (lenient, 95% CI) | Faithfulness | $/question | Δ vs previous | Answerability P / R | Tokens/question (in / cached / out) | p50 | p95 | Determinism | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 2026-09-23 01:30:50 | de42c40 | new scoring | gpt-5.4 | openai:gpt-5.4 (answersynthesizer, astplanner, datasourceresolver, decomposer, refiner) | chinook_gold.yaml @dcb8c715 | @ceed80fe | admin | 1 | 79.1% [64.8-88.6] | 79.1% [64.8-88.6] | 86.8% | $0.0194 | new series (dataset changed) | 100.0% / 75.0% | 10,291 / 6,900 / 617 | 7.03s | 9.15s | - | complete |
 | 2026-09-22 14:18:51 | 27cad30 | after baseline fixes | gpt-5.4 | openai:gpt-5.4 (answersynthesizer, astplanner, datasourceresolver, decomposer, refiner) | chinook_gold.yaml @7d104084 | @ceed80fe | admin | 1 | 58.1% | - | 87.5% | $0.0202 | accuracy +16.3 pp, faithfulness -6.9 pp, $/question -$0.0034, 0 flipped to fail, 7 to pass (McNemar p=0.016) | 100.0% / 75.0% | 10,655 / 7,082 / 633 | 8.54s | 10.99s | - | complete |
 | 2026-09-22 04:41:56 | 1a8101d | first gpt-5.4 baseline run | gpt-5.4 | openai:gpt-5.4 (answersynthesizer, astplanner, datasourceresolver, decomposer, refiner) | chinook_gold.yaml @7d104084 | @ceed80fe | admin | 1 | 41.9% | - | 94.4% | $0.0236 | first run | 100.0% / 75.0% | 11,222 / 6,153 / 627 | 6.62s | 8.96s | - | complete |
 

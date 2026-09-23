@@ -71,7 +71,7 @@ The real model end to end on the Chinook gold questions. Accuracy is the strict 
 
 | Config | Database | Date (UTC) | Commit | Accuracy (strict) | Accuracy (lenient) | Faithfulness | $/question | Δ vs previous |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| gpt-5.4 | chinook | 2026-09-22 | 27cad30 | 58.1% | - | 87.5% | $0.0202 | accuracy +16.3 pp, faithfulness -6.9 pp, $/question -$0.0034 |
+| gpt-5.4 | chinook | 2026-09-23 | de42c40 | 79.1% [64.8-88.6] | 79.1% | 86.8% | $0.0194 | new series (dataset changed) |
 
 ### Retrieval recall
 
