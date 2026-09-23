@@ -4351,9 +4351,11 @@ read-only everywhere.</p>
 <p><code>deploy/huggingface/Dockerfile</code> builds the playground as a hosted demo. It is a
 Space root rather than a repository build: it needs no build context, so the
 whole deploy is that one folder, copied to the Space's root.</p>
-<p>It installs <code>nl2sql-engine[demo]</code> (from the repository's <code>main</code> branch by
-default; set <code>--build-arg NL2SQL_SPEC="nl2sql-engine[demo]==X.Y.Z"</code> to pin a
-release), then runs <code>nl2sql setup --demo</code> <strong>at build time</strong>. That bakes three
+<p>It installs <code>nl2sql-engine[demo]</code> from <strong>one commit of this repository</strong>, named
+by the <code>NL2SQL_REF</code> build argument -- <code>main</code> in the checked-in <code>Dockerfile</code>, and
+the deploying commit's sha in the copy the workflow pushes to the Space. Set
+<code>--build-arg NL2SQL_SPEC="nl2sql-engine[demo]==X.Y.Z"</code> to install a release
+instead. Then it runs <code>nl2sql setup --demo</code> <strong>at build time</strong>. That bakes three
 things into the image so the container reaches nothing but the model at run
 time and the first question is answered at once:</p>
 <ul>
@@ -4394,7 +4396,47 @@ it, because a key there would be spent by every visitor.</p>
 <h3 id="automatically-from-main">Automatically, from <code>main</code></h3>
 <p><a href="https://github.com/nadeem4/nl2sql/blob/main/.github/workflows/publish_space.yml"><code>.github/workflows/publish_space.yml</code></a> is the normal path: it creates
 the Space if it is missing, mirrors <code>deploy/huggingface/</code> onto the Space's root,
-and waits for the build.</p>
+stamps it with the commit being deployed, and waits for the rebuild.</p>
+<p><strong>What a deploy puts at the Space root.</strong> The four files of
+<code>deploy/huggingface/</code> -- <code>Dockerfile</code>, <code>README.md</code> (the Space's configuration
+and front page), <code>docker-compose.yml</code>, and <code>SOURCE_SHA</code> -- with two of them
+rewritten to name the commit:</p>
+<table>
+<thead>
+<tr>
+<th>At the Space root</th>
+<th>What the deploy writes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SOURCE_SHA</code></td>
+<td>the full sha of the repository commit this deploy came from</td>
+</tr>
+<tr>
+<td><code>Dockerfile</code></td>
+<td>its <code>ARG NL2SQL_REF=</code> line, rewritten from <code>main</code> to that same sha</td>
+</tr>
+</tbody>
+</table>
+<p>Both matter, and for different reasons.</p>
+<p><code>SOURCE_SHA</code> is what makes an <strong>engine-only or playground-only change reach the
+Space at all</strong>. The Space repo holds only that one folder, so a merge that
+changed <code>packages/nl2sql/</code> left the mirrored files byte-identical: there was
+nothing to commit, the Hub saw no new commit, and it never rebuilt. The Space
+stayed frozen on whatever <code>main</code> was the last time the folder itself happened to
+change. Stamping the sha means every deploy is a real commit, and a real commit
+is what the Hub rebuilds on.</p>
+<p>The <code>Dockerfile</code> rewrite is what makes that rebuild <strong>build the right thing</strong>.
+The image installs the engine from a GitHub archive of this repository, and
+building <code>main</code> meant the Space got whatever <code>main</code> was at build time rather
+than what the deploy was for. The ref is now the deploying sha, so the Space is
+pinned to its own source commit -- and because the text of the <code>ARG</code> line
+changes, the layer cache for the install below it is busted and the engine is
+genuinely reinstalled. The workflow rewrites the default rather than passing
+<code>--build-arg</code>, because a Space build takes no build arguments from us; a <code>grep</code>
+right after the rewrite fails the deploy if that line is ever renamed, instead
+of quietly shipping a Space that still builds <code>main</code>.</p>
 <p><strong>The one secret.</strong> A Hugging Face access token with <strong>write</strong> permission
 (<a href="https://huggingface.co/settings/tokens">https://huggingface.co/settings/tokens</a>), added as the repository secret
 <strong><code>HF_TOKEN</code></strong> at
@@ -4409,10 +4451,17 @@ and as the password in the <code>git push</code> URL. It is never echoed, never 
 command rather than saved into <code>.git/config</code>.</p>
 <p><strong>When it runs.</strong> On every push to <code>main</code> that touches something the Space is
 built from -- <code>deploy/huggingface/**</code> (its root), <code>packages/nl2sql/**</code> (the
-engine the image installs from <code>main</code>) or <code>web/playground/**</code> (the page the
-engine serves) -- and on demand. A docs-only merge changes none of those and
-does not redeploy. One deploy runs at a time; a run overtaken by a newer push is
+engine the image installs) or <code>web/playground/**</code> (the page the engine serves)
+-- and on demand. A docs-only merge changes none of those and does not
+redeploy. One deploy runs at a time; a run overtaken by a newer push is
 cancelled.</p>
+<p><strong>What it reports.</strong> The job never calls a build that did not happen a success.
+If the push produced a commit, the workflow checks the Space's head is that
+commit, then waits for a build to actually start and finish; a Space that never
+starts one within five minutes fails the job rather than reporting the previous
+build's <code>RUNNING</code>. If there was nothing to push -- the same commit deployed
+twice -- the job says so plainly and the summary reads <strong>"No rebuild"</strong>, with
+the Space left on its previous image.</p>
 <p><strong>By hand.</strong> Actions → <strong>Publish Space</strong> → <em>Run workflow</em>. Two optional inputs:
 <code>space_id</code>, which defaults to <code>nadeem4nk/nl2sql-demo</code>, and <code>token_secret</code>, the
 name of the secret holding the token, which defaults to <code>HF_TOKEN</code>. Pointing
@@ -4429,13 +4478,16 @@ survives a deploy.</p>
 <ul>
 <li><strong>Re-run an older commit's workflow.</strong> Actions → <strong>Publish Space</strong> → the run
   for the commit you want back → <em>Re-run all jobs</em>. It checks that commit out
-  again and pushes its <code>deploy/huggingface/</code> to the Space. Note that the image
-  installs the engine from the <strong>tip of <code>main</code></strong> unless the <code>Dockerfile</code> pins a
-  release, so this rolls back the Space's configuration, not necessarily the
-  engine inside it; pin <code>NL2SQL_SPEC</code> to a released version if you need the
-  whole thing to go back.</li>
+  again, stamps the Space with <strong>that</strong> sha, and the image is rebuilt from it --
+  so this rolls the engine and the playground back, not just the Space's
+  configuration. (Before the sha was stamped in, the image installed the tip of
+  <code>main</code> and a re-run restored only the configuration; that is fixed.)</li>
 <li><strong>Push an earlier subtree yourself</strong>, with the manual steps below:
-  <code>git push space $(git subtree split --prefix deploy/huggingface &lt;old-sha&gt;):main</code>.</li>
+  <code>git push space $(git subtree split --prefix deploy/huggingface &lt;old-sha&gt;):main</code>.
+  Doing it this way ships the checked-in <code>Dockerfile</code>, whose ref is <code>main</code>, so
+  the Space rebuilds from the tip of <code>main</code> rather than from <code>&lt;old-sha&gt;</code>. Edit
+  <code>SOURCE_SHA</code> and the <code>ARG NL2SQL_REF=</code> line yourself if you want the engine
+  pinned too -- or just use the re-run above, which does it for you.</li>
 </ul>
 <p>The workflow adds a commit on top of whatever the Space's <code>main</code> already is, so
 the Space's history is never rewritten and never lost -- including commits made
