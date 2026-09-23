@@ -7,7 +7,6 @@ from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.common.exceptions import PipelineExecutionError
 from nl2sql.context import NL2SQLContext
 from nl2sql.pipeline.graph_utils import (
-    StateAccessor,
     build_scan_payload,
     completed_scan_ids,
     next_scan_layer_ids,
@@ -20,8 +19,7 @@ logger = get_logger("router")
 
 
 def resolver_route(state: GraphState) -> str:
-    accessor = StateAccessor(state)
-    resolver_response = accessor.get("datasource_resolver_response")
+    resolver_response = state.datasource_resolver_response
     if not resolver_response:
         return "end"
     if not resolver_response.resolved_datasources or not resolver_response.allowed_datasource_ids:

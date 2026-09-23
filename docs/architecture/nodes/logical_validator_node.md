@@ -12,7 +12,6 @@
 
 ## Responsibilities
 
-- Validate query type (READ‑only).
 - Validate ordinals, aliases, joins, and column references.
 - Reject any plan the generator could not build (see *Buildability* below).
 - Enforce RBAC table access using strict datasource namespacing.
@@ -100,7 +99,6 @@ From `SubgraphExecutionState`:
 
 Validation performed:
 
-- Query type must be `READ`.
 - Ordinals must be contiguous.
 - Aliases must be unique.
 - Joins must match known relationships.

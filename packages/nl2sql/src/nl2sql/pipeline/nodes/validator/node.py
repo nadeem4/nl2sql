@@ -708,7 +708,6 @@ class LogicalValidatorNode:
         """Performs static structure validation on the plan.
 
         Checks:
-        - Query type allowed (READ only).
         - Ordinal integrity.
         - Alias uniqueness.
         - Join alias validity.
@@ -731,16 +730,6 @@ class LogicalValidatorNode:
                     message="Plan has no tables.",
                     severity=ErrorSeverity.ERROR,
                     error_code=ErrorCode.INVALID_PLAN_STRUCTURE,
-                )
-            ]
-
-        if plan.query_type != "READ":
-            return [
-                PipelineError(
-                    node="logical_validator",
-                    message=f"Query type '{plan.query_type}' not allowed.",
-                    severity=ErrorSeverity.CRITICAL,
-                    error_code=ErrorCode.SECURITY_VIOLATION,
                 )
             ]
 

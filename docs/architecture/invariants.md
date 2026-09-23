@@ -77,10 +77,10 @@ Plan fields are schema-validated with no unknown fields, and query type must be 
 
 ### Enforcement Points
 - `ConfigDict(extra="forbid")` on plan models in `nl2sql.pipeline.nodes.ast_planner.schemas`
-- `PlanModel.query_type` literal and `LogicalValidatorNode._validate_static()` in `nl2sql.pipeline.nodes.validator.node`
+- `PlanModel.query_type: Literal["READ"]` in `nl2sql.pipeline.nodes.ast_planner.schemas`, which pydantic enforces before any node sees the plan (the plan cache re-validates on read, so a cached plan is covered too)
 
 ### Failure Behavior
-Pydantic validation errors for extra/invalid fields; `PipelineError` with `SECURITY_VIOLATION` for non-READ queries.
+Pydantic validation errors for extra/invalid fields and for any `query_type` other than `READ`; the plan never reaches the validator. `LogicalValidatorNode` no longer re-checks it — the branch was unreachable.
 
 ### Why It Exists
 Prevents mutation or unknown plan constructs from entering execution.

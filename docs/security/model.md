@@ -88,8 +88,9 @@ trace to the user who produced it is left to a multi-user deployment.
 ## What keeps the SQL read-only
 
 The model never writes SQL. It emits a typed plan whose `query_type` is
-`Literal["READ"]`, and the generator renders that plan with `sqlglot` starting
-from `exp.select()`. A statement that is not a SELECT therefore cannot be
+`Literal["READ"]` — pydantic rejects anything else before a node sees the plan,
+which is the whole enforcement — and the generator renders that plan with
+`sqlglot` starting from `exp.select()`. A statement that is not a SELECT therefore cannot be
 produced, and free text from the model is never executed.
 
 What is **not** in place: database connections are **not** opened read-only on
