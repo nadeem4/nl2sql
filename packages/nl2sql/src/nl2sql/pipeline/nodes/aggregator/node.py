@@ -6,7 +6,6 @@ if TYPE_CHECKING:
 
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.pipeline.nodes.aggregator.schemas import AggregatorResponse
-from nl2sql.pipeline.nodes.global_planner.schemas import GlobalPlannerResponse
 from nl2sql.common.logger import get_logger
 from nl2sql.context import NL2SQLContext
 from nl2sql.aggregation import AggregationService
@@ -25,12 +24,8 @@ class EngineAggregatorNode:
 
     def __call__(self, state: GraphState) -> Dict[str, Any]:
         try:
-            planner_response = state.global_planner_response
-            artifact_refs = state.artifact_refs
-           
-            dag = planner_response.execution_dag
-            
-            terminal_results = self.service.execute(dag, artifact_refs)
+            dag = state.execution_dag
+            terminal_results = self.service.execute(dag, state.artifact_refs)
             aggregator_response = AggregatorResponse(
                 terminal_results=terminal_results,
                 computed_artifacts={},

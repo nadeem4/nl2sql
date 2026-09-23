@@ -1,27 +1,22 @@
 from nl2sql.pipeline.graph_utils import next_scan_layer_ids
-from nl2sql.pipeline.nodes.global_planner.schemas import (
+from nl2sql.execution.dag import (
     ExecutionDAG,
     LogicalNode,
     LogicalEdge,
-    RelationSchema,
-    ColumnSpec,
 )
 
 
-def _schema(columns):
-    return RelationSchema(columns=[ColumnSpec(name=c) for c in columns])
 
 
 def test_next_scan_layer_ids_respects_existing_results():
     # Validates DAG routing because scan layers must honor completed nodes.
     # Arrange
-    scan_left = LogicalNode(node_id="sq_left", kind="scan", inputs=[], output_schema=_schema(["id"]))
-    scan_right = LogicalNode(node_id="sq_right", kind="scan", inputs=[], output_schema=_schema(["id"]))
+    scan_left = LogicalNode(node_id="sq_left", kind="scan", inputs=[])
+    scan_right = LogicalNode(node_id="sq_right", kind="scan", inputs=[])
     combine = LogicalNode(
         node_id="combine_cg_1",
         kind="combine",
         inputs=["sq_left", "sq_right"],
-        output_schema=_schema(["id"]),
     )
     dag = ExecutionDAG(
         nodes=[scan_left, scan_right, combine],
@@ -47,7 +42,6 @@ def test_completed_scan_without_artifact_is_not_pending():
                 kind="scan",
                 attributes={},
                 inputs=[],
-                output_schema=_schema(["id"]),
             )
         ],
         edges=[],

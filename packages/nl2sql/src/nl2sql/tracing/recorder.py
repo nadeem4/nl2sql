@@ -42,10 +42,9 @@ from nl2sql.tracing.document import jsonable
 NODE_INPUTS: Dict[str, Tuple[str, ...]] = {
     "datasource_resolver": ("user_query", "datasource_id", "user_context"),
     "decomposer": ("user_query", "datasource_resolver_response"),
-    "global_planner": ("decomposer_response",),
     "layer_router": ("artifact_refs",),
     "sql_agent": ("subgraph_id",),
-    "aggregator": ("global_planner_response", "artifact_refs"),
+    "aggregator": ("execution_dag", "artifact_refs"),
     "answer_synthesizer": ("user_query", "aggregator_response"),
     "schema_retriever": ("sub_query",),
     "ast_planner": ("sub_query", "relevant_tables", "errors", "retry_count"),

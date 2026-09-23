@@ -26,7 +26,7 @@ def graph_nodes(monkeypatch):
     from nl2sql.pipeline.subgraphs import sql_agent
 
     for name in ("DatasourceResolverNode", "DecomposerNode", "EngineAggregatorNode",
-                 "AnswerSynthesizerNode", "GlobalPlannerNode"):
+                 "AnswerSynthesizerNode"):
         monkeypatch.setattr(control, name, _blank)
     for name in ("SchemaRetrieverNode", "ASTPlannerNode", "LogicalValidatorNode",
                  "GeneratorNode", "ExecutorNode", "RefinerNode"):

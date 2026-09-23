@@ -3,11 +3,9 @@ import pytest
 from nl2sql.common.errors import ErrorCode, ErrorSeverity, PipelineError
 from nl2sql.common.exceptions import NL2SQLError, PipelineExecutionError
 from nl2sql.pipeline.graph_utils import resolve_subgraph
-from nl2sql.pipeline.nodes.global_planner.schemas import (
-    ColumnSpec,
+from nl2sql.execution.dag import (
     ExecutionDAG,
     LogicalNode,
-    RelationSchema,
 )
 from nl2sql.pipeline.routes import build_scan_layer_router
 from nl2sql.pipeline.subgraphs.sql_agent import build_sql_agent_graph
@@ -65,7 +63,6 @@ def _scan_state(datasource_id):
         node_id="sq_1",
         kind="scan",
         inputs=[],
-        output_schema=RelationSchema(columns=[ColumnSpec(name="id")]),
     )
     dag = ExecutionDAG(nodes=[node], edges=[])
     return SimpleNamespace(
@@ -74,7 +71,7 @@ def _scan_state(datasource_id):
         datasource_resolver_response=None,
         artifact_refs={},
         subgraph_outputs={},
-        global_planner_response=SimpleNamespace(execution_dag=dag),
+        execution_dag=dag,
         decomposer_response=SimpleNamespace(
             sub_queries=[SimpleNamespace(id="sq_1", datasource_id=datasource_id)]
         ),

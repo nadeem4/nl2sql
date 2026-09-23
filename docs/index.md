@@ -30,8 +30,7 @@ Model output itself is not reproducible; see [Determinism](architecture/determin
 flowchart TD
     User[User Query] --> Resolver[DatasourceResolverNode]
     Resolver --> Decomposer[DecomposerNode]
-    Decomposer --> Planner[GlobalPlannerNode]
-    Planner --> Router[Scan Layer Router]
+    Decomposer --> Router[Scan Layer Router]
     Router --> Subgraph[SQL Agent Subgraph]
     Subgraph --> Router
     Router --> Aggregator[EngineAggregatorNode]

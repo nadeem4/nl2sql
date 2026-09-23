@@ -13,13 +13,10 @@ from nl2sql.common.settings import settings
 from nl2sql.context import NL2SQLContext
 from nl2sql.pipeline.nodes.aggregator.node import EngineAggregatorNode
 from nl2sql.pipeline.nodes.answer_synthesizer.node import AnswerSynthesizerNode
-from nl2sql.pipeline.nodes.global_planner.schemas import (
+from nl2sql.execution.dag import (
     ExecutionDAG,
     LogicalNode,
     LogicalEdge,
-    RelationSchema,
-    ColumnSpec,
-    GlobalPlannerResponse,
 )
 from nl2sql.pipeline.nodes.aggregator.schemas import AggregatorResponse
 from nl2sql.pipeline.state import GraphState
@@ -109,17 +106,14 @@ def demo_env() -> SimpleNamespace:
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
 
-def _schema(columns):
-    return RelationSchema(columns=[ColumnSpec(name=c) for c in columns])
 
 
 def _build_aggregator_response() -> AggregatorResponse:
-    scan = LogicalNode(node_id="sq_1", kind="scan", inputs=[], output_schema=_schema(["value"]))
+    scan = LogicalNode(node_id="sq_1", kind="scan", inputs=[])
     post_filter = LogicalNode(
         node_id="op_filter",
         kind="post_filter",
         inputs=["sq_1"],
-        output_schema=_schema(["value"]),
         attributes={"operation": "filter", "filters": [{"attribute": "value", "operator": ">", "value": 10}]},
     )
     dag = ExecutionDAG(
@@ -146,7 +140,7 @@ def _build_aggregator_response() -> AggregatorResponse:
     )
     state = GraphState(
         user_query="q",
-        global_planner_response=GlobalPlannerResponse(execution_dag=dag),
+        execution_dag=dag,
         artifact_refs={"sq_1": artifact},
     )
     return EngineAggregatorNode(SimpleNamespace())(state)["aggregator_response"]

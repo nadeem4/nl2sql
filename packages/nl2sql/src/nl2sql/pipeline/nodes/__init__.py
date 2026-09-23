@@ -1,25 +1,10 @@
-from .decomposer.node import DecomposerNode
-from .datasource_resolver.node import DatasourceResolverNode
-from .global_planner.node import GlobalPlannerNode
-from .aggregator.node import EngineAggregatorNode
-from .ast_planner.node import ASTPlannerNode
-from .schema_retriever.node import SchemaRetrieverNode
-from .generator.node import GeneratorNode
-from .executor.node import ExecutorNode
-from .refiner.node import RefinerNode
-from .validator.node import LogicalValidatorNode
-from .answer_synthesizer.node import AnswerSynthesizerNode
+"""The pipeline's nodes. Import the one you need from its own module.
 
-__all__ = [
-    "ASTPlannerNode", 
-    "SchemaRetrieverNode",
-    "GeneratorNode", 
-    "ExecutorNode", 
-    "RefinerNode", 
-    "DecomposerNode", 
-    "DatasourceResolverNode",
-    "GlobalPlannerNode",
-    "LogicalValidatorNode",
-    "EngineAggregatorNode",
-    "AnswerSynthesizerNode",
-]
+This package deliberately re-exports nothing. It used to import every node
+class, which meant that importing any leaf module under it -- say
+``nodes.ast_planner.schemas`` for ``PlanModel`` -- first ran every node module
+in the package. ``plan_cache`` needs exactly that one schema, and
+``ast_planner.node`` needs ``plan_cache``, so the two formed a cycle that only
+stayed hidden while some earlier import happened to load them in the lucky
+order. Nothing in the tree imported the re-exports.
+"""

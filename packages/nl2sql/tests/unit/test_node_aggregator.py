@@ -2,14 +2,11 @@ from types import SimpleNamespace
 import tempfile
 
 from nl2sql.pipeline.nodes.aggregator.node import EngineAggregatorNode
-from nl2sql.pipeline.nodes.global_planner.schemas import (
+from nl2sql.execution.dag import (
     ExecutionDAG,
     LogicalNode,
     LogicalEdge,
-    RelationSchema,
-    ColumnSpec,
 )
-from nl2sql.pipeline.nodes.global_planner.schemas import GlobalPlannerResponse
 from nl2sql.pipeline.state import GraphState
 from nl2sql_adapter_sdk.contracts import ResultFrame
 from nl2sql.common.errors import ErrorCode
@@ -17,8 +14,6 @@ from nl2sql.execution.artifacts import ArtifactStore, ArtifactStoreConfig
 from nl2sql.common.settings import settings
 
 
-def _schema(columns):
-    return RelationSchema(columns=[ColumnSpec(name=c) for c in columns])
 
 
 def test_aggregator_filters_rows_deterministically(monkeypatch):
@@ -27,12 +22,11 @@ def test_aggregator_filters_rows_deterministically(monkeypatch):
     ctx = SimpleNamespace()
     node = EngineAggregatorNode(ctx)
 
-    scan = LogicalNode(node_id="sq_1", kind="scan", inputs=[], output_schema=_schema(["id", "value"]))
+    scan = LogicalNode(node_id="sq_1", kind="scan", inputs=[])
     post_filter = LogicalNode(
         node_id="op_filter",
         kind="post_filter",
         inputs=["sq_1"],
-        output_schema=_schema(["id", "value"]),
         attributes={"operation": "filter", "filters": [{"attribute": "value", "operator": ">", "value": 10}]},
     )
     dag = ExecutionDAG(
@@ -67,7 +61,7 @@ def test_aggregator_filters_rows_deterministically(monkeypatch):
         )
         state = GraphState(
             user_query="q",
-            global_planner_response=GlobalPlannerResponse(execution_dag=dag),
+            execution_dag=dag,
             artifact_refs={"sq_1": artifact},
         )
 
@@ -85,13 +79,12 @@ def test_aggregator_join_requires_keys(monkeypatch):
     ctx = SimpleNamespace()
     node = EngineAggregatorNode(ctx)
 
-    scan_left = LogicalNode(node_id="sq_left", kind="scan", inputs=[], output_schema=_schema(["id"]))
-    scan_right = LogicalNode(node_id="sq_right", kind="scan", inputs=[], output_schema=_schema(["id"]))
+    scan_left = LogicalNode(node_id="sq_left", kind="scan", inputs=[])
+    scan_right = LogicalNode(node_id="sq_right", kind="scan", inputs=[])
     combine = LogicalNode(
         node_id="combine_cg_1",
         kind="combine",
         inputs=["sq_left", "sq_right"],
-        output_schema=_schema(["id"]),
         attributes={"operation": "join", "join_keys": []},
     )
     dag = ExecutionDAG(
@@ -139,7 +132,7 @@ def test_aggregator_join_requires_keys(monkeypatch):
         )
         state = GraphState(
             user_query="q",
-            global_planner_response=GlobalPlannerResponse(execution_dag=dag),
+            execution_dag=dag,
             artifact_refs={"sq_left": left_artifact, "sq_right": right_artifact},
         )
 
@@ -155,7 +148,7 @@ def test_aggregator_requires_execution_dag():
     # Arrange
     ctx = SimpleNamespace()
     node = EngineAggregatorNode(ctx)
-    state = GraphState(user_query="q", global_planner_response=None)
+    state = GraphState(user_query="q", execution_dag=None)
 
     # Act
     result = node(state)
@@ -169,12 +162,11 @@ def test_aggregator_post_aggregate_sum(monkeypatch):
     ctx = SimpleNamespace()
     node = EngineAggregatorNode(ctx)
 
-    scan = LogicalNode(node_id="sq_1", kind="scan", inputs=[], output_schema=_schema(["value"]))
+    scan = LogicalNode(node_id="sq_1", kind="scan", inputs=[])
     post_agg = LogicalNode(
         node_id="op_agg",
         kind="post_aggregate",
         inputs=["sq_1"],
-        output_schema=_schema(["total_value"]),
         attributes={
             "operation": "aggregate",
             "metrics": [{"name": "value", "aggregation": "sum"}],
@@ -213,7 +205,7 @@ def test_aggregator_post_aggregate_sum(monkeypatch):
         )
         state = GraphState(
             user_query="q",
-            global_planner_response=GlobalPlannerResponse(execution_dag=dag),
+            execution_dag=dag,
             artifact_refs={"sq_1": artifact},
         )
 
@@ -228,12 +220,11 @@ def test_aggregator_post_sort_limit(monkeypatch):
     ctx = SimpleNamespace()
     node = EngineAggregatorNode(ctx)
 
-    scan = LogicalNode(node_id="sq_1", kind="scan", inputs=[], output_schema=_schema(["value"]))
+    scan = LogicalNode(node_id="sq_1", kind="scan", inputs=[])
     post_sort = LogicalNode(
         node_id="op_sort",
         kind="post_sort",
         inputs=["sq_1"],
-        output_schema=_schema(["value"]),
         attributes={
             "operation": "sort",
             "order_by": [{"attribute": "value", "direction": "desc"}],
@@ -243,7 +234,6 @@ def test_aggregator_post_sort_limit(monkeypatch):
         node_id="op_limit",
         kind="post_limit",
         inputs=["op_sort"],
-        output_schema=_schema(["value"]),
         attributes={
             "operation": "limit",
             "limit": 1,
@@ -284,7 +274,7 @@ def test_aggregator_post_sort_limit(monkeypatch):
         )
         state = GraphState(
             user_query="q",
-            global_planner_response=GlobalPlannerResponse(execution_dag=dag),
+            execution_dag=dag,
             artifact_refs={"sq_1": artifact},
         )
 
@@ -299,13 +289,12 @@ def test_aggregator_union_combines_rows(monkeypatch):
     ctx = SimpleNamespace()
     node = EngineAggregatorNode(ctx)
 
-    scan_left = LogicalNode(node_id="sq_left", kind="scan", inputs=[], output_schema=_schema(["id"]))
-    scan_right = LogicalNode(node_id="sq_right", kind="scan", inputs=[], output_schema=_schema(["id"]))
+    scan_left = LogicalNode(node_id="sq_left", kind="scan", inputs=[])
+    scan_right = LogicalNode(node_id="sq_right", kind="scan", inputs=[])
     combine = LogicalNode(
         node_id="combine_union",
         kind="combine",
         inputs=["sq_left", "sq_right"],
-        output_schema=_schema(["id"]),
         attributes={"operation": "union", "join_keys": []},
     )
     dag = ExecutionDAG(
@@ -353,7 +342,7 @@ def test_aggregator_union_combines_rows(monkeypatch):
         )
         state = GraphState(
             user_query="q",
-            global_planner_response=GlobalPlannerResponse(execution_dag=dag),
+            execution_dag=dag,
             artifact_refs={"sq_left": left_artifact, "sq_right": right_artifact},
         )
 
@@ -368,9 +357,9 @@ def test_aggregator_missing_artifact_reference():
     ctx = SimpleNamespace()
     node = EngineAggregatorNode(ctx)
 
-    scan = LogicalNode(node_id="sq_1", kind="scan", inputs=[], output_schema=_schema(["id"]))
+    scan = LogicalNode(node_id="sq_1", kind="scan", inputs=[])
     dag = ExecutionDAG(nodes=[scan], edges=[])
-    state = GraphState(user_query="q", global_planner_response=GlobalPlannerResponse(execution_dag=dag))
+    state = GraphState(user_query="q", execution_dag=dag)
 
     result = node(state)
 
@@ -387,13 +376,12 @@ def test_the_jazz_but_never_rock_dag_is_refused_with_the_reason(monkeypatch):
     # Arrange
     node = EngineAggregatorNode(SimpleNamespace())
 
-    jazz = LogicalNode(node_id="sq_jazz", kind="scan", inputs=[], output_schema=_schema(["customer"]))
-    rock = LogicalNode(node_id="sq_rock", kind="scan", inputs=[], output_schema=_schema(["customer"]))
+    jazz = LogicalNode(node_id="sq_jazz", kind="scan", inputs=[])
+    rock = LogicalNode(node_id="sq_rock", kind="scan", inputs=[])
     combine = LogicalNode(
         node_id="combine_cg_1",
         kind="combine",
         inputs=["sq_jazz", "sq_rock"],
-        output_schema=_schema(["customer"]),
         attributes={"operation": "join",
                     "join_keys": [{"left": "customer", "right": "right.customer"}]},
     )
@@ -401,7 +389,6 @@ def test_the_jazz_but_never_rock_dag_is_refused_with_the_reason(monkeypatch):
         node_id="op_not_rock",
         kind="post_filter",
         inputs=["combine_cg_1"],
-        output_schema=_schema(["customer"]),
         attributes={"operation": "filter",
                     "filters": [{"attribute": "right.customer", "operator": "=", "value": None}]},
     )
@@ -438,7 +425,7 @@ def test_the_jazz_but_never_rock_dag_is_refused_with_the_reason(monkeypatch):
             )
         state = GraphState(
             user_query="Which customers bought jazz tracks but never rock?",
-            global_planner_response=GlobalPlannerResponse(execution_dag=dag),
+            execution_dag=dag,
             artifact_refs=refs,
         )
 

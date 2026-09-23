@@ -30,7 +30,7 @@ ANSI = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
 
 # Every node a counted, executed question passes through.
 NODES = {
-    "datasource_resolver", "decomposer", "global_planner", "layer_router", "sql_agent",
+    "datasource_resolver", "decomposer", "layer_router", "sql_agent",
     "schema_retriever", "ast_planner", "logical_validator", "generator", "executor",
     "aggregator", "answer_synthesizer",
 }

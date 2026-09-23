@@ -1,6 +1,11 @@
+"""The execution DAG the decomposer builds from its own decomposition.
+
+It was a graph node of its own until the DAG turned out to be a pure function
+of ``DecomposerResponse``; these are that node's tests, against the function.
+"""
 import pytest
 
-from nl2sql.pipeline.nodes.global_planner.node import GlobalPlannerNode
+from nl2sql.pipeline.nodes.decomposer.dag import build_execution_dag
 from nl2sql.pipeline.nodes.decomposer.schemas import (
     DecomposerResponse,
     SubQuery,
@@ -9,10 +14,9 @@ from nl2sql.pipeline.nodes.decomposer.schemas import (
     PostCombineOp,
     ExpectedColumn,
 )
-from nl2sql.pipeline.state import GraphState
 
 
-def test_global_planner_builds_execution_dag():
+def test_the_dag_builds_execution_dag():
     # Validates DAG construction because aggregation depends on correct edges.
     # Arrange
     sub_queries = [
@@ -63,12 +67,7 @@ def test_global_planner_builds_execution_dag():
         unmapped_subqueries=[],
     )
 
-    node = GlobalPlannerNode(ctx=None)
-    state = GraphState(user_query="q", decomposer_response=response)
-
-    # Act
-    result = node(state)
-    dag = result["global_planner_response"].execution_dag
+    dag = build_execution_dag(response)
 
     # Assert
     node_ids = {n.node_id for n in dag.nodes}
@@ -76,10 +75,9 @@ def test_global_planner_builds_execution_dag():
     assert "sq2" in node_ids
     assert "combine_g1" in node_ids
     assert any(n.kind.startswith("post_") for n in dag.nodes)
-    assert dag.dag_id
 
 
-def test_global_planner_dag_layers_and_edges():
+def test_the_dag_dag_layers_and_edges():
     # Validates layer rules and acyclic DAG for deterministic planning.
     sub_queries = [
         SubQuery(
@@ -142,11 +140,7 @@ def test_global_planner_dag_layers_and_edges():
         unmapped_subqueries=[],
     )
 
-    node = GlobalPlannerNode(ctx=None)
-    state = GraphState(user_query="q", decomposer_response=response)
-
-    result = node(state)
-    dag = result["global_planner_response"].execution_dag
+    dag = build_execution_dag(response)
 
     node_index = {n.node_id: n for n in dag.nodes}
     assert set(node_index) == {"sq_base", "sq_left", "sq_right", "combine_g_join", "op_stub"}
@@ -164,11 +158,12 @@ def test_global_planner_dag_layers_and_edges():
         assert edge.from_id in node_index
         assert edge.to_id in node_index
 
-    scan_schema = node_index["sq_base"].output_schema
-    assert [c.name for c in scan_schema.columns] == ["base_id"]
+    # A scan node carries nothing of its own: its id is its sub-query's id,
+    # so everything about it is one lookup away in the decomposer response.
+    assert node_index["sq_base"].attributes == {}
 
 
-def test_global_planner_scan_only_dag():
+def test_the_dag_scan_only_dag():
     # Validates scan-only plans because some queries skip combine/post stages.
     sub_queries = [
         SubQuery(
@@ -197,10 +192,7 @@ def test_global_planner_scan_only_dag():
         unmapped_subqueries=[],
     )
 
-    node = GlobalPlannerNode(ctx=None)
-    state = GraphState(user_query="q", decomposer_response=response)
-    result = node(state)
-    dag = result["global_planner_response"].execution_dag
+    dag = build_execution_dag(response)
 
     assert len(dag.edges) == 0
     assert dag.layers
@@ -209,7 +201,7 @@ def test_global_planner_scan_only_dag():
         assert node_obj.kind == "scan"
 
 
-def test_global_planner_multiple_combine_groups():
+def test_the_dag_multiple_combine_groups():
     # Validates multi-group plans because complex queries may have multiple combines.
     sub_queries = [
         SubQuery(
@@ -265,17 +257,14 @@ def test_global_planner_multiple_combine_groups():
         unmapped_subqueries=[],
     )
 
-    node = GlobalPlannerNode(ctx=None)
-    state = GraphState(user_query="q", decomposer_response=response)
-    result = node(state)
-    dag = result["global_planner_response"].execution_dag
+    dag = build_execution_dag(response)
 
     node_ids = {n.node_id for n in dag.nodes}
     assert "combine_g1" in node_ids
     assert "combine_g2" in node_ids
 
 
-def test_global_planner_unknown_post_combine_group_returns_error():
+def test_the_dag_unknown_post_combine_group_returns_error():
     # Validates error handling when post-ops reference unknown groups.
     with pytest.raises(ValueError, match="PostCombineOp references unknown combine group"):
         DecomposerResponse(
@@ -309,7 +298,7 @@ def test_global_planner_unknown_post_combine_group_returns_error():
         )
 
 
-def test_global_planner_unknown_subquery_in_combine_returns_error():
+def test_the_dag_unknown_subquery_in_combine_returns_error():
     # Validates error handling for edges pointing to unknown nodes.
     with pytest.raises(ValueError, match="CombineGroup references unknown subquery"):
         DecomposerResponse(
@@ -336,32 +325,57 @@ def test_global_planner_unknown_subquery_in_combine_returns_error():
         )
 
 
-def test_a_planner_failure_reports_its_own_error_instead_of_crashing():
-    # Duplicate expected_schema names are a real way the decomposer's output
-    # breaks the DAG. The error handler used to build a response the schema
-    # rejects, so the run surfaced "Pipeline crashed" instead of this error.
+def test_a_dag_that_cannot_be_built_ends_the_run_with_its_error():
+    """A DAG failure is reported, never raised through the graph.
+
+    Two sub-queries the model wrote identically get the same content-addressed
+    id, so the graph they describe has one node where the combine group expects
+    two. That was the global planner's own error path; it is now the
+    decomposer's, which keeps the decomposition, emits no ``execution_dag`` --
+    the layer router ends a run without one -- and reports the cause.
+    """
+    from types import SimpleNamespace
+    from unittest.mock import MagicMock
+
     from nl2sql.api.query_api import result_from_state
     from nl2sql.common.errors import ErrorCode
+    from nl2sql.pipeline.nodes.datasource_resolver.schemas import (
+        DatasourceResolverResponse,
+        ResolvedDatasource,
+    )
+    from nl2sql.pipeline.nodes.decomposer.node import DecomposerNode
+    from nl2sql.pipeline.state import GraphState
 
-    response = DecomposerResponse(
+    twins = DecomposerResponse(
         sub_queries=[
-            SubQuery(
-                id="sq1",
-                intent="customers per country",
-                datasource_id="chinook",
-                expected_schema=[ExpectedColumn(name="country"), ExpectedColumn(name="country")],
-            )
+            SubQuery(id="a", intent="customers per country", datasource_id="chinook"),
+            SubQuery(id="b", intent="customers per country", datasource_id="chinook"),
         ],
-        combine_groups=[],
+        combine_groups=[CombineGroup(
+            group_id="g1", operation="union",
+            inputs=[CombineInput(subquery_id="a", role="left"),
+                    CombineInput(subquery_id="b", role="right")],
+        )],
     )
 
-    result = GlobalPlannerNode(ctx=None)(GraphState(user_query="q", decomposer_response=response))
+    node = DecomposerNode(SimpleNamespace(llm_registry=MagicMock()))
+    node.chain = MagicMock()
+    node.chain.invoke.return_value = twins
+
+    result = node(GraphState(
+        user_query="q",
+        datasource_resolver_response=DatasourceResolverResponse(
+            resolved_datasources=[ResolvedDatasource(datasource_id="chinook", schema_version="v1")],
+            allowed_datasource_ids=["chinook"],
+        ),
+    ))
 
     [error] = result["errors"]
     assert error.error_code == ErrorCode.PLANNER_FAILED
-    assert error.node == "globalplanner"
-    assert "Duplicate columns in schema" in error.message
-    assert result.get("global_planner_response") is None
+    assert error.node == "decomposer"
+    assert result.get("execution_dag") is None
+    # The decomposition itself survives, so the failure names what was decomposed.
+    assert result["decomposer_response"].sub_queries
 
     query_result = result_from_state({**result, "trace_id": "t"})
     assert query_result.status == "error"

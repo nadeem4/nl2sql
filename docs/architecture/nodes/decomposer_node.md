@@ -4,7 +4,7 @@
 
 - Decomposes the user query into datasource‑scoped sub‑queries and combination operations.
 - Produces deterministic IDs for sub‑queries and post‑combine ops.
-- Sits after `DatasourceResolverNode` and before `GlobalPlannerNode`.
+- Sits after `DatasourceResolverNode` and before the layer router.
 - Class: `DecomposerNode`
 - Source: `packages/nl2sql/src/nl2sql/pipeline/nodes/decomposer/node.py`
 
@@ -16,6 +16,7 @@
 - Filter sub‑queries by resolved/allowed/unsupported datasources.
 - Stabilize IDs using a hash of sub‑query content.
 - Normalize and sort combine groups and post‑combine operations.
+- Build the `ExecutionDAG` the layer router walks and the aggregator runs (`decomposer/dag.py`). The DAG is a pure function of the response above, so it is code here rather than a node of its own.
 
 ---
 
@@ -25,14 +26,14 @@ Upstream:
 - `DatasourceResolverNode`
 
 Downstream:
-- `GlobalPlannerNode`
+- `layer_router`
 
 Trigger conditions:
 - Executed only when `resolver_route` returns `continue`.
 
 ```mermaid
 flowchart LR
-    Resolver[DatasourceResolverNode] --> Decomposer[DecomposerNode] --> Planner[GlobalPlannerNode]
+    Resolver[DatasourceResolverNode] --> Decomposer[DecomposerNode] --> Router[layer_router]
 ```
 
 ---

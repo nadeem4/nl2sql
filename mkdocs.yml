@@ -75,7 +75,6 @@ nav:
       - Engine Aggregator: architecture/nodes/engine_aggregator_node.md
       - Executor: architecture/nodes/executor_node.md
       - Generator: architecture/nodes/generator_node.md
-      - Global Planner: architecture/nodes/global_planner_node.md
       - Logical Validator: architecture/nodes/logical_validator_node.md
       - Refiner: architecture/nodes/refiner_node.md
       - Schema Retriever: architecture/nodes/schema_retriever_node.md

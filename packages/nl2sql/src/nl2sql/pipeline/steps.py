@@ -60,11 +60,9 @@ PIPELINE_STEPS: List[PipelineStep] = [
           "Decides whether the connected databases can answer the question at all, and which one "
           "it is about, before anything else runs."),
     _step("decomposer", "Question splitter",
-          "Breaks the question into the sub-queries that have to be answered, and says how their "
-          "answers combine."),
-    _step("global_planner", "Execution plan",
-          "Arranges those sub-queries into a dependency graph: which can run together, which wait "
-          "on another's rows."),
+          "Breaks the question into the sub-queries that have to be answered, says how their "
+          "answers combine, and arranges them into a dependency graph: which can run together, "
+          "which wait on another's rows."),
     _step("layer_router", "Layer router",
           "Sends the next layer of sub-queries to the SQL agent, and stops when every one of them "
           "has an answer."),

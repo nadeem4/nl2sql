@@ -1,4 +1,4 @@
-"""The execution DAG: the logical plan the global planner builds and the aggregation service runs.
+"""The execution DAG: the logical plan the decomposer builds and the aggregation service runs.
 
 It lives here, below both, so ``nl2sql.aggregation`` never imports ``nl2sql.pipeline``.
 """
@@ -6,23 +6,6 @@ from __future__ import annotations
 from typing import List, Literal, Optional, Dict, Any
 from pydantic import BaseModel, Field, model_validator
 
-
-JsonLiteral = str | int | float | bool | None
-
-
-class ColumnSpec(BaseModel):
-    name: str
-    dtype: Optional[str] = None
-
-class RelationSchema(BaseModel):
-    columns: List[ColumnSpec]
-
-    @model_validator(mode="after")
-    def validate_unique_columns(self):
-        names = [c.name for c in self.columns]
-        if len(names) != len(set(names)):
-            raise ValueError(f"Duplicate columns in schema: {names}")
-        return self
 
 class LogicalNode(BaseModel):
     node_id: str
@@ -36,7 +19,6 @@ class LogicalNode(BaseModel):
         "post_limit",
     ]
     inputs: List[str] = Field(default_factory=list)
-    output_schema: RelationSchema
     attributes: Dict[str, Any] = Field(default_factory=dict)
 
 
@@ -48,8 +30,6 @@ class LogicalEdge(BaseModel):
 
 
 class ExecutionDAG(BaseModel):
-    dag_id: Optional[str] = None
-    content_hash: Optional[str] = None
     nodes: List[LogicalNode]
     edges: List[LogicalEdge]
     layers: List[List[str]] = Field(default_factory=list)
