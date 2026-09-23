@@ -101,5 +101,7 @@ include = ["nl2sql*"]
 "nl2sql.evaluation" = ["datasets/*.yaml"]
 "nl2sql.evaluation.presets" = ["*.yaml"]
 # The committed Vite build of web/playground: the wheel must carry the finished
-# page so `pip install "nl2sql-engine[demo]"` needs no Node toolchain.
-"nl2sql.cli.demo.playground" = ["static/*"]
+# page so `pip install "nl2sql-engine[demo]"` needs no Node toolchain. The card
+# the link preview names sits beside it rather than in `static/`, which the
+# Vite build empties on every run.
+"nl2sql.cli.demo.playground" = ["static/*", "assets/*"]

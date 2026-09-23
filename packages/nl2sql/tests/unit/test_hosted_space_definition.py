@@ -32,6 +32,30 @@ def test_the_space_front_matter_declares_a_public_docker_space():
     assert front["license"] == "mit"
 
 
+def test_the_space_card_has_a_sentence_and_a_thumbnail():
+    """What the Space's own link preview is made of.
+
+    A Space card shows the `short_description` and the `thumbnail`, and has
+    nothing else to show: the README's body is the page, not the card. The
+    thumbnail is read from raw GitHub rather than from the Space, so the card
+    works before the Space has built and while it is sleeping.
+    """
+    front = _front_matter()
+
+    assert front["short_description"]
+    assert len(front["short_description"]) <= 60, "Hugging Face truncates a longer one"
+    assert front["thumbnail"] == (
+        "https://raw.githubusercontent.com/nadeem4/nl2sql/main/docs/assets/social-card.png"
+    )
+
+
+def test_the_thumbnail_names_a_card_this_repository_holds():
+    card = SPACE.parents[1] / "docs" / "assets" / "social-card.png"
+
+    assert card.is_file(), "deploy/huggingface/README.md points its thumbnail at a missing file"
+    assert card.read_bytes().startswith(b"\x89PNG\r\n\x1a\n")
+
+
 def test_the_declared_port_is_the_one_the_container_listens_on():
     dockerfile = (SPACE / "Dockerfile").read_text(encoding="utf-8")
     compose = yaml.safe_load((SPACE / "docker-compose.yml").read_text(encoding="utf-8"))

@@ -1,4 +1,7 @@
 """The playground FastAPI app: meta, ask, schema and the served page."""
+import pathlib
+import re
+
 import pytest
 
 fastapi = pytest.importorskip("fastapi")
@@ -314,3 +317,99 @@ def test_trace_route_never_resolves_a_file_outside_the_directory(tmp_path):
     client = _trace_client(tmp_path)
     # "outside" is a valid-looking id, but its file sits one level up.
     assert client.get("/api/trace/outside").status_code == 404
+
+
+# ---------- the link preview ----------
+#
+# A crawler runs no JavaScript and resolves no relative path, and both of those
+# are the point here: the tags are in the HTML the server sends, and the URLs
+# in them are absolute and name the host the visitor typed.
+
+REPO = pathlib.Path(__file__).resolve().parents[4]
+CARD_COPIES = (
+    REPO / "docs" / "assets" / "social-card.png",
+    REPO / "packages" / "nl2sql" / "src" / "nl2sql" / "cli" / "demo" / "playground" / "assets" / "social-card.png",
+)
+
+
+def _served_page(**headers) -> str:
+    client = TestClient(build_app(_Engine(), questions=[], roles=["admin"], mode="live", dataset="chinook"))
+    response = client.get("/", headers=headers)
+    assert response.status_code == 200
+    return response.text
+
+
+def _tag(html: str, key: str) -> str:
+    match = re.search(rf'<meta (?:name|property)="{re.escape(key)}" content="([^"]*)"', html)
+    assert match, f"the served page has no {key} tag"
+    return match.group(1)
+
+
+def test_the_served_page_carries_the_preview_tags_a_crawler_reads():
+    html = _served_page()
+
+    # In the head of the document, not added to it by the bundle afterwards.
+    assert html.index("og:title") < html.index('<div id="root">')
+    assert _tag(html, "og:type") == "website"
+    assert _tag(html, "og:title") == "nl2sql playground"
+    assert "plain English" in _tag(html, "og:description")
+    assert _tag(html, "twitter:card") == "summary_large_image"
+    assert _tag(html, "twitter:title") == _tag(html, "og:title")
+    assert _tag(html, "twitter:description") == _tag(html, "og:description")
+    assert _tag(html, "twitter:image") == _tag(html, "og:image")
+    # One description, and it says what the card says.
+    assert _tag(html, "description") == _tag(html, "og:description")
+    assert html.count('name="description"') == 1
+
+
+def test_the_preview_urls_are_absolute_and_name_the_host_the_visitor_typed():
+    html = _served_page(**{"x-forwarded-proto": "https",
+                           "x-forwarded-host": "nadeem4nk-nl2sql-demo.hf.space"})
+
+    assert _tag(html, "og:url") == "https://nadeem4nk-nl2sql-demo.hf.space/"
+    assert _tag(html, "og:image") == "https://nadeem4nk-nl2sql-demo.hf.space/social-card.png"
+    assert _tag(html, "og:image:width") == "1200"
+    assert _tag(html, "og:image:height") == "630"
+
+
+def test_without_a_proxy_the_preview_urls_are_the_ones_the_app_was_reached_on():
+    html = _served_page()
+
+    # TestClient asks for http://testserver/, which is what a local run looks
+    # like: absolute, and right for whoever can reach this playground.
+    assert _tag(html, "og:url") == "http://testserver/"
+    assert _tag(html, "og:image") == "http://testserver/social-card.png"
+
+
+@pytest.mark.parametrize("host", ['evil"><script>alert(1)</script>', "not a host", "", " "])
+def test_a_forged_host_header_cannot_write_a_url_into_the_page(host):
+    html = _served_page(**{"x-forwarded-host": host})
+
+    assert "<script>alert(1)</script>" not in html
+    assert _tag(html, "og:image").startswith("http://")
+    assert _tag(html, "og:image").endswith("/social-card.png")
+
+
+def test_the_app_serves_the_card_as_a_png():
+    client = TestClient(build_app(_Engine(), questions=[], roles=["admin"], mode="live", dataset="chinook"))
+    response = client.get("/social-card.png")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "image/png"
+    assert response.content.startswith(b"\x89PNG\r\n\x1a\n")
+
+
+def test_the_card_the_app_serves_is_the_one_the_space_reads_from_github():
+    """Two copies, one file.
+
+    The Space's `thumbnail:` reads the copy in `docs/` over raw GitHub, so the
+    Space's own card works before the Space has built; the playground serves
+    the copy in the package, so a pip install has it too.
+    `scripts/render_social_card.py` writes both, and a card regenerated into
+    only one of them is the drift this catches.
+    """
+    docs, packaged = (path.read_bytes() for path in CARD_COPIES)
+
+    assert docs == packaged
+    # Small enough that an unfurler fetches it rather than giving up.
+    assert len(docs) < 200 * 1024

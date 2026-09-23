@@ -8,6 +8,7 @@ app_port: 7860
 pinned: false
 license: mit
 short_description: Ask a sample database in English, with your own API key
+thumbnail: https://raw.githubusercontent.com/nadeem4/nl2sql/main/docs/assets/social-card.png
 ---
 
 # nl2sql playground
@@ -44,6 +45,12 @@ Source and documentation: <https://github.com/nadeem4/nl2sql>.
 Everything the Space needs is in this one folder: the `Dockerfile` builds the
 image with no build context from the repository, and the front-matter above is
 the Space configuration. Nothing here holds a secret.
+
+The front-matter's `short_description` and `thumbnail` are what this Space's
+own link preview is made of; the thumbnail is read from raw GitHub, so the card
+works before the Space has built. The image is generated -- regenerate it with
+`python scripts/render_social_card.py`, described in
+[the hosted demo docs](https://github.com/nadeem4/nl2sql/blob/main/docs/deployment/hosted-demo.md).
 
 **Normally this is automatic.** `.github/workflows/publish_space.yml` in the
 repository creates the Space if it is missing, mirrors this folder onto its
