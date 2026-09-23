@@ -42,7 +42,7 @@ See `sdk.md` for the authoritative adapter interface reference and required fiel
 
 ## Capability-driven routing
 
-Adapters expose capabilities (e.g., `supports_sql`, `supports_schema_introspection`). The registry reads them once, at registration, and `DatasourceRegistry.supports(datasource_id, *capabilities)` is the one check every consumer asks. It fails closed: an unknown datasource, or an adapter whose `capabilities()` is missing or raises, supports nothing. These capabilities drive:
+Adapters expose capabilities (`supports_sql`, `supports_rest`). The registry reads them once, at registration, and `DatasourceRegistry.supports(datasource_id, *capabilities)` is the one check every consumer asks. It fails closed: an unknown datasource, or an adapter whose `capabilities()` is missing or raises, supports nothing. These capabilities drive:
 
 - **Subgraph selection** (`resolve_subgraph()` in routing).
 - **Executor selection** (`ExecutorNode._supports_sql()` and `SqlExecutorService.validate_request()`, gating the SQL executor).

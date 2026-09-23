@@ -40,7 +40,7 @@ Executes a plan-specific request and returns a normalized `ResultFrame`.
 
 #### `fetch_schema_snapshot()`
 
-Required only if `supports_schema_introspection` is advertised.
+Required by every adapter; there is no capability flag gating it.
 
 ### Optional Methods (SQL adapters)
 

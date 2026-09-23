@@ -31,17 +31,25 @@ pip install "nl2sql-engine[demo]"
 nl2sql demo
 ```
 
-That writes a demo project into `./nl2sql-demo` with the Chinook sample
-database, indexes its schema locally (no key; the first run downloads a ~79 MB
-ONNX embedding model) and opens the playground on <http://127.0.0.1:8765/>.
+That writes a demo project into `./nl2sql-demo`, copies in three SQLite
+databases -- [Chinook](https://github.com/nadeem4/nl2sql/blob/main/THIRD_PARTY_NOTICES.md),
+`support` and `webanalytics` -- indexes their schemas locally (no key; the
+first run downloads a ~79 MB ONNX embedding model) and opens the playground on
+<http://127.0.0.1:8765/>.
 
 **Answering a question needs a model:** `--api-key`, or `OPENAI_API_KEY`,
 `OPENROUTER_API_KEY` or `ANTHROPIC_API_KEY` in the environment (Claude needs
 `pip install "nl2sql-engine[demo,anthropic]"`), a key pasted into the
-playground's Settings panel, or a reachable Ollama. Without one the demo runs
+playground's Settings page, or a reachable Ollama. Without one the demo runs
 in replay mode, which has no recorded answers out of the box, so it can show the
 schema and the index but answers nothing. `nl2sql demo --record` (with an
 OpenAI or OpenRouter key) records the guided questions for later key-free runs.
+
+`nl2sql demo --hosted` runs a public-facing variant instead: the server holds
+no API key, each visitor pastes their own into the page for that question
+only, and Settings, Rebuild, ratings and `--record` are refused. See
+[Hosted demo](https://github.com/nadeem4/nl2sql/blob/main/docs/deployment/hosted-demo.md)
+in the full docs.
 
 The playground shows each answer's plan, validation checks, SQL, rows and cost,
 a per-node Debug view, a Retrieval inspector over the live index, and a

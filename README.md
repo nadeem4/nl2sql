@@ -214,7 +214,7 @@ folder (`cd nl2sql-demo`). Every command has `--help`.
 | `nl2sql feedback export --good` | Write thumbs-up runs as draft gold entries to a separate YAML for review | `--out` (default `feedback_gold_drafts.yaml`) |
 | `nl2sql feedback clear` | Delete every rating | `--yes` |
 | `nl2sql benchmark --tier 1` | Tier 1: the hand-written gold plans through the validator, generator and executor, with a local fake LLM (no key) | `--role`, `--include-ids`, `--export-path` |
-| `nl2sql benchmark --tier 2` | Tier 2: the real model end to end on the gold questions, per config, under a cost cap | `--max-cost USD` (required), `--model` (repeatable), `--llm PRESET\|PATH` (repeatable), `--passes`, `--questions`, `--note`, `--baseline`, `--results-dir` |
+| `nl2sql benchmark --tier 2` | Tier 2: the real model end to end on the gold questions, per config, under a cost cap | `--max-cost USD` (required), `--model` (repeatable), `--llm PRESET\|PATH` (repeatable), `--passes`, `--questions`, `--note`, `--baseline`, `--max-regressions`, `--max-accuracy-drop` (deprecated), `--max-cost-increase`, `--results-dir` |
 | `nl2sql benchmark` | Without `--tier`: the gold questions through the full pipeline with the configured LLM | `--iterations` (default 3), `--bench-config-path`, `--role`, `--include-ids` |
 | `nl2sql benchmark retrieval` | Table and column recall of schema retrieval on the gold questions; no key, no LLM | `--record`, `--note`, `--baseline`, `--questions`, `--results-dir` |
 | `nl2sql benchmark presets` | List the built-in tier 2 LLM configs (`gpt-5.4`, `gpt-5.4-mini-helpers`, `claude-planner`) | |
@@ -398,7 +398,11 @@ Details: [Security Model](docs/security/model.md),
 - **Tier 2** (real model, costs money): end to end per config, with accuracy,
   answerability precision and recall, cost, latency, determinism and answer
   faithfulness (whether the answer's numbers and names come from the rows).
-  Stops before spend could pass `--max-cost`; `--baseline` fails on a regression.
+  Stops before spend could pass `--max-cost`. `--baseline` pairs each run's
+  questions with the baseline's and fails when more than `--max-regressions`
+  (default 2) flip from pass to fail, or when a smaller drop is significant by
+  McNemar's test; the old flat-threshold `--max-accuracy-drop` gate still
+  works if passed explicitly, but is deprecated in favor of `--max-regressions`.
 - **Retrieval recall** (no key): the share of each question's needed tables and
   columns that schema retrieval sends the planner.
 - **Feedback:** playground ratings and guardrail rates via `nl2sql feedback stats`;
