@@ -14,8 +14,13 @@ export const NO_KEY_REASON = "Add your API key under Settings to ask a question.
 
 // True when the Ask page should show the first-run state and hold its controls.
 // Only ever true on the hosted demo, and only until a key is in this tab.
+//
+// A tab can hold a key per provider (`hostedKey.js`), so this takes either the
+// whole set or one key on its own; any one of them ends the first-run state,
+// because any one of them can answer a question.
 export function needsKey(meta, apiKey) {
-  return Boolean(meta && meta.hosted) && !(apiKey || "").trim();
+  const keys = apiKey && typeof apiKey === "object" ? Object.values(apiKey) : [apiKey];
+  return Boolean(meta && meta.hosted) && !keys.some((key) => (key || "").trim());
 }
 
 // What the top bar's mode line says on the hosted demo: whose key answers and
@@ -27,10 +32,13 @@ export function needsKey(meta, apiKey) {
 // away from the one place that can do something about it. Once a key is in
 // this tab the line has something of its own to say, so it comes back.
 export function hostedNote(meta, apiKey) {
-  if (!meta || !(apiKey || "").trim()) return "";
+  const held = (apiKey && typeof apiKey === "object" ? Object.values(apiKey) : [apiKey])
+    .filter((key) => (key || "").trim());
+  if (!meta || !held.length) return "";
   const limits = meta.limits || {};
   const capped = limits.questions_per_minute
     ? ` Up to ${limits.questions_per_minute} questions a minute and ${limits.questions_per_session} a session.`
     : "";
-  return `Questions run on the key in this browser tab; it is sent with each question and stored nowhere.${capped} Replace or clear it under`;
+  const kept = held.length === 1 ? "the key" : `the ${held.length} keys`;
+  return `Questions run on ${kept} in this browser tab; ${held.length === 1 ? "it is" : "each is"} sent with each question and stored nowhere.${capped} Replace or clear ${held.length === 1 ? "it" : "them"}, or change the model each step uses, under`;
 }

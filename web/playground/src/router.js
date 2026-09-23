@@ -40,7 +40,7 @@ export const PAGES = [
     // The hosted demo saves nothing, so the page is only about the visitor's
     // own key; the same route, a different promise.
     hostedDescription:
-      "Add your own API key for this browser tab. The hosted demo keeps no key of its own and stores nothing you paste here.",
+      "Add your own API keys, one per provider, and choose which model runs each step. Both stay in this browser tab: the hosted demo keeps no key of its own and saves nothing you set here.",
   },
   {
     id: "retrieval",

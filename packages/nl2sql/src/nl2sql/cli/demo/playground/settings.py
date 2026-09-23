@@ -170,6 +170,27 @@ class SettingsPanel:
     def available(self) -> bool:
         return self.reason is None
 
+    @property
+    def default_provider(self) -> str:
+        """The provider the default agent runs on.
+
+        Read from the live registry rather than the file, so it is right in
+        hosted mode too, where there is no writable project to read.
+        """
+        try:
+            default = (self.engine.list_llms() or {}).get("default") or {}
+        except Exception:  # an engine without a registry
+            return "openai"
+        return default.get("provider") or "openai"
+
+    @property
+    def default_model(self) -> Optional[str]:
+        try:
+            default = (self.engine.list_llms() or {}).get("default") or {}
+        except Exception:
+            return None
+        return default.get("model")
+
     # --- the guard -------------------------------------------------------------
 
     def guard(self, request: Request) -> None:
@@ -207,10 +228,29 @@ class SettingsPanel:
 
     def read(self) -> Dict[str, Any]:
         """What the panel shows. Never the key: at most its masked form."""
+        if self.hosted:
+            # Nothing to save, but plenty to offer: the visitor's keys and
+            # their model per step live in their browser, so the page needs the
+            # catalogue to offer them. Not one field here comes from a key or
+            # from the environment.
+            return {
+                "available": False,
+                "hosted": True,
+                "reason": self.reason,
+                "provider": self.default_provider,
+                "default_model": self.default_model,
+                "providers": [
+                    {"id": name, "label": PROVIDER_LABELS.get(name, name), "usable": True,
+                     "env_var": (PROVIDER_PRESETS[name].api_key_env if name in PROVIDER_PRESETS else None),
+                     "models": [{"id": model, "temperature": temp} for model, temp in models.items()]}
+                    for name, models in VERIFIED_MODELS.items()
+                ],
+                "nodes": [{**node, "provider": None, "model": None, "unavailable": None}
+                          for node in LLM_NODES],
+            }
         if not self.available:
-            # ``hosted`` distinguishes "off, and here is why" from "there is
-            # nothing to save here, keep your key in the browser".
-            return {"available": False, "hosted": self.hosted, "reason": self.reason}
+            # "Off, and here is why", as opposed to the hosted case above.
+            return {"available": False, "hosted": False, "reason": self.reason}
 
         cfg = self._load()
         default = cfg.get("default") or {}

@@ -22,6 +22,13 @@ test("local mode never shows it, key or no key", () => {
   assert.equal(needsKey({ mode: "replay" }, KEY), false);
 });
 
+test("a key for any provider clears it, since any one of them can answer", () => {
+  assert.equal(needsKey({ hosted: true }, {}), true);
+  assert.equal(needsKey({ hosted: true }, { openai: "" }), true);
+  assert.equal(needsKey({ hosted: true }, { anthropic: KEY }), false);
+  assert.equal(needsKey({ hosted: true }, { openai: KEY, anthropic: KEY }), false);
+});
+
 test("nothing is claimed before the server has answered", () => {
   assert.equal(needsKey(null, ""), false);
   assert.equal(needsKey(undefined, KEY), false);
@@ -43,7 +50,18 @@ test("with a key the mode line has something of its own to say, limits included"
   const line = hostedNote(meta, KEY);
   assert.match(line, /^Questions run on the key in this browser tab/);
   assert.match(line, /6 questions a minute and 30 a session/);
-  assert.match(line, /Replace or clear it under$/);
+  assert.match(line, /Replace or clear it, or change the model each step uses, under$/);
+});
+
+test("with a key per provider it counts them, and still quotes the limits", () => {
+  const meta = { hosted: true, limits: { questions_per_minute: 6, questions_per_session: 30 } };
+  const line = hostedNote(meta, { openai: KEY, anthropic: KEY });
+  assert.match(line, /^Questions run on the 2 keys in this browser tab/);
+  assert.match(line, /6 questions a minute and 30 a session/);
+  assert.match(line, /Replace or clear them, or change the model each step uses, under$/);
+  // An empty set is the same as no key at all.
+  assert.equal(hostedNote(meta, {}), "");
+  assert.equal(hostedNote(meta, { openai: "  " }), "");
 });
 
 test("a server that reports no limits has none to quote", () => {

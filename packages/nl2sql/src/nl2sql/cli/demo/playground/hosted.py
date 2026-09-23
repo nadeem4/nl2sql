@@ -6,36 +6,90 @@ looser gate:
 ============  =========================  =================================
               local (``nl2sql demo``)    hosted (``nl2sql demo --hosted``)
 ============  =========================  =================================
-the key       saved to ``.env.demo``     held by the browser, sent per
-              and used by the process    request, used in memory, dropped
-settings      written to disk            refused; the page keeps the key
+the keys      saved to ``.env.demo``     held by the browser, one per
+              and used by the process    provider, sent per request, used
+                                         in memory, dropped
+model/step    written to disk            sent per request; nothing is saved
+settings      written to disk            saves nothing; the page keeps both
 rebuild       on (loopback)              refused
 feedback      on (loopback)              off
 ``--record``  supported                  refused before the server starts
 limits        none                       a token bucket and a session cap
 ============  =========================  =================================
 
-This module is the hosted half: where the key is read from, what refusals read
-like, and the two limits. It holds no key of its own -- :func:`api_key` returns
-one to the caller, which passes it to
-:func:`nl2sql.llm.request_key.use_api_key` for the length of one question and
-never anywhere else.
+Choosing a model does not need the server to remember anything, so hosted mode
+keeps it: the choice travels with the question, in
+:data:`MODELS_HEADER`, and each provider's key in its own
+:func:`key_header_for` header.
+
+This module is the hosted half: where the keys and the choices are read from,
+what refusals read like, and the two limits. It holds no key of its own --
+:func:`Hosted.request_llms` returns a
+:class:`~nl2sql.llm.request_key.RequestLLMs` to the caller, which passes it to
+:func:`nl2sql.llm.request_key.use_request_llms` for the length of one question
+and never anywhere else.
 """
 from __future__ import annotations
 
+import json
 import os
 import secrets
 import threading
 import time
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from fastapi import HTTPException, Request, Response
 
-from nl2sql.llm.providers import KEY_SHAPE_MESSAGE, looks_like_api_key
+from nl2sql.llm.providers import (
+    KEY_SHAPE_MESSAGE,
+    KEYED_PROVIDERS,
+    LLM_AGENTS,
+    VERIFIED_MODELS,
+    looks_like_api_key,
+)
+from nl2sql.llm.request_key import RequestLLMs
 
 # The header the page sends its key in. A header, not the body: a body is what
 # request logs, validation errors and error reports quote.
+#
+# One key per provider goes in a header of its own, ``KEY_HEADER-<provider>``
+# (``X-NL2SQL-Api-Key-anthropic``), so a key never shares a header with
+# anything else: no parser, no error message and no quoting rule can expose
+# one. ``KEY_HEADER`` on its own is the key sent without naming a provider,
+# which is the one-key case and what the header has always meant.
 KEY_HEADER = "X-NL2SQL-Api-Key"
+
+# The model each step is to run on: one compact JSON object, agent name ->
+# "provider:model". It carries no secret, so it is safe to parse and safe to
+# quote back in a refusal.
+MODELS_HEADER = "X-NL2SQL-Models"
+
+# The agent names a step may be chosen for. The labels are the settings
+# panel's, so a refusal names a step the way the page does.
+STEP_AGENTS: Tuple[str, ...] = tuple(LLM_AGENTS.values())
+
+
+def step_label(agent: str) -> str:
+    """What the page calls a step, for a message a visitor reads."""
+    from nl2sql.cli.demo.playground.settings import LLM_NODES
+
+    return next((node["label"] for node in LLM_NODES if node["agent"] == agent), agent)
+
+
+def provider_label(provider: str) -> str:
+    from nl2sql.cli.demo.playground.settings import PROVIDER_LABELS
+
+    return PROVIDER_LABELS.get(provider, provider)
+
+
+def key_header_for(provider: str) -> str:
+    """The header one provider's key travels in."""
+    return f"{KEY_HEADER}-{provider}"
+
+
+MODELS_SHAPE_MESSAGE = (
+    f"{MODELS_HEADER} must be a JSON object of step name to \"provider:model\"."
+)
 
 # The cookie the session cap counts against. It names no visitor: it is a
 # random token this process made up, kept only in this process's memory.
@@ -163,6 +217,79 @@ class Limits:
                 store.pop(key, None)
 
 
+def _models_from(raw: Optional[str]) -> Dict[str, Tuple[str, str]]:
+    """The model header as ``{agent: (provider, model)}``, or a 400 saying why not.
+
+    Every name is checked against what the engine knows -- the pipeline's own
+    steps and the verified model lists -- so nothing arbitrary reaches a client.
+    """
+    text = (raw or "").strip()
+    if not text:
+        return {}
+    try:
+        parsed = json.loads(text)
+    except ValueError:
+        raise HTTPException(status_code=400, detail=MODELS_SHAPE_MESSAGE)
+    if not isinstance(parsed, dict):
+        raise HTTPException(status_code=400, detail=MODELS_SHAPE_MESSAGE)
+
+    chosen: Dict[str, Tuple[str, str]] = {}
+    for agent, value in parsed.items():
+        if agent not in STEP_AGENTS:
+            raise HTTPException(status_code=400,
+                                detail=f"{_quotable(agent)} is not a step of the pipeline.")
+        if value is None or value == "":
+            continue  # the default: the same as sending nothing for this step
+        if not isinstance(value, str) or ":" not in value:
+            raise HTTPException(status_code=400, detail=MODELS_SHAPE_MESSAGE)
+        provider, model = value.split(":", 1)
+        verified = VERIFIED_MODELS.get(provider)
+        if not verified:
+            raise HTTPException(
+                status_code=400,
+                detail=f"A step can be put on {' or '.join(provider_label(p) for p in VERIFIED_MODELS)} "
+                       f"for now, not {_quotable(provider)}.")
+        if model not in verified:
+            raise HTTPException(
+                status_code=400,
+                detail=f"{_quotable(model)} is not on the verified list for {provider_label(provider)}: "
+                       f"{', '.join(verified)}.")
+        chosen[agent] = (provider, model)
+    return chosen
+
+
+def _quotable(value: object) -> str:
+    """``value`` as a refusal may repeat it, and never something shaped like a key.
+
+    The model header holds no secret when the page fills it, but a person
+    driving the API by hand could paste a key into it, and a refusal is the one
+    place this server would otherwise echo what it was sent.
+    """
+    text = str(value)
+    return "that value" if looks_like_api_key(text) else f"'{text}'"
+
+
+def _require_keys(llms: RequestLLMs, default_provider: str) -> None:
+    """Refuses, naming the step and the provider, when a step has no key.
+
+    Checked before the question runs, so a visitor is told which step to fix
+    rather than watching the run fail somewhere inside the graph.
+    """
+    from nl2sql.llm.request_key import MissingProviderKey
+
+    for agent in STEP_AGENTS:
+        try:
+            llms.resolve(agent, default_provider)
+        except MissingProviderKey as missing:
+            label = provider_label(missing.provider)
+            raise HTTPException(
+                status_code=400,
+                detail=(f"The {step_label(missing.agent)} step is set to run on {label}, but no "
+                        f"{label} key was supplied. Add one under Settings, or put that step back "
+                        f"on a provider you have a key for."),
+            ) from None
+
+
 def _address(request: Request) -> str:
     """The address the bucket is keyed by.
 
@@ -187,18 +314,47 @@ class Hosted:
             per_session=_positive_int(QUESTIONS_PER_SESSION, DEFAULT_QUESTIONS_PER_SESSION),
         )
 
-    def api_key(self, request: Request) -> str:
-        """The key this request brought, or a refusal that says how to add one.
+    def request_llms(self, request: Request, default_provider: str = "openai") -> RequestLLMs:
+        """The keys and the per-step models this request brought.
 
-        Neither refusal quotes what arrived, so a mistyped key cannot end up in
-        a browser console, a screenshot or a bug report.
+        One header per provider carries a key; one compact JSON header carries
+        the model each step is to run on. Nothing here quotes a key back: a
+        malformed one is refused by shape alone, and the model header, which
+        holds no secret, is the only thing a message ever repeats.
+
+        Raises:
+            HTTPException: 401 with no key at all, 400 for a key that is not
+            one, for a model choice that is not on the verified list, or for a
+            step whose chosen provider has no key here.
         """
-        key = (request.headers.get(KEY_HEADER) or "").strip()
-        if not key:
+        keys: Dict[str, str] = {}
+        for provider in KEYED_PROVIDERS:
+            value = (request.headers.get(key_header_for(provider)) or "").strip()
+            if not value:
+                continue
+            if not looks_like_api_key(value):
+                raise HTTPException(status_code=400, detail=KEY_SHAPE_MESSAGE)
+            keys[provider] = value
+
+        fallback = (request.headers.get(KEY_HEADER) or "").strip()
+        if fallback:
+            if not looks_like_api_key(fallback):
+                raise HTTPException(status_code=400, detail=KEY_SHAPE_MESSAGE)
+            from nl2sql.llm.providers import provider_for_key
+
+            keys.setdefault(provider_for_key(fallback), fallback)
+        # A key named for a provider is a deliberate choice, so once there is
+        # more than one the un-named key stops standing in for all of them.
+        if len(keys) > 1:
+            fallback = ""
+
+        models = _models_from(request.headers.get(MODELS_HEADER))
+        if not keys:
             raise HTTPException(status_code=401, detail=NO_KEY_MESSAGE)
-        if not looks_like_api_key(key):
-            raise HTTPException(status_code=400, detail=KEY_SHAPE_MESSAGE)
-        return key
+
+        llms = RequestLLMs(keys=keys, models=models, fallback=fallback or None)
+        _require_keys(llms, default_provider)
+        return llms
 
     def session(self, request: Request, response: Response) -> str:
         """This browser's session token, minted and set on the first question."""
