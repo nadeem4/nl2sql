@@ -115,7 +115,9 @@ def test_meta_and_ask():
     assert client.get("/api/meta").json() == {
         "mode": "replay", "dataset": "chinook", "questions": ["q1"],
         "question_groups": [{"datasource": "chinook", "questions": ["q1"]}],
-        "roles": ["admin", "viewer"], "recorded_questions": 0}
+        "roles": ["admin", "viewer"], "recorded_questions": 0,
+        # Local mode: the public-demo server is off and has no limits to report.
+        "hosted": False, "limits": None}
     r = client.post("/api/ask", json={"question": "q1", "role": "viewer", "execute": False})
     assert r.status_code == 200
     body = r.json()

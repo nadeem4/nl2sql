@@ -24,6 +24,9 @@ flowchart TD
 
 - **Local dev**: local vector store + SQLite schema store + local artifact store.
 - **Production**: persistent volumes or external stores, stable secret providers, observability exporter enabled.
+- **Hosted demo**: the playground on the shipped sample databases, holding no
+  API key of its own; each visitor brings theirs. See
+  [Hosted demo](hosted-demo.md).
 
 ## Scaling and isolation
 

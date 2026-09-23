@@ -1,6 +1,14 @@
 """`nl2sql demo`: scaffold a demo project, index it, and serve the playground.
 
-Three modes, chosen at process start from the first key that turns up:
+``--hosted`` (or ``NL2SQL_DEMO_HOSTED=1``) is a fourth mode and a different
+server: it is for a public demo, where the process holds no key at all and
+every visitor brings their own in a request header. Nothing is saved -- not the
+key, not settings, not the index, not feedback -- and per-visitor limits apply.
+It is not a loosened ``--allow-settings``: settings, Rebuild, feedback and
+``--record`` are all refused there. See
+:mod:`nl2sql.cli.demo.playground.hosted`.
+
+Otherwise three modes, chosen at process start from the first key that turns up:
 
 ``replay``  no key anywhere, so questions answer only from recordings: the
             demo project's ``recordings.json`` (written by ``--record``), else
@@ -289,7 +297,25 @@ def demo_command(
     record: bool,
     api_key: Optional[str] = None,
     allow_settings: bool = False,
+    hosted: bool = False,
 ) -> None:
+    # The playground -- and hosted mode with it -- comes from the demo extra.
+    # Asked for here so a missing extra is one clear line, not an ImportError
+    # halfway through scaffolding.
+    try:
+        from nl2sql.cli.demo.playground.hosted import from_env as _hosted_from_env
+    except ImportError:
+        print_error(INSTALL_HINT)
+        raise SystemExit(1)
+
+    hosted_mode = _hosted_from_env(hosted)
+    if hosted_mode.enabled and record:
+        print_error("--record is refused in hosted mode: it would write recordings to the server's disk.")
+        raise SystemExit(1)
+    if hosted_mode.enabled and api_key:
+        print_error("--api-key is refused in hosted mode: the server holds no key; each visitor brings one.")
+        raise SystemExit(1)
+
     # chdir before anything indexes. The schema store path is resolved against
     # the working directory rather than the project root, so indexing from a
     # different cwd than the one the engine later runs in writes the snapshot
@@ -300,13 +326,18 @@ def demo_command(
     os.environ["ENV"] = "demo"
 
     env_file = directory / ".env.demo"
-    resolved_key, key_source = resolve_api_key(api_key, env_file)
+    if hosted_mode.enabled:
+        # No key is looked for and none is used: a key found here would be the
+        # owner's, and a public demo must never spend it.
+        resolved_key, key_source = None, "none"
+    else:
+        resolved_key, key_source = resolve_api_key(api_key, env_file)
     if resolved_key and key_source != "environment":
         # A key already exported by the user stays under the variable they
         # chose; one from the flag or from the file is placed by its own shape.
         os.environ[env_var_for_key(resolved_key)] = resolved_key
 
-    mode = detect_llm_mode()
+    mode = "hosted" if hosted_mode.enabled else detect_llm_mode()
     # A reachable Ollama makes the mode "live" but gives recording nothing to
     # proxy through, so --record asks for a key directly rather than for a mode.
     if record and not resolved_key:
@@ -351,6 +382,22 @@ def demo_command(
         # would be recorded for replay to answer with.
         os.environ["PLAN_CACHE_ENABLED"] = "false"
         console.print("[bold]Recording mode:[/bold] running the sample questions through the real provider.")
+    elif mode == "hosted":
+        # The config is normalised once, here, and never written again: a
+        # visitor's key moves the client to their own provider per request
+        # (``LLMRegistry._for_key``) and is stored nowhere.
+        _point_llm_config_at(directory, None, provider="openai")
+        # Whatever the host exported, the server runs with no key of its own,
+        # so a bug cannot quietly fall back to the owner's.
+        for name in PROVIDER_KEYS:
+            os.environ.pop(name, None)
+        console.print(
+            "[bold]Hosted mode:[/bold] the server holds no API key. Each visitor pastes their own "
+            "under Settings; it stays in their browser tab, travels with each question and is "
+            "never written down here. Settings, Rebuild, feedback and --record are off, and "
+            f"questions are limited to {hosted_mode.limits.per_minute} a minute and "
+            f"{hosted_mode.limits.per_session} a session."
+        )
     elif mode == "replay":
         recordings = replay_recordings(directory)
         store = ReplayStore.load(recordings) if recordings else ReplayStore()
@@ -390,17 +437,18 @@ def demo_command(
         engine,
         questions=questions,
         roles=roles,
-        mode="replay" if replay_server else "live",
+        mode=mode if hosted_mode.enabled else ("replay" if replay_server else "live"),
         dataset=DATASET,
         project_dir=directory,
         host=host,
         allow_settings=allow_settings,
+        hosted=hosted_mode,
         recorded_questions=recorded_questions,
         questions_by_datasource=DEMO_QUESTIONS_BY_DATASOURCE,
     )
     url = f"http://{host}:{port}/"
     print_success(f"Playground ready at {url}")
-    if not no_browser:
+    if not (no_browser or hosted_mode.enabled):
         webbrowser.open(url)
     try:
         _serve(app, host, port)

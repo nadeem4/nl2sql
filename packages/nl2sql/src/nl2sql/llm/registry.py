@@ -7,6 +7,7 @@ from langchain_core.language_models import BaseChatModel
 from nl2sql.common.env_hint import active_env_file
 from nl2sql.secrets import SecretManager
 from .models import AgentConfig
+from .request_key import current_api_key
 from .wires import WIRES, Wire
 
 
@@ -143,6 +144,10 @@ class LLMRegistry:
     def get_llm(self, name: str) -> BaseChatModel:
         """Returns the client for an agent, building it on first use.
 
+        When the caller brought its own key (:mod:`nl2sql.llm.request_key`) the
+        client is built from that key and cached nowhere, so it belongs to that
+        request and to nothing else.
+
         Args:
             name: Agent name; falls back to the 'default' agent.
 
@@ -155,18 +160,15 @@ class LLMRegistry:
                 registered, or if the provider needs an API key that cannot be
                 resolved.
         """
+        request_key = current_api_key()
         with self._lock:
+            if request_key:
+                return self._build_client(self._for_key(self._config_for(name), request_key),
+                                          api_key=request_key)
             if name in self.llms:
                 return self.llms[name]
 
-            config = self._configs.get(name) or self._configs.get("default")
-            if config is None:
-                raise ValueError(
-                    f"No LLM named '{name}' is configured and no 'default' LLM has "
-                    "been registered. Add it to configs/llm.yaml (under 'agents', or "
-                    "as the 'default' agent)."
-                )
-
+            config = self._config_for(name)
             if config.name in self.llms:
                 return self.llms[config.name]
 
@@ -174,11 +176,43 @@ class LLMRegistry:
             self.llms[config.name] = client
             return client
 
-    def _build_client(self, agent: AgentConfig) -> BaseChatModel:
+    def _config_for(self, name: str) -> AgentConfig:
+        config = self._configs.get(name) or self._configs.get("default")
+        if config is None:
+            raise ValueError(
+                f"No LLM named '{name}' is configured and no 'default' LLM has "
+                "been registered. Add it to configs/llm.yaml (under 'agents', or "
+                "as the 'default' agent)."
+            )
+        return config
+
+    @staticmethod
+    def _for_key(agent: AgentConfig, key: str) -> AgentConfig:
+        """``agent`` as the key's own provider would run it.
+
+        A key names its provider by its shape, and the configured model belongs
+        to the configured provider: a ``gpt-`` model means nothing to Anthropic.
+        So a key from another provider moves the agent to that provider's
+        default model and endpoint; a key from the configured provider changes
+        nothing but the credential, which keeps a pinned model (and a test's
+        fake endpoint) in force.
+        """
+        from .providers import default_model_for, default_temperature_for, provider_for_key
+
+        provider = provider_for_key(key)
+        if provider == agent.provider:
+            return agent
+        return agent.model_copy(update={"provider": provider, "model": default_model_for(provider),
+                                        "temperature": default_temperature_for(provider),
+                                        "base_url": None, "api_key": None})
+
+    def _build_client(self, agent: AgentConfig, api_key: Optional[str] = None) -> BaseChatModel:
         """Builds the client for one agent through its provider's wire adapter.
 
         Args:
             agent: Validated configuration for the agent.
+            api_key: A key supplied by the caller, which wins over the config
+                and the environment and is never stored.
 
         Returns:
             BaseChatModel: A client pointed at the configured endpoint.
@@ -188,7 +222,7 @@ class LLMRegistry:
                 extra) is missing.
         """
         preset = PROVIDER_PRESETS[agent.provider]
-        api_key = self._resolve_api_key(agent, preset)
+        api_key = api_key or self._resolve_api_key(agent, preset)
 
         base_url = agent.base_url or preset.base_url
         kwargs = {"base_url": base_url} if base_url else {}

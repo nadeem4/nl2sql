@@ -22,6 +22,13 @@ Fourteen routes:
 ``GET  /api/feedback``         whether answer feedback is on, the counts and the ratings
 ``POST /api/feedback``         rate a run this playground answered: up or down, and a note
 
+Hosted mode (``nl2sql demo --hosted``, see
+:mod:`nl2sql.cli.demo.playground.hosted`) changes three of these: ``/api/ask``
+takes the visitor's own key from a header and uses it for that one call,
+``/api/settings`` reports that there is nothing to save, and
+``/api/index/rebuild`` and the feedback routes are refused. Everything else is
+what it is locally.
+
 Every result pane in the browser is a renderer over ``QueryResult``; nothing
 is computed here that the engine does not already return. The only state is
 the settings panel's (see ``settings.py``): the current mode, and the gate that
@@ -38,17 +45,19 @@ from collections import OrderedDict
 from importlib.resources import files
 from typing import Any, Dict, List, Literal, Optional, Union
 
-from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from nl2sql.auth.models import UserContext
+from nl2sql.cli.demo.playground.hosted import FEEDBACK_MESSAGE, REBUILD_MESSAGE, Hosted
 from nl2sql.cli.demo.playground.index_panel import IndexPanel
 from nl2sql.cli.demo.playground.settings import SettingsPanel
 from nl2sql.common.settings import settings
 from nl2sql.feedback import NOTE_MAX_CHARS, FeedbackStore, run_record, run_signals
+from nl2sql.llm.request_key import use_api_key
 from nl2sql.tracing.document import find_trace, load_trace
 from nl2sql.tracing.trace import engine_info
 
@@ -126,6 +135,8 @@ RECENT_RUNS = 200
 
 def _feedback_off_reason(panel) -> Optional[str]:
     """Why answer feedback is off, in its own words; the gate is the settings panel's."""
+    if panel.hosted:
+        return FEEDBACK_MESSAGE
     if not settings.feedback_enabled:
         return "Feedback is turned off (FEEDBACK_ENABLED=false)."
     if panel.available:
@@ -147,7 +158,9 @@ def _engine_version() -> str:
 
 def _retrieval_off_reason(panel) -> Optional[str]:
     """Why the inspector is off, in its own words; the gate is the settings panel's."""
-    if panel.available:
+    if panel.available or panel.hosted:
+        # Hosted: the index holds our own sample schema and nothing else, and
+        # the inspector only reads it, so it is part of what the demo shows.
         return None
     if panel.project_dir is None:
         return "The Retrieval inspector is available in the playground that nl2sql demo starts."
@@ -183,7 +196,8 @@ def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset
               trace_dir: Optional[pathlib.Path] = None, project_dir: Optional[pathlib.Path] = None,
               host: str = "127.0.0.1", allow_settings: bool = False,
               recorded_questions: int = 0,
-              questions_by_datasource: Optional[Dict[str, List[str]]] = None) -> FastAPI:
+              questions_by_datasource: Optional[Dict[str, List[str]]] = None,
+              hosted: Optional[Hosted] = None) -> FastAPI:
     """Builds the playground app over ``engine``.
 
     ``recorded_questions`` is how many of ``questions`` the loaded replay
@@ -197,13 +211,20 @@ def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset
     ``project_dir``, ``host`` and ``allow_settings`` drive the settings panel:
     it is on only for a demo project, served on a loopback host or with
     ``allow_settings``; everywhere else it reports why it is off.
+
+    ``hosted`` turns the public-demo server on (see
+    :mod:`nl2sql.cli.demo.playground.hosted`): every question carries the
+    visitor's own key in a header, the limits apply, and everything that would
+    write to disk -- settings, rebuild, feedback -- is refused.
     """
     app = FastAPI(title="nl2sql playground")
     page = _read_page()
-    panel = SettingsPanel(engine, project_dir, mode, host, allow_settings)
+    hosted = hosted or Hosted(enabled=False)
+    panel = SettingsPanel(engine, project_dir, mode, host, allow_settings, hosted=hosted.enabled)
     index_panel = IndexPanel(engine, panel, _default_datasource(engine, dataset), project_dir)
     app.state.settings_panel = panel
     app.state.index_panel = index_panel
+    app.state.hosted = hosted
     # trace id -> what feedback would store for that run; never its rows.
     recent: "OrderedDict[str, Dict[str, Any]]" = OrderedDict()
     recent_lock = threading.Lock()
@@ -216,6 +237,13 @@ def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset
         reason = _feedback_off_reason(panel)
         if reason:
             raise HTTPException(status_code=403, detail=reason)
+        panel.guard(request)
+
+    def rebuild_guard(request: Request) -> None:
+        # Hosted: off outright, and said in the rebuild's own words rather
+        # than the settings panel's.
+        if hosted.enabled:
+            raise HTTPException(status_code=403, detail=REBUILD_MESSAGE)
         panel.guard(request)
 
     def remember(req: AskRequest, body: Dict[str, Any]) -> None:
@@ -232,10 +260,15 @@ def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset
 
     def retrieval_guard(request: Request) -> None:
         # Local only, exactly like Settings and Rebuild: the same guard, with
-        # the inspector's own reason when it is off.
+        # the inspector's own reason when it is off. Hosted, the inspector is
+        # part of the demo -- it reads our own sample index and writes
+        # nothing -- so it answers everyone, at the hosted pace.
         reason = _retrieval_off_reason(panel)
         if reason:
             raise HTTPException(status_code=403, detail=reason)
+        if hosted.enabled:
+            hosted.throttle(request)
+            return
         panel.guard(request)
 
     @app.exception_handler(RequestValidationError)
@@ -261,17 +294,26 @@ def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset
     def meta() -> Dict[str, Any]:
         return {"mode": panel.mode, "dataset": dataset, "questions": questions,
                 "question_groups": groups, "roles": roles,
-                "recorded_questions": recorded_questions}
+                "recorded_questions": recorded_questions, **hosted.describe()}
 
     @app.get("/api/schema")
     def schema(datasource: Optional[str] = None) -> Dict[str, Any]:
         return engine.get_schema(datasource or _default_datasource(engine, dataset))
 
     @app.post("/api/ask")
-    def ask(req: AskRequest) -> Dict[str, Any]:
+    def ask(req: AskRequest, request: Request, response: Response) -> Dict[str, Any]:
         # Sync on purpose: the engine blocks, so Starlette runs this in a thread
         # instead of stalling the event loop.
-        with panel.gate.run():
+        #
+        # Hosted: the key arrives in a header, is bound to this call and to no
+        # other, and is gone when the block ends. It is never written to a
+        # file, an environment variable or a module-level cache; the registry
+        # builds a client from it per request and keeps none (see
+        # ``nl2sql.llm.request_key``).
+        key = hosted.api_key(request) if hosted.enabled else None
+        if hosted.enabled:
+            hosted.spend(request, response)
+        with panel.gate.run(), use_api_key(key):
             result = engine.run_query(
                 req.question, execute=req.execute, user_context=UserContext(roles=[req.role])
             )
@@ -370,10 +412,11 @@ def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset
     def read_index() -> Dict[str, Any]:
         return index_panel.read()
 
-    @app.post("/api/index/rebuild", status_code=202, dependencies=[Depends(panel.guard)])
+    @app.post("/api/index/rebuild", status_code=202, dependencies=[Depends(rebuild_guard)])
     def rebuild(req: RebuildRequest) -> Dict[str, Any]:
         # Guarded exactly like a settings change: local only unless
-        # --allow-settings, and only from the playground page itself.
+        # --allow-settings, and only from the playground page itself. Hosted,
+        # it is off outright -- it would write the index and the snapshot.
         index_panel.start(req.enrich)
         return index_panel.read()
 
@@ -381,9 +424,12 @@ def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset
     def retrieval_options() -> Dict[str, Any]:
         from nl2sql.indexing.vector_store import VectorStore
 
+        reason = _retrieval_off_reason(panel)
         return {
-            "available": panel.available,
-            "reason": _retrieval_off_reason(panel),
+            # Hosted, the panel is off but the inspector is on, so the
+            # inspector's own reason is the one that decides.
+            "available": reason is None,
+            "reason": reason,
             "datasource_id": index_panel.datasource_id,
             "datasources": [d["datasource_id"] for d in index_panel.health().get("datasources", [])],
             "types": ENTRY_TYPES,

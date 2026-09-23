@@ -11,7 +11,11 @@ gathers all three.
 
 CHINOOK_DATASOURCE = {
     "id": "chinook",
-    "connection": {"type": "sqlite", "database": "data/chinook.sqlite"},
+    # Read-only: nothing in the engine writes to a demo database, and a hosted
+    # demo must not be able to. ``mode=ro`` makes the driver refuse a write
+    # before any SQL is parsed (``SqliteAdapter.construct_uri``).
+    "connection": {"type": "sqlite", "database": "data/chinook.sqlite",
+                   "options": {"read_only": True}},
     "description": "Chinook digital music store: artists, albums, tracks, genres, playlists, customers, employees, invoices and invoice lines",
 }
 

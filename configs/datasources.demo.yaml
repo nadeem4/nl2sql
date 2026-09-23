@@ -8,6 +8,8 @@ datasources:
   connection:
     type: sqlite
     database: data/chinook.sqlite
+    options:
+      read_only: true
   options: {}
 - id: support
   description: 'Help-desk ticketing system: tickets, the messages exchanged on them,
@@ -17,6 +19,8 @@ datasources:
   connection:
     type: sqlite
     database: data/support.sqlite
+    options:
+      read_only: true
   options: {}
 - id: webanalytics
   description: 'Website traffic analytics: visitor sessions with their duration and
@@ -29,4 +33,6 @@ datasources:
   connection:
     type: sqlite
     database: data/webanalytics.sqlite
+    options:
+      read_only: true
   options: {}

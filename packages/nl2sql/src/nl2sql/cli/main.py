@@ -215,9 +215,21 @@ def demo(
             "statistics and sample values included."
         ),
     )] = False,
+    hosted: Annotated[bool, typer.Option(
+        "--hosted",
+        help=(
+            "Serve a public demo of the sample databases. The server holds no API key: every "
+            "visitor pastes their own, the browser keeps it and sends it with each question, and "
+            "it is used in memory for that question only -- never written to a file, an "
+            "environment variable, a log or a trace. Settings, Rebuild, feedback and --record are "
+            "refused, the sample databases are opened read-only, and questions are rate limited "
+            "per visitor and capped per session. NL2SQL_DEMO_HOSTED=1 does the same for a "
+            "container."
+        ),
+    )] = False,
 ):
     """One-command playground over the Chinook sample database."""
-    demo_command(directory, host, port, no_browser, record, api_key, allow_settings)
+    demo_command(directory, host, port, no_browser, record, api_key, allow_settings, hosted)
 
 
 @app.command()

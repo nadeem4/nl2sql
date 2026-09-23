@@ -9,7 +9,9 @@ synthetic and owned by this repository; no third-party dataset is involved.
 
 SUPPORT_DATASOURCE = {
     "id": "support",
-    "connection": {"type": "sqlite", "database": "data/support.sqlite"},
+    # Read-only, like the other two: see ``chinook.py``.
+    "connection": {"type": "sqlite", "database": "data/support.sqlite",
+                   "options": {"read_only": True}},
     # Kept deliberately domain-led, and without a sentence about sharing
     # Chinook's customers. Indexing embeds this description, and an earlier
     # draft that named chinook and "customers" out-ranked Chinook itself on

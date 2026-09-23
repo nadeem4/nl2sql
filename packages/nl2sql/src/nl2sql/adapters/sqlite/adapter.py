@@ -59,16 +59,24 @@ class SqliteAdapter(BaseSQLAlchemyAdapter):
     def construct_uri(self, args: Dict[str, Any]) -> str:
         """Constructs the SQLite connection URI.
 
+        With ``options.read_only`` the file is opened through SQLite's own URI
+        form with ``mode=ro``, so the driver refuses every write before any SQL
+        is parsed. That is the last line under the policy and validator checks,
+        and the one a public demo needs: the sample databases are ours to show
+        and nobody's to change.
+
         Args:
             args: The raw connection arguments dictionary.
 
         Returns:
             str: The fully constructed SQLAlchemy connection URI.
-        
+
         Raises:
             ValidationError: If the configuration is invalid.
         """
         config = SqliteConnectionConfig(**args)
+        if config.options.get("read_only"):
+            return f"sqlite:///file:{config.database}?mode=ro&uri=true"
         return f"sqlite:///{config.database}"
 
     def connect(self) -> None:
