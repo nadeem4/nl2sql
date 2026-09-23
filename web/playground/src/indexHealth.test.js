@@ -1,7 +1,7 @@
 // Run with `npm test` (node's built-in runner; no test dependency).
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { countRows, needsRebuild, relativeTime, shortVersion, statusLine } from "./indexHealth.js";
+import { countRows, joinNames, needsRebuild, relativeTime, shortVersion, sourceNames, statusLine } from "./indexHealth.js";
 
 test("countRows orders known kinds and names them in plain words", () => {
   const rows = countRows({ "schema.column": 64, "schema.table": 11, "schema.datasource": 1, "schema.relationship": 11 });
@@ -22,6 +22,20 @@ test("statusLine says what an empty index means for a question", () => {
   assert.match(statusLine({ status: "empty", total: 0 }), /every question will fail/);
   assert.match(statusLine({ status: "ok", total: 87 }), /^87 entries/);
   assert.equal(statusLine(null), "Checking the index.");
+});
+
+test("sourceNames lists every database the index covers", () => {
+  const health = { datasources: [{ datasource_id: "chinook" }, { datasource_id: "support" }, { entries: 0 }] };
+  assert.deepEqual(sourceNames(health), ["chinook", "support"]);
+  assert.deepEqual(sourceNames({}), []);
+  assert.deepEqual(sourceNames(null), []);
+});
+
+test("joinNames reads as a sentence, not a list", () => {
+  assert.equal(joinNames([]), "");
+  assert.equal(joinNames(["chinook"]), "chinook");
+  assert.equal(joinNames(["chinook", "support"]), "chinook and support");
+  assert.equal(joinNames(["chinook", "support", "webanalytics"]), "chinook, support and webanalytics");
 });
 
 test("needsRebuild is true for anything but ok", () => {

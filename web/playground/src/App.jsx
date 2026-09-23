@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import SchemaPanel from "./SchemaPanel.jsx";
 import IndexPanel from "./IndexPanel.jsx";
-import { needsRebuild } from "./indexHealth.js";
+import { needsRebuild, sourceNames } from "./indexHealth.js";
 import Run from "./Panes.jsx";
 import Settings from "./Settings.jsx";
 import RetrievalInspector from "./Retrieval.jsx";
@@ -192,6 +192,9 @@ export default function App() {
   const replay = meta && meta.mode === "replay";
   const canSet = settings && settings.available;
   const indexBroken = index && needsRebuild(index.health) && index.job.state !== "running";
+  // The rail shows one database's schema; how many there are is the index's to
+  // say, and until it answers the rail keeps the single-database wording.
+  const databases = index ? sourceNames(index.health).length : 1;
   const onAsk = page === "ask";
   const groups = guidedGroups(meta);
   const current = pageFor(page);
@@ -334,7 +337,8 @@ export default function App() {
 
             <aside className="rail">
               <IndexPanel index={index} error={indexError} onRebuild={rebuildIndex} />
-              <SchemaPanel schema={schema} used={used} denied={denied} role={asked && asked.role} />
+              <SchemaPanel schema={schema} used={used} denied={denied} role={asked && asked.role}
+                databases={databases} />
             </aside>
 
             <section className="run" id="run" ref={runRef} aria-labelledby="run-heading" tabIndex={-1}>

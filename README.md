@@ -8,7 +8,7 @@ before any SQL is generated.
 [![PyPI](https://img.shields.io/pypi/v/nl2sql-engine)](https://pypi.org/project/nl2sql-engine/)
 [![License: MIT](https://img.shields.io/github/license/nadeem4/nl2sql)](LICENSE)
 
-![The nl2sql playground: the search index and schema on the left, a question with its plan and checks on the right](https://raw.githubusercontent.com/nadeem4/nl2sql/main/docs/assets/screenshots/playground-overview.png)
+![The nl2sql playground on its Ask page: the Ask, Settings and Retrieval nav across the top, the search index over three databases and one schema on the left, the question box and the guided questions on the right](https://raw.githubusercontent.com/nadeem4/nl2sql/main/docs/assets/screenshots/playground-overview.png)
 
 ## Contents
 
@@ -120,7 +120,7 @@ ONNX embedding model.
 The provider follows the key's shape: `sk-ant-...` is Anthropic, `sk-or-...` is
 OpenRouter, anything else is OpenAI. Claude needs the extra:
 `pip install "nl2sql-engine[demo,anthropic]"`. You can also start without a key
-and paste one into the playground's **Settings** panel, which switches the
+and paste one into the playground's **Settings** page, which switches the
 running demo to live mode without a restart and picks a model per step.
 
 **Without a key**, the demo runs in replay mode, which answers only from
@@ -166,13 +166,13 @@ model response.
 each LLM step. Written to the demo project's `.env.demo` and
 `configs/llm.demo.yaml`.
 
-![The Settings panel with the key form and a model per step](https://raw.githubusercontent.com/nadeem4/nl2sql/main/docs/assets/screenshots/playground-settings.png)
+![The Settings page with the key form and a model per step](https://raw.githubusercontent.com/nadeem4/nl2sql/main/docs/assets/screenshots/playground-settings.png)
 
 **Retrieval inspector:** run the engine's vector search for any text against the
 live index, with k, lambda, entry types and datasource as knobs, and see what
 MMR picked and what it dropped. No LLM call.
 
-![The Retrieval inspector showing picks, similarity and MMR scores](https://raw.githubusercontent.com/nadeem4/nl2sql/main/docs/assets/screenshots/playground-retrieval.png)
+![The Retrieval inspector page showing picks, similarity and MMR scores](https://raw.githubusercontent.com/nadeem4/nl2sql/main/docs/assets/screenshots/playground-retrieval.png)
 
 **Feedback:** rate an answer right or wrong, with an optional note. Stored in the
 project with the question, role and SQL, never the rows;

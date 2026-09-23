@@ -40,14 +40,21 @@ Back and Forward, and that routing touches nothing but the hash.
 ## What the page shows
 
 - **Database** (left rail, or below the run on a narrow window): the indexed
-  schema from `/api/schema`, visible before any question. Each table shows its
-  row count and the tables it refers to; open one for columns, types, keys and
-  foreign keys. Tables the current plan reads are marked `in plan`; tables the
-  role was refused are marked `refused for <role>`.
+  schema from `/api/schema`, visible before any question. It is one database's,
+  so where the index holds several the summary opens with `One of 3 databases`
+  (`databases`, counted from the index health in `App`); with one it reads as
+  it always has. Each table shows its row count and the tables it refers to;
+  open one for columns, types, keys and foreign keys. Tables the current plan
+  reads are marked `in plan`; tables the role was refused are marked
+  `refused for <role>`.
 - **Search index** (`#index-panel`, top of the rail): from `GET /api/index`,
   the vector index the resolver searches, which the Database below does not
   show. A status line (`#index-status`), entries by type (`#index-counts`), the
-  schema version (`#index-version`) and when it was built (`#index-built`).
+  schema version (`#index-version`) and when it was built (`#index-built`). The
+  index covers every database, so the heading names one only when there is one;
+  with several, `#index-sources` lists them ("Covers chinook, support and
+  webanalytics", from `sourceNames` and `joinNames` in `indexHealth.js`) and
+  Rebuild's help names the single database it rebuilds.
   When the index is empty, missing or out of date, the panel turns to the fault
   colour, a stale index lists why, and a warning under the top bar
   (`#index-warning`) puts the keyboard on the button, or, from another page,
