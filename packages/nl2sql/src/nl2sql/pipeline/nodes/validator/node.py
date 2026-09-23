@@ -17,7 +17,12 @@ from nl2sql.pipeline.nodes.ast_planner.functions import (
     is_allowed_function,
 )
 from nl2sql.pipeline.nodes.ast_planner.schemas import PlanModel, Expr
-from nl2sql.pipeline.nodes.generator.node import SqlVisitor, ordered
+from nl2sql.pipeline.nodes.generator.node import (
+    SUPPORTED_BINARY_OPS,
+    GeneratorNode,
+    SqlVisitor,
+    ordered,
+)
 from nl2sql.context import NL2SQLContext
 from nl2sql.auth.rbac import table_allowed
 from nl2sql.common.logger import get_logger
@@ -92,6 +97,10 @@ class LogicalValidatorNode:
         self.registry = ctx.ds_registry
         self.rbac = ctx.rbac
         self.strict_columns = settings.logical_validator_strict_columns
+        # The validator does not render SQL, but it builds the generator's
+        # query tree to find out whether the plan *can* be rendered. See
+        # ``_validate_buildable``.
+        self._generator = GeneratorNode(ctx)
 
     def _normalize_table_key(
         self,
@@ -338,6 +347,132 @@ class LogicalValidatorNode:
             f"Available columns: {self._format_columns(available)}."
         )
 
+    def _plan_dialect(self, state: SubgraphExecutionState) -> Optional[str]:
+        """The sub-query datasource's dialect, looked up the way the generator does.
+
+        Falls back to ``None`` (sqlglot's default dialect) when there is no
+        datasource or the registry cannot produce an adapter. The dialect only
+        affects rendering details the buildability check discards, so failing
+        to find one must not fail validation.
+        """
+        datasource_id = state.sub_query.datasource_id if state.sub_query else None
+        if not datasource_id:
+            return None
+        try:
+            return self.registry.get_adapter(datasource_id).get_dialect()
+        except Exception as exc:  # pragma: no cover - registry shapes vary
+            logger.debug("No dialect for datasource %s: %s", datasource_id, exc)
+            return None
+
+    @staticmethod
+    def _unsupported_operators(plan: PlanModel) -> List[PipelineError]:
+        """Rejects a binary operator the generator has no way to render.
+
+        ``Expr.op``'s Literal admits ``NOT``, but ``_visit_binary`` renders
+        only :data:`SUPPORTED_BINARY_OPS`; anything else raises. This check runs
+        before every check that walks the plan through ``SqlVisitor``, which is
+        why ``op: "NOT"`` used to surface as a ``VALIDATOR_CRASH`` -- retryable
+        only by accident, with a message the planner could not act on.
+        """
+        errors: List[PipelineError] = []
+        seen: Set[str] = set()
+        for expr in _plan_exprs(plan):
+            if expr.kind != "binary" or not expr.op:
+                continue
+            op = str(expr.op).upper()
+            if op in SUPPORTED_BINARY_OPS or op in seen:
+                continue
+            seen.add(op)
+            errors.append(
+                PipelineError(
+                    node="logical_validator",
+                    message=(
+                        f"Operator '{expr.op}' is not a binary operator. "
+                        f"Binary operators: {', '.join(sorted(SUPPORTED_BINARY_OPS))}. "
+                        "To negate a condition, use a unary expression with op 'NOT'."
+                    ),
+                    severity=ErrorSeverity.ERROR,
+                    error_code=ErrorCode.INVALID_PLAN_STRUCTURE,
+                )
+            )
+        return errors
+
+    def _describe_plan_joins(
+        self, plan: PlanModel, relationships: List[Dict[str, Any]]
+    ) -> str:
+        """Names the plan's tables and the foreign keys that would join them.
+
+        A structural join failure is only actionable if the planner is told
+        which alias is which table and which columns connect them. The schema
+        snapshot already carries the relationships, so they are rewritten into
+        the plan's own vocabulary here -- the same move
+        ``_describe_column_failure`` makes for columns.
+        """
+        tables = ", ".join(f"{t.alias} = {t.name}" for t in plan.tables) or "none"
+        alias_by_table: Dict[str, List[str]] = {}
+        for t in plan.tables:
+            alias_by_table.setdefault(self._normalize_name(t.name), []).append(t.alias)
+
+        keys: List[str] = []
+        for rel in relationships:
+            from_table = self._normalize_name(rel.get("from_table"))
+            to_table = self._normalize_name(rel.get("to_table"))
+            from_cols = rel.get("from_columns") or []
+            to_cols = rel.get("to_columns") or []
+            if from_table not in alias_by_table or to_table not in alias_by_table:
+                continue
+            for from_alias in alias_by_table[from_table]:
+                for to_alias in alias_by_table[to_table]:
+                    if from_alias == to_alias:
+                        continue
+                    for from_col, to_col in zip(from_cols, to_cols):
+                        key = (
+                            f"{from_alias} ({rel.get('from_table')}).{from_col} = "
+                            f"{to_alias} ({rel.get('to_table')}).{to_col}"
+                        )
+                        if key not in keys:
+                            keys.append(key)
+
+        if keys:
+            joins = f"Foreign keys between them: {'; '.join(sorted(keys))}."
+        else:
+            joins = "No foreign key is declared between them."
+        return f"Plan tables: {tables}. {joins}"
+
+    def _validate_buildable(
+        self,
+        state: SubgraphExecutionState,
+        plan: PlanModel,
+        relationships: List[Dict[str, Any]],
+    ) -> Optional[PipelineError]:
+        """Rejects a plan the generator could not turn into a query.
+
+        The validator resolves columns against a cross-joined throw-away query
+        (``_build_validation_query``), which is blind to join topology on
+        purpose. The generator builds the real FROM clause, so an orphaned
+        table, a stranded join, a duplicate join or an operator it cannot
+        render used to pass here and fail one node later as a terminal
+        ``SQL_GEN_FAILED`` -- after the last retry edge, where the planner can
+        no longer be asked to fix it.
+
+        Rather than restate those rules and let the two drift apart, the
+        generator's own builder runs here and its tree is discarded. Anything
+        it rejects is a malformed plan, reported as a retryable
+        ``INVALID_PLAN_STRUCTURE`` so the planner gets another go.
+        """
+        try:
+            self._generator._build_query(
+                plan, int(plan.limit or 1000), self._plan_dialect(state)
+            )
+        except ValueError as exc:
+            return PipelineError(
+                node="logical_validator",
+                message=f"{exc} {self._describe_plan_joins(plan, relationships)}",
+                severity=ErrorSeverity.ERROR,
+                error_code=ErrorCode.INVALID_PLAN_STRUCTURE,
+            )
+        return None
+
     @staticmethod
     def _format_columns(columns: Set[str]) -> str:
         """Renders a bounded, deterministic list of column names for feedback."""
@@ -580,7 +715,11 @@ class LogicalValidatorNode:
         - No function named DISTINCT (it is the ``distinct`` flag).
         - Every other function name is a known one (``ast_planner.functions``).
         - Date operations name a portable unit (year, quarter, month, day).
+        - Every binary operator is one the generator can render.
         - Column existence and scoping (via sqlglot's qualify optimizer).
+        - The plan builds into a query at all (``_validate_buildable``): every
+          table reachable from the FROM table, every join connecting to it
+          exactly once.
         """
         plan: PlanModel = state.ast_planner_response.plan if state.ast_planner_response else None
         errors: list[PipelineError] = []
@@ -625,6 +764,12 @@ class LogicalValidatorNode:
             errors.append(distinct_err)
 
         errors.extend(self._unsupported_functions(plan))
+
+        # Before anything that walks the plan through ``SqlVisitor``: an
+        # operator it cannot render makes every one of those checks raise.
+        operator_errors = self._unsupported_operators(plan)
+        if operator_errors:
+            return errors + operator_errors
 
         date_err = self._date_operations(plan)
         if date_err:
@@ -764,6 +909,12 @@ class LogicalValidatorNode:
                     error_code=ErrorCode.COLUMN_NOT_FOUND,
                 )
             )
+
+        # Last, so every check above keeps its own error code: whatever the
+        # generator would still refuse to build.
+        build_error = self._validate_buildable(state, plan, relationships)
+        if build_error:
+            errors.append(build_error)
 
         return errors
 

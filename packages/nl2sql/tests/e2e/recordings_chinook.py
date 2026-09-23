@@ -120,6 +120,25 @@ RULES_ALBUMS_PER_ARTIST = [
 ]
 
 
+# The same plan with its join dropped: two tables and nothing connecting them.
+# The generator cannot build it, and until the validator learned to say so this
+# surfaced one node later as a terminal SQL_GEN_FAILED -- past the last retry
+# edge, so the planner was never asked again.
+ALBUMS_PER_ARTIST_PLAN_UNJOINED = {**ALBUMS_PER_ARTIST_PLAN, "joins": []}
+
+# The planner's second prompt carries every error the first attempt produced,
+# so the validator's own words select the corrected plan. Rules are matched in
+# order and the first hit wins, so the unconditional broken plan must come last.
+RULES_ALBUMS_PER_ARTIST_RETRY = [
+    ANSWERABLE,
+    Rule("DecomposerResponse", ALBUMS_PER_ARTIST_DECOMPOSER),
+    Rule("PlanModel", ALBUMS_PER_ARTIST_PLAN, when="never joined to the FROM table"),
+    Rule("PlanModel", ALBUMS_PER_ARTIST_PLAN_UNJOINED),
+    Rule("AggregatedResponse", albums_per_artist_answer),
+    Rule("plain", "Join Album to Artist on ArtistId."),
+]
+
+
 # ---------------------------------------------------------------------------
 # The two shapes that `LogicalValidatorNode` used to block, one per defect.
 # ---------------------------------------------------------------------------

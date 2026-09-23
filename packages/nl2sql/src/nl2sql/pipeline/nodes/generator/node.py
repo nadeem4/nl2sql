@@ -62,6 +62,14 @@ _BINARY_NODES = {
 }
 
 
+# The operators ``SqlVisitor._visit_binary`` can render: the table above plus
+# the ones it special-cases before consulting it. ``Expr.op``'s Literal also
+# admits ``NOT``, which belongs on a unary expression; the validator rejects it
+# against this set so the plan never reaches the generator, where the failure
+# would be terminal. ``test_generator_binary_operators`` keeps the two in step.
+SUPPORTED_BINARY_OPS = frozenset(_BINARY_NODES) | {"AND", "OR", "IN", "IS NOT", "||"}
+
+
 def _is_text(operand: exp.Expression) -> bool:
     """Whether an operand is known to be a string: a non-numeric string literal or a concatenation.
 
