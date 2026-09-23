@@ -59,7 +59,9 @@ What it does **not** do:
 - It does not reach a trace. Run traces are written as usual (that is what the
   playground's **Debug** drill-down reads), and the trace redactor is told about
   the request's key along with every other credential, so it is masked if it ever
-  reaches a prompt or an error.
+  reaches a prompt or an error. The demo project ships `TRACE_MODE=always`, so
+  every question leaves a file on the container's own disk; `TRACE_MODE=on_failure`
+  keeps only the runs that went wrong.
 - It does not reach the log. Nothing logs the header, and errors about a key
   report its type, never its value.
 - It does not reach your data. The hosted demo answers only from the three
@@ -111,6 +113,72 @@ policy and the validator rather than instead of them. This is not specific to
 hosted mode: nothing in the engine writes to a demo database, so they are opened
 read-only everywhere.
 
+## The container
+
+`deploy/huggingface/Dockerfile` builds the playground as a hosted demo. It is a
+Space root rather than a repository build: it needs no build context, so the
+whole deploy is one `git subtree push` of that folder.
+
+It installs `nl2sql-engine[demo]` (from the repository's `main` branch by
+default; set `--build-arg NL2SQL_SPEC="nl2sql-engine[demo]==X.Y.Z"` to pin a
+release), then runs `nl2sql setup --demo` **at build time**. That bakes three
+things into the image so the container reaches nothing but the model at run
+time and the first question is answered at once:
+
+- the three sample databases and their configs,
+- their vector index, built with the local embedder,
+- the local embedding model itself, roughly 79 MB of ONNX `all-MiniLM-L6-v2`
+  that chromadb would otherwise download on the first question. The 83 MB
+  archive it was extracted from is deleted; chroma reaches for it only when the
+  extracted files are missing.
+
+The container runs as uid 1000 (not root), listens on `$PORT` (7860 by
+default, which is what a Space routes to), and carries a healthcheck that polls
+`/api/meta`. `NL2SQL_DEMO_HOSTED=1` is set in the image, so hosted mode holds
+even if the command is overridden.
+
+```bash
+cd deploy/huggingface
+docker build -t nl2sql-demo .
+docker run --rm -p 7860:7860 nl2sql-demo
+```
+
+`docker compose up --build` in the same folder does it through
+`docker-compose.yml`, which builds the same image with the same settings.
+
+Measured on a build of this Dockerfile: **1175 MB** on the container's own
+filesystem (`docker image ls` reports 1.65 GB, which includes the build
+attestations). Most of it is chromadb's transitive dependencies (polars,
+pyarrow, kubernetes, onnxruntime), which the vector store needs. Boot is
+**about 5 seconds** from `docker run` to the first answered request, and a
+guided question through a stand-in provider answered in **1.2 seconds**.
+
+## Deploying it as a Hugging Face Space
+
+The Space is `nadeem4nk/nl2sql-demo`: public, Docker SDK, CPU basic. The full
+steps, and what each Space setting does, are in
+[`deploy/huggingface/README.md`][space-readme] -- that file is also the Space's
+own front page, since a Docker Space reads its configuration from the
+front-matter of the `README.md` at its root.
+
+In short, and performed by the owner:
+
+1. Create the Space at <https://huggingface.co/new-space> under `nadeem4nk`,
+   named `nl2sql-demo`, SDK **Docker** (blank), CPU basic, public.
+2. Add it as a git remote:
+   `git remote add space https://huggingface.co/spaces/nadeem4nk/nl2sql-demo`
+   (pushing needs a write token from
+   <https://huggingface.co/settings/tokens>).
+3. Push the folder as the Space root:
+   `git subtree push --prefix deploy/huggingface space main`.
+
+The Space builds on push and serves at
+<https://nadeem4nk-nl2sql-demo.hf.space>.
+
+**Never give the Space an API key**, as a secret or otherwise. Hosted mode
+clears any provider key it finds in its environment at start-up rather than use
+it, because a key there would be spent by every visitor.
+
 ## Running it locally instead
 
 Hosted mode exists to show the engine on our sample data. To ask questions of
@@ -124,3 +192,4 @@ nl2sql demo
 See [Demo](../getting_started/demo.md).
 
 [key-module]: https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/llm/request_key.py
+[space-readme]: https://github.com/nadeem4/nl2sql/blob/main/deploy/huggingface/README.md

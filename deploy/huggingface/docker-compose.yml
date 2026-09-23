@@ -1,0 +1,31 @@
+# The Space's image, run locally.
+#
+#   cd deploy/huggingface && docker compose up --build
+#   open http://localhost:7860
+#
+# Same Dockerfile, same hosted mode, same limits: what you see here is what the
+# Space serves. Paste your own key under Settings; nothing is saved, here or
+# there.
+name: nl2sql-demo
+
+services:
+  playground:
+    build:
+      context: .
+      args:
+        # The branch or tag to install the engine from. A release instead:
+        #   NL2SQL_SPEC: "nl2sql-engine[demo]==0.2.0"
+        NL2SQL_REF: main
+    image: nl2sql-demo:local
+    ports:
+      - "7860:7860"
+    environment:
+      # Hosted mode is already on in the image; named here because a public
+      # demo must never be run without it.
+      NL2SQL_DEMO_HOSTED: "1"
+      PORT: "7860"
+      NL2SQL_DEMO_QUESTIONS_PER_MINUTE: "6"
+      NL2SQL_DEMO_QUESTIONS_PER_SESSION: "30"
+    # No volumes and no secrets on purpose: the sample data and its index are
+    # baked into the image, and the server holds no API key.
+    restart: unless-stopped
