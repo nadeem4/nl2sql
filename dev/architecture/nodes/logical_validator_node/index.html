@@ -2016,7 +2016,7 @@
 <hr/>
 <h2 id="responsibilities">Responsibilities</h2>
 <ul>
-<li>Validate ordinals, aliases, joins, and column references.</li>
+<li>Validate aliases, joins, and column references.</li>
 <li>Reject any plan the generator could not build (see <em>Buildability</em> below).</li>
 <li>Enforce RBAC table access using strict datasource namespacing.</li>
 </ul>
@@ -2083,7 +2083,6 @@ emits a <code>PlanModel</code>, never SQL.</p>
 </ul>
 <p>Validation performed:</p>
 <ul>
-<li>Ordinals must be contiguous.</li>
 <li>Aliases must be unique.</li>
 <li>Joins must match known relationships.</li>
 <li>Column references must exist and be unambiguous.</li>

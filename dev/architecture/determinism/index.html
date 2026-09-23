@@ -4402,7 +4402,7 @@ gives every result a total row order.</p>
 </ul>
 <h3 id="validation-gates">Validation Gates</h3>
 <ul>
-<li>Deterministic: Logical validation normalizes names, enforces ordinal continuity, validates aliases, and uses sorted comparisons for expected schema/alias matching (<a href="https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/pipeline/nodes/validator/node.py"><code>pipeline/nodes/validator/node.py</code></a>).</li>
+<li>Deterministic: Logical validation normalizes names, validates aliases, and uses sorted comparisons for expected schema/alias matching (<a href="https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/pipeline/nodes/validator/node.py"><code>pipeline/nodes/validator/node.py</code></a>).</li>
 <li>Deterministic: Policy enforcement uses explicit namespaced checks and deterministic set membership (<a href="https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/pipeline/nodes/validator/node.py"><code>pipeline/nodes/validator/node.py</code></a>).</li>
 </ul>
 <h3 id="dag-execution-order-and-node-sequencing">DAG Execution Order and Node Sequencing</h3>
