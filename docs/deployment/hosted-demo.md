@@ -93,11 +93,14 @@ anything reaches a client. Each step is then built from the key for the
 provider it names: the planner can be on Claude while the answer writer stays
 on OpenAI, each calling its own endpoint with its own key.
 
-**A step whose provider has no key is refused before the question runs**, with
-`400` and a sentence naming both, for example *"The Query planner step is set
-to run on Anthropic, but no Anthropic key was supplied. Add one under Settings,
-or put that step back on a provider you have a key for."* Nothing is spent on
-the keys that were supplied.
+**A step whose chosen provider has no key is refused before the question
+runs**, with `400` and a sentence naming both, for example *"The Query planner
+step is set to run on Anthropic, but no Anthropic key was supplied. Add one
+under Settings, or put that step back on a provider you have a key for."*
+Nothing is spent on the keys that were supplied. A step nobody chose a provider
+for is never refused this way: it takes the key for the provider it is
+configured on, or, failing that, the first key the request brought, exactly as
+a single key has always worked.
 
 What it does **not** do:
 

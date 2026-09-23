@@ -138,13 +138,21 @@ def test_a_step_with_no_choice_prefers_the_configured_providers_key():
     assert llms.resolve("decomposer", "openai") == (None, None, FIRST_KEY)
 
 
-def test_a_step_with_no_choice_and_no_key_for_its_provider_names_it():
+def test_a_step_with_no_choice_and_no_key_for_its_provider_takes_the_first_key():
+    """Nobody chose this step's provider, so a refusal would name the wrong thing."""
     llms = RequestLLMs(keys={"openai": FIRST_KEY, "anthropic": ANTHROPIC_KEY}, models={})
 
-    with pytest.raises(MissingProviderKey) as raised:
-        llms.resolve("decomposer", "openrouter")
+    # The first key answers, on its own provider, as a single key always has.
+    assert llms.resolve("decomposer", "openrouter") == (None, None, FIRST_KEY)
 
-    assert (raised.value.agent, raised.value.provider) == ("decomposer", "openrouter")
+
+def test_a_request_with_no_key_at_all_names_the_step_and_its_provider():
+    llms = RequestLLMs(keys={}, models={})
+
+    with pytest.raises(MissingProviderKey) as raised:
+        llms.resolve("decomposer", "openai")
+
+    assert (raised.value.agent, raised.value.provider) == ("decomposer", "openai")
 
 
 def test_a_chosen_model_on_the_configured_provider_keeps_the_configured_endpoint(registry):

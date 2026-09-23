@@ -17,8 +17,13 @@ step of the pipeline on a provider and model of their own
 2. otherwise the key the visitor sent without naming a provider, which keeps
    the one-key case exactly what it was;
 3. otherwise the configured provider's key, if they sent one;
-4. otherwise their only key, if they sent exactly one;
-5. otherwise :exc:`MissingProviderKey`.
+4. otherwise the first key they sent, moved onto its own provider, so a
+   visitor who brought no key for the configured provider is never stuck;
+5. otherwise -- they sent no key at all -- :exc:`MissingProviderKey`.
+
+A step is therefore refused for a missing key only when the caller chose that
+provider for it, which is the one case where naming the step and the provider
+says what to fix.
 
 A :class:`~contextvars.ContextVar` is the store because the engine runs one
 question per thread: Starlette dispatches the playground's synchronous
@@ -121,9 +126,11 @@ class RequestLLMs(NamedTuple):
         own = self.keys.get(provider)
         if own:
             return None, None, own
-        if len(self.keys) == 1:
-            only = next(iter(self.keys.values()))
-            return None, None, only
+        if self.keys:
+            # No key for the provider this step is configured on, and the
+            # caller chose nothing for it: their first key answers, on its own
+            # provider, exactly as a single key always has.
+            return None, None, next(iter(self.keys.values()))
         raise MissingProviderKey(agent, provider)
 
 
