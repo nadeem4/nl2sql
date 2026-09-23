@@ -1669,10 +1669,21 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#the-settings-panel" class="md-nav__link">
+  <a href="#pages" class="md-nav__link">
     <span class="md-ellipsis">
       
-        The settings panel
+        Pages
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-settings-page" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Settings page
       
     </span>
   </a>
@@ -4132,10 +4143,21 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#the-settings-panel" class="md-nav__link">
+  <a href="#pages" class="md-nav__link">
     <span class="md-ellipsis">
       
-        The settings panel
+        Pages
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-settings-page" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Settings page
       
     </span>
   </a>
@@ -4271,7 +4293,7 @@ The tables, columns and row counts are in
 <p>For the browser playground instead of the CLI, <code>nl2sql demo</code> does the same
 scaffolding in <code>./nl2sql-demo</code> and serves a page over it. See the
 <a href="https://github.com/nadeem4/nl2sql#try-it">README</a> for its flags, and
-<a href="#the-settings-panel">the settings panel</a> for entering a key and choosing
+<a href="#the-settings-page">the Settings page</a> for entering a key and choosing
 models from the page.</p>
 <h3 id="the-schemas">The schemas</h3>
 <p>Chinook is eleven tables with real declared foreign keys: <code>Artist</code>, <code>Album</code>,
@@ -4424,7 +4446,7 @@ is also always available on demand.</p>
   model, so it can take a few minutes.</li>
 <li><strong>Write descriptions with the LLM</strong> is off by default because it spends
   tokens on your key; it is unavailable in replay mode.</li>
-<li>It has the settings panel's guardrails (so does the
+<li>It has the Settings page's guardrails (so does the
   <a href="#the-retrieval-inspector">Retrieval inspector</a>): local only unless <code>--allow-settings</code>,
   and only from the playground page itself.</li>
 </ul>
@@ -4435,9 +4457,18 @@ keeps that engine's defaults (for example an older default model, or no
 starts in a folder stamped by an older engine, or in one with no stamp at all,
 it warns and suggests a fresh <code>--dir</code>. The playground's index panel repeats the
 warning.</p>
-<h3 id="the-settings-panel">The settings panel</h3>
-<p>The playground that <code>nl2sql demo</code> serves has a <strong>Settings</strong> button at the top
-right. It edits the same two files the CLI reads, and nothing else: there is no
+<h3 id="pages">Pages</h3>
+<p>The playground is three pages, named across the top of every one of them:
+<strong>Ask</strong>, <strong>Settings</strong> and <strong>Retrieval</strong>. Each is a route in the address bar --
+<code>#/</code>, <code>#/settings</code> and <code>#/retrieval</code> -- so a reload stays where you were, a
+link can be pasted to someone else, and Back and Forward walk the pages you
+visited. A route nobody serves lands on Ask. The nav marks the page you are on,
+and marks Settings or Retrieval when the server has it off; the page itself
+then says why. Moving between pages keeps the question, the answer and the
+Debug choice: they belong to the visit, not to the page.</p>
+<h3 id="the-settings-page">The Settings page</h3>
+<p>The playground that <code>nl2sql demo</code> serves has a <strong>Settings</strong> page in the header
+nav. It edits the same two files the CLI reads, and nothing else: there is no
 second settings store, and the browser keeps nothing but UI conveniences.</p>
 <ul>
 <li><strong>API keys, one per provider.</strong> Paste a key and press <strong>Save key</strong>. The
@@ -4525,9 +4556,8 @@ saved.
 </li>
 </ul>
 <h3 id="the-retrieval-inspector">The Retrieval inspector</h3>
-<p>The <strong>Retrieval</strong> button next to Settings opens a panel that embeds any text
-with the local model and runs the engine's own vector search against the live
-index: the pool of nearest entries with their similarity, the entries MMR picks
+<p><strong>Retrieval</strong> is the third page in the header nav. It embeds any text with the
+local model and runs the engine's own vector search against the live index: the pool of nearest entries with their similarity, the entries MMR picks
 in order, the score each won with, and what was dropped. There is no
 re-ranking model; the "re-ranking" is MMR, explained in
 <a href="../../architecture/indexing/#retrieval-mmr-not-a-re-ranking-model">Indexing</a>.</p>
@@ -4625,8 +4655,10 @@ object; use the flags when the file holds your key.</p>
 run the CLI from the directory you ran <code>nl2sql setup --demo</code> in.</p>
 <h2 id="sample-questions">Sample questions</h2>
 <p><code>configs/sample_questions.demo.yaml</code> is written with twenty questions, the same
-ones the playground offers as guided questions. Chinook's twelve come first, so
-the demo opens on familiar ground:</p>
+ones the playground offers as guided questions -- the playground shows them in
+one pile per database, each headed by the datasource id, rather than as one
+list of twenty. Chinook's twelve come first, so the demo opens on familiar
+ground:</p>
 <ul>
 <li>How many customers do we have, by country?</li>
 <li>Who are the top 5 customers by total spend?</li>
@@ -4668,7 +4700,7 @@ that was fixed wrote the setting as <code>ROUTING_EXAMPLES</code>, which nothing
 <h2 id="regenerating-the-demo">Regenerating the demo</h2>
 <p>Re-running <code>nl2sql setup --demo</code> overwrites all three databases under <code>data/</code>
 and the <code>configs/*.demo.*</code> files with fresh copies. An existing <code>.env.demo</code> is
-overwritten too, so a key recorded there is lost - pass <code>--api-key</code> again, save it in the playground's Settings panel, or
+overwritten too, so a key recorded there is lost - pass <code>--api-key</code> again, save it on the playground's Settings page, or
 re-add it afterwards.</p>
 <h2 id="the-datasets-that-are-not-here">The datasets that are not here</h2>
 <p><code>--lite</code> and <code>--docker</code> chose between a generated manufacturing dataset in
