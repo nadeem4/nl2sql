@@ -117,7 +117,7 @@ read-only everywhere.
 
 `deploy/huggingface/Dockerfile` builds the playground as a hosted demo. It is a
 Space root rather than a repository build: it needs no build context, so the
-whole deploy is one `git subtree push` of that folder.
+whole deploy is that one folder, copied to the Space's root.
 
 It installs `nl2sql-engine[demo]` (from the repository's `main` branch by
 default; set `--build-arg NL2SQL_SPEC="nl2sql-engine[demo]==X.Y.Z"` to pin a
@@ -161,7 +161,75 @@ steps, and what each Space setting does, are in
 own front page, since a Docker Space reads its configuration from the
 front-matter of the `README.md` at its root.
 
-In short, and performed by the owner:
+The Space builds on push and serves at
+<https://nadeem4nk-nl2sql-demo.hf.space>.
+
+**Never give the Space an API key**, as a secret or otherwise. Hosted mode
+clears any provider key it finds in its environment at start-up rather than use
+it, because a key there would be spent by every visitor.
+
+### Automatically, from `main`
+
+[`.github/workflows/publish_space.yml`][workflow] is the normal path: it creates
+the Space if it is missing, mirrors `deploy/huggingface/` onto the Space's root,
+and waits for the build.
+
+**The one secret.** A Hugging Face access token with **write** permission
+(<https://huggingface.co/settings/tokens>), added as the repository secret
+**`HF_TOKEN`** at
+<https://github.com/nadeem4/nl2sql/settings/secrets/actions>. That is the only
+credential the workflow uses, and nothing else needs configuring. Without it --
+on a fork, or before it is added -- the job logs a line saying so and finishes
+green; it never fails for a missing secret.
+
+The token is read into the job's environment and used in exactly two places: by
+`huggingface_hub`, which picks `HF_TOKEN` up from the environment on its own,
+and as the password in the `git push` URL. It is never echoed, never traced (no
+`set -x`), and never written to a file: the Space remote is passed to each git
+command rather than saved into `.git/config`.
+
+**When it runs.** On every push to `main` that touches something the Space is
+built from -- `deploy/huggingface/**` (its root), `packages/nl2sql/**` (the
+engine the image installs from `main`) or `web/playground/**` (the page the
+engine serves) -- and on demand. A docs-only merge changes none of those and
+does not redeploy. One deploy runs at a time; a run overtaken by a newer push is
+cancelled.
+
+**By hand.** Actions → **Publish Space** → *Run workflow*. Two optional inputs:
+`space_id`, which defaults to `nadeem4nk/nl2sql-demo`, and `token_secret`, the
+name of the secret holding the token, which defaults to `HF_TOKEN`. Pointing
+`space_id` at a scratch Space of your own is how to rehearse a change without
+touching the public demo.
+
+**What the first run does.** The Space does not have to exist. The workflow
+calls `create_repo(repo_type="space", space_sdk="docker", private=False,
+exist_ok=True)`, which makes a public Docker Space on CPU basic, then pushes the
+folder into it. On every later run `exist_ok` makes that call a no-op: the Hub
+ignores visibility, SDK and hardware for a Space that already exists, so a
+hardware upgrade or a visibility change made in the Space's own settings
+survives a deploy.
+
+**Rolling back.** Two ways, both without touching the Hub by hand:
+
+- **Re-run an older commit's workflow.** Actions → **Publish Space** → the run
+  for the commit you want back → *Re-run all jobs*. It checks that commit out
+  again and pushes its `deploy/huggingface/` to the Space. Note that the image
+  installs the engine from the **tip of `main`** unless the `Dockerfile` pins a
+  release, so this rolls back the Space's configuration, not necessarily the
+  engine inside it; pin `NL2SQL_SPEC` to a released version if you need the
+  whole thing to go back.
+- **Push an earlier subtree yourself**, with the manual steps below:
+  `git push space $(git subtree split --prefix deploy/huggingface <old-sha>):main`.
+
+The workflow adds a commit on top of whatever the Space's `main` already is, so
+the Space's history is never rewritten and never lost -- including commits made
+in the Hub's own web editor. If a concurrent push lands between the workflow's
+fetch and its push, the push is refused and the job fails; re-running it picks
+up the new head and reapplies the folder. Nothing in the workflow force-pushes.
+
+### By hand, as a fallback
+
+If the workflow is unavailable, the owner can do the same thing from a clone:
 
 1. Create the Space at <https://huggingface.co/new-space> under `nadeem4nk`,
    named `nl2sql-demo`, SDK **Docker** (blank), CPU basic, public.
@@ -172,12 +240,10 @@ In short, and performed by the owner:
 3. Push the folder as the Space root:
    `git subtree push --prefix deploy/huggingface space main`.
 
-The Space builds on push and serves at
-<https://nadeem4nk-nl2sql-demo.hf.space>.
-
-**Never give the Space an API key**, as a secret or otherwise. Hosted mode
-clears any provider key it finds in its environment at start-up rather than use
-it, because a key there would be spent by every visitor.
+If step 3 is refused because the Space has commits of its own,
+`git push space $(git subtree split --prefix deploy/huggingface main):main --force`
+replaces the Space's history with this folder's. The workflow above never needs
+that, which is why it exists.
 
 ## Running it locally instead
 
@@ -193,3 +259,4 @@ See [Demo](../getting_started/demo.md).
 
 [key-module]: https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/llm/request_key.py
 [space-readme]: https://github.com/nadeem4/nl2sql/blob/main/deploy/huggingface/README.md
+[workflow]: https://github.com/nadeem4/nl2sql/blob/main/.github/workflows/publish_space.yml

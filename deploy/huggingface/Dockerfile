@@ -1,8 +1,9 @@
 # The nl2sql playground as a public demo (`nl2sql demo --hosted`).
 #
 # This folder is a Space root: it needs no build context from the repository,
-# so the whole deploy is one `git subtree push` of this directory. See
-# README.md here, and docs/deployment/hosted-demo.md in the repository.
+# so the whole deploy is this directory, copied to the Space's root by
+# .github/workflows/publish_space.yml. See README.md here, and
+# docs/deployment/hosted-demo.md in the repository.
 #
 # Three things are baked in so the container answers the first question
 # immediately and reaches nothing but the model at run time:
