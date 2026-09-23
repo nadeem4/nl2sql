@@ -4411,10 +4411,11 @@ every datasource in a collection must share one embedding model, so the store
 otherwise raises <code>EmbeddingDimensionMismatchError</code> (or
 <code>EmbeddingModelMismatchError</code> for a different model of the same size).</p>
 <h3 id="index-health-and-repair">Index health and repair</h3>
-<p>The playground's schema panel reads the schema snapshot; the resolver, which
+<p>The playground's schema panel reads the schema snapshot, for whichever database
+its <strong>Showing</strong> switcher names; the resolver, which
 picks the database for every question when more than one is registered, reads
 the separate vector index, and with three registered it searches on every
-question. The two
+question. After a run the Question station names the database it picked. The two
 can disagree: a folder once had its snapshot intact and 0 entries in its index,
 so the page looked fine while every question failed with
 <code>SCHEMA_RETRIEVAL_FAILED</code>. Three things now guard against that:</p>
@@ -4439,9 +4440,9 @@ so the page looked fine while every question failed with
 (datasource, tables, columns, relationships), the schema version they were
 built from, and when. One index holds every database, so with the demo's three
 the heading carries no name and the line under it says which they are --
-"Covers chinook, support and webanalytics" -- and the <strong>Database</strong> panel below,
-which shows one schema, opens with "One of 3 databases". With a single database
-both panels name it in their heading instead. When the index is empty, missing
+"Covers chinook, support and webanalytics" -- and the <strong>Database</strong> panel below
+carries a <strong>Showing</strong> switcher for which of them to read. With a single database
+both panels name it in their heading instead, and there is no switcher. When the index is empty, missing
 or out of date, a warning under the top bar says what that means for a
 question, and the panel's <strong>Rebuild the index</strong> button becomes the rail's one
 filled button. <strong>Rebuild</strong> is also always available on demand.</p>
@@ -4709,7 +4710,10 @@ ground:</p>
 <li>How many purchases were there per month in 2013?</li>
 </ul>
 <p>None of them spans two databases, deliberately: the engine cannot answer such a
-question yet.</p>
+question yet. The rail says so too, under the database switcher: each question
+is answered from one database, and joining across them is planned. Clicking a
+question from another pile moves the switcher to that database, so the schema
+on the left is the one the question is about.</p>
 <p>They are also indexed, per datasource: the <code>schema.datasource</code> entry the
 resolver matches every question against carries that datasource's configured
 description and its own questions (<code>.env.demo</code> points <code>SAMPLE_QUESTIONS</code> at the

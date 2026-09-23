@@ -4169,7 +4169,9 @@ stays in this browser tab and is never stored on the server, with a link to
 <strong>Settings</strong>; the question box and the guided questions are disabled until
 there is a key, so a click cannot fail with a <code>401</code> the visitor had no way to
 see coming. The moment a key is saved the state clears and everything enables,
-with no reload. None of this appears in local mode.</p>
+with no reload. That state is the only place the point is made: until a key is
+saved the top bar reads just <strong>Hosted demo.</strong>, and it says whose key answers
+and what the limits are once there is one. None of this appears in local mode.</p>
 <p>The visitor pastes a key on the <strong>Settings</strong> page. From there:</p>
 <ol>
 <li><strong>The browser keeps it</strong>, in that tab's <code>sessionStorage</code>. Closing the tab
@@ -4268,8 +4270,9 @@ panel reports that the index was built before the demo started and which
 databases it covers, and where the button would be it prints the server's own
 reason -- rebuilding writes to disk and the sample data never changes.</p>
 <p><strong>On:</strong> asking the twenty guided questions or any other question, the schema
-view, the per-node <strong>Debug</strong> drill-down with its traces, and the retrieval
-inspector read-only.</p>
+view of any of the three databases (the rail's <strong>Showing</strong> switcher), which
+database answered a run, the per-node <strong>Debug</strong> drill-down with its traces, and
+the retrieval inspector read-only.</p>
 <h2 id="read-only-sample-data">Read-only sample data</h2>
 <p>The demo's three SQLite databases are configured with <code>read_only: true</code> under
 their connection options, which opens them through SQLite's own URI form with
