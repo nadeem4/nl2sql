@@ -2863,6 +2863,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#a-model-for-each-step" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A model for each step
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#limits" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3988,6 +3999,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#a-model-for-each-step" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A model for each step
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#limits" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4117,14 +4139,19 @@ gate that protects it.</p>
 </thead>
 <tbody>
 <tr>
-<td>the API key</td>
+<td>the API keys</td>
 <td>saved to <code>.env.demo</code>, used by the process</td>
-<td>held by the browser tab, sent per request, used in memory, dropped</td>
+<td>one per provider, held by the browser tab, sent per request, used in memory, dropped</td>
+</tr>
+<tr>
+<td>a model per step</td>
+<td>written to <code>configs/llm.demo.yaml</code></td>
+<td>chosen in the browser tab, sent per request, saved nowhere</td>
 </tr>
 <tr>
 <td>Settings</td>
 <td>writes <code>.env.demo</code> and <code>configs/llm.demo.yaml</code></td>
-<td>writes nothing; the page keeps the visitor's key</td>
+<td>writes nothing; the page keeps the keys and the choices</td>
 </tr>
 <tr>
 <td>Rebuild</td>
@@ -4177,27 +4204,58 @@ see coming. The moment a key is saved the state clears and everything enables,
 with no reload. That state is the only place the point is made: until a key is
 saved the top bar reads just <strong>Hosted demo.</strong>, and it says whose key answers
 and what the limits are once there is one. None of this appears in local mode.</p>
-<p>The visitor pastes a key on the <strong>Settings</strong> page. From there:</p>
+<p>The visitor pastes a key on the <strong>Settings</strong> page, one per provider. From there:</p>
 <ol>
-<li><strong>The browser keeps it</strong>, in that tab's <code>sessionStorage</code>. Closing the tab
-   clears it. Nothing else in the page reads it.</li>
-<li><strong>It travels as a request header</strong>, <code>X-NL2SQL-Api-Key</code>, on <code>POST /api/ask</code>
-   and nowhere else. A header rather than the body, because a body is what
-   request logs and validation errors quote back. The playground is served over
-   plain HTTP locally and over the host's TLS when it is published, so deploy it
-   behind HTTPS.</li>
+<li><strong>The browser keeps it</strong>, in that tab's <code>sessionStorage</code>, under that
+   provider's own name. Closing the tab clears it. Nothing else in the page
+   reads it.</li>
+<li><strong>It travels as a request header of its own</strong>, <code>X-NL2SQL-Api-Key-&lt;provider&gt;</code>
+   (<code>X-NL2SQL-Api-Key-anthropic</code>), on <code>POST /api/ask</code> and nowhere else. A
+   header rather than the body, because a body is what request logs and
+   validation errors quote back; one header per provider, so a key never shares
+   a header with anything else and nothing that parses or quotes a header can
+   expose two at once. With exactly one key the older <code>X-NL2SQL-Api-Key</code> is
+   sent as well, and on its own it still means what it always did. The
+   playground is served over plain HTTP locally and over the host's TLS when it
+   is published, so deploy it behind HTTPS.</li>
 <li><strong>The server uses it for that one request.</strong> It is bound to the request with
-   <a href="https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/llm/request_key.py"><code>nl2sql.llm.request_key</code></a> and the LLM registry builds a client
-   from it while the pipeline graph is constructed. The client is cached
-   nowhere, so no later request and no other visitor can be handed it.</li>
+   <a href="https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/llm/request_key.py"><code>nl2sql.llm.request_key</code></a> and the LLM registry builds each
+   step's client from it while the pipeline graph is constructed. The client is
+   cached nowhere, so no later request and no other visitor can be handed it.</li>
 <li><strong>Then it is gone.</strong> It is never written to a file, never put in an
    environment variable, never held in a module-level cache, and never included
    in a response.</li>
 </ol>
-<p>The key's shape picks the provider, exactly as <code>--api-key</code> does: <code>sk-ant-</code> is
-Anthropic, <code>sk-or-</code> is OpenRouter, anything else is OpenAI. A key from a
-different provider than the server's configured default also moves the model to
-that provider's default, since a <code>gpt-</code> model means nothing to Anthropic.</p>
+<p>A key sent without naming a provider has its provider read from its shape,
+exactly as <code>--api-key</code> does: <code>sk-ant-</code> is Anthropic, <code>sk-or-</code> is OpenRouter,
+anything else is OpenAI. Such a key also moves the model to that provider's
+default when it differs from the server's configured one, since a <code>gpt-</code> model
+means nothing to Anthropic.</p>
+<h2 id="a-model-for-each-step">A model for each step</h2>
+<p>Choosing a model asks the server to remember nothing, so hosted mode keeps it.
+Under <strong>Models for each step</strong> on the Settings page, collapsed by default, the
+visitor can put each of the five model-using steps on a provider and model of
+their own. The choice lives in the same tab's <code>sessionStorage</code> and travels with
+each question in one more header:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>X-NL2SQL-Models: {"astplanner":"anthropic:claude-opus-5"}
+</code></pre></div>
+<p>A compact JSON object, agent name to <code>provider:model</code>, and nothing else; it
+carries no secret, which is why it is the one header the server parses and the
+one thing a refusal repeats. A step with no entry runs on the configured
+default, so the simple path stays one key, the defaults, and a question.</p>
+<p>The server checks every name against what the engine knows -- the pipeline's
+own steps, and the verified model lists in <code>nl2sql/llm/providers.py</code> -- before
+anything reaches a client. Each step is then built from the key for the
+provider it names: the planner can be on Claude while the answer writer stays
+on OpenAI, each calling its own endpoint with its own key.</p>
+<p><strong>A step whose chosen provider has no key is refused before the question
+runs</strong>, with <code>400</code> and a sentence naming both, for example <em>"The Query planner
+step is set to run on Anthropic, but no Anthropic key was supplied. Add one
+under Settings, or put that step back on a provider you have a key for."</em>
+Nothing is spent on the keys that were supplied. A step nobody chose a provider
+for is never refused this way: it takes the key for the provider it is
+configured on, or, failing that, the first key the request brought, exactly as
+a single key has always worked.</p>
 <p>What it does <strong>not</strong> do:</p>
 <ul>
 <li>It is not stored, so it cannot be reused for anyone else's question, and there
@@ -4213,10 +4271,12 @@ that provider's default, since a <code>gpt-</code> model means nothing to Anthro
 <li>It does not reach your data. The hosted demo answers only from the three
   sample databases shipped with the engine.</li>
 </ul>
-<p>A question with no key answers <code>401</code> with a sentence telling the visitor to add
-one under Settings; the page holds the controls closed before it comes to that,
-so the <code>401</code> is the guard rather than the first thing a visitor meets. A
-malformed key answers <code>400</code> without quoting what was sent.</p>
+<p>A question with no key at all answers <code>401</code> with a sentence telling the visitor
+to add one under Settings; the page holds the controls closed before it comes
+to that, so the <code>401</code> is the guard rather than the first thing a visitor meets.
+A malformed key answers <code>400</code> without quoting what was sent, and no refusal
+ever repeats something shaped like a key, not even when one was pasted into the
+model header by hand.</p>
 <h2 id="limits">Limits</h2>
 <p>Both live in this one process's memory. There are no accounts, no analytics and
 no storage.</p>
@@ -4266,7 +4326,8 @@ carries no key, and exists only so the session cap has something to count. A
 visitor who clears their cookies starts a new session; the rate limit, which is
 keyed by address, is what holds the pace down in the meantime.</p>
 <h2 id="what-is-off-and-what-is-on">What is off, and what is on</h2>
-<p><strong>Off:</strong> Settings persistence, Rebuild, answer ratings, and <code>--record</code> (refused
+<p><strong>Off:</strong> Settings <em>persistence</em> (choosing a model is on; it is only the saving
+that is off), Rebuild, answer ratings, and <code>--record</code> (refused
 before the server starts). <code>--api-key</code> is refused too: a server-side key is the
 one thing hosted mode is built to avoid, and any provider key exported into the
 process is cleared at start-up so nothing can fall back to it.</p>
@@ -4274,10 +4335,11 @@ process is cleared at start-up so nothing can fall back to it.</p>
 panel reports that the index was built before the demo started and which
 databases it covers, and where the button would be it prints the server's own
 reason -- rebuilding writes to disk and the sample data never changes.</p>
-<p><strong>On:</strong> asking the twenty guided questions or any other question, the schema
-view of any of the three databases (the rail's <strong>Showing</strong> switcher), which
-database answered a run, the per-node <strong>Debug</strong> drill-down with its traces, and
-the retrieval inspector read-only.</p>
+<p><strong>On:</strong> asking the twenty guided questions or any other question, a key per
+provider and a model per step (both kept by the browser), the schema view of
+any of the three databases (the rail's <strong>Showing</strong> switcher), which database
+answered a run, the per-node <strong>Debug</strong> drill-down with its traces, and the
+retrieval inspector read-only.</p>
 <h2 id="read-only-sample-data">Read-only sample data</h2>
 <p>The demo's three SQLite databases are configured with <code>read_only: true</code> under
 their connection options, which opens them through SQLite's own URI form with
@@ -4306,9 +4368,9 @@ time and the first question is answered at once:</p>
 default, which is what a Space routes to), and carries a healthcheck that polls
 <code>/api/meta</code>. <code>NL2SQL_DEMO_HOSTED=1</code> is set in the image, so hosted mode holds
 even if the command is overridden.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nb">cd</span><span class="w"> </span>deploy/huggingface
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>docker<span class="w"> </span>build<span class="w"> </span>-t<span class="w"> </span>nl2sql-demo<span class="w"> </span>.
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>docker<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>-p<span class="w"> </span><span class="m">7860</span>:7860<span class="w"> </span>nl2sql-demo
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nb">cd</span><span class="w"> </span>deploy/huggingface
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>docker<span class="w"> </span>build<span class="w"> </span>-t<span class="w"> </span>nl2sql-demo<span class="w"> </span>.
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>docker<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>-p<span class="w"> </span><span class="m">7860</span>:7860<span class="w"> </span>nl2sql-demo
 </code></pre></div>
 <p><code>docker compose up --build</code> in the same folder does it through
 <code>docker-compose.yml</code>, which builds the same image with the same settings.</p>
@@ -4399,8 +4461,8 @@ that, which is why it exists.</p>
 <h2 id="running-it-locally-instead">Running it locally instead</h2>
 <p>Hosted mode exists to show the engine on our sample data. To ask questions of
 your own data, with no limits and a key that never leaves your machine:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"nl2sql-engine[demo]"</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>nl2sql<span class="w"> </span>demo
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"nl2sql-engine[demo]"</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>nl2sql<span class="w"> </span>demo
 </code></pre></div>
 <p>See <a href="../../getting_started/demo/">Demo</a>.</p>
 
