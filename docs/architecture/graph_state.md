@@ -17,7 +17,7 @@ Fields (exact names and types from code):
 - `datasource_id: Optional[str]`
 - `datasource_resolver_response: Optional[DatasourceResolverResponse]`
 - `decomposer_response: Optional[DecomposerResponse]`
-- `global_planner_response: Optional[GlobalPlannerResponse]`
+- `execution_dag: Optional[ExecutionDAG]`
 - `aggregator_response: Optional[AggregatorResponse]`
 - `answer_synthesizer_response: Optional[AnswerSynthesizerResponse]`
 - `artifact_refs: Annotated[Dict[str, ArtifactRef], update_results]`
@@ -105,11 +105,11 @@ The lifecycle below lists creation, mutation, reads, and resets based strictly o
 
 ### `decomposer_response`
 - Creation/mutation: returned by `DecomposerNode` as `decomposer_response`.
-- Read points: `GlobalPlannerNode`, `build_scan_payload`, and `wrap_subgraph` (to find `sub_query` by id).
+- Read points: `build_scan_layer_router`, `build_scan_payload`, and `wrap_subgraph` (to find `sub_query` by id).
 - Reset: none in code.
 
-### `global_planner_response`
-- Creation/mutation: returned by `GlobalPlannerNode` as `global_planner_response`.
+### `execution_dag`
+- Creation/mutation: returned by `DecomposerNode`, which builds it from its own response (`decomposer/dag.py`).
 - Read points: `build_scan_layer_router` and `EngineAggregatorNode`.
 - Reset: none in code.
 
@@ -165,7 +165,7 @@ The lifecycle below lists creation, mutation, reads, and resets based strictly o
 Ownership is defined by which node returns updates for a field:
 - `datasource_resolver_response`: `DatasourceResolverNode`
 - `decomposer_response`: `DecomposerNode`
-- `global_planner_response`: `GlobalPlannerNode`
+- `execution_dag`: `DecomposerNode`
 - `aggregator_response`: `EngineAggregatorNode`
 - `answer_synthesizer_response`: `AnswerSynthesizerNode`
 - `artifact_refs`: `wrap_subgraph` (subgraph wrapper in `graph_utils.py`)
@@ -187,16 +187,15 @@ Step-by-step execution flow as defined in `build_graph` and routing:
 1. `run_with_graph` constructs `GraphState` with `user_query`, `user_context`, and optional `datasource_id`, then calls `graph.invoke(initial_state.model_dump())`.
 2. `DatasourceResolverNode` runs first and populates `datasource_resolver_response`, `reasoning`, and `errors`.
 3. `resolver_route` decides whether to continue based on `datasource_resolver_response`.
-4. `DecomposerNode` produces `decomposer_response` and reasoning.
-5. `GlobalPlannerNode` produces `global_planner_response` (including the `ExecutionDAG`).
-6. `build_scan_layer_router` emits `Send` branches using `build_scan_payload` for each pending scan node. The payload contains `subgraph_id`, `subgraph_name`, `trace_id`, `user_context`, `decomposer_response`, and `datasource_resolver_response`.
-7. Each subgraph is wrapped by `wrap_subgraph`, which:
+4. `DecomposerNode` produces `decomposer_response`, the `execution_dag` built from it, and reasoning.
+5. `build_scan_layer_router` emits `Send` branches using `build_scan_payload` for each pending scan node. The payload contains `subgraph_id`, `subgraph_name`, `trace_id`, `user_context`, `decomposer_response`, and `datasource_resolver_response`.
+6. Each subgraph is wrapped by `wrap_subgraph`, which:
    - Builds a `SubgraphExecutionState` using the payload and a `sub_query` resolved from `decomposer_response`.
    - Invokes the subgraph and validates the result into `SubgraphExecutionState`.
    - Returns updates for `artifact_refs`, `subgraph_outputs`, `errors`, and `reasoning`.
-8. The router checks `artifact_refs` to decide which scan nodes are still pending. When none remain, it routes to `aggregator`.
-9. `EngineAggregatorNode` consumes `global_planner_response` and `artifact_refs` to produce `aggregator_response`.
-10. `AnswerSynthesizerNode` consumes `aggregator_response` and `decomposer_response` to produce `answer_synthesizer_response`.
+7. The router checks `artifact_refs` to decide which scan nodes are still pending. When none remain, it routes to `aggregator`.
+8. `EngineAggregatorNode` consumes `execution_dag` and `artifact_refs` to produce `aggregator_response`.
+9. `AnswerSynthesizerNode` consumes `aggregator_response` and `decomposer_response` to produce `answer_synthesizer_response`.
 
 Subgraph internal flow uses `SubgraphExecutionState` and is defined in `build_sql_agent_graph`:
 `schema_retriever` -> `ast_planner` -> `logical_validator` -> `generator` -> `executor`, with a retry loop via `retry_handler` and `refiner`.
@@ -274,7 +273,6 @@ Subgraph state and execution:
 Mutators / consumers:
 - `packages/nl2sql/src/nl2sql/pipeline/nodes/datasource_resolver/node.py`
 - `packages/nl2sql/src/nl2sql/pipeline/nodes/decomposer/node.py`
-- `packages/nl2sql/src/nl2sql/pipeline/nodes/global_planner/node.py`
 - `packages/nl2sql/src/nl2sql/pipeline/nodes/aggregator/node.py`
 - `packages/nl2sql/src/nl2sql/pipeline/nodes/answer_synthesizer/node.py`
 - `packages/nl2sql/src/nl2sql/pipeline/nodes/schema_retriever/node.py`

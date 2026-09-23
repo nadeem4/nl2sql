@@ -78,7 +78,7 @@ def test_the_route_answers_on_the_hosted_demo_too():
 def test_an_engine_that_cannot_report_its_models_still_lists_the_steps():
     body = _client(_Broken()).get("/api/pipeline").json()
 
-    assert len(body["steps"]) == 14
+    assert len(body["steps"]) == 13
     assert all(s["model"] is None for s in body["steps"])
 
 

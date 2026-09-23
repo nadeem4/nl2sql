@@ -6,6 +6,7 @@ from langchain_core.runnables import Runnable
 if TYPE_CHECKING:
     from nl2sql.pipeline.state import GraphState
 
+from .dag import build_execution_dag
 from .schemas import DecomposerResponse, SubQuery, UnmappedSubQuery, PostCombineOp
 from .prompts import DECOMPOSER_PROMPT
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
@@ -241,8 +242,35 @@ class DecomposerNode:
                 unmapped_subqueries=unmapped,
             )
 
+            # The execution DAG is a pure function of this response, so it is
+            # built here rather than in a node of its own. It has its own
+            # failure: a decomposition can be well-formed and still not make a
+            # runnable graph (two identical sub-queries share one stable id, so
+            # the graph they describe has a node with two of everything). The
+            # response is returned either way -- the layer router ends a run
+            # with no DAG, leaving this error as its cause.
+            try:
+                execution_dag = build_execution_dag(response)
+            except Exception as exc:
+                logger.error(f"Execution DAG generation failed: {exc}")
+                return {
+                    "decomposer_response": response,
+                    "reasoning": [{"node": self.node_name,
+                                   "content": f"Execution DAG generation failed: {exc}",
+                                   "type": "error"}],
+                    "errors": [
+                        PipelineError(
+                            node=self.node_name,
+                            message=f"Execution DAG generation failed: {exc}",
+                            severity=ErrorSeverity.ERROR,
+                            error_code=ErrorCode.PLANNER_FAILED,
+                        )
+                    ],
+                }
+
             return {
                 "decomposer_response": response,
+                "execution_dag": execution_dag,
                 "reasoning": [{"node": self.node_name, "content": "Decomposition completed."}],
             }
 

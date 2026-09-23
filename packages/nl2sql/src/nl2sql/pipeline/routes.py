@@ -42,8 +42,7 @@ def build_scan_layer_router(ctx: NL2SQLContext, execute: bool = True):
     """
 
     def route_scan_layers(state: GraphState):
-        global_planner_response = state.global_planner_response
-        dag = global_planner_response.execution_dag if global_planner_response else None
+        dag = state.execution_dag
         decomposer_response = state.decomposer_response
         sub_queries = decomposer_response.sub_queries if decomposer_response else []
         sub_query_map = {sq.id: sq for sq in sub_queries}
@@ -51,7 +50,6 @@ def build_scan_layer_router(ctx: NL2SQLContext, execute: bool = True):
         if not dag or not dag.layers:
             return END
 
-        node_index = {n.node_id: n for n in dag.nodes}
         target_ids = next_scan_layer_ids(
             dag, artifact_refs, completed_scan_ids(state.subgraph_outputs)
         )
@@ -62,21 +60,17 @@ def build_scan_layer_router(ctx: NL2SQLContext, execute: bool = True):
 
         branches = []
         for node_id in target_ids:
-            if node_id in sub_query_map:
-                sq = sub_query_map[node_id]
-                datasource_id = sq.datasource_id
-            else:
-                node = node_index.get(node_id) if dag else None
-                if not node:
-                    continue
-                datasource_id = (node.attributes or {}).get("datasource_id")
+            # A scan node's id is its sub-query's id, so the lookup always hits.
+            sq = sub_query_map.get(node_id)
+            if sq is None:
+                continue
 
-            target = resolve_subgraph(datasource_id, ctx)
+            target = resolve_subgraph(sq.datasource_id, ctx)
             if not target:
                 raise PipelineExecutionError(
                     PipelineError(
                         node="layer_router",
-                        message=f"No compatible subgraph found for datasource '{datasource_id}'.",
+                        message=f"No compatible subgraph found for datasource '{sq.datasource_id}'.",
                         severity=ErrorSeverity.ERROR,
                         error_code=ErrorCode.INVALID_STATE,
                     )

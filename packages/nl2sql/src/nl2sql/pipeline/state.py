@@ -10,13 +10,13 @@ from nl2sql.common.errors import PipelineError
 from nl2sql.auth import UserContext
 from nl2sql.pipeline.nodes.datasource_resolver.schemas import DatasourceResolverResponse
 from nl2sql.pipeline.nodes.decomposer.schemas import DecomposerResponse, SubQuery
-from nl2sql.pipeline.nodes.global_planner.schemas import GlobalPlannerResponse
 from nl2sql.pipeline.nodes.aggregator.schemas import AggregatorResponse
 from nl2sql.pipeline.nodes.answer_synthesizer.schemas import AnswerSynthesizerResponse
 from nl2sql.pipeline.nodes.ast_planner.schemas import ASTPlannerResponse
 from nl2sql.pipeline.nodes.validator.schemas import LogicalValidatorResponse
 from nl2sql.pipeline.nodes.generator.schemas import GeneratorResponse
 from nl2sql.execution.contracts import ArtifactRef, ExecutorResponse
+from nl2sql.execution.dag import ExecutionDAG
 from nl2sql.pipeline.nodes.refiner.schemas import RefinerResponse
 from nl2sql.pipeline.subgraphs.schemas import SubgraphOutput
 from nl2sql.pipeline.nodes.schema_retriever.schema import Table
@@ -39,7 +39,7 @@ class GraphState(BaseModel):
         datasource_id (Optional[str]): Optional datasource override for resolution.
         datasource_resolver_response (Optional[DatasourceResolverResponse]): Output of resolver node.
         decomposer_response (Optional[DecomposerResponse]): Output of decomposer node.
-        global_planner_response (Optional[GlobalPlannerResponse]): Output of planner node.
+        execution_dag (Optional[ExecutionDAG]): The graph of sub-queries the decomposer built.
         aggregator_response (Optional[AggregatorResponse]): Output of aggregator node.
         answer_synthesizer_response (Optional[AnswerSynthesizerResponse]): Output of synthesizer node.
         artifact_refs (Dict[str, ArtifactRef]): Artifact refs keyed by ExecutionDAG node_id.
@@ -58,7 +58,7 @@ class GraphState(BaseModel):
     datasource_id: Optional[str] = Field(default=None, description="Optional datasource override for resolution.")
     datasource_resolver_response: Optional[DatasourceResolverResponse] = Field(default=None)
     decomposer_response: Optional[DecomposerResponse] = Field(default=None)
-    global_planner_response: Optional[GlobalPlannerResponse] = Field(default=None)
+    execution_dag: Optional[ExecutionDAG] = Field(default=None)
     aggregator_response: Optional[AggregatorResponse] = Field(default=None)
     answer_synthesizer_response: Optional[AnswerSynthesizerResponse] = Field(default=None)
     artifact_refs: Annotated[Dict[str, ArtifactRef], update_results] = Field(default_factory=dict)

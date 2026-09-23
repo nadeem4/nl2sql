@@ -40,7 +40,7 @@ flowchart LR
 
 From `GraphState`:
 
-- `global_planner_response.execution_dag` (required)
+- `execution_dag` (required)
 - `artifact_refs` (required)
 
 Validation performed:

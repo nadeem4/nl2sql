@@ -8,7 +8,6 @@ For pipeline-level wiring, see `../pipeline.md`. For subgraph wiring and lifecyc
 
 - [DatasourceResolverNode](datasource_resolver_node.md)
 - [DecomposerNode](decomposer_node.md)
-- [GlobalPlannerNode](global_planner_node.md)
 - [EngineAggregatorNode](engine_aggregator_node.md)
 - [AnswerSynthesizerNode](answer_synthesizer_node.md)
 

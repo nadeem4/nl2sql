@@ -8,7 +8,7 @@ from nl2sql.pipeline.routes import build_scan_layer_router
 def test_router_ends_instead_of_aggregating_when_execute_is_false(monkeypatch):
     monkeypatch.setattr("nl2sql.pipeline.routes.next_scan_layer_ids", lambda dag, refs, completed=frozenset(): [])
     dag = SimpleNamespace(layers=[["sq1"]], nodes=[])
-    state = SimpleNamespace(global_planner_response=SimpleNamespace(execution_dag=dag),
+    state = SimpleNamespace(execution_dag=dag,
                             decomposer_response=None, artifact_refs={"sq1": object()}, subgraph_outputs={})
     assert build_scan_layer_router(SimpleNamespace(), execute=False)(state) == END
     sends = build_scan_layer_router(SimpleNamespace(), execute=True)(state)
@@ -17,7 +17,7 @@ def test_router_ends_instead_of_aggregating_when_execute_is_false(monkeypatch):
 
 def _finished_state(artifact_refs):
     dag = SimpleNamespace(layers=[["sq1"]], nodes=[])
-    return SimpleNamespace(global_planner_response=SimpleNamespace(execution_dag=dag),
+    return SimpleNamespace(execution_dag=dag,
                            decomposer_response=None, artifact_refs=artifact_refs,
                            subgraph_outputs={"sql_agent:sq1:t": object()})
 

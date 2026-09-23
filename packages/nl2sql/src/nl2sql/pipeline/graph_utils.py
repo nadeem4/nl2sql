@@ -6,7 +6,7 @@ from langchain_core.runnables import Runnable, RunnableConfig
 
 from nl2sql.common.errors import ErrorCode, ErrorSeverity, PipelineError
 from nl2sql.context import NL2SQLContext
-from nl2sql.pipeline.nodes.global_planner.schemas import ExecutionDAG
+from nl2sql.execution.dag import ExecutionDAG
 from nl2sql.pipeline.plan_cache import PlanCache
 from nl2sql.pipeline.state import GraphState, SubgraphExecutionState
 from nl2sql.pipeline.subgraphs import SubgraphOutput

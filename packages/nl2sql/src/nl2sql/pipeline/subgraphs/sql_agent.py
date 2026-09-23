@@ -6,7 +6,7 @@ from nl2sql.common.cancellation import CancellationToken
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.common.settings import settings
 from nl2sql.pipeline.state import SubgraphExecutionState
-from nl2sql.pipeline.nodes.ast_planner import ASTPlannerNode
+from nl2sql.pipeline.nodes.ast_planner.node import ASTPlannerNode
 from nl2sql.pipeline.nodes.schema_retriever import SchemaRetrieverNode
 from nl2sql.pipeline.nodes.validator import LogicalValidatorNode
 from nl2sql.pipeline.nodes.refiner import RefinerNode

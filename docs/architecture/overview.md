@@ -17,8 +17,7 @@ flowchart TD
     Runtime --> Graph[build_graph()]
     Graph --> Resolver[DatasourceResolverNode]
     Resolver --> Decomposer[DecomposerNode]
-    Decomposer --> Planner[GlobalPlannerNode]
-    Planner --> Router[Scan Layer Router]
+    Decomposer --> Router[Scan Layer Router]
     Router --> Subgraph[SQL Agent Subgraph]
     Subgraph --> Router
     Router --> Aggregator[EngineAggregatorNode]
@@ -61,7 +60,7 @@ flowchart LR
 
 ## Major subsystems (and responsibilities)
 
-- **Planner / Decomposer**: `DecomposerNode` produces stable, semantically-scoped sub-queries; `GlobalPlannerNode` produces a deterministic `ExecutionDAG`.
+- **Planner / Decomposer**: `DecomposerNode` produces stable, semantically-scoped sub-queries and, from them, a deterministic `ExecutionDAG`.
 - **Schema Store**: `SchemaStore` persists versioned schema snapshots with fingerprints.
 - **Chunking + Retrieval**: `SchemaChunkBuilder` produces typed chunks; `VectorStore` provides staged retrieval for routing and planning context.
 - **Validation layer**: `LogicalValidatorNode` enforces schema correctness and RBAC.
@@ -78,7 +77,6 @@ sequenceDiagram
     participant Runtime as run_with_graph
     participant Resolver as DatasourceResolverNode
     participant Decomposer as DecomposerNode
-    participant Planner as GlobalPlannerNode
     participant Router as Scan Layer Router
     participant Subgraph as SQL Agent Subgraph
     participant Agg as EngineAggregatorNode
@@ -87,8 +85,7 @@ sequenceDiagram
     User->>Runtime: user_query
     Runtime->>Resolver: GraphState
     Resolver->>Decomposer: resolved datasources
-    Decomposer->>Planner: sub_queries + combine groups
-    Planner->>Router: ExecutionDAG
+    Decomposer->>Router: ExecutionDAG over the sub-queries
     Router->>Subgraph: Send(sub_query)
     Subgraph-->>Router: ArtifactRef + diagnostics
     Router->>Agg: all scan artifacts

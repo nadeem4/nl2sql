@@ -439,6 +439,17 @@ def test_the_engine_builds_its_benchmark_api_lazily():
     assert isinstance(NL2SQL.__dict__["benchmark"], property)
 
 
+def test_the_plan_cache_imports_without_the_nodes_package_importing_it_back():
+    """``plan_cache`` needs ``PlanModel``; ``ast_planner.node`` needs ``PlanCache``.
+
+    While ``nodes/__init__`` and ``nodes/ast_planner/__init__`` re-exported the
+    node classes, importing the schemas ran the node first, and the pair was a
+    cycle that only stayed hidden because some earlier import happened to load
+    them in the lucky order. Importing the cache on its own is the test.
+    """
+    assert _run("import nl2sql.pipeline.plan_cache; print('ok')") == "ok",         f"nl2sql.pipeline.plan_cache cannot be imported on its own. The rule is written down in {RULES}."
+
+
 def test_aggregation_never_imports_the_pipeline():
     """The pipeline's aggregator node calls the aggregation service; the reverse was a cycle."""
     offenders = [f"{_where(path)}:{lineno} {name}"

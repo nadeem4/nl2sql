@@ -7,8 +7,7 @@ This document consolidates the LangGraph pipeline architecture as implemented in
 ```mermaid
 flowchart TD
     Resolver[DatasourceResolverNode] --> Decomposer[DecomposerNode]
-    Decomposer --> Planner[GlobalPlannerNode]
-    Planner --> Router[layer_router]
+    Decomposer --> Router[layer_router]
     Router --> SqlAgent[SQL Agent Subgraph]
     SqlAgent --> Router
     Router --> Aggregator[EngineAggregatorNode]
@@ -19,7 +18,6 @@ flowchart TD
 
 - [DatasourceResolverNode](nodes/datasource_resolver_node.md)
 - [DecomposerNode](nodes/decomposer_node.md)
-- [GlobalPlannerNode](nodes/global_planner_node.md)
 - `layer_router` (routing function, not a node class)
 - [EngineAggregatorNode](nodes/engine_aggregator_node.md)
 - [AnswerSynthesizerNode](nodes/answer_synthesizer_node.md)
@@ -52,12 +50,11 @@ graph TD
 
 - `kind`: `scan`, `combine`, `post_filter`, `post_aggregate`, `post_project`, `post_sort`, `post_limit`
 - `inputs`: upstream node IDs
-- `output_schema`: `RelationSchema` (column specs)
-- `attributes`: operation-specific metadata (e.g., join keys, filters, metrics)
+- `attributes`: operation-specific metadata for a combine or post-combine node (join keys, filters, metrics). A `scan` node carries none: its ID is its sub-query's ID, so everything about it is one lookup away in `decomposer_response`.
 
 ## Routing and subgraph selection
 
-`build_scan_layer_router()` selects the next scan layer with missing artifacts and dispatches subgraphs in parallel using `Send()`. Scan node IDs are matched against `SubQuery.id` for datasource routing; otherwise datasource ID is resolved from node attributes.
+`build_scan_layer_router()` selects the next scan layer with missing artifacts and dispatches subgraphs in parallel using `Send()`. A scan node's ID is its sub-query's ID, so the datasource comes from that `SubQuery`.
 
 Subgraph selection is capability-based via `resolve_subgraph()`:
 

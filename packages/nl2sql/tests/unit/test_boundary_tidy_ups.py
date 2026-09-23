@@ -32,12 +32,12 @@ def test_the_wheel_carries_the_chinook_database():
 
 # F18: the DAG models are neutral, so the aggregation service need not import
 # the pipeline. The import rule itself lives in tests/architecture/.
-def test_the_global_planner_uses_the_neutral_dag_models():
+def test_the_decomposer_builds_the_neutral_dag_models():
     from nl2sql.execution import dag
-    from nl2sql.pipeline.nodes.global_planner import schemas
+    from nl2sql.pipeline.nodes.decomposer import dag as builder
 
-    assert schemas.ExecutionDAG is dag.ExecutionDAG
-    assert schemas.LogicalNode is dag.LogicalNode
+    assert builder.ExecutionDAG is dag.ExecutionDAG
+    assert builder.LogicalNode is dag.LogicalNode
 
 
 # F16: SQL is compared in the datasource's dialect, not sqlglot's default.

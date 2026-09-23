@@ -6,7 +6,6 @@ from nl2sql.pipeline.nodes.aggregator import EngineAggregatorNode
 from nl2sql.pipeline.nodes.answer_synthesizer import AnswerSynthesizerNode
 from nl2sql.pipeline.nodes.datasource_resolver import DatasourceResolverNode
 from nl2sql.pipeline.nodes.decomposer import DecomposerNode
-from nl2sql.pipeline.nodes.global_planner import GlobalPlannerNode
 from nl2sql.pipeline.routes import build_scan_layer_router, resolver_route
 from nl2sql.pipeline.state import GraphState
 from nl2sql.pipeline.subgraphs.sql_agent import build_sql_agent_graph
@@ -33,13 +32,11 @@ def build_graph(
     decomposer_node = DecomposerNode(ctx)
     aggregator_node = EngineAggregatorNode(ctx)
     synthesizer_node = AnswerSynthesizerNode(ctx)
-    global_planner_node = GlobalPlannerNode(ctx)
 
     sql_agent_subgraph = build_sql_agent_graph(ctx, execute=execute)
 
     graph.add_node("datasource_resolver", resolver_node)
     graph.add_node("decomposer", decomposer_node)
-    graph.add_node("global_planner", global_planner_node)
     graph.add_node(
         SQL_AGENT_SUBGRAPH,
         wrap_subgraph(sql_agent_subgraph, SQL_AGENT_SUBGRAPH, ctx, execute=execute),
@@ -56,10 +53,11 @@ def build_graph(
         {"continue": "decomposer", "end": END},
     )
 
-    graph.add_edge("decomposer", "global_planner")
+    # The decomposer builds the execution DAG itself, so its output is all the
+    # router needs: there is no node between them.
     route_scan_layers = build_scan_layer_router(ctx, execute=execute)
 
-    graph.add_edge("global_planner", "layer_router")
+    graph.add_edge("decomposer", "layer_router")
     graph.add_conditional_edges(
         "layer_router",
         route_scan_layers,

@@ -12,7 +12,7 @@ Source file path: `packages/nl2sql/src/nl2sql/pipeline/graph.py`
 
 ## Boundary Definition
 
-This graph is the top-level orchestrator. It encapsulates datasource resolution, decomposition, global planning, routing to subgraphs, aggregation, and answer synthesis. It does NOT implement subgraph internals (SQL planning/execution), per-node business logic, or adapter-specific execution; those are delegated to nodes and registered subgraphs.
+This graph is the top-level orchestrator. It encapsulates datasource resolution, decomposition (which builds the execution DAG), routing to subgraphs, aggregation, and answer synthesis. It does NOT implement subgraph internals (SQL planning/execution), per-node business logic, or adapter-specific execution; those are delegated to nodes and registered subgraphs.
 
 ---
 
@@ -51,8 +51,7 @@ Partial completion behavior:
 
 Execution order (nominal path):
 - `datasource_resolver` — `DatasourceResolverNode` — `packages/nl2sql/src/nl2sql/pipeline/nodes/datasource_resolver/node.py` — resolve candidate datasources, RBAC, and the answerability check (an LLM call).
-- `decomposer` — `DecomposerNode` — `packages/nl2sql/src/nl2sql/pipeline/nodes/decomposer/node.py` — decompose query into sub-queries.
-- `global_planner` — `GlobalPlannerNode` — `packages/nl2sql/src/nl2sql/pipeline/nodes/global_planner/node.py` — build execution DAG.
+- `decomposer` — `DecomposerNode` — `packages/nl2sql/src/nl2sql/pipeline/nodes/decomposer/node.py` — decompose query into sub-queries, and build the `ExecutionDAG` from them (`decomposer/dag.py`).
 - `layer_router` — inline lambda + `routes.build_scan_layer_router` — `packages/nl2sql/src/nl2sql/pipeline/routes.py` — route each scan layer to a subgraph or aggregator.
 - `<subgraph nodes>` — via `wrap_subgraph()` — `packages/nl2sql/src/nl2sql/pipeline/graph_utils.py` — invoke registered subgraphs per scan node.
 - `aggregator` — `EngineAggregatorNode` — `packages/nl2sql/src/nl2sql/pipeline/nodes/aggregator/node.py` — execute aggregation DAG.
@@ -63,8 +62,7 @@ Mermaid diagram (main pipeline only):
 flowchart TD
     datasource_resolver -->|continue| decomposer
     datasource_resolver -->|end| END
-    decomposer --> global_planner
-    global_planner --> layer_router
+    decomposer --> layer_router
     layer_router -->|subgraph| subgraph_exec
     subgraph_exec --> layer_router
     layer_router -->|aggregator| aggregator
@@ -88,17 +86,16 @@ Field ownership, reducers, and lifecycle are defined in `../graph_state.md`.
 2. `resolver_route` decides:
    - `continue` if allowed datasources exist and the question was judged answerable.
    - `end` if none exist, the question is not answerable, or the response is missing.
-3. `decomposer` uses the LLM to produce `SubQuery` objects and combine groups.
-4. `global_planner` builds a deterministic `ExecutionDAG` from sub-queries and combines.
-5. `layer_router` inspects the DAG and current `artifact_refs`:
+3. `decomposer` uses the LLM to produce `SubQuery` objects and combine groups, then builds a deterministic `ExecutionDAG` from them in code. The DAG is a pure function of that output, so it is not a node of its own; a DAG that cannot be built is reported as `PLANNER_FAILED` and the run ends at the router.
+4. `layer_router` inspects the DAG and current `artifact_refs`:
    - If no DAG or layers, returns `END`.
    - If next scan layer is empty, routes to `aggregator` -- or to `END` when no scan produced an artifact or `execute` is False.
    - For each scan node, resolves a compatible subgraph and sends `build_scan_payload`.
-6. Each subgraph execution returns `artifact_refs`, `subgraph_outputs`, and `errors` to `GraphState`.
-7. `layer_router` is re-entered until all scan-layer nodes produce artifacts.
-8. `aggregator` executes the DAG using the stored `artifact_refs`.
-9. `answer_synthesizer` summarizes aggregated results into a final answer.
-10. Graph reaches `END`.
+5. Each subgraph execution returns `artifact_refs`, `subgraph_outputs`, and `errors` to `GraphState`.
+6. `layer_router` is re-entered until all scan-layer nodes produce artifacts.
+7. `aggregator` executes the DAG using the stored `artifact_refs`.
+8. `answer_synthesizer` summarizes aggregated results into a final answer.
+9. Graph reaches `END`.
 
 ---
 
@@ -123,7 +120,7 @@ See `../failure_recovery.md` for retry scope and recovery behavior.
 ## Performance Characteristics
 
 - Blocking calls include LLM requests in `datasource_resolver`, `decomposer` and `answer_synthesizer`.
-- `global_planner` and `aggregator` are CPU-bound (DAG construction and local aggregation).
+- The decomposer's DAG construction and the `aggregator` are CPU-bound.
 - Subgraph executions are dispatched per scan layer and can run in parallel via LangGraph routing.
 - Overall pipeline is executed on a single-worker thread pool created per run and guarded by `settings.global_timeout_sec`.
 
@@ -170,6 +167,6 @@ See `../failure_recovery.md` for retry scope and recovery behavior.
 - Node implementations:
   - `packages/nl2sql/src/nl2sql/pipeline/nodes/datasource_resolver/node.py`
   - `packages/nl2sql/src/nl2sql/pipeline/nodes/decomposer/node.py`
-  - `packages/nl2sql/src/nl2sql/pipeline/nodes/global_planner/node.py`
+  - `packages/nl2sql/src/nl2sql/pipeline/nodes/decomposer/dag.py`
   - `packages/nl2sql/src/nl2sql/pipeline/nodes/aggregator/node.py`
   - `packages/nl2sql/src/nl2sql/pipeline/nodes/answer_synthesizer/node.py`

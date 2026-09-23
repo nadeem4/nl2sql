@@ -224,7 +224,7 @@ Prevents invalid execution requests and ensures capability compatibility.
 Post-combine ops must target known combine groups, all edges must reference existing nodes, and the DAG must be acyclic.
 
 ### Enforcement Points
-- `GlobalPlannerNode.__call__()` in `nl2sql.pipeline.nodes.global_planner.node`
+- `build_execution_dag()` in `nl2sql.pipeline.nodes.decomposer.dag`, called by `DecomposerNode.__call__()`
 - `ExecutionDAG._layered_toposort()` in `nl2sql.execution.dag`
 
 ### Failure Behavior
@@ -417,7 +417,7 @@ The validator resolves columns against a throw-away query in which every table i
 - `packages/nl2sql/src/nl2sql/pipeline/nodes/generator/node.py`
 - `packages/nl2sql/src/nl2sql/pipeline/nodes/executor/node.py`
 - `packages/nl2sql/src/nl2sql/execution/executor/sql_executor.py`
-- `packages/nl2sql/src/nl2sql/pipeline/nodes/global_planner/node.py`
+- `packages/nl2sql/src/nl2sql/pipeline/nodes/decomposer/dag.py`
 - `packages/nl2sql/src/nl2sql/execution/dag.py`
 - `packages/nl2sql/src/nl2sql/aggregation/aggregator.py`
 - `packages/nl2sql/src/nl2sql/context.py`
