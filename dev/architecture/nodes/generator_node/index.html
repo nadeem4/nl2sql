@@ -2081,6 +2081,16 @@
 <li><code>SQL_GEN_FAILED</code></li>
 </ul>
 <p>A malformed join graph is a planning error, not something to guess around. <code>SQL_GEN_FAILED</code> is raised when a join names an undeclared alias, when a join connects two tables that are both already in scope, when a join cannot be reached from the <code>FROM</code> table, or when a declared table is never joined.</p>
+<p>In practice the planner should never see this. There is no retry edge after the
+generator, so a <code>SQL_GEN_FAILED</code> ends the sub-query. <code>LogicalValidatorNode</code>
+therefore runs <code>_build_query()</code> itself and reports the same <code>ValueError</code> as a
+<strong>retryable</strong> <code>INVALID_PLAN_STRUCTURE</code> one node earlier — see
+<a href="../logical_validator_node/#buildability-the-validator-runs-the-generator">Buildability</a>.
+The checks below stay where they are: they are the single definition of the
+rules, and the validator calling this code is what keeps the two in step.
+<code>SUPPORTED_BINARY_OPS</code> is exported for the same reason — it is the set
+<code>SqlVisitor._visit_binary</code> renders, and the validator rejects anything outside
+it before the plan gets here.</p>
 <p>Logs exceptions via <code>logger.exception</code>.</p>
 <hr/>
 <h2 id="retry-idempotency">Retry + Idempotency</h2>

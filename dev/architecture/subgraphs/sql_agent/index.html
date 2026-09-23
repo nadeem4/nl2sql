@@ -2101,6 +2101,13 @@ Source file path: <code>packages/nl2sql/src/nl2sql/pipeline/subgraphs/sql_agent.
 <li>No subgraph-specific metrics or trace spans are emitted.</li>
 <li>Retry loop only considers planner and logical validation errors.</li>
 </ul>
+<p>Because the generator has no retry edge, the invariant the loop depends on is
+that <strong><code>logical_validator</code> rejects every plan <code>generator</code> would refuse to
+build</strong>. <code>LogicalValidatorNode._validate_buildable()</code> enforces it by running the
+generator's own <code>_build_query()</code> — see
+<a href="../../nodes/logical_validator_node/#buildability-the-validator-runs-the-generator">Buildability</a>.
+Without it, a plan whose tables are not joined reached <code>generator</code> and ended the
+sub-query with a terminal <code>SQL_GEN_FAILED</code>.</p>
 <hr/>
 <h2 id="related-code">Related Code</h2>
 <ul>

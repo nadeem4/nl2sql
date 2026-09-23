@@ -605,6 +605,19 @@
       
     </span>
 </a>
+<nav aria-label="Responsibilities" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#buildability-the-validator-runs-the-generator">
+<span class="md-ellipsis">
+      
+        Buildability: the validator runs the generator
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
 </li>
 <li class="md-nav__item">
 <a class="md-nav__link" href="#position-in-execution-graph">
@@ -1844,6 +1857,19 @@
       
     </span>
 </a>
+<nav aria-label="Responsibilities" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#buildability-the-validator-runs-the-generator">
+<span class="md-ellipsis">
+      
+        Buildability: the validator runs the generator
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
 </li>
 <li class="md-nav__item">
 <a class="md-nav__link" href="#position-in-execution-graph">
@@ -1992,6 +2018,7 @@
 <ul>
 <li>Validate query type (READ‑only).</li>
 <li>Validate ordinals, aliases, joins, and column references.</li>
+<li>Reject any plan the generator could not build (see <em>Buildability</em> below).</li>
 <li>Enforce RBAC table access using strict datasource namespacing.</li>
 </ul>
 <p>Literal filter values are <strong>not</strong> validated against a column's sampled values.
@@ -1999,6 +2026,35 @@ The adapter records at most five sample values per text column, which is a
 retrieval hint, not the column's domain; treating it as an allowlist rejected
 correct filters on any higher-cardinality column. Safety comes from the RBAC
 table allowlist and from schema resolution, neither of which depends on stats.</p>
+<h3 id="buildability-the-validator-runs-the-generator">Buildability: the validator runs the generator</h3>
+<p><code>_validate_columns()</code> resolves columns against a query in which every plan table
+is <strong>CROSS JOINed</strong> (<code>_build_validation_query()</code>). That is correct for column
+resolution — alias-to-column visibility does not depend on join structure — and
+it is exactly why the validator is blind to join <em>topology</em>.</p>
+<p>The generator builds the real FROM clause and walks the join graph, so four
+structural mistakes used to pass validation CLEAN and fail one node later as a
+terminal <code>SQL_GEN_FAILED</code>: a declared table never joined to the FROM table, a
+plan with several tables and no joins at all, a join island that does not
+connect to the FROM table, and the same pair joined twice. <code>GeneratorNode</code> has
+no retry edge after it, so each of those ended the sub-query with no chance for
+the planner to fix it.</p>
+<p>Rather than restate those four rules here and let the two drift apart,
+<code>_validate_buildable()</code> calls <code>GeneratorNode._build_query()</code> with the
+sub-query's own datasource dialect and discards the tree. Any <code>ValueError</code>
+becomes a retryable <code>INVALID_PLAN_STRUCTURE</code>, and the message is extended with
+the plan's tables and the foreign keys declared between them, written with the
+plan's own aliases — the same move <code>_describe_column_failure()</code> makes for
+columns:</p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-0-1" id="__codelineno-0-1" name="__codelineno-0-1"></a>Table alias(es) t3 are declared in the plan but never joined to the FROM table.
+<a href="#__codelineno-0-2" id="__codelineno-0-2" name="__codelineno-0-2"></a>Plan tables: t1 = Artist, t2 = Album, t3 = Track.
+<a href="#__codelineno-0-3" id="__codelineno-0-3" name="__codelineno-0-3"></a>Foreign keys between them: t2 (Album).ArtistId = t1 (Artist).ArtistId;
+<a href="#__codelineno-0-4" id="__codelineno-0-4" name="__codelineno-0-4"></a>t3 (Track).AlbumId = t2 (Album).AlbumId.
+</code></pre></div>
+<p>It runs <strong>last</strong>, after every other static check, so each of those keeps its own
+error code and the generator's wording never replaces a more specific one. The
+cost is a second tree build, measured at ~2.4 ms against a ~3.4 s planner call.</p>
+<p><code>test_logical_validator_generator_parity.py</code> asserts the invariant directly: for
+each broken plan shape, the generator rejects it <strong>and</strong> so does the validator.</p>
 <p>Column resolution is delegated to <code>sqlglot</code>'s optimizer. The node converts the
 plan into a throw‑away <code>sqlglot</code> expression tree (reusing the generator's
 <code>SqlVisitor</code>) and runs <code>sqlglot.optimizer.qualify.qualify()</code> against a schema
@@ -2033,6 +2089,8 @@ emits a <code>PlanModel</code>, never SQL.</p>
 <li>Aliases must be unique.</li>
 <li>Joins must match known relationships.</li>
 <li>Column references must exist and be unambiguous.</li>
+<li>Every binary operator must be one the generator can render.</li>
+<li>The plan must build into a query at all.</li>
 </ul>
 <hr/>
 <h2 id="outputs">Outputs</h2>
@@ -2092,6 +2150,13 @@ was validated, not only what failed. The names are fixed and always in this orde
 <li><code>_date_operations()</code> rejects a date function whose unit is not <code>year</code>,
      <code>quarter</code>, <code>month</code> or <code>day</code>, or whose shape is not <code>(unit literal, date)</code>,
      with <code>INVALID_PLAN_STRUCTURE</code>; the message states the portable forms.</li>
+<li><code>_unsupported_operators()</code> rejects a binary <code>op</code> the generator's
+     <code>SqlVisitor</code> cannot render, with <code>INVALID_PLAN_STRUCTURE</code>. The schema's
+     <code>op</code> Literal admits <code>NOT</code>, which belongs on a unary expression; every
+     other member is in <code>generator.node.SUPPORTED_BINARY_OPS</code>. This runs before
+     any check that walks the plan through the visitor, because an operator it
+     cannot render makes all of them raise — which is how <code>op: "NOT"</code> used to
+     surface as a <code>VALIDATOR_CRASH</code>.</li>
 <li><code>_validate_columns()</code> builds the plan's <code>sqlglot</code> tree and runs
      <code>qualify(..., validate_qualify_columns=True)</code>. On failure each distinct
      column reference is re-probed so every bad reference is reported, and
@@ -2100,6 +2165,9 @@ was validated, not only what failed. The names are fixed and always in this orde
      wrapped in <code>exp.Ordered</code> first (<code>generator.node.ordered()</code>): sqlglot only
      wraps an argument it has to <em>parse</em>, and a bare function node in
      <code>Order.expressions</code> makes <code>qualify()</code> raise.</li>
+<li><code>_validate_buildable()</code> runs last and is the <strong>buildability</strong> check: it
+     calls the generator's own <code>_build_query()</code> and throws the tree away. See
+     below.</li>
 <li>Run <code>_validate_policy()</code> for RBAC enforcement. This always runs, even when
    static validation failed or raised — the security check is never skipped.
    Each forbidden table yields a <code>CRITICAL</code> <code>SECURITY_VIOLATION</code> whose message
@@ -2116,7 +2184,7 @@ was validated, not only what failed. The names are fixed and always in this orde
 <hr/>
 <h2 id="contracts-interfaces">Contracts &amp; Interfaces</h2>
 <p>Implements a LangGraph node callable:</p>
-<div class="highlight"><pre><span></span><code><a href="#__codelineno-0-1" id="__codelineno-0-1" name="__codelineno-0-1"></a>def __call__(self, state: SubgraphExecutionState) -&gt; Dict[str, Any]
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-1-1" id="__codelineno-1-1" name="__codelineno-1-1"></a>def __call__(self, state: SubgraphExecutionState) -&gt; Dict[str, Any]
 </code></pre></div>
 <p>Key contracts:</p>
 <ul>
