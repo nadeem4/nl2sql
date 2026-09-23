@@ -2179,8 +2179,9 @@ with a Rebuild button.</p>
 <h2 id="retrieval-mmr-not-a-re-ranking-model">Retrieval: MMR, not a re-ranking model</h2>
 <p>Every vector search in the engine is one maximal marginal relevance (MMR)
 search over the one Chroma collection, <code>nl2sql_store</code>, which holds every
-datasource (Chinook: 1 datasource, 11 table, 64 column and 11 relationship
-entries, 87 in all). There is <strong>no re-ranking model</strong>. What is sometimes called
+datasource (the demo's three databases: 3 datasource, 20 table, 121 column and
+18 relationship entries, 162 in all, of which Chinook is 87). There is <strong>no
+re-ranking model</strong>. What is sometimes called
 re-ranking is this:</p>
 <ol>
 <li>Embed the query text with the collection's embedder (the local
@@ -2239,8 +2240,10 @@ as <code>Chroma.max_marginal_relevance_search</code> returns them.</p>
 </table>
 <p>The schema retriever runs none of these when the schema has
 <code>SCHEMA_RETRIEVAL_FULL_SNAPSHOT_MAX_TABLES</code> tables or fewer (15 by default, so
-Chinook's 11 are always sent whole); the resolver runs none when the request
-names a <code>datasource_id</code> or only one datasource is registered (the Chinook demo).</p>
+each of the demo's three schemas, at 11, 4 and 5 tables, is always sent whole);
+the resolver runs none when the request names a <code>datasource_id</code> or only one
+datasource is registered. The demo is no longer such a case: with three
+datasources registered, the resolver searches on every question.</p>
 <p><code>nl2sql.indexing.retrieval_trace.mmr_search</code> is the one implementation: it
 makes the Chroma query and calls the same <code>maximal_marginal_relevance</code>
 function Chroma's method does, and returns the documents with a record of the

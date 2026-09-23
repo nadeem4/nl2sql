@@ -2111,7 +2111,9 @@ flowchart LR
 <li>Return <code>DatasourceResolverResponse</code> with resolved, allowed and unsupported IDs.</li>
 <li>On exceptions (including a failed model call), log and return <code>SCHEMA_RETRIEVAL_FAILED</code> with the exception text.</li>
 </ol>
-<p>Adding a second datasource restores the vector search with no other change.</p>
+<p>A single registered datasource is the shortcut, not the usual case: with more
+than one - the demo registers three - the vector search runs, and nothing else
+in the flow changes.</p>
 <h3 id="order-of-checks">Order of checks</h3>
 <p>The role check runs before the answerability check, so:</p>
 <ul>
@@ -2141,7 +2143,7 @@ flowchart LR
 <li><code>{datasources}</code> is a JSON list, one entry per allowed candidate, sorted by id, with sorted keys: <code>description</code> (the datasource description from the latest schema snapshot, which indexing takes from the datasources config) and <code>tables</code> (sorted bare table names).</li>
 <li>The instructions and datasources come first (the system message) and the question last (the human message), so the prompt is byte-identical across questions up to the question and a provider's prompt cache can serve the prefix. OpenAI caches only prompts of 1,024 tokens or more, so with one small datasource nothing is cached; the prefix grows, and becomes cacheable, with more datasources.</li>
 <li>The verdict is used only to refuse: a non-empty list lets every allowed candidate through to the decomposer unchanged.</li>
-<li>For Chinook the rendered prompt is about 260 tokens (<code>o200k_base</code>), plus the <code>AnswerabilityResponse</code> function schema.</li>
+<li>For Chinook on its own the rendered prompt is about 260 tokens (<code>o200k_base</code>), plus the <code>AnswerabilityResponse</code> function schema; the demo now registers three datasources, so its prompt is correspondingly longer.</li>
 </ul>
 <hr/>
 <h2 id="contracts-interfaces">Contracts &amp; Interfaces</h2>

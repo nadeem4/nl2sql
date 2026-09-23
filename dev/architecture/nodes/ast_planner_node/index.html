@@ -2150,7 +2150,7 @@ byte-identically. It drops empty fields and <code>schema_version</code>. Of the 
 statistics only <code>sample_values</code> is sent (it helps match literal filters such as
 <code>'Rock'</code> or <code>'USA'</code>); <code>min_value</code>, <code>max_value</code>, <code>null_percentage</code> and
 <code>distinct_count</code> stay in the snapshot.</p>
-<p>Measured on Chinook with tiktoken <code>o200k_base</code>, 12 demo questions, no LLM call
+<p>Measured on Chinook with tiktoken <code>o200k_base</code>, its 12 demo questions, no LLM call
 (<code>python scripts/measure_prompt_tokens.py</code>):</p>
 <table>
 <thead>
