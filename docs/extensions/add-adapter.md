@@ -39,8 +39,7 @@ Secrets are resolved by `SecretManager` before the registry initializes.
 Ensure `capabilities()` advertises the correct set for routing and execution:
 
 - `supports_sql` if SQL execution is supported.
-- `supports_schema_introspection` if schema can be fetched.
-- `supports_dry_run` or `supports_cost_estimate` if available.
+- `supports_rest` if REST execution is supported.
 
 ## Source references
 
