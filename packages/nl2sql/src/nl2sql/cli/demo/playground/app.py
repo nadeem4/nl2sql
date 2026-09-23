@@ -1,6 +1,6 @@
 """The playground FastAPI app.
 
-Fourteen routes:
+Fifteen routes:
 
 ``GET  /``                     the built React page
 ``GET  /api/meta``             mode, dataset, every registered datasource, the guided
@@ -12,6 +12,8 @@ Fourteen routes:
 ``POST /api/ask``              one ``QueryResult``, plus a ``replay_miss`` flag; a miss
                                carries one plain error instead of the raw ones
 ``GET  /api/trace/{trace_id}`` one run trace, read only from the traces directory
+``GET  /api/pipeline``         every step of a run in order, which five call a model, and the
+                               model each of those is configured to use
 ``GET  /api/settings``         the settings panel: masked key, verified models, one model per node
 ``POST /api/settings/key``     save an API key to ``.env.demo`` and switch to live
 ``POST /api/settings/models``  write a model per LLM node into ``llm.demo.yaml``
@@ -60,6 +62,7 @@ from nl2sql.cli.demo.playground.settings import SettingsPanel
 from nl2sql.common.settings import settings
 from nl2sql.feedback import NOTE_MAX_CHARS, FeedbackStore, run_record, run_signals
 from nl2sql.llm.request_key import use_api_key
+from nl2sql.pipeline.steps import describe_pipeline
 from nl2sql.tracing.document import find_trace, load_trace
 from nl2sql.tracing.trace import engine_info
 
@@ -76,6 +79,10 @@ REPLAY_MISS_MARKER = "fake llm: no rule for"
 REPLAY_MISS_MESSAGE = "No recorded answer for this question. Add an API key to ask it live."
 
 STATIC_DIR = pathlib.Path(str(files("nl2sql.cli.demo.playground") / "static"))
+
+# The long version of what the Pipeline page summarises. The playground is
+# served from a pip install, so a repository-relative path would not resolve.
+PIPELINE_DOCS = "https://github.com/nadeem4/nl2sql/blob/main/docs/architecture/pipeline.md"
 
 # Shown when the page has not been built. The React source lives in
 # `web/playground`; `npm run build` writes into STATIC_DIR and the result is
@@ -408,6 +415,21 @@ def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset
         finally:
             store.close()
         return {"saved": saved, "counts": counts}
+
+    @app.get("/api/pipeline")
+    def pipeline() -> Dict[str, Any]:
+        """Every step of a run, and the model each model step is configured on.
+
+        Read from :mod:`nl2sql.pipeline.steps`, which a test holds against the
+        graphs themselves, so the page cannot describe a pipeline that is not
+        the one running. Only a provider and a model are taken from the LLM
+        configuration; never a key.
+        """
+        try:
+            agents = engine.list_llms() or {}
+        except Exception:  # an engine without a registry (a plan-only harness)
+            agents = {}
+        return {"steps": describe_pipeline(agents), "docs": PIPELINE_DOCS}
 
     @app.get("/api/settings")
     def read_settings() -> Dict[str, Any]:

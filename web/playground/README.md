@@ -4,14 +4,15 @@ The React source for the page `nl2sql demo` serves.
 
 ## Pages
 
-Three pages, named across the top of each of them by one header nav
-(`.nav`, one `#nav-ask`, `#nav-settings`, `#nav-retrieval` link each). Every
-page states its title and one line saying what it does, then gives its content
-the full width.
+Four pages, named across the top of each of them by one header nav
+(`.nav`, one `#nav-ask`, `#nav-pipeline`, `#nav-settings`, `#nav-retrieval`
+link each). Every page states its title and one line saying what it does, then
+gives its content the full width.
 
 | Route | Page | What it holds |
 | --- | --- | --- |
 | `#/` | Ask | the composer, the rail (Search index and Database, with a switcher for which database) and the run |
+| `#/pipeline` | What runs a question | `#pipeline-panel`: every step, and which five call a model |
 | `#/settings` | Settings | `#settings-panel`: keys and a model per step |
 | `#/retrieval` | Retrieval inspector | `#retrieval-panel`: the inspector |
 
@@ -158,6 +159,20 @@ Back and Forward, and that routing touches nothing but the hash.
   where it is off (the same rule as Settings, or `FEEDBACK_ENABLED=false`) a
   line says why. See
   [Feedback and Signals](../../docs/observability/feedback.md).
+
+- **Pipeline** (`#nav-pipeline` in the header nav, route `#/pipeline`; the
+  page's content is `#pipeline-panel`): every step of a run in order, on the
+  same spine the run uses, with the five a model decides marked in the accent
+  and the deterministic ones left quiet. Each step gives its name in plain
+  words, its graph node name in mono (the name the Debug ledger uses) and one
+  sentence on what it decides. The steps come from `GET /api/pipeline`, which
+  reads them from `nl2sql.pipeline.steps`; a test holds that list against the
+  graphs themselves, so the page cannot describe a pipeline that is not the one
+  running. Before a run each model step names the model it is set to use; after
+  one it names the model that answered and shows that step's input, cached and
+  output tokens and its time, joined to `usage.nodes` and `timings` by node
+  name. `src/pipeline.js` does the joining and `npm test` covers it. The Debug
+  drill-down is unchanged; this page is the overview, not a replacement.
 
 - **Retrieval** (`#nav-retrieval` in the header nav, route `#/retrieval`; the
   page's content is `#retrieval-panel`): the Retrieval inspector. Text to embed

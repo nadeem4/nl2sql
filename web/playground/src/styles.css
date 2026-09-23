@@ -723,6 +723,49 @@ li[data-flag="denied"] .flag { color: var(--ink); background: var(--well); }
   @keyframes arrive { from { opacity: 0; transform: translateY(6px); } }
 }
 
+/* ---------- pipeline: what runs a question ----------
+   The same spine the run uses, because it is the same path. The only thing
+   this page adds is the one distinction it exists to make: a step a model
+   decides takes the accent in its mark and names its model; a deterministic
+   step keeps the quiet outline. Nothing else is coloured. */
+
+.pipeline { max-width: 900px; }
+.pipeline-note { font-size: 14.5px; max-width: 80ch; text-wrap: pretty; }
+.pipeline-note a { color: var(--accent); }
+.pipeline-state { margin-top: 10px; font-size: 13.5px; color: var(--ink-2); max-width: 80ch; }
+.pipeline-state .mono { color: var(--ink); font-size: 12.5px; }
+
+.steps { list-style: none; margin: 22px 0 0; padding-left: 34px; }
+.step { position: relative; padding: 14px 0 16px; }
+.step + .step { border-top: 1px solid var(--rule); }
+.step .mark { top: 19px; background: var(--paper); }
+.step[data-kind="model"] .mark { background: var(--accent); border-color: var(--accent); }
+/* The SQL agent's own nodes, nested under it exactly as the ledger nests them. */
+.step[data-depth="1"] { padding-left: 22px; }
+.step[data-depth="1"] .mark { left: -8px; width: 8px; height: 8px; top: 21px; }
+.step[data-depth="1"]::before {
+  content: ""; position: absolute; left: -21px; top: 25px; width: 14px; height: 1px;
+  background: var(--rule);
+}
+
+.step-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.step h3 { font-size: 15.5px; }
+.step-node { font-family: var(--mono); font-size: 12.5px; color: var(--ink-3); }
+.step-kind { font-size: 12.5px; color: var(--ink-3); margin-left: auto; }
+.step[data-kind="model"] .step-kind { color: var(--accent); font-weight: 600; }
+.step-does { margin-top: 5px; font-size: 14px; color: var(--ink-2); max-width: 74ch; text-wrap: pretty; }
+.step-model { margin-top: 6px; font-size: 13.5px; color: var(--ink); }
+.step-model b { font-weight: 400; color: var(--ink); }
+
+.step-run { display: flex; align-items: flex-end; gap: 10px 28px; flex-wrap: wrap; margin-top: 10px; }
+.step-tokens { margin: 0; display: flex; gap: 10px 22px; }
+.step-tokens div { display: flex; flex-direction: column-reverse; }
+.step-tokens dt { font-size: 12px; color: var(--ink-2); }
+.step-tokens dd { margin: 0; font-family: var(--mono); font-size: 14px; font-variant-numeric: tabular-nums; }
+.step-time { font-family: var(--mono); font-size: 13px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.step:not([data-ran]) .step-time { font-family: var(--sans); color: var(--ink-3); }
+.step-time .tag { margin-left: 8px; font-family: var(--sans); font-size: 12px; font-weight: 600; color: var(--accent); }
+
 /* ---------- narrow windows ---------- */
 
 @media (max-width: 1060px) {
@@ -737,7 +780,7 @@ li[data-flag="denied"] .flag { color: var(--ink); background: var(--well); }
 
 @media (max-width: 640px) {
   :root { --gutter: 16px; }
-  /* Three names fit across a phone, so the nav stays a nav. */
+  /* Four names fit across a phone, so the nav stays a nav. */
   .nav-link { padding: 7px 9px 9px; font-size: 14px; }
   .nav ul { gap: 0; }
   .page-head { padding-top: 20px; }
@@ -748,6 +791,10 @@ li[data-flag="denied"] .flag { color: var(--ink); background: var(--well); }
   .spine::before { left: 5px; }
   .mark { left: -26px; }
   .station[data-state="skipped"]::before { left: -21px; }
+  .steps { padding-left: 26px; }
+  .step[data-depth="1"] { padding-left: 14px; }
+  .step[data-depth="1"]::before { left: -17px; width: 10px; }
+  .step-kind { margin-left: 0; }
   #pane-validation .mark { left: -30px; }
   .station h3 { min-width: 0; }
   .checks { grid-template-columns: max-content minmax(0, 1fr); }

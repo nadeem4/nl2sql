@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { changedModels, choicesFrom, modelGroups, variableModels } from "./settings.js";
+import { PROVIDER_NAMES, changedModels, choicesFrom, modelGroups, variableModels } from "./settings.js";
 import { looksLikeKey, maskKey } from "./hostedKey.js";
 
 // Sends JSON and returns the parsed reply; a refusal carries the server's own
@@ -17,8 +17,6 @@ async function send(url, body) {
   }
   return reply;
 }
-
-const PROVIDER_NAMES = { openai: "OpenAI", openrouter: "OpenRouter", anthropic: "Anthropic" };
 
 function KeyForm({ settings, onSaved, recorded }) {
   const [key, setKey] = useState("");

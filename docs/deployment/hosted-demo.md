@@ -17,6 +17,7 @@ gate that protects it.
 | Rebuild | on (loopback, or `--allow-settings`) | refused |
 | Answer ratings | on (loopback, or `--allow-settings`) | off |
 | Retrieval inspector | on (loopback, or `--allow-settings`) | on, read only, at the hosted rate |
+| Pipeline page | on | on, read only: it names the steps and their models, never a key |
 | `--record` | supported | refused before the server starts |
 | the sample databases | read-only | read-only |
 | limits | none | a rate limit per visitor and a cap per session |

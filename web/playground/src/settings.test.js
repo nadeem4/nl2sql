@@ -1,7 +1,7 @@
 // Run with `npm test` (node's built-in runner; no test dependency).
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { changedModels, choicesFrom, choiceValue, modelGroups, variableModels } from "./settings.js";
+import { changedModels, choicesFrom, choiceValue, modelGroups, providerName, variableModels } from "./settings.js";
 
 const PROVIDERS = [
   { id: "openai", label: "OpenAI", usable: true, models: [
@@ -75,4 +75,13 @@ test("variableModels names the chosen models that run without a temperature", ()
 test("choiceValue is empty for the default", () => {
   assert.equal(choiceValue("openai", null), "");
   assert.equal(choiceValue("anthropic", "claude-opus-5"), "anthropic:claude-opus-5");
+});
+
+test("providerName writes each provider the way its own documentation does", () => {
+  assert.equal(providerName("openai"), "OpenAI");
+  assert.equal(providerName("anthropic"), "Anthropic");
+  assert.equal(providerName("openrouter"), "OpenRouter");
+  // A provider the page has no name for reads as the server sent it.
+  assert.equal(providerName("vllm"), "vllm");
+  assert.equal(providerName(null), "");
 });

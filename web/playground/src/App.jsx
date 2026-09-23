@@ -4,6 +4,7 @@ import IndexPanel from "./IndexPanel.jsx";
 import { needsRebuild } from "./indexHealth.js";
 import Run from "./Panes.jsx";
 import Settings from "./Settings.jsx";
+import Pipeline from "./Pipeline.jsx";
 import RetrievalInspector from "./Retrieval.jsx";
 import { answeredDatasources, datasourceNames } from "./datasources.js";
 import { guidedGroups } from "./questions.js";
@@ -94,6 +95,8 @@ export default function App() {
   const [indexError, setIndexError] = useState(null);
   const [retrieval, setRetrieval] = useState(null);
   const [retrievalError, setRetrievalError] = useState(null);
+  const [pipeline, setPipeline] = useState(null);
+  const [pipelineError, setPipelineError] = useState(null);
   const [feedback, setFeedback] = useState(null);
   // Which database the schema panel is showing. Null until something picks
   // one, when the server serves the demo's own.
@@ -114,6 +117,7 @@ export default function App() {
     getJson("/api/settings").then(setSettings).catch((e) => setSettingsError(e.message));
     getJson("/api/index").then(setIndex).catch((e) => setIndexError(e.message));
     getJson("/api/retrieval").then(setRetrieval).catch((e) => setRetrievalError(e.message));
+    getJson("/api/pipeline").then(setPipeline).catch((e) => setPipelineError(e.message));
     // Without it the rating control stays hidden; nothing else depends on it.
     getJson("/api/feedback").then(setFeedback).catch(() => {});
   }, []);
@@ -179,6 +183,9 @@ export default function App() {
   const settingsSaved = (next) => {
     setSettings(next);
     setMeta((m) => (m ? { ...m, mode: next.mode } : m));
+    // A saved model changes what each step is set to run on, which the
+    // Pipeline page states.
+    getJson("/api/pipeline").then(setPipeline).catch(() => {});
   };
 
   // `source` is the database a guided question belongs to: clicking one from
@@ -431,6 +438,12 @@ export default function App() {
                 answered={answered}
               />
             </section>
+          </div>
+        )}
+
+        {page === "pipeline" && (
+          <div className="sheet" id="pipeline-panel">
+            <Pipeline pipeline={pipeline} error={pipelineError} result={result} asked={asked} />
           </div>
         )}
 

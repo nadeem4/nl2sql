@@ -1,7 +1,7 @@
 // Where you are in the playground, kept in the address bar.
 //
 // A route is a hash that starts with "#/": "#/" is the question and answer
-// view, "#/settings" and "#/retrieval" are pages of their own. So a reload
+// view, "#/pipeline", "#/settings" and "#/retrieval" are pages of their own. So a reload
 // lands where you were and a link can be shared, with no server route to add.
 // Anything else -- a route nobody serves, or a bare fragment left by an older
 // link -- reads as the question and answer view, so Back and Forward always
@@ -21,6 +21,14 @@ export const PAGES = [
     title: "Ask",
     description:
       "Put a question to the demo database and follow the run: the plan, the checks, the SQL, the rows and what it cost.",
+  },
+  {
+    id: "pipeline",
+    path: "/pipeline",
+    label: "Pipeline",
+    title: "What runs a question",
+    description:
+      "Every step a question passes through, in order: the five a model decides, and the deterministic code that writes and checks the SQL around them.",
   },
   {
     id: "settings",

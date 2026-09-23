@@ -229,14 +229,40 @@ warning.
 
 ### Pages
 
-The playground is three pages, named across the top of every one of them:
-**Ask**, **Settings** and **Retrieval**. Each is a route in the address bar --
-`#/`, `#/settings` and `#/retrieval` -- so a reload stays where you were, a
+The playground is four pages, named across the top of every one of them:
+**Ask**, **Pipeline**, **Settings** and **Retrieval**. Each is a route in the
+address bar -- `#/`, `#/pipeline`, `#/settings` and `#/retrieval` -- so a
+reload stays where you were, a
 link can be pasted to someone else, and Back and Forward walk the pages you
 visited. A route nobody serves lands on Ask. The nav marks the page you are on,
 and marks Settings or Retrieval when the server has it off; the page itself
 then says why. Moving between pages keeps the question, the answer and the
 Debug choice: they belong to the visit, not to the page.
+
+### The Pipeline page
+
+**Pipeline** lists every step a question passes through, in the order a run
+takes them, and marks which of them a model decides. Five do: the answerability
+check, the question splitter, the query planner, the plan repair and the answer
+writer. The other nine are ordinary code -- the schema search, the execution
+plan, the layer router, the plan checks, the SQL writer, the executor and the
+result combiner among them -- which is the point: the model plans, and
+deterministic code writes the SQL, checks it against the real schema and this
+role's policy, and runs it.
+
+Each step gives its name in plain words, the graph node name the Debug ledger
+uses, and one sentence on what it decides. Before any question, each model step
+names the model it is set to use, so the page is worth reading on arrival.
+After a question, it names the model that answered that step and shows the
+step's input, cached and output tokens and its time, taken from the run the Ask
+page just showed.
+
+The list is not written by hand on the page: it comes from `GET /api/pipeline`,
+which reads it from the graph's own node names, and a test fails when a node is
+added, renamed or removed and the description does not follow. The per-node
+drill-down under **Debug** on the Ask page is unchanged; this page is the
+overview. The long version is in
+[Pipeline architecture](../architecture/pipeline.md).
 
 ### The Settings page
 
