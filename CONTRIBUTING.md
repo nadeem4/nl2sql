@@ -3,6 +3,13 @@
 Thanks for contributing to the `nl2sql` monorepo. This guide covers local setup,
 tests, documentation, and adapter development.
 
+The rules a change has to keep -- the package boundaries, where dialect
+knowledge lives, and what the model is allowed to emit -- are in `CLAUDE.md` at
+the repo root, one line each, with the reasoning in
+`docs/architecture/invariants.md`. Most are enforced by
+`packages/nl2sql/tests/architecture/test_boundaries.py`, so a broken boundary
+fails the suite rather than review.
+
 ## Monorepo layout
 
 - `packages/nl2sql`: Engine and pipeline, the CLI (`nl2sql.cli`), and the
@@ -53,6 +60,13 @@ pytest packages/nl2sql/tests/unit
 `pytest-randomly` shuffles test order on every run, so tests that depend on the
 order they run in fail locally instead of only in CI. Reproduce a failing run
 with the seed it prints: `pytest -p randomly --randomly-seed=<seed>`.
+
+The package boundaries are their own suite, an AST scan of `packages/*/src`
+that imports none of it:
+
+```bash
+pytest packages/nl2sql/tests/architecture
+```
 
 Integration tests need generated demo data, and some modules also need a real
 LLM API key. The two are separate markers, so the key-free subset -- the same

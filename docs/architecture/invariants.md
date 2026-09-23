@@ -332,6 +332,77 @@ Ensures latency bounds and prevents hung requests.
 
 ---
 
+## Package Boundaries Are One-Way
+
+### Definition
+Dependencies point in one direction: `nl2sql-adapter-sdk` → nothing, `nl2sql.adapters.*` → the SDK, `nl2sql` (the engine) → the SDK, and every caller — the REST API, the CLI, the playground — → the top-level `nl2sql` facade.
+
+Concretely:
+
+- The SDK imports only pydantic and the standard library.
+- An adapter imports only the SDK, its driver, SQLAlchemy, sqlglot, pydantic and the standard library. SQLAlchemy and sqlglot are adapter-layer libraries: the shared connection layer, and the expression vocabulary the engine hands over to be rendered.
+- Nothing outside `nl2sql/adapters/` imports an adapter, SQLAlchemy or a database driver. The engine reaches an adapter through the `nl2sql.adapters` entry points and `DatasourceAdapterProtocol`.
+- Nothing outside `nl2sql/cli/` imports the CLI, and `nl2sql.cli.demo` never imports `nl2sql.cli.commands`.
+- `nl2sql_api` imports only the top-level `nl2sql` namespace, and the playground reaches the engine only through `NL2SQL`'s public methods, never `engine.context`.
+- The runtime (`pipeline`, `execution`, `indexing`, `datasources`, `llm`, `auth`, `aggregation`, `schema`, `services`, `context`, `public_api`) never imports `nl2sql.evaluation` or `nl2sql.feedback` at module scope. A deferred import inside a function is fine.
+- A provider's API-key environment variable is read in `nl2sql/llm/` only. `PROVIDER_PRESETS` (`llm/registry.py`) is the one table; everything the CLI, the playground, evaluation and the REST API know about providers derives from it through `llm/providers.py`.
+
+### Enforcement Points
+- `packages/nl2sql/tests/architecture/test_boundaries.py` — an AST import scan of `packages/*/src`, one test per rule
+- `packages/api/tests/test_architecture.py` — the REST API's own imports, and that its response model *is* `nl2sql.QueryResult`
+
+### Failure Behavior
+A failing test naming the rule and the file, line and import that broke it. Each documented exception is a named constant in the test module with the reason beside it.
+
+### Why It Exists
+Each rule keeps one thing replaceable. The SDK is what a third-party adapter compiles against, so a dependency there is a dependency every adapter author inherits; an adapter that imported the engine would close the circle and make the split meaningless. Engine code that imports an adapter, or SQLAlchemy, is a second way to reach a database that no new adapter can plug into. And `import nl2sql` loading `nl2sql.evaluation` cost every SDK user the YAML loaders, the gold dataset and the fake LLM before anyone asked a question.
+
+### Example
+The playground once read `engine.context.ds_registry`, `engine.context.schema_store` and `engine.context.vector_store` through `getattr`, so the schema view, the retrieval inspector and index health existed only in the playground; `nl2sql-api` had a placeholder where index status should be. The fix was four facade methods that both callers use. The rule stops the shortcut being taken again, which is what keeps a second client cheap.
+
+---
+
+## Dialect Knowledge Lives in the Adapter
+
+### Definition
+No engine module names a database dialect or writes one database's SQL. The plan says *what*; the adapter says *how*. An adapter declares its dialect with `get_dialect()`, which must return a name `sqlglot.Dialect.get_or_raise` accepts, and may override `render_sql()` for what sqlglot cannot express.
+
+### Enforcement Points
+- `test_no_dialect_name_outside_the_adapters` and `test_no_dialect_specific_sql_outside_the_adapters` in `packages/nl2sql/tests/architecture/test_boundaries.py` — a scan of every non-docstring string literal, f-string chunks included
+- `test_get_dialect_is_a_sqlglot_dialect`, over every `nl2sql.adapters` entry point
+- The plan's one function vocabulary: `ALLOWED_FUNCTIONS` in `nl2sql.pipeline.nodes.ast_planner.functions` (see *Plan Functions Are Known Functions*)
+
+### Failure Behavior
+A failing test naming the literal and where it was written. The documented exceptions are the engine's own SQLite metadata store (`schema/store.py`, `schema/sqlite_store.py`, `common/settings.py`), the in-process polars/DuckDB compute engine (`aggregation/engines/polars_duckdb.py`), and the plan's function allow-list.
+
+### Why It Exists
+SQL that only one database understands, written in the engine, is wrong for every other database — and it is wrong silently, because it parses. A dialect name in engine code is worse: it is a switch statement that every future adapter has to be added to, in a repo whose point is that adapters are pluggable.
+
+### Example
+The planner prompt asked for `STRFTIME('%Y', o.order_date)` to get a year. On SQLite that works; on Postgres and SQL Server it is a call to a function that does not exist, and on MySQL it means something else. The fix was not to teach the prompt about dialects but to move the decision: the plan asks for `DATE_PART('year', x)`, the generator builds a typed sqlglot node, and `SQLiteAdapter.render_sql()` rewrites it to `STRFTIME` for SQLite only. Related: `get_dialect()` returned SQLAlchemy's `postgresql` and `mssql`, which sqlglot rejects, so *no* SQL could be generated for either datasource — a one-word bug that the entry-point contract test now catches.
+
+---
+
+## The Validator Rejects Everything the Generator Can
+
+### Definition
+Anything the generator can refuse, the logical validator must refuse first. The validator is the last node with a retry edge back to the planner; the generator runs after it.
+
+### Enforcement Points
+- `packages/nl2sql/tests/unit/test_logical_validator_generator_parity.py` — each case asserts both halves: the generator rejects the plan, and so does the validator, with a retryable code
+- `LogicalValidatorNode._validate_static()` in `nl2sql.pipeline.nodes.validator.node`
+
+### Failure Behavior
+A structural mistake is returned as a retryable `PipelineError` from the validator, so `check_logical_validation` sends the plan back to the refiner and the planner sees the message. The same mistake reaching the generator is a terminal `SQL_GEN_FAILED`.
+
+### Why It Exists
+A check that lives only in the generator is a dead end rather than a retry. The model produced a fixable plan and got a hard failure, one node past the only gate that could have asked it to try again.
+
+### Example
+The validator resolves columns against a throw-away query in which every table is `CROSS JOIN`ed — correct for column resolution, and deliberately blind to join topology. So a plan declaring three tables and joining only two validated CLEAN, then failed in the generator with *"Table alias(es) t3 are declared in the plan but never joined to the FROM table."* Three more join-shape mistakes behaved the same way. Every one is a pure function of `plan.tables` and `plan.joins` — no schema, no dialect — so each belongs in the validator, where the message reaches the planner.
+
+---
+
 ## Categories
 
 - **State**: Plan Model Is Strict and Read-Only; Relation Schemas Have Unique Column Names; Context Requires Vector Store and Schema Store Configuration
@@ -339,6 +410,8 @@ Ensures latency bounds and prevents hung requests.
 - **Security**: Policy Enforcement Is Namespaced and Fail-Closed; Datasource Access Is RBAC-Gated; Plan Model Is Strict and Read-Only
 - **Determinism**: Plan Ordinals Are Contiguous; Expected Schema Must Match Select List; Joins Must Be Valid and Schema-Backed
 - **Resource bounds**: SQL Generation Enforces a Row Limit Cap; Context Requires Vector Store and Schema Store Configuration
+- **Boundaries**: Package Boundaries Are One-Way; Dialect Knowledge Lives in the Adapter
+- **Retryability**: The Validator Rejects Everything the Generator Can; Plan Functions Are Known Functions
 
 ---
 
@@ -367,3 +440,7 @@ Ensures latency bounds and prevents hung requests.
 - `packages/nl2sql/src/nl2sql/schema/store.py`
 - `packages/nl2sql/src/nl2sql/pipeline/runtime.py`
 - `packages/nl2sql/src/nl2sql/auth/models.py`
+- `packages/nl2sql/src/nl2sql/pipeline/nodes/ast_planner/functions.py`
+- `packages/nl2sql/src/nl2sql/llm/registry.py`
+- `packages/adapter-sdk/src/nl2sql_adapter_sdk/protocols.py`
+- `packages/nl2sql/tests/architecture/test_boundaries.py`
