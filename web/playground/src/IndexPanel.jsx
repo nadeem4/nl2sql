@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { countRows, needsRebuild, relativeTime, shortVersion, statusLine } from "./indexHealth.js";
+import { countRows, joinNames, needsRebuild, relativeTime, shortVersion, sourceNames, statusLine } from "./indexHealth.js";
 
 // Server sentences mark commands with backticks; show them as code.
 function withCode(text) {
@@ -36,6 +36,10 @@ export default function IndexPanel({ index, error, onRebuild }) {
   const running = job.state === "running";
   const broken = needsRebuild(health);
   const ds = (health.datasources || []).find((d) => d.datasource_id === index.datasource_id) || health.datasources?.[0];
+  // One index, one heading; with several databases in it, name them instead of
+  // the one Rebuild happens to touch.
+  const names = sourceNames(health);
+  const several = names.length > 1;
   const rows = countRows(health.counts);
   const built = relativeTime(ds?.built_at || health.built_at);
 
@@ -55,8 +59,11 @@ export default function IndexPanel({ index, error, onRebuild }) {
   return (
     <section className="index" id="index-panel" aria-labelledby="index-heading" data-status={health.status}>
       <h2 id="index-heading">
-        Search index <code className="ds">{index.datasource_id}</code>
+        Search index {!several && <code className="ds">{index.datasource_id}</code>}
       </h2>
+      {several && (
+        <p className="index-sources" id="index-sources">Covers {joinNames(names)}.</p>
+      )}
       <p className="index-status" id="index-status" role="status">{statusLine(health)}</p>
 
       {health.status === "stale" && health.problems.length > 0 && (
@@ -121,7 +128,14 @@ export default function IndexPanel({ index, error, onRebuild }) {
           </button>
           {!running && (
             <p className="index-help">
-              Re-reads the schema, then replaces this datasource's entries once the new ones are complete.
+              {several ? (
+                <>
+                  Re-reads the schema, then replaces the entries for <code>{index.datasource_id}</code> once the new
+                  ones are complete.
+                </>
+              ) : (
+                "Re-reads the schema, then replaces this datasource's entries once the new ones are complete."
+              )}{" "}
               Questions keep using the current entries until then.
             </p>
           )}

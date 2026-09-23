@@ -3,7 +3,11 @@ import React, { useState } from "react";
 // The database, read from the engine's own indexed snapshot: the same schema
 // the planner is given. Visible before any question is asked. Tables the
 // current plan reads, and tables the role was refused, are marked.
-export default function SchemaPanel({ schema, used = [], denied = [], role }) {
+//
+// `databases` is how many are registered: this panel shows one of them, and
+// saying so is the difference between a demo with one database and a demo
+// whose resolver picks. The Search index above names them.
+export default function SchemaPanel({ schema, used = [], denied = [], role, databases = 1 }) {
   const [open, setOpen] = useState(() => new Set());
 
   const toggle = (name) =>
@@ -43,6 +47,7 @@ export default function SchemaPanel({ schema, used = [], denied = [], role }) {
         Database <code className="ds">{schema.datasource_id}</code>
       </h2>
       <p className="schema-sum">
+        {databases > 1 && `One of ${databases} databases: `}
         {schema.tables.length} tables, {rows.toLocaleString()} rows. Open a table for its columns and keys.
       </p>
       <ul className="tables">

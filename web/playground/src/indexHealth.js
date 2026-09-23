@@ -41,6 +41,20 @@ export function statusLine(health) {
   }
 }
 
+// The databases the index covers, in the order the server reports them. One is
+// the demo's own, and the rail names it in a heading; several make that heading
+// a lie, so the panels name them all instead.
+export function sourceNames(health) {
+  const sources = (health && health.datasources) || [];
+  return sources.map((d) => d.datasource_id).filter(Boolean);
+}
+
+// "chinook, support and webanalytics": a sentence, because the rail is prose.
+export function joinNames(names) {
+  if (names.length < 2) return names[0] || "";
+  return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+}
+
 export function needsRebuild(health) {
   return Boolean(health) && health.status !== "ok";
 }

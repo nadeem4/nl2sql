@@ -285,6 +285,7 @@ li[data-flag="denied"] .flag { color: var(--ink); background: var(--well); }
 
 .index { margin-bottom: 26px; padding-bottom: 18px; border-bottom: 1px solid var(--rule); }
 .index .ds { font-size: 13px; color: var(--ink-2); font-weight: 400; }
+.index-sources { font-size: 13px; color: var(--ink-2); margin: -4px 0 10px; max-width: 42ch; }
 .index-status { font-size: 13.5px; color: var(--ink-2); margin: -4px 0 10px; max-width: 42ch; }
 .index[data-status="empty"] .index-status,
 .index[data-status="missing"] .index-status,

@@ -185,15 +185,20 @@ so the page looked fine while every question failed with
 
 The playground's left rail opens with **Search index**: entries by type
 (datasource, tables, columns, relationships), the schema version they were
-built from, and when. When the index is empty, missing or out of date, a
-warning under the top bar says what that means for a question, and the panel's
-**Rebuild the index** button becomes the rail's one filled button. **Rebuild**
-is also always available on demand.
+built from, and when. One index holds every database, so with the demo's three
+the heading carries no name and the line under it says which they are --
+"Covers chinook, support and webanalytics" -- and the **Database** panel below,
+which shows one schema, opens with "One of 3 databases". With a single database
+both panels name it in their heading instead. When the index is empty, missing
+or out of date, a warning under the top bar says what that means for a
+question, and the panel's **Rebuild the index** button becomes the rail's one
+filled button. **Rebuild** is also always available on demand.
 
-- Rebuild re-reads each database's schema into a new snapshot and rebuilds
-  every datasource's entries beside the current ones; questions keep using
-  the current entries until the new ones are complete, and questions in flight
-  finish before the switch.
+- Rebuild re-reads one database's schema into a new snapshot and rebuilds its
+  entries beside the current ones; questions keep using the current entries
+  until the new ones are complete, and questions in flight finish before the
+  switch. That database is the demo's own, named in the button's help;
+  `nl2sql --env demo index` rebuilds all three.
 - It shows each step as it runs. The first run downloads the 79 MB embedding
   model, so it can take a few minutes.
 - **Write descriptions with the LLM** is off by default because it spends
