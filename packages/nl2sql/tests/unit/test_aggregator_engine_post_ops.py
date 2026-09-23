@@ -86,3 +86,77 @@ def test_an_unknown_join_key_still_fails_clearly(engine):
 
     with pytest.raises(Exception, match="nope"):
         engine.combine("join", [("left", frame), ("right", frame)], [{"left": "customer", "right": "nope"}])
+
+
+# ---------------------------------------------------------------------------
+# chinook_009, from the recorded plan in
+# benchmarks/tier2/chinook/2026-09-23_de42c40_gpt-5.4.json.
+#
+# The decomposer split "Which customers bought jazz tracks but never rock?"
+# into two sub-queries -- "customers who bought rock tracks" and "customers who
+# bought jazz tracks" -- each selecting one column aliased `customer`, and
+# combined them. There is no anti-join in the plan language, so the only
+# two-input operations available are `join` and `compare`, both inner. The
+# model reached for a right-hand column to negate against; `right.customer` is
+# that invention, and an inner join keyed on `customer` does not keep it.
+# ---------------------------------------------------------------------------
+
+JAZZ = pl.DataFrame({"customer": ["Ann", "Bo"]})
+ROCK = pl.DataFrame({"customer": ["Bo", "Cy"]})
+
+
+def _joined(engine):
+    return engine.combine("join", [("left", JAZZ), ("right", ROCK)],
+                          [{"left": "customer", "right": "right.customer"}])
+
+
+def test_the_inner_join_keeps_only_the_shared_key_column(engine):
+    # The premise of every assertion below: polars drops the right-hand key
+    # when `right_on` names it, so the combined frame is exactly ["customer"]
+    # -- which is the `valid columns: ["customer"]` in the recorded failure.
+    joined = _joined(engine)
+
+    assert joined.columns == ["customer"]
+    assert joined.rows() == [("Bo",)]  # the intersection: bought *both*
+
+
+@pytest.mark.parametrize("operation, attributes", [
+    ("filter", {"filters": [{"attribute": "right.customer", "operator": "!=", "value": "Bo"}]}),
+    ("project", {"expected_schema": [{"name": "right.customer"}]}),
+    ("sort", {"order_by": [{"attribute": "right.customer", "direction": "asc"}]}),
+    ("aggregate", {"group_by": [{"attribute": "right.customer"}],
+                   "metrics": [{"name": "customer", "aggregation": "count"}]}),
+])
+def test_a_side_qualified_post_combine_attribute_is_refused_with_an_explanation(
+    engine, operation, attributes
+):
+    # The recorded crash was polars' own `unable to find column
+    # "right.customer"; valid columns: ["customer"]`, which says nothing a
+    # caller or a planner can act on.
+    with pytest.raises(ValueError) as caught:
+        engine.post_op(operation, _joined(engine), attributes)
+
+    message = str(caught.value)
+    assert "right.customer" in message
+    assert "customer" in message  # what the frame actually has
+    # The real reason, said plainly rather than as a missing column.
+    assert "anti-join" in message
+    assert "cannot be expressed" in message
+
+
+def test_an_unknown_post_combine_attribute_names_what_is_available(engine):
+    # Not side-qualified: an ordinary typo still fails clearly, without the
+    # anti-join explanation, which would be wrong here.
+    with pytest.raises(ValueError) as caught:
+        engine.post_op("sort", JAZZ, {"order_by": [{"attribute": "spend"}]})
+
+    message = str(caught.value)
+    assert "spend" in message and "customer" in message
+    assert "anti-join" not in message
+
+
+def test_a_known_post_combine_attribute_is_untouched(engine):
+    # The check must not reject anything that worked before.
+    kept = engine.post_op("filter", JAZZ, {"filters": [{"attribute": "customer", "operator": "=", "value": "Ann"}]})
+
+    assert kept.rows() == [("Ann",)]

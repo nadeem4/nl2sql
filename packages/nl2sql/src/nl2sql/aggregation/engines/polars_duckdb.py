@@ -22,6 +22,55 @@ def _column(frame: pl.DataFrame, key: str) -> str:
     return bare if bare in frame.columns else key
 
 
+_SIDE_PREFIXES = ("left", "right", "base", "compare", "primary", "secondary")
+
+
+def _check_attributes(frame: pl.DataFrame, names: List[str]) -> None:
+    """Refuses a post-combine attribute the combined frame does not have.
+
+    polars reports this as ``unable to find column "right.customer"; valid
+    columns: ["customer"]``, which tells neither the caller nor the planner
+    anything. It is almost always one question: "which customers bought jazz
+    but never rock?".
+
+    The plan language has no anti-join. ``CombineGroup.operation`` is one of
+    ``standalone``, ``compare``, ``join`` or ``union``, and both two-input
+    operations are **inner** joins; ``FilterSpec`` has no null or existence
+    operator either. So there is no way to say "present on the left and absent
+    on the right", and the model reaches for a right-hand column to negate
+    against instead. That column does not exist: an inner join keyed on the
+    shared column drops the right-hand copy and suffixes the rest with
+    ``_right``.
+
+    Resolving the prefix away would be worse than the crash. ``right.customer``
+    would become ``customer``, the filter would run against the *intersection*,
+    and the answer to "bought jazz but never rock" would be the customers who
+    bought both -- wrong, and silently so. The question is refused with the
+    reason instead.
+    """
+    missing = [name for name in names if name and name not in frame.columns]
+    if not missing:
+        return
+
+    available = ", ".join(frame.columns) or "none"
+    detail = (
+        f"Post-combine operation references {', '.join(repr(m) for m in missing)}, "
+        f"which the combined result does not have. Available columns: {available}."
+    )
+    if any("." in m and m.split(".", 1)[0].lower() in _SIDE_PREFIXES for m in missing):
+        detail += (
+            " A column qualified by side does not survive the combine: joining on"
+            " the shared column drops the right-hand copy, and the other right-hand"
+            " columns are suffixed '_right'. This is what a question of the form"
+            " 'has X but never Y' looks like here, and it cannot be expressed:"
+            " the plan language has no anti-join or set-difference operation"
+            " (combine is one of standalone, compare, join, union -- all inner),"
+            " so the question is refused rather than answered with the"
+            " intersection."
+        )
+    raise ValueError(detail)
+
+
 def _filter(rows: pl.DataFrame, filters: List[Dict[str, Any]]) -> pl.DataFrame:
     for flt in filters:
         col, op, val = pl.col(flt.get("attribute")), flt.get("operator"), flt.get("value")
@@ -129,6 +178,16 @@ class PolarsDuckdbEngine:
         """
         if operation not in {"filter", "aggregate", "project", "sort", "limit"}:
             raise ValueError(f"Unsupported post-combine operation '{operation}'.")
+        # Every column this op will read, checked against the combined frame
+        # before polars is asked for any of them. See `_check_attributes`.
+        _check_attributes(frame, [
+            *(g.get("attribute") for g in attributes.get("group_by", [])),
+            *(m.get("name") for m in attributes.get("metrics", [])),
+            *(c.get("name") for c in attributes.get("expected_schema", [])
+              if operation == "project"),
+            *(f.get("attribute") for f in attributes.get("filters", [])),
+            *(o.get("attribute") for o in attributes.get("order_by", [])),
+        ])
         rows = frame
         if operation == "aggregate":
             rows = _aggregate(rows, attributes)

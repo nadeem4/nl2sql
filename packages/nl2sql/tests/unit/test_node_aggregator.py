@@ -375,3 +375,80 @@ def test_aggregator_missing_artifact_reference():
     result = node(state)
 
     assert result["errors"][0].error_code == ErrorCode.AGGREGATOR_FAILED
+
+
+def test_the_jazz_but_never_rock_dag_is_refused_with_the_reason(monkeypatch):
+    # chinook_009, the shape recorded in
+    # benchmarks/tier2/chinook/2026-09-23_de42c40_gpt-5.4.json: two sub-queries
+    # each selecting one column aliased `customer`, joined, then a post-combine
+    # op reaching for `right.customer` to negate against. It has failed in all
+    # three tier 2 runs; what reached the caller was polars' own `unable to
+    # find column "right.customer"; valid columns: ["customer"]`.
+    # Arrange
+    node = EngineAggregatorNode(SimpleNamespace())
+
+    jazz = LogicalNode(node_id="sq_jazz", kind="scan", inputs=[], output_schema=_schema(["customer"]))
+    rock = LogicalNode(node_id="sq_rock", kind="scan", inputs=[], output_schema=_schema(["customer"]))
+    combine = LogicalNode(
+        node_id="combine_cg_1",
+        kind="combine",
+        inputs=["sq_jazz", "sq_rock"],
+        output_schema=_schema(["customer"]),
+        attributes={"operation": "join",
+                    "join_keys": [{"left": "customer", "right": "right.customer"}]},
+    )
+    post_filter = LogicalNode(
+        node_id="op_not_rock",
+        kind="post_filter",
+        inputs=["combine_cg_1"],
+        output_schema=_schema(["customer"]),
+        attributes={"operation": "filter",
+                    "filters": [{"attribute": "right.customer", "operator": "=", "value": None}]},
+    )
+    dag = ExecutionDAG(
+        nodes=[jazz, rock, combine, post_filter],
+        edges=[
+            LogicalEdge(edge_id="e_j", from_id="sq_jazz", to_id="combine_cg_1", role="left"),
+            LogicalEdge(edge_id="e_r", from_id="sq_rock", to_id="combine_cg_1", role="right"),
+            LogicalEdge(edge_id="e_f", from_id="combine_cg_1", to_id="op_not_rock"),
+        ],
+    )
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        monkeypatch.setattr(settings, "result_artifact_backend", "local")
+        monkeypatch.setattr(settings, "result_artifact_base_uri", tmpdir)
+        monkeypatch.setattr(
+            settings,
+            "result_artifact_path_template",
+            "<tenant_id>/<request_id>/<subgraph_name>/<dag_node_id>/<schema_version>/part-00000.parquet",
+        )
+        store = ArtifactStore(
+            ArtifactStoreConfig(
+                backend="local",
+                base_uri=tmpdir,
+                path_template=settings.result_artifact_path_template,
+            )
+        )
+        refs = {}
+        for node_id, names in (("sq_jazz", ["Ann", "Bo"]), ("sq_rock", ["Bo", "Cy"])):
+            refs[node_id] = store.create_artifact_ref(
+                ResultFrame.from_row_dicts([{"customer": n} for n in names]),
+                {"tenant_id": "t1", "request_id": f"r1_{node_id}", "subgraph_name": "sql_agent",
+                 "dag_node_id": node_id, "schema_version": "v1"},
+            )
+        state = GraphState(
+            user_query="Which customers bought jazz tracks but never rock?",
+            global_planner_response=GlobalPlannerResponse(execution_dag=dag),
+            artifact_refs=refs,
+        )
+
+        # Act
+        result = node(state)
+
+    # Assert
+    [error] = result["errors"]
+    assert error.error_code == ErrorCode.AGGREGATOR_FAILED
+    assert "unable to find column" not in error.message  # polars' words, not ours
+    assert "anti-join" in error.message
+    assert "cannot be expressed" in error.message
+    assert "right.customer" in error.message
