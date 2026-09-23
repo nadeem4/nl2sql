@@ -17,12 +17,24 @@
 # own, per request, and writes it nowhere.
 FROM python:3.12-slim
 
-# Which engine to install. The default follows the repository's main branch,
-# which is where the demo should be; pin a release instead with
+# Which commit of the repository to install the engine from.
+#
+# A Space build takes no build arguments from us, so .github/workflows/publish_space.yml
+# rewrites this one line in the copy it pushes, to the sha it is deploying --
+# the same sha it writes into SOURCE_SHA beside this file. That does two jobs:
+# it pins the Space to the commit that deployed it (so re-running an old
+# workflow run restores the engine, not just the configuration), and it changes
+# the text of this instruction, which busts the layer cache for the install
+# below. Building `main` here instead left the Space serving whatever `main`
+# was the last time the image happened to be rebuilt.
+#
+# A GitHub archive rather than `git+https`, so the image needs no git; a bare
+# ref works for a branch and for a full sha, which `refs/heads/` would not.
+# Pin a release instead with
 #   --build-arg NL2SQL_SPEC="nl2sql-engine[demo]==0.2.0"
 # once one carries hosted mode.
 ARG NL2SQL_REF=main
-ARG NL2SQL_SPEC="nl2sql-engine[demo] @ https://github.com/nadeem4/nl2sql/archive/refs/heads/${NL2SQL_REF}.tar.gz#subdirectory=packages/nl2sql"
+ARG NL2SQL_SPEC="nl2sql-engine[demo] @ https://github.com/nadeem4/nl2sql/archive/${NL2SQL_REF}.tar.gz#subdirectory=packages/nl2sql"
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \

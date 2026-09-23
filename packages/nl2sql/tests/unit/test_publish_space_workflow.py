@@ -8,23 +8,34 @@ from, a missing concurrency guard that lets two deploys race, a renamed secret,
 or a Space id that quietly points somewhere else.
 """
 import pathlib
+import re
 
 import pytest
 
 yaml = pytest.importorskip("yaml")
 
-WORKFLOW = (
-    pathlib.Path(__file__).resolve().parents[4]
-    / ".github"
-    / "workflows"
-    / "publish_space.yml"
-)
+ROOT = pathlib.Path(__file__).resolve().parents[4]
+WORKFLOW = ROOT / ".github" / "workflows" / "publish_space.yml"
+SPACE = ROOT / "deploy" / "huggingface"
 
 SPACE_ID = "nadeem4nk/nl2sql-demo"
+
+# The one line the mirror step rewrites to pin the image to the deployed
+# commit. Written out here so a rename in either file fails a test rather than
+# silently shipping a Space that still builds from `main`.
+REF_ARG_ANCHOR = "ARG NL2SQL_REF="
 
 
 def _workflow() -> dict:
     return yaml.safe_load(WORKFLOW.read_text(encoding="utf-8"))
+
+
+def _step(name_fragment: str) -> dict:
+    job = next(iter(_workflow()["jobs"].values()))
+    for step in job["steps"]:
+        if name_fragment in (step.get("name") or ""):
+            return step
+    raise AssertionError(f"no step named like {name_fragment!r}")
 
 
 def _triggers(workflow: dict) -> dict:
@@ -77,6 +88,49 @@ def test_the_hub_client_is_pinned():
     text = WORKFLOW.read_text(encoding="utf-8")
 
     assert "huggingface_hub==" in text
+
+
+def test_every_deploy_writes_its_source_sha_into_the_space_root():
+    # Without this the mirror had nothing to commit whenever a deploy was
+    # triggered by an engine or playground change -- the Space folder itself
+    # had not moved -- so the Hub never rebuilt and the Space served whatever
+    # `main` was the last time the folder happened to change.
+    assert (SPACE / "SOURCE_SHA").exists()
+
+    mirror = _step("Push deploy/huggingface")["run"]
+    assert "SOURCE_SHA" in mirror
+    assert "$GITHUB_SHA" in mirror
+
+
+def test_the_mirror_pins_the_image_to_the_commit_it_is_deploying():
+    """The rewrite has to keep matching the line it rewrites.
+
+    If the `ARG` is renamed in the Dockerfile and the workflow is not, the
+    deploy ships a Space that still builds `main` -- so replay the substitution
+    here and insist it lands on exactly one line.
+    """
+    mirror = _step("Push deploy/huggingface")["run"]
+    dockerfile = (SPACE / "Dockerfile").read_text(encoding="utf-8")
+
+    assert REF_ARG_ANCHOR in mirror
+    _, hits = re.subn(rf"(?m)^{REF_ARG_ANCHOR}.*$", f"{REF_ARG_ANCHOR}deadbeef", dockerfile)
+    assert hits == 1
+
+    # And the deploy fails loudly rather than silently if it ever stops landing.
+    assert "grep -qx" in mirror
+
+
+def test_the_wait_step_does_not_call_an_absent_rebuild_a_deploy():
+    wait = _step("Wait for the Space")["run"]
+    summary = _step("Summarise")["run"]
+
+    # A run that pushed nothing triggered no build, so `RUNNING` says nothing
+    # about this commit. Both steps have to know the difference.
+    assert "PUSHED" in wait
+    assert "PUSHED" in summary
+    assert "No rebuild" in summary
+    # The pushed commit is checked against the Space's head rather than assumed.
+    assert "space_info" in wait
 
 
 def test_nothing_in_the_workflow_prints_the_token():
