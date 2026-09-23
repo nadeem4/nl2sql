@@ -66,7 +66,14 @@ Back and Forward, and that routing touches nothing but the hash.
   this question. Add an API key to ask it live." (`replay_miss` from `/api/ask`).
 - **Composer** (Ask page): the question box, the role selector
   (`#role-select`), **Plan only** (`#plan-only`), **Debug** (`#debug-toggle`)
-  and the guided questions from `/api/meta`.
+  and the guided questions from `/api/meta`. The demo registers three
+  databases, so the questions are shown in one `.guided-group` per datasource,
+  each headed by its id (`.guided-source`) in the quiet mono the rail uses, in
+  the order `/api/meta` sends them in `question_groups`. With a single
+  database there is nothing to tell apart, so no heading is printed and the
+  question box names that database; with several it does not, because the
+  resolver picks. `src/questions.js` does the grouping and falls back to the
+  flat `questions` list when a server sends no `question_groups`.
 - **The run**: one spine, read top to bottom. Question, Plan (`#pane-plan`),
   Checks (`#pane-validation`), SQL (`#pane-sql`), Rows (`#pane-rows`), Cost &
   time (`#pane-usage`). The checks sit across the spine as a gate: when a plan is
@@ -166,7 +173,8 @@ ledger, refused-table parsing, the trace drill-down helpers), `src/settings.js`
 (model options, which nodes changed, which chosen models run without a
 temperature), `src/indexHealth.js` (entry counts in plain words, the status
 line, relative build times), `src/router.js` (which page a hash names, the nav
-rows, and the router over `hashchange`) and `src/retrieval.js` (the MMR summary line, picks
+rows, and the router over `hashchange`), `src/questions.js` (the guided
+questions grouped by datasource) and `src/retrieval.js` (the MMR summary line, picks
 in order, entries passed over, the copyable text form) and `src/feedback.js`
 (when a run can be rated, the request body, the saved line) with Node's built-in test runner; there is no test dependency.
 

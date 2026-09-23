@@ -49,7 +49,7 @@ from nl2sql.llm.providers import (
 from nl2sql.cli.common.decorators import handle_cli_errors
 from nl2sql.cli.console import console, print_error, print_step, print_success
 from nl2sql.cli.demo import DemoManager
-from nl2sql.cli.demo.datasets import DEMO_QUESTIONS
+from nl2sql.cli.demo.datasets import DEMO_QUESTIONS, DEMO_QUESTIONS_BY_DATASOURCE
 from nl2sql.cli.demo.llm_config import persist_api_key as _persist_api_key
 from nl2sql.cli.demo.llm_config import point_llm_config_at as _point_llm_config_at
 from nl2sql.cli.demo.stamp import outdated_warning
@@ -396,6 +396,7 @@ def demo_command(
         host=host,
         allow_settings=allow_settings,
         recorded_questions=recorded_questions,
+        questions_by_datasource=DEMO_QUESTIONS_BY_DATASOURCE,
     )
     url = f"http://{host}:{port}/"
     print_success(f"Playground ready at {url}")

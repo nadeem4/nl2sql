@@ -5,6 +5,7 @@ import { needsRebuild } from "./indexHealth.js";
 import Run from "./Panes.jsx";
 import Settings from "./Settings.jsx";
 import RetrievalInspector from "./Retrieval.jsx";
+import { guidedGroups } from "./questions.js";
 import { createRouter, hashFor, navItems, pageFor, pageFromHash } from "./router.js";
 import { deniedTables, planTables } from "./run.js";
 
@@ -192,6 +193,7 @@ export default function App() {
   const canSet = settings && settings.available;
   const indexBroken = index && needsRebuild(index.health) && index.job.state !== "running";
   const onAsk = page === "ask";
+  const groups = guidedGroups(meta);
   const current = pageFor(page);
   const nav = navItems(page, {
     settings: settings && !settings.available,
@@ -266,9 +268,12 @@ export default function App() {
           <div className="layout">
             <section className="composer" aria-labelledby="ask-heading">
               <h2 id="ask-heading" className="visually-hidden">Ask</h2>
-              {/* The page title above already says Ask; this names the database. */}
+              {/* The page title above already says Ask. With one database this
+                  names it; with three the resolver picks, so it must not. */}
               <label className="question-label" htmlFor="question">
-                Your question for the {meta ? meta.dataset : "demo"} database
+                {groups.length > 1
+                  ? "Your question"
+                  : `Your question for the ${meta ? meta.dataset : "demo"} database`}
               </label>
               <textarea
                 id="question"
@@ -303,16 +308,26 @@ export default function App() {
                   <kbd aria-hidden="true">Ctrl Enter</kbd>
                 </button>
               </div>
-              {meta && meta.questions.length > 0 && (
+              {groups.length > 0 && (
                 <section className="guided" aria-labelledby="guided-heading">
                   <h3 id="guided-heading">Or try a guided question</h3>
-                  <ul>
-                    {meta.questions.map((q) => (
-                      <li key={q}>
-                        <button className="guided-q" onClick={() => ask(q)} disabled={busy}>{q}</button>
-                      </li>
-                    ))}
-                  </ul>
+                  {/* One database needs no labels; three do. */}
+                  {groups.map((group) => (
+                    <div className="guided-group" key={group.datasource}>
+                      {groups.length > 1 && (
+                        <h4 className="guided-source mono" id={`guided-${group.datasource}`}>
+                          {group.datasource}
+                        </h4>
+                      )}
+                      <ul aria-labelledby={groups.length > 1 ? `guided-${group.datasource}` : undefined}>
+                        {group.questions.map((q) => (
+                          <li key={q}>
+                            <button className="guided-q" onClick={() => ask(q)} disabled={busy}>{q}</button>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
                 </section>
               )}
             </section>

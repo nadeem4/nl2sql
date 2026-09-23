@@ -3,8 +3,9 @@
 Fourteen routes:
 
 ``GET  /``                     the built React page
-``GET  /api/meta``             mode, dataset, the guided questions, the roles and how
-                               many guided questions have replay recordings
+``GET  /api/meta``             mode, dataset, the guided questions (flat, and grouped
+                               by datasource), the roles and how many guided questions
+                               have replay recordings
 ``GET  /api/schema``           the indexed schema, so a visitor sees the database first
 ``POST /api/ask``              one ``QueryResult``, plus a ``replay_miss`` flag; a miss
                                carries one plain error instead of the raw ones
@@ -181,12 +182,17 @@ def _llm_configs(engine) -> Dict[str, Any]:
 def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset: str,
               trace_dir: Optional[pathlib.Path] = None, project_dir: Optional[pathlib.Path] = None,
               host: str = "127.0.0.1", allow_settings: bool = False,
-              recorded_questions: int = 0) -> FastAPI:
+              recorded_questions: int = 0,
+              questions_by_datasource: Optional[Dict[str, List[str]]] = None) -> FastAPI:
     """Builds the playground app over ``engine``.
 
     ``recorded_questions`` is how many of ``questions`` the loaded replay
     recordings can answer; ``/api/meta`` reports it so the page claims
     recorded answers only when there are some.
+
+    ``questions_by_datasource`` is the same guided questions, grouped, so the
+    page can label each pile instead of running three databases' worth of them
+    into one list. Without it the whole list is one group under ``dataset``.
 
     ``project_dir``, ``host`` and ``allow_settings`` drive the settings panel:
     it is on only for a demo project, served on a loopback host or with
@@ -247,9 +253,14 @@ def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset
     def index() -> str:
         return page
 
+    # One group per datasource that has guided questions, in the order given.
+    groups = [{"datasource": ds, "questions": list(qs)}
+              for ds, qs in (questions_by_datasource or {dataset: questions}).items() if qs]
+
     @app.get("/api/meta")
     def meta() -> Dict[str, Any]:
-        return {"mode": panel.mode, "dataset": dataset, "questions": questions, "roles": roles,
+        return {"mode": panel.mode, "dataset": dataset, "questions": questions,
+                "question_groups": groups, "roles": roles,
                 "recorded_questions": recorded_questions}
 
     @app.get("/api/schema")

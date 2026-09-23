@@ -219,9 +219,17 @@ button:disabled { cursor: default; }
 
 .rail h2 { font-size: 15px; margin-bottom: 10px; display: flex; align-items: baseline; gap: 8px; }
 
+/* With three databases registered, twenty guided questions read as one pile
+   unless each says which database it asks about. The name is the quiet mono
+   the rail uses for a datasource; with a single database there is nothing to
+   tell apart, so no name is printed. */
 .guided { margin-top: 22px; }
 .guided h3 { font-size: 14px; font-weight: 500; color: var(--ink-2); margin-bottom: 4px; }
-.guided ul { list-style: none; margin: 0; padding: 0; columns: 2 300px; column-gap: 32px; }
+.guided-group + .guided-group { margin-top: 14px; }
+.guided-source {
+  margin: 0 0 2px; font-size: 12.5px; font-weight: 400; color: var(--ink-3);
+}
+.guided ul { list-style: none; margin: 0; padding: 0; columns: 3 260px; column-gap: 32px; }
 .guided li { break-inside: avoid; }
 .guided-q {
   display: block; width: calc(100% + 8px); text-align: left;

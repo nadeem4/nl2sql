@@ -406,8 +406,10 @@ run the CLI from the directory you ran `nl2sql setup --demo` in.
 ## Sample questions
 
 `configs/sample_questions.demo.yaml` is written with twenty questions, the same
-ones the playground offers as guided questions. Chinook's twelve come first, so
-the demo opens on familiar ground:
+ones the playground offers as guided questions -- the playground shows them in
+one pile per database, each headed by the datasource id, rather than as one
+list of twenty. Chinook's twelve come first, so the demo opens on familiar
+ground:
 
 - How many customers do we have, by country?
 - Who are the top 5 customers by total spend?
