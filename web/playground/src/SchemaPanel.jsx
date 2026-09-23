@@ -4,11 +4,14 @@ import React, { useState } from "react";
 // the planner is given. Visible before any question is asked. Tables the
 // current plan reads, and tables the role was refused, are marked.
 //
-// `databases` is how many are registered: this panel shows one of them, and
-// saying so is the difference between a demo with one database and a demo
-// whose resolver picks. The Search index above names them.
-export default function SchemaPanel({ schema, used = [], denied = [], role, databases = 1 }) {
+// `datasources` is every registered database. With more than one the heading
+// carries a switcher, so each of them can be looked at rather than only the
+// one the demo opens on; with one there is nothing to choose and the panel is
+// exactly what it always was.
+export default function SchemaPanel({ schema, used = [], denied = [], role,
+                                     datasources = [], onDatasource }) {
   const [open, setOpen] = useState(() => new Set());
+  const several = datasources.length > 1;
 
   const toggle = (name) =>
     setOpen((prev) => {
@@ -44,12 +47,25 @@ export default function SchemaPanel({ schema, used = [], denied = [], role, data
   return (
     <section className="schema" aria-labelledby="schema-heading">
       <h2 id="schema-heading">
-        Database <code className="ds">{schema.datasource_id}</code>
+        Database {!several && <code className="ds">{schema.datasource_id}</code>}
       </h2>
+      {several && (
+        <p className="schema-pick">
+          <label htmlFor="schema-datasource">Showing</label>
+          <select id="schema-datasource" value={schema.datasource_id}
+                  onChange={(e) => onDatasource && onDatasource(e.target.value)}>
+            {datasources.map((name) => <option key={name} value={name}>{name}</option>)}
+          </select>
+        </p>
+      )}
       <p className="schema-sum">
-        {databases > 1 && `One of ${databases} databases: `}
         {schema.tables.length} tables, {rows.toLocaleString()} rows. Open a table for its columns and keys.
       </p>
+      {several && (
+        <p className="schema-cross" id="schema-cross">
+          Each question is answered from one database; joining across them is planned.
+        </p>
+      )}
       <ul className="tables">
         {schema.tables.map((table) => {
           const isOpen = open.has(table.name);

@@ -9,7 +9,7 @@ its browser playground, and the database adapters (PostgreSQL, MySQL, SQL
 Server, SQLite, DuckDB). The REST server is the separate `nl2sql-api` package.
 Full README and docs: <https://github.com/nadeem4/nl2sql>.
 
-![The nl2sql playground on its Ask page: the Ask, Settings and Retrieval nav across the top, the search index over three databases and one schema on the left, the question box and the guided questions on the right](https://raw.githubusercontent.com/nadeem4/nl2sql/main/docs/assets/screenshots/playground-overview.png)
+![The nl2sql playground on its Ask page: the Ask, Settings and Retrieval nav across the top, the search index over three databases and a switcher for whichever of their schemas to read on the left, the question box and the guided questions on the right](https://raw.githubusercontent.com/nadeem4/nl2sql/main/docs/assets/screenshots/playground-overview.png)
 
 ## How it works
 

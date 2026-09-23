@@ -8,7 +8,7 @@ before any SQL is generated.
 [![PyPI](https://img.shields.io/pypi/v/nl2sql-engine)](https://pypi.org/project/nl2sql-engine/)
 [![License: MIT](https://img.shields.io/github/license/nadeem4/nl2sql)](LICENSE)
 
-![The nl2sql playground on its Ask page: the Ask, Settings and Retrieval nav across the top, the search index over three databases and one schema on the left, the question box and the guided questions on the right](https://raw.githubusercontent.com/nadeem4/nl2sql/main/docs/assets/screenshots/playground-overview.png)
+![The nl2sql playground on its Ask page: the Ask, Settings and Retrieval nav across the top, the search index over three databases and a switcher for whichever of their schemas to read on the left, the question box and the guided questions on the right](https://raw.githubusercontent.com/nadeem4/nl2sql/main/docs/assets/screenshots/playground-overview.png)
 
 ## Contents
 
@@ -135,9 +135,11 @@ In the playground, pick one of the twenty guided questions -- twelve on
 Chinook, four on `support`, four on `webanalytics` -- or type one, and choose a
 role: `admin` and `analyst` can read the customer tables, `viewer` cannot, so
 asking as `viewer` about customers shows the validator refusing the plan before
-any SQL exists. With three databases registered, every question is routed
+any SQL exists. The rail's **Showing** switcher reads any of the three schemas,
+and follows the guided question you click. With three databases registered,
+every question is routed
 first: the resolver picks the one it is about, a step a single-database demo
-never reached. A question that spans two of them is not answerable yet -- each
+never reached, and the run says which one answered. A question that spans two of them is not answerable yet -- each
 sub-query is planned against one datasource, so the engine cannot join across
 databases, and the shared customer identities are groundwork for when it can.
 

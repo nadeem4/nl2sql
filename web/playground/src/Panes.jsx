@@ -22,7 +22,9 @@ function Station({ id, title, state, note, children }) {
   );
 }
 
-function Question({ asked, busy }) {
+// `answered` is the database the resolver picked, and is empty with a single
+// database registered: there is then nothing for it to have picked.
+function Question({ asked, busy, answered = [] }) {
   return (
     <Station id="pane-question" title="Question" state={asked ? "done" : "idle"}
       note={asked ? null : "Pick a guided question or type your own."}>
@@ -34,6 +36,11 @@ function Question({ asked, busy }) {
             {asked.planOnly && ", plan only"}
             {busy && <span className="working" role="status">Running the pipeline</span>}
           </p>
+          {!busy && answered.length > 0 && (
+            <p className="asked-meta" id="answered-from">
+              Answered from <strong>{answered.join(" and ")}</strong>, the database the resolver picked.
+            </p>
+          )}
         </>
       )}
     </Station>
@@ -352,7 +359,7 @@ function list(names) {
   return [...b.slice(0, -1).flatMap((x, i) => (i ? [", ", x] : [x])), " or ", b[b.length - 1]];
 }
 
-export default function Run({ asked, result, sub, busy, error, debug, replay, feedback }) {
+export default function Run({ asked, result, sub, busy, error, debug, replay, feedback, answered = [] }) {
   const checks = (sub && sub.validation) || [];
   const gateFailed = checks.some((c) => !c.passed);
   const miss = result && result.replay_miss;
@@ -379,7 +386,7 @@ export default function Run({ asked, result, sub, busy, error, debug, replay, fe
 
   return (
     <div className="spine" data-outcome={!asked ? "idle" : busy ? "busy" : gateFailed ? "refused" : "ran"} aria-busy={busy}>
-      <Question asked={asked} busy={busy} />
+      <Question asked={asked} busy={busy} answered={answered} />
       {miss && (
         <p className="notice" role="status">
           No recorded answer for this question. Add an API key to ask it live.

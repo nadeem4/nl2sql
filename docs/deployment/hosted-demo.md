@@ -116,8 +116,9 @@ databases it covers, and where the button would be it prints the server's own
 reason -- rebuilding writes to disk and the sample data never changes.
 
 **On:** asking the twenty guided questions or any other question, the schema
-view, the per-node **Debug** drill-down with its traces, and the retrieval
-inspector read-only.
+view of any of the three databases (the rail's **Showing** switcher), which
+database answered a run, the per-node **Debug** drill-down with its traces, and
+the retrieval inspector read-only.
 
 ## Read-only sample data
 
