@@ -4433,15 +4433,20 @@ so the page looked fine while every question failed with
 <h3 id="the-search-index-panel">The search index panel</h3>
 <p>The playground's left rail opens with <strong>Search index</strong>: entries by type
 (datasource, tables, columns, relationships), the schema version they were
-built from, and when. When the index is empty, missing or out of date, a
-warning under the top bar says what that means for a question, and the panel's
-<strong>Rebuild the index</strong> button becomes the rail's one filled button. <strong>Rebuild</strong>
-is also always available on demand.</p>
+built from, and when. One index holds every database, so with the demo's three
+the heading carries no name and the line under it says which they are --
+"Covers chinook, support and webanalytics" -- and the <strong>Database</strong> panel below,
+which shows one schema, opens with "One of 3 databases". With a single database
+both panels name it in their heading instead. When the index is empty, missing
+or out of date, a warning under the top bar says what that means for a
+question, and the panel's <strong>Rebuild the index</strong> button becomes the rail's one
+filled button. <strong>Rebuild</strong> is also always available on demand.</p>
 <ul>
-<li>Rebuild re-reads each database's schema into a new snapshot and rebuilds
-  every datasource's entries beside the current ones; questions keep using
-  the current entries until the new ones are complete, and questions in flight
-  finish before the switch.</li>
+<li>Rebuild re-reads one database's schema into a new snapshot and rebuilds its
+  entries beside the current ones; questions keep using the current entries
+  until the new ones are complete, and questions in flight finish before the
+  switch. That database is the demo's own, named in the button's help;
+  <code>nl2sql --env demo index</code> rebuilds all three.</li>
 <li>It shows each step as it runs. The first run downloads the 79 MB embedding
   model, so it can take a few minutes.</li>
 <li><strong>Write descriptions with the LLM</strong> is off by default because it spends
