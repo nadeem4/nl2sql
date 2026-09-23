@@ -115,7 +115,7 @@ def test_meta_and_ask():
     assert client.get("/api/meta").json() == {
         "mode": "replay", "dataset": "chinook", "questions": ["q1"],
         "question_groups": [{"datasource": "chinook", "questions": ["q1"]}],
-        "roles": ["admin", "viewer"], "recorded_questions": 0,
+        "roles": ["admin", "viewer"], "datasources": ["chinook"], "recorded_questions": 0,
         # Local mode: the public-demo server is off and has no limits to report.
         "hosted": False, "limits": None}
     r = client.post("/api/ask", json={"question": "q1", "role": "viewer", "execute": False})
@@ -158,6 +158,32 @@ def test_schema_route_reads_the_engine_snapshot():
     assert album["foreign_keys"] == [
         {"columns": ["ArtistId"], "references_table": "Artist", "references_columns": ["ArtistId"]}
     ]
+
+
+def test_meta_lists_every_registered_datasource_with_the_demo_s_own_first():
+    """The rail's switcher is built from this list, so all three have to be in it."""
+    engine = _Engine(datasources=("support", "chinook", "webanalytics"))
+    client = TestClient(build_app(engine, questions=[], roles=["admin"], mode="replay",
+                                  dataset="chinook"))
+    assert client.get("/api/meta").json()["datasources"] == ["chinook", "support", "webanalytics"]
+
+
+def test_meta_lists_a_datasource_with_no_guided_questions_too():
+    """A database is worth looking at whether or not a guided question asks about it."""
+    client = TestClient(build_app(_Engine(datasources=("chinook", "support")), questions=["c1"],
+                                  roles=["admin"], mode="replay", dataset="chinook",
+                                  questions_by_datasource={"chinook": ["c1"]}))
+    meta = client.get("/api/meta").json()
+    assert meta["datasources"] == ["chinook", "support"]
+    assert [g["datasource"] for g in meta["question_groups"]] == ["chinook"]
+
+
+def test_schema_route_follows_the_datasource_the_panel_asks_for():
+    engine = _Engine(snapshot=None, datasources=("chinook", "support"))
+    client = TestClient(build_app(engine, questions=[], roles=["admin"], mode="replay",
+                                  dataset="chinook"))
+    assert client.get("/api/schema").json()["datasource_id"] == "chinook"
+    assert client.get("/api/schema", params={"datasource": "support"}).json()["datasource_id"] == "support"
 
 
 def test_schema_route_is_empty_when_nothing_is_indexed():

@@ -11,7 +11,7 @@ the full width.
 
 | Route | Page | What it holds |
 | --- | --- | --- |
-| `#/` | Ask | the composer, the rail (Search index and Database) and the run |
+| `#/` | Ask | the composer, the rail (Search index and Database, with a switcher for which database) and the run |
 | `#/settings` | Settings | `#settings-panel`: keys and a model per step |
 | `#/retrieval` | Retrieval inspector | `#retrieval-panel`: the inspector |
 
@@ -61,10 +61,16 @@ Back and Forward, and that routing touches nothing but the hash.
 ## What the page shows
 
 - **Database** (left rail, or below the run on a narrow window): the indexed
-  schema from `/api/schema`, visible before any question. It is one database's,
-  so where the index holds several the summary opens with `One of 3 databases`
-  (`databases`, counted from the index health in `App`); with one it reads as
-  it always has. Each table shows its row count and the tables it refers to;
+  schema from `/api/schema`, visible before any question. It shows one database
+  at a time, and with more than one registered the heading carries a switcher
+  (`#schema-datasource`, the names from `datasourceNames` over `meta.datasources`)
+  that re-reads `/api/schema?datasource=`; under it one line says plainly that
+  each question is answered from one database and that joining across them is
+  planned (`#schema-cross`). Clicking a guided question from another pile moves
+  the switcher to that pile's database, so the rail shows the schema the
+  question is about. With a single database none of that is printed: the
+  heading names it and the panel reads exactly as it always has.
+  Each table shows its row count and the tables it refers to;
   open one for columns, types, keys and foreign keys. Tables the current plan
   reads are marked `in plan`; tables the role was refused are marked
   `refused for <role>`.
@@ -98,6 +104,12 @@ Back and Forward, and that routing touches nothing but the hash.
   `/api/meta`), or, with none, that replay mode has no recorded answers and a key
   is needed. A question replay has no answer for shows "No recorded answer for
   this question. Add an API key to ask it live." (`replay_miss` from `/api/ask`).
+  Hosted, it reads **Hosted demo.** and nothing more until this tab has a key:
+  the first-run state above the question box, and the Settings form, are
+  already saying what a key is for, and a third copy in the top bar pulled the
+  eye away from the one place that could do something about it. With a key
+  saved it says whose key answers and what the limits are (`hostedNote` in
+  `src/firstRun.js`).
 - **Composer** (Ask page): the question box, the role selector
   (`#role-select`), **Plan only** (`#plan-only`), **Debug** (`#debug-toggle`)
   and the guided questions from `/api/meta`. The demo registers three
@@ -113,7 +125,11 @@ Back and Forward, and that routing touches nothing but the hash.
   time (`#pane-usage`). The checks sit across the spine as a gate: when a plan is
   refused the page says so there, names the tables the role may not read, and
   the SQL and Rows stations show that nothing was written or run. A retried plan
-  shows the rejected attempt and the refiner's feedback.
+  shows the rejected attempt and the refiner's feedback. With more than one
+  database registered, the Question station also says which one answered
+  (`#answered-from`, from each sub-query's `datasource_id` in `/api/ask` via
+  `answeredDatasources`); with one there is nothing for the resolver to have
+  picked, so the line is not printed.
 - **Cost & time**: the question's totals (LLM calls, input, cached and output
   tokens, time waiting on the model, total time). With **Debug** on, a per-node
   table follows: one row per node that ran, in execution order, code nodes
@@ -209,7 +225,10 @@ temperature), `src/indexHealth.js` (entry counts in plain words, the status
 line, relative build times), `src/router.js` (which page a hash names, the nav
 rows, and the router over `hashchange`), `src/questions.js` (the guided
 questions grouped by datasource), `src/firstRun.js` (when the hosted demo has
-to ask for a key before it takes a question) and `src/retrieval.js` (the MMR summary line, picks
+to ask for a key before it takes a question, and what the mode line then says),
+`src/datasources.js` (the
+databases the switcher offers, and which one a run was answered from) and
+`src/retrieval.js` (the MMR summary line, picks
 in order, entries passed over, the copyable text form) and `src/feedback.js`
 (when a run can be rated, the request body, the saved line) with Node's built-in test runner; there is no test dependency.
 

@@ -163,10 +163,11 @@ otherwise raises `EmbeddingDimensionMismatchError` (or
 
 ### Index health and repair
 
-The playground's schema panel reads the schema snapshot; the resolver, which
+The playground's schema panel reads the schema snapshot, for whichever database
+its **Showing** switcher names; the resolver, which
 picks the database for every question when more than one is registered, reads
 the separate vector index, and with three registered it searches on every
-question. The two
+question. After a run the Question station names the database it picked. The two
 can disagree: a folder once had its snapshot intact and 0 entries in its index,
 so the page looked fine while every question failed with
 `SCHEMA_RETRIEVAL_FAILED`. Three things now guard against that:
@@ -192,9 +193,9 @@ The playground's left rail opens with **Search index**: entries by type
 (datasource, tables, columns, relationships), the schema version they were
 built from, and when. One index holds every database, so with the demo's three
 the heading carries no name and the line under it says which they are --
-"Covers chinook, support and webanalytics" -- and the **Database** panel below,
-which shows one schema, opens with "One of 3 databases". With a single database
-both panels name it in their heading instead. When the index is empty, missing
+"Covers chinook, support and webanalytics" -- and the **Database** panel below
+carries a **Showing** switcher for which of them to read. With a single database
+both panels name it in their heading instead, and there is no switcher. When the index is empty, missing
 or out of date, a warning under the top bar says what that means for a
 question, and the panel's **Rebuild the index** button becomes the rail's one
 filled button. **Rebuild** is also always available on demand.
@@ -461,7 +462,10 @@ And four on `webanalytics`:
 - How many purchases were there per month in 2013?
 
 None of them spans two databases, deliberately: the engine cannot answer such a
-question yet.
+question yet. The rail says so too, under the database switcher: each question
+is answered from one database, and joining across them is planned. Clicking a
+question from another pile moves the switcher to that database, so the schema
+on the left is the one the question is about.
 
 They are also indexed, per datasource: the `schema.datasource` entry the
 resolver matches every question against carries that datasource's configured

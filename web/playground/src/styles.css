@@ -259,7 +259,13 @@ button:disabled { cursor: default; }
 .guided-q:disabled { color: var(--ink-3); }
 
 .schema .ds { font-size: 13px; color: var(--ink-2); font-weight: 400; }
+/* With three databases the rail is a choice, not a label: the same quiet
+   select the composer uses for a role, on the line under the heading. With
+   one there is nothing to choose and none of this is printed. */
+.schema-pick { display: flex; align-items: center; gap: 8px; margin: -2px 0 10px; }
+.schema-pick label { font-size: 13px; color: var(--ink-2); }
 .schema-sum { font-size: 13px; color: var(--ink-2); margin: -4px 0 10px; }
+.schema-cross { font-size: 12.5px; color: var(--ink-3); margin: -6px 0 12px; max-width: 42ch; }
 .tables { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--rule); }
 .tables > li { border-bottom: 1px solid var(--rule); }
 .table-head {

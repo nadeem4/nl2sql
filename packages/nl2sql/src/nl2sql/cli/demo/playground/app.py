@@ -3,10 +3,12 @@
 Fourteen routes:
 
 ``GET  /``                     the built React page
-``GET  /api/meta``             mode, dataset, the guided questions (flat, and grouped
-                               by datasource), the roles and how many guided questions
-                               have replay recordings
-``GET  /api/schema``           the indexed schema, so a visitor sees the database first
+``GET  /api/meta``             mode, dataset, every registered datasource, the guided
+                               questions (flat, and grouped by datasource), the roles
+                               and how many guided questions have replay recordings
+``GET  /api/schema``           the indexed schema of one datasource (``?datasource=``,
+                               default the demo's own), so a visitor sees the database
+                               first and can look at each of them
 ``POST /api/ask``              one ``QueryResult``, plus a ``replay_miss`` flag; a miss
                                carries one plain error instead of the raw ones
 ``GET  /api/trace/{trace_id}`` one run trace, read only from the traces directory
@@ -186,6 +188,18 @@ def _default_datasource(engine, dataset: str) -> str:
     return dataset if dataset in ids else (ids[0] if ids else dataset)
 
 
+def _datasource_ids(engine, dataset: str) -> List[str]:
+    """Every registered datasource, the one the schema panel opens on first.
+
+    The page offers these as the schema panel's choices, so the order is the
+    order they are listed in, and the default leads.
+    """
+    ids = list(engine.list_datasources() or [])
+    if dataset in ids:
+        return [dataset] + [d for d in ids if d != dataset]
+    return ids or [dataset]
+
+
 def _llm_configs(engine) -> Dict[str, Any]:
     """Provider, model and temperature per configured agent, for a feedback record."""
     return {name: {key: (config or {}).get(key) for key in ("provider", "model", "temperature")}
@@ -294,6 +308,9 @@ def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset
     def meta() -> Dict[str, Any]:
         return {"mode": panel.mode, "dataset": dataset, "questions": questions,
                 "question_groups": groups, "roles": roles,
+                # Every registered database, not only the ones with guided
+                # questions: the schema panel offers these as its choices.
+                "datasources": _datasource_ids(engine, dataset),
                 "recorded_questions": recorded_questions, **hosted.describe()}
 
     @app.get("/api/schema")

@@ -1,12 +1,13 @@
 import React, { useEffect, useRef, useState } from "react";
 import SchemaPanel from "./SchemaPanel.jsx";
 import IndexPanel from "./IndexPanel.jsx";
-import { needsRebuild, sourceNames } from "./indexHealth.js";
+import { needsRebuild } from "./indexHealth.js";
 import Run from "./Panes.jsx";
 import Settings from "./Settings.jsx";
 import RetrievalInspector from "./Retrieval.jsx";
+import { answeredDatasources, datasourceNames } from "./datasources.js";
 import { guidedGroups } from "./questions.js";
-import { NO_KEY_REASON, needsKey } from "./firstRun.js";
+import { NO_KEY_REASON, hostedNote, needsKey } from "./firstRun.js";
 import { askHeaders, readKey, writeKey } from "./hostedKey.js";
 import { createRouter, hashFor, navItems, pageFor, pageFromHash } from "./router.js";
 import { deniedTables, planTables } from "./run.js";
@@ -18,19 +19,6 @@ function replayNote(recorded, total, canSet) {
     return `No API key found, and replay mode has no recorded answers, so no question can be answered. To ask questions, ${fix}.`;
   }
   return `No API key found. ${recorded} of ${total} guided questions answer from recorded model responses; for any other question, ${fix}.`;
-}
-
-// The hosted demo runs on the visitor's own key and never on the owner's, so
-// the mode line says whose key answers and what the limits are.
-function hostedNote(meta, key) {
-  const limits = meta.limits || {};
-  const capped = limits.questions_per_minute
-    ? ` Up to ${limits.questions_per_minute} questions a minute and ${limits.questions_per_session} a session.`
-    : "";
-  if (!key) {
-    return `Questions run on your own API key, which you add under Settings. It stays in this browser tab and is never stored on the server.${capped} Add one under`;
-  }
-  return `Questions run on the key in this browser tab; it is sent with each question and stored nowhere.${capped} Replace or clear it under`;
 }
 
 const DEBUG_KEY = "nl2sql.playground.debug";
@@ -107,6 +95,9 @@ export default function App() {
   const [retrieval, setRetrieval] = useState(null);
   const [retrievalError, setRetrievalError] = useState(null);
   const [feedback, setFeedback] = useState(null);
+  // Which database the schema panel is showing. Null until something picks
+  // one, when the server serves the demo's own.
+  const [datasource, setDatasource] = useState(null);
   // The hosted demo's key: this tab's, never the server's.
   const [apiKey, setApiKey] = useState(() => readKey(window.sessionStorage));
   const runRef = useRef(null);
@@ -120,13 +111,27 @@ export default function App() {
         if (m.roles.length) setRole(m.roles.includes("admin") ? "admin" : m.roles[0]);
       })
       .catch((e) => setError(e.message));
-    getJson("/api/schema").then(setSchema).catch((e) => setError(e.message));
     getJson("/api/settings").then(setSettings).catch((e) => setSettingsError(e.message));
     getJson("/api/index").then(setIndex).catch((e) => setIndexError(e.message));
     getJson("/api/retrieval").then(setRetrieval).catch((e) => setRetrievalError(e.message));
     // Without it the rating control stays hidden; nothing else depends on it.
     getJson("/api/feedback").then(setFeedback).catch(() => {});
   }, []);
+
+  // The schema panel follows whichever database is picked; with none picked
+  // the server serves the demo's own.
+  const schemaUrl = datasource ? `/api/schema?datasource=${encodeURIComponent(datasource)}` : "/api/schema";
+  useEffect(() => {
+    // Two databases picked quickly are two requests in flight; only the one
+    // the rail is still showing may land.
+    let current = true;
+    getJson(schemaUrl)
+      .then((next) => current && setSchema(next))
+      .catch((e) => current && setError(e.message));
+    return () => {
+      current = false;
+    };
+  }, [schemaUrl]);
 
   // A new page starts at its top, with the keyboard on it: the browser does
   // neither of those for a view the hash swapped out.
@@ -149,13 +154,13 @@ export default function App() {
         .then((next) => {
           setIndex(next);
           if (next.job.state !== "running") {
-            getJson("/api/schema").then(setSchema).catch(() => {});
+            getJson(schemaUrl).then(setSchema).catch(() => {});
           }
         })
         .catch((e) => setIndexError(e.message));
     }, 1000);
     return () => clearInterval(timer);
-  }, [rebuilding]);
+  }, [rebuilding, schemaUrl]);
 
   const rebuildIndex = async (enrich) => {
     const response = await fetch("/api/index/rebuild", {
@@ -176,9 +181,13 @@ export default function App() {
     setMeta((m) => (m ? { ...m, mode: next.mode } : m));
   };
 
-  const ask = async (text) => {
+  // `source` is the database a guided question belongs to: clicking one from
+  // another pile moves the schema panel to match, so what the rail shows is
+  // the database the question is about.
+  const ask = async (text, source) => {
     const q = (text === undefined ? question : text).trim();
     if (!q || busy || needsKey(meta, apiKey)) return;
+    if (source) setDatasource(source);
     setQuestion(q);
     setAsked({ question: q, role, planOnly });
     setBusy(true);
@@ -221,13 +230,17 @@ export default function App() {
   const hosted = Boolean(meta && meta.hosted);
   const canSet = settings && settings.available;
   const indexBroken = index && needsRebuild(index.health) && index.job.state !== "running";
-  // The rail shows one database's schema; how many there are is the index's to
-  // say, and until it answers the rail keeps the single-database wording.
-  const databases = index ? sourceNames(index.health).length : 1;
+  // Every registered database, and the one a run was answered from. With a
+  // single database neither is a fact worth printing: the rail's heading
+  // already names it and there is nothing for the resolver to choose.
+  const databases = datasourceNames(meta);
+  const answered = databases.length > 1 ? answeredDatasources(result) : [];
   const onAsk = page === "ask";
   // Hosted, with no key in this tab: the page says so and holds the question
   // box and the guided questions closed instead of letting a click fail.
   const noKey = needsKey(meta, apiKey);
+  // Empty until this tab has a key: the first-run state is saying it already.
+  const modeNote = hosted ? hostedNote(meta, apiKey) : "";
   const groups = guidedGroups(meta);
   const current = pageFor(page);
   const nav = navItems(page, {
@@ -253,9 +266,11 @@ export default function App() {
             <p className={`mode mode-${meta.mode}`}>
               <strong>{hosted ? "Hosted demo." : replay ? "Replay mode." : "Live mode."}</strong>{" "}
               {hosted ? (
-                <>
-                  {hostedNote(meta, apiKey)} <a href={hashFor("settings")}>Settings</a>.
-                </>
+                modeNote && (
+                  <>
+                    {modeNote} <a href={hashFor("settings")}>Settings</a>.
+                  </>
+                )
               ) : replay ? (
                 replayNote(meta.recorded_questions, (meta.questions || []).length, canSet)
               ) : (
@@ -383,7 +398,8 @@ export default function App() {
                       <ul aria-labelledby={groups.length > 1 ? `guided-${group.datasource}` : undefined}>
                         {group.questions.map((q) => (
                           <li key={q}>
-                            <button className="guided-q" onClick={() => ask(q)} disabled={busy || noKey}
+                            <button className="guided-q" onClick={() => ask(q, group.datasource)}
+                              disabled={busy || noKey}
                               title={noKey ? NO_KEY_REASON : undefined}
                               aria-describedby={noKey ? "first-run-why" : undefined}>{q}</button>
                           </li>
@@ -398,7 +414,7 @@ export default function App() {
             <aside className="rail">
               <IndexPanel index={index} error={indexError} onRebuild={rebuildIndex} hosted={hosted} />
               <SchemaPanel schema={schema} used={used} denied={denied} role={asked && asked.role}
-                databases={databases} />
+                datasources={databases} onDatasource={setDatasource} />
             </aside>
 
             <section className="run" id="run" ref={runRef} aria-labelledby="run-heading" tabIndex={-1}>
@@ -412,6 +428,7 @@ export default function App() {
                 debug={debug}
                 replay={replay}
                 feedback={feedback}
+                answered={answered}
               />
             </section>
           </div>
