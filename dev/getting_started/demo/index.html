@@ -3014,6 +3014,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../deployment/hosted-demo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hosted demo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -4371,6 +4399,10 @@ instead of the OpenAI embeddings API. The first indexing run downloads roughly
   output is model-dependent - see
   <a href="../../configuration/llm/#ollama">LLM configuration → Ollama</a>.</li>
 </ul>
+<p>Sharing the demo with other people is the one case where none of this applies:
+<code>nl2sql demo --hosted</code> serves the playground with <strong>no key on the server at
+all</strong>, and each visitor pastes their own into the page. See
+<a href="../../deployment/hosted-demo/">Hosted demo</a>.</p>
 <p>Because the demo indexes with <code>local</code> and the default environment indexes with
 <code>openai</code>, the two use different vector dimensions. <code>.env.demo</code> keeps its own
 <code>VECTOR_STORE=data/vector_store_demo</code> directory, so they do not collide. If you
@@ -4529,7 +4561,11 @@ saved.
   swap in their own key, or spend on yours. <code>nl2sql demo --allow-settings</code> turns
   it on anyway, for a network you trust. Changes are also refused from another
   site's page (a foreign <code>Origin</code>), through a hostname that is not a loopback
-  name, or in anything but JSON.</p>
+  name, or in anything but JSON.
+- <strong>Hosted mode is a third state.</strong> With <code>nl2sql demo --hosted</code> the page shows a
+  key form that writes only to this browser tab's <code>sessionStorage</code>; the settings
+  routes stay refused because there is nothing on the server to save. See
+  <a href="../../deployment/hosted-demo/">Hosted demo</a>.</p>
 </li>
 </ul>
 <h3 id="the-retrieval-inspector">The Retrieval inspector</h3>
