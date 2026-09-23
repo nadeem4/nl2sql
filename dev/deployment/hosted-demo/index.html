@@ -2929,6 +2929,34 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-link-preview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The link preview
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The link preview">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#regenerating-the-card" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Regenerating the card
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#running-it-locally-instead" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4065,6 +4093,34 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-link-preview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The link preview
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The link preview">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#regenerating-the-card" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Regenerating the card
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#running-it-locally-instead" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4482,11 +4538,61 @@ up the new head and reapplies the folder. Nothing in the workflow force-pushes.<
 <code>git push space $(git subtree split --prefix deploy/huggingface main):main --force</code>
 replaces the Space's history with this folder's. The workflow above never needs
 that, which is why it exists.</p>
+<h2 id="the-link-preview">The link preview</h2>
+<p>Two different links go around, and each unfurls from a different place:</p>
+<table>
+<thead>
+<tr>
+<th>Pasted link</th>
+<th>The card comes from</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://nadeem4nk-nl2sql-demo.hf.space">https://nadeem4nk-nl2sql-demo.hf.space</a></td>
+<td>the Open Graph and Twitter tags in the page the app serves</td>
+</tr>
+<tr>
+<td><a href="https://huggingface.co/spaces/nadeem4nk/nl2sql-demo">https://huggingface.co/spaces/nadeem4nk/nl2sql-demo</a></td>
+<td><code>short_description</code> and <code>thumbnail</code> in <code>deploy/huggingface/README.md</code>'s front-matter</td>
+</tr>
+</tbody>
+</table>
+<p>Both show the same 1200x630 card:</p>
+<p><img alt="The link preview card: the nl2sql playground wordmark, the line &quot;Ask a database in plain English, the model plans, the code writes the SQL&quot;, and a fragment of a plan turning into SQL" src="../../assets/social-card.png" /></p>
+<p><strong>The app's tags</strong> are added to the built page's <code>&lt;head&gt;</code> by
+<a href="https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/cli/demo/playground/preview.py"><code>preview.py</code></a> as each request goes out, not baked into the bundle. A
+crawler runs no JavaScript, so a tag React adds on mount is a tag nobody sees;
+and <code>og:image</code> and <code>og:url</code> have to be absolute, while the same page is the
+Space, a container and <code>http://127.0.0.1:8000</code>. So the host comes off the
+request: <code>X-Forwarded-Proto</code> and <code>X-Forwarded-Host</code> when a proxy set them
+(which is what the Space does), the <code>Host</code> header otherwise, and the URL the
+app itself saw if neither is a host. The card is served by the app at
+<code>/social-card.png</code> and ships in the wheel, so a <code>pip install</code> serves it too.</p>
+<p><strong>The Space's card</strong> reads <code>thumbnail</code> over raw GitHub rather than from the
+Space, so it works before the Space has built and while it is asleep.</p>
+<h3 id="regenerating-the-card">Regenerating the card</h3>
+<p>The card is rendered from <code>scripts/social_card.html</code>, which uses the
+playground's own colours and both of its typefaces. Edit that file, then:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nb">cd</span><span class="w"> </span>web/playground<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>npm<span class="w"> </span>ci<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nb">cd</span><span class="w"> </span>../..<span class="w">   </span><span class="c1"># the fonts the card borrows</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>python<span class="w"> </span>scripts/render_social_card.py
+</code></pre></div>
+<p>Headless Chrome shoots it at 1200x630 and the script writes the same bytes to
+both places that need them: <code>docs/assets/social-card.png</code>, which the Space's
+<code>thumbnail</code> reads, and
+<code>packages/nl2sql/src/nl2sql/cli/demo/playground/assets/social-card.png</code>, which
+the app serves. A test holds the two byte-identical, so regenerating into only
+one of them fails rather than going out half-changed.</p>
+<p>A card validator needs a public URL, so the check that the card really unfurls
+can only be run against the deployed Space, with X's card validator or
+<a href="https://opengraph.dev">https://opengraph.dev</a>. What the tests check is everything up to that: the
+tags are in the served HTML, their URLs are absolute, and the image is served
+as <code>image/png</code>.</p>
 <h2 id="running-it-locally-instead">Running it locally instead</h2>
 <p>Hosted mode exists to show the engine on our sample data. To ask questions of
 your own data, with no limits and a key that never leaves your machine:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"nl2sql-engine[demo]"</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>nl2sql<span class="w"> </span>demo
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"nl2sql-engine[demo]"</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>nl2sql<span class="w"> </span>demo
 </code></pre></div>
 <p>See <a href="../../getting_started/demo/">Demo</a>.</p>
 
