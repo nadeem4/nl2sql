@@ -104,6 +104,12 @@ Back and Forward, and that routing touches nothing but the hash.
   `/api/meta`), or, with none, that replay mode has no recorded answers and a key
   is needed. A question replay has no answer for shows "No recorded answer for
   this question. Add an API key to ask it live." (`replay_miss` from `/api/ask`).
+  Hosted, it reads **Hosted demo.** and nothing more until this tab has a key:
+  the first-run state above the question box, and the Settings form, are
+  already saying what a key is for, and a third copy in the top bar pulled the
+  eye away from the one place that could do something about it. With a key
+  saved it says whose key answers and what the limits are (`hostedNote` in
+  `src/firstRun.js`).
 - **Composer** (Ask page): the question box, the role selector
   (`#role-select`), **Plan only** (`#plan-only`), **Debug** (`#debug-toggle`)
   and the guided questions from `/api/meta`. The demo registers three
@@ -219,7 +225,8 @@ temperature), `src/indexHealth.js` (entry counts in plain words, the status
 line, relative build times), `src/router.js` (which page a hash names, the nav
 rows, and the router over `hashchange`), `src/questions.js` (the guided
 questions grouped by datasource), `src/firstRun.js` (when the hosted demo has
-to ask for a key before it takes a question), `src/datasources.js` (the
+to ask for a key before it takes a question, and what the mode line then says),
+`src/datasources.js` (the
 databases the switcher offers, and which one a run was answered from) and
 `src/retrieval.js` (the MMR summary line, picks
 in order, entries passed over, the copyable text form) and `src/feedback.js`

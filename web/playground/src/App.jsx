@@ -7,7 +7,7 @@ import Settings from "./Settings.jsx";
 import RetrievalInspector from "./Retrieval.jsx";
 import { answeredDatasources, datasourceNames } from "./datasources.js";
 import { guidedGroups } from "./questions.js";
-import { NO_KEY_REASON, needsKey } from "./firstRun.js";
+import { NO_KEY_REASON, hostedNote, needsKey } from "./firstRun.js";
 import { askHeaders, readKey, writeKey } from "./hostedKey.js";
 import { createRouter, hashFor, navItems, pageFor, pageFromHash } from "./router.js";
 import { deniedTables, planTables } from "./run.js";
@@ -19,19 +19,6 @@ function replayNote(recorded, total, canSet) {
     return `No API key found, and replay mode has no recorded answers, so no question can be answered. To ask questions, ${fix}.`;
   }
   return `No API key found. ${recorded} of ${total} guided questions answer from recorded model responses; for any other question, ${fix}.`;
-}
-
-// The hosted demo runs on the visitor's own key and never on the owner's, so
-// the mode line says whose key answers and what the limits are.
-function hostedNote(meta, key) {
-  const limits = meta.limits || {};
-  const capped = limits.questions_per_minute
-    ? ` Up to ${limits.questions_per_minute} questions a minute and ${limits.questions_per_session} a session.`
-    : "";
-  if (!key) {
-    return `Questions run on your own API key, which you add under Settings. It stays in this browser tab and is never stored on the server.${capped} Add one under`;
-  }
-  return `Questions run on the key in this browser tab; it is sent with each question and stored nowhere.${capped} Replace or clear it under`;
 }
 
 const DEBUG_KEY = "nl2sql.playground.debug";
@@ -252,6 +239,8 @@ export default function App() {
   // Hosted, with no key in this tab: the page says so and holds the question
   // box and the guided questions closed instead of letting a click fail.
   const noKey = needsKey(meta, apiKey);
+  // Empty until this tab has a key: the first-run state is saying it already.
+  const modeNote = hosted ? hostedNote(meta, apiKey) : "";
   const groups = guidedGroups(meta);
   const current = pageFor(page);
   const nav = navItems(page, {
@@ -277,9 +266,11 @@ export default function App() {
             <p className={`mode mode-${meta.mode}`}>
               <strong>{hosted ? "Hosted demo." : replay ? "Replay mode." : "Live mode."}</strong>{" "}
               {hosted ? (
-                <>
-                  {hostedNote(meta, apiKey)} <a href={hashFor("settings")}>Settings</a>.
-                </>
+                modeNote && (
+                  <>
+                    {modeNote} <a href={hashFor("settings")}>Settings</a>.
+                  </>
+                )
               ) : replay ? (
                 replayNote(meta.recorded_questions, (meta.questions || []).length, canSet)
               ) : (

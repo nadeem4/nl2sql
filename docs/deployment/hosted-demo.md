@@ -36,7 +36,9 @@ stays in this browser tab and is never stored on the server, with a link to
 **Settings**; the question box and the guided questions are disabled until
 there is a key, so a click cannot fail with a `401` the visitor had no way to
 see coming. The moment a key is saved the state clears and everything enables,
-with no reload. None of this appears in local mode.
+with no reload. That state is the only place the point is made: until a key is
+saved the top bar reads just **Hosted demo.**, and it says whose key answers
+and what the limits are once there is one. None of this appears in local mode.
 
 The visitor pastes a key on the **Settings** page. From there:
 

@@ -17,3 +17,20 @@ export const NO_KEY_REASON = "Add your API key under Settings to ask a question.
 export function needsKey(meta, apiKey) {
   return Boolean(meta && meta.hosted) && !(apiKey || "").trim();
 }
+
+// What the top bar's mode line says on the hosted demo: whose key answers and
+// what the limits are.
+//
+// Empty until there is a key. The first-run state above the question box is
+// already making that case in full, and the Settings form makes it again on
+// its own page; a third copy in the top bar is noise, and it pulled the eye
+// away from the one place that can do something about it. Once a key is in
+// this tab the line has something of its own to say, so it comes back.
+export function hostedNote(meta, apiKey) {
+  if (!meta || !(apiKey || "").trim()) return "";
+  const limits = meta.limits || {};
+  const capped = limits.questions_per_minute
+    ? ` Up to ${limits.questions_per_minute} questions a minute and ${limits.questions_per_session} a session.`
+    : "";
+  return `Questions run on the key in this browser tab; it is sent with each question and stored nowhere.${capped} Replace or clear it under`;
+}
