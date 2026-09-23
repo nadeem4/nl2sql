@@ -101,12 +101,7 @@ class BaseSQLAlchemyAdapter:
 
     def capabilities(self) -> set[DatasourceCapability]:
         """Default capability set for SQL adapters."""
-        return {
-            DatasourceCapability.SUPPORTS_SQL,
-            DatasourceCapability.SUPPORTS_SCHEMA_INTROSPECTION,
-            DatasourceCapability.SUPPORTS_DRY_RUN,
-            DatasourceCapability.SUPPORTS_COST_ESTIMATE,
-        }
+        return {DatasourceCapability.SUPPORTS_SQL}
 
     def execute_sql(self, sql: str) -> ResultFrame:
         """Executes a SQL query against the datasource.

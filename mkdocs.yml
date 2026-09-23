@@ -141,7 +141,6 @@ nav:
       - Indexing: api/core/indexing.md
       - Query: api/core/query.md
       - Settings: api/core/settings.md
-      - Result: api/core/result.md
     - REST API (FastAPI):
       - Overview: api/rest/index.md
       - Health: api/rest/health.md

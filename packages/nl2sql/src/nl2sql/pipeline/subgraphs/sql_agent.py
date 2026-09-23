@@ -46,12 +46,6 @@ def build_sql_agent_graph(
     refiner = RefinerNode(ctx)
     generator = GeneratorNode(ctx)
 
-    def _get_subgraph_id(state: SubgraphExecutionState) -> str:
-        if state.subgraph_id:
-            return state.subgraph_id
-        sub_query_id = state.sub_query.id if state.sub_query else None
-        return f"sql_agent:{sub_query_id}:{state.trace_id}"
-
     def _get_retry_count(state: SubgraphExecutionState) -> int:
         return state.retry_count
 

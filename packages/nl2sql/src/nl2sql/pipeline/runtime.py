@@ -22,6 +22,11 @@ from nl2sql.services.callbacks.token_handler import TokenUsageCallback
 from nl2sql.tracing.recorder import TraceRecorder
 from nl2sql.tracing.trace import write_run_trace
 
+# What a caller is told when the run ran out of time. It is returned in the
+# answer synthesizer's own shape, which is the only place `result_from_state`
+# looks for an answer.
+TIMEOUT_ANSWER = "I apologize, but the request timed out. Please try again with a simpler query."
+
 
 def _start_keyboard_cancel_listener(
     token: CancellationToken,
@@ -189,7 +194,17 @@ def run_with_graph(
                         error_code=ErrorCode.PIPELINE_TIMEOUT,
                     )
                 ],
-                "final_answer": "I apologize, but the request timed out. Please try again with a simpler query.",
+                # Written where the answer synthesizer would have written it:
+                # `result_from_state` reads `final_answer` off
+                # `answer_synthesizer_response` and nowhere else, so a
+                # top-level key never reached the caller, who saw only the
+                # error code. The shape is `AggregatedResponse`'s.
+                "answer_synthesizer_response": {"final_answer": {
+                    "summary": TIMEOUT_ANSWER,
+                    "format_type": "text",
+                    "content": TIMEOUT_ANSWER,
+                    "warnings": [],
+                }},
                 **_telemetry(),
             }, "timeout", error_msg)
 

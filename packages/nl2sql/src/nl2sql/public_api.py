@@ -18,7 +18,6 @@ from nl2sql.api.llm_api import LLM_API
 from nl2sql.api.indexing_api import IndexingAPI
 from nl2sql.api.auth_api import AuthAPI
 from nl2sql.api.settings_api import SettingsAPI
-from nl2sql.api.result_api import ResultAPI
 from nl2sql.api.policy_api import PolicyAPI
 
 
@@ -78,7 +77,6 @@ class NL2SQL:
         self.indexing = IndexingAPI(self._ctx)
         self.auth = AuthAPI(self._ctx)
         self.settings = SettingsAPI(self._ctx)
-        self.results = ResultAPI(self._ctx)
         self.policy = PolicyAPI(self._ctx)
         self._benchmark = None
 

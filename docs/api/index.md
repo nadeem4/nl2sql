@@ -16,7 +16,6 @@ API for remote clients. Use the links below for the full technical references.
   - [Indexing API](core/indexing.md)
   - [Query API](core/query.md)
   - [Settings API](core/settings.md)
-  - [Result API](core/result.md)
 
 ## REST API (FastAPI)
 

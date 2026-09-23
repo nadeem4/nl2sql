@@ -17,7 +17,6 @@ from .api.llm_api import LLM_API
 from .api.indexing_api import IndexingAPI
 from .api.auth_api import AuthAPI
 from .api.settings_api import SettingsAPI
-from .api.result_api import ResultAPI
 from .api.policy_api import PolicyAPI
 
 # Also expose core models and enums
@@ -47,7 +46,6 @@ __all__ = [
     "IndexingAPI",
     "AuthAPI",
     "SettingsAPI",
-    "ResultAPI",
     "PolicyAPI",
     "BenchmarkAPI",
     "ErrorSeverity",

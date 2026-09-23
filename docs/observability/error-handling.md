@@ -13,6 +13,22 @@ One case cannot use state: LangGraph conditional-edge routers may only return ro
 
 Common error codes include `MISSING_SQL`, `EXECUTION_FAILED`, `PIPELINE_TIMEOUT`, `SECURITY_VIOLATION`, `QUESTION_NOT_ANSWERABLE`.
 
+`ErrorCode` carries only codes something can produce. Eleven members that no
+code path raised were removed (`MISSING_GROUP_BY`, `INVALID_ALIAS_USAGE`,
+`JOIN_MISSING_ON_CLAUSE`, `INVALID_DATE_FORMAT`, `INVALID_NUMERIC_VALUE`,
+`EXECUTION_ERROR`, `PERFORMANCE_WARNING`, `SERVICE_UNAVAILABLE`,
+`PHYSICAL_VALIDATOR_FAILED`, `EXECUTION_TIMEOUT`, `INTENT_VIOLATION`); a code
+nobody can emit is a promise to a caller the engine never keeps. `DB_EXECUTION_ERROR`
+and `SAFEGUARD_VIOLATION` are kept although nothing raises them yet: each has a
+caller-facing message in `SAFE_ERROR_MESSAGES`, so each is a declared refusal
+path. `test_boundary_tidy_ups.py` asserts the rule.
+
+A run that hits the global timeout returns `PIPELINE_TIMEOUT` **and** an
+answer: the apology is written where the answer synthesizer writes its own, so
+`QueryResult.final_answer` carries it. It used to be written to a top-level
+state key that `result_from_state` never read, so every caller through the SDK
+and the REST route saw `final_answer: null` with only the error code.
+
 `QUESTION_NOT_ANSWERABLE` (severity `ERROR`) comes from the datasource resolver when its answerability check finds that no datasource the role may read can answer the question, such as "what is the weather in Paris?". The run ends before the decomposer: no decomposer, planner, refiner or synthesizer call is made, `QueryResult.status` is `error`, and the message tells the user the question can't be answered from the connected data. The check is told to answer "answerable" when unsure. See [DatasourceResolverNode](../architecture/nodes/datasource_resolver_node.md#answerability-check).
 
 ## Circuit breaker

@@ -36,7 +36,7 @@ def _write(tmp_path):
                            "error_code": "COLUMN_NOT_FOUND", "severity": "WARNING"}]),
             _node(4, "ast_planner", attempt=2, sq="sq_abc", calls=[_call(11400)]),
             _node(5, "executor", sq="sq_abc", status="error",
-                  errors=[{"message": "no such table", "error_code": "EXECUTION_ERROR", "severity": "ERROR"}]),
+                  errors=[{"message": "no such table", "error_code": "DB_EXECUTION_ERROR", "severity": "ERROR"}]),
         ],
         "result": {"status": "error"},
     }

@@ -54,7 +54,7 @@ Returns the execution plan.
 
 #### `cost_estimate(sql: str)`
 
-Returns cost/row estimates. Advertised via the `SUPPORTS_COST_ESTIMATE` capability; the pipeline does not currently call it.
+Returns cost/row estimates. The pipeline does not currently call it, and there is no capability flag for it: `DatasourceCapability` carries only what something queries.
 
 ### Optional hook: `render_sql(expression)`
 

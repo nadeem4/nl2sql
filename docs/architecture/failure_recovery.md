@@ -159,7 +159,7 @@ Replay is not supported. There is no persisted graph state or execution log to r
 
 ## Known Gaps
 
-- No dry-run or cost-estimate gate runs before execution, even where the adapter advertises `SUPPORTS_DRY_RUN` / `SUPPORTS_COST_ESTIMATE`.
+- No dry-run or cost-estimate gate runs before execution. The `SUPPORTS_DRY_RUN` / `SUPPORTS_COST_ESTIMATE` capability flags are gone with it: nothing queried them.
 - `VECTOR_BREAKER` is the only circuit breaker; LLM calls and SQL execution have no breaker and no fast-fail path.
 - There is no process isolation around SQL execution, so a driver crash is unrecoverable at the engine level.
 - Subgraph wrapper assumes executor output is present; earlier failures can cause wrapper-level errors.

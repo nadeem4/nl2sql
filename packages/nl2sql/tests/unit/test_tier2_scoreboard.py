@@ -111,7 +111,7 @@ def _rec(qid, status, *, expected="allowed", tags=("join",), difficulty="easy", 
 def test_scoreboard_reports_accuracy_overall_by_tag_and_by_difficulty():
     records = [
         _rec("a", "pass", tags=("join",), difficulty="easy"),
-        _rec("b", "fail", tags=("join", "date"), difficulty="hard", errors=("EXECUTION_ERROR",)),
+        _rec("b", "fail", tags=("join", "date"), difficulty="hard", errors=("DB_EXECUTION_ERROR",)),
         _rec("c", "pass", tags=("date",), difficulty="hard"),
         _rec("d", "pass", expected="unanswerable", tags=("unanswerable",), refused_unanswerable=True),
     ]
@@ -120,7 +120,7 @@ def test_scoreboard_reports_accuracy_overall_by_tag_and_by_difficulty():
     assert board["accuracy"]["by_tag"]["join"] == {"pass": 1, "lenient_pass": 1, "total": 2,
                                                    "accuracy": 0.5, "lenient_accuracy": 0.5}
     assert board["accuracy"]["by_difficulty"]["hard"]["accuracy"] == 0.5
-    assert board["errors_by_code"] == {"EXECUTION_ERROR": 1}
+    assert board["errors_by_code"] == {"DB_EXECUTION_ERROR": 1}
     assert board["determinism"] is None
 
 

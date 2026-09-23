@@ -10,6 +10,7 @@ from nl2sql.auth import UserContext
 from nl2sql.common.cancellation import CancellationToken
 from nl2sql.common.errors import ErrorCode, ErrorSeverity, PipelineError
 from nl2sql.common.exceptions import PipelineExecutionError
+from nl2sql.api import query_api
 from nl2sql.pipeline import runtime
 
 
@@ -101,7 +102,31 @@ def test_run_exceeding_timeout_returns_pipeline_timeout_error(monkeypatch):
     assert error.node == "orchestrator"
     assert error.error_code == ErrorCode.PIPELINE_TIMEOUT
     assert "timed out after 0.05 seconds" in error.message
-    assert result["final_answer"].startswith("I apologize")
+
+
+def test_a_timed_out_run_tells_the_caller_so(monkeypatch):
+    # The apology used to be written to a top-level "final_answer" key, and
+    # `result_from_state` only ever reads `answer_synthesizer_response`, so
+    # every caller through QueryAPI and the REST route saw `final_answer: null`
+    # with nothing but a PIPELINE_TIMEOUT code.
+    # Arrange
+    monkeypatch.setattr(runtime.settings, "global_timeout_sec", 0.05)
+
+    def on_invoke(state, config):
+        time.sleep(0.5)
+        return {"final_answer": "too late"}
+
+    _use_fake_graph(monkeypatch, on_invoke)
+
+    # Act
+    result = query_api.result_from_state(runtime.run_with_graph(None, "slow query", user_context=_USER))
+
+    # Assert
+    assert result.status == "error"
+    assert result.final_answer is not None, "the timeout apology never reached the caller"
+    assert result.final_answer["summary"].startswith("I apologize")
+    assert result.final_answer["format_type"] == "text"
+    assert [e["error_code"] for e in result.errors] == [ErrorCode.PIPELINE_TIMEOUT.value]
 
 
 def test_routing_error_keeps_its_own_error_code(monkeypatch):

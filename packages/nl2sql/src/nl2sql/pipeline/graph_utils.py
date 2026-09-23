@@ -17,18 +17,6 @@ SQL_AGENT_SUBGRAPH = "sql_agent"
 SQL_AGENT_REQUIRED_CAPABILITIES = {DatasourceCapability.SUPPORTS_SQL.value}
 
 
-class StateAccessor:
-    """Adapter for GraphState/dict access to simplify routing logic."""
-
-    def __init__(self, state: Any):
-        self._state = state
-
-    def get(self, key: str, default: Any = None) -> Any:
-        if isinstance(self._state, dict):
-            return self._state.get(key, default)
-        return getattr(self._state, key, default)
-
-
 def next_scan_layer_ids(
     dag: ExecutionDAG,
     artifact_refs: Dict[str, Any],

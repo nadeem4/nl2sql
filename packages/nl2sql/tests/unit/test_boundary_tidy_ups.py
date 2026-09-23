@@ -79,3 +79,68 @@ def test_index_health_builds_its_snapshot_store_through_the_factory(tmp_path, mo
 def test_pandas_is_not_a_core_dependency():
     deps = [d.split(">")[0].split("=")[0].split("<")[0].strip().lower() for d in _pyproject()["project"]["dependencies"]]
     assert "pandas" not in deps
+
+
+# --- The architecture review's dead-code list. Each of these was defined,
+# exported or declared and read by nothing; the assertions keep them gone.
+
+def test_every_error_code_is_raised_or_is_a_declared_refusal():
+    """No `ErrorCode` member exists that nothing raises and nothing explains.
+
+    Eleven did. A code nothing can produce is a promise to a caller the engine
+    never keeps: it reaches the docs and the trace schema, and someone writes a
+    handler for a case that cannot happen.
+
+    A code with an entry in `SAFE_ERROR_MESSAGES` is the exception: that entry
+    is the caller-facing text for a refusal the engine has committed to, which
+    makes it a declared path rather than a leftover.
+    """
+    import re
+
+    from nl2sql.common.errors import SAFE_ERROR_MESSAGES, ErrorCode
+
+    source = "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in SRC.rglob("*.py")
+        if path.name != "errors.py"
+    )
+    raised = set(re.findall(r"ErrorCode\.([A-Z_]+)", source))
+    explained = {code.name for code in SAFE_ERROR_MESSAGES}
+
+    assert {member.name for member in ErrorCode} - raised - explained == set()
+
+
+def test_cancelled_is_a_string_not_a_one_tuple():
+    # `CANCELLED = "CANCELLED",` worked only because ErrorCode mixes in str,
+    # so the enum machinery unpacked the tuple as constructor arguments.
+    from nl2sql.common.errors import ErrorCode
+
+    assert ErrorCode.CANCELLED.value == "CANCELLED"
+    assert all(isinstance(member.value, str) for member in ErrorCode)
+
+
+def test_every_capability_flag_is_one_something_queries():
+    """`DatasourceCapability` carries only flags a code path checks.
+
+    Six did not. `SUPPORTS_SQL` is the only flag the engine ever queries;
+    `SUPPORTS_REST` is kept as the stand-in for a datasource the SQL agent
+    cannot serve, which is what the capability-gating tests are about.
+    """
+    import re
+
+    from nl2sql_adapter_sdk.capabilities import DatasourceCapability
+
+    source = "\n".join(path.read_text(encoding="utf-8") for path in SRC.rglob("*.py"))
+    queried = set(re.findall(r"DatasourceCapability\.([A-Z_]+)", source))
+
+    assert {member.name for member in DatasourceCapability} - queried == {"SUPPORTS_REST"}
+
+
+def test_the_public_facade_exposes_nothing_without_methods():
+    # `NL2SQL().results` was an empty class exported as `nl2sql.ResultAPI`,
+    # mounted on the facade and given a docs page. Removing it is a public API
+    # break, which is why it is worth doing while the surface is small.
+    import nl2sql
+
+    assert "ResultAPI" not in nl2sql.__all__
+    assert not hasattr(nl2sql, "ResultAPI")
