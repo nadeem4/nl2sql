@@ -712,18 +712,6 @@
 </a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="../../nodes/global_planner_node/">
-<span class="md-ellipsis">
-    
-  
-    Global Planner
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
 <a class="md-nav__link" href="../../nodes/logical_validator_node/">
 <span class="md-ellipsis">
     
@@ -1989,7 +1977,7 @@
 Source file path: <code>packages/nl2sql/src/nl2sql/pipeline/graph.py</code></p>
 <hr/>
 <h2 id="boundary-definition">Boundary Definition</h2>
-<p>This graph is the top-level orchestrator. It encapsulates datasource resolution, decomposition, global planning, routing to subgraphs, aggregation, and answer synthesis. It does NOT implement subgraph internals (SQL planning/execution), per-node business logic, or adapter-specific execution; those are delegated to nodes and registered subgraphs.</p>
+<p>This graph is the top-level orchestrator. It encapsulates datasource resolution, decomposition (which builds the execution DAG), routing to subgraphs, aggregation, and answer synthesis. It does NOT implement subgraph internals (SQL planning/execution), per-node business logic, or adapter-specific execution; those are delegated to nodes and registered subgraphs.</p>
 <hr/>
 <h2 id="entry-conditions">Entry Conditions</h2>
 <p>Required state:
@@ -2015,8 +2003,7 @@ Source file path: <code>packages/nl2sql/src/nl2sql/pipeline/graph.py</code></p>
 <h2 id="internal-node-composition">Internal Node Composition</h2>
 <p>Execution order (nominal path):
 - <code>datasource_resolver</code> — <code>DatasourceResolverNode</code> — <code>packages/nl2sql/src/nl2sql/pipeline/nodes/datasource_resolver/node.py</code> — resolve candidate datasources, RBAC, and the answerability check (an LLM call).
-- <code>decomposer</code> — <code>DecomposerNode</code> — <code>packages/nl2sql/src/nl2sql/pipeline/nodes/decomposer/node.py</code> — decompose query into sub-queries.
-- <code>global_planner</code> — <code>GlobalPlannerNode</code> — <code>packages/nl2sql/src/nl2sql/pipeline/nodes/global_planner/node.py</code> — build execution DAG.
+- <code>decomposer</code> — <code>DecomposerNode</code> — <code>packages/nl2sql/src/nl2sql/pipeline/nodes/decomposer/node.py</code> — decompose query into sub-queries, and build the <code>ExecutionDAG</code> from them (<code>decomposer/dag.py</code>).
 - <code>layer_router</code> — inline lambda + <code>routes.build_scan_layer_router</code> — <code>packages/nl2sql/src/nl2sql/pipeline/routes.py</code> — route each scan layer to a subgraph or aggregator.
 - <code>&lt;subgraph nodes&gt;</code> — via <code>wrap_subgraph()</code> — <code>packages/nl2sql/src/nl2sql/pipeline/graph_utils.py</code> — invoke registered subgraphs per scan node.
 - <code>aggregator</code> — <code>EngineAggregatorNode</code> — <code>packages/nl2sql/src/nl2sql/pipeline/nodes/aggregator/node.py</code> — execute aggregation DAG.
@@ -2025,8 +2012,7 @@ Source file path: <code>packages/nl2sql/src/nl2sql/pipeline/graph.py</code></p>
 <pre class="mermaid"><code>flowchart TD
     datasource_resolver --&gt;|continue| decomposer
     datasource_resolver --&gt;|end| END
-    decomposer --&gt; global_planner
-    global_planner --&gt; layer_router
+    decomposer --&gt; layer_router
     layer_router --&gt;|subgraph| subgraph_exec
     subgraph_exec --&gt; layer_router
     layer_router --&gt;|aggregator| aggregator
@@ -2043,8 +2029,7 @@ Source file path: <code>packages/nl2sql/src/nl2sql/pipeline/graph.py</code></p>
 <li><code>resolver_route</code> decides:</li>
 <li><code>continue</code> if allowed datasources exist and the question was judged answerable.</li>
 <li><code>end</code> if none exist, the question is not answerable, or the response is missing.</li>
-<li><code>decomposer</code> uses the LLM to produce <code>SubQuery</code> objects and combine groups.</li>
-<li><code>global_planner</code> builds a deterministic <code>ExecutionDAG</code> from sub-queries and combines.</li>
+<li><code>decomposer</code> uses the LLM to produce <code>SubQuery</code> objects and combine groups, then builds a deterministic <code>ExecutionDAG</code> from them in code. The DAG is a pure function of that output, so it is not a node of its own; a DAG that cannot be built is reported as <code>PLANNER_FAILED</code> and the run ends at the router.</li>
 <li><code>layer_router</code> inspects the DAG and current <code>artifact_refs</code>:</li>
 <li>If no DAG or layers, returns <code>END</code>.</li>
 <li>If next scan layer is empty, routes to <code>aggregator</code> -- or to <code>END</code> when no scan produced an artifact or <code>execute</code> is False.</li>
@@ -2068,7 +2053,7 @@ Source file path: <code>packages/nl2sql/src/nl2sql/pipeline/graph.py</code></p>
 <h2 id="performance-characteristics">Performance Characteristics</h2>
 <ul>
 <li>Blocking calls include LLM requests in <code>datasource_resolver</code>, <code>decomposer</code> and <code>answer_synthesizer</code>.</li>
-<li><code>global_planner</code> and <code>aggregator</code> are CPU-bound (DAG construction and local aggregation).</li>
+<li>The decomposer's DAG construction and the <code>aggregator</code> are CPU-bound.</li>
 <li>Subgraph executions are dispatched per scan layer and can run in parallel via LangGraph routing.</li>
 <li>Overall pipeline is executed on a single-worker thread pool created per run and guarded by <code>settings.global_timeout_sec</code>.</li>
 </ul>
@@ -2110,7 +2095,7 @@ Source file path: <code>packages/nl2sql/src/nl2sql/pipeline/graph.py</code></p>
 <li>Node implementations:</li>
 <li><code>packages/nl2sql/src/nl2sql/pipeline/nodes/datasource_resolver/node.py</code></li>
 <li><code>packages/nl2sql/src/nl2sql/pipeline/nodes/decomposer/node.py</code></li>
-<li><code>packages/nl2sql/src/nl2sql/pipeline/nodes/global_planner/node.py</code></li>
+<li><code>packages/nl2sql/src/nl2sql/pipeline/nodes/decomposer/dag.py</code></li>
 <li><code>packages/nl2sql/src/nl2sql/pipeline/nodes/aggregator/node.py</code></li>
 <li><code>packages/nl2sql/src/nl2sql/pipeline/nodes/answer_synthesizer/node.py</code></li>
 </ul>

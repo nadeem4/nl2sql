@@ -890,10 +890,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#global_planner_response" class="md-nav__link">
+  <a href="#execution_dag" class="md-nav__link">
     <span class="md-ellipsis">
       
-        global_planner_response
+        execution_dag
       
     </span>
   </a>
@@ -1613,34 +1613,6 @@
     
   
     Generator
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../nodes/global_planner_node/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Global Planner
   
 
     
@@ -4370,10 +4342,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#global_planner_response" class="md-nav__link">
+  <a href="#execution_dag" class="md-nav__link">
     <span class="md-ellipsis">
       
-        global_planner_response
+        execution_dag
       
     </span>
   </a>
@@ -4616,7 +4588,7 @@
 - <code>datasource_id: Optional[str]</code>
 - <code>datasource_resolver_response: Optional[DatasourceResolverResponse]</code>
 - <code>decomposer_response: Optional[DecomposerResponse]</code>
-- <code>global_planner_response: Optional[GlobalPlannerResponse]</code>
+- <code>execution_dag: Optional[ExecutionDAG]</code>
 - <code>aggregator_response: Optional[AggregatorResponse]</code>
 - <code>answer_synthesizer_response: Optional[AnswerSynthesizerResponse]</code>
 - <code>artifact_refs: Annotated[Dict[str, ArtifactRef], update_results]</code>
@@ -4705,12 +4677,12 @@
 <h3 id="decomposer_response"><code>decomposer_response</code></h3>
 <ul>
 <li>Creation/mutation: returned by <code>DecomposerNode</code> as <code>decomposer_response</code>.</li>
-<li>Read points: <code>GlobalPlannerNode</code>, <code>build_scan_payload</code>, and <code>wrap_subgraph</code> (to find <code>sub_query</code> by id).</li>
+<li>Read points: <code>build_scan_layer_router</code>, <code>build_scan_payload</code>, and <code>wrap_subgraph</code> (to find <code>sub_query</code> by id).</li>
 <li>Reset: none in code.</li>
 </ul>
-<h3 id="global_planner_response"><code>global_planner_response</code></h3>
+<h3 id="execution_dag"><code>execution_dag</code></h3>
 <ul>
-<li>Creation/mutation: returned by <code>GlobalPlannerNode</code> as <code>global_planner_response</code>.</li>
+<li>Creation/mutation: returned by <code>DecomposerNode</code>, which builds it from its own response (<code>decomposer/dag.py</code>).</li>
 <li>Read points: <code>build_scan_layer_router</code> and <code>EngineAggregatorNode</code>.</li>
 <li>Reset: none in code.</li>
 </ul>
@@ -4773,7 +4745,7 @@
 <p>Ownership is defined by which node returns updates for a field:
 - <code>datasource_resolver_response</code>: <code>DatasourceResolverNode</code>
 - <code>decomposer_response</code>: <code>DecomposerNode</code>
-- <code>global_planner_response</code>: <code>GlobalPlannerNode</code>
+- <code>execution_dag</code>: <code>DecomposerNode</code>
 - <code>aggregator_response</code>: <code>EngineAggregatorNode</code>
 - <code>answer_synthesizer_response</code>: <code>AnswerSynthesizerNode</code>
 - <code>artifact_refs</code>: <code>wrap_subgraph</code> (subgraph wrapper in <code>graph_utils.py</code>)
@@ -4791,16 +4763,15 @@
 1. <code>run_with_graph</code> constructs <code>GraphState</code> with <code>user_query</code>, <code>user_context</code>, and optional <code>datasource_id</code>, then calls <code>graph.invoke(initial_state.model_dump())</code>.
 2. <code>DatasourceResolverNode</code> runs first and populates <code>datasource_resolver_response</code>, <code>reasoning</code>, and <code>errors</code>.
 3. <code>resolver_route</code> decides whether to continue based on <code>datasource_resolver_response</code>.
-4. <code>DecomposerNode</code> produces <code>decomposer_response</code> and reasoning.
-5. <code>GlobalPlannerNode</code> produces <code>global_planner_response</code> (including the <code>ExecutionDAG</code>).
-6. <code>build_scan_layer_router</code> emits <code>Send</code> branches using <code>build_scan_payload</code> for each pending scan node. The payload contains <code>subgraph_id</code>, <code>subgraph_name</code>, <code>trace_id</code>, <code>user_context</code>, <code>decomposer_response</code>, and <code>datasource_resolver_response</code>.
-7. Each subgraph is wrapped by <code>wrap_subgraph</code>, which:
+4. <code>DecomposerNode</code> produces <code>decomposer_response</code>, the <code>execution_dag</code> built from it, and reasoning.
+5. <code>build_scan_layer_router</code> emits <code>Send</code> branches using <code>build_scan_payload</code> for each pending scan node. The payload contains <code>subgraph_id</code>, <code>subgraph_name</code>, <code>trace_id</code>, <code>user_context</code>, <code>decomposer_response</code>, and <code>datasource_resolver_response</code>.
+6. Each subgraph is wrapped by <code>wrap_subgraph</code>, which:
    - Builds a <code>SubgraphExecutionState</code> using the payload and a <code>sub_query</code> resolved from <code>decomposer_response</code>.
    - Invokes the subgraph and validates the result into <code>SubgraphExecutionState</code>.
    - Returns updates for <code>artifact_refs</code>, <code>subgraph_outputs</code>, <code>errors</code>, and <code>reasoning</code>.
-8. The router checks <code>artifact_refs</code> to decide which scan nodes are still pending. When none remain, it routes to <code>aggregator</code>.
-9. <code>EngineAggregatorNode</code> consumes <code>global_planner_response</code> and <code>artifact_refs</code> to produce <code>aggregator_response</code>.
-10. <code>AnswerSynthesizerNode</code> consumes <code>aggregator_response</code> and <code>decomposer_response</code> to produce <code>answer_synthesizer_response</code>.</p>
+7. The router checks <code>artifact_refs</code> to decide which scan nodes are still pending. When none remain, it routes to <code>aggregator</code>.
+8. <code>EngineAggregatorNode</code> consumes <code>execution_dag</code> and <code>artifact_refs</code> to produce <code>aggregator_response</code>.
+9. <code>AnswerSynthesizerNode</code> consumes <code>aggregator_response</code> and <code>decomposer_response</code> to produce <code>answer_synthesizer_response</code>.</p>
 <p>Subgraph internal flow uses <code>SubgraphExecutionState</code> and is defined in <code>build_sql_agent_graph</code>:
 <code>schema_retriever</code> -&gt; <code>ast_planner</code> -&gt; <code>logical_validator</code> -&gt; <code>generator</code> -&gt; <code>executor</code>, with a retry loop via <code>retry_handler</code> and <code>refiner</code>.</p>
 <hr />
@@ -4851,7 +4822,6 @@
 <p>Mutators / consumers:
 - <code>packages/nl2sql/src/nl2sql/pipeline/nodes/datasource_resolver/node.py</code>
 - <code>packages/nl2sql/src/nl2sql/pipeline/nodes/decomposer/node.py</code>
-- <code>packages/nl2sql/src/nl2sql/pipeline/nodes/global_planner/node.py</code>
 - <code>packages/nl2sql/src/nl2sql/pipeline/nodes/aggregator/node.py</code>
 - <code>packages/nl2sql/src/nl2sql/pipeline/nodes/answer_synthesizer/node.py</code>
 - <code>packages/nl2sql/src/nl2sql/pipeline/nodes/schema_retriever/node.py</code>

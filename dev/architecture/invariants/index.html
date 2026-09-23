@@ -2699,34 +2699,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../nodes/global_planner_node/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Global Planner
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../nodes/logical_validator_node/" class="md-nav__link">
         
   
@@ -6902,7 +6874,7 @@
 <p>Post-combine ops must target known combine groups, all edges must reference existing nodes, and the DAG must be acyclic.</p>
 <h3 id="enforcement-points_13">Enforcement Points</h3>
 <ul>
-<li><code>GlobalPlannerNode.__call__()</code> in <code>nl2sql.pipeline.nodes.global_planner.node</code></li>
+<li><code>build_execution_dag()</code> in <code>nl2sql.pipeline.nodes.decomposer.dag</code>, called by <code>DecomposerNode.__call__()</code></li>
 <li><code>ExecutionDAG._layered_toposort()</code> in <code>nl2sql.execution.dag</code></li>
 </ul>
 <h3 id="failure-behavior_13">Failure Behavior</h3>
@@ -7055,7 +7027,7 @@
 <li><code>packages/nl2sql/src/nl2sql/pipeline/nodes/generator/node.py</code></li>
 <li><code>packages/nl2sql/src/nl2sql/pipeline/nodes/executor/node.py</code></li>
 <li><code>packages/nl2sql/src/nl2sql/execution/executor/sql_executor.py</code></li>
-<li><code>packages/nl2sql/src/nl2sql/pipeline/nodes/global_planner/node.py</code></li>
+<li><code>packages/nl2sql/src/nl2sql/pipeline/nodes/decomposer/dag.py</code></li>
 <li><code>packages/nl2sql/src/nl2sql/execution/dag.py</code></li>
 <li><code>packages/nl2sql/src/nl2sql/aggregation/aggregator.py</code></li>
 <li><code>packages/nl2sql/src/nl2sql/context.py</code></li>

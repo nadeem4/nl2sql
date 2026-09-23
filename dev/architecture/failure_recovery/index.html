@@ -1718,34 +1718,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../nodes/global_planner_node/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Global Planner
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../nodes/logical_validator_node/" class="md-nav__link">
         
   
@@ -4792,7 +4764,7 @@
 <ul>
 <li>Decomposer LLM failures return <code>ORCHESTRATOR_CRASH</code> (critical) and empty responses.</li>
 <li>AST planner LLM failures return <code>PLANNING_FAILURE</code> and a <code>None</code> plan.</li>
-<li>Global planner failures return <code>PLANNER_FAILED</code> and no <code>global_planner_response</code>; the layer router ends the run.</li>
+<li>A decomposition that cannot be turned into an execution DAG returns <code>PLANNER_FAILED</code> and no <code>execution_dag</code>; the layer router ends the run.</li>
 </ul>
 <h3 id="validation">Validation</h3>
 <ul>

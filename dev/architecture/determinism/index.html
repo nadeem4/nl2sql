@@ -1473,34 +1473,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../nodes/global_planner_node/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Global Planner
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../nodes/logical_validator_node/" class="md-nav__link">
         
   
@@ -4287,7 +4259,7 @@ answer". <strong>Model output is not reproducible.</strong> What is stable is th
 run:</p>
 <ul>
 <li><strong>Stable sub-query and DAG ids.</strong> Both are SHA-256 content hashes over
-  canonical JSON, not counters or UUIDs (<a href="https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/pipeline/nodes/decomposer/node.py"><code>decomposer/node.py</code></a>, <a href="https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/pipeline/nodes/global_planner/node.py"><code>global_planner/node.py</code></a>). The same decomposition always yields the same ids.</li>
+  canonical JSON, not counters or UUIDs (<a href="https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/pipeline/nodes/decomposer/node.py"><code>decomposer/node.py</code></a>, <a href="https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/pipeline/nodes/decomposer/dag.py"><code>decomposer/dag.py</code></a>). The same decomposition always yields the same ids.</li>
 <li><strong>Sorted layer order.</strong> The topological sort sorts each ready set and each
   dependent set, so the execution layers of a given DAG are fixed
   (<a href="https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/execution/dag.py"><code>execution/dag.py</code></a>).</li>
@@ -4379,7 +4351,7 @@ gives every result a total row order.</p>
 </ul>
 <h3 id="planner-and-dag-construction">Planner and DAG Construction</h3>
 <ul>
-<li>Deterministic: Global planner sorts nodes and edges by IDs and roles before constructing the DAG, then hashes a sorted JSON payload to produce a stable <code>dag_id</code> for a given logical plan (<a href="https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/pipeline/nodes/global_planner/node.py"><code>pipeline/nodes/global_planner/node.py</code></a>).</li>
+<li>Deterministic: The decomposer sorts nodes and edges by IDs and roles before constructing the DAG, so the same decomposition always gives the same layers (<a href="https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/pipeline/nodes/decomposer/dag.py"><code>pipeline/nodes/decomposer/dag.py</code></a>).</li>
 <li>Deterministic: DAG layers are computed with a topological sort that sorts ready nodes and dependents, yielding stable layer ordering given the same node/edge sets (<a href="https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/execution/dag.py"><code>execution/dag.py</code></a>).</li>
 <li>Non-deterministic: The AST planner is LLM-driven; the PlanModel content is not stabilized inside the node (<a href="https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/pipeline/nodes/ast_planner/node.py"><code>pipeline/nodes/ast_planner/node.py</code></a>).</li>
 <li>Deterministic (conditional): Once a sub-query's plan has validated and executed, the plan cache pins it: the same normalised intent, datasource and schema version reuse that plan without a planner call, and it is validated again on every use (see <a href="#the-plan-cache-determinism-from-the-architecture">The plan cache</a>).</li>
@@ -4433,7 +4405,7 @@ gives every result a total row order.</p>
 </ul>
 <h3 id="hashingfingerprinting">Hashing/Fingerprinting</h3>
 <ul>
-<li>Deterministic: Stable hashing is consistently performed with sorted JSON and fixed separators for sub-query IDs, DAG hashes, schema fingerprints, and artifact content hashes (<a href="https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/pipeline/nodes/decomposer/node.py"><code>pipeline/nodes/decomposer/node.py</code></a>, <a href="https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/pipeline/nodes/global_planner/node.py"><code>pipeline/nodes/global_planner/node.py</code></a>, <a href="https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/schema/protocol.py"><code>schema/protocol.py</code></a>, <a href="https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/execution/artifacts/store.py"><code>execution/artifacts/store.py</code></a>).</li>
+<li>Deterministic: Stable hashing is consistently performed with sorted JSON and fixed separators for sub-query IDs, schema fingerprints, and artifact content hashes (<a href="https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/pipeline/nodes/decomposer/node.py"><code>pipeline/nodes/decomposer/node.py</code></a>, <a href="https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/schema/protocol.py"><code>schema/protocol.py</code></a>, <a href="https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/execution/artifacts/store.py"><code>execution/artifacts/store.py</code></a>).</li>
 </ul>
 <h3 id="time-based-logic-and-runtime-controls">Time-Based Logic and Runtime Controls</h3>
 <ul>

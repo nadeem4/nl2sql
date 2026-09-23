@@ -631,18 +631,6 @@
 </a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="../nodes/global_planner_node/">
-<span class="md-ellipsis">
-    
-  
-    Global Planner
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
 <a class="md-nav__link" href="../nodes/logical_validator_node/">
 <span class="md-ellipsis">
     
@@ -1831,8 +1819,7 @@
     Runtime --&gt; Graph[build_graph()]
     Graph --&gt; Resolver[DatasourceResolverNode]
     Resolver --&gt; Decomposer[DecomposerNode]
-    Decomposer --&gt; Planner[GlobalPlannerNode]
-    Planner --&gt; Router[Scan Layer Router]
+    Decomposer --&gt; Router[Scan Layer Router]
     Router --&gt; Subgraph[SQL Agent Subgraph]
     Subgraph --&gt; Router
     Router --&gt; Aggregator[EngineAggregatorNode]
@@ -1869,7 +1856,7 @@
     Execution --&gt; Obs</code></pre>
 <h2 id="major-subsystems-and-responsibilities">Major subsystems (and responsibilities)</h2>
 <ul>
-<li><strong>Planner / Decomposer</strong>: <code>DecomposerNode</code> produces stable, semantically-scoped sub-queries; <code>GlobalPlannerNode</code> produces a deterministic <code>ExecutionDAG</code>.</li>
+<li><strong>Planner / Decomposer</strong>: <code>DecomposerNode</code> produces stable, semantically-scoped sub-queries and, from them, a deterministic <code>ExecutionDAG</code>.</li>
 <li><strong>Schema Store</strong>: <code>SchemaStore</code> persists versioned schema snapshots with fingerprints.</li>
 <li><strong>Chunking + Retrieval</strong>: <code>SchemaChunkBuilder</code> produces typed chunks; <code>VectorStore</code> provides staged retrieval for routing and planning context.</li>
 <li><strong>Validation layer</strong>: <code>LogicalValidatorNode</code> enforces schema correctness and RBAC.</li>
@@ -1884,7 +1871,6 @@
     participant Runtime as run_with_graph
     participant Resolver as DatasourceResolverNode
     participant Decomposer as DecomposerNode
-    participant Planner as GlobalPlannerNode
     participant Router as Scan Layer Router
     participant Subgraph as SQL Agent Subgraph
     participant Agg as EngineAggregatorNode
@@ -1893,8 +1879,7 @@
     User-&gt;&gt;Runtime: user_query
     Runtime-&gt;&gt;Resolver: GraphState
     Resolver-&gt;&gt;Decomposer: resolved datasources
-    Decomposer-&gt;&gt;Planner: sub_queries + combine groups
-    Planner-&gt;&gt;Router: ExecutionDAG
+    Decomposer-&gt;&gt;Router: ExecutionDAG over the sub-queries
     Router-&gt;&gt;Subgraph: Send(sub_query)
     Subgraph--&gt;&gt;Router: ArtifactRef + diagnostics
     Router-&gt;&gt;Agg: all scan artifacts

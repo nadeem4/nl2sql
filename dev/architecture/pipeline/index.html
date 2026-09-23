@@ -693,18 +693,6 @@
 </a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="../nodes/global_planner_node/">
-<span class="md-ellipsis">
-    
-  
-    Global Planner
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
 <a class="md-nav__link" href="../nodes/logical_validator_node/">
 <span class="md-ellipsis">
     
@@ -1945,8 +1933,7 @@
 <h2 id="end-to-end-flow">End-to-end flow</h2>
 <pre class="mermaid"><code>flowchart TD
     Resolver[DatasourceResolverNode] --&gt; Decomposer[DecomposerNode]
-    Decomposer --&gt; Planner[GlobalPlannerNode]
-    Planner --&gt; Router[layer_router]
+    Decomposer --&gt; Router[layer_router]
     Router --&gt; SqlAgent[SQL Agent Subgraph]
     SqlAgent --&gt; Router
     Router --&gt; Aggregator[EngineAggregatorNode]
@@ -1955,7 +1942,6 @@
 <ul>
 <li><a href="../nodes/datasource_resolver_node/">DatasourceResolverNode</a></li>
 <li><a href="../nodes/decomposer_node/">DecomposerNode</a></li>
-<li><a href="../nodes/global_planner_node/">GlobalPlannerNode</a></li>
 <li><code>layer_router</code> (routing function, not a node class)</li>
 <li><a href="../nodes/engine_aggregator_node/">EngineAggregatorNode</a></li>
 <li><a href="../nodes/answer_synthesizer_node/">AnswerSynthesizerNode</a></li>
@@ -1982,11 +1968,10 @@
 <ul>
 <li><code>kind</code>: <code>scan</code>, <code>combine</code>, <code>post_filter</code>, <code>post_aggregate</code>, <code>post_project</code>, <code>post_sort</code>, <code>post_limit</code></li>
 <li><code>inputs</code>: upstream node IDs</li>
-<li><code>output_schema</code>: <code>RelationSchema</code> (column specs)</li>
-<li><code>attributes</code>: operation-specific metadata (e.g., join keys, filters, metrics)</li>
+<li><code>attributes</code>: operation-specific metadata for a combine or post-combine node (join keys, filters, metrics). A <code>scan</code> node carries none: its ID is its sub-query's ID, so everything about it is one lookup away in <code>decomposer_response</code>.</li>
 </ul>
 <h2 id="routing-and-subgraph-selection">Routing and subgraph selection</h2>
-<p><code>build_scan_layer_router()</code> selects the next scan layer with missing artifacts and dispatches subgraphs in parallel using <code>Send()</code>. Scan node IDs are matched against <code>SubQuery.id</code> for datasource routing; otherwise datasource ID is resolved from node attributes.</p>
+<p><code>build_scan_layer_router()</code> selects the next scan layer with missing artifacts and dispatches subgraphs in parallel using <code>Send()</code>. A scan node's ID is its sub-query's ID, so the datasource comes from that <code>SubQuery</code>.</p>
 <p>Subgraph selection is capability-based via <code>resolve_subgraph()</code>:</p>
 <pre class="mermaid"><code>flowchart TD
     DatasourceId[DatasourceId] --&gt; Capabilities[DatasourceCapability set]
