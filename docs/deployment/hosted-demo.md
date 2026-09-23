@@ -351,6 +351,55 @@ If step 3 is refused because the Space has commits of its own,
 replaces the Space's history with this folder's. The workflow above never needs
 that, which is why it exists.
 
+## The link preview
+
+Two different links go around, and each unfurls from a different place:
+
+| Pasted link | The card comes from |
+| --- | --- |
+| <https://nadeem4nk-nl2sql-demo.hf.space> | the Open Graph and Twitter tags in the page the app serves |
+| <https://huggingface.co/spaces/nadeem4nk/nl2sql-demo> | `short_description` and `thumbnail` in `deploy/huggingface/README.md`'s front-matter |
+
+Both show the same 1200x630 card:
+
+![The link preview card: the nl2sql playground wordmark, the line "Ask a database in plain English, the model plans, the code writes the SQL", and a fragment of a plan turning into SQL](../assets/social-card.png)
+
+**The app's tags** are added to the built page's `<head>` by
+[`preview.py`][preview] as each request goes out, not baked into the bundle. A
+crawler runs no JavaScript, so a tag React adds on mount is a tag nobody sees;
+and `og:image` and `og:url` have to be absolute, while the same page is the
+Space, a container and `http://127.0.0.1:8000`. So the host comes off the
+request: `X-Forwarded-Proto` and `X-Forwarded-Host` when a proxy set them
+(which is what the Space does), the `Host` header otherwise, and the URL the
+app itself saw if neither is a host. The card is served by the app at
+`/social-card.png` and ships in the wheel, so a `pip install` serves it too.
+
+**The Space's card** reads `thumbnail` over raw GitHub rather than from the
+Space, so it works before the Space has built and while it is asleep.
+
+### Regenerating the card
+
+The card is rendered from `scripts/social_card.html`, which uses the
+playground's own colours and both of its typefaces. Edit that file, then:
+
+```bash
+cd web/playground && npm ci && cd ../..   # the fonts the card borrows
+python scripts/render_social_card.py
+```
+
+Headless Chrome shoots it at 1200x630 and the script writes the same bytes to
+both places that need them: `docs/assets/social-card.png`, which the Space's
+`thumbnail` reads, and
+`packages/nl2sql/src/nl2sql/cli/demo/playground/assets/social-card.png`, which
+the app serves. A test holds the two byte-identical, so regenerating into only
+one of them fails rather than going out half-changed.
+
+A card validator needs a public URL, so the check that the card really unfurls
+can only be run against the deployed Space, with X's card validator or
+<https://opengraph.dev>. What the tests check is everything up to that: the
+tags are in the served HTML, their URLs are absolute, and the image is served
+as `image/png`.
+
 ## Running it locally instead
 
 Hosted mode exists to show the engine on our sample data. To ask questions of
@@ -364,5 +413,6 @@ nl2sql demo
 See [Demo](../getting_started/demo.md).
 
 [key-module]: https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/llm/request_key.py
+[preview]: https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/cli/demo/playground/preview.py
 [space-readme]: https://github.com/nadeem4/nl2sql/blob/main/deploy/huggingface/README.md
 [workflow]: https://github.com/nadeem4/nl2sql/blob/main/.github/workflows/publish_space.yml

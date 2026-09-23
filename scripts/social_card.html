@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>nl2sql playground link preview card</title>
+    <!--
+      The 1200x630 card a link to the hosted demo unfurls into.
+
+      It is the playground's own page in miniature: mist paper, graphite ink,
+      one verdigris accent, and the same two typefaces. The colours and the
+      fonts below are copied from `web/playground/src/styles.css`, which is
+      the only place they are decided; keep them in step with it.
+
+      The font files are the ones the playground bundles, so rendering this
+      needs `npm ci` in `web/playground` first. Render it with:
+
+          python scripts/render_social_card.py
+
+      which inlines the fonts and shoots it with headless Chrome. Opening this
+      file in a browser shows the same layout in fallback typefaces, which is
+      enough for laying it out but not for the committed PNG.
+    -->
+    <style>
+      @font-face {
+        font-family: "Schibsted Grotesk";
+        font-style: normal;
+        font-weight: 400 900;
+        src: url("../web/playground/node_modules/@fontsource-variable/schibsted-grotesk/files/schibsted-grotesk-latin-wght-normal.woff2") format("woff2");
+      }
+
+      @font-face {
+        font-family: "Fragment Mono";
+        font-style: normal;
+        font-weight: 400;
+        src: url("../web/playground/node_modules/@fontsource/fragment-mono/files/fragment-mono-latin-400-normal.woff2") format("woff2");
+      }
+
+      :root {
+        --paper: #eef1ee;
+        --well: #e3e8e4;
+        --ink: #17201c;
+        --ink-2: #4a5752;
+        --rule: #c8d0cb;
+        --accent: #0c6a5c;
+        --accent-soft: #d3e6e0;
+
+        --sans: "Schibsted Grotesk", ui-sans-serif, system-ui, sans-serif;
+        --mono: "Fragment Mono", ui-monospace, Consolas, monospace;
+      }
+
+      * { box-sizing: border-box; }
+
+      html, body { margin: 0; padding: 0; }
+
+      body {
+        width: 1200px;
+        height: 630px;
+        overflow: hidden;
+        background: var(--paper);
+        color: var(--ink);
+        font-family: var(--sans);
+        font-feature-settings: "ss01";
+        -webkit-font-smoothing: antialiased;
+      }
+
+      /* The spine: the playground's one idea is that a run is a single line
+         from question to cost, and the accent marks it. Here it carries the
+         card the same way, and the mark sits where the gate would. */
+      .card {
+        position: relative;
+        display: grid;
+        grid-template-rows: auto 1fr auto;
+        width: 1200px;
+        height: 630px;
+        padding: 68px 80px 64px;
+      }
+
+      .card::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 10px;
+        background: var(--accent);
+      }
+
+      .mark { display: flex; align-items: center; gap: 18px; }
+
+      .mark svg { display: block; width: 44px; height: 44px; }
+
+      .wordmark {
+        margin: 0;
+        font-size: 30px;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+        color: var(--ink-2);
+      }
+
+      .wordmark span {
+        font-family: var(--mono);
+        font-size: 30px;
+        color: var(--ink);
+        margin-right: 4px;
+      }
+
+      /* Two lines of headline, no widow: the width and the size are set
+         together, so changing one means looking at the render again. */
+      .say { align-self: center; max-width: 1020px; }
+
+      h1 {
+        margin: 0;
+        font-size: 52px;
+        line-height: 1.16;
+        font-weight: 650;
+        letter-spacing: -0.022em;
+      }
+
+      h1 b { color: var(--accent); font-weight: 650; }
+
+      .quiet {
+        margin: 30px 0 0;
+        font-size: 28px;
+        line-height: 1.4;
+        color: var(--ink-2);
+      }
+
+      /* The cue: a fragment of the plan the model writes, and the SQL the code
+         writes from it. Decoration at thumbnail size, readable at full size,
+         and true to what the demo does either way. */
+      .cue {
+        display: flex;
+        align-items: center;
+        gap: 22px;
+        padding-top: 36px;
+        border-top: 1px solid var(--rule);
+        font-family: var(--mono);
+        font-size: 23px;
+        white-space: nowrap;
+      }
+
+      .chip { padding: 11px 18px; border-radius: 8px; }
+
+      .chip.plan { background: var(--accent-soft); color: var(--accent); }
+
+      .chip.sql { background: var(--well); color: var(--ink); }
+
+      .arrow { color: var(--accent); font-family: var(--sans); font-size: 30px; }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <div class="mark">
+        <!-- The playground's own mark, the favicon at card scale: the spine a
+             question travels, and the gate that checks it. -->
+        <svg viewBox="0 0 16 16" aria-hidden="true">
+          <rect x="7" y="0" width="2" height="16" fill="#0c6a5c" />
+          <rect x="2" y="7" width="12" height="3" fill="#17201c" />
+        </svg>
+        <p class="wordmark"><span>nl2sql</span> playground</p>
+      </div>
+
+      <div class="say">
+        <h1>Ask a database in plain English &mdash; the model <b>plans</b>, the code writes the <b>SQL</b></h1>
+        <p class="quiet">Bring your own API key &middot; Sample data &middot; Open source</p>
+      </div>
+
+      <div class="cue">
+        <span class="chip plan">group_by: country &middot; sum(total)</span>
+        <span class="arrow">&rarr;</span>
+        <span class="chip sql">SELECT country, SUM(total) &hellip;</span>
+      </div>
+    </div>
+  </body>
+</html>

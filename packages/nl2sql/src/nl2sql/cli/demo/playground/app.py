@@ -1,8 +1,10 @@
 """The playground FastAPI app.
 
-Fifteen routes:
+Sixteen routes:
 
-``GET  /``                     the built React page
+``GET  /``                     the built React page, with the link preview's
+                               tags in its head (see :mod:`preview`)
+``GET  /social-card.png``      the 1200x630 card those tags name
 ``GET  /api/meta``             mode, dataset, every registered datasource, the guided
                                questions (flat, and grouped by datasource), the roles
                                and how many guided questions have replay recordings
@@ -58,6 +60,7 @@ from pydantic import BaseModel, Field
 from nl2sql.auth.models import UserContext
 from nl2sql.cli.demo.playground.hosted import FEEDBACK_MESSAGE, REBUILD_MESSAGE, Hosted
 from nl2sql.cli.demo.playground.index_panel import IndexPanel
+from nl2sql.cli.demo.playground.preview import CARD, CARD_ROUTE, with_preview
 from nl2sql.cli.demo.playground.settings import SettingsPanel
 from nl2sql.common.settings import settings
 from nl2sql.feedback import NOTE_MAX_CHARS, FeedbackStore, run_record, run_signals
@@ -304,8 +307,18 @@ def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset
         app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
     @app.get("/", response_class=HTMLResponse)
-    def index() -> str:
-        return page
+    def index(request: Request) -> str:
+        # The preview tags are added here rather than baked into the built
+        # page: they carry absolute URLs, and the host they name is the one
+        # this request arrived on. See :mod:`preview`.
+        return with_preview(page, request)
+
+    @app.get(CARD_ROUTE, include_in_schema=False)
+    def social_card() -> FileResponse:
+        """The card the preview tags name. It ships with the package."""
+        if not CARD.is_file():
+            raise HTTPException(status_code=404, detail="No preview card in this install.")
+        return FileResponse(CARD, media_type="image/png")
 
     # One group per datasource that has guided questions, in the order given.
     groups = [{"datasource": ds, "questions": list(qs)}

@@ -191,6 +191,7 @@ def _every_route_response(client, trace_id="0b8f7d2e-1111-4222-8333-944455556666
     """One request per route; the test fails if a route is added and not listed."""
     requests = {
         ("GET", "/"): lambda: client.get("/"),
+        ("GET", "/social-card.png"): lambda: client.get("/social-card.png"),
         ("GET", "/api/meta"): lambda: client.get("/api/meta"),
         ("GET", "/api/schema"): lambda: client.get("/api/schema"),
         ("POST", "/api/ask"): lambda: client.post("/api/ask", json={"question": "q1", "role": "admin"}),
