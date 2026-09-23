@@ -4458,6 +4458,11 @@ filled button. <strong>Rebuild</strong> is also always available on demand.</p>
 <li>It has the Settings page's guardrails (so does the
   <a href="#the-retrieval-inspector">Retrieval inspector</a>): local only unless <code>--allow-settings</code>,
   and only from the playground page itself.</li>
+<li>On the <a href="../../deployment/hosted-demo/">hosted demo</a> there is no button at all.
+  The panel says instead that the index was built before the demo started and
+  which databases it covers, and prints the server's own reason where the
+  button would be: rebuilding writes to disk, and the sample data never
+  changes.</li>
 </ul>
 <h3 id="old-demo-folders">Old demo folders</h3>
 <p>Demo folders are not upgraded in place: a folder written by an older engine
@@ -4564,8 +4569,11 @@ saved.
   name, or in anything but JSON.
 - <strong>Hosted mode is a third state.</strong> With <code>nl2sql demo --hosted</code> the page shows a
   key form that writes only to this browser tab's <code>sessionStorage</code>; the settings
-  routes stay refused because there is nothing on the server to save. See
-  <a href="../../deployment/hosted-demo/">Hosted demo</a>.</p>
+  routes stay refused because there is nothing on the server to save. The Ask
+  page there opens by saying a key is needed and holds the question box and the
+  guided questions closed until one is saved, so a new visitor is not left to
+  discover it by asking. Locally there is nothing to announce, and nothing is
+  shown. See <a href="../../deployment/hosted-demo/">Hosted demo</a>.</p>
 </li>
 </ul>
 <h3 id="the-retrieval-inspector">The Retrieval inspector</h3>

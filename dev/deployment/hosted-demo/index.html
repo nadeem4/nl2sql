@@ -4163,6 +4163,13 @@ gate that protects it.</p>
 <p><code>NL2SQL_DEMO_HOSTED=1</code> does the same thing without a command line, which is how
 a container turns it on.</p>
 <h2 id="what-the-visitors-key-does-and-does-not-do">What the visitor's key does, and does not do</h2>
+<p>A visitor who has not pasted one yet is told so before they ask. The <strong>Ask</strong>
+page opens on a short state saying the demo runs on their own key, that it
+stays in this browser tab and is never stored on the server, with a link to
+<strong>Settings</strong>; the question box and the guided questions are disabled until
+there is a key, so a click cannot fail with a <code>401</code> the visitor had no way to
+see coming. The moment a key is saved the state clears and everything enables,
+with no reload. None of this appears in local mode.</p>
 <p>The visitor pastes a key on the <strong>Settings</strong> page. From there:</p>
 <ol>
 <li><strong>The browser keeps it</strong>, in that tab's <code>sessionStorage</code>. Closing the tab
@@ -4200,7 +4207,9 @@ that provider's default, since a <code>gpt-</code> model means nothing to Anthro
   sample databases shipped with the engine.</li>
 </ul>
 <p>A question with no key answers <code>401</code> with a sentence telling the visitor to add
-one under Settings. A malformed key answers <code>400</code> without quoting what was sent.</p>
+one under Settings; the page holds the controls closed before it comes to that,
+so the <code>401</code> is the guard rather than the first thing a visitor meets. A
+malformed key answers <code>400</code> without quoting what was sent.</p>
 <h2 id="limits">Limits</h2>
 <p>Both live in this one process's memory. There are no accounts, no analytics and
 no storage.</p>
@@ -4254,6 +4263,10 @@ keyed by address, is what holds the pace down in the meantime.</p>
 before the server starts). <code>--api-key</code> is refused too: a server-side key is the
 one thing hosted mode is built to avoid, and any provider key exported into the
 process is cleared at start-up so nothing can fall back to it.</p>
+<p>Rebuild being off is said on the page rather than left as a gap: the index
+panel reports that the index was built before the demo started and which
+databases it covers, and where the button would be it prints the server's own
+reason -- rebuilding writes to disk and the sample data never changes.</p>
 <p><strong>On:</strong> asking the twenty guided questions or any other question, the schema
 view, the per-node <strong>Debug</strong> drill-down with its traces, and the retrieval
 inspector read-only.</p>
