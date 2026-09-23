@@ -2896,6 +2896,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-container" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The container
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deploying-it-as-a-hugging-face-space" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deploying it as a Hugging Face Space
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#running-it-locally-instead" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3971,6 +3993,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-container" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The container
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deploying-it-as-a-hugging-face-space" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deploying it as a Hugging Face Space
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#running-it-locally-instead" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4091,7 +4135,9 @@ that provider's default, since a <code>gpt-</code> model means nothing to Anthro
 <li>It does not reach a trace. Run traces are written as usual (that is what the
   playground's <strong>Debug</strong> drill-down reads), and the trace redactor is told about
   the request's key along with every other credential, so it is masked if it ever
-  reaches a prompt or an error.</li>
+  reaches a prompt or an error. The demo project ships <code>TRACE_MODE=always</code>, so
+  every question leaves a file on the container's own disk; <code>TRACE_MODE=on_failure</code>
+  keeps only the runs that went wrong.</li>
 <li>It does not reach the log. Nothing logs the header, and errors about a key
   report its type, never its value.</li>
 <li>It does not reach your data. The hosted demo answers only from the three
@@ -4162,11 +4208,66 @@ their connection options, which opens them through SQLite's own URI form with
 policy and the validator rather than instead of them. This is not specific to
 hosted mode: nothing in the engine writes to a demo database, so they are opened
 read-only everywhere.</p>
+<h2 id="the-container">The container</h2>
+<p><code>deploy/huggingface/Dockerfile</code> builds the playground as a hosted demo. It is a
+Space root rather than a repository build: it needs no build context, so the
+whole deploy is one <code>git subtree push</code> of that folder.</p>
+<p>It installs <code>nl2sql-engine[demo]</code> (from the repository's <code>main</code> branch by
+default; set <code>--build-arg NL2SQL_SPEC="nl2sql-engine[demo]==X.Y.Z"</code> to pin a
+release), then runs <code>nl2sql setup --demo</code> <strong>at build time</strong>. That bakes three
+things into the image so the container reaches nothing but the model at run
+time and the first question is answered at once:</p>
+<ul>
+<li>the three sample databases and their configs,</li>
+<li>their vector index, built with the local embedder,</li>
+<li>the local embedding model itself, roughly 79 MB of ONNX <code>all-MiniLM-L6-v2</code>
+  that chromadb would otherwise download on the first question. The 83 MB
+  archive it was extracted from is deleted; chroma reaches for it only when the
+  extracted files are missing.</li>
+</ul>
+<p>The container runs as uid 1000 (not root), listens on <code>$PORT</code> (7860 by
+default, which is what a Space routes to), and carries a healthcheck that polls
+<code>/api/meta</code>. <code>NL2SQL_DEMO_HOSTED=1</code> is set in the image, so hosted mode holds
+even if the command is overridden.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nb">cd</span><span class="w"> </span>deploy/huggingface
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>docker<span class="w"> </span>build<span class="w"> </span>-t<span class="w"> </span>nl2sql-demo<span class="w"> </span>.
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>docker<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>-p<span class="w"> </span><span class="m">7860</span>:7860<span class="w"> </span>nl2sql-demo
+</code></pre></div>
+<p><code>docker compose up --build</code> in the same folder does it through
+<code>docker-compose.yml</code>, which builds the same image with the same settings.</p>
+<p>Measured on a build of this Dockerfile: <strong>1175 MB</strong> on the container's own
+filesystem (<code>docker image ls</code> reports 1.65 GB, which includes the build
+attestations). Most of it is chromadb's transitive dependencies (polars,
+pyarrow, kubernetes, onnxruntime), which the vector store needs. Boot is
+<strong>about 5 seconds</strong> from <code>docker run</code> to the first answered request, and a
+guided question through a stand-in provider answered in <strong>1.2 seconds</strong>.</p>
+<h2 id="deploying-it-as-a-hugging-face-space">Deploying it as a Hugging Face Space</h2>
+<p>The Space is <code>nadeem4nk/nl2sql-demo</code>: public, Docker SDK, CPU basic. The full
+steps, and what each Space setting does, are in
+<a href="https://github.com/nadeem4/nl2sql/blob/main/deploy/huggingface/README.md"><code>deploy/huggingface/README.md</code></a> -- that file is also the Space's
+own front page, since a Docker Space reads its configuration from the
+front-matter of the <code>README.md</code> at its root.</p>
+<p>In short, and performed by the owner:</p>
+<ol>
+<li>Create the Space at <a href="https://huggingface.co/new-space">https://huggingface.co/new-space</a> under <code>nadeem4nk</code>,
+   named <code>nl2sql-demo</code>, SDK <strong>Docker</strong> (blank), CPU basic, public.</li>
+<li>Add it as a git remote:
+   <code>git remote add space https://huggingface.co/spaces/nadeem4nk/nl2sql-demo</code>
+   (pushing needs a write token from
+   <a href="https://huggingface.co/settings/tokens">https://huggingface.co/settings/tokens</a>).</li>
+<li>Push the folder as the Space root:
+   <code>git subtree push --prefix deploy/huggingface space main</code>.</li>
+</ol>
+<p>The Space builds on push and serves at
+<a href="https://nadeem4nk-nl2sql-demo.hf.space">https://nadeem4nk-nl2sql-demo.hf.space</a>.</p>
+<p><strong>Never give the Space an API key</strong>, as a secret or otherwise. Hosted mode
+clears any provider key it finds in its environment at start-up rather than use
+it, because a key there would be spent by every visitor.</p>
 <h2 id="running-it-locally-instead">Running it locally instead</h2>
 <p>Hosted mode exists to show the engine on our sample data. To ask questions of
 your own data, with no limits and a key that never leaves your machine:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"nl2sql-engine[demo]"</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>nl2sql<span class="w"> </span>demo
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"nl2sql-engine[demo]"</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>nl2sql<span class="w"> </span>demo
 </code></pre></div>
 <p>See <a href="../../getting_started/demo/">Demo</a>.</p>
 
