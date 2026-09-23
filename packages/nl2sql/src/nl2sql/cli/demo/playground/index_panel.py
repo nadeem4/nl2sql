@@ -28,6 +28,7 @@ from typing import Any, Dict, Optional
 
 from fastapi import HTTPException
 
+from nl2sql.cli.demo.playground.hosted import REBUILD_MESSAGE
 from nl2sql.cli.demo.stamp import engine_version, outdated_warning, read_stamp
 from nl2sql.common.logger import get_logger
 
@@ -76,7 +77,9 @@ class IndexPanel:
             "health": self.health(),
             "rebuild": {
                 "available": self.settings.available,
-                "reason": self.settings.reason,
+                # Hosted, Rebuild is off in its own words, not the panel's:
+                # nothing there is about saving a key.
+                "reason": REBUILD_MESSAGE if self.settings.hosted else self.settings.reason,
                 "enrich_available": live,
                 "enrich_reason": None if live else (
                     "Descriptions are written by the LLM, so they need an API key. Add one in Settings."

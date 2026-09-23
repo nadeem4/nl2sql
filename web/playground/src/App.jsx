@@ -6,6 +6,7 @@ import Run from "./Panes.jsx";
 import Settings from "./Settings.jsx";
 import RetrievalInspector from "./Retrieval.jsx";
 import { guidedGroups } from "./questions.js";
+import { askHeaders, readKey, writeKey } from "./hostedKey.js";
 import { createRouter, hashFor, navItems, pageFor, pageFromHash } from "./router.js";
 import { deniedTables, planTables } from "./run.js";
 
@@ -16,6 +17,19 @@ function replayNote(recorded, total, canSet) {
     return `No API key found, and replay mode has no recorded answers, so no question can be answered. To ask questions, ${fix}.`;
   }
   return `No API key found. ${recorded} of ${total} guided questions answer from recorded model responses; for any other question, ${fix}.`;
+}
+
+// The hosted demo runs on the visitor's own key and never on the owner's, so
+// the mode line says whose key answers and what the limits are.
+function hostedNote(meta, key) {
+  const limits = meta.limits || {};
+  const capped = limits.questions_per_minute
+    ? ` Up to ${limits.questions_per_minute} questions a minute and ${limits.questions_per_session} a session.`
+    : "";
+  if (!key) {
+    return `Questions run on your own API key, which you add under Settings. It stays in this browser tab and is never stored on the server.${capped} Add one under`;
+  }
+  return `Questions run on the key in this browser tab; it is sent with each question and stored nowhere.${capped} Replace or clear it under`;
 }
 
 const DEBUG_KEY = "nl2sql.playground.debug";
@@ -40,7 +54,14 @@ function writeDebug(on) {
 
 async function getJson(url, options) {
   const response = await fetch(url, options);
-  if (!response.ok) throw new Error(`${url} returned ${response.status}`);
+  if (!response.ok) {
+    // A refusal carries the server's own sentence -- no key, a bad key, a
+    // limit reached -- and that is what the page should show, not a status.
+    const reply = await response.json().catch(() => ({}));
+    throw new Error(
+      typeof reply.detail === "string" ? reply.detail : `${url} returned ${response.status}`,
+    );
+  }
   return response.json();
 }
 
@@ -85,6 +106,8 @@ export default function App() {
   const [retrieval, setRetrieval] = useState(null);
   const [retrievalError, setRetrievalError] = useState(null);
   const [feedback, setFeedback] = useState(null);
+  // The hosted demo's key: this tab's, never the server's.
+  const [apiKey, setApiKey] = useState(() => readKey(window.sessionStorage));
   const runRef = useRef(null);
   const pageRef = useRef(null);
   const firstPage = useRef(true);
@@ -170,7 +193,9 @@ export default function App() {
       setResult(
         await getJson("/api/ask", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          // The key travels in a header, never in the body: a body is what
+          // request logs and validation errors quote back.
+          headers: askHeaders(apiKey),
           body: JSON.stringify({ question: q, role, execute: !planOnly }),
         })
       );
@@ -186,10 +211,13 @@ export default function App() {
     writeDebug(on);
   };
 
+  const saveKey = (next) => setApiKey(writeKey(window.sessionStorage, next));
+
   const sub = result && result.sub_queries && result.sub_queries[0];
   const used = planTables(sub && sub.plan);
   const denied = deniedTables(result && result.errors);
   const replay = meta && meta.mode === "replay";
+  const hosted = Boolean(meta && meta.hosted);
   const canSet = settings && settings.available;
   const indexBroken = index && needsRebuild(index.health) && index.job.state !== "running";
   // The rail shows one database's schema; how many there are is the index's to
@@ -199,7 +227,8 @@ export default function App() {
   const groups = guidedGroups(meta);
   const current = pageFor(page);
   const nav = navItems(page, {
-    settings: settings && !settings.available,
+    // Hosted, Settings is not off: it is where the visitor's own key goes.
+    settings: settings && !settings.available && !settings.hosted,
     retrieval: retrieval && !retrieval.available,
   });
 
@@ -218,10 +247,16 @@ export default function App() {
           </p>
           {meta && (
             <p className={`mode mode-${meta.mode}`}>
-              <strong>{replay ? "Replay mode." : "Live mode."}</strong>{" "}
-              {replay
-                ? replayNote(meta.recorded_questions, (meta.questions || []).length, canSet)
-                : "Questions go to the configured model."}
+              <strong>{hosted ? "Hosted demo." : replay ? "Replay mode." : "Live mode."}</strong>{" "}
+              {hosted ? (
+                <>
+                  {hostedNote(meta, apiKey)} <a href={hashFor("settings")}>Settings</a>.
+                </>
+              ) : replay ? (
+                replayNote(meta.recorded_questions, (meta.questions || []).length, canSet)
+              ) : (
+                "Questions go to the configured model."
+              )}
             </p>
           )}
         </div>
@@ -263,7 +298,9 @@ export default function App() {
       <main className="page" id="page" ref={pageRef} tabIndex={-1} aria-labelledby="page-title">
         <div className="page-head">
           <h1 id="page-title">{current.title}</h1>
-          <p className="page-lede">{current.description}</p>
+          <p className="page-lede">
+            {(hosted && current.hostedDescription) || current.description}
+          </p>
           {current.note && <p className="page-note">{current.note}</p>}
         </div>
 
@@ -360,7 +397,8 @@ export default function App() {
         {page === "settings" && (
           <div className="sheet" id="settings-panel">
             <Settings settings={settings} error={settingsError} onSaved={settingsSaved}
-              recorded={meta ? meta.recorded_questions : 0} />
+              recorded={meta ? meta.recorded_questions : 0}
+              apiKey={apiKey} onKey={saveKey} limits={meta && meta.limits} />
           </div>
         )}
 

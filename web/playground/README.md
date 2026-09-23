@@ -34,6 +34,16 @@ project, on a loopback host or with `--allow-settings`), its nav item stays and
 is marked `off`; opening it is how you read the reason
 (`#settings-unavailable`, `#retrieval-unavailable`).
 
+**Hosted mode** (`nl2sql demo --hosted`, `meta.hosted`) is a third state, not a
+page that is off. Settings keeps its nav item unmarked and shows
+`#hosted-key-heading` instead: a key form that writes only to this tab's
+`sessionStorage` (`src/hostedKey.js`), from where `askHeaders` sends it as the
+`X-NL2SQL-Api-Key` header on `/api/ask` and nowhere else. Nothing about the key
+is posted to the server, so there is no save to succeed or fail; the copy on the
+page says exactly that, plus the limits from `meta.limits` and how to run the
+demo locally instead. Rebuild and answer ratings are off, and the retrieval
+inspector stays on. See [Hosted demo](../../docs/deployment/hosted-demo.md).
+
 `src/router.test.js` covers the default route, deep links, an unknown route,
 Back and Forward, and that routing touches nothing but the hash.
 

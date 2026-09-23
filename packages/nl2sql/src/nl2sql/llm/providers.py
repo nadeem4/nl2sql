@@ -10,12 +10,14 @@ and the REST API all read it from here.
 
 from __future__ import annotations
 
+import re
 from typing import Dict, Optional, Tuple
 
 from .registry import PROVIDER_PRESETS
 
 __all__ = [
     "ANTHROPIC_ENV",
+    "KEY_SHAPE_MESSAGE",
     "DEFAULT_ANTHROPIC_MODEL",
     "DEFAULT_OPENAI_MODEL",
     "DEFAULT_OPENROUTER_MODEL",
@@ -32,9 +34,28 @@ __all__ = [
     "default_temperature_for",
     "env_var_for_key",
     "env_var_for_provider",
+    "looks_like_api_key",
     "mask_key",
     "provider_for_key",
 ]
+
+# Letters, digits, '-' and '_' only, and at least twenty of them. A key is
+# written into a dotenv file by the CLI and carried in an HTTP header by the
+# hosted demo, so nothing that could end a line, start a comment or split a
+# header gets through. The one shape check: the CLI, the settings panel and
+# hosted mode all read it from here.
+_KEY_SHAPE = re.compile(r"^[A-Za-z0-9_-]{20,}$")
+
+# What to tell someone whose key does not match, without quoting what they sent.
+KEY_SHAPE_MESSAGE = (
+    "That does not look like an API key: expected 20 or more letters, digits, "
+    "'-' or '_', with no spaces."
+)
+
+
+def looks_like_api_key(key: Optional[str]) -> bool:
+    """True when ``key`` has the shape every supported provider's keys share."""
+    return bool(_KEY_SHAPE.match((key or "").strip()))
 
 OPENAI_ENV = PROVIDER_PRESETS["openai"].api_key_env
 OPENROUTER_ENV = PROVIDER_PRESETS["openrouter"].api_key_env

@@ -9,7 +9,9 @@ and owned by this repository; no third-party dataset is involved.
 
 WEBANALYTICS_DATASOURCE = {
     "id": "webanalytics",
-    "connection": {"type": "sqlite", "database": "data/webanalytics.sqlite"},
+    # Read-only, like the other two: see ``chinook.py``.
+    "connection": {"type": "sqlite", "database": "data/webanalytics.sqlite",
+                   "options": {"read_only": True}},
     "description": (
         "Website traffic analytics: visitor sessions with their duration and bounce flag, the "
         "pages viewed in each session and time on page, the referrer domain and marketing channel "

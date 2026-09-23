@@ -120,6 +120,7 @@ nav:
     - Deployment Architecture: deployment/architecture.md
     - Docker: deployment/docker.md
     - Kubernetes: deployment/kubernetes.md
+    - Hosted demo: deployment/hosted-demo.md
   - Development:
     - Extending NL2SQL: development/index.md
     - Releasing: development/releasing.md

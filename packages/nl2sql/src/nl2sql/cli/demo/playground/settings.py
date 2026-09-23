@@ -15,6 +15,12 @@ Three rules:
 * **Secrets are write-only.** A key goes in; only ``mask_key``'s form comes
   back, in responses and in errors alike.
 
+``hosted`` is a fourth state rather than a loosening of the first rule: on a
+public demo (:mod:`nl2sql.cli.demo.playground.hosted`) there is nothing to save,
+because the server keeps no key and writes no config. The panel then reports
+itself unavailable with ``hosted: True``, and the page offers the visitor a key
+form that writes to their own browser instead.
+
 The engine builds its pipeline, and fetches its LLM clients, per question. A
 settings change therefore waits, under :class:`RunGate`, for the questions in
 flight to finish on the clients they started with, and holds new ones back
@@ -24,7 +30,6 @@ from __future__ import annotations
 
 import ipaddress
 import os
-import re
 import threading
 from contextlib import contextmanager
 from pathlib import Path
@@ -34,7 +39,16 @@ from urllib.parse import urlsplit
 import yaml
 from fastapi import HTTPException, Request
 
-from nl2sql.llm.providers import LLM_AGENTS, PROVIDER_KEYS, VERIFIED_MODELS, env_var_for_key, mask_key, provider_for_key
+from nl2sql.llm.providers import (
+    KEY_SHAPE_MESSAGE,
+    LLM_AGENTS,
+    PROVIDER_KEYS,
+    VERIFIED_MODELS,
+    env_var_for_key,
+    looks_like_api_key,
+    mask_key,
+    provider_for_key,
+)
 from nl2sql.cli.demo.llm_config import persist_api_key, point_llm_config_at
 from nl2sql.common.logger import get_logger
 from nl2sql.llm.registry import PROVIDER_PRESETS
@@ -64,9 +78,12 @@ _AGENTS = {node["agent"] for node in LLM_NODES}
 
 PROVIDER_LABELS = {"openai": "OpenAI", "anthropic": "Anthropic", "openrouter": "OpenRouter", "ollama": "Ollama"}
 
-# Letters, digits, '-' and '_' only: the key is written into a dotenv file, so
-# nothing that could end the line or start a comment gets through.
-_KEY_SHAPE = re.compile(r"^[A-Za-z0-9_-]{20,}$")
+# Why the panel writes nothing on a hosted demo. The page turns this into the
+# browser-only key form rather than an "off" notice; see ``read``.
+HOSTED_SETTINGS_REASON = (
+    "This is the hosted demo, so nothing is saved on the server: your key lives in this browser "
+    "tab, travels with each question, and is used only to answer it."
+)
 
 
 def is_loopback(host: str) -> bool:
@@ -125,16 +142,19 @@ class SettingsPanel:
     """Reads and writes the demo project's LLM settings for the playground."""
 
     def __init__(self, engine, project_dir: Optional[Path], mode: str, host: str,
-                 allow_settings: bool) -> None:
+                 allow_settings: bool, hosted: bool = False) -> None:
         self.engine = engine
         self.project_dir = Path(project_dir) if project_dir is not None else None
         self.mode = mode
         self.host = host
+        self.hosted = hosted
         self.gate = RunGate()
-        if self.project_dir is None:
-            self.reason: Optional[str] = (
-                "Settings are available in the playground that nl2sql demo starts."
-            )
+        if hosted:
+            # A third state, not a loosened gate: there is nothing to save,
+            # because the server keeps no key and writes no config.
+            self.reason: Optional[str] = HOSTED_SETTINGS_REASON
+        elif self.project_dir is None:
+            self.reason = "Settings are available in the playground that nl2sql demo starts."
         elif not (is_loopback(host) or allow_settings):
             self.reason = (
                 f"This playground is bound to {host}, which other "
@@ -188,7 +208,9 @@ class SettingsPanel:
     def read(self) -> Dict[str, Any]:
         """What the panel shows. Never the key: at most its masked form."""
         if not self.available:
-            return {"available": False, "reason": self.reason}
+            # ``hosted`` distinguishes "off, and here is why" from "there is
+            # nothing to save here, keep your key in the browser".
+            return {"available": False, "hosted": self.hosted, "reason": self.reason}
 
         cfg = self._load()
         default = cfg.get("default") or {}
@@ -252,13 +274,9 @@ class SettingsPanel:
     def save_key(self, key: str) -> None:
         """Saves ``key`` to ``.env.demo`` and switches the demo to live on it."""
         key = (key or "").strip()
-        if not _KEY_SHAPE.match(key):
+        if not looks_like_api_key(key):
             # Deliberately says nothing about the value it was given.
-            raise HTTPException(
-                status_code=400,
-                detail="That does not look like an API key: expected 20 or more letters, digits, "
-                       "'-' or '_', with no spaces.",
-            )
+            raise HTTPException(status_code=400, detail=KEY_SHAPE_MESSAGE)
         variable = env_var_for_key(key)
         with self.gate.change():
             try:

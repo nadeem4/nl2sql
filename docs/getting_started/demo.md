@@ -148,6 +148,11 @@ This covers the embedding step only. The demo is **not** key-free end to end:
   output is model-dependent - see
   [LLM configuration → Ollama](../configuration/llm.md#ollama).
 
+Sharing the demo with other people is the one case where none of this applies:
+`nl2sql demo --hosted` serves the playground with **no key on the server at
+all**, and each visitor pastes their own into the page. See
+[Hosted demo](../deployment/hosted-demo.md).
+
 Because the demo indexes with `local` and the default environment indexes with
 `openai`, the two use different vector dimensions. `.env.demo` keeps its own
 `VECTOR_STORE=data/vector_store_demo` directory, so they do not collide. If you
@@ -290,6 +295,10 @@ second settings store, and the browser keeps nothing but UI conveniences.
   it on anyway, for a network you trust. Changes are also refused from another
   site's page (a foreign `Origin`), through a hostname that is not a loopback
   name, or in anything but JSON.
+- **Hosted mode is a third state.** With `nl2sql demo --hosted` the page shows a
+  key form that writes only to this browser tab's `sessionStorage`; the settings
+  routes stay refused because there is nothing on the server to save. See
+  [Hosted demo](../deployment/hosted-demo.md).
 
 ### The Retrieval inspector
 

@@ -29,6 +29,10 @@ export const PAGES = [
     title: "Settings",
     description:
       "Save an API key for the demo project and choose which model runs each step of the pipeline.",
+    // The hosted demo saves nothing, so the page is only about the visitor's
+    // own key; the same route, a different promise.
+    hostedDescription:
+      "Add your own API key for this browser tab. The hosted demo keeps no key of its own and stores nothing you paste here.",
   },
   {
     id: "retrieval",

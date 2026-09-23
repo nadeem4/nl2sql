@@ -17,6 +17,7 @@ from typing import Any, Dict, Iterable, Optional, Set
 
 from nl2sql.common.logger import get_logger
 from nl2sql.common.settings import secret_value, settings
+from nl2sql.llm.request_key import current_api_key
 from nl2sql.tracing.document import (
     TRACE_FORMAT_VERSION,
     Limits,
@@ -56,6 +57,11 @@ def engine_info() -> Dict[str, Any]:
 def collect_secrets(ctx: Any) -> Set[str]:
     """Every secret value this process knows of, for the redactor."""
     found: Set[str] = set()
+    # A key the caller brought for this request only. It is in no environment
+    # variable and in no registry, so nothing below would find it.
+    request_key = current_api_key()
+    if request_key:
+        found.add(request_key)
     for name, value in os.environ.items():
         if value and _SECRET_ENV.search(name):
             found.add(value)
