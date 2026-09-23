@@ -349,6 +349,13 @@ to the next question. The panel offers the providers and models in
 now, and a provider only once its key is saved. See
 [the Settings page](../getting_started/demo.md#the-settings-page).
 
+The playground's **Pipeline** page reads the same configuration back: it lists
+every step of a run and, for each of the five a model decides, the provider and
+model it is set to use, then what it actually spent once a question has been
+asked. It is served by `GET /api/pipeline` from `nl2sql.pipeline.steps`, which
+takes its five model steps from `LLM_AGENTS` rather than repeating the table
+above. See [the Pipeline page](../getting_started/demo.md#the-pipeline-page).
+
 When `nl2sql demo` picks replay or live mode at start-up it points `default`
 at the chosen provider. In replay and record mode every `agents:` entry
 follows, because one fake or proxy serves every call. In live mode a step

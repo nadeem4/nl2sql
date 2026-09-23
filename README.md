@@ -175,6 +175,13 @@ model response.
 
 ![The per-node cost table with the datasource resolver opened on its model call](https://raw.githubusercontent.com/nadeem4/nl2sql/main/docs/assets/screenshots/playground-debug.png)
 
+**Pipeline:** every step of a run in order, with the five a model decides
+marked and the deterministic ones left quiet. Before a question it shows the
+model each step is set to use; after one, the model that answered, that step's
+tokens and its time.
+
+![The Pipeline page listing each step of a run, the five marked as decided by a model, with tokens and time from the last run](https://raw.githubusercontent.com/nadeem4/nl2sql/main/docs/assets/screenshots/playground-pipeline.png)
+
 **Settings:** save an API key per provider and choose a provider and model for
 each LLM step. Written to the demo project's `.env.demo` and
 `configs/llm.demo.yaml`.

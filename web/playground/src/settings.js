@@ -2,6 +2,15 @@
 // live on the server (nl2sql/llm/providers.py) and arrive from
 // GET /api/settings; nothing here names a model or a provider.
 
+// How each provider is written on the page. The ids are the server's
+// (PROVIDER_PRESETS); anything it sends that is not listed reads as itself.
+export const PROVIDER_NAMES = { openai: "OpenAI", openrouter: "OpenRouter", anthropic: "Anthropic",
+  ollama: "Ollama" };
+
+export function providerName(id) {
+  return PROVIDER_NAMES[id] || id || "";
+}
+
 // A step's choice as one <select> value: "provider:model", or "" for the default.
 export function choiceValue(provider, model) {
   return model ? `${provider}:${model}` : "";

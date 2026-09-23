@@ -195,6 +195,7 @@ def _every_route_response(client, trace_id="0b8f7d2e-1111-4222-8333-944455556666
         ("GET", "/api/schema"): lambda: client.get("/api/schema"),
         ("POST", "/api/ask"): lambda: client.post("/api/ask", json={"question": "q1", "role": "admin"}),
         ("GET", "/api/trace/{trace_id}"): lambda: client.get(f"/api/trace/{trace_id}"),
+        ("GET", "/api/pipeline"): lambda: client.get("/api/pipeline"),
         ("GET", "/api/settings"): lambda: client.get("/api/settings"),
         ("POST", "/api/settings/key"): lambda: client.post("/api/settings/key", json={"api_key": FAKE_KEY}),
         ("POST", "/api/settings/models"): lambda: client.post(

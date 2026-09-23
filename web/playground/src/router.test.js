@@ -47,6 +47,7 @@ test("the default route is the question and answer view", () => {
 test("a deep link opens the page it names", () => {
   assert.equal(pageFromHash("#/settings"), "settings");
   assert.equal(pageFromHash("#/retrieval"), "retrieval");
+  assert.equal(pageFromHash("#/pipeline"), "pipeline");
   // A trailing slash or a shouted hash is the same link.
   assert.equal(pageFromHash("#/settings/"), "settings");
   assert.equal(pageFromHash("#/Retrieval"), "retrieval");
@@ -135,7 +136,7 @@ test("the nav names every page, marks the current one and says which are off", (
   const items = navItems("settings", { retrieval: true });
 
   assert.deepEqual(items.map((i) => i.id), PAGES.map((p) => p.id));
-  assert.deepEqual(items.map((i) => i.href), ["#/", "#/settings", "#/retrieval"]);
+  assert.deepEqual(items.map((i) => i.href), ["#/", "#/pipeline", "#/settings", "#/retrieval"]);
   assert.equal(items.filter((i) => i.current).length, 1);
   assert.equal(items.find((i) => i.id === "settings").current, true);
   // An off page keeps its place in the nav: it opens and says why.
@@ -146,6 +147,6 @@ test("the nav names every page, marks the current one and says which are off", (
 
 test("nothing is marked off before the server has answered", () => {
   const items = navItems("ask", {});
-  assert.deepEqual(items.map((i) => i.off), [false, false, false]);
+  assert.deepEqual(items.map((i) => i.off), [false, false, false, false]);
   assert.equal(items.find((i) => i.id === "ask").current, true);
 });
