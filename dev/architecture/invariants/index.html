@@ -4815,34 +4815,6 @@
 
               
             
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../api/core/result/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Result
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
           </ul>
         </nav>
       
@@ -6481,10 +6453,10 @@
 <h3 id="enforcement-points_4">Enforcement Points</h3>
 <ul>
 <li><code>ConfigDict(extra="forbid")</code> on plan models in <code>nl2sql.pipeline.nodes.ast_planner.schemas</code></li>
-<li><code>PlanModel.query_type</code> literal and <code>LogicalValidatorNode._validate_static()</code> in <code>nl2sql.pipeline.nodes.validator.node</code></li>
+<li><code>PlanModel.query_type: Literal["READ"]</code> in <code>nl2sql.pipeline.nodes.ast_planner.schemas</code>, which pydantic enforces before any node sees the plan (the plan cache re-validates on read, so a cached plan is covered too)</li>
 </ul>
 <h3 id="failure-behavior_4">Failure Behavior</h3>
-<p>Pydantic validation errors for extra/invalid fields; <code>PipelineError</code> with <code>SECURITY_VIOLATION</code> for non-READ queries.</p>
+<p>Pydantic validation errors for extra/invalid fields and for any <code>query_type</code> other than <code>READ</code>; the plan never reaches the validator. <code>LogicalValidatorNode</code> no longer re-checks it — the branch was unreachable.</p>
 <h3 id="why-it-exists_4">Why It Exists</h3>
 <p>Prevents mutation or unknown plan constructs from entering execution.</p>
 <hr />

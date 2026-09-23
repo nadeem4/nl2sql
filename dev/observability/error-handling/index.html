@@ -1586,18 +1586,6 @@
   </span>
 </a>
 </li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../api/core/result/">
-<span class="md-ellipsis">
-    
-  
-    Result
-  
-
-    
-  </span>
-</a>
-</li>
 </ul>
 </nav>
 </li>
@@ -1790,6 +1778,20 @@
 <li><code>is_retryable</code> derived from severity and error code</li>
 </ul>
 <p>Common error codes include <code>MISSING_SQL</code>, <code>EXECUTION_FAILED</code>, <code>PIPELINE_TIMEOUT</code>, <code>SECURITY_VIOLATION</code>, <code>QUESTION_NOT_ANSWERABLE</code>.</p>
+<p><code>ErrorCode</code> carries only codes something can produce. Eleven members that no
+code path raised were removed (<code>MISSING_GROUP_BY</code>, <code>INVALID_ALIAS_USAGE</code>,
+<code>JOIN_MISSING_ON_CLAUSE</code>, <code>INVALID_DATE_FORMAT</code>, <code>INVALID_NUMERIC_VALUE</code>,
+<code>EXECUTION_ERROR</code>, <code>PERFORMANCE_WARNING</code>, <code>SERVICE_UNAVAILABLE</code>,
+<code>PHYSICAL_VALIDATOR_FAILED</code>, <code>EXECUTION_TIMEOUT</code>, <code>INTENT_VIOLATION</code>); a code
+nobody can emit is a promise to a caller the engine never keeps. <code>DB_EXECUTION_ERROR</code>
+and <code>SAFEGUARD_VIOLATION</code> are kept although nothing raises them yet: each has a
+caller-facing message in <code>SAFE_ERROR_MESSAGES</code>, so each is a declared refusal
+path. <code>test_boundary_tidy_ups.py</code> asserts the rule.</p>
+<p>A run that hits the global timeout returns <code>PIPELINE_TIMEOUT</code> <strong>and</strong> an
+answer: the apology is written where the answer synthesizer writes its own, so
+<code>QueryResult.final_answer</code> carries it. It used to be written to a top-level
+state key that <code>result_from_state</code> never read, so every caller through the SDK
+and the REST route saw <code>final_answer: null</code> with only the error code.</p>
 <p><code>QUESTION_NOT_ANSWERABLE</code> (severity <code>ERROR</code>) comes from the datasource resolver when its answerability check finds that no datasource the role may read can answer the question, such as "what is the weather in Paris?". The run ends before the decomposer: no decomposer, planner, refiner or synthesizer call is made, <code>QueryResult.status</code> is <code>error</code>, and the message tells the user the question can't be answered from the connected data. The check is told to answer "answerable" when unsure. See <a href="../../architecture/nodes/datasource_resolver_node/#answerability-check">DatasourceResolverNode</a>.</p>
 <h2 id="circuit-breaker">Circuit breaker</h2>
 <p><code>create_breaker()</code> configures <code>pybreaker.CircuitBreaker</code> instances with observability hooks. The system defines exactly one:</p>

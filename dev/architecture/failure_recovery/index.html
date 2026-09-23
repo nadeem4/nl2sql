@@ -3989,34 +3989,6 @@
 
               
             
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../api/core/result/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Result
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
           </ul>
         </nav>
       
@@ -4936,7 +4908,7 @@
 <hr />
 <h2 id="known-gaps">Known Gaps</h2>
 <ul>
-<li>No dry-run or cost-estimate gate runs before execution, even where the adapter advertises <code>SUPPORTS_DRY_RUN</code> / <code>SUPPORTS_COST_ESTIMATE</code>.</li>
+<li>No dry-run or cost-estimate gate runs before execution. The <code>SUPPORTS_DRY_RUN</code> / <code>SUPPORTS_COST_ESTIMATE</code> capability flags are gone with it: nothing queried them.</li>
 <li><code>VECTOR_BREAKER</code> is the only circuit breaker; LLM calls and SQL execution have no breaker and no fast-fail path.</li>
 <li>There is no process isolation around SQL execution, so a driver crash is unrecoverable at the engine level.</li>
 <li>Subgraph wrapper assumes executor output is present; earlier failures can cause wrapper-level errors.</li>

@@ -3706,34 +3706,6 @@
 
               
             
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../api/core/result/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Result
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
           </ul>
         </nav>
       
@@ -4272,7 +4244,7 @@
 <h4 id="explainsql-str"><code>explain(sql: str)</code></h4>
 <p>Returns the execution plan.</p>
 <h4 id="cost_estimatesql-str"><code>cost_estimate(sql: str)</code></h4>
-<p>Returns cost/row estimates. Advertised via the <code>SUPPORTS_COST_ESTIMATE</code> capability; the pipeline does not currently call it.</p>
+<p>Returns cost/row estimates. The pipeline does not currently call it, and there is no capability flag for it: <code>DatasourceCapability</code> carries only what something queries.</p>
 <h3 id="optional-hook-render_sqlexpression">Optional hook: <code>render_sql(expression)</code></h3>
 <p><code>nl2sql_adapter_sdk.protocols.SqlRenderingAdapterProtocol</code>. The engine builds
 every query as a sqlglot expression tree and, when the adapter has

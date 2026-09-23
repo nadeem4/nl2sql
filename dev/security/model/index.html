@@ -1604,18 +1604,6 @@
   </span>
 </a>
 </li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../api/core/result/">
-<span class="md-ellipsis">
-    
-  
-    Result
-  
-
-    
-  </span>
-</a>
-</li>
 </ul>
 </nav>
 </li>
@@ -1898,8 +1886,9 @@ trace to the user who produced it is left to a multi-user deployment.</p>
 </ul>
 <h2 id="what-keeps-the-sql-read-only">What keeps the SQL read-only</h2>
 <p>The model never writes SQL. It emits a typed plan whose <code>query_type</code> is
-<code>Literal["READ"]</code>, and the generator renders that plan with <code>sqlglot</code> starting
-from <code>exp.select()</code>. A statement that is not a SELECT therefore cannot be
+<code>Literal["READ"]</code> — pydantic rejects anything else before a node sees the plan,
+which is the whole enforcement — and the generator renders that plan with
+<code>sqlglot</code> starting from <code>exp.select()</code>. A statement that is not a SELECT therefore cannot be
 produced, and free text from the model is never executed.</p>
 <p>What is <strong>not</strong> in place: database connections are <strong>not</strong> opened read-only on
 any dialect, and the executor has no statement-kind or statement-count gate of
