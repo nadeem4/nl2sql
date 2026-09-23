@@ -160,6 +160,14 @@ See `../failure_recovery.md` for retry scope and recovery behavior.
 - No subgraph-specific metrics or trace spans are emitted.
 - Retry loop only considers planner and logical validation errors.
 
+Because the generator has no retry edge, the invariant the loop depends on is
+that **`logical_validator` rejects every plan `generator` would refuse to
+build**. `LogicalValidatorNode._validate_buildable()` enforces it by running the
+generator's own `_build_query()` — see
+[Buildability](../nodes/logical_validator_node.md#buildability-the-validator-runs-the-generator).
+Without it, a plan whose tables are not joined reached `generator` and ended the
+sub-query with a terminal `SQL_GEN_FAILED`.
+
 ---
 
 ## Related Code

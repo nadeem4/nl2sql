@@ -125,6 +125,17 @@ Emits `PipelineError` with:
 
 A malformed join graph is a planning error, not something to guess around. `SQL_GEN_FAILED` is raised when a join names an undeclared alias, when a join connects two tables that are both already in scope, when a join cannot be reached from the `FROM` table, or when a declared table is never joined.
 
+In practice the planner should never see this. There is no retry edge after the
+generator, so a `SQL_GEN_FAILED` ends the sub-query. `LogicalValidatorNode`
+therefore runs `_build_query()` itself and reports the same `ValueError` as a
+**retryable** `INVALID_PLAN_STRUCTURE` one node earlier — see
+[Buildability](logical_validator_node.md#buildability-the-validator-runs-the-generator).
+The checks below stay where they are: they are the single definition of the
+rules, and the validator calling this code is what keeps the two in step.
+`SUPPORTED_BINARY_OPS` is exported for the same reason — it is the set
+`SqlVisitor._visit_binary` renders, and the validator rejects anything outside
+it before the plan gets here.
+
 Logs exceptions via `logger.exception`.
 
 ---

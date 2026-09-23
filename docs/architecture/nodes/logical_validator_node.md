@@ -14,6 +14,7 @@
 
 - Validate query type (READ‑only).
 - Validate ordinals, aliases, joins, and column references.
+- Reject any plan the generator could not build (see *Buildability* below).
 - Enforce RBAC table access using strict datasource namespacing.
 
 Literal filter values are **not** validated against a column's sampled values.
@@ -21,6 +22,43 @@ The adapter records at most five sample values per text column, which is a
 retrieval hint, not the column's domain; treating it as an allowlist rejected
 correct filters on any higher-cardinality column. Safety comes from the RBAC
 table allowlist and from schema resolution, neither of which depends on stats.
+
+### Buildability: the validator runs the generator
+
+`_validate_columns()` resolves columns against a query in which every plan table
+is **CROSS JOINed** (`_build_validation_query()`). That is correct for column
+resolution — alias-to-column visibility does not depend on join structure — and
+it is exactly why the validator is blind to join *topology*.
+
+The generator builds the real FROM clause and walks the join graph, so four
+structural mistakes used to pass validation CLEAN and fail one node later as a
+terminal `SQL_GEN_FAILED`: a declared table never joined to the FROM table, a
+plan with several tables and no joins at all, a join island that does not
+connect to the FROM table, and the same pair joined twice. `GeneratorNode` has
+no retry edge after it, so each of those ended the sub-query with no chance for
+the planner to fix it.
+
+Rather than restate those four rules here and let the two drift apart,
+`_validate_buildable()` calls `GeneratorNode._build_query()` with the
+sub-query's own datasource dialect and discards the tree. Any `ValueError`
+becomes a retryable `INVALID_PLAN_STRUCTURE`, and the message is extended with
+the plan's tables and the foreign keys declared between them, written with the
+plan's own aliases — the same move `_describe_column_failure()` makes for
+columns:
+
+```
+Table alias(es) t3 are declared in the plan but never joined to the FROM table.
+Plan tables: t1 = Artist, t2 = Album, t3 = Track.
+Foreign keys between them: t2 (Album).ArtistId = t1 (Artist).ArtistId;
+t3 (Track).AlbumId = t2 (Album).AlbumId.
+```
+
+It runs **last**, after every other static check, so each of those keeps its own
+error code and the generator's wording never replaces a more specific one. The
+cost is a second tree build, measured at ~2.4 ms against a ~3.4 s planner call.
+
+`test_logical_validator_generator_parity.py` asserts the invariant directly: for
+each broken plan shape, the generator rejects it **and** so does the validator.
 
 Column resolution is delegated to `sqlglot`'s optimizer. The node converts the
 plan into a throw‑away `sqlglot` expression tree (reusing the generator's
@@ -67,6 +105,8 @@ Validation performed:
 - Aliases must be unique.
 - Joins must match known relationships.
 - Column references must exist and be unambiguous.
+- Every binary operator must be one the generator can render.
+- The plan must build into a query at all.
 
 ---
 
@@ -115,6 +155,13 @@ Side effects:
    - `_date_operations()` rejects a date function whose unit is not `year`,
      `quarter`, `month` or `day`, or whose shape is not `(unit literal, date)`,
      with `INVALID_PLAN_STRUCTURE`; the message states the portable forms.
+   - `_unsupported_operators()` rejects a binary `op` the generator's
+     `SqlVisitor` cannot render, with `INVALID_PLAN_STRUCTURE`. The schema's
+     `op` Literal admits `NOT`, which belongs on a unary expression; every
+     other member is in `generator.node.SUPPORTED_BINARY_OPS`. This runs before
+     any check that walks the plan through the visitor, because an operator it
+     cannot render makes all of them raise — which is how `op: "NOT"` used to
+     surface as a `VALIDATOR_CRASH`.
    - `_validate_columns()` builds the plan's `sqlglot` tree and runs
      `qualify(..., validate_qualify_columns=True)`. On failure each distinct
      column reference is re-probed so every bad reference is reported, and
@@ -123,6 +170,9 @@ Side effects:
      wrapped in `exp.Ordered` first (`generator.node.ordered()`): sqlglot only
      wraps an argument it has to *parse*, and a bare function node in
      `Order.expressions` makes `qualify()` raise.
+   - `_validate_buildable()` runs last and is the **buildability** check: it
+     calls the generator's own `_build_query()` and throws the tree away. See
+     below.
 3. Run `_validate_policy()` for RBAC enforcement. This always runs, even when
    static validation failed or raised — the security check is never skipped.
    Each forbidden table yields a `CRITICAL` `SECURITY_VIOLATION` whose message
