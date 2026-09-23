@@ -48,7 +48,7 @@ Re-indexing never deletes the collection first. Each datasource is rebuilt on it
 own, inside the one collection (`VectorStore.refresh_schema_chunks`):
 
 ```mermaid
-%%{init: {"theme": "neutral"}}%%
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#ffffff','primaryTextColor':'#000000','primaryBorderColor':'#000000','lineColor':'#000000'}}}%%
 flowchart TD
     A[Read schema, register snapshot] --> B[Write every entry under a new build_id]
     B --> C{All entries written?}

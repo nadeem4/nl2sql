@@ -29,7 +29,12 @@ name the rule.
 - **Update the docs in the same PR as the code.** A doc that lags is worse than no doc — see `CONTRIBUTING.md`.
 - **Never read or edit `nl2sql-demo*/` or any `.env` file.** A folder made by `nl2sql demo` holds a real API key in `.env.demo`; `.gitignore` keeps it out of the repo and you keep it out of the transcript.
 - **Never merge the release-please PR (#85).** Merging it releases all three packages; releasing is a deliberate act, described in `docs/development/releasing.md`.
-- **Mermaid diagrams are black and white**, opening with `%%{init: {"theme": "neutral"}}%%`.
+- **Mermaid diagrams are black and white.** Open every one with exactly this line, so a diagram reads the same on the site, in a Notion page and on paper:
+
+    ```
+    %%{init: {'theme':'base','themeVariables':{'primaryColor':'#ffffff','primaryTextColor':'#000000','primaryBorderColor':'#000000','lineColor':'#000000'}}}%%
+    ```
+
 - **Never change gold data to make a benchmark run pass.** Add a reviewed `alt_gold_sql` alternative instead: [`docs/testing/evaluation-dataset.md`](docs/testing/evaluation-dataset.md).
 
 ## Checks

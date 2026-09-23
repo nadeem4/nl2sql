@@ -38,7 +38,7 @@ Trigger conditions:
 - Always executed as the control graph entry node.
 
 ```mermaid
-%%{init: {"theme": "neutral"}}%%
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#ffffff','primaryTextColor':'#000000','primaryBorderColor':'#000000','lineColor':'#000000'}}}%%
 flowchart LR
     Resolver[DatasourceResolverNode] -->|answerable and allowed| Decomposer[DecomposerNode]
     Resolver -->|denied or not answerable| EndNode[END]
