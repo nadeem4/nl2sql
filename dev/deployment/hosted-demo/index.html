@@ -2915,6 +2915,34 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Deploying it as a Hugging Face Space">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#automatically-from-main" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Automatically, from main
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#by-hand-as-a-fallback" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        By hand, as a fallback
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -4012,6 +4040,34 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Deploying it as a Hugging Face Space">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#automatically-from-main" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Automatically, from main
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#by-hand-as-a-fallback" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        By hand, as a fallback
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -4211,7 +4267,7 @@ read-only everywhere.</p>
 <h2 id="the-container">The container</h2>
 <p><code>deploy/huggingface/Dockerfile</code> builds the playground as a hosted demo. It is a
 Space root rather than a repository build: it needs no build context, so the
-whole deploy is one <code>git subtree push</code> of that folder.</p>
+whole deploy is that one folder, copied to the Space's root.</p>
 <p>It installs <code>nl2sql-engine[demo]</code> (from the repository's <code>main</code> branch by
 default; set <code>--build-arg NL2SQL_SPEC="nl2sql-engine[demo]==X.Y.Z"</code> to pin a
 release), then runs <code>nl2sql setup --demo</code> <strong>at build time</strong>. That bakes three
@@ -4247,7 +4303,64 @@ steps, and what each Space setting does, are in
 <a href="https://github.com/nadeem4/nl2sql/blob/main/deploy/huggingface/README.md"><code>deploy/huggingface/README.md</code></a> -- that file is also the Space's
 own front page, since a Docker Space reads its configuration from the
 front-matter of the <code>README.md</code> at its root.</p>
-<p>In short, and performed by the owner:</p>
+<p>The Space builds on push and serves at
+<a href="https://nadeem4nk-nl2sql-demo.hf.space">https://nadeem4nk-nl2sql-demo.hf.space</a>.</p>
+<p><strong>Never give the Space an API key</strong>, as a secret or otherwise. Hosted mode
+clears any provider key it finds in its environment at start-up rather than use
+it, because a key there would be spent by every visitor.</p>
+<h3 id="automatically-from-main">Automatically, from <code>main</code></h3>
+<p><a href="https://github.com/nadeem4/nl2sql/blob/main/.github/workflows/publish_space.yml"><code>.github/workflows/publish_space.yml</code></a> is the normal path: it creates
+the Space if it is missing, mirrors <code>deploy/huggingface/</code> onto the Space's root,
+and waits for the build.</p>
+<p><strong>The one secret.</strong> A Hugging Face access token with <strong>write</strong> permission
+(<a href="https://huggingface.co/settings/tokens">https://huggingface.co/settings/tokens</a>), added as the repository secret
+<strong><code>HF_TOKEN</code></strong> at
+<a href="https://github.com/nadeem4/nl2sql/settings/secrets/actions">https://github.com/nadeem4/nl2sql/settings/secrets/actions</a>. That is the only
+credential the workflow uses, and nothing else needs configuring. Without it --
+on a fork, or before it is added -- the job logs a line saying so and finishes
+green; it never fails for a missing secret.</p>
+<p>The token is read into the job's environment and used in exactly two places: by
+<code>huggingface_hub</code>, which picks <code>HF_TOKEN</code> up from the environment on its own,
+and as the password in the <code>git push</code> URL. It is never echoed, never traced (no
+<code>set -x</code>), and never written to a file: the Space remote is passed to each git
+command rather than saved into <code>.git/config</code>.</p>
+<p><strong>When it runs.</strong> On every push to <code>main</code> that touches something the Space is
+built from -- <code>deploy/huggingface/**</code> (its root), <code>packages/nl2sql/**</code> (the
+engine the image installs from <code>main</code>) or <code>web/playground/**</code> (the page the
+engine serves) -- and on demand. A docs-only merge changes none of those and
+does not redeploy. One deploy runs at a time; a run overtaken by a newer push is
+cancelled.</p>
+<p><strong>By hand.</strong> Actions → <strong>Publish Space</strong> → <em>Run workflow</em>. Two optional inputs:
+<code>space_id</code>, which defaults to <code>nadeem4nk/nl2sql-demo</code>, and <code>token_secret</code>, the
+name of the secret holding the token, which defaults to <code>HF_TOKEN</code>. Pointing
+<code>space_id</code> at a scratch Space of your own is how to rehearse a change without
+touching the public demo.</p>
+<p><strong>What the first run does.</strong> The Space does not have to exist. The workflow
+calls <code>create_repo(repo_type="space", space_sdk="docker", private=False,
+exist_ok=True)</code>, which makes a public Docker Space on CPU basic, then pushes the
+folder into it. On every later run <code>exist_ok</code> makes that call a no-op: the Hub
+ignores visibility, SDK and hardware for a Space that already exists, so a
+hardware upgrade or a visibility change made in the Space's own settings
+survives a deploy.</p>
+<p><strong>Rolling back.</strong> Two ways, both without touching the Hub by hand:</p>
+<ul>
+<li><strong>Re-run an older commit's workflow.</strong> Actions → <strong>Publish Space</strong> → the run
+  for the commit you want back → <em>Re-run all jobs</em>. It checks that commit out
+  again and pushes its <code>deploy/huggingface/</code> to the Space. Note that the image
+  installs the engine from the <strong>tip of <code>main</code></strong> unless the <code>Dockerfile</code> pins a
+  release, so this rolls back the Space's configuration, not necessarily the
+  engine inside it; pin <code>NL2SQL_SPEC</code> to a released version if you need the
+  whole thing to go back.</li>
+<li><strong>Push an earlier subtree yourself</strong>, with the manual steps below:
+  <code>git push space $(git subtree split --prefix deploy/huggingface &lt;old-sha&gt;):main</code>.</li>
+</ul>
+<p>The workflow adds a commit on top of whatever the Space's <code>main</code> already is, so
+the Space's history is never rewritten and never lost -- including commits made
+in the Hub's own web editor. If a concurrent push lands between the workflow's
+fetch and its push, the push is refused and the job fails; re-running it picks
+up the new head and reapplies the folder. Nothing in the workflow force-pushes.</p>
+<h3 id="by-hand-as-a-fallback">By hand, as a fallback</h3>
+<p>If the workflow is unavailable, the owner can do the same thing from a clone:</p>
 <ol>
 <li>Create the Space at <a href="https://huggingface.co/new-space">https://huggingface.co/new-space</a> under <code>nadeem4nk</code>,
    named <code>nl2sql-demo</code>, SDK <strong>Docker</strong> (blank), CPU basic, public.</li>
@@ -4258,11 +4371,10 @@ front-matter of the <code>README.md</code> at its root.</p>
 <li>Push the folder as the Space root:
    <code>git subtree push --prefix deploy/huggingface space main</code>.</li>
 </ol>
-<p>The Space builds on push and serves at
-<a href="https://nadeem4nk-nl2sql-demo.hf.space">https://nadeem4nk-nl2sql-demo.hf.space</a>.</p>
-<p><strong>Never give the Space an API key</strong>, as a secret or otherwise. Hosted mode
-clears any provider key it finds in its environment at start-up rather than use
-it, because a key there would be spent by every visitor.</p>
+<p>If step 3 is refused because the Space has commits of its own,
+<code>git push space $(git subtree split --prefix deploy/huggingface main):main --force</code>
+replaces the Space's history with this folder's. The workflow above never needs
+that, which is why it exists.</p>
 <h2 id="running-it-locally-instead">Running it locally instead</h2>
 <p>Hosted mode exists to show the engine on our sample data. To ask questions of
 your own data, with no limits and a key that never leaves your machine:</p>
