@@ -48,8 +48,8 @@ def _run(sql):
 
 def _plan(alias):
     return PlanModel(
-        tables=[TableRef(name="Employee", alias="t1", ordinal=0)],
-        select_items=[SelectItem(ordinal=0, alias=alias,
+        tables=[TableRef(name="Employee", alias="t1")],
+        select_items=[SelectItem(alias=alias,
                                  expr=Expr(kind="column", alias="t1", column_name="LastName"))],
         where=Expr(kind="binary", op="=", left=Expr(kind="column", alias="t1", column_name="Title"),
                    right=Expr(kind="literal", value="Sales Support Agent")),
@@ -79,7 +79,7 @@ def test_a_bare_identifier_alias_stays_unquoted():
 
 def test_an_order_by_on_the_spaced_alias_is_quoted_too():
     plan = _plan("sales support agent").model_copy(update={"order_by": [
-        OrderItem(ordinal=0, direction="desc", expr=Expr(kind="column", column_name="sales support agent"))]})
+        OrderItem(direction="desc", expr=Expr(kind="column", column_name="sales support agent"))]})
 
     sql = _sql(plan)
 

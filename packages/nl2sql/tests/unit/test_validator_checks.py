@@ -34,8 +34,8 @@ def _ctx(allowed_tables):
 def _plan() -> PlanModel:
     return PlanModel(
         query_type="READ",
-        tables=[TableRef(name="users", alias="u", ordinal=0)],
-        select_items=[SelectItem(expr=_col("u", "id"), ordinal=0)],
+        tables=[TableRef(name="users", alias="u")],
+        select_items=[SelectItem(expr=_col("u", "id"))],
         joins=[],
     )
 

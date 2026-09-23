@@ -121,7 +121,7 @@ gives every result a total row order.
 - Deterministic (conditional): If `schema_version` is provided by a sub-query, schema retrieval resolves that exact snapshot; otherwise it uses the latest available version, which is time-ordered ([`pipeline/nodes/schema_retriever/node.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/pipeline/nodes/schema_retriever/node.py)).
 
 ### Validation Gates
-- Deterministic: Logical validation normalizes names, enforces ordinal continuity, validates aliases, and uses sorted comparisons for expected schema/alias matching ([`pipeline/nodes/validator/node.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/pipeline/nodes/validator/node.py)).
+- Deterministic: Logical validation normalizes names, validates aliases, and uses sorted comparisons for expected schema/alias matching ([`pipeline/nodes/validator/node.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/pipeline/nodes/validator/node.py)).
 - Deterministic: Policy enforcement uses explicit namespaced checks and deterministic set membership ([`pipeline/nodes/validator/node.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/pipeline/nodes/validator/node.py)).
 
 ### DAG Execution Order and Node Sequencing

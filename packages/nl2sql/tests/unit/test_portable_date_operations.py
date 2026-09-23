@@ -83,16 +83,16 @@ def _run(sql):
 def _revenue_by(period: Expr, where: Expr = None) -> PlanModel:
     """The recorded shape: SELECT <period>, SUM(Total) ... GROUP BY <period> ORDER BY <period>."""
     return PlanModel(
-        tables=[TableRef(name="Invoice", alias="t1", ordinal=0)],
+        tables=[TableRef(name="Invoice", alias="t1")],
         select_items=[
-            SelectItem(ordinal=0, expr=period, alias="period"),
-            SelectItem(ordinal=1, alias="revenue", expr=Expr(
+            SelectItem(expr=period, alias="period"),
+            SelectItem(alias="revenue", expr=Expr(
                 kind="func", func_name="SUM", is_aggregate=True,
                 args=[Expr(kind="column", alias="t1", column_name="Total")])),
         ],
         where=where,
-        group_by=[GroupByItem(ordinal=0, expr=period)],
-        order_by=[OrderItem(ordinal=0, direction="asc", expr=period)],
+        group_by=[GroupByItem(expr=period)],
+        order_by=[OrderItem(direction="asc", expr=period)],
     )
 
 
@@ -199,10 +199,10 @@ def _adapter(cls):
 ])
 def test_default_render_uses_sqlglot_for_the_adapter_dialect(adapter, part, trunc):
     sql = _sql(PlanModel(
-        tables=[TableRef(name="Invoice", alias="t1", ordinal=0)],
+        tables=[TableRef(name="Invoice", alias="t1")],
         select_items=[
-            SelectItem(ordinal=0, alias="y", expr=_func("DATE_PART", _lit("year"), DATE)),
-            SelectItem(ordinal=1, alias="m", expr=_func("DATE_TRUNC", _lit("month"), DATE)),
+            SelectItem(alias="y", expr=_func("DATE_PART", _lit("year"), DATE)),
+            SelectItem(alias="m", expr=_func("DATE_TRUNC", _lit("month"), DATE)),
         ],
     ), adapter)
 
@@ -217,11 +217,11 @@ def test_duckdb_returns_the_same_types_as_sqlite():
     conn.execute("INSERT INTO Invoice VALUES ('2009-05-17 00:00:00', 1.0)")
     adapter = _adapter(DuckdbAdapter)
     sql = _sql(PlanModel(
-        tables=[TableRef(name="Invoice", alias="t1", ordinal=0)],
+        tables=[TableRef(name="Invoice", alias="t1")],
         select_items=[
-            SelectItem(ordinal=0, alias="y", expr=_func("DATE_PART", _lit("year"), DATE)),
-            SelectItem(ordinal=1, alias="q", expr=_func("DATE_PART", _lit("quarter"), DATE)),
-            SelectItem(ordinal=2, alias="m", expr=_func("DATE_TRUNC", _lit("quarter"), DATE)),
+            SelectItem(alias="y", expr=_func("DATE_PART", _lit("year"), DATE)),
+            SelectItem(alias="q", expr=_func("DATE_PART", _lit("quarter"), DATE)),
+            SelectItem(alias="m", expr=_func("DATE_TRUNC", _lit("quarter"), DATE)),
         ],
     ), adapter)
 
@@ -249,8 +249,8 @@ def test_the_generator_hands_the_expression_to_the_adapter():
 
 
 def _validate(expr):
-    plan = PlanModel(tables=[TableRef(name="Invoice", alias="t1", ordinal=0)],
-                     select_items=[SelectItem(ordinal=0, alias="p", expr=expr)])
+    plan = PlanModel(tables=[TableRef(name="Invoice", alias="t1")],
+                     select_items=[SelectItem(alias="p", expr=expr)])
     return LogicalValidatorNode._date_operations(plan)
 
 
@@ -293,8 +293,8 @@ def test_planner_prompt_describes_the_portable_operations_and_no_dialect():
 def test_known_functions_render_in_the_adapter_dialect():
     name = Expr(kind="column", alias="t1", column_name="Name")
     plan = PlanModel(
-        tables=[TableRef(name="Artist", alias="t1", ordinal=0)],
-        select_items=[SelectItem(ordinal=0, alias="n", expr=_func("LENGTH", name))],
+        tables=[TableRef(name="Artist", alias="t1")],
+        select_items=[SelectItem(alias="n", expr=_func("LENGTH", name))],
     )
 
     assert "LEN(t1.Name)" in _sql(plan, _adapter(MssqlAdapter))
@@ -305,8 +305,8 @@ def test_a_function_built_as_an_operator_keeps_its_operands_grouped():
     total = Expr(kind="column", alias="t1", column_name="Total")
     sum_ = Expr(kind="binary", op="+", left=total, right=_lit(1))
     plan = PlanModel(
-        tables=[TableRef(name="Invoice", alias="t1", ordinal=0)],
-        select_items=[SelectItem(ordinal=0, alias="m", expr=_func("MOD", sum_, _lit(3)))],
+        tables=[TableRef(name="Invoice", alias="t1")],
+        select_items=[SelectItem(alias="m", expr=_func("MOD", sum_, _lit(3)))],
     )
 
     assert "(t1.Total + 1) % 3" in _sql(plan, _sqlite_adapter())

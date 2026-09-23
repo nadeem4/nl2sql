@@ -11,7 +11,6 @@ Modify `PlanModel` or related AST models in:
 Keep these rules in mind:
 
 - Models are strict (`extra="forbid"`).
-- Ordinals must be contiguous (validated by the logical validator).
 - Expression kinds must pass `model_post_init` validation.
 
 ## 2. Update planner prompt

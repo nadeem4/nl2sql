@@ -92,7 +92,7 @@ Example response:
       "sql": "SELECT s.customer, SUM(s.revenue) AS revenue FROM sales AS s GROUP BY s.customer ORDER BY SUM(s.revenue) DESC, s.customer LIMIT 5",
       "datasource_id": "warehouse",
       "schema_version": "v3",
-      "plan": {"tables": [{"name": "sales", "alias": "s", "ordinal": 0}]},
+      "plan": {"tables": [{"name": "sales", "alias": "s"}]},
       "validation": [
         {"name": "plan_present", "passed": true, "message": "Plan received from the planner"},
         {"name": "structure_and_schema", "passed": true, "message": "Tables, columns and joins resolve against the retrieved schema"},

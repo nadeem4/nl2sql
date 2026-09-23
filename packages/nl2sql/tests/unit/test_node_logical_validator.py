@@ -1,6 +1,7 @@
 from types import SimpleNamespace
 
 import pytest
+from pydantic import ValidationError
 
 from nl2sql.pipeline.nodes.validator.node import LogicalValidatorNode
 from nl2sql.pipeline.nodes.ast_planner.schemas import (
@@ -51,14 +52,13 @@ def test_logical_validator_detects_join_alias_mismatch():
     node = LogicalValidatorNode(_ctx())
     plan = PlanModel(
         query_type="READ",
-        tables=[TableRef(name="users", alias="u", ordinal=0)],
-        select_items=[SelectItem(expr=_col("u", "id"), ordinal=0)],
+        tables=[TableRef(name="users", alias="u")],
+        select_items=[SelectItem(expr=_col("u", "id"))],
         joins=[
             JoinSpec(
                 left_alias="u",
                 right_alias="o",
                 join_type="inner",
-                ordinal=0,
                 condition=Expr(kind="binary", op="=", left=_col("u", "id"), right=_col("o", "user_id")),
             )
         ],
@@ -84,8 +84,8 @@ def test_logical_validator_expected_schema_mismatch():
     node = LogicalValidatorNode(_ctx())
     plan = PlanModel(
         query_type="READ",
-        tables=[TableRef(name="users", alias="u", ordinal=0)],
-        select_items=[SelectItem(expr=_col("u", "id"), alias="user_id", ordinal=0)],
+        tables=[TableRef(name="users", alias="u")],
+        select_items=[SelectItem(expr=_col("u", "id"), alias="user_id")],
         joins=[],
     )
     state = SubgraphExecutionState(
@@ -114,10 +114,10 @@ def test_logical_validator_duplicate_aliases():
     plan = PlanModel(
         query_type="READ",
         tables=[
-            TableRef(name="users", alias="t", ordinal=0),
-            TableRef(name="orders", alias="t", ordinal=1),
+            TableRef(name="users", alias="t"),
+            TableRef(name="orders", alias="t"),
         ],
-        select_items=[SelectItem(expr=_col("t", "id"), ordinal=0)],
+        select_items=[SelectItem(expr=_col("t", "id"))],
         joins=[],
     )
     state = SubgraphExecutionState(
@@ -136,26 +136,23 @@ def test_logical_validator_duplicate_aliases():
     assert any(e.error_code == ErrorCode.INVALID_PLAN_STRUCTURE for e in result["errors"])
 
 
-def test_logical_validator_invalid_ordinals():
-    # Validates ordinal checks because non-contiguous ordinals should be rejected.
-    node = LogicalValidatorNode(_ctx())
-    plan = PlanModel(
-        query_type="READ",
-        tables=[TableRef(name="users", alias="u", ordinal=1)],
-        select_items=[SelectItem(expr=_col("u", "id"), ordinal=1)],
-        joins=[],
-    )
-    state = SubgraphExecutionState(
-        trace_id="t",
-        sub_query=SubQuery(id="sq1", datasource_id="ds1", intent="q"),
-        relevant_tables=[Table(name="users", columns=[Column(name="id", type="int")])],
-        ast_planner_response=ASTPlannerResponse(plan=plan),
-        user_context=UserContext(),
-    )
+def test_a_plan_may_not_carry_ordinal_fields():
+    """List order is the plan's order, so there is nothing for an ordinal to say.
 
-    result = node(state)
+    The fields were required on six models and the validator only ever checked
+    that each equalled its item's index. ``extra="forbid"`` now rejects them, so
+    a plan written before they were dropped fails loudly instead of being read
+    as if it meant something.
+    """
+    with pytest.raises(ValidationError) as caught:
+        PlanModel.model_validate({
+            "query_type": "READ",
+            "tables": [{"name": "users", "alias": "u", "ordinal": 0}],
+            "select_items": [{"ordinal": 0,
+                              "expr": {"kind": "column", "alias": "u", "column_name": "id"}}],
+        })
 
-    assert any(e.error_code == ErrorCode.INVALID_PLAN_STRUCTURE for e in result["errors"])
+    assert [e["type"] for e in caught.value.errors()] == ["extra_forbidden", "extra_forbidden"]
 
 
 def test_logical_validator_ambiguous_column_without_alias():
@@ -164,10 +161,10 @@ def test_logical_validator_ambiguous_column_without_alias():
     plan = PlanModel(
         query_type="READ",
         tables=[
-            TableRef(name="users", alias="u", ordinal=0),
-            TableRef(name="orders", alias="o", ordinal=1),
+            TableRef(name="users", alias="u"),
+            TableRef(name="orders", alias="o"),
         ],
-        select_items=[SelectItem(expr=Expr(kind="column", column_name="id"), ordinal=0)],
+        select_items=[SelectItem(expr=Expr(kind="column", column_name="id"))],
         joins=[],
     )
     state = SubgraphExecutionState(
@@ -190,8 +187,8 @@ def test_logical_validator_column_not_found_strict_vs_warning(monkeypatch):
     # Validates strict columns toggle because severity depends on settings.
     plan = PlanModel(
         query_type="READ",
-        tables=[TableRef(name="users", alias="u", ordinal=0)],
-        select_items=[SelectItem(expr=_col("u", "missing"), ordinal=0)],
+        tables=[TableRef(name="users", alias="u")],
+        select_items=[SelectItem(expr=_col("u", "missing"))],
         joins=[],
     )
     state = SubgraphExecutionState(
@@ -219,16 +216,15 @@ def test_logical_validator_rejects_join_not_in_relationships():
     plan = PlanModel(
         query_type="READ",
         tables=[
-            TableRef(name="users", alias="u", ordinal=0),
-            TableRef(name="orders", alias="o", ordinal=1),
+            TableRef(name="users", alias="u"),
+            TableRef(name="orders", alias="o"),
         ],
-        select_items=[SelectItem(expr=_col("u", "id"), ordinal=0)],
+        select_items=[SelectItem(expr=_col("u", "id"))],
         joins=[
             JoinSpec(
                 left_alias="u",
                 right_alias="o",
                 join_type="inner",
-                ordinal=0,
                 condition=Expr(
                     kind="binary",
                     op="=",
@@ -334,16 +330,15 @@ def _album_artist_plan():
     return PlanModel(
         query_type="READ",
         tables=[
-            TableRef(name="Artist", alias="ar", ordinal=0),
-            TableRef(name="Album", alias="al", ordinal=1),
+            TableRef(name="Artist", alias="ar"),
+            TableRef(name="Album", alias="al"),
         ],
-        select_items=[SelectItem(expr=_col("ar", "Name"), ordinal=0)],
+        select_items=[SelectItem(expr=_col("ar", "Name"))],
         joins=[
             JoinSpec(
                 left_alias="ar",
                 right_alias="al",
                 join_type="inner",
-                ordinal=0,
                 condition=Expr(
                     kind="binary",
                     op="=",

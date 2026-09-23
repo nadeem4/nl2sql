@@ -277,7 +277,7 @@ class SqlVisitor:
         when_list = []
 
         if expr.whens:
-            for w in sorted(expr.whens, key=lambda x: x.ordinal):
+            for w in expr.whens:
                 when_list.append(
                     exp.If(
                         this=self.visit(w.condition),
@@ -373,7 +373,7 @@ class GeneratorNode:
 
         ``left_alias``/``right_alias`` name the two sides of a join; they do not
         say which one is new. Each join attaches whichever side is not yet in
-        scope, and joins are taken in dependency order -- the lowest-ordinal
+        scope, and joins are taken in dependency order -- the first listed
         join that touches the tables already in scope goes next -- so a plan
         may list its joins in any order. When the new table is the join's left
         side an outer join is mirrored, so the table the plan preserves is
@@ -385,7 +385,7 @@ class GeneratorNode:
                 table; or if a declared table is never joined. Each of these
                 is a malformed plan, and guessing would produce wrong SQL.
         """
-        pending = sorted(plan.joins, key=lambda x: x.ordinal)
+        pending = list(plan.joins)
         for j in pending:
             for alias in (j.left_alias, j.right_alias):
                 if alias not in declared:
@@ -440,7 +440,7 @@ class GeneratorNode:
             query = query.distinct()
         selected = []
 
-        for s in sorted(plan.select_items, key=lambda x: x.ordinal):
+        for s in plan.select_items:
             e = visitor.visit(s.expr)
             selected.append((e, s.alias))
             if s.alias:
@@ -448,7 +448,7 @@ class GeneratorNode:
                 e = exp.Alias(this=e, alias=exp.to_identifier(s.alias))
             query = query.select(e)
 
-        tables = sorted(plan.tables, key=lambda x: x.ordinal)
+        tables = plan.tables
         if not tables:
             raise ValueError("Plan has no tables")
 
@@ -460,14 +460,14 @@ class GeneratorNode:
         if plan.where:
             query = query.where(visitor.visit(plan.where))
 
-        for g in sorted(plan.group_by, key=lambda x: x.ordinal):
+        for g in plan.group_by:
             query = query.group_by(visitor.visit(g.expr))
 
         if plan.having:
             query = query.having(visitor.visit(plan.having))
 
         ordered_on = set()
-        for o in sorted(plan.order_by, key=lambda x: x.ordinal):
+        for o in plan.order_by:
             term = visitor.visit(o.expr)
             ordered_on.add(term.sql())
             query = query.order_by(ordered(term, o.direction, dialect))

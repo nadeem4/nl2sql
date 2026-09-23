@@ -27,8 +27,8 @@ def test_refiner_sends_the_failed_plan_as_compact_json():
     from nl2sql.pipeline.nodes.ast_planner.schemas import ASTPlannerResponse, Expr, PlanModel, SelectItem, TableRef
 
     plan = PlanModel(
-        tables=[TableRef(name="Customers", alias="t1", ordinal=0)],
-        select_items=[SelectItem(expr=Expr(kind="column", alias="t1", column_name="CustomerId"), ordinal=0)],
+        tables=[TableRef(name="Customers", alias="t1")],
+        select_items=[SelectItem(expr=Expr(kind="column", alias="t1", column_name="CustomerId"))],
         joins=[],
     )
     captured = {}

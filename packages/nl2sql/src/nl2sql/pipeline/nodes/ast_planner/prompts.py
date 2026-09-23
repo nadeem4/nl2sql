@@ -16,15 +16,14 @@ Plan:
 {
   "reasoning": "Filter orders by year 2023. Join users. Select user name.",
   "tables": [
-    {"name": "users", "alias": "t1", "ordinal": 0},
-    {"name": "orders", "alias": "t2", "ordinal": 1}
+    {"name": "users", "alias": "t1"},
+    {"name": "orders", "alias": "t2"}
   ],
   "joins": [
     {
       "left_alias": "t1",
       "right_alias": "t2",
       "join_type": "inner",
-      "ordinal": 0,
       "condition": {
         "kind": "binary",
         "op": "=",
@@ -51,7 +50,6 @@ Plan:
   },
   "select_items": [
     {
-      "ordinal": 0,
       "expr": {"kind": "column", "alias": "t1", "column_name": "name"},
       "alias": "user_name"
     }
@@ -69,7 +67,7 @@ Plan:
 {
   "reasoning": "Group by region and sum revenue.",
   "tables": [
-    {"name": "orders", "alias": "t1", "ordinal": 0}
+    {"name": "orders", "alias": "t1"}
   ],
   "joins": [],
   "where": {
@@ -80,19 +78,16 @@ Plan:
   },
   "select_items": [
     {
-      "ordinal": 0,
       "expr": {"kind": "column", "alias": "t1", "column_name": "region"},
       "alias": "region"
     },
     {
-      "ordinal": 1,
       "expr": {"kind": "func", "func_name": "SUM", "args": [{"kind": "column", "alias": "t1", "column_name": "revenue"}], "is_aggregate": true},
       "alias": "total_revenue"
     }
   ],
   "group_by": [
     {
-      "ordinal": 0,
       "expr": {"kind": "column", "alias": "t1", "column_name": "region"}
     }
   ]
@@ -106,23 +101,21 @@ Plan:
 {
   "reasoning": "Sum revenue per region, highest first, keep one row.",
   "tables": [
-    {"name": "orders", "alias": "t1", "ordinal": 0}
+    {"name": "orders", "alias": "t1"}
   ],
   "joins": [],
   "select_items": [
-    {"ordinal": 0, "expr": {"kind": "column", "alias": "t1", "column_name": "region"}, "alias": "region"},
+    {"expr": {"kind": "column", "alias": "t1", "column_name": "region"}, "alias": "region"},
     {
-      "ordinal": 1,
       "expr": {"kind": "func", "func_name": "SUM", "args": [{"kind": "column", "alias": "t1", "column_name": "revenue"}], "is_aggregate": true},
       "alias": "total_revenue"
     }
   ],
   "group_by": [
-    {"ordinal": 0, "expr": {"kind": "column", "alias": "t1", "column_name": "region"}}
+    {"expr": {"kind": "column", "alias": "t1", "column_name": "region"}}
   ],
   "order_by": [
     {
-      "ordinal": 0,
       "direction": "desc",
       "expr": {"kind": "func", "func_name": "SUM", "args": [{"kind": "column", "alias": "t1", "column_name": "revenue"}], "is_aggregate": true}
     }
@@ -136,12 +129,11 @@ Plan:
 {
   "reasoning": "Count distinct customer ids on orders.",
   "tables": [
-    {"name": "orders", "alias": "t1", "ordinal": 0}
+    {"name": "orders", "alias": "t1"}
   ],
   "joins": [],
   "select_items": [
     {
-      "ordinal": 0,
       "expr": {"kind": "func", "func_name": "COUNT", "args": [{"kind": "column", "alias": "t1", "column_name": "user_id"}], "is_aggregate": true, "distinct": true},
       "alias": "customer_count"
     }
@@ -161,24 +153,23 @@ PLANNER_SYSTEM_PROMPT = (
 
     "[INSTRUCTIONS]\n"
     "1. Analyze [USER_QUERY] and [SEMANTIC_CONTEXT].\n"
-    "2. Select ONLY tables from [RELEVANT_TABLES]. Assign strict 'ordinal' positions 0..N.\n"
+    "2. Select ONLY tables from [RELEVANT_TABLES]. The first one is the FROM table.\n"
     "3. When joining, use relationships listed in [RELEVANT_TABLES]. If no relationship exists, do not join.\n"
     "4. Define joins using ONLY table aliases (left_alias/right_alias).\n"
     "5. Build Expr trees using:\n"
     "   literal | column | func | binary | unary | case\n"
     "   Join strings (a full name, a label) with the binary op \"||\", never \"+\".\n"
-    "6. Every list MUST contain `ordinal` fields in ascending order starting at 0.\n"
-    "7. Order lists to match ordinals (0..N) exactly.\n"
-    "8. For literal values on '=' or 'IN', choose values from a column's sample_values if listed.\n"
-    "9. If no exact match is available, fall back to LIKE but keep the pattern derived from sample_values.\n"
-    "10. For COUNT(DISTINCT x), set \"distinct\": true on the COUNT func expr; for SELECT DISTINCT,"
+    "6. Every list is read in the order you write it. There is no position field.\n"
+    "7. For literal values on '=' or 'IN', choose values from a column's sample_values if listed.\n"
+    "8. If no exact match is available, fall back to LIKE but keep the pattern derived from sample_values.\n"
+    "9. For COUNT(DISTINCT x), set \"distinct\": true on the COUNT func expr; for SELECT DISTINCT,"
     " set the plan's \"distinct\": true. DISTINCT is never a func_name.\n"
-    "11. [SEMANTIC_CONTEXT] is the query's structured intent. Apply every part of it: its filters"
+    "10. [SEMANTIC_CONTEXT] is the query's structured intent. Apply every part of it: its filters"
     " (on an aggregated metric, as having), its order_by as the plan's order_by, and its limit as"
     " the plan's limit.\n"
-    "12. A question for the most, least, highest, lowest, top N or bottom N rows needs an order_by on"
+    "11. A question for the most, least, highest, lowest, top N or bottom N rows needs an order_by on"
     " the ranked value (desc for most/highest/top) and a limit (1 for a single answer, N for top N).\n"
-    "13. For any date grouping or filtering, use only the two portable date functions:\n"
+    "12. For any date grouping or filtering, use only the two portable date functions:\n"
     "   DATE_PART(unit, date) returns an integer (DATE_PART('year', d) = 2011);\n"
     "   DATE_TRUNC(unit, date) returns the period's first day as 'YYYY-MM-DD'.\n"
     "   The unit is a string literal first argument: 'year', 'quarter', 'month' or 'day'.\n"

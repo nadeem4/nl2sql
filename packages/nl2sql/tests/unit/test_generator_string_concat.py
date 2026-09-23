@@ -77,13 +77,13 @@ def _top_customers_plan(op="+"):
     """chinook_002's recorded plan shape: top 5 customers by total spend, name concatenated."""
     total = Expr(kind="func", func_name="SUM", is_aggregate=True, args=[_col("t2", "Total")])
     return PlanModel(
-        tables=[TableRef(name="Customer", alias="t1", ordinal=0), TableRef(name="Invoice", alias="t2", ordinal=1)],
-        joins=[JoinSpec(left_alias="t1", right_alias="t2", ordinal=0,
+        tables=[TableRef(name="Customer", alias="t1"), TableRef(name="Invoice", alias="t2")],
+        joins=[JoinSpec(left_alias="t1", right_alias="t2",
                         condition=_plus(_col("t1", "CustomerId"), _col("t2", "CustomerId"), "="))],
-        select_items=[SelectItem(ordinal=0, expr=_full_name(op=op), alias="customer"),
-                      SelectItem(ordinal=1, expr=total, alias="total_spend")],
-        group_by=[GroupByItem(ordinal=0, expr=_full_name(op=op))],
-        order_by=[OrderItem(ordinal=0, direction="desc", expr=total)],
+        select_items=[SelectItem(expr=_full_name(op=op), alias="customer"),
+                      SelectItem(expr=total, alias="total_spend")],
+        group_by=[GroupByItem(expr=_full_name(op=op))],
+        order_by=[OrderItem(direction="desc", expr=total)],
         limit=5,
     )
 
@@ -100,10 +100,10 @@ def test_the_recorded_plus_on_names_concatenates_on_sqlite():
 def test_the_recorded_self_join_names_the_manager():
     # chinook_036: Who does Jane Peacock report to?
     plan = PlanModel(
-        tables=[TableRef(name="Employee", alias="t1", ordinal=0), TableRef(name="Employee", alias="t2", ordinal=1)],
-        joins=[JoinSpec(left_alias="t1", right_alias="t2", ordinal=0,
+        tables=[TableRef(name="Employee", alias="t1"), TableRef(name="Employee", alias="t2")],
+        joins=[JoinSpec(left_alias="t1", right_alias="t2",
                         condition=_plus(_col("t1", "ReportsTo"), _col("t2", "EmployeeId"), "="))],
-        select_items=[SelectItem(ordinal=0, expr=_full_name("t2"), alias="manager_name")],
+        select_items=[SelectItem(expr=_full_name("t2"), alias="manager_name")],
         where=_plus(_plus(_col("t1", "FirstName"), _str("Jane"), "="),
                     _plus(_col("t1", "LastName"), _str("Peacock"), "="), "AND"),
     )

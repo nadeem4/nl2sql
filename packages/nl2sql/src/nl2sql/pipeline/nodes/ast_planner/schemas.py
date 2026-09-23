@@ -9,13 +9,11 @@ class CaseWhen(BaseModel):
     Attributes:
         condition (Expr): The condition expression to evaluate.
         result (Expr): The result expression if the condition is true.
-        ordinal (int): The position of this clause in the CASE statement.
     """
     model_config = ConfigDict(extra="forbid")
 
     condition: "Expr"
     result: "Expr"
-    ordinal: int
 
 
 class Expr(BaseModel):
@@ -123,7 +121,6 @@ class TableRef(BaseModel):
         schema_name (Optional[str]): The schema of the table.
         database (Optional[str]): The database name.
         alias (str): The alias used for the table in the query.
-        ordinal (int): The strict ordinal position of the table.
     """
     model_config = ConfigDict(extra="forbid")
 
@@ -131,7 +128,6 @@ class TableRef(BaseModel):
     schema_name: Optional[str] = None
     database: Optional[str] = None
     alias: str
-    ordinal: int
 
 
 class JoinSpec(BaseModel):
@@ -142,7 +138,6 @@ class JoinSpec(BaseModel):
         right_alias (str): Alias of the right table.
         join_type (Literal): Type of join (inner, left, right, full).
         condition (Expr): The join condition expression.
-        ordinal (int): The strict ordinal position of the join.
     """
     model_config = ConfigDict(extra="forbid")
 
@@ -150,7 +145,6 @@ class JoinSpec(BaseModel):
     right_alias: str
     join_type: Literal["inner", "left", "right", "full"] = "inner"
     condition: Expr
-    ordinal: int
 
 
 class SelectItem(BaseModel):
@@ -159,13 +153,11 @@ class SelectItem(BaseModel):
     Attributes:
         expr (Expr): The expression to select.
         alias (Optional[str]): The alias for the selected expression.
-        ordinal (int): The strict ordinal position of the select item.
     """
     model_config = ConfigDict(extra="forbid")
 
     expr: Expr
     alias: Optional[str] = None
-    ordinal: int
 
 
 class OrderItem(BaseModel):
@@ -174,13 +166,11 @@ class OrderItem(BaseModel):
     Attributes:
         expr (Expr): The expression to order by.
         direction (Literal): The sort direction (asc, desc).
-        ordinal (int): The strict ordinal position of the order item.
     """
     model_config = ConfigDict(extra="forbid")
 
     expr: Expr
     direction: Literal["asc", "desc"] = "asc"
-    ordinal: int
 
 
 class GroupByItem(BaseModel):
@@ -188,16 +178,19 @@ class GroupByItem(BaseModel):
 
     Attributes:
         expr (Expr): The expression to group by.
-        ordinal (int): The strict ordinal position of the group by item.
     """
     model_config = ConfigDict(extra="forbid")
 
     expr: Expr
-    ordinal: int
 
 
 class PlanModel(BaseModel):
     """Standardized representation of a SQL execution plan.
+
+    Every list is ordered by its own position: the first table is the ``FROM``
+    table, the first select item is the first column, and so on. JSON arrays
+    keep their order through structured output, so nothing in the plan restates
+    it.
 
     Attributes:
         query_type (Literal): The type of query (default: READ).

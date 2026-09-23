@@ -12,7 +12,7 @@
 
 ## Responsibilities
 
-- Validate ordinals, aliases, joins, and column references.
+- Validate aliases, joins, and column references.
 - Reject any plan the generator could not build (see *Buildability* below).
 - Enforce RBAC table access using strict datasource namespacing.
 
@@ -99,7 +99,6 @@ From `SubgraphExecutionState`:
 
 Validation performed:
 
-- Ordinals must be contiguous.
 - Aliases must be unique.
 - Joins must match known relationships.
 - Column references must exist and be unambiguous.

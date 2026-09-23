@@ -30,9 +30,9 @@ def _func(name, *args, **kw):
 
 def _errors(expr, where="select"):
     plan = PlanModel(
-        tables=[TableRef(name="Artist", alias="t1", ordinal=0)],
-        select_items=[SelectItem(ordinal=0, alias="v", expr=expr if where == "select" else NAME)],
-        order_by=[OrderItem(ordinal=0, expr=expr)] if where == "order_by" else [],
+        tables=[TableRef(name="Artist", alias="t1")],
+        select_items=[SelectItem(alias="v", expr=expr if where == "select" else NAME)],
+        order_by=[OrderItem(expr=expr)] if where == "order_by" else [],
     )
     rbac = SimpleNamespace(get_allowed_tables=lambda _: ["*"])
     node = LogicalValidatorNode(SimpleNamespace(ds_registry=SimpleNamespace(), rbac=rbac))

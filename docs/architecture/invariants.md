@@ -87,22 +87,6 @@ Prevents mutation or unknown plan constructs from entering execution.
 
 ---
 
-## Plan Ordinals Are Contiguous
-
-### Definition
-Ordinal fields for tables, joins, select items, group-by, and order-by must be contiguous starting at 0.
-
-### Enforcement Points
-- `LogicalValidatorNode._validate_ordinals()` in `nl2sql.pipeline.nodes.validator.node`
-
-### Failure Behavior
-Returns `PipelineError` with `INVALID_PLAN_STRUCTURE`.
-
-### Why It Exists
-Ensures deterministic ordering and stable SQL generation.
-
----
-
 ## Table Aliases Are Unique
 
 ### Definition
@@ -408,7 +392,7 @@ The validator resolves columns against a throw-away query in which every table i
 - **State**: Plan Model Is Strict and Read-Only; Relation Schemas Have Unique Column Names; Context Requires Vector Store and Schema Store Configuration
 - **Execution**: SQL Execution Requires SQL, Datasource, and Capability; Execution DAG Must Be Valid and Acyclic; Aggregation Requires Scan Artifacts and Single-Input Post Nodes; Pipeline Execution Is Time-Bounded
 - **Security**: Policy Enforcement Is Namespaced and Fail-Closed; Datasource Access Is RBAC-Gated; Plan Model Is Strict and Read-Only
-- **Determinism**: Plan Ordinals Are Contiguous; Expected Schema Must Match Select List; Joins Must Be Valid and Schema-Backed
+- **Determinism**: Expected Schema Must Match Select List; Joins Must Be Valid and Schema-Backed
 - **Resource bounds**: SQL Generation Enforces a Row Limit Cap; Context Requires Vector Store and Schema Store Configuration
 - **Boundaries**: Package Boundaries Are One-Way; Dialect Knowledge Lives in the Adapter
 - **Retryability**: The Validator Rejects Everything the Generator Can; Plan Functions Are Known Functions

@@ -75,8 +75,8 @@ def _joined_plan(select_items, joins=None):
     return PlanModel(
         query_type="READ",
         tables=[
-            TableRef(name="users", alias="u", ordinal=0),
-            TableRef(name="orders", alias="o", ordinal=1),
+            TableRef(name="users", alias="u"),
+            TableRef(name="orders", alias="o"),
         ],
         select_items=select_items,
         joins=[
@@ -84,7 +84,6 @@ def _joined_plan(select_items, joins=None):
                 left_alias="u",
                 right_alias="o",
                 join_type="inner",
-                ordinal=0,
                 condition=Expr(
                     kind="binary", op="=", left=_col("u", "id"), right=_col("o", "user_id")
                 ),
@@ -106,7 +105,7 @@ def _messages(result):
 def test_unknown_column_is_reported_with_column_and_alias():
     # Validates that a qualified column missing from the schema is rejected.
     node = LogicalValidatorNode(_ctx())
-    plan = _joined_plan([SelectItem(expr=_col("o", "nope"), ordinal=0)])
+    plan = _joined_plan([SelectItem(expr=_col("o", "nope"))])
 
     result = node(_state(plan))
 
@@ -120,7 +119,7 @@ def test_ambiguous_column_across_join_is_reported():
     # Validates ambiguity detection: 'id' exists in both joined tables.
     node = LogicalValidatorNode(_ctx())
     plan = _joined_plan(
-        [SelectItem(expr=Expr(kind="column", column_name="id"), ordinal=0)]
+        [SelectItem(expr=Expr(kind="column", column_name="id"))]
     )
 
     result = node(_state(plan))
@@ -136,8 +135,8 @@ def test_valid_qualified_reference_across_join_passes():
     node = LogicalValidatorNode(_ctx())
     plan = _joined_plan(
         [
-            SelectItem(expr=_col("u", "name"), ordinal=0),
-            SelectItem(expr=_col("o", "total"), ordinal=1),
+            SelectItem(expr=_col("u", "name")),
+            SelectItem(expr=_col("o", "total")),
         ]
     )
 
@@ -155,7 +154,7 @@ def test_select_star_is_accepted(star_alias):
     # Validates that wildcards are not treated as missing columns.
     node = LogicalValidatorNode(_ctx())
     plan = _joined_plan(
-        [SelectItem(expr=Expr(kind="column", alias=star_alias, column_name="*"), ordinal=0)]
+        [SelectItem(expr=Expr(kind="column", alias=star_alias, column_name="*"))]
     )
 
     result = node(_state(plan))
@@ -168,8 +167,8 @@ def test_undeclared_alias_is_reported():
     node = LogicalValidatorNode(_ctx())
     plan = PlanModel(
         query_type="READ",
-        tables=[TableRef(name="users", alias="u", ordinal=0)],
-        select_items=[SelectItem(expr=_col("x", "id"), ordinal=0)],
+        tables=[TableRef(name="users", alias="u")],
+        select_items=[SelectItem(expr=_col("x", "id"))],
         joins=[],
     )
 
@@ -185,7 +184,7 @@ def test_column_present_in_only_one_joined_table_resolves_without_alias():
     # Validates that an unambiguous unqualified column is accepted.
     node = LogicalValidatorNode(_ctx())
     plan = _joined_plan(
-        [SelectItem(expr=Expr(kind="column", column_name="total"), ordinal=0)]
+        [SelectItem(expr=Expr(kind="column", column_name="total"))]
     )
 
     result = node(_state(plan))
@@ -196,7 +195,7 @@ def test_column_present_in_only_one_joined_table_resolves_without_alias():
 def test_column_errors_in_where_and_having_are_reported():
     # Validates that resolution covers predicate clauses, not just SELECT.
     node = LogicalValidatorNode(_ctx())
-    plan = _joined_plan([SelectItem(expr=_col("u", "name"), ordinal=0)])
+    plan = _joined_plan([SelectItem(expr=_col("u", "name"))])
     plan.where = Expr(
         kind="binary",
         op="=",
@@ -214,7 +213,7 @@ def test_rbac_denial_still_fires_when_column_resolution_fails():
     # Security: policy enforcement must never be skipped because logical
     # validation already failed.
     node = LogicalValidatorNode(_ctx(allowed=["ds1.allowed"]))
-    plan = _joined_plan([SelectItem(expr=_col("o", "nope"), ordinal=0)])
+    plan = _joined_plan([SelectItem(expr=_col("o", "nope"))])
 
     result = node(_state(plan, roles=["user"]))
 
@@ -234,8 +233,8 @@ def test_missing_table_is_reported_as_table_not_found():
     node = LogicalValidatorNode(_ctx())
     plan = PlanModel(
         query_type="READ",
-        tables=[TableRef(name="ghosts", alias="g", ordinal=0)],
-        select_items=[SelectItem(expr=_col("g", "id"), ordinal=0)],
+        tables=[TableRef(name="ghosts", alias="g")],
+        select_items=[SelectItem(expr=_col("g", "id"))],
         joins=[],
     )
 
@@ -254,7 +253,7 @@ def test_rbac_denial_still_fires_when_static_validation_crashes(monkeypatch):
         "_validate_static",
         lambda self, state: (_ for _ in ()).throw(RuntimeError("boom")),
     )
-    plan = _joined_plan([SelectItem(expr=_col("u", "name"), ordinal=0)])
+    plan = _joined_plan([SelectItem(expr=_col("u", "name"))])
 
     result = node(_state(plan, roles=["user"]))
 

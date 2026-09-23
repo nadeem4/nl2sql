@@ -54,8 +54,8 @@ def _state(plan: PlanModel) -> SubgraphExecutionState:
 def _plan(*exprs: Expr, distinct: bool = False) -> PlanModel:
     return PlanModel(
         distinct=distinct,
-        tables=[TableRef(name="Invoice", alias="t1", ordinal=0)],
-        select_items=[SelectItem(expr=e, alias=f"c{i}", ordinal=i) for i, e in enumerate(exprs)],
+        tables=[TableRef(name="Invoice", alias="t1")],
+        select_items=[SelectItem(expr=e, alias=f"c{i}") for i, e in enumerate(exprs)],
     )
 
 
