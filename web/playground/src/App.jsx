@@ -5,6 +5,8 @@ import { needsRebuild } from "./indexHealth.js";
 import Run from "./Panes.jsx";
 import Settings from "./Settings.jsx";
 import RetrievalInspector from "./Retrieval.jsx";
+import { guidedGroups } from "./questions.js";
+import { createRouter, hashFor, navItems, pageFor, pageFromHash } from "./router.js";
 import { deniedTables, planTables } from "./run.js";
 
 // The banner claims recorded answers only when the server loaded some.
@@ -42,7 +44,30 @@ async function getJson(url, options) {
   return response.json();
 }
 
+// The address bar says which page is open, so a reload and a shared link both
+// work and Back walks the pages you visited.
+function useRoute() {
+  const [page, setPage] = useState(() => pageFromHash(window.location.hash));
+  useEffect(() => {
+    const router = createRouter(window);
+    // The hash can change between the first render and this effect.
+    setPage(router.page());
+    const drop = router.subscribe(setPage);
+    return () => {
+      drop();
+      router.stop();
+    };
+  }, []);
+  return page;
+}
+
+function focusById(id) {
+  const target = document.getElementById(id);
+  if (target) target.focus();
+}
+
 export default function App() {
+  const page = useRoute();
   const [meta, setMeta] = useState(null);
   const [schema, setSchema] = useState(null);
   const [question, setQuestion] = useState("");
@@ -55,14 +80,14 @@ export default function App() {
   const [error, setError] = useState(null);
   const [settings, setSettings] = useState(null);
   const [settingsError, setSettingsError] = useState(null);
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [index, setIndex] = useState(null);
   const [indexError, setIndexError] = useState(null);
   const [retrieval, setRetrieval] = useState(null);
   const [retrievalError, setRetrievalError] = useState(null);
-  const [retrievalOpen, setRetrievalOpen] = useState(false);
   const [feedback, setFeedback] = useState(null);
   const runRef = useRef(null);
+  const pageRef = useRef(null);
+  const firstPage = useRef(true);
 
   useEffect(() => {
     getJson("/api/meta")
@@ -78,6 +103,17 @@ export default function App() {
     // Without it the rating control stays hidden; nothing else depends on it.
     getJson("/api/feedback").then(setFeedback).catch(() => {});
   }, []);
+
+  // A new page starts at its top, with the keyboard on it: the browser does
+  // neither of those for a view the hash swapped out.
+  useEffect(() => {
+    if (firstPage.current) {
+      firstPage.current = false;
+      return;
+    }
+    window.scrollTo(0, 0);
+    if (pageRef.current) pageRef.current.focus();
+  }, [page]);
 
   // While a rebuild runs, follow its steps; when it ends, re-read the schema,
   // which the rebuild re-read from the database too.
@@ -156,42 +192,53 @@ export default function App() {
   const replay = meta && meta.mode === "replay";
   const canSet = settings && settings.available;
   const indexBroken = index && needsRebuild(index.health) && index.job.state !== "running";
+  const onAsk = page === "ask";
+  const groups = guidedGroups(meta);
+  const current = pageFor(page);
+  const nav = navItems(page, {
+    settings: settings && !settings.available,
+    retrieval: retrieval && !retrieval.available,
+  });
 
   return (
     <div className="app">
-      <a className="skip" href="#run">Skip to the run</a>
+      {/* A button, not a fragment link: the hash belongs to the router. */}
+      <button className="skip" onClick={() => focusById(onAsk ? "run" : "page")}>
+        {onAsk ? "Skip to the run" : "Skip to the page"}
+      </button>
+
       <header className="topbar">
-        <h1 className="wordmark">
-          <span className="mono">nl2sql</span> playground
-        </h1>
-        {meta && (
-          <p className={`mode mode-${meta.mode}`}>
-            <strong>{replay ? "Replay mode." : "Live mode."}</strong>{" "}
-            {replay
-              ? replayNote(meta.recorded_questions, (meta.questions || []).length, canSet)
-              : "Questions go to the configured model."}
+        <div className="topbar-line">
+          {/* The product mark, not the page's heading: the page title is. */}
+          <p className="wordmark">
+            <span className="mono">nl2sql</span> playground
           </p>
-        )}
-        <button
-          id="retrieval-toggle"
-          className="settings-toggle"
-          aria-expanded={retrievalOpen}
-          aria-controls="retrieval-panel"
-          onClick={() => setRetrievalOpen(!retrievalOpen)}
-        >
-          Retrieval
-          {retrieval && !retrieval.available && <span className="settings-toggle-off">off</span>}
-        </button>
-        <button
-          id="settings-toggle"
-          className="settings-toggle"
-          aria-expanded={settingsOpen}
-          aria-controls="settings-panel"
-          onClick={() => setSettingsOpen(!settingsOpen)}
-        >
-          Settings
-          {settings && !settings.available && <span className="settings-toggle-off">off</span>}
-        </button>
+          {meta && (
+            <p className={`mode mode-${meta.mode}`}>
+              <strong>{replay ? "Replay mode." : "Live mode."}</strong>{" "}
+              {replay
+                ? replayNote(meta.recorded_questions, (meta.questions || []).length, canSet)
+                : "Questions go to the configured model."}
+            </p>
+          )}
+        </div>
+        <nav className="nav" aria-label="Playground pages">
+          <ul>
+            {nav.map((item) => (
+              <li key={item.id}>
+                <a
+                  id={`nav-${item.id}`}
+                  className="nav-link"
+                  href={item.href}
+                  aria-current={item.current ? "page" : undefined}
+                >
+                  {item.label}
+                  {item.off && <span className="nav-off">off</span>}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </nav>
       </header>
 
       {indexBroken && (
@@ -200,103 +247,124 @@ export default function App() {
           {index.health.status === "stale"
             ? "Answers may use an older schema. "
             : "Every question will fail until it is rebuilt. "}
-          {index.rebuild.available
-            ? <a href="#index-rebuild">Rebuild it</a>
-            : <>Run <code>nl2sql --env demo index</code> in the demo directory.</>}
+          {!index.rebuild.available ? (
+            <>Run <code>nl2sql --env demo index</code> in the demo directory.</>
+          ) : onAsk ? (
+            <button className="linkish" onClick={() => focusById("index-rebuild")}>Rebuild it</button>
+          ) : (
+            <a href={hashFor("ask")}>Rebuild it</a>
+          )}
         </p>
       )}
 
-      {settingsOpen && (
-        <section id="settings-panel" className="settings" aria-labelledby="settings-heading">
-          <h2 id="settings-heading" className="visually-hidden">Settings</h2>
-          <Settings settings={settings} error={settingsError} onSaved={settingsSaved}
-            recorded={meta ? meta.recorded_questions : 0} />
-        </section>
-      )}
+      <main className="page" id="page" ref={pageRef} tabIndex={-1} aria-labelledby="page-title">
+        <div className="page-head">
+          <h1 id="page-title">{current.title}</h1>
+          <p className="page-lede">{current.description}</p>
+          {current.note && <p className="page-note">{current.note}</p>}
+        </div>
 
-      {retrievalOpen && (
-        <section id="retrieval-panel" className="settings" aria-labelledby="retrieval-heading">
-          <h2 id="retrieval-heading" className="retrieval-heading">Retrieval inspector</h2>
-          <p className="settings-help retrieval-intro">
-            Embeds any text with the local model and runs the engine's search against the live index: the nearest
-            entries with their similarity, then the ones MMR picks, trading similarity against overlap with earlier
-            picks. There is no re-ranking model. Nothing here calls the LLM.
-          </p>
-          <RetrievalInspector options={retrieval} error={retrievalError} question={question} />
-        </section>
-      )}
-
-      <main className="layout">
-        <section className="composer" aria-labelledby="ask-heading">
-          <h2 id="ask-heading" className="visually-hidden">Ask</h2>
-          <label className="question-label" htmlFor="question">
-            Ask the {meta ? meta.dataset : "demo"} database a question
-          </label>
-          <textarea
-            id="question"
-            rows={2}
-            value={question}
-            placeholder="Which genre sells the most tracks?"
-            onChange={(e) => setQuestion(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) ask();
-            }}
-          />
-          <div className="controls">
-            <div className="field">
-              <label htmlFor="role-select">Ask as</label>
-              <select id="role-select" value={role} onChange={(e) => setRole(e.target.value)}>
-                {(meta ? meta.roles : ["admin"]).map((r) => (
-                  <option key={r} value={r}>{r}</option>
-                ))}
-              </select>
-            </div>
-            <label className="check" htmlFor="plan-only">
-              <input id="plan-only" type="checkbox" checked={planOnly} onChange={(e) => setPlanOnly(e.target.checked)} />
-              Plan only
-            </label>
-            <label className="check" htmlFor="debug-toggle">
-              <input id="debug-toggle" type="checkbox" checked={debug} onChange={(e) => toggleDebug(e.target.checked)} />
-              Debug
-              <span className="hint">per-node tokens and time</span>
-            </label>
-            <button className="ask" onClick={() => ask()} disabled={busy || !question.trim()}>
-              {busy ? "Asking" : "Ask"}
-              <kbd aria-hidden="true">Ctrl Enter</kbd>
-            </button>
-          </div>
-          {meta && meta.questions.length > 0 && (
-            <section className="guided" aria-labelledby="guided-heading">
-              <h3 id="guided-heading">Or try a guided question</h3>
-              <ul>
-                {meta.questions.map((q) => (
-                  <li key={q}>
-                    <button className="guided-q" onClick={() => ask(q)} disabled={busy}>{q}</button>
-                  </li>
-                ))}
-              </ul>
+        {onAsk && (
+          <div className="layout">
+            <section className="composer" aria-labelledby="ask-heading">
+              <h2 id="ask-heading" className="visually-hidden">Ask</h2>
+              {/* The page title above already says Ask. With one database this
+                  names it; with three the resolver picks, so it must not. */}
+              <label className="question-label" htmlFor="question">
+                {groups.length > 1
+                  ? "Your question"
+                  : `Your question for the ${meta ? meta.dataset : "demo"} database`}
+              </label>
+              <textarea
+                id="question"
+                rows={2}
+                value={question}
+                placeholder="Which genre sells the most tracks?"
+                onChange={(e) => setQuestion(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) ask();
+                }}
+              />
+              <div className="controls">
+                <div className="field">
+                  <label htmlFor="role-select">Ask as</label>
+                  <select id="role-select" value={role} onChange={(e) => setRole(e.target.value)}>
+                    {(meta ? meta.roles : ["admin"]).map((r) => (
+                      <option key={r} value={r}>{r}</option>
+                    ))}
+                  </select>
+                </div>
+                <label className="check" htmlFor="plan-only">
+                  <input id="plan-only" type="checkbox" checked={planOnly} onChange={(e) => setPlanOnly(e.target.checked)} />
+                  Plan only
+                </label>
+                <label className="check" htmlFor="debug-toggle">
+                  <input id="debug-toggle" type="checkbox" checked={debug} onChange={(e) => toggleDebug(e.target.checked)} />
+                  Debug
+                  <span className="hint">per-node tokens and time</span>
+                </label>
+                <button className="ask" onClick={() => ask()} disabled={busy || !question.trim()}>
+                  {busy ? "Asking" : "Ask"}
+                  <kbd aria-hidden="true">Ctrl Enter</kbd>
+                </button>
+              </div>
+              {groups.length > 0 && (
+                <section className="guided" aria-labelledby="guided-heading">
+                  <h3 id="guided-heading">Or try a guided question</h3>
+                  {/* One database needs no labels; three do. */}
+                  {groups.map((group) => (
+                    <div className="guided-group" key={group.datasource}>
+                      {groups.length > 1 && (
+                        <h4 className="guided-source mono" id={`guided-${group.datasource}`}>
+                          {group.datasource}
+                        </h4>
+                      )}
+                      <ul aria-labelledby={groups.length > 1 ? `guided-${group.datasource}` : undefined}>
+                        {group.questions.map((q) => (
+                          <li key={q}>
+                            <button className="guided-q" onClick={() => ask(q)} disabled={busy}>{q}</button>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </section>
+              )}
             </section>
-          )}
-        </section>
 
-        <aside className="rail">
-          <IndexPanel index={index} error={indexError} onRebuild={rebuildIndex} />
-          <SchemaPanel schema={schema} used={used} denied={denied} role={asked && asked.role} />
-        </aside>
+            <aside className="rail">
+              <IndexPanel index={index} error={indexError} onRebuild={rebuildIndex} />
+              <SchemaPanel schema={schema} used={used} denied={denied} role={asked && asked.role} />
+            </aside>
 
-        <section className="run" id="run" ref={runRef} aria-labelledby="run-heading" tabIndex={-1}>
-          <h2 id="run-heading" className="visually-hidden">The run</h2>
-          <Run
-            asked={asked}
-            result={result}
-            sub={sub}
-            busy={busy}
-            error={error}
-            debug={debug}
-            replay={replay}
-            feedback={feedback}
-          />
-        </section>
+            <section className="run" id="run" ref={runRef} aria-labelledby="run-heading" tabIndex={-1}>
+              <h2 id="run-heading" className="visually-hidden">The run</h2>
+              <Run
+                asked={asked}
+                result={result}
+                sub={sub}
+                busy={busy}
+                error={error}
+                debug={debug}
+                replay={replay}
+                feedback={feedback}
+              />
+            </section>
+          </div>
+        )}
+
+        {page === "settings" && (
+          <div className="sheet" id="settings-panel">
+            <Settings settings={settings} error={settingsError} onSaved={settingsSaved}
+              recorded={meta ? meta.recorded_questions : 0} />
+          </div>
+        )}
+
+        {page === "retrieval" && (
+          <div className="sheet" id="retrieval-panel">
+            <RetrievalInspector options={retrieval} error={retrievalError} question={question} />
+          </div>
+        )}
       </main>
     </div>
   );

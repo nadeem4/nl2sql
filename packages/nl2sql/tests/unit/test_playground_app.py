@@ -112,8 +112,10 @@ def _snapshot() -> SchemaSnapshot:
 def test_meta_and_ask():
     engine = _Engine()
     client = TestClient(build_app(engine, questions=["q1"], roles=["admin", "viewer"], mode="replay", dataset="chinook"))
-    assert client.get("/api/meta").json() == {"mode": "replay", "dataset": "chinook", "questions": ["q1"],
-                                              "roles": ["admin", "viewer"], "recorded_questions": 0}
+    assert client.get("/api/meta").json() == {
+        "mode": "replay", "dataset": "chinook", "questions": ["q1"],
+        "question_groups": [{"datasource": "chinook", "questions": ["q1"]}],
+        "roles": ["admin", "viewer"], "recorded_questions": 0}
     r = client.post("/api/ask", json={"question": "q1", "role": "viewer", "execute": False})
     assert r.status_code == 200
     body = r.json()
@@ -206,6 +208,27 @@ def test_a_missing_recording_is_a_replay_miss_whatever_code_it_surfaces_as():
 
     live = TestClient(build_app(_NoRule(), questions=[], roles=["admin"], mode="live", dataset="chinook"))
     assert live.post("/api/ask", json={"question": "q", "role": "admin"}).json()["replay_miss"] is False
+
+
+def test_meta_groups_the_guided_questions_by_datasource():
+    """With several databases the page can label each pile, not run them together."""
+    by_datasource = {"chinook": ["c1", "c2"], "support": ["s1"]}
+    client = TestClient(build_app(_Engine(), questions=["c1", "c2", "s1"], roles=["admin"],
+                                  mode="replay", dataset="chinook",
+                                  questions_by_datasource=by_datasource))
+    meta = client.get("/api/meta").json()
+    assert meta["question_groups"] == [{"datasource": "chinook", "questions": ["c1", "c2"]},
+                                       {"datasource": "support", "questions": ["s1"]}]
+    # The flat list stays, so nothing that reads it has to change.
+    assert meta["questions"] == ["c1", "c2", "s1"]
+
+
+def test_meta_drops_a_datasource_with_no_guided_questions():
+    client = TestClient(build_app(_Engine(), questions=["c1"], roles=["admin"], mode="replay",
+                                  dataset="chinook",
+                                  questions_by_datasource={"chinook": ["c1"], "support": []}))
+    assert client.get("/api/meta").json()["question_groups"] == [
+        {"datasource": "chinook", "questions": ["c1"]}]
 
 
 def test_meta_says_how_many_guided_questions_have_recordings():

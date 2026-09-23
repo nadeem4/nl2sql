@@ -347,7 +347,7 @@ removes the entry. The running engine reloads the file, so the change applies
 to the next question. The panel offers the providers and models in
 `VERIFIED_MODELS` (`nl2sql/llm/providers.py`), OpenAI and Anthropic for
 now, and a provider only once its key is saved. See
-[the settings panel](../getting_started/demo.md#the-settings-panel).
+[the Settings page](../getting_started/demo.md#the-settings-page).
 
 When `nl2sql demo` picks replay or live mode at start-up it points `default`
 at the chosen provider. In replay and record mode every `agents:` entry

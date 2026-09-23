@@ -51,5 +51,5 @@ tracebacks show `**********` instead of the value:
 The real value is read only where it is used: building the LLM or embeddings
 client, a database connection, the artifact store's storage options or a
 secret provider's client. Writers of config files (`nl2sql setup`, the demo
-scaffold, the playground Settings panel) still write the literal value or the
+scaffold, the playground's Settings page) still write the literal value or the
 `${env:...}` reference, never the mask.

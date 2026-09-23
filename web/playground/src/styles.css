@@ -100,9 +100,12 @@ button, input, select, textarea { font: inherit; color: inherit; }
   clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
 }
 
+/* A button rather than a fragment link: the hash is the router's, so the jump
+   moves focus instead of writing one. */
 .skip {
   position: absolute; left: 16px; top: -48px; z-index: 10;
-  background: var(--ink); color: var(--paper); padding: 8px 12px; border-radius: var(--r-control);
+  background: var(--ink); color: var(--paper); border: 0;
+  padding: 8px 12px; border-radius: var(--r-control); font: inherit; font-size: 14px;
 }
 .skip:focus { top: 12px; }
 
@@ -112,16 +115,44 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 .app { max-width: 1480px; margin: 0 auto; padding: 0 var(--gutter) 64px; }
 
-.topbar {
-  display: flex; align-items: baseline; gap: 24px; flex-wrap: wrap;
-  padding: 18px 0 16px; border-bottom: 1px solid var(--rule);
-}
+/* The top bar carries the product mark and the mode on one line, and the pages
+   on the next. The nav sits on the bar's own rule: the page you are on takes
+   that rule in the accent, the colour that already marks the path a question
+   travels. Nothing here is a panel that opens -- each name is a page. */
+.topbar { display: grid; gap: 13px; padding: 18px 0 0; border-bottom: 1px solid var(--rule); }
+.topbar-line { display: flex; align-items: baseline; gap: 24px; flex-wrap: wrap; }
 .wordmark { font-size: 17px; font-weight: 600; color: var(--ink-2); }
 .wordmark .mono { font-size: 17px; color: var(--ink); margin-right: 2px; }
 .mode { color: var(--ink-2); font-size: 13.5px; max-width: 78ch; }
 .mode strong { color: var(--ink); font-weight: 600; }
 
+.nav ul {
+  list-style: none; margin: 0 0 -1px; padding: 0;
+  display: flex; flex-wrap: wrap; gap: 0 2px;
+}
+.nav-link {
+  display: inline-flex; align-items: baseline; gap: 7px;
+  padding: 7px 14px 9px; font-size: 14.5px; font-weight: 550;
+  color: var(--ink-2); text-decoration: none;
+  border-bottom: 2px solid transparent;
+  transition: color .15s ease, border-color .15s ease;
+}
+.nav-link:hover { color: var(--ink); border-bottom-color: var(--rule-strong); }
+.nav-link[aria-current="page"] { color: var(--ink); border-bottom-color: var(--accent); }
+.nav-off { font-size: 12px; font-weight: 400; color: var(--ink-3); }
+.nav-link[aria-current="page"] .nav-off, .nav-link:hover .nav-off { color: var(--ink-2); }
+
+/* Every page says what it is and what it does, then gives its content the
+   full width. */
+.page:focus { outline: none; }
+.page-head { padding: 26px 0 0; }
+.page-head h1 { font-size: 23px; letter-spacing: -0.015em; }
+.page-lede { margin-top: 5px; font-size: 14.5px; color: var(--ink-2); max-width: 76ch; text-wrap: pretty; }
+.page-note { margin-top: 6px; font-size: 13.5px; color: var(--ink-3); max-width: 84ch; text-wrap: pretty; }
+.sheet { margin-top: 24px; padding-bottom: 8px; }
+
 .layout {
+  margin-top: 6px;
   display: grid;
   grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
   grid-template-areas:
@@ -131,13 +162,13 @@ button, input, select, textarea { font: inherit; color: inherit; }
   column-gap: 48px;
   align-items: start;
 }
-.composer { grid-area: composer; padding: 28px 0 8px; min-width: 0; }
+.composer { grid-area: composer; padding: 18px 0 8px; min-width: 0; }
 .run { grid-area: run; min-width: 0; padding-top: 12px; }
 .run:focus { outline: none; }
 .rail {
   grid-area: rail; min-width: 0;
   position: sticky; top: 0; max-height: 100dvh; overflow: auto;
-  padding: 28px 18px 32px 0; margin-right: -18px;
+  padding: 18px 18px 32px 0; margin-right: -18px;
   border-right: 1px solid var(--rule);
   scrollbar-gutter: stable;
 }
@@ -188,9 +219,17 @@ button:disabled { cursor: default; }
 
 .rail h2 { font-size: 15px; margin-bottom: 10px; display: flex; align-items: baseline; gap: 8px; }
 
+/* With three databases registered, twenty guided questions read as one pile
+   unless each says which database it asks about. The name is the quiet mono
+   the rail uses for a datasource; with a single database there is nothing to
+   tell apart, so no name is printed. */
 .guided { margin-top: 22px; }
 .guided h3 { font-size: 14px; font-weight: 500; color: var(--ink-2); margin-bottom: 4px; }
-.guided ul { list-style: none; margin: 0; padding: 0; columns: 2 300px; column-gap: 32px; }
+.guided-group + .guided-group { margin-top: 14px; }
+.guided-source {
+  margin: 0 0 2px; font-size: 12.5px; font-weight: 400; color: var(--ink-3);
+}
+.guided ul { list-style: none; margin: 0; padding: 0; columns: 3 260px; column-gap: 32px; }
 .guided li { break-inside: avoid; }
 .guided-q {
   display: block; width: calc(100% + 8px); text-align: left;
@@ -291,7 +330,13 @@ li[data-flag="denied"] .flag { color: var(--ink); background: var(--well); }
   background: var(--fault-soft); color: var(--fault); font-size: 14.5px; max-width: 96ch;
 }
 .index-warning strong { font-weight: 650; }
-.index-warning a { color: inherit; font-weight: 600; text-decoration: underline 1px; text-underline-offset: 3px; }
+/* On the Ask page Rebuild is a jump to the button in the rail, so it is a
+   button too; from another page it is a link back to that page. */
+.index-warning a, .index-warning .linkish {
+  background: none; border: 0; padding: 0; font: inherit;
+  color: inherit; font-weight: 600; text-decoration: underline 1px; text-underline-offset: 3px;
+}
+.index-warning a:hover, .index-warning .linkish:hover { text-decoration-thickness: 2px; }
 .index-warning code { color: var(--ink); }
 
 /* ---------- the run: one spine, six stations ---------- */
@@ -515,22 +560,10 @@ li[data-flag="denied"] .flag { color: var(--ink); background: var(--well); }
   white-space: pre-wrap; overflow-wrap: anywhere;
 }
 
-/* ---------- settings: a secondary surface, shut until asked for ----------
-   It opens under the top bar and pushes the page down rather than covering
-   it, uses the rail's quiet vocabulary (rules, wells, mono for names), and
+/* ---------- settings: its own page ----------
+   It keeps the rail's quiet vocabulary (rules, wells, mono for names) and
    never the accent fill, which belongs to the Ask button and the run. */
 
-.settings-toggle {
-  margin-left: auto; align-self: center; display: inline-flex; align-items: baseline; gap: 8px;
-  background: none; border: 1px solid var(--rule-strong); border-radius: var(--r-control);
-  padding: 3px 12px; font-size: 13.5px; color: var(--ink-2);
-  transition: color .15s ease, border-color .15s ease;
-}
-.settings-toggle:hover { color: var(--ink); border-color: var(--ink-2); }
-.settings-toggle[aria-expanded="true"] { color: var(--ink); border-color: var(--ink); }
-.settings-toggle-off { font-size: 12px; color: var(--ink-3); }
-
-.settings { padding: 20px 0 24px; border-bottom: 1px solid var(--rule); }
 .settings-grid {
   display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); column-gap: 48px; row-gap: 28px;
   max-width: 1120px;
@@ -590,15 +623,10 @@ li[data-flag="denied"] .flag { color: var(--ink); background: var(--well); }
 
 /* ---------- retrieval: what a vector search saw and how MMR chose ----------
    One table serves the run's trace (inside the node drill-down) and the
-   Retrieval inspector (a panel under the top bar, like Settings). The pool is
-   listed nearest first; picks carry the accent bar the Database uses for the
-   tables a plan reads, dropped entries go quiet. Similarity gets the ledger's
-   trackless bar, so the gap between neighbours is visible at a glance. */
-
-.settings-toggle + .settings-toggle { margin-left: 0; }
-
-.retrieval-heading { font-size: 15px; margin-bottom: 4px; }
-.retrieval-intro { margin: 0 0 16px; max-width: 86ch; }
+   Retrieval page. The pool is listed nearest first; picks carry the accent bar
+   the Database uses for the tables a plan reads, dropped entries go quiet.
+   Similarity gets the ledger's trackless bar, so the gap between neighbours is
+   visible at a glance. */
 
 .inspector-form .settings-row { max-width: 820px; }
 .inspector-form .settings-row input { font-family: var(--sans); font-size: 15px; padding: 7px 12px; }
@@ -683,6 +711,11 @@ li[data-flag="denied"] .flag { color: var(--ink); background: var(--well); }
 
 @media (max-width: 640px) {
   :root { --gutter: 16px; }
+  /* Three names fit across a phone, so the nav stays a nav. */
+  .nav-link { padding: 7px 9px 9px; font-size: 14px; }
+  .nav ul { gap: 0; }
+  .page-head { padding-top: 20px; }
+  .page-head h1 { font-size: 21px; }
   .ask { margin-left: 0; width: 100%; justify-content: center; }
   .ask kbd { display: none; }
   .spine { padding-left: 26px; }

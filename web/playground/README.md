@@ -2,6 +2,41 @@
 
 The React source for the page `nl2sql demo` serves.
 
+## Pages
+
+Three pages, named across the top of each of them by one header nav
+(`.nav`, one `#nav-ask`, `#nav-settings`, `#nav-retrieval` link each). Every
+page states its title and one line saying what it does, then gives its content
+the full width.
+
+| Route | Page | What it holds |
+| --- | --- | --- |
+| `#/` | Ask | the composer, the rail (Search index and Database) and the run |
+| `#/settings` | Settings | `#settings-panel`: keys and a model per step |
+| `#/retrieval` | Retrieval inspector | `#retrieval-panel`: the inspector |
+
+`src/router.js` is the whole of it: `pageFromHash` reads the hash, `navItems`
+builds the nav, and `createRouter` follows `hashchange`. A route nobody serves
+reads as `#/`, so Back and Forward always land somewhere. The nav links are
+plain `<a href="#/...">`, so the keyboard reaches them and the browser keeps
+the history; the current one carries `aria-current="page"` and the accent under
+the top bar's rule. Nothing in the page links to a bare fragment -- the skip
+control and the index warning's **Rebuild it** move focus instead -- because
+the hash belongs to the router.
+
+**The run is not lost.** The question, the answer, the Debug choice and every
+`/api` reply are held in `App`, above the page switch, so Settings and back
+leaves the run exactly as it was. Nothing extra is written to storage for it:
+the address bar already restores the page on a reload.
+
+**Where a page is off** (Settings, Retrieval and Rebuild share one gate: a demo
+project, on a loopback host or with `--allow-settings`), its nav item stays and
+is marked `off`; opening it is how you read the reason
+(`#settings-unavailable`, `#retrieval-unavailable`).
+
+`src/router.test.js` covers the default route, deep links, an unknown route,
+Back and Forward, and that routing touches nothing but the hash.
+
 ## What the page shows
 
 - **Database** (left rail, or below the run on a narrow window): the indexed
@@ -15,7 +50,8 @@ The React source for the page `nl2sql demo` serves.
   schema version (`#index-version`) and when it was built (`#index-built`).
   When the index is empty, missing or out of date, the panel turns to the fault
   colour, a stale index lists why, and a warning under the top bar
-  (`#index-warning`) links to the button. **Rebuild** (`#index-rebuild`) is
+  (`#index-warning`) puts the keyboard on the button, or, from another page,
+  leads back to Ask. **Rebuild** (`#index-rebuild`) is
   always offered; it posts to `POST /api/index/rebuild` and the page polls
   `GET /api/index` for its steps (`#index-progress`) until it ends, then
   re-reads the schema. **Write descriptions with the LLM** (`#index-enrich`) is
@@ -28,9 +64,16 @@ The React source for the page `nl2sql demo` serves.
   `/api/meta`), or, with none, that replay mode has no recorded answers and a key
   is needed. A question replay has no answer for shows "No recorded answer for
   this question. Add an API key to ask it live." (`replay_miss` from `/api/ask`).
-- **Composer**: the question box, the role selector (`#role-select`), **Plan
-  only** (`#plan-only`), **Debug** (`#debug-toggle`) and the guided questions
-  from `/api/meta`.
+- **Composer** (Ask page): the question box, the role selector
+  (`#role-select`), **Plan only** (`#plan-only`), **Debug** (`#debug-toggle`)
+  and the guided questions from `/api/meta`. The demo registers three
+  databases, so the questions are shown in one `.guided-group` per datasource,
+  each headed by its id (`.guided-source`) in the quiet mono the rail uses, in
+  the order `/api/meta` sends them in `question_groups`. With a single
+  database there is nothing to tell apart, so no heading is printed and the
+  question box names that database; with several it does not, because the
+  resolver picks. `src/questions.js` does the grouping and falls back to the
+  flat `questions` list when a server sends no `question_groups`.
 - **The run**: one spine, read top to bottom. Question, Plan (`#pane-plan`),
   Checks (`#pane-validation`), SQL (`#pane-sql`), Rows (`#pane-rows`), Cost &
   time (`#pane-usage`). The checks sit across the spine as a gate: when a plan is
@@ -66,8 +109,8 @@ The React source for the page `nl2sql demo` serves.
   line says why. See
   [Feedback and Signals](../../docs/observability/feedback.md).
 
-- **Retrieval** (`#retrieval-toggle`, top right beside Settings; the panel is
-  `#retrieval-panel`): the Retrieval inspector. Text to embed
+- **Retrieval** (`#nav-retrieval` in the header nav, route `#/retrieval`; the
+  page's content is `#retrieval-panel`): the Retrieval inspector. Text to embed
   (`#retrieval-query`), **Search** (`#retrieval-search`), picks `k`
   (`#retrieval-k`, the pool is shown as `4 * k`), lambda (`#retrieval-lambda`),
   a datasource filter (`#retrieval-datasource`) and one checkbox per entry type
@@ -78,15 +121,14 @@ The React source for the page `nl2sql demo` serves.
   earlier picks, each entry's embedded text, and **Copy as text**
   (`#retrieval-copy`) for diffing two runs. A failure shows `#retrieval-error`.
   Where it is off (the same rule as Settings) it says why
-  (`#retrieval-unavailable`).
+  (`#retrieval-unavailable`), and the nav marks it.
 - **Retrieval in the drill-down**: for `datasource_resolver` and
   `schema_retriever`, the node drill-down also shows the run's retrieval record
   from the trace: the text embedded, each search's pool with the picks marked,
   the entries MMR passed over, and the tables sent to the planner; or why no
   search ran.
-- **Settings** (`#settings-toggle`, top right; the panel is `#settings-panel`):
-  shut until asked for, and it pushes the page down rather than covering the
-  run. **API key** (`#settings-key`, `#settings-save-key`) shows the key in use
+- **Settings** (`#nav-settings` in the header nav, route `#/settings`; the
+  page's content is `#settings-panel`). **API key** (`#settings-key`, `#settings-save-key`) shows the key in use
   only in masked form (`#settings-key-current`); saving one writes it to the
   demo project's `.env.demo` and turns replay into live without a restart, and
   the mode line follows. **Model for each step** has one selector per LLM node
@@ -97,8 +139,8 @@ The React source for the page `nl2sql demo` serves.
   Choosing a model that runs without a temperature shows
   `#settings-temperature-note`. The model list comes from `GET /api/settings`;
   the page names no model itself. When the server has settings off (a
-  non-loopback `--host` without `--allow-settings`) the panel shows the reason
-  (`#settings-unavailable`) instead of a form.
+  non-loopback `--host` without `--allow-settings`) the page shows the reason
+  (`#settings-unavailable`) instead of a form, and the nav marks it.
 
 Every run station renders the `/api/ask` response; nothing is computed
 server-side for the page.
@@ -130,7 +172,9 @@ if you edit anything under `src/`, run `npm run build` and commit
 ledger, refused-table parsing, the trace drill-down helpers), `src/settings.js`
 (model options, which nodes changed, which chosen models run without a
 temperature), `src/indexHealth.js` (entry counts in plain words, the status
-line, relative build times) and `src/retrieval.js` (the MMR summary line, picks
+line, relative build times), `src/router.js` (which page a hash names, the nav
+rows, and the router over `hashchange`), `src/questions.js` (the guided
+questions grouped by datasource) and `src/retrieval.js` (the MMR summary line, picks
 in order, entries passed over, the copyable text form) and `src/feedback.js`
 (when a run can be rated, the request body, the saved line) with Node's built-in test runner; there is no test dependency.
 
@@ -164,8 +208,8 @@ serves, not from the Vite dev server.
 
 ## Scope
 
-React and Vite only -- no router, no state library, no component kit, no CSS
-framework, no TypeScript. Plain JSX and plain CSS, kept small enough to read in
+React and Vite only -- no router library (`src/router.js` is 110 lines over the
+hash), no state library, no component kit, no CSS framework, no TypeScript. Plain JSX and plain CSS, kept small enough to read in
 one sitting. Light and dark follow `prefers-color-scheme`; motion is limited to
 the run arriving in order and is off under `prefers-reduced-motion`. The only
 browser storage is the Debug toggle; settings live in the demo project's files,
