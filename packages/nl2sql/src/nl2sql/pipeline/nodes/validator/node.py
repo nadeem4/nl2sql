@@ -539,23 +539,6 @@ class LogicalValidatorNode:
             messages.append(f"Plan columns could not be resolved: {failure}")
         return messages
 
-    def _validate_ordinals(self, items: List[Any], label: str) -> Optional[PipelineError]:
-        """Checks if ordinals in a list of items are contiguous starting from 0."""
-        if not items:
-            return None
-
-        ords = [x.ordinal for x in items]
-        expected = list(range(len(items)))
-
-        if ords != expected:
-            return PipelineError(
-                node="logical_validator",
-                message=f"{label} ordinals must be contiguous 0..{len(items)-1}, found {ords}",
-                severity=ErrorSeverity.ERROR,
-                error_code=ErrorCode.INVALID_PLAN_STRUCTURE,
-            )
-        return None
-
     def _alias_collision(self, plan: PlanModel) -> Optional[PipelineError]:
         """Checks for duplicate table aliases in the plan."""
         seen = set()
@@ -708,7 +691,6 @@ class LogicalValidatorNode:
         """Performs static structure validation on the plan.
 
         Checks:
-        - Ordinal integrity.
         - Alias uniqueness.
         - Join alias validity.
         - No function named DISTINCT (it is the ``distinct`` flag).
@@ -732,17 +714,6 @@ class LogicalValidatorNode:
                     error_code=ErrorCode.INVALID_PLAN_STRUCTURE,
                 )
             ]
-
-        for label, group in [
-            ("tables", plan.tables),
-            ("joins", plan.joins),
-            ("select_items", plan.select_items),
-            ("group_by", plan.group_by),
-            ("order_by", plan.order_by),
-        ]:
-            err = self._validate_ordinals(group, label)
-            if err:
-                errors.append(err)
 
         alias_err = self._alias_collision(plan)
         if alias_err:

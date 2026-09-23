@@ -6,22 +6,19 @@
       "name": "Genre",
       "schema_name": null,
       "database": null,
-      "alias": "t1",
-      "ordinal": 0
+      "alias": "t1"
     },
     {
       "name": "Track",
       "schema_name": null,
       "database": null,
-      "alias": "t2",
-      "ordinal": 1
+      "alias": "t2"
     },
     {
       "name": "InvoiceLine",
       "schema_name": null,
       "database": null,
-      "alias": "t3",
-      "ordinal": 2
+      "alias": "t3"
     }
   ],
   "joins": [
@@ -74,8 +71,7 @@
         "expr": null,
         "whens": [],
         "else_expr": null
-      },
-      "ordinal": 0
+      }
     },
     {
       "left_alias": "t3",
@@ -126,8 +122,7 @@
         "expr": null,
         "whens": [],
         "else_expr": null
-      },
-      "ordinal": 1
+      }
     }
   ],
   "select_items": [
@@ -148,8 +143,7 @@
         "whens": [],
         "else_expr": null
       },
-      "alias": "genre",
-      "ordinal": 0
+      "alias": "genre"
     },
     {
       "expr": {
@@ -215,8 +209,7 @@
         "whens": [],
         "else_expr": null
       },
-      "alias": "track_sales",
-      "ordinal": 1
+      "alias": "track_sales"
     }
   ],
   "where": null,
@@ -237,8 +230,7 @@
         "expr": null,
         "whens": [],
         "else_expr": null
-      },
-      "ordinal": 0
+      }
     }
   ],
   "having": null,

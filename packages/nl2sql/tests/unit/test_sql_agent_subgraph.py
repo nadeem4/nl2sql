@@ -11,8 +11,8 @@ from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 
 def _plan_ok():
     return PlanModel(
-        tables=[TableRef(name="users", alias="u", ordinal=0)],
-        select_items=[SelectItem(expr=Expr(kind="column", alias="u", column_name="id"), ordinal=0)],
+        tables=[TableRef(name="users", alias="u")],
+        select_items=[SelectItem(expr=Expr(kind="column", alias="u", column_name="id"))],
         joins=[],
     )
 

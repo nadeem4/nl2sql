@@ -144,7 +144,7 @@ def test_a_table_that_no_join_reaches_is_a_planning_error():
 
 def test_a_join_between_two_tables_already_in_scope_is_a_planning_error():
     raw = _captured_plan()
-    raw["joins"].append(dict(raw["joins"][0], ordinal=2))
+    raw["joins"].append(dict(raw["joins"][0]))
 
     result = _generate(PlanModel.model_validate(raw))
 
@@ -165,14 +165,13 @@ def test_a_join_naming_an_undeclared_alias_is_a_planning_error():
 def test_joined_tables_keep_their_schema_qualifier():
     plan = PlanModel(
         tables=[
-            TableRef(name="Album", schema_name="main", alias="al", ordinal=0),
-            TableRef(name="Artist", schema_name="main", alias="ar", ordinal=1),
+            TableRef(name="Album", schema_name="main", alias="al"),
+            TableRef(name="Artist", schema_name="main", alias="ar"),
         ],
         joins=[
             JoinSpec(
                 left_alias="ar",
                 right_alias="al",
-                ordinal=0,
                 condition=Expr(
                     kind="binary",
                     op="=",
@@ -181,7 +180,7 @@ def test_joined_tables_keep_their_schema_qualifier():
                 ),
             )
         ],
-        select_items=[SelectItem(ordinal=0, expr=Expr(kind="column", alias="ar", column_name="Name"))],
+        select_items=[SelectItem(expr=Expr(kind="column", alias="ar", column_name="Name"))],
     )
 
     sql = _sql(plan)
@@ -198,15 +197,14 @@ def test_an_outer_join_attached_from_its_left_side_keeps_the_preserved_table():
     """
     plan = PlanModel(
         tables=[
-            TableRef(name="Album", alias="al", ordinal=0),
-            TableRef(name="Artist", alias="ar", ordinal=1),
+            TableRef(name="Album", alias="al"),
+            TableRef(name="Artist", alias="ar"),
         ],
         joins=[
             JoinSpec(
                 left_alias="ar",
                 right_alias="al",
                 join_type="left",
-                ordinal=0,
                 condition=Expr(
                     kind="binary",
                     op="=",
@@ -215,7 +213,7 @@ def test_an_outer_join_attached_from_its_left_side_keeps_the_preserved_table():
                 ),
             )
         ],
-        select_items=[SelectItem(ordinal=0, expr=Expr(kind="column", alias="ar", column_name="ArtistId"))],
+        select_items=[SelectItem(expr=Expr(kind="column", alias="ar", column_name="ArtistId"))],
     )
 
     rows = _run_on_chinook(_sql(plan))
@@ -321,10 +319,10 @@ def test_the_validator_builds_its_query_with_the_same_arithmetic():
 
 def _single_table_plan(**overrides) -> PlanModel:
     fields = dict(
-        tables=[TableRef(name="Customer", alias="c", ordinal=0)],
+        tables=[TableRef(name="Customer", alias="c")],
         select_items=[
-            SelectItem(ordinal=0, expr=_col("c", "Country")),
-            SelectItem(ordinal=1, expr=_col("c", "City"), alias="city"),
+            SelectItem(expr=_col("c", "Country")),
+            SelectItem(expr=_col("c", "City"), alias="city"),
         ],
     )
     fields.update(overrides)
@@ -351,7 +349,7 @@ def test_an_aggregate_with_group_by_is_ordered_by_its_aliases():
 def test_a_desc_order_by_keeps_its_direction_and_gets_the_other_columns_as_ascending_tie_breakers():
     raw = _captured_plan()
     revenue = raw["select_items"][1]["expr"]
-    raw["order_by"] = [{"ordinal": 0, "direction": "desc", "expr": revenue}]
+    raw["order_by"] = [{"direction": "desc", "expr": revenue}]
 
     sql = _sql(PlanModel.model_validate(raw))
 
@@ -364,13 +362,13 @@ def test_a_desc_order_by_keeps_its_direction_and_gets_the_other_columns_as_ascen
 
 def test_an_order_by_on_a_column_gets_the_remaining_columns_in_select_order():
     plan = PlanModel(
-        tables=[TableRef(name="Customer", alias="c", ordinal=0)],
+        tables=[TableRef(name="Customer", alias="c")],
         select_items=[
-            SelectItem(ordinal=0, expr=_col("c", "FirstName"), alias="given"),
-            SelectItem(ordinal=1, expr=_col("c", "Country")),
-            SelectItem(ordinal=2, expr=_col("c", "LastName")),
+            SelectItem(expr=_col("c", "FirstName"), alias="given"),
+            SelectItem(expr=_col("c", "Country")),
+            SelectItem(expr=_col("c", "LastName")),
         ],
-        order_by=[OrderItem(ordinal=0, direction="desc", expr=_col("c", "Country"))],
+        order_by=[OrderItem(direction="desc", expr=_col("c", "Country"))],
         limit=5,
     )
 
@@ -381,7 +379,7 @@ def test_an_order_by_on_a_column_gets_the_remaining_columns_in_select_order():
 
 
 def test_an_order_by_on_a_select_alias_is_not_repeated_as_a_tie_breaker():
-    plan = _single_table_plan(order_by=[OrderItem(ordinal=0, direction="desc", expr=Expr(kind="column", column_name="city"))])
+    plan = _single_table_plan(order_by=[OrderItem(direction="desc", expr=Expr(kind="column", column_name="city"))])
 
     sql = _sql(plan)
 
@@ -393,23 +391,22 @@ def test_a_joined_group_by_count_orders_by_every_column_and_runs():
     count = Expr(kind="func", func_name="COUNT", is_aggregate=True, args=[_col("al", "AlbumId")])
     plan = PlanModel(
         tables=[
-            TableRef(name="Artist", alias="ar", ordinal=0),
-            TableRef(name="Album", alias="al", ordinal=1),
+            TableRef(name="Artist", alias="ar"),
+            TableRef(name="Album", alias="al"),
         ],
         joins=[
             JoinSpec(
                 left_alias="ar",
                 right_alias="al",
-                ordinal=0,
                 condition=Expr(kind="binary", op="=", left=_col("ar", "ArtistId"), right=_col("al", "ArtistId")),
             )
         ],
         select_items=[
-            SelectItem(ordinal=0, expr=_col("ar", "Name")),
-            SelectItem(ordinal=1, expr=count),
+            SelectItem(expr=_col("ar", "Name")),
+            SelectItem(expr=count),
         ],
-        group_by=[GroupByItem(ordinal=0, expr=_col("ar", "Name"))],
-        order_by=[OrderItem(ordinal=0, direction="desc", expr=count)],
+        group_by=[GroupByItem(expr=_col("ar", "Name"))],
+        order_by=[OrderItem(direction="desc", expr=count)],
         limit=10,
     )
 
@@ -425,8 +422,8 @@ def test_a_constant_select_item_is_never_an_order_by_term():
     """``ORDER BY 1`` would be read as a position, not as the number one."""
     plan = _single_table_plan(
         select_items=[
-            SelectItem(ordinal=0, expr=_num(7)),
-            SelectItem(ordinal=1, expr=_col("c", "Country")),
+            SelectItem(expr=_num(7)),
+            SelectItem(expr=_col("c", "Country")),
         ]
     )
 
@@ -457,15 +454,15 @@ def test_a_truncated_result_is_always_the_same_first_rows():
 
 def _mixed_direction_plan() -> PlanModel:
     return PlanModel(
-        tables=[TableRef(name="Customer", alias="c", ordinal=0)],
+        tables=[TableRef(name="Customer", alias="c")],
         select_items=[
-            SelectItem(ordinal=0, expr=_col("c", "Country")),
-            SelectItem(ordinal=1, expr=_col("c", "City"), alias="city"),
-            SelectItem(ordinal=2, expr=_col("c", "LastName")),
+            SelectItem(expr=_col("c", "Country")),
+            SelectItem(expr=_col("c", "City"), alias="city"),
+            SelectItem(expr=_col("c", "LastName")),
         ],
         order_by=[
-            OrderItem(ordinal=0, direction="asc", expr=Expr(kind="column", column_name="city")),
-            OrderItem(ordinal=1, direction="desc", expr=_col("c", "Country")),
+            OrderItem(direction="asc", expr=Expr(kind="column", column_name="city")),
+            OrderItem(direction="desc", expr=_col("c", "Country")),
         ],
         limit=5,
     )
@@ -493,8 +490,8 @@ def test_plan_order_by_terms_keep_the_dialects_default_null_placement(dialect, e
 
 def test_an_ascending_plan_order_by_puts_nulls_where_sqlite_does():
     plan = _single_table_plan(
-        select_items=[SelectItem(ordinal=0, expr=_col("c", "Company"), alias="company")],
-        order_by=[OrderItem(ordinal=0, direction="asc", expr=_col("c", "Company"))],
+        select_items=[SelectItem(expr=_col("c", "Company"), alias="company")],
+        order_by=[OrderItem(direction="asc", expr=_col("c", "Company"))],
     )
 
     rows = _run_on_chinook(_sql(plan))

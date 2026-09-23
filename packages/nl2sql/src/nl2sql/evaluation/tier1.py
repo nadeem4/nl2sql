@@ -65,7 +65,7 @@ def decomposer_response(question: GoldQuestion, plan: PlanModel) -> Dict[str, An
         "sub_queries": [{
             "id": "sq1", "datasource_id": question.datasource, "intent": question.question,
             "metrics": [], "filters": [], "group_by": [],
-            "expected_schema": [{"name": s.alias} for s in sorted(plan.select_items, key=lambda s: s.ordinal)],
+            "expected_schema": [{"name": s.alias} for s in plan.select_items],
         }],
         "combine_groups": [{"group_id": "g1", "operation": "standalone",
                             "inputs": [{"subquery_id": "sq1"}], "join_keys": []}],

@@ -89,23 +89,22 @@ def _state(plan: PlanModel) -> SubgraphExecutionState:
 
 def _three_tables():
     return [
-        TableRef(name="Artist", alias="t1", ordinal=0),
-        TableRef(name="Album", alias="t2", ordinal=1),
-        TableRef(name="Track", alias="t3", ordinal=2),
+        TableRef(name="Artist", alias="t1"),
+        TableRef(name="Album", alias="t2"),
+        TableRef(name="Track", alias="t3"),
     ]
 
 
-def _artist_album_join(ordinal=0):
+def _artist_album_join():
     return JoinSpec(
         left_alias="t1",
         right_alias="t2",
-        ordinal=ordinal,
         condition=Expr(kind="binary", op="=", left=_col("t1", "ArtistId"), right=_col("t2", "ArtistId")),
     )
 
 
 def _select_name():
-    return [SelectItem(ordinal=0, alias="name", expr=_col("t1", "Name"))]
+    return [SelectItem(alias="name", expr=_col("t1", "Name"))]
 
 
 # The four shapes the architecture review measured passing the validator CLEAN
@@ -128,7 +127,6 @@ STRANDED_JOIN_ISLAND = PlanModel(
         JoinSpec(
             left_alias="t2",
             right_alias="t3",
-            ordinal=0,
             condition=Expr(kind="binary", op="=", left=_col("t2", "AlbumId"), right=_col("t3", "AlbumId")),
         )
     ],
@@ -137,12 +135,12 @@ STRANDED_JOIN_ISLAND = PlanModel(
 
 SAME_PAIR_JOINED_TWICE = PlanModel(
     tables=_three_tables()[:2],
-    joins=[_artist_album_join(0), _artist_album_join(1)],
+    joins=[_artist_album_join(), _artist_album_join()],
     select_items=_select_name(),
 )
 
 NOT_AS_BINARY_OP = PlanModel(
-    tables=[TableRef(name="Artist", alias="t1", ordinal=0)],
+    tables=[TableRef(name="Artist", alias="t1")],
     joins=[],
     select_items=_select_name(),
     where=Expr(kind="binary", op="NOT", left=_col("t1", "ArtistId"), right=Expr(kind="literal", value=1)),
@@ -288,9 +286,9 @@ def test_existing_error_codes_survive_the_new_check():
     # buildability check that runs after it.
     # Arrange
     plan = PlanModel(
-        tables=[TableRef(name="Nonexistent", alias="t1", ordinal=0)],
+        tables=[TableRef(name="Nonexistent", alias="t1")],
         joins=[],
-        select_items=[SelectItem(ordinal=0, alias="name", expr=_col("t1", "Name"))],
+        select_items=[SelectItem(alias="name", expr=_col("t1", "Name"))],
     )
 
     # Act

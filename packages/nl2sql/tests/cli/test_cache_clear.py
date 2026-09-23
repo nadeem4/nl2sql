@@ -18,8 +18,8 @@ ANSI = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
 
 def _plan() -> PlanModel:
     return PlanModel.model_validate({
-        "tables": [{"name": "Customer", "alias": "t1", "ordinal": 0}],
-        "select_items": [{"ordinal": 0, "alias": "n",
+        "tables": [{"name": "Customer", "alias": "t1"}],
+        "select_items": [{"alias": "n",
                           "expr": {"kind": "column", "alias": "t1", "column_name": "CustomerId"}}],
     })
 

@@ -21,7 +21,7 @@ def _col(alias: str, name: str):
     return Expr(kind="column", alias=alias, column_name=name)
 
 
-def test_generator_orders_select_items_by_ordinal():
+def test_generator_selects_columns_in_the_plan_s_list_order():
     # Validates deterministic ordering because column order affects clients.
     # Arrange
     adapter = SimpleNamespace(row_limit=5, max_bytes=1000, get_dialect=lambda: "sqlite")
@@ -29,10 +29,10 @@ def test_generator_orders_select_items_by_ordinal():
     node = GeneratorNode(ctx)
 
     plan = PlanModel(
-        tables=[TableRef(name="users", alias="u", ordinal=0)],
+        tables=[TableRef(name="users", alias="u")],
         select_items=[
-            SelectItem(expr=_col("u", "name"), alias="name_second", ordinal=1),
-            SelectItem(expr=_col("u", "id"), alias="id_first", ordinal=0),
+            SelectItem(expr=_col("u", "id"), alias="id_first"),
+            SelectItem(expr=_col("u", "name"), alias="name_second"),
         ],
         joins=[],
     )
@@ -57,8 +57,8 @@ def test_generator_applies_limit_clamp():
     node = GeneratorNode(ctx)
 
     plan = PlanModel(
-        tables=[TableRef(name="users", alias="u", ordinal=0)],
-        select_items=[SelectItem(expr=_col("u", "id"), ordinal=0)],
+        tables=[TableRef(name="users", alias="u")],
+        select_items=[SelectItem(expr=_col("u", "id"))],
         joins=[],
         limit=100,
     )
@@ -83,14 +83,13 @@ def test_generator_raises_on_unknown_join_alias():
     node = GeneratorNode(ctx)
 
     plan = PlanModel(
-        tables=[TableRef(name="users", alias="u", ordinal=0)],
-        select_items=[SelectItem(expr=_col("u", "id"), ordinal=0)],
+        tables=[TableRef(name="users", alias="u")],
+        select_items=[SelectItem(expr=_col("u", "id"))],
         joins=[
             JoinSpec(
                 left_alias="u",
                 right_alias="o",
                 join_type="inner",
-                ordinal=0,
                 condition=Expr(kind="binary", op="=", left=_col("u", "id"), right=_col("o", "user_id")),
             )
         ],
@@ -115,8 +114,8 @@ def test_generator_requires_datasource_id():
     node = GeneratorNode(ctx)
 
     plan = PlanModel(
-        tables=[TableRef(name="users", alias="u", ordinal=0)],
-        select_items=[SelectItem(expr=_col("u", "id"), ordinal=0)],
+        tables=[TableRef(name="users", alias="u")],
+        select_items=[SelectItem(expr=_col("u", "id"))],
         joins=[],
     )
     state = SubgraphExecutionState(
@@ -165,14 +164,14 @@ def test_generator_emits_the_requested_sort_direction():
         args=[_col("u", "id")],
     )
     plan = PlanModel(
-        tables=[TableRef(name="users", alias="u", ordinal=0)],
+        tables=[TableRef(name="users", alias="u")],
         select_items=[
-            SelectItem(expr=_col("u", "name"), alias="name", ordinal=0),
-            SelectItem(expr=count_id, alias="n", ordinal=1),
+            SelectItem(expr=_col("u", "name"), alias="name"),
+            SelectItem(expr=count_id, alias="n"),
         ],
         joins=[],
-        group_by=[GroupByItem(ordinal=0, expr=_col("u", "name"))],
-        order_by=[OrderItem(ordinal=0, direction="desc", expr=count_id)],
+        group_by=[GroupByItem(expr=_col("u", "name"))],
+        order_by=[OrderItem(direction="desc", expr=count_id)],
     )
     state = SubgraphExecutionState(
         trace_id="t",
@@ -199,11 +198,11 @@ def test_generator_keeps_the_then_result_of_a_case():
     node = GeneratorNode(ctx)
 
     is_jazz = Expr(kind="binary", op="=", left=_col("u", "genre"), right=Expr(kind="literal", value="Jazz"))
-    case = Expr(kind="case", whens=[CaseWhen(ordinal=0, condition=is_jazz, result=Expr(kind="literal", value=1))],
+    case = Expr(kind="case", whens=[CaseWhen(condition=is_jazz, result=Expr(kind="literal", value=1))],
                 else_expr=Expr(kind="literal", value=0))
     plan = PlanModel(
-        tables=[TableRef(name="users", alias="u", ordinal=0)],
-        select_items=[SelectItem(expr=case, alias="is_jazz", ordinal=0)],
+        tables=[TableRef(name="users", alias="u")],
+        select_items=[SelectItem(expr=case, alias="is_jazz")],
     )
     state = SubgraphExecutionState(
         trace_id="t",

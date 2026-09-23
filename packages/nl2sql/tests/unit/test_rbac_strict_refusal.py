@@ -90,8 +90,8 @@ def test_rbac_ignores_an_unknown_role_beside_a_known_one():
 def _plan(*tables: str, reasoning: str | None = None) -> PlanModel:
     return PlanModel(
         query_type="READ",
-        tables=[PlanTableRef(name=name, alias=f"t{i}", ordinal=i) for i, name in enumerate(tables)],
-        select_items=[SelectItem(expr=Expr(kind="column", alias="t0", column_name="Email"), ordinal=0)],
+        tables=[PlanTableRef(name=name, alias=f"t{i}") for i, name in enumerate(tables)],
+        select_items=[SelectItem(expr=Expr(kind="column", alias="t0", column_name="Email"))],
         joins=[],
         reasoning=reasoning,
     )

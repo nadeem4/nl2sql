@@ -81,9 +81,9 @@ Side effects:
    - A `func` expr with `distinct: true` wraps its arguments in `exp.Distinct`, so `{"kind": "func", "func_name": "COUNT", "is_aggregate": true, "distinct": true, "args": [x]}` renders as `COUNT(DISTINCT x)`. `PlanModel.distinct: true` renders `SELECT DISTINCT`.
    - A `func` expr is built with `sqlglot.exp.func(name, *args)`, so a function sqlglot knows becomes its typed node and each dialect renders it its own way (`LENGTH` is `LEN` on T-SQL, `COUNT` is `COUNT_BIG` on T-SQL). A name sqlglot does not know (such as `STRFTIME`) stays as written; the logical validator has already limited names to `ast_planner.functions.ALLOWED_FUNCTIONS`. A function sqlglot builds as an operator (`MOD(a, b)` is `a % b`) keeps its operands' grouping.
    - Dates are portable: `DATE_PART(unit, x)` becomes `CAST(EXTRACT(unit FROM x) AS INT)`, an integer, and `DATE_TRUNC(unit, x)` becomes `exp.TimeToStr(exp.TimestampTrunc(x, unit), '%Y-%m-%d')`, a `YYYY-MM-DD` string, with unit `year`, `quarter`, `month` or `day`. `YEAR(x)`, `QUARTER(x)`, `MONTH(x)`, `DAY(x)`, `EXTRACT(unit, x)` and `DATE_TRUNC(x, unit)` written by a model are read the same way. The generator writes no dialect SQL for them: the adapter renders the tree (next step).
-5. Attach joins. The first table by ordinal is the `FROM` table. `left_alias`/`right_alias` do not say which table is new: each join attaches whichever side is not yet in scope, taking the lowest-ordinal join that touches a table already in scope, so joins may be listed in any order. When the new table is the join's left side, `left`/`right` outer joins are mirrored so the same table is preserved. Joined tables keep their `schema_name`/`database` qualifiers.
+5. Attach joins. The first table in `plan.tables` is the `FROM` table. `left_alias`/`right_alias` do not say which table is new: each join attaches whichever side is not yet in scope, taking the first listed join that touches a table already in scope, so joins may be listed in any order. When the new table is the join's left side, `left`/`right` outer joins are mirrored so the same table is preserved. Joined tables keep their `schema_name`/`database` qualifiers.
 6. Order the rows completely. The plan's `ORDER BY` terms come first, with their direction. Every other selected column follows as an ascending tie-breaker, in select order. With no `ORDER BY` in the plan, the query is ordered by every selected column. This does not change what the query means, but without it the `LIMIT` below could keep a different subset of rows on each run.
-   - An aliased item is ordered by its alias (`ORDER BY genre, track_sales`), which stays valid for aggregates under `GROUP BY`. Terms are never positional ordinals.
+   - An aliased item is ordered by its alias (`ORDER BY genre, track_sales`), which stays valid for aggregates under `GROUP BY`. Terms are never positions.
    - A select item already used as an `ORDER BY` term, by expression or by alias, is not repeated.
    - Constant items are skipped: they order nothing, and a bare number would be read as a position.
    - Every term, the plan's own and the tie-breakers, keeps the dialect's default NULL placement for its direction, so no `NULLS FIRST`/`NULLS LAST` clause is rendered (nor, on T-SQL and MySQL, a `CASE WHEN ... IS NULL` emulation, which is invalid when the term is an alias). For example, a plan ordering by `city` ascending and `c.Country` descending renders `ORDER BY city ASC, c.Country DESC, c.LastName` on SQLite, Postgres, T-SQL and MySQL alike.
@@ -112,7 +112,7 @@ Key contracts:
 ## Determinism Guarantees
 
 - Deterministic for a fixed AST and adapter dialect.
-- Ordering is enforced via ordinals and sorted lists.
+- Ordering is the plan's own list order: the first select item is the first column, the first table is the `FROM` table.
 - Row order is total: every selected column is an `ORDER BY` term (see step 6), so the same plan run against the same data returns the same rows in the same order, even when `LIMIT` truncates the result.
 
 ---

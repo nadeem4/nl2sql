@@ -245,7 +245,7 @@ def test_a_record_keeps_each_sub_querys_intent_and_plan_next_to_its_sql():
     from nl2sql.api.query_api import QueryResult, SubQueryResult
 
     question = load_gold_dataset()[0]
-    plan = {"tables": [{"name": "Artist", "alias": "t1", "ordinal": 0}], "limit": 1}
+    plan = {"tables": [{"name": "Artist", "alias": "t1"}], "limit": 1}
     result = QueryResult(sub_queries=[SubQueryResult(id="sq_a", intent="artist with most albums",
                                                      sql="SELECT 1", plan=plan)])
 

@@ -158,7 +158,7 @@ def _rules_with_one_retry():
     from .recordings_chinook import (ANSWERABLE, COUNT_CUSTOMERS_DECOMPOSER, COUNT_CUSTOMERS_PLAN,
                                      count_customers_answer)
 
-    bad_plan = {**COUNT_CUSTOMERS_PLAN, "tables": [{"name": "Customers", "alias": "t1", "ordinal": 0}]}
+    bad_plan = {**COUNT_CUSTOMERS_PLAN, "tables": [{"name": "Customers", "alias": "t1"}]}
     planner_calls = []
 
     def plan(_text):

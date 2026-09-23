@@ -51,10 +51,9 @@ def test_order_by_over_a_function_does_not_crash_the_validator():
     tables = [Table(name="orders", columns=[Column(name="id", type="int")])]
     plan = PlanModel(
         query_type="READ",
-        tables=[TableRef(name="orders", alias="o", ordinal=0)],
+        tables=[TableRef(name="orders", alias="o")],
         select_items=[
             SelectItem(
-                ordinal=0,
                 alias="n",
                 expr=Expr(
                     kind="func",
@@ -64,10 +63,9 @@ def test_order_by_over_a_function_does_not_crash_the_validator():
                 ),
             )
         ],
-        group_by=[GroupByItem(ordinal=0, expr=Expr(kind="column", alias="o", column_name="id"))],
+        group_by=[GroupByItem(expr=Expr(kind="column", alias="o", column_name="id"))],
         order_by=[
             OrderItem(
-                ordinal=0,
                 direction="desc",
                 expr=Expr(
                     kind="func",
@@ -101,8 +99,8 @@ def test_an_equality_filter_on_a_real_value_outside_the_sample_is_not_rejected()
     ]
     plan = PlanModel(
         query_type="READ",
-        tables=[TableRef(name="artist", alias="a", ordinal=0)],
-        select_items=[SelectItem(ordinal=0, expr=Expr(kind="column", alias="a", column_name="artistid"))],
+        tables=[TableRef(name="artist", alias="a")],
+        select_items=[SelectItem(expr=Expr(kind="column", alias="a", column_name="artistid"))],
         where=Expr(
             kind="binary",
             op="=",
@@ -124,15 +122,15 @@ def test_ascending_order_by_terms_validate_with_the_dialects_null_placement():
                  args=[Expr(kind="column", alias="o", column_name="id")])
     plan = PlanModel(
         query_type="READ",
-        tables=[TableRef(name="orders", alias="o", ordinal=0)],
+        tables=[TableRef(name="orders", alias="o")],
         select_items=[
-            SelectItem(ordinal=0, expr=Expr(kind="column", alias="o", column_name="city")),
-            SelectItem(ordinal=1, alias="n", expr=count),
+            SelectItem(expr=Expr(kind="column", alias="o", column_name="city")),
+            SelectItem(alias="n", expr=count),
         ],
-        group_by=[GroupByItem(ordinal=0, expr=Expr(kind="column", alias="o", column_name="city"))],
+        group_by=[GroupByItem(expr=Expr(kind="column", alias="o", column_name="city"))],
         order_by=[
-            OrderItem(ordinal=0, direction="asc", expr=count),
-            OrderItem(ordinal=1, direction="asc", expr=Expr(kind="column", alias="o", column_name="city")),
+            OrderItem(direction="asc", expr=count),
+            OrderItem(direction="asc", expr=Expr(kind="column", alias="o", column_name="city")),
         ],
     )
 

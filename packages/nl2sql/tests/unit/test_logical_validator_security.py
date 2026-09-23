@@ -18,8 +18,8 @@ def test_logical_validator_enforces_policy_namespace():
 
     plan = PlanModel(
         query_type="READ",
-        tables=[TableRef(name="secret", alias="s", ordinal=0)],
-        select_items=[SelectItem(expr=Expr(kind="column", alias="s", column_name="id"), ordinal=0)],
+        tables=[TableRef(name="secret", alias="s")],
+        select_items=[SelectItem(expr=Expr(kind="column", alias="s", column_name="id"))],
         joins=[],
     )
     state = SubgraphExecutionState(
@@ -45,8 +45,8 @@ def test_logical_validator_missing_datasource_id_fails_closed():
 
     plan = PlanModel(
         query_type="READ",
-        tables=[TableRef(name="users", alias="u", ordinal=0)],
-        select_items=[SelectItem(expr=Expr(kind="column", alias="u", column_name="id"), ordinal=0)],
+        tables=[TableRef(name="users", alias="u")],
+        select_items=[SelectItem(expr=Expr(kind="column", alias="u", column_name="id"))],
         joins=[],
     )
     state = SubgraphExecutionState(

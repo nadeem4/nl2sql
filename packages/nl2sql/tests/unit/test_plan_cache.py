@@ -7,6 +7,7 @@ the schema store, and what the planner node and the subgraph wrapper do with it.
 """
 from __future__ import annotations
 
+import json
 from datetime import datetime
 from types import SimpleNamespace
 from unittest.mock import MagicMock
@@ -44,8 +45,8 @@ def store(request, tmp_path):
 def _plan(reasoning="Count rows in Customer.") -> PlanModel:
     return PlanModel.model_validate({
         "query_type": "READ",
-        "tables": [{"name": "Customer", "alias": "t1", "ordinal": 0}],
-        "select_items": [{"ordinal": 0, "alias": "n",
+        "tables": [{"name": "Customer", "alias": "t1"}],
+        "select_items": [{"alias": "n",
                           "expr": {"kind": "func", "func_name": "COUNT", "is_aggregate": True,
                                    "args": [{"kind": "column", "alias": "t1", "column_name": "CustomerId"}]}}],
         "reasoning": reasoning,
@@ -179,6 +180,33 @@ def test_an_unreadable_cached_plan_is_a_miss(tmp_path):
     try:
         store.put_cached_plan("how many customers are there", "chinook", "v1", "{not json")
         assert PlanCache(store).get(_sq()) is None
+    finally:
+        store.close()
+
+
+def test_a_plan_cached_before_the_ordinal_fields_were_dropped_is_a_miss(tmp_path):
+    """An entry written by an older version is skipped, not raised on.
+
+    ``PlanModel`` forbids extra fields, so a stored plan carrying the
+    ``ordinal`` keys no longer deserialises. A store full of them must still
+    behave as an empty cache: the planner runs and overwrites the entry.
+    """
+    stale = json.dumps({
+        "query_type": "READ",
+        "tables": [{"name": "Customer", "alias": "t1", "ordinal": 0}],
+        "select_items": [{"ordinal": 0, "alias": "n",
+                          "expr": {"kind": "column", "alias": "t1", "column_name": "CustomerId"}}],
+    })
+    store = SqliteSchemaStore(path=tmp_path / "schema_store.db")
+    try:
+        cache = PlanCache(store)
+        store.put_cached_plan("how many customers are there", "chinook", "v1", stale)
+
+        assert cache.get(_sq()) is None
+
+        # And the entry is replaced the moment a fresh plan validates.
+        assert cache.put(_sq(), _plan()) is True
+        assert cache.get(_sq()) == _plan()
     finally:
         store.close()
 

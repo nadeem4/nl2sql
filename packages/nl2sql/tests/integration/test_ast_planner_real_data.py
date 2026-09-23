@@ -153,7 +153,5 @@ def test_ast_planner_real_data(demo_env, datasource_id, user_query) -> None:
     for table in plan.tables:
         assert table.name
         assert table.alias
-        assert table.ordinal >= 0
     for item in plan.select_items:
         assert item.expr is not None
-        assert item.ordinal >= 0

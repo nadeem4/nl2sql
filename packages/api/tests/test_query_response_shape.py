@@ -14,7 +14,7 @@ def _stub_result() -> QueryResult:
                 sql="SELECT COUNT(*) FROM Customer",
                 datasource_id="chinook",
                 schema_version="v1",
-                plan={"tables": [{"name": "Customer", "alias": "c", "ordinal": 0}]},
+                plan={"tables": [{"name": "Customer", "alias": "c"}]},
                 validation=[
                     ValidationCheck(name="plan_present", passed=True, message="Plan received from the planner"),
                     ValidationCheck(name="structure_and_schema", passed=True, message="ok"),
