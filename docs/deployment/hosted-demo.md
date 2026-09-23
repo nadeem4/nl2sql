@@ -59,7 +59,9 @@ What it does **not** do:
 - It does not reach a trace. Run traces are written as usual (that is what the
   playground's **Debug** drill-down reads), and the trace redactor is told about
   the request's key along with every other credential, so it is masked if it ever
-  reaches a prompt or an error.
+  reaches a prompt or an error. The demo project ships `TRACE_MODE=always`, so
+  every question leaves a file on the container's own disk; `TRACE_MODE=on_failure`
+  keeps only the runs that went wrong.
 - It does not reach the log. Nothing logs the header, and errors about a key
   report its type, never its value.
 - It does not reach your data. The hosted demo answers only from the three

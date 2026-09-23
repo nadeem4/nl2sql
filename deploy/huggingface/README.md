@@ -113,6 +113,7 @@ Variables** can override any of them:
 | `NL2SQL_DEMO_QUESTIONS_PER_MINUTE` | `6` | rate limit per visitor |
 | `NL2SQL_DEMO_QUESTIONS_PER_SESSION` | `30` | cap per browser session |
 | `GLOBAL_TIMEOUT_SEC` | `60` | how long one question may run |
+| `TRACE_MODE` | `always` (from `.env.demo`) | what the playground's **Debug** drill-down reads. Every question writes a trace file to the container's own disk, which is wiped whenever the Space restarts; set it to `on_failure` to keep only the runs that went wrong |
 
 **Never add an API key as a Space secret.** The whole point of hosted mode is
 that the server has none; a key here would be spent by every visitor, and
