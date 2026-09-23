@@ -6,6 +6,13 @@
 # workflow mirrors that folder onto the Space's root, which is where the Hub
 # looks for both, and then waits for the build.
 #
+# The mirror also stamps the deploy with its source commit, in SOURCE_SHA and
+# in the Dockerfile's NL2SQL_REF. Without that stamp a deploy triggered by an
+# engine or playground change had nothing to commit -- the folder itself had
+# not moved -- so the Hub saw no new commit and never rebuilt, and the Space
+# went on serving whatever `main` was the last time the folder happened to
+# change. The stamp also pins the image to that commit instead of to `main`.
+#
 # The Space holds no API key and this workflow never gives it one: hosted mode
 # takes each visitor's own key, per request. The only credential here is the
 # Hugging Face *write* token, read from the `HF_TOKEN` repository secret.
@@ -125,7 +132,7 @@ jobs:
       # needs `fetch-depth: 0` and gets slower as this repository grows.
       # Fetching the Space's own main and committing on top of it fast-forwards
       # every time, keeps every earlier deploy in the Space's log, and reads
-      # three small files instead of the whole repository.
+      # four small files instead of the whole repository.
       - name: Push deploy/huggingface as the Space root
         id: push
         if: steps.token.outputs.present == 'true'
@@ -159,9 +166,22 @@ jobs:
           find . -mindepth 1 -maxdepth 1 ! -name .git ! -name .gitattributes -exec rm -rf {} +
           cp -R "$GITHUB_WORKSPACE/deploy/huggingface/." .
 
+          # Stamp the deploy with its source commit. This is what lets an
+          # engine-only or playground-only change reach the Space at all: the
+          # folder itself has not moved, so without the stamp there is nothing
+          # to commit and the Hub never rebuilds.
+          printf '%s\n' "$GITHUB_SHA" > SOURCE_SHA
+
+          # And pin the image to that same commit, by rewriting the default in
+          # the pushed copy -- a Space build takes no --build-arg from us. The
+          # grep is the guard: if that line is ever renamed, the deploy fails
+          # here instead of quietly shipping a Space that still builds `main`.
+          sed -i "s|^ARG NL2SQL_REF=.*|ARG NL2SQL_REF=$GITHUB_SHA|" Dockerfile
+          grep -qx "ARG NL2SQL_REF=$GITHUB_SHA" Dockerfile
+
           git add -A
           if git diff --cached --quiet; then
-            echo "The Space root already matches deploy/huggingface at $GITHUB_SHA; nothing to push."
+            echo "The Space root already carries $GITHUB_SHA; nothing to push, so no build will run."
             echo "pushed=false" >> "$GITHUB_OUTPUT"
           else
             git commit --quiet -m "Deploy deploy/huggingface from $GITHUB_REPOSITORY@$GITHUB_SHA"
@@ -169,11 +189,13 @@ jobs:
             echo "Pushed $GITHUB_SHA to https://huggingface.co/spaces/$SPACE_ID"
             echo "pushed=true" >> "$GITHUB_OUTPUT"
           fi
+          echo "space_commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
-      - name: Wait for the Space to build
+      - name: Wait for the Space to rebuild
         if: steps.token.outputs.present == 'true'
         env:
           PUSHED: ${{ steps.push.outputs.pushed }}
+          SPACE_COMMIT: ${{ steps.push.outputs.space_commit }}
         run: |
           python - <<'PY'
           import os
@@ -183,22 +205,20 @@ jobs:
           from huggingface_hub import HfApi
 
           repo_id = os.environ["SPACE_ID"]
+          source_sha = os.environ["GITHUB_SHA"]
           pushed = os.environ.get("PUSHED") == "true"
+          expected = os.environ.get("SPACE_COMMIT") or ""
           timeout = int(os.environ["SPACE_BUILD_TIMEOUT_SEC"])
           api = HfApi()
 
           WORKING = {"BUILDING", "APP_STARTING", "RUNNING_BUILDING", "RUNNING_APP_STARTING"}
-          LIVE = {"RUNNING", "RUNNING_BUILDING", "RUNNING_APP_STARTING"}
           BROKEN = {"BUILD_ERROR", "CONFIG_ERROR", "RUNTIME_ERROR", "NO_APP_FILE"}
           HALTED = {"PAUSED", "STOPPED", "DELETING"}
 
-          # The Hub takes a moment to notice the push, so a stage read straight
-          # after it still describes the *previous* build. Only after the Space
-          # has been seen working does RUNNING mean this deploy is up.
-          grace = time.time() + 180 if pushed else 0.0
-          deadline = time.time() + timeout
-          seen_working = not pushed
-          last = None
+
+          def stage_now() -> str:
+              stage = api.get_space_runtime(repo_id).stage
+              return getattr(stage, "value", stage)
 
 
           def tail_of_the_build_log() -> str:
@@ -209,15 +229,43 @@ jobs:
               return "".join(lines[-50:]) or "(the build log was empty)"
 
 
+          # Nothing was committed, so the Hub started no build and the Space is
+          # still serving an earlier one. Say that instead of reading RUNNING as
+          # this commit's success -- which is exactly how the Space came to
+          # serve four merges' worth of stale code.
+          if not pushed:
+              print(f"No rebuild: the Space root already carried {source_sha}, so nothing was pushed.")
+              print(f"The Space is at commit {api.space_info(repo_id).sha} and is {stage_now()}.")
+              sys.exit(0)
+
+          deadline = time.time() + timeout
+
+          # The push is synchronous, but the repo metadata can lag it briefly.
+          head_deadline = time.time() + 120
           while True:
-              stage = api.get_space_runtime(repo_id).stage
-              stage = getattr(stage, "value", stage)
+              head = api.space_info(repo_id).sha
+              if not expected or head == expected:
+                  break
+              if time.time() > head_deadline:
+                  print(f"The Space's head is {head}, not the {expected} this run pushed.")
+                  print("Something else pushed to the Space; re-run this workflow.")
+                  sys.exit(1)
+              time.sleep(5)
+          print(f"The Space is at commit {head}, from {source_sha}.")
+
+          # A pushed commit always moves SOURCE_SHA and the Dockerfile's ref, so
+          # the Hub always has something to rebuild. If it never starts one,
+          # that is a failure to report, not a RUNNING to take credit for.
+          grace = time.time() + 300
+          seen_working = False
+          last = None
+
+          while True:
+              stage = stage_now()
               if stage != last:
                   print(f"stage: {stage}", flush=True)
                   last = stage
 
-              if stage in WORKING:
-                  seen_working = True
               if stage in BROKEN:
                   print(f"The Space is {stage}. The last of its build log:\n")
                   print(tail_of_the_build_log())
@@ -225,22 +273,21 @@ jobs:
               if stage in HALTED:
                   print(f"The Space is {stage}, so it will not come up on its own.")
                   sys.exit(1)
-              if stage == "RUNNING" and seen_working:
+              if stage in WORKING:
+                  seen_working = True
+              if seen_working and stage == "RUNNING":
                   break
               if not seen_working and time.time() > grace:
-                  # The push landed but the Hub never started a build -- the
-                  # commit changed nothing it rebuilds for. Whatever is up is
-                  # what this commit describes.
-                  if stage in LIVE:
-                      break
-                  seen_working = True
+                  print(f"The Space never started a build in the 5 minutes after {head} landed; it is {stage}.")
+                  print("The commit is on the Space but the image it is running is older.")
+                  sys.exit(1)
               if time.time() > deadline:
                   print(f"Gave up after {timeout}s with the Space in {stage}.")
                   print(tail_of_the_build_log())
                   sys.exit(1)
               time.sleep(15)
 
-          print(f"The Space is running: https://huggingface.co/spaces/{repo_id}")
+          print(f"The Space rebuilt from {source_sha} and is running: https://huggingface.co/spaces/{repo_id}")
           PY
 
       - name: Summarise the deploy
@@ -248,15 +295,25 @@ jobs:
         run: |
           set -euo pipefail
           subdomain="$(echo "$SPACE_ID" | tr '/' '-' | tr '[:upper:]' '[:lower:]')"
+          if [ "${PUSHED:-false}" = "true" ]; then
+            headline="### Hugging Face Space deployed"
+            outcome="Rebuilt from \`$GITHUB_SHA\` and running."
+          else
+            headline="### Hugging Face Space unchanged"
+            outcome="**No rebuild.** The Space root already carried \`$GITHUB_SHA\`, so nothing was pushed and no build ran; the Space is still serving its previous image."
+          fi
           {
-            echo "### Hugging Face Space deployed"
+            echo "$headline"
+            echo ""
+            echo "$outcome"
             echo ""
             echo "| | |"
             echo "| --- | --- |"
             echo "| Space | https://huggingface.co/spaces/$SPACE_ID |"
             echo "| Playground | https://$subdomain.hf.space |"
-            echo "| Commit | \`$GITHUB_SHA\` |"
-            echo "| Pushed | ${PUSHED:-false} |"
+            echo "| Source commit | \`$GITHUB_SHA\` |"
+            echo "| Space commit | \`${SPACE_COMMIT:-unknown}\` |"
           } >> "$GITHUB_STEP_SUMMARY"
         env:
           PUSHED: ${{ steps.push.outputs.pushed }}
+          SPACE_COMMIT: ${{ steps.push.outputs.space_commit }}

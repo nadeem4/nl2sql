@@ -88,8 +88,11 @@ a few minutes (installing the engine, generating the sample databases, indexing
 them and baking in the embedding model). The playground is live at
 <https://nadeem4nk-nl2sql-demo.hf.space> once the build is green.
 
-To deploy again after a change here, run the same `git subtree push`. If it is
-refused because the Space has commits of its own,
+To deploy again after a change here, run the same `git subtree push`. Note that
+a change to the *engine* or the *playground* does not touch this folder, so it
+gives the push nothing to commit and the Space does not rebuild -- edit
+`SOURCE_SHA` to the commit you want, which is what the workflow does for you. If
+the push is refused because the Space has commits of its own,
 `git push space $(git subtree split --prefix deploy/huggingface main):main --force`
 replaces its history with this folder's.
 
@@ -99,9 +102,14 @@ at Settings; that is the error visitors see before they add one.
 
 ### Which engine version it builds
 
-The `Dockerfile` installs the engine from this repository's `main` branch by
-default, so the Space tracks what is merged. To pin a release instead, set the
-build argument in the `Dockerfile`:
+`SOURCE_SHA` at the Space root is the repository commit this Space was deployed
+from, and the `Dockerfile`'s `ARG NL2SQL_REF=` line is that same sha -- so the
+image installs the engine from exactly that commit. The publish workflow writes
+both on every deploy. In the repository both say `main`, which is what a local
+`docker build` and a hand-made `git subtree push` get.
+
+To pin a release instead of a commit, set the other build argument in the
+`Dockerfile`:
 
 ```dockerfile
 ARG NL2SQL_SPEC="nl2sql-engine[demo]==0.2.0"
