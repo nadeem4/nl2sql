@@ -2,7 +2,7 @@
   "version": 1,
   "roles": {
     "admin": {
-      "description": "Every table",
+      "description": "Every table in every demo database",
       "role": "admin",
       "allowed_datasources": [
         "*"
@@ -12,10 +12,12 @@
       ]
     },
     "analyst": {
-      "description": "Everything except employee records",
+      "description": "Everything except employee and support-agent records",
       "role": "analyst",
       "allowed_datasources": [
-        "chinook"
+        "chinook",
+        "support",
+        "webanalytics"
       ],
       "allowed_tables": [
         "chinook.Album",
@@ -27,14 +29,23 @@
         "chinook.MediaType",
         "chinook.Playlist",
         "chinook.PlaylistTrack",
-        "chinook.Track"
+        "chinook.Track",
+        "support.customers",
+        "support.ticket_messages",
+        "support.tickets",
+        "webanalytics.conversions",
+        "webanalytics.devices",
+        "webanalytics.page_views",
+        "webanalytics.referrers",
+        "webanalytics.sessions"
       ]
     },
     "viewer": {
-      "description": "Music catalog only, no customers or sales",
+      "description": "Music catalog and anonymous web traffic; no customers, sales or support",
       "role": "viewer",
       "allowed_datasources": [
-        "chinook"
+        "chinook",
+        "webanalytics"
       ],
       "allowed_tables": [
         "chinook.Album",
@@ -43,7 +54,10 @@
         "chinook.MediaType",
         "chinook.Playlist",
         "chinook.PlaylistTrack",
-        "chinook.Track"
+        "chinook.Track",
+        "webanalytics.devices",
+        "webanalytics.page_views",
+        "webanalytics.referrers"
       ]
     }
   }

@@ -10,7 +10,7 @@ from typer.testing import CliRunner
 
 pytest.importorskip("fastapi")
 
-from nl2sql.cli.demo.chinook import CHINOOK_QUESTIONS  # noqa: E402
+from nl2sql.cli.demo.datasets import CHINOOK_QUESTIONS, DEMO_QUESTIONS  # noqa: E402
 from nl2sql.cli.main import app  # noqa: E402
 from nl2sql.llm.replay import ReplayStore  # noqa: E402
 from nl2sql.testing.fake_llm import FakeLLMServer  # noqa: E402
@@ -61,10 +61,11 @@ def test_record_then_replay_with_no_key(demo_project, tmp_path, monkeypatch):
         reload_settings()
 
     assert recorded.exit_code == 0, recorded.output
-    assert set(ReplayStore.load(project / "recordings.json").covered(CHINOOK_QUESTIONS)) == set(CHINOOK_QUESTIONS)
+    # --record walks every guided question, across all three datasources.
+    assert set(ReplayStore.load(project / "recordings.json").covered(DEMO_QUESTIONS)) == set(DEMO_QUESTIONS)
 
     assert replayed.exit_code == 0, replayed.output
-    total = len(CHINOOK_QUESTIONS)
+    total = len(DEMO_QUESTIONS)
     assert f"{total} of {total} guided questions answer from recorded responses" in " ".join(
         replayed.output.split()
     )

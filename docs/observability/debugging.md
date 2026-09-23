@@ -159,10 +159,11 @@ object in `outputs`: what the vector search retrieved and how MMR chose among it
 - **`tables`** (schema retriever) is what survived: the tables and columns sent
   to the planner.
 - **`skipped: true`** with a `reason` means no search ran: the schema is small
-  enough to send whole (Chinook, with 11 tables, always is), only one
-  datasource is registered (`"single datasource: vector search skipped"`; the
-  Chinook demo always is), the request named a `datasource_id`, or there is no
-  vector store. The resolver's answerability check is an LLM call, so it is in
+  enough to send whole (each of the demo's three schemas, at 11, 4 and 5 tables,
+  always is), only one datasource is registered (`"single datasource: vector
+  search skipped"`, which the demo is not: it registers three, so the resolver
+  searches on every question), the request named a `datasource_id`, or there is
+  no vector store. The resolver's answerability check is an LLM call, so it is in
   that entry's `llm_calls`, not in `retrieval`.
 
 The record carries entry ids and names, never an entry's embedded text, which

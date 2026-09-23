@@ -33,7 +33,7 @@ def demo_with_key_in_file(tmp_path, monkeypatch):
     for name in ("OPENAI_API_KEY", "OPENROUTER_API_KEY", "ENV", "ENV_FILE_PATH"):
         monkeypatch.delenv(name, raising=False)
     key = _fake_key("fileonly")
-    DemoManager(Console(quiet=True), tmp_path).setup_chinook(api_key=key)
+    DemoManager(Console(quiet=True), tmp_path).setup_demo(api_key=key)
     assert "OPENAI_API_KEY" not in os.environ
     return key
 

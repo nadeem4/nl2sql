@@ -97,7 +97,7 @@ include = ["nl2sql*"]
 [tool.setuptools.package-data]
 "*" = ["configs/*.yaml", ".env"]
 "nl2sql.cli.demo" = ["recordings/*.json"]
-"nl2sql.datasets" = ["*.sqlite"]
+"nl2sql.datasets" = ["*.sqlite", "README.md"]
 "nl2sql.evaluation" = ["datasets/*.yaml"]
 "nl2sql.evaluation.presets" = ["*.yaml"]
 # The committed Vite build of web/playground: the wheel must carry the finished

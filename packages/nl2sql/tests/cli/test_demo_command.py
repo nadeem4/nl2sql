@@ -84,7 +84,7 @@ def test_replay_without_recordings_says_it_cannot_answer(tmp_path, monkeypatch):
 
 def test_replay_reads_the_recordings_written_by_record(tmp_path, monkeypatch):
     """`--record` writes `<demo>/recordings.json`; replay has to read it back."""
-    from nl2sql.cli.demo.chinook import CHINOOK_QUESTIONS
+    from nl2sql.cli.demo.datasets import CHINOOK_QUESTIONS, DEMO_QUESTIONS
     from nl2sql.llm.replay import Recording, ReplayStore
 
     (tmp_path / "d").mkdir()
@@ -94,20 +94,20 @@ def test_replay_reads_the_recordings_written_by_record(tmp_path, monkeypatch):
 
     output, served_app = _replay_demo(tmp_path, monkeypatch)
 
-    assert f"1 of {len(CHINOOK_QUESTIONS)} guided questions answer from recorded responses" in output
+    assert f"1 of {len(DEMO_QUESTIONS)} guided questions answer from recorded responses" in output
     assert "no recorded answers" not in output
     assert _meta(served_app)["recorded_questions"] == 1
 
 
 def test_replay_falls_back_to_the_packaged_recordings(tmp_path, monkeypatch):
-    from nl2sql.cli.demo.chinook import CHINOOK_QUESTIONS
+    from nl2sql.cli.demo.datasets import CHINOOK_QUESTIONS, DEMO_QUESTIONS
     from nl2sql.llm.replay import Recording, ReplayStore
 
     packaged = ReplayStore([Recording("DecomposerResponse", q, {}) for q in CHINOOK_QUESTIONS[:2]])
 
     output, served_app = _replay_demo(tmp_path, monkeypatch, packaged=packaged)
 
-    assert f"2 of {len(CHINOOK_QUESTIONS)} guided questions answer from recorded responses" in output
+    assert f"2 of {len(DEMO_QUESTIONS)} guided questions answer from recorded responses" in output
     assert _meta(served_app)["recorded_questions"] == 2
 
 

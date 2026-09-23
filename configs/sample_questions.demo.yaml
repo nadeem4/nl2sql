@@ -11,3 +11,13 @@ chinook:
 - What was the monthly revenue in 2013 for customers in the USA?
 - Which playlists contain tracks from more than three genres?
 - Who are the top customers by total spend?
+support:
+- How many support tickets are still open, by priority?
+- Which support agents resolved the most tickets?
+- What is the average time to close a ticket, by category?
+- Which customers raised the most support tickets?
+webanalytics:
+- Which pages were viewed the most last year?
+- How many sessions came from each marketing channel?
+- What is the bounce rate by device type?
+- How many purchases were there per month in 2013?

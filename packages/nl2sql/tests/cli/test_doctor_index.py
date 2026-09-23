@@ -31,7 +31,7 @@ def _plain(text: str) -> str:
 def demo(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("COLUMNS", "200")
-    DemoManager(Console(quiet=True), tmp_path).setup_chinook()
+    DemoManager(Console(quiet=True), tmp_path).setup_demo()
     return tmp_path
 
 

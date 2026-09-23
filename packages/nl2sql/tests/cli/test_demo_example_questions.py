@@ -32,14 +32,14 @@ def test_the_env_template_names_the_setting_the_engine_reads():
 
 
 def test_a_new_demo_folder_indexes_its_example_questions(tmp_path, monkeypatch):
-    DemoManager(Console(quiet=True), tmp_path).setup_chinook()
+    DemoManager(Console(quiet=True), tmp_path).setup_demo()
 
     assert _questions_after_loading(tmp_path, monkeypatch) == list(CHINOOK_QUESTIONS)
 
 
 def test_an_existing_folder_with_the_old_name_still_gets_its_questions(tmp_path, monkeypatch):
     """Folders written before the fix say ROUTING_EXAMPLES; they keep working."""
-    DemoManager(Console(quiet=True), tmp_path).setup_chinook()
+    DemoManager(Console(quiet=True), tmp_path).setup_demo()
     env = tmp_path / ".env.demo"
     env.write_text(env.read_text(encoding="utf-8").replace("SAMPLE_QUESTIONS=", "ROUTING_EXAMPLES="),
                    encoding="utf-8")

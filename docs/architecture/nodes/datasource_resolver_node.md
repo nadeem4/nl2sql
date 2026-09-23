@@ -98,7 +98,9 @@ Side effects:
 5. Return `DatasourceResolverResponse` with resolved, allowed and unsupported IDs.
 6. On exceptions (including a failed model call), log and return `SCHEMA_RETRIEVAL_FAILED` with the exception text.
 
-Adding a second datasource restores the vector search with no other change.
+A single registered datasource is the shortcut, not the usual case: with more
+than one - the demo registers three - the vector search runs, and nothing else
+in the flow changes.
 
 ### Order of checks
 
@@ -136,7 +138,7 @@ User Query:
 - `{datasources}` is a JSON list, one entry per allowed candidate, sorted by id, with sorted keys: `description` (the datasource description from the latest schema snapshot, which indexing takes from the datasources config) and `tables` (sorted bare table names).
 - The instructions and datasources come first (the system message) and the question last (the human message), so the prompt is byte-identical across questions up to the question and a provider's prompt cache can serve the prefix. OpenAI caches only prompts of 1,024 tokens or more, so with one small datasource nothing is cached; the prefix grows, and becomes cacheable, with more datasources.
 - The verdict is used only to refuse: a non-empty list lets every allowed candidate through to the decomposer unchanged.
-- For Chinook the rendered prompt is about 260 tokens (`o200k_base`), plus the `AnswerabilityResponse` function schema.
+- For Chinook on its own the rendered prompt is about 260 tokens (`o200k_base`), plus the `AnswerabilityResponse` function schema; the demo now registers three datasources, so its prompt is correspondingly longer.
 
 ---
 

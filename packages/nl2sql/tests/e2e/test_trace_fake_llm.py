@@ -102,11 +102,20 @@ def test_a_run_writes_a_trace_with_every_node_its_llm_calls_and_no_secret(demo_p
     assert sub["rows"]["rows"] == [[59]]
     assert doc["failed"] is False
 
-    # Retrieval: the demo has one datasource and 11 tables, so neither node searched,
-    # and each says why.
+    # Retrieval: the demo registers three datasources, so the single-datasource
+    # shortcut no longer applies and the resolver's vector search runs for real.
+    # Chinook ranks first for a question about customers.
     [resolver] = [n for n in doc["nodes"] if n["node"] == "datasource_resolver"]
-    assert resolver["outputs"]["retrieval"] == {"skipped": True,
-                                                "reason": "single datasource: vector search skipped"}
+    resolver_retrieval = resolver["outputs"]["retrieval"]
+    assert resolver_retrieval["skipped"] is False
+    assert resolver_retrieval["query"] == QUESTION
+    [search] = resolver_retrieval["searches"]
+    assert {entry["datasource_id"] for entry in search["pool"]} == {
+        "chinook", "support", "webanalytics"}
+    picked = sorted((e for e in search["pool"] if e["picked"]), key=lambda e: e["pick_order"])
+    assert picked[0]["datasource_id"] == "chinook"
+
+    # The schema retriever still skips: Chinook alone is 11 tables, under its threshold.
     [retriever] = [n for n in doc["nodes"] if n["node"] == "schema_retriever"]
     retrieval = retriever["outputs"]["retrieval"]
     assert retrieval["skipped"] is True and "11 tables" in retrieval["reason"]

@@ -405,13 +405,15 @@ def setup_command(demo: bool = False, api_key: Optional[str] = None):
     if demo:
         console.print(Panel("[bold green]Setting up Demo Environment...[/bold green]", border_style="green"))
 
-        demo_manager.setup_chinook(api_key=api_key)
+        demo_manager.setup_demo(api_key=api_key)
 
         print_step("Indexing Demo Environment...")
         if not demo_manager.index_demo_data():
             print_error("Indexing failed; see the error above. Re-run with: nl2sql --env demo index")
             raise SystemExit(1)
+        console.print("Three datasources are registered: [cyan]chinook[/cyan], [cyan]support[/cyan] and [cyan]webanalytics[/cyan].")
         console.print("Run: [cyan]nl2sql --env demo run \"How many customers do we have, by country?\"[/cyan]")
+        console.print("Target one with: [cyan]nl2sql --env demo run --ds-id support \"How many tickets are still open?\"[/cyan]")
 
         return
 
