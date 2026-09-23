@@ -2083,7 +2083,7 @@ metadata into the decomposer prompt.</p>
 <h2 id="rebuilding-without-an-empty-index">Rebuilding without an empty index</h2>
 <p>Re-indexing never deletes the collection first. Each datasource is rebuilt on its
 own, inside the one collection (<code>VectorStore.refresh_schema_chunks</code>):</p>
-<pre class="mermaid"><code>%%{init: {"theme": "neutral"}}%%
+<pre class="mermaid"><code>%%{init: {'theme':'base','themeVariables':{'primaryColor':'#ffffff','primaryTextColor':'#000000','primaryBorderColor':'#000000','lineColor':'#000000'}}}%%
 flowchart TD
     A[Read schema, register snapshot] --&gt; B[Write every entry under a new build_id]
     B --&gt; C{All entries written?}

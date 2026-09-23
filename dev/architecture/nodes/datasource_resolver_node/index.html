@@ -2056,7 +2056,7 @@
 - Terminates early (<code>END</code>) if no datasource is allowed, or the question is not answerable.</p>
 <p>Trigger conditions:
 - Always executed as the control graph entry node.</p>
-<pre class="mermaid"><code>%%{init: {"theme": "neutral"}}%%
+<pre class="mermaid"><code>%%{init: {'theme':'base','themeVariables':{'primaryColor':'#ffffff','primaryTextColor':'#000000','primaryBorderColor':'#000000','lineColor':'#000000'}}}%%
 flowchart LR
     Resolver[DatasourceResolverNode] --&gt;|answerable and allowed| Decomposer[DecomposerNode]
     Resolver --&gt;|denied or not answerable| EndNode[END]</code></pre>
