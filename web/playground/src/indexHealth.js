@@ -55,6 +55,18 @@ export function joinNames(names) {
   return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
 }
 
+// The line under the heading that says which databases the index holds, and,
+// on the hosted demo, that it was built before anyone arrived. Nothing there
+// is indexed while a visitor reads it, and Rebuild's absence is easier to take
+// once that is said. Locally one database needs no such line: the heading
+// names it.
+export function coverageLine(health, hosted = false) {
+  const names = joinNames(sourceNames(health));
+  if (!names) return null;
+  if (hosted) return `Built before this demo started, covering ${names}.`;
+  return sourceNames(health).length > 1 ? `Covers ${names}.` : null;
+}
+
 export function needsRebuild(health) {
   return Boolean(health) && health.status !== "ok";
 }

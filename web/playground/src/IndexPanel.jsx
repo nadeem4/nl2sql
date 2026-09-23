@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { countRows, joinNames, needsRebuild, relativeTime, shortVersion, sourceNames, statusLine } from "./indexHealth.js";
+import { countRows, coverageLine, needsRebuild, relativeTime, shortVersion, sourceNames, statusLine } from "./indexHealth.js";
 
 // Server sentences mark commands with backticks; show them as code.
 function withCode(text) {
@@ -10,7 +10,7 @@ function withCode(text) {
 // schema, and a Rebuild that is always on offer. It sits above the Database
 // in the rail because the two are easy to confuse: the Database reads the
 // schema snapshot, and it can look fine while this index is empty.
-export default function IndexPanel({ index, error, onRebuild }) {
+export default function IndexPanel({ index, error, onRebuild, hosted = false }) {
   const [enrich, setEnrich] = useState(false);
   const [fault, setFault] = useState(null);
   const [sending, setSending] = useState(false);
@@ -40,6 +40,7 @@ export default function IndexPanel({ index, error, onRebuild }) {
   // the one Rebuild happens to touch.
   const names = sourceNames(health);
   const several = names.length > 1;
+  const coverage = coverageLine(health, hosted);
   const rows = countRows(health.counts);
   const built = relativeTime(ds?.built_at || health.built_at);
 
@@ -61,8 +62,8 @@ export default function IndexPanel({ index, error, onRebuild }) {
       <h2 id="index-heading">
         Search index {!several && <code className="ds">{index.datasource_id}</code>}
       </h2>
-      {several && (
-        <p className="index-sources" id="index-sources">Covers {joinNames(names)}.</p>
+      {coverage && (
+        <p className="index-sources" id="index-sources">{coverage}</p>
       )}
       <p className="index-status" id="index-status" role="status">{statusLine(health)}</p>
 
@@ -142,7 +143,12 @@ export default function IndexPanel({ index, error, onRebuild }) {
         </div>
       ) : (
         <p className="index-help" id="index-unavailable">
-          Rebuild is off here. {rebuild.reason} From a terminal: <code>nl2sql --env demo index</code>.
+          {/* The server's own sentence either way. Hosted it already says that
+              the sample data never changes and what to run instead, so the
+              terminal command -- which needs the demo directory -- is left off. */}
+          {hosted ? rebuild.reason : (
+            <>Rebuild is off here. {rebuild.reason} From a terminal: <code>nl2sql --env demo index</code>.</>
+          )}
         </p>
       )}
 
