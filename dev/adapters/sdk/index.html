@@ -4265,7 +4265,7 @@
 <li><strong>Returns</strong>: <code>ResultFrame</code> with <code>columns</code>, <code>rows</code>, <code>row_count</code>, and error metadata</li>
 </ul>
 <h4 id="fetch_schema_snapshot"><code>fetch_schema_snapshot()</code></h4>
-<p>Required only if <code>supports_schema_introspection</code> is advertised.</p>
+<p>Required by every adapter; there is no capability flag gating it.</p>
 <h3 id="optional-methods-sql-adapters">Optional Methods (SQL adapters)</h3>
 <h4 id="dry_runsql-str"><code>dry_run(sql: str)</code></h4>
 <p>Validates SQL without executing it (or safely rolling back).</p>

@@ -1830,7 +1830,7 @@
     }</code></pre>
 <p>See <code>sdk.md</code> for the authoritative adapter interface reference and required fields/methods.</p>
 <h2 id="capability-driven-routing">Capability-driven routing</h2>
-<p>Adapters expose capabilities (e.g., <code>supports_sql</code>, <code>supports_schema_introspection</code>). The registry reads them once, at registration, and <code>DatasourceRegistry.supports(datasource_id, *capabilities)</code> is the one check every consumer asks. It fails closed: an unknown datasource, or an adapter whose <code>capabilities()</code> is missing or raises, supports nothing. These capabilities drive:</p>
+<p>Adapters expose capabilities (<code>supports_sql</code>, <code>supports_rest</code>). The registry reads them once, at registration, and <code>DatasourceRegistry.supports(datasource_id, *capabilities)</code> is the one check every consumer asks. It fails closed: an unknown datasource, or an adapter whose <code>capabilities()</code> is missing or raises, supports nothing. These capabilities drive:</p>
 <ul>
 <li><strong>Subgraph selection</strong> (<code>resolve_subgraph()</code> in routing).</li>
 <li><strong>Executor selection</strong> (<code>ExecutorNode._supports_sql()</code> and <code>SqlExecutorService.validate_request()</code>, gating the SQL executor).</li>
