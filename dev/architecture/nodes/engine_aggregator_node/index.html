@@ -593,6 +593,19 @@
       
     </span>
 </a>
+<nav aria-label="Internal Flow (Step-by-Step)" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#no-anti-join-what-bought-x-but-never-y-does-here">
+<span class="md-ellipsis">
+      
+        No anti-join: what "bought X but never Y" does here
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
 </li>
 <li class="md-nav__item">
 <a class="md-nav__link" href="#contracts-interfaces">
@@ -1880,6 +1893,19 @@
       
     </span>
 </a>
+<nav aria-label="Internal Flow (Step-by-Step)" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#no-anti-join-what-bought-x-but-never-y-does-here">
+<span class="md-ellipsis">
+      
+        No anti-join: what "bought X but never Y" does here
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
 </li>
 <li class="md-nav__item">
 <a class="md-nav__link" href="#contracts-interfaces">
@@ -2033,14 +2059,46 @@
 <li>Invoke <code>AggregationService.execute(dag, artifact_refs)</code>.</li>
 <li>A <code>join</code>/<code>compare</code> combine resolves each join key against its frame's columns. A key written with a side or sub-query prefix (<code>right.customer</code>, <code>sq_2.customer</code>) resolves to the bare column when only that exists; an unknown key is left for polars to report.</li>
 <li>A post-combine op (<code>PolarsDuckdbEngine.post_op</code>) applies every field it carries, in SQL's order: the reshaping its <code>operation</code> names (<code>aggregate</code> groups with polars' <code>group_by</code>, <code>project</code> selects <code>expected_schema</code>), then its <code>filters</code> (after an aggregate they filter the aggregated rows, as HAVING does), its <code>order_by</code>, and its <code>limit</code>. A <code>filter</code> op with <code>order_by</code> and <code>limit</code>, as the decomposer's prompt used to show, keeps all three.</li>
+<li>Before polars is asked for any column, a post-combine op's attributes (<code>group_by</code>, <code>metrics</code>, <code>project</code>'s <code>expected_schema</code>, <code>filters</code>, <code>order_by</code>) are checked against the combined frame. An attribute the frame does not have is refused with the columns it does have, and a side-qualified one (<code>right.customer</code>) with the reason — see <em>No anti-join</em> below.</li>
 <li>Build <code>AggregatorResponse</code> with <code>terminal_results</code>.</li>
 <li>Return success reasoning.</li>
 <li>On exception, emit <code>AGGREGATOR_FAILED</code>.</li>
 </ol>
+<h3 id="no-anti-join-what-bought-x-but-never-y-does-here">No anti-join: what "bought X but never Y" does here</h3>
+<p><code>CombineGroup.operation</code> is one of <code>standalone</code>, <code>compare</code>, <code>join</code> and <code>union</code>.
+<code>join</code> and <code>compare</code> are both <strong>inner</strong> joins (<code>how="inner"</code> in
+<code>PolarsDuckdbEngine.combine</code>), and <code>FilterSpec</code> has no null or existence
+operator, so there is <strong>no way to express "present on the left and absent on
+the right"</strong>. This is a capability gap in the plan language, not a bug in the
+engine.</p>
+<p>Asked "Which customers bought jazz tracks but never rock?", the model
+decomposes it into the two sets and then reaches for a right-hand column to
+negate against — <code>right.customer</code>. That column does not exist: an inner join
+keyed on the shared column drops the right-hand copy, and the other right-hand
+columns are suffixed <code>_right</code>. Every tier 2 run has failed this question, and
+what reached the caller was polars' own <code>unable to find column
+"right.customer"; valid columns: ["customer"]</code>.</p>
+<p>Resolving the prefix away would be worse. <code>right.customer</code> would become
+<code>customer</code>, the filter would run against the <strong>intersection</strong>, and the answer
+would be the customers who bought <em>both</em> genres — wrong, and silently so. So
+the attribute check refuses the question and says why:</p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-0-1" id="__codelineno-0-1" name="__codelineno-0-1"></a>Aggregator failed: Post-combine operation references 'right.customer', which
+<a href="#__codelineno-0-2" id="__codelineno-0-2" name="__codelineno-0-2"></a>the combined result does not have. Available columns: customer. A column
+<a href="#__codelineno-0-3" id="__codelineno-0-3" name="__codelineno-0-3"></a>qualified by side does not survive the combine: ... it cannot be expressed:
+<a href="#__codelineno-0-4" id="__codelineno-0-4" name="__codelineno-0-4"></a>the plan language has no anti-join or set-difference operation ... so the
+<a href="#__codelineno-0-5" id="__codelineno-0-5" name="__codelineno-0-5"></a>question is refused rather than answered with the intersection.
+</code></pre></div>
+<p>The same gap has a second shape: the decomposer sometimes emits the two
+sub-queries <strong>uncombined</strong>, and <code>AggregationService.execute</code> then returns two
+terminal result sets, which the run reports as "expected one result set, got 2"
+(<code>2026-09-22_27cad30</code>). Both are the same missing operation.</p>
+<p>Closing it properly means adding an anti-join (or <code>except</code>) to
+<code>CombineGroup.operation</code>, the decomposer prompt, the DAG and the engine. That
+is a feature, not a fix, and is deliberately not done here.</p>
 <hr/>
 <h2 id="contracts-interfaces">Contracts &amp; Interfaces</h2>
 <p>Implements a LangGraph node callable:</p>
-<div class="highlight"><pre><span></span><code><a href="#__codelineno-0-1" id="__codelineno-0-1" name="__codelineno-0-1"></a>def __call__(self, state: GraphState) -&gt; Dict[str, Any]
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-1-1" id="__codelineno-1-1" name="__codelineno-1-1"></a>def __call__(self, state: GraphState) -&gt; Dict[str, Any]
 </code></pre></div>
 <p>Key contracts:</p>
 <ul>
