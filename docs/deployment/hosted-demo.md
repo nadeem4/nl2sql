@@ -12,8 +12,9 @@ gate that protects it.
 
 | | local (`nl2sql demo`) | hosted (`nl2sql demo --hosted`) |
 | --- | --- | --- |
-| the API key | saved to `.env.demo`, used by the process | held by the browser tab, sent per request, used in memory, dropped |
-| Settings | writes `.env.demo` and `configs/llm.demo.yaml` | writes nothing; the page keeps the visitor's key |
+| the API keys | saved to `.env.demo`, used by the process | one per provider, held by the browser tab, sent per request, used in memory, dropped |
+| a model per step | written to `configs/llm.demo.yaml` | chosen in the browser tab, sent per request, saved nowhere |
+| Settings | writes `.env.demo` and `configs/llm.demo.yaml` | writes nothing; the page keeps the keys and the choices |
 | Rebuild | on (loopback, or `--allow-settings`) | refused |
 | Answer ratings | on (loopback, or `--allow-settings`) | off |
 | Retrieval inspector | on (loopback, or `--allow-settings`) | on, read only, at the hosted rate |
@@ -41,27 +42,65 @@ with no reload. That state is the only place the point is made: until a key is
 saved the top bar reads just **Hosted demo.**, and it says whose key answers
 and what the limits are once there is one. None of this appears in local mode.
 
-The visitor pastes a key on the **Settings** page. From there:
+The visitor pastes a key on the **Settings** page, one per provider. From there:
 
-1. **The browser keeps it**, in that tab's `sessionStorage`. Closing the tab
-   clears it. Nothing else in the page reads it.
-2. **It travels as a request header**, `X-NL2SQL-Api-Key`, on `POST /api/ask`
-   and nowhere else. A header rather than the body, because a body is what
-   request logs and validation errors quote back. The playground is served over
-   plain HTTP locally and over the host's TLS when it is published, so deploy it
-   behind HTTPS.
+1. **The browser keeps it**, in that tab's `sessionStorage`, under that
+   provider's own name. Closing the tab clears it. Nothing else in the page
+   reads it.
+2. **It travels as a request header of its own**, `X-NL2SQL-Api-Key-<provider>`
+   (`X-NL2SQL-Api-Key-anthropic`), on `POST /api/ask` and nowhere else. A
+   header rather than the body, because a body is what request logs and
+   validation errors quote back; one header per provider, so a key never shares
+   a header with anything else and nothing that parses or quotes a header can
+   expose two at once. With exactly one key the older `X-NL2SQL-Api-Key` is
+   sent as well, and on its own it still means what it always did. The
+   playground is served over plain HTTP locally and over the host's TLS when it
+   is published, so deploy it behind HTTPS.
 3. **The server uses it for that one request.** It is bound to the request with
-   [`nl2sql.llm.request_key`][key-module] and the LLM registry builds a client
-   from it while the pipeline graph is constructed. The client is cached
-   nowhere, so no later request and no other visitor can be handed it.
+   [`nl2sql.llm.request_key`][key-module] and the LLM registry builds each
+   step's client from it while the pipeline graph is constructed. The client is
+   cached nowhere, so no later request and no other visitor can be handed it.
 4. **Then it is gone.** It is never written to a file, never put in an
    environment variable, never held in a module-level cache, and never included
    in a response.
 
-The key's shape picks the provider, exactly as `--api-key` does: `sk-ant-` is
-Anthropic, `sk-or-` is OpenRouter, anything else is OpenAI. A key from a
-different provider than the server's configured default also moves the model to
-that provider's default, since a `gpt-` model means nothing to Anthropic.
+A key sent without naming a provider has its provider read from its shape,
+exactly as `--api-key` does: `sk-ant-` is Anthropic, `sk-or-` is OpenRouter,
+anything else is OpenAI. Such a key also moves the model to that provider's
+default when it differs from the server's configured one, since a `gpt-` model
+means nothing to Anthropic.
+
+## A model for each step
+
+Choosing a model asks the server to remember nothing, so hosted mode keeps it.
+Under **Models for each step** on the Settings page, collapsed by default, the
+visitor can put each of the five model-using steps on a provider and model of
+their own. The choice lives in the same tab's `sessionStorage` and travels with
+each question in one more header:
+
+```
+X-NL2SQL-Models: {"astplanner":"anthropic:claude-opus-5"}
+```
+
+A compact JSON object, agent name to `provider:model`, and nothing else; it
+carries no secret, which is why it is the one header the server parses and the
+one thing a refusal repeats. A step with no entry runs on the configured
+default, so the simple path stays one key, the defaults, and a question.
+
+The server checks every name against what the engine knows -- the pipeline's
+own steps, and the verified model lists in `nl2sql/llm/providers.py` -- before
+anything reaches a client. Each step is then built from the key for the
+provider it names: the planner can be on Claude while the answer writer stays
+on OpenAI, each calling its own endpoint with its own key.
+
+**A step whose chosen provider has no key is refused before the question
+runs**, with `400` and a sentence naming both, for example *"The Query planner
+step is set to run on Anthropic, but no Anthropic key was supplied. Add one
+under Settings, or put that step back on a provider you have a key for."*
+Nothing is spent on the keys that were supplied. A step nobody chose a provider
+for is never refused this way: it takes the key for the provider it is
+configured on, or, failing that, the first key the request brought, exactly as
+a single key has always worked.
 
 What it does **not** do:
 
@@ -78,10 +117,12 @@ What it does **not** do:
 - It does not reach your data. The hosted demo answers only from the three
   sample databases shipped with the engine.
 
-A question with no key answers `401` with a sentence telling the visitor to add
-one under Settings; the page holds the controls closed before it comes to that,
-so the `401` is the guard rather than the first thing a visitor meets. A
-malformed key answers `400` without quoting what was sent.
+A question with no key at all answers `401` with a sentence telling the visitor
+to add one under Settings; the page holds the controls closed before it comes
+to that, so the `401` is the guard rather than the first thing a visitor meets.
+A malformed key answers `400` without quoting what was sent, and no refusal
+ever repeats something shaped like a key, not even when one was pasted into the
+model header by hand.
 
 ## Limits
 
@@ -108,7 +149,8 @@ keyed by address, is what holds the pace down in the meantime.
 
 ## What is off, and what is on
 
-**Off:** Settings persistence, Rebuild, answer ratings, and `--record` (refused
+**Off:** Settings *persistence* (choosing a model is on; it is only the saving
+that is off), Rebuild, answer ratings, and `--record` (refused
 before the server starts). `--api-key` is refused too: a server-side key is the
 one thing hosted mode is built to avoid, and any provider key exported into the
 process is cleared at start-up so nothing can fall back to it.
@@ -118,10 +160,11 @@ panel reports that the index was built before the demo started and which
 databases it covers, and where the button would be it prints the server's own
 reason -- rebuilding writes to disk and the sample data never changes.
 
-**On:** asking the twenty guided questions or any other question, the schema
-view of any of the three databases (the rail's **Showing** switcher), which
-database answered a run, the per-node **Debug** drill-down with its traces, and
-the retrieval inspector read-only.
+**On:** asking the twenty guided questions or any other question, a key per
+provider and a model per step (both kept by the browser), the schema view of
+any of the three databases (the rail's **Showing** switcher), which database
+answered a run, the per-node **Debug** drill-down with its traces, and the
+retrieval inspector read-only.
 
 ## Read-only sample data
 

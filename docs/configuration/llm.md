@@ -356,6 +356,17 @@ asked. It is served by `GET /api/pipeline` from `nl2sql.pipeline.steps`, which
 takes its five model steps from `LLM_AGENTS` rather than repeating the table
 above. See [the Pipeline page](../getting_started/demo.md#the-pipeline-page).
 
+On the **hosted demo** (`nl2sql demo --hosted`) the same choice is offered and
+nothing is written at all. The visitor keeps one key per provider and a model
+per step in their own browser tab, and both travel with each question: a key
+per provider in a header of its own, and the choices in one compact
+`X-NL2SQL-Models` header, `{"astplanner": "anthropic:claude-opus-5"}`. The
+server validates every name against `LLM_AGENTS` and `VERIFIED_MODELS`, builds
+each step's client for that one request from the key for the provider it names,
+caches none of them, and refuses with `400` -- naming the step and the
+provider -- when a step is on a provider the request brought no key for. See
+[Hosted demo](../deployment/hosted-demo.md).
+
 When `nl2sql demo` picks replay or live mode at start-up it points `default`
 at the chosen provider. In replay and record mode every `agents:` entry
 follows, because one fake or proxy serves every call. In live mode a step

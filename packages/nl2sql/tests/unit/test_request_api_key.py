@@ -1,15 +1,25 @@
-"""A key that belongs to one request: how the registry uses it, and drops it.
+"""Keys that belong to one request: how the registry uses them, and drops them.
 
 This is the mechanism hosted mode is built on (``nl2sql demo --hosted``). The
 rule it has to keep is simple: a key bound to a request builds a client for
 that request and is cached nowhere, so no later request -- and no other
 visitor -- can be handed a client built with it.
+
+A request may bring one key per provider and a model per step; which key each
+step is built with is :meth:`RequestLLMs.resolve`, and it is tested here.
 """
 import pytest
 
 from nl2sql.llm import LLMRegistry
 from nl2sql.llm.models import AgentConfig
-from nl2sql.llm.request_key import current_api_key, use_api_key
+from nl2sql.llm.request_key import (
+    MissingProviderKey,
+    RequestLLMs,
+    current_api_key,
+    current_api_keys,
+    use_api_key,
+    use_request_llms,
+)
 from nl2sql.secrets import SecretManager
 from nl2sql.tracing.trace import collect_secrets
 
@@ -86,3 +96,102 @@ def test_the_trace_redactor_knows_the_bound_key():
 
     assert FIRST_KEY in during
     assert FIRST_KEY not in after
+
+
+# --- a key per provider, and a model per step --------------------------------------
+
+
+def test_a_step_with_a_choice_takes_that_providers_key():
+    llms = RequestLLMs(keys={"openai": FIRST_KEY, "anthropic": ANTHROPIC_KEY},
+                       models={"astplanner": ("anthropic", "claude-opus-5")})
+
+    assert llms.resolve("astplanner", "openai") == ("anthropic", "claude-opus-5", ANTHROPIC_KEY)
+    # A step with no choice of its own stays where the config put it.
+    assert llms.resolve("decomposer", "openai") == (None, None, FIRST_KEY)
+
+
+def test_a_step_whose_chosen_provider_has_no_key_names_both():
+    llms = RequestLLMs(keys={"openai": FIRST_KEY},
+                       models={"astplanner": ("anthropic", "claude-opus-5")})
+
+    with pytest.raises(MissingProviderKey) as raised:
+        llms.resolve("astplanner", "openai")
+
+    assert raised.value.agent == "astplanner"
+    assert raised.value.provider == "anthropic"
+    # The refusal says what is missing and quotes no key.
+    assert FIRST_KEY not in str(raised.value)
+
+
+def test_one_key_and_no_choices_is_exactly_what_it_was():
+    llms = RequestLLMs.from_key(ANTHROPIC_KEY)
+
+    # The key names its own provider, and every step follows it.
+    assert llms.keys == {"anthropic": ANTHROPIC_KEY}
+    assert llms.resolve("astplanner", "openai") == (None, None, ANTHROPIC_KEY)
+
+
+def test_a_step_with_no_choice_prefers_the_configured_providers_key():
+    llms = RequestLLMs(keys={"openai": FIRST_KEY, "anthropic": ANTHROPIC_KEY}, models={})
+
+    assert llms.resolve("decomposer", "anthropic") == (None, None, ANTHROPIC_KEY)
+    assert llms.resolve("decomposer", "openai") == (None, None, FIRST_KEY)
+
+
+def test_a_step_with_no_choice_and_no_key_for_its_provider_takes_the_first_key():
+    """Nobody chose this step's provider, so a refusal would name the wrong thing."""
+    llms = RequestLLMs(keys={"openai": FIRST_KEY, "anthropic": ANTHROPIC_KEY}, models={})
+
+    # The first key answers, on its own provider, as a single key always has.
+    assert llms.resolve("decomposer", "openrouter") == (None, None, FIRST_KEY)
+
+
+def test_a_request_with_no_key_at_all_names_the_step_and_its_provider():
+    llms = RequestLLMs(keys={}, models={})
+
+    with pytest.raises(MissingProviderKey) as raised:
+        llms.resolve("decomposer", "openai")
+
+    assert (raised.value.agent, raised.value.provider) == ("decomposer", "openai")
+
+
+def test_a_chosen_model_on_the_configured_provider_keeps_the_configured_endpoint(registry):
+    config = registry._config_for("default").model_copy(update={"base_url": "http://fake/v1"})
+    llms = RequestLLMs(keys={"openai": FIRST_KEY}, models={"astplanner": ("openai", "gpt-4.1")})
+
+    moved, key = LLMRegistry._for_request(config, "astplanner", llms)
+
+    assert (moved.provider, moved.model, key) == ("openai", "gpt-4.1", FIRST_KEY)
+    # Same provider, so the endpoint the config pinned is still in force.
+    assert moved.base_url == "http://fake/v1"
+    # And the temperature moves with the model.
+    assert moved.temperature == 0.0
+
+
+def test_a_chosen_model_on_another_provider_drops_the_endpoint_and_the_key_reference(registry):
+    config = registry._config_for("default").model_copy(update={"base_url": "http://fake/v1"})
+    llms = RequestLLMs(keys={"openai": FIRST_KEY, "anthropic": ANTHROPIC_KEY},
+                       models={"astplanner": ("anthropic", "claude-opus-5")})
+
+    moved, key = LLMRegistry._for_request(config, "astplanner", llms)
+
+    assert (moved.provider, moved.model, key) == ("anthropic", "claude-opus-5", ANTHROPIC_KEY)
+    # OpenAI's endpoint means nothing to Anthropic, and neither does its key
+    # reference: the key for this call is the one the caller supplied.
+    assert moved.base_url is None and moved.api_key is None
+    # Claude Opus 5 rejects any temperature, so none is sent.
+    assert moved.temperature is None
+
+
+def test_every_bound_key_reaches_the_redactor_and_none_of_them_outlives_the_block():
+    llms = RequestLLMs(keys={"openai": FIRST_KEY, "anthropic": ANTHROPIC_KEY}, models={})
+
+    with use_request_llms(llms):
+        assert set(current_api_keys()) == {FIRST_KEY, ANTHROPIC_KEY}
+        # No key was sent without naming a provider, so there is no fallback.
+        assert current_api_key() is None
+        during = collect_secrets(object())
+
+    assert current_api_keys() == ()
+    assert {FIRST_KEY, ANTHROPIC_KEY} <= during
+    assert not ({FIRST_KEY, ANTHROPIC_KEY} & collect_secrets(object()))

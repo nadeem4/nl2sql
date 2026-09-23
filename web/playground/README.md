@@ -36,14 +36,29 @@ is marked `off`; opening it is how you read the reason
 (`#settings-unavailable`, `#retrieval-unavailable`).
 
 **Hosted mode** (`nl2sql demo --hosted`, `meta.hosted`) is a third state, not a
-page that is off. Settings keeps its nav item unmarked and shows
-`#hosted-key-heading` instead: a key form that writes only to this tab's
-`sessionStorage` (`src/hostedKey.js`), from where `askHeaders` sends it as the
-`X-NL2SQL-Api-Key` header on `/api/ask` and nowhere else. Nothing about the key
-is posted to the server, so there is no save to succeed or fail; the copy on the
-page says exactly that, plus the limits from `meta.limits` and how to run the
-demo locally instead. Rebuild and answer ratings are off, and the retrieval
-inspector stays on. See [Hosted demo](../../docs/deployment/hosted-demo.md).
+page that is off. Settings keeps its nav item unmarked and shows two blocks
+that write only to this tab's `sessionStorage`, never to the server:
+
+- `#hosted-key-heading`, one key per provider (`src/hostedKey.js`). A pasted
+  key names its own provider by its prefix, each is listed masked with its own
+  **Clear it**, and `askHeaders` sends each as its own
+  `X-NL2SQL-Api-Key-<provider>` header on `/api/ask`. With exactly one key the
+  bare `X-NL2SQL-Api-Key` goes too, so the simple path is byte for byte what it
+  was.
+- `#hosted-models`, **Models for each step** (`src/hostedModels.js`), a
+  `<details>` shut by default whose summary says what the steps will use. Each
+  of the five model steps has a selector over the same catalogue the local page
+  offers, which hosted mode's `GET /api/settings` now carries (`nodes` and
+  `providers`, and still not a key of any kind). The choices travel as one
+  `X-NL2SQL-Models` header, `{"astplanner":"anthropic:claude-opus-5"}`, which
+  holds no secret. A step on a provider this tab has no key for says so
+  (`#hosted-model-<agent>-nokey`), and the server refuses the question by name.
+
+Nothing about a key or a choice is posted to the server, so there is no save to
+succeed or fail; the copy on the page says exactly that, plus the limits from
+`meta.limits` and how to run the demo locally instead. Rebuild and answer
+ratings are off, and the retrieval inspector stays on. See
+[Hosted demo](../../docs/deployment/hosted-demo.md).
 
 **Hosted, before a key** (`needsKey` in `src/firstRun.js`: `meta.hosted` and
 nothing in this tab's `sessionStorage`), the Ask page opens with `#first-run`

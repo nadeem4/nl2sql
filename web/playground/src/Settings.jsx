@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { PROVIDER_NAMES, changedModels, choicesFrom, modelGroups, variableModels } from "./settings.js";
-import { looksLikeKey, maskKey } from "./hostedKey.js";
+import { KEY_PROVIDERS, looksLikeKey, maskKey, providerForKey } from "./hostedKey.js";
+import { providersNeeded } from "./hostedModels.js";
 
 // Sends JSON and returns the parsed reply; a refusal carries the server's own
 // sentence in `detail`, which is what the panel shows.
@@ -194,10 +195,11 @@ function ModelsForm({ settings, onSaved }) {
 // put into this tab's storage and sent as a header with each question. The
 // wording is the promise the code keeps, so it says exactly what happens and
 // where to go for anything more.
-function HostedKeyForm({ apiKey, onKey, limits, reason }) {
+function HostedKeyForm({ apiKeys, onKey, limits, reason }) {
   const [key, setKey] = useState("");
   const [fault, setFault] = useState(null);
   const [status, setStatus] = useState(null);
+  const held = KEY_PROVIDERS.filter((p) => apiKeys[p]);
 
   const save = (e) => {
     e.preventDefault();
@@ -207,28 +209,37 @@ function HostedKeyForm({ apiKey, onKey, limits, reason }) {
       return;
     }
     setFault(null);
-    onKey(key);
+    const provider = providerForKey(key);
+    onKey(provider, key);
     setKey("");
-    setStatus("Kept in this browser tab. Ask a question and it goes with it.");
+    setStatus(`Kept in this browser tab as the ${PROVIDER_NAMES[provider] || provider} key. Ask a question and it goes with it.`);
   };
 
-  const forget = () => {
-    onKey("");
-    setStatus("Cleared from this tab.");
+  const forget = (provider) => {
+    onKey(provider, "");
+    setStatus(`The ${PROVIDER_NAMES[provider] || provider} key is cleared from this tab.`);
   };
 
   return (
     <form className="settings-block" onSubmit={save} aria-labelledby="hosted-key-heading">
-      <h3 id="hosted-key-heading">Your API key</h3>
-      <p className="settings-current" id="hosted-key-current">
-        {apiKey ? (
-          <>In this tab: <code>{maskKey(apiKey)}</code>.</>
-        ) : (
-          "No key in this tab yet, so questions cannot be answered."
-        )}
-      </p>
+      <h3 id="hosted-key-heading">Your API keys</h3>
+      {held.length ? (
+        <ul className="settings-current settings-keys" id="hosted-key-current">
+          {held.map((provider) => (
+            <li key={provider}>
+              {PROVIDER_NAMES[provider] || provider}: <code>{maskKey(apiKeys[provider])}</code>{" "}
+              <button type="button" className="linkish" id={`hosted-clear-${provider}`}
+                onClick={() => forget(provider)}>Clear it</button>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="settings-current" id="hosted-key-current">
+          No key in this tab yet, so questions cannot be answered.
+        </p>
+      )}
       <label className="settings-label" htmlFor="hosted-key">
-        {apiKey ? "Replace the key" : "Paste an OpenAI, Anthropic or OpenRouter key"}
+        {held.length ? "Add or replace a key" : "Paste an OpenAI, Anthropic or OpenRouter key"}
       </label>
       <div className="settings-row">
         <input
@@ -243,16 +254,18 @@ function HostedKeyForm({ apiKey, onKey, limits, reason }) {
         <button id="hosted-save-key" className="settings-save" type="submit" disabled={!key.trim()}>
           Use this key
         </button>
-        {apiKey && (
-          <button type="button" className="linkish" onClick={forget}>Clear it</button>
-        )}
       </div>
+      <p className="settings-help">
+        A key starting <code>sk-ant-</code> is Anthropic, <code>sk-or-</code> is OpenRouter; any
+        other is OpenAI. One key is all the demo needs; add a second only to put a step on another
+        provider below.
+      </p>
       <p className="settings-help" id="hosted-key-help">
-        {reason} It is kept in this tab's <code>sessionStorage</code>, sent as a request header with
-        each question, used to call the model for that one question and then dropped: it is never
-        written to a file, an environment variable, a log or a run trace on the server, and no
-        other visitor can reach it. Closing the tab clears it. The demo answers only from its own
-        three sample databases
+        {reason} Each key is kept in this tab's <code>sessionStorage</code>, sent in a request
+        header of its own with each question, used to call that provider for that one question and
+        then dropped: it is never written to a file, an environment variable, a log or a run trace
+        on the server, and no other visitor can reach it. Closing the tab clears them. The demo
+        answers only from its own three sample databases
         {limits && limits.questions_per_minute
           ? `, up to ${limits.questions_per_minute} questions a minute and ${limits.questions_per_session} a session`
           : ""}
@@ -266,9 +279,90 @@ function HostedKeyForm({ apiKey, onKey, limits, reason }) {
   );
 }
 
+// The hosted demo's model per step. Like the key, it writes nothing to the
+// server: the choice goes into this tab's storage and travels with each
+// question. Collapsed by default, because the whole of the simple path is one
+// key and the defaults; the summary says what the steps will use so the
+// section is worth opening only when that is not what you want.
+function HostedModelsForm({ settings, apiKeys, models, onModel }) {
+  const nodes = settings.nodes || [];
+  const providers = settings.providers || [];
+  const groups = modelGroups(providers, settings.default_model);
+  const missing = providersNeeded(models).filter((p) => !apiKeys[p]);
+  const chosen = nodes.filter((n) => models[n.agent]);
+  const summary = chosen.length
+    ? `${chosen.length} of ${nodes.length} steps on a model you chose`
+    : `all ${nodes.length} steps on ${settings.default_model || "the default model"}`;
+
+  return (
+    <details className="settings-block step-models" id="hosted-models">
+      <summary>
+        <span className="step-models-title">Models for each step</span>
+        <span className="step-models-summary">{summary}</span>
+      </summary>
+      <p className="settings-help" id="hosted-models-help">
+        Five steps of a run put the question to a model; everything else is deterministic code.
+        Each choice is kept in this tab and sent with the question, and needs a key for the
+        provider it names. Nothing here is saved on the server.
+      </p>
+      <ul className="model-rows">
+        {nodes.map((node) => {
+          const value = models[node.agent] || "";
+          const provider = value.split(":")[0];
+          const needsKey = provider && !apiKeys[provider];
+          return (
+            <li key={node.agent}>
+              <label htmlFor={`hosted-model-${node.agent}`}>
+                <span className="model-step">{node.label}</span>
+                <span className="model-does">{node.does}</span>
+              </label>
+              <select
+                id={`hosted-model-${node.agent}`}
+                value={value}
+                aria-invalid={needsKey ? true : undefined}
+                aria-describedby={needsKey ? `hosted-model-${node.agent}-nokey` : undefined}
+                onChange={(e) => onModel(node.agent, e.target.value)}
+              >
+                {groups.map((g) =>
+                  g.label === null ? (
+                    g.options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)
+                  ) : (
+                    <optgroup key={g.label} label={g.label}>
+                      {g.options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                    </optgroup>
+                  ),
+                )}
+              </select>
+              {needsKey && (
+                <p className="model-unavailable" id={`hosted-model-${node.agent}-nokey`}>
+                  {PROVIDER_NAMES[provider] || provider} has no key in this tab. Add one above
+                  before asking: this step cannot run without it.
+                </p>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+      {missing.length > 0 && (
+        <p className="settings-warn" id="hosted-models-missing">
+          No key in this tab for {missing.map((p) => PROVIDER_NAMES[p] || p).join(" or ")}. A
+          question will be refused, naming the step, until one is added above.
+        </p>
+      )}
+      {variableModels(providers, models).length > 0 && (
+        <p className="settings-warn" id="hosted-temperature-note">
+          <code>{variableModels(providers, models).join(", ")}</code> does not accept temperature 0,
+          so a step on it runs at the model's default temperature and varies more from run to run.
+        </p>
+      )}
+    </details>
+  );
+}
+
 // The settings panel: a secondary surface, closed until asked for. When the
 // server has settings off it says why instead of offering a form that fails.
-export default function Settings({ settings, error, onSaved, recorded, apiKey, onKey, limits }) {
+export default function Settings({ settings, error, onSaved, recorded, apiKeys, onKey, limits,
+                                   stepModels, onStepModel }) {
   if (error) {
     return <p className="fault">Settings could not be loaded: {error}</p>;
   }
@@ -276,11 +370,14 @@ export default function Settings({ settings, error, onSaved, recorded, apiKey, o
     return <p className="settings-help">Loading settings</p>;
   }
   if (settings.hosted) {
-    // Not "off": there is nothing for the server to save, and the one thing
-    // the visitor does need to set lives in their own browser.
+    // Not "off": there is nothing for the server to save, and the two things
+    // the visitor does set -- their keys and the model each step runs on --
+    // live in their own browser and travel with each question.
     return (
       <div className="settings-grid">
-        <HostedKeyForm apiKey={apiKey} onKey={onKey} limits={limits} reason={settings.reason} />
+        <HostedKeyForm apiKeys={apiKeys} onKey={onKey} limits={limits} reason={settings.reason} />
+        <HostedModelsForm settings={settings} apiKeys={apiKeys} models={stepModels}
+          onModel={onStepModel} />
       </div>
     );
   }

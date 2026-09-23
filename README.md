@@ -150,10 +150,13 @@ address unless you pass `--allow-settings`. Full guide:
 
 `nl2sql demo --hosted` is a third state, for a public demo of the sample
 databases: the server holds no API key, each visitor pastes their own into the
-page, the browser keeps it and sends it with each question, and it is used in
-memory for that question only. The Ask page says so on arrival and keeps the
-question box closed until a key is saved, so nobody discovers the requirement
-by asking. Settings, Rebuild, answer ratings and `--record`
+page, one per provider, the browser keeps them and sends each with the
+questions that need it, and each is used in memory for that question only. The
+Ask page says so on arrival and keeps the question box closed until a key is
+saved, so nobody discovers the requirement by asking. The model each step runs
+on is chosen in the browser the same way and saved nowhere, so the planner can
+be on Claude while the rest stays on OpenAI.
+Saving settings, Rebuild, answer ratings and `--record`
 are refused there, the sample databases are opened read-only, and questions are
 rate limited per visitor and capped per session. `deploy/huggingface/` is that
 demo as a Hugging Face Space, deployed from `main` by the **Publish Space**

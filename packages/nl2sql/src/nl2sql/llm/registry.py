@@ -7,7 +7,7 @@ from langchain_core.language_models import BaseChatModel
 from nl2sql.common.env_hint import active_env_file
 from nl2sql.secrets import SecretManager
 from .models import AgentConfig
-from .request_key import current_api_key
+from .request_key import RequestLLMs, current_request_llms
 from .wires import WIRES, Wire
 
 
@@ -144,8 +144,9 @@ class LLMRegistry:
     def get_llm(self, name: str) -> BaseChatModel:
         """Returns the client for an agent, building it on first use.
 
-        When the caller brought its own key (:mod:`nl2sql.llm.request_key`) the
-        client is built from that key and cached nowhere, so it belongs to that
+        When the caller brought its own keys (:mod:`nl2sql.llm.request_key`)
+        the client is built from them, and from the caller's choice of provider
+        and model for this step, and cached nowhere, so it belongs to that
         request and to nothing else.
 
         Args:
@@ -160,11 +161,11 @@ class LLMRegistry:
                 registered, or if the provider needs an API key that cannot be
                 resolved.
         """
-        request_key = current_api_key()
+        request = current_request_llms()
         with self._lock:
-            if request_key:
-                return self._build_client(self._for_key(self._config_for(name), request_key),
-                                          api_key=request_key)
+            if request:
+                config, key = self._for_request(self._config_for(name), name, request)
+                return self._build_client(config, api_key=key)
             if name in self.llms:
                 return self.llms[name]
 
@@ -185,6 +186,37 @@ class LLMRegistry:
                 "as the 'default' agent)."
             )
         return config
+
+    @staticmethod
+    def _for_request(agent: AgentConfig, name: str, request: RequestLLMs):
+        """``agent`` as this request asked for it, and the key to build it with.
+
+        A step the caller chose a provider and model for moves there and takes
+        that provider's key; the temperature moves with the model, because a
+        model that rejects ``temperature: 0`` must be sent none. A step with no
+        choice of its own is what it always was: the caller's key, with the
+        agent moved to that key's provider when it belongs to another one.
+
+        Raises:
+            MissingProviderKey: when the step's provider has no key here.
+        """
+        from .providers import VERIFIED_MODELS
+
+        provider, model, key = request.resolve(name, agent.provider)
+        if provider is None:
+            return LLMRegistry._for_key(agent, key), key
+        # A model off the verified list sends no temperature at all, which
+        # every model accepts; the caller's choice is checked before it gets here.
+        temperature = VERIFIED_MODELS.get(provider, {}).get(model)
+        if provider == agent.provider:
+            if model == agent.model:
+                return agent, key
+            # The same provider: only the model and its temperature change, so
+            # a configured endpoint (and a test's fake one) stays in force.
+            return agent.model_copy(update={"model": model, "temperature": temperature}), key
+        return agent.model_copy(update={"provider": provider, "model": model,
+                                        "temperature": temperature,
+                                        "base_url": None, "api_key": None}), key
 
     @staticmethod
     def _for_key(agent: AgentConfig, key: str) -> AgentConfig:

@@ -61,7 +61,7 @@ from nl2sql.cli.demo.playground.index_panel import IndexPanel
 from nl2sql.cli.demo.playground.settings import SettingsPanel
 from nl2sql.common.settings import settings
 from nl2sql.feedback import NOTE_MAX_CHARS, FeedbackStore, run_record, run_signals
-from nl2sql.llm.request_key import use_api_key
+from nl2sql.llm.request_key import use_request_llms
 from nl2sql.pipeline.steps import describe_pipeline
 from nl2sql.tracing.document import find_trace, load_trace
 from nl2sql.tracing.trace import engine_info
@@ -329,15 +329,16 @@ def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset
         # Sync on purpose: the engine blocks, so Starlette runs this in a thread
         # instead of stalling the event loop.
         #
-        # Hosted: the key arrives in a header, is bound to this call and to no
-        # other, and is gone when the block ends. It is never written to a
-        # file, an environment variable or a module-level cache; the registry
-        # builds a client from it per request and keeps none (see
-        # ``nl2sql.llm.request_key``).
-        key = hosted.api_key(request) if hosted.enabled else None
+        # Hosted: the keys arrive one header per provider, and the model each
+        # step is to run on in one compact JSON header. Both are bound to this
+        # call and to no other, and are gone when the block ends. A key is
+        # never written to a file, an environment variable or a module-level
+        # cache; the registry builds each step's client from it per request and
+        # keeps none (see ``nl2sql.llm.request_key``).
+        llms = hosted.request_llms(request, panel.default_provider) if hosted.enabled else None
         if hosted.enabled:
             hosted.spend(request, response)
-        with panel.gate.run(), use_api_key(key):
+        with panel.gate.run(), use_request_llms(llms):
             result = engine.run_query(
                 req.question, execute=req.execute, user_context=UserContext(roles=[req.role])
             )

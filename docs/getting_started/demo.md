@@ -328,12 +328,15 @@ second settings store, and the browser keeps nothing but UI conveniences.
   site's page (a foreign `Origin`), through a hostname that is not a loopback
   name, or in anything but JSON.
 - **Hosted mode is a third state.** With `nl2sql demo --hosted` the page shows a
-  key form that writes only to this browser tab's `sessionStorage`; the settings
-  routes stay refused because there is nothing on the server to save. The Ask
-  page there opens by saying a key is needed and holds the question box and the
-  guided questions closed until one is saved, so a new visitor is not left to
-  discover it by asking. Locally there is nothing to announce, and nothing is
-  shown. See [Hosted demo](../deployment/hosted-demo.md).
+  key form and a **Models for each step** section that write only to this
+  browser tab's `sessionStorage`; the settings routes stay refused because
+  there is nothing on the server to save. Choosing a model needs nothing
+  saved, so hosted mode keeps it: one key per provider and the model each step
+  runs on travel with each question, in a header each. The Ask page there opens
+  by saying a key is needed and holds the question box and the guided questions
+  closed until one is saved, so a new visitor is not left to discover it by
+  asking. Locally there is nothing to announce, and nothing is shown. See
+  [Hosted demo](../deployment/hosted-demo.md).
 
 ### The Retrieval inspector
 

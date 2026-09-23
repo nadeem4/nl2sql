@@ -9,7 +9,8 @@ import RetrievalInspector from "./Retrieval.jsx";
 import { answeredDatasources, datasourceNames } from "./datasources.js";
 import { guidedGroups } from "./questions.js";
 import { NO_KEY_REASON, hostedNote, needsKey } from "./firstRun.js";
-import { askHeaders, readKey, writeKey } from "./hostedKey.js";
+import { askHeaders, readKeys, writeKeyFor } from "./hostedKey.js";
+import { readModels, writeModel } from "./hostedModels.js";
 import { createRouter, hashFor, navItems, pageFor, pageFromHash } from "./router.js";
 import { deniedTables, planTables } from "./run.js";
 
@@ -101,8 +102,9 @@ export default function App() {
   // Which database the schema panel is showing. Null until something picks
   // one, when the server serves the demo's own.
   const [datasource, setDatasource] = useState(null);
-  // The hosted demo's key: this tab's, never the server's.
-  const [apiKey, setApiKey] = useState(() => readKey(window.sessionStorage));
+  // The hosted demo's keys and step choices: this tab's, never the server's.
+  const [apiKeys, setApiKeys] = useState(() => readKeys(window.sessionStorage));
+  const [stepModels, setStepModels] = useState(() => readModels(window.sessionStorage));
   const runRef = useRef(null);
   const pageRef = useRef(null);
   const firstPage = useRef(true);
@@ -193,7 +195,7 @@ export default function App() {
   // the database the question is about.
   const ask = async (text, source) => {
     const q = (text === undefined ? question : text).trim();
-    if (!q || busy || needsKey(meta, apiKey)) return;
+    if (!q || busy || needsKey(meta, apiKeys)) return;
     if (source) setDatasource(source);
     setQuestion(q);
     setAsked({ question: q, role, planOnly });
@@ -212,7 +214,7 @@ export default function App() {
           method: "POST",
           // The key travels in a header, never in the body: a body is what
           // request logs and validation errors quote back.
-          headers: askHeaders(apiKey),
+          headers: askHeaders(apiKeys, stepModels),
           body: JSON.stringify({ question: q, role, execute: !planOnly }),
         })
       );
@@ -228,7 +230,9 @@ export default function App() {
     writeDebug(on);
   };
 
-  const saveKey = (next) => setApiKey(writeKey(window.sessionStorage, next));
+  const saveKey = (provider, next) => setApiKeys(writeKeyFor(window.sessionStorage, provider, next));
+  const saveStepModel = (agent, choice) =>
+    setStepModels((models) => writeModel(window.sessionStorage, models, agent, choice));
 
   const sub = result && result.sub_queries && result.sub_queries[0];
   const used = planTables(sub && sub.plan);
@@ -245,9 +249,9 @@ export default function App() {
   const onAsk = page === "ask";
   // Hosted, with no key in this tab: the page says so and holds the question
   // box and the guided questions closed instead of letting a click fail.
-  const noKey = needsKey(meta, apiKey);
+  const noKey = needsKey(meta, apiKeys);
   // Empty until this tab has a key: the first-run state is saying it already.
-  const modeNote = hosted ? hostedNote(meta, apiKey) : "";
+  const modeNote = hosted ? hostedNote(meta, apiKeys) : "";
   const groups = guidedGroups(meta);
   const current = pageFor(page);
   const nav = navItems(page, {
@@ -451,7 +455,8 @@ export default function App() {
           <div className="sheet" id="settings-panel">
             <Settings settings={settings} error={settingsError} onSaved={settingsSaved}
               recorded={meta ? meta.recorded_questions : 0}
-              apiKey={apiKey} onKey={saveKey} limits={meta && meta.limits} />
+              apiKeys={apiKeys} onKey={saveKey} limits={meta && meta.limits}
+              stepModels={stepModels} onStepModel={saveStepModel} />
           </div>
         )}
 

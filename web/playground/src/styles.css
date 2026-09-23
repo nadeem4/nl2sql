@@ -643,6 +643,17 @@ li[data-flag="denied"] .flag { color: var(--ink); background: var(--well); }
 .settings-foot { margin-top: 14px; align-items: flex-start; flex-wrap: nowrap; }
 .settings-foot .settings-help { margin-top: 3px; }
 
+/* The hosted demo's per-step models: shut until asked for, because one key and
+   the defaults is the whole of the simple path. The summary says what the
+   steps will use, so it is worth opening only when that is not what you want. */
+/* A plain <summary>, so the browser's own disclosure marker is the affordance. */
+.step-models > summary { cursor: pointer; padding: 6px 0; }
+.step-models > summary::marker { color: var(--ink-3); }
+.step-models-title { font-size: 15px; font-weight: 650; letter-spacing: -0.01em; }
+.step-models-summary { margin-left: 10px; font-size: 13.5px; color: var(--ink-2); }
+.step-models[open] > summary { border-bottom: 1px solid var(--rule); margin-bottom: 12px; }
+.step-models .model-rows { margin-top: 10px; }
+
 .settings-off { max-width: 76ch; padding: 12px 16px; background: var(--well); border-radius: var(--r-well); }
 .settings-off h3 { font-size: 15px; margin-bottom: 4px; }
 .settings-off p { font-size: 14px; color: var(--ink-2); }
