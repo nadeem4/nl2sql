@@ -41,7 +41,7 @@ def _no_shared_plan_cache(monkeypatch):
 
 @pytest.fixture(scope="session")
 def demo_project(tmp_path_factory):
-    """A generated Chinook demo (one SQLite DB, indexed locally, no key)."""
+    """A generated demo project (three SQLite databases, indexed locally, no key)."""
     root = tmp_path_factory.mktemp("demo")
     subprocess.run(CLI + ["setup", "--demo"], cwd=root, env=_base_env(), check=True, timeout=900)
     return root

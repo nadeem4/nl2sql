@@ -13,12 +13,18 @@ that reached the tables and columns the planner is given:
 Chinook has 11 tables, under the full-snapshot limit
 (``SCHEMA_RETRIEVAL_FULL_SNAPSHOT_MAX_TABLES``, default 15) that skips
 retrieval on a small schema, so the limit is set to 0 for the run. No LLM is
-called: the datasource is the one registered (or, with several, the top hit
-of the resolver's own vector search; the resolver's answerability check is an
-LLM call and is skipped), and the retriever's query is the question alone,
-since the decomposer that would add filters and expected columns is an LLM.
-What the retriever sent is read from its retrieval record
-(``nl2sql.indexing.retrieval_trace``), the same one a run trace keeps.
+called: each question is scored against the datasource its gold entry names,
+and the retriever's query is the question alone, since the decomposer that
+would add filters and expected columns is an LLM. What the retriever sent is
+read from its retrieval record (``nl2sql.indexing.retrieval_trace``), the
+same one a run trace keeps.
+
+Which datasource the resolver's own vector search would have picked is
+measured too, as ``datasource_top1_accuracy``: the share of questions whose
+top candidate is the one the gold entry names. It is scoring the router, not
+the schema retriever, so it is kept apart from recall -- and with a single
+datasource registered there is nothing to choose and it is 1.0. The
+resolver's answerability check is an LLM call and is skipped.
 """
 from __future__ import annotations
 
@@ -57,7 +63,13 @@ def _mean(values: Sequence[float]) -> Optional[float]:
 
 
 def summarize(results: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
-    """The means over questions, and how many had every needed table or column."""
+    """The means over questions, how many had every needed table or column, and the router's top-1 share.
+
+    ``datasource_top1_accuracy`` is the share of questions whose top
+    datasource candidate is the one the gold entry names; ``None`` when the
+    results do not say which datasource was retrieved.
+    """
+    routed = [r for r in results if "retrieved_datasource_id" in r]
     return {
         "questions": len(results),
         "table_recall": _mean([r["table_recall"] for r in results]),
@@ -66,6 +78,8 @@ def summarize(results: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
         "perfect_columns": sum(r["column_recall"] == 1.0 for r in results),
         "tables_sent": _mean([r["tables_sent"] for r in results]),
         "columns_sent": _mean([r["columns_sent"] for r in results]),
+        "datasource_top1_accuracy": _mean([float(r["retrieved_datasource_id"] == r["datasource_id"])
+                                           for r in routed]),
     }
 
 
@@ -98,8 +112,13 @@ def _embedding_name(ctx: NL2SQLContext) -> str:
     return str(getattr(embeddings, "model", None) or type(embeddings).__name__)
 
 
-def _datasource(ctx: NL2SQLContext, question: str) -> Optional[str]:
-    """The datasource the resolver would pick, without its LLM answerability check."""
+def _retrieved_datasource(ctx: NL2SQLContext, question: str) -> Optional[str]:
+    """The datasource the resolver would pick, without its LLM answerability check.
+
+    Reported beside the gold entry's own datasource, never used in place of
+    it: a question is scored against the database it is asked about, however
+    the router would have ranked it.
+    """
     ids = ctx.ds_registry.list_ids()
     if len(ids) == 1:
         return ids[0]
@@ -136,8 +155,8 @@ def run_retrieval_recall(ctx: NL2SQLContext, dataset_path: pathlib.Path = GOLD_D
     try:
         results = []
         for q in dataset:
-            datasource_id = _datasource(ctx, q.question)
-            results.append({**score_question(q, _sent(ctx, q, datasource_id)), "datasource_id": datasource_id})
+            results.append({**score_question(q, _sent(ctx, q, q.datasource)), "datasource_id": q.datasource,
+                            "retrieved_datasource_id": _retrieved_datasource(ctx, q.question)})
     finally:
         settings.schema_retrieval_full_snapshot_max_tables = saved
 

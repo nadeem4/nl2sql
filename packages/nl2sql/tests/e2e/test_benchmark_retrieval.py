@@ -27,35 +27,32 @@ def test_retrieval_recall_runs_over_every_answerable_question(demo_project, tmp_
     answerable = {q.id for q in load_gold_dataset() if q.needed_tables}
     assert {r["id"] for r in report["results"]} == answerable
     assert report["settings"]["full_snapshot_max_tables"] == 0 and report["settings"]["embedding"]
-    # The demo registers three datasources, so `retrieval_recall._datasource`
-    # picks the top vector hit rather than the only one. The gold set is
-    # Chinook-only and all but one question still lands on Chinook; "Who does
-    # Jane Peacock report to?" ranks the support desk first, which has agents.
-    # That is a property of this harness, not of the pipeline: the resolver
-    # passes every candidate on, so a real run is unaffected. Pinning the gold
-    # benchmark to Chinook belongs in `nl2sql/evaluation/retrieval_recall.py`.
-    registered = {"chinook", "support", "webanalytics"}
+    # The gold set is Chinook's, so every question is scored against Chinook
+    # however the demo's other two databases rank in the vector search.
     for r in report["results"]:
         assert 0.0 <= r["table_recall"] <= 1.0 and 0.0 <= r["column_recall"] <= 1.0
-        assert r["datasource_id"] in registered
-    on_chinook = sum(1 for r in report["results"] if r["datasource_id"] == "chinook")
-    assert on_chinook >= len(report["results"]) - 2
+        assert r["datasource_id"] == "chinook"
+        assert r["retrieved_datasource_id"] in {"chinook", "support", "webanalytics"}
+    # Where the resolver's own top hit disagrees is reported, not scored: with
+    # three databases registered this is a real number, not always 1.0.
+    top1 = report["summary"]["datasource_top1_accuracy"]
+    assert 0.5 <= top1 <= 1.0
+    assert top1 == round(sum(r["retrieved_datasource_id"] == "chinook" for r in report["results"])
+                         / len(report["results"]), 4)
     # Retrieval ran: with 11 tables and k=8, not every question was sent the full schema.
     assert min(r["tables_sent"] for r in report["results"]) < 11
     assert report["summary"]["questions"] == len(answerable)
     assert "Schema retrieval recall" in proc.stdout and "table recall" in proc.stdout
+    assert "datasource top-1" in proc.stdout
 
-    # `records.describe_database` names every registered datasource, so the
-    # record now files itself under the combined name rather than "chinook".
-    # That means a fresh run no longer continues the committed
-    # `benchmarks/retrieval/chinook/` series -- the same follow-up in
-    # `nl2sql/evaluation/records.py` as noted above.
-    [record] = list(results.glob("retrieval/chinook-support-webanalytics/*_retrieval.json"))
+    # The record is identified by the dataset's datasource, so it files itself
+    # into -- and continues -- the committed `benchmarks/retrieval/chinook/`
+    # series, with the same schema fingerprint the baseline recorded.
+    [record] = list(results.glob("retrieval/chinook/*_retrieval.json"))
     body = json.loads(record.read_text(encoding="utf-8"))
     assert body["metrics"] == report["summary"] and body["note"] == "e2e"
-    assert body["database"] == report["database"]
     baseline = REPO / "benchmarks" / "retrieval" / "chinook" / "2026-09-22_571cd16_retrieval.json"
-    assert json.loads(baseline.read_text(encoding="utf-8"))["database"]["datasource_id"] == "chinook"
+    assert body["database"] == report["database"] == json.loads(baseline.read_text(encoding="utf-8"))["database"]
 
 
 @pytest.mark.e2e

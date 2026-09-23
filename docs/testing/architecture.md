@@ -28,7 +28,7 @@ markers. A test may carry both.
 
 | Marker | Means | Provided by |
 | --- | --- | --- |
-| `integration` | Needs external resources: the generated Chinook SQLite database, or the downloaded ONNX embedding model. | `nl2sql setup --demo` |
+| `integration` | Needs external resources: the demo project's SQLite databases - vendored Chinook and the generated `support` and `webanalytics` - or the downloaded ONNX embedding model. | `nl2sql setup --demo` |
 | `llm` | Needs a real `OPENAI_API_KEY`. Costs money per run. | Nothing in CI - never selected. |
 
 Everything under `packages/nl2sql/tests/integration/` is marked `integration`

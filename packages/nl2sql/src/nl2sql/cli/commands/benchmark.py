@@ -268,7 +268,8 @@ def run_retrieval_benchmark(
         f"{s['questions']} questions, k {st['table_k']} tables / {st['planning_k']} planning, {escape(st['embedding'])}: "
         f"table recall {pct(s['table_recall'])} ({s['perfect_tables']} complete), "
         f"column recall {pct(s['column_recall'])} ({s['perfect_columns']} complete), "
-        f"{s['tables_sent']:.1f} tables / {s['columns_sent']:.1f} columns sent on average")
+        f"{s['tables_sent']:.1f} tables / {s['columns_sent']:.1f} columns sent on average, "
+        f"datasource top-1 {pct(s.get('datasource_top1_accuracy'))}")
     if baseline is not None:
         old = json.loads(pathlib.Path(baseline).read_text(encoding="utf-8"))
         diff = compare_reports(report, old.get("report", old))  # a report, or a record holding one

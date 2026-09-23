@@ -9,6 +9,9 @@ against the price table.
 """
 from __future__ import annotations
 
+import json
+import pathlib
+
 import pytest
 import yaml
 
@@ -17,6 +20,8 @@ from nl2sql.common.settings import settings
 from nl2sql.evaluation.prices import PRICES, call_cost
 from nl2sql.evaluation.tier1 import GoldPlanLLM, load_gold_plans
 from nl2sql.evaluation.tier2 import UnknownPriceError
+
+REPO = pathlib.Path(__file__).resolve().parents[4]
 
 QUESTIONS = ["chinook_001", "chinook_018", "chinook_038", "chinook_040"]
 WRONG = "chinook_018"  # the bad server answers it with chinook_038's plan
@@ -196,13 +201,12 @@ def test_a_model_config_runs_on_every_node_and_records_the_database(demo_env, se
     assert set(cfg["models"].values()) == {"openai:gpt-5.4"}
     assert good.server.calls
     database = board["database"]
-    # `describe_database` names every datasource registered in the context, and
-    # the demo now registers three. The gold dataset itself is still
-    # Chinook-only, so this identity no longer describes what was benchmarked;
-    # narrowing it to the datasources the dataset actually uses belongs in
-    # `nl2sql/evaluation/records.py`. Until then, records key off the combined
-    # name and will not line up with the committed `benchmarks/tier2/chinook/`
-    # baselines.
-    assert (database["datasource_id"], database["engine"]) == (
-        "chinook+support+webanalytics", "sqlite")
-    assert database["tables"] == 11 + 4 + 5 and len(database["schema_fingerprint"]) == 16
+    # The demo registers three databases; the gold dataset asks about Chinook,
+    # so that alone is what the run is identified by -- the same identity, and
+    # the same schema fingerprint, as the committed `benchmarks/tier2/chinook/`
+    # runs recorded before the other two existed.
+    assert (database["datasource_id"], database["engine"]) == ("chinook", "sqlite")
+    assert database["tables"] == 11 and len(database["schema_fingerprint"]) == 16
+    committed = json.loads((REPO / "benchmarks" / "tier2" / "chinook"
+                            / "2026-09-22_27cad30_gpt-5.4.json").read_text(encoding="utf-8"))
+    assert database == committed["database"]
