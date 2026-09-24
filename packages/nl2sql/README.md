@@ -9,18 +9,38 @@ its browser playground, and the database adapters (PostgreSQL, MySQL, SQL
 Server, SQLite, DuckDB). The REST server is the separate `nl2sql-api` package.
 Full README and docs: <https://github.com/nadeem4/nl2sql>.
 
-![The nl2sql playground on its Ask page: the Ask, Settings and Retrieval nav across the top, the search index over three databases and a switcher for whichever of their schemas to read on the left, the question box and the guided questions on the right](https://raw.githubusercontent.com/nadeem4/nl2sql/main/docs/assets/screenshots/playground-overview.png)
+## Try it in your browser
+
+**<https://nadeem4nk-nl2sql-demo.hf.space>** — the playground on three sample
+databases, nothing to install.
+
+[![Ask a database in plain English; the model plans, the code writes the SQL](https://raw.githubusercontent.com/nadeem4/nl2sql/main/docs/assets/social-card.png)](https://nadeem4nk-nl2sql-demo.hf.space)
+
+The server holds no API key: you paste your own into the page, one per
+provider, and it stays in that browser tab, is used in memory for the question
+that needs it, and is never stored, logged or traced. Settings also puts each
+of the five model-using steps on a provider and model of its own.
+
+![The nl2sql playground on its Ask page: the search index over three databases and a switcher for whichever of their schemas to read on the left, the question box and the guided questions on the right](https://raw.githubusercontent.com/nadeem4/nl2sql/main/docs/assets/screenshots/playground-overview.png)
 
 ## How it works
 
-- The question is checked for answerability, split into sub-queries, and each
-  gets the part of the schema it needs.
-- The model returns a typed plan (a Pydantic `PlanModel`), never SQL.
+- The question is checked for answerability and routed to one of the registered
+  databases, then split into sub-queries, and each gets the part of the schema
+  it needs.
+- The model returns a typed plan (a Pydantic `PlanModel`), never SQL. It may
+  only name a function from an allow-list, and date work is written portably
+  and rendered by each adapter in its own dialect.
 - The logical validator checks every table and column against the schema,
   joins against the declared foreign keys, and every table against the caller's
-  role (RBAC). A refused plan never becomes SQL.
+  role (RBAC); it also builds the query tree the generator would build, so an
+  unjoinable plan is caught while the planner can still be asked to fix it. A
+  refused plan never becomes SQL.
 - Only a plan that passes is rendered to SQL, deterministically, with `sqlglot`,
   then executed and summarised.
+
+The whole pipeline is 13 steps, five of them decided by a model; the
+playground's Pipeline page lists them.
 
 ## Quickstart
 
@@ -45,15 +65,18 @@ in replay mode, which has no recorded answers out of the box, so it can show the
 schema and the index but answers nothing. `nl2sql demo --record` (with an
 OpenAI or OpenRouter key) records the guided questions for later key-free runs.
 
-`nl2sql demo --hosted` runs a public-facing variant instead: the server holds
-no API key, each visitor pastes their own into the page for that question
-only, and Settings, Rebuild, ratings and `--record` are refused. See
+`nl2sql demo --hosted` runs the public variant above yourself: the server holds
+no API key, each visitor pastes their own into the page for that question only,
+the sample databases are opened read-only, questions are rate limited per
+visitor and capped per session, and Settings, Rebuild, ratings and `--record`
+are refused. See
 [Hosted demo](https://github.com/nadeem4/nl2sql/blob/main/docs/deployment/hosted-demo.md)
 in the full docs.
 
 The playground shows each answer's plan, validation checks, SQL, rows and cost,
-a per-node Debug view, a Retrieval inspector over the live index, and a
-right/wrong rating per answer.
+a per-node Debug view, a Pipeline page listing every step of a run with the
+model each used, a Retrieval inspector over the live index, and a right/wrong
+rating per answer that `nl2sql feedback stats` reports on.
 
 ## CLI
 
@@ -107,10 +130,13 @@ SQLite needs no extra.
   written answer).
 - RBAC is a per-role table allowlist; a plan touching a forbidden table is
   refused. No column masking or row-level security.
-- Read-only is not enforced by the executor: only SELECTs are generated, but
-  connections are not opened read-only. Give the engine a read-only database
-  user.
+- Read-only is not checked by the executor: only SELECTs are generated, and a
+  SQLite datasource can be opened read-only with `options.read_only: true` (the
+  three sample databases are), but no other dialect is. Give the engine a
+  read-only database user.
 - No authentication: the caller supplies the role.
+- No cross-database questions and no conversation yet: each sub-query is
+  planned against one datasource, and each question is answered on its own.
 
 ## Status
 

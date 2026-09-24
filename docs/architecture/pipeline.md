@@ -32,7 +32,9 @@ flowchart TD
 The system uses two orchestration layers:
 
 - **Control graph (LangGraph `StateGraph`)**: runtime nodes and routing.
-- **Logical DAG (`ExecutionDAG`)**: deterministic compute plan produced by the global planner.
+- **Logical DAG (`ExecutionDAG`)**: deterministic compute plan, built by the
+  decomposer (`nodes/decomposer/dag.py::build_execution_dag`) from the
+  sub-queries it just wrote, not by a node of its own.
 
 ```mermaid
 graph TD
