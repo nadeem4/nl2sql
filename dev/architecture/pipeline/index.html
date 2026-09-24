@@ -1955,7 +1955,9 @@
 <p>The system uses two orchestration layers:</p>
 <ul>
 <li><strong>Control graph (LangGraph <code>StateGraph</code>)</strong>: runtime nodes and routing.</li>
-<li><strong>Logical DAG (<code>ExecutionDAG</code>)</strong>: deterministic compute plan produced by the global planner.</li>
+<li><strong>Logical DAG (<code>ExecutionDAG</code>)</strong>: deterministic compute plan, built by the
+  decomposer (<code>nodes/decomposer/dag.py::build_execution_dag</code>) from the
+  sub-queries it just wrote, not by a node of its own.</li>
 </ul>
 <pre class="mermaid"><code>graph TD
     Scan1[scan:subquery_1] --&gt; Combine[combine:group_1]
