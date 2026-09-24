@@ -133,7 +133,7 @@ no storage.
 | --- | --- | --- | --- |
 | Questions per minute | 6 | `NL2SQL_DEMO_QUESTIONS_PER_MINUTE` | client address (a token bucket) |
 | Questions per session | 30 | `NL2SQL_DEMO_QUESTIONS_PER_SESSION` | a random session cookie |
-| Query timeout | 60s | `GLOBAL_TIMEOUT_SEC` | the run |
+| Query timeout | 300s | `GLOBAL_TIMEOUT_SEC` | the run |
 | Rows returned | 1000 | the datasource's `row_limit` option | the query |
 
 Hitting one is a `429` with a sentence, never a stack trace: the rate limit says
@@ -286,9 +286,10 @@ command rather than saved into `.git/config`.
 **When it runs.** On every push to `main` that touches something the Space is
 built from -- `deploy/huggingface/**` (its root), `packages/nl2sql/**` (the
 engine the image installs) or `web/playground/**` (the page the engine serves)
--- and on demand. A docs-only merge changes none of those and does not
-redeploy. One deploy runs at a time; a run overtaken by a newer push is
-cancelled.
+-- or the workflow file itself, `.github/workflows/publish_space.yml`, so a
+change to the deploy logic redeploys too -- and on demand. A docs-only merge
+changes none of those and does not redeploy. One deploy runs at a time; a run
+overtaken by a newer push is cancelled.
 
 **What it reports.** The job never calls a build that did not happen a success.
 If the push produced a commit, the workflow checks the Space's head is that

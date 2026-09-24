@@ -108,7 +108,7 @@ Failure in this system is represented as structured `PipelineError` objects accu
 
 ### Retry scope
 - Only the SQL agent subgraph retries (planner and validation loop).
-- Other nodes (resolver, decomposer, global planner, generator, executor, aggregator, answer synthesizer) do not retry.
+- Other nodes (resolver, decomposer, generator, executor, aggregator, answer synthesizer) do not retry.
 
 ### Backoff
 - Exponential backoff with jitter in `retry_handler` using:
@@ -144,7 +144,7 @@ Failure in this system is represented as structured `PipelineError` objects accu
 
 ### What must restart
 - Any graph-level failure (timeout, cancellation, unknown exception) requires a new run.
-- Resolver failures, decomposer failures, global planner failures, generator failures, executor failures, and aggregator failures have no local recovery and require a new run.
+- Resolver failures, decomposer failures, generator failures, executor failures, and aggregator failures have no local recovery and require a new run.
 
 ### What is unrecoverable
 - `FATAL_ERRORS` or `CRITICAL` severity errors (security violations, missing datasource ID, missing LLM, invalid state) terminate the subgraph or graph without retry.

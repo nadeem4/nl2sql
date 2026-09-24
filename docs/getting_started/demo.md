@@ -244,7 +244,7 @@ Debug choice: they belong to the visit, not to the page.
 **Pipeline** lists every step a question passes through, in the order a run
 takes them, and marks which of them a model decides. Five do: the answerability
 check, the question splitter, the query planner, the plan repair and the answer
-writer. The other nine are ordinary code -- the schema search, the execution
+writer. The other eight are ordinary code -- the schema search, the execution
 plan, the layer router, the plan checks, the SQL writer, the executor and the
 result combiner among them -- which is the point: the model plans, and
 deterministic code writes the SQL, checks it against the real schema and this

@@ -231,7 +231,7 @@ GraphState carries identifiers and artifact references that could support replay
 ---
 
 ## Determinism Impact
-Determinism guarantees and non-determinism sources are documented in `determinism.md`. GraphState only carries the artifacts produced by those nodes (IDs, DAG hashes, errors, and diagnostics).
+Determinism guarantees and non-determinism sources are documented in `determinism.md`. GraphState only carries the artifacts produced by those nodes (IDs, errors, and diagnostics).
 
 ---
 
