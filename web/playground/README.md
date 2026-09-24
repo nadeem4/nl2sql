@@ -257,8 +257,10 @@ rows, and the router over `hashchange`), `src/questions.js` (the guided
 questions grouped by datasource), `src/firstRun.js` (when the hosted demo has
 to ask for a key before it takes a question, and what the mode line then says),
 `src/datasources.js` (the
-databases the switcher offers, and which one a run was answered from) and
-`src/retrieval.js` (the MMR summary line, picks
+databases the switcher offers, and which one a run was answered from),
+`src/pipeline.js` (the run/model join for the Pipeline page), `src/hostedKey.js`
+(per-provider key parsing and masking), `src/hostedModels.js` (per-step model
+choice storage), `src/retrieval.js` (the MMR summary line, picks
 in order, entries passed over, the copyable text form) and `src/feedback.js`
 (when a run can be rated, the request body, the saved line) with Node's built-in test runner; there is no test dependency.
 
@@ -281,8 +283,8 @@ npm run dev
 
 Vite serves the page on its own port. Run `nl2sql demo --no-browser` alongside
 it and proxy or point `fetch` at `http://127.0.0.1:8765` to exercise the real
-API; the app calls `/api/meta`, `/api/schema`, `/api/ask`, `/api/trace/{id}`
-the settings routes (`GET /api/settings`, `POST /api/settings/key`,
+API; the app calls `/api/meta`, `/api/schema`, `/api/ask`, `/api/trace/{id}`,
+`/api/pipeline`, the settings routes (`GET /api/settings`, `POST /api/settings/key`,
 `POST /api/settings/models`) and the index routes (`GET /api/index`,
 `POST /api/index/rebuild`), the inspector's (`GET /api/retrieval`,
 `POST /api/retrieval`) and feedback's (`GET /api/feedback`, `POST /api/feedback`).
@@ -292,7 +294,7 @@ serves, not from the Vite dev server.
 
 ## Scope
 
-React and Vite only -- no router library (`src/router.js` is 110 lines over the
+React and Vite only -- no router library (`src/router.js` is 119 lines over the
 hash), no state library, no component kit, no CSS framework, no TypeScript. Plain JSX and plain CSS, kept small enough to read in
 one sitting. Light and dark follow `prefers-color-scheme`; motion is limited to
 the run arriving in order and is off under `prefers-reduced-motion`. The only
