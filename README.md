@@ -8,13 +8,32 @@ before any SQL is generated.
 [![PyPI](https://img.shields.io/pypi/v/nl2sql-engine)](https://pypi.org/project/nl2sql-engine/)
 [![License: MIT](https://img.shields.io/github/license/nadeem4/nl2sql)](LICENSE)
 
-![The nl2sql playground on its Ask page: the Ask, Settings and Retrieval nav across the top, the search index over three databases and a switcher for whichever of their schemas to read on the left, the question box and the guided questions on the right](https://raw.githubusercontent.com/nadeem4/nl2sql/main/docs/assets/screenshots/playground-overview.png)
+## Try it in your browser
+
+**<https://nadeem4nk-nl2sql-demo.hf.space>** — the playground on three sample
+databases, nothing to install.
+
+[![Ask a database in plain English; the model plans, the code writes the SQL](https://raw.githubusercontent.com/nadeem4/nl2sql/main/docs/assets/social-card.png)](https://nadeem4nk-nl2sql-demo.hf.space)
+
+**Bring your own key.** The server holds none. You paste yours into the page —
+one per provider — it stays in that browser tab, travels with the question that
+needs it, is used in memory for that question and dropped: never stored, never
+logged, never written to a trace. Settings also puts each of the five
+model-using steps on a provider and model of its own, so the planner can be on
+Claude while the rest stays on OpenAI. The sample databases are opened
+read-only, and questions are rate limited per visitor and capped per session.
+How it is built: [Hosted demo](docs/deployment/hosted-demo.md).
+
+Prefer it on your own machine? [Quickstart](#quickstart-run-it-locally).
+
+![The nl2sql playground on its Ask page: the search index over three databases and a switcher for whichever of their schemas to read on the left, the question box and the guided questions on the right](https://raw.githubusercontent.com/nadeem4/nl2sql/main/docs/assets/screenshots/playground-overview.png)
 
 ## Contents
 
+- [Try it in your browser](#try-it-in-your-browser)
 - [How it works](#how-it-works)
 - [Latest benchmark results](#latest-benchmark-results)
-- [Quickstart: the demo](#quickstart-the-demo)
+- [Quickstart: run it locally](#quickstart-run-it-locally)
 - [Screenshots](#screenshots)
 - [CLI reference](#cli-reference)
 - [REST API](#rest-api)
@@ -27,14 +46,22 @@ before any SQL is generated.
 
 ## How it works
 
-- The question is checked for answerability, split into sub-queries, and each
-  sub-query gets the part of the schema it needs (vector search over an index of
-  tables, columns and relationships, or the whole schema when it is small).
+- The question is checked for answerability and routed to one of the registered
+  databases, then split into sub-queries; the decomposer also builds the
+  execution DAG that says which sub-queries can run together and how their
+  results combine.
+- Each sub-query gets the part of the schema it needs (vector search over an
+  index of tables, columns and relationships, or the whole schema when it is
+  small).
 - The model returns a **typed plan** (a Pydantic `PlanModel`: tables, joins,
-  select items, filters), never a SQL string.
+  select items, filters), never a SQL string. It may only name a function from
+  an allow-list, and it writes date work portably — `DATE_PART`/`DATE_TRUNC`
+  over a fixed set of units — which each adapter renders in its own dialect.
 - The **logical validator** resolves every table and column against the schema,
-  checks joins against the declared foreign keys, and checks every table against
-  the caller's role (RBAC). A refused plan never becomes SQL.
+  checks joins against the declared foreign keys, checks every table against
+  the caller's role (RBAC), and builds the query tree the generator would build,
+  so a plan whose tables cannot be joined is caught here, where the planner can
+  still be asked to fix it. A refused plan never becomes SQL.
 - Only a plan that passes reaches the **generator**, which renders SQL
   deterministically with `sqlglot`. The executor runs it and the answer writer
   summarises the rows.
@@ -42,19 +69,22 @@ before any SQL is generated.
   to `SQL_AGENT_MAX_RETRIES` (default 3). A security refusal is final.
 
 ```mermaid
-%%{init: {'theme':'base','themeVariables':{'primaryColor':'#ffffff','primaryTextColor':'#000000','primaryBorderColor':'#000000','lineColor':'#000000'}}}%%
 flowchart LR
-    Q[Question] --> R[Answerability check<br/>and decomposer]
+    Q([Question]) --> R[Resolve datasource<br/>and decompose]
     R --> S[Schema retrieval]
     S --> P[LLM planner<br/>typed plan, no SQL]
-    P --> V{Validator<br/>schema + RBAC}
+    P --> V{Validator<br/>schema, joins, RBAC}
     V -->|retryable| F[Refiner] --> P
-    V -->|refused| X[Refusal with reason]
+    V -->|refused| X([Refusal with reason])
     V -->|passed| G[SQL generator<br/>sqlglot]
-    G --> E[Executor] --> A[Answer writer]
+    G --> E[Executor] --> A([Answer])
 ```
 
+That is the shape of a run; the full pipeline is **13 steps**, five of them
+decided by a model, and the playground's Pipeline page lists them all.
+
 Architecture detail: [System Architecture](docs/architecture/overview.md),
+[Pipeline](docs/architecture/pipeline.md),
 [Agent Nodes](docs/architecture/nodes/index.md),
 [Determinism](docs/architecture/determinism.md).
 
@@ -84,7 +114,7 @@ The share of each answerable gold question's needed tables and columns that sche
 Full history: [docs/benchmarks.md](docs/benchmarks.md)
 <!-- BENCHMARKS:END -->
 
-## Quickstart: the demo
+## Quickstart: run it locally
 
 Requires Python 3.12 or newer.
 
@@ -137,30 +167,29 @@ role: `admin` and `analyst` can read the customer tables, `viewer` cannot, so
 asking as `viewer` about customers shows the validator refusing the plan before
 any SQL exists. The rail's **Showing** switcher reads any of the three schemas,
 and follows the guided question you click. With three databases registered,
-every question is routed
-first: the resolver picks the one it is about, a step a single-database demo
-never reached, and the run says which one answered. A question that spans two of them is not answerable yet -- each
-sub-query is planned against one datasource, so the engine cannot join across
-databases, and the shared customer identities are groundwork for when it can.
+every question is routed first: the resolver picks the one it is about, a step
+a single-database demo never reached, and the run says which one answered. A
+question that spans two of them is not answerable yet -- each sub-query is
+planned against one datasource, so the engine cannot join across databases, and
+the shared customer identities are groundwork for when it can.
 
 The playground has no login. It binds to `127.0.0.1` by default; Settings,
 Rebuild, the Retrieval inspector and answer ratings are off on any other
 address unless you pass `--allow-settings`. Full guide:
 [Demo](docs/getting_started/demo.md).
 
-`nl2sql demo --hosted` is a third state, for a public demo of the sample
-databases: the server holds no API key, each visitor pastes their own into the
-page, one per provider, the browser keeps them and sends each with the
-questions that need it, and each is used in memory for that question only. The
-Ask page says so on arrival and keeps the question box closed until a key is
-saved, so nobody discovers the requirement by asking. The model each step runs
-on is chosen in the browser the same way and saved nowhere, so the planner can
-be on Claude while the rest stays on OpenAI.
-Saving settings, Rebuild, answer ratings and `--record`
-are refused there, the sample databases are opened read-only, and questions are
-rate limited per visitor and capped per session. `deploy/huggingface/` is that
-demo as a Hugging Face Space, deployed from `main` by the **Publish Space**
-workflow. See [Hosted demo](docs/deployment/hosted-demo.md).
+`nl2sql demo --hosted` is a third state: the public demo
+[above](#try-it-in-your-browser), which you can run yourself. The server holds
+no API key, each visitor pastes their own into the page, one per provider, and
+the Ask page says so on arrival and keeps the question box closed until a key
+is saved, so nobody discovers the requirement by asking. Saving settings,
+Rebuild, answer ratings and `--record` are refused there, and the sample
+databases are opened read-only. Two limits keep the pace, both in process and
+both best-effort: 6 questions a minute keyed by client address
+(`NL2SQL_DEMO_QUESTIONS_PER_MINUTE`) and 30 a session keyed by a random cookie
+(`NL2SQL_DEMO_QUESTIONS_PER_SESSION`). `deploy/huggingface/` is that demo as a
+Hugging Face Space, deployed from `main` by the **Publish Space** workflow. See
+[Hosted demo](docs/deployment/hosted-demo.md).
 
 ## Screenshots
 
@@ -228,12 +257,17 @@ folder (`cd nl2sql-demo`). Every command has `--help`.
 | `nl2sql feedback stats` | Ratings plus guardrail rates: refusals, refiner retries, validator rejections, errors, plan-cache hits | `--json`, `--traces DIR` |
 | `nl2sql feedback export --good` | Write thumbs-up runs as draft gold entries to a separate YAML for review | `--out` (default `feedback_gold_drafts.yaml`) |
 | `nl2sql feedback clear` | Delete every rating | `--yes` |
-| `nl2sql benchmark --tier 1` | Tier 1: the hand-written gold plans through the validator, generator and executor, with a local fake LLM (no key) | `--role`, `--include-ids`, `--export-path` |
-| `nl2sql benchmark --tier 2` | Tier 2: the real model end to end on the gold questions, per config, under a cost cap | `--max-cost USD` (required), `--model` (repeatable), `--llm PRESET\|PATH` (repeatable), `--passes`, `--questions`, `--note`, `--baseline`, `--max-regressions`, `--max-accuracy-drop` (deprecated), `--max-cost-increase`, `--results-dir` |
+| `nl2sql benchmark --tier 1` | Tier 1: the hand-written gold plans through the validator, generator and executor, with a local fake LLM (no key) | `--role` (repeatable), `--include-ids` (repeatable), `--export-path` |
+| `nl2sql benchmark --tier 2` | Tier 2: the real model end to end on the gold questions, per config, under a cost cap | `--max-cost USD` (no default; exits 2 without it), `--model` (repeatable), `--llm PRESET\|PATH` (repeatable), `--passes` (default 1), `--questions` (repeatable), `--note`, `--baseline`, `--max-regressions` (default 2), `--max-accuracy-drop` (deprecated), `--max-cost-increase` (default 0.20), `--results-dir` |
 | `nl2sql benchmark` | Without `--tier`: the gold questions through the full pipeline with the configured LLM | `--iterations` (default 3), `--bench-config-path`, `--role`, `--include-ids` |
-| `nl2sql benchmark retrieval` | Table and column recall of schema retrieval on the gold questions; no key, no LLM | `--record`, `--note`, `--baseline`, `--questions`, `--results-dir` |
+| `nl2sql benchmark retrieval` | Table and column recall of schema retrieval on the gold questions; no key, no LLM | `--record`, `--note`, `--baseline`, `--questions`, `--export-path`, `--results-dir` |
 | `nl2sql benchmark presets` | List the built-in tier 2 LLM configs (`gpt-5.4`, `gpt-5.4-mini-helpers`, `claude-planner`) | |
 | `nl2sql benchmark publish` | Rebuild `docs/benchmarks.md` and the README results block from `benchmarks/`; run from the repo root | `--from DEMO_FOLDER` (repeatable: copy that folder's records in first) |
+
+Every `benchmark` command also takes `--dataset` (default: the Chinook gold set)
+and the same `--config`/`--llm-config`/`--policies-config`/`--secrets-config`/`--vector-store`
+overrides as `run`. `--llm` takes a preset name, a `.yaml` path or `NAME=PATH`,
+and a unique suffix will do: `--llm mini-helpers` finds `gpt-5.4-mini-helpers`.
 
 Examples, from the demo folder:
 
@@ -283,7 +317,7 @@ With none of them, `/api/v1/query` answers HTTP 401.
 | --- | --- | --- |
 | `POST` | `/api/v1/query` | Ask a question; returns the plan, checks, SQL, rows, answer, errors and usage |
 | `GET` | `/api/v1/health` | Liveness check |
-| `GET` | `/api/v1/ready` | Readiness check (does not yet check datasources or the LLM) |
+| `GET` | `/api/v1/ready` | Readiness check (does not yet check datasources, the LLM or the index) |
 | `POST` | `/api/v1/datasource` | Register a datasource in the running process |
 | `GET` | `/api/v1/datasource` | List registered datasource ids |
 | `GET` | `/api/v1/datasource/{datasource_id}` | Check that a datasource is registered |
@@ -302,11 +336,14 @@ curl -X POST http://localhost:8000/api/v1/query \
   -d '{"natural_language": "How many customers are there?"}'
 ```
 
-The response has `status`, `sub_queries` (each with `plan`, `validation`, `sql`,
-`rows`, `status` and `plan_source`), `final_answer`, `errors`, `warnings`,
-`timings`, `usage` and `trace_path`. A pipeline failure, a refusal included,
-comes back as HTTP 200 with `status: "error"` and the reason in `errors`.
-Reference: [REST API](docs/api/rest/index.md).
+The response has `status`, `sub_queries`, `final_answer`, `errors`, `warnings`,
+`reasoning`, `timings`, `usage`, `artifact_refs`, `trace_id` and `trace_path`.
+Each sub-query carries `id`, `intent`, `datasource_id`, `schema_version`,
+`plan`, `validation`, `sql`, `rows`, `status`, `retry_count` and `plan_source`.
+`rows` is a capped sample with the true total; the full result set lives in
+artifact storage, addressed by `artifact_refs`. A pipeline failure, a refusal
+included, comes back as HTTP 200 with `status: "error"` and the reason in
+`errors`. Reference: [REST API](docs/api/rest/index.md).
 
 ## Python SDK
 
@@ -319,7 +356,7 @@ result = engine.run_query(
     user_context=UserContext(roles=["admin"]),
 )
 
-print(result.status)                  # "success", "error" or "plan_only"
+print(result.status)                  # "success", "error", "plan_only", or "" if nothing ran
 for sq in result.sub_queries:
     print(sq.sql)
     print([c.name for c in sq.validation if c.passed])
@@ -339,7 +376,9 @@ still validated for the caller's role.
 
 `NL2SQL` also exposes `engine.query`, `engine.datasource`, `engine.llm`,
 `engine.indexing`, `engine.auth`, `engine.policy`, `engine.settings`
-and `engine.benchmark`. See
+and `engine.benchmark`, plus `engine.get_schema()`, `engine.index_health()`,
+`engine.inspect_retrieval()` and `engine.rebuild_index()` — what the playground
+runs on. Feedback is not on the facade; it is read through the CLI. See
 [the public facade](docs/api/core/public-facade.md) and
 [`examples/`](examples/).
 
@@ -354,20 +393,27 @@ and `engine.benchmark`. See
 
 **LLM providers.** `openai` (default model `gpt-5.4`), `anthropic` (Claude,
 `pip install "nl2sql-engine[anthropic]"`, `claude-opus-5` with
-`temperature: null`), `openrouter` (OpenAI-compatible gateway) and `ollama`
-(local; small models often cannot fill the recursive plan schema). Each LLM
-step can have its own provider and model under `agents`: `datasourceresolver`,
-`decomposer`, `astplanner`, `refiner`, `answersynthesizer`, and
-`indexing_enrichment` for optional schema descriptions during indexing.
+`temperature: null`), `openrouter` (OpenAI-compatible gateway, default
+`anthropic/claude-sonnet-4.5`) and `ollama` (local; small models often cannot
+fill the recursive plan schema). Those defaults are what `nl2sql setup` and
+`nl2sql demo` write. Each of the five model-using steps can have its own
+provider and model under `agents`: `datasourceresolver`, `decomposer`,
+`astplanner`, `refiner` and `answersynthesizer`, plus `indexing_enrichment`
+for optional schema descriptions during indexing.
 
 **Key environment variables** ([System configuration](docs/configuration/system.md)):
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `OPENROUTER_API_KEY` | unset | Provider keys |
+| `ENV` (or `APP_ENV`) | unset | Loads `.env.<name>`; what `--env` and `NL2SQL(env=...)` set |
+| `ENV_FILE_PATH` | unset | Load this env file instead; wins over `ENV` |
 | `DATASOURCE_CONFIG`, `LLM_CONFIG`, `POLICIES_CONFIG`, `SECRETS_CONFIG` | `configs/...` | Config file paths |
 | `VECTOR_STORE` | `./chroma_db` | Vector store directory |
 | `EMBEDDING_PROVIDER` | `openai` | `local` runs an ONNX embedder with no key (the demo sets it) |
+| `EMBEDDING_MODEL` | `text-embedding-3-small` | Embedding model; changing it needs `nl2sql index --full` |
+| `SCHEMA_STORE_PATH` | `data/schema_store.db` | Schema snapshots, the plan cache and the feedback table |
+| `RESULT_ARTIFACT_BACKEND`, `RESULT_ARTIFACT_BASE_URI` | `local`, `./artifacts` | Where the full result set goes |
 | `GLOBAL_TIMEOUT_SEC` | 60 | How long the caller waits for a run (the demo sets 300) |
 | `SQL_AGENT_MAX_RETRIES` | 3 | Refiner retries per sub-query |
 | `SCHEMA_RETRIEVAL_FULL_SNAPSHOT_MAX_TABLES` | 15 | Send the whole schema, skipping vector search, up to this many tables |
@@ -389,10 +435,13 @@ step can have its own provider and model under `agents`: `datasourceresolver`,
   see. Sample values and statistics of forbidden tables are stripped from the
   prompt and the trace. An unknown role grants nothing. There is no column
   masking and no row-level security.
-- **Read-only is not enforced by the executor.** The plan type only allows
-  `SELECT` and the generator only builds one, but the executor does not inspect
-  the SQL and connections are not opened read-only on any dialect. **Give the
-  engine a read-only database user.**
+- **Read-only is a database setting, not something the executor checks.** The
+  plan type only allows `SELECT` and the generator only builds one, but the
+  executor does not inspect the SQL. A SQLite datasource can be opened read-only
+  at the driver level with `options.read_only: true` (SQLite's `mode=ro` URI),
+  and all three sample databases are; the write is then refused by SQLite
+  itself. No other dialect opens read-only, so on PostgreSQL, MySQL, SQL Server
+  or DuckDB, **give the engine a read-only database user.**
 - **No authentication** in the CLI, playground or REST API. The CLI and
   playground take the role from the caller. The REST API takes it from a trusted
   proxy header or a static setting, never from the body unless a dev flag is
@@ -405,19 +454,26 @@ Details: [Security Model](docs/security/model.md),
 
 ## Evaluation and quality
 
-- **Gold set:** 43 Chinook questions with expected results per role, including
-  refusals and unanswerable questions.
+- **Gold set:** 43 Chinook questions (39 answerable, 4 deliberately not) with
+  expected results per role, including refusals. A question may carry reviewed
+  `alt_gold_sql` alternatives, so a second correct way to answer it scores as
+  correct; gold data is never edited to make a run pass.
 - **Tier 1** (no key, runs in CI): the hand-written gold plans through the
   validator, generator and executor with a fake LLM, so a failure is a bug in
   code, not the model.
 - **Tier 2** (real model, costs money): end to end per config, with accuracy,
   answerability precision and recall, cost, latency, determinism and answer
-  faithfulness (whether the answer's numbers and names come from the rows).
-  Stops before spend could pass `--max-cost`. `--baseline` pairs each run's
-  questions with the baseline's and fails when more than `--max-regressions`
-  (default 2) flip from pass to fail, or when a smaller drop is significant by
-  McNemar's test; the old flat-threshold `--max-accuracy-drop` gate still
-  works if passed explicitly, but is deprecated in favor of `--max-regressions`.
+  faithfulness (a deterministic check, no second model, that every number and
+  name in the written answer comes from the rows). Accuracy is scored twice:
+  **strict**, where the rows must match the gold answer exactly, and
+  **lenient**, which allows extra and reordered columns and date labels. Each
+  is published with a 95% Wilson interval, because 43 questions cannot separate
+  small differences. Stops before spend could pass `--max-cost`. `--baseline`
+  pairs each run's questions with the baseline's and fails when more than
+  `--max-regressions` (default 2) flip from pass to fail, or when a smaller
+  drop is significant by McNemar's exact test; the old flat-threshold
+  `--max-accuracy-drop` gate still works if passed explicitly, but is
+  deprecated in favor of `--max-regressions`.
 - **Retrieval recall** (no key): the share of each question's needed tables and
   columns that schema retrieval sends the planner.
 - **Feedback:** playground ratings and guardrail rates via `nl2sql feedback stats`;
@@ -443,8 +499,13 @@ Known limitations:
 - A question cannot span two databases: every sub-query is planned against one
   datasource, so the demo's three cannot be joined, however much their data
   lines up.
-- The executor does not enforce read-only (see above). `max_bytes` is not
-  enforced; `row_limit` is, in the generated SQL.
+- There is no conversation: each question is answered on its own, with no memory
+  of the last one, so "and by country?" is not a follow-up.
+- Read-only is enforced by SQLite when a datasource asks for it, and by nothing
+  else (see above), so a database user that can only read is still the real
+  control. `max_bytes` is not enforced; `row_limit` is, in the generated SQL.
+- The hosted demo's rate limits are best-effort: they live in one process, and
+  the per-session cap hangs on a cookie the visitor can clear.
 - The model's output is not reproducible; determinism is structural (fixed
   topology, validation before generation, plan cache) ([Determinism](docs/architecture/determinism.md)).
 - The S3 and ADLS result backends have not been verified against a real service.
@@ -462,6 +523,12 @@ adapters exist, but that path is not yet documented or supported end to end.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for local setup and test markers
 (`pytest -m "not integration"` runs without a database or key).
+[`CLAUDE.md`](CLAUDE.md) is the short form of the rules a change has to keep —
+package boundaries, no dialect outside an adapter, validation before
+generation — and most of them are enforced, not just written down:
+`packages/nl2sql/tests/architecture/test_boundaries.py` parses the tree and
+fails with the rule's own name. The reasoning behind each is in
+[Invariants](docs/architecture/invariants.md).
 
 Repository layout: `packages/nl2sql` (engine, CLI, adapters),
 `packages/api` (REST API), `packages/adapter-sdk` (adapter contract),
