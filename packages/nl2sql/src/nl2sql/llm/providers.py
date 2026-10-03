@@ -25,6 +25,7 @@ __all__ = [
     "LLM_AGENTS",
     "OPENAI_ENV",
     "OPENROUTER_ENV",
+    "PROVIDER_LABELS",
     "PROVIDER_KEYS",
     "UPSTREAMS",
     "VERIFIED_ANTHROPIC_MODELS",
@@ -56,6 +57,11 @@ KEY_SHAPE_MESSAGE = (
 def looks_like_api_key(key: Optional[str]) -> bool:
     """True when ``key`` has the shape every supported provider's keys share."""
     return bool(_KEY_SHAPE.match((key or "").strip()))
+
+# Each provider as a person names it: in the settings panel, and in the message
+# of an error the provider caused (``nl2sql.llm.failures``).
+PROVIDER_LABELS: Dict[str, str] = {"openai": "OpenAI", "anthropic": "Anthropic", "openrouter": "OpenRouter",
+                                   "ollama": "Ollama"}
 
 OPENAI_ENV = PROVIDER_PRESETS["openai"].api_key_env
 OPENROUTER_ENV = PROVIDER_PRESETS["openrouter"].api_key_env

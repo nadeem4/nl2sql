@@ -366,7 +366,8 @@ def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset
             # The raw errors name the fake server and read as a crash; the
             # reasoning log and the failed call's usage entry repeat them.
             body["errors"] = [{"node": "replay", "message": REPLAY_MISS_MESSAGE,
-                               "error_code": "REPLAY_MISS", "severity": "ERROR"}]
+                               "error_code": "REPLAY_MISS", "severity": "ERROR",
+                               "provider": None, "detail": None}]
             body["reasoning"] = [r for r in body.get("reasoning", []) if REPLAY_MISS_MARKER not in str(r)]
             for call in (body.get("usage") or {}).get("calls", []):
                 if REPLAY_MISS_MARKER in (call.get("error") or ""):

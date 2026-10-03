@@ -15,6 +15,7 @@ from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.common.exceptions import PipelineExecutionError
 from nl2sql.common.settings import settings
 from nl2sql.context import NL2SQLContext
+from nl2sql.llm.failures import provider_error
 from nl2sql.pipeline.graph import build_graph
 from nl2sql.pipeline.state import GraphState
 from nl2sql.pipeline.timing import NodeTimingCallback
@@ -230,10 +231,11 @@ def run_with_graph(
         # blanket catch below would relabel it UNKNOWN_ERROR and flip is_retryable.
         return _done({"errors": [e.error]}, "crashed", e.error.message)
     except Exception as e:
-        # Fallback for other runtime crashes
+        # Fallback for other runtime crashes. A provider failure that escaped
+        # its node still gets its own code rather than UNKNOWN_ERROR.
         return _done({
             "errors": [
-                PipelineError(
+                provider_error("orchestrator", e) or PipelineError(
                     node="orchestrator",
                     message=f"Pipeline crashed: {str(e)}",
                     severity=ErrorSeverity.ERROR,

@@ -113,7 +113,7 @@ Key contracts:
 
 Emits `PipelineError` with:
 
-- `ORCHESTRATOR_CRASH` on exceptions.
+- `ORCHESTRATOR_CRASH` on exceptions; a provider's refusal of the call is a `PROVIDER_*` error instead (see [provider failures](../../observability/error-handling.md#provider-failures)).
 
 Logs failures via `logger.error`.
 

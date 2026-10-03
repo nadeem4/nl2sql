@@ -7,6 +7,7 @@ if TYPE_CHECKING:
     from nl2sql.pipeline.state import SubgraphExecutionState
 from .prompts import REFINER_PROMPT
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
+from nl2sql.llm.failures import provider_error
 from nl2sql.pipeline.nodes.refiner.schemas import RefinerResponse
 from nl2sql.pipeline.nodes.schema_retriever.schema import render_schema_for_prompt
 
@@ -108,7 +109,7 @@ class RefinerNode:
                      
         except Exception as e:
             logger.error(f"Node {self.node_name} failed: {e}")
-            error = PipelineError(
+            error = provider_error(self.node_name, e) or PipelineError(
                 node=self.node_name,
                 message=f"Refiner failed: {e}",
                 severity=ErrorSeverity.ERROR,
@@ -117,6 +118,6 @@ class RefinerNode:
             )
             return {
                 "refiner_response": RefinerResponse(errors=[error]),
-                "reasoning": [{"node": self.node_name, "content": f"Refiner failed: {e}", "type": "error"}],
+                "reasoning": [{"node": self.node_name, "content": error.message, "type": "error"}],
                 "errors": [error],
             }

@@ -77,7 +77,7 @@ def step_label(agent: str) -> str:
 
 
 def provider_label(provider: str) -> str:
-    from nl2sql.cli.demo.playground.settings import PROVIDER_LABELS
+    from nl2sql.llm.providers import PROVIDER_LABELS
 
     return PROVIDER_LABELS.get(provider, provider)
 

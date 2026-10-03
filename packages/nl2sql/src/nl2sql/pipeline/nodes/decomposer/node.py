@@ -12,6 +12,7 @@ from .prompts import DECOMPOSER_PROMPT
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.common.logger import get_logger
 from nl2sql.context import NL2SQLContext
+from nl2sql.llm.failures import provider_error
 from nl2sql.llm.wires import structured
 import hashlib
 import json
@@ -276,6 +277,13 @@ class DecomposerNode:
 
         except Exception as e:
             logger.error(f"Node {self.node_name} failed: {e}")
+            error = provider_error(self.node_name, e) or PipelineError(
+                node=self.node_name,
+                message=f"Decomposition failed: {str(e)}",
+                severity=ErrorSeverity.CRITICAL,
+                error_code=ErrorCode.ORCHESTRATOR_CRASH,
+                stack_trace=str(e),
+            )
 
             return {
                 "decomposer_response": DecomposerResponse(
@@ -287,17 +295,9 @@ class DecomposerNode:
                 "reasoning": [
                     {
                         "node": self.node_name,
-                        "content": f"Decomposition failed: {str(e)}",
+                        "content": error.message,
                         "type": "error",
                     }
                 ],
-                "errors": [
-                    PipelineError(
-                        node=self.node_name,
-                        message=f"Decomposition failed: {str(e)}",
-                        severity=ErrorSeverity.CRITICAL,
-                        error_code=ErrorCode.ORCHESTRATOR_CRASH,
-                        stack_trace=str(e),
-                    )
-                ],
+                "errors": [error],
             }

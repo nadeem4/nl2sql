@@ -88,7 +88,7 @@ def __call__(self, state: SubgraphExecutionState) -> Dict[str, Any]
 Key contracts:
 
 - `RefinerResponse`
-- `PipelineError` (`PLAN_FEEDBACK`, `MISSING_LLM`, `REFINER_FAILED`)
+- `PipelineError` (`PLAN_FEEDBACK`, `MISSING_LLM`, `REFINER_FAILED`, or a `PROVIDER_*` error when the provider refused the call (see [provider failures](../../observability/error-handling.md#provider-failures)))
 
 ---
 

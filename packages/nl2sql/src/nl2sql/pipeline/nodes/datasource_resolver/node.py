@@ -12,6 +12,7 @@ from nl2sql.auth import UserContext
 from nl2sql.common.logger import get_logger
 from nl2sql.context import NL2SQLContext
 from nl2sql.common.settings import settings
+from nl2sql.llm.failures import provider_error
 from nl2sql.llm.wires import structured
 from .prompts import ANSWERABILITY_PROMPT
 from .schemas import AnswerabilityResponse, DatasourceResolverResponse, ResolvedDatasource
@@ -340,7 +341,7 @@ class DatasourceResolverNode:
             return {
                 "datasource_resolver_response": DatasourceResolverResponse(),
                 "errors": [
-                    PipelineError(
+                    provider_error(self.node_name, exc) or PipelineError(
                         node=self.node_name,
                         message=f"Datasource resolution failed: {exc}",
                         severity=ErrorSeverity.ERROR,

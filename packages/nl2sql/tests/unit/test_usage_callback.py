@@ -140,6 +140,18 @@ def test_a_failed_call_still_counts_with_its_latency():
     assert call.node == "ast_planner" and call.usage_reported is False and call.error
 
 
+def test_a_failed_calls_error_carries_no_key():
+    # The usage block reaches every caller; a provider's error text can quote the key.
+    key = "-".join(["sk", "proj", "usage" + "u" * 30 + "9d3e"])
+    cb = TokenUsageCallback()
+    run = uuid.uuid4()
+    _start(cb, "decomposer", run)
+    cb.on_llm_error(RuntimeError(f"Error code: 401 - Incorrect API key provided: {key}"), run_id=run)
+    [call] = cb.usage().calls
+    assert "Incorrect API key provided" in call.error
+    assert key not in call.error and "9d3e" not in call.error
+
+
 def test_cost_only_when_a_price_is_configured():
     prices = {"gpt-4o": {"input": 2.5, "cached_input": 1.25, "output": 10.0}}
     cb = TokenUsageCallback(prices=prices)

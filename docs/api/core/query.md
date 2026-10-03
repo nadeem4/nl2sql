@@ -62,7 +62,7 @@ Fields:
 | --- | --- | --- | --- |
 | `sub_queries` | `List[SubQueryResult]` | no | One entry per decomposed sub-query. |
 | `final_answer` | `Optional[Dict[str, Any]]` | no | Answer synthesizer payload (`summary`, `format_type`, `content`). |
-| `errors` | `List[Dict[str, Any]]` | no | Pipeline errors (`node`, `message`, `error_code`, `severity`). |
+| `errors` | `List[Dict[str, Any]]` | no | Pipeline errors (`node`, `message`, `error_code`, `severity`, `provider`, `detail`). `provider` and `detail` are set for a `PROVIDER_*` code and `null` otherwise; see [provider failures](../../observability/error-handling.md#provider-failures). |
 | `trace_id` | `str` | no | Trace identifier. |
 | `reasoning` | `List[Dict[str, Any]]` | no | Reasoning events/logs. |
 | `warnings` | `List[Dict[str, Any]]` | no | Warning events/logs. |

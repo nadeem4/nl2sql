@@ -92,6 +92,9 @@ def _error_summary(error: Any) -> Dict[str, Any]:
         "message": _field(error, "message", "") or "",
         "error_code": _enum_value(_field(error, "error_code")),
         "severity": _enum_value(_field(error, "severity")),
+        # Set for a PROVIDER_* error: who refused the call, and in their words.
+        "provider": _field(error, "provider"),
+        "detail": _field(error, "detail"),
     }
 
 

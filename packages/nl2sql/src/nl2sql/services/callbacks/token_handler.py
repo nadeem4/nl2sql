@@ -29,6 +29,7 @@ from pydantic import BaseModel, Field
 
 from nl2sql.common.context import current_datasource_id
 from nl2sql.common.metrics import token_usage_counter
+from nl2sql.llm.failures import redact_keys
 from nl2sql.llm.wires import wire_named
 
 # Per-model prices, per million tokens: {"input": .., "output": .., "cached_input": ..}.
@@ -193,7 +194,8 @@ class TokenUsageCallback(BaseCallbackHandler):
             model=(_model_name(response) if response is not None else "") or requested,
             latency_s=round(time.perf_counter() - t0, 4),
             usage_reported=tokens is not None,
-            error=str(error) if error is not None else None,
+            # A provider's error text can quote the key; the usage block reaches every caller.
+            error=redact_keys(str(error)) if error is not None else None,
             **(tokens or {}),
         )
         call.cost = _cost(call, requested, self._prices)

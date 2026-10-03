@@ -9,6 +9,7 @@ One case cannot use state: LangGraph conditional-edge routers may only return ro
 `PipelineError` includes:
 
 - `node`, `message`, `severity`, `error_code`
+- `provider` and `detail`, set on a `PROVIDER_*` error (below), otherwise `None`
 - `is_retryable` derived from severity and error code
 
 Common error codes include `MISSING_SQL`, `EXECUTION_FAILED`, `PIPELINE_TIMEOUT`, `SECURITY_VIOLATION`, `QUESTION_NOT_ANSWERABLE`.
@@ -30,6 +31,45 @@ state key that `result_from_state` never read, so every caller through the SDK
 and the REST route saw `final_answer: null` with only the error code.
 
 `QUESTION_NOT_ANSWERABLE` (severity `ERROR`) comes from the datasource resolver when its answerability check finds that no datasource the role may read can answer the question, such as "what is the weather in Paris?". The run ends before the decomposer: no decomposer, planner, refiner or synthesizer call is made, `QueryResult.status` is `error`, and the message tells the user the question can't be answered from the connected data. The check is told to answer "answerable" when unsure. See [DatasourceResolverNode](../architecture/nodes/datasource_resolver_node.md#answerability-check).
+
+## Provider failures
+
+When the model provider refuses or fails a call, the LLM node that made it
+(datasource resolver, decomposer, AST planner, refiner, answer synthesizer)
+reports it through `nl2sql.llm.failures.provider_error` instead of its own
+failure code, so every caller (SDK, REST API, playground) gets the same entry.
+`classify_provider_error` reads the OpenAI and Anthropic SDK exceptions by
+shape (the anthropic SDK is an optional extra, so it is never imported), looking
+through what the exception was raised from:
+
+| `error_code` | when | `message` (for OpenAI) |
+| --- | --- | --- |
+| `PROVIDER_AUTH_FAILED` | HTTP 401, or 403 | "OpenAI rejected the API key." |
+| `PROVIDER_RATE_LIMITED` | HTTP 429 | "OpenAI rate limited the request." |
+| `PROVIDER_QUOTA_EXCEEDED` | HTTP 429 with `insufficient_quota` | "OpenAI says this API key has no quota left." |
+| `PROVIDER_TIMEOUT` | the SDK's timeout, or HTTP 408 | "OpenAI did not answer in time." |
+| `PROVIDER_UNAVAILABLE` | a connection error, or HTTP 5xx | "OpenAI could not be reached." / "OpenAI had a server error and could not answer." |
+| `PROVIDER_MODEL_UNAVAILABLE` | HTTP 404, or `model_not_found` | "OpenAI does not offer the configured model to this API key." |
+
+- `message` is one sentence naming the provider. It never carries the key
+  (masked or not), a Python repr, or the node's own label.
+- `provider` is the provider as a person names it (`PROVIDER_LABELS` in
+  `llm/providers.py`): Anthropic for the Anthropic SDK, otherwise the preset
+  whose endpoint the call went to. A `base_url` no preset names is
+  "The model provider".
+- `detail` is the provider's own words, such as
+  `HTTP 401 (invalid_api_key): Incorrect API key provided: [redacted key]. ...`,
+  for a "provider response" disclosure. `redact_keys` replaces anything
+  key-like (a bearer token, an `sk-`/`pk-`/`rk-` key whole or masked, any
+  unbroken run of 32 or more letters, digits, `-` or `_`) with `[redacted key]`.
+  The `error` of a failed call in `usage.calls` is redacted the same way.
+- Every `PROVIDER_*` code is fatal (`is_retryable` is false): a refinement
+  retry would make the same call to the same provider with the same key.
+- An HTTP 400 is not classified. It is a request the engine built wrongly, or
+  a model refusing a parameter, and the node's own error explains it better.
+
+`run_with_graph()`'s fallback applies the same classification, so a provider
+failure that escapes its node is not `UNKNOWN_ERROR`.
 
 ## Circuit breaker
 

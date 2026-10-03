@@ -10,6 +10,7 @@ from nl2sql.pipeline.nodes.schema_retriever.schema import render_schema_for_prom
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.common.logger import get_logger
 from nl2sql.context import NL2SQLContext
+from nl2sql.llm.failures import provider_error
 from nl2sql.llm.wires import structured
 from nl2sql.pipeline.plan_cache import PlanCache
 
@@ -159,7 +160,7 @@ class ASTPlannerNode:
             return {
                 "ast_planner_response": ASTPlannerResponse(plan=None),
                 "errors": [
-                    PipelineError(
+                    provider_error(self.node_name, exc) or PipelineError(
                         node=self.node_name,
                         message="Planner failed.",
                         severity=ErrorSeverity.ERROR,

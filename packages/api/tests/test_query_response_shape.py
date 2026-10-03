@@ -108,3 +108,16 @@ def test_the_response_says_where_the_run_trace_was_written(api_client):
 def test_no_trace_path_when_no_trace_was_written(api_client):
     client, _engine = api_client(QueryResult(status="success"))
     assert client.post("/api/v1/query", json={"natural_language": "q"}).json()["trace_path"] is None
+
+
+def test_a_provider_failure_reaches_the_caller_with_its_code_provider_and_detail(api_client):
+    # The engine classifies a provider's refusal; the route serves the entry as is.
+    entry = {"node": "datasource_resolver", "message": "OpenAI rejected the API key.",
+             "error_code": "PROVIDER_AUTH_FAILED", "severity": "ERROR", "provider": "OpenAI",
+             "detail": "HTTP 401 (invalid_api_key): Incorrect API key provided: [redacted key]."}
+    client, _engine = api_client(QueryResult(errors=[entry], status="error"))
+
+    body = client.post("/api/v1/query", json={"natural_language": "q"}).json()
+
+    assert body["status"] == "error"
+    assert body["errors"] == [entry]
