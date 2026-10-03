@@ -1652,6 +1652,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#the-ask-page" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Ask page
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#the-pipeline-page" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4137,6 +4148,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#the-ask-page" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Ask page
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#the-pipeline-page" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4409,7 +4431,7 @@ otherwise raises <code>EmbeddingDimensionMismatchError</code> (or
 its <strong>Showing</strong> switcher names; the resolver, which
 picks the database for every question when more than one is registered, reads
 the separate vector index, and with three registered it searches on every
-question. After a run the Question station names the database it picked. The two
+question. After a run the answer header names the database it picked. The two
 can disagree: a folder once had its snapshot intact and 0 entries in its index,
 so the page looked fine while every question failed with
 <code>SCHEMA_RETRIEVAL_FAILED</code>. Three things now guard against that:</p>
@@ -4485,6 +4507,40 @@ Debug choice: they belong to the visit, not to the page.</p>
 or on the hosted demo whether this tab has a key yet. Hover it, or let a screen
 reader read it, for the full sentence: how replay answers, or whose key answers
 and the hosted limits.</p>
+<h3 id="the-ask-page">The Ask page</h3>
+<p>Ask is the question box, then the run, answer first:</p>
+<ul>
+<li><strong>Suggestions.</strong> Under the question box, a row of chips offers three or four
+  guided questions for the database the rail is showing, and <strong>N more</strong> opens
+  every pile, one per database. On a phone the row is a strip you swipe
+  sideways. The run sits right below the box.</li>
+<li><strong>The answer leads.</strong> Once a run is back, its first block is the answer: the
+  question and the role it was asked as, the answer sentence in the largest
+  type on the page, and a strip such as <code>10 rows / 3 of 3 checks / 2 plans /
+  5.04 s / $0.0187</code>. Each item in the strip moves the keyboard to its station
+  below. A refusal gets the same block: <strong>Refused at the checks. No SQL was
+  written.</strong></li>
+<li><strong>The stations.</strong> Plan, Checks, SQL, Rows and Cost &amp; time follow, each with a
+  small heading, a tag for who decides it (<strong>Model · gpt-5.4</strong>, from the run's
+  usage, or <strong>Code</strong>) and the step's time. On the spine a round mark is a model
+  step and a square one is code; filled with a tick is done, an outline is
+  waiting and a dashed outline was not reached.</li>
+<li><strong>The gate.</strong> The Checks station shows the plans the checks saw (<strong>Plan 1
+  refused</strong>, then <strong>Plan 2 passed</strong> when the first was sent back), why, in one
+  sentence, and each check as a tile with a tick or a cross.</li>
+<li><strong>While it runs.</strong> Only the station being worked on is lit; the rest wait,
+  faded. A counter beside the button reads <strong>Running · 3.4 s</strong>, and after a
+  moment <strong>Ask</strong> becomes <strong>Stop</strong>, which cancels the request: the run then says
+  <strong>Stopped</strong> and every station is marked not reached. The server is not told;
+  a question already sent still counts against the hosted limits.</li>
+<li><strong>When it fails.</strong> A provider's refusal is said in words with the next step,
+  for example <strong>OpenAI rejected this key.</strong> with <strong>Replace the key</strong>, which
+  opens Settings. The provider's own reply is folded under <strong>Provider
+  response</strong>.</li>
+<li><strong>On a phone</strong>, once a run is on the page, a bar at the bottom, <strong>Ask another
+  question</strong>, takes you back to the question box. It hides while the box is in
+  view.</li>
+</ul>
 <h3 id="the-pipeline-page">The Pipeline page</h3>
 <p><strong>Pipeline</strong> lists every step a question passes through, in the order a run
 takes them, and marks which of them a model decides. Five do: the answerability
@@ -4609,9 +4665,11 @@ saved.
   there is nothing on the server to save. Choosing a model needs nothing
   saved, so hosted mode keeps it: one key per provider and the model each step
   runs on travel with each question, in a header each. The Ask page there opens
-  by saying a key is needed and holds the question box and the guided questions
-  closed until one is saved, so a new visitor is not left to discover it by
-  asking. Locally there is nothing to announce, and nothing is shown. See
+  with the key form itself: pick a provider, paste the key and <strong>Use this key</strong>,
+  under three facts about it -- <strong>Stored</strong> in this browser tab only, <strong>Sent</strong>
+  with each question in a request header, <strong>Never</strong> written to disk, logs or
+  traces. The question box and the suggestions stay closed until a key is in,
+  so a new visitor is not left to discover it by asking. Locally there is nothing to announce, and nothing is shown. See
   <a href="../../deployment/hosted-demo/">Hosted demo</a>.</p>
 </li>
 </ul>
@@ -4719,9 +4777,9 @@ object; use the flags when the file holds your key.</p>
 run the CLI from the directory you ran <code>nl2sql setup --demo</code> in.</p>
 <h2 id="sample-questions">Sample questions</h2>
 <p><code>configs/sample_questions.demo.yaml</code> is written with twenty questions, the same
-ones the playground offers as guided questions -- the playground shows them in
-one pile per database, each headed by the datasource id, rather than as one
-list of twenty. Chinook's twelve come first, so the demo opens on familiar
+ones the playground offers as guided questions -- a few as chips for the
+database the rail is showing, and all twenty behind <strong>N more</strong>, in one pile per
+database, each headed by the datasource id. Chinook's twelve come first, so the demo opens on familiar
 ground:</p>
 <ul>
 <li>How many customers do we have, by country?</li>

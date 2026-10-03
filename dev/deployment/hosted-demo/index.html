@@ -4224,9 +4224,11 @@ gate that protects it.</p>
 a container turns it on.</p>
 <h2 id="what-the-visitors-key-does-and-does-not-do">What the visitor's key does, and does not do</h2>
 <p>A visitor who has not pasted one yet is told so before they ask. The <strong>Ask</strong>
-page opens on a short state saying the demo runs on their own key, that it
-stays in this browser tab and is never stored on the server, with a link to
-<strong>Settings</strong>; the question box and the guided questions are disabled until
+page opens on the key form itself: a provider choice, the key and <strong>Use this
+key</strong>, under three facts -- <strong>Stored</strong> in this browser tab only, <strong>Sent</strong> with
+each question in a request header, <strong>Never</strong> written to disk, logs or traces --
+and a link to <strong>Settings</strong> for a key per provider or a model per step; the
+question box and the suggested questions are disabled until
 there is a key, so a click cannot fail with a <code>401</code> the visitor had no way to
 see coming. The moment a key is saved the state clears and everything enables,
 with no reload. That state is the only place the point is made: until a key is
