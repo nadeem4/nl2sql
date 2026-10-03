@@ -4,7 +4,7 @@ The playground showed ``The run stopped: Datasource resolution failed: Error
 code: 401 - {'error': {...}}``: the node's own label, the SDK's repr and the
 masked key. Each LLM node now hands a provider failure to
 ``nl2sql.llm.failures.provider_error``, and ``QueryResult.errors`` carries its
-``provider`` and ``detail`` to every caller.
+``provider`` and ``provider_response`` to every caller.
 """
 from types import SimpleNamespace
 from unittest.mock import MagicMock
@@ -90,7 +90,7 @@ def test_each_llm_node_reports_a_provider_failure_by_its_code(build):
     error = result["errors"][0]
     assert error.error_code == ErrorCode.PROVIDER_RATE_LIMITED
     assert error.provider == "OpenAI"
-    assert "Rate limit reached." in error.detail
+    assert "Rate limit reached." in error.provider_response
     assert "Error code" not in error.message
     # The reasoning log the playground shows must not repeat the raw exception.
     assert all("Error code" not in str(entry) for entry in result.get("reasoning", []))
@@ -133,14 +133,14 @@ def test_a_rejected_key_reaches_the_facade_as_provider_auth_failed(rejecting_reg
     # The stand-in listens on 127.0.0.1, which no provider preset names.
     assert entry["provider"] == "The model provider"
     assert entry["message"] == "The model provider rejected the API key."
-    assert "Incorrect API key provided" in entry["detail"]
-    for text in (entry["message"], entry["detail"]):
+    assert "Incorrect API key provided" in entry["provider_response"]
+    for text in (entry["message"], entry["provider_response"]):
         assert "Datasource resolution failed" not in text
         assert "{'" not in text
         assert MASKED not in text and FAKE_KEY not in text and "0000" not in text
 
 
-def test_an_error_with_no_provider_has_null_provider_and_detail():
+def test_an_error_with_no_provider_has_null_provider_and_provider_response():
     from nl2sql.common.errors import ErrorSeverity, PipelineError
 
     result = result_from_state({"errors": [PipelineError(node="ast_planner", message="Planner failed.",
@@ -149,4 +149,4 @@ def test_an_error_with_no_provider_has_null_provider_and_detail():
 
     assert result.errors == [{"node": "ast_planner", "message": "Planner failed.",
                               "error_code": "PLANNING_FAILURE", "severity": "ERROR",
-                              "provider": None, "detail": None}]
+                              "provider": None, "provider_response": None}]

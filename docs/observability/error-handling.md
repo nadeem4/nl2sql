@@ -9,7 +9,7 @@ One case cannot use state: LangGraph conditional-edge routers may only return ro
 `PipelineError` includes:
 
 - `node`, `message`, `severity`, `error_code`
-- `provider` and `detail`, set on a `PROVIDER_*` error (below), otherwise `None`
+- `provider` and `provider_response`, set on a `PROVIDER_*` error (below), otherwise `None`
 - `is_retryable` derived from severity and error code
 
 Common error codes include `MISSING_SQL`, `EXECUTION_FAILED`, `PIPELINE_TIMEOUT`, `SECURITY_VIOLATION`, `QUESTION_NOT_ANSWERABLE`.
@@ -57,7 +57,7 @@ through what the exception was raised from:
   `llm/providers.py`): Anthropic for the Anthropic SDK, otherwise the preset
   whose endpoint the call went to. A `base_url` no preset names is
   "The model provider".
-- `detail` is the provider's own words, such as
+- `provider_response` is the provider's own words, such as
   `HTTP 401 (invalid_api_key): Incorrect API key provided: [redacted key]. ...`,
   for a "provider response" disclosure. `redact_keys` replaces anything
   key-like (a bearer token, an `sk-`/`pk-`/`rk-` key whole or masked, any

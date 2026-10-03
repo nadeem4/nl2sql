@@ -6,7 +6,7 @@ import { SETTINGS_ROUTE, describeFault } from "./faults.js";
 function entry(error_code, extra = {}) {
   return {
     node: "datasource_resolver", message: "engine message", error_code, severity: "ERROR",
-    provider: "OpenAI", detail: "HTTP 401 (invalid_api_key): Incorrect API key provided: [redacted key].", ...extra,
+    provider: "OpenAI", provider_response: "HTTP 401 (invalid_api_key): Incorrect API key provided: [redacted key].", ...extra,
   };
 }
 

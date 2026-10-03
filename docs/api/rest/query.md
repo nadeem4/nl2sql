@@ -39,7 +39,7 @@ Derives from `nl2sql.QueryResult` (only `sub_queries` is narrowed to
 | --- | --- | --- | --- |
 | `sub_queries` | `List[SubQueryResponse]` | no | One entry per decomposed sub-query, each with its SQL. |
 | `final_answer` | `Optional[Dict[str, Any]]` | no | Answer synthesizer payload (`summary`, `format_type`, `content`). |
-| `errors` | `List[Dict[str, Any]]` | no | Pipeline errors (`node`, `message`, `error_code`, `severity`, `provider`, `detail`). `provider` and `detail` are set for a `PROVIDER_*` code and `null` otherwise; see [provider failures](../../observability/error-handling.md#provider-failures). |
+| `errors` | `List[Dict[str, Any]]` | no | Pipeline errors (`node`, `message`, `error_code`, `severity`, `provider`, `provider_response`). `provider` and `provider_response` are set for a `PROVIDER_*` code and `null` otherwise; see [provider failures](../../observability/error-handling.md#provider-failures). |
 | `trace_id` | `str` | no | Trace identifier. |
 | `reasoning` | `List[Dict[str, Any]]` | no | Reasoning events/logs. |
 | `warnings` | `List[Dict[str, Any]]` | no | Warning events/logs. |
@@ -62,11 +62,11 @@ An `errors[]` entry for a key the provider rejected:
   "error_code": "PROVIDER_AUTH_FAILED",
   "severity": "ERROR",
   "provider": "OpenAI",
-  "detail": "HTTP 401 (invalid_api_key): Incorrect API key provided: [redacted key]. You can find your API key at https://platform.openai.com/account/api-keys."
+  "provider_response": "HTTP 401 (invalid_api_key): Incorrect API key provided: [redacted key]. You can find your API key at https://platform.openai.com/account/api-keys."
 }
 ```
 
-Branch on `error_code`, show `message`, and keep `detail` for a "provider
+Branch on `error_code`, show `message`, and keep `provider_response` for a "provider
 response" disclosure. The codes are listed under
 [provider failures](../../observability/error-handling.md#provider-failures).
 

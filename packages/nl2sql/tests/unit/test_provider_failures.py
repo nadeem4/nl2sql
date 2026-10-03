@@ -4,7 +4,7 @@ The model provider's own exception reads like ``Error code: 401 - {'error':
 {'message': 'Incorrect API key provided: sk-...0000', ...}}``: a Python repr,
 with the key's tail in it. ``nl2sql.llm.failures`` turns that into an
 ``ErrorCode`` a caller can branch on, a short message naming the provider, and
-the provider's own words (with any key cut out) in ``detail``. No network: the
+the provider's own words (with any key cut out) in ``provider_response``. No network: the
 exceptions are the SDK's own, built from a stub response.
 """
 import re
@@ -118,7 +118,7 @@ def test_an_anthropic_exception_is_classified_without_the_anthropic_sdk():
 
     assert failure.code == ErrorCode.PROVIDER_AUTH_FAILED
     assert failure.provider == "Anthropic"
-    assert "invalid x-api-key" in failure.detail
+    assert "invalid x-api-key" in failure.provider_response
 
 
 def test_a_wrapped_provider_exception_is_found_through_its_cause():
@@ -140,15 +140,15 @@ def test_anything_else_is_left_to_the_node_that_caught_it(exc):
     assert classify_provider_error(exc) is None
 
 
-def test_detail_keeps_the_providers_words_without_the_key_or_a_repr():
+def test_provider_response_keeps_the_providers_words_without_the_key_or_a_repr():
     failure = classify_provider_error(_status_error(401, AUTH))
 
-    assert "Incorrect API key provided" in failure.detail
-    assert "401" in failure.detail
-    assert "invalid_api_key" in failure.detail
-    assert "{'" not in failure.detail
-    assert OPENAI_MASKED not in failure.detail
-    assert "0000" not in failure.detail
+    assert "Incorrect API key provided" in failure.provider_response
+    assert "401" in failure.provider_response
+    assert "invalid_api_key" in failure.provider_response
+    assert "{'" not in failure.provider_response
+    assert OPENAI_MASKED not in failure.provider_response
+    assert "0000" not in failure.provider_response
 
 
 @pytest.mark.parametrize("key", [RAW_KEY, OPENAI_MASKED, ELLIPSIS_MASKED,
@@ -162,12 +162,12 @@ def test_no_key_like_string_survives_redaction(key):
     assert "Incorrect API key provided" in redacted and "Try again." in redacted
 
 
-def test_no_key_survives_in_message_or_detail_even_when_the_provider_echoes_it_whole():
+def test_no_key_survives_in_message_or_provider_response_even_when_the_provider_echoes_it_whole():
     body = _openai_body(f"Incorrect API key provided: {RAW_KEY}.", code="invalid_api_key")
 
     error = provider_error("datasource_resolver", _status_error(401, body))
 
-    for text in (error.message, error.detail):
+    for text in (error.message, error.provider_response):
         assert RAW_KEY not in text and RAW_KEY[-4:] not in text
 
 

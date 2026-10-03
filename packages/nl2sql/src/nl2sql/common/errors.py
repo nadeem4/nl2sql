@@ -87,7 +87,7 @@ class PipelineError(BaseModel):
             callers.
         provider (Optional[str]): The model provider a ``PROVIDER_*`` error
             came from, as a person would name it ("OpenAI").
-        detail (Optional[str]): The provider's own words behind ``message``,
+        provider_response (Optional[str]): The provider's own words behind ``message``,
             with anything key-like redacted, for a "provider response"
             disclosure. Sent to callers.
     """
@@ -100,7 +100,7 @@ class PipelineError(BaseModel):
     stack_trace: Optional[str] = None
     details: Optional[Any] = None
     provider: Optional[str] = None
-    detail: Optional[str] = None
+    provider_response: Optional[str] = None
 
     @property
     def is_retryable(self) -> bool:

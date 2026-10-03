@@ -5,7 +5,7 @@ A provider SDK raises something like ``Error code: 401 - {'error': {'message':
 tail in it. A node that put ``str(exc)`` into its error showed exactly that to
 every caller. :func:`classify_provider_error` turns it into one of a few stable
 ``ErrorCode`` values, a sentence naming the provider, and the provider's own
-words (anything key-like cut out) as ``detail``. Every LLM node reports a
+words (anything key-like cut out) as ``provider_response``. Every LLM node reports a
 provider failure through :func:`provider_error`, so the SDK, the REST API and
 the playground all get the same entry.
 
@@ -47,13 +47,13 @@ class ProviderFailure(NamedTuple):
         code: One of the ``PROVIDER_*`` error codes.
         provider: The provider as a person names it, or "The model provider".
         message: One sentence naming the provider and what happened.
-        detail: The provider's own words, with anything key-like redacted.
+        provider_response: The provider's own words, with anything key-like redacted.
     """
 
     code: ErrorCode
     provider: str
     message: str
-    detail: str
+    provider_response: str
 
 
 def redact_keys(text: str) -> str:
@@ -106,7 +106,7 @@ def _reason(exc: BaseException) -> str:
     return str(getattr(exc, "code", None) or "")
 
 
-def _detail(exc: BaseException, status: Optional[int]) -> str:
+def _provider_response(exc: BaseException, status: Optional[int]) -> str:
     body = _error_body(exc)
     if isinstance(body, dict) and isinstance(body.get("message"), str):
         words = body["message"]
@@ -163,7 +163,7 @@ def classify_provider_error(exc: BaseException) -> Optional[ProviderFailure]:
             found = None
         if found:
             code, message = found
-            return ProviderFailure(code, p, message, _detail(candidate, status if isinstance(status, int) else None))
+            return ProviderFailure(code, p, message, _provider_response(candidate, status if isinstance(status, int) else None))
     return None
 
 
@@ -181,5 +181,5 @@ def provider_error(node: str, exc: BaseException) -> Optional[PipelineError]:
         severity=ErrorSeverity.ERROR,
         error_code=failure.code,
         provider=failure.provider,
-        detail=failure.detail,
+        provider_response=failure.provider_response,
     )

@@ -3,7 +3,7 @@
 //
 // The engine classifies a provider's refusal (`nl2sql.llm.failures`) into a
 // `PROVIDER_*` code and names the provider; this only picks the words and the
-// next step. The provider's own text stays in `entry.detail`, for a disclosure.
+// next step. The provider's own text stays in `entry.provider_response`, for a disclosure.
 
 export const SETTINGS_ROUTE = "#/settings";
 
