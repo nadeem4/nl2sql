@@ -8,20 +8,12 @@ import Pipeline from "./Pipeline.jsx";
 import RetrievalInspector from "./Retrieval.jsx";
 import { answeredDatasources, datasourceNames } from "./datasources.js";
 import { guidedGroups } from "./questions.js";
-import { NO_KEY_REASON, hostedNote, needsKey } from "./firstRun.js";
+import { NO_KEY_REASON, needsKey } from "./firstRun.js";
+import { modeStatus } from "./status.js";
 import { askHeaders, readKeys, writeKeyFor } from "./hostedKey.js";
 import { readModels, writeModel } from "./hostedModels.js";
 import { createRouter, hashFor, navItems, pageFor, pageFromHash } from "./router.js";
 import { deniedTables, planTables } from "./run.js";
-
-// The banner claims recorded answers only when the server loaded some.
-function replayNote(recorded, total, canSet) {
-  const fix = canSet ? "add an API key under Settings or restart with --api-key" : "restart with --api-key";
-  if (!recorded) {
-    return `No API key found, and replay mode has no recorded answers, so no question can be answered. To ask questions, ${fix}.`;
-  }
-  return `No API key found. ${recorded} of ${total} guided questions answer from recorded model responses; for any other question, ${fix}.`;
-}
 
 const DEBUG_KEY = "nl2sql.playground.debug";
 
@@ -181,7 +173,7 @@ export default function App() {
     setIndex(reply);
   };
 
-  // A saved key can turn replay into live; the mode line follows the server.
+  // A saved key can turn replay into live; the status pill follows the server.
   const settingsSaved = (next) => {
     setSettings(next);
     setMeta((m) => (m ? { ...m, mode: next.mode } : m));
@@ -250,8 +242,7 @@ export default function App() {
   // Hosted, with no key in this tab: the page says so and holds the question
   // box and the guided questions closed instead of letting a click fail.
   const noKey = needsKey(meta, apiKeys);
-  // Empty until this tab has a key: the first-run state is saying it already.
-  const modeNote = hosted ? hostedNote(meta, apiKeys) : "";
+  const status = modeStatus(meta, apiKeys, { canSet });
   const groups = guidedGroups(meta);
   const current = pageFor(page);
   const nav = navItems(page, {
@@ -268,28 +259,10 @@ export default function App() {
       </button>
 
       <header className="topbar">
-        <div className="topbar-line">
-          {/* The product mark, not the page's heading: the page title is. */}
-          <p className="wordmark">
-            <span className="mono">nl2sql</span> playground
-          </p>
-          {meta && (
-            <p className={`mode mode-${meta.mode}`}>
-              <strong>{hosted ? "Hosted demo." : replay ? "Replay mode." : "Live mode."}</strong>{" "}
-              {hosted ? (
-                modeNote && (
-                  <>
-                    {modeNote} <a href={hashFor("settings")}>Settings</a>.
-                  </>
-                )
-              ) : replay ? (
-                replayNote(meta.recorded_questions, (meta.questions || []).length, canSet)
-              ) : (
-                "Questions go to the configured model."
-              )}
-            </p>
-          )}
-        </div>
+        {/* The product mark, not the page's heading: the page title is. */}
+        <p className="wordmark">
+          <span className="mono">nl2sql</span> playground
+        </p>
         <nav className="nav" aria-label="Playground pages">
           <ul>
             {nav.map((item) => (
@@ -307,6 +280,15 @@ export default function App() {
             ))}
           </ul>
         </nav>
+        {/* The mode in a few words; the sentence it stands for is the
+            tooltip, and is read out in full. */}
+        {status && (
+          <p className={`status mode-${meta.mode}`} data-tone={status.tone} title={status.detail}>
+            <span className="pulse" aria-hidden="true" />
+            <span className="status-label">{status.label}</span>
+            <span className="visually-hidden">. {status.detail}</span>
+          </p>
+        )}
       </header>
 
       {indexBroken && (

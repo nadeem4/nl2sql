@@ -39,8 +39,10 @@ stays in this browser tab and is never stored on the server, with a link to
 there is a key, so a click cannot fail with a `401` the visitor had no way to
 see coming. The moment a key is saved the state clears and everything enables,
 with no reload. That state is the only place the point is made: until a key is
-saved the top bar reads just **Hosted demo.**, and it says whose key answers
-and what the limits are once there is one. None of this appears in local mode.
+saved the status pill in the top bar reads just **Hosted demo · No key yet**,
+and once there is one it names whose key answers (**Hosted demo · OpenAI key
+in this tab**), with the limits in its tooltip. None of this appears in local
+mode.
 
 The visitor pastes a key on the **Settings** page, one per provider. From there:
 
