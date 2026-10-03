@@ -115,17 +115,19 @@ Back and Forward, and that routing touches nothing but the hash.
   sentence already says the sample data never changes and what to run instead,
   so the terminal command is left off. A demo folder written by an older
   engine shows `#index-folder-warning`.
-- **Mode line** (top bar): live or replay. In replay it states how many guided
-  questions the loaded recordings answer (`recorded_questions` from
-  `/api/meta`), or, with none, that replay mode has no recorded answers and a key
-  is needed. A question replay has no answer for shows "No recorded answer for
-  this question. Add an API key to ask it live." (`replay_miss` from `/api/ask`).
-  Hosted, it reads **Hosted demo.** and nothing more until this tab has a key:
-  the first-run state above the question box, and the Settings form, are
-  already saying what a key is for, and a third copy in the top bar pulled the
-  eye away from the one place that could do something about it. With a key
-  saved it says whose key answers and what the limits are (`hostedNote` in
-  `src/firstRun.js`).
+- **Status pill** (`.status`, top bar, on the same row as the wordmark and the
+  nav at 1061px and wider): the mode in a few words, from `modeStatus` in
+  `src/status.js`, with a green dot when a question can be answered live and an
+  amber one when it cannot. **Live · configured model**; **Replay mode · 12 of
+  20 recorded** (`recorded_questions` from `/api/meta`) or **Replay mode · No
+  recordings**; hosted, **Hosted demo · No key yet** until this tab has a key,
+  then **Hosted demo · OpenAI key in this tab** (or **2 keys**). The sentence
+  the old mode line carried -- how many questions replay answers and how to
+  get a key, or whose key answers and the hosted limits (`hostedNote` in
+  `src/firstRun.js`) -- is kept whole as the pill's `title` and as
+  visually-hidden text a screen reader reads. A question replay has no answer
+  for shows "No recorded answer for this question. Add an API key to ask it
+  live." (`replay_miss` from `/api/ask`).
 - **Composer** (Ask page): the question box, the role selector
   (`#role-select`), **Plan only** (`#plan-only`), **Debug** (`#debug-toggle`)
   and the guided questions from `/api/meta`. The demo registers three
@@ -211,7 +213,7 @@ Back and Forward, and that routing touches nothing but the hash.
   page's content is `#settings-panel`). **API key** (`#settings-key`, `#settings-save-key`) shows the key in use
   only in masked form (`#settings-key-current`); saving one writes it to the
   demo project's `.env.demo` and turns replay into live without a restart, and
-  the mode line follows. **Model for each step** has one selector per LLM node
+  the status pill follows. **Model for each step** has one selector per LLM node
   (`#model-datasourceresolver`, `#model-decomposer`, `#model-astplanner`,
   `#model-refiner`, `#model-answersynthesizer`) with a Default option, and
   **Save models** (`#settings-save-models`) writes the changed ones to
@@ -255,12 +257,38 @@ temperature), `src/indexHealth.js` (entry counts in plain words, the status
 line, relative build times), `src/router.js` (which page a hash names, the nav
 rows, and the router over `hashchange`), `src/questions.js` (the guided
 questions grouped by datasource), `src/firstRun.js` (when the hosted demo has
-to ask for a key before it takes a question, and what the mode line then says),
+to ask for a key before it takes a question, and whose key answers),
+`src/status.js` (what the top bar's status pill says in each mode, and the
+sentence it stands for),
 `src/datasources.js` (the
 databases the switcher offers, and which one a run was answered from) and
 `src/retrieval.js` (the MMR summary line, picks
 in order, entries passed over, the copyable text form) and `src/feedback.js`
 (when a run can be rated, the request body, the saved line) with Node's built-in test runner; there is no test dependency.
+
+## Look
+
+`src/styles.css` is the one stylesheet, built on tokens declared on `:root`
+(light) and again under `prefers-color-scheme: dark`:
+
+- **Colour** (Porcelain): `--paper`, `--surface`, `--raised`, `--well`, three
+  inks, `--rule`/`--rule-strong`/`--hair`, one oxblood `--accent` used
+  sparingly, `--accent-fill` (ink: the primary button), `--ok` for passed
+  checks and a live status, `--warn`, and `--fault` for real faults. Every text
+  colour holds 4.5:1 on every ground in both themes.
+- **Type**: `--fs-1` to `--fs-6` (12 / 13.5 / 15 / 18 / 24 / 34px) and
+  `--fw-regular` / `--fw-medium` / `--fw-bold` (400 / 500 / 650). No other size
+  is used.
+- **Spacing**: `--sp-1` to `--sp-8` (4 / 8 / 12 / 16 / 24 / 32 / 48 / 72px).
+- **One raised tier** (`--raised`, 12px radius, a `--hair` border, `--shadow`),
+  and only for the composer, the checks gate's body, the SQL and rows, and the
+  node inspector. Everything else sits flat on the paper.
+- **One button family**: primary (ink fill: Ask, Add your key, Use this key,
+  a needed Rebuild), secondary (outline: Rebuild, the rating buttons) and ghost
+  (Close, Copy), 36px tall (40px on a coarse pointer), 8px radius. Hover
+  changes colour only, inside `@media (hover: hover)`; a press scales to .98.
+- Links share one style (accent, 1px underline at 3px offset), and every
+  `<summary>` uses one CSS caret instead of the browser's triangle.
 
 ## Fonts and offline use
 
@@ -271,7 +299,7 @@ Google Fonts. The two typefaces are bundled at build time from `@fontsource`
 - **Schibsted Grotesk** (variable) for the interface;
 - **Fragment Mono** for plans, SQL, table and column names, and numbers.
 
-Both are SIL Open Font License. The built page is about 300 KB.
+Both are SIL Open Font License. The built page is about 350 KB (150 KB gzipped).
 
 ## Develop
 

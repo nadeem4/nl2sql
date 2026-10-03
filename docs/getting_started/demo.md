@@ -239,6 +239,12 @@ and marks Settings or Retrieval when the server has it off; the page itself
 then says why. Moving between pages keeps the question, the answer and the
 Debug choice: they belong to the visit, not to the page.
 
+At the right of the top bar a status pill says which mode the page is in --
+**Live**, **Replay mode** with how many guided questions it has recordings for,
+or on the hosted demo whether this tab has a key yet. Hover it, or let a screen
+reader read it, for the full sentence: how replay answers, or whose key answers
+and the hosted limits.
+
 ### The Pipeline page
 
 **Pipeline** lists every step a question passes through, in the order a run
