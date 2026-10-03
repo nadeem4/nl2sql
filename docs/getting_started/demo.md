@@ -372,6 +372,10 @@ re-ranking model; the "re-ranking" is MMR, explained in
   which entry types to include, and a datasource filter. After the first
   search, each change searches again. Each entry shows the text that was
   embedded for it.
+- **Reading it.** The picks in order, and the entries MMR passed over, sit above
+  the pool as rows of chips. Each similarity has a bar placed within the
+  pool's own range, nearest full and farthest empty: raw cosine scores bunch
+  together, so this is what shows which entries are actually nearer.
 - **Free.** The embedder is local; nothing here calls the LLM.
 - **For chunking experiments.** Change the chunking, press Rebuild, search the
   same text, and diff the **Copy as text** output of the two runs: one

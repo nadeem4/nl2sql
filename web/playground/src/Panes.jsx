@@ -1,8 +1,11 @@
 import React, { useState } from "react";
 import NodeInspector from "./NodeInspector.jsx";
 import Feedback from "./Feedback.jsx";
+import SqlCard from "./SqlCard.jsx";
+import RowsTable from "./RowsTable.jsx";
+import Ledger, { Totals } from "./Ledger.jsx";
 import { planSections } from "./plan.js";
-import { deniedTables, formatSql, humanCheck, nodeLedger, traceFileName, traceUrl } from "./run.js";
+import { deniedTables, humanCheck, nodeLedger, traceFileName, traceUrl } from "./run.js";
 
 // The run reads top to bottom as one sequence: question, plan, checks, SQL,
 // rows, cost. Each station is a renderer over the `/api/ask` response. The
@@ -149,7 +152,7 @@ export function SqlPane({ sub, state, refused }) {
           : sql ? null : "No SQL.";
   return (
     <Station id="pane-sql" title="SQL" state={state} note={note}>
-      {sql && <pre className="sql" tabIndex={0} aria-label="Generated SQL">{formatSql(sql)}</pre>}
+      {sql && <SqlCard sql={sql} plan={(sub.retry_count || 0) + 1} />}
     </Station>
   );
 }
@@ -158,13 +161,6 @@ export function RowsPane({ sub, result, state }) {
   const rows = sub && sub.rows;
   const summary = result && result.final_answer && result.final_answer.summary;
   const planOnly = result && result.status === "plan_only";
-  // A column is numeric when its first non-null value is; its header aligns with it.
-  const numeric = rows
-    ? rows.columns.map((_, j) => {
-        const first = rows.rows.find((r) => r[j] !== null);
-        return !!first && typeof first[j] === "number";
-      })
-    : [];
   const note =
     state === "idle" ? "The query runs read-only against the database."
       : state === "skipped" ? "Nothing ran."
@@ -174,37 +170,11 @@ export function RowsPane({ sub, result, state }) {
   return (
     <Station id="pane-rows" title="Rows" state={state} note={note}>
       {summary && <p className="answer">{summary}</p>}
-      {rows && (
-        <>
-          <div className="table-scroll rows-wrap" tabIndex={0} role="region" aria-label="Result rows">
-            <table className="grid">
-              <thead>
-                <tr>{rows.columns.map((c, j) => <th key={c} scope="col" className={numeric[j] ? "num" : undefined}>{c}</th>)}</tr>
-              </thead>
-              <tbody>
-                {rows.rows.map((row, i) => (
-                  <tr key={i}>
-                    {row.map((cell, j) => (
-                      <td key={j} className={typeof cell === "number" ? "num" : cell === null ? "null" : ""}>
-                        {cell === null ? "NULL" : String(cell)}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <p className="table-foot">
-            {rows.total_rows.toLocaleString()} {rows.total_rows === 1 ? "row" : "rows"}
-            {rows.rows.length < rows.total_rows && `, showing the first ${rows.rows.length}`}
-          </p>
-        </>
-      )}
+      {rows && <RowsTable rows={rows} result={result} />}
     </Station>
   );
 }
 
-const num = (n) => Number(n || 0).toLocaleString();
 export const secs = (n) => {
   if (n === undefined || n === null) return "-";
   const s = Number(n);
@@ -251,18 +221,9 @@ export function UsagePane({ usage, timings, replay, debug, state, result }) {
     );
   }
   const priced = total && total.cost !== null && total.cost !== undefined;
-  const longest = Math.max(...ledger.map((r) => r.seconds || 0), 0.000001);
   return (
     <Station id="pane-usage" title="Cost & time" state="done">
-      <dl className="totals">
-        <div><dt>LLM calls</dt><dd>{num(total && total.calls)}</dd></div>
-        <div><dt>Input tokens</dt><dd>{num(total && total.input_tokens)}</dd></div>
-        <div><dt>Cached</dt><dd>{num(total && total.cached_input_tokens)}</dd></div>
-        <div><dt>Output tokens</dt><dd>{num(total && total.output_tokens)}</dd></div>
-        <div><dt>Waiting on the model</dt><dd>{secs(total && total.latency_s)}</dd></div>
-        <div><dt>Total time</dt><dd>{secs(wall)}</dd></div>
-        {priced && <div><dt>Cost</dt><dd>${Number(total.cost).toFixed(4)}</dd></div>}
-      </dl>
+      <Totals total={total} wall={wall} />
       {debug && href && (
         <p className="trace-line">
           Select a node to see what it read, what it returned and, for a model call, the exact prompt and answer.
@@ -278,70 +239,7 @@ export function UsagePane({ usage, timings, replay, debug, state, result }) {
         <p className="trace-line">No trace file was kept for this run. Set <code>TRACE_MODE=always</code> to keep one for every run.</p>
       )}
       {debug && ledger.length > 0 && (
-        <div className="table-scroll ledger-wrap" tabIndex={0} role="region" aria-label="Per-node tokens and time">
-          <table className="grid ledger">
-            <caption className="visually-hidden">Per node, in the order the pipeline ran them</caption>
-            <thead>
-              <tr>
-                <th scope="col">Node</th>
-                <th scope="col">Calls</th>
-                <th scope="col">Input</th>
-                <th scope="col">Cached</th>
-                <th scope="col">Output</th>
-                <th scope="col">Reasoning</th>
-                <th scope="col">LLM time</th>
-                <th scope="col" className="time-col">Node time</th>
-                {priced && <th scope="col">Cost</th>}
-              </tr>
-            </thead>
-            <tbody>
-              {ledger.map((r) => {
-                const u = r.usage;
-                return (
-                  <tr key={r.name} data-node={r.name} data-depth={r.depth} className={u ? "llm" : "code"}
-                    data-picked={picked === r.name ? "true" : undefined}>
-                    <th scope="row">
-                      {href ? (
-                        <button className="node node-link" aria-pressed={picked === r.name} aria-controls="node-inspector"
-                          onClick={() => pick(r.name)}>{r.name}</button>
-                      ) : (
-                        <span className="node">{r.name}</span>
-                      )}
-                      {r.retried && <span className="tag">{u.calls} calls, retried</span>}
-                      {r.name === "sql_agent" && <span className="tag quiet">includes the nodes below</span>}
-                    </th>
-                    <td>{u ? num(u.calls) : ""}</td>
-                    <td>{u ? num(u.input_tokens) : ""}</td>
-                    <td>{u ? num(u.cached_input_tokens) : ""}</td>
-                    <td>{u ? num(u.output_tokens) : ""}</td>
-                    <td>{u ? num(u.reasoning_tokens) : ""}</td>
-                    <td>{u ? secs(u.latency_s) : ""}</td>
-                    <td className="time-col">
-                      <span className="share" style={{ "--share": (r.seconds || 0) / longest }} aria-hidden="true" />
-                      {secs(r.seconds)}
-                    </td>
-                    {priced && <td>{u && u.cost !== null && u.cost !== undefined ? Number(u.cost).toFixed(4) : ""}</td>}
-                  </tr>
-                );
-              })}
-            </tbody>
-            {total && (
-              <tfoot>
-                <tr>
-                  <th scope="row">Question total</th>
-                  <td>{num(total.calls)}</td>
-                  <td>{num(total.input_tokens)}</td>
-                  <td>{num(total.cached_input_tokens)}</td>
-                  <td>{num(total.output_tokens)}</td>
-                  <td>{num(total.reasoning_tokens)}</td>
-                  <td>{secs(total.latency_s)}</td>
-                  <td className="time-col">{secs(wall)}</td>
-                  {priced && <td>{Number(total.cost).toFixed(4)}</td>}
-                </tr>
-              </tfoot>
-            )}
-          </table>
-        </div>
+        <Ledger ledger={ledger} total={total} wall={wall} priced={priced} picked={picked} href={href} onPick={pick} />
       )}
       {debug && picked && (
         <NodeInspector name={picked} trace={trace} loading={loading} error={traceError} onClose={() => setPicked(null)} />

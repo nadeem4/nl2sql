@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import { callTokens, nodeRuns, pretty, readable } from "./run.js";
 import { RetrievalRecord } from "./Retrieval.jsx";
 
@@ -77,16 +77,30 @@ function LlmCall({ call }) {
   );
 }
 
+// On open (and on each node picked), the inspector scrolls just into view and
+// takes focus on its title; Close hands focus back to the node that opened it.
 export default function NodeInspector({ name, trace, loading, error, onClose }) {
   const runs = nodeRuns(trace, name);
+  const box = useRef(null);
+  const title = useRef(null);
+  useEffect(() => {
+    const still = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (box.current) box.current.scrollIntoView({ block: "nearest", behavior: still ? "auto" : "smooth" });
+    if (title.current) title.current.focus({ preventScroll: true });
+  }, [name]);
+  const close = () => {
+    const opener = document.querySelector('.node-link[aria-controls="node-inspector"][aria-pressed="true"]');
+    onClose();
+    if (opener) opener.focus();
+  };
   return (
-    <section className="inspect" id="node-inspector" aria-labelledby="inspect-title" aria-live="polite">
+    <section className="inspect" id="node-inspector" ref={box} aria-labelledby="inspect-title" aria-live="polite">
       <div className="inspect-head">
-        <h4 id="inspect-title"><span className="mono">{name}</span></h4>
+        <h4 id="inspect-title" ref={title} tabIndex={-1}><span className="mono">{name}</span></h4>
         <p className="inspect-sum">
           {loading ? "Reading the trace" : error ? null : `${runs.length} ${runs.length === 1 ? "run" : "runs"}`}
         </p>
-        <button className="inspect-close" onClick={onClose}>Close</button>
+        <button className="inspect-close" onClick={close}>Close</button>
       </div>
       {error && <p className="fault">Could not read the trace: {error}</p>}
       {!loading && !error && !runs.length && <p className="station-note">This node has no record in the trace.</p>}

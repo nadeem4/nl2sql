@@ -274,14 +274,15 @@ served. It then compares the replayed `QueryResult` with the recorded one
 
 ## The playground
 
-With **Debug** on, each node name in the per-node table under **Cost & time**
-opens that node's record from the trace: every attempt and sub-query, its
+With **Debug** on, the per-node table under **Cost & time** puts a bar beside
+each node's time, sized to the slowest node, so the slow step stands out. Each
+node name opens that node's record from the trace: every attempt and sub-query, its
 errors and warnings, what it read and returned, and for LLM nodes the exact
 prompt, the raw response and the parsed result. Long text is folded. For the
 `datasource_resolver` and `schema_retriever` nodes it also shows the retrieval
 record as a table: the pool nearest first, picks marked with their MMR order,
-dropped entries greyed, and a line naming the entries MMR passed over because
-they repeat an earlier pick. The **Retrieval** inspector at the top of the page
+dropped entries greyed, the picks in order as a row of chips, and a second row
+naming the entries MMR passed over because they repeat an earlier pick. The **Retrieval** inspector at the top of the page
 runs the same search for any text (see the
 [demo guide](../getting_started/demo.md#the-retrieval-inspector)). The page
 fetches the file from `GET /api/trace/{trace_id}`, which serves only files
