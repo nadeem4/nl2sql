@@ -52,6 +52,32 @@ export function maskKey(key) {
   return `${k.slice(0, 3)}...${k.slice(-4)}`;
 }
 
+// "…0f3a": the last four characters and nothing else, which is all the
+// Settings card shows of a key it holds. A key too short to mask usefully is
+// not shown at all.
+export function keyTail(key) {
+  const k = (key || "").trim();
+  return k.length < 12 ? null : `…${k.slice(-4)}`;
+}
+
+// The provider a pasted key belongs to when it is not the one chosen, else
+// null: a key is kept under the provider its own prefix names, so a mismatch
+// is said before it is filed under the wrong name.
+export function keyMismatch(chosen, key) {
+  if (!(key || "").trim()) return null;
+  const actual = providerForKey(key);
+  return actual === chosen ? null : actual;
+}
+
+const KEY_LABELS = { openai: "OpenAI", anthropic: "Anthropic", openrouter: "OpenRouter" };
+
+// One card per provider a key can be kept for, saying whether this tab holds
+// its key.
+export function providerCards(keys) {
+  const held = keys || {};
+  return KEY_PROVIDERS.map((id) => ({ id, label: KEY_LABELS[id] || id, held: Boolean((held[id] || "").trim()) }));
+}
+
 function get(storage, name) {
   try {
     return (storage && storage.getItem(name)) || "";

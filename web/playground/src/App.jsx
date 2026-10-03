@@ -67,7 +67,13 @@ function useRoute() {
 
 function focusById(id) {
   const target = document.getElementById(id);
-  if (target) target.focus();
+  if (!target) return;
+  // A control inside a shut <details> (the rail's search index) cannot take
+  // focus until it is opened.
+  for (let fold = target.closest("details"); fold; fold = fold.parentElement && fold.parentElement.closest("details")) {
+    fold.open = true;
+  }
+  target.focus();
 }
 
 export default function App() {
@@ -405,9 +411,9 @@ export default function App() {
             </section>
 
             <aside className="rail">
-              <IndexPanel index={index} error={indexError} onRebuild={rebuildIndex} hosted={hosted} />
               <SchemaPanel schema={schema} used={used} denied={denied} role={asked && asked.role}
                 datasources={databases} onDatasource={setDatasource} />
+              <IndexPanel index={index} error={indexError} onRebuild={rebuildIndex} hosted={hosted} />
             </aside>
 
             <section className="run" id="run" ref={runRef} aria-labelledby="run-heading" tabIndex={-1}>

@@ -189,16 +189,20 @@ so the page looked fine while every question failed with
 
 ### The search index panel
 
-The playground's left rail opens with **Search index**: entries by type
-(datasource, tables, columns, relationships), the schema version they were
-built from, and when. One index holds every database, so with the demo's three
-the heading carries no name and the line under it says which they are --
-"Covers chinook, support and webanalytics" -- and the **Database** panel below
-carries a **Showing** switcher for which of them to read. With a single database
-both panels name it in their heading instead, and there is no switcher. When the index is empty, missing
-or out of date, a warning under the top bar says what that means for a
-question, and the panel's **Rebuild the index** button becomes the rail's one
-filled button. **Rebuild** is also always available on demand.
+The playground's left rail opens with the **Database** panel, and with the
+demo's three databases it carries a switcher for which of them to read: a
+segmented control while there are four or fewer, a **Showing** select beyond
+that. At the foot of the rail, **Search index** is one line when all is well --
+"Search index fresh. 162 entries, built 3 minutes ago." -- that opens to entries
+by type (datasource, tables, columns, relationships), the schema version they
+were built from, and when. One index holds every database, so with the demo's
+three the line inside says which they are -- "Covers chinook, support and
+webanalytics". With a single database both panels name it instead, and there
+is no switcher. When the index is empty, missing or out of date, or a rebuild
+is running or failed, the panel opens itself, a warning under the top bar says
+what that means for a question, and the panel's **Rebuild the index** button
+becomes the rail's one filled button. **Rebuild** is also always available on
+demand.
 
 - Rebuild re-reads one database's schema into a new snapshot and rebuilds its
   entries beside the current ones; questions keep using the current entries
@@ -250,18 +254,29 @@ and the hosted limits.
 **Pipeline** lists every step a question passes through, in the order a run
 takes them, and marks which of them a model decides. Five do: the answerability
 check, the question splitter, the query planner, the plan repair and the answer
-writer. The other nine are ordinary code -- the schema search, the execution
-plan, the layer router, the plan checks, the SQL writer, the executor and the
-result combiner among them -- which is the point: the model plans, and
+writer. The other eight are ordinary code -- the layer router, the SQL agent,
+the schema search, the plan checks, the retry bookkeeping, the SQL writer, the
+executor and the result combiner -- which is the point: the model plans, and
 deterministic code writes the SQL, checks it against the real schema and this
 role's policy, and runs it.
+
+The steps are grouped into three phases: **Understand the question**, **Answer
+each sub-query** (the SQL agent and its own steps, in a bracket, because they
+repeat per sub-query and again when the checks refuse a plan) and **Combine and
+explain**. A step a model decides is a raised row with a round mark and its
+model in a chip; a code step is a compact row with a square mark. A legend
+reads: asks a model, code, did not run, skipped.
 
 Each step gives its name in plain words, the graph node name the Debug ledger
 uses, and one sentence on what it decides. Before any question, each model step
 names the model it is set to use, so the page is worth reading on arrival.
-After a question, it names the model that answered that step and shows the
-step's input, cached and output tokens and its time, taken from the run the Ask
-page just showed.
+After a question, each row gets a time bar and its time, so the page doubles as
+the run's waterfall, and a model step names the model that answered it and its
+input, cached and output tokens. The timings record how long each step took,
+not when it started, so the bars are laid end to end in pipeline order, and a
+step that ran more than once is drawn for its longest run. A step passed over
+while a later one ran (the plan repair, when no retry was needed) is marked
+skipped; a step the run never reached is marked did not run.
 
 The list is not written by hand on the page: it comes from `GET /api/pipeline`,
 which reads it from the graph's own node names, and a test fails when a node is
@@ -334,7 +349,7 @@ second settings store, and the browser keeps nothing but UI conveniences.
   site's page (a foreign `Origin`), through a hostname that is not a loopback
   name, or in anything but JSON.
 - **Hosted mode is a third state.** With `nl2sql demo --hosted` the page shows a
-  key form and a **Models for each step** section that write only to this
+  key form and a **Model for each step** section that write only to this
   browser tab's `sessionStorage`; the settings routes stay refused because
   there is nothing on the server to save. Choosing a model needs nothing
   saved, so hosted mode keeps it: one key per provider and the model each step

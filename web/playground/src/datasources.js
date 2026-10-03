@@ -20,6 +20,14 @@ export function datasourceNames(meta) {
   return meta.dataset ? [meta.dataset] : [];
 }
 
+// How the rail offers the choice: nothing for one database, a segmented
+// control while every name fits across the rail (four), a select beyond that.
+export function switcherKind(names) {
+  const n = (names || []).length;
+  if (n < 2) return "none";
+  return n <= 4 ? "segmented" : "select";
+}
+
 // The database (or databases) a run was answered from, as the resolver picked
 // it: each sub-query carries the datasource it was planned against. Empty
 // until a run comes back, and for a run that stopped before any sub-query.

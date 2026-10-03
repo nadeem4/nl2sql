@@ -75,7 +75,7 @@ means nothing to Anthropic.
 ## A model for each step
 
 Choosing a model asks the server to remember nothing, so hosted mode keeps it.
-Under **Models for each step** on the Settings page, collapsed by default, the
+Under **Model for each step** on the Settings page (open beside the key card on a wide window, collapsed on a narrow one), the
 visitor can put each of the five model-using steps on a provider and model of
 their own. The choice lives in the same tab's `sessionStorage` and travels with
 each question in one more header:

@@ -11,7 +11,7 @@ gives its content the full width.
 
 | Route | Page | What it holds |
 | --- | --- | --- |
-| `#/` | Ask | the composer, the rail (Search index and Database, with a switcher for which database) and the run |
+| `#/` | Ask | the composer, the rail (Database, with a switcher for which database, then the Search index as one line) and the run |
 | `#/pipeline` | What runs a question | `#pipeline-panel`: every step, and which five call a model |
 | `#/settings` | Settings | `#settings-panel`: keys and a model per step |
 | `#/retrieval` | Retrieval inspector | `#retrieval-panel`: the inspector |
@@ -39,14 +39,23 @@ is marked `off`; opening it is how you read the reason
 page that is off. Settings keeps its nav item unmarked and shows two blocks
 that write only to this tab's `sessionStorage`, never to the server:
 
-- `#hosted-key-heading`, one key per provider (`src/hostedKey.js`). A pasted
-  key names its own provider by its prefix, each is listed masked with its own
-  **Clear it**, and `askHeaders` sends each as its own
+- `#hosted-key-heading`, one key per provider (`src/hostedKey.js`), in a
+  raised card: a provider choice (OpenAI, Anthropic, OpenRouter, each saying
+  "key set" or "none"), a 44px mono `#hosted-key` and **Use this key**. A pasted
+  key is kept under the provider its own prefix names, even when another card
+  was chosen, and the page says so (`keyMismatch`). Each held key shows as
+  "Key ending …0f3a is active in this tab" (`#hosted-key-current`, the last four
+  characters only, `keyTail`) with its own **Clear** (`#hosted-clear-<provider>`).
+  Three facts -- Stored, Sent, Never -- stand for the privacy text, which is in
+  full behind **How your key is handled** (`#hosted-key-help`), with the limits
+  and how to run locally. `askHeaders` sends each as its own
   `X-NL2SQL-Api-Key-<provider>` header on `/api/ask`. With exactly one key the
   bare `X-NL2SQL-Api-Key` goes too, so the simple path is byte for byte what it
   was.
-- `#hosted-models`, **Models for each step** (`src/hostedModels.js`), a
-  `<details>` shut by default whose summary says what the steps will use. Each
+- `#hosted-models`, **Model for each step** (`src/hostedModels.js`), a
+  `<details>` card, open from the start at 1060px and wider (where it sits
+  beside the key card) and shut on a narrower window; its summary says what the
+  steps will use. Each
   of the five model steps has a selector over the same catalogue the local page
   offers, which hosted mode's `GET /api/settings` now carries (`nodes` and
   `providers`, and still not a key of any kind). The choices travel as one
@@ -79,20 +88,26 @@ Back and Forward, and that routing touches nothing but the hash.
 - **Database** (left rail, or below the run on a narrow window): the indexed
   schema from `/api/schema`, visible before any question. It shows one database
   at a time, and with more than one registered the heading carries a switcher
-  (`#schema-datasource`, the names from `datasourceNames` over `meta.datasources`)
-  that re-reads `/api/schema?datasource=`; under it one line says plainly that
+  (`#schema-datasource`, the names from `datasourceNames` over `meta.datasources`:
+  a segmented control of radio buttons for four or fewer, a select beyond that,
+  `switcherKind` in `datasources.js`) that re-reads `/api/schema?datasource=`; under it one line says plainly that
   each question is answered from one database and that joining across them is
   planned (`#schema-cross`). Clicking a guided question from another pile moves
   the switcher to that pile's database, so the rail shows the schema the
   question is about. With a single database none of that is printed: the
   heading names it and the panel reads exactly as it always has.
-  Each table shows its row count and the tables it refers to;
-  open one for columns, types, keys and foreign keys. Tables the current plan
-  reads are marked `in plan`; tables the role was refused are marked
-  `refused for <role>`.
-- **Search index** (`#index-panel`, top of the rail): from `GET /api/index`,
-  the vector index the resolver searches, which the Database below does not
-  show. A status line (`#index-status`), entries by type (`#index-counts`), the
+  Each table is a 40px row with its row count; open one for the tables it
+  refers to, columns, types, keys and foreign keys. Tables the current plan
+  reads are marked `in plan` with an accent bar; tables the role was refused
+  are marked `refused for <role>`. On a wide window the rail scrolls on its own:
+  its scroll is contained, its scrollbar is thin, and a fade shows only on an
+  edge that has more past it (`src/railFade.js`).
+- **Search index** (`#index-panel`, foot of the rail): from `GET /api/index`,
+  the vector index the resolver searches, which the Database above does not
+  show. Folded to one line ("Search index fresh. 162 entries, built 3 minutes
+  ago.", `indexSummary` in `indexHealth.js`) that opens itself when the index
+  is empty, missing or stale or a rebuild is running or failed
+  (`indexExpanded`); `#index-heading` stays, visually hidden. Opened: a status line (`#index-status`), entries by type (`#index-counts`), the
   schema version (`#index-version`) and when it was built (`#index-built`). The
   index covers every database, so the heading names one only when there is one;
   with several, `#index-sources` lists them ("Covers chinook, support and
@@ -103,7 +118,7 @@ Back and Forward, and that routing touches nothing but the hash.
   the missing Rebuild reads as a decision rather than as something broken.
   When the index is empty, missing or out of date, the panel turns to the fault
   colour, a stale index lists why, and a warning under the top bar
-  (`#index-warning`) puts the keyboard on the button, or, from another page,
+  (`#index-warning`) opens the panel and puts the keyboard on the button, or, from another page,
   leads back to Ask. **Rebuild** (`#index-rebuild`) is
   always offered; it posts to `POST /api/index/rebuild` and the page polls
   `GET /api/index` for its steps (`#index-progress`) until it ends, then
@@ -178,17 +193,25 @@ Back and Forward, and that routing touches nothing but the hash.
   [Feedback and Signals](../../docs/observability/feedback.md).
 
 - **Pipeline** (`#nav-pipeline` in the header nav, route `#/pipeline`; the
-  page's content is `#pipeline-panel`): every step of a run in order, on the
-  same spine the run uses, with the five a model decides marked in the accent
-  and the deterministic ones left quiet. Each step gives its name in plain
+  page's content is `#pipeline-panel`): every step of a run in order, in three
+  phases -- Understand the question, Answer each sub-query (the SQL agent and
+  its own steps in a dashed bracket) and Combine and explain -- cut from the
+  step list itself by `pipelinePhases` in `src/pipelinePhases.js`. The five
+  steps a model decides are raised rows with a round mark and a model chip;
+  code steps are compact rows with a square mark, under a legend (asks a model,
+  code, did not run, skipped; `stepStates`). Each step gives its name in plain
   words, its graph node name in mono (the name the Debug ledger uses) and one
-  sentence on what it decides. The steps come from `GET /api/pipeline`, which
+  sentence on what it decides. While the list loads the page is a skeleton in
+  its final shape. The steps come from `GET /api/pipeline`, which
   reads them from `nl2sql.pipeline.steps`; a test holds that list against the
   graphs themselves, so the page cannot describe a pipeline that is not the one
   running. Before a run each model step names the model it is set to use; after
   one it names the model that answered and shows that step's input, cached and
-  output tokens and its time, joined to `usage.nodes` and `timings` by node
-  name. `src/pipeline.js` does the joining and `npm test` covers it. The Debug
+  output tokens, and every row gets a waterfall bar and its time (`waterfall`:
+  the timings say how long, not when, so bars are laid end to end in pipeline
+  order, nested steps inside the SQL agent's span, scaled to the run's total),
+  joined to `usage.nodes` and `timings` by node name. `src/pipeline.js` and
+  `src/pipelinePhases.js` do the joining and `npm test` covers them. The Debug
   drill-down is unchanged; this page is the overview, not a replacement.
 
 - **Retrieval** (`#nav-retrieval` in the header nav, route `#/retrieval`; the
@@ -210,8 +233,11 @@ Back and Forward, and that routing touches nothing but the hash.
   the entries MMR passed over, and the tables sent to the planner; or why no
   search ran.
 - **Settings** (`#nav-settings` in the header nav, route `#/settings`; the
-  page's content is `#settings-panel`). **API key** (`#settings-key`, `#settings-save-key`) shows the key in use
-  only in masked form (`#settings-key-current`); saving one writes it to the
+  page's content is `#settings-panel`): two raised cards, side by side at
+  1061px and wider, and a skeleton of them while `GET /api/settings` loads.
+  **API key** (`#settings-key`, a 44px mono input, and `#settings-save-key`) shows the key in use
+  only in masked form (`#settings-key-current`), with three facts (Stored, Sent,
+  Never) and the full text behind **How your key is handled** (`#settings-key-help`); saving one writes it to the
   demo project's `.env.demo` and turns replay into live without a restart, and
   the status pill follows. **Model for each step** has one selector per LLM node
   (`#model-datasourceresolver`, `#model-decomposer`, `#model-astplanner`,
@@ -261,7 +287,13 @@ to ask for a key before it takes a question, and whose key answers),
 `src/status.js` (what the top bar's status pill says in each mode, and the
 sentence it stands for),
 `src/datasources.js` (the
-databases the switcher offers, and which one a run was answered from) and
+databases the switcher offers, whether it is a segmented control or a select,
+and which one a run was answered from), `src/pipelinePhases.js` (the Pipeline
+page's three phases, each step's state and the waterfall bars),
+`src/railFade.js` (which edges of the rail fade), `src/hostedKey.js` (also the
+key's masked tail, the provider cards and a key pasted under the wrong
+provider), `src/indexHealth.js` (also the rail's one-line index summary and
+when it opens itself) and
 `src/retrieval.js` (the MMR summary line, picks
 in order, entries passed over, the copyable text form) and `src/feedback.js`
 (when a run can be rated, the request body, the saved line) and `src/faults.js`

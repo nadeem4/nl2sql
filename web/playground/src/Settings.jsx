@@ -1,7 +1,19 @@
 import React, { useEffect, useState } from "react";
 import { PROVIDER_NAMES, changedModels, choicesFrom, modelGroups, variableModels } from "./settings.js";
-import { KEY_PROVIDERS, looksLikeKey, maskKey, providerForKey } from "./hostedKey.js";
+import { keyMismatch, keyTail, looksLikeKey, providerCards, providerForKey } from "./hostedKey.js";
 import { providersNeeded } from "./hostedModels.js";
+
+// Settings: the key and the model each step runs on, as two raised cards side
+// by side on a wide window. Each card says what it holds in one line, and how
+// a key is handled in three facts; the full sentence on that sits behind a
+// disclosure, because it is a promise to be able to check, not to read first.
+
+// Wide enough for the two cards to sit side by side, so the models card can
+// start open without pushing the key card off the screen.
+const WIDE = "(min-width: 1060px)";
+const wide = () => typeof window !== "undefined" && window.matchMedia && window.matchMedia(WIDE).matches;
+
+const PLACEHOLDERS = { openai: "sk-…", anthropic: "sk-ant-…", openrouter: "sk-or-…" };
 
 // Sends JSON and returns the parsed reply; a refusal carries the server's own
 // sentence in `detail`, which is what the panel shows.
@@ -17,6 +29,35 @@ async function send(url, body) {
     throw new Error(detail);
   }
   return reply;
+}
+
+// Stored / Sent / Never: the three things to know about a key, as the code
+// keeps them.
+function Facts({ id, facts }) {
+  return (
+    <dl className="facts" id={id}>
+      {facts.map(([term, text]) => (
+        <div className="fact" key={term}><dt>{term}</dt><dd>{text}</dd></div>
+      ))}
+    </dl>
+  );
+}
+
+function ModelSelect({ id, value, groups, disabled, invalid, describedBy, onChange }) {
+  return (
+    <select id={id} value={value} disabled={disabled} aria-invalid={invalid ? true : undefined}
+            aria-describedby={describedBy} onChange={(e) => onChange(e.target.value)}>
+      {groups.map((g) =>
+        g.label === null ? (
+          g.options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)
+        ) : (
+          <optgroup key={g.label} label={g.label} disabled={g.disabled}>
+            {g.options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </optgroup>
+        ),
+      )}
+    </select>
+  );
 }
 
 function KeyForm({ settings, onSaved, recorded }) {
@@ -51,13 +92,17 @@ function KeyForm({ settings, onSaved, recorded }) {
   };
 
   return (
-    <form className="settings-block" onSubmit={save} aria-labelledby="settings-key-heading">
-      <h3 id="settings-key-heading">API keys</h3>
+    <form className="set-card" onSubmit={save} aria-labelledby="settings-key-heading">
+      <h2 id="settings-key-heading">API keys</h2>
       {saved.length ? (
-        <ul className="settings-current settings-keys" id="settings-key-current">
+        <ul className="saved-keys" id="settings-key-current">
           {saved.map((p) => (
-            <li key={p.env_var}>
-              {p.label}: <code>{p.masked}</code> from <code>{p.env_var}</code>
+            <li className="saved" key={p.env_var}>
+              <span className="pulse" aria-hidden="true" />
+              <span>
+                {p.label} key ending <span className="mono">…{String(p.masked).slice(-4)}</span>, from{" "}
+                <code>{p.env_var}</code>.
+              </span>
             </li>
           ))}
         </ul>
@@ -68,33 +113,45 @@ function KeyForm({ settings, onSaved, recorded }) {
             : "No key in use, and there are no recorded answers. Paste a key to ask questions."}
         </p>
       )}
-      <label className="settings-label" htmlFor="settings-key">
-        {saved.length ? "Add or replace a key" : "Paste a key"}
-      </label>
-      <div className="settings-row">
-        <input
-          id="settings-key"
-          type="password"
-          value={key}
-          autoComplete="off"
-          spellCheck={false}
-          aria-describedby="settings-key-help"
-          onChange={(e) => setKey(e.target.value)}
-        />
-        <button id="settings-save-key" className="settings-save" type="submit" disabled={busy || !key.trim()}>
-          {busy ? "Saving" : "Save key"}
-        </button>
+      <div className="key-field">
+        <label className="settings-label" htmlFor="settings-key">
+          {saved.length ? "Add or replace a key" : "Paste a key"}
+        </label>
+        <div className="key-row">
+          <input
+            id="settings-key"
+            className="key-input"
+            type="password"
+            value={key}
+            placeholder="sk-…"
+            autoComplete="off"
+            spellCheck={false}
+            aria-describedby="settings-key-facts settings-key-help"
+            onChange={(e) => setKey(e.target.value)}
+          />
+          <button id="settings-save-key" className="settings-save" type="submit" disabled={busy || !key.trim()}>
+            {busy ? "Saving" : "Save key"}
+          </button>
+        </div>
       </div>
-      <p className="settings-help" id="settings-key-help">
-        A key starting <code>sk-ant-</code> is Anthropic, <code>sk-or-</code> is OpenRouter; any
-        other is OpenAI. Each provider keeps one key, written to{" "}
-        <code>{settings.files.env}</code>, and the default moves to the provider of the key you
-        save, without a restart. Steps put on another provider stay there. On a later start,{" "}
-        <code>--api-key</code> or a key exported in your shell still wins. A key is never shown
-        again, only its last four characters.
-      </p>
       <p className="settings-status" role="status">{status}</p>
       {fault && <p className="fault">{fault}</p>}
+      <Facts id="settings-key-facts" facts={[
+        ["Stored", <>In <code>{settings.files.env}</code> on this machine.</>],
+        ["Sent", "To that provider, with each model call."],
+        ["Never", "Shown again, past its last four characters."],
+      ]} />
+      <details className="key-more">
+        <summary>How your key is handled</summary>
+        <p className="settings-help" id="settings-key-help">
+          A key starting <code>sk-ant-</code> is Anthropic, <code>sk-or-</code> is OpenRouter; any
+          other is OpenAI. Each provider keeps one key, written to{" "}
+          <code>{settings.files.env}</code>, and the default moves to the provider of the key you
+          save, without a restart. Steps put on another provider stay there. On a later start,{" "}
+          <code>--api-key</code> or a key exported in your shell still wins. A key is never shown
+          again, only its last four characters.
+        </p>
+      </details>
     </form>
   );
 }
@@ -130,8 +187,11 @@ function ModelsForm({ settings, onSaved }) {
   };
 
   return (
-    <form className="settings-block" onSubmit={save} aria-labelledby="settings-models-heading">
-      <h3 id="settings-models-heading">Provider and model for each step</h3>
+    <form className="set-card" onSubmit={save} aria-labelledby="settings-models-heading">
+      <div className="set-card-head">
+        <h2 id="settings-models-heading">Provider and model for each step</h2>
+        <span className="set-meta">{settings.nodes.length} steps ask a model</span>
+      </div>
       {settings.models_note && <p className="notice">{settings.models_note}</p>}
       <ul className="model-rows">
         {settings.nodes.map((node) => (
@@ -140,24 +200,10 @@ function ModelsForm({ settings, onSaved }) {
               <span className="model-step">{node.label}</span>
               <span className="model-does">{node.does}</span>
             </label>
-            <select
-              id={`model-${node.agent}`}
-              value={choices[node.agent] || ""}
-              disabled={!hasList}
-              aria-invalid={node.unavailable ? true : undefined}
-              aria-describedby={node.unavailable ? `model-${node.agent}-unavailable` : undefined}
-              onChange={(e) => setChoices({ ...choices, [node.agent]: e.target.value })}
-            >
-              {groups.map((g) =>
-                g.label === null ? (
-                  g.options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)
-                ) : (
-                  <optgroup key={g.label} label={g.label} disabled={g.disabled}>
-                    {g.options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                  </optgroup>
-                ),
-              )}
-            </select>
+            <ModelSelect id={`model-${node.agent}`} value={choices[node.agent] || ""} groups={groups}
+              disabled={!hasList} invalid={node.unavailable}
+              describedBy={node.unavailable ? `model-${node.agent}-unavailable` : undefined}
+              onChange={(v) => setChoices({ ...choices, [node.agent]: v })} />
             {node.unavailable && (
               <p className="model-unavailable" id={`model-${node.agent}-unavailable`}>{node.unavailable}</p>
             )}
@@ -172,17 +218,17 @@ function ModelsForm({ settings, onSaved }) {
         </p>
       )}
       {hasList && (
-        <div className="settings-row settings-foot">
-          <button id="settings-save-models" className="settings-save" type="submit"
-                  disabled={busy || !Object.keys(changes).length}>
-            {busy ? "Saving" : "Save models"}
-          </button>
+        <div className="set-foot">
           <p className="settings-help">
             Written to <code>{settings.files.llm}</code>, the file the CLI reads. The OpenAI models
             worked with the engine's parameters in a check on 2026-09-20; the Claude ones follow
             Anthropic's documented parameter rules. Whether a model plans well is for the evaluation
             to show.
           </p>
+          <button id="settings-save-models" className="settings-save" type="submit"
+                  disabled={busy || !Object.keys(changes).length}>
+            {busy ? "Saving" : "Save models"}
+          </button>
         </div>
       )}
       <p className="settings-status" role="status">{status}</p>
@@ -193,13 +239,16 @@ function ModelsForm({ settings, onSaved }) {
 
 // The hosted demo's key form. Nothing here talks to the server: the key is
 // put into this tab's storage and sent as a header with each question. The
-// wording is the promise the code keeps, so it says exactly what happens and
-// where to go for anything more.
+// three facts are the promise the code keeps; the disclosure says it in full.
 function HostedKeyForm({ apiKeys, onKey, limits, reason }) {
+  const cards = providerCards(apiKeys);
+  const held = cards.filter((c) => c.held);
+  const [chosen, setChosen] = useState(() => (held[0] ? held[0].id : "openai"));
   const [key, setKey] = useState("");
   const [fault, setFault] = useState(null);
   const [status, setStatus] = useState(null);
-  const held = KEY_PROVIDERS.filter((p) => apiKeys[p]);
+  const name = (p) => PROVIDER_NAMES[p] || p;
+  const chosenHeld = held.some((c) => c.id === chosen);
 
   const save = (e) => {
     e.preventDefault();
@@ -209,27 +258,50 @@ function HostedKeyForm({ apiKeys, onKey, limits, reason }) {
       return;
     }
     setFault(null);
-    const provider = providerForKey(key);
+    // A key is kept under the provider its own prefix names; one pasted under
+    // another card is filed where it belongs, and the page says so.
+    const other = keyMismatch(chosen, key);
+    const provider = other || providerForKey(key);
     onKey(provider, key);
     setKey("");
-    setStatus(`Kept in this browser tab as the ${PROVIDER_NAMES[provider] || provider} key. Ask a question and it goes with it.`);
+    setChosen(provider);
+    setStatus(other
+      ? `That key's prefix says ${name(provider)}, so it is kept as the ${name(provider)} key. Ask a question and it goes with it.`
+      : `Kept in this browser tab as the ${name(provider)} key. Ask a question and it goes with it.`);
   };
 
   const forget = (provider) => {
     onKey(provider, "");
-    setStatus(`The ${PROVIDER_NAMES[provider] || provider} key is cleared from this tab.`);
+    setStatus(`The ${name(provider)} key is cleared from this tab.`);
   };
 
   return (
-    <form className="settings-block" onSubmit={save} aria-labelledby="hosted-key-heading">
-      <h3 id="hosted-key-heading">Your API keys</h3>
+    <form className="set-card" onSubmit={save} aria-labelledby="hosted-key-heading">
+      <h2 id="hosted-key-heading">API key</h2>
+      <fieldset className="provider">
+        <legend className="visually-hidden">Provider</legend>
+        {cards.map((c) => (
+          <label key={c.id} className="prov" data-on={chosen === c.id ? "true" : undefined}>
+            <input type="radio" className="visually-hidden" name="hosted-provider" id={`hosted-provider-${c.id}`}
+                   value={c.id} checked={chosen === c.id} onChange={() => setChosen(c.id)} />
+            {c.label}
+            <span>{c.held ? "key set" : "none"}</span>
+          </label>
+        ))}
+      </fieldset>
       {held.length ? (
-        <ul className="settings-current settings-keys" id="hosted-key-current">
-          {held.map((provider) => (
-            <li key={provider}>
-              {PROVIDER_NAMES[provider] || provider}: <code>{maskKey(apiKeys[provider])}</code>{" "}
-              <button type="button" className="linkish" id={`hosted-clear-${provider}`}
-                onClick={() => forget(provider)}>Clear it</button>
+        <ul className="saved-keys" id="hosted-key-current">
+          {held.map((c) => (
+            <li className="saved" key={c.id}>
+              <span className="pulse" aria-hidden="true" />
+              <span>
+                {held.length > 1 ? `${c.label} key` : "Key"} ending{" "}
+                <span className="mono">{keyTail(apiKeys[c.id]) || "…"}</span> is active in this tab.
+              </span>
+              <button type="button" className="key-clear" id={`hosted-clear-${c.id}`}
+                      onClick={() => forget(c.id)}>
+                Clear<span className="visually-hidden"> the {c.label} key</span>
+              </button>
             </li>
           ))}
         </ul>
@@ -238,72 +310,80 @@ function HostedKeyForm({ apiKeys, onKey, limits, reason }) {
           No key in this tab yet, so questions cannot be answered.
         </p>
       )}
-      <label className="settings-label" htmlFor="hosted-key">
-        {held.length ? "Add or replace a key" : "Paste an OpenAI, Anthropic or OpenRouter key"}
-      </label>
-      <div className="settings-row">
-        <input
-          id="hosted-key"
-          type="password"
-          value={key}
-          autoComplete="off"
-          spellCheck={false}
-          aria-describedby="hosted-key-help"
-          onChange={(e) => setKey(e.target.value)}
-        />
-        <button id="hosted-save-key" className="settings-save" type="submit" disabled={!key.trim()}>
-          Use this key
-        </button>
+      <div className="key-field">
+        <label className="settings-label" htmlFor="hosted-key">
+          {chosenHeld ? `Replace the ${name(chosen)} key` : `Paste your ${name(chosen)} key`}
+        </label>
+        <div className="key-row">
+          <input
+            id="hosted-key"
+            className="key-input"
+            type="password"
+            value={key}
+            placeholder={PLACEHOLDERS[chosen] || "sk-…"}
+            autoComplete="off"
+            spellCheck={false}
+            aria-describedby="hosted-key-facts hosted-key-help"
+            onChange={(e) => setKey(e.target.value)}
+          />
+          <button id="hosted-save-key" className="settings-save" type="submit" disabled={!key.trim()}>
+            Use this key
+          </button>
+        </div>
       </div>
-      <p className="settings-help">
-        A key starting <code>sk-ant-</code> is Anthropic, <code>sk-or-</code> is OpenRouter; any
-        other is OpenAI. One key is all the demo needs; add a second only to put a step on another
-        provider below.
-      </p>
-      <p className="settings-help" id="hosted-key-help">
-        {reason} Each key is kept in this tab's <code>sessionStorage</code>, sent in a request
-        header of its own with each question, used to call that provider for that one question and
-        then dropped: it is never written to a file, an environment variable, a log or a run trace
-        on the server, and no other visitor can reach it. Closing the tab clears them. The demo
-        answers only from its own three sample databases
-        {limits && limits.questions_per_minute
-          ? `, up to ${limits.questions_per_minute} questions a minute and ${limits.questions_per_session} a session`
-          : ""}
-        . To ask questions of your own data, with no limits and a key that stays on your machine,
-        run it locally:{" "}
-        <code>pip install "nl2sql-engine[demo]"</code> then <code>nl2sql demo</code>.
-      </p>
       <p className="settings-status" role="status">{status}</p>
       {fault && <p className="fault">{fault}</p>}
+      <Facts id="hosted-key-facts" facts={[
+        ["Stored", "This tab's session storage."],
+        ["Sent", "In a header with each question."],
+        ["Never", "On disk, in logs or in traces."],
+      ]} />
+      <details className="key-more">
+        <summary>How your key is handled</summary>
+        <p className="settings-help" id="hosted-key-help">
+          {reason} Each key is kept in this tab's <code>sessionStorage</code>, sent in a request
+          header of its own with each question, used to call that provider for that one question and
+          then dropped: it is never written to a file, an environment variable, a log or a run trace
+          on the server, and no other visitor can reach it. Closing the tab clears them. One key is
+          all the demo needs; add a second only to put a step on another provider. The demo
+          answers only from its own three sample databases
+          {limits && limits.questions_per_minute
+            ? `, up to ${limits.questions_per_minute} questions a minute and ${limits.questions_per_session} a session`
+            : ""}
+          . To ask questions of your own data, with no limits and a key that stays on your machine,
+          run it locally:{" "}
+          <code>pip install "nl2sql-engine[demo]"</code> then <code>nl2sql demo</code>.
+        </p>
+      </details>
     </form>
   );
 }
 
 // The hosted demo's model per step. Like the key, it writes nothing to the
 // server: the choice goes into this tab's storage and travels with each
-// question. Collapsed by default, because the whole of the simple path is one
-// key and the defaults; the summary says what the steps will use so the
-// section is worth opening only when that is not what you want.
+// question. Open from the start on a wide window, where it sits beside the key
+// card; shut on a narrow one, where the one key is the whole of the simple path.
 function HostedModelsForm({ settings, apiKeys, models, onModel }) {
+  const [open] = useState(wide);
   const nodes = settings.nodes || [];
   const providers = settings.providers || [];
   const groups = modelGroups(providers, settings.default_model);
   const missing = providersNeeded(models).filter((p) => !apiKeys[p]);
   const chosen = nodes.filter((n) => models[n.agent]);
+  const loose = variableModels(providers, models);
   const summary = chosen.length
     ? `${chosen.length} of ${nodes.length} steps on a model you chose`
     : `all ${nodes.length} steps on ${settings.default_model || "the default model"}`;
 
   return (
-    <details className="settings-block step-models" id="hosted-models">
+    <details className="set-card step-models" id="hosted-models" open={open}>
       <summary>
-        <span className="step-models-title">Models for each step</span>
+        <span className="step-models-title">Model for each step</span>
         <span className="step-models-summary">{summary}</span>
       </summary>
       <p className="settings-help" id="hosted-models-help">
-        Five steps of a run put the question to a model; everything else is deterministic code.
-        Each choice is kept in this tab and sent with the question, and needs a key for the
-        provider it names. Nothing here is saved on the server.
+        These {nodes.length} steps put the question to a model; everything else is code. A choice
+        is kept in this tab, sent with the question, and needs a key for its provider.
       </p>
       <ul className="model-rows">
         {nodes.map((node) => {
@@ -316,27 +396,13 @@ function HostedModelsForm({ settings, apiKeys, models, onModel }) {
                 <span className="model-step">{node.label}</span>
                 <span className="model-does">{node.does}</span>
               </label>
-              <select
-                id={`hosted-model-${node.agent}`}
-                value={value}
-                aria-invalid={needsKey ? true : undefined}
-                aria-describedby={needsKey ? `hosted-model-${node.agent}-nokey` : undefined}
-                onChange={(e) => onModel(node.agent, e.target.value)}
-              >
-                {groups.map((g) =>
-                  g.label === null ? (
-                    g.options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)
-                  ) : (
-                    <optgroup key={g.label} label={g.label}>
-                      {g.options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                    </optgroup>
-                  ),
-                )}
-              </select>
+              <ModelSelect id={`hosted-model-${node.agent}`} value={value} groups={groups}
+                invalid={needsKey} describedBy={needsKey ? `hosted-model-${node.agent}-nokey` : undefined}
+                onChange={(v) => onModel(node.agent, v)} />
               {needsKey && (
                 <p className="model-unavailable" id={`hosted-model-${node.agent}-nokey`}>
-                  {PROVIDER_NAMES[provider] || provider} has no key in this tab. Add one above
-                  before asking: this step cannot run without it.
+                  {PROVIDER_NAMES[provider] || provider} has no key in this tab. Add one before
+                  asking: this step cannot run without it.
                 </p>
               )}
             </li>
@@ -346,12 +412,12 @@ function HostedModelsForm({ settings, apiKeys, models, onModel }) {
       {missing.length > 0 && (
         <p className="settings-warn" id="hosted-models-missing">
           No key in this tab for {missing.map((p) => PROVIDER_NAMES[p] || p).join(" or ")}. A
-          question will be refused, naming the step, until one is added above.
+          question will be refused, naming the step, until one is added.
         </p>
       )}
-      {variableModels(providers, models).length > 0 && (
+      {loose.length > 0 && (
         <p className="settings-warn" id="hosted-temperature-note">
-          <code>{variableModels(providers, models).join(", ")}</code> does not accept temperature 0,
+          <code>{loose.join(", ")}</code> does not accept temperature 0,
           so a step on it runs at the model's default temperature and varies more from run to run.
         </p>
       )}
@@ -359,16 +425,36 @@ function HostedModelsForm({ settings, apiKeys, models, onModel }) {
   );
 }
 
-// The settings panel: a secondary surface, closed until asked for. When the
-// server has settings off it says why instead of offering a form that fails.
+// Two cards in their final shape while GET /api/settings is on its way.
+export function SettingsSkeleton() {
+  return (
+    <div className="settings-grid" aria-busy="true" aria-label="Loading settings">
+      {[3, 5].map((rows, i) => (
+        <div className="set-card" key={i} aria-hidden="true">
+          <span className="sk" style={{ width: 140, height: 18 }} />
+          {i === 0 && <span className="sk" style={{ height: 60 }} />}
+          {i === 0 && <span className="sk" style={{ height: 44 }} />}
+          {Array.from({ length: i === 0 ? 0 : rows }, (_, r) => (
+            <div className="sk-mrow" key={r}>
+              <span className="sk" style={{ width: `${45 + ((r * 13) % 30)}%` }} />
+              <span className="sk" style={{ height: 32 }} />
+            </div>
+          ))}
+          {i === 0 && <span className="sk" style={{ width: "80%" }} />}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// The settings page. When the server has settings off it says why instead of
+// offering a form that fails.
 export default function Settings({ settings, error, onSaved, recorded, apiKeys, onKey, limits,
                                    stepModels, onStepModel }) {
   if (error) {
     return <p className="fault">Settings could not be loaded: {error}</p>;
   }
-  if (!settings) {
-    return <p className="settings-help">Loading settings</p>;
-  }
+  if (!settings) return <SettingsSkeleton />;
   if (settings.hosted) {
     // Not "off": there is nothing for the server to save, and the two things
     // the visitor does set -- their keys and the model each step runs on --
