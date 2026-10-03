@@ -167,7 +167,7 @@ The playground's schema panel reads the schema snapshot, for whichever database
 its **Showing** switcher names; the resolver, which
 picks the database for every question when more than one is registered, reads
 the separate vector index, and with three registered it searches on every
-question. After a run the Question station names the database it picked. The two
+question. After a run the answer header names the database it picked. The two
 can disagree: a folder once had its snapshot intact and 0 entries in its index,
 so the page looked fine while every question failed with
 `SCHEMA_RETRIEVAL_FAILED`. Three things now guard against that:
@@ -248,6 +248,41 @@ At the right of the top bar a status pill says which mode the page is in --
 or on the hosted demo whether this tab has a key yet. Hover it, or let a screen
 reader read it, for the full sentence: how replay answers, or whose key answers
 and the hosted limits.
+
+### The Ask page
+
+Ask is the question box, then the run, answer first:
+
+- **Suggestions.** Under the question box, a row of chips offers three or four
+  guided questions for the database the rail is showing, and **N more** opens
+  every pile, one per database. On a phone the row is a strip you swipe
+  sideways. The run sits right below the box.
+- **The answer leads.** Once a run is back, its first block is the answer: the
+  question and the role it was asked as, the answer sentence in the largest
+  type on the page, and a strip such as `10 rows / 3 of 3 checks / 2 plans /
+  5.04 s / $0.0187`. Each item in the strip moves the keyboard to its station
+  below. A refusal gets the same block: **Refused at the checks. No SQL was
+  written.**
+- **The stations.** Plan, Checks, SQL, Rows and Cost & time follow, each with a
+  small heading, a tag for who decides it (**Model · gpt-5.4**, from the run's
+  usage, or **Code**) and the step's time. On the spine a round mark is a model
+  step and a square one is code; filled with a tick is done, an outline is
+  waiting and a dashed outline was not reached.
+- **The gate.** The Checks station shows the plans the checks saw (**Plan 1
+  refused**, then **Plan 2 passed** when the first was sent back), why, in one
+  sentence, and each check as a tile with a tick or a cross.
+- **While it runs.** Only the station being worked on is lit; the rest wait,
+  faded. A counter beside the button reads **Running · 3.4 s**, and after a
+  moment **Ask** becomes **Stop**, which cancels the request: the run then says
+  **Stopped** and every station is marked not reached. The server is not told;
+  a question already sent still counts against the hosted limits.
+- **When it fails.** A provider's refusal is said in words with the next step,
+  for example **OpenAI rejected this key.** with **Replace the key**, which
+  opens Settings. The provider's own reply is folded under **Provider
+  response**.
+- **On a phone**, once a run is on the page, a bar at the bottom, **Ask another
+  question**, takes you back to the question box. It hides while the box is in
+  view.
 
 ### The Pipeline page
 
@@ -354,9 +389,11 @@ second settings store, and the browser keeps nothing but UI conveniences.
   there is nothing on the server to save. Choosing a model needs nothing
   saved, so hosted mode keeps it: one key per provider and the model each step
   runs on travel with each question, in a header each. The Ask page there opens
-  by saying a key is needed and holds the question box and the guided questions
-  closed until one is saved, so a new visitor is not left to discover it by
-  asking. Locally there is nothing to announce, and nothing is shown. See
+  with the key form itself: pick a provider, paste the key and **Use this key**,
+  under three facts about it -- **Stored** in this browser tab only, **Sent**
+  with each question in a request header, **Never** written to disk, logs or
+  traces. The question box and the suggestions stay closed until a key is in,
+  so a new visitor is not left to discover it by asking. Locally there is nothing to announce, and nothing is shown. See
   [Hosted demo](../deployment/hosted-demo.md).
 
 ### The Retrieval inspector
@@ -483,9 +520,9 @@ run the CLI from the directory you ran `nl2sql setup --demo` in.
 ## Sample questions
 
 `configs/sample_questions.demo.yaml` is written with twenty questions, the same
-ones the playground offers as guided questions -- the playground shows them in
-one pile per database, each headed by the datasource id, rather than as one
-list of twenty. Chinook's twelve come first, so the demo opens on familiar
+ones the playground offers as guided questions -- a few as chips for the
+database the rail is showing, and all twenty behind **N more**, in one pile per
+database, each headed by the datasource id. Chinook's twelve come first, so the demo opens on familiar
 ground:
 
 - How many customers do we have, by country?

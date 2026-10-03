@@ -71,10 +71,16 @@ ratings are off, and the retrieval inspector stays on. See
 
 **Hosted, before a key** (`needsKey` in `src/firstRun.js`: `meta.hosted` and
 nothing in this tab's `sessionStorage`), the Ask page opens with `#first-run`
-above the question box -- what the demo needs, what happens to the key, and a
-link to `#/settings` -- and holds the question box, **Ask** and every guided
-question disabled, each carrying `#first-run-why` as its `aria-describedby`.
-Saving a key in Settings clears all of it on the next render, with no reload:
+above the question box: the pitch, `#first-run-why`, the key form itself (a
+provider choice, `#first-run-provider-<provider>`, the key, `#first-run-key`,
+and **Use this key**, `#first-run-save`) and three facts (`#first-run-facts`:
+**Stored** in this tab only, **Sent** in a header with each question, **Never**
+written to disk, logs or traces). The provider follows the key's own prefix once
+one is typed, as the server reads it, and the key is kept exactly as the
+Settings form keeps it (`writeKeyFor` in `src/hostedKey.js`); the keyboard then
+moves to `#question`. Until then the question box, **Ask** and every suggestion
+are disabled, each carrying `#first-run-why` as its `aria-describedby`.
+Saving a key here or in Settings clears all of it on the next render, with no reload:
 `App` holds the key in state, so nothing has to be reloaded to see it. In local
 mode none of this appears -- there a key is already configured, or replay
 answers from recordings, and a wall would be in the way of someone who has
@@ -145,21 +151,56 @@ Back and Forward, and that routing touches nothing but the hash.
   live." (`replay_miss` from `/api/ask`).
 - **Composer** (Ask page): the question box, the role selector
   (`#role-select`), **Plan only** (`#plan-only`), **Debug** (`#debug-toggle`)
-  and the guided questions from `/api/meta`. The demo registers three
-  databases, so the questions are shown in one `.guided-group` per datasource,
-  each headed by its id (`.guided-source`) in the quiet mono the rail uses, in
-  the order `/api/meta` sends them in `question_groups`. With a single
-  database there is nothing to tell apart, so no heading is printed and the
-  question box names that database; with several it does not, because the
-  resolver picks. `src/questions.js` does the grouping and falls back to the
-  flat `questions` list when a server sends no `question_groups`.
-- **The run**: one spine, read top to bottom. Question, Plan (`#pane-plan`),
-  Checks (`#pane-validation`), SQL (`#pane-sql`), Rows (`#pane-rows`), Cost &
-  time (`#pane-usage`). The checks sit across the spine as a gate: when a plan is
-  refused the page says so there, names the tables the role may not read, and
-  the SQL and Rows stations show that nothing was written or run. A retried plan
-  shows the rejected attempt and the refiner's feedback. With more than one
-  database registered, the Question station also says which one answered
+  and the guided questions from `/api/meta` as a chip row (`#guided-heading`):
+  four from the database the rail is showing (three once a run is on the
+  page) and a **N more** chip (`aria-controls="guided-all"`) that opens every
+  pile, one `.guided-group` per datasource headed by its id (`#guided-<ds>`,
+  always in the page, visually hidden with a single database). Under 640px the
+  row is a horizontal scroll-snap strip of 44px chips. `chipRow` in
+  `src/runState.js` picks the chips; `src/questions.js` does the grouping and
+  falls back to the flat `questions` list when a server sends no
+  `question_groups`. With a single database the question box names it; with
+  several it does not, because the resolver picks. An empty box with a key
+  leaves **Ask** looking ready; pressing it puts the keyboard in the box.
+- **Busy and Stop**: while `/api/ask` is out, only the first unfinished
+  station is live (the API reports no per-node progress, so that is Plan) and
+  the rest are queued at 40% opacity, with skeleton bars in the live one, a 2px
+  accent segment travelling down the spine (`.spine-run`, held still under reduced
+  motion) and `#elapsed` beside the button: **Running · 3.4 s**, drawn on
+  `requestAnimationFrame`, with a visually hidden status that changes once a
+  second. **Ask** (`#ask`) keeps its fill; after 600ms (`STOP_AFTER_MS`) it
+  becomes **Stop**, which aborts the fetch through an `AbortController`. The
+  run then reads **Stopped** and every station is marked not reached.
+- **The answer header** (`#pane-question`, the first block of the run): before
+  a question, one line saying the answer will lead here. Once asked, the
+  question with its role tag, then the answer sentence at 28px (the largest
+  text in the run; the Rows station keeps only the table), then a mono strip
+  such as `10 rows / 3 of 3 checks / 2 plans / 5.04 s / $0.0187`. Each strip
+  item is a button that scrolls to its station and focuses it; none is a hash
+  link, because the hash is the router's. A refusal gets the same header
+  ("Refused at the checks. No SQL was written."). `answerHead` and
+  `statusStrip` in `src/runState.js` decide the words. On the Ask page
+  `#page-title` is visually hidden, kept for `aria-labelledby`.
+- **Faults**: a failed run turns the header into the fault card, a 3px
+  `--fault` rule on the raised card. `describeFault` in `src/faults.js` gives
+  the headline (the only `role="alert"`), the body and an action, such as
+  **Replace the key** to `#/settings` for `PROVIDER_AUTH_FAILED`; **Ask again**
+  sits beside it, and the provider's own reply (`provider_response`) is folded
+  under **Provider response** in 12px mono. `runFault` picks the entry: any
+  `PROVIDER_*` error, or the first error when no sub-query came back.
+- **The run**: one spine, read top to bottom: Plan (`#pane-plan`), Checks
+  (`#pane-validation`), SQL (`#pane-sql`), Rows (`#pane-rows`), Cost & time
+  (`#pane-usage`). Each station's head is a 12px uppercase label, a kind tag
+  (**Model · gpt-5.4** from `usage.nodes`, or **Code**) and the step's time on
+  the right (`stationHeads`). Marks are round for a model step and square for
+  code; filled with a tick is done, an outline is pending, dashed was not
+  reached. The checks are a gate band: a timeline of the plans the checks saw
+  (**Plan 1 refused**, **Plan 2 passed**, `gateTimeline`), the reason in one
+  sentence (`gateReason`: the refusal, the tables the role may not read, or
+  what sent a plan back and the refiner's hint), and each check as a tile with a
+  tick or a cross, passed in `--ok` and refused in `--fault`. The SQL and Rows
+  stations then show that nothing was written or run. With more than one
+  database registered, the answer header also says which one answered
   (`#answered-from`, from each sub-query's `datasource_id` in `/api/ask` via
   `answeredDatasources`); with one there is nothing for the resolver to have
   picked, so the line is not printed.
@@ -199,6 +240,9 @@ Back and Forward, and that routing touches nothing but the hash.
   **Download trace** link sits above the table. Opening a node scrolls the
   inspector (`#node-inspector`) just into view and moves focus to its title
   (`#inspect-title`); **Close** returns focus to the node that opened it.
+- **Ask another question** (`.ask-dock`, phones only): once a run is on the
+  page, a bar fixed to the bottom of the screen scrolls back to `#question`
+  and focuses it. It hides while `#question` is in view.
 - **Was this answer right?** (`#feedback`, below Cost & time once a run is
   back): **👍 Right** (`#feedback-up`) and **👎 Wrong** (`#feedback-down`) save
   a rating at once through `POST /api/feedback`; a note is optional, from the
@@ -298,7 +342,11 @@ if you edit anything under `src/`, run `npm run build` and commit
 `static/index.html` in the same change.
 
 `npm test` runs the pure helpers in `src/run.js` (SQL line breaks, the per-node
-ledger, refused-table parsing, the trace drill-down helpers), `src/settings.js`
+ledger, refused-table parsing, the trace drill-down helpers), `src/runState.js`
+(each station's state, live and queued while busy, its head, the answer
+header and its strip, the gate's timeline and reason, which error the fault
+box explains, Ask turning into Stop, the elapsed counter, the chip row),
+`src/faults.js` (the fault box's words and action for each provider error), `src/settings.js`
 (model options, which nodes changed, which chosen models run without a
 temperature), `src/indexHealth.js` (entry counts in plain words, the status
 line, relative build times), `src/router.js` (which page a hash names, the nav
@@ -318,10 +366,8 @@ when it opens itself),
 `src/retrieval.js` (the MMR summary line, picks
 in order, entries passed over, the copyable text form), `src/sqlHighlight.js`
 (the SQL card's tokenizer), `src/artifacts.js` (the rows bar and the ledger and
-pool bars, numeric columns, the CSV), `src/feedback.js`
-(when a run can be rated, the request body, the saved line) and `src/faults.js`
-(the headline, body and next step for an `errors[]` entry, by its `PROVIDER_*`
-code; not wired into the page yet) with Node's built-in test runner; there is no test dependency.
+pool bars, numeric columns, the CSV) and `src/feedback.js`
+(when a run can be rated, the request body, the saved line) with Node's built-in test runner; there is no test dependency.
 
 ## Look
 
@@ -335,13 +381,14 @@ code; not wired into the page yet) with Node's built-in test runner; there is no
   colour holds 4.5:1 on every ground in both themes.
 - **Type**: `--fs-1` to `--fs-6` (12 / 13.5 / 15 / 18 / 24 / 34px) and
   `--fw-regular` / `--fw-medium` / `--fw-bold` (400 / 500 / 650). No other size
-  is used.
+  is used, except the answer sentence on Ask: 28px (22px on a phone), so the
+  answer is the largest text in a run.
 - **Spacing**: `--sp-1` to `--sp-8` (4 / 8 / 12 / 16 / 24 / 32 / 48 / 72px).
 - **One raised tier** (`--raised`, 12px radius, a `--hair` border, `--shadow`),
-  and only for the composer, the checks gate's body, the SQL and rows, and the
-  node inspector. Everything else sits flat on the paper.
-- **One button family**: primary (ink fill: Ask, Add your key, Use this key,
-  a needed Rebuild), secondary (outline: Rebuild, the rating buttons) and ghost
+  and only for the composer, the answer header, the checks gate's body, the SQL
+  and rows, and the node inspector. Everything else sits flat on the paper.
+- **One button family**: primary (ink fill: Ask and Stop, Use this key,
+  Replace the key, a needed Rebuild), secondary (outline: Rebuild, the rating buttons) and ghost
   (Close, Copy), 36px tall (40px on a coarse pointer), 8px radius. Hover
   changes colour only, inside `@media (hover: hover)`; a press scales to .98.
 - Links share one style (accent, 1px underline at 3px offset), and every
