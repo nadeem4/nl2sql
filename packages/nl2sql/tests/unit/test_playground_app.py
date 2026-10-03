@@ -241,6 +241,34 @@ def test_a_missing_recording_is_a_replay_miss_whatever_code_it_surfaces_as():
     assert live.post("/api/ask", json={"question": "q", "role": "admin"}).json()["replay_miss"] is False
 
 
+def test_ask_passes_a_classified_provider_failure_through_unchanged():
+    entry = {"node": "datasource_resolver", "message": "OpenAI rejected the API key.",
+             "error_code": "PROVIDER_AUTH_FAILED", "severity": "ERROR", "provider": "OpenAI",
+             "provider_response": "HTTP 401 (invalid_api_key): Incorrect API key provided: [redacted key]."}
+
+    class _Rejected(_Engine):
+        def run_query(self, natural_language, datasource_id=None, execute=True, user_context=None):
+            return QueryResult(status="error", errors=[entry])
+
+    for mode in ("live", "replay"):
+        client = TestClient(build_app(_Rejected(), questions=[], roles=["admin"], mode=mode, dataset="chinook"))
+        body = client.post("/api/ask", json={"question": "q", "role": "admin"}).json()
+        assert body["errors"] == [entry]
+        assert body["replay_miss"] is False
+
+
+def test_a_replay_miss_entry_has_the_same_fields_as_any_other_error():
+    class _Missing(_Engine):
+        def run_query(self, natural_language, datasource_id=None, execute=True, user_context=None):
+            return QueryResult(status="error", errors=[
+                {"node": "ast_planner", "message": "no rule", "error_code": "PLANNING_FAILURE",
+                 "severity": "ERROR"}])
+
+    client = TestClient(build_app(_Missing(), questions=[], roles=["admin"], mode="replay", dataset="chinook"))
+    entry = client.post("/api/ask", json={"question": "q", "role": "admin"}).json()["errors"][0]
+    assert set(entry) == {"node", "message", "error_code", "severity", "provider", "provider_response"}
+
+
 def test_meta_groups_the_guided_questions_by_datasource():
     """With several databases the page can label each pile, not run them together."""
     by_datasource = {"chinook": ["c1", "c2"], "support": ["s1"]}

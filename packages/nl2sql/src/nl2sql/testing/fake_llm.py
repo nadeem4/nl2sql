@@ -137,6 +137,9 @@ class FakeLLMServer:
     """``reject_temperature`` answers any request carrying ``temperature`` with
     OpenAI's 400 for models that only accept the default, as gpt-5.5 does.
 
+    ``fail_with`` answers every call with one ``(status, body)`` error, the way
+    a provider refusing a key (401) or rate limiting it (429) does.
+
     Each entry in ``calls`` keeps the request ``body``, and the ``authorization``
     header of a matched or unmatched call, so tests can check what was actually
     sent and with which key.
@@ -146,6 +149,8 @@ class FakeLLMServer:
     host: str = "127.0.0.1"
     port: int = 0
     reject_temperature: bool = False
+    # (status, body): answer every call with this error, as a provider refusing it would.
+    fail_with: Optional[tuple] = None
     calls: List[Dict[str, Any]] = field(default_factory=list)
     _server: Optional[HTTPServer] = None
     _thread: Optional[threading.Thread] = None
@@ -199,6 +204,10 @@ class FakeLLMServer:
 
             def do_POST(self):
                 body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+                if outer.fail_with is not None:
+                    outer.calls.append({"name": None, "mode": "failed", "matched": False, "body": body})
+                    self._send(*outer.fail_with)
+                    return
                 if self.path.rstrip("/").endswith("/messages"):
                     self._anthropic(body)
                     return

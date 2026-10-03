@@ -41,6 +41,13 @@ class ErrorCode(str, Enum):
     PIPELINE_TIMEOUT = "PIPELINE_TIMEOUT"
     CANCELLED = "CANCELLED"
     EXECUTION_FAILED = "EXECUTION_FAILED"
+    # The model provider refused or failed a call (nl2sql.llm.failures).
+    PROVIDER_AUTH_FAILED = "PROVIDER_AUTH_FAILED"
+    PROVIDER_RATE_LIMITED = "PROVIDER_RATE_LIMITED"
+    PROVIDER_QUOTA_EXCEEDED = "PROVIDER_QUOTA_EXCEEDED"
+    PROVIDER_TIMEOUT = "PROVIDER_TIMEOUT"
+    PROVIDER_UNAVAILABLE = "PROVIDER_UNAVAILABLE"
+    PROVIDER_MODEL_UNAVAILABLE = "PROVIDER_MODEL_UNAVAILABLE"
 
 
 
@@ -49,7 +56,14 @@ FATAL_ERRORS = {
     ErrorCode.SAFEGUARD_VIOLATION,
     ErrorCode.MISSING_DATASOURCE_ID,
     ErrorCode.MISSING_LLM,
-    ErrorCode.INVALID_STATE
+    ErrorCode.INVALID_STATE,
+    # A refinement retry would make the same call to the same provider.
+    ErrorCode.PROVIDER_AUTH_FAILED,
+    ErrorCode.PROVIDER_RATE_LIMITED,
+    ErrorCode.PROVIDER_QUOTA_EXCEEDED,
+    ErrorCode.PROVIDER_TIMEOUT,
+    ErrorCode.PROVIDER_UNAVAILABLE,
+    ErrorCode.PROVIDER_MODEL_UNAVAILABLE,
 }
 
 SAFE_ERROR_MESSAGES = {
@@ -69,7 +83,13 @@ class PipelineError(BaseModel):
         severity (ErrorSeverity): The severity of the error.
         error_code (ErrorCode): The standardized error code.
         stack_trace (Optional[str]): Stack trace if applicable.
-        details (Optional[Any]): Additional context or metadata.
+        details (Optional[Any]): Additional context or metadata. Not sent to
+            callers.
+        provider (Optional[str]): The model provider a ``PROVIDER_*`` error
+            came from, as a person would name it ("OpenAI").
+        provider_response (Optional[str]): The provider's own words behind ``message``,
+            with anything key-like redacted, for a "provider response"
+            disclosure. Sent to callers.
     """
     model_config = ConfigDict(extra="ignore")
     
@@ -79,6 +99,8 @@ class PipelineError(BaseModel):
     error_code: ErrorCode
     stack_trace: Optional[str] = None
     details: Optional[Any] = None
+    provider: Optional[str] = None
+    provider_response: Optional[str] = None
 
     @property
     def is_retryable(self) -> bool:

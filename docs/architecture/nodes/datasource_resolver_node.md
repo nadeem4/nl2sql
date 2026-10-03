@@ -95,7 +95,7 @@ Side effects:
 3. Schema version mismatch policy (`fail` returns `INVALID_STATE`; `warn` adds a warning).
 4. Answerability check over the **allowed** candidates only (see below). An empty verdict returns `QUESTION_NOT_ANSWERABLE`.
 5. Return `DatasourceResolverResponse` with resolved, allowed and unsupported IDs.
-6. On exceptions (including a failed model call), log and return `SCHEMA_RETRIEVAL_FAILED` with the exception text.
+6. On exceptions, log and return `SCHEMA_RETRIEVAL_FAILED` with the exception text; a provider's refusal of the model call is a `PROVIDER_*` error instead (see [provider failures](../../observability/error-handling.md#provider-failures)).
 
 A single registered datasource is the shortcut, not the usual case: with more
 than one - the demo registers three - the vector search runs, and nothing else

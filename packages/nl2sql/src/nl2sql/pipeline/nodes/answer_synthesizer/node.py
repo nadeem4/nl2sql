@@ -11,6 +11,7 @@ if TYPE_CHECKING:
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.common.logger import get_logger
 from nl2sql.context import NL2SQLContext
+from nl2sql.llm.failures import provider_error
 from nl2sql.llm.wires import structured
 from .schemas import AggregatedResponse, AnswerSynthesizerResponse
 from .prompts import ANSWER_SYNTHESIZER_PROMPT
@@ -87,7 +88,7 @@ class AnswerSynthesizerNode:
             return {
                 "answer_synthesizer_response": AnswerSynthesizerResponse(),
                 "errors": [
-                    PipelineError(
+                    provider_error(self.node_name, exc) or PipelineError(
                         node=self.node_name,
                         message=f"Answer synthesis failed: {exc}",
                         severity=ErrorSeverity.ERROR,

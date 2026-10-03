@@ -96,6 +96,8 @@ def _assert_mapped(result: QueryResult):
             "message": "boom",
             "error_code": "SQL_GEN_FAILED",
             "severity": "ERROR",
+            "provider": None,
+            "provider_response": None,
         }
     ]
 

@@ -191,7 +191,7 @@ but not rendered.
 
 Emits `PipelineError` with:
 
-- `PLANNING_FAILURE` on LLM or parsing errors.
+- `PLANNING_FAILURE` on LLM or parsing errors; a provider's refusal of the call is a `PROVIDER_*` error instead (see [provider failures](../../observability/error-handling.md#provider-failures)).
 
 Logs failures via `logger.exception`.
 

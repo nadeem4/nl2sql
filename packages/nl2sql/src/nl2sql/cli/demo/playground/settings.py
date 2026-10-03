@@ -42,6 +42,7 @@ from fastapi import HTTPException, Request
 from nl2sql.llm.providers import (
     KEY_SHAPE_MESSAGE,
     LLM_AGENTS,
+    PROVIDER_LABELS,
     PROVIDER_KEYS,
     VERIFIED_MODELS,
     env_var_for_key,
@@ -75,8 +76,6 @@ LLM_NODES: List[Dict[str, str]] = [
     for node, agent in LLM_AGENTS.items()
 ]
 _AGENTS = {node["agent"] for node in LLM_NODES}
-
-PROVIDER_LABELS = {"openai": "OpenAI", "anthropic": "Anthropic", "openrouter": "OpenRouter", "ollama": "Ollama"}
 
 # Why the panel writes nothing on a hosted demo. The page turns this into the
 # browser-only key form rather than an "off" notice; see ``read``.

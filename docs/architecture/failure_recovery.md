@@ -11,15 +11,16 @@ Failure in this system is represented as structured `PipelineError` objects accu
 - Missing or invalid configuration raises during context construction (e.g., missing vector store path or collection name), preventing pipeline startup.
 - Explicit datasource overrides fail if the datasource is unknown or not allowed, returning `SECURITY_VIOLATION` or `INVALID_STATE`.
 - Missing LLMs for specific nodes (e.g., refiner) return `MISSING_LLM` errors.
+- A model provider refusing or failing a call (rejected key, rate limit, quota, timeout, outage, unknown model) returns a fatal `PROVIDER_*` error from whichever LLM node made the call, in place of that node's own failure code below. See [provider failures](../observability/error-handling.md#provider-failures).
 
 ### Retrieval
 - Vector store calls are wrapped by `VECTOR_BREAKER`; breaker open or retrieval errors propagate into resolver or schema retriever.
 - Resolver returns `SCHEMA_RETRIEVAL_FAILED` if no candidate datasources are found, or if more than one datasource is registered and there is no vector store. With one datasource registered it runs no vector search.
-- Resolver returns `QUESTION_NOT_ANSWERABLE` when its answerability check finds no allowed datasource can answer the question; the run ends before the decomposer. A failed answerability call returns `SCHEMA_RETRIEVAL_FAILED` with the model's error.
+- Resolver returns `QUESTION_NOT_ANSWERABLE` when its answerability check finds no allowed datasource can answer the question; the run ends before the decomposer. A failed answerability call returns `SCHEMA_RETRIEVAL_FAILED` with the model's error, or a `PROVIDER_*` error when the provider refused it.
 - Schema retriever falls back to full schema snapshot if vector retrieval yields no tables; if schema store returns `None`, it silently returns an empty table list.
 
 ### Planning
-- Decomposer LLM failures return `ORCHESTRATOR_CRASH` (critical) and empty responses.
+- Decomposer LLM failures return `ORCHESTRATOR_CRASH` (critical) and empty responses; a provider's refusal returns a `PROVIDER_*` error instead.
 - AST planner LLM failures return `PLANNING_FAILURE` and a `None` plan.
 - A decomposition that cannot be turned into an execution DAG returns `PLANNER_FAILED` and no `execution_dag`; the layer router ends the run.
 

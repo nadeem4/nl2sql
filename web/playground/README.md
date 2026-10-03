@@ -264,7 +264,9 @@ sentence it stands for),
 databases the switcher offers, and which one a run was answered from) and
 `src/retrieval.js` (the MMR summary line, picks
 in order, entries passed over, the copyable text form) and `src/feedback.js`
-(when a run can be rated, the request body, the saved line) with Node's built-in test runner; there is no test dependency.
+(when a run can be rated, the request body, the saved line) and `src/faults.js`
+(the headline, body and next step for an `errors[]` entry, by its `PROVIDER_*`
+code; not wired into the page yet) with Node's built-in test runner; there is no test dependency.
 
 ## Look
 

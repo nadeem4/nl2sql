@@ -102,7 +102,7 @@ Key contracts:
 Emits `PipelineError` with:
 
 - `INVALID_STATE` (no aggregated result)
-- `AGGREGATOR_FAILED` (LLM failure)
+- `AGGREGATOR_FAILED` (LLM failure), or a `PROVIDER_*` error when the provider refused the call (see [provider failures](../../observability/error-handling.md#provider-failures))
 
 Logs failures via `logger.error`.
 
