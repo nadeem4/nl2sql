@@ -2096,7 +2096,7 @@
 <li>Schema version mismatch policy (<code>fail</code> returns <code>INVALID_STATE</code>; <code>warn</code> adds a warning).</li>
 <li>Answerability check over the <strong>allowed</strong> candidates only (see below). An empty verdict returns <code>QUESTION_NOT_ANSWERABLE</code>.</li>
 <li>Return <code>DatasourceResolverResponse</code> with resolved, allowed and unsupported IDs.</li>
-<li>On exceptions (including a failed model call), log and return <code>SCHEMA_RETRIEVAL_FAILED</code> with the exception text.</li>
+<li>On exceptions, log and return <code>SCHEMA_RETRIEVAL_FAILED</code> with the exception text; a provider's refusal of the model call is a <code>PROVIDER_*</code> error instead (see <a href="../../../observability/error-handling/#provider-failures">provider failures</a>).</li>
 </ol>
 <p>A single registered datasource is the shortcut, not the usual case: with more
 than one - the demo registers three - the vector search runs, and nothing else

@@ -4752,17 +4752,18 @@
 <li>Missing or invalid configuration raises during context construction (e.g., missing vector store path or collection name), preventing pipeline startup.</li>
 <li>Explicit datasource overrides fail if the datasource is unknown or not allowed, returning <code>SECURITY_VIOLATION</code> or <code>INVALID_STATE</code>.</li>
 <li>Missing LLMs for specific nodes (e.g., refiner) return <code>MISSING_LLM</code> errors.</li>
+<li>A model provider refusing or failing a call (rejected key, rate limit, quota, timeout, outage, unknown model) returns a fatal <code>PROVIDER_*</code> error from whichever LLM node made the call, in place of that node's own failure code below. See <a href="../../observability/error-handling/#provider-failures">provider failures</a>.</li>
 </ul>
 <h3 id="retrieval">Retrieval</h3>
 <ul>
 <li>Vector store calls are wrapped by <code>VECTOR_BREAKER</code>; breaker open or retrieval errors propagate into resolver or schema retriever.</li>
 <li>Resolver returns <code>SCHEMA_RETRIEVAL_FAILED</code> if no candidate datasources are found, or if more than one datasource is registered and there is no vector store. With one datasource registered it runs no vector search.</li>
-<li>Resolver returns <code>QUESTION_NOT_ANSWERABLE</code> when its answerability check finds no allowed datasource can answer the question; the run ends before the decomposer. A failed answerability call returns <code>SCHEMA_RETRIEVAL_FAILED</code> with the model's error.</li>
+<li>Resolver returns <code>QUESTION_NOT_ANSWERABLE</code> when its answerability check finds no allowed datasource can answer the question; the run ends before the decomposer. A failed answerability call returns <code>SCHEMA_RETRIEVAL_FAILED</code> with the model's error, or a <code>PROVIDER_*</code> error when the provider refused it.</li>
 <li>Schema retriever falls back to full schema snapshot if vector retrieval yields no tables; if schema store returns <code>None</code>, it silently returns an empty table list.</li>
 </ul>
 <h3 id="planning">Planning</h3>
 <ul>
-<li>Decomposer LLM failures return <code>ORCHESTRATOR_CRASH</code> (critical) and empty responses.</li>
+<li>Decomposer LLM failures return <code>ORCHESTRATOR_CRASH</code> (critical) and empty responses; a provider's refusal returns a <code>PROVIDER_*</code> error instead.</li>
 <li>AST planner LLM failures return <code>PLANNING_FAILURE</code> and a <code>None</code> plan.</li>
 <li>A decomposition that cannot be turned into an execution DAG returns <code>PLANNER_FAILED</code> and no <code>execution_dag</code>; the layer router ends the run.</li>
 </ul>

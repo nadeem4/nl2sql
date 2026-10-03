@@ -1119,6 +1119,15 @@
 </a>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="#provider-failures">
+<span class="md-ellipsis">
+      
+        Provider failures
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="#circuit-breaker">
 <span class="md-ellipsis">
       
@@ -1726,6 +1735,15 @@
 </a>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="#provider-failures">
+<span class="md-ellipsis">
+      
+        Provider failures
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="#circuit-breaker">
 <span class="md-ellipsis">
       
@@ -1775,6 +1793,7 @@
 <p><code>PipelineError</code> includes:</p>
 <ul>
 <li><code>node</code>, <code>message</code>, <code>severity</code>, <code>error_code</code></li>
+<li><code>provider</code> and <code>provider_response</code>, set on a <code>PROVIDER_*</code> error (below), otherwise <code>None</code></li>
 <li><code>is_retryable</code> derived from severity and error code</li>
 </ul>
 <p>Common error codes include <code>MISSING_SQL</code>, <code>EXECUTION_FAILED</code>, <code>PIPELINE_TIMEOUT</code>, <code>SECURITY_VIOLATION</code>, <code>QUESTION_NOT_ANSWERABLE</code>.</p>
@@ -1793,6 +1812,75 @@ answer: the apology is written where the answer synthesizer writes its own, so
 state key that <code>result_from_state</code> never read, so every caller through the SDK
 and the REST route saw <code>final_answer: null</code> with only the error code.</p>
 <p><code>QUESTION_NOT_ANSWERABLE</code> (severity <code>ERROR</code>) comes from the datasource resolver when its answerability check finds that no datasource the role may read can answer the question, such as "what is the weather in Paris?". The run ends before the decomposer: no decomposer, planner, refiner or synthesizer call is made, <code>QueryResult.status</code> is <code>error</code>, and the message tells the user the question can't be answered from the connected data. The check is told to answer "answerable" when unsure. See <a href="../../architecture/nodes/datasource_resolver_node/#answerability-check">DatasourceResolverNode</a>.</p>
+<h2 id="provider-failures">Provider failures</h2>
+<p>When the model provider refuses or fails a call, the LLM node that made it
+(datasource resolver, decomposer, AST planner, refiner, answer synthesizer)
+reports it through <code>nl2sql.llm.failures.provider_error</code> instead of its own
+failure code, so every caller (SDK, REST API, playground) gets the same entry.
+<code>classify_provider_error</code> reads the OpenAI and Anthropic SDK exceptions by
+shape (the anthropic SDK is an optional extra, so it is never imported), looking
+through what the exception was raised from:</p>
+<table>
+<thead>
+<tr>
+<th><code>error_code</code></th>
+<th>when</th>
+<th><code>message</code> (for OpenAI)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>PROVIDER_AUTH_FAILED</code></td>
+<td>HTTP 401, or 403</td>
+<td>"OpenAI rejected the API key."</td>
+</tr>
+<tr>
+<td><code>PROVIDER_RATE_LIMITED</code></td>
+<td>HTTP 429</td>
+<td>"OpenAI rate limited the request."</td>
+</tr>
+<tr>
+<td><code>PROVIDER_QUOTA_EXCEEDED</code></td>
+<td>HTTP 429 with <code>insufficient_quota</code></td>
+<td>"OpenAI says this API key has no quota left."</td>
+</tr>
+<tr>
+<td><code>PROVIDER_TIMEOUT</code></td>
+<td>the SDK's timeout, or HTTP 408</td>
+<td>"OpenAI did not answer in time."</td>
+</tr>
+<tr>
+<td><code>PROVIDER_UNAVAILABLE</code></td>
+<td>a connection error, or HTTP 5xx</td>
+<td>"OpenAI could not be reached." / "OpenAI had a server error and could not answer."</td>
+</tr>
+<tr>
+<td><code>PROVIDER_MODEL_UNAVAILABLE</code></td>
+<td>HTTP 404, or <code>model_not_found</code></td>
+<td>"OpenAI does not offer the configured model to this API key."</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><code>message</code> is one sentence naming the provider. It never carries the key
+  (masked or not), a Python repr, or the node's own label.</li>
+<li><code>provider</code> is the provider as a person names it (<code>PROVIDER_LABELS</code> in
+  <code>llm/providers.py</code>): Anthropic for the Anthropic SDK, otherwise the preset
+  whose endpoint the call went to. A <code>base_url</code> no preset names is
+  "The model provider".</li>
+<li><code>provider_response</code> is the provider's own words, such as
+  <code>HTTP 401 (invalid_api_key): Incorrect API key provided: [redacted key]. ...</code>,
+  for a "provider response" disclosure. <code>redact_keys</code> replaces anything
+  key-like (a bearer token, an <code>sk-</code>/<code>pk-</code>/<code>rk-</code> key whole or masked, any
+  unbroken run of 32 or more letters, digits, <code>-</code> or <code>_</code>) with <code>[redacted key]</code>.
+  The <code>error</code> of a failed call in <code>usage.calls</code> is redacted the same way.</li>
+<li>Every <code>PROVIDER_*</code> code is fatal (<code>is_retryable</code> is false): a refinement
+  retry would make the same call to the same provider with the same key.</li>
+<li>An HTTP 400 is not classified. It is a request the engine built wrongly, or
+  a model refusing a parameter, and the node's own error explains it better.</li>
+</ul>
+<p><code>run_with_graph()</code>'s fallback applies the same classification, so a provider
+failure that escapes its node is not <code>UNKNOWN_ERROR</code>.</p>
 <h2 id="circuit-breaker">Circuit breaker</h2>
 <p><code>create_breaker()</code> configures <code>pybreaker.CircuitBreaker</code> instances with observability hooks. The system defines exactly one:</p>
 <ul>

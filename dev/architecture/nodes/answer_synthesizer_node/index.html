@@ -2047,7 +2047,7 @@
 <p>Emits <code>PipelineError</code> with:</p>
 <ul>
 <li><code>INVALID_STATE</code> (no aggregated result)</li>
-<li><code>AGGREGATOR_FAILED</code> (LLM failure)</li>
+<li><code>AGGREGATOR_FAILED</code> (LLM failure), or a <code>PROVIDER_*</code> error when the provider refused the call (see <a href="../../../observability/error-handling/#provider-failures">provider failures</a>)</li>
 </ul>
 <p>Logs failures via <code>logger.error</code>.</p>
 <hr/>

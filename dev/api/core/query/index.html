@@ -4185,7 +4185,7 @@ No exceptions are raised by <code>run_query</code>; errors are returned in <code
 | --- | --- | --- | --- |
 | <code>sub_queries</code> | <code>List[SubQueryResult]</code> | no | One entry per decomposed sub-query. |
 | <code>final_answer</code> | <code>Optional[Dict[str, Any]]</code> | no | Answer synthesizer payload (<code>summary</code>, <code>format_type</code>, <code>content</code>). |
-| <code>errors</code> | <code>List[Dict[str, Any]]</code> | no | Pipeline errors (<code>node</code>, <code>message</code>, <code>error_code</code>, <code>severity</code>). |
+| <code>errors</code> | <code>List[Dict[str, Any]]</code> | no | Pipeline errors (<code>node</code>, <code>message</code>, <code>error_code</code>, <code>severity</code>, <code>provider</code>, <code>provider_response</code>). <code>provider</code> and <code>provider_response</code> are set for a <code>PROVIDER_*</code> code and <code>null</code> otherwise; see <a href="../../../observability/error-handling/#provider-failures">provider failures</a>. |
 | <code>trace_id</code> | <code>str</code> | no | Trace identifier. |
 | <code>reasoning</code> | <code>List[Dict[str, Any]]</code> | no | Reasoning events/logs. |
 | <code>warnings</code> | <code>List[Dict[str, Any]]</code> | no | Warning events/logs. |

@@ -2197,7 +2197,7 @@ but not rendered.</p>
 <h2 id="error-handling">Error Handling</h2>
 <p>Emits <code>PipelineError</code> with:</p>
 <ul>
-<li><code>PLANNING_FAILURE</code> on LLM or parsing errors.</li>
+<li><code>PLANNING_FAILURE</code> on LLM or parsing errors; a provider's refusal of the call is a <code>PROVIDER_*</code> error instead (see <a href="../../../observability/error-handling/#provider-failures">provider failures</a>).</li>
 </ul>
 <p>Logs failures via <code>logger.exception</code>.</p>
 <hr/>

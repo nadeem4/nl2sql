@@ -2036,7 +2036,7 @@
 <p>Key contracts:</p>
 <ul>
 <li><code>RefinerResponse</code></li>
-<li><code>PipelineError</code> (<code>PLAN_FEEDBACK</code>, <code>MISSING_LLM</code>, <code>REFINER_FAILED</code>)</li>
+<li><code>PipelineError</code> (<code>PLAN_FEEDBACK</code>, <code>MISSING_LLM</code>, <code>REFINER_FAILED</code>, or a <code>PROVIDER_*</code> error when the provider refused the call (see <a href="../../../observability/error-handling/#provider-failures">provider failures</a>))</li>
 </ul>
 <hr/>
 <h2 id="determinism-guarantees">Determinism Guarantees</h2>
