@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { minMaxShares } from "./artifacts.js";
 import { asText, mmrLine, passedOver, picksInOrder, score, searchTitle, shortType } from "./retrieval.js";
 
 // What a vector search saw and how MMR chose: the pool nearest first, the
@@ -6,14 +7,25 @@ import { asText, mmrLine, passedOver, picksInOrder, score, searchTitle, shortTyp
 // the dropped entries quiet. The same table serves a run's trace (Debug) and
 // the Retrieval inspector.
 
-function Similarity({ value, withheld }) {
+// The bar places a similarity within this pool's own range, nearest full and
+// farthest empty: raw cosines bunch together, so against 0..1 every bar looked
+// the same length.
+function Similarity({ value, withheld, share }) {
   if (withheld) return <span className="quiet" title={withheld}>withheld</span>;
-  const share = typeof value === "number" ? Math.max(0, Math.min(1, value)) : 0;
   return (
-    <>
-      {score(value)}
-      <span className="share" style={{ "--share": share }} aria-hidden="true" />
-    </>
+    <span className="simcell">
+      <span className="bar" aria-hidden="true">{share !== null && <i style={{ "--share": share }} />}</span>
+      <span>{score(value)}</span>
+    </span>
+  );
+}
+
+// An ordered row of mono chips: MMR's picks, or the entries it passed over.
+function Chips({ entries, label, picks }) {
+  return (
+    <ol className={picks ? "chips picks" : "chips"} aria-label={label}>
+      {entries.map((e) => <li key={e.id}><code>{e.label || e.id}</code></li>)}
+    </ol>
   );
 }
 
@@ -21,32 +33,23 @@ export function SearchTable({ search, withText }) {
   const pool = search.pool || [];
   const skipped = passedOver(search);
   const picks = picksInOrder(search);
+  const shares = minMaxShares(pool.map((e) => (e.withheld ? null : e.similarity)));
   return (
     <div className="search">
       <p className="search-line">{mmrLine(search)}</p>
       {picks.length > 0 && (
-        <p className="search-line">
-          Picks in order:{" "}
-          {picks.map((e, i) => (
-            <React.Fragment key={e.id}>
-              {i > 0 && ", "}
-              <code>{e.label || e.id}</code>
-            </React.Fragment>
-          ))}
-          .
-          {skipped.length > 0 && (
-            <>
-              {" "}Passed over, although closer to the query, because {skipped.length === 1 ? "it repeats" : "each repeats"} an earlier pick:{" "}
-              {skipped.map((e, i) => (
-                <React.Fragment key={e.id}>
-                  {i > 0 && ", "}
-                  <code>{e.label || e.id}</code>
-                </React.Fragment>
-              ))}
-              .
-            </>
-          )}
-        </p>
+        <div className="chip-line">
+          <span className="chip-label">Picks in order</span>
+          <Chips entries={picks} label="Picks in order" picks />
+        </div>
+      )}
+      {picks.length > 0 && skipped.length > 0 && (
+        <div className="chip-line">
+          <span className="chip-label">
+            Passed over, although closer to the query, because {skipped.length === 1 ? "it repeats" : "each repeats"} an earlier pick
+          </span>
+          <Chips entries={skipped} label="Passed over" />
+        </div>
       )}
       {pool.length > 0 && (
         <div className="table-scroll pool-wrap" tabIndex={0} role="region" aria-label={`${searchTitle(search)} pool`}>
@@ -63,7 +66,7 @@ export function SearchTable({ search, withText }) {
               </tr>
             </thead>
             <tbody>
-              {pool.map((e) => (
+              {pool.map((e, i) => (
                 <tr key={e.id} data-picked={e.picked || undefined}>
                   <td className="num">{e.rank}</td>
                   <th scope="row" className="entry">
@@ -71,7 +74,7 @@ export function SearchTable({ search, withText }) {
                     {withText && e.text && <span className="entry-text" title={e.text}>{e.text}</span>}
                   </th>
                   <td className="entry-type">{shortType(e.type)}</td>
-                  <td className="num sim-col"><Similarity value={e.similarity} withheld={e.withheld} /></td>
+                  <td className="num sim-col"><Similarity value={e.similarity} withheld={e.withheld} share={shares[i]} /></td>
                   <td className="pick">{e.picked ? `pick ${e.pick_order}` : "dropped"}</td>
                   <td className="num">{e.picked ? score(e.mmr_score) : ""}</td>
                   <td className="num">{e.picked && e.pick_order > 1 ? score(e.redundancy) : ""}</td>

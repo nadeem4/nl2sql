@@ -163,12 +163,28 @@ Back and Forward, and that routing touches nothing but the hash.
   (`#answered-from`, from each sub-query's `datasource_id` in `/api/ask` via
   `answeredDatasources`); with one there is nothing for the resolver to have
   picked, so the line is not printed.
-- **Cost & time**: the question's totals (LLM calls, input, cached and output
-  tokens, time waiting on the model, total time). With **Debug** on, a per-node
-  table follows: one row per node that ran, in execution order, code nodes
-  included, with calls, input, cached, output and reasoning tokens, LLM time and
-  node wall-clock time. The SQL agent is a subgraph, so its nodes are nested
-  under it and its time includes theirs. When a sub-query's plan came from the
+- **SQL and rows** are raised cards. The SQL card (`src/SqlCard.jsx`) has a
+  header strip, **Generated SQL** and the plan it came from (`from plan 2` after
+  a retry), a **Copy** button (the clipboard, or the text selected where the
+  browser refuses; it reads "Copied" for about 1.4s), numbered lines and a
+  keyword tint: keywords, function names and numbers take `--kw`, `--fn` and
+  `--num`. The tint comes from `src/sqlHighlight.js`, a small tokenizer with no
+  library, rendered as React text so the SQL is never parsed as markup; a long
+  line scrolls inside the card. The rows card (`src/RowsTable.jsx`) fills the
+  column with 38px rows (44px on a phone) and a header that sticks. The first
+  numeric column carries an in-cell bar, a 6px track and fill sized to the
+  column's largest magnitude (a negative is drawn by its size, in ink), beside
+  the right-aligned number. NULL stays dimmed. The foot counts the rows and
+  offers **Download CSV**, built in the page from the rows it already has.
+- **Cost & time**: five figures (total time, waiting on the model, model calls,
+  input tokens with the cached count, cost). With **Debug** on, a per-node
+  ledger follows (`src/Ledger.jsx`): one row per node that ran, in execution
+  order, code nodes included, with calls, input, cached and output tokens
+  (reasoning too when any node spent some), LLM time and node wall-clock time.
+  Beside each node time is a 72x6px bar sized to the slowest node: a model
+  node's bar is in the accent, a code node's in dimmed ink. A node that needed
+  more than one call is tagged **retried**. The SQL agent is a subgraph, so its
+  nodes are nested under it and its time includes theirs. When a sub-query's plan came from the
   plan cache (`plan_source: "cache"` in `/api/ask`), Debug also shows
   `#plan-cache-hit`: no planner call was made, and the plan was validated again
   for the role. Debug is on by default; the choice is
@@ -180,7 +196,9 @@ Back and Forward, and that routing touches nothing but the hash.
   and shows that node's executions (attempts and sub-queries) with errors and
   warnings, the state it read, the update it returned and, for LLM nodes, the
   exact prompt, the raw response and the parsed result, each folded. A
-  **Download trace** link sits above the table.
+  **Download trace** link sits above the table. Opening a node scrolls the
+  inspector (`#node-inspector`) just into view and moves focus to its title
+  (`#inspect-title`); **Close** returns focus to the node that opened it.
 - **Was this answer right?** (`#feedback`, below Cost & time once a run is
   back): **👍 Right** (`#feedback-up`) and **👎 Wrong** (`#feedback-down`) save
   a rating at once through `POST /api/feedback`; a note is optional, from the
@@ -222,9 +240,12 @@ Back and Forward, and that routing touches nothing but the hash.
   (`#retrieval-type-table`, `-column`, `-datasource`, `-join`, `-metric`). It
   posts to `POST /api/retrieval`; after the first search every knob searches
   again. The result (`#retrieval-result`) is the pool nearest first, with
-  similarity, MMR pick order, the score each pick won with and its overlap with
+  similarity (with a bar placed within the pool's own range, nearest full and
+  farthest empty, since raw cosines bunch together), MMR pick order, the
+  score each pick won with and its overlap with
   earlier picks, each entry's embedded text, and **Copy as text**
-  (`#retrieval-copy`) for diffing two runs. A failure shows `#retrieval-error`.
+  (`#retrieval-copy`) for diffing two runs. The picks in order, and the
+  entries passed over, sit above the table as rows of mono chips. A failure shows `#retrieval-error`.
   Where it is off (the same rule as Settings) it says why
   (`#retrieval-unavailable`), and the nav marks it.
 - **Retrieval in the drill-down**: for `datasource_resolver` and
@@ -293,9 +314,11 @@ page's three phases, each step's state and the waterfall bars),
 `src/railFade.js` (which edges of the rail fade), `src/hostedKey.js` (also the
 key's masked tail, the provider cards and a key pasted under the wrong
 provider), `src/indexHealth.js` (also the rail's one-line index summary and
-when it opens itself) and
+when it opens itself),
 `src/retrieval.js` (the MMR summary line, picks
-in order, entries passed over, the copyable text form) and `src/feedback.js`
+in order, entries passed over, the copyable text form), `src/sqlHighlight.js`
+(the SQL card's tokenizer), `src/artifacts.js` (the rows bar and the ledger and
+pool bars, numeric columns, the CSV), `src/feedback.js`
 (when a run can be rated, the request body, the saved line) and `src/faults.js`
 (the headline, body and next step for an `errors[]` entry, by its `PROVIDER_*`
 code; not wired into the page yet) with Node's built-in test runner; there is no test dependency.

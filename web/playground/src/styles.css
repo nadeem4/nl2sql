@@ -302,7 +302,7 @@ button:disabled { cursor: default; }
    One step up from the paper, and only for the four things a reader works
    with: the composer, the checks gate, the SQL and its rows, and the node
    inspector. Everything else stays flat. */
-.composer, #pane-validation .station-body, .sql, .rows-wrap, .inspect {
+.composer, #pane-validation .station-body, .art, .inspect {
   background: var(--raised); border: 1px solid var(--hair);
   border-radius: var(--r-raised); box-shadow: var(--shadow);
 }
@@ -554,12 +554,6 @@ li[data-flag="denied"] .flag { color: var(--ink); background: var(--well); }
 .retry strong { color: var(--ink); }
 .retry .quote { color: var(--ink); font-family: var(--mono); font-size: var(--fs-2); }
 
-/* SQL */
-.sql {
-  margin: 0; padding: var(--sp-4) var(--sp-5);
-  font-size: var(--fs-2); line-height: 1.6; overflow-x: auto; white-space: pre; tab-size: 2;
-}
-
 /* Rows */
 .answer { font-size: var(--fs-4); font-weight: var(--fw-medium); margin-bottom: var(--sp-3); letter-spacing: -0.01em; max-width: 60ch; }
 .table-scroll { overflow: auto; max-height: 380px; border: 1px solid var(--rule); border-radius: var(--r-well); background: var(--surface); }
@@ -572,40 +566,10 @@ li[data-flag="denied"] .flag { color: var(--ink); background: var(--well); }
 }
 .grid tbody tr:last-child > * { border-bottom: 0; }
 .grid td { font-family: var(--mono); font-size: var(--fs-1); }
-.rows-wrap { width: fit-content; max-width: 100%; background: var(--raised); border-color: var(--hair); border-radius: var(--r-raised); }
-.rows-wrap .grid { width: auto; min-width: 280px; }
-.rows-wrap .grid th, .rows-wrap .grid td { border-bottom-color: var(--hair); }
-.rows-wrap .grid thead th { background: var(--surface); border-bottom-color: var(--rule); }
 .grid th.num { text-align: right; }
 .grid td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .grid td.null { color: var(--ink-3); }
-.table-foot { margin-top: var(--sp-2); color: var(--ink-2); font-size: var(--fs-2); }
 
-/* Cost & time */
-.totals { margin: 0; display: flex; flex-wrap: wrap; gap: var(--sp-3) var(--sp-6); }
-.totals div { display: flex; flex-direction: column-reverse; }
-.totals dt { font-size: var(--fs-1); color: var(--ink-2); }
-.totals dd { margin: 0; font-family: var(--mono); font-size: var(--fs-4); font-variant-numeric: tabular-nums; }
-
-.ledger-wrap { margin-top: var(--sp-4); max-height: none; }
-.ledger th, .ledger td { padding: 5px var(--sp-3); }
-.ledger thead th, .ledger td, .ledger tfoot th { text-align: right; }
-.ledger thead th:first-child, .ledger tbody th, .ledger tfoot th { text-align: left; }
-.ledger tbody th { font-weight: var(--fw-regular); }
-.ledger td { font-variant-numeric: tabular-nums; }
-.ledger .node { font-family: var(--mono); font-size: var(--fs-1); }
-.ledger tr.code .node { color: var(--ink-2); }
-.ledger tr[data-depth="1"] th { padding-left: 30px; }
-.ledger tr[data-depth="1"] th::before { content: ""; display: inline-block; width: 8px; height: 1px; background: var(--rule-strong); margin: 0 8px 3px -16px; }
-.ledger .tag { margin-left: var(--sp-2); font-size: var(--fs-1); font-weight: var(--fw-bold); color: var(--accent); }
-.ledger .tag.quiet { color: var(--ink-3); font-weight: var(--fw-regular); }
-.ledger tfoot th, .ledger tfoot td { border-top: 1px solid var(--rule-strong); border-bottom: 0; font-weight: var(--fw-bold); background: var(--paper); }
-.ledger .time-col { position: relative; min-width: 110px; }
-/* Where the time goes: a bar sized to the slowest node, no track behind it. */
-.ledger td.time-col .share {
-  position: absolute; left: 12px; bottom: 3px; height: 2px;
-  width: calc((100% - 24px) * var(--share, 0)); background: var(--accent); opacity: .7;
-}
 .footnote { margin-top: var(--sp-3); font-size: var(--fs-2); color: var(--ink-2); }
 
 /* Rating the answer: after the run, below the spine's last station, with no
@@ -645,9 +609,7 @@ li[data-flag="denied"] .flag { color: var(--ink); background: var(--well); }
   background: none; border: 0; padding: 0; color: var(--ink); text-align: left;
   text-decoration: underline dotted var(--rule-strong); text-underline-offset: 3px;
 }
-.ledger tr.code .node-link { color: var(--ink-2); }
 .node-link[aria-pressed="true"] { color: var(--accent); font-weight: var(--fw-bold); text-decoration: none; }
-.ledger tr[data-picked] > th { box-shadow: inset 2px 0 0 var(--accent); }
 
 .inspect { margin-top: var(--sp-4); padding: var(--sp-4) var(--sp-5) var(--sp-5); }
 .inspect-head { display: flex; align-items: baseline; gap: var(--sp-3); flex-wrap: wrap; }
@@ -801,12 +763,6 @@ li[data-flag="denied"] .flag { color: var(--ink); background: var(--well); }
 .pool tr[data-picked] td.pick { color: var(--accent); font-weight: var(--fw-bold); }
 .pool tbody tr:not([data-picked]) .entry-name,
 .pool tbody tr:not([data-picked]) td { color: var(--ink-3); }
-.pool td.sim-col { position: relative; min-width: 104px; }
-.pool td.sim-col .share {
-  position: absolute; left: 12px; bottom: 3px; height: 2px;
-  width: calc((100% - 24px) * var(--share, 0)); background: var(--accent); opacity: .7;
-}
-.pool tbody tr:not([data-picked]) td.sim-col .share { background: var(--rule-strong); }
 
 .retrieval-record { display: grid; gap: 6px; padding-left: var(--sp-3); border-left: 2px solid var(--accent-soft); min-width: 0; }
 .retrieval-record h5 { margin: 0; font-size: var(--fs-2); font-weight: var(--fw-bold); }
@@ -1162,3 +1118,142 @@ li[data-flag="denied"] .flag { color: var(--ink); background: var(--well); }
   .seg-opt { min-height: 40px; }
   .key-clear { min-height: 44px; }
 }
+
+/* ---- Data artifacts ----
+   The SQL, the rows, the cost ledger and the retrieval pool, each read as a
+   finished artifact: the SQL and the rows are raised cards with a header or a
+   foot strip, and every magnitude is an inline 6px track and fill beside its
+   number, sized against its own set (the column's largest value, the slowest
+   node, the pool's range). A model's bar takes the accent; code's is dimmed
+   ink. The SQL tint holds 4.5:1 on --raised in both themes. */
+
+:root { --kw: #8c1d2e; --fn: #1f5fa8; --num: #6b3fb0; }
+@media (prefers-color-scheme: dark) {
+  :root { --kw: #f08a9b; --fn: #8ab4f8; --num: #c7a2ff; }
+}
+
+.art { overflow: hidden; min-width: 0; }
+.art-head {
+  display: flex; align-items: center; gap: var(--sp-3);
+  padding: var(--sp-1) var(--sp-2) var(--sp-1) var(--sp-5); min-height: 44px;
+  border-bottom: 1px solid var(--hair);
+}
+.art-label { font-size: var(--fs-1); font-weight: var(--fw-bold); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); }
+.art-meta { font-family: var(--mono); font-size: var(--fs-1); color: var(--ink-2); }
+.art-head .inspect-close, .art-foot .inspect-close { margin-left: auto; font-family: var(--sans); }
+.art-scroll { overflow: auto; max-height: 420px; }
+.art-scroll:focus-visible { outline-offset: -2px; }
+.art-foot {
+  display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap;
+  padding: var(--sp-1) var(--sp-2) var(--sp-1) var(--sp-5); min-height: 44px;
+  font-family: var(--mono); font-size: var(--fs-1); color: var(--ink-2);
+  border-top: 1px solid var(--hair); background: var(--surface);
+}
+
+/* SQL: numbered lines from a CSS counter, so a copy never picks them up. */
+.sql-code {
+  margin: 0; padding: var(--sp-4) var(--sp-5); counter-reset: line;
+  font-size: var(--fs-2); line-height: 1.7; color: var(--ink);
+  overflow-x: auto; white-space: pre; tab-size: 2;
+}
+.sql-code:focus-visible { outline-offset: -2px; }
+.sql-line { counter-increment: line; }
+.sql-line::before {
+  content: counter(line); display: inline-block; width: 2ch; margin-right: var(--sp-4);
+  text-align: right; color: var(--ink-3); user-select: none;
+}
+.tk-kw { color: var(--kw); }
+.tk-fn { color: var(--fn); }
+.tk-num { color: var(--num); }
+
+/* Rows: the table fills the card, 38px rows, a header that sticks. */
+.rows-table, .ledger-table { width: 100%; border-collapse: separate; border-spacing: 0; }
+.rows-table th {
+  position: sticky; top: 0; z-index: 1; background: var(--surface);
+  padding: var(--sp-2) var(--sp-5); text-align: left; white-space: nowrap;
+  font-family: var(--mono); font-weight: var(--fw-regular); font-size: var(--fs-1); color: var(--ink-2);
+  border-bottom: 1px solid var(--rule);
+}
+.rows-table td {
+  height: 38px; padding: 0 var(--sp-5); white-space: nowrap;
+  font-size: var(--fs-2); font-variant-numeric: tabular-nums;
+  border-bottom: 1px solid var(--hair);
+}
+.rows-table tbody tr:last-child td { border-bottom: 0; }
+.rows-table th.num, .rows-table td.num { text-align: right; }
+.rows-table td.num { font-family: var(--mono); }
+.rows-table td.null { font-family: var(--mono); font-size: var(--fs-1); color: var(--ink-3); }
+.rows-table td.barcell-td { width: 50%; min-width: 180px; }
+.barcell { display: grid; grid-template-columns: minmax(48px, 1fr) var(--num-w, 7ch); gap: var(--sp-3); align-items: center; }
+.barcell > span:last-child { text-align: right; }
+
+/* One bar for every magnitude: a 6px track and its fill. */
+.bar { display: block; height: 6px; border-radius: 99px; background: var(--well); overflow: hidden; }
+.bar i {
+  display: block; height: 100%; width: calc(var(--share, 0) * 100%); min-width: 2px;
+  border-radius: 99px; background: var(--accent); transform-origin: left center;
+}
+.bar.neg i { background: var(--ink-2); }
+.bar.dim i { background: var(--ink-3); opacity: .6; }
+
+/* Cost and time: five figures, then (Debug) the ledger. */
+.totals { margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(128px, 1fr)); gap: var(--sp-4); }
+.totals div { display: flex; flex-direction: column-reverse; justify-content: flex-end; gap: 2px; min-width: 0; }
+.totals dt { font-size: var(--fs-1); color: var(--ink-2); }
+.totals dd { margin: 0; font-family: var(--mono); font-size: var(--fs-4); font-variant-numeric: tabular-nums; }
+
+.art-ledger { margin-top: var(--sp-4); }
+.art-ledger .art-scroll { max-height: none; }
+.ledger-table { font-family: var(--mono); font-size: var(--fs-1); }
+.ledger-table th, .ledger-table td { padding: var(--sp-2) var(--sp-3); text-align: right; white-space: nowrap; border-bottom: 1px solid var(--hair); font-variant-numeric: tabular-nums; }
+.ledger-table thead th { font-weight: var(--fw-regular); color: var(--ink-2); background: var(--surface); border-bottom-color: var(--rule); }
+.ledger-table thead th:first-child, .ledger-table tbody th, .ledger-table tfoot th { text-align: left; }
+.ledger-table tbody th { font-weight: var(--fw-regular); }
+.ledger-table tr.code .node, .ledger-table tr.code .node-link { color: var(--ink-2); }
+.ledger-table tr[data-depth="1"] th { padding-left: 34px; }
+.ledger-table tr[data-depth="1"] th::before {
+  content: ""; display: inline-block; width: 8px; height: 1px; background: var(--rule-strong); margin: 0 8px 3px -16px;
+}
+.ledger-table tr[data-picked] > th { box-shadow: inset 2px 0 0 var(--accent); }
+.ledger-table .tag {
+  margin-left: var(--sp-2); padding: 1px 6px; border-radius: 4px;
+  font-family: var(--sans); font-size: var(--fs-1); font-weight: var(--fw-bold);
+  color: var(--warn); background: var(--warn-soft);
+}
+.ledger-table .tag.quiet { padding: 0; background: none; color: var(--ink-3); font-weight: var(--fw-regular); }
+.ledger-table tfoot th, .ledger-table tfoot td { border-top: 1px solid var(--rule-strong); border-bottom: 0; font-weight: var(--fw-bold); background: var(--surface); }
+.ledger-table tfoot th { font-family: var(--sans); }
+.timecell { display: inline-grid; grid-template-columns: 72px 7ch; gap: var(--sp-3); align-items: center; }
+.timecell > span:last-child { text-align: right; }
+
+/* Retrieval: similarity across the pool's own range, picks as chips. */
+.simcell { display: inline-grid; grid-template-columns: 56px 5ch; gap: var(--sp-2); align-items: center; }
+.simcell > span:last-child { text-align: right; }
+.pool tbody tr:not([data-picked]) .bar i { background: var(--rule-strong); }
+.chip-line { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-3); font-size: var(--fs-2); color: var(--ink-2); max-width: 1120px; }
+.chips { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; counter-reset: chip; }
+.chips li {
+  counter-increment: chip; display: inline-flex; align-items: baseline; gap: 6px;
+  padding: 2px var(--sp-2); border: 1px solid var(--rule); border-radius: 6px; background: var(--surface);
+}
+.chips.picks li::before { content: counter(chip); font-family: var(--mono); font-size: var(--fs-1); color: var(--ink-3); }
+.chips code { font-size: var(--fs-1); color: var(--ink); }
+.chips.picks li { border-color: color-mix(in srgb, var(--accent) 45%, var(--rule)); }
+
+#inspect-title:focus { outline: none; }
+#inspect-title:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .bar i { animation: bar-grow .42s var(--ease) both; }
+  @keyframes bar-grow { from { transform: scaleX(0); } }
+  .inspect { animation: arrive .32s var(--ease) both; }
+}
+
+@media (max-width: 640px) {
+  .art-head, .art-foot { padding-left: var(--sp-4); }
+  .sql-code { padding: var(--sp-3) var(--sp-4); }
+  .rows-table th, .rows-table td { padding-left: var(--sp-3); padding-right: var(--sp-3); }
+  .rows-table td { height: 44px; }
+  .rows-table td.barcell-td { min-width: 150px; }
+}
+/* ---- end Data artifacts ---- */
