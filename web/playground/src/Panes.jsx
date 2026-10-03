@@ -5,57 +5,163 @@ import SqlCard from "./SqlCard.jsx";
 import RowsTable from "./RowsTable.jsx";
 import Ledger, { Totals } from "./Ledger.jsx";
 import { planSections } from "./plan.js";
-import { deniedTables, humanCheck, nodeLedger, traceFileName, traceUrl } from "./run.js";
+import { humanCheck, nodeLedger, traceFileName, traceUrl } from "./run.js";
+import { describeFault } from "./faults.js";
+import {
+  answerHead, gateReason, gateTimeline, runFault, secs, stationHeads, stationStates, statusStrip,
+} from "./runState.js";
 
-// The run reads top to bottom as one sequence: question, plan, checks, SQL,
-// rows, cost. Each station is a renderer over the `/api/ask` response. The
-// checks sit between the plan and the SQL on purpose: that is where the engine
-// stops a plan, before any SQL exists.
+export { secs };
 
-function Station({ id, title, state, note, children }) {
+// The run reads answer first, then the sequence that produced it: plan,
+// checks, SQL, rows, cost. Each station is a renderer over the `/api/ask`
+// response. The checks sit between the plan and the SQL on purpose: that is
+// where the engine stops a plan, before any SQL exists.
+
+// A station's head is a small label, its kind (a model decides it, or code
+// does) and its time; the mark on the spine is round for a model step and
+// square for code. A station that is queued or live says so in its head and
+// its mark, so its idle sentence is not shown.
+function Station({ id, title, state, note, head = {}, children }) {
+  const { kind = "code", tag = null, time = null } = head;
+  const quiet = state === "queued" || state === "busy";
   return (
-    <section className="station" id={id} data-state={state} aria-labelledby={`${id}-title`}>
+    <section className="station" id={id} data-state={state} data-kind={kind} tabIndex={-1}
+      aria-labelledby={`${id}-title`}>
       <span className="mark" aria-hidden="true" />
       <div className="station-head">
         <h3 id={`${id}-title`}>{title}</h3>
-        {note && <p className="station-note">{note}</p>}
+        {tag && <span className="kind-tag" data-kind={kind}>{tag}</span>}
+        {time && <span className="station-time">{time}</span>}
       </div>
+      {note && !quiet && <p className="station-note">{note}</p>}
       {children && <div className="station-body">{children}</div>}
     </section>
   );
 }
 
-// `answered` is the database the resolver picked, and is empty with a single
-// database registered: there is then nothing for it to have picked.
-function Question({ asked, busy, answered = [] }) {
+// Strip items move focus to their station rather than writing a hash: the
+// hash belongs to the router.
+function jump(id) {
+  const target = document.getElementById(id);
+  if (!target) return;
+  const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  target.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
+  target.focus({ preventScroll: true });
+}
+
+// What went wrong, in words a visitor can act on (`faults.js`), with the
+// provider's own text folded away underneath.
+function Fault({ entry, onAgain }) {
+  const said = describeFault(entry);
+  const raw = entry.provider_response;
   return (
-    <Station id="pane-question" title="Question" state={asked ? "done" : "idle"}
-      note={asked ? null : "Pick a guided question or type your own."}>
-      {asked && (
-        <>
-          <p className="asked">{asked.question}</p>
-          <p className="asked-meta">
-            Asked as <strong>{asked.role}</strong>
-            {asked.planOnly && ", plan only"}
-            {busy && <span className="working" role="status">Running the pipeline</span>}
-          </p>
-          {!busy && answered.length > 0 && (
-            <p className="asked-meta" id="answered-from">
-              Answered from <strong>{answered.join(" and ")}</strong>, the database the resolver picked.
-            </p>
-          )}
-        </>
+    <div className="fault-box">
+      <div className="fault-head">
+        <span className="fault-ico" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8"
+            strokeLinecap="round" strokeLinejoin="round"><circle cx="10" cy="10" r="7.5" /><path d="M10 6v5M10 14h.01" /></svg>
+        </span>
+        <div className="fault-words">
+          <p className="fault-title" role="alert">{said.headline}</p>
+          {said.body && <p className="fault-body">{said.body}</p>}
+        </div>
+      </div>
+      <div className="fault-actions">
+        {said.action && <a className="fault-action" href={said.action.route}>{said.action.label}</a>}
+        {onAgain && <button type="button" className="fault-again" onClick={onAgain}>Ask again</button>}
+      </div>
+      {raw && (
+        <details className="fault-raw">
+          <summary>Provider response</summary>
+          <pre>{typeof raw === "string" ? raw : JSON.stringify(raw, null, 2)}</pre>
+        </details>
       )}
-    </Station>
+    </div>
   );
 }
 
-export function PlanPane({ sub, state }) {
+// `#pane-question`: before a run, a line saying what will appear here; once
+// asked, the answer header. The answer sentence is the largest text in the
+// run, and the strip under it summarises the stations below and jumps to them.
+// `answered` is the database the resolver picked, and is empty with a single
+// database registered: there is then nothing for it to have picked.
+function AnswerHead({ asked, busy, stopped, result, sub, fault, answered = [], onAgain }) {
+  if (!asked) {
+    return (
+      <section className="answer-head is-idle" id="pane-question" tabIndex={-1} aria-labelledby="pane-question-title">
+        <h3 id="pane-question-title" className="answer-label">Answer</h3>
+        <p className="answer-idle">
+          Pick a suggestion or type your own question. The answer leads here, with every step that produced it below.
+        </p>
+      </section>
+    );
+  }
+  const head = !busy && !stopped && !fault ? answerHead(result, sub) : null;
+  const strip = head ? statusStrip(result, sub) : [];
+  const miss = result && result.replay_miss;
+  const state = busy ? "busy" : stopped ? "stopped" : fault ? "fault" : head ? head.kind : "empty";
+  return (
+    <section className="answer-head" id="pane-question" tabIndex={-1} aria-labelledby="pane-question-title"
+      data-state={state}>
+      <div className="answer-q">
+        <h3 id="pane-question-title" className="answer-label">
+          {stopped ? "Stopped" : fault ? "No answer" : "Answer"}
+        </h3>
+        <span className="asked">{asked.question}</span>
+        <span className="role-tag">as {asked.role}{asked.planOnly && ", plan only"}</span>
+      </div>
+      {busy && (
+        <div className="answer-wait" aria-hidden="true">
+          <span className="sk" style={{ width: "78%" }} />
+          <span className="sk" style={{ width: "52%" }} />
+        </div>
+      )}
+      {busy && <p className="answer-note">The answer is written last, after the rows come back.</p>}
+      {stopped && (
+        <p className="answer-text is-quiet" role="status">Stopped. You cancelled the question before an answer came back.</p>
+      )}
+      {fault && <Fault entry={fault} onAgain={onAgain} />}
+      {miss && (
+        <p className="notice" role="status">No recorded answer for this question. Add an API key to ask it live.</p>
+      )}
+      {head && <p className="answer-text" data-kind={head.kind}>{head.text}</p>}
+      {strip.length > 0 && (
+        <div className="answer-strip" role="group" aria-label="Run summary">
+          {strip.map((item, i) => (
+            <React.Fragment key={`${item.label}-${i}`}>
+              {i > 0 && <span className="sep" aria-hidden="true">/</span>}
+              <button type="button" className="strip-item" data-tone={item.tone || undefined}
+                onClick={() => jump(item.target)}>{item.label}</button>
+            </React.Fragment>
+          ))}
+        </div>
+      )}
+      {!busy && answered.length > 0 && (
+        <p className="answer-from" id="answered-from">
+          Answered from <strong>{answered.join(" and ")}</strong>, the database the resolver picked.
+        </p>
+      )}
+    </section>
+  );
+}
+
+export function PlanPane({ sub, state, head }) {
   const sections = planSections(sub && sub.plan);
   const idle = "The model writes a typed plan here, never SQL.";
   return (
-    <Station id="pane-plan" title="Plan" state={state}
-      note={state === "idle" ? idle : state === "busy" ? "Waiting for the planner." : sections.length ? null : "No plan came back, so nothing downstream ran."}>
+    <Station id="pane-plan" title="Plan" state={state} head={head}
+      note={state === "idle" ? idle : state === "done" && !sections.length ? "No plan came back, so nothing downstream ran." : null}>
+      {state === "busy" && (
+        <>
+          <p className="reasoning is-live">Writing a typed plan from the retrieved tables.</p>
+          <div className="plan-skeleton" aria-hidden="true">
+            <span>Tables</span><span className="sk" style={{ width: "70%" }} />
+            <span>Joins</span><span className="sk" style={{ width: "85%" }} />
+            <span>Select</span><span className="sk" style={{ width: "60%" }} />
+          </div>
+        </>
+      )}
       {sections.length > 0 && (
         <>
           <dl className="plan">
@@ -77,116 +183,102 @@ export function PlanPane({ sub, state }) {
   );
 }
 
-function Retry({ sub, result }) {
-  if (!sub || !sub.retry_count) return null;
-  const rejected = ((result && result.errors) || []).filter((e) => e.error_code !== "SECURITY_VIOLATION");
-  const feedback = ((result && result.warnings) || []).filter((w) => w.node === "refiner");
-  const attempts = sub.retry_count + 1;
+function Glyph({ ok }) {
   return (
-    <div className="retry">
-      <p>
-        <strong>{attempts} plans.</strong> The checks rejected {sub.retry_count === 1 ? "the first" : `the first ${sub.retry_count}`}
-        {rejected.length > 0 && <>: <span className="quote">{rejected[0].message}</span></>}
-      </p>
-      {feedback.length > 0 && (
-        <p>Refiner feedback to the planner: <span className="quote">{feedback[0].message}</span></p>
-      )}
-      <p>The checks below are for the plan that ran.</p>
-    </div>
+    <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.2"
+      strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      {ok ? <path d="M2.5 6.5l2.2 2.2 4.8-5" /> : <path d="M3 3l6 6M9 3l-6 6" />}
+    </svg>
   );
 }
 
-export function ValidationPane({ sub, result, state, role }) {
+// The gate: the plans the checks saw, why they did what they did, and each
+// check as a tile with a glyph, so a pass and a refusal differ in more than
+// colour.
+export function ValidationPane({ sub, result, state, role, head }) {
   const checks = (sub && sub.validation) || [];
-  const errors = (result && result.errors) || [];
-  const failed = checks.filter((c) => !c.passed);
-  const denied = deniedTables(errors);
-  let verdict = null;
-  if (failed.length && denied.length) {
-    verdict = (
-      <div className="verdict">
-        <p className="verdict-head">Refused before any SQL was written.</p>
-        <p>
-          The role <strong>{role}</strong> may not read {list(denied)}. The plan stopped here; the generator never ran.
-        </p>
-      </div>
-    );
-  } else if (failed.length) {
-    verdict = (
-      <div className="verdict">
-        <p className="verdict-head">Stopped at the checks. No SQL was written.</p>
-        <p>{failed[0].message}</p>
-      </div>
-    );
-  }
+  const timeline = gateTimeline(sub);
+  const reason = gateReason(sub, result);
   const note =
     state === "idle" ? "Checked against the real schema and your role, before any SQL exists."
-      : state === "busy" ? null
-        : state === "skipped" ? "Not reached."
-          : !checks.length ? "Nothing to check." : null;
+      : state === "done" && !checks.length ? "Nothing to check." : null;
+  const body = Boolean(timeline || reason || checks.length);
   return (
-    <Station id="pane-validation" title="Checks" state={state} note={note}>
-      {verdict}
-      <Retry sub={sub} result={result} />
-      {checks.length > 0 && (
-        <ul className="checks">
-          {checks.map((check, i) => (
-            <li key={i} data-passed={check.passed}>
-              <span className="check-result">{check.passed ? "Passed" : "Refused"}</span>
-              <span className="check-name" title={check.name}>{humanCheck(check.name)}</span>
-              <span className="check-msg">{check.message}</span>
-            </li>
-          ))}
-        </ul>
+    <Station id="pane-validation" title="Checks" state={state} note={note} head={head}>
+      {body && (
+        <>
+          {timeline && (
+            <ol className="gate-timeline" aria-label="Plans the checks saw">
+              {timeline.map((step) => (
+                <li key={step.label} className="gate-pill" data-passed={step.passed}>
+                  <Glyph ok={step.passed} />{step.label}
+                </li>
+              ))}
+            </ol>
+          )}
+          {reason && (
+            <p className="gate-why">
+              {reason.kind === "denied" ? (
+                <>
+                  The role <strong>{role}</strong> may not read {list(reason.tables)}. The plan stopped here; the generator never ran.
+                </>
+              ) : reason.text}
+            </p>
+          )}
+          {checks.length > 0 && (
+            <ul className="gate-tiles">
+              {checks.map((check, i) => (
+                <li key={i} className="gate-tile" data-passed={check.passed}>
+                  <span className="gate-glyph"><Glyph ok={check.passed} /></span>
+                  <b title={check.name}>
+                    {humanCheck(check.name)}
+                    <span className="visually-hidden">: {check.passed ? "passed" : "refused"}</span>
+                  </b>
+                  <span>{check.message}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
       )}
     </Station>
   );
 }
 
-export function SqlPane({ sub, state, refused }) {
+export function SqlPane({ sub, state, refused, head }) {
   const sql = (sub && sub.sql) || "";
   const note =
     state === "idle" ? "Generated from the approved plan, only after the checks pass."
-      : state === "skipped" ? (refused ? "Not written. The plan never passed the checks." : "Not reached.")
+      : state === "skipped" ? (refused ? "Not written. The plan never passed the checks." : null)
         : state === "busy" ? null
           : sql ? null : "No SQL.";
   return (
-    <Station id="pane-sql" title="SQL" state={state} note={note}>
+    <Station id="pane-sql" title="SQL" state={state} note={note} head={head}>
       {sql && <SqlCard sql={sql} plan={(sub.retry_count || 0) + 1} />}
     </Station>
   );
 }
 
-export function RowsPane({ sub, result, state }) {
+export function RowsPane({ sub, result, state, head }) {
   const rows = sub && sub.rows;
-  const summary = result && result.final_answer && result.final_answer.summary;
   const planOnly = result && result.status === "plan_only";
   const note =
     state === "idle" ? "The query runs read-only against the database."
-      : state === "skipped" ? "Nothing ran."
+      : state === "skipped" ? null
         : state === "busy" ? null
           : planOnly ? "Plan only: nothing was executed."
             : !rows ? "No rows." : null;
   return (
-    <Station id="pane-rows" title="Rows" state={state} note={note}>
-      {summary && <p className="answer">{summary}</p>}
+    <Station id="pane-rows" title="Rows" state={state} note={note} head={head}>
       {rows && <RowsTable rows={rows} result={result} />}
     </Station>
   );
 }
 
-export const secs = (n) => {
-  if (n === undefined || n === null) return "-";
-  const s = Number(n);
-  if (s >= 1) return `${s.toFixed(2)} s`;
-  if (s < 0.001) return "<1 ms";
-  return `${Math.round(s * 1000)} ms`;
-};
-
 // What the answer cost. The summary is always shown; Debug adds one row per
 // node that ran, code nodes included, in execution order. When the run wrote a
 // trace, each node name opens that node's internals and the trace downloads.
-export function UsagePane({ usage, timings, replay, debug, state, result }) {
+export function UsagePane({ usage, timings, replay, debug, state, result, head }) {
   const [picked, setPicked] = useState(null);
   const [trace, setTrace] = useState(null);
   const [traceError, setTraceError] = useState(null);
@@ -216,13 +308,13 @@ export function UsagePane({ usage, timings, replay, debug, state, result }) {
   const wall = timings && timings.LangGraph;
   if (state !== "done" || (!ledger.length && !total)) {
     return (
-      <Station id="pane-usage" title="Cost & time" state={state === "done" ? "done" : state}
+      <Station id="pane-usage" title="Cost & time" state={state === "done" ? "done" : state} head={head}
         note={state === "busy" ? null : state === "idle" ? "Model calls, tokens and time for this question." : "Nothing was recorded for this run."} />
     );
   }
   const priced = total && total.cost !== null && total.cost !== undefined;
   return (
-    <Station id="pane-usage" title="Cost & time" state="done">
+    <Station id="pane-usage" title="Cost & time" state="done" head={head}>
       <Totals total={total} wall={wall} />
       {debug && href && (
         <p className="trace-line">
@@ -257,47 +349,30 @@ function list(names) {
   return [...b.slice(0, -1).flatMap((x, i) => (i ? [", ", x] : [x])), " or ", b[b.length - 1]];
 }
 
-export default function Run({ asked, result, sub, busy, error, debug, replay, feedback, answered = [] }) {
-  const checks = (sub && sub.validation) || [];
-  const gateFailed = checks.some((c) => !c.passed);
-  const miss = result && result.replay_miss;
-  const planOnly = result && result.status === "plan_only";
-
-  // Station states: idle (nothing asked), busy, done, stopped (the gate held
-  // the plan), skipped (never reached).
-  let s;
-  if (!asked) s = { plan: "idle", checks: "idle", sql: "idle", rows: "idle", cost: "idle" };
-  else if (busy) s = { plan: "busy", checks: "busy", sql: "busy", rows: "busy", cost: "busy" };
-  else if (!result || miss || !sub) {
-    const reached = result && !miss ? "done" : "skipped";
-    s = { plan: "skipped", checks: "skipped", sql: "skipped", rows: "skipped", cost: reached };
-  } else {
-    s = {
-      plan: "done",
-      checks: gateFailed ? "stopped" : "done",
-      sql: sub.sql ? "done" : "skipped",
-      rows: planOnly ? "held" : sub.rows ? "done" : "skipped",
-      cost: "done",
-    };
-  }
-  const fault = error || (result && !miss && !sub && result.errors && result.errors[0] && result.errors[0].message);
+// `stopped` is a run the visitor cancelled; `onAgain` asks the same question
+// again, offered beside a fault.
+export default function Run({ asked, result, sub, busy, stopped, error, debug, replay, feedback, answered = [], onAgain }) {
+  const s = stationStates({ asked, busy, stopped, result, sub });
+  const heads = stationHeads(result, s);
+  const gateFailed = s.checks === "stopped";
+  // A failed request carries only a sentence; an engine error carries a code.
+  const fault = stopped ? null : error ? { message: error } : runFault(result, sub);
+  const outcome = !asked ? "idle" : busy ? "busy" : stopped ? "stopped" : gateFailed ? "refused" : "ran";
 
   return (
-    <div className="spine" data-outcome={!asked ? "idle" : busy ? "busy" : gateFailed ? "refused" : "ran"} aria-busy={busy}>
-      <Question asked={asked} busy={busy} answered={answered} />
-      {miss && (
-        <p className="notice" role="status">
-          No recorded answer for this question. Add an API key to ask it live.
-        </p>
-      )}
-      {fault && <p className="fault" role="alert">The run stopped: {fault}</p>}
-      <PlanPane sub={sub} state={s.plan} />
-      <ValidationPane sub={sub} result={result} state={s.checks} role={asked && asked.role} />
-      <SqlPane sub={sub} state={s.sql} refused={gateFailed} />
-      <RowsPane sub={sub} result={result} state={s.rows} />
-      <UsagePane key={(result && result.trace_id) || "none"} usage={result && result.usage} timings={result && result.timings}
-        replay={replay} debug={debug} state={s.cost} result={result} />
-      <Feedback key={`rate-${(result && result.trace_id) || "none"}`} result={result} busy={busy} options={feedback} />
-    </div>
+    <>
+      <AnswerHead asked={asked} busy={busy} stopped={stopped} result={result} sub={sub} fault={fault}
+        answered={answered} onAgain={onAgain} />
+      <div className="spine" data-outcome={outcome} aria-busy={busy}>
+        {busy && <span className="spine-run" aria-hidden="true" />}
+        <PlanPane sub={sub} state={s.plan} head={heads.plan} />
+        <ValidationPane sub={sub} result={result} state={s.checks} role={asked && asked.role} head={heads.checks} />
+        <SqlPane sub={sub} state={s.sql} refused={gateFailed} head={heads.sql} />
+        <RowsPane sub={sub} result={result} state={s.rows} head={heads.rows} />
+        <UsagePane key={(result && result.trace_id) || "none"} usage={result && result.usage} timings={result && result.timings}
+          replay={replay} debug={debug} state={s.cost} result={result} head={heads.cost} />
+        <Feedback key={`rate-${(result && result.trace_id) || "none"}`} result={result} busy={busy} options={feedback} />
+      </div>
+    </>
   );
 }

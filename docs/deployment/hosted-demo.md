@@ -33,9 +33,11 @@ a container turns it on.
 ## What the visitor's key does, and does not do
 
 A visitor who has not pasted one yet is told so before they ask. The **Ask**
-page opens on a short state saying the demo runs on their own key, that it
-stays in this browser tab and is never stored on the server, with a link to
-**Settings**; the question box and the guided questions are disabled until
+page opens on the key form itself: a provider choice, the key and **Use this
+key**, under three facts -- **Stored** in this browser tab only, **Sent** with
+each question in a request header, **Never** written to disk, logs or traces --
+and a link to **Settings** for a key per provider or a model per step; the
+question box and the suggested questions are disabled until
 there is a key, so a click cannot fail with a `401` the visitor had no way to
 see coming. The moment a key is saved the state clears and everything enables,
 with no reload. That state is the only place the point is made: until a key is

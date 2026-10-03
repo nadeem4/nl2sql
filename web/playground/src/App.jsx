@@ -9,6 +9,8 @@ import RetrievalInspector from "./Retrieval.jsx";
 import { answeredDatasources, datasourceNames } from "./datasources.js";
 import { guidedGroups } from "./questions.js";
 import { NO_KEY_REASON, needsKey } from "./firstRun.js";
+import { AskDock, Elapsed, FirstRun, Suggestions } from "./AskParts.jsx";
+import { STOP_AFTER_MS, askButton } from "./runState.js";
 import { modeStatus } from "./status.js";
 import { askHeaders, readKeys, writeKeyFor } from "./hostedKey.js";
 import { readModels, writeModel } from "./hostedModels.js";
@@ -87,6 +89,11 @@ export default function App() {
   const [result, setResult] = useState(null);
   const [asked, setAsked] = useState(null);
   const [busy, setBusy] = useState(false);
+  // When the run in flight started, whether it may be stopped yet, and whether
+  // the visitor stopped the last one.
+  const [startedAt, setStartedAt] = useState(null);
+  const [stoppable, setStoppable] = useState(false);
+  const [stopped, setStopped] = useState(false);
   const [error, setError] = useState(null);
   const [settings, setSettings] = useState(null);
   const [settingsError, setSettingsError] = useState(null);
@@ -104,6 +111,7 @@ export default function App() {
   const [apiKeys, setApiKeys] = useState(() => readKeys(window.sessionStorage));
   const [stepModels, setStepModels] = useState(() => readModels(window.sessionStorage));
   const runRef = useRef(null);
+  const abortRef = useRef(null);
   const pageRef = useRef(null);
   const firstPage = useRef(true);
 
@@ -193,13 +201,25 @@ export default function App() {
   // the database the question is about.
   const ask = async (text, source) => {
     const q = (text === undefined ? question : text).trim();
-    if (!q || busy || needsKey(meta, apiKeys)) return;
+    if (busy || needsKey(meta, apiKeys)) return;
+    // An empty box looks ready rather than grey; pressing Ask then puts the
+    // keyboard where the question goes.
+    if (!q) {
+      focusById("question");
+      return;
+    }
     if (source) setDatasource(source);
     setQuestion(q);
     setAsked({ question: q, role, planOnly });
     setBusy(true);
+    setStopped(false);
     setError(null);
     setResult(null);
+    const controller = new AbortController();
+    abortRef.current = controller;
+    setStartedAt(performance.now());
+    setStoppable(false);
+    const stopTimer = setTimeout(() => setStoppable(true), STOP_AFTER_MS);
     // On a single-column layout the run sits below the fold; bring it up.
     const run = runRef.current;
     if (run && run.getBoundingClientRect().top > window.innerHeight * 0.6) {
@@ -214,13 +234,23 @@ export default function App() {
           // request logs and validation errors quote back.
           headers: askHeaders(apiKeys, stepModels),
           body: JSON.stringify({ question: q, role, execute: !planOnly }),
+          signal: controller.signal,
         })
       );
     } catch (e) {
-      setError(e.message);
+      if (e.name === "AbortError") setStopped(true);
+      else setError(e.message);
     } finally {
+      clearTimeout(stopTimer);
+      abortRef.current = null;
       setBusy(false);
+      setStoppable(false);
     }
+  };
+
+  // Stop cancels the request; whatever the server finishes is not shown.
+  const stop = () => {
+    if (abortRef.current) abortRef.current.abort();
   };
 
   const toggleDebug = (on) => {
@@ -229,6 +259,11 @@ export default function App() {
   };
 
   const saveKey = (provider, next) => setApiKeys(writeKeyFor(window.sessionStorage, provider, next));
+  // The first-run form: once the key is in, the question box is the next step.
+  const firstKey = (provider, next) => {
+    saveKey(provider, next);
+    setTimeout(() => focusById("question"), 0);
+  };
   const saveStepModel = (agent, choice) =>
     setStepModels((models) => writeModel(window.sessionStorage, models, agent, choice));
 
@@ -250,6 +285,7 @@ export default function App() {
   const noKey = needsKey(meta, apiKeys);
   const status = modeStatus(meta, apiKeys, { canSet });
   const groups = guidedGroups(meta);
+  const button = askButton({ busy, elapsedMs: stoppable ? STOP_AFTER_MS : 0 });
   const current = pageFor(page);
   const nav = navItems(page, {
     // Hosted, Settings is not off: it is where the visitor's own key goes.
@@ -314,7 +350,9 @@ export default function App() {
       )}
 
       <main className="page" id="page" ref={pageRef} tabIndex={-1} aria-labelledby="page-title">
-        <div className="page-head">
+        {/* On Ask the open tab already says where you are; the heading stays
+            for the page's label and for screen readers. */}
+        <div className={onAsk ? "page-head visually-hidden" : "page-head"}>
           <h1 id="page-title">{current.title}</h1>
           <p className="page-lede">
             {(hosted && current.hostedDescription) || current.description}
@@ -326,18 +364,7 @@ export default function App() {
           <div className="layout">
             <section className="composer" aria-labelledby="ask-heading">
               <h2 id="ask-heading" className="visually-hidden">Ask</h2>
-              {noKey && (
-                <div className="first-run" id="first-run">
-                  <h3>Add your API key to ask a question</h3>
-                  <p id="first-run-why">
-                    {/* The promise the code keeps; `hostedKey.js` is where it is kept. */}
-                    This demo runs on your own API key. It stays in this browser tab, travels with each
-                    question and is never stored on the server. The sample databases and their search
-                    index are already built, so the key is the only thing missing.
-                  </p>
-                  <a className="first-run-go" href={hashFor("settings")}>Add your key</a>
-                </div>
-              )}
+              {noKey && <FirstRun databases={databases} onKey={firstKey} />}
               {/* The page title above already says Ask. With one database this
                   names it; with three the resolver picks, so it must not. */}
               <label className="question-label" htmlFor="question">
@@ -376,38 +403,25 @@ export default function App() {
                   Debug
                   <span className="hint">per-node tokens and time</span>
                 </label>
-                <button className="ask" onClick={() => ask()} disabled={busy || noKey || !question.trim()}
+                {busy && startedAt !== null && <Elapsed since={startedAt} />}
+                {/* Keeps its fill while busy; after a moment it becomes Stop. */}
+                <button className="ask" id="ask" data-mode={button.action} aria-busy={busy || undefined}
+                  onClick={() => (button.action === "stop" ? stop() : button.action === "ask" ? ask() : null)}
+                  disabled={noKey}
                   title={noKey ? NO_KEY_REASON : undefined}
                   aria-describedby={noKey ? "first-run-why" : undefined}>
-                  {busy ? "Asking" : "Ask"}
-                  <kbd aria-hidden="true">Ctrl Enter</kbd>
+                  {button.action === "wait" && <span className="spin" aria-hidden="true" />}
+                  {button.action === "stop" && (
+                    <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
+                      <rect x="2" y="2" width="8" height="8" rx="1.5" fill="currentColor" />
+                    </svg>
+                  )}
+                  {button.label}
+                  {button.action === "ask" && <kbd aria-hidden="true">Ctrl Enter</kbd>}
                 </button>
               </div>
-              {groups.length > 0 && (
-                <section className="guided" aria-labelledby="guided-heading">
-                  <h3 id="guided-heading">Or try a guided question</h3>
-                  {/* One database needs no labels; three do. */}
-                  {groups.map((group) => (
-                    <div className="guided-group" key={group.datasource}>
-                      {groups.length > 1 && (
-                        <h4 className="guided-source mono" id={`guided-${group.datasource}`}>
-                          {group.datasource}
-                        </h4>
-                      )}
-                      <ul aria-labelledby={groups.length > 1 ? `guided-${group.datasource}` : undefined}>
-                        {group.questions.map((q) => (
-                          <li key={q}>
-                            <button className="guided-q" onClick={() => ask(q, group.datasource)}
-                              disabled={busy || noKey}
-                              title={noKey ? NO_KEY_REASON : undefined}
-                              aria-describedby={noKey ? "first-run-why" : undefined}>{q}</button>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  ))}
-                </section>
-              )}
+              <Suggestions groups={groups} selected={datasource} ran={Boolean(asked)} busy={busy}
+                noKey={noKey} onAsk={ask} />
             </section>
 
             <aside className="rail">
@@ -423,13 +437,16 @@ export default function App() {
                 result={result}
                 sub={sub}
                 busy={busy}
+                stopped={stopped}
                 error={error}
+                onAgain={asked ? () => ask(asked.question) : undefined}
                 debug={debug}
                 replay={replay}
                 feedback={feedback}
                 answered={answered}
               />
             </section>
+            {!busy && (result || error || stopped) && <AskDock />}
           </div>
         )}
 
