@@ -1,4 +1,6 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
+import { switcherKind } from "./datasources.js";
+import { watchFade } from "./railFade.js";
 
 // The database, read from the engine's own indexed snapshot: the same schema
 // the planner is given. Visible before any question is asked. Tables the
@@ -7,11 +9,51 @@ import React, { useState } from "react";
 // `datasources` is every registered database. With more than one the heading
 // carries a switcher, so each of them can be looked at rather than only the
 // one the demo opens on; with one there is nothing to choose and the panel is
-// exactly what it always was.
+// exactly what it always was. Up to four databases the switcher is a
+// segmented control (radio buttons, so arrow keys move between them); beyond
+// that the names no longer fit across the rail and it is a select. Either way
+// the control is `#schema-datasource`.
+//
+// The panel leads the rail, so it also looks after the rail's scroll: a fade
+// on an edge only while there is more past it (see railFade.js).
+function Switcher({ current, datasources, onDatasource }) {
+  const kind = switcherKind(datasources);
+  if (kind === "select") {
+    return (
+      <p className="schema-pick">
+        <label htmlFor="schema-datasource">Showing</label>
+        <select id="schema-datasource" value={current}
+                onChange={(e) => onDatasource && onDatasource(e.target.value)}>
+          {datasources.map((name) => <option key={name} value={name}>{name}</option>)}
+        </select>
+      </p>
+    );
+  }
+  return (
+    <div className="seg" id="schema-datasource" role="radiogroup" aria-label="Database shown">
+      {datasources.map((name) => (
+        <label key={name} className="seg-opt" data-on={name === current ? "true" : undefined}>
+          <input type="radio" className="visually-hidden" name="schema-datasource" value={name}
+                 checked={name === current} onChange={() => onDatasource && onDatasource(name)} />
+          {name}
+        </label>
+      ))}
+    </div>
+  );
+}
+
 export default function SchemaPanel({ schema, used = [], denied = [], role,
                                      datasources = [], onDatasource }) {
   const [open, setOpen] = useState(() => new Set());
   const several = datasources.length > 1;
+  const self = useRef(null);
+
+  // The rail is this panel's scroll container on a wide window. Re-read when
+  // the schema or an opened table changes how much there is to scroll.
+  useEffect(() => {
+    const rail = self.current && self.current.closest(".rail");
+    return rail ? watchFade(rail) : undefined;
+  }, [schema, open]);
 
   const toggle = (name) =>
     setOpen((prev) => {
@@ -23,7 +65,7 @@ export default function SchemaPanel({ schema, used = [], denied = [], role,
 
   if (!schema) {
     return (
-      <section className="schema" aria-labelledby="schema-heading">
+      <section className="schema" ref={self} aria-labelledby="schema-heading">
         <h2 id="schema-heading">Database</h2>
         <p className="quiet">Reading the schema.</p>
       </section>
@@ -32,7 +74,7 @@ export default function SchemaPanel({ schema, used = [], denied = [], role,
 
   if (!schema.tables.length) {
     return (
-      <section className="schema" aria-labelledby="schema-heading">
+      <section className="schema" ref={self} aria-labelledby="schema-heading">
         <h2 id="schema-heading">Database</h2>
         <p className="quiet">
           No indexed schema for <code>{schema.datasource_id}</code>. Run <code>nl2sql index</code> in the demo
@@ -45,18 +87,12 @@ export default function SchemaPanel({ schema, used = [], denied = [], role,
   const rows = schema.tables.reduce((n, t) => n + (t.row_count || 0), 0);
 
   return (
-    <section className="schema" aria-labelledby="schema-heading">
+    <section className="schema" ref={self} aria-labelledby="schema-heading">
       <h2 id="schema-heading">
         Database {!several && <code className="ds">{schema.datasource_id}</code>}
       </h2>
       {several && (
-        <p className="schema-pick">
-          <label htmlFor="schema-datasource">Showing</label>
-          <select id="schema-datasource" value={schema.datasource_id}
-                  onChange={(e) => onDatasource && onDatasource(e.target.value)}>
-            {datasources.map((name) => <option key={name} value={name}>{name}</option>)}
-          </select>
-        </p>
+        <Switcher current={schema.datasource_id} datasources={datasources} onDatasource={onDatasource} />
       )}
       <p className="schema-sum">
         {schema.tables.length} tables, {rows.toLocaleString()} rows. Open a table for its columns and keys.
@@ -84,11 +120,11 @@ export default function SchemaPanel({ schema, used = [], denied = [], role,
                 {flag === "used" && <span className="flag">in plan</span>}
                 {flag === "denied" && <span className="flag">refused{role ? ` for ${role}` : ""}</span>}
                 {table.row_count != null && <span className="table-rows">{table.row_count.toLocaleString()}</span>}
-                {refs.length > 0 && <span className="refs">refers to {refs.join(", ")}</span>}
               </button>
               {isOpen && (
                 <div className="table-body" id={`cols-${table.name}`}>
                   {table.description && <p className="quiet">{table.description}</p>}
+                  {refs.length > 0 && <p className="refs">Refers to {refs.join(", ")}.</p>}
                   <table className="cols">
                     <caption className="visually-hidden">Columns of {table.name}</caption>
                     <tbody>

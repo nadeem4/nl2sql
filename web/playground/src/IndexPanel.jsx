@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { countRows, coverageLine, needsRebuild, relativeTime, shortVersion, sourceNames, statusLine } from "./indexHealth.js";
+import { countRows, coverageLine, indexExpanded, indexSummary, needsRebuild, relativeTime, shortVersion, sourceNames,
+  statusLine } from "./indexHealth.js";
 
 // Server sentences mark commands with backticks; show them as code.
 function withCode(text) {
@@ -7,9 +8,33 @@ function withCode(text) {
 }
 
 // The search index behind the resolver: what it holds, whether it matches the
-// schema, and a Rebuild that is always on offer. It sits above the Database
-// in the rail because the two are easy to confuse: the Database reads the
-// schema snapshot, and it can look fine while this index is empty.
+// schema, and a Rebuild that is always on offer. It sits at the foot of the
+// rail as one line ("Search index fresh. 162 entries, built 3 minutes ago.")
+// and opens itself only when the index is empty, missing or out of date, or a
+// rebuild is running or failed: a healthy index is a fact, not a task.
+//
+// The heading stays (visually hidden) so the panel is still a landmark the
+// keyboard can find; the summary line is the disclosure that opens the rest.
+function Fold({ index, error, children }) {
+  const summary = error
+    ? { lead: "Search index unavailable.", detail: "Its status could not be read." }
+    : indexSummary(index && index.health, index && index.job, Date.now(), index && index.datasource_id);
+  const tone = error ? "fault" : !index ? "quiet" : indexExpanded(index) ? "warn" : "ok";
+  return (
+    <section className="index" id="index-panel" aria-labelledby="index-heading"
+             data-status={index ? index.health.status : undefined}>
+      <h2 id="index-heading" className="visually-hidden">Search index</h2>
+      <details className="index-fold" open={Boolean(error) || indexExpanded(index)}>
+        <summary className="idx" data-tone={tone}>
+          <span className="pulse" aria-hidden="true" />
+          <span><b>{summary.lead}</b>{summary.detail ? ` ${summary.detail}` : ""}</span>
+        </summary>
+        <div className="index-body">{children}</div>
+      </details>
+    </section>
+  );
+}
+
 export default function IndexPanel({ index, error, onRebuild, hosted = false }) {
   const [enrich, setEnrich] = useState(false);
   const [fault, setFault] = useState(null);
@@ -17,18 +42,16 @@ export default function IndexPanel({ index, error, onRebuild, hosted = false }) 
 
   if (error) {
     return (
-      <section className="index" id="index-panel" aria-labelledby="index-heading">
-        <h2 id="index-heading">Search index</h2>
+      <Fold error={error}>
         <p className="fault">The index status could not be read: {error}</p>
-      </section>
+      </Fold>
     );
   }
   if (!index) {
     return (
-      <section className="index" id="index-panel" aria-labelledby="index-heading">
-        <h2 id="index-heading">Search index</h2>
+      <Fold index={null}>
         <p className="quiet">Checking the index.</p>
-      </section>
+      </Fold>
     );
   }
 
@@ -58,10 +81,10 @@ export default function IndexPanel({ index, error, onRebuild, hosted = false }) 
   };
 
   return (
-    <section className="index" id="index-panel" aria-labelledby="index-heading" data-status={health.status}>
-      <h2 id="index-heading">
+    <Fold index={index}>
+      <p className="index-title">
         Search index {!several && <code className="ds">{index.datasource_id}</code>}
-      </h2>
+      </p>
       {coverage && (
         <p className="index-sources" id="index-sources">{coverage}</p>
       )}
@@ -167,6 +190,6 @@ export default function IndexPanel({ index, error, onRebuild, hosted = false }) 
       )}
       {job.state === "failed" && job.error && <p className="fault" id="index-error">{job.error}</p>}
       {fault && <p className="fault">{fault}</p>}
-    </section>
+    </Fold>
   );
 }

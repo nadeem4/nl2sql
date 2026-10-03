@@ -71,6 +71,46 @@ export function needsRebuild(health) {
   return Boolean(health) && health.status !== "ok";
 }
 
+// The rail's one line at its foot: a short lead and the detail after it.
+// `datasourceId` picks the datasource whose build time is quoted, when the
+// index records one per datasource.
+export function indexSummary(health, job, now = Date.now(), datasourceId = null) {
+  if (job && job.state === "running") {
+    return { lead: "Rebuilding the search index.", detail: (job.steps || []).slice(-1)[0] || "" };
+  }
+  if (job && job.state === "failed") {
+    return { lead: "The last rebuild failed.", detail: "Open this for the error." };
+  }
+  if (!health) return { lead: "Checking the search index.", detail: "" };
+  const fail = "Every question will fail until it is rebuilt.";
+  switch (health.status) {
+    case "ok": {
+      const sources = health.datasources || [];
+      const ds = sources.find((d) => d.datasource_id === datasourceId) || sources[0];
+      const built = relativeTime((ds && ds.built_at) || health.built_at, now);
+      const n = Number(health.total || 0);
+      const entries = `${n.toLocaleString("en-US")} ${n === 1 ? "entry" : "entries"}`;
+      return { lead: "Search index fresh.", detail: built ? `${entries}, built ${built}.` : `${entries}.` };
+    }
+    case "stale":
+      return { lead: "Search index out of date.", detail: "Answers may use an older schema." };
+    case "empty":
+      return { lead: "Search index empty.", detail: fail };
+    case "missing":
+      return { lead: "No search index yet.", detail: fail };
+    default:
+      return { lead: `Search index ${health.status}.`, detail: "" };
+  }
+}
+
+// The index panel opens itself only when there is something to do or watch:
+// an index that needs rebuilding, a rebuild under way, or one that failed.
+export function indexExpanded(index) {
+  if (!index) return false;
+  const state = index.job && index.job.state;
+  return needsRebuild(index.health) || state === "running" || state === "failed";
+}
+
 // "3 minutes ago", "2 days ago"; the exact time goes in a title attribute.
 export function relativeTime(iso, now = Date.now()) {
   if (!iso) return null;
