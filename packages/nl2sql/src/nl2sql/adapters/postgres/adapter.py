@@ -53,7 +53,9 @@ class PostgresAdapter(BaseSQLAlchemyAdapter):
             from urllib.parse import urlencode
             query_str = "?" + urlencode(options)
             
-        return f"postgresql://{creds}{netloc}/{database}{query_str}"
+        # Name the driver: the `postgres` extra installs psycopg2, and a bare
+        # `postgresql://` means psycopg (v3) from SQLAlchemy 2.1 onwards.
+        return f"postgresql+psycopg2://{creds}{netloc}/{database}{query_str}"
 
     def connect(self) -> None:
         """Postgres-specific connection with Native Server-Side Timeout."""

@@ -160,7 +160,7 @@ def test_fully_env_resolved_datasource_registers(monkeypatch):
 
     # Assert
     assert adapter.connection_string == (
-        "postgresql://ref_admin:ref-pw@analytics_db:5432/analytics_db"
+        "postgresql+psycopg2://ref_admin:ref-pw@analytics_db:5432/analytics_db"
     )
 
 
