@@ -30,7 +30,7 @@ from nl2sql.adapters.sqlalchemy_base import BaseSQLAlchemyAdapter
 class PostgresAdapter(BaseSQLAlchemyAdapter):
     def construct_uri(self, args: Dict[str, Any]) -> str:
         # Convert args to connection string
-        return f"postgresql://{args['user']}:{args['password']}@{args['host']}/{args['database']}"
+        return f"postgresql+psycopg2://{args['user']}:{args['password']}@{args['host']}/{args['database']}"
 ```
 
 > See the **[SQLAlchemy Adapter Reference](sqlalchemy.md)** for full API details.

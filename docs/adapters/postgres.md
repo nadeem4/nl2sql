@@ -24,7 +24,7 @@ connection:
 ### Connection Details
 
 * **Driver**: `psycopg2` (via `sqlalchemy`).
-* **URI Constructed**: `postgresql://{user}:{pass}@{host}:{port}/{db}?{options}`
+* **URI Constructed**: `postgresql+psycopg2://{user}:{pass}@{host}:{port}/{db}?{options}`
 
 ## Features
 
