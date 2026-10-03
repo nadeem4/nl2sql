@@ -98,7 +98,8 @@ class _Engine(NL2SQL):
         self.release = None
         self.entered = threading.Event()
 
-    def run_query(self, natural_language, datasource_id=None, execute=True, user_context=None):
+    def run_query(self, natural_language, datasource_id=None, execute=True, user_context=None,
+                  cancellation_token=None):
         self.entered.set()
         if self.release is not None:
             self.release.wait(5)

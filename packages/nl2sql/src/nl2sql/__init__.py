@@ -21,6 +21,7 @@ from .api.policy_api import PolicyAPI
 
 # Also expose core models and enums
 from .common.errors import ErrorSeverity, ErrorCode, PipelineError
+from .common.cancellation import CancellationToken
 from .auth.models import UserContext
 
 # The benchmark lives in nl2sql.evaluation, which the runtime never needs, so
@@ -51,6 +52,7 @@ __all__ = [
     "ErrorSeverity",
     "ErrorCode",
     "PipelineError",
+    "CancellationToken",
     "UserContext",
     "SubQueryResult",
     "RowSample",

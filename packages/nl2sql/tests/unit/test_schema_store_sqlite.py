@@ -81,3 +81,37 @@ def test_sqlite_schema_store_table_accessors(tmp_path):
 
     assert store.get_table_contract("ds1", version, table_key) is not None
     assert store.get_table_metadata("ds1", version, table_key) is not None
+
+
+def test_one_store_serves_many_threads_at_once(tmp_path):
+    """The playground's first page load reads the schema and the index health
+    on two threadpool workers at once, through the one store. A shared
+    sqlite3 connection used from two threads at the same moment raised
+    ``InterfaceError: bad parameter or other API misuse`` and ``/api/index``
+    answered 500."""
+    import threading
+
+    # Arrange
+    store = SqliteSchemaStore(path=tmp_path / "schema_store.db", max_versions=3)
+    store.register_snapshot(_snapshot("users"))
+    failures = []
+    start = threading.Barrier(8)
+
+    def reader():
+        start.wait()
+        try:
+            for _ in range(300):
+                assert store.get_latest_version("ds1")
+                assert store.get_latest_snapshot("ds1") is not None
+        except Exception as exc:  # noqa: BLE001 - collected and asserted below
+            failures.append(repr(exc))
+
+    # Act
+    threads = [threading.Thread(target=reader) for _ in range(8)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    # Assert
+    assert failures == []

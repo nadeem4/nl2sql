@@ -81,7 +81,8 @@ class _Engine(NL2SQL):
         # The steps a run asks the registry for; the graph asks for all five.
         self.steps = ["astplanner"]
 
-    def run_query(self, natural_language, datasource_id=None, execute=True, user_context=None):
+    def run_query(self, natural_language, datasource_id=None, execute=True, user_context=None,
+                  cancellation_token=None):
         if self.hold is not None:
             self.hold.wait(5)
         # Exactly what a pipeline node does while the graph is built.

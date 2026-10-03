@@ -3,7 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   STOP_AFTER_MS, answerHead, askButton, chipRow, elapsedLabel, gateReason, gateTimeline, runFault,
-  secs, stationHeads, stationStates, statusStrip,
+  runScroll, secs, stationHeads, stationStates, statusStrip, stoppedNote,
 } from "./runState.js";
 
 const passed = (name) => ({ name, passed: true, message: `${name} ok` });
@@ -253,4 +253,23 @@ test("secs formats like the ledger", () => {
   assert.equal(secs(0.004), "4 ms");
   assert.equal(secs(0.0001), "<1 ms");
   assert.equal(secs(undefined), "-");
+});
+
+// ---------- stop ----------
+
+test("a stopped run says the server stops it too, and, hosted, that it still counts", () => {
+  // The server cancels the run when the request drops, before its next step;
+  // the hosted limits charge a question on arrival.
+  assert.equal(stoppedNote({ hosted: false }),
+    "Stopped. The server ends the question after the step it was on.");
+  assert.equal(stoppedNote({ hosted: true }),
+    "Stopped. The server ends the question after the step it was on. It still counts toward this session's questions.");
+});
+
+// ---------- scroll after Ask ----------
+
+test("after Ask the run scrolls only as far as it must, and only when it is low on the screen", () => {
+  assert.equal(runScroll({ top: 300 }, 844, { reduce: false }), null);
+  assert.deepEqual(runScroll({ top: 700 }, 844, { reduce: false }), { behavior: "smooth", block: "nearest" });
+  assert.deepEqual(runScroll({ top: 700 }, 844, { reduce: true }), { behavior: "auto", block: "nearest" });
 });

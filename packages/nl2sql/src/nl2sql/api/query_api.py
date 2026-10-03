@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 from nl2sql.context import NL2SQLContext
 from nl2sql.pipeline.runtime import run_with_graph
 from nl2sql.auth import UserContext
+from nl2sql.common.cancellation import CancellationToken
 from nl2sql.common.errors import ErrorSeverity
 from nl2sql.execution.contracts import ArtifactRef
 from nl2sql.pipeline.nodes.validator.schemas import ValidationCheck
@@ -239,6 +240,7 @@ class QueryAPI:
         datasource_id: Optional[str] = None,
         execute: bool = True,
         user_context: Optional[UserContext] = None,
+        cancellation_token: Optional[CancellationToken] = None,
     ) -> QueryResult:
         """
         Execute a natural language query against the database.
@@ -248,6 +250,9 @@ class QueryAPI:
             datasource_id: Optional specific datasource to query (otherwise auto-resolved)
             execute: Whether to actually execute the SQL against the database
             user_context: Optional user context for permissions
+            cancellation_token: Optional token the caller cancels to stop the
+                run. It stops before the next step or model call; the one in
+                flight finishes, and the result carries a ``CANCELLED`` error.
 
         Returns:
             A :class:`QueryResult` built from the pipeline graph state.
@@ -257,7 +262,8 @@ class QueryAPI:
             natural_language,
             datasource_id=datasource_id,
             execute=execute,
-            user_context=user_context
+            user_context=user_context,
+            cancellation_token=cancellation_token,
         )
         return result_from_state(
             state,

@@ -4,7 +4,9 @@ from datetime import datetime
 import json
 import logging
 from pathlib import Path
+import functools
 import sqlite3
+import threading
 import time
 from typing import List, Optional, Tuple
 
@@ -21,12 +23,31 @@ from .protocol import generate_schema_fingerprint
 logger = logging.getLogger(__name__)
 
 
+def _locked(method):
+    """Runs ``method`` holding the store's lock.
+
+    One connection serves every thread (``check_same_thread=False``), and
+    sqlite3 does not serialise a shared connection's statements itself: two
+    threadpool workers reading at once (the playground's ``/api/schema`` and
+    ``/api/index`` on a page load) failed with ``InterfaceError``.
+    """
+    @functools.wraps(method)
+    def wrapper(self, *args, **kwargs):
+        with self._lock:
+            return method(self, *args, **kwargs)
+    return wrapper
+
+
 class SqliteSchemaStore:
-    """SQLite-backed schema store with versioning and per-table access."""
+    """SQLite-backed schema store with versioning and per-table access.
+
+    Safe to share between threads: every use of the connection holds one lock.
+    """
 
     def __init__(self, path: Path, max_versions: int = 3):
         self._path = path
         self._max_versions = max_versions
+        self._lock = threading.RLock()
         self._connection = self._connect()
         self._initialize_schema()
 
@@ -81,10 +102,12 @@ class SqliteSchemaStore:
         )
         self._connection.commit()
 
+    @_locked
     def close(self) -> None:
         """Closes the connection; for short-lived readers such as a health check."""
         self._connection.close()
 
+    @_locked
     def register_snapshot(self, snapshot: SchemaSnapshot) -> Tuple[str, List[str]]:
         fingerprint = generate_schema_fingerprint(snapshot.contract)
         existing_version = self._get_version_by_fingerprint(
@@ -150,6 +173,7 @@ class SqliteSchemaStore:
         evicted_versions = self._evict_old_versions(snapshot.contract.datasource_id)
         return schema_version, evicted_versions
 
+    @_locked
     def get_snapshot(
         self, datasource_id: str, schema_version: str
     ) -> Optional[SchemaSnapshot]:
@@ -167,12 +191,14 @@ class SqliteSchemaStore:
         metadata = SchemaMetadata.model_validate(json.loads(row[1]))
         return SchemaSnapshot(contract=contract, metadata=metadata)
 
+    @_locked
     def get_latest_snapshot(self, datasource_id: str) -> Optional[SchemaSnapshot]:
         latest_version = self.get_latest_version(datasource_id)
         if not latest_version:
             return None
         return self.get_snapshot(datasource_id, latest_version)
 
+    @_locked
     def get_latest_version(self, datasource_id: str) -> Optional[str]:
         with self._connection:
             row = self._connection.execute(
@@ -188,6 +214,7 @@ class SqliteSchemaStore:
 
             return row[0] if row else None
 
+    @_locked
     def list_versions(self, datasource_id: str) -> List[str]:
         rows = self._connection.execute(
             """
@@ -223,6 +250,7 @@ class SqliteSchemaStore:
         return snapshot.metadata.tables.get(table_key)
 
     # -- plan cache ------------------------------------------------------------
+    @_locked
     def get_cached_plan(self, question_key: str, datasource_id: str, schema_version: str) -> Optional[str]:
         row = self._connection.execute(
             """
@@ -233,6 +261,7 @@ class SqliteSchemaStore:
         ).fetchone()
         return row[0] if row else None
 
+    @_locked
     def put_cached_plan(self, question_key: str, datasource_id: str, schema_version: str, plan_json: str) -> None:
         with self._connection:
             self._connection.execute(
@@ -244,10 +273,12 @@ class SqliteSchemaStore:
                 (question_key, datasource_id, schema_version, plan_json, int(time.time())),
             )
 
+    @_locked
     def clear_plan_cache(self) -> int:
         with self._connection:
             return self._connection.execute("DELETE FROM plan_cache;").rowcount
 
+    @_locked
     def _get_version_by_fingerprint(
         self, datasource_id: str, fingerprint: str
     ) -> Optional[str]:
@@ -263,6 +294,7 @@ class SqliteSchemaStore:
         ).fetchone()
         return row[0] if row else None
 
+    @_locked
     def _evict_old_versions(self, datasource_id: str) -> List[str]:
         rows = self._connection.execute(
             """

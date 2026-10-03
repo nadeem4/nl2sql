@@ -1,4 +1,5 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import SchemaPanel from "./SchemaPanel.jsx";
 import IndexPanel from "./IndexPanel.jsx";
 import { needsRebuild } from "./indexHealth.js";
@@ -10,11 +11,13 @@ import { answeredDatasources, datasourceNames } from "./datasources.js";
 import { guidedGroups } from "./questions.js";
 import { NO_KEY_REASON, needsKey } from "./firstRun.js";
 import { AskDock, Elapsed, FirstRun, Suggestions } from "./AskParts.jsx";
-import { STOP_AFTER_MS, askButton } from "./runState.js";
+import { STOP_AFTER_MS, askButton, runScroll } from "./runState.js";
 import { modeStatus } from "./status.js";
 import { askHeaders, readKeys, writeKeyFor } from "./hostedKey.js";
 import { readModels, writeModel } from "./hostedModels.js";
-import { createRouter, hashFor, navItems, pageFor, pageFromHash } from "./router.js";
+import {
+  createRouter, hashFor, indicatorTransform, navItems, pageFor, pageFromHash, swapView,
+} from "./router.js";
 import { deniedTables, planTables } from "./run.js";
 
 const DEBUG_KEY = "nl2sql.playground.debug";
@@ -50,21 +53,56 @@ async function getJson(url, options) {
   return response.json();
 }
 
+const reducedMotion = () =>
+  Boolean(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+
 // The address bar says which page is open, so a reload and a shared link both
-// work and Back walks the pages you visited.
+// work and Back walks the pages you visited. A change of page crossfades in a
+// view transition where the browser has one (router.js, `swapView`); flushSync
+// puts the new page in the DOM inside the transition's callback.
 function useRoute() {
   const [page, setPage] = useState(() => pageFromHash(window.location.hash));
   useEffect(() => {
     const router = createRouter(window);
     // The hash can change between the first render and this effect.
     setPage(router.page());
-    const drop = router.subscribe(setPage);
+    const drop = router.subscribe((next) =>
+      swapView(document, () => flushSync(() => setPage(next)), { reduce: reducedMotion() }));
     return () => {
       drop();
       router.stop();
     };
   }, []);
   return page;
+}
+
+// One underline for the whole nav, slid under the current tab (styles.css,
+// `.nav-ind`). It is placed without a transition first, then `data-ind="on"`
+// lets later moves slide; until then the current tab's own border shows.
+function useNavIndicator(page) {
+  const navRef = useRef(null);
+  const indRef = useRef(null);
+  useLayoutEffect(() => {
+    const nav = navRef.current;
+    const ind = indRef.current;
+    if (!nav || !ind) return undefined;
+    const place = () => {
+      const link = nav.querySelector('.nav-link[aria-current="page"]');
+      const transform = indicatorTransform(link && link.getBoundingClientRect(), nav.getBoundingClientRect());
+      if (!transform) return;
+      ind.style.transform = transform;
+      if (!nav.dataset.ind) requestAnimationFrame(() => { nav.dataset.ind = "on"; });
+    };
+    place();
+    const observer = typeof ResizeObserver === "function" ? new ResizeObserver(place) : null;
+    if (observer) observer.observe(nav);
+    window.addEventListener("resize", place);
+    return () => {
+      if (observer) observer.disconnect();
+      window.removeEventListener("resize", place);
+    };
+  }, [page]);
+  return { navRef, indRef };
 }
 
 function focusById(id) {
@@ -80,6 +118,7 @@ function focusById(id) {
 
 export default function App() {
   const page = useRoute();
+  const { navRef, indRef } = useNavIndicator(page);
   const [meta, setMeta] = useState(null);
   const [schema, setSchema] = useState(null);
   const [question, setQuestion] = useState("");
@@ -152,7 +191,8 @@ export default function App() {
       firstPage.current = false;
       return;
     }
-    window.scrollTo(0, 0);
+    // Instant, whatever `scroll-behavior` says: the new page fades in at its top.
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
     if (pageRef.current) pageRef.current.focus();
   }, [page]);
 
@@ -220,12 +260,13 @@ export default function App() {
     setStartedAt(performance.now());
     setStoppable(false);
     const stopTimer = setTimeout(() => setStoppable(true), STOP_AFTER_MS);
-    // On a single-column layout the run sits below the fold; bring it up.
-    const run = runRef.current;
-    if (run && run.getBoundingClientRect().top > window.innerHeight * 0.6) {
-      const smooth = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-      run.scrollIntoView({ behavior: smooth ? "smooth" : "auto", block: "start" });
-    }
+    // On a single-column layout the run sits below the fold; bring it up,
+    // only as far as it must come.
+    // The target is the answer header, not the whole run: "nearest" leaves an
+    // element taller than the screen where it is.
+    const head = document.getElementById("pane-question") || runRef.current;
+    const scroll = head && runScroll(head.getBoundingClientRect(), window.innerHeight, { reduce: reducedMotion() });
+    if (scroll) head.scrollIntoView(scroll);
     try {
       setResult(
         await getJson("/api/ask", {
@@ -248,7 +289,7 @@ export default function App() {
     }
   };
 
-  // Stop cancels the request; whatever the server finishes is not shown.
+  // Stop aborts the request; the server sees it drop and cancels the run.
   const stop = () => {
     if (abortRef.current) abortRef.current.abort();
   };
@@ -303,9 +344,9 @@ export default function App() {
       <header className="topbar">
         {/* The product mark, not the page's heading: the page title is. */}
         <p className="wordmark">
-          <span className="mono">nl2sql</span> playground
+          <span className="mono">nl2sql</span> <span className="wordmark-sub">playground</span>
         </p>
-        <nav className="nav" aria-label="Playground pages">
+        <nav className="nav" aria-label="Playground pages" ref={navRef}>
           <ul>
             {nav.map((item) => (
               <li key={item.id}>
@@ -321,6 +362,7 @@ export default function App() {
               </li>
             ))}
           </ul>
+          <span className="nav-ind" ref={indRef} aria-hidden="true" />
         </nav>
         {/* The mode in a few words; the sentence it stands for is the
             tooltip, and is read out in full. */}
@@ -438,6 +480,7 @@ export default function App() {
                 sub={sub}
                 busy={busy}
                 stopped={stopped}
+                hosted={hosted}
                 error={error}
                 onAgain={asked ? () => ask(asked.question) : undefined}
                 debug={debug}

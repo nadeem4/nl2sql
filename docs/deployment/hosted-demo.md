@@ -146,6 +146,11 @@ all. The retrieval inspector spends from the same rate bucket (it costs no
 tokens, but it does embed text) and does not count against the session's
 questions.
 
+A question is charged when it arrives, before it runs, so one the visitor
+stops still counts toward both limits. Stopping does end the work: the page
+aborts its request, the server sees the connection close and cancels the run
+before its next step or model call (the call already in flight finishes).
+
 The session cookie is a random token this process made up. It names no visitor,
 carries no key, and exists only so the session cap has something to count. A
 visitor who clears their cookies starts a new session; the rate limit, which is

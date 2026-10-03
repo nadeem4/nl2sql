@@ -6,11 +6,12 @@ import { barShares, csvFileName, firstNumericColumn, numericColumns, toCsv } fro
 // than twice" is visible in the data. NULL stays dimmed. The foot counts the
 // rows and offers them as CSV, built in the page from the rows it already has.
 
-function Bar({ bar }) {
+// `i` is the row, so the bars grow one after another (styles.css, `--i`).
+function Bar({ bar, i = 0 }) {
   if (!bar) return <span className="bar" aria-hidden="true" />;
   return (
     <span className={bar.negative ? "bar neg" : "bar"} aria-hidden="true">
-      <i style={{ "--share": bar.share }} />
+      <i style={{ "--share": bar.share, "--i": i }} />
     </span>
   );
 }
@@ -50,7 +51,7 @@ export default function RowsTable({ rows, result }) {
                   if (j === barCol) {
                     return (
                       <td key={j} className={`num barcell-td${cell === null ? " null" : ""}`}>
-                        <span className="barcell"><Bar bar={bars[i]} /><span>{shownCell}</span></span>
+                        <span className="barcell"><Bar bar={bars[i]} i={i} /><span>{shownCell}</span></span>
                       </td>
                     );
                   }

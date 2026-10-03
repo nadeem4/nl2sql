@@ -92,6 +92,7 @@ Failure in this system is represented as structured `PipelineError` objects accu
 
 ### Request termination
 - `run_with_graph` terminates early on cancellation (`CANCELLED`) or global timeout (`PIPELINE_TIMEOUT`).
+- Once the run's token is cancelled, a callback refuses to start the next node or send the next model call, so a cancelled run stops at the next step instead of running to the end; the step in flight finishes.
 - `PipelineExecutionError` (raised where a router cannot return a `PipelineError` as a value)
   is unwrapped and its structured payload returned unchanged, keeping its own `error_code`,
   `severity`, `node` and `is_retryable`.

@@ -1,6 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { DEFAULT_PAGE, PAGES, createRouter, hashFor, navItems, pageFor, pageFromHash } from "./router.js";
+import {
+  DEFAULT_PAGE, PAGES, createRouter, hashFor, indicatorTransform, navItems, pageFor, pageFromHash, swapView,
+} from "./router.js";
 
 // A window with just the two things the router touches: the hash and the
 // hashchange event. `go` is what the browser does for a link, Back and
@@ -149,4 +151,39 @@ test("nothing is marked off before the server has answered", () => {
   const items = navItems("ask", {});
   assert.deepEqual(items.map((i) => i.off), [false, false, false, false]);
   assert.equal(items.find((i) => i.id === "ask").current, true);
+});
+
+// ---------- route change motion ----------
+
+test("a route change runs inside a view transition when the browser has one", () => {
+  const calls = [];
+  const doc = { startViewTransition: (update) => { calls.push("transition"); update(); return {}; } };
+
+  swapView(doc, () => calls.push("update"), { reduce: false });
+
+  assert.deepEqual(calls, ["transition", "update"]);
+});
+
+test("without view transitions, or with reduced motion, the swap is instant", () => {
+  const calls = [];
+  swapView({}, () => calls.push("plain"), { reduce: false });
+  const doc = { startViewTransition: () => calls.push("transition") };
+  swapView(doc, () => calls.push("reduced"), { reduce: true });
+
+  assert.deepEqual(calls, ["plain", "reduced"]);
+});
+
+test("a transition that throws still swaps the page", () => {
+  const calls = [];
+  const doc = { startViewTransition: () => { throw new Error("InvalidStateError"); } };
+
+  swapView(doc, () => calls.push("update"), { reduce: false });
+
+  assert.deepEqual(calls, ["update"]);
+});
+
+test("the nav indicator sits under the current tab: moved and scaled, never resized", () => {
+  const nav = { left: 100 };
+  assert.equal(indicatorTransform({ left: 140, width: 72 }, nav), "translateX(40px) scaleX(72)");
+  assert.equal(indicatorTransform(null, nav), null);
 });

@@ -79,7 +79,16 @@
   --r-well: 8px;
   --r-raised: 12px;
   --gutter: var(--sp-6);
-  --ease: cubic-bezier(.2, .7, .2, 1);
+
+  /* Motion: two curves and five durations. Only transform and opacity
+     animate, and only under prefers-reduced-motion: no-preference. */
+  --ease-out: cubic-bezier(.2, .7, .2, 1);
+  --ease-in-out: cubic-bezier(.65, 0, .35, 1);
+  --dur-press: 90ms;
+  --dur-state: 160ms;
+  --dur-page: 180ms;
+  --dur-enter: 320ms;
+  --dur-data: 420ms;
 
   color-scheme: light;
 }
@@ -116,7 +125,10 @@
 
 * { box-sizing: border-box; }
 
-html { -webkit-text-size-adjust: 100%; }
+html { -webkit-text-size-adjust: 100%; -webkit-tap-highlight-color: transparent; }
+@media (prefers-reduced-motion: no-preference) {
+  html { scroll-behavior: smooth; }
+}
 
 body {
   margin: 0;
@@ -151,7 +163,7 @@ summary::-webkit-details-marker { display: none; }
 summary::before {
   content: ""; display: inline-block; width: 6px; height: 6px; margin: 0 10px 0 2px;
   border-right: 1.5px solid var(--ink-3); border-bottom: 1.5px solid var(--ink-3);
-  transform: translateY(-2px) rotate(-45deg); transition: transform .15s ease;
+  transform: translateY(-2px) rotate(-45deg); transition: transform var(--dur-state) ease;
 }
 details[open] > summary::before { transform: translateY(-3px) rotate(45deg); }
 
@@ -184,7 +196,7 @@ button:disabled { cursor: default; }
   border: 1px solid transparent; font-size: var(--fs-2); font-weight: var(--fw-bold);
   line-height: 1.2; white-space: nowrap; text-decoration: none;
   -webkit-tap-highlight-color: transparent;
-  transition: transform 90ms var(--ease), background-color .16s ease, border-color .16s ease, color .16s ease;
+  transition: transform var(--dur-press) var(--ease-out), background-color var(--dur-state) ease, border-color var(--dur-state) ease, color var(--dur-state) ease;
 }
 .ask:active:not(:disabled), .first-run-go:active, .index-rebuild:active:not(:disabled),
 .settings-save:active:not(:disabled), .rate-btn:active:not(:disabled), .inspect-close:active:not(:disabled) {
@@ -213,7 +225,8 @@ button:disabled { cursor: default; }
 }
 
 @media (pointer: coarse) {
-  .ask, .first-run-go, .index-rebuild, .settings-save, .rate-btn, .inspect-close { min-height: 40px; }
+  .ask, .first-run-go, .index-rebuild, .settings-save, .rate-btn, .inspect-close,
+  .fault-action, .fault-again { min-height: 44px; }
 }
 
 /* ---------- frame ---------- */
@@ -254,9 +267,22 @@ button:disabled { cursor: default; }
   padding: var(--sp-2) var(--sp-3); font-size: var(--fs-3); font-weight: var(--fw-medium);
   color: var(--ink-2); text-decoration: none;
   border-bottom: 2px solid transparent;
-  transition: color .15s ease, border-color .15s ease;
+  transition: color var(--dur-state) ease, border-color var(--dur-state) ease;
 }
 .nav-link[aria-current="page"] { color: var(--ink); border-bottom-color: var(--accent); }
+/* One underline for the whole nav (App.jsx, useNavIndicator): a 1px bar
+   moved and scaled to the current tab. Once it is placed, the tabs' own
+   accent border gives way to it. */
+.nav { position: relative; }
+.nav-ind {
+  position: absolute; left: 0; bottom: -1px; width: 1px; height: 2px;
+  background: var(--accent); transform-origin: left center; opacity: 0; pointer-events: none;
+}
+.nav[data-ind] .nav-ind { opacity: 1; }
+.nav[data-ind] .nav-link[aria-current="page"] { border-bottom-color: transparent; }
+@media (prefers-reduced-motion: no-preference) {
+  .nav[data-ind="on"] .nav-ind { transition: transform 240ms var(--ease-out); }
+}
 .nav-off { font-size: var(--fs-1); font-weight: var(--fw-regular); color: var(--ink-3); }
 .nav-link[aria-current="page"] .nav-off { color: var(--ink-2); }
 
@@ -270,6 +296,17 @@ button:disabled { cursor: default; }
 /* Every page says what it is and what it does, then gives its content the
    full width. */
 .page:focus { outline: none; }
+.page { view-transition-name: page; }
+.topbar { view-transition-name: topbar; }
+/* Only the page moves; the root (the paper behind it) does not animate. */
+::view-transition-old(root), ::view-transition-new(root) { animation: none; }
+::view-transition-old(page), ::view-transition-new(page) { animation: none; }
+@media (prefers-reduced-motion: no-preference) {
+  ::view-transition-old(page) { animation: fade-out var(--dur-page) var(--ease-out) both; }
+  ::view-transition-new(page) { animation: rise-in var(--dur-page) var(--ease-out) both; }
+  @keyframes fade-out { to { opacity: 0; } }
+  @keyframes rise-in { from { opacity: 0; transform: translateY(4px); } }
+}
 .page-head { padding: var(--sp-6) 0 0; }
 .page-head h1 { font-size: var(--fs-5); letter-spacing: -0.02em; line-height: 1.2; }
 .page-lede { margin-top: var(--sp-2); font-size: var(--fs-3); color: var(--ink-2); max-width: 76ch; text-wrap: pretty; }
@@ -295,7 +332,6 @@ button:disabled { cursor: default; }
   position: sticky; top: 0; max-height: 100dvh; overflow: auto;
   padding: var(--sp-4) var(--sp-4) var(--sp-6) 0; margin-right: calc(-1 * var(--sp-4));
   border-right: 1px solid var(--rule);
-  scrollbar-gutter: stable;
 }
 
 /* ---------- the raised tier ----------
@@ -354,7 +390,12 @@ select {
 
 /* ---------- rail: guided questions and the database ---------- */
 
-.rail h2 { font-size: var(--fs-3); margin-bottom: var(--sp-3); display: flex; align-items: baseline; gap: var(--sp-2); }
+/* The rail's headings are labels, like YOUR QUESTION: the content leads, not the title. */
+.rail h2 {
+  font-size: var(--fs-1); font-weight: var(--fw-bold); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3);
+  margin-bottom: var(--sp-3); display: flex; align-items: baseline; gap: var(--sp-2);
+}
+.rail h2 code { text-transform: none; letter-spacing: 0; color: var(--ink-2); }
 
 /* With three databases registered, twenty guided questions read as one pile
    unless each says which database it asks about. The name is the quiet mono
@@ -372,7 +413,7 @@ select {
   display: block; width: calc(100% + 8px); text-align: left;
   background: none; border: 0; border-radius: var(--r-control);
   padding: var(--sp-1) var(--sp-2); margin-left: calc(-1 * var(--sp-2)); font-size: var(--fs-2); line-height: 1.4; color: var(--ink);
-  transition: background-color .15s ease;
+  transition: background-color var(--dur-state) ease;
 }
 .guided-q:disabled { color: var(--ink-3); }
 
@@ -392,7 +433,7 @@ select {
 }
 .caret {
   width: 6px; height: 6px; border-right: 1.5px solid var(--ink-3); border-bottom: 1.5px solid var(--ink-3);
-  transform: translateY(-2px) rotate(-45deg); transition: transform .15s ease; justify-self: center;
+  transform: translateY(-2px) rotate(-45deg); transition: transform var(--dur-state) ease; justify-self: center;
 }
 .table-head[aria-expanded="true"] .caret { transform: translateY(-3px) rotate(45deg); }
 .table-name { font-family: var(--mono); font-size: var(--fs-2); }
@@ -514,10 +555,9 @@ li[data-flag="denied"] .flag { color: var(--ink); background: var(--well); }
 
 .working { margin-left: var(--sp-3); color: var(--accent); font-weight: var(--fw-bold); }
 @media (prefers-reduced-motion: no-preference) {
-  .working::after { content: ""; display: inline-block; width: 1.2em; text-align: left; animation: dots 1.2s steps(4) infinite; }
-  @keyframes dots { 0% { content: ""; } 25% { content: "."; } 50% { content: ".."; } 75% { content: "..."; } }
-  .station[data-state="busy"] .mark { animation: pulse 1.4s ease-in-out infinite; }
-  @keyframes pulse { 50% { border-color: var(--accent); } }
+  .working::after { content: "\2026"; display: inline-block; margin-left: 2px; animation: breathe 1.2s var(--ease-in-out) infinite; }
+  .station[data-state="busy"] .mark { animation: breathe 1.4s var(--ease-in-out) infinite; }
+  @keyframes breathe { 50% { opacity: .35; } }
 }
 
 /* Question */
@@ -588,7 +628,7 @@ li[data-flag="denied"] .flag { color: var(--ink); background: var(--well); }
 .rate-choice {
   padding: var(--sp-1) 10px; font-size: var(--fs-2); color: var(--ink); background: var(--well);
   border: 1px solid transparent; border-radius: var(--r-control);
-  transition: border-color .15s ease;
+  transition: border-color var(--dur-state) ease;
 }
 .rate-choice[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
 .rate-entry { display: flex; gap: var(--sp-2); }
@@ -739,7 +779,7 @@ li[data-flag="denied"] .flag { color: var(--ink); background: var(--well); }
 
 .inspector-result { margin-top: var(--sp-5); }
 .inspector-result-head { display: flex; align-items: baseline; gap: var(--sp-4); flex-wrap: wrap; max-width: 1120px; }
-.inspector-result[aria-busy="true"] .pool-wrap { opacity: .6; transition: opacity .15s ease; }
+.inspector-result[aria-busy="true"] .pool-wrap { opacity: .6; transition: opacity var(--dur-state) ease; }
 
 .search { display: grid; gap: 6px; min-width: 0; }
 .search-line { font-size: var(--fs-2); color: var(--ink-2); max-width: 96ch; }
@@ -770,16 +810,28 @@ li[data-flag="denied"] .flag { color: var(--ink); background: var(--well); }
 .search-block h6 { margin: 0; font-size: var(--fs-2); font-weight: var(--fw-bold); color: var(--ink-2); }
 
 /* A new answer arrives in order, top to bottom. */
+.spine .station:nth-child(2) { --n: 1; }
+.spine .station:nth-child(3) { --n: 2; }
+.spine .station:nth-child(4) { --n: 3; }
+.spine .station:nth-child(5) { --n: 4; }
+.spine .station:nth-child(6) { --n: 5; }
 @media (prefers-reduced-motion: no-preference) {
   .spine[data-outcome="ran"] .station, .spine[data-outcome="refused"] .station {
-    animation: arrive .35s cubic-bezier(.2, .7, .2, 1) both;
+    animation: arrive var(--dur-enter) var(--ease-out) both;
+    animation-delay: calc(var(--n, 0) * 40ms);
   }
-  .spine .station:nth-child(2) { animation-delay: 40ms; }
-  .spine .station:nth-child(3) { animation-delay: 80ms; }
-  .spine .station:nth-child(4) { animation-delay: 120ms; }
-  .spine .station:nth-child(5) { animation-delay: 160ms; }
-  .spine .station:nth-child(6) { animation-delay: 200ms; }
   @keyframes arrive { from { opacity: 0; transform: translateY(6px); } }
+  /* Each mark fills just after its station lands, so they light in order. */
+  .spine[data-outcome="ran"] .station .mark, .spine[data-outcome="refused"] .station .mark {
+    animation: mark-fill var(--dur-enter) var(--ease-out) both;
+    animation-delay: calc(var(--n, 0) * 40ms + 120ms);
+  }
+  @keyframes mark-fill { from { opacity: 0; transform: scale(.6); } }
+  .spine[data-outcome="ran"] .gate-tile, .spine[data-outcome="refused"] .gate-tile {
+    animation: settle var(--dur-enter) var(--ease-out) both;
+    animation-delay: 160ms;
+  }
+  @keyframes settle { from { opacity: 0; transform: scale(.98); } }
 }
 
 /* ---------- hover, only where hover is real ----------
@@ -789,6 +841,7 @@ li[data-flag="denied"] .flag { color: var(--ink); background: var(--well); }
   a:hover { text-decoration-color: currentColor; }
   .nav-link:hover { color: var(--ink); border-bottom-color: var(--rule-strong); }
   .nav-link[aria-current="page"]:hover { border-bottom-color: var(--accent); }
+  .nav[data-ind] .nav-link[aria-current="page"]:hover { border-bottom-color: transparent; }
   .nav-link:hover .nav-off { color: var(--ink-2); }
 
   .ask:hover:not(:disabled), .first-run-go:hover, .index-rebuild.is-primary:hover:not(:disabled),
@@ -830,8 +883,11 @@ li[data-flag="denied"] .flag { color: var(--ink); background: var(--well); }
   :root { --gutter: var(--sp-4); }
   /* Four names fit across a phone, so the nav stays a nav. */
   .nav-link { padding: var(--sp-2) 10px; font-size: var(--fs-2); }
-  .nav ul { gap: 0; }
+  .nav ul { gap: 0; justify-content: space-between; }
   .topbar { column-gap: var(--sp-3); }
+  /* The mark and the status share the first row; the tabs take the second. */
+  .wordmark-sub { display: none; }
+  .status { min-width: 0; }
   .page-head { padding-top: var(--sp-5); }
   .composer { padding: var(--sp-4); }
   .ask { margin-left: 0; width: 100%; }
@@ -859,6 +915,9 @@ li[data-flag="denied"] .flag { color: var(--ink); background: var(--well); }
 @media (pointer: coarse) {
   .nav-link { min-height: 44px; align-items: center; }
   .guided-q { min-height: 44px; padding-block: var(--sp-2); }
+  .chip, .table-head, .strip-item { min-height: 44px; }
+  .check { min-height: 44px; }
+  .check input[type="checkbox"] { width: 20px; height: 20px; }
 }
 
 /* ---- Pipeline, Settings, rail ----
@@ -949,7 +1008,7 @@ li[data-flag="denied"] .flag { color: var(--ink); background: var(--well); }
 .track i { position: absolute; top: 0; bottom: 0; min-width: 3px; border-radius: 99px; background: var(--accent); }
 .pstep[data-kind="code"] .track i { background: var(--ink-3); opacity: .6; }
 @media (prefers-reduced-motion: no-preference) {
-  .track i { transform-origin: left; animation: grow .42s var(--ease) both; }
+  .track i { transform-origin: left; animation: grow var(--dur-data) var(--ease-out) both; }
   @keyframes grow { from { transform: scaleX(0); } }
 }
 
@@ -974,7 +1033,7 @@ li[data-flag="denied"] .flag { color: var(--ink); background: var(--well); }
 .prov {
   display: flex; flex-direction: column; gap: 2px; padding: var(--sp-3) 14px; border-radius: 10px; cursor: pointer;
   border: 1px solid var(--rule); background: var(--surface); font-size: var(--fs-3); font-weight: var(--fw-bold);
-  transition: border-color .16s ease, background-color .16s ease;
+  transition: border-color var(--dur-state) ease, background-color var(--dur-state) ease;
 }
 .prov span { font-family: var(--mono); font-size: var(--fs-1); font-weight: var(--fw-regular); color: var(--ink-3); }
 .prov[data-on] { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); background: var(--raised); }
@@ -990,7 +1049,7 @@ li[data-flag="denied"] .flag { color: var(--ink); background: var(--well); }
 .key-clear {
   flex: none; min-height: 36px; padding: 0 var(--sp-3); border: 0; border-radius: var(--r-control);
   background: transparent; color: var(--ink-2); font-size: var(--fs-2); font-weight: var(--fw-medium);
-  transition: transform 90ms var(--ease), background-color .16s ease, color .16s ease;
+  transition: transform var(--dur-press) var(--ease-out), background-color var(--dur-state) ease, color var(--dur-state) ease;
 }
 .key-clear:active { transform: scale(.98); }
 
@@ -1060,7 +1119,7 @@ li[data-flag="denied"] .flag { color: var(--ink); background: var(--well); }
 .seg-opt {
   display: inline-flex; align-items: center; min-height: 30px; padding: 0 10px; border-radius: 6px; cursor: pointer;
   font-family: var(--mono); font-size: var(--fs-1); color: var(--ink-2);
-  transition: background-color .16s ease, color .16s ease;
+  transition: background-color var(--dur-state) ease, color var(--dur-state) ease;
 }
 .seg-opt[data-on] { background: var(--raised); color: var(--ink); box-shadow: 0 1px 2px rgba(0, 0, 0, .08); }
 
@@ -1081,7 +1140,7 @@ li[data-flag="denied"] .flag { color: var(--ink); background: var(--well); }
 .idx::after {
   content: ""; flex: none; margin-left: auto; width: 6px; height: 6px;
   border-right: 1.5px solid var(--ink-3); border-bottom: 1.5px solid var(--ink-3);
-  transform: translateY(-2px) rotate(45deg); transition: transform .15s ease;
+  transform: translateY(-2px) rotate(45deg); transition: transform var(--dur-state) ease;
 }
 .index-fold[open] > .idx::after { transform: translateY(1px) rotate(-135deg); }
 .idx b { color: var(--ink); font-weight: var(--fw-bold); }
@@ -1231,22 +1290,21 @@ li[data-flag="denied"] .flag { color: var(--ink); background: var(--well); }
 .simcell > span:last-child { text-align: right; }
 .pool tbody tr:not([data-picked]) .bar i { background: var(--rule-strong); }
 .chip-line { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-3); font-size: var(--fs-2); color: var(--ink-2); max-width: 1120px; }
-.chips { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; counter-reset: chip; }
-.chips li {
+ol.chips { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; counter-reset: chip; }
+ol.chips li {
   counter-increment: chip; display: inline-flex; align-items: baseline; gap: 6px;
   padding: 2px var(--sp-2); border: 1px solid var(--rule); border-radius: 6px; background: var(--surface);
 }
-.chips.picks li::before { content: counter(chip); font-family: var(--mono); font-size: var(--fs-1); color: var(--ink-3); }
-.chips code { font-size: var(--fs-1); color: var(--ink); }
-.chips.picks li { border-color: color-mix(in srgb, var(--accent) 45%, var(--rule)); }
+ol.chips.picks li::before { content: counter(chip); font-family: var(--mono); font-size: var(--fs-1); color: var(--ink-3); }
+ol.chips code { font-size: var(--fs-1); color: var(--ink); }
+ol.chips.picks li { border-color: color-mix(in srgb, var(--accent) 45%, var(--rule)); }
 
 #inspect-title:focus { outline: none; }
 #inspect-title:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 
 @media (prefers-reduced-motion: no-preference) {
-  .bar i { animation: bar-grow .42s var(--ease) both; }
-  @keyframes bar-grow { from { transform: scaleX(0); } }
-  .inspect { animation: arrive .32s var(--ease) both; }
+  .bar i { animation: grow var(--dur-data) var(--ease-out) both; animation-delay: calc(var(--i, 0) * 30ms); }
+  .inspect { animation: arrive var(--dur-enter) var(--ease-out) both; }
 }
 
 @media (max-width: 640px) {
@@ -1303,7 +1361,7 @@ li[data-flag="denied"] .flag { color: var(--ink); background: var(--well); }
   display: inline-flex; align-items: center; min-height: 34px; padding: 0 14px;
   border-radius: 999px; border: 1px solid var(--rule); background: var(--surface);
   font-size: var(--fs-2); color: var(--ink); white-space: nowrap;
-  transition: border-color .16s ease, background-color .16s ease, transform 90ms var(--ease);
+  transition: border-color var(--dur-state) ease, background-color var(--dur-state) ease, transform var(--dur-press) var(--ease-out);
 }
 .chip:active:not(:disabled) { transform: scale(.98); }
 .chip:disabled { color: var(--ink-3); cursor: default; }
@@ -1413,7 +1471,7 @@ li[data-flag="denied"] .flag { color: var(--ink); background: var(--well); }
 .fault-action, .fault-again {
   display: inline-flex; align-items: center; justify-content: center; min-height: 40px; padding: 0 var(--sp-4);
   border-radius: var(--r-control); border: 1px solid transparent; font-size: var(--fs-2); font-weight: var(--fw-bold);
-  text-decoration: none; transition: transform 90ms var(--ease), background-color .16s ease, border-color .16s ease;
+  text-decoration: none; transition: transform var(--dur-press) var(--ease-out), background-color var(--dur-state) ease, border-color var(--dur-state) ease;
 }
 .fault-action { background: var(--accent-fill); color: var(--accent-on); border-color: var(--accent-fill); }
 .fault-again { background: transparent; color: var(--ink); border-color: var(--rule-strong); font-weight: var(--fw-medium); }
@@ -1463,8 +1521,7 @@ li[data-flag="denied"] .flag { color: var(--ink); background: var(--well); }
   content: ""; position: absolute; inset: 0; margin: auto; width: 10px; height: 2px; background: var(--paper);
 }
 @media (prefers-reduced-motion: no-preference) {
-  .run .station[data-state="busy"] .mark { animation: ask-breathe 1.4s ease-in-out infinite; }
-  @keyframes ask-breathe { 50% { box-shadow: 0 0 0 8px color-mix(in srgb, var(--accent) 10%, transparent); } }
+  .run .station[data-state="busy"] .mark { animation: breathe 1.4s var(--ease-in-out) infinite; }
 }
 
 /* A 64px accent segment travels down the spine while a run is busy. */
@@ -1475,7 +1532,7 @@ li[data-flag="denied"] .flag { color: var(--ink); background: var(--well); }
   transform: translateY(calc(-100% + 64px));
 }
 @media (prefers-reduced-motion: no-preference) {
-  .spine-run::after { animation: ask-travel 1.6s cubic-bezier(.65, 0, .35, 1) infinite; }
+  .spine-run::after { animation: ask-travel 1.6s var(--ease-in-out) infinite; }
   @keyframes ask-travel { from { transform: translateY(-100%); } to { transform: translateY(0); } }
 }
 
@@ -1494,16 +1551,7 @@ li[data-flag="denied"] .flag { color: var(--ink); background: var(--well); }
 .run .station-note { margin-top: var(--sp-2); }
 .run .station-body { margin-top: var(--sp-3); }
 
-/* Skeletons in the live station. */
-.sk { display: block; height: 12px; border-radius: 6px; background: var(--well); position: relative; overflow: hidden; }
-@media (prefers-reduced-motion: no-preference) {
-  .sk::after {
-    content: ""; position: absolute; inset: 0; transform: translateX(-100%);
-    background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--raised) 60%, transparent), transparent);
-    animation: ask-shimmer 1.6s infinite;
-  }
-  @keyframes ask-shimmer { to { transform: translateX(100%); } }
-}
+/* Skeletons in the live station use the one .sk above (Pipeline section). */
 .reasoning.is-live { margin: 0 0 var(--sp-3); color: var(--ink); font-style: normal; }
 .plan-skeleton {
   display: grid; grid-template-columns: 88px minmax(0, 1fr); gap: 10px var(--sp-4); align-items: center; max-width: 520px;

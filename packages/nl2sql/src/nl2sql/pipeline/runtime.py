@@ -9,6 +9,8 @@ import time
 import traceback
 from typing import Callable, Dict, List, Optional
 
+from langchain_core.callbacks import BaseCallbackHandler
+
 from nl2sql.auth import UserContext
 from nl2sql.common.cancellation import CancellationToken
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
@@ -27,6 +29,35 @@ from nl2sql.tracing.trace import write_run_trace
 # answer synthesizer's own shape, which is the only place `result_from_state`
 # looks for an answer.
 TIMEOUT_ANSWER = "I apologize, but the request timed out. Please try again with a simpler query."
+
+
+class RunCancelled(Exception):
+    """Raised inside the graph once its run's token is cancelled."""
+
+
+class _StopWhenCancelled(BaseCallbackHandler):
+    """Refuses to start another step, or another model call, after a cancel.
+
+    Nodes only see the token where they read it (the SQL agent's routers), so
+    without this a run cancelled during the decomposer would still call the
+    planner and the answer synthesizer. ``raise_error`` makes the callback
+    manager re-raise instead of logging, which stops the graph at the next
+    node and a model call before its request is sent. The step already in
+    flight -- one model call at most -- finishes.
+    """
+
+    raise_error = True
+
+    def __init__(self, token: CancellationToken) -> None:
+        self._token = token
+
+    def _check(self, *args, **kwargs) -> None:
+        if self._token.is_cancelled():
+            raise RunCancelled("Pipeline cancelled by user.")
+
+    on_chain_start = _check
+    on_llm_start = _check
+    on_chat_model_start = _check
 
 
 def _start_keyboard_cancel_listener(
@@ -162,12 +193,25 @@ def run_with_graph(
             out["trace_path"] = path
         return out
 
+    def _cancelled() -> Dict:
+        return _done({
+            "errors": [
+                PipelineError(
+                    node="orchestrator",
+                    message="Pipeline cancelled by user.",
+                    severity=ErrorSeverity.ERROR,
+                    error_code=ErrorCode.CANCELLED,
+                )
+            ],
+            **_telemetry(),
+        }, "cancelled")
+
     def _invoke():
         return graph.invoke(
             initial_state.model_dump(),
             config={
                 "configurable": {"cancellation_token": token},
-                "callbacks": [*(callbacks or []), timing, usage, recorder],
+                "callbacks": [_StopWhenCancelled(token), *(callbacks or []), timing, usage, recorder],
             },
         )
 
@@ -209,19 +253,10 @@ def run_with_graph(
                 **_telemetry(),
             }, "timeout", error_msg)
 
-        # Nodes observe the token and unwind, so a cancelled run returns normally.
+        # Nodes observe the token and unwind, so a cancelled run usually
+        # returns normally; one stopped between steps raised RunCancelled.
         if token.is_cancelled():
-            return _done({
-                "errors": [
-                    PipelineError(
-                        node="orchestrator",
-                        message="Pipeline cancelled by user.",
-                        severity=ErrorSeverity.ERROR,
-                        error_code=ErrorCode.CANCELLED,
-                    )
-                ],
-                **_telemetry(),
-            }, "cancelled")
+            return _cancelled()
         result = dict(result)
         result.update(_telemetry())
         return _done(result, "completed")
@@ -231,6 +266,8 @@ def run_with_graph(
         # blanket catch below would relabel it UNKNOWN_ERROR and flip is_retryable.
         return _done({"errors": [e.error]}, "crashed", e.error.message)
     except Exception as e:
+        if token.is_cancelled():
+            return _cancelled()
         # Fallback for other runtime crashes. A provider failure that escaped
         # its node still gets its own code rather than UNKNOWN_ERROR.
         return _done({

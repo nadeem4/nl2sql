@@ -107,7 +107,11 @@ Back and Forward, and that routing touches nothing but the hash.
   reads are marked `in plan` with an accent bar; tables the role was refused
   are marked `refused for <role>`. On a wide window the rail scrolls on its own:
   its scroll is contained, its scrollbar is thin, and a fade shows only on an
-  edge that has more past it (`src/railFade.js`).
+  edge that has more past it (`src/railFade.js`). It reserves no scrollbar
+  gutter: `scrollbar-gutter: stable` beside the thin scrollbar left Chrome
+  painting over the first number on a line (the table count, the first index
+  stat). The rail's headings (Database, Search index) are small uppercase
+  labels like the composer's YOUR QUESTION.
 - **Search index** (`#index-panel`, foot of the rail): from `GET /api/index`,
   the vector index the resolver searches, which the Database above does not
   show. Folded to one line ("Search index fresh. 162 entries, built 3 minutes
@@ -170,7 +174,12 @@ Back and Forward, and that routing touches nothing but the hash.
   `requestAnimationFrame`, with a visually hidden status that changes once a
   second. **Ask** (`#ask`) keeps its fill; after 600ms (`STOP_AFTER_MS`) it
   becomes **Stop**, which aborts the fetch through an `AbortController`. The
-  run then reads **Stopped** and every station is marked not reached.
+  run then reads **Stopped** and every station is marked not reached. The
+  server watches the connection and cancels the run when it closes
+  (`cancel_when_disconnected` in `app.py`, an `nl2sql.CancellationToken`
+  underneath): no further step or model call starts. A stopped question still
+  counts toward the hosted limits, which charge it on arrival. The answer
+  header says so (`stoppedNote` in `src/runState.js`).
 - **The answer header** (`#pane-question`, the first block of the run): before
   a question, one line saying the answer will lead here. Once asked, the
   question with its role tag, then the answer sentence at 28px (the largest
@@ -389,10 +398,43 @@ pool bars, numeric columns, the CSV) and `src/feedback.js`
   and rows, and the node inspector. Everything else sits flat on the paper.
 - **One button family**: primary (ink fill: Ask and Stop, Use this key,
   Replace the key, a needed Rebuild), secondary (outline: Rebuild, the rating buttons) and ghost
-  (Close, Copy), 36px tall (40px on a coarse pointer), 8px radius. Hover
+  (Close, Copy), 36px tall (44px on a coarse pointer), 8px radius. Hover
   changes colour only, inside `@media (hover: hover)`; a press scales to .98.
 - Links share one style (accent, 1px underline at 3px offset), and every
   `<summary>` uses one CSS caret instead of the browser's triangle.
+
+## Motion and touch
+
+The tokens are on `:root`, once: `--ease-out` (`cubic-bezier(.2,.7,.2,1)`),
+`--ease-in-out` (`cubic-bezier(.65,0,.35,1)`), and `--dur-press` 90ms,
+`--dur-state` 160ms, `--dur-page` 180ms, `--dur-enter` 320ms, `--dur-data`
+420ms. Only `transform` and `opacity` animate, and every animation sits inside
+`@media (prefers-reduced-motion: no-preference)`; `src/styles.test.js` reads the
+stylesheet and fails the build if either slips.
+
+- **Route change**: `swapView` in `src/router.js` runs the page swap inside
+  `document.startViewTransition` (React's `flushSync` puts the new page in the
+  DOM inside the callback). `main` (`view-transition-name: page`) fades out
+  and the new page fades in with a 4px rise over 180ms; the top bar has its
+  own name, so it stays still. No API, reduced motion or a refused transition
+  is an instant swap. Focus still moves to `#page` and the page starts at its
+  top.
+- **Nav**: one indicator (`.nav-ind`), a 1px bar moved and scaled to the
+  current tab (`indicatorTransform`), slides between tabs over 240ms. Until it
+  is placed the current tab's own accent border shows.
+- **A result arriving**: the stations rise 40ms apart (`--n`), each mark fills
+  just after its station, the row and ledger bars grow from `scaleX(0)` over
+  420ms, 30ms apart (`--i`, the row), and the gate's tiles settle from scale
+  .98.
+- **Touch**: under `(pointer: coarse)` the nav, the chips, the rail's table
+  rows, every button and the checkbox labels are at least 44px. The tap
+  highlight is off for the whole page, and every hover rule is inside
+  `(hover: hover)`.
+- **Scroll**: `scroll-behavior: smooth` on `html` only under no-preference.
+  After Ask, a phone brings the answer header up with `block: "nearest"`
+  (`runScroll`), so the question box does not jump away.
+- **Never**: bounce, parallax, a hover lift, glass or blur on content, glows,
+  or animating width, height or top.
 
 ## Fonts and offline use
 
@@ -424,9 +466,10 @@ serves, not from the Vite dev server.
 
 ## Scope
 
-React and Vite only -- no router library (`src/router.js` is 110 lines over the
+React and Vite only -- no router library (`src/router.js` is 145 lines over the
 hash), no state library, no component kit, no CSS framework, no TypeScript. Plain JSX and plain CSS, kept small enough to read in
-one sitting. Light and dark follow `prefers-color-scheme`; motion is limited to
-the run arriving in order and is off under `prefers-reduced-motion`. The only
+one sitting. Light and dark follow `prefers-color-scheme`; motion is the page
+crossfade, the nav indicator and the run arriving in order, and is off under
+`prefers-reduced-motion` (see Motion and touch). The only
 browser storage is the Debug toggle; settings live in the demo project's files,
 and ratings in its schema store.
