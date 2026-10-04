@@ -4152,7 +4152,7 @@
 <p>Source:
 <code>packages/nl2sql/src/nl2sql/api/query_api.py</code></p>
 <p>Signature:
-<code>run_query(natural_language: str, datasource_id: Optional[str] = None, execute: bool = True, user_context: Optional[UserContext] = None) -&gt; QueryResult</code></p>
+<code>run_query(natural_language: str, datasource_id: Optional[str] = None, execute: bool = True, user_context: Optional[UserContext] = None, cancellation_token: Optional[CancellationToken] = None) -&gt; QueryResult</code></p>
 <p><code>run_query</code> passes the context's artifact store to <code>result_from_state</code>, so each
 sub-query carries a capped row sample alongside its artifact reference.</p>
 <p>Parameters:
@@ -4161,7 +4161,8 @@ sub-query carries a capped row sample alongside its artifact reference.</p>
 | <code>natural_language</code> | <code>str</code> | yes | User query. |
 | <code>datasource_id</code> | <code>Optional[str]</code> | no | Datasource override; otherwise resolved. |
 | <code>execute</code> | <code>bool</code> | no | Whether to execute SQL against datasource. |
-| <code>user_context</code> | <code>Optional[UserContext]</code> | no | RBAC context. Pass one with a role: omitting it currently raises a pydantic <code>ValidationError</code> (the graph state does not accept <code>None</code>), and a role the policy does not know is refused. |</p>
+| <code>user_context</code> | <code>Optional[UserContext]</code> | no | RBAC context. Pass one with a role: omitting it currently raises a pydantic <code>ValidationError</code> (the graph state does not accept <code>None</code>), and a role the policy does not know is refused. |
+| <code>cancellation_token</code> | <code>Optional[CancellationToken]</code> | no | A token (<code>from nl2sql import CancellationToken</code>) the caller cancels from another thread to stop the run. No further step and no further model call starts once it is cancelled; the step in flight finishes, and the result carries one <code>CANCELLED</code> error. <code>NL2SQL.run_query</code> takes it too. The playground cancels it when the browser drops the request. |</p>
 <p>Returns:
 <code>QueryResult</code>, built from the pipeline graph state by <code>result_from_state</code>.</p>
 <p>Raises:
@@ -4172,7 +4173,8 @@ No exceptions are raised by <code>run_query</code>; errors are returned in <code
 - Not guaranteed; execution can depend on external systems and time.</p>
 <h2 id="execution-lifecycle">Execution Lifecycle</h2>
 <ul>
-<li>Create a per-run <code>CancellationToken</code> and install signal / Ctrl+X handlers bound to it.</li>
+<li>Use the caller's <code>CancellationToken</code>, or create one per run, and install signal / Ctrl+X handlers bound to it.</li>
+<li>Pass the graph a callback that raises <code>RunCancelled</code> at the next node start or model call once the token is cancelled.</li>
 <li>Build LangGraph pipeline from <code>build_graph</code>.</li>
 <li>Execute graph in thread pool with timeout.</li>
 <li>On timeout/cancel, return <code>PipelineError</code> with appropriate <code>ErrorCode</code>.</li>

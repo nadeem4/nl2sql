@@ -4003,7 +4003,7 @@
 <p><code>build_schema_store()</code> constructs a store based on settings:</p>
 <ul>
 <li><code>InMemorySchemaStore</code>: in-memory, versioned snapshots.</li>
-<li><code>SqliteSchemaStore</code>: persistent storage with indexes on fingerprint and timestamps.</li>
+<li><code>SqliteSchemaStore</code>: persistent storage with indexes on fingerprint and timestamps. One connection serves every thread, and each use of it holds one lock, so a server reading the schema and the index health on two workers at once is safe.</li>
 </ul>
 <p>Schema versions are timestamped and include a fingerprint prefix (e.g., <code>YYYYMMDDhhmmss_&lt;fp8&gt;</code>). Old versions are evicted beyond <code>schema_store_max_versions</code>.</p>
 <p>The store also holds the <strong>plan cache</strong>: validated, executed plans keyed by <code>(normalised sub-query intent, datasource_id, schema_version)</code>, in the <code>plan_cache</code> table of the SQLite store (a dict in the in-memory one). Evicting a schema version deletes its cached plans; <code>nl2sql cache clear</code> deletes them all and keeps the snapshots. See <a href="../../architecture/determinism/#the-plan-cache-determinism-from-the-architecture">Determinism → The plan cache</a>.</p>

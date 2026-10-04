@@ -4840,6 +4840,7 @@
 <h3 id="request-termination">Request termination</h3>
 <ul>
 <li><code>run_with_graph</code> terminates early on cancellation (<code>CANCELLED</code>) or global timeout (<code>PIPELINE_TIMEOUT</code>).</li>
+<li>Once the run's token is cancelled, a callback refuses to start the next node or send the next model call, so a cancelled run stops at the next step instead of running to the end; the step in flight finishes.</li>
 <li><code>PipelineExecutionError</code> (raised where a router cannot return a <code>PipelineError</code> as a value)
   is unwrapped and its structured payload returned unchanged, keeping its own <code>error_code</code>,
   <code>severity</code>, <code>node</code> and <code>is_retryable</code>.</li>
