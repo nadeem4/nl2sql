@@ -21,7 +21,7 @@ Source:
 `packages/nl2sql/src/nl2sql/api/query_api.py`
 
 Signature:
-`run_query(natural_language: str, datasource_id: Optional[str] = None, execute: bool = True, user_context: Optional[UserContext] = None) -> QueryResult`
+`run_query(natural_language: str, datasource_id: Optional[str] = None, execute: bool = True, user_context: Optional[UserContext] = None, cancellation_token: Optional[CancellationToken] = None) -> QueryResult`
 
 `run_query` passes the context's artifact store to `result_from_state`, so each
 sub-query carries a capped row sample alongside its artifact reference.
@@ -33,6 +33,7 @@ Parameters:
 | `datasource_id` | `Optional[str]` | no | Datasource override; otherwise resolved. |
 | `execute` | `bool` | no | Whether to execute SQL against datasource. |
 | `user_context` | `Optional[UserContext]` | no | RBAC context. Pass one with a role: omitting it currently raises a pydantic `ValidationError` (the graph state does not accept `None`), and a role the policy does not know is refused. |
+| `cancellation_token` | `Optional[CancellationToken]` | no | A token (`from nl2sql import CancellationToken`) the caller cancels from another thread to stop the run. No further step and no further model call starts once it is cancelled; the step in flight finishes, and the result carries one `CANCELLED` error. `NL2SQL.run_query` takes it too. The playground cancels it when the browser drops the request. |
 
 Returns:
 `QueryResult`, built from the pipeline graph state by `result_from_state`.
@@ -47,7 +48,8 @@ Idempotency:
 - Not guaranteed; execution can depend on external systems and time.
 
 ## Execution Lifecycle
-- Create a per-run `CancellationToken` and install signal / Ctrl+X handlers bound to it.
+- Use the caller's `CancellationToken`, or create one per run, and install signal / Ctrl+X handlers bound to it.
+- Pass the graph a callback that raises `RunCancelled` at the next node start or model call once the token is cancelled.
 - Build LangGraph pipeline from `build_graph`.
 - Execute graph in thread pool with timeout.
 - On timeout/cancel, return `PipelineError` with appropriate `ErrorCode`.

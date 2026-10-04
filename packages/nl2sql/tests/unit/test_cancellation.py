@@ -3,8 +3,10 @@ their identity. Cancellation is scoped to a single run, not to the whole process
 """
 from __future__ import annotations
 
+import operator
 import threading
 import time
+from typing import Annotated, TypedDict
 
 from nl2sql.auth import UserContext
 from nl2sql.common.cancellation import CancellationToken
@@ -223,3 +225,112 @@ def test_run_from_worker_thread_does_not_raise(monkeypatch):
 
     assert "exc" not in box, box.get("exc")
     assert box["result"]["final_answer"] == "ok"
+
+
+# --- A cancelled token stops the graph at the next step ---------------------
+#
+# The token used to be read only by the SQL agent's routers, so a caller who
+# cancelled during the decomposer still paid for the planner, the refiner and
+# the answer synthesizer. The runtime now refuses to start another node, or
+# another model call, once the token is cancelled.
+
+class _TwoStepState(TypedDict, total=False):
+    user_query: str
+    steps: Annotated[list, operator.add]
+
+
+def _two_step_graph(first, second):
+    from langgraph.graph import END, START, StateGraph
+
+    graph = StateGraph(_TwoStepState)
+    graph.add_node("first", first)
+    graph.add_node("second", second)
+    graph.add_edge(START, "first")
+    graph.add_edge("first", "second")
+    graph.add_edge("second", END)
+    return graph.compile()
+
+
+def test_a_cancelled_run_never_starts_the_next_step(monkeypatch):
+    # Arrange
+    ran = []
+
+    def first(state, config):
+        ran.append("first")
+        config["configurable"]["cancellation_token"].cancel()
+        return {"steps": ["first"]}
+
+    def second(state):
+        ran.append("second")
+        return {"steps": ["second"]}
+
+    monkeypatch.setattr(runtime, "build_graph",
+                        lambda ctx, execute=True: _two_step_graph(first, second))
+
+    # Act
+    result = runtime.run_with_graph(None, "q", user_context=_USER)
+
+    # Assert
+    assert ran == ["first"], "the step after the cancel still ran"
+    assert [e.error_code for e in result["errors"]] == [ErrorCode.CANCELLED]
+
+
+def test_a_cancelled_run_makes_no_further_model_call(monkeypatch):
+    # A node that catches its own model failure (every LLM node does) must
+    # still not reach the provider once the run is cancelled.
+    from langchain_core.language_models.fake_chat_models import FakeListChatModel
+
+    model = FakeListChatModel(responses=["paid for"])
+    calls = []
+
+    def first(state, config):
+        config["configurable"]["cancellation_token"].cancel()
+        try:
+            calls.append(model.invoke("hello", config=config).content)
+        except Exception:  # noqa: BLE001 - the node swallows it, as real nodes do
+            pass
+        return {"steps": ["first"]}
+
+    monkeypatch.setattr(runtime, "build_graph",
+                        lambda ctx, execute=True: _two_step_graph(first, lambda s: {}))
+
+    result = runtime.run_with_graph(None, "q", user_context=_USER)
+
+    assert calls == [], "a model was called after the run was cancelled"
+    assert [e.error_code for e in result["errors"]] == [ErrorCode.CANCELLED]
+
+
+def test_the_caller_s_token_is_the_one_the_run_obeys(monkeypatch):
+    token = CancellationToken()
+    seen = {}
+
+    def on_invoke(state, config):
+        seen["token"] = config["configurable"]["cancellation_token"]
+        return {"final_answer": "ok"}
+
+    _use_fake_graph(monkeypatch, on_invoke)
+    runtime.run_with_graph(None, "q", user_context=_USER, cancellation_token=token)
+
+    assert seen["token"] is token
+
+
+def test_query_api_and_the_facade_pass_the_token_through(monkeypatch):
+    # An SDK caller (and the playground, and nl2sql-api) cancels through the
+    # facade, so the token has to reach the runtime from there.
+    from nl2sql import NL2SQL, CancellationToken as Exported
+
+    assert Exported is CancellationToken
+    seen = {}
+
+    def fake_run(ctx, question, **kwargs):
+        seen.update(kwargs)
+        return {}
+
+    monkeypatch.setattr(query_api, "run_with_graph", fake_run)
+    token = CancellationToken()
+    engine = NL2SQL.__new__(NL2SQL)
+    engine.query = query_api.QueryAPI(None)
+
+    engine.run_query("q", user_context=_USER, cancellation_token=token)
+
+    assert seen["cancellation_token"] is token

@@ -274,8 +274,12 @@ Ask is the question box, then the run, answer first:
 - **While it runs.** Only the station being worked on is lit; the rest wait,
   faded. A counter beside the button reads **Running · 3.4 s**, and after a
   moment **Ask** becomes **Stop**, which cancels the request: the run then says
-  **Stopped** and every station is marked not reached. The server is not told;
-  a question already sent still counts against the hosted limits.
+  **Stopped** and every station is marked not reached. The server notices the
+  dropped request within a quarter of a second and cancels the run: no further
+  step starts and no further model call is sent, though the one already in
+  flight finishes (and is billed by the provider). On the hosted demo a stopped
+  question still counts toward both limits, because it is charged when it
+  arrives, before it runs.
 - **When it fails.** A provider's refusal is said in words with the next step,
   for example **OpenAI rejected this key.** with **Replace the key**, which
   opens Settings. The provider's own reply is folded under **Provider

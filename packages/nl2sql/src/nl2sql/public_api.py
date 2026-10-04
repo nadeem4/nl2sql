@@ -101,15 +101,20 @@ class NL2SQL:
         datasource_id: Optional[str] = None,
         execute: bool = True,
         user_context=None,
+        cancellation_token=None,
     ):
         """
         Execute a natural language query against the database.
+
+        Pass a :class:`~nl2sql.CancellationToken` and call its ``cancel()``
+        from another thread to stop the run before its next step.
         """
         return self.query.run_query(
             natural_language=natural_language,
             datasource_id=datasource_id,
             execute=execute,
-            user_context=user_context
+            user_context=user_context,
+            cancellation_token=cancellation_token,
         )
 
     def add_datasource(self, config):

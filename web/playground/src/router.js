@@ -117,3 +117,28 @@ export function createRouter(win) {
     },
   };
 }
+
+// Swaps the page inside a view transition, so the new page crossfades in with
+// a small rise (styles.css, `::view-transition-new(page)`) while the top bar,
+// which has a transition name of its own, stays put. Without the API, under
+// reduced motion, or if the browser refuses, the swap is simply instant.
+// `update` must change the DOM before it returns (App uses flushSync).
+export function swapView(doc, update, { reduce = false } = {}) {
+  if (reduce || !doc || typeof doc.startViewTransition !== "function") {
+    update();
+    return;
+  }
+  try {
+    doc.startViewTransition(update);
+  } catch {
+    update();
+  }
+}
+
+// One indicator for the whole nav: it moves to the current tab and is scaled
+// to its width (a 1px element, transform-origin left), so the slide animates
+// transform alone. `link` and `nav` are bounding rects.
+export function indicatorTransform(link, nav) {
+  if (!link || !nav) return null;
+  return `translateX(${Math.round(link.left - nav.left)}px) scaleX(${Math.round(link.width)})`;
+}

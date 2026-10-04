@@ -35,7 +35,7 @@ Each `SchemaSnapshot` (contract + metadata) is versioned using a **deterministic
 `build_schema_store()` constructs a store based on settings:
 
 - `InMemorySchemaStore`: in-memory, versioned snapshots.
-- `SqliteSchemaStore`: persistent storage with indexes on fingerprint and timestamps.
+- `SqliteSchemaStore`: persistent storage with indexes on fingerprint and timestamps. One connection serves every thread, and each use of it holds one lock, so a server reading the schema and the index health on two workers at once is safe.
 
 Schema versions are timestamped and include a fingerprint prefix (e.g., `YYYYMMDDhhmmss_<fp8>`). Old versions are evicted beyond `schema_store_max_versions`.
 

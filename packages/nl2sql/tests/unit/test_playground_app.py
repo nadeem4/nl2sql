@@ -36,7 +36,8 @@ class _Engine(NL2SQL):
     def list_datasources(self):
         return self._ctx.ds_registry.list_ids()
 
-    def run_query(self, natural_language, datasource_id=None, execute=True, user_context=None):
+    def run_query(self, natural_language, datasource_id=None, execute=True, user_context=None,
+                  cancellation_token=None):
         self.calls.append((natural_language, execute, user_context.roles))
         return QueryResult(status="success", sub_queries=[SubQueryResult(
             id="sq1", sql="SELECT 1", status="success",
@@ -199,7 +200,8 @@ def test_schema_route_is_empty_when_nothing_is_indexed():
 
 def test_ask_flags_a_replay_miss():
     class _Missing(_Engine):
-        def run_query(self, natural_language, datasource_id=None, execute=True, user_context=None):
+        def run_query(self, natural_language, datasource_id=None, execute=True, user_context=None,
+                  cancellation_token=None):
             return QueryResult(status="error", errors=[
                 {"node": "ast_planner", "message": "no rule", "error_code": "PLANNING_FAILURE",
                  "severity": "ERROR"}])
@@ -221,7 +223,8 @@ def test_a_missing_recording_is_a_replay_miss_whatever_code_it_surfaces_as():
     MISSING_LLM showed a visitor a raw crash instead of "no recording".
     """
     class _NoRule(_Engine):
-        def run_query(self, natural_language, datasource_id=None, execute=True, user_context=None):
+        def run_query(self, natural_language, datasource_id=None, execute=True, user_context=None,
+                  cancellation_token=None):
             return QueryResult(status="error", errors=[{
                 "node": "decomposer",
                 "message": "Decomposition failed: Error code: 400 - {'error': "
@@ -247,7 +250,8 @@ def test_ask_passes_a_classified_provider_failure_through_unchanged():
              "provider_response": "HTTP 401 (invalid_api_key): Incorrect API key provided: [redacted key]."}
 
     class _Rejected(_Engine):
-        def run_query(self, natural_language, datasource_id=None, execute=True, user_context=None):
+        def run_query(self, natural_language, datasource_id=None, execute=True, user_context=None,
+                  cancellation_token=None):
             return QueryResult(status="error", errors=[entry])
 
     for mode in ("live", "replay"):
@@ -259,7 +263,8 @@ def test_ask_passes_a_classified_provider_failure_through_unchanged():
 
 def test_a_replay_miss_entry_has_the_same_fields_as_any_other_error():
     class _Missing(_Engine):
-        def run_query(self, natural_language, datasource_id=None, execute=True, user_context=None):
+        def run_query(self, natural_language, datasource_id=None, execute=True, user_context=None,
+                  cancellation_token=None):
             return QueryResult(status="error", errors=[
                 {"node": "ast_planner", "message": "no rule", "error_code": "PLANNING_FAILURE",
                  "severity": "ERROR"}])
@@ -441,3 +446,83 @@ def test_the_card_the_app_serves_is_the_one_the_space_reads_from_github():
     assert docs == packaged
     # Small enough that an unfurler fetches it rather than giving up.
     assert len(docs) < 200 * 1024
+
+
+# --- Stop: a question whose browser has gone stops on the server -----------
+
+class _Waiting(_Engine):
+    """Holds the question open until its token is cancelled, or gives up."""
+
+    def __init__(self):
+        super().__init__()
+        self.tokens = []
+        self.cancelled = None
+
+    def run_query(self, natural_language, datasource_id=None, execute=True, user_context=None,
+                  cancellation_token=None):
+        self.tokens.append(cancellation_token)
+        if cancellation_token is None:
+            return QueryResult(status="success")
+        self.cancelled = cancellation_token.wait(timeout=5.0)
+        return QueryResult(status="error", errors=[
+            {"node": "orchestrator", "message": "Pipeline cancelled by user.",
+             "error_code": "CANCELLED", "severity": "ERROR"}])
+
+
+def test_every_question_runs_with_a_token_of_its_own():
+    # Arrange
+    engine = _Engine()
+    seen = []
+    engine.run_query = lambda *a, cancellation_token=None, **k: (
+        seen.append(cancellation_token) or QueryResult(status="success"))
+    client = TestClient(build_app(engine, questions=[], roles=["admin"], mode="live",
+                                  dataset="chinook"))
+
+    # Act
+    for _ in range(2):
+        assert client.post("/api/ask", json={"question": "q", "role": "admin"}).status_code == 200
+
+    # Assert: a token per question, and a question that finished is not cancelled
+    assert len(seen) == 2 and seen[0] is not None and seen[0] is not seen[1]
+    assert not seen[0].is_cancelled()
+
+
+def test_a_dropped_request_cancels_its_run():
+    """The browser's Stop aborts the fetch; the server sees the disconnect and
+    cancels the run, which then stops before its next step or model call."""
+    import socket
+    import threading
+    import time
+
+    httpx = pytest.importorskip("httpx")
+    uvicorn = pytest.importorskip("uvicorn")
+
+    # Arrange
+    engine = _Waiting()
+    app = build_app(engine, questions=[], roles=["admin"], mode="live", dataset="chinook")
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        port = probe.getsockname()[1]
+    server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=port, log_level="error"))
+    thread = threading.Thread(target=server.run, daemon=True)
+    thread.start()
+    try:
+        for _ in range(100):
+            if server.started:
+                break
+            time.sleep(0.05)
+
+        # Act: the client gives up after half a second, the way Stop does
+        with pytest.raises(httpx.ReadTimeout):
+            httpx.post(f"http://127.0.0.1:{port}/api/ask",
+                       json={"question": "q", "role": "admin"}, timeout=0.5)
+        for _ in range(100):
+            if engine.cancelled is not None:
+                break
+            time.sleep(0.05)
+    finally:
+        server.should_exit = True
+        thread.join(timeout=5)
+
+    # Assert
+    assert engine.cancelled is True, "the server kept running a question nobody was waiting for"

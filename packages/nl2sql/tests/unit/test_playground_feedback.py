@@ -32,7 +32,8 @@ class _Engine(NL2SQL):
     def list_llms(self):
         return {}
 
-    def run_query(self, natural_language, datasource_id=None, execute=True, user_context=None):
+    def run_query(self, natural_language, datasource_id=None, execute=True, user_context=None,
+                  cancellation_token=None):
         return QueryResult(trace_id=TRACE_ID, status="success", sub_queries=[SubQueryResult(
             id="sq1", sql="SELECT COUNT(*) FROM Customer", status="success")])
 

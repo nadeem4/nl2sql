@@ -2,7 +2,7 @@ import React from "react";
 import { countModelSteps, modelUsed, pipelineRows } from "./pipeline.js";
 import { pipelinePhases, stepStates, waterfall } from "./pipelinePhases.js";
 import { providerName } from "./settings.js";
-import { secs } from "./Panes.jsx";
+import { secs } from "./runState.js";
 
 // What runs a question. The page exists because the engine's one claim -- the
 // model plans, deterministic code writes and checks the SQL -- is invisible

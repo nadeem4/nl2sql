@@ -12,7 +12,8 @@ Sixteen routes:
                                default the demo's own), so a visitor sees the database
                                first and can look at each of them
 ``POST /api/ask``              one ``QueryResult``, plus a ``replay_miss`` flag; a miss
-                               carries one plain error instead of the raw ones
+                               carries one plain error instead of the raw ones; a client
+                               that disconnects (the page's Stop) cancels the run
 ``GET  /api/trace/{trace_id}`` one run trace, read only from the traces directory
 ``GET  /api/pipeline``         every step of a run in order, which five call a model, and the
                                model each of those is configured to use
@@ -45,6 +46,7 @@ rather than what a page claims (see ``nl2sql.feedback``).
 """
 from __future__ import annotations
 
+import asyncio
 import pathlib
 import threading
 from collections import OrderedDict
@@ -56,6 +58,9 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
+from starlette.concurrency import run_in_threadpool
+
+from nl2sql import CancellationToken
 
 from nl2sql.auth.models import UserContext
 from nl2sql.cli.demo.playground.hosted import FEEDBACK_MESSAGE, REBUILD_MESSAGE, Hosted
@@ -80,6 +85,9 @@ REPLAY_MISS_MARKER = "fake llm: no rule for"
 
 # What a replay miss answers instead of the replay server's internals.
 REPLAY_MISS_MESSAGE = "No recorded answer for this question. Add an API key to ask it live."
+
+# How often a running question checks that its browser is still waiting.
+DISCONNECT_POLL_SECONDS = 0.25
 
 STATIC_DIR = pathlib.Path(str(files("nl2sql.cli.demo.playground") / "static"))
 
@@ -216,6 +224,21 @@ def _llm_configs(engine) -> Dict[str, Any]:
             for name, config in (engine.list_llms() or {}).items()}
 
 
+async def cancel_when_disconnected(request: Request, token: CancellationToken,
+                                   interval: float = DISCONNECT_POLL_SECONDS) -> None:
+    """Cancels ``token`` once the client that asked has gone.
+
+    The page's Stop aborts its fetch, which closes the connection; the run
+    then stops before its next step or model call (see
+    :class:`nl2sql.CancellationToken`). The step in flight finishes.
+    """
+    while not token.is_cancelled():
+        if await request.is_disconnected():
+            token.cancel()
+            return
+        await asyncio.sleep(interval)
+
+
 def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset: str,
               trace_dir: Optional[pathlib.Path] = None, project_dir: Optional[pathlib.Path] = None,
               host: str = "127.0.0.1", allow_settings: bool = False,
@@ -338,9 +361,12 @@ def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset
         return engine.get_schema(datasource or _default_datasource(engine, dataset))
 
     @app.post("/api/ask")
-    def ask(req: AskRequest, request: Request, response: Response) -> Dict[str, Any]:
-        # Sync on purpose: the engine blocks, so Starlette runs this in a thread
-        # instead of stalling the event loop.
+    async def ask(req: AskRequest, request: Request, response: Response) -> Dict[str, Any]:
+        # The engine blocks, so the question runs in Starlette's threadpool;
+        # the event loop meanwhile watches the connection, and a client that
+        # goes away (the page's Stop) cancels the run. A stopped question has
+        # already been charged against the hosted limits: it is spent below,
+        # before the run starts.
         #
         # Hosted: the keys arrive one header per provider, and the model each
         # step is to run on in one compact JSON header. Both are bound to this
@@ -351,10 +377,20 @@ def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset
         llms = hosted.request_llms(request, panel.default_provider) if hosted.enabled else None
         if hosted.enabled:
             hosted.spend(request, response)
-        with panel.gate.run(), use_request_llms(llms):
-            result = engine.run_query(
-                req.question, execute=req.execute, user_context=UserContext(roles=[req.role])
-            )
+        token = CancellationToken()
+
+        def run():
+            with panel.gate.run(), use_request_llms(llms):
+                return engine.run_query(
+                    req.question, execute=req.execute, user_context=UserContext(roles=[req.role]),
+                    cancellation_token=token,
+                )
+
+        watcher = asyncio.ensure_future(cancel_when_disconnected(request, token))
+        try:
+            result = await run_in_threadpool(run)
+        finally:
+            watcher.cancel()
         body = result.model_dump(mode="json")
         errors = body.get("errors", [])
         codes = {e.get("error_code") for e in errors}

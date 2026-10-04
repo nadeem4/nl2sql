@@ -162,6 +162,22 @@ export function askButton({ busy, elapsedMs }) {
   return { label: "Stop", action: "stop" };
 }
 
+// What a stopped run says. Stop aborts the request; the server sees the
+// connection close and cancels the run before its next step or model call.
+// Hosted, the question was charged when it arrived, so it still counts.
+export function stoppedNote({ hosted = false } = {}) {
+  const said = "Stopped. The server ends the question after the step it was on.";
+  return hosted ? `${said} It still counts toward this session's questions.` : said;
+}
+
+// After Ask, on a single-column layout the run can sit below the fold. It is
+// brought up only when its top is in the lower part of the screen, and only
+// as far as it must be ("nearest"), so the question box does not jump away.
+export function runScroll(rect, viewportHeight, { reduce = false } = {}) {
+  if (!rect || rect.top <= viewportHeight * 0.6) return null;
+  return { behavior: reduce ? "auto" : "smooth", block: "nearest" };
+}
+
 // "Running · 3.4 s" on screen; the spoken form changes once a second.
 export function elapsedLabel(ms, { spoken = false } = {}) {
   if (spoken) {

@@ -1,6 +1,6 @@
 import React from "react";
 import { barShares } from "./artifacts.js";
-import { secs } from "./Panes.jsx";
+import { secs } from "./runState.js";
 
 // What the answer cost, as two artifacts: a five-figure summary, and (Debug)
 // one ledger row per node with an inline time bar sized to the slowest node.
@@ -23,11 +23,11 @@ export function Totals({ total, wall }) {
   );
 }
 
-function TimeCell({ seconds, bar, model }) {
+function TimeCell({ seconds, bar, model, i = 0 }) {
   return (
     <span className="timecell">
       <span className={model ? "bar" : "bar dim"} aria-hidden="true">
-        {bar && <i style={{ "--share": bar.share }} />}
+        {bar && <i style={{ "--share": bar.share, "--i": i }} />}
       </span>
       <span>{secs(seconds)}</span>
     </span>
@@ -78,7 +78,7 @@ export default function Ledger({ ledger, total, wall, priced, picked, href, onPi
                   <td>{u ? num(u.output_tokens) : ""}</td>
                   {reasoning && <td>{u ? num(u.reasoning_tokens) : ""}</td>}
                   <td>{u ? secs(u.latency_s) : ""}</td>
-                  <td className="time-col"><TimeCell seconds={r.seconds} bar={bars[i]} model={!!u} /></td>
+                  <td className="time-col"><TimeCell seconds={r.seconds} bar={bars[i]} model={!!u} i={i} /></td>
                   {priced && <td>{u && u.cost !== null && u.cost !== undefined ? Number(u.cost).toFixed(4) : ""}</td>}
                 </tr>
               );

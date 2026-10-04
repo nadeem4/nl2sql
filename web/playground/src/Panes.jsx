@@ -8,10 +8,8 @@ import { planSections } from "./plan.js";
 import { humanCheck, nodeLedger, traceFileName, traceUrl } from "./run.js";
 import { describeFault } from "./faults.js";
 import {
-  answerHead, gateReason, gateTimeline, runFault, secs, stationHeads, stationStates, statusStrip,
+  answerHead, gateReason, gateTimeline, runFault, stationHeads, stationStates, statusStrip, stoppedNote,
 } from "./runState.js";
-
-export { secs };
 
 // The run reads answer first, then the sequence that produced it: plan,
 // checks, SQL, rows, cost. Each station is a renderer over the `/api/ask`
@@ -86,7 +84,7 @@ function Fault({ entry, onAgain }) {
 // run, and the strip under it summarises the stations below and jumps to them.
 // `answered` is the database the resolver picked, and is empty with a single
 // database registered: there is then nothing for it to have picked.
-function AnswerHead({ asked, busy, stopped, result, sub, fault, answered = [], onAgain }) {
+function AnswerHead({ asked, busy, stopped, hosted, result, sub, fault, answered = [], onAgain }) {
   if (!asked) {
     return (
       <section className="answer-head is-idle" id="pane-question" tabIndex={-1} aria-labelledby="pane-question-title">
@@ -119,7 +117,7 @@ function AnswerHead({ asked, busy, stopped, result, sub, fault, answered = [], o
       )}
       {busy && <p className="answer-note">The answer is written last, after the rows come back.</p>}
       {stopped && (
-        <p className="answer-text is-quiet" role="status">Stopped. You cancelled the question before an answer came back.</p>
+        <p className="answer-text is-quiet" role="status">{stoppedNote({ hosted })}</p>
       )}
       {fault && <Fault entry={fault} onAgain={onAgain} />}
       {miss && (
@@ -350,8 +348,9 @@ function list(names) {
 }
 
 // `stopped` is a run the visitor cancelled; `onAgain` asks the same question
-// again, offered beside a fault.
-export default function Run({ asked, result, sub, busy, stopped, error, debug, replay, feedback, answered = [], onAgain }) {
+// again, offered beside a fault; `hosted` adds that a stopped question still
+// counts toward the session's limit.
+export default function Run({ asked, result, sub, busy, stopped, hosted = false, error, debug, replay, feedback, answered = [], onAgain }) {
   const s = stationStates({ asked, busy, stopped, result, sub });
   const heads = stationHeads(result, s);
   const gateFailed = s.checks === "stopped";
@@ -361,7 +360,7 @@ export default function Run({ asked, result, sub, busy, stopped, error, debug, r
 
   return (
     <>
-      <AnswerHead asked={asked} busy={busy} stopped={stopped} result={result} sub={sub} fault={fault}
+      <AnswerHead asked={asked} busy={busy} stopped={stopped} hosted={hosted} result={result} sub={sub} fault={fault}
         answered={answered} onAgain={onAgain} />
       <div className="spine" data-outcome={outcome} aria-busy={busy}>
         {busy && <span className="spine-run" aria-hidden="true" />}
