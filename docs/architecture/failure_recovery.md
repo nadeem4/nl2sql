@@ -149,7 +149,7 @@ Failure in this system is represented as structured `PipelineError` objects accu
 - Resolver failures, decomposer failures, global planner failures, generator failures, executor failures, and aggregator failures have no local recovery and require a new run.
 
 ### What is unrecoverable
-- `FATAL_ERRORS` or `CRITICAL` severity errors (security violations, missing datasource ID, missing LLM, invalid state) terminate the subgraph or graph without retry.
+- `FATAL_ERRORS` or `CRITICAL` severity errors (security violations, missing datasource ID, missing LLM, invalid state, and every `PROVIDER_*` error, since a retry would make the same call to the same provider) terminate the subgraph or graph without retry.
 
 ---
 
