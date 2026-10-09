@@ -409,6 +409,16 @@ can only be run against the deployed Space, with X's card validator or
 tags are in the served HTML, their URLs are absolute, and the image is served
 as `image/png`.
 
+### The mark
+
+The wordmark's icon on the card is the playground's favicon, the plan spine: a
+root bar and stem with two indented steps, the typed plan the model writes, in
+outline. Its one copy is `docs/assets/favicon.svg`; the playground inlines it,
+this site uses it as its favicon, and the card redraws it in the light colours.
+See [the playground README][playground-readme] for where each copy lives.
+
+[playground-readme]: https://github.com/nadeem4/nl2sql/blob/main/web/playground/README.md#the-mark
+
 ## Running it locally instead
 
 Hosted mode exists to show the engine on our sample data. To ask questions of

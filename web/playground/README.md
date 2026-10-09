@@ -447,6 +447,19 @@ Google Fonts. The two typefaces are bundled at build time from `@fontsource`
 
 Both are SIL Open Font License. The built page is about 350 KB (150 KB gzipped).
 
+## The mark
+
+The favicon is the plan spine: a teal root bar and stem with two indented ink
+steps, a typed plan in outline. Its one copy is
+[`docs/assets/favicon.svg`](../../docs/assets/favicon.svg), which follows
+`prefers-color-scheme` (teal `#0c6a5c` and ink `#17201c` in light, `#62c7b1`
+and `#e2e9e5` in dark). `index.html` inlines it as a `data:` URI, so the icon
+costs no request either; the docs site names the file as `theme.favicon`, and
+`scripts/social_card.html` draws the same shapes at card scale. If you change
+the mark, change all three and run `npm run build`; a test in
+`tests/unit/test_playground_app.py` fails if any of them, or the built page,
+drifts from the file.
+
 ## Develop
 
 ```bash
