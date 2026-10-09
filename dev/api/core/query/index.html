@@ -4462,7 +4462,7 @@ been recorded, on a timed-out or cancelled run.</p>
 <tr>
 <td><code>cost</code></td>
 <td><code>Optional[float]</code></td>
-<td>Only when <code>LLM_PRICES</code> prices every call counted here; otherwise <code>null</code>.</td>
+<td>Only when <code>LLM_PRICES</code> prices every call counted here; otherwise <code>null</code>. Cache reads are billed at <code>cached_input</code>, cache writes at <code>cache_write</code> (by default <code>input</code> x 1.25 on Claude, <code>input</code> on the OpenAI wire), the rest of <code>input_tokens</code> at <code>input</code> and <code>output_tokens</code> at <code>output</code>; see <a href="../../../configuration/system/">System configuration</a>.</td>
 </tr>
 </tbody>
 </table>

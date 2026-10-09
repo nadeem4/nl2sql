@@ -4433,7 +4433,10 @@ error as OpenAI (see <a href="#temperature">Temperature</a>).</p>
   timeout.</li>
 <li><strong>Usage.</strong> Cache reads and writes are reported as <code>cached_input_tokens</code> and
   <code>cache_write_input_tokens</code>, with each input token counted once (see
-  <a href="../../api/core/query/">Query API → usage</a>).</li>
+  <a href="../../api/core/query/">Query API → usage</a>). With <code>LLM_PRICES</code> set, a cache
+  write costs 1.25x the model's <code>input</code> rate (Anthropic's price for a 5-minute
+  write, the only kind the engine asks for) unless the price gives its own
+  <code>cache_write</code>.</li>
 </ul>
 <p><code>nl2sql demo --record</code> cannot record Claude: the recording proxy and replay
 speak the OpenAI wire format, so it asks for an OpenAI or OpenRouter key.</p>

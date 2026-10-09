@@ -2206,7 +2206,7 @@ providers. The check runs on the read path only, so the fix is simply to re-run
 <tr>
 <td><code>LLM_PRICES</code></td>
 <td><code>{}</code></td>
-<td>Optional per-model prices per million tokens, as JSON, e.g. <code>{"gpt-4o": {"input": 2.5, "cached_input": 1.25, "output": 10}}</code>. <code>cached_input</code> defaults to <code>input</code>. With no price for a model, <code>QueryResult.usage</code> reports tokens only and <code>cost</code> is <code>null</code>. No prices are built in.</td>
+<td>Optional per-model prices per million tokens, as JSON, e.g. <code>{"gpt-4o": {"input": 2.5, "cached_input": 1.25, "output": 10}}</code>. Optional <code>cached_input</code> (cache reads) defaults to <code>input</code>; optional <code>cache_write</code> (cache writes) defaults to <code>input</code> times the wire's write premium: 1.25 for Claude (<code>provider: anthropic</code>, whose 5-minute cache write Anthropic bills at 1.25x input) and 1 for the OpenAI wire. The rest of the prompt is billed at <code>input</code>. With no price for a model, <code>QueryResult.usage</code> reports tokens only and <code>cost</code> is <code>null</code>. No prices are built in.</td>
 </tr>
 <tr>
 <td><code>TRACE_MODE</code></td>
