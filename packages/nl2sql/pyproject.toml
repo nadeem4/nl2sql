@@ -122,4 +122,4 @@ include = ["nl2sql*"]
 # page so `pip install "nl2sql-engine[demo]"` needs no Node toolchain. The card
 # the link preview names sits beside it rather than in `static/`, which the
 # Vite build empties on every run.
-"nl2sql.cli.demo.playground" = ["static/*", "assets/*"]
+"nl2sql.cli.demo.playground" = ["static/*", "assets/*", "assets/clips/*"]

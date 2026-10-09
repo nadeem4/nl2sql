@@ -267,12 +267,19 @@ warning.
 
 ### Pages
 
-The playground is four pages, named across the top of every one of them:
-**Ask**, **Pipeline**, **Settings** and **Retrieval**. Each is a route in the
-address bar -- `#/`, `#/pipeline`, `#/settings` and `#/retrieval` -- so a
-reload stays where you were, a
+The playground is five pages, named across the top of every one of them:
+**Home**, **Ask**, **Pipeline**, **Settings** and **Retrieval**. Each is a
+route in the address bar -- `#/`, `#/ask`, `#/pipeline`, `#/settings` and
+`#/retrieval` -- so a reload stays where you were, a
 link can be pasted to someone else, and Back and Forward walk the pages you
-visited. A route nobody serves lands on Ask. The nav marks the page you are on,
+visited. A route nobody serves lands on Home.
+
+**Home** says what the engine does and shows it: the five steps a question
+travels (Question, Plan, Check, SQL, Rows, marked by whether a model or code
+decides each), then a short clip of Ask, Pipeline and Retrieval with a link
+into each. **Try a sample question** opens Ask and asks a guided question; on
+the hosted demo it picks one with a recorded answer, so it works before you
+add a key. The nav marks the page you are on,
 and marks Settings or Retrieval when the server has it off; the page itself
 then says why. Moving between pages keeps the question, the answer and the
 Debug choice: they belong to the visit, not to the page.
