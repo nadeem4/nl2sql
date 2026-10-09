@@ -222,7 +222,8 @@ databases are opened read-only. Two limits keep the pace, both in process and
 both best-effort: 6 questions a minute keyed by client address
 (`NL2SQL_DEMO_QUESTIONS_PER_MINUTE`) and 30 a session keyed by a random cookie
 (`NL2SQL_DEMO_QUESTIONS_PER_SESSION`). `deploy/huggingface/` is that demo as a
-Hugging Face Space, deployed from `main` by the **Publish Space** workflow. See
+Hugging Face Space, deployed by every release at the version just published to
+PyPI. See
 [Hosted demo](docs/deployment/hosted-demo.md).
 
 ## Screenshots

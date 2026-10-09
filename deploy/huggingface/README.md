@@ -54,12 +54,16 @@ works before the Space has built. The image is generated -- regenerate it with
 `python scripts/render_social_card.py`, described in
 [the hosted demo docs](https://github.com/nadeem4/nl2sql/blob/main/docs/deployment/hosted-demo.md).
 
-**Normally this is automatic.** `.github/workflows/publish_space.yml` in the
-repository creates the Space if it is missing, mirrors this folder onto its
-root, and waits for the build -- on every push to `main` that touches this
-folder, the engine or the playground, and on demand from the Actions tab. It
-needs one repository secret, `HF_TOKEN`, holding a Hugging Face write token.
-The steps below are the same thing by hand, for when that is not available.
+**Normally this is automatic, and only a release does it.** Every release
+(merging the release pull request) publishes `nl2sql-engine` to PyPI, checks
+that version installs and boots from PyPI, and then
+`.github/workflows/publish_space.yml` creates the Space if it is missing,
+mirrors this folder onto its root pinned to that version, and waits for the
+build; a last job waits for the live URL to report the new version. A push to
+`main` does not deploy. A hand run from the Actions tab with a `tag` redeploys
+a release. It needs one repository secret, `HF_TOKEN`, holding a Hugging Face
+write token. The steps below are the same thing by hand, for when that is not
+available.
 
 **1. Create the Space.** At <https://huggingface.co/new-space>, under the
 `nadeem4nk` account:
@@ -99,9 +103,9 @@ them and baking in the embedding model). The playground is live at
 
 To deploy again after a change here, run the same `git subtree push`. Note that
 a change to the *engine* or the *playground* does not touch this folder, so it
-gives the push nothing to commit and the Space does not rebuild -- edit
-`SOURCE_SHA` to the commit you want, which is what the workflow does for you. If
-the push is refused because the Space has commits of its own,
+gives the push nothing to commit and the Space does not rebuild -- edit the
+`ARG NL2SQL_SPEC=` line to the release you want, which is what the workflow
+does for you. If the push is refused because the Space has commits of its own,
 `git push space $(git subtree split --prefix deploy/huggingface main):main --force`
 replaces its history with this folder's.
 
@@ -111,18 +115,18 @@ recordings ship) and any other question answers with **Add a key in Settings**.
 
 ### Which engine version it builds
 
-`SOURCE_SHA` at the Space root is the repository commit this Space was deployed
-from, and the `Dockerfile`'s `ARG NL2SQL_REF=` line is that same sha -- so the
-image installs the engine from exactly that commit. The publish workflow writes
-both on every deploy. In the repository both say `main`, which is what a local
-`docker build` and a hand-made `git subtree push` get.
-
-To pin a release instead of a commit, set the other build argument in the
-`Dockerfile`:
+The `Dockerfile`'s `ARG NL2SQL_SPEC=` line names what the image installs. A
+release deploy rewrites it to the version it published:
 
 ```dockerfile
 ARG NL2SQL_SPEC="nl2sql-engine[demo]==0.2.0"
 ```
+
+`SOURCE_SHA` at the Space root is the repository commit the deploy came from.
+In the repository the spec is a GitHub archive of `main` and `SOURCE_SHA` says
+`main`, which is what a local `docker build` and a hand-made
+`git subtree push` get. `/api/health` on the running Space reports the
+installed version.
 
 ### Settings on the Space
 

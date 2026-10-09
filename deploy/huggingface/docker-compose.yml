@@ -12,10 +12,10 @@ services:
   playground:
     build:
       context: .
-      args:
-        # The branch or tag to install the engine from. A release instead:
-        #   NL2SQL_SPEC: "nl2sql-engine[demo]==0.2.0"
-        NL2SQL_REF: main
+      # The Dockerfile installs the tip of `main` by default. To run a release,
+      # the way the Space does:
+      #   args:
+      #     NL2SQL_SPEC: "nl2sql-engine[demo]==0.2.0"
     image: nl2sql-demo:local
     ports:
       - "7860:7860"

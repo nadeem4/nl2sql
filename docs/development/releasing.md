@@ -8,6 +8,10 @@ resolves for users if every package declares the same version.
 Releases are automated. Nobody edits a version number and nobody edits
 `CHANGELOG.md` by hand — [release-please](https://github.com/googleapis/release-please)
 owns both. The one manual step is **merging the release pull request**.
+Everything after that runs on its own: the three packages go to PyPI, the API
+image to GHCR, the versioned docs to `gh-pages`, and the hosted demo on Hugging
+Face is rebuilt on the version just published. Each of those is checked from
+the outside before the release counts as done.
 
 ## The automated flow
 
@@ -22,7 +26,15 @@ flowchart TD
     S -->|yes| PY[PyPI via trusted publishing:<br/>one job per package,<br/>one environment each]
     PY --> GH[ghcr.io/nadeem4/nl2sql-api]
     PY --> D[mike deploy: versioned docs]
+    PY --> PS[pypi-smoke: pip install the release<br/>from PyPI, boot the demo]
+    PS --> SP[publish_space.yml: Space pinned to<br/>nl2sql-engine demo == X.Y.Z]
+    SP --> SS[space-smoke: the live Space<br/>reports version X.Y.Z]
 ```
+
+The same chain runs on every pull request up to the point of publishing: the
+`build` and `fresh-install` jobs in `test.yml` build the wheels, install them
+the way a user does and boot the demo, so a release does not meet these
+checks for the first time.
 
 ### 1. Commit messages decide the version
 
@@ -93,7 +105,7 @@ changelog and the version it proposes is the release decision.
 
 ### 4. The release publishes everything
 
-`publish_pypi.yaml` runs four jobs:
+`publish_pypi.yaml` runs seven jobs:
 
 1. **`build`** — builds sdists and wheels for all three packages, then
    smoke-installs them into a clean virtualenv and runs `import nl2sql` and
@@ -125,6 +137,35 @@ changelog and the version it proposes is the release decision.
 4. **`docs`** — `needs: pypi`, likewise after all three uploads.
    `mike deploy --push --update-aliases $TAG latest` adds a versioned copy of
    the docs to `gh-pages` and moves the `latest` alias onto it.
+5. **`pypi-smoke`** — `needs: pypi`. On a fresh runner, installs the release
+   from PyPI itself, `pip install "nl2sql-engine[demo]==X.Y.Z"`, into an empty
+   virtualenv, boots `nl2sql demo --hosted` with no API key and checks the
+   page, `/api/health` (which must report `X.Y.Z`), `/api/meta`,
+   `/api/schema` and `/api/index`. This is
+   `python scripts/fresh_install_check.py --pypi X.Y.Z`, the same check the
+   `fresh-install` PR job runs on the wheels. PyPI accepts an upload at once,
+   but the CDN in front of its index serves a new version a little later, so
+   the install is retried up to ten times, 30 seconds apart, with pip's cache
+   off.
+6. **`space`** — `needs: pypi-smoke`, so the hosted demo is never built on a
+   version that does not install from PyPI. Calls
+   [`publish_space.yml`](../deployment/hosted-demo.md#deployed-by-the-release)
+   with the tag, which pins the Space's image to
+   `nl2sql-engine[demo]==X.Y.Z`, pushes it and waits for the build.
+   `secrets: inherit` carries `HF_TOKEN` down, from `release_please.yml`
+   through this workflow into that one; without the secret the job skips
+   green and says so.
+7. **`space-smoke`** — runs when `space` reports it deployed. A Space can
+   report `RUNNING` on its new build while the router still sends visitors
+   to the old one, so this checks where visitors are: it polls
+   `https://nadeem4nk-nl2sql-demo.hf.space/api/health` until it reports
+   `X.Y.Z` (up to 15 minutes), then checks the page and `/api/meta`.
+
+A release is fully out when all seven are green. A red `pypi-smoke` means the
+release is on PyPI but does not install or boot as published; yank it and ship
+a patch (see [Package order](#package-order)). A red `space` or `space-smoke`
+leaves PyPI as it is and the Space on its previous image; fix the cause and
+re-run the failed jobs, or redeploy by hand (below).
 
 Authentication is PyPI **trusted publishing** (OIDC, `id-token: write`). There
 is no API token anywhere in the workflow and no secret to rotate.
@@ -211,6 +252,13 @@ Only legs that never uploaded can be re-run — PyPI rejects a re-upload of a
 version it already has, so a partially-published release needs `skip-existing`
 or a manual publish of just the missing packages, in the
 [dependency order below](#package-order).
+
+To redeploy only the hosted demo at a release that is already on PyPI, without
+touching PyPI, GHCR or the docs, dispatch the Space workflow with the tag:
+
+```console
+$ gh workflow run publish_space.yml -f tag=v0.2.0
+```
 
 Every job resolves its tag from `${{ inputs.tag || github.ref_name }}`, never
 from the raw ref. On a dispatched run `github.ref_name` is the *branch* you
@@ -391,8 +439,8 @@ workflow moves `latest` and sets the site default.
 
 ## One-time human setup
 
-Three things must be configured by hand before the first release. None of
-them involves a token secret.
+Four things must be configured by hand before the first release. Only the
+last involves a secret, and it is not a PyPI one.
 
 ### PyPI pending publishers
 
@@ -465,6 +513,16 @@ Without it `release_please.yml` creates its release branch and commit and then
 fails with `GitHub Actions is not permitted to create or approve pull
 requests`, so the release pull request never appears and nothing can be merged
 or tagged.
+
+### The Hugging Face token
+
+A Hugging Face access token with **write** permission
+(<https://huggingface.co/settings/tokens>), saved as the repository secret
+**`HF_TOKEN`** under Settings → Secrets and variables → Actions. It is what the
+`space` job pushes the Space with. Without it every release still publishes to
+PyPI, GHCR and the docs; the `space` job logs that the secret is missing and
+finishes green, and `space-smoke` is skipped. See
+[Hosted demo](../deployment/hosted-demo.md#deployed-by-the-release).
 
 ## Package order
 

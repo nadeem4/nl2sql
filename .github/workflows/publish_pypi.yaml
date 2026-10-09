@@ -2,6 +2,15 @@
 # that job: if the freshly built wheels do not install and import, nothing is
 # published anywhere.
 #
+#   build -> pypi -> ghcr
+#                 -> docs
+#                 -> pypi-smoke -> space -> space-smoke
+#
+# After PyPI: the image, the versioned docs, and a fresh install of the
+# release from PyPI that boots the demo. Only once that passes is the Hugging
+# Face Space deployed at the same version (publish_space.yml), and the live
+# Space is then polled until it serves it.
+#
 # Three entry points, one behaviour. GitHub does not start a workflow from an
 # event created with the default `GITHUB_TOKEN`, so the tag release-please
 # pushes never fires the `push: tags` trigger - `release_please.yml` therefore
@@ -228,3 +237,71 @@ jobs:
         run: |
           mike deploy --push --update-aliases "$TAG" latest
           mike set-default --push latest
+
+  # The release as a user gets it: `pip install "nl2sql-engine[demo]==X.Y.Z"`
+  # from PyPI itself into an empty virtualenv on a fresh runner, then the same
+  # key-free boot of `nl2sql demo --hosted` the `fresh-install` job in test.yml
+  # runs on the wheels. PyPI accepts an upload at once but its CDN serves the
+  # new version a little later, so the install is retried (10 tries, 30s
+  # apart). This also gates the Space: it never builds a version that does not
+  # install from PyPI.
+  pypi-smoke:
+    needs: pypi
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref_name }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Cache the local embedding model
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/chroma
+          key: chroma-onnx-all-MiniLM-L6-v2
+
+      - name: Install the release from PyPI and boot the demo
+        env:
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: python scripts/fresh_install_check.py --pypi "${TAG#v}"
+
+  # The hosted demo, pinned to the version just published. secrets: inherit
+  # is what carries HF_TOKEN in; release_please.yml passes it down too. With no
+  # token the deploy skips green and `space-smoke` below is skipped with it.
+  space:
+    needs: pypi-smoke
+    uses: ./.github/workflows/publish_space.yml
+    with:
+      tag: ${{ inputs.tag || github.ref_name }}
+    secrets: inherit
+    permissions:
+      contents: read
+
+  # The Space can report RUNNING on its new build before the router sends
+  # traffic to it, and it serves the previous image until then. So the release
+  # is checked where visitors meet it: the public URL, polled until
+  # /api/health reports this version, then the page and /api/meta.
+  space-smoke:
+    needs: space
+    if: needs.space.outputs.deployed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref_name }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Wait for the live Space to serve the release
+        env:
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: >-
+          python scripts/fresh_install_check.py
+          --url https://nadeem4nk-nl2sql-demo.hf.space
+          --expect-version "${TAG#v}"
+          --timeout 900

@@ -36,7 +36,8 @@ jobs:
 
   # Only runs on the push to main that actually tagged a release; every other
   # push leaves `releases_created` as `false` and this is skipped. The publish
-  # pipeline itself - build, smoke gate, per-package PyPI legs, GHCR, docs -
+  # pipeline itself - build, smoke gate, per-package PyPI legs, GHCR, docs, the
+  # install-from-PyPI check, the Hugging Face Space and its live check -
   # stays in publish_pypi.yaml, which is also the workflow filename registered
   # with PyPI's trusted publishers.
   publish:
@@ -45,6 +46,9 @@ jobs:
     uses: ./.github/workflows/publish_pypi.yaml
     with:
       tag: ${{ needs.release-please.outputs.tag_name }}
+    # HF_TOKEN, for the Hugging Face Space deploy publish_pypi.yaml calls in
+    # turn. PyPI itself needs no secret: trusted publishing is OIDC.
+    secrets: inherit
     # Ceiling for the called workflow: its jobs keep their own narrower
     # permissions, but a reusable workflow can never exceed the caller's.
     # `id-token: write` is what carries OIDC trusted publishing through.

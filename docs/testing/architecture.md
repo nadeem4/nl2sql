@@ -73,7 +73,12 @@ Two more jobs test the package rather than the source tree:
 
   Any `*_API_KEY` in your environment is dropped for the run, so a key you
   exported cannot make it pass where CI would fail. The decisions it makes are
-  unit-tested in `tests/unit/test_fresh_install_check.py`.
+  unit-tested in `tests/unit/test_fresh_install_check.py`. After a release
+  the same script runs twice more, from `publish_pypi.yaml`: with
+  `--pypi X.Y.Z` to install the published version from PyPI itself, and with
+  `--url https://nadeem4nk-nl2sql-demo.hf.space --expect-version X.Y.Z` to
+  wait for the live Space to serve it (see
+  [Releasing](../development/releasing.md)).
 
 Nothing selects `llm`. Those tests are run by hand with a key:
 
