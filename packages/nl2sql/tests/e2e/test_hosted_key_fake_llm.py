@@ -75,9 +75,11 @@ def test_the_visitors_key_answers_the_question_and_lands_nowhere(demo_project, t
         provider.stop()
         reload_settings()
 
-    # Without a key: one clear sentence, no model call, no crash.
-    assert refused.status_code == 401
-    assert "Settings" in refused.json()["detail"]
+    # Without a key, and nothing recorded: the replay miss asks for a key, and
+    # no model was called.
+    assert refused.status_code == 200
+    assert refused.json()["replay_miss"] is True
+    assert "Add an API key" in refused.json()["errors"][0]["message"]
 
     # With the visitor's key: a real answer, and the fake provider saw the key.
     assert answered.status_code == 200, answered.text

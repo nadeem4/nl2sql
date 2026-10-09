@@ -189,8 +189,12 @@ How the engine uses it:
   write, the only kind the engine asks for) unless the price gives its own
   `cache_write`.
 
-`nl2sql demo --record` cannot record Claude: the recording proxy and replay
-speak the OpenAI wire format, so it asks for an OpenAI or OpenRouter key.
+`nl2sql demo --record` records Claude too: with an Anthropic key the recording
+proxy speaks Anthropic's Messages API to `https://api.anthropic.com`, and stores
+each answer under the same name and question an OpenAI one would get, so replay
+(which answers on the OpenAI wire) serves it unchanged. The hosted demo's shipped
+recordings are made this way; see
+[Hosted demo](../deployment/hosted-demo.md#recorded-answers-without-a-key).
 
 ### OpenRouter
 

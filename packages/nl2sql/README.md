@@ -63,10 +63,11 @@ first run downloads a ~79 MB ONNX embedding model) and opens the playground on
 playground's Settings page, or a reachable Ollama. Without one the demo runs
 in replay mode, which has no recorded answers out of the box, so it can show the
 schema and the index but answers nothing. `nl2sql demo --record` (with an
-OpenAI or OpenRouter key) records the guided questions for later key-free runs.
+OpenAI, OpenRouter or Anthropic key) records the guided questions for later key-free runs.
 
 `nl2sql demo --hosted` runs the public variant above yourself: the server holds
-no API key, each visitor pastes their own into the page for that question only,
+no API key, each visitor pastes their own into the page for that question only
+(without one, the guided questions replay recorded runs),
 the sample databases are opened read-only, questions are rate limited per
 visitor and capped per session, and Settings, Rebuild, ratings and `--record`
 are refused. See

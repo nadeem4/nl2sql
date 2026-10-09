@@ -122,7 +122,7 @@ def test_meta_and_ask():
         "question_groups": [{"datasource": "chinook", "questions": ["q1"]}],
         "roles": ["admin", "viewer"], "datasources": ["chinook"], "recorded_questions": 0,
         # Local mode: the public-demo server is off and has no limits to report.
-        "hosted": False, "limits": None}
+        "hosted": False, "recorded": [], "limits": None}
     r = client.post("/api/ask", json={"question": "q1", "role": "viewer", "execute": False})
     assert r.status_code == 200
     body = r.json()
@@ -138,6 +138,16 @@ def test_page_has_the_four_panes():
     assert '<div id="root">' in html
     # The React bundle owns the panes; the page only has to mount it.
     assert "/static/" in html or "<script" in html
+
+
+def test_the_built_page_labels_recorded_runs_and_offers_a_key_on_a_miss():
+    """The committed bundle carries the keyless hosted path: the badge, the
+    marked chips and the way to Settings from a replay miss."""
+    client = TestClient(build_app(_Engine(), questions=[], roles=["admin"], mode="live", dataset="chinook"))
+    html = client.get("/").text
+    for text in ("Recorded run", "recorded-badge", "replay-miss-key", "Add a key in Settings",
+                 "Try a recorded run"):
+        assert text in html, text
 
 
 def test_schema_route_reads_the_engine_snapshot():

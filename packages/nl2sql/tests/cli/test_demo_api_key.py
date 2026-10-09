@@ -243,13 +243,25 @@ def test_a_restart_keeps_every_saved_key_and_each_steps_provider(tmp_path):
     assert cfg["agents"]["astplanner"]["api_key"] == "${env:ANTHROPIC_API_KEY}"
 
 
-def test_record_refuses_an_anthropic_key(tmp_path, monkeypatch):
+def test_record_with_an_anthropic_key_proxies_to_anthropic_on_its_own_wire(tmp_path, monkeypatch):
+    """The demo's shipped answers are recorded with Claude."""
+    import yaml
+
     monkeypatch.setattr("nl2sql.cli.commands.demo.RecordingProxy", _StubProxy)
+    monkeypatch.setattr(
+        "nl2sql.cli.commands.demo._record_all",
+        lambda engine, questions, proxy, store, store_path: None,
+    )
 
     result = _run("--dir", str(tmp_path / "d"), "--record", "--api-key", FAKE_ANTHROPIC_KEY)
 
-    assert result.exit_code == 1
-    assert "OpenAI" in _plain(result.output)
+    assert result.exit_code == 0, result.output
+    assert _StubProxy.last_upstream == "https://api.anthropic.com"
+    assert _StubProxy.last_wire == "anthropic"
+    assert _StubProxy.last_key == FAKE_ANTHROPIC_KEY
+    llm = yaml.safe_load((tmp_path / "d" / "configs" / "llm.demo.yaml").read_text(encoding="utf-8"))
+    assert llm["default"]["provider"] == "anthropic"
+    assert llm["default"]["base_url"] == "http://127.0.0.1:9"
 
 
 def test_help_states_the_precedence_and_the_argv_caveat():
@@ -354,10 +366,12 @@ class _StubProxy:
     last_key = None
     last_upstream = None
 
-    def __init__(self, upstream, key, store, **kwargs):
+    def __init__(self, upstream, key, store, wire="openai", **kwargs):
         _StubProxy.last_upstream = upstream
         _StubProxy.last_key = key
+        _StubProxy.last_wire = wire
         self.base_url = "http://127.0.0.1:9/v1"
+        self.anthropic_base_url = "http://127.0.0.1:9"
 
     def start(self):
         return self

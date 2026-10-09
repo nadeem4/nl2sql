@@ -36,7 +36,7 @@ import os
 import secrets
 import threading
 import time
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, Iterable, List, Optional, Tuple
 
 from fastapi import HTTPException, Request, Response
 
@@ -304,15 +304,54 @@ def _address(request: Request) -> str:
     return (request.client.host if request.client else None) or "unknown"
 
 
-class Hosted:
-    """Hosted mode's state: whether it is on, and the limits it enforces."""
+# The credential a replayed run's clients carry. The replay server ignores it;
+# it exists because a client will not construct without one.
+REPLAY_KEY = "replay-recorded-answers-only"
 
-    def __init__(self, enabled: bool = False, limits: Optional[Limits] = None) -> None:
+
+class Replay:
+    """The recorded answers a visitor with no key is served.
+
+    ``base_url`` is the local replay server (``FakeLLMServer`` over the
+    packaged recordings) and ``questions`` the guided questions it can answer
+    from the start. A keyless question outside that set is a replay miss and
+    never runs.
+    """
+
+    def __init__(self, base_url: str, questions: Iterable[str]) -> None:
+        self.base_url = base_url
+        self.questions = list(questions)
+        self._known = {q.strip() for q in self.questions}
+
+    def answers(self, question: str) -> bool:
+        return (question or "").strip() in self._known
+
+    def llms(self) -> RequestLLMs:
+        """Every step of one run, pointed at the replay server."""
+        return RequestLLMs(keys={"openai": REPLAY_KEY}, fallback=REPLAY_KEY, base_url=self.base_url)
+
+
+class Hosted:
+    """Hosted mode's state: whether it is on, the limits it enforces, and the
+    recorded answers a visitor without a key is served (``replay``)."""
+
+    def __init__(self, enabled: bool = False, limits: Optional[Limits] = None,
+                 replay: Optional[Replay] = None) -> None:
         self.enabled = enabled
+        self.replay = replay
         self.limits = limits or Limits(
             per_minute=_positive_int(QUESTIONS_PER_MINUTE, DEFAULT_QUESTIONS_PER_MINUTE),
             per_session=_positive_int(QUESTIONS_PER_SESSION, DEFAULT_QUESTIONS_PER_SESSION),
         )
+
+    def brings_key(self, request: Request) -> bool:
+        """Whether this request carries any key at all, well-formed or not."""
+        headers = [KEY_HEADER] + [key_header_for(p) for p in KEYED_PROVIDERS]
+        return any((request.headers.get(name) or "").strip() for name in headers)
+
+    def replays(self, question: str) -> bool:
+        """Whether a keyless visitor's ``question`` has a recorded answer."""
+        return self.replay is not None and self.replay.answers(question)
 
     def request_llms(self, request: Request, default_provider: str = "openai") -> RequestLLMs:
         """The keys and the per-step models this request brought.
@@ -387,6 +426,8 @@ class Hosted:
     def describe(self) -> Dict[str, object]:
         """What ``/api/meta`` tells the page about hosted mode."""
         return {"hosted": self.enabled,
+                # The guided questions a visitor without a key gets a recorded answer to.
+                "recorded": list(self.replay.questions) if (self.enabled and self.replay) else [],
                 "limits": {"questions_per_minute": self.limits.per_minute,
                            "questions_per_session": self.limits.per_session} if self.enabled else None}
 

@@ -186,8 +186,8 @@ running demo to live mode without a restart and picks a model per step.
 recorded model responses. None ship with the engine, so the console and the page
 say "replay mode has no recorded answers" and a question gets "No recorded
 answer for this question. Add an API key to ask it live." The schema, the index
-and the Retrieval inspector still work. `nl2sql demo --record` (with an OpenAI
-or OpenRouter key) records the guided questions into the project's
+and the Retrieval inspector still work. `nl2sql demo --record` (with an OpenAI,
+OpenRouter or Anthropic key) records the guided questions into the project's
 `recordings.json`, and later key-free runs of that folder replay them.
 
 In the playground, pick one of the twenty guided questions -- twelve on
@@ -215,8 +215,8 @@ address unless you pass `--allow-settings`. Full guide:
 `nl2sql demo --hosted` is a third state: the public demo
 [above](#try-it-in-your-browser), which you can run yourself. The server holds
 no API key, each visitor pastes their own into the page, one per provider, and
-the Ask page says so on arrival and keeps the question box closed until a key
-is saved, so nobody discovers the requirement by asking. Saving settings,
+a visitor without one can still click a guided question and watch a recorded
+run of it, labelled **Recorded run**; any other question asks for a key. Saving settings,
 Rebuild, answer ratings and `--record` are refused there, and the sample
 databases are opened read-only. Two limits keep the pace, both in process and
 both best-effort: 6 questions a minute keyed by client address

@@ -2,7 +2,8 @@
 
 ``--hosted`` (or ``NL2SQL_DEMO_HOSTED=1``) is a fourth mode and a different
 server: it is for a public demo, where the process holds no key at all and
-every visitor brings their own in a request header. Nothing is saved -- not the
+every visitor brings their own in a request header; a visitor without one is
+answered from the packaged recordings for the guided questions they cover. Nothing is saved -- not the
 key, not settings, not the index, not feedback -- and per-visitor limits apply.
 It is not a loosened ``--allow-settings``: settings, Rebuild, feedback and
 ``--record`` are all refused there. See
@@ -12,7 +13,8 @@ Otherwise three modes, chosen at process start from the first key that turns up:
 
 ``replay``  no key anywhere, so questions answer only from recordings: the
             demo project's ``recordings.json`` (written by ``--record``), else
-            any packaged with the engine (none ship today)
+            any packaged with the engine (``scripts/record_demo_answers.py``
+            makes those)
 ``live``    a key (or a reachable Ollama) is present, so questions go upstream
 ``record``  ``--record`` with a key, capturing upstream answers for replay
 
@@ -46,6 +48,7 @@ from typing import List, Optional, Tuple
 import yaml
 
 from nl2sql.llm.providers import (
+    ANTHROPIC_UPSTREAM,
     KEYED_PROVIDERS,
     PROVIDER_KEYS,
     UPSTREAMS,
@@ -303,6 +306,7 @@ def demo_command(
     # Asked for here so a missing extra is one clear line, not an ImportError
     # halfway through scaffolding.
     try:
+        from nl2sql.cli.demo.playground.hosted import Replay
         from nl2sql.cli.demo.playground.hosted import from_env as _hosted_from_env
     except ImportError:
         print_error(INSTALL_HINT)
@@ -342,11 +346,13 @@ def demo_command(
     # proxy through, so --record asks for a key directly rather than for a mode.
     if record and not resolved_key:
         print_error("--record needs an API key.")
-        console.print("Pass --api-key, or set OPENAI_API_KEY or OPENROUTER_API_KEY.")
+        console.print("Pass --api-key, or set OPENAI_API_KEY, OPENROUTER_API_KEY or ANTHROPIC_API_KEY.")
         raise SystemExit(1)
-    # The recording proxy and replay speak the OpenAI wire format; Claude does not.
-    if record and live_provider(resolved_key, key_source) not in UPSTREAMS:
-        print_error("--record needs an OpenAI or OpenRouter key: recordings capture the OpenAI wire format.")
+    # The recording proxy speaks the OpenAI wire and Anthropic's Messages API;
+    # replay answers both from the same recordings.
+    record_provider = live_provider(resolved_key, key_source) if record else None
+    if record and record_provider not in UPSTREAMS and record_provider != "anthropic":
+        print_error("--record needs an OpenAI, OpenRouter or Anthropic key.")
         raise SystemExit(1)
 
     preserved = {key: os.environ[key] for key in PROVIDER_KEYS if os.environ.get(key)}
@@ -373,11 +379,16 @@ def demo_command(
     if record:
         # --record already refused to start without a key, so the provider here
         # is never "ollama".
-        upstream = UPSTREAMS[live_provider(resolved_key, key_source)]
         store = ReplayStore.load(store_path) if store_path.exists() else ReplayStore()
-        proxy = RecordingProxy(upstream, resolved_key, store).start()
-        _point_llm_config_at(directory, proxy.base_url, provider="openai")
-        os.environ["OPENAI_API_KEY"] = os.environ.get("OPENAI_API_KEY") or "proxy"
+        if record_provider == "anthropic":
+            proxy = RecordingProxy(ANTHROPIC_UPSTREAM, resolved_key, store, wire="anthropic").start()
+            _point_llm_config_at(directory, proxy.anthropic_base_url, provider="anthropic")
+            anthropic_env = env_var_for_provider("anthropic")
+            os.environ[anthropic_env] = os.environ.get(anthropic_env) or "proxy"
+        else:
+            proxy = RecordingProxy(UPSTREAMS[record_provider], resolved_key, store).start()
+            _point_llm_config_at(directory, proxy.base_url, provider="openai")
+            os.environ["OPENAI_API_KEY"] = os.environ.get("OPENAI_API_KEY") or "proxy"
         # A plan served from the plan cache makes no planner call, so nothing
         # would be recorded for replay to answer with.
         os.environ["PLAN_CACHE_ENABLED"] = "false"
@@ -391,12 +402,28 @@ def demo_command(
         # so a bug cannot quietly fall back to the owner's.
         for name in PROVIDER_KEYS:
             os.environ.pop(name, None)
+        # A visitor with no key is served the packaged recordings for the
+        # guided questions they cover, from a replay server on loopback that
+        # only this process can reach. Every other keyless question is a
+        # replay miss that asks for a key.
+        recordings = replay_recordings(directory)
+        store = ReplayStore.load(recordings) if recordings else ReplayStore()
+        covered = store.covered(DEMO_QUESTIONS)
+        recorded_questions = len(covered)
+        if covered:
+            replay_server = FakeLLMServer(store.rules()).start()
+            hosted_mode.replay = Replay(replay_server.base_url, covered)
         console.print(
             "[bold]Hosted mode:[/bold] the server holds no API key. Each visitor pastes their own "
             "under Settings; it stays in their browser tab, travels with each question and is "
             "never written down here. Settings, Rebuild, feedback and --record are off, and "
             f"questions are limited to {hosted_mode.limits.per_minute} a minute and "
             f"{hosted_mode.limits.per_session} a session."
+        )
+        console.print(
+            f"{recorded_questions} guided questions answer from recordings without a key."
+            if recorded_questions else
+            "No recordings ship with this install, so a visitor needs a key for every question."
         )
     elif mode == "replay":
         recordings = replay_recordings(directory)

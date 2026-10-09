@@ -1,0 +1,73 @@
+name: Record demo answers
+
+# Records real answers to the demo's guided questions with a Claude model, for
+# the hosted demo's keyless path (docs/deployment/hosted-demo.md, "Recorded
+# answers without a key"), and opens a pull request with them.
+#
+# It spends money on the ANTHROPIC_API_KEY repository secret, so it only ever
+# runs by hand: Actions -> Record demo answers -> Run workflow. Nothing else
+# triggers it.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: record-demo
+  cancel-in-progress: false
+
+jobs:
+  record-answers:
+    runs-on: ubuntu-latest
+    env:
+      EMBEDDING_PROVIDER: local
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install packages
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e packages/adapter-sdk -e "packages/nl2sql[demo,anthropic]" -e packages/api
+
+      - name: Cache the local embedding model
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/chroma
+          key: chroma-onnx-all-MiniLM-L6-v2
+
+      # The key is read from the environment by the script and never printed.
+      # Without the secret the script exits 2 and the job fails. Exit 1 (some
+      # questions not recorded) still opens the pull request, whose diff and
+      # the log above say which ones are missing.
+      - name: Record the guided questions
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python scripts/record_demo_answers.py || [ $? -eq 1 ]
+
+      - name: Open a pull request with the recordings
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          file=packages/nl2sql/src/nl2sql/cli/demo/recordings/chinook.json
+          if git diff --quiet -- "$file" && git ls-files --error-unmatch "$file" >/dev/null 2>&1; then
+            echo "The recordings are unchanged; no pull request."
+            exit 0
+          fi
+          branch="recordings/demo-answers-${GITHUB_RUN_ID}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+          git add "$file"
+          git commit -m "chore(demo): record the guided questions' answers for the hosted demo"
+          git push origin "$branch"
+          gh pr create --base main --head "$branch" \
+            --title "chore(demo): record the guided questions' answers for the hosted demo" \
+            --body "Recorded by the Record demo answers workflow (run ${GITHUB_RUN_ID}) with the Anthropic preset's default model. A visitor to the hosted demo without a key is answered from these for the guided questions. Review the plans and answers before merging."

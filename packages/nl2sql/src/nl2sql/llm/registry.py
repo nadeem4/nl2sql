@@ -202,6 +202,14 @@ class LLMRegistry:
         """
         from .providers import VERIFIED_MODELS
 
+        if request.base_url:
+            # One endpoint for the whole request (the hosted demo's replay
+            # server): every step speaks the OpenAI wire to it, whatever it is
+            # configured on, and no per-step choice applies.
+            _, _, key = request.resolve(name, agent.provider)
+            return agent.model_copy(update={"provider": "openai", "base_url": request.base_url,
+                                            "api_key": None}), key
+
         provider, model, key = request.resolve(name, agent.provider)
         if provider is None:
             return LLMRegistry._for_key(agent, key), key

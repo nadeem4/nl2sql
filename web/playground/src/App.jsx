@@ -9,7 +9,7 @@ import Pipeline from "./Pipeline.jsx";
 import RetrievalInspector from "./Retrieval.jsx";
 import { answeredDatasources, datasourceNames } from "./datasources.js";
 import { guidedGroups } from "./questions.js";
-import { NO_KEY_REASON, needsKey } from "./firstRun.js";
+import { needsKey } from "./firstRun.js";
 import { AskDock, Elapsed, FirstRun, Suggestions } from "./AskParts.jsx";
 import { STOP_AFTER_MS, askButton, runScroll } from "./runState.js";
 import { modeStatus } from "./status.js";
@@ -241,7 +241,7 @@ export default function App() {
   // the database the question is about.
   const ask = async (text, source) => {
     const q = (text === undefined ? question : text).trim();
-    if (busy || needsKey(meta, apiKeys)) return;
+    if (busy) return;
     // An empty box looks ready rather than grey; pressing Ask then puts the
     // keyboard where the question goes.
     if (!q) {
@@ -321,8 +321,10 @@ export default function App() {
   const databases = datasourceNames(meta);
   const answered = databases.length > 1 ? answeredDatasources(result) : [];
   const onAsk = page === "ask";
-  // Hosted, with no key in this tab: the page says so and holds the question
-  // box and the guided questions closed instead of letting a click fail.
+  // Hosted, with no key in this tab: the page says what a keyless visitor can
+  // do -- replay the recorded guided questions -- and leads with them. Nothing
+  // is held closed; a question without a recording answers with the way to
+  // add a key.
   const noKey = needsKey(meta, apiKeys);
   const status = modeStatus(meta, apiKeys, { canSet });
   const groups = guidedGroups(meta);
@@ -406,7 +408,11 @@ export default function App() {
           <div className="layout">
             <section className="composer" aria-labelledby="ask-heading">
               <h2 id="ask-heading" className="visually-hidden">Ask</h2>
-              {noKey && <FirstRun databases={databases} onKey={firstKey} />}
+              {noKey && <FirstRun databases={databases} meta={meta} onKey={firstKey} />}
+              {noKey && (
+                <Suggestions groups={groups} selected={datasource} ran={Boolean(asked)} busy={busy}
+                  noKey meta={meta} onAsk={ask} />
+              )}
               {/* The page title above already says Ask. With one database this
                   names it; with three the resolver picks, so it must not. */}
               <label className="question-label" htmlFor="question">
@@ -419,9 +425,6 @@ export default function App() {
                 rows={2}
                 value={question}
                 placeholder="Which genre sells the most tracks?"
-                disabled={noKey}
-                title={noKey ? NO_KEY_REASON : undefined}
-                aria-describedby={noKey ? "first-run-why" : undefined}
                 onChange={(e) => setQuestion(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) ask();
@@ -449,9 +452,7 @@ export default function App() {
                 {/* Keeps its fill while busy; after a moment it becomes Stop. */}
                 <button className="ask" id="ask" data-mode={button.action} aria-busy={busy || undefined}
                   onClick={() => (button.action === "stop" ? stop() : button.action === "ask" ? ask() : null)}
-                  disabled={noKey}
-                  title={noKey ? NO_KEY_REASON : undefined}
-                  aria-describedby={noKey ? "first-run-why" : undefined}>
+                  >
                   {button.action === "wait" && <span className="spin" aria-hidden="true" />}
                   {button.action === "stop" && (
                     <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
@@ -462,8 +463,10 @@ export default function App() {
                   {button.action === "ask" && <kbd aria-hidden="true">Ctrl Enter</kbd>}
                 </button>
               </div>
-              <Suggestions groups={groups} selected={datasource} ran={Boolean(asked)} busy={busy}
-                noKey={noKey} onAsk={ask} />
+              {!noKey && (
+                <Suggestions groups={groups} selected={datasource} ran={Boolean(asked)} busy={busy}
+                  meta={meta} onAsk={ask} />
+              )}
             </section>
 
             <aside className="rail">
@@ -485,6 +488,7 @@ export default function App() {
                 onAgain={asked ? () => ask(asked.question) : undefined}
                 debug={debug}
                 replay={replay}
+                meta={meta}
                 feedback={feedback}
                 answered={answered}
               />

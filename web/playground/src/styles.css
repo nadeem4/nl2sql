@@ -1416,6 +1416,43 @@ ol.chips.picks li { border-color: color-mix(in srgb, var(--accent) 45%, var(--ru
 .first-run-facts dt { font-size: var(--fs-1); font-weight: var(--fw-bold); letter-spacing: .06em; text-transform: uppercase; color: var(--ink); }
 .first-run-facts dd { margin: 0; font-size: var(--fs-2); color: var(--ink-2); }
 .first-run-more { font-size: var(--fs-2); color: var(--ink-2); }
+/* The key form, folded while the recorded runs are the way in. */
+.first-run-key { width: 100%; display: flex; flex-direction: column; gap: var(--sp-4); }
+.first-run-key > summary {
+  width: fit-content; cursor: pointer; font-size: var(--fs-2); font-weight: var(--fw-bold); color: var(--ink);
+  min-height: 32px; display: inline-flex; align-items: center;
+}
+.first-run-key[open] > summary { margin-bottom: var(--sp-3); }
+/* Keyless, the chips lead: they sit under the pitch, above the question box. */
+.composer .first-run + .guided { margin: 0 0 var(--sp-5); }
+.composer .first-run:has(+ .guided) { border-bottom: 0; padding-bottom: 0; margin-bottom: var(--sp-4); }
+/* A guided question that answers from a recording, before a key is in. */
+.chip[data-recorded]::before, .guided-q[data-recorded]::before {
+  content: ""; flex: none; width: 6px; height: 6px; margin-right: var(--sp-2); border-radius: 50%;
+  background: var(--accent);
+}
+.guided-q[data-recorded] { display: inline-flex; align-items: center; }
+
+/* A replayed answer says so, beside the question it answers. */
+.recorded-badge {
+  display: inline-flex; align-items: center; height: 22px; padding: 0 var(--sp-2); border-radius: 999px;
+  font-size: var(--fs-1); font-weight: var(--fw-bold); letter-spacing: .04em; text-transform: uppercase;
+  color: var(--accent); background: var(--accent-soft); white-space: nowrap; cursor: help;
+}
+/* A question nothing recorded can answer: say so, and offer the key. */
+.miss {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3) var(--sp-4);
+  margin: var(--sp-1) 0 var(--sp-3); padding: var(--sp-3) var(--sp-4); border-radius: var(--r-well);
+  background: var(--well); max-width: 80ch;
+}
+.miss-text { font-size: var(--fs-3); color: var(--ink); flex: 1 1 32ch; text-wrap: pretty; }
+.miss-action {
+  display: inline-flex; align-items: center; min-height: 40px; padding: 0 var(--sp-4); border-radius: var(--r-control);
+  background: var(--accent-fill); color: var(--accent-on); font-size: var(--fs-2); font-weight: var(--fw-bold);
+  text-decoration: none; transition: transform var(--dur-press) var(--ease-out);
+}
+.miss-action:active { transform: scale(.98); }
+@media (pointer: coarse) { .miss-action { min-height: 44px; } }
 
 /* The answer header: #pane-question once a question is asked. */
 .answer-head {

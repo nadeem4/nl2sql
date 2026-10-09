@@ -77,6 +77,37 @@ def test_hosted_serves_a_playground_with_no_key_of_its_own(tmp_path, monkeypatch
     assert _meta(served)["mode"] == "hosted"
 
 
+def test_hosted_serves_the_packaged_recordings_to_a_visitor_without_a_key(tmp_path, monkeypatch):
+    from nl2sql.cli.demo.datasets import CHINOOK_QUESTIONS
+    from nl2sql.llm.replay import Recording, ReplayStore
+
+    shipped = tmp_path / "shipped"
+    ReplayStore([Recording("DecomposerResponse", q, {}) for q in CHINOOK_QUESTIONS[:2]]).save(
+        shipped / "chinook.json")
+    monkeypatch.setattr("nl2sql.cli.commands.demo.RECORDINGS", shipped)
+
+    result, served = _run(tmp_path, monkeypatch, "--hosted")
+
+    assert result.exit_code == 0, result.output
+    meta = _meta(served)
+    assert meta["recorded"] == CHINOOK_QUESTIONS[:2]
+    assert meta["recorded_questions"] == 2
+    assert "2 guided questions answer from recordings without a key" in " ".join(result.output.split())
+    # The replay server is the process's own, on loopback, and is not a key.
+    replay = served["app"].state.hosted.replay
+    assert replay.base_url.startswith("http://127.0.0.1:")
+
+
+def test_hosted_without_recordings_asks_every_keyless_visitor_for_a_key(tmp_path, monkeypatch):
+    monkeypatch.setattr("nl2sql.cli.commands.demo.RECORDINGS", tmp_path / "none")
+
+    result, served = _run(tmp_path, monkeypatch, "--hosted")
+
+    assert result.exit_code == 0, result.output
+    assert _meta(served)["recorded"] == []
+    assert served["app"].state.hosted.replay is None
+
+
 def test_hosted_does_not_open_a_browser(tmp_path, monkeypatch):
     result, served = _run(tmp_path, monkeypatch, "--hosted")
 

@@ -7,6 +7,7 @@ import Ledger, { Totals } from "./Ledger.jsx";
 import { planSections } from "./plan.js";
 import { humanCheck, nodeLedger, traceFileName, traceUrl } from "./run.js";
 import { describeFault } from "./faults.js";
+import { missPrompt, recordedBadge } from "./firstRun.js";
 import {
   answerHead, gateReason, gateTimeline, runFault, stationHeads, stationStates, statusStrip, stoppedNote,
 } from "./runState.js";
@@ -84,7 +85,7 @@ function Fault({ entry, onAgain }) {
 // run, and the strip under it summarises the stations below and jumps to them.
 // `answered` is the database the resolver picked, and is empty with a single
 // database registered: there is then nothing for it to have picked.
-function AnswerHead({ asked, busy, stopped, hosted, result, sub, fault, answered = [], onAgain }) {
+function AnswerHead({ asked, busy, stopped, hosted, meta, result, sub, fault, answered = [], onAgain }) {
   if (!asked) {
     return (
       <section className="answer-head is-idle" id="pane-question" tabIndex={-1} aria-labelledby="pane-question-title">
@@ -97,7 +98,8 @@ function AnswerHead({ asked, busy, stopped, hosted, result, sub, fault, answered
   }
   const head = !busy && !stopped && !fault ? answerHead(result, sub) : null;
   const strip = head ? statusStrip(result, sub) : [];
-  const miss = result && result.replay_miss;
+  const miss = busy ? null : missPrompt(result, meta);
+  const badge = busy ? null : recordedBadge(result);
   const state = busy ? "busy" : stopped ? "stopped" : fault ? "fault" : head ? head.kind : "empty";
   return (
     <section className="answer-head" id="pane-question" tabIndex={-1} aria-labelledby="pane-question-title"
@@ -108,6 +110,7 @@ function AnswerHead({ asked, busy, stopped, hosted, result, sub, fault, answered
         </h3>
         <span className="asked">{asked.question}</span>
         <span className="role-tag">as {asked.role}{asked.planOnly && ", plan only"}</span>
+        {badge && <span className="recorded-badge" id="recorded-badge" title={badge.title}>{badge.label}</span>}
       </div>
       {busy && (
         <div className="answer-wait" aria-hidden="true">
@@ -121,7 +124,10 @@ function AnswerHead({ asked, busy, stopped, hosted, result, sub, fault, answered
       )}
       {fault && <Fault entry={fault} onAgain={onAgain} />}
       {miss && (
-        <p className="notice" role="status">No recorded answer for this question. Add an API key to ask it live.</p>
+        <div className="miss" id="replay-miss" role="status">
+          <p className="miss-text">{miss.text}</p>
+          {miss.action && <a className="miss-action" id="replay-miss-key" href={miss.action.route}>{miss.action.label}</a>}
+        </div>
       )}
       {head && <p className="answer-text" data-kind={head.kind}>{head.text}</p>}
       {strip.length > 0 && (
@@ -334,8 +340,8 @@ export function UsagePane({ usage, timings, replay, debug, state, result, head }
       {debug && picked && (
         <NodeInspector name={picked} trace={trace} loading={loading} error={traceError} onClose={() => setPicked(null)} />
       )}
-      {replay && (
-        <p className="footnote">Replay mode: recorded answers report placeholder token counts, not real usage.</p>
+      {(replay || (result && result.recorded)) && (
+        <p className="footnote">Recorded run: replayed answers report placeholder token counts, not real usage.</p>
       )}
     </Station>
   );
@@ -350,7 +356,7 @@ function list(names) {
 // `stopped` is a run the visitor cancelled; `onAgain` asks the same question
 // again, offered beside a fault; `hosted` adds that a stopped question still
 // counts toward the session's limit.
-export default function Run({ asked, result, sub, busy, stopped, hosted = false, error, debug, replay, feedback, answered = [], onAgain }) {
+export default function Run({ asked, result, sub, busy, stopped, hosted = false, meta = null, error, debug, replay, feedback, answered = [], onAgain }) {
   const s = stationStates({ asked, busy, stopped, result, sub });
   const heads = stationHeads(result, s);
   const gateFailed = s.checks === "stopped";
@@ -360,7 +366,7 @@ export default function Run({ asked, result, sub, busy, stopped, hosted = false,
 
   return (
     <>
-      <AnswerHead asked={asked} busy={busy} stopped={stopped} hosted={hosted} result={result} sub={sub} fault={fault}
+      <AnswerHead asked={asked} busy={busy} stopped={stopped} hosted={hosted} meta={meta} result={result} sub={sub} fault={fault}
         answered={answered} onAgain={onAgain} />
       <div className="spine" data-outcome={outcome} aria-busy={busy}>
         {busy && <span className="spine-run" aria-hidden="true" />}

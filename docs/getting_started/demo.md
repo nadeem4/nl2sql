@@ -183,7 +183,8 @@ This covers the embedding step only. The demo is **not** key-free end to end:
 
 Sharing the demo with other people is the one case where none of this applies:
 `nl2sql demo --hosted` serves the playground with **no key on the server at
-all**, and each visitor pastes their own into the page. See
+all**, and each visitor pastes their own into the page; a visitor without one
+can replay the guided questions from recorded runs. See
 [Hosted demo](../deployment/hosted-demo.md).
 
 Because the demo indexes with `local` and the default environment indexes with
@@ -429,8 +430,11 @@ second settings store, and the browser keeps nothing but UI conveniences.
   with the key form itself: pick a provider, paste the key and **Use this key**,
   under three facts about it -- **Stored** in this browser tab only, **Sent**
   with each question in a request header, **Never** written to disk, logs or
-  traces. The question box and the suggestions stay closed until a key is in,
-  so a new visitor is not left to discover it by asking. Locally there is nothing to announce, and nothing is shown. See
+  traces. Nothing is held closed without a key: the guided questions the
+  server has recordings for are marked and answer from a recorded run,
+  labelled **Recorded run**, and any other question answers with a button to
+  Settings to add a key. With recordings the key form is folded under **Use
+  your own key**. Locally there is nothing to announce, and nothing is shown. See
   [Hosted demo](../deployment/hosted-demo.md).
 
 ### The Retrieval inspector

@@ -195,3 +195,36 @@ def test_every_bound_key_reaches_the_redactor_and_none_of_them_outlives_the_bloc
     assert current_api_keys() == ()
     assert {FIRST_KEY, ANTHROPIC_KEY} <= during
     assert not ({FIRST_KEY, ANTHROPIC_KEY} & collect_secrets(object()))
+
+
+# --- an endpoint for one request: hosted replay ------------------------------------
+
+REPLAY_URL = "http://127.0.0.1:9/v1"
+
+
+def test_a_request_endpoint_points_the_step_at_it_and_is_cached_nowhere(registry, monkeypatch):
+    """The hosted demo answers a keyless guided question from its recordings by
+    pointing that one request's clients at the local replay server."""
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    replay = RequestLLMs(keys={"openai": "replay-only"}, fallback="replay-only", base_url=REPLAY_URL)
+
+    with use_request_llms(replay):
+        client = registry.get_llm("astplanner")
+    with use_request_llms(RequestLLMs.from_key(FIRST_KEY)):
+        after = registry.get_llm("astplanner")
+
+    assert str(client.openai_api_base) == REPLAY_URL
+    # The next request is not sent to the replay server.
+    assert after.openai_api_base != REPLAY_URL
+    assert registry.llms == {}
+
+
+def test_a_request_endpoint_moves_a_step_on_another_provider_onto_the_openai_wire():
+    reg = LLMRegistry(SecretManager())
+    reg.register_llm(AgentConfig(provider="anthropic", model="claude-opus-5", temperature=None,
+                                 api_key="${env:ANTHROPIC_API_KEY}", name="default"))
+    replay = RequestLLMs(keys={"openai": "replay-only"}, fallback="replay-only", base_url=REPLAY_URL)
+
+    config, key = LLMRegistry._for_request(reg._config_for("default"), "astplanner", replay)
+
+    assert (config.provider, config.base_url, key) == ("openai", REPLAY_URL, "replay-only")

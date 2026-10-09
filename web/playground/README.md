@@ -71,15 +71,24 @@ ratings are off, and the retrieval inspector stays on. See
 
 **Hosted, before a key** (`needsKey` in `src/firstRun.js`: `meta.hosted` and
 nothing in this tab's `sessionStorage`), the Ask page opens with `#first-run`
-above the question box: the pitch, `#first-run-why`, the key form itself (a
-provider choice, `#first-run-provider-<provider>`, the key, `#first-run-key`,
-and **Use this key**, `#first-run-save`) and three facts (`#first-run-facts`:
-**Stored** in this tab only, **Sent** in a header with each question, **Never**
-written to disk, logs or traces). The provider follows the key's own prefix once
-one is typed, as the server reads it, and the key is kept exactly as the
-Settings form keeps it (`writeKeyFor` in `src/hostedKey.js`); the keyboard then
-moves to `#question`. Until then the question box, **Ask** and every suggestion
-are disabled, each carrying `#first-run-why` as its `aria-describedby`.
+above the question box: the pitch and `#first-run-why` (`firstRunCopy`), then
+the guided questions as chips headed **Try a recorded run**, moved up from
+under the question box so they lead. The ones the server has recordings for
+(`meta.recorded`, `isRecorded`) carry a dot and `data-recorded`. The key form
+sits in `#first-run-keyform`, a `<details>` folded under **Use your own key**
+when there are recordings and open when there are none: a provider choice,
+`#first-run-provider-<provider>`, the key, `#first-run-key`, **Use this key**,
+`#first-run-save`, and three facts (`#first-run-facts`: **Stored** in this tab
+only, **Sent** in a header with each question, **Never** written to disk, logs
+or traces). The provider follows the key's own prefix once one is typed, as the
+server reads it, and the key is kept exactly as the Settings form keeps it
+(`writeKeyFor` in `src/hostedKey.js`); the keyboard then moves to `#question`.
+**Nothing is disabled** (`lockControls`): a recorded guided question answers
+from its recording, and the answer header carries a **Recorded run** badge
+(`#recorded-badge`, `recordedBadge`) whose title says it was not run just now;
+any other question comes back as a replay miss, shown as `#replay-miss` with
+**Add a key in Settings** (`#replay-miss-key`, `missPrompt`). The Cost & time
+station's footnote says a recorded run's token counts are placeholders.
 Saving a key here or in Settings clears all of it on the next render, with no reload:
 `App` holds the key in state, so nothing has to be reloaded to see it. In local
 mode none of this appears -- there a key is already configured, or replay
@@ -145,7 +154,8 @@ Back and Forward, and that routing touches nothing but the hash.
   `src/status.js`, with a green dot when a question can be answered live and an
   amber one when it cannot. **Live · configured model**; **Replay mode · 12 of
   20 recorded** (`recorded_questions` from `/api/meta`) or **Replay mode · No
-  recordings**; hosted, **Hosted demo · No key yet** until this tab has a key,
+  recordings**; hosted, **Hosted demo · Recorded runs** (or **Hosted demo · No
+  key yet** when nothing is recorded) until this tab has a key,
   then **Hosted demo · OpenAI key in this tab** (or **2 keys**). The sentence
   the old mode line carried -- how many questions replay answers and how to
   get a key, or whose key answers and the hosted limits (`hostedNote` in
@@ -360,8 +370,9 @@ box explains, Ask turning into Stop, the elapsed counter, the chip row),
 temperature), `src/indexHealth.js` (entry counts in plain words, the status
 line, relative build times), `src/router.js` (which page a hash names, the nav
 rows, and the router over `hashchange`), `src/questions.js` (the guided
-questions grouped by datasource), `src/firstRun.js` (when the hosted demo has
-to ask for a key before it takes a question, and whose key answers),
+questions grouped by datasource), `src/firstRun.js` (what the hosted demo offers a
+visitor with no key: the recorded questions, the badge, the key prompt on a
+miss, and whose key answers once there is one),
 `src/status.js` (what the top bar's status pill says in each mode, and the
 sentence it stands for),
 `src/datasources.js` (the

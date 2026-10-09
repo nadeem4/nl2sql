@@ -69,11 +69,16 @@ class RequestLLMs(NamedTuple):
             chose a model for. A step with no entry runs on the configured one.
         fallback: The key that was sent without naming a provider, if any. It
             is what the one-key case has always used.
+        base_url: An OpenAI-wire endpoint every step of this request is sent
+            to instead of its provider's own, or None. The hosted demo sets it
+            to its local replay server to answer a keyless guided question from
+            recordings; it lasts exactly as long as the request.
     """
 
     keys: Mapping[str, str] = {}
     models: Mapping[str, Tuple[str, str]] = {}
     fallback: Optional[str] = None
+    base_url: Optional[str] = None
 
     @classmethod
     def from_key(cls, key: Optional[str]) -> "RequestLLMs":

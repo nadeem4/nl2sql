@@ -96,3 +96,54 @@ def test_proxy_records_what_the_upstream_answered():
         upstream.stop()
     rule = store.rules()[0]
     assert rule.name == "PlanModel" and rule.when == "Which artist has the most albums?" and rule.payload == {"tables": []}
+
+
+def _post(url, body, headers=None):
+    import urllib.request
+
+    req = urllib.request.Request(url, data=json.dumps(body).encode(),
+                                 headers={"Content-Type": "application/json", **(headers or {})}, method="POST")
+    with urllib.request.urlopen(req) as r:
+        return r.status, json.loads(r.read())
+
+
+def test_proxy_records_an_anthropic_upstream_with_the_key_in_x_api_key():
+    """The demo's answers are recorded with a Claude model, on Anthropic's own wire."""
+    upstream = FakeLLMServer([Rule("PlanModel", {"tables": []}), Rule("plain", "Fifty-nine.")]).start()
+    store = ReplayStore()
+    proxy = RecordingProxy(upstream.anthropic_base_url, "sk-ant-upstream", store, wire="anthropic").start()
+    try:
+        tool = {"model": "claude", "max_tokens": 10, "tools": [{"name": "PlanModel", "input_schema": {}}],
+                "messages": [{"role": "user", "content": "User Query:\nWhich artist has the most albums?"}]}
+        status, answer = _post(proxy.anthropic_base_url + "/v1/messages", tool, {"anthropic-version": "2023-06-01"})
+        plain = {"model": "claude", "max_tokens": 10,
+                 "messages": [{"role": "user", "content": [{"type": "text", "text": "User Query: How many?"}]}]}
+        _post(proxy.anthropic_base_url + "/v1/messages", plain)
+    finally:
+        proxy.stop()
+        upstream.stop()
+
+    assert status == 200 and answer["content"][0]["type"] == "tool_use"
+    assert all(call["api_key"] == "sk-ant-upstream" for call in upstream.calls)
+    rules = {(r.name, r.when): r.payload for r in store.rules()}
+    assert rules[("PlanModel", "Which artist has the most albums?")] == {"tables": []}
+    assert rules[("plain", "How many?")] == "Fifty-nine."
+
+
+def test_a_recording_made_on_the_anthropic_wire_replays_on_the_openai_wire():
+    store = ReplayStore([Recording("PlanModel", "Which artist has the most albums?", {"tables": []})])
+    replay = FakeLLMServer(store.rules()).start()
+    try:
+        body = {"model": "m", "messages": [{"role": "user", "content": "User Query:\nWhich artist has the most albums?"}],
+                "tools": [{"type": "function", "function": {"name": "PlanModel"}}]}
+        status, answer = _post(replay.base_url + "/chat/completions", body)
+    finally:
+        replay.stop()
+
+    assert status == 200
+    assert json.loads(answer["choices"][0]["message"]["tool_calls"][0]["function"]["arguments"]) == {"tables": []}
+
+
+def test_the_proxy_refuses_a_wire_it_cannot_speak():
+    with pytest.raises(ValueError):
+        RecordingProxy("http://127.0.0.1:9", "k", ReplayStore(), wire="gemini")

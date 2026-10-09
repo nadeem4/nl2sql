@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { KEY_PROVIDERS, looksLikeKey, providerForKey } from "./hostedKey.js";
-import { NO_KEY_REASON } from "./firstRun.js";
+import { firstRunCopy, isRecorded } from "./firstRun.js";
 import { providerName } from "./settings.js";
 import { chipRow, elapsedLabel } from "./runState.js";
 
@@ -11,12 +11,13 @@ const COUNT = ["no", "one", "two", "three", "four", "five", "six"];
 // about where the key goes. Saving puts the key in this tab exactly as the
 // Settings form does (`hostedKey.js`); the provider follows the key's own
 // prefix once one is typed, because that is how the server reads it too.
-export function FirstRun({ databases, onKey }) {
+export function FirstRun({ databases, meta, onKey }) {
   const [chosen, setChosen] = useState("openai");
   const [key, setKey] = useState("");
   const [problem, setProblem] = useState(null);
   const provider = key.trim() ? providerForKey(key) : chosen;
   const n = databases.length;
+  const copy = firstRunCopy(meta);
   const pitch = n > 1
     ? `Ask ${COUNT[n] || n} real databases in plain English.`
     : "Ask a real database in plain English.";
@@ -35,12 +36,9 @@ export function FirstRun({ databases, onKey }) {
     <div className="first-run" id="first-run">
       <p className="first-run-kicker">Hosted demo</p>
       <h3>{pitch}</h3>
-      <p id="first-run-why">
-        {/* The promise the code keeps; `hostedKey.js` is where it is kept. */}
-        This demo runs on your own API key. The model writes a typed plan, the checks review it, and only
-        then is SQL written and run. The sample databases and their search index are already built, so the
-        key is the only thing missing.
-      </p>
+      <p id="first-run-why">{copy.why}</p>
+      <details className="first-run-key" id="first-run-keyform" open={copy.keyOpen || undefined}>
+        <summary>{copy.keyOpen ? "Your API key" : "Use your own key"}</summary>
       <form className="first-run-form" onSubmit={save} aria-label="Your API key">
         <fieldset className="first-run-providers">
           <legend>Provider</legend>
@@ -72,6 +70,7 @@ export function FirstRun({ databases, onKey }) {
       <p className="first-run-more">
         A key per provider and a model per step are under <a href="#/settings">Settings</a>.
       </p>
+      </details>
     </div>
   );
 }
@@ -79,16 +78,18 @@ export function FirstRun({ databases, onKey }) {
 // The guided questions as a row of chips in the composer: a few from the
 // selected database, and "N more" opening every pile. Every pile is always in
 // the page (`#guided-<ds>`), hidden until opened.
-export function Suggestions({ groups, selected, ran, busy, noKey, onAsk }) {
+export function Suggestions({ groups, selected, ran, busy, noKey, meta, onAsk }) {
   const [open, setOpen] = useState(false);
   if (!groups.length) return null;
   const row = chipRow(groups, selected, { ran });
   const many = groups.length > 1;
-  const lock = {
-    disabled: busy || noKey,
-    title: noKey ? NO_KEY_REASON : undefined,
-    "aria-describedby": noKey ? "first-run-why" : undefined,
-  };
+  // Never held closed for want of a key: a keyless visitor replays the
+  // recorded ones, and the rest answer with the way to add a key.
+  const lock = { disabled: busy };
+  // Hosted, without a key: the recorded questions are marked, so a visitor
+  // can see which ones will answer before a key is in.
+  const mark = (q) => (noKey && isRecorded(meta, q)
+    ? { "data-recorded": true, title: "Answers from a recorded run" } : {});
   const pick = (question, datasource) => {
     setOpen(false);
     onAsk(question, datasource);
@@ -96,11 +97,11 @@ export function Suggestions({ groups, selected, ran, busy, noKey, onAsk }) {
   return (
     <section className="guided" aria-labelledby="guided-heading" data-ran={ran || undefined}>
       <div className="chips">
-        <h3 id="guided-heading" className="guided-label">{noKey ? "Then try" : "Try"}</h3>
+        <h3 id="guided-heading" className="guided-label">{noKey ? "Try a recorded run" : "Try"}</h3>
         <ul className="chip-list" aria-labelledby="guided-heading">
           {row.chips.map((q) => (
             <li key={q}>
-              <button type="button" className="chip" onClick={() => pick(q, row.datasource)} {...lock}>{q}</button>
+              <button type="button" className="chip" onClick={() => pick(q, row.datasource)} {...lock} {...mark(q)}>{q}</button>
             </li>
           ))}
           {row.more > 0 && (
@@ -122,7 +123,7 @@ export function Suggestions({ groups, selected, ran, busy, noKey, onAsk }) {
             <ul aria-labelledby={`guided-${group.datasource}`}>
               {group.questions.map((q) => (
                 <li key={q}>
-                  <button type="button" className="guided-q" onClick={() => pick(q, group.datasource)} {...lock}>{q}</button>
+                  <button type="button" className="guided-q" onClick={() => pick(q, group.datasource)} {...lock} {...mark(q)}>{q}</button>
                 </li>
               ))}
             </ul>
