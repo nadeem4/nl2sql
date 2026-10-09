@@ -4829,7 +4829,9 @@ person must review each draft and run <code>python -m nl2sql.evaluation.gold</co
 adding it; see
 <a href="../../observability/feedback/#growing-the-gold-set-nl2sql-feedback-export-good">Feedback and Signals</a>.</p>
 <p><code>nl2sql demo --record</code> turns the cache off while recording, so every planner
-answer is captured. See
+answer is captured. It also stops with exit <code>1</code>, recording nothing, when the
+demo's indexing fails: a plain <code>nl2sql demo</code> keeps going and offers Rebuild,
+but answers recorded against no index would be the wrong ones. See
 <a href="../../architecture/determinism/#the-plan-cache-determinism-from-the-architecture">Determinism → The plan cache</a>.</p>
 <p><code>--env &lt;name&gt;</code> loads <code>.env.&lt;name&gt;</code>. To point at an exact file instead, use
 <code>--env-file &lt;path&gt;</code>, which takes precedence over <code>--env</code>. Either flag also
