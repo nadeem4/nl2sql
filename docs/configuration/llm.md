@@ -158,7 +158,13 @@ How the engine uses it:
 - **Structured output** is a forced tool call (`with_structured_output`'s
   `function_calling` method), for every node. Anthropic's native JSON outputs
   (`output_config.format`) do not accept recursive schemas, and the planner's
-  `PlanModel` is recursive.
+  `PlanModel` is recursive; neither does strict tool use (`strict: true`).
+  Claude now and then nests a tool call's arguments one level down, as
+  `{"input": {...}}` or `{"inputs": {...}}` -- a recording run on
+  `claude-opus-5` failed the decomposer this way. The wire unwraps exactly that
+  shape before the node parses it: a single key the schema does not declare,
+  holding an object with every required field. Any other malformed answer still
+  fails validation as before.
 - **Prompt caching.** The resolver, decomposer, planner and refiner send a
   stable system message and a variable human message. On the `anthropic` wire
   only, the last system

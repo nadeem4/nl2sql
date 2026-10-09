@@ -8,7 +8,7 @@ from __future__ import annotations
 from typing import Any, Dict, Optional
 
 from langchain_core.language_models import BaseChatModel
-from langchain_core.outputs import LLMResult
+from langchain_core.outputs import ChatResult, LLMResult
 
 from .base import as_int, usage, usage_metadata_of
 
@@ -21,6 +21,36 @@ CACHE_CONTROL = {"type": "ephemeral"}
 # When Anthropic reports a cache write per TTL, langchain-anthropic zeroes the
 # generic ``cache_creation`` detail and puts the tokens under these keys.
 _CACHE_WRITE_BY_TTL = ("ephemeral_5m_input_tokens", "ephemeral_1h_input_tokens")
+
+# The wire field a tool call's arguments travel in is ``input``; Claude now and
+# then nests the arguments one level down under that name (or ``inputs``).
+_WRAPPER_KEYS = ("input", "inputs")
+
+
+def unwrap_tool_input(args: Any, input_schema: Optional[Dict[str, Any]]) -> Any:
+    """``args`` with one level of ``{"input": {...}}`` nesting removed, when that is what it is.
+
+    Unwraps only a dict whose single key is ``input`` or ``inputs``, which the
+    tool's schema does not declare, holding an object that has every field the
+    schema requires and at least one field it declares. Anything else -- a
+    declared ``input`` field, a wrapped object missing required fields -- is
+    returned unchanged, so validation reports it as it would have.
+
+    Without this a schema whose fields all have defaults (``AnswerabilityResponse``)
+    validated the wrapper as an empty answer, silently.
+    """
+    if not isinstance(args, dict) or len(args) != 1:
+        return args
+    [(key, inner)] = args.items()
+    schema = input_schema or {}
+    properties = schema.get("properties") or {}
+    if key not in _WRAPPER_KEYS or key in properties or not isinstance(inner, dict):
+        return args
+    if not all(name in inner for name in schema.get("required") or []):
+        return args
+    if not any(name in properties for name in inner):
+        return args
+    return inner
 
 
 class AnthropicWire:
@@ -61,6 +91,28 @@ class AnthropicWire:
             blocks[-1] = {**blocks[-1], "cache_control": CACHE_CONTROL}
             payload["system"] = blocks
         return payload
+
+    def repair_tool_calls(self, result: ChatResult, tools: Any) -> ChatResult:
+        """``result`` with each tool call's arguments passed through :func:`unwrap_tool_input`.
+
+        ``tools`` is the list the client sent (Anthropic tool dicts, each with
+        an ``input_schema``). Every structured-output call on this wire is a
+        forced tool call, so this covers every node, not only the decomposer.
+        """
+        schemas = {t.get("name"): t.get("input_schema") for t in tools or [] if isinstance(t, dict)}
+        if not schemas:
+            return result
+        for generation in result.generations:
+            message = getattr(generation, "message", None)
+            calls = getattr(message, "tool_calls", None)
+            if not calls:
+                continue
+            message.tool_calls = [
+                {**call, "args": unwrap_tool_input(call.get("args"), schemas.get(call.get("name")))}
+                if call.get("name") in schemas else call
+                for call in calls
+            ]
+        return result
 
     def read_usage(self, response: LLMResult) -> Optional[Dict[str, int]]:
         """Anthropic's usage in the engine's fields, each input token counted once.
