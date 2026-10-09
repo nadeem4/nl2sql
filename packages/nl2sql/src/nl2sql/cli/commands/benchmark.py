@@ -214,7 +214,7 @@ def run_tier2_benchmark(
     if baseline is not None:
         if max_accuracy_drop is not None:
             presenter.print_warning(
-                "--max-accuracy-drop is deprecated: at 43 questions two points is less than one question, "
+                "--max-accuracy-drop is deprecated: at 44 questions two points is less than one question, "
                 "so it fires on noise. The gate is --max-regressions plus McNemar's test.")
         old = json.loads(pathlib.Path(baseline).read_text(encoding="utf-8"))
         presenter.print_baseline_comparison(compare_with_baseline(board, old))

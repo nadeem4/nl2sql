@@ -507,7 +507,7 @@ one the runs of a single question are not independent and it reads narrower
 than it really is; pass^k below counts questions and does not.
 
 **Compare two runs question by question, not headline to headline.** The same
-43 questions are run both times, so the runs are paired and most of the
+44 questions are run both times, so the runs are paired and most of the
 variance cancels. `--baseline PATH` prints, per config:
 
 - the strict and lenient accuracy of each run, side by side;

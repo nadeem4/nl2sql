@@ -502,7 +502,7 @@ Details: [Security Model](docs/security/model.md),
   name in the written answer comes from the rows). Accuracy is scored twice:
   **strict**, where the rows must match the gold answer exactly, and
   **lenient**, which allows extra and reordered columns and date labels. Each
-  is published with a 95% Wilson interval, because 43 questions cannot separate
+  is published with a 95% Wilson interval, because 44 questions cannot separate
   small differences. Stops before spend could pass `--max-cost`. `--baseline`
   pairs each run's questions with the baseline's and fails when more than
   `--max-regressions` (default 2) flip from pass to fail, or when a smaller

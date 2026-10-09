@@ -387,7 +387,7 @@ def question_flips(records: Sequence[Dict[str, Any]], baseline_records: Sequence
 def compare_with_baseline(scoreboard: Dict[str, Any], baseline: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
     """Per config both scoreboards name, the run against the baseline question by question.
 
-    A single run of 43 questions has a 95% interval about 14 points wide, so
+    A single run of 44 questions has a 95% interval about 14 points wide, so
     the headline difference is read alongside the questions that actually
     flipped and McNemar's exact test on them
     (https://www.anthropic.com/research/statistical-approach-to-model-evals).
