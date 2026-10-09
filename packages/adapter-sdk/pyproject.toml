@@ -5,14 +5,33 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "nl2sql-adapter-sdk"
 version = "0.1.2" # x-release-please-version
-description = "Shared adapter contracts for NL2SQL"
+description = "The contracts a database adapter for the nl2sql engine implements; depends on pydantic only"
+readme = "README.md"
 license = "MIT"
+keywords = ["nl2sql", "text-to-sql", "sql", "database", "adapter", "sdk"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Database",
+    "Topic :: Software Development :: Libraries",
+]
 requires-python = ">=3.12"
 dependencies = [
     # ConfigDict (contracts.py, schema.py) is pydantic v2 only; the old
     # >=1.10 floor advertised an install that cannot import.
     "pydantic>=2.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/nadeem4/nl2sql"
+Documentation = "https://nadeem4.github.io/nl2sql/"
+Source = "https://github.com/nadeem4/nl2sql"
+Issues = "https://github.com/nadeem4/nl2sql/issues"
+Demo = "https://nadeem4nk-nl2sql-demo.hf.space"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
