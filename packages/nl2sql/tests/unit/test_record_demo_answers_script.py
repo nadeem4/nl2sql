@@ -96,6 +96,66 @@ def test_a_failed_demo_run_fails_the_script_and_writes_nothing(tmp_path, monkeyp
     assert "Nothing was recorded" in capsys.readouterr().err
 
 
+def _recording_demo(answered):
+    """A `demo --record` that recorded only ``answered`` and exited 1 for the rest, as it now does."""
+    from nl2sql.llm.replay import Recording, ReplayStore
+
+    def _demo(directory, **kwargs):
+        directory.mkdir(parents=True, exist_ok=True)
+        ReplayStore([Recording("DecomposerResponse", q, {}) for q in answered]).save(directory / "recordings.json")
+        raise SystemExit(1)
+
+    return _demo
+
+
+def test_failed_questions_are_listed_and_fail_the_script(tmp_path, monkeypatch, capsys):
+    """A real run said "Recorded 20 of 20" with 10 failed runs."""
+    from nl2sql.cli.demo.datasets import DEMO_QUESTIONS
+    from nl2sql.llm.replay import ReplayStore
+
+    _clear(monkeypatch)
+    monkeypatch.setenv("ANTHROPIC_API_KEY", FAKE_CLAUDE)
+    monkeypatch.setattr("nl2sql.cli.commands.demo.demo_command", _recording_demo(DEMO_QUESTIONS[:1]))
+    out = tmp_path / "out.json"
+
+    status = _load().main(["--env-file", str(tmp_path / "missing.env"), "--out", str(out),
+                           "--dir", str(tmp_path / "demo")])
+
+    assert status == 1
+    assert ReplayStore.load(out).covered(DEMO_QUESTIONS) == DEMO_QUESTIONS[:1]
+    printed = capsys.readouterr().out
+    assert f"Recorded 1 of {len(DEMO_QUESTIONS)}" in printed
+    for question in DEMO_QUESTIONS[1:]:
+        assert f"not recorded: {question}" in printed
+
+
+def test_recordings_left_from_an_earlier_run_are_not_taken_for_this_one(tmp_path, monkeypatch, capsys):
+    from nl2sql.cli.demo.datasets import DEMO_QUESTIONS
+    from nl2sql.llm.replay import Recording, ReplayStore
+
+    _clear(monkeypatch)
+    monkeypatch.setenv("ANTHROPIC_API_KEY", FAKE_CLAUDE)
+    project = tmp_path / "demo"
+    project.mkdir()
+    stale = project / "recordings.json"
+    ReplayStore([Recording("DecomposerResponse", q, {}) for q in DEMO_QUESTIONS]).save(stale)
+    import os
+    os.utime(stale, (1_000_000_000, 1_000_000_000))
+
+    def _stopped(**kwargs):
+        raise SystemExit(1)
+
+    monkeypatch.setattr("nl2sql.cli.commands.demo.demo_command", _stopped)
+    out = tmp_path / "out.json"
+
+    status = _load().main(["--env-file", str(tmp_path / "missing.env"), "--out", str(out),
+                           "--dir", str(project)])
+
+    assert status == 1
+    assert not out.exists()
+    assert "Nothing was recorded" in capsys.readouterr().err
+
+
 def test_output_is_made_safe_before_the_demo_writes_anything(tmp_path, monkeypatch):
     """The script is an entry point of its own: `main()` of the CLI never runs.
 

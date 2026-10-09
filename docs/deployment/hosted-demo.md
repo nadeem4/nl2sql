@@ -78,7 +78,13 @@ deliberate act, never part of CI. Either:
   prints the key), sets any OpenAI or OpenRouter key aside for the run, builds
   a fresh demo project, runs `nl2sql demo --record` through the recording proxy
   on Anthropic's own wire with the Anthropic preset's default model, and writes
-  `packages/nl2sql/src/nl2sql/cli/demo/recordings/chinook.json`. It exits `0`
+  `packages/nl2sql/src/nl2sql/cli/demo/recordings/chinook.json`. A question is
+  recorded only when its run succeeded -- rows, an answer, no error. A failed
+  run's recordings are dropped, because every model call is recorded as it
+  passes through the proxy and a run that failed in the aggregator would
+  otherwise still count (a real run once said "Recorded 20 of 20" with ten
+  failed). The file is written with the runs that succeeded, and every question
+  that was not recorded is listed with its error. It exits `0`
   when every guided question was recorded, `1` when some were not or when the
   demo stopped before recording (its indexing failed: `nl2sql demo --record`
   refuses to record answers given against no index, and nothing is written),

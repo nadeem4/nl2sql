@@ -256,7 +256,7 @@ def test_record_turns_the_plan_cache_off_so_every_planner_answer_is_recorded(tmp
     class _Recorder(_StubEngine):
         def run_query(self, *args, **kwargs):
             seen.append(settings.plan_cache_enabled)
-            return SimpleNamespace(status="success")
+            return SimpleNamespace(status="success", final_answer={"summary": "ok"}, errors=[])
 
     monkeypatch.setattr("nl2sql.cli.commands.demo.RecordingProxy", _Proxy)
     monkeypatch.setattr("nl2sql.cli.commands.demo._build_engine", lambda: _Recorder())

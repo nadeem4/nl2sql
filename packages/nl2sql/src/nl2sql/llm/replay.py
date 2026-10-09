@@ -85,6 +85,11 @@ class ReplayStore:
         else:
             self._recordings[existing] = recording
 
+    def discard(self, question: str) -> None:
+        """Drops every recording made for ``question``; catch-alls (``when=None``) stay."""
+        self._recordings = [r for r in self._recordings if r.when != question]
+        self._index = {(r.name, r.when): i for i, r in enumerate(self._recordings)}
+
     def covered(self, questions: Iterable[str]) -> List[str]:
         """The ``questions`` this store can start answering.
 

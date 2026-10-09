@@ -22,8 +22,14 @@ five model calls each). The ``Record demo answers`` workflow
 (``.github/workflows/record_demo.yml``) runs the same thing in CI from the
 ``ANTHROPIC_API_KEY`` repository secret and opens a pull request with the result.
 
+A question counts as recorded only when its run succeeded -- rows, an answer,
+no error. A failed run's recordings are dropped (a run that died in the
+aggregator still left its decomposer and planner calls behind, and a real run
+once reported "Recorded 20 of 20" with half of them failed), and every
+question that was not recorded is listed.
+
 Exit status: 0 when every guided question was recorded, 1 when some were not
-(the file is still written, with what was) or when the demo stopped before
+(the file is still written, with the runs that succeeded) or when the demo stopped before
 recording -- its indexing failed, say -- (nothing is written), 2 when there is
 no key or ``langchain-anthropic`` is not installed.
 """
@@ -37,6 +43,7 @@ import pathlib
 import shutil
 import sys
 import tempfile
+import time
 from typing import List, Optional
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -102,16 +109,21 @@ def main(argv: Optional[List[str]] = None) -> int:
         scratch = tempfile.mkdtemp(prefix="nl2sql-record-")
         directory = pathlib.Path(scratch) / "demo"
     cwd = os.getcwd()
+    recorded = directory.resolve() / "recordings.json"
+    started = time.time()
     try:
         try:
             demo.demo_command(directory=directory, host="127.0.0.1", port=0, no_browser=True, record=True)
         except SystemExit as exc:
-            # `demo --record` exits non-zero when it cannot record honestly --
-            # indexing failed, say -- after printing why.
-            print(f"nl2sql demo --record stopped (exit {exc.code}). Nothing was recorded "
-                  f"to {args.out}.", file=sys.stderr)
-            return 1
-        recorded = directory.resolve() / "recordings.json"
+            # `demo --record` exits 1 in two cases, after printing why. Either
+            # it stopped before recording (indexing failed, say) and wrote
+            # nothing, or some questions' runs failed: then it wrote the
+            # recordings of the runs that succeeded, and those are kept. A file
+            # older than this run is an earlier run's, not this one's.
+            if not recorded.is_file() or recorded.stat().st_mtime < started - 1:
+                print(f"nl2sql demo --record stopped (exit {exc.code}). Nothing was recorded "
+                      f"to {args.out}.", file=sys.stderr)
+                return 1
         store = ReplayStore.load(recorded)
         args.out.parent.mkdir(parents=True, exist_ok=True)
         store.save(args.out)

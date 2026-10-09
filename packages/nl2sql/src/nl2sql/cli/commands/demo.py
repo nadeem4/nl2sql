@@ -280,25 +280,57 @@ def _build_engine():
     return NL2SQL()
 
 
-def _record_all(engine, questions: List[str], proxy, store: ReplayStore, store_path: pathlib.Path) -> None:
-    """Drives every guided question through the proxy so replay has an answer."""
+def run_succeeded(result) -> bool:
+    """Whether a run answered: rows, an answer, and no error.
+
+    Only such a run is worth replaying. Every model call is recorded as it
+    passes through the proxy, so a run that failed later -- in the
+    aggregator, say -- still leaves recordings behind.
+    """
+    return (getattr(result, "status", "") == "success"
+            and bool(getattr(result, "final_answer", None))
+            and not getattr(result, "errors", None))
+
+
+def _record_all(engine, questions: List[str], proxy, store: ReplayStore, store_path: pathlib.Path) -> List[str]:
+    """Drives every guided question through the proxy so replay has an answer.
+
+    Returns the questions whose run did not succeed (:func:`run_succeeded`).
+    Their recordings are dropped before the file is written, so replay never
+    serves a half-run and the question counts as not recorded.
+    """
     from nl2sql.auth.models import UserContext
 
+    failed: List[str] = []
     for question in questions:
         result = engine.run_query(question, execute=True, user_context=UserContext(roles=["admin"]))
-        console.print(f"  [{result.status or 'unknown'}] {question}")
+        console.print(escape(f"  [{result.status or 'unknown'}] {question}"))
+        if not run_succeeded(result):
+            failed.append(question)
+            for error in getattr(result, "errors", None) or []:
+                message = error.get("message") if isinstance(error, dict) else str(error)
+                console.print(f"      {escape(str(message))}")
 
     if questions:
         # The denial path still calls the planner, so the last question has to be
         # asked as viewer too or replay has no recording for the rejected plan.
+        # It is meant to be refused, so its status is not a failure.
         denied = engine.run_query(
             questions[-1], execute=True, user_context=UserContext(roles=["viewer"])
         )
-        console.print(f"  [{denied.status or 'unknown'}] (as viewer) {questions[-1]}")
+        console.print(escape(f"  [{denied.status or 'unknown'}] (as viewer) {questions[-1]}"))
 
     proxy.stop()
+    for question in failed:
+        store.discard(question)
     store.save(store_path)
-    print_success(f"Recorded {len(store.rules())} responses to {store_path}")
+    print_success(f"Recorded {len(questions) - len(failed)} of {len(questions)} guided questions "
+                  f"({len(store.rules())} responses) to {store_path}")
+    if failed:
+        print_error(f"{len(failed)} runs failed and were not recorded:")
+        for question in failed:
+            console.print(f"  not recorded: {escape(question)}")
+    return failed
 
 
 @handle_cli_errors
@@ -467,7 +499,10 @@ def demo_command(
     roles = list(engine.context.policies_cfg.roles)
 
     if record:
-        _record_all(engine, questions, proxy, store, store_path)
+        if _record_all(engine, questions, proxy, store, store_path):
+            # The file is written with the runs that succeeded; the exit says
+            # that not every question was.
+            raise SystemExit(1)
         return
 
     app = build_app(

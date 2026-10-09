@@ -552,7 +552,10 @@ adding it; see
 `nl2sql demo --record` turns the cache off while recording, so every planner
 answer is captured. It also stops with exit `1`, recording nothing, when the
 demo's indexing fails: a plain `nl2sql demo` keeps going and offers Rebuild,
-but answers recorded against no index would be the wrong ones. See
+but answers recorded against no index would be the wrong ones. Only a
+question whose run succeeded (rows, an answer, no error) keeps its recordings;
+a failed run's are dropped, the question is listed as not recorded, and the
+command exits `1` after writing `recordings.json` with the rest. See
 [Determinism → The plan cache](../architecture/determinism.md#the-plan-cache-determinism-from-the-architecture).
 
 `--env <name>` loads `.env.<name>`. To point at an exact file instead, use
