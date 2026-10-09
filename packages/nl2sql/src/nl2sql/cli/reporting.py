@@ -51,8 +51,22 @@ class ConsolePresenter:
         live.start()
         return live
 
+    def _symbol(self, symbol: str, fallback: str) -> str:
+        """``symbol`` when the console's stream can encode it, else ``fallback``.
+
+        ``configure_output_encoding`` makes the CLI's own streams UTF-8, but a
+        caller that skips ``main()`` -- a script calling ``demo_command`` with
+        stdout redirected on Windows (cp1252) -- got a UnicodeEncodeError from
+        a check mark, which aborted whatever command was printing it.
+        """
+        try:
+            symbol.encode(self.console.encoding)
+        except (UnicodeEncodeError, LookupError):
+            return fallback
+        return symbol
+
     def finish_task_line(self, live: Live, message: str, success: bool = True) -> None:
-        label = "✓" if success else "✗"
+        label = self._symbol("✓", "[OK]") if success else self._symbol("✗", "[FAILED]")
         style = "green" if success else "red"
         live.update(Text(f"{label} {message}", style=style))
         live.stop()
@@ -64,7 +78,7 @@ class ConsolePresenter:
         self.console.print(f"[{style}]{escape(label)}[/{style}] {escape(str(message))}")
 
     def print_success(self, message: str) -> None:
-        self._print_labeled("✓", "green", message)
+        self._print_labeled(self._symbol("✓", "[OK]"), "green", message)
 
     def print_error(self, message: str) -> None:
         self._print_labeled("[ERROR]", "red", message)

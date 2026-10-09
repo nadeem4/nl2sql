@@ -186,3 +186,23 @@ def test_index_demo_data_reports_a_failed_run_instead_of_exiting(tmp_path, monke
     monkeypatch.setattr("nl2sql.context.NL2SQLContext", lambda **kwargs: object())
 
     assert manager.index_demo_data() is False
+
+
+def test_a_failed_index_is_not_fatal_by_default(project, calls, capsys):
+    """Plain `nl2sql demo` keeps going: the playground offers Rebuild."""
+    calls["result"] = False
+
+    demo_cmd.prepare_project(project)
+
+    assert "Indexing failed" in _plain(capsys.readouterr().out)
+
+
+def test_a_failed_index_is_fatal_when_one_is_required(project, calls, capsys):
+    """`demo --record` must not record answers given against no index."""
+    calls["result"] = False
+
+    with pytest.raises(SystemExit) as exc:
+        demo_cmd.prepare_project(project, require_index=True)
+
+    assert exc.value.code == 1
+    assert "Nothing was recorded" in _plain(capsys.readouterr().out)

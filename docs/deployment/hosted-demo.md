@@ -79,8 +79,13 @@ deliberate act, never part of CI. Either:
   a fresh demo project, runs `nl2sql demo --record` through the recording proxy
   on Anthropic's own wire with the Anthropic preset's default model, and writes
   `packages/nl2sql/src/nl2sql/cli/demo/recordings/chinook.json`. It exits `0`
-  when every guided question was recorded, `1` when some were not, `2` with no
-  key. Review the diff and commit it.
+  when every guided question was recorded, `1` when some were not or when the
+  demo stopped before recording (its indexing failed: `nl2sql demo --record`
+  refuses to record answers given against no index, and nothing is written),
+  `2` with no key or without `langchain-anthropic`
+  (`pip install "nl2sql-engine[anthropic]"`). Its output is safe to redirect
+  to a file on Windows: it makes stdout and stderr UTF-8 before the demo prints
+  anything. Review the diff and commit it.
 - **In CI**, Actions → **Record demo answers** → *Run workflow*
   (`.github/workflows/record_demo.yml`). It runs the same script with the
   repository secret **`ANTHROPIC_API_KEY`** and opens a pull request with the new

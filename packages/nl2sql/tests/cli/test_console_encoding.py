@@ -66,3 +66,35 @@ def test_the_entry_point_configures_the_encoding(monkeypatch):
     main()
 
     assert calls == ["configured", "app"]
+
+
+def test_the_presenter_degrades_its_symbols_when_the_stream_cannot_encode_them(monkeypatch):
+    """`scripts/record_demo_answers.py` calls `demo_command` without `main()`.
+
+    With stdout redirected to a file on Windows (cp1252) and no
+    ``configure_output_encoding``, the check mark in ``finish_task_line``
+    raised inside ``run_indexing``, so indexing "failed" and every question
+    then ran against no index. The presenter must never be what kills a command.
+    """
+    stream = _legacy_stdout(monkeypatch)
+    presenter = ConsolePresenter()
+
+    presenter.print_success("Indexing complete.")
+    presenter.finish_task_line(presenter.start_task_line("Indexing chinook..."), "chinook indexed")
+    presenter.finish_task_line(presenter.start_task_line("Indexing sales..."), "sales failed", success=False)
+    stream.flush()
+
+    written = stream.buffer.getvalue().decode("cp1252")
+    assert "[OK] Indexing complete." in written
+    assert "[OK] chinook indexed" in written
+    assert "[FAILED] sales failed" in written
+
+
+def test_the_presenter_keeps_its_symbols_on_a_utf8_stream(monkeypatch):
+    stream = io.TextIOWrapper(io.BytesIO(), encoding="utf-8")
+    monkeypatch.setattr(sys, "stdout", stream)
+
+    ConsolePresenter().print_success("Indexing complete.")
+    stream.flush()
+
+    assert "✓ Indexing complete." in stream.buffer.getvalue().decode("utf-8")

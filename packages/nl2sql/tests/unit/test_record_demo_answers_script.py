@@ -59,6 +59,65 @@ def test_no_key_records_nothing_and_says_so_without_running(tmp_path, monkeypatc
     assert "No ANTHROPIC_API_KEY" in capsys.readouterr().err
 
 
+def test_without_the_anthropic_extra_it_says_what_to_install_without_running(tmp_path, monkeypatch, capsys):
+    """It used to die deep in a traceback that asked to report a bug."""
+    import sys
+
+    _clear(monkeypatch)
+    monkeypatch.setenv("ANTHROPIC_API_KEY", FAKE_CLAUDE)
+    monkeypatch.setitem(sys.modules, "langchain_anthropic", None)  # find_spec reports it missing
+    ran = []
+    monkeypatch.setattr("nl2sql.cli.commands.demo.demo_command", lambda **kwargs: ran.append(kwargs))
+    out = tmp_path / "out.json"
+
+    status = _load().main(["--env-file", str(tmp_path / "missing.env"), "--out", str(out)])
+
+    assert status == 2
+    assert not ran
+    assert not out.exists()
+    assert 'pip install "nl2sql-engine[anthropic]"' in capsys.readouterr().err
+
+
+def test_a_failed_demo_run_fails_the_script_and_writes_nothing(tmp_path, monkeypatch, capsys):
+    """`demo --record` stops when indexing fails; the script must not report success."""
+    _clear(monkeypatch)
+    monkeypatch.setenv("ANTHROPIC_API_KEY", FAKE_CLAUDE)
+
+    def _failing(**kwargs):
+        raise SystemExit(1)
+
+    monkeypatch.setattr("nl2sql.cli.commands.demo.demo_command", _failing)
+    out = tmp_path / "out.json"
+
+    status = _load().main(["--env-file", str(tmp_path / "missing.env"), "--out", str(out)])
+
+    assert status == 1
+    assert not out.exists()
+    assert "Nothing was recorded" in capsys.readouterr().err
+
+
+def test_output_is_made_safe_before_the_demo_writes_anything(tmp_path, monkeypatch):
+    """The script is an entry point of its own: `main()` of the CLI never runs.
+
+    Redirected to a file on Windows, stdout is cp1252 and the demo's first
+    check mark killed indexing.
+    """
+    _clear(monkeypatch)
+    monkeypatch.setenv("ANTHROPIC_API_KEY", FAKE_CLAUDE)
+    calls = []
+    monkeypatch.setattr("nl2sql.cli.console.configure_output_encoding", lambda: calls.append("configured"))
+
+    def _demo(**kwargs):
+        calls.append("demo")
+        raise SystemExit(1)
+
+    monkeypatch.setattr("nl2sql.cli.commands.demo.demo_command", _demo)
+
+    _load().main(["--env-file", str(tmp_path / "missing.env"), "--out", str(tmp_path / "out.json")])
+
+    assert calls == ["configured", "demo"]
+
+
 def test_by_default_it_writes_the_file_the_engine_ships():
     module = _load()
 
