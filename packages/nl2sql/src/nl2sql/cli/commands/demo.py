@@ -173,12 +173,16 @@ _INDEX_STATE = {
 }
 
 
-def prepare_project(directory: pathlib.Path) -> pathlib.Path:
+def prepare_project(directory: pathlib.Path, require_index: bool = False) -> pathlib.Path:
     """Scaffolds the demo folder if needed and makes sure its index is usable.
 
     The index is judged by its contents (entries, and whether they match the
     latest schema snapshot), not by whether its folder exists: a folder with
     an empty collection once passed the old check on every start.
+
+    A failed index is not fatal by default -- the playground shows it and
+    offers Rebuild. ``require_index`` (``--record``) makes it exit 1 instead:
+    answers recorded against no index are the wrong answers.
     """
     directory.mkdir(parents=True, exist_ok=True)
     manager = DemoManager(console, directory)
@@ -197,6 +201,12 @@ def prepare_project(directory: pathlib.Path) -> pathlib.Path:
             "(first run downloads a 79 MB embedding model)"
         )
         if not manager.index_demo_data():
+            if require_index:
+                print_error(
+                    "Indexing failed, so --record stops here: answers recorded against no index "
+                    "would be wrong. Nothing was recorded. Fix the error above and run it again."
+                )
+                raise SystemExit(1)
             print_error(
                 "Indexing failed, so questions will fail until the index is rebuilt. "
                 "Any previous index is unchanged. Fix the error above, then press Rebuild "
@@ -356,7 +366,7 @@ def demo_command(
         raise SystemExit(1)
 
     preserved = {key: os.environ[key] for key in PROVIDER_KEYS if os.environ.get(key)}
-    directory = prepare_project(directory)
+    directory = prepare_project(directory, require_index=record)
     for key, value in preserved.items():
         if not os.environ.get(key):
             os.environ[key] = value

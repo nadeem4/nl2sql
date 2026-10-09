@@ -267,6 +267,21 @@ def test_record_turns_the_plan_cache_off_so_every_planner_answer_is_recorded(tmp
     assert seen and not any(seen)
 
 
+def test_record_stops_when_indexing_fails(tmp_path, monkeypatch):
+    """A recording made against no index records the wrong answers, so it stops."""
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-" + "fake-record-test")
+    monkeypatch.setattr("nl2sql.cli.commands.demo._ollama_reachable", lambda: False)
+    monkeypatch.setattr("nl2sql.cli.demo.manager.DemoManager.index_demo_data", lambda self: False)
+    built = []
+    monkeypatch.setattr("nl2sql.cli.commands.demo._build_engine", lambda: built.append(1))
+
+    result = runner.invoke(app, ["demo", "--dir", str(tmp_path / "d"), "--no-browser", "--record"])
+
+    assert result.exit_code == 1, result.output
+    assert not built
+    assert "Nothing was recorded" in " ".join(result.output.split())
+
+
 class _StubEngine:
     """Stands in for `NL2SQL()`; the command only reads policies off it."""
 

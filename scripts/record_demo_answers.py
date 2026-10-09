@@ -23,12 +23,15 @@ five model calls each). The ``Record demo answers`` workflow
 ``ANTHROPIC_API_KEY`` repository secret and opens a pull request with the result.
 
 Exit status: 0 when every guided question was recorded, 1 when some were not
-(the file is still written, with what was), 2 when there is no key.
+(the file is still written, with what was) or when the demo stopped before
+recording -- its indexing failed, say -- (nothing is written), 2 when there is
+no key or ``langchain-anthropic`` is not installed.
 """
 
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import os
 import pathlib
 import shutil
@@ -76,9 +79,22 @@ def main(argv: Optional[List[str]] = None) -> int:
               f"{args.env_file}. Nothing was recorded.", file=sys.stderr)
         return 2
 
-    from nl2sql.cli.commands.demo import demo_command
+    if importlib.util.find_spec("langchain_anthropic") is None:
+        from nl2sql.llm.wires.anthropic import EXTRA_HINT
+
+        print(f"Recording uses Claude, which needs langchain-anthropic. {EXTRA_HINT}. "
+              "Nothing was recorded.", file=sys.stderr)
+        return 2
+
+    from nl2sql.cli import console
+    from nl2sql.cli.commands import demo
     from nl2sql.cli.demo.datasets import DEMO_QUESTIONS
     from nl2sql.llm.replay import ReplayStore
+
+    # This script is an entry point of its own, so the CLI's `main()` -- which
+    # makes stdout and stderr UTF-8 -- never runs. Redirected to a file on
+    # Windows they are cp1252, and the demo's first check mark killed indexing.
+    console.configure_output_encoding()
 
     scratch = None
     directory = args.dir
@@ -87,7 +103,14 @@ def main(argv: Optional[List[str]] = None) -> int:
         directory = pathlib.Path(scratch) / "demo"
     cwd = os.getcwd()
     try:
-        demo_command(directory=directory, host="127.0.0.1", port=0, no_browser=True, record=True)
+        try:
+            demo.demo_command(directory=directory, host="127.0.0.1", port=0, no_browser=True, record=True)
+        except SystemExit as exc:
+            # `demo --record` exits non-zero when it cannot record honestly --
+            # indexing failed, say -- after printing why.
+            print(f"nl2sql demo --record stopped (exit {exc.code}). Nothing was recorded "
+                  f"to {args.out}.", file=sys.stderr)
+            return 1
         recorded = directory.resolve() / "recordings.json"
         store = ReplayStore.load(recorded)
         args.out.parent.mkdir(parents=True, exist_ok=True)
