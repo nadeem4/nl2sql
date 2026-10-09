@@ -4438,8 +4438,12 @@ error as OpenAI (see <a href="#temperature">Temperature</a>).</p>
   write, the only kind the engine asks for) unless the price gives its own
   <code>cache_write</code>.</li>
 </ul>
-<p><code>nl2sql demo --record</code> cannot record Claude: the recording proxy and replay
-speak the OpenAI wire format, so it asks for an OpenAI or OpenRouter key.</p>
+<p><code>nl2sql demo --record</code> records Claude too: with an Anthropic key the recording
+proxy speaks Anthropic's Messages API to <code>https://api.anthropic.com</code>, and stores
+each answer under the same name and question an OpenAI one would get, so replay
+(which answers on the OpenAI wire) serves it unchanged. The hosted demo's shipped
+recordings are made this way; see
+<a href="../../deployment/hosted-demo/#recorded-answers-without-a-key">Hosted demo</a>.</p>
 <h3 id="openrouter">OpenRouter</h3>
 <p><a href="https://openrouter.ai">OpenRouter</a> is an OpenAI-compatible gateway: a single
 API key reaches Anthropic, Google, Meta and hundreds of other models. Models are

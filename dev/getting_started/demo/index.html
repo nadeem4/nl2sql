@@ -4469,7 +4469,8 @@ instead of the OpenAI embeddings API. The first indexing run downloads roughly
 </ul>
 <p>Sharing the demo with other people is the one case where none of this applies:
 <code>nl2sql demo --hosted</code> serves the playground with <strong>no key on the server at
-all</strong>, and each visitor pastes their own into the page. See
+all</strong>, and each visitor pastes their own into the page; a visitor without one
+can replay the guided questions from recorded runs. See
 <a href="../../deployment/hosted-demo/">Hosted demo</a>.</p>
 <p>Because the demo indexes with <code>local</code> and the default environment indexes with
 <code>openai</code>, the two use different vector dimensions. <code>.env.demo</code> keeps its own
@@ -4724,8 +4725,11 @@ saved.
   with the key form itself: pick a provider, paste the key and <strong>Use this key</strong>,
   under three facts about it -- <strong>Stored</strong> in this browser tab only, <strong>Sent</strong>
   with each question in a request header, <strong>Never</strong> written to disk, logs or
-  traces. The question box and the suggestions stay closed until a key is in,
-  so a new visitor is not left to discover it by asking. Locally there is nothing to announce, and nothing is shown. See
+  traces. Nothing is held closed without a key: the guided questions the
+  server has recordings for are marked and answer from a recorded run,
+  labelled <strong>Recorded run</strong>, and any other question answers with a button to
+  Settings to add a key. With recordings the key form is folded under <strong>Use
+  your own key</strong>. Locally there is nothing to announce, and nothing is shown. See
   <a href="../../deployment/hosted-demo/">Hosted demo</a>.</p>
 </li>
 </ul>

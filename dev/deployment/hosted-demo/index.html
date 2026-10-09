@@ -2824,6 +2824,34 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#recorded-answers-without-a-key" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recorded answers without a key
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Recorded answers without a key">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#making-the-recordings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Making the recordings
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#what-the-visitors-key-does-and-does-not-do" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3999,6 +4027,34 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#recorded-answers-without-a-key" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recorded answers without a key
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Recorded answers without a key">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#making-the-recordings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Making the recordings
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#what-the-visitors-key-does-and-does-not-do" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4229,6 +4285,11 @@ gate that protects it.</p>
 <td>refused before the server starts</td>
 </tr>
 <tr>
+<td>a visitor with no key</td>
+<td>replay mode, if no key is configured</td>
+<td>the guided questions replay recorded runs; anything else asks for a key</td>
+</tr>
+<tr>
 <td>the sample databases</td>
 <td>read-only</td>
 <td>read-only</td>
@@ -4244,19 +4305,71 @@ gate that protects it.</p>
 </code></pre></div>
 <p><code>NL2SQL_DEMO_HOSTED=1</code> does the same thing without a command line, which is how
 a container turns it on.</p>
+<h2 id="recorded-answers-without-a-key">Recorded answers without a key</h2>
+<p>A visitor does not need a key to see the demo work. The guided questions are
+answered from <strong>recordings of real runs</strong>: every model step's actual reply to
+each guided question, captured once from a Claude model and shipped in the wheel
+at <code>nl2sql/cli/demo/recordings/chinook.json</code> (none ship until the first
+recording run below has been made and merged). At start-up the hosted server loads
+them into a replay server on loopback (the same <code>FakeLLMServer</code> local replay
+mode uses) and, for a question that carries no key:</p>
+<ul>
+<li><strong>a guided question with a recording</strong> runs the whole pipeline -- retrieval,
+  the checks, SQL generation and the query against the sample database are all
+  real and run now -- with each model step answered from the recording. The
+  response carries <code>"recorded": true</code>, and the page puts a <strong>Recorded run</strong>
+  badge beside the question, so nobody mistakes it for a live run. It is paced
+  by the per-minute limit but not counted against the session cap, since it
+  spends nothing.</li>
+<li><strong>anything else</strong> never runs. It answers <code>200</code> with <code>"replay_miss": true</code> and
+  the sentence "No recorded answer for this question. Add an API key to ask it
+  live."; the page shows that with an <strong>Add a key in Settings</strong> button.</li>
+</ul>
+<p>With a key, every question -- guided or not -- runs live on that key, exactly as
+before. <code>/api/meta</code> lists the questions that replay as <code>recorded</code>, and the page
+marks those chips with a dot.</p>
+<p><strong>If no recordings ship</strong> (the file is missing or covers no guided question),
+the keyless path still works: the chips and the question box stay open and
+every question answers with the key prompt. The console line at start-up says
+which: "N guided questions answer from recordings without a key", or "No
+recordings ship with this install".</p>
+<h3 id="making-the-recordings">Making the recordings</h3>
+<p>The recordings are made with a real Claude model, which costs money, so it is a
+deliberate act, never part of CI. Either:</p>
+<ul>
+<li><strong>Locally</strong>, from the repository root:</li>
+</ul>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>python<span class="w"> </span>scripts/record_demo_answers.py
+</code></pre></div>
+<p>It reads <code>ANTHROPIC_API_KEY</code> from the environment or, failing that, from the
+  repository root's <code>.env</code> (python-dotenv, the loader the engine uses; nothing
+  prints the key), sets any OpenAI or OpenRouter key aside for the run, builds
+  a fresh demo project, runs <code>nl2sql demo --record</code> through the recording proxy
+  on Anthropic's own wire with the Anthropic preset's default model, and writes
+  <code>packages/nl2sql/src/nl2sql/cli/demo/recordings/chinook.json</code>. It exits <code>0</code>
+  when every guided question was recorded, <code>1</code> when some were not, <code>2</code> with no
+  key. Review the diff and commit it.
+- <strong>In CI</strong>, Actions → <strong>Record demo answers</strong> → <em>Run workflow</em>
+  (<code>.github/workflows/record_demo.yml</code>). It runs the same script with the
+  repository secret <strong><code>ANTHROPIC_API_KEY</code></strong> and opens a pull request with the new
+  recordings. It only ever runs by hand.</p>
+<p><code>tests/e2e/test_record_demo_answers_fake_llm.py</code> runs the whole chain -- the
+script, the proxy on the Anthropic wire, a keyless hosted visitor replaying the
+result -- against a stand-in provider, so it is tested with no key and nothing
+spent.</p>
 <h2 id="what-the-visitors-key-does-and-does-not-do">What the visitor's key does, and does not do</h2>
-<p>A visitor who has not pasted one yet is told so before they ask. The <strong>Ask</strong>
-page opens on the key form itself: a provider choice, the key and <strong>Use this
-key</strong>, under three facts -- <strong>Stored</strong> in this browser tab only, <strong>Sent</strong> with
-each question in a request header, <strong>Never</strong> written to disk, logs or traces --
-and a link to <strong>Settings</strong> for a key per provider or a model per step; the
-question box and the suggested questions are disabled until
-there is a key, so a click cannot fail with a <code>401</code> the visitor had no way to
-see coming. The moment a key is saved the state clears and everything enables,
-with no reload. That state is the only place the point is made: until a key is
-saved the status pill in the top bar reads just <strong>Hosted demo · No key yet</strong>,
-and once there is one it names whose key answers (<strong>Hosted demo · OpenAI key
-in this tab</strong>), with the limits in its tooltip. None of this appears in local
+<p>A visitor without a key is told what they can do before they ask. The <strong>Ask</strong>
+page opens with the pitch and, when recordings ship, the guided questions
+straight under it, the recorded ones marked; the key form (a provider choice,
+the key and <strong>Use this key</strong>, under three facts -- <strong>Stored</strong> in this browser
+tab only, <strong>Sent</strong> with each question in a request header, <strong>Never</strong> written to
+disk, logs or traces) is folded under <strong>Use your own key</strong>, and open from the
+start when nothing is recorded. Nothing is disabled: a question nobody recorded
+comes back with the way to add a key. The moment a key is saved the block
+clears, with no reload. The status pill in the top bar reads <strong>Hosted demo ·
+Recorded runs</strong> (or <strong>Hosted demo · No key yet</strong> with nothing recorded), and
+once there is a key it names whose key answers (<strong>Hosted demo · OpenAI key in
+this tab</strong>), with the limits in its tooltip. None of this appears in local
 mode.</p>
 <p>The visitor pastes a key on the <strong>Settings</strong> page, one per provider. From there:</p>
 <ol>
@@ -4291,7 +4404,7 @@ Under <strong>Model for each step</strong> on the Settings page (open beside the
 visitor can put each of the five model-using steps on a provider and model of
 their own. The choice lives in the same tab's <code>sessionStorage</code> and travels with
 each question in one more header:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>X-NL2SQL-Models: {"astplanner":"anthropic:claude-opus-5"}
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>X-NL2SQL-Models: {"astplanner":"anthropic:claude-opus-5"}
 </code></pre></div>
 <p>A compact JSON object, agent name to <code>provider:model</code>, and nothing else; it
 carries no secret, which is why it is the one header the server parses and the
@@ -4325,10 +4438,9 @@ a single key has always worked.</p>
 <li>It does not reach your data. The hosted demo answers only from the three
   sample databases shipped with the engine.</li>
 </ul>
-<p>A question with no key at all answers <code>401</code> with a sentence telling the visitor
-to add one under Settings; the page holds the controls closed before it comes
-to that, so the <code>401</code> is the guard rather than the first thing a visitor meets.
-A malformed key answers <code>400</code> without quoting what was sent, and no refusal
+<p>A question with no key at all is never a <code>401</code>: it replays, or it is a replay
+miss that asks for a key (see <a href="#recorded-answers-without-a-key">above</a>). A
+malformed key answers <code>400</code> without quoting what was sent, and no refusal
 ever repeats something shaped like a key, not even when one was pasted into the
 model header by hand.</p>
 <h2 id="limits">Limits</h2>
@@ -4393,7 +4505,8 @@ process is cleared at start-up so nothing can fall back to it.</p>
 panel reports that the index was built before the demo started and which
 databases it covers, and where the button would be it prints the server's own
 reason -- rebuilding writes to disk and the sample data never changes.</p>
-<p><strong>On:</strong> asking the twenty guided questions or any other question, a key per
+<p><strong>On:</strong> the guided questions without a key, from recorded runs; asking them or
+any other question live with a key; a key per
 provider and a model per step (both kept by the browser), the schema view of
 any of the three databases (the rail's <strong>Showing</strong> switcher), which database
 answered a run, the per-node <strong>Debug</strong> drill-down with its traces, and the
@@ -4428,9 +4541,9 @@ time and the first question is answered at once:</p>
 default, which is what a Space routes to), and carries a healthcheck that polls
 <code>/api/meta</code>. <code>NL2SQL_DEMO_HOSTED=1</code> is set in the image, so hosted mode holds
 even if the command is overridden.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nb">cd</span><span class="w"> </span>deploy/huggingface
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>docker<span class="w"> </span>build<span class="w"> </span>-t<span class="w"> </span>nl2sql-demo<span class="w"> </span>.
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>docker<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>-p<span class="w"> </span><span class="m">7860</span>:7860<span class="w"> </span>nl2sql-demo
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nb">cd</span><span class="w"> </span>deploy/huggingface
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>docker<span class="w"> </span>build<span class="w"> </span>-t<span class="w"> </span>nl2sql-demo<span class="w"> </span>.
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>docker<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>-p<span class="w"> </span><span class="m">7860</span>:7860<span class="w"> </span>nl2sql-demo
 </code></pre></div>
 <p><code>docker compose up --build</code> in the same folder does it through
 <code>docker-compose.yml</code>, which builds the same image with the same settings.</p>
@@ -4605,8 +4718,8 @@ Space, so it works before the Space has built and while it is asleep.</p>
 <h3 id="regenerating-the-card">Regenerating the card</h3>
 <p>The card is rendered from <code>scripts/social_card.html</code>, which uses the
 playground's own colours and both of its typefaces. Edit that file, then:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nb">cd</span><span class="w"> </span>web/playground<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>npm<span class="w"> </span>ci<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nb">cd</span><span class="w"> </span>../..<span class="w">   </span><span class="c1"># the fonts the card borrows</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>python<span class="w"> </span>scripts/render_social_card.py
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nb">cd</span><span class="w"> </span>web/playground<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>npm<span class="w"> </span>ci<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nb">cd</span><span class="w"> </span>../..<span class="w">   </span><span class="c1"># the fonts the card borrows</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>python<span class="w"> </span>scripts/render_social_card.py
 </code></pre></div>
 <p>Headless Chrome shoots it at 1200x630 and the script writes the same bytes to
 both places that need them: <code>docs/assets/social-card.png</code>, which the Space's
@@ -4628,8 +4741,8 @@ See <a href="https://github.com/nadeem4/nl2sql/blob/main/web/playground/README.m
 <h2 id="running-it-locally-instead">Running it locally instead</h2>
 <p>Hosted mode exists to show the engine on our sample data. To ask questions of
 your own data, with no limits and a key that never leaves your machine:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"nl2sql-engine[demo]"</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>nl2sql<span class="w"> </span>demo
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"nl2sql-engine[demo]"</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>nl2sql<span class="w"> </span>demo
 </code></pre></div>
 <p>See <a href="../../getting_started/demo/">Demo</a>.</p>
 
