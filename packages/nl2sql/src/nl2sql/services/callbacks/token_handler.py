@@ -15,6 +15,12 @@ A detail the provider did not report is recorded as ``0``. A call whose result
 carries no usage at all is recorded with zero tokens and ``usage_reported=False``
 so a zero is never mistaken for a measurement. Cached and cache-write tokens are
 a subset of ``input_tokens``; reasoning tokens are a subset of ``output_tokens``.
+
+With a price for the model (``LLM_PRICES``), each part of the prompt is billed
+at its own rate: cache reads at ``cached_input``, cache writes at
+``cache_write`` (by default the input rate times the wire's
+``cache_write_multiplier``: 1.25 for Anthropic's 5-minute cache, 1 for OpenAI),
+and the rest at ``input``.
 """
 from __future__ import annotations
 
@@ -32,7 +38,8 @@ from nl2sql.common.metrics import token_usage_counter
 from nl2sql.llm.failures import redact_keys
 from nl2sql.llm.wires import wire_named
 
-# Per-model prices, per million tokens: {"input": .., "output": .., "cached_input": ..}.
+# Per-model prices, per million tokens:
+# {"input": .., "output": .., "cached_input": .., "cache_write": ..}.
 Prices = Mapping[str, Mapping[str, float]]
 
 _TOKEN_FIELDS = (
@@ -124,10 +131,15 @@ def _model_name(response: LLMResult) -> str:
     return str((response.llm_output or {}).get("model_name") or "")
 
 
-def _cost(call: LLMCallUsage, requested_model: str, prices: Optional[Prices]) -> Optional[float]:
+def _cost(call: LLMCallUsage, requested_model: str, prices: Optional[Prices],
+          cache_write_multiplier: float = 1.0) -> Optional[float]:
     """Price a call by its served model name, else by the configured one.
 
-    No prefix matching: ``gpt-4o`` must not price ``gpt-4o-mini``.
+    Cache reads cost ``cached_input`` (default ``input``); cache writes cost
+    ``cache_write``, by default the input rate times the wire's
+    ``cache_write_multiplier`` (1.25 on Anthropic). The rest of the prompt is
+    billed at ``input``. No prefix matching: ``gpt-4o`` must not price
+    ``gpt-4o-mini``.
     """
     if not prices:
         return None
@@ -135,9 +147,11 @@ def _cost(call: LLMCallUsage, requested_model: str, prices: Optional[Prices]) ->
     if not price or "input" not in price or "output" not in price:
         return None
     cached_price = price.get("cached_input", price["input"])
-    uncached = call.input_tokens - call.cached_input_tokens
+    write_price = price.get("cache_write", price["input"] * cache_write_multiplier)
+    uncached = max(call.input_tokens - call.cached_input_tokens - call.cache_write_input_tokens, 0)
     return round(
-        (uncached * price["input"] + call.cached_input_tokens * cached_price + call.output_tokens * price["output"])
+        (uncached * price["input"] + call.cached_input_tokens * cached_price
+         + call.cache_write_input_tokens * write_price + call.output_tokens * price["output"])
         / 1_000_000,
         8,
     )
@@ -198,7 +212,8 @@ class TokenUsageCallback(BaseCallbackHandler):
             error=redact_keys(str(error)) if error is not None else None,
             **(tokens or {}),
         )
-        call.cost = _cost(call, requested, self._prices)
+        wire = wire_named(_provider(response) if response is not None else None)
+        call.cost = _cost(call, requested, self._prices, wire.cache_write_multiplier)
         with self._lock:
             self._calls.append(call)
             self._by_run[run_id] = call

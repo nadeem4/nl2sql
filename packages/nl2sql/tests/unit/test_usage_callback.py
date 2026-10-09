@@ -3,6 +3,8 @@
 import uuid
 from unittest.mock import patch
 
+import pytest
+
 from langchain_core.messages import AIMessage
 from langchain_core.outputs import ChatGeneration, Generation, LLMResult
 
@@ -174,6 +176,48 @@ def test_cost_only_when_a_price_is_configured():
     assert usage.nodes["refiner"].cost is None
     # A partial sum would understate the bill, so the total is unknown too.
     assert usage.total.cost is None
+
+
+ANTHROPIC_WRITE_USAGE = {
+    # langchain-anthropic's input_tokens is the whole prompt: 200k uncached,
+    # 300k read from the cache and 500k written to it.
+    "input_tokens": 1_000_000, "output_tokens": 100_000, "total_tokens": 1_100_000,
+    "input_token_details": {"cache_read": 300_000, "cache_creation": 0,
+                            "ephemeral_5m_input_tokens": 500_000},
+}
+
+
+def _priced_call(prices, usage, model, provider):
+    cb = TokenUsageCallback(prices=prices)
+    run = uuid.uuid4()
+    _start(cb, "ast_planner", run, model=model)
+    cb.on_llm_end(_chat_result(usage, model=model, provider=provider), run_id=run)
+    [call] = cb.usage().calls
+    return call
+
+
+def test_an_anthropic_cache_write_is_priced_at_1_25x_input_by_default():
+    # Anthropic bills a 5-minute cache write at 1.25x the input rate (the
+    # engine writes only 5-minute entries) and a cache read at the cached rate.
+    prices = {"claude-opus-5": {"input": 5.0, "cached_input": 0.5, "output": 25.0}}
+    call = _priced_call(prices, ANTHROPIC_WRITE_USAGE, "claude-opus-5", "anthropic")
+    # 200k * 5 + 300k * 0.5 + 500k * 6.25 + 100k * 25, per million.
+    assert call.cost == pytest.approx(1.0 + 0.15 + 3.125 + 2.5)
+
+
+def test_a_configured_cache_write_price_wins():
+    prices = {"claude-opus-5": {"input": 5.0, "cached_input": 0.5, "cache_write": 10.0, "output": 25.0}}
+    call = _priced_call(prices, ANTHROPIC_WRITE_USAGE, "claude-opus-5", "anthropic")
+    assert call.cost == pytest.approx(1.0 + 0.15 + 5.0 + 2.5)
+
+
+def test_an_openai_cache_write_costs_the_input_rate():
+    # OpenAI charges nothing extra to write its automatic cache.
+    prices = {"gpt-4o": {"input": 2.5, "cached_input": 1.25, "output": 10.0}}
+    usage = {"input_tokens": 1_000_000, "output_tokens": 0, "total_tokens": 1_000_000,
+             "input_token_details": {"cache_read": 400_000, "cache_creation": 100_000}}
+    call = _priced_call(prices, usage, "gpt-4o", "openai")
+    assert call.cost == pytest.approx(1.5 + 0.5)
 
 
 def test_emits_the_otel_token_counter_per_token_type():

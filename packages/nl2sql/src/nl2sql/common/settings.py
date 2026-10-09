@@ -204,6 +204,8 @@ class Settings(BaseSettings):
         description=(
             "Optional per-model prices per million tokens, as JSON: "
             '{"gpt-4o": {"input": 2.5, "cached_input": 1.25, "output": 10}}. '
+            "Optional 'cache_write' prices cache writes; it defaults to input x 1.25 on "
+            "Claude and input on the OpenAI wire. "
             "Without a price for a model, usage reports tokens only (cost is null)."
         ),
     )

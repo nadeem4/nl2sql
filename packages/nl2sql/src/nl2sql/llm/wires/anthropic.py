@@ -34,6 +34,9 @@ class AnthropicWire:
     name = "anthropic"
     llm_type = "anthropic-chat"
     structured_output_method = "function_calling"
+    # Anthropic bills a 5-minute cache write at 1.25x the input rate (a 1-hour
+    # one at 2x, which CACHE_CONTROL never asks for).
+    cache_write_multiplier = 1.25
 
     def build_client(self, model: str, temperature: Optional[float], **kwargs: Any) -> BaseChatModel:
         try:

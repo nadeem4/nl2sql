@@ -111,7 +111,7 @@ providers. The check runs on the read path only, so the fix is simply to re-run
 | --- | --- | --- |
 | `OBSERVABILITY_EXPORTER` | `none` | Exporter for metrics/traces: `none`, `console`, `otlp`. |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | `—` | Endpoint for OTLP exporter. |
-| `LLM_PRICES` | `{}` | Optional per-model prices per million tokens, as JSON, e.g. `{"gpt-4o": {"input": 2.5, "cached_input": 1.25, "output": 10}}`. `cached_input` defaults to `input`. With no price for a model, `QueryResult.usage` reports tokens only and `cost` is `null`. No prices are built in. |
+| `LLM_PRICES` | `{}` | Optional per-model prices per million tokens, as JSON, e.g. `{"gpt-4o": {"input": 2.5, "cached_input": 1.25, "output": 10}}`. Optional `cached_input` (cache reads) defaults to `input`; optional `cache_write` (cache writes) defaults to `input` times the wire's write premium: 1.25 for Claude (`provider: anthropic`, whose 5-minute cache write Anthropic bills at 1.25x input) and 1 for the OpenAI wire. The rest of the prompt is billed at `input`. With no price for a model, `QueryResult.usage` reports tokens only and `cost` is `null`. No prices are built in. |
 | `TRACE_MODE` | `on_failure` | When to write a run trace: `off`, `on_failure` (errors, a retry, or an incomplete run) or `always`. `nl2sql demo` writes `always` into `.env.demo`. See [Debugging a Run](../observability/debugging.md). |
 | `TRACE_DIR` | `traces` | Directory run traces are written to, relative to the working directory. |
 | `TRACE_SAMPLE_ROWS` | `50` | Result rows kept in a trace. |

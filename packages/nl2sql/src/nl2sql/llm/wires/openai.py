@@ -81,6 +81,8 @@ class OpenAIWire:
     name = "openai"
     llm_type = "openai-chat"
     structured_output_method = "function_calling"
+    # Writing OpenAI's automatic cache costs nothing extra.
+    cache_write_multiplier = 1.0
 
     def build_client(self, model: str, temperature: Optional[float], **kwargs: Any) -> ConfiguredChatOpenAI:
         return build_chat_client(model, temperature, **kwargs)
