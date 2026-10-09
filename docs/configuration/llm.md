@@ -184,7 +184,10 @@ How the engine uses it:
   timeout.
 - **Usage.** Cache reads and writes are reported as `cached_input_tokens` and
   `cache_write_input_tokens`, with each input token counted once (see
-  [Query API → usage](../api/core/query.md)).
+  [Query API → usage](../api/core/query.md)). With `LLM_PRICES` set, a cache
+  write costs 1.25x the model's `input` rate (Anthropic's price for a 5-minute
+  write, the only kind the engine asks for) unless the price gives its own
+  `cache_write`.
 
 `nl2sql demo --record` cannot record Claude: the recording proxy and replay
 speak the OpenAI wire format, so it asks for an OpenAI or OpenRouter key.

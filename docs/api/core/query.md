@@ -173,7 +173,7 @@ been recorded, on a timed-out or cancelled run.
 | `reasoning_tokens` | `int` | Reasoning ("thinking") tokens (a subset of `output_tokens`). |
 | `total_tokens` | `int` | As the provider reports it; `input + output` if it does not. |
 | `latency_s` | `float` | Seconds spent waiting on the model, summed over calls. The node's wall-clock time, which includes its non-LLM work, is in `timings`. |
-| `cost` | `Optional[float]` | Only when `LLM_PRICES` prices every call counted here; otherwise `null`. |
+| `cost` | `Optional[float]` | Only when `LLM_PRICES` prices every call counted here; otherwise `null`. Cache reads are billed at `cached_input`, cache writes at `cache_write` (by default `input` x 1.25 on Claude, `input` on the OpenAI wire), the rest of `input_tokens` at `input` and `output_tokens` at `output`; see [System configuration](../../configuration/system.md). |
 
 `LLMCallUsage` has the same token fields plus `node`, `model` (the model the
 provider says served the call, e.g. `gpt-4o-2024-08-06`), `latency_s`, `cost`,

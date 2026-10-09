@@ -23,11 +23,15 @@ class Wire(Protocol):
         llm_type: The ``_llm_type`` of the client the adapter builds.
         structured_output_method: The ``with_structured_output`` method every
             node uses on this wire.
+        cache_write_multiplier: What writing a token to this wire's prompt
+            cache costs, as a multiple of the input rate. It prices a cache
+            write when ``LLM_PRICES`` gives the model no ``cache_write`` rate.
     """
 
     name: str
     llm_type: str
     structured_output_method: str
+    cache_write_multiplier: float
 
     def build_client(self, model: str, temperature: Optional[float], **kwargs: Any) -> BaseChatModel:
         """A client sending exactly the configured temperature, or none when it is None.
