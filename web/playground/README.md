@@ -4,21 +4,25 @@ The React source for the page `nl2sql demo` serves.
 
 ## Pages
 
-Four pages, named across the top of each of them by one header nav
-(`.nav`, one `#nav-ask`, `#nav-pipeline`, `#nav-settings`, `#nav-retrieval`
-link each). Every page states its title and one line saying what it does, then
-gives its content the full width.
+Five pages, named across the top of each of them by one header nav
+(`.nav`, one `#nav-home`, `#nav-ask`, `#nav-pipeline`, `#nav-settings`,
+`#nav-retrieval` link each). Every page but Home states its title and one line
+saying what it does, then gives its content the full width; Home is its own
+hero.
 
 | Route | Page | What it holds |
 | --- | --- | --- |
-| `#/` | Ask | the composer, the rail (Database, with a switcher for which database, then the Search index as one line) and the run |
+| `#/` | Home | `#home`: the front page (see [Home](#home) below) |
+| `#/ask` | Ask | the composer, the rail (Database, with a switcher for which database, then the Search index as one line) and the run |
 | `#/pipeline` | What runs a question | `#pipeline-panel`: every step, and which five call a model |
 | `#/settings` | Settings | `#settings-panel`: keys and a model per step |
 | `#/retrieval` | Retrieval inspector | `#retrieval-panel`: the inspector |
 
 `src/router.js` is the whole of it: `pageFromHash` reads the hash, `navItems`
 builds the nav, and `createRouter` follows `hashchange`. A route nobody serves
-reads as `#/`, so Back and Forward always land somewhere. The nav links are
+reads as `#/`, Home, so Back and Forward always land somewhere. A bare fragment
+from an older link (`#run`, `#question`, a station's id) named a place on Ask
+when Ask was `#/`, so it still opens Ask. The nav links are
 plain `<a href="#/...">`, so the keyboard reaches them and the browser keeps
 the history; the current one carries `aria-current="page"` and the accent under
 the top bar's rule. Nothing in the page links to a bare fragment -- the skip
@@ -97,6 +101,58 @@ nothing to do.
 
 `src/router.test.js` covers the default route, deep links, an unknown route,
 Back and Forward, and that routing touches nothing but the hash.
+
+## Home
+
+`#/` (`src/Home.jsx`, its words in `src/home.js` so `npm test` can hold each
+claim against what the playground does). Top to bottom:
+
+- **The hero**: the one eyebrow on the page (**Questions in, rows out**), the
+  promise as the h1, one sentence a line on a wide window, a lede, then three
+  actions. **Try a sample question** (`#home-try`) opens Ask and asks the first
+  guided question the server has a recorded answer for (`sampleQuestion`), so
+  on the hosted demo it answers with no key; with nothing recorded it asks the
+  first guided question, which answers with the key prompt. **Use your own
+  key** (`#home-key`) is `#/settings`. **See how it works** (`#home-how`) moves
+  focus to the path below rather than linking to a fragment. Under them three
+  facts (`#home-facts`, `facts`); the third depends on the server, and only
+  says a key is optional where something answers without one.
+- **The path** (`#how`): Question, Plan, Check, SQL, Rows, drawn as the run
+  spine laid on its side and with its marks: round for a step a model decides,
+  square for code, and the checks as the gate bar. Its line draws and the marks
+  fill in order on load, the page's one moment of motion (held still under
+  reduced motion). On a phone it stands up, like the spine on Ask.
+- **Three features**, alternating sides: **Ask, and get rows back**, **Watch
+  the plan become SQL** and **See what it looked up**, each with two points,
+  a link into its page and a clip.
+- **More**: run it locally (`pip install "nl2sql-engine[demo]"`, `nl2sql demo`),
+  the docs, the source; then a footer.
+
+**Clips** (`src/Clip.jsx`): a muted, looping, inline webm over its poster in
+the one raised card, with a 44px Pause / Play button. It follows
+`prefers-color-scheme`, swapping to the `-dark` recording and poster; under
+reduced motion it holds the poster until Play. A clip with no video yet (the
+request fails) shows its poster alone, with no button. The files are served by
+the app at `/clips/<name>` from
+`packages/nl2sql/src/nl2sql/cli/demo/playground/assets/clips/`, outside the
+bundle (which `npm run build` rewrites and which should not carry video) and
+named `<feature>[-dark].webm|jpg` for `ask`, `pipeline` and `retrieval`.
+
+They are recorded, not drawn:
+
+```bash
+pip install playwright && python -m playwright install chromium
+python scripts/record_home_clips.py
+```
+
+The script boots `nl2sql demo --hosted` with no key anywhere, drives each page
+in headless Chromium at 1280x800 and writes a webm and a poster per feature
+and theme (each well under 2 MB; a test holds that). Pipeline and Retrieval
+call no model, so they are always real. Ask shows a model's answer, so it is
+recorded only from a guided question with a shipped recording
+(`scripts/record_demo_answers.py`); until those ship it is a "Clip coming"
+poster in both themes. Actions → **Record demo answers** → *Run workflow*
+with `record: clips` runs the same script in CI and opens a pull request.
 
 ## What the page shows
 
@@ -369,7 +425,9 @@ box explains, Ask turning into Stop, the elapsed counter, the chip row),
 (model options, which nodes changed, which chosen models run without a
 temperature), `src/indexHealth.js` (entry counts in plain words, the status
 line, relative build times), `src/router.js` (which page a hash names, the nav
-rows, and the router over `hashchange`), `src/questions.js` (the guided
+rows, and the router over `hashchange`), `src/home.js` (the home page's words,
+its five steps, the sample question it asks and the facts it may claim),
+`src/questions.js` (the guided
 questions grouped by datasource), `src/firstRun.js` (what the hosted demo offers a
 visitor with no key: the recorded questions, the badge, the key prompt on a
 miss, and whose key answers once there is one),
@@ -400,7 +458,9 @@ pool bars, numeric columns, the CSV) and `src/feedback.js`
   checks and a live status, `--warn`, and `--fault` for real faults. Every text
   colour holds 4.5:1 on every ground in both themes.
 - **Type**: `--fs-1` to `--fs-6` (12 / 13.5 / 15 / 18 / 24 / 34px) and
-  `--fw-regular` / `--fw-medium` / `--fw-bold` (400 / 500 / 650). No other size
+  `--fw-regular` / `--fw-medium` / `--fw-bold` (400 / 500 / 650). Home's h1
+  (`.home-title`, up to 54px) is the one other exception besides the answer
+  sentence below. No other size
   is used, except the answer sentence on Ask: 28px (22px on a phone), so the
   answer is the largest text in a run.
 - **Spacing**: `--sp-1` to `--sp-8` (4 / 8 / 12 / 16 / 24 / 32 / 48 / 72px).

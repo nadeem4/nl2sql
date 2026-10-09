@@ -1669,3 +1669,159 @@ ol.chips.picks li { border-color: color-mix(in srgb, var(--accent) 45%, var(--ru
     background: var(--accent-fill); color: var(--accent-on); font-weight: var(--fw-bold);
   }
 }
+
+/* ---------- home ---------- */
+
+/* The front page. Flat on the paper like every page; the clips are the one
+   raised thing. Its single moment of motion is the question's path filling
+   in, step by step, the way a run fills the spine on Ask. */
+.home { max-width: 1120px; padding-top: var(--sp-7); }
+.home > section + section { margin-top: var(--sp-8); }
+
+.home-hero { display: grid; gap: var(--sp-4); justify-items: start; }
+.home-eyebrow {
+  font-size: var(--fs-1); font-weight: var(--fw-bold); letter-spacing: .06em; text-transform: uppercase; color: var(--accent);
+}
+/* The one size outside the type scale besides the answer sentence: the page's
+   own promise, set as large as the hero can carry in two lines. */
+.home-title {
+  margin: 0; max-width: 34ch; font-size: clamp(34px, 1.2rem + 3vw, 54px); line-height: 1.06;
+  font-weight: var(--fw-bold); letter-spacing: -.032em; text-wrap: balance;
+}
+@media (min-width: 1061px) { .home-title-line { display: block; } }
+.home-lede { margin: 0; max-width: 58ch; font-size: var(--fs-4); line-height: 1.5; color: var(--ink-2); text-wrap: pretty; }
+
+.home-ctas { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); margin-top: var(--sp-2); }
+.home-cta {
+  display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 var(--sp-5);
+  border-radius: var(--r-control); border: 1px solid transparent; font: inherit; font-size: var(--fs-3);
+  font-weight: var(--fw-bold); white-space: nowrap; text-decoration: none; cursor: pointer;
+  transition: transform var(--dur-press) var(--ease-out), background-color var(--dur-state) ease, border-color var(--dur-state) ease, color var(--dur-state) ease;
+}
+.home-cta:active { transform: scale(.98); }
+.home-cta.is-primary { background: var(--accent-fill); color: var(--accent-on); border-color: var(--accent-fill); }
+.home-cta.is-secondary { background: transparent; color: var(--ink); border-color: var(--rule-strong); }
+.home-cta.is-link {
+  padding: 0 var(--sp-2); background: none; color: var(--ink-2); font-weight: var(--fw-medium);
+  text-decoration: underline; text-underline-offset: 4px; text-decoration-color: var(--rule-strong);
+}
+@media (hover: hover) {
+  .home-cta.is-primary:hover { background: color-mix(in oklab, var(--accent-fill), var(--paper) 18%); }
+  .home-cta.is-secondary:hover { border-color: var(--ink); }
+  .home-cta.is-link:hover { color: var(--ink); text-decoration-color: currentColor; }
+}
+
+.home-facts {
+  list-style: none; margin: var(--sp-2) 0 0; padding: 0;
+  display: flex; flex-wrap: wrap; gap: var(--sp-1) 0; font-size: var(--fs-2); color: var(--ink-2);
+}
+.home-facts li + li::before {
+  content: ""; display: inline-block; width: 1px; height: 12px; margin: 0 var(--sp-3);
+  vertical-align: -1px; background: var(--rule-strong);
+}
+
+/* The question's path: the run page's spine laid on its side, with its marks.
+   Round is a step a model decides, square is code, and the checks are the
+   gate bar. */
+.home-path { scroll-margin-top: var(--sp-6); }
+.home-path:focus { outline: none; }
+.path {
+  position: relative; list-style: none; margin: 0; padding: 0;
+  display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--sp-4);
+}
+.path::before {
+  content: ""; position: absolute; left: 7px; right: 0; top: 7px; height: 2px; background: var(--rule);
+  transform-origin: left center;
+}
+.path-step { position: relative; display: grid; gap: var(--sp-1); padding-top: var(--sp-6); min-width: 0; }
+.path-mark, .path-key-mark {
+  width: 16px; height: 16px; border: 2px solid var(--ink); background: var(--paper); border-radius: 2px;
+}
+.path-mark { position: absolute; top: 0; left: 0; }
+.path-step[data-kind="model"] .path-mark, .path-key-mark[data-kind="model"] {
+  border-radius: 50%; background: var(--accent); border-color: var(--accent);
+}
+.path-step[data-gate] .path-mark { width: 24px; height: 10px; top: 3px; border-radius: 1px; background: var(--ink); }
+.path-name { font-size: var(--fs-4); font-weight: var(--fw-bold); letter-spacing: -.01em; }
+.path-what { font-size: var(--fs-2); color: var(--ink-2); text-wrap: pretty; }
+.path-key {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); margin: var(--sp-5) 0 0;
+  font-size: var(--fs-2); color: var(--ink-3);
+}
+.path-key-mark { display: inline-block; width: 12px; height: 12px; }
+.path-key-mark + .path-key-mark, .path-key-mark ~ .path-key-mark { margin-left: var(--sp-4); }
+@media (prefers-reduced-motion: no-preference) {
+  .path::before { animation: grow 640ms var(--ease-out) both; }
+  .path-mark { animation: mark-fill var(--dur-enter) var(--ease-out) both; animation-delay: calc(120ms + var(--i, 0) * 110ms); }
+  .path-step:nth-child(2) .path-mark { --i: 1; }
+  .path-step:nth-child(3) .path-mark { --i: 2; }
+  .path-step:nth-child(4) .path-mark { --i: 3; }
+  .path-step:nth-child(5) .path-mark { --i: 4; }
+}
+
+/* One section per page: the words on one side, the clip on the other. */
+.home-feature {
+  display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: var(--sp-7); align-items: center;
+}
+.home-feature[data-flip] { grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); }
+.home-feature[data-flip] .home-feature-copy { order: 2; }
+.home-feature-copy { display: grid; gap: var(--sp-3); justify-items: start; }
+.home-feature-copy h2 { margin: 0; font-size: var(--fs-5); line-height: 1.15; letter-spacing: -.02em; }
+.home-feature-copy p { margin: 0; max-width: 46ch; color: var(--ink); text-wrap: pretty; }
+.home-feature-copy ul { margin: 0; padding-left: 1.1em; display: grid; gap: var(--sp-1); color: var(--ink-2); font-size: var(--fs-2); max-width: 46ch; }
+.home-feature-copy li::marker { color: var(--ink-3); }
+.home-open {
+  display: inline-flex; align-items: center; min-height: 44px; margin-top: var(--sp-1);
+  font-weight: var(--fw-bold); color: var(--ink); text-decoration: underline; text-underline-offset: 5px;
+  text-decoration-color: var(--accent); text-decoration-thickness: 2px;
+}
+
+.clip { margin: 0; display: grid; gap: var(--sp-2); min-width: 0; }
+.clip-frame {
+  position: relative; aspect-ratio: 16 / 10; overflow: hidden;
+  border-radius: var(--r-raised); border: 1px solid var(--hair); background: var(--raised); box-shadow: var(--shadow);
+}
+.clip-media { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top left; }
+.clip-toggle {
+  position: absolute; right: var(--sp-3); bottom: var(--sp-3); width: 44px; height: 44px;
+  display: grid; place-items: center; border-radius: 50%; border: 1px solid var(--rule);
+  background: var(--raised); color: var(--ink);
+}
+@media (hover: hover) { .clip-toggle:hover { border-color: var(--ink); } }
+.clip-caption { font-size: var(--fs-2); color: var(--ink-2); }
+
+.home-more {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--sp-6);
+  padding-top: var(--sp-6); border-top: 1px solid var(--rule);
+}
+.home-more-item { display: grid; gap: var(--sp-2); align-content: start; min-width: 0; }
+.home-more-item p { margin: 0; font-size: var(--fs-2); color: var(--ink-2); }
+.home-more-link { margin: 0; font-size: var(--fs-3); font-weight: var(--fw-bold); color: var(--ink); }
+a.home-more-link { text-decoration: underline; text-underline-offset: 4px; text-decoration-color: var(--rule-strong); }
+.home-code {
+  margin: 0; padding: var(--sp-3) var(--sp-4); background: var(--well); border-radius: var(--r-well);
+  font-family: var(--mono); font-size: var(--fs-2); line-height: 1.7; overflow-x: auto;
+}
+
+.home-foot {
+  display: flex; flex-wrap: wrap; gap: var(--sp-2) var(--sp-5); margin-top: var(--sp-7); padding-top: var(--sp-4);
+  border-top: 1px solid var(--hair); font-size: var(--fs-2); color: var(--ink-3);
+}
+.home-foot a { color: var(--ink-2); }
+
+@media (max-width: 900px) {
+  .home { padding-top: var(--sp-5); }
+  .home > section + section { margin-top: var(--sp-7); }
+  .home-feature, .home-feature[data-flip] { grid-template-columns: minmax(0, 1fr); gap: var(--sp-5); }
+  .home-feature[data-flip] .home-feature-copy { order: 0; }
+  .home-more { grid-template-columns: minmax(0, 1fr); gap: var(--sp-5); }
+}
+/* On a phone the path stands up, like the spine on Ask. */
+@media (max-width: 640px) {
+  .path { grid-template-columns: minmax(0, 1fr); gap: var(--sp-4); }
+  .path::before { left: 7px; right: auto; top: 8px; bottom: 8px; width: 2px; height: auto; transform-origin: top center; }
+  .path-step { padding: 0 0 0 var(--sp-6); }
+  .path-step[data-gate] .path-mark { left: -4px; }
+  .home-ctas { flex-direction: column; align-items: stretch; }
+}
+@media (pointer: coarse) { .home-cta, .home-open { min-height: 44px; } }

@@ -1,11 +1,12 @@
 // Where you are in the playground, kept in the address bar.
 //
-// A route is a hash that starts with "#/": "#/" is the question and answer
-// view, "#/pipeline", "#/settings" and "#/retrieval" are pages of their own. So a reload
-// lands where you were and a link can be shared, with no server route to add.
-// Anything else -- a route nobody serves, or a bare fragment left by an older
-// link -- reads as the question and answer view, so Back and Forward always
-// land somewhere. Nothing in the page links to a bare fragment: the skip
+// A route is a hash that starts with "#/": "#/" is the home page, "#/ask" the
+// question and answer view, "#/pipeline", "#/settings" and "#/retrieval" pages
+// of their own. So a reload lands where you were and a link can be shared,
+// with no server route to add. A route nobody serves reads as the home page; a
+// bare fragment left by an older link (#run, #question, a station) was a place
+// on the Ask page when Ask was the default, so it still opens Ask. Back and
+// Forward always land somewhere. Nothing in the page links to a bare fragment: the skip
 // control and the index warning move focus instead, which keeps the hash a
 // route and keeps the history honest.
 //
@@ -15,8 +16,16 @@
 
 export const PAGES = [
   {
-    id: "ask",
+    id: "home",
     path: "/",
+    label: "Home",
+    title: "nl2sql playground",
+    description:
+      "Ask a database a question and see the typed plan, the checks and the SQL before any rows come back.",
+  },
+  {
+    id: "ask",
+    path: "/ask",
     label: "Ask",
     title: "Ask",
     description:
@@ -54,7 +63,10 @@ export const PAGES = [
   },
 ];
 
-export const DEFAULT_PAGE = "ask";
+export const DEFAULT_PAGE = "home";
+
+// Where a bare fragment from an older link lands: those all named places on Ask.
+const FRAGMENT_PAGE = "ask";
 
 const byId = new Map(PAGES.map((page) => [page.id, page]));
 const byPath = new Map(PAGES.map((page) => [page.path, page]));
@@ -73,7 +85,10 @@ function isRouteHash(hash) {
 }
 
 export function pageFromHash(hash) {
-  if (!isRouteHash(hash)) return DEFAULT_PAGE;
+  if (!isRouteHash(hash)) {
+    const bare = typeof hash === "string" ? hash.trim().replace(/^#/, "") : "";
+    return bare ? FRAGMENT_PAGE : DEFAULT_PAGE;
+  }
   let path = hash.trim().slice(1).toLowerCase();
   if (path.length > 1 && path.endsWith("/")) path = path.slice(0, -1);
   const page = byPath.get(path);

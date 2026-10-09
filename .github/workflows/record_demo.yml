@@ -6,10 +6,17 @@ name: Record demo answers
 #
 # It spends money on the ANTHROPIC_API_KEY repository secret, so it only ever
 # runs by hand: Actions -> Record demo answers -> Run workflow. Nothing else
-# triggers it.
+# triggers it. With `record: clips` it instead records the playground home
+# page's clips (scripts/record_home_clips.py), which needs no key at all.
 
 on:
   workflow_dispatch:
+    inputs:
+      record:
+        description: "answers (spends on ANTHROPIC_API_KEY) or clips (the home page's clips; no key, no model)"
+        type: choice
+        options: [answers, clips]
+        default: answers
 
 permissions:
   contents: write
@@ -21,6 +28,7 @@ concurrency:
 
 jobs:
   record-answers:
+    if: inputs.record == 'answers'
     runs-on: ubuntu-latest
     env:
       EMBEDDING_PROVIDER: local
@@ -71,3 +79,54 @@ jobs:
           gh pr create --base main --head "$branch" \
             --title "chore(demo): record the guided questions' answers for the hosted demo" \
             --body "Recorded by the Record demo answers workflow (run ${GITHUB_RUN_ID}) with the Anthropic preset's default model. A visitor to the hosted demo without a key is answered from these for the guided questions. Review the plans and answers before merging."
+
+  # The home page's clips. No key and no model: the demo runs hosted with no
+  # key, Ask is recorded from the shipped recordings (or left as a "Clip
+  # coming" poster when there are none), Pipeline and Retrieval call no model.
+  record-clips:
+    if: inputs.record == 'clips'
+    runs-on: ubuntu-latest
+    env:
+      EMBEDDING_PROVIDER: local
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install packages and Chromium
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e packages/adapter-sdk -e "packages/nl2sql[demo]" -e packages/api playwright
+          python -m playwright install --with-deps chromium
+
+      - name: Cache the local embedding model
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/chroma
+          key: chroma-onnx-all-MiniLM-L6-v2
+
+      - name: Record the clips
+        run: python scripts/record_home_clips.py
+
+      - name: Open a pull request with the clips
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          dir=packages/nl2sql/src/nl2sql/cli/demo/playground/assets/clips
+          if [ -z "$(git status --porcelain -- "$dir")" ]; then
+            echo "The clips are unchanged; no pull request."
+            exit 0
+          fi
+          branch="recordings/home-clips-${GITHUB_RUN_ID}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+          git add -A -- "$dir"
+          git commit -m "chore(playground): record the home page's clips"
+          git push origin "$branch"
+          gh pr create --base main --head "$branch" \
+            --title "chore(playground): record the home page's clips" \
+            --body "Recorded by the Record demo answers workflow (clips, run ${GITHUB_RUN_ID}) against the hosted demo with no key. Check each poster and clip before merging."

@@ -7,6 +7,8 @@ import Run from "./Panes.jsx";
 import Settings from "./Settings.jsx";
 import Pipeline from "./Pipeline.jsx";
 import RetrievalInspector from "./Retrieval.jsx";
+import Home from "./Home.jsx";
+import { sampleQuestion } from "./home.js";
 import { answeredDatasources, datasourceNames } from "./datasources.js";
 import { guidedGroups } from "./questions.js";
 import { needsKey } from "./firstRun.js";
@@ -290,6 +292,16 @@ export default function App() {
   };
 
   // Stop aborts the request; the server sees it drop and cancels the run.
+  // Home's "Try a sample question": open Ask and ask one, a recorded one when
+  // the server has some, so it answers with no key on the hosted demo.
+  const trySample = () => {
+    const q = sampleQuestion(meta);
+    window.location.hash = hashFor("ask");
+    if (!q) return;
+    const group = ((meta && meta.question_groups) || []).find((g) => (g.questions || []).includes(q));
+    ask(q, group ? group.datasource : undefined);
+  };
+
   const stop = () => {
     if (abortRef.current) abortRef.current.abort();
   };
@@ -393,16 +405,18 @@ export default function App() {
         </p>
       )}
 
-      <main className="page" id="page" ref={pageRef} tabIndex={-1} aria-labelledby="page-title">
+      <main className="page" id="page" ref={pageRef} tabIndex={-1}
+        aria-labelledby={page === "home" ? "home-title" : "page-title"}>
+        {page === "home" && <Home meta={meta} onTry={trySample} />}
         {/* On Ask the open tab already says where you are; the heading stays
-            for the page's label and for screen readers. */}
-        <div className={onAsk ? "page-head visually-hidden" : "page-head"}>
+            for the page's label and for screen readers. Home has its own. */}
+        {page !== "home" && <div className={onAsk ? "page-head visually-hidden" : "page-head"}>
           <h1 id="page-title">{current.title}</h1>
           <p className="page-lede">
             {(hosted && current.hostedDescription) || current.description}
           </p>
           {current.note && <p className="page-note">{current.note}</p>}
-        </div>
+        </div>}
 
         {onAsk && (
           <div className="layout">

@@ -150,6 +150,46 @@ def test_the_built_page_labels_recorded_runs_and_offers_a_key_on_a_miss():
         assert text in html, text
 
 
+def test_the_built_page_has_the_home_page():
+    client = TestClient(build_app(_Engine(), questions=[], roles=["admin"], mode="live", dataset="chinook"))
+    html = client.get("/").text
+    for text in ("Questions in, rows out",
+                 "Ask your database a question. See the plan before it becomes SQL.",
+                 "Try a sample question", "Use your own key", "See how it works",
+                 "Ask, and get rows back", "Watch the plan become SQL", "See what it looked up",
+                 "Run it on your machine", "https://nadeem4.github.io/nl2sql/", "#/ask"):
+        assert text in html, text
+
+
+def test_clips_are_served_from_the_package_and_nothing_else_is(monkeypatch, tmp_path):
+    from nl2sql.cli.demo.playground import app as playground
+
+    (tmp_path / "ask.jpg").write_bytes(b"\xff\xd8\xff poster")
+    (tmp_path / "ask.webm").write_bytes(b"\x1a\x45\xdf\xa3 clip")
+    monkeypatch.setattr(playground, "CLIPS_DIR", tmp_path)
+    client = TestClient(build_app(_Engine(), questions=[], roles=["admin"], mode="live", dataset="chinook"))
+
+    poster = client.get("/clips/ask.jpg")
+    video = client.get("/clips/ask.webm")
+
+    assert poster.status_code == 200 and poster.headers["content-type"] == "image/jpeg"
+    assert video.status_code == 200 and video.headers["content-type"] == "video/webm"
+    assert client.get("/clips/pipeline.webm").status_code == 404
+    for bad in ("..%2Fapp.py", "ask.py", "ASK.jpg", "a%2Fb.jpg"):
+        assert client.get(f"/clips/{bad}").status_code == 404, bad
+
+
+def test_the_shipped_clips_are_small_and_come_in_pairs():
+    """Each feature has a light and a dark poster; a recorded clip stays under 2 MB."""
+    from nl2sql.cli.demo.playground.app import CLIPS_DIR
+
+    for feature in ("ask", "pipeline", "retrieval"):
+        for suffix in ("", "-dark"):
+            assert (CLIPS_DIR / f"{feature}{suffix}.jpg").is_file(), f"{feature}{suffix}.jpg"
+    for clip in CLIPS_DIR.glob("*.webm"):
+        assert clip.stat().st_size < 2 * 1024 * 1024, clip.name
+
+
 def test_schema_route_reads_the_engine_snapshot():
     engine = _Engine(snapshot=_snapshot())
     client = TestClient(build_app(engine, questions=[], roles=["admin"], mode="replay", dataset="chinook"))

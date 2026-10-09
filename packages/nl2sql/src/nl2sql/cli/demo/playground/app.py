@@ -1,10 +1,11 @@
 """The playground FastAPI app.
 
-Sixteen routes:
+Seventeen routes:
 
 ``GET  /``                     the built React page, with the link preview's
                                tags in its head (see :mod:`preview`)
 ``GET  /social-card.png``      the 1200x630 card those tags name
+``GET  /clips/{name}``         the home page's clips: a webm or poster jpg per feature and theme
 ``GET  /api/meta``             mode, dataset, every registered datasource, the guided
                                questions (flat, and grouped by datasource), the roles
                                and how many guided questions have replay recordings
@@ -51,6 +52,7 @@ from __future__ import annotations
 
 import asyncio
 import pathlib
+import re
 import threading
 from collections import OrderedDict
 from importlib.resources import files
@@ -104,6 +106,14 @@ def _replay_miss() -> Dict[str, Any]:
 DISCONNECT_POLL_SECONDS = 0.25
 
 STATIC_DIR = pathlib.Path(str(files("nl2sql.cli.demo.playground") / "static"))
+
+# The home page's clips: a light and a dark webm and poster per feature,
+# recorded by scripts/record_home_clips.py. They sit beside the page rather
+# than inside it, so the bundle does not carry megabytes of video, and outside
+# `static/`, which `npm run build` empties.
+CLIPS_DIR = pathlib.Path(str(files("nl2sql.cli.demo.playground") / "assets" / "clips"))
+CLIP_NAME = re.compile(r"^[a-z]+(-dark)?\.(webm|jpg)$")
+CLIP_TYPES = {"webm": "video/webm", "jpg": "image/jpeg"}
 
 # The long version of what the Pipeline page summarises. The playground is
 # served from a pip install, so a repository-relative path would not resolve.
@@ -356,6 +366,15 @@ def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset
         if not CARD.is_file():
             raise HTTPException(status_code=404, detail="No preview card in this install.")
         return FileResponse(CARD, media_type="image/png")
+
+    @app.get("/clips/{name}", include_in_schema=False)
+    def clip(name: str) -> FileResponse:
+        """One of the home page's clips. The name is a plain token, so no path
+        can lead outside the clips folder."""
+        path = CLIPS_DIR / name
+        if not CLIP_NAME.match(name) or not path.is_file():
+            raise HTTPException(status_code=404, detail="No such clip.")
+        return FileResponse(path, media_type=CLIP_TYPES[name.rsplit(".", 1)[1]])
 
     # One group per datasource that has guided questions, in the order given.
     groups = [{"datasource": ds, "questions": list(qs)}

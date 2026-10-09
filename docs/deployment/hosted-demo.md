@@ -84,7 +84,9 @@ deliberate act, never part of CI. Either:
 - **In CI**, Actions → **Record demo answers** → *Run workflow*
   (`.github/workflows/record_demo.yml`). It runs the same script with the
   repository secret **`ANTHROPIC_API_KEY`** and opens a pull request with the new
-  recordings. It only ever runs by hand.
+  recordings. It only ever runs by hand. The same workflow with `record: clips`
+  re-records the playground home page's clips, which needs no key: Ask's clip is
+  made from these recordings, so record the answers first.
 
 `tests/e2e/test_record_demo_answers_fake_llm.py` runs the whole chain -- the
 script, the proxy on the Anthropic wire, a keyless hosted visitor replaying the

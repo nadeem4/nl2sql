@@ -38,12 +38,16 @@ test("every page has a route, a label, a title and one line saying what it does"
   assert.ok(PAGES.some((p) => p.id === DEFAULT_PAGE));
 });
 
-test("the default route is the question and answer view", () => {
+test("the default route is the home page, and Ask has a route of its own", () => {
+  assert.equal(DEFAULT_PAGE, "home");
   for (const hash of ["", "#", "#/", "#/ "]) {
-    assert.equal(pageFromHash(hash), DEFAULT_PAGE, `${JSON.stringify(hash)} is not the default`);
+    assert.equal(pageFromHash(hash), "home", `${JSON.stringify(hash)} is not the default`);
   }
-  assert.equal(pageFromHash(undefined), DEFAULT_PAGE);
-  assert.equal(hashFor(DEFAULT_PAGE), "#/");
+  assert.equal(pageFromHash(undefined), "home");
+  assert.equal(hashFor("home"), "#/");
+  assert.equal(hashFor("ask"), "#/ask");
+  assert.equal(pageFromHash("#/ask"), "ask");
+  assert.equal(pageFromHash("#/ask/"), "ask");
 });
 
 test("a deep link opens the page it names", () => {
@@ -56,9 +60,17 @@ test("a deep link opens the page it names", () => {
   assert.equal(pageFor("settings").title, "Settings");
 });
 
-test("an unknown route falls back to the question and answer view", () => {
+test("an unknown route falls back to the home page", () => {
   for (const hash of ["#/nope", "#/settings/extra", "#/index", "#//"]) {
-    assert.equal(pageFromHash(hash), DEFAULT_PAGE, `${hash} should fall back`);
+    assert.equal(pageFromHash(hash), "home", `${hash} should fall back`);
+  }
+});
+
+test("an old link to a place on the Ask page still opens Ask", () => {
+  // Before the home page, Ask was the default, and a bookmark carrying one of
+  // its bare fragments (#run, #question, a station) landed on it. It still does.
+  for (const hash of ["#run", "#question", "#pane-sql", "#index-rebuild"]) {
+    assert.equal(pageFromHash(hash), "ask", `${hash} should open Ask`);
   }
 });
 
@@ -68,16 +80,17 @@ test("back and forward move between pages", () => {
   const seen = [];
   router.subscribe((page) => seen.push(page));
 
-  assert.equal(router.page(), "ask");
+  assert.equal(router.page(), "home");
+  win.go("#/ask");
   win.go("#/settings");
   win.go("#/retrieval");
   // Back, then back again: the browser restores the earlier hash.
   win.go("#/settings");
-  win.go("#/");
+  win.go("#/ask");
   // Forward.
   win.go("#/settings");
 
-  assert.deepEqual(seen, ["settings", "retrieval", "settings", "ask", "settings"]);
+  assert.deepEqual(seen, ["ask", "settings", "retrieval", "settings", "ask", "settings"]);
   assert.equal(router.page(), "settings");
 });
 
@@ -89,7 +102,7 @@ test("a deep link is the page the router starts on", () => {
 
 test("a bare fragment lands on the question and answer view, so Back always moves", () => {
   // Nothing in the page links to a bare fragment, but an older bookmark can
-  // still carry one. It reads as the default page rather than sticking.
+  // still carry one. It reads as Ask, where those fragments lived.
   const win = fakeWindow("#/settings");
   const router = createRouter(win);
   const seen = [];
@@ -106,18 +119,18 @@ test("moving to another page and back keeps the run: the router touches nothing 
   // The question, the answer and the Debug choice are held above the page
   // switch, so the router never sees them. Frozen here: a write would throw.
   const run = Object.freeze({ question: "Which genre sells the most tracks?", answer: "Rock", debug: true });
-  const win = fakeWindow("#/");
+  const win = fakeWindow("#/ask");
   const router = createRouter(win);
   const seen = [];
   router.subscribe((page) => seen.push(page));
 
   win.go("#/settings");
-  win.go("#/");
+  win.go("#/ask");
 
   assert.deepEqual(seen, ["settings", "ask"]);
   assert.equal(router.page(), "ask");
   assert.deepEqual(run, { question: "Which genre sells the most tracks?", answer: "Rock", debug: true });
-  assert.equal(win.location.hash, "#/");
+  assert.equal(win.location.hash, "#/ask");
 });
 
 test("leaving stops listening, so a stale page hears nothing", () => {
@@ -138,7 +151,8 @@ test("the nav names every page, marks the current one and says which are off", (
   const items = navItems("settings", { retrieval: true });
 
   assert.deepEqual(items.map((i) => i.id), PAGES.map((p) => p.id));
-  assert.deepEqual(items.map((i) => i.href), ["#/", "#/pipeline", "#/settings", "#/retrieval"]);
+  assert.deepEqual(items.map((i) => i.href), ["#/", "#/ask", "#/pipeline", "#/settings", "#/retrieval"]);
+  assert.deepEqual(items.map((i) => i.label), ["Home", "Ask", "Pipeline", "Settings", "Retrieval"]);
   assert.equal(items.filter((i) => i.current).length, 1);
   assert.equal(items.find((i) => i.id === "settings").current, true);
   // An off page keeps its place in the nav: it opens and says why.
@@ -149,7 +163,7 @@ test("the nav names every page, marks the current one and says which are off", (
 
 test("nothing is marked off before the server has answered", () => {
   const items = navItems("ask", {});
-  assert.deepEqual(items.map((i) => i.off), [false, false, false, false]);
+  assert.deepEqual(items.map((i) => i.off), [false, false, false, false, false]);
   assert.equal(items.find((i) => i.id === "ask").current, true);
 });
 
