@@ -140,6 +140,7 @@ class DecomposerNode:
             allowed_ids = set(resolver_response.allowed_datasource_ids)
             unsupported_ids = set(resolver_response.unsupported_datasource_ids)
             id_map: Dict[str, str] = {}
+            id_counts: Dict[str, int] = {}
 
             for llm_sq in llm_response.sub_queries:
                 datasource_id = (llm_sq.datasource_id or "").strip() or None
@@ -186,6 +187,13 @@ class DecomposerNode:
                         "expected_schema": [c.model_dump() for c in llm_sq.expected_schema],
                     },
                 )
+                # Identical sub-queries hash to the same id. Each is still a
+                # sub-query of its own -- a combine group may name both -- so a
+                # repeat takes the next ordinal: sq_<hash>, sq_<hash>_2, ...
+                seen = id_counts.get(stable_id, 0) + 1
+                id_counts[stable_id] = seen
+                if seen > 1:
+                    stable_id = f"{stable_id}_{seen}"
                 id_map[llm_sq.id] = stable_id
                 sq = SubQuery(
                     id=stable_id,
@@ -245,11 +253,9 @@ class DecomposerNode:
 
             # The execution DAG is a pure function of this response, so it is
             # built here rather than in a node of its own. It has its own
-            # failure: a decomposition can be well-formed and still not make a
-            # runnable graph (two identical sub-queries share one stable id, so
-            # the graph they describe has a node with two of everything). The
-            # response is returned either way -- the layer router ends a run
-            # with no DAG, leaving this error as its cause.
+            # failure, the last line of defence before the router walks the
+            # layers. The response is returned either way -- the layer router
+            # ends a run with no DAG, leaving this error as its cause.
             try:
                 execution_dag = build_execution_dag(response)
             except Exception as exc:

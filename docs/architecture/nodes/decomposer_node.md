@@ -75,6 +75,7 @@ Side effects:
 4. For each LLM sub‑query:
    - Validate datasource existence and RBAC allowance.
    - Assign deterministic ID via `_stable_id()`, over the intent, metrics, filters, group_by, order_by, limit and expected schema.
+   - Two sub-queries the model wrote identically hash to the same ID, but each is still a sub-query of its own (a combine group may name both), so a repeat takes the next ordinal: `sq_<hash>`, `sq_<hash>_2`, and so on. Both run, and the DAG gets one scan node per sub-query. Before this, the shared ID gave the DAG one node id for two nodes, and the run ended with `PLANNER_FAILED` ("contains a cycle").
    - Attach schema version.
 5. Remap combine groups to stable sub‑query IDs.
 6. Assign deterministic IDs to post‑combine ops.
@@ -103,7 +104,7 @@ Key contracts:
 
 ## Determinism Guarantees
 
-- Stable IDs are generated via SHA‑256 hash of sub‑query content.
+- Stable IDs are generated via SHA‑256 hash of sub‑query content; identical sub‑queries are told apart by an ordinal suffix (`_2`, `_3`, ...).
 - Ordering of outputs is explicitly sorted.
 - LLM output is non‑deterministic unless configured deterministically.
 

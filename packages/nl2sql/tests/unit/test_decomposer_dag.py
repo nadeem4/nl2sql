@@ -325,17 +325,88 @@ def test_the_dag_unknown_subquery_in_combine_returns_error():
         )
 
 
+def _decompose_with_fake_llm(payload):
+    """Runs the decomposer against ``FakeLLMServer`` answering ``payload``.
+
+    A real OpenAI client parses the answer, so this is the path a run takes.
+    """
+    from types import SimpleNamespace
+
+    from nl2sql.llm import LLMRegistry
+    from nl2sql.llm.models import AgentConfig
+    from nl2sql.pipeline.nodes.datasource_resolver.schemas import (
+        DatasourceResolverResponse,
+        ResolvedDatasource,
+    )
+    from nl2sql.pipeline.nodes.decomposer.node import DecomposerNode
+    from nl2sql.pipeline.state import GraphState
+    from nl2sql.secrets import SecretManager
+    from nl2sql.testing.fake_llm import FakeLLMServer, Rule
+
+    server = FakeLLMServer([Rule("DecomposerResponse", payload)]).start()
+    try:
+        registry = LLMRegistry(SecretManager())
+        registry.register_llm(AgentConfig(provider="openai", model="gpt-4o", api_key="sk-fake",
+                                          base_url=server.base_url, name="default"))
+        node = DecomposerNode(SimpleNamespace(llm_registry=registry))
+        return node(GraphState(
+            user_query="customers per country, twice",
+            datasource_resolver_response=DatasourceResolverResponse(
+                resolved_datasources=[ResolvedDatasource(datasource_id="chinook", schema_version="v1")],
+                allowed_datasource_ids=["chinook"],
+            ),
+        ))
+    finally:
+        server.stop()
+
+
+_TWIN = {"datasource_id": "chinook", "intent": "customers per country",
+         "group_by": [{"attribute": "country"}],
+         "metrics": [{"name": "customer_count", "aggregation": "count"}]}
+
+
+def test_two_identical_sub_queries_still_make_a_runnable_dag():
+    """Two sub-queries the model wrote identically are two scans, not one.
+
+    Their ids are content-addressed, so they used to collide: the graph had
+    one node id for two nodes, the layered sort counted it once and reported a
+    cycle, and the run ended with ``PLANNER_FAILED``. Each now gets its own id
+    and the combine group keeps both inputs.
+    """
+    twins = {
+        "sub_queries": [{"id": "a", **_TWIN}, {"id": "b", **_TWIN}],
+        "combine_groups": [{"group_id": "g1", "operation": "union",
+                            "inputs": [{"subquery_id": "a", "role": "left"},
+                                       {"subquery_id": "b", "role": "right"}]}],
+    }
+
+    result = _decompose_with_fake_llm(twins)
+
+    assert not result.get("errors")
+    sub_queries = result["decomposer_response"].sub_queries
+    assert len(sub_queries) == 2
+    first, second = (sq.id for sq in sub_queries)
+    assert first != second
+    [group] = result["decomposer_response"].combine_groups
+    assert {i.subquery_id for i in group.inputs} == {first, second}
+    dag = result["execution_dag"]
+    assert dag.layers == [sorted([first, second]), ["combine_g1"]]
+
+    # The same decomposition gives the same ids every time.
+    again = _decompose_with_fake_llm(twins)
+    assert [sq.id for sq in again["decomposer_response"].sub_queries] == [first, second]
+
+
 def test_a_dag_that_cannot_be_built_ends_the_run_with_its_error():
     """A DAG failure is reported, never raised through the graph.
 
-    Two sub-queries the model wrote identically get the same content-addressed
-    id, so the graph they describe has one node where the combine group expects
-    two. That was the global planner's own error path; it is now the
-    decomposer's, which keeps the decomposition, emits no ``execution_dag`` --
-    the layer router ends a run without one -- and reports the cause.
+    No valid decomposition reaches it any more (identical sub-queries used to,
+    see above), so the failure is forced here. The decomposer keeps the
+    decomposition, emits no ``execution_dag`` -- the layer router ends a run
+    without one -- and reports the cause.
     """
     from types import SimpleNamespace
-    from unittest.mock import MagicMock
+    from unittest.mock import MagicMock, patch
 
     from nl2sql.api.query_api import result_from_state
     from nl2sql.common.errors import ErrorCode
@@ -346,29 +417,27 @@ def test_a_dag_that_cannot_be_built_ends_the_run_with_its_error():
     from nl2sql.pipeline.nodes.decomposer.node import DecomposerNode
     from nl2sql.pipeline.state import GraphState
 
-    twins = DecomposerResponse(
-        sub_queries=[
-            SubQuery(id="a", intent="customers per country", datasource_id="chinook"),
-            SubQuery(id="b", intent="customers per country", datasource_id="chinook"),
-        ],
+    response = DecomposerResponse(
+        sub_queries=[SubQuery(id="a", intent="customers per country", datasource_id="chinook")],
         combine_groups=[CombineGroup(
-            group_id="g1", operation="union",
-            inputs=[CombineInput(subquery_id="a", role="left"),
-                    CombineInput(subquery_id="b", role="right")],
+            group_id="g1", operation="standalone",
+            inputs=[CombineInput(subquery_id="a")],
         )],
     )
 
     node = DecomposerNode(SimpleNamespace(llm_registry=MagicMock()))
     node.chain = MagicMock()
-    node.chain.invoke.return_value = twins
+    node.chain.invoke.return_value = response
 
-    result = node(GraphState(
-        user_query="q",
-        datasource_resolver_response=DatasourceResolverResponse(
-            resolved_datasources=[ResolvedDatasource(datasource_id="chinook", schema_version="v1")],
-            allowed_datasource_ids=["chinook"],
-        ),
-    ))
+    with patch("nl2sql.pipeline.nodes.decomposer.node.build_execution_dag",
+               side_effect=ValueError("ExecutionDAG contains a cycle")):
+        result = node(GraphState(
+            user_query="q",
+            datasource_resolver_response=DatasourceResolverResponse(
+                resolved_datasources=[ResolvedDatasource(datasource_id="chinook", schema_version="v1")],
+                allowed_datasource_ids=["chinook"],
+            ),
+        ))
 
     [error] = result["errors"]
     assert error.error_code == ErrorCode.PLANNER_FAILED
