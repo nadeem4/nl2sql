@@ -11,7 +11,8 @@ Sixteen routes:
 ``GET  /api/schema``           the indexed schema of one datasource (``?datasource=``,
                                default the demo's own), so a visitor sees the database
                                first and can look at each of them
-``POST /api/ask``              one ``QueryResult``, plus a ``replay_miss`` flag; a miss
+``POST /api/ask``              one ``QueryResult``, plus ``replay_miss`` and ``recorded``
+                               (answered from recordings, not run live just now); a miss
                                carries one plain error instead of the raw ones; a client
                                that disconnects (the page's Stop) cancels the run
 ``GET  /api/trace/{trace_id}`` one run trace, read only from the traces directory
@@ -31,7 +32,9 @@ Sixteen routes:
 
 Hosted mode (``nl2sql demo --hosted``, see
 :mod:`nl2sql.cli.demo.playground.hosted`) changes three of these: ``/api/ask``
-takes the visitor's own key from a header and uses it for that one call,
+takes the visitor's own key from a header and uses it for that one call, or,
+with no key, replays a recorded guided question and answers anything else
+with a replay miss that asks for a key,
 ``/api/settings`` reports that there is nothing to save, and
 ``/api/index/rebuild`` and the feedback routes are refused. Everything else is
 what it is locally.
@@ -60,7 +63,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
 
-from nl2sql import CancellationToken
+from nl2sql import CancellationToken, QueryResult
 
 from nl2sql.auth.models import UserContext
 from nl2sql.cli.demo.playground.hosted import FEEDBACK_MESSAGE, REBUILD_MESSAGE, Hosted
@@ -85,6 +88,17 @@ REPLAY_MISS_MARKER = "fake llm: no rule for"
 
 # What a replay miss answers instead of the replay server's internals.
 REPLAY_MISS_MESSAGE = "No recorded answer for this question. Add an API key to ask it live."
+
+REPLAY_MISS_ERROR = {"node": "replay", "message": REPLAY_MISS_MESSAGE, "error_code": "REPLAY_MISS",
+                     "severity": "ERROR", "provider": None, "provider_response": None}
+
+
+def _replay_miss() -> Dict[str, Any]:
+    """A run that never started because nothing recorded can answer it."""
+    body = QueryResult(status="error", errors=[dict(REPLAY_MISS_ERROR)]).model_dump(mode="json")
+    body.update(replay_miss=True, recorded=False)
+    return body
+
 
 # How often a running question checks that its browser is still waiting.
 DISCONNECT_POLL_SECONDS = 0.25
@@ -374,8 +388,21 @@ def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset
         # never written to a file, an environment variable or a module-level
         # cache; the registry builds each step's client from it per request and
         # keeps none (see ``nl2sql.llm.request_key``).
-        llms = hosted.request_llms(request, panel.default_provider) if hosted.enabled else None
-        if hosted.enabled:
+        #
+        # Hosted, without a key: a guided question with a recording replays
+        # it, paced like any request but never counted against the session,
+        # since it spends nothing; anything else is a replay miss that asks
+        # for a key, and runs nothing.
+        replaying = panel.mode == "replay"
+        llms = None
+        if hosted.enabled and not hosted.brings_key(request):
+            hosted.throttle(request)
+            if not hosted.replays(req.question):
+                return _replay_miss()
+            llms = hosted.replay.llms()
+            replaying = True
+        elif hosted.enabled:
+            llms = hosted.request_llms(request, panel.default_provider)
             hosted.spend(request, response)
         token = CancellationToken()
 
@@ -397,13 +424,14 @@ def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset
         missing = bool(codes & REPLAY_MISS_CODES) or any(
             REPLAY_MISS_MARKER in (e.get("message") or "") for e in errors
         )
-        body["replay_miss"] = panel.mode == "replay" and missing
+        body["replay_miss"] = replaying and missing
+        # Answered from recordings rather than by a model just now: the page
+        # labels it so, and nobody mistakes it for a live run.
+        body["recorded"] = replaying and not missing
         if body["replay_miss"]:
             # The raw errors name the fake server and read as a crash; the
             # reasoning log and the failed call's usage entry repeat them.
-            body["errors"] = [{"node": "replay", "message": REPLAY_MISS_MESSAGE,
-                               "error_code": "REPLAY_MISS", "severity": "ERROR",
-                               "provider": None, "provider_response": None}]
+            body["errors"] = [dict(REPLAY_MISS_ERROR)]
             body["reasoning"] = [r for r in body.get("reasoning", []) if REPLAY_MISS_MARKER not in str(r)]
             for call in (body.get("usage") or {}).get("calls", []):
                 if REPLAY_MISS_MARKER in (call.get("error") or ""):

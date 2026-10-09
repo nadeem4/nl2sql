@@ -20,6 +20,7 @@ gate that protects it.
 | Retrieval inspector | on (loopback, or `--allow-settings`) | on, read only, at the hosted rate |
 | Pipeline page | on | on, read only: it names the steps and their models, never a key |
 | `--record` | supported | refused before the server starts |
+| a visitor with no key | replay mode, if no key is configured | the guided questions replay recorded runs; anything else asks for a key |
 | the sample databases | read-only | read-only |
 | limits | none | a rate limit per visitor and a cap per session |
 
@@ -30,20 +31,80 @@ nl2sql demo --hosted --host 0.0.0.0 --port 7860
 `NL2SQL_DEMO_HOSTED=1` does the same thing without a command line, which is how
 a container turns it on.
 
+## Recorded answers without a key
+
+A visitor does not need a key to see the demo work. The guided questions are
+answered from **recordings of real runs**: every model step's actual reply to
+each guided question, captured once from a Claude model and shipped in the wheel
+at `nl2sql/cli/demo/recordings/chinook.json` (none ship until the first
+recording run below has been made and merged). At start-up the hosted server loads
+them into a replay server on loopback (the same `FakeLLMServer` local replay
+mode uses) and, for a question that carries no key:
+
+- **a guided question with a recording** runs the whole pipeline -- retrieval,
+  the checks, SQL generation and the query against the sample database are all
+  real and run now -- with each model step answered from the recording. The
+  response carries `"recorded": true`, and the page puts a **Recorded run**
+  badge beside the question, so nobody mistakes it for a live run. It is paced
+  by the per-minute limit but not counted against the session cap, since it
+  spends nothing.
+- **anything else** never runs. It answers `200` with `"replay_miss": true` and
+  the sentence "No recorded answer for this question. Add an API key to ask it
+  live."; the page shows that with an **Add a key in Settings** button.
+
+With a key, every question -- guided or not -- runs live on that key, exactly as
+before. `/api/meta` lists the questions that replay as `recorded`, and the page
+marks those chips with a dot.
+
+**If no recordings ship** (the file is missing or covers no guided question),
+the keyless path still works: the chips and the question box stay open and
+every question answers with the key prompt. The console line at start-up says
+which: "N guided questions answer from recordings without a key", or "No
+recordings ship with this install".
+
+### Making the recordings
+
+The recordings are made with a real Claude model, which costs money, so it is a
+deliberate act, never part of CI. Either:
+
+- **Locally**, from the repository root:
+
+  ```bash
+  python scripts/record_demo_answers.py
+  ```
+
+  It reads `ANTHROPIC_API_KEY` from the environment or, failing that, from the
+  repository root's `.env` (python-dotenv, the loader the engine uses; nothing
+  prints the key), sets any OpenAI or OpenRouter key aside for the run, builds
+  a fresh demo project, runs `nl2sql demo --record` through the recording proxy
+  on Anthropic's own wire with the Anthropic preset's default model, and writes
+  `packages/nl2sql/src/nl2sql/cli/demo/recordings/chinook.json`. It exits `0`
+  when every guided question was recorded, `1` when some were not, `2` with no
+  key. Review the diff and commit it.
+- **In CI**, Actions → **Record demo answers** → *Run workflow*
+  (`.github/workflows/record_demo.yml`). It runs the same script with the
+  repository secret **`ANTHROPIC_API_KEY`** and opens a pull request with the new
+  recordings. It only ever runs by hand.
+
+`tests/e2e/test_record_demo_answers_fake_llm.py` runs the whole chain -- the
+script, the proxy on the Anthropic wire, a keyless hosted visitor replaying the
+result -- against a stand-in provider, so it is tested with no key and nothing
+spent.
+
 ## What the visitor's key does, and does not do
 
-A visitor who has not pasted one yet is told so before they ask. The **Ask**
-page opens on the key form itself: a provider choice, the key and **Use this
-key**, under three facts -- **Stored** in this browser tab only, **Sent** with
-each question in a request header, **Never** written to disk, logs or traces --
-and a link to **Settings** for a key per provider or a model per step; the
-question box and the suggested questions are disabled until
-there is a key, so a click cannot fail with a `401` the visitor had no way to
-see coming. The moment a key is saved the state clears and everything enables,
-with no reload. That state is the only place the point is made: until a key is
-saved the status pill in the top bar reads just **Hosted demo · No key yet**,
-and once there is one it names whose key answers (**Hosted demo · OpenAI key
-in this tab**), with the limits in its tooltip. None of this appears in local
+A visitor without a key is told what they can do before they ask. The **Ask**
+page opens with the pitch and, when recordings ship, the guided questions
+straight under it, the recorded ones marked; the key form (a provider choice,
+the key and **Use this key**, under three facts -- **Stored** in this browser
+tab only, **Sent** with each question in a request header, **Never** written to
+disk, logs or traces) is folded under **Use your own key**, and open from the
+start when nothing is recorded. Nothing is disabled: a question nobody recorded
+comes back with the way to add a key. The moment a key is saved the block
+clears, with no reload. The status pill in the top bar reads **Hosted demo ·
+Recorded runs** (or **Hosted demo · No key yet** with nothing recorded), and
+once there is a key it names whose key answers (**Hosted demo · OpenAI key in
+this tab**), with the limits in its tooltip. None of this appears in local
 mode.
 
 The visitor pastes a key on the **Settings** page, one per provider. From there:
@@ -121,10 +182,9 @@ What it does **not** do:
 - It does not reach your data. The hosted demo answers only from the three
   sample databases shipped with the engine.
 
-A question with no key at all answers `401` with a sentence telling the visitor
-to add one under Settings; the page holds the controls closed before it comes
-to that, so the `401` is the guard rather than the first thing a visitor meets.
-A malformed key answers `400` without quoting what was sent, and no refusal
+A question with no key at all is never a `401`: it replays, or it is a replay
+miss that asks for a key (see [above](#recorded-answers-without-a-key)). A
+malformed key answers `400` without quoting what was sent, and no refusal
 ever repeats something shaped like a key, not even when one was pasted into the
 model header by hand.
 
@@ -169,7 +229,8 @@ panel reports that the index was built before the demo started and which
 databases it covers, and where the button would be it prints the server's own
 reason -- rebuilding writes to disk and the sample data never changes.
 
-**On:** asking the twenty guided questions or any other question, a key per
+**On:** the guided questions without a key, from recorded runs; asking them or
+any other question live with a key; a key per
 provider and a model per step (both kept by the browser), the schema view of
 any of the three databases (the rail's **Showing** switcher), which database
 answered a run, the per-node **Debug** drill-down with its traces, and the

@@ -20,7 +20,9 @@ cost per step.
 **Bring your own key.** This Space holds no API key. Open **Settings**, paste
 your own OpenAI, Anthropic or OpenRouter key, and it stays in that browser tab:
 it is sent with each question, used to answer that question, and stored nowhere
-on the server. Closing the tab clears it.
+on the server. Closing the tab clears it. Without a key, the guided questions
+still answer, from recorded runs labelled **Recorded run**; any other question
+asks for a key.
 
 **Your data never comes here.** The demo answers only from the three sample
 databases baked into the image (a music store, its help desk and its website
@@ -104,8 +106,8 @@ the push is refused because the Space has commits of its own,
 replaces its history with this folder's.
 
 **4. Check it.** Open the Space, go to **Settings**, paste a key, and ask a
-guided question. Without a key the page answers `401` with a sentence pointing
-at Settings; that is the error visitors see before they add one.
+guided question. Without a key a guided question replays its recorded run (when
+recordings ship) and any other question answers with **Add a key in Settings**.
 
 ### Which engine version it builds
 

@@ -19,6 +19,14 @@ test("hosted with no key: a short pill, and the reason in full beside it", () =>
   assert.match(status.detail, /Settings/);
 });
 
+test("hosted with no key but recordings: the pill says the guided questions replay", () => {
+  const status = modeStatus({ hosted: true, limits: LIMITS, recorded: ["a", "b"], questions: ["a", "b", "c"] }, {});
+  assert.equal(status.tone, "warn");
+  assert.equal(status.label, "Hosted demo · Recorded runs");
+  assert.match(status.detail, /2 guided questions answer from recorded runs/);
+  assert.match(status.detail, /Settings/);
+});
+
 test("hosted with one key names its provider, and the detail keeps the limits", () => {
   const status = modeStatus({ hosted: true, limits: LIMITS }, { openai: KEY });
   assert.equal(status.tone, "ok");

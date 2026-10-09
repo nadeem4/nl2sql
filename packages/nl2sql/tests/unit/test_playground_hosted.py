@@ -32,6 +32,7 @@ from nl2sql.cli.demo.playground.hosted import (
     SESSION_COOKIE,
     Hosted,
     Limits,
+    Replay,
     key_header_for,
 )
 from nl2sql.configs import ConfigManager
@@ -194,15 +195,94 @@ def test_two_questions_at_once_each_keep_their_own_key(project):
 # --- (c) no key, and a key that is not one -----------------------------------------
 
 
-def test_a_question_without_a_key_is_401_and_says_where_to_add_one(project):
+MISS = "No recorded answer for this question. Add an API key to ask it live."
+
+
+def test_a_question_without_a_key_and_no_recordings_is_a_replay_miss_not_a_401(project):
+    """Keyless visitors are welcome: what cannot be replayed asks for a key."""
     engine, client = _client(project)
 
     answer = _ask(client)
 
-    assert answer.status_code == 401
-    assert "Settings" in answer.json()["detail"]
-    assert "never stores it" in answer.json()["detail"]
+    assert answer.status_code == 200
+    body = answer.json()
+    assert body["replay_miss"] is True and body["recorded"] is False
+    assert [e["message"] for e in body["errors"]] == [MISS]
+    assert body["sub_queries"] == []
+    # Nothing ran: no model, no engine.
     assert engine.seen == []
+
+
+def _replay_client(project, recorded, limits=None):
+    engine = _Engine(project)
+    hosted = Hosted(enabled=True, limits=limits,
+                    replay=Replay(base_url="http://127.0.0.1:9/v1", questions=recorded))
+    app = build_app(engine, questions=["q1", "q2"], roles=["admin"], mode="hosted", dataset="chinook",
+                    trace_dir=project / "traces", project_dir=project, host="0.0.0.0", hosted=hosted,
+                    recorded_questions=len(recorded))
+    return engine, TestClient(app, base_url="http://demo.example:7860")
+
+
+def test_a_recorded_guided_question_without_a_key_replays_from_the_recordings(project):
+    engine, client = _replay_client(project, ["q1"])
+
+    answer = _ask(client, question="q1")
+
+    assert answer.status_code == 200, answer.text
+    assert answer.json()["recorded"] is True
+    assert answer.json()["replay_miss"] is False
+    # The run's clients were pointed at the replay server, for this request only.
+    (_, planner), = engine.seen
+    assert str(planner.openai_api_base) == "http://127.0.0.1:9/v1"
+
+
+def test_an_unrecorded_question_without_a_key_misses_without_running(project):
+    engine, client = _replay_client(project, ["q1"])
+
+    answer = _ask(client, question="Something nobody recorded")
+
+    assert answer.json()["replay_miss"] is True
+    assert [e["message"] for e in answer.json()["errors"]] == [MISS]
+    assert engine.seen == []
+
+
+def test_with_a_key_a_recorded_question_runs_live_on_that_key(project):
+    engine, client = _replay_client(project, ["q1"])
+
+    answer = _ask(client, VISITOR_KEY, question="q1")
+
+    assert answer.json()["recorded"] is False
+    (key, planner), = engine.seen
+    assert key == VISITOR_KEY
+    assert str(planner.openai_api_base) != "http://127.0.0.1:9/v1"
+
+
+def test_replays_spend_nothing_from_the_session_cap(project):
+    """A recorded answer costs no tokens, so it is paced but never counted."""
+    _, client = _replay_client(project, ["q1"], limits=Limits(per_minute=100, per_session=1))
+
+    codes = [_ask(client, question="q1").status_code for _ in range(3)]
+    live = _ask(client, VISITOR_KEY, question="q2")
+
+    assert codes == [200, 200, 200]
+    assert live.status_code == 200
+
+
+def test_replays_are_still_rate_limited(project):
+    _, client = _replay_client(project, ["q1"], limits=Limits(per_minute=2, per_session=100))
+
+    codes = [_ask(client, question="q1").status_code for _ in range(3)]
+
+    assert codes == [200, 200, 429]
+
+
+def test_meta_names_the_questions_a_keyless_visitor_can_replay(project):
+    _, client = _replay_client(project, ["q1"])
+
+    meta = client.get("/api/meta").json()
+
+    assert meta["recorded"] == ["q1"]
+    assert meta["recorded_questions"] == 1
 
 
 @pytest.mark.parametrize("bad", ["short", "has spaces in it and is long enough", "a" * 19])

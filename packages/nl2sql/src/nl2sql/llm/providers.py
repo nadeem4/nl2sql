@@ -28,6 +28,7 @@ __all__ = [
     "PROVIDER_LABELS",
     "PROVIDER_KEYS",
     "UPSTREAMS",
+    "ANTHROPIC_UPSTREAM",
     "VERIFIED_ANTHROPIC_MODELS",
     "VERIFIED_MODELS",
     "VERIFIED_OPENAI_MODELS",
@@ -79,6 +80,11 @@ UPSTREAMS: Dict[str, str] = {
     name: PROVIDER_PRESETS[name].base_url or _OPENAI_BASE_URL
     for name in KEYED_PROVIDERS if PROVIDER_PRESETS[name].wire == "openai"
 }
+
+# Where Anthropic's Messages API is reached; the client appends /v1/messages.
+# The recording proxy forwards Claude's calls here when the demo's answers are
+# recorded with an Anthropic key.
+ANTHROPIC_UPSTREAM = "https://api.anthropic.com"
 
 # The pipeline's LLM nodes: the graph node name usage is recorded under, and
 # the agent key the LLM config names it by. Anything not listed uses ``default``.

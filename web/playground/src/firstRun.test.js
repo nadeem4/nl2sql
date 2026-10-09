@@ -1,6 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { NO_KEY_REASON, hostedNote, needsKey } from "./firstRun.js";
+import {
+  NO_KEY_REASON, firstRunCopy, hostedNote, isRecorded, lockControls, missPrompt, needsKey, recordedBadge,
+} from "./firstRun.js";
 
 // Built here rather than written out, so no scanner mistakes it for a real key.
 const KEY = ["sk", "proj", `first${"r".repeat(24)}91ad`].join("-");
@@ -62,6 +64,50 @@ test("with a key per provider it counts them, and still quotes the limits", () =
   // An empty set is the same as no key at all.
   assert.equal(hostedNote(meta, {}), "");
   assert.equal(hostedNote(meta, { openai: "  " }), "");
+});
+
+test("a keyless visitor is never locked out: the controls stay open", () => {
+  // `needsKey` says the first-run block is shown; it no longer disables anything.
+  assert.equal(lockControls({ hosted: true }, {}), false);
+  assert.equal(lockControls({ hosted: true, recorded: [] }, ""), false);
+});
+
+test("the guided questions a keyless visitor can replay", () => {
+  const meta = { hosted: true, recorded: ["How many customers are there?"] };
+  assert.equal(isRecorded(meta, "How many customers are there?"), true);
+  assert.equal(isRecorded(meta, "  How many customers are there?  "), true);
+  assert.equal(isRecorded(meta, "Something else"), false);
+  assert.equal(isRecorded({ hosted: true }, "anything"), false);
+  assert.equal(isRecorded(null, "anything"), false);
+});
+
+test("the first-run pitch points at the recordings only when there are some", () => {
+  const some = firstRunCopy({ hosted: true, recorded: ["a", "b"] });
+  assert.match(some.why, /recorded run/i);
+  assert.match(some.why, /your own question/i);
+  assert.equal(some.keyOpen, false);
+  const none = firstRunCopy({ hosted: true, recorded: [] });
+  assert.doesNotMatch(none.why, /recorded/i);
+  assert.match(none.why, /key/);
+  assert.equal(none.keyOpen, true);
+});
+
+test("a replay miss on the hosted demo asks for a key, with the way to Settings", () => {
+  const prompt = missPrompt({ replay_miss: true }, { hosted: true });
+  assert.match(prompt.text, /recorded/);
+  assert.equal(prompt.action.route, "#/settings");
+  assert.match(prompt.action.label, /key/i);
+  // Local replay mode has its own wording, and nothing to send to.
+  assert.equal(missPrompt({ replay_miss: true }, { mode: "replay" }).action, null);
+  assert.equal(missPrompt({ replay_miss: false }, { hosted: true }), null);
+  assert.equal(missPrompt(null, { hosted: true }), null);
+});
+
+test("a recorded answer carries a badge; a live one does not", () => {
+  assert.equal(recordedBadge({ recorded: true }).label, "Recorded run");
+  assert.match(recordedBadge({ recorded: true }).title, /not run just now/);
+  assert.equal(recordedBadge({ recorded: false }), null);
+  assert.equal(recordedBadge(null), null);
 });
 
 test("a server that reports no limits has none to quote", () => {

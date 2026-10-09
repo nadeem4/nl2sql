@@ -33,6 +33,14 @@ export function modeStatus(meta, apiKeys, { canSet = false } = {}) {
   if (meta.hosted) {
     const held = heldProviders(apiKeys);
     if (!held.length) {
+      const recorded = (meta.recorded || []).length;
+      if (recorded) {
+        return {
+          tone: "warn",
+          label: "Hosted demo · Recorded runs",
+          detail: `No key in this tab: ${recorded} guided questions answer from recorded runs. ${NO_KEY_REASON}`,
+        };
+      }
       return { tone: "warn", label: "Hosted demo · No key yet", detail: NO_KEY_REASON };
     }
     const whose = held.length === 1 ? `${providerName(held[0])} key` : `${held.length} keys`;
