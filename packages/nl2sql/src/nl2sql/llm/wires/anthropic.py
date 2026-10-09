@@ -22,19 +22,17 @@ CACHE_CONTROL = {"type": "ephemeral"}
 # generic ``cache_creation`` detail and puts the tokens under these keys.
 _CACHE_WRITE_BY_TTL = ("ephemeral_5m_input_tokens", "ephemeral_1h_input_tokens")
 
-# The wire field a tool call's arguments travel in is ``input``; Claude now and
-# then nests the arguments one level down under that name (or ``inputs``).
-_WRAPPER_KEYS = ("input", "inputs")
-
-
 def unwrap_tool_input(args: Any, input_schema: Optional[Dict[str, Any]]) -> Any:
-    """``args`` with one level of ``{"input": {...}}`` nesting removed, when that is what it is.
+    """``args`` with one level of ``{"<key>": {...}}`` nesting removed, when that is what it is.
 
-    Unwraps only a dict whose single key is ``input`` or ``inputs``, which the
-    tool's schema does not declare, holding an object that has every field the
+    Claude now and then nests a tool call's arguments one level down under a
+    single key of its own choosing -- seen: ``input``, ``inputs``, ``query``,
+    ``dtype``. Unwraps only a dict with exactly one key, which the tool's
+    schema does not declare, holding an object that has every field the
     schema requires and at least one field it declares. Anything else -- a
-    declared ``input`` field, a wrapped object missing required fields -- is
-    returned unchanged, so validation reports it as it would have.
+    declared field, a wrapped object missing required fields, an object with
+    nothing the schema knows -- is returned unchanged, so validation reports
+    it as it would have.
 
     Without this a schema whose fields all have defaults (``AnswerabilityResponse``)
     validated the wrapper as an empty answer, silently.
@@ -44,7 +42,7 @@ def unwrap_tool_input(args: Any, input_schema: Optional[Dict[str, Any]]) -> Any:
     [(key, inner)] = args.items()
     schema = input_schema or {}
     properties = schema.get("properties") or {}
-    if key not in _WRAPPER_KEYS or key in properties or not isinstance(inner, dict):
+    if key in properties or not isinstance(inner, dict):
         return args
     if not all(name in inner for name in schema.get("required") or []):
         return args
