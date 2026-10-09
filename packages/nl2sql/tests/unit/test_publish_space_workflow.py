@@ -1,10 +1,10 @@
 """The workflow that deploys the hosted demo Space says what it deploys, and
-where, and never fails a fork.
+where, and never fails a fork; and the release calls it.
 
 Nothing here runs the workflow -- it needs a Hugging Face write token and a real
 Space. What is checkable from the repository is the drift that would only show
 up after a merge: a trigger path that stops covering what the Space is built
-from, a missing concurrency guard that lets two deploys race, a renamed secret,
+from, a release that stops reaching the Space, a missing concurrency guard that lets two deploys race, a renamed secret,
 or a Space id that quietly points somewhere else.
 """
 import pathlib
@@ -16,18 +16,20 @@ yaml = pytest.importorskip("yaml")
 
 ROOT = pathlib.Path(__file__).resolve().parents[4]
 WORKFLOW = ROOT / ".github" / "workflows" / "publish_space.yml"
+PUBLISH = ROOT / ".github" / "workflows" / "publish_pypi.yaml"
+RELEASE = ROOT / ".github" / "workflows" / "release_please.yml"
 SPACE = ROOT / "deploy" / "huggingface"
 
 SPACE_ID = "nadeem4nk/nl2sql-demo"
 
-# The one line the mirror step rewrites to pin the image to the deployed
-# commit. Written out here so a rename in either file fails a test rather than
+# The one line the mirror step rewrites to pin what the image installs.
+# Written out here so a rename in either file fails a test rather than
 # silently shipping a Space that still builds from `main`.
-REF_ARG_ANCHOR = "ARG NL2SQL_REF="
+SPEC_ARG_ANCHOR = "ARG NL2SQL_SPEC="
 
 
-def _workflow() -> dict:
-    return yaml.safe_load(WORKFLOW.read_text(encoding="utf-8"))
+def _workflow(path: pathlib.Path = WORKFLOW) -> dict:
+    return yaml.safe_load(path.read_text(encoding="utf-8"))
 
 
 def _step(name_fragment: str) -> dict:
@@ -56,15 +58,49 @@ def test_it_can_be_run_by_hand_against_the_demo_space_by_default():
     assert dispatch["inputs"]["space_id"]["default"] == SPACE_ID
 
 
-def test_a_push_deploys_only_when_something_the_space_is_built_from_changed():
-    push = _triggers(_workflow())["push"]
+def test_a_push_to_main_never_deploys_the_public_space():
+    # The public demo runs released code only; a merge reaches it with the
+    # next release, not before.
+    assert "push" not in _triggers(_workflow())
 
-    assert push["branches"] == ["main"]
-    # The Space root itself, the engine it installs, and the playground the
-    # engine serves. A docs-only merge must not redeploy.
-    for prefix in ("deploy/huggingface/**", "packages/nl2sql/**", "web/playground/**"):
-        assert prefix in push["paths"]
-    assert not any(path.startswith("docs/") for path in push["paths"])
+
+def test_a_release_calls_it_with_the_tag_and_learns_whether_it_deployed():
+    call = _triggers(_workflow())["workflow_call"]
+
+    assert call["inputs"]["tag"]["required"] is True
+    assert call["inputs"]["space_id"]["default"] == SPACE_ID
+    assert "deployed" in call["outputs"]
+
+
+def test_a_hand_run_can_redeploy_a_release_by_tag():
+    dispatch = _triggers(_workflow())["workflow_dispatch"]
+
+    assert "tag" in dispatch["inputs"]
+    assert dispatch["inputs"]["tag"]["required"] is False
+
+
+def test_the_release_deploys_the_space_only_after_pypi_serves_the_version():
+    jobs = _workflow(PUBLISH)["jobs"]
+
+    assert jobs["pypi-smoke"]["needs"] == "pypi"
+    assert "--pypi" in str(jobs["pypi-smoke"]["steps"])
+    assert jobs["space"]["needs"] == "pypi-smoke"
+    assert jobs["space"]["uses"] == "./.github/workflows/publish_space.yml"
+    # HF_TOKEN reaches a called workflow only when it is handed down, at
+    # every level: release_please -> publish_pypi -> publish_space.
+    assert jobs["space"]["secrets"] == "inherit"
+    assert _workflow(RELEASE)["jobs"]["publish"]["secrets"] == "inherit"
+
+
+def test_the_release_checks_the_live_space_serves_the_new_version():
+    smoke = _workflow(PUBLISH)["jobs"]["space-smoke"]
+
+    assert smoke["needs"] == "space"
+    # No token, no deploy: nothing to wait for.
+    assert "needs.space.outputs.deployed == 'true'" in smoke["if"]
+    run = str(smoke["steps"])
+    assert "https://nadeem4nk-nl2sql-demo.hf.space" in run
+    assert "--expect-version" in run
 
 
 def test_one_deploy_at_a_time_and_a_superseded_run_is_cancelled():
@@ -91,18 +127,21 @@ def test_the_hub_client_is_pinned():
 
 
 def test_every_deploy_writes_its_source_sha_into_the_space_root():
-    # Without this the mirror had nothing to commit whenever a deploy was
-    # triggered by an engine or playground change -- the Space folder itself
-    # had not moved -- so the Hub never rebuilt and the Space served whatever
-    # `main` was the last time the folder happened to change.
     assert (SPACE / "SOURCE_SHA").exists()
 
     mirror = _step("Push deploy/huggingface")["run"]
     assert "SOURCE_SHA" in mirror
-    assert "$GITHUB_SHA" in mirror
+    # The checked-out commit -- the tag's, on a release -- not the caller's.
+    assert "rev-parse HEAD" in mirror
 
 
-def test_the_mirror_pins_the_image_to_the_commit_it_is_deploying():
+def test_a_release_pins_the_image_to_the_version_it_published():
+    mirror = _step("Push deploy/huggingface")["run"]
+
+    assert 'nl2sql-engine[demo]==${TAG#v}' in mirror
+
+
+def test_the_mirror_rewrites_exactly_one_line_and_checks_it_landed():
     """The rewrite has to keep matching the line it rewrites.
 
     If the `ARG` is renamed in the Dockerfile and the workflow is not, the
@@ -112,12 +151,12 @@ def test_the_mirror_pins_the_image_to_the_commit_it_is_deploying():
     mirror = _step("Push deploy/huggingface")["run"]
     dockerfile = (SPACE / "Dockerfile").read_text(encoding="utf-8")
 
-    assert REF_ARG_ANCHOR in mirror
-    _, hits = re.subn(rf"(?m)^{REF_ARG_ANCHOR}.*$", f"{REF_ARG_ANCHOR}deadbeef", dockerfile)
+    assert SPEC_ARG_ANCHOR in mirror
+    _, hits = re.subn(rf"(?m)^{SPEC_ARG_ANCHOR}.*$", 'ARG NL2SQL_SPEC="x"', dockerfile)
     assert hits == 1
 
     # And the deploy fails loudly rather than silently if it ever stops landing.
-    assert "grep -qx" in mirror
+    assert "grep -qxF" in mirror
 
 
 def test_the_wait_step_does_not_call_an_absent_rebuild_a_deploy():

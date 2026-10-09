@@ -87,6 +87,39 @@ def test_install_args_leave_the_api_out(check, tmp_path):
     assert not any("nl2sql_api" in a for a in args)
 
 
+def test_wheel_version_reads_the_filename(check, tmp_path):
+    assert check.wheel_version(tmp_path / "nl2sql_engine-0.2.0-py3-none-any.whl") == "0.2.0"
+
+
+def test_pypi_install_args_pin_the_published_version_with_the_demo_extra(check):
+    args = check.pypi_install_args("0.2.0")
+    assert "nl2sql-engine[demo]==0.2.0" in args
+    # A cached index page from before the upload is what makes a just-published
+    # version look missing; nothing local may stand in for PyPI either.
+    assert "--no-cache-dir" in args
+    assert "--find-links" not in args
+
+
+def test_retry_retries_until_success(check):
+    calls = []
+
+    def flaky():
+        calls.append(1)
+        if len(calls) < 3:
+            raise check.subprocess.CalledProcessError(1, "pip")
+
+    check.retry(flaky, attempts=5, delay=0, sleep=lambda s: None)
+    assert len(calls) == 3
+
+
+def test_retry_gives_up_after_the_last_attempt(check):
+    def broken():
+        raise check.subprocess.CalledProcessError(1, "pip")
+
+    with pytest.raises(check.subprocess.CalledProcessError):
+        check.retry(broken, attempts=3, delay=0, sleep=lambda s: None)
+
+
 # --- the environment the demo runs in -----------------------------------------
 
 def test_demo_env_drops_every_api_key(check):
@@ -141,6 +174,12 @@ def test_schema_problems_want_tables(check):
     assert check.schema_problems({"tables": []})
 
 
+def test_health_problems_want_the_expected_version(check):
+    assert check.health_problems({"status": "ok", "version": "0.2.0"}, "0.2.0") == []
+    assert check.health_problems({"status": "ok", "version": "0.1.2"}, "0.2.0")
+    assert check.health_problems({"status": "starting", "version": "0.2.0"}, "0.2.0")
+
+
 def test_index_problems_want_an_ok_index(check):
     assert check.index_problems({"health": {"status": "ok"}}) == []
     assert check.index_problems({"health": {"status": "empty", "problems": ["no entries"]}})
@@ -172,6 +211,22 @@ def test_wait_until_up_fails_when_the_server_dies(check):
     with pytest.raises(SystemExit, match="exited"):
         check.wait_until_up(lambda: False, alive=lambda: False, timeout=60,
                             clock=clock.time, sleep=clock.sleep, interval=1)
+
+
+def test_wait_for_version_waits_out_the_old_build(check):
+    # The Space keeps serving the previous image until the new one is up.
+    clock = _Clock()
+    seen = iter([None, {"status": "ok", "version": "0.1.2"}, {"status": "ok", "version": "0.2.0"}])
+    check.wait_for_version(lambda: next(seen), "0.2.0", timeout=600,
+                           clock=clock.time, sleep=clock.sleep, interval=30)
+    assert clock.now == 60
+
+
+def test_wait_for_version_names_what_it_last_saw(check):
+    clock = _Clock()
+    with pytest.raises(SystemExit, match="0.1.2"):
+        check.wait_for_version(lambda: {"status": "ok", "version": "0.1.2"}, "0.2.0", timeout=60,
+                               clock=clock.time, sleep=clock.sleep, interval=30)
 
 
 def test_wait_until_up_gives_up_at_the_deadline(check):

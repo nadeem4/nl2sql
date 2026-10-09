@@ -78,32 +78,43 @@ def test_the_container_runs_hosted_mode_as_a_non_root_user():
     assert "nl2sql setup --demo" in dockerfile
 
 
-def test_the_engine_is_installed_from_whichever_commit_is_being_deployed():
-    """The image must not install `main` at build time.
+def test_what_the_engine_is_installed_from_is_one_rewritable_line():
+    """The publish workflow pins the image by rewriting `ARG NL2SQL_SPEC=`.
 
-    It did, which meant a Space rebuilt for one reason picked up whatever `main`
-    happened to be, and a Space that was never rebuilt stayed frozen. The ref is
-    a build argument, declared before the install so rewriting it both pins the
-    engine and busts the cache for every layer below.
+    A release rewrites it to `nl2sql-engine[demo]==X.Y.Z`. It is declared
+    before the install, so rewriting it both pins the engine and busts the
+    cache for every layer below. Nothing else feeds it: the old `NL2SQL_REF`
+    is gone, so no deploy can pin only half of it.
     """
     lines = (SPACE / "Dockerfile").read_text(encoding="utf-8").splitlines()
 
-    ref = next(i for i, line in enumerate(lines) if line.startswith("ARG NL2SQL_REF="))
-    spec = next(i for i, line in enumerate(lines) if line.startswith("ARG NL2SQL_SPEC="))
+    specs = [i for i, line in enumerate(lines) if line.startswith("ARG NL2SQL_SPEC=")]
     install = next(i for i, line in enumerate(lines) if "pip install" in line and "NL2SQL_SPEC" in line)
 
-    assert ref < spec < install
-    assert "${NL2SQL_REF}" in lines[spec]
-    # The sha is enough on its own: no `refs/heads/` in the URL, or a commit
-    # sha would not resolve.
-    assert "refs/heads" not in lines[spec]
+    assert len(specs) == 1 and specs[0] < install
+    assert not any(line.startswith("ARG NL2SQL_REF=") for line in lines)
+    assert "${" not in lines[specs[0]]
+
+
+def test_the_healthcheck_polls_the_health_route():
+    dockerfile = (SPACE / "Dockerfile").read_text(encoding="utf-8")
+    healthcheck = dockerfile[dockerfile.index("HEALTHCHECK"):]
+
+    assert "/api/health" in healthcheck.split("\n\n")[0]
+
+
+def test_compose_builds_with_the_same_single_argument():
+    compose = yaml.safe_load((SPACE / "docker-compose.yml").read_text(encoding="utf-8"))
+    args = compose["services"]["playground"]["build"].get("args") or {}
+
+    assert "NL2SQL_REF" not in args
 
 
 def test_the_source_sha_file_records_what_the_space_was_built_from():
     sha = (SPACE / "SOURCE_SHA").read_text(encoding="utf-8").strip()
 
     # In the repository it is the branch name; the publish workflow overwrites
-    # it with the deploying commit in the copy it pushes to the Space.
+    # it with the commit it deployed from in the copy it pushes to the Space.
     assert sha
     assert "\n" not in sha
 

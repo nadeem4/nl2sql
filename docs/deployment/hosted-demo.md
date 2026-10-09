@@ -88,6 +88,11 @@ deliberate act, never part of CI. Either:
   re-records the playground home page's clips, which needs no key: Ask's clip is
   made from these recordings, so record the answers first.
 
+The recordings ship inside the `nl2sql-engine` wheel, and the public Space runs
+released versions only, so merged recordings reach the Space with the next
+release (see [Deployed by the release](#deployed-by-the-release)), not when
+their pull request merges.
+
 `tests/e2e/test_record_demo_answers_fake_llm.py` runs the whole chain -- the
 script, the proxy on the Anthropic wire, a keyless hosted visitor replaying the
 result -- against a stand-in provider, so it is tested with no key and nothing
@@ -253,11 +258,13 @@ read-only everywhere.
 Space root rather than a repository build: it needs no build context, so the
 whole deploy is that one folder, copied to the Space's root.
 
-It installs `nl2sql-engine[demo]` from **one commit of this repository**, named
-by the `NL2SQL_REF` build argument -- `main` in the checked-in `Dockerfile`, and
-the deploying commit's sha in the copy the workflow pushes to the Space. Set
-`--build-arg NL2SQL_SPEC="nl2sql-engine[demo]==X.Y.Z"` to install a release
-instead. Then it runs `nl2sql setup --demo` **at build time**. That bakes three
+It installs whatever the one build argument `NL2SQL_SPEC` names. On the Space
+that is always **a released version from PyPI**,
+`nl2sql-engine[demo]==X.Y.Z`, written into the copy of the `Dockerfile` the
+release pushes. The checked-in default is a GitHub archive of the tip of
+`main`, which is only what a local `docker build` gets; pass
+`--build-arg NL2SQL_SPEC="nl2sql-engine[demo]==X.Y.Z"` to build a release
+locally. Then it runs `nl2sql setup --demo` **at build time**. That bakes three
 things into the image so the container reaches nothing but the model at run
 time and the first question is answered at once:
 
@@ -270,8 +277,11 @@ time and the first question is answered at once:
 
 The container runs as uid 1000 (not root), listens on `$PORT` (7860 by
 default, which is what a Space routes to), and carries a healthcheck that polls
-`/api/meta`. `NL2SQL_DEMO_HOSTED=1` is set in the image, so hosted mode holds
-even if the command is overridden.
+`/api/health`. That route reads nothing but process state and answers
+`{"status": "ok", "version": "X.Y.Z"}`, the installed `nl2sql-engine`
+version, in every mode; the release pipeline polls it on the live Space to
+know the new version is the one being served. `NL2SQL_DEMO_HOSTED=1` is set in
+the image, so hosted mode holds even if the command is overridden.
 
 ```bash
 cd deploy/huggingface
@@ -297,57 +307,77 @@ steps, and what each Space setting does, are in
 own front page, since a Docker Space reads its configuration from the
 front-matter of the `README.md` at its root.
 
-The Space builds on push and serves at
-<https://nadeem4nk-nl2sql-demo.hf.space>.
+The Space serves at <https://nadeem4nk-nl2sql-demo.hf.space>.
 
 **Never give the Space an API key**, as a secret or otherwise. Hosted mode
 clears any provider key it finds in its environment at start-up rather than use
 it, because a key there would be spent by every visitor.
 
-### Automatically, from `main`
+### Deployed by the release
 
-[`.github/workflows/publish_space.yml`][workflow] is the normal path: it creates
-the Space if it is missing, mirrors `deploy/huggingface/` onto the Space's root,
-stamps it with the commit being deployed, and waits for the rebuild.
+The public Space runs **released versions only**, and a release deploys it
+with nothing to do by hand. Merging the release pull request tags `vX.Y.Z`, and
+[`publish_pypi.yaml`][publish] then runs, in order:
+
+```mermaid
+flowchart LR
+    PY[pypi: the three packages<br/>reach PyPI] --> PS[pypi-smoke: install X.Y.Z<br/>from PyPI, boot the demo]
+    PS --> SP[space: publish_space.yml<br/>pins and pushes the Space]
+    SP --> SS[space-smoke: the live URL<br/>reports X.Y.Z]
+```
+
+1. **`pypi-smoke`** installs `nl2sql-engine[demo]==X.Y.Z` from PyPI into an
+   empty virtualenv on a fresh runner, boots this same `nl2sql demo --hosted`
+   with no key and checks it serves. The Space is never built on a version
+   that does not install from PyPI.
+2. **`space`** calls [`publish_space.yml`][workflow] with the tag. It mirrors
+   `deploy/huggingface/` onto the Space's root, pins the image to the release,
+   pushes, and waits for the Hub to build it.
+3. **`space-smoke`** polls `https://nadeem4nk-nl2sql-demo.hf.space/api/health`
+   until it reports `X.Y.Z`, then checks the page and `/api/meta`. A Space goes
+   on serving its previous image while the new one builds, so a build that
+   finished is not yet proof that visitors see it.
+
+The whole release flow is in [Releasing](../development/releasing.md).
+
+**A push to `main` does not deploy the Space.** It used to: every merge that
+touched the engine, the playground or this folder rebuilt the public demo from
+that commit, so the demo ran code no release contained, and a broken merge
+reached visitors before anyone had decided to ship it. Now a merge reaches the
+Space with the next release. Nothing is lost by waiting: the `fresh-install`
+job on every pull request builds the wheels, installs them as a user would and
+boots this exact command, so a change that would break the Space fails its PR.
+To see a change running on a Space before it is released, deploy it to a
+scratch Space of your own (below), never to the public one.
 
 **What a deploy puts at the Space root.** The four files of
 `deploy/huggingface/` -- `Dockerfile`, `README.md` (the Space's configuration
 and front page), `docker-compose.yml`, and `SOURCE_SHA` -- with two of them
-rewritten to name the commit:
+rewritten:
 
 | At the Space root | What the deploy writes |
 | --- | --- |
-| `SOURCE_SHA` | the full sha of the repository commit this deploy came from |
-| `Dockerfile` | its `ARG NL2SQL_REF=` line, rewritten from `main` to that same sha |
+| `Dockerfile` | its `ARG NL2SQL_SPEC=` line: `nl2sql-engine[demo]==X.Y.Z` for a release, or a GitHub archive of the commit for a tagless run by hand |
+| `SOURCE_SHA` | the full sha of the repository commit the deploy came from -- the tagged commit, on a release |
 
-Both matter, and for different reasons.
-
-`SOURCE_SHA` is what makes an **engine-only or playground-only change reach the
-Space at all**. The Space repo holds only that one folder, so a merge that
-changed `packages/nl2sql/` left the mirrored files byte-identical: there was
-nothing to commit, the Hub saw no new commit, and it never rebuilt. The Space
-stayed frozen on whatever `main` was the last time the folder itself happened to
-change. Stamping the sha means every deploy is a real commit, and a real commit
-is what the Hub rebuilds on.
-
-The `Dockerfile` rewrite is what makes that rebuild **build the right thing**.
-The image installs the engine from a GitHub archive of this repository, and
-building `main` meant the Space got whatever `main` was at build time rather
-than what the deploy was for. The ref is now the deploying sha, so the Space is
-pinned to its own source commit -- and because the text of the `ARG` line
-changes, the layer cache for the install below it is busted and the engine is
-genuinely reinstalled. The workflow rewrites the default rather than passing
-`--build-arg`, because a Space build takes no build arguments from us; a `grep`
-right after the rewrite fails the deploy if that line is ever renamed, instead
-of quietly shipping a Space that still builds `main`.
+The `Dockerfile` rewrite is what makes the Space **run the release**: the same
+bytes a user gets from `pip install`, not whatever `main` was at build time.
+Because the text of the `ARG` line changes with every release, the Hub always
+has a new commit to rebuild on and the layer cache below it is busted, so the
+engine is genuinely reinstalled. The workflow rewrites the default rather than
+passing `--build-arg`, because a Space build takes no build arguments from us;
+a `grep` right after the rewrite fails the deploy if that line is ever
+renamed, instead of quietly shipping a Space that builds something else.
 
 **The one secret.** A Hugging Face access token with **write** permission
 (<https://huggingface.co/settings/tokens>), added as the repository secret
 **`HF_TOKEN`** at
 <https://github.com/nadeem4/nl2sql/settings/secrets/actions>. That is the only
-credential the workflow uses, and nothing else needs configuring. Without it --
-on a fork, or before it is added -- the job logs a line saying so and finishes
-green; it never fails for a missing secret.
+credential the workflow uses. `release_please.yml` and `publish_pypi.yaml` hand
+it down with `secrets: inherit`, since a called workflow sees no secret it is
+not given. Without it -- on a fork, or before it is added -- the deploy logs a
+line saying so and finishes green, `space-smoke` is skipped, and the rest of
+the release is unaffected; it never fails for a missing secret.
 
 The token is read into the job's environment and used in exactly two places: by
 `huggingface_hub`, which picks `HF_TOKEN` up from the environment on its own,
@@ -355,27 +385,29 @@ and as the password in the `git push` URL. It is never echoed, never traced (no
 `set -x`), and never written to a file: the Space remote is passed to each git
 command rather than saved into `.git/config`.
 
-**When it runs.** On every push to `main` that touches something the Space is
-built from -- `deploy/huggingface/**` (its root), `packages/nl2sql/**` (the
-engine the image installs) or `web/playground/**` (the page the engine serves)
--- or the workflow file itself, `.github/workflows/publish_space.yml`, so a
-change to the deploy logic redeploys too -- and on demand. A docs-only merge
-changes none of those and does not redeploy. One deploy runs at a time; a run
-overtaken by a newer push is cancelled.
-
 **What it reports.** The job never calls a build that did not happen a success.
 If the push produced a commit, the workflow checks the Space's head is that
 commit, then waits for a build to actually start and finish; a Space that never
 starts one within five minutes fails the job rather than reporting the previous
-build's `RUNNING`. If there was nothing to push -- the same commit deployed
+build's `RUNNING`. If there was nothing to push -- the same release deployed
 twice -- the job says so plainly and the summary reads **"No rebuild"**, with
-the Space left on its previous image.
+the Space left on its previous image. One deploy runs at a time; a run
+overtaken by a newer one is cancelled.
 
-**By hand.** Actions → **Publish Space** → *Run workflow*. Two optional inputs:
-`space_id`, which defaults to `nadeem4nk/nl2sql-demo`, and `token_secret`, the
-name of the secret holding the token, which defaults to `HF_TOKEN`. Pointing
-`space_id` at a scratch Space of your own is how to rehearse a change without
-touching the public demo.
+**By hand.** Actions → **Publish Space** → *Run workflow*, or:
+
+```console
+$ gh workflow run publish_space.yml -f tag=v0.2.0
+```
+
+Three optional inputs: `tag`, the release to deploy; `space_id`, which defaults
+to `nadeem4nk/nl2sql-demo`; and `token_secret`, the name of the secret holding
+the token, which defaults to `HF_TOKEN`. With a tag it does exactly what a
+release does. With **no** tag it deploys the commit of the branch it was run
+from, installed from a GitHub archive of that commit -- which is how to try an
+unreleased change on a Space: point `space_id` at a scratch Space of your own.
+Do not run it tagless against the public demo; that is the "unreleased code in
+public" this design exists to prevent.
 
 **What the first run does.** The Space does not have to exist. The workflow
 calls `create_repo(repo_type="space", space_sdk="docker", private=False,
@@ -385,20 +417,11 @@ ignores visibility, SDK and hardware for a Space that already exists, so a
 hardware upgrade or a visibility change made in the Space's own settings
 survives a deploy.
 
-**Rolling back.** Two ways, both without touching the Hub by hand:
-
-- **Re-run an older commit's workflow.** Actions → **Publish Space** → the run
-  for the commit you want back → *Re-run all jobs*. It checks that commit out
-  again, stamps the Space with **that** sha, and the image is rebuilt from it --
-  so this rolls the engine and the playground back, not just the Space's
-  configuration. (Before the sha was stamped in, the image installed the tip of
-  `main` and a re-run restored only the configuration; that is fixed.)
-- **Push an earlier subtree yourself**, with the manual steps below:
-  `git push space $(git subtree split --prefix deploy/huggingface <old-sha>):main`.
-  Doing it this way ships the checked-in `Dockerfile`, whose ref is `main`, so
-  the Space rebuilds from the tip of `main` rather than from `<old-sha>`. Edit
-  `SOURCE_SHA` and the `ARG NL2SQL_REF=` line yourself if you want the engine
-  pinned too -- or just use the re-run above, which does it for you.
+**Rolling back.** Run it by hand with the earlier tag,
+`gh workflow run publish_space.yml -f tag=v0.1.9`. It checks that tag out,
+pins the image to that version on PyPI and rebuilds, so the engine and the
+playground both go back. PyPI keeps every version, so any earlier release can
+be redeployed this way.
 
 The workflow adds a commit on top of whatever the Space's `main` already is, so
 the Space's history is never rewritten and never lost -- including commits made
@@ -499,3 +522,4 @@ See [Demo](../getting_started/demo.md).
 [preview]: https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/cli/demo/playground/preview.py
 [space-readme]: https://github.com/nadeem4/nl2sql/blob/main/deploy/huggingface/README.md
 [workflow]: https://github.com/nadeem4/nl2sql/blob/main/.github/workflows/publish_space.yml
+[publish]: https://github.com/nadeem4/nl2sql/blob/main/.github/workflows/publish_pypi.yaml

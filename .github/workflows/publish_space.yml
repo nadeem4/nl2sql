@@ -1,17 +1,22 @@
 # Deploys the hosted playground (`nl2sql demo --hosted`) to its Hugging Face
 # Space, `nadeem4nk/nl2sql-demo`.
 #
+# A release deploys it. publish_pypi.yaml calls this workflow with the release
+# tag once that version is on PyPI and a fresh install of it from PyPI has
+# booted (`pypi-smoke`), and afterwards polls the live Space until it reports
+# that version (`space-smoke`). A push to main does not deploy: the public demo
+# runs released code only. See docs/development/releasing.md.
+#
 # `deploy/huggingface/` is a Space root: a Dockerfile that needs no build
 # context and a README whose front-matter is the Space configuration. This
 # workflow mirrors that folder onto the Space's root, which is where the Hub
 # looks for both, and then waits for the build.
 #
-# The mirror also stamps the deploy with its source commit, in SOURCE_SHA and
-# in the Dockerfile's NL2SQL_REF. Without that stamp a deploy triggered by an
-# engine or playground change had nothing to commit -- the folder itself had
-# not moved -- so the Hub saw no new commit and never rebuilt, and the Space
-# went on serving whatever `main` was the last time the folder happened to
-# change. The stamp also pins the image to that commit instead of to `main`.
+# The mirror pins what the image installs by rewriting the Dockerfile's
+# `ARG NL2SQL_SPEC=` line: to `nl2sql-engine[demo]==X.Y.Z` for a release, or to
+# a GitHub archive of the checked-out commit when dispatched with no tag. It
+# also writes that commit to SOURCE_SHA. A new release always changes the pin,
+# so the Hub always has a new commit to rebuild on.
 #
 # The Space holds no API key and this workflow never gives it one: hosted mode
 # takes each visitor's own key, per request. The only credential here is the
@@ -19,8 +24,36 @@
 name: Publish Space
 
 on:
+  workflow_call:
+    inputs:
+      tag:
+        description: Release tag to deploy, e.g. v0.2.0. The image installs that version from PyPI.
+        required: true
+        type: string
+      space_id:
+        description: The Space to deploy to, as owner/name.
+        required: false
+        type: string
+        default: nadeem4nk/nl2sql-demo
+      token_secret:
+        description: Name of the repository secret holding the Hugging Face write token.
+        required: false
+        type: string
+        default: HF_TOKEN
+    outputs:
+      deployed:
+        description: "'true' once a build of the pushed commit is RUNNING; empty when nothing was deployed."
+        value: ${{ jobs.publish.outputs.deployed }}
+  # The escape hatch: redeploy a release by hand, or rehearse on a scratch
+  # Space. With a tag it does exactly what a release does. With no tag it
+  # deploys the commit it was dispatched from, installed from git -- meant for
+  # a `space_id` of your own, not the public demo.
   workflow_dispatch:
     inputs:
+      tag:
+        description: Release tag to deploy, e.g. v0.2.0. Blank deploys this branch's commit from git (for a scratch Space).
+        required: false
+        default: ""
       space_id:
         description: The Space to deploy to, as owner/name.
         required: false
@@ -29,21 +62,9 @@ on:
         description: Name of the repository secret holding the Hugging Face write token.
         required: false
         default: HF_TOKEN
-  push:
-    branches:
-      - main
-    # Only the three things the Space is actually built from: its own root,
-    # the engine the image installs from this branch, and the playground the
-    # engine serves. A docs-only merge changes none of them and must not spend
-    # ten minutes rebuilding the image.
-    paths:
-      - deploy/huggingface/**
-      - packages/nl2sql/**
-      - web/playground/**
-      - .github/workflows/publish_space.yml
 
-# One deploy at a time. A run superseded by a newer push is cancelled rather
-# than left to race the newer one to the Space's main branch.
+# One deploy at a time. A run superseded by a newer one is cancelled rather
+# than left to race it to the Space's main branch.
 concurrency:
   group: publish-space
   cancel-in-progress: true
@@ -54,7 +75,10 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    outputs:
+      deployed: ${{ steps.wait.outputs.deployed }}
     env:
+      TAG: ${{ inputs.tag }}
       SPACE_ID: ${{ inputs.space_id || 'nadeem4nk/nl2sql-demo' }}
       # `huggingface_hub` reads HF_TOKEN from the environment, so no step has
       # to pass a token as an argument. On a fork, or before the secret is
@@ -65,7 +89,10 @@ jobs:
       HUGGINGFACE_HUB_PIN: huggingface_hub==1.32.0
       SPACE_BUILD_TIMEOUT_SEC: "1800"
     steps:
+      # The release's own commit, so the Space root deployed is the tagged one.
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.sha }}
 
       # A fork has no access to the secret, and neither does this repository
       # before the owner adds it. Either way that is not a failure: say so and
@@ -139,6 +166,17 @@ jobs:
         run: |
           set -euo pipefail
 
+          source_sha="$(git -C "$GITHUB_WORKSPACE" rev-parse HEAD)"
+          if [ -n "$TAG" ]; then
+            spec="nl2sql-engine[demo]==${TAG#v}"
+          else
+            spec="nl2sql-engine[demo] @ https://github.com/$GITHUB_REPOSITORY/archive/$source_sha.tar.gz#subdirectory=packages/nl2sql"
+          fi
+          {
+            echo "source_sha=$source_sha"
+            echo "spec=$spec"
+          } >> "$GITHUB_OUTPUT"
+
           work="$RUNNER_TEMP/space"
           rm -rf "$work"
           mkdir -p "$work"
@@ -166,36 +204,38 @@ jobs:
           find . -mindepth 1 -maxdepth 1 ! -name .git ! -name .gitattributes -exec rm -rf {} +
           cp -R "$GITHUB_WORKSPACE/deploy/huggingface/." .
 
-          # Stamp the deploy with its source commit. This is what lets an
-          # engine-only or playground-only change reach the Space at all: the
-          # folder itself has not moved, so without the stamp there is nothing
-          # to commit and the Hub never rebuilds.
-          printf '%s\n' "$GITHUB_SHA" > SOURCE_SHA
+          # Pin what the image installs, by rewriting the default in the pushed
+          # copy -- a Space build takes no --build-arg from us. A release pins
+          # the version it just put on PyPI; a dispatch with no tag pins this
+          # commit, from git. The grep is the guard: if that line is ever
+          # renamed, the deploy fails here instead of quietly shipping a Space
+          # that builds something else.
+          sed -i "s|^ARG NL2SQL_SPEC=.*|ARG NL2SQL_SPEC=\"$spec\"|" Dockerfile
+          grep -qxF "ARG NL2SQL_SPEC=\"$spec\"" Dockerfile
+          echo "The image installs: $spec"
 
-          # And pin the image to that same commit, by rewriting the default in
-          # the pushed copy -- a Space build takes no --build-arg from us. The
-          # grep is the guard: if that line is ever renamed, the deploy fails
-          # here instead of quietly shipping a Space that still builds `main`.
-          sed -i "s|^ARG NL2SQL_REF=.*|ARG NL2SQL_REF=$GITHUB_SHA|" Dockerfile
-          grep -qx "ARG NL2SQL_REF=$GITHUB_SHA" Dockerfile
+          # And record the commit the Space root came from.
+          printf '%s\n' "$source_sha" > SOURCE_SHA
 
           git add -A
           if git diff --cached --quiet; then
-            echo "The Space root already carries $GITHUB_SHA; nothing to push, so no build will run."
+            echo "The Space root already installs $spec from $source_sha; nothing to push, so no build will run."
             echo "pushed=false" >> "$GITHUB_OUTPUT"
           else
-            git commit --quiet -m "Deploy deploy/huggingface from $GITHUB_REPOSITORY@$GITHUB_SHA"
+            git commit --quiet -m "Deploy ${TAG:-$source_sha} from $GITHUB_REPOSITORY@$source_sha"
             git push --quiet "$remote" HEAD:refs/heads/main
-            echo "Pushed $GITHUB_SHA to https://huggingface.co/spaces/$SPACE_ID"
+            echo "Pushed ${TAG:-$source_sha} to https://huggingface.co/spaces/$SPACE_ID"
             echo "pushed=true" >> "$GITHUB_OUTPUT"
           fi
           echo "space_commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Wait for the Space to rebuild
+        id: wait
         if: steps.token.outputs.present == 'true'
         env:
           PUSHED: ${{ steps.push.outputs.pushed }}
           SPACE_COMMIT: ${{ steps.push.outputs.space_commit }}
+          SOURCE_SHA: ${{ steps.push.outputs.source_sha }}
         run: |
           python - <<'PY'
           import os
@@ -205,7 +245,7 @@ jobs:
           from huggingface_hub import HfApi
 
           repo_id = os.environ["SPACE_ID"]
-          source_sha = os.environ["GITHUB_SHA"]
+          source_sha = os.environ["SOURCE_SHA"]
           pushed = os.environ.get("PUSHED") == "true"
           expected = os.environ.get("SPACE_COMMIT") or ""
           timeout = int(os.environ["SPACE_BUILD_TIMEOUT_SEC"])
@@ -229,13 +269,22 @@ jobs:
               return "".join(lines[-50:]) or "(the build log was empty)"
 
 
+          def deployed() -> None:
+              with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as out:
+                  out.write("deployed=true\n")
+
+
           # Nothing was committed, so the Hub started no build and the Space is
           # still serving an earlier one. Say that instead of reading RUNNING as
           # this commit's success -- which is exactly how the Space came to
-          # serve four merges' worth of stale code.
+          # serve four merges' worth of stale code. A re-run of a release that
+          # already reached the Space lands here, and that Space is the release.
           if not pushed:
-              print(f"No rebuild: the Space root already carried {source_sha}, so nothing was pushed.")
-              print(f"The Space is at commit {api.space_info(repo_id).sha} and is {stage_now()}.")
+              print(f"No rebuild: the Space root already carried this deploy, from {source_sha}.")
+              stage = stage_now()
+              print(f"The Space is at commit {api.space_info(repo_id).sha} and is {stage}.")
+              if stage == "RUNNING":
+                  deployed()
               sys.exit(0)
 
           deadline = time.time() + timeout
@@ -253,7 +302,7 @@ jobs:
               time.sleep(5)
           print(f"The Space is at commit {head}, from {source_sha}.")
 
-          # A pushed commit always moves SOURCE_SHA and the Dockerfile's ref, so
+          # A pushed commit always moves the Dockerfile's pin or SOURCE_SHA, so
           # the Hub always has something to rebuild. If it never starts one,
           # that is a failure to report, not a RUNNING to take credit for.
           grace = time.time() + 300
@@ -288,6 +337,7 @@ jobs:
               time.sleep(15)
 
           print(f"The Space rebuilt from {source_sha} and is running: https://huggingface.co/spaces/{repo_id}")
+          deployed()
           PY
 
       - name: Summarise the deploy
@@ -297,10 +347,10 @@ jobs:
           subdomain="$(echo "$SPACE_ID" | tr '/' '-' | tr '[:upper:]' '[:lower:]')"
           if [ "${PUSHED:-false}" = "true" ]; then
             headline="### Hugging Face Space deployed"
-            outcome="Rebuilt from \`$GITHUB_SHA\` and running."
+            outcome="Rebuilt and running."
           else
             headline="### Hugging Face Space unchanged"
-            outcome="**No rebuild.** The Space root already carried \`$GITHUB_SHA\`, so nothing was pushed and no build ran; the Space is still serving its previous image."
+            outcome="**No rebuild.** The Space root already carried this deploy, so nothing was pushed and no build ran; the Space is still serving its previous image."
           fi
           {
             echo "$headline"
@@ -311,9 +361,12 @@ jobs:
             echo "| --- | --- |"
             echo "| Space | https://huggingface.co/spaces/$SPACE_ID |"
             echo "| Playground | https://$subdomain.hf.space |"
-            echo "| Source commit | \`$GITHUB_SHA\` |"
+            echo "| Installs | \`$SPEC\` |"
+            echo "| Source commit | \`$SOURCE_SHA\` |"
             echo "| Space commit | \`${SPACE_COMMIT:-unknown}\` |"
           } >> "$GITHUB_STEP_SUMMARY"
         env:
           PUSHED: ${{ steps.push.outputs.pushed }}
           SPACE_COMMIT: ${{ steps.push.outputs.space_commit }}
+          SOURCE_SHA: ${{ steps.push.outputs.source_sha }}
+          SPEC: ${{ steps.push.outputs.spec }}

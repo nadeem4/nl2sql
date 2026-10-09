@@ -17,24 +17,22 @@
 # own, per request, and writes it nowhere.
 FROM python:3.12-slim
 
-# Which commit of the repository to install the engine from.
+# What to install the engine from.
 #
-# A Space build takes no build arguments from us, so .github/workflows/publish_space.yml
-# rewrites this one line in the copy it pushes, to the sha it is deploying --
-# the same sha it writes into SOURCE_SHA beside this file. That does two jobs:
-# it pins the Space to the commit that deployed it (so re-running an old
-# workflow run restores the engine, not just the configuration), and it changes
-# the text of this instruction, which busts the layer cache for the install
-# below. Building `main` here instead left the Space serving whatever `main`
-# was the last time the image happened to be rebuilt.
+# A Space build takes no build arguments from us, so
+# .github/workflows/publish_space.yml rewrites this one line in the copy it
+# pushes. A release pins the version it just published:
+#   ARG NL2SQL_SPEC="nl2sql-engine[demo]==0.2.0"
+# so the public demo always runs a released version, the same bytes a user
+# gets from `pip install`. A dispatch with no tag (a rehearsal on a scratch
+# Space) pins a GitHub archive of the commit it was run from instead. Either
+# way the text of this instruction changes, which busts the layer cache for
+# the install below.
 #
-# A GitHub archive rather than `git+https`, so the image needs no git; a bare
-# ref works for a branch and for a full sha, which `refs/heads/` would not.
-# Pin a release instead with
-#   --build-arg NL2SQL_SPEC="nl2sql-engine[demo]==0.2.0"
-# once one carries hosted mode.
-ARG NL2SQL_REF=main
-ARG NL2SQL_SPEC="nl2sql-engine[demo] @ https://github.com/nadeem4/nl2sql/archive/${NL2SQL_REF}.tar.gz#subdirectory=packages/nl2sql"
+# The default here, the tip of `main` as a GitHub archive (so the image needs
+# no git), is only what a local `docker build` of this folder gets. To build a
+# release locally: --build-arg NL2SQL_SPEC="nl2sql-engine[demo]==0.2.0".
+ARG NL2SQL_SPEC="nl2sql-engine[demo] @ https://github.com/nadeem4/nl2sql/archive/main.tar.gz#subdirectory=packages/nl2sql"
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -70,10 +68,10 @@ RUN nl2sql setup --demo \
 
 EXPOSE 7860
 
-# Answers as soon as the playground serves its own metadata; this route reads
-# nothing but process state.
+# Answers as soon as the playground is serving; this route reads nothing but
+# process state, and reports the engine version the release pipeline waits for.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-    CMD python -c "import os,urllib.request; urllib.request.urlopen('http://127.0.0.1:'+os.environ.get('PORT','7860')+'/api/meta',timeout=4)"
+    CMD python -c "import os,urllib.request; urllib.request.urlopen('http://127.0.0.1:'+os.environ.get('PORT','7860')+'/api/health',timeout=4)"
 
 # A shell, so $PORT is the container's rather than the build's; `exec`, so the
 # server is pid 1 and a stop signal reaches it instead of the shell.
