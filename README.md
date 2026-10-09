@@ -4,6 +4,9 @@ Ask a database questions in English. The model writes a typed query plan, never
 SQL text; the plan is checked against the real schema and the caller's role
 before any SQL is generated.
 
+**Live demo: <https://nadeem4nk-nl2sql-demo.hf.space>** — bring your own model
+key, nothing to install. [What you will see](#what-to-expect).
+
 [![Test](https://github.com/nadeem4/nl2sql/actions/workflows/test.yml/badge.svg)](https://github.com/nadeem4/nl2sql/actions/workflows/test.yml)
 [![PyPI](https://img.shields.io/pypi/v/nl2sql-engine)](https://pypi.org/project/nl2sql-engine/)
 [![License: MIT](https://img.shields.io/github/license/nadeem4/nl2sql)](LICENSE)
@@ -124,10 +127,36 @@ nl2sql demo
 ```
 
 > The `demo` command, the `[demo]` extra and most of what this README describes
-> are on `main` and not yet in a PyPI release (the latest is 0.1.2). Until the
-> next release, install from a clone:
+> are on `main` and arrive on PyPI with 0.2.0 (at the time of writing the latest
+> release is 0.1.2). If `pip install "nl2sql-engine[demo]"` warns that the
+> extra does not exist, install from a clone:
 > `pip install -e packages/adapter-sdk -e "packages/nl2sql[demo]"`
 > (add `-e packages/api` for the REST server).
+
+### What to expect
+
+1. **No questions at the terminal.** `nl2sql demo` does not prompt. It looks
+   for a model key (the order is below) and says which mode it chose:
+   **Live mode** with the provider, or replay mode when it finds none.
+2. **A project folder and an index.** It writes `./nl2sql-demo`, copies in
+   three SQLite databases -- Chinook (a music store), `support` (a help desk)
+   and `webanalytics` (website traffic) -- and indexes their schemas on your
+   machine. The first run downloads a ~79 MB embedding model; no key is needed
+   for that.
+3. **A local page.** It prints `Playground ready at http://127.0.0.1:8765/` and
+   opens that address in your browser (`--no-browser` skips it, `--port`
+   changes it). Ctrl+C stops it.
+4. **No key yet?** Paste an OpenAI or Anthropic key into the **Settings** page
+   (an OpenRouter one works too); the running demo switches to live without a
+   restart.
+5. **Ask.** Pick one of twenty guided questions or type your own, as `admin`,
+   `analyst` or `viewer`. A run shows the answer first, then the **plan** the
+   model wrote, the **checks** it passed or failed, the **SQL** the code
+   generated, the **rows**, and cost and time. **Debug** opens every step's
+   model calls, prompts and responses; **Pipeline** lists all 13 steps and
+   which five a model decides.
+
+The live demo above is the same playground with the key entry first.
 
 `nl2sql demo` writes a demo project into `./nl2sql-demo`, copies in three
 SQLite databases and indexes their schemas on your machine, serves the

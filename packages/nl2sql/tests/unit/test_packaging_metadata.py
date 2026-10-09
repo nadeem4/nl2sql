@@ -37,3 +37,33 @@ def test_engine_dependencies_name_what_the_code_imports():
     assert "typer" in names and not any(d.startswith("typer[") for d in deps)
     # cli/commands/demo.py and cli/demo/manager.py import dotenv.
     assert "python-dotenv" in names
+
+
+PACKAGES = ["nl2sql", "api", "adapter-sdk"]
+PROJECT_URLS = {"Homepage", "Documentation", "Source", "Issues", "Demo"}
+
+
+@pytest.mark.parametrize("package", PACKAGES)
+def test_every_distribution_has_a_readme_pypi_can_render(package):
+    readme = _project(package).get("readme")
+    assert readme, f"{package} declares no readme, so PyPI shows an empty page"
+    assert (ROOT / "packages" / package / readme).is_file()
+
+
+@pytest.mark.parametrize("package", PACKAGES)
+def test_every_distribution_links_home_docs_source_issues_and_demo(package):
+    urls = _project(package).get("urls", {})
+    assert PROJECT_URLS <= set(urls), f"{package} is missing {PROJECT_URLS - set(urls)}"
+    assert all(url.startswith("https://") for url in urls.values())
+
+
+@pytest.mark.parametrize("package", PACKAGES)
+def test_every_distribution_is_findable_and_classified(package):
+    project = _project(package)
+    assert project.get("description")
+    assert project.get("keywords")
+    classifiers = project.get("classifiers", [])
+    assert "Programming Language :: Python :: 3.12" in classifiers
+    assert any(c.startswith("Development Status ::") for c in classifiers)
+    # PEP 639: alongside a `license` expression, a License :: classifier is an error.
+    assert not any(c.startswith("License ::") for c in classifiers)

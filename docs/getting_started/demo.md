@@ -13,6 +13,39 @@ project by the CLI, so no data is downloaded or built when you set the demo up.
 The tables, columns and row counts are in
 [Demo datasets](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/datasets/README.md).
 
+To see it before installing anything, the same playground runs at
+<https://nadeem4nk-nl2sql-demo.hf.space>, where you bring your own model key.
+
+## What to expect
+
+After `pip install "nl2sql-engine[demo]"` and `nl2sql demo`:
+
+1. **No questions at the terminal.** The command does not prompt. It looks for
+   a model key -- `--api-key`, then `OPENAI_API_KEY`, `OPENROUTER_API_KEY` or
+   `ANTHROPIC_API_KEY`, then a key saved in `.env.demo`, then an Ollama daemon
+   on `localhost:11434` -- and says which mode it chose: **Live mode** with
+   the provider, or **Replay mode** when it finds none.
+2. **A project folder and an index.** It writes `./nl2sql-demo` (`--dir`
+   changes it), copies in the three databases above and indexes their schemas
+   on your machine. The first run downloads a ~79 MB embedding model; indexing
+   needs no key.
+3. **A local page.** It prints `Playground ready at http://127.0.0.1:8765/` and
+   opens that address in your browser (`--no-browser` skips it, `--port`
+   changes it). Ctrl+C stops it.
+4. **No key yet?** Paste an OpenAI or Anthropic key (or an OpenRouter one) into
+   [the Settings page](#the-settings-page); the running demo switches to live
+   without a restart.
+5. **Ask.** Pick one of twenty guided questions or type your own, as `admin`,
+   `analyst` or `viewer`. A run shows the answer first, then the plan the model
+   wrote, the checks, the generated SQL, the rows, and cost and time.
+   **Debug** opens each step's model calls, prompts and responses, and
+   [the Pipeline page](#the-pipeline-page) lists every step and which a model
+   decides.
+
+The `demo` command and the `[demo]` extra arrive on PyPI with 0.2.0. If pip
+says `nl2sql-engine` has no `demo` extra, you have an earlier release: install
+from a clone with `pip install -e packages/adapter-sdk -e "packages/nl2sql[demo]"`.
+
 ## 1. Install the CLI
 
 ```bash
@@ -47,7 +80,7 @@ Setup then runs schema indexing once, automatically, and exits `1` if it fails.
 
 For the browser playground instead of the CLI, `nl2sql demo` does the same
 scaffolding in `./nl2sql-demo` and serves a page over it. See the
-[README](https://github.com/nadeem4/nl2sql#try-it) for its flags, and
+[README](https://github.com/nadeem4/nl2sql#quickstart-run-it-locally) for its flags, and
 [the Settings page](#the-settings-page) for entering a key and choosing
 models from the page.
 

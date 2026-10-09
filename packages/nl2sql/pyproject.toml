@@ -5,8 +5,19 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "nl2sql-engine"
 version = "0.1.2" # x-release-please-version
-description = "Natural-language-to-SQL engine, CLI and database adapters"
+description = "Ask a database questions in English: the model writes a typed query plan, never SQL, and the plan is checked against the schema and the caller's role before any SQL is generated"
 readme = "README.md"
+keywords = ["nl2sql", "text-to-sql", "natural language", "sql", "llm", "langgraph", "sqlglot", "database"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Database",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
 license = "MIT"
 # Copies of the repository-root files: setuptools packs license files only from
 # inside the project directory. The wheel vendors Chinook (MIT) and two OFL
@@ -79,6 +90,13 @@ all = [
     "pymysql>=1.1.0",
     "psycopg2-binary>=2.9",
 ]
+
+[project.urls]
+Homepage = "https://github.com/nadeem4/nl2sql"
+Documentation = "https://nadeem4.github.io/nl2sql/"
+Source = "https://github.com/nadeem4/nl2sql"
+Issues = "https://github.com/nadeem4/nl2sql/issues"
+Demo = "https://nadeem4nk-nl2sql-demo.hf.space"
 
 [project.scripts]
 nl2sql = "nl2sql.cli.main:main"

@@ -5,8 +5,21 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "nl2sql-api"
 version = "0.1.2" # x-release-please-version
-description = "API layer for NL2SQL engine"
+description = "FastAPI REST service for the nl2sql engine: ask a database questions in English over HTTP"
+readme = "README.md"
 license = "MIT"
+keywords = ["nl2sql", "text-to-sql", "natural language", "sql", "llm", "fastapi", "rest api"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Framework :: FastAPI",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Database",
+    "Topic :: Internet :: WWW/HTTP :: HTTP Servers",
+]
 requires-python = ">=3.12"
 dependencies = [
     "nl2sql-engine~=0.1",
@@ -16,6 +29,13 @@ dependencies = [
     "python-multipart>=0.0.6",
     "python-dotenv>=1.0.0"
 ]
+
+[project.urls]
+Homepage = "https://github.com/nadeem4/nl2sql"
+Documentation = "https://nadeem4.github.io/nl2sql/"
+Source = "https://github.com/nadeem4/nl2sql"
+Issues = "https://github.com/nadeem4/nl2sql/issues"
+Demo = "https://nadeem4nk-nl2sql-demo.hf.space"
 
 [project.scripts]
 nl2sql-api = "nl2sql_api.server:main"
