@@ -1,11 +1,14 @@
 """The playground FastAPI app.
 
-Seventeen routes:
+Eighteen routes:
 
 ``GET  /``                     the built React page, with the link preview's
                                tags in its head (see :mod:`preview`)
 ``GET  /social-card.png``      the 1200x630 card those tags name
 ``GET  /clips/{name}``         the home page's clips: a webm or poster jpg per feature and theme
+``GET  /api/health``           ``{"status": "ok", "version": <nl2sql-engine version>}``,
+                               from process state only; the release pipeline
+                               polls it on the Space for the version it published
 ``GET  /api/meta``             mode, dataset, every registered datasource, the guided
                                questions (flat, and grouped by datasource), the roles
                                and how many guided questions have replay recordings
@@ -72,6 +75,7 @@ from nl2sql.cli.demo.playground.hosted import FEEDBACK_MESSAGE, REBUILD_MESSAGE,
 from nl2sql.cli.demo.playground.index_panel import IndexPanel
 from nl2sql.cli.demo.playground.preview import CARD, CARD_ROUTE, with_preview
 from nl2sql.cli.demo.playground.settings import SettingsPanel
+from nl2sql.cli.demo.stamp import engine_version
 from nl2sql.common.settings import settings
 from nl2sql.feedback import NOTE_MAX_CHARS, FeedbackStore, run_record, run_signals
 from nl2sql.llm.request_key import use_request_llms
@@ -379,6 +383,13 @@ def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset
     # One group per datasource that has guided questions, in the order given.
     groups = [{"datasource": ds, "questions": list(qs)}
               for ds, qs in (questions_by_datasource or {dataset: questions}).items() if qs]
+
+    @app.get("/api/health")
+    def health() -> Dict[str, Any]:
+        # Process state only, so it answers in every mode and never waits on
+        # the engine. The release pipeline polls it on the live Space until
+        # `version` is the one it just published.
+        return {"status": "ok", "version": engine_version()}
 
     @app.get("/api/meta")
     def meta() -> Dict[str, Any]:

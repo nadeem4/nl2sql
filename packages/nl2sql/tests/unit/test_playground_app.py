@@ -130,6 +130,25 @@ def test_meta_and_ask():
     assert engine.calls == [("q1", False, ["viewer"])]
 
 
+def test_health_reports_the_installed_engine_version():
+    # The release pipeline polls this on the live Space until it reports the
+    # version it just published, so it must be the installed distribution's.
+    from importlib.metadata import version
+
+    client = TestClient(build_app(_Engine(), questions=[], roles=["admin"], mode="replay", dataset="chinook"))
+    response = client.get("/api/health")
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok", "version": version("nl2sql-engine")}
+
+
+def test_health_answers_in_hosted_mode_without_a_key():
+    from nl2sql.cli.demo.playground.hosted import Hosted
+
+    client = TestClient(build_app(_Engine(), questions=[], roles=["admin"], mode="hosted",
+                                  dataset="chinook", hosted=Hosted(enabled=True)))
+    assert client.get("/api/health").json()["status"] == "ok"
+
+
 def test_page_has_the_four_panes():
     client = TestClient(build_app(_Engine(), questions=[], roles=["admin"], mode="live", dataset="chinook"))
     response = client.get("/")
