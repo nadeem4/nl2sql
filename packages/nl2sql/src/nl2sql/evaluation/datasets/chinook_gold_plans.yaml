@@ -703,3 +703,43 @@ chinook_039:
   - {alias: track_count, expr: {kind: func, func_name: COUNT, is_aggregate: true, args: [{kind: column, alias: t1, column_name: TrackId}]}}
   where: {kind: binary, op: IS, left: {kind: column, alias: t2, column_name: InvoiceLineId}, right: {kind: literal, is_null: true}}
   reasoning: Count tracks with no invoice line.
+
+chinook_044:
+  tables:
+  - {name: Customer, alias: t1}
+  - {name: Invoice, alias: t2}
+  - {name: InvoiceLine, alias: t3}
+  - {name: Track, alias: t4}
+  - {name: Genre, alias: t5}
+  joins:
+  - left_alias: t1
+    right_alias: t2
+    join_type: inner
+    condition: {kind: binary, op: '=', left: {kind: column, alias: t1, column_name: CustomerId}, right: {kind: column, alias: t2, column_name: CustomerId}}
+  - left_alias: t2
+    right_alias: t3
+    join_type: inner
+    condition: {kind: binary, op: '=', left: {kind: column, alias: t2, column_name: InvoiceId}, right: {kind: column, alias: t3, column_name: InvoiceId}}
+  - left_alias: t3
+    right_alias: t4
+    join_type: inner
+    condition: {kind: binary, op: '=', left: {kind: column, alias: t3, column_name: TrackId}, right: {kind: column, alias: t4, column_name: TrackId}}
+  - left_alias: t4
+    right_alias: t5
+    join_type: inner
+    condition: {kind: binary, op: '=', left: {kind: column, alias: t4, column_name: GenreId}, right: {kind: column, alias: t5, column_name: GenreId}}
+  select_items:
+  - {alias: first_name, expr: {kind: column, alias: t1, column_name: FirstName}}
+  - {alias: last_name, expr: {kind: column, alias: t1, column_name: LastName}}
+  - {alias: jazz_tracks, expr: {kind: func, func_name: COUNT, is_aggregate: true, args: [{kind: column, alias: t3, column_name: InvoiceLineId}]}}
+  where: {kind: binary, op: '=', left: {kind: column, alias: t5, column_name: Name}, right: {kind: literal, value: Jazz}}
+  group_by:
+  - {expr: {kind: column, alias: t1, column_name: CustomerId}}
+  - {expr: {kind: column, alias: t1, column_name: FirstName}}
+  - {expr: {kind: column, alias: t1, column_name: LastName}}
+  order_by:
+  - direction: desc
+    expr: {kind: func, func_name: COUNT, is_aggregate: true, args: [{kind: column, alias: t3, column_name: InvoiceLineId}]}
+  - {direction: asc, expr: {kind: column, alias: t1, column_name: CustomerId}}
+  limit: 5
+  reasoning: Count each customer's jazz invoice lines and keep the five largest.

@@ -1,0 +1,3813 @@
+[
+  {
+    "name": "AnswerabilityResponse",
+    "when": "How many customers do we have, by country?",
+    "payload": {
+      "answerable_datasource_ids": [
+        "chinook"
+      ],
+      "reason": "The Chinook Customer table holds customer records with country information."
+    }
+  },
+  {
+    "name": "DecomposerResponse",
+    "when": "How many customers do we have, by country?",
+    "payload": {
+      "sub_queries": [
+        {
+          "id": "sq_1",
+          "datasource_id": "chinook",
+          "intent": "count of customers grouped by country",
+          "kind": "scan",
+          "metrics": [
+            {
+              "name": "customer_count",
+              "aggregation": "count",
+              "description": "number of customers"
+            }
+          ],
+          "filters": [],
+          "group_by": [
+            {
+              "attribute": "country"
+            }
+          ],
+          "order_by": [],
+          "expected_schema": [
+            {
+              "name": "country",
+              "dtype": "string"
+            },
+            {
+              "name": "customer_count",
+              "dtype": "int"
+            }
+          ]
+        }
+      ],
+      "combine_groups": [
+        {
+          "group_id": "cg_1",
+          "operation": "standalone",
+          "inputs": [
+            {
+              "subquery_id": "sq_1",
+              "role": "base"
+            }
+          ],
+          "join_keys": []
+        }
+      ],
+      "post_combine_ops": [],
+      "unmapped_subqueries": []
+    }
+  },
+  {
+    "name": "PlanModel",
+    "when": "count of customers grouped by country",
+    "payload": {
+      "reasoning": "Group customers by country and count customer ids.",
+      "tables": [
+        {
+          "name": "Customer",
+          "alias": "t1"
+        }
+      ],
+      "joins": [],
+      "select_items": [
+        {
+          "expr": {
+            "kind": "column",
+            "alias": "t1",
+            "column_name": "Country"
+          },
+          "alias": "country"
+        },
+        {
+          "expr": {
+            "kind": "func",
+            "func_name": "COUNT",
+            "args": [
+              {
+                "kind": "column",
+                "alias": "t1",
+                "column_name": "CustomerId"
+              }
+            ],
+            "is_aggregate": true
+          },
+          "alias": "customer_count"
+        }
+      ],
+      "group_by": [
+        {
+          "expr": {
+            "kind": "column",
+            "alias": "t1",
+            "column_name": "Country"
+          }
+        }
+      ],
+      "order_by": [
+        {
+          "expr": {
+            "kind": "func",
+            "func_name": "COUNT",
+            "args": [
+              {
+                "kind": "column",
+                "alias": "t1",
+                "column_name": "CustomerId"
+              }
+            ],
+            "is_aggregate": true
+          },
+          "direction": "desc"
+        }
+      ]
+    }
+  },
+  {
+    "name": "AggregatedResponse",
+    "when": "How many customers do we have, by country?",
+    "payload": {
+      "summary": "You have 59 customers spread across 24 countries. The USA leads with 13 customers (22% of the total), followed by Canada (8), then Brazil and France (5 each) and Germany (4). The long tail is significant: 15 of the 24 countries have just a single customer.",
+      "format_type": "table",
+      "content": "| # | Country | Customers |\n|---|---------|-----------|\n| 1 | USA | 13 |\n| 2 | Canada | 8 |\n| 3 | Brazil | 5 |\n| 4 | France | 5 |\n| 5 | Germany | 4 |\n| 6 | United Kingdom | 3 |\n| 7 | Czech Republic | 2 |\n| 8 | India | 2 |\n| 9 | Portugal | 2 |\n| 10 | Argentina | 1 |\n| 11 | Australia | 1 |\n| 12 | Austria | 1 |\n| 13 | Belgium | 1 |\n| 14 | Chile | 1 |\n| 15 | Denmark | 1 |\n| 16 | Finland | 1 |\n| 17 | Hungary | 1 |\n| 18 | Ireland | 1 |\n| 19 | Italy | 1 |\n| 20 | Netherlands | 1 |\n| 21 | Norway | 1 |\n| 22 | Poland | 1 |\n| 23 | Spain | 1 |\n| 24 | Sweden | 1 |\n| | **Total** | **59** |\n\n**Key observations**\n- **North America accounts for 21 customers (~36%)** — USA and Canada combined are the largest regional block.\n- **Europe contributes 16 countries** but mostly thin coverage; France (5), Germany (4) and the UK (3) are the strongest markets.\n- **South America** totals 7 customers (Brazil 5, Argentina 1, Chile 1).\n- **Asia-Pacific is lightly represented** with India (2) and Australia (1)."
+    }
+  },
+  {
+    "name": "AnswerabilityResponse",
+    "when": "Who are the top 5 customers by total spend?",
+    "payload": {
+      "answerable_datasource_ids": [
+        "chinook"
+      ],
+      "reason": "Chinook holds customers and invoices, allowing total spend per customer to be ranked."
+    }
+  },
+  {
+    "name": "DecomposerResponse",
+    "when": "Who are the top 5 customers by total spend?",
+    "payload": {
+      "sub_queries": [
+        {
+          "id": "sq_1",
+          "datasource_id": "chinook",
+          "intent": "the five customers with the highest total spend",
+          "metrics": [
+            {
+              "name": "total_spend",
+              "aggregation": "sum"
+            }
+          ],
+          "filters": [],
+          "group_by": [
+            {
+              "attribute": "customer"
+            }
+          ],
+          "order_by": [
+            {
+              "attribute": "total_spend",
+              "direction": "desc"
+            }
+          ],
+          "limit": 5,
+          "expected_schema": [
+            {
+              "name": "customer",
+              "dtype": "string"
+            },
+            {
+              "name": "total_spend",
+              "dtype": "float"
+            }
+          ]
+        }
+      ],
+      "combine_groups": [
+        {
+          "group_id": "cg_1",
+          "operation": "standalone",
+          "inputs": [
+            {
+              "subquery_id": "sq_1",
+              "role": "base"
+            }
+          ],
+          "join_keys": []
+        }
+      ],
+      "post_combine_ops": [],
+      "unmapped_subqueries": []
+    }
+  },
+  {
+    "name": "PlanModel",
+    "when": "the five customers with the highest total spend",
+    "payload": {
+      "reasoning": "Join Customer to Invoice, sum invoice totals per customer, order desc, limit 5. Customer name is first || ' ' || last.",
+      "tables": [
+        {
+          "name": "Customer",
+          "alias": "t1"
+        },
+        {
+          "name": "Invoice",
+          "alias": "t2"
+        }
+      ],
+      "joins": [
+        {
+          "left_alias": "t1",
+          "right_alias": "t2",
+          "join_type": "inner",
+          "condition": {
+            "kind": "binary",
+            "op": "=",
+            "left": {
+              "kind": "column",
+              "alias": "t1",
+              "column_name": "CustomerId"
+            },
+            "right": {
+              "kind": "column",
+              "alias": "t2",
+              "column_name": "CustomerId"
+            }
+          }
+        }
+      ],
+      "select_items": [
+        {
+          "expr": {
+            "kind": "binary",
+            "op": "||",
+            "left": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "column",
+                "alias": "t1",
+                "column_name": "FirstName"
+              },
+              "right": {
+                "kind": "literal",
+                "value": " "
+              }
+            },
+            "right": {
+              "kind": "column",
+              "alias": "t1",
+              "column_name": "LastName"
+            }
+          },
+          "alias": "customer"
+        },
+        {
+          "expr": {
+            "kind": "func",
+            "func_name": "SUM",
+            "args": [
+              {
+                "kind": "column",
+                "alias": "t2",
+                "column_name": "Total"
+              }
+            ],
+            "is_aggregate": true
+          },
+          "alias": "total_spend"
+        }
+      ],
+      "group_by": [
+        {
+          "expr": {
+            "kind": "column",
+            "alias": "t1",
+            "column_name": "CustomerId"
+          }
+        },
+        {
+          "expr": {
+            "kind": "column",
+            "alias": "t1",
+            "column_name": "FirstName"
+          }
+        },
+        {
+          "expr": {
+            "kind": "column",
+            "alias": "t1",
+            "column_name": "LastName"
+          }
+        }
+      ],
+      "order_by": [
+        {
+          "direction": "desc",
+          "expr": {
+            "kind": "func",
+            "func_name": "SUM",
+            "args": [
+              {
+                "kind": "column",
+                "alias": "t2",
+                "column_name": "Total"
+              }
+            ],
+            "is_aggregate": true
+          }
+        }
+      ],
+      "limit": 5
+    }
+  },
+  {
+    "name": "AggregatedResponse",
+    "when": "Who are the top 5 customers by total spend?",
+    "payload": {
+      "summary": "The top 5 customers by total spend are led by Helena Holý ($49.62), followed closely by Richard Cunningham ($47.62) and Luis Rojas ($46.62), with Hugh O'Reilly and Ladislav Kovács tied for fourth at $45.62 each. Spend is tightly clustered, spanning just $4.00 between first and fifth place.",
+      "format_type": "table",
+      "content": "| Rank | Customer | Total Spend |\n| --- | --- | --- |\n| 1 | Helena Holý | $49.62 |\n| 2 | Richard Cunningham | $47.62 |\n| 3 | Luis Rojas | $46.62 |\n| 4 | Hugh O'Reilly | $45.62 |\n| 4 | Ladislav Kovács | $45.62 |\n\n**Notes:**\n- Combined spend of the top 5 customers: **$235.10**\n- Hugh O'Reilly and Ladislav Kovács are tied at $45.62.\n- The gap between the highest and lowest of the top 5 is only $4.00, indicating a very even distribution of spend among top customers."
+    }
+  },
+  {
+    "name": "AnswerabilityResponse",
+    "when": "Which artist has the most albums?",
+    "payload": {
+      "answerable_datasource_ids": [
+        "chinook"
+      ],
+      "reason": "Chinook holds Artist and Album tables needed to count albums per artist."
+    }
+  },
+  {
+    "name": "DecomposerResponse",
+    "when": "Which artist has the most albums?",
+    "payload": {
+      "sub_queries": [
+        {
+          "id": "sq_1",
+          "datasource_id": "chinook",
+          "intent": "the artist with the highest number of albums",
+          "kind": "scan",
+          "metrics": [
+            {
+              "name": "album_count",
+              "aggregation": "count",
+              "description": "number of albums per artist"
+            }
+          ],
+          "filters": [],
+          "group_by": [
+            {
+              "attribute": "artist"
+            }
+          ],
+          "order_by": [
+            {
+              "attribute": "album_count",
+              "direction": "desc"
+            }
+          ],
+          "limit": 1,
+          "expected_schema": [
+            {
+              "name": "artist",
+              "dtype": "string"
+            },
+            {
+              "name": "album_count",
+              "dtype": "int"
+            }
+          ]
+        }
+      ],
+      "combine_groups": [
+        {
+          "group_id": "cg_1",
+          "operation": "standalone",
+          "inputs": [
+            {
+              "subquery_id": "sq_1",
+              "role": "base"
+            }
+          ],
+          "join_keys": []
+        }
+      ],
+      "post_combine_ops": [],
+      "unmapped_subqueries": []
+    }
+  },
+  {
+    "name": "PlanModel",
+    "when": "the artist with the highest number of albums",
+    "payload": {
+      "reasoning": "Join Album to Artist, count albums per artist, order desc, limit 1.",
+      "tables": [
+        {
+          "name": "Album",
+          "alias": "t1"
+        },
+        {
+          "name": "Artist",
+          "alias": "t2"
+        }
+      ],
+      "joins": [
+        {
+          "left_alias": "t1",
+          "right_alias": "t2",
+          "join_type": "inner",
+          "condition": {
+            "kind": "binary",
+            "op": "=",
+            "left": {
+              "kind": "column",
+              "alias": "t1",
+              "column_name": "ArtistId"
+            },
+            "right": {
+              "kind": "column",
+              "alias": "t2",
+              "column_name": "ArtistId"
+            }
+          }
+        }
+      ],
+      "select_items": [
+        {
+          "expr": {
+            "kind": "column",
+            "alias": "t2",
+            "column_name": "Name"
+          },
+          "alias": "artist"
+        },
+        {
+          "expr": {
+            "kind": "func",
+            "func_name": "COUNT",
+            "args": [
+              {
+                "kind": "column",
+                "alias": "t1",
+                "column_name": "AlbumId"
+              }
+            ],
+            "is_aggregate": true
+          },
+          "alias": "album_count"
+        }
+      ],
+      "group_by": [
+        {
+          "expr": {
+            "kind": "column",
+            "alias": "t2",
+            "column_name": "Name"
+          }
+        }
+      ],
+      "order_by": [
+        {
+          "direction": "desc",
+          "expr": {
+            "kind": "func",
+            "func_name": "COUNT",
+            "args": [
+              {
+                "kind": "column",
+                "alias": "t1",
+                "column_name": "AlbumId"
+              }
+            ],
+            "is_aggregate": true
+          }
+        }
+      ],
+      "limit": 1
+    }
+  },
+  {
+    "name": "AggregatedResponse",
+    "when": "Which artist has the most albums?",
+    "payload": {
+      "summary": "Iron Maiden has the most albums, with 21 albums in total.",
+      "format_type": "text",
+      "content": "**Iron Maiden** is the artist with the most albums, holding **21 albums** — the highest count of any artist in the dataset. No other artist matched or exceeded this total."
+    }
+  },
+  {
+    "name": "AnswerabilityResponse",
+    "when": "What is the total revenue per year?",
+    "payload": {
+      "answerable_datasource_ids": [
+        "chinook"
+      ],
+      "reason": "Invoice totals and dates in the chinook store can be aggregated per year."
+    }
+  },
+  {
+    "name": "DecomposerResponse",
+    "when": "What is the total revenue per year?",
+    "payload": {
+      "sub_queries": [
+        {
+          "id": "sq_1",
+          "datasource_id": "chinook",
+          "intent": "total revenue aggregated per year",
+          "metrics": [
+            {
+              "name": "total_revenue",
+              "aggregation": "sum"
+            }
+          ],
+          "filters": [],
+          "group_by": [
+            {
+              "attribute": "year"
+            }
+          ],
+          "order_by": [
+            {
+              "attribute": "year",
+              "direction": "asc"
+            }
+          ],
+          "expected_schema": [
+            {
+              "name": "year",
+              "dtype": "int"
+            },
+            {
+              "name": "total_revenue",
+              "dtype": "float"
+            }
+          ]
+        }
+      ],
+      "combine_groups": [
+        {
+          "group_id": "cg_1",
+          "operation": "standalone",
+          "inputs": [
+            {
+              "subquery_id": "sq_1",
+              "role": "base"
+            }
+          ],
+          "join_keys": []
+        }
+      ],
+      "post_combine_ops": [],
+      "unmapped_subqueries": []
+    }
+  },
+  {
+    "name": "PlanModel",
+    "when": "total revenue aggregated per year",
+    "payload": {
+      "reasoning": "Sum Invoice.Total grouped by the year of InvoiceDate, ordered by year ascending.",
+      "tables": [
+        {
+          "name": "Invoice",
+          "alias": "t1"
+        }
+      ],
+      "joins": [],
+      "select_items": [
+        {
+          "expr": {
+            "kind": "func",
+            "func_name": "DATE_PART",
+            "args": [
+              {
+                "kind": "literal",
+                "value": "year"
+              },
+              {
+                "kind": "column",
+                "alias": "t1",
+                "column_name": "InvoiceDate"
+              }
+            ]
+          },
+          "alias": "year"
+        },
+        {
+          "expr": {
+            "kind": "func",
+            "func_name": "SUM",
+            "args": [
+              {
+                "kind": "column",
+                "alias": "t1",
+                "column_name": "Total"
+              }
+            ],
+            "is_aggregate": true
+          },
+          "alias": "total_revenue"
+        }
+      ],
+      "group_by": [
+        {
+          "expr": {
+            "kind": "func",
+            "func_name": "DATE_PART",
+            "args": [
+              {
+                "kind": "literal",
+                "value": "year"
+              },
+              {
+                "kind": "column",
+                "alias": "t1",
+                "column_name": "InvoiceDate"
+              }
+            ]
+          }
+        }
+      ],
+      "order_by": [
+        {
+          "expr": {
+            "kind": "func",
+            "func_name": "DATE_PART",
+            "args": [
+              {
+                "kind": "literal",
+                "value": "year"
+              },
+              {
+                "kind": "column",
+                "alias": "t1",
+                "column_name": "InvoiceDate"
+              }
+            ]
+          },
+          "direction": "asc"
+        }
+      ]
+    }
+  },
+  {
+    "name": "AggregatedResponse",
+    "when": "What is the total revenue per year?",
+    "payload": {
+      "summary": "Total revenue was reported for five years (2009–2013), ranging from 449.46 to 481.45, with a combined total of 2,328.60 and an average of approximately 465.72 per year. Revenue peaked in 2010 (481.45) and was lowest in 2009 (449.46), showing relatively flat, range-bound performance over the period.",
+      "format_type": "table",
+      "content": "| Year | Total Revenue | Change vs. Prior Year |\n|------|---------------|------------------------|\n| 2009 | 449.46 | — |\n| 2010 | 481.45 | +31.99 (+7.1%) |\n| 2011 | 469.58 | -11.87 (-2.5%) |\n| 2012 | 477.53 | +7.95 (+1.7%) |\n| 2013 | 450.58 | -26.95 (-5.6%) |\n| **Total** | **2,328.60** | — |\n\n**Key observations**\n- **Peak year:** 2010 with 481.45\n- **Lowest year:** 2009 with 449.46\n- **Average annual revenue:** ~465.72\n- **Overall trend:** Essentially flat — 2013 revenue (450.58) is only ~0.2% above 2009 levels, with the total spread across all five years under 32 units (~7%)."
+    }
+  },
+  {
+    "name": "AnswerabilityResponse",
+    "when": "Which genre sells the most tracks?",
+    "payload": {
+      "answerable_datasource_ids": [
+        "chinook"
+      ],
+      "reason": "Chinook holds genres, tracks and invoice lines needed to rank genres by sales."
+    }
+  },
+  {
+    "name": "DecomposerResponse",
+    "when": "Which genre sells the most tracks?",
+    "payload": {
+      "sub_queries": [
+        {
+          "id": "sq_1",
+          "datasource_id": "chinook",
+          "intent": "the genre with the highest number of tracks sold",
+          "metrics": [
+            {
+              "name": "tracks_sold",
+              "aggregation": "sum",
+              "description": "total quantity of tracks sold"
+            }
+          ],
+          "filters": [],
+          "group_by": [
+            {
+              "attribute": "genre"
+            }
+          ],
+          "order_by": [
+            {
+              "attribute": "tracks_sold",
+              "direction": "desc"
+            }
+          ],
+          "limit": 1,
+          "expected_schema": [
+            {
+              "name": "genre",
+              "dtype": "string"
+            },
+            {
+              "name": "tracks_sold",
+              "dtype": "int"
+            }
+          ]
+        }
+      ],
+      "combine_groups": [
+        {
+          "group_id": "cg_1",
+          "operation": "standalone",
+          "inputs": [
+            {
+              "subquery_id": "sq_1",
+              "role": "base"
+            }
+          ],
+          "join_keys": []
+        }
+      ],
+      "post_combine_ops": [],
+      "unmapped_subqueries": []
+    }
+  },
+  {
+    "name": "PlanModel",
+    "when": "the genre with the highest number of tracks sold",
+    "payload": {
+      "reasoning": "Join InvoiceLine to Track to Genre, sum quantity per genre, order desc, limit 1.",
+      "tables": [
+        {
+          "name": "InvoiceLine",
+          "alias": "t1"
+        },
+        {
+          "name": "Track",
+          "alias": "t2"
+        },
+        {
+          "name": "Genre",
+          "alias": "t3"
+        }
+      ],
+      "joins": [
+        {
+          "left_alias": "t1",
+          "right_alias": "t2",
+          "join_type": "inner",
+          "condition": {
+            "kind": "binary",
+            "op": "=",
+            "left": {
+              "kind": "column",
+              "alias": "t1",
+              "column_name": "TrackId"
+            },
+            "right": {
+              "kind": "column",
+              "alias": "t2",
+              "column_name": "TrackId"
+            }
+          }
+        },
+        {
+          "left_alias": "t2",
+          "right_alias": "t3",
+          "join_type": "inner",
+          "condition": {
+            "kind": "binary",
+            "op": "=",
+            "left": {
+              "kind": "column",
+              "alias": "t2",
+              "column_name": "GenreId"
+            },
+            "right": {
+              "kind": "column",
+              "alias": "t3",
+              "column_name": "GenreId"
+            }
+          }
+        }
+      ],
+      "select_items": [
+        {
+          "expr": {
+            "kind": "column",
+            "alias": "t3",
+            "column_name": "Name"
+          },
+          "alias": "genre"
+        },
+        {
+          "expr": {
+            "kind": "func",
+            "func_name": "SUM",
+            "args": [
+              {
+                "kind": "column",
+                "alias": "t1",
+                "column_name": "Quantity"
+              }
+            ],
+            "is_aggregate": true
+          },
+          "alias": "tracks_sold"
+        }
+      ],
+      "group_by": [
+        {
+          "expr": {
+            "kind": "column",
+            "alias": "t3",
+            "column_name": "Name"
+          }
+        }
+      ],
+      "order_by": [
+        {
+          "direction": "desc",
+          "expr": {
+            "kind": "func",
+            "func_name": "SUM",
+            "args": [
+              {
+                "kind": "column",
+                "alias": "t1",
+                "column_name": "Quantity"
+              }
+            ],
+            "is_aggregate": true
+          }
+        }
+      ],
+      "limit": 1
+    }
+  },
+  {
+    "name": "AggregatedResponse",
+    "when": "Which genre sells the most tracks?",
+    "payload": {
+      "summary": "Rock is the top-selling genre with 835 tracks sold.",
+      "format_type": "text",
+      "content": "**Rock** is the best-selling genre, accounting for **835 tracks sold**. It is the only genre returned at the top of the ranking, confirming it leads all other genres in track sales volume. No comparison figures for runner-up genres were included in the aggregated results, so the size of Rock's lead over the next genre cannot be quantified here."
+    }
+  },
+  {
+    "name": "AnswerabilityResponse",
+    "when": "What is the average invoice total by billing country?",
+    "payload": {
+      "answerable_datasource_ids": [
+        "chinook"
+      ],
+      "reason": "The chinook Invoice table holds invoice totals and billing country."
+    }
+  },
+  {
+    "name": "DecomposerResponse",
+    "when": "What is the average invoice total by billing country?",
+    "payload": {
+      "sub_queries": [
+        {
+          "id": "sq_1",
+          "datasource_id": "chinook",
+          "intent": "average invoice total broken down by billing country",
+          "metrics": [
+            {
+              "name": "average_invoice_total",
+              "aggregation": "avg",
+              "description": "Average total amount per invoice"
+            }
+          ],
+          "filters": [],
+          "group_by": [
+            {
+              "attribute": "billing_country"
+            }
+          ],
+          "expected_schema": [
+            {
+              "name": "billing_country",
+              "dtype": "string"
+            },
+            {
+              "name": "average_invoice_total",
+              "dtype": "float"
+            }
+          ]
+        }
+      ],
+      "combine_groups": [
+        {
+          "group_id": "cg_1",
+          "operation": "standalone",
+          "inputs": [
+            {
+              "subquery_id": "sq_1",
+              "role": "base"
+            }
+          ],
+          "join_keys": []
+        }
+      ],
+      "post_combine_ops": [],
+      "unmapped_subqueries": []
+    }
+  },
+  {
+    "name": "PlanModel",
+    "when": "average invoice total broken down by billing country",
+    "payload": {
+      "reasoning": "Group invoices by BillingCountry and compute average of Total.",
+      "tables": [
+        {
+          "name": "Invoice",
+          "alias": "t1"
+        }
+      ],
+      "joins": [],
+      "select_items": [
+        {
+          "expr": {
+            "kind": "column",
+            "alias": "t1",
+            "column_name": "BillingCountry"
+          },
+          "alias": "billing_country"
+        },
+        {
+          "expr": {
+            "kind": "func",
+            "func_name": "AVG",
+            "args": [
+              {
+                "kind": "column",
+                "alias": "t1",
+                "column_name": "Total"
+              }
+            ],
+            "is_aggregate": true
+          },
+          "alias": "average_invoice_total"
+        }
+      ],
+      "group_by": [
+        {
+          "expr": {
+            "kind": "column",
+            "alias": "t1",
+            "column_name": "BillingCountry"
+          }
+        }
+      ],
+      "order_by": [
+        {
+          "expr": {
+            "kind": "column",
+            "alias": "t1",
+            "column_name": "BillingCountry"
+          },
+          "direction": "asc"
+        }
+      ]
+    }
+  },
+  {
+    "name": "AggregatedResponse",
+    "when": "What is the average invoice total by billing country?",
+    "payload": {
+      "summary": "Average invoice totals across 24 billing countries range from about $5.37 to $6.66. Chile has the highest average invoice total ($6.66), followed by Hungary and Ireland ($6.52 each) and Czech Republic ($6.45). A large group of countries — Argentina, Australia, Belgium, Denmark, Italy, Poland, Spain, and the United Kingdom — all tie at the lowest average of roughly $5.37. Overall, averages are tightly clustered, with most countries falling between $5.37 and $5.80.",
+      "format_type": "table",
+      "content": "| Rank | Billing Country | Average Invoice Total |\n|------|-----------------|-----------------------|\n| 1 | Chile | $6.66 |\n| 2 | Hungary | $6.52 |\n| 2 | Ireland | $6.52 |\n| 4 | Czech Republic | $6.45 |\n| 5 | Austria | $6.09 |\n| 6 | Finland | $5.95 |\n| 7 | Netherlands | $5.80 |\n| 8 | India | $5.79 |\n| 9 | USA | $5.75 |\n| 10 | Norway | $5.66 |\n| 11 | Germany | $5.59 |\n| 12 | France | $5.57 |\n| 13 | Portugal | $5.52 |\n| 13 | Sweden | $5.52 |\n| 15 | Brazil | $5.43 |\n| 16 | Canada | $5.43 |\n| 17 | Argentina | $5.37 |\n| 17 | Australia | $5.37 |\n| 17 | Belgium | $5.37 |\n| 17 | Denmark | $5.37 |\n| 17 | Italy | $5.37 |\n| 17 | Poland | $5.37 |\n| 17 | Spain | $5.37 |\n| 17 | United Kingdom | $5.37 |\n\n**Key observations**\n- Spread between the highest (Chile, $6.66) and lowest ($5.37) averages is only ~$1.29, a ~24% difference.\n- Eight countries share an identical average of $5.3743, suggesting they have a similar/identical mix of invoice line items.\n- Only five countries exceed a $6.00 average invoice total."
+    }
+  },
+  {
+    "name": "AnswerabilityResponse",
+    "when": "Which employees support the most customers?",
+    "payload": {
+      "answerable_datasource_ids": [
+        "chinook"
+      ],
+      "reason": "Chinook has Employee and Customer tables with a support rep relationship."
+    }
+  },
+  {
+    "name": "DecomposerResponse",
+    "when": "Which employees support the most customers?",
+    "payload": {
+      "sub_queries": [
+        {
+          "id": "sq_1",
+          "datasource_id": "chinook",
+          "intent": "employees ranked by the number of customers they support, highest first",
+          "metrics": [
+            {
+              "name": "customer_count",
+              "aggregation": "count",
+              "description": "number of customers supported by the employee"
+            }
+          ],
+          "filters": [],
+          "group_by": [
+            {
+              "attribute": "employee"
+            }
+          ],
+          "order_by": [
+            {
+              "attribute": "customer_count",
+              "direction": "desc"
+            }
+          ],
+          "limit": 1,
+          "expected_schema": [
+            {
+              "name": "employee",
+              "dtype": "string"
+            },
+            {
+              "name": "customer_count",
+              "dtype": "int"
+            }
+          ]
+        }
+      ],
+      "combine_groups": [
+        {
+          "group_id": "cg_1",
+          "operation": "standalone",
+          "inputs": [
+            {
+              "subquery_id": "sq_1",
+              "role": "base"
+            }
+          ],
+          "join_keys": []
+        }
+      ],
+      "post_combine_ops": [],
+      "unmapped_subqueries": []
+    }
+  },
+  {
+    "name": "PlanModel",
+    "when": "employees ranked by the number of customers they support, highest first",
+    "payload": {
+      "reasoning": "Join Employee to Customer via SupportRepId, count distinct customers per employee, order desc. Semantic context specifies limit 1.",
+      "tables": [
+        {
+          "name": "Employee",
+          "alias": "t1"
+        },
+        {
+          "name": "Customer",
+          "alias": "t2"
+        }
+      ],
+      "joins": [
+        {
+          "left_alias": "t1",
+          "right_alias": "t2",
+          "join_type": "inner",
+          "condition": {
+            "kind": "binary",
+            "op": "=",
+            "left": {
+              "kind": "column",
+              "alias": "t1",
+              "column_name": "EmployeeId"
+            },
+            "right": {
+              "kind": "column",
+              "alias": "t2",
+              "column_name": "SupportRepId"
+            }
+          }
+        }
+      ],
+      "select_items": [
+        {
+          "expr": {
+            "kind": "binary",
+            "op": "||",
+            "left": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "column",
+                "alias": "t1",
+                "column_name": "FirstName"
+              },
+              "right": {
+                "kind": "literal",
+                "value": " "
+              }
+            },
+            "right": {
+              "kind": "column",
+              "alias": "t1",
+              "column_name": "LastName"
+            }
+          },
+          "alias": "employee"
+        },
+        {
+          "expr": {
+            "kind": "func",
+            "func_name": "COUNT",
+            "args": [
+              {
+                "kind": "column",
+                "alias": "t2",
+                "column_name": "CustomerId"
+              }
+            ],
+            "is_aggregate": true,
+            "distinct": true
+          },
+          "alias": "customer_count"
+        }
+      ],
+      "group_by": [
+        {
+          "expr": {
+            "kind": "column",
+            "alias": "t1",
+            "column_name": "EmployeeId"
+          }
+        },
+        {
+          "expr": {
+            "kind": "binary",
+            "op": "||",
+            "left": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "column",
+                "alias": "t1",
+                "column_name": "FirstName"
+              },
+              "right": {
+                "kind": "literal",
+                "value": " "
+              }
+            },
+            "right": {
+              "kind": "column",
+              "alias": "t1",
+              "column_name": "LastName"
+            }
+          }
+        }
+      ],
+      "order_by": [
+        {
+          "expr": {
+            "kind": "func",
+            "func_name": "COUNT",
+            "args": [
+              {
+                "kind": "column",
+                "alias": "t2",
+                "column_name": "CustomerId"
+              }
+            ],
+            "is_aggregate": true,
+            "distinct": true
+          },
+          "direction": "desc"
+        }
+      ],
+      "limit": 1
+    }
+  },
+  {
+    "name": "AggregatedResponse",
+    "when": "Which employees support the most customers?",
+    "payload": {
+      "summary": "Jane Peacock supports the most customers, with 21 customers assigned to her. She is the only employee returned in the aggregated results.",
+      "format_type": "table",
+      "content": "| Rank | Employee | Customers Supported |\n|------|--------------|---------------------|\n| 1    | Jane Peacock | 21                  |"
+    }
+  },
+  {
+    "name": "AnswerabilityResponse",
+    "when": "What is the longest track in each genre?",
+    "payload": {
+      "answerable_datasource_ids": [
+        "chinook"
+      ],
+      "reason": "Chinook holds Track durations and Genre associations."
+    }
+  },
+  {
+    "name": "DecomposerResponse",
+    "when": "What is the longest track in each genre?",
+    "payload": {
+      "sub_queries": [
+        {
+          "id": "sq_1",
+          "datasource_id": "chinook",
+          "intent": "the track with the longest duration in each genre",
+          "metrics": [
+            {
+              "name": "max_track_duration",
+              "aggregation": "max",
+              "description": "longest track duration within the genre"
+            }
+          ],
+          "filters": [],
+          "group_by": [
+            {
+              "attribute": "genre"
+            },
+            {
+              "attribute": "track"
+            }
+          ],
+          "order_by": [
+            {
+              "attribute": "max_track_duration",
+              "direction": "desc"
+            }
+          ],
+          "expected_schema": [
+            {
+              "name": "genre",
+              "dtype": "string"
+            },
+            {
+              "name": "track",
+              "dtype": "string"
+            },
+            {
+              "name": "max_track_duration",
+              "dtype": "float"
+            }
+          ]
+        }
+      ],
+      "combine_groups": [
+        {
+          "group_id": "cg_1",
+          "operation": "standalone",
+          "inputs": [
+            {
+              "subquery_id": "sq_1",
+              "role": "base"
+            }
+          ],
+          "join_keys": []
+        }
+      ],
+      "post_combine_ops": [],
+      "unmapped_subqueries": []
+    }
+  },
+  {
+    "name": "PlanModel",
+    "when": "the track with the longest duration in each genre",
+    "payload": {
+      "reasoning": "Join Track to Genre, group by genre name and track name, take MAX(Milliseconds) as the duration, ordered descending so the longest tracks surface first.",
+      "tables": [
+        {
+          "name": "Track",
+          "alias": "t1"
+        },
+        {
+          "name": "Genre",
+          "alias": "t2"
+        }
+      ],
+      "joins": [
+        {
+          "left_alias": "t1",
+          "right_alias": "t2",
+          "join_type": "inner",
+          "condition": {
+            "kind": "binary",
+            "op": "=",
+            "left": {
+              "kind": "column",
+              "alias": "t1",
+              "column_name": "GenreId"
+            },
+            "right": {
+              "kind": "column",
+              "alias": "t2",
+              "column_name": "GenreId"
+            }
+          }
+        }
+      ],
+      "select_items": [
+        {
+          "expr": {
+            "kind": "column",
+            "alias": "t2",
+            "column_name": "Name"
+          },
+          "alias": "genre"
+        },
+        {
+          "expr": {
+            "kind": "column",
+            "alias": "t1",
+            "column_name": "Name"
+          },
+          "alias": "track"
+        },
+        {
+          "expr": {
+            "kind": "func",
+            "func_name": "MAX",
+            "args": [
+              {
+                "kind": "column",
+                "alias": "t1",
+                "column_name": "Milliseconds"
+              }
+            ],
+            "is_aggregate": true
+          },
+          "alias": "max_track_duration"
+        }
+      ],
+      "group_by": [
+        {
+          "expr": {
+            "kind": "column",
+            "alias": "t2",
+            "column_name": "Name"
+          }
+        },
+        {
+          "expr": {
+            "kind": "column",
+            "alias": "t1",
+            "column_name": "Name"
+          }
+        }
+      ],
+      "order_by": [
+        {
+          "expr": {
+            "kind": "func",
+            "func_name": "MAX",
+            "args": [
+              {
+                "kind": "column",
+                "alias": "t1",
+                "column_name": "Milliseconds"
+              }
+            ],
+            "is_aggregate": true
+          },
+          "direction": "desc"
+        }
+      ]
+    }
+  },
+  {
+    "name": "AggregatedResponse",
+    "when": "What is the longest track in each genre?",
+    "payload": {
+      "content": "Below is the single longest track found for each genre, based on the aggregated results (durations are in milliseconds, with approximate minutes shown for readability).\n\n| Genre | Longest Track | Duration (ms) | ≈ Duration |\n|---|---|---:|---|\n| TV Shows | Occupation / Precipice | 5,286,953 | ~88 min |\n| Drama | Through a Looking Glass | 5,088,838 | ~85 min |\n| Sci Fi & Fantasy | Greetings from Earth, Pt. 1 | 2,960,293 | ~49 min |\n| Science Fiction | Hero | 2,713,755 | ~45 min |\n| Comedy | The Job | 2,541,875 | ~42 min |\n| Rock | Dazed And Confused | 1,612,329 | ~27 min |\n| Jazz | My Funny Valentine (Live) | 907,520 | ~15 min |\n| Metal | Rime of the Ancient Mariner | 816,509 | ~14 min |\n| Alternative | Reach Down | 672,773 | ~11 min |\n| Pop | Amy Amy Amy (Outro) | 663,426 | ~11 min |\n| Classical | Adagio for Strings from the String Quartet, Op. 11 | 596,519 | ~10 min |\n| Blues | Talkin' 'Bout Women Obviously | 589,531 | ~10 min |\n| Alternative & Punk | Homecoming / The Death Of St. Jimmy / East 12th St. / Nobody Likes You / Rock And Roll Girlfriend / We're Coming Home Again | 558,602 | ~9 min |\n| Latin | Faroeste Caboclo | 543,007 | ~9 min |\n| Electronica/Dance | Just Another Story | 529,684 | ~8.8 min |\n| Heavy Metal | Dance Of Death | 516,649 | ~8.6 min |\n| R&B/Soul | Rehab (Hot Chip Remix) | 418,293 | ~7 min |\n| Hip Hop/Rap | Se Liga | 410,409 | ~6.8 min |\n| Bossa Nova | Samba Da Bênção | 409,965 | ~6.8 min |\n| Soundtrack | Always Forever Now | 383,764 | ~6.4 min |\n| Reggae | Equal Rights Downpresser Man | 366,733 | ~6.1 min |\n\nNotes:\n- Video content genres (TV Shows, Drama, Sci Fi & Fantasy, Science Fiction, Comedy) dominate the top of the list because they contain full episodes rather than songs.\n- Among music genres, Rock leads with Led Zeppelin's \"Dazed And Confused\" (~27 minutes, a live version), followed by Jazz and Metal.",
+      "format_type": "table",
+      "summary": "Across 21 genres, the longest track per genre is led by video-based genres — \"Occupation / Precipice\" (TV Shows, ~88 min) and \"Through a Looking Glass\" (Drama, ~85 min). Among true music genres, Rock tops the list with \"Dazed And Confused\" (~27 min), followed by Jazz's \"My Funny Valentine (Live)\" (~15 min) and Metal's \"Rime of the Ancient Mariner\" (~14 min). The shortest \"longest track\" belongs to Reggae at just over 6 minutes.",
+      "warnings": [
+        "The raw result set listed many tracks per genre rather than one; only the maximum-duration track per genre was retained for this summary.",
+        "Some genres contain duplicate or near-duplicate titles (e.g., 'Rime of the Ancient Mariner' appears twice in Metal), which may indicate repeated entries across albums."
+      ]
+    }
+  },
+  {
+    "name": "AnswerabilityResponse",
+    "when": "Which 5 customers bought the most jazz tracks?",
+    "payload": {
+      "answerable_datasource_ids": [
+        "chinook"
+      ],
+      "reason": "Chinook holds customers, invoice lines, tracks and genres needed to rank jazz purchases."
+    }
+  },
+  {
+    "name": "DecomposerResponse",
+    "when": "Which 5 customers bought the most jazz tracks?",
+    "payload": {
+      "sub_queries": [
+        {
+          "id": "sq_1",
+          "datasource_id": "chinook",
+          "intent": "the five customers who purchased the greatest number of jazz genre tracks",
+          "kind": "scan",
+          "metrics": [
+            {
+              "name": "jazz_tracks_purchased",
+              "aggregation": "sum",
+              "description": "total number of jazz genre tracks purchased by the customer"
+            }
+          ],
+          "filters": [
+            {
+              "attribute": "genre",
+              "operator": "=",
+              "value": "Jazz"
+            }
+          ],
+          "group_by": [
+            {
+              "attribute": "customer"
+            }
+          ],
+          "order_by": [
+            {
+              "attribute": "jazz_tracks_purchased",
+              "direction": "desc"
+            }
+          ],
+          "limit": 5,
+          "expected_schema": [
+            {
+              "name": "customer",
+              "dtype": "string"
+            },
+            {
+              "name": "jazz_tracks_purchased",
+              "dtype": "int"
+            }
+          ]
+        }
+      ],
+      "combine_groups": [
+        {
+          "group_id": "cg_1",
+          "operation": "standalone",
+          "inputs": [
+            {
+              "subquery_id": "sq_1",
+              "role": "base"
+            }
+          ],
+          "join_keys": []
+        }
+      ],
+      "post_combine_ops": [],
+      "unmapped_subqueries": []
+    }
+  },
+  {
+    "name": "PlanModel",
+    "when": "the five customers who purchased the greatest number of jazz genre tracks",
+    "payload": {
+      "reasoning": "Join Customer -> Invoice -> InvoiceLine -> Track -> Genre, filter Genre name = 'Jazz', sum quantity per customer, order desc, limit 5.",
+      "tables": [
+        {
+          "name": "Customer",
+          "alias": "t1"
+        },
+        {
+          "name": "Invoice",
+          "alias": "t2"
+        },
+        {
+          "name": "InvoiceLine",
+          "alias": "t3"
+        },
+        {
+          "name": "Track",
+          "alias": "t4"
+        },
+        {
+          "name": "Genre",
+          "alias": "t5"
+        }
+      ],
+      "joins": [
+        {
+          "left_alias": "t1",
+          "right_alias": "t2",
+          "join_type": "inner",
+          "condition": {
+            "kind": "binary",
+            "op": "=",
+            "left": {
+              "kind": "column",
+              "alias": "t1",
+              "column_name": "CustomerId"
+            },
+            "right": {
+              "kind": "column",
+              "alias": "t2",
+              "column_name": "CustomerId"
+            }
+          }
+        },
+        {
+          "left_alias": "t2",
+          "right_alias": "t3",
+          "join_type": "inner",
+          "condition": {
+            "kind": "binary",
+            "op": "=",
+            "left": {
+              "kind": "column",
+              "alias": "t2",
+              "column_name": "InvoiceId"
+            },
+            "right": {
+              "kind": "column",
+              "alias": "t3",
+              "column_name": "InvoiceId"
+            }
+          }
+        },
+        {
+          "left_alias": "t3",
+          "right_alias": "t4",
+          "join_type": "inner",
+          "condition": {
+            "kind": "binary",
+            "op": "=",
+            "left": {
+              "kind": "column",
+              "alias": "t3",
+              "column_name": "TrackId"
+            },
+            "right": {
+              "kind": "column",
+              "alias": "t4",
+              "column_name": "TrackId"
+            }
+          }
+        },
+        {
+          "left_alias": "t4",
+          "right_alias": "t5",
+          "join_type": "inner",
+          "condition": {
+            "kind": "binary",
+            "op": "=",
+            "left": {
+              "kind": "column",
+              "alias": "t4",
+              "column_name": "GenreId"
+            },
+            "right": {
+              "kind": "column",
+              "alias": "t5",
+              "column_name": "GenreId"
+            }
+          }
+        }
+      ],
+      "where": {
+        "kind": "binary",
+        "op": "=",
+        "left": {
+          "kind": "column",
+          "alias": "t5",
+          "column_name": "Name"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "Jazz"
+        }
+      },
+      "select_items": [
+        {
+          "expr": {
+            "kind": "binary",
+            "op": "||",
+            "left": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "column",
+                "alias": "t1",
+                "column_name": "FirstName"
+              },
+              "right": {
+                "kind": "literal",
+                "value": " "
+              }
+            },
+            "right": {
+              "kind": "column",
+              "alias": "t1",
+              "column_name": "LastName"
+            }
+          },
+          "alias": "customer"
+        },
+        {
+          "expr": {
+            "kind": "func",
+            "func_name": "SUM",
+            "args": [
+              {
+                "kind": "column",
+                "alias": "t3",
+                "column_name": "Quantity"
+              }
+            ],
+            "is_aggregate": true
+          },
+          "alias": "jazz_tracks_purchased"
+        }
+      ],
+      "group_by": [
+        {
+          "expr": {
+            "kind": "column",
+            "alias": "t1",
+            "column_name": "CustomerId"
+          }
+        },
+        {
+          "expr": {
+            "kind": "binary",
+            "op": "||",
+            "left": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "column",
+                "alias": "t1",
+                "column_name": "FirstName"
+              },
+              "right": {
+                "kind": "literal",
+                "value": " "
+              }
+            },
+            "right": {
+              "kind": "column",
+              "alias": "t1",
+              "column_name": "LastName"
+            }
+          }
+        }
+      ],
+      "order_by": [
+        {
+          "expr": {
+            "kind": "func",
+            "func_name": "SUM",
+            "args": [
+              {
+                "kind": "column",
+                "alias": "t3",
+                "column_name": "Quantity"
+              }
+            ],
+            "is_aggregate": true
+          },
+          "direction": "desc"
+        }
+      ],
+      "limit": 5
+    }
+  },
+  {
+    "name": "AggregatedResponse",
+    "when": "Which 5 customers bought the most jazz tracks?",
+    "payload": {
+      "summary": "The top 5 purchasers of jazz tracks are led by Dominique Lefebvre with 6 tracks, followed by a three-way tie at 5 tracks (François Tremblay, Manoj Pareek, Puja Srivastava) and Dan Miller with 4. Purchase volumes are low and tightly clustered, with only a 2-track spread across the entire top 5.",
+      "format_type": "table",
+      "content": "| Rank | Customer | Jazz Tracks Purchased |\n|------|----------------------|-----------------------|\n| 1 | Dominique Lefebvre | 6 |\n| 2 | François Tremblay | 5 |\n| 2 | Manoj Pareek | 5 |\n| 2 | Puja Srivastava | 5 |\n| 5 | Dan Miller | 4 |\n\n**Notes:**\n- Three customers are tied at 5 jazz tracks each, so the ordering among them is arbitrary.\n- The margin between first and fifth place is just 2 tracks, indicating no single dominant jazz buyer."
+    }
+  },
+  {
+    "name": "AnswerabilityResponse",
+    "when": "What was the monthly revenue in 2013 for customers in the USA?",
+    "payload": {
+      "answerable_datasource_ids": [
+        "chinook"
+      ],
+      "reason": "Chinook has invoices with dates and totals plus customer country, enabling monthly 2013 USA revenue."
+    }
+  },
+  {
+    "name": "DecomposerResponse",
+    "when": "What was the monthly revenue in 2013 for customers in the USA?",
+    "payload": {
+      "sub_queries": [
+        {
+          "id": "sq_1",
+          "datasource_id": "chinook",
+          "intent": "Total revenue per month in 2013 for customers located in the USA",
+          "kind": "scan",
+          "metrics": [
+            {
+              "name": "total_revenue",
+              "aggregation": "sum",
+              "description": "Sum of purchase amounts"
+            }
+          ],
+          "filters": [
+            {
+              "attribute": "year",
+              "operator": "=",
+              "value": 2013
+            },
+            {
+              "attribute": "customer_country",
+              "operator": "=",
+              "value": "USA"
+            }
+          ],
+          "group_by": [
+            {
+              "attribute": "month"
+            }
+          ],
+          "order_by": [
+            {
+              "attribute": "month",
+              "direction": "asc"
+            }
+          ],
+          "expected_schema": [
+            {
+              "name": "month",
+              "dtype": "string"
+            },
+            {
+              "name": "total_revenue",
+              "dtype": "float"
+            }
+          ]
+        }
+      ],
+      "combine_groups": [
+        {
+          "group_id": "cg_1",
+          "operation": "standalone",
+          "inputs": [
+            {
+              "subquery_id": "sq_1",
+              "role": "base"
+            }
+          ],
+          "join_keys": []
+        }
+      ],
+      "post_combine_ops": [],
+      "unmapped_subqueries": []
+    }
+  },
+  {
+    "name": "PlanModel",
+    "when": "Total revenue per month in 2013 for customers located in the USA",
+    "payload": {
+      "reasoning": "Join Invoice to Customer, filter on customer country USA and invoice year 2013, group by truncated month of InvoiceDate, sum Total, order by month ascending.",
+      "tables": [
+        {
+          "name": "Invoice",
+          "alias": "t1"
+        },
+        {
+          "name": "Customer",
+          "alias": "t2"
+        }
+      ],
+      "joins": [
+        {
+          "left_alias": "t1",
+          "right_alias": "t2",
+          "join_type": "inner",
+          "condition": {
+            "kind": "binary",
+            "op": "=",
+            "left": {
+              "kind": "column",
+              "alias": "t1",
+              "column_name": "CustomerId"
+            },
+            "right": {
+              "kind": "column",
+              "alias": "t2",
+              "column_name": "CustomerId"
+            }
+          }
+        }
+      ],
+      "where": {
+        "kind": "binary",
+        "op": "AND",
+        "left": {
+          "kind": "binary",
+          "op": "=",
+          "left": {
+            "kind": "func",
+            "func_name": "DATE_PART",
+            "args": [
+              {
+                "kind": "literal",
+                "value": "year"
+              },
+              {
+                "kind": "column",
+                "alias": "t1",
+                "column_name": "InvoiceDate"
+              }
+            ]
+          },
+          "right": {
+            "kind": "literal",
+            "value": 2013
+          }
+        },
+        "right": {
+          "kind": "binary",
+          "op": "=",
+          "left": {
+            "kind": "column",
+            "alias": "t2",
+            "column_name": "Country"
+          },
+          "right": {
+            "kind": "literal",
+            "value": "USA"
+          }
+        }
+      },
+      "select_items": [
+        {
+          "expr": {
+            "kind": "func",
+            "func_name": "DATE_TRUNC",
+            "args": [
+              {
+                "kind": "literal",
+                "value": "month"
+              },
+              {
+                "kind": "column",
+                "alias": "t1",
+                "column_name": "InvoiceDate"
+              }
+            ]
+          },
+          "alias": "month"
+        },
+        {
+          "expr": {
+            "kind": "func",
+            "func_name": "SUM",
+            "args": [
+              {
+                "kind": "column",
+                "alias": "t1",
+                "column_name": "Total"
+              }
+            ],
+            "is_aggregate": true
+          },
+          "alias": "total_revenue"
+        }
+      ],
+      "group_by": [
+        {
+          "expr": {
+            "kind": "func",
+            "func_name": "DATE_TRUNC",
+            "args": [
+              {
+                "kind": "literal",
+                "value": "month"
+              },
+              {
+                "kind": "column",
+                "alias": "t1",
+                "column_name": "InvoiceDate"
+              }
+            ]
+          }
+        }
+      ],
+      "order_by": [
+        {
+          "expr": {
+            "kind": "func",
+            "func_name": "DATE_TRUNC",
+            "args": [
+              {
+                "kind": "literal",
+                "value": "month"
+              },
+              {
+                "kind": "column",
+                "alias": "t1",
+                "column_name": "InvoiceDate"
+              }
+            ]
+          },
+          "direction": "asc"
+        }
+      ]
+    }
+  },
+  {
+    "name": "AggregatedResponse",
+    "when": "What was the monthly revenue in 2013 for customers in the USA?",
+    "payload": {
+      "content": "| Month | Total Revenue (USD) |\n|---|---|\n| 2013-02 | $13.86 |\n| 2013-04 | $18.81 |\n| 2013-05 | $0.99 |\n| 2013-07 | $14.85 |\n| 2013-08 | $0.99 |\n| 2013-09 | $3.96 |\n| 2013-10 | $22.77 |\n| 2013-11 | $0.99 |\n| 2013-12 | $7.92 |\n| **Total** | **$85.14** |\n\n**Key observations:**\n- **Peak month:** October 2013 ($22.77), followed by April ($18.81) and July ($14.85).\n- **Lowest months:** May, August, and November each recorded just $0.99 (a single-track sale).\n- **No revenue recorded** for January, March, or June 2013 — these months are absent from the results.\n- **Average per reporting month:** ~$9.46 across the 9 months with activity.",
+      "format_type": "table",
+      "summary": "USA customers generated $85.14 in total revenue across 2013, spread over 9 active months. Revenue was highly uneven, peaking in October ($22.77) and April ($18.81), with three months (May, August, November) producing only $0.99 each. No transactions were recorded in January, March, or June."
+    }
+  },
+  {
+    "name": "AnswerabilityResponse",
+    "when": "Which playlists contain tracks from more than three genres?",
+    "payload": {
+      "answerable_datasource_ids": [
+        "chinook"
+      ],
+      "reason": "Chinook holds Playlist, PlaylistTrack, Track and Genre tables needed to count distinct genres per playlist."
+    }
+  },
+  {
+    "name": "DecomposerResponse",
+    "when": "Which playlists contain tracks from more than three genres?",
+    "payload": {
+      "sub_queries": [
+        {
+          "id": "sq_1",
+          "datasource_id": "chinook",
+          "intent": "playlists whose tracks span more than three distinct genres",
+          "metrics": [
+            {
+              "name": "distinct_genre_count",
+              "aggregation": "count",
+              "description": "number of distinct genres among the tracks in the playlist"
+            }
+          ],
+          "filters": [
+            {
+              "attribute": "distinct_genre_count",
+              "operator": ">",
+              "value": 3
+            }
+          ],
+          "group_by": [
+            {
+              "attribute": "playlist"
+            }
+          ],
+          "expected_schema": [
+            {
+              "name": "playlist",
+              "dtype": "string"
+            },
+            {
+              "name": "distinct_genre_count",
+              "dtype": "int"
+            }
+          ]
+        }
+      ],
+      "combine_groups": [
+        {
+          "group_id": "cg_1",
+          "operation": "standalone",
+          "inputs": [
+            {
+              "subquery_id": "sq_1",
+              "role": "base"
+            }
+          ],
+          "join_keys": []
+        }
+      ],
+      "post_combine_ops": [],
+      "unmapped_subqueries": []
+    }
+  },
+  {
+    "name": "PlanModel",
+    "when": "playlists whose tracks span more than three distinct genres",
+    "payload": {
+      "reasoning": "Join Playlist -> PlaylistTrack -> Track, group by playlist name, count distinct GenreId, keep groups with more than 3 distinct genres.",
+      "tables": [
+        {
+          "name": "Playlist",
+          "alias": "t1"
+        },
+        {
+          "name": "PlaylistTrack",
+          "alias": "t2"
+        },
+        {
+          "name": "Track",
+          "alias": "t3"
+        }
+      ],
+      "joins": [
+        {
+          "left_alias": "t1",
+          "right_alias": "t2",
+          "join_type": "inner",
+          "condition": {
+            "kind": "binary",
+            "op": "=",
+            "left": {
+              "kind": "column",
+              "alias": "t1",
+              "column_name": "PlaylistId"
+            },
+            "right": {
+              "kind": "column",
+              "alias": "t2",
+              "column_name": "PlaylistId"
+            }
+          }
+        },
+        {
+          "left_alias": "t2",
+          "right_alias": "t3",
+          "join_type": "inner",
+          "condition": {
+            "kind": "binary",
+            "op": "=",
+            "left": {
+              "kind": "column",
+              "alias": "t2",
+              "column_name": "TrackId"
+            },
+            "right": {
+              "kind": "column",
+              "alias": "t3",
+              "column_name": "TrackId"
+            }
+          }
+        }
+      ],
+      "select_items": [
+        {
+          "expr": {
+            "kind": "column",
+            "alias": "t1",
+            "column_name": "Name"
+          },
+          "alias": "playlist"
+        },
+        {
+          "expr": {
+            "kind": "func",
+            "func_name": "COUNT",
+            "args": [
+              {
+                "kind": "column",
+                "alias": "t3",
+                "column_name": "GenreId"
+              }
+            ],
+            "is_aggregate": true,
+            "distinct": true
+          },
+          "alias": "distinct_genre_count"
+        }
+      ],
+      "group_by": [
+        {
+          "expr": {
+            "kind": "column",
+            "alias": "t1",
+            "column_name": "Name"
+          }
+        }
+      ],
+      "having": {
+        "kind": "binary",
+        "op": ">",
+        "left": {
+          "kind": "func",
+          "func_name": "COUNT",
+          "args": [
+            {
+              "kind": "column",
+              "alias": "t3",
+              "column_name": "GenreId"
+            }
+          ],
+          "is_aggregate": true,
+          "distinct": true
+        },
+        "right": {
+          "kind": "literal",
+          "value": 3
+        }
+      },
+      "order_by": [
+        {
+          "expr": {
+            "kind": "func",
+            "func_name": "COUNT",
+            "args": [
+              {
+                "kind": "column",
+                "alias": "t3",
+                "column_name": "GenreId"
+              }
+            ],
+            "is_aggregate": true,
+            "distinct": true
+          },
+          "direction": "desc"
+        }
+      ]
+    }
+  },
+  {
+    "name": "AggregatedResponse",
+    "when": "Which playlists contain tracks from more than three genres?",
+    "payload": {
+      "summary": "Three playlists contain tracks spanning more than three distinct genres: \"Music\" leads with 20 genres, followed by \"90's Music\" with 16, and \"TV Shows\" with 5.",
+      "format_type": "table",
+      "content": "| Playlist | Distinct Genre Count |\n| --- | --- |\n| Music | 20 |\n| 90’s Music | 16 |\n| TV Shows | 5 |\n\n**Notes:**\n- Only 3 playlists meet the \">3 genres\" threshold.\n- \"Music\" and \"90's Music\" are the most genre-diverse by a wide margin (20 and 16 genres), while \"TV Shows\" is a distant third at 5."
+    }
+  },
+  {
+    "name": "AnswerabilityResponse",
+    "when": "Who are the top customers by total spend?",
+    "payload": {
+      "answerable_datasource_ids": [
+        "chinook"
+      ],
+      "reason": "Chinook holds customers and invoices, allowing total spend per customer to be ranked."
+    }
+  },
+  {
+    "name": "DecomposerResponse",
+    "when": "Who are the top customers by total spend?",
+    "payload": {
+      "sub_queries": [
+        {
+          "id": "sq_1",
+          "datasource_id": "chinook",
+          "intent": "the top customers ranked by total amount spent",
+          "metrics": [
+            {
+              "name": "total_spend",
+              "aggregation": "sum",
+              "description": "total amount spent by the customer"
+            }
+          ],
+          "filters": [],
+          "group_by": [
+            {
+              "attribute": "customer"
+            }
+          ],
+          "order_by": [
+            {
+              "attribute": "total_spend",
+              "direction": "desc"
+            }
+          ],
+          "limit": 10,
+          "expected_schema": [
+            {
+              "name": "customer",
+              "dtype": "string"
+            },
+            {
+              "name": "total_spend",
+              "dtype": "float"
+            }
+          ]
+        }
+      ],
+      "combine_groups": [
+        {
+          "group_id": "cg_1",
+          "operation": "standalone",
+          "inputs": [
+            {
+              "subquery_id": "sq_1",
+              "role": "base"
+            }
+          ],
+          "join_keys": []
+        }
+      ],
+      "post_combine_ops": [],
+      "unmapped_subqueries": []
+    }
+  },
+  {
+    "name": "PlanModel",
+    "when": "the top customers ranked by total amount spent",
+    "payload": {
+      "reasoning": "Join Customer to Invoice, sum invoice totals per customer, order descending, limit 10. Customer name is FirstName || ' ' || LastName.",
+      "tables": [
+        {
+          "name": "Customer",
+          "alias": "t1"
+        },
+        {
+          "name": "Invoice",
+          "alias": "t2"
+        }
+      ],
+      "joins": [
+        {
+          "left_alias": "t1",
+          "right_alias": "t2",
+          "join_type": "inner",
+          "condition": {
+            "kind": "binary",
+            "op": "=",
+            "left": {
+              "kind": "column",
+              "alias": "t1",
+              "column_name": "CustomerId"
+            },
+            "right": {
+              "kind": "column",
+              "alias": "t2",
+              "column_name": "CustomerId"
+            }
+          }
+        }
+      ],
+      "select_items": [
+        {
+          "expr": {
+            "kind": "binary",
+            "op": "||",
+            "left": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "column",
+                "alias": "t1",
+                "column_name": "FirstName"
+              },
+              "right": {
+                "kind": "literal",
+                "value": " "
+              }
+            },
+            "right": {
+              "kind": "column",
+              "alias": "t1",
+              "column_name": "LastName"
+            }
+          },
+          "alias": "customer"
+        },
+        {
+          "expr": {
+            "kind": "func",
+            "func_name": "SUM",
+            "args": [
+              {
+                "kind": "column",
+                "alias": "t2",
+                "column_name": "Total"
+              }
+            ],
+            "is_aggregate": true
+          },
+          "alias": "total_spend"
+        }
+      ],
+      "group_by": [
+        {
+          "expr": {
+            "kind": "column",
+            "alias": "t1",
+            "column_name": "CustomerId"
+          }
+        },
+        {
+          "expr": {
+            "kind": "column",
+            "alias": "t1",
+            "column_name": "FirstName"
+          }
+        },
+        {
+          "expr": {
+            "kind": "column",
+            "alias": "t1",
+            "column_name": "LastName"
+          }
+        }
+      ],
+      "order_by": [
+        {
+          "direction": "desc",
+          "expr": {
+            "kind": "func",
+            "func_name": "SUM",
+            "args": [
+              {
+                "kind": "column",
+                "alias": "t2",
+                "column_name": "Total"
+              }
+            ],
+            "is_aggregate": true
+          }
+        }
+      ],
+      "limit": 10
+    }
+  },
+  {
+    "name": "AggregatedResponse",
+    "when": "Who are the top customers by total spend?",
+    "payload": {
+      "summary": "The top 10 customers by total spend range from $42.62 to $49.62, with Helena Holý leading at $49.62. Spending is tightly clustered — only $7.00 separates first from tenth place — indicating a fairly even distribution of revenue across the top customer tier, with several customers tied at the same totals.",
+      "format_type": "table",
+      "content": "| Rank | Customer | Total Spend |\n|------|----------|-------------|\n| 1 | Helena Holý | $49.62 |\n| 2 | Richard Cunningham | $47.62 |\n| 3 | Luis Rojas | $46.62 |\n| 4 | Hugh O'Reilly | $45.62 |\n| 4 | Ladislav Kovács | $45.62 |\n| 6 | Frank Ralston | $43.62 |\n| 6 | Fynn Zimmermann | $43.62 |\n| 6 | Julia Barnett | $43.62 |\n| 9 | Astrid Gruber | $42.62 |\n| 9 | Victor Stevens | $42.62 |\n\n**Key observations:**\n- **Top spender:** Helena Holý ($49.62), $2.00 ahead of the runner-up.\n- **Narrow spread:** The gap between 1st and 10th place is just $7.00 (~14%), so no single customer dominates revenue.\n- **Ties:** Hugh O'Reilly and Ladislav Kovács tie at $45.62; Frank Ralston, Fynn Zimmermann, and Julia Barnett tie at $43.62; Astrid Gruber and Victor Stevens tie at $42.62.\n- **Combined total:** The top 10 customers account for $450.20 in total spend, averaging $45.02 each."
+    }
+  },
+  {
+    "name": "AnswerabilityResponse",
+    "when": "How many support tickets are still open, by priority?",
+    "payload": {
+      "answerable_datasource_ids": [
+        "support"
+      ],
+      "reason": "The support datasource holds tickets with status and priority fields."
+    }
+  },
+  {
+    "name": "DecomposerResponse",
+    "when": "How many support tickets are still open, by priority?",
+    "payload": {
+      "sub_queries": [
+        {
+          "id": "sq_1",
+          "datasource_id": "support",
+          "intent": "count of support tickets that are still open, grouped by priority",
+          "kind": "scan",
+          "metrics": [
+            {
+              "name": "open_ticket_count",
+              "aggregation": "count",
+              "description": "Number of support tickets with open status"
+            }
+          ],
+          "filters": [
+            {
+              "attribute": "ticket_status",
+              "operator": "=",
+              "value": "open"
+            }
+          ],
+          "group_by": [
+            {
+              "attribute": "priority"
+            }
+          ],
+          "expected_schema": [
+            {
+              "name": "priority",
+              "dtype": "string"
+            },
+            {
+              "name": "open_ticket_count",
+              "dtype": "int"
+            }
+          ]
+        }
+      ],
+      "combine_groups": [
+        {
+          "group_id": "cg_1",
+          "operation": "standalone",
+          "inputs": [
+            {
+              "subquery_id": "sq_1",
+              "role": "base"
+            }
+          ],
+          "join_keys": []
+        }
+      ],
+      "post_combine_ops": [],
+      "unmapped_subqueries": []
+    }
+  },
+  {
+    "name": "PlanModel",
+    "when": "count of support tickets that are still open, grouped by priority",
+    "payload": {
+      "reasoning": "Filter tickets to status 'open', group by priority, count tickets.",
+      "tables": [
+        {
+          "name": "tickets",
+          "alias": "t1"
+        }
+      ],
+      "joins": [],
+      "where": {
+        "kind": "binary",
+        "op": "=",
+        "left": {
+          "kind": "column",
+          "alias": "t1",
+          "column_name": "status"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "open"
+        }
+      },
+      "select_items": [
+        {
+          "expr": {
+            "kind": "column",
+            "alias": "t1",
+            "column_name": "priority"
+          },
+          "alias": "priority"
+        },
+        {
+          "expr": {
+            "kind": "func",
+            "func_name": "COUNT",
+            "args": [
+              {
+                "kind": "column",
+                "alias": "t1",
+                "column_name": "ticket_id"
+              }
+            ],
+            "is_aggregate": true
+          },
+          "alias": "open_ticket_count"
+        }
+      ],
+      "group_by": [
+        {
+          "expr": {
+            "kind": "column",
+            "alias": "t1",
+            "column_name": "priority"
+          }
+        }
+      ],
+      "order_by": [
+        {
+          "expr": {
+            "kind": "func",
+            "func_name": "COUNT",
+            "args": [
+              {
+                "kind": "column",
+                "alias": "t1",
+                "column_name": "ticket_id"
+              }
+            ],
+            "is_aggregate": true
+          },
+          "direction": "desc"
+        }
+      ]
+    }
+  },
+  {
+    "name": "AggregatedResponse",
+    "when": "How many support tickets are still open, by priority?",
+    "payload": {
+      "summary": "There are 41 open support tickets in total. Medium priority accounts for the largest share (19 tickets, ~46%), followed by low (13), while high (5) and urgent (4) together make up just 9 tickets (~22%).",
+      "format_type": "table",
+      "content": "| Priority | Open Tickets | % of Total |\n| --- | --- | --- |\n| Medium | 19 | 46.3% |\n| Low | 13 | 31.7% |\n| High | 5 | 12.2% |\n| Urgent | 4 | 9.8% |\n| **Total** | **41** | **100%** |"
+    }
+  },
+  {
+    "name": "AnswerabilityResponse",
+    "when": "Which support agents resolved the most tickets?",
+    "payload": {
+      "answerable_datasource_ids": [
+        "support"
+      ],
+      "reason": "The support datasource holds agents and tickets with resolution status, enabling a count per agent."
+    }
+  },
+  {
+    "name": "DecomposerResponse",
+    "when": "Which support agents resolved the most tickets?",
+    "payload": {
+      "sub_queries": [
+        {
+          "id": "sq_1",
+          "datasource_id": "support",
+          "intent": "support agents ranked by the number of tickets they resolved, highest first",
+          "metrics": [
+            {
+              "name": "resolved_ticket_count",
+              "aggregation": "count",
+              "description": "Number of resolved tickets attributed to the agent"
+            }
+          ],
+          "filters": [
+            {
+              "attribute": "ticket_status",
+              "operator": "=",
+              "value": "resolved"
+            }
+          ],
+          "group_by": [
+            {
+              "attribute": "support_agent"
+            }
+          ],
+          "order_by": [
+            {
+              "attribute": "resolved_ticket_count",
+              "direction": "desc"
+            }
+          ],
+          "limit": 10,
+          "expected_schema": [
+            {
+              "name": "support_agent",
+              "dtype": "string"
+            },
+            {
+              "name": "resolved_ticket_count",
+              "dtype": "int"
+            }
+          ]
+        }
+      ],
+      "combine_groups": [
+        {
+          "group_id": "cg_1",
+          "operation": "standalone",
+          "inputs": [
+            {
+              "subquery_id": "sq_1",
+              "role": "base"
+            }
+          ],
+          "join_keys": []
+        }
+      ],
+      "post_combine_ops": [],
+      "unmapped_subqueries": []
+    }
+  },
+  {
+    "name": "PlanModel",
+    "when": "support agents ranked by the number of tickets they resolved, highest first",
+    "payload": {
+      "reasoning": "Join tickets to agents, filter status = 'resolved', count tickets per agent, order desc, limit 10.",
+      "tables": [
+        {
+          "name": "agents",
+          "alias": "t1"
+        },
+        {
+          "name": "tickets",
+          "alias": "t2"
+        }
+      ],
+      "joins": [
+        {
+          "left_alias": "t1",
+          "right_alias": "t2",
+          "join_type": "inner",
+          "condition": {
+            "kind": "binary",
+            "op": "=",
+            "left": {
+              "kind": "column",
+              "alias": "t1",
+              "column_name": "agent_id"
+            },
+            "right": {
+              "kind": "column",
+              "alias": "t2",
+              "column_name": "agent_id"
+            }
+          }
+        }
+      ],
+      "where": {
+        "kind": "binary",
+        "op": "=",
+        "left": {
+          "kind": "column",
+          "alias": "t2",
+          "column_name": "status"
+        },
+        "right": {
+          "kind": "literal",
+          "value": "resolved"
+        }
+      },
+      "select_items": [
+        {
+          "expr": {
+            "kind": "column",
+            "alias": "t1",
+            "column_name": "full_name"
+          },
+          "alias": "support_agent"
+        },
+        {
+          "expr": {
+            "kind": "func",
+            "func_name": "COUNT",
+            "args": [
+              {
+                "kind": "column",
+                "alias": "t2",
+                "column_name": "ticket_id"
+              }
+            ],
+            "is_aggregate": true
+          },
+          "alias": "resolved_ticket_count"
+        }
+      ],
+      "group_by": [
+        {
+          "expr": {
+            "kind": "column",
+            "alias": "t1",
+            "column_name": "full_name"
+          }
+        }
+      ],
+      "order_by": [
+        {
+          "expr": {
+            "kind": "func",
+            "func_name": "COUNT",
+            "args": [
+              {
+                "kind": "column",
+                "alias": "t2",
+                "column_name": "ticket_id"
+              }
+            ],
+            "is_aggregate": true
+          },
+          "direction": "desc"
+        }
+      ],
+      "limit": 10
+    }
+  },
+  {
+    "name": "AggregatedResponse",
+    "when": "Which support agents resolved the most tickets?",
+    "payload": {
+      "summary": "Diego Santos leads all support agents with 25 resolved tickets — roughly 56% more than the next-highest agent, Elena Petrova (16). The top 10 agents resolved 130 tickets in total, with counts clustering tightly between 8 and 16 outside of Diego's standout performance.",
+      "format_type": "table",
+      "content": "| Rank | Support Agent | Resolved Tickets |\n|-----:|---------------|-----------------:|\n| 1 | Diego Santos | 25 |\n| 2 | Elena Petrova | 16 |\n| 3 | Claire Dubois | 15 |\n| 4 | Priya Raman | 14 |\n| 5 | Aisha Bello | 11 |\n| 5 | Samuel Okoro | 11 |\n| 5 | Tomas Novak | 11 |\n| 8 | Marco Rossi | 10 |\n| 9 | Hannah Weber | 9 |\n| 10 | Yuki Tanaka | 8 |\n\n**Key observations**\n- **Top performer:** Diego Santos (25 tickets) resolved nearly twice the median of the remaining agents.\n- **Three-way tie:** Aisha Bello, Samuel Okoro, and Tomas Novak each resolved 11 tickets.\n- **Distribution:** Excluding Diego, the group is tightly packed (8–16 tickets), suggesting a fairly even workload across the rest of the team.\n- **Total:** 130 tickets resolved across the top 10 agents."
+    }
+  },
+  {
+    "name": "AnswerabilityResponse",
+    "when": "What is the average time to close a ticket, by category?",
+    "payload": {
+      "answerable_datasource_ids": [
+        "support"
+      ],
+      "reason": "The support datasource holds tickets with category, open/close timestamps and resolution times."
+    }
+  },
+  {
+    "name": "DecomposerResponse",
+    "when": "What is the average time to close a ticket, by category?",
+    "payload": {
+      "sub_queries": [
+        {
+          "id": "sq_1",
+          "datasource_id": "support",
+          "intent": "average time to close a support ticket, broken down by ticket category",
+          "metrics": [
+            {
+              "name": "avg_time_to_close",
+              "aggregation": "avg",
+              "description": "average elapsed time between ticket creation and ticket closure"
+            }
+          ],
+          "group_by": [
+            {
+              "attribute": "category"
+            }
+          ],
+          "expected_schema": [
+            {
+              "name": "category",
+              "dtype": "string"
+            },
+            {
+              "name": "avg_time_to_close",
+              "dtype": "float"
+            }
+          ]
+        }
+      ],
+      "combine_groups": [
+        {
+          "group_id": "cg_1",
+          "operation": "standalone",
+          "inputs": [
+            {
+              "subquery_id": "sq_1",
+              "role": "base"
+            }
+          ],
+          "join_keys": []
+        }
+      ],
+      "post_combine_ops": [],
+      "unmapped_subqueries": []
+    }
+  },
+  {
+    "name": "PlanModel",
+    "when": "average time to close a support ticket, broken down by ticket category",
+    "payload": {
+      "reasoning": "Single table tickets. Compute elapsed seconds as STRFTIME('%s', closed_at) - STRFTIME('%s', opened_at), divide by 3600.0 for hours, average and round to 2 decimals. Filter out rows where closed_at or opened_at is NULL using binary IS NOT with a null literal (schema only allows NOT/+/- for unary). Group by category. Expected schema requires aliases category and avg_time_to_close.",
+      "tables": [
+        {
+          "name": "tickets",
+          "alias": "t1"
+        }
+      ],
+      "joins": [],
+      "where": {
+        "kind": "binary",
+        "op": "AND",
+        "left": {
+          "kind": "binary",
+          "op": "IS NOT",
+          "left": {
+            "kind": "column",
+            "alias": "t1",
+            "column_name": "closed_at"
+          },
+          "right": {
+            "kind": "literal",
+            "is_null": true
+          }
+        },
+        "right": {
+          "kind": "binary",
+          "op": "IS NOT",
+          "left": {
+            "kind": "column",
+            "alias": "t1",
+            "column_name": "opened_at"
+          },
+          "right": {
+            "kind": "literal",
+            "is_null": true
+          }
+        }
+      },
+      "select_items": [
+        {
+          "expr": {
+            "kind": "column",
+            "alias": "t1",
+            "column_name": "category"
+          },
+          "alias": "category"
+        },
+        {
+          "expr": {
+            "kind": "func",
+            "func_name": "ROUND",
+            "args": [
+              {
+                "kind": "func",
+                "func_name": "AVG",
+                "is_aggregate": true,
+                "args": [
+                  {
+                    "kind": "binary",
+                    "op": "/",
+                    "left": {
+                      "kind": "binary",
+                      "op": "-",
+                      "left": {
+                        "kind": "func",
+                        "func_name": "STRFTIME",
+                        "args": [
+                          {
+                            "kind": "literal",
+                            "value": "%s"
+                          },
+                          {
+                            "kind": "column",
+                            "alias": "t1",
+                            "column_name": "closed_at"
+                          }
+                        ]
+                      },
+                      "right": {
+                        "kind": "func",
+                        "func_name": "STRFTIME",
+                        "args": [
+                          {
+                            "kind": "literal",
+                            "value": "%s"
+                          },
+                          {
+                            "kind": "column",
+                            "alias": "t1",
+                            "column_name": "opened_at"
+                          }
+                        ]
+                      }
+                    },
+                    "right": {
+                      "kind": "literal",
+                      "value": 3600.0
+                    }
+                  }
+                ]
+              },
+              {
+                "kind": "literal",
+                "value": 2
+              }
+            ]
+          },
+          "alias": "avg_time_to_close"
+        }
+      ],
+      "group_by": [
+        {
+          "expr": {
+            "kind": "column",
+            "alias": "t1",
+            "column_name": "category"
+          }
+        }
+      ],
+      "order_by": [
+        {
+          "direction": "desc",
+          "expr": {
+            "kind": "func",
+            "func_name": "AVG",
+            "is_aggregate": true,
+            "args": [
+              {
+                "kind": "binary",
+                "op": "/",
+                "left": {
+                  "kind": "binary",
+                  "op": "-",
+                  "left": {
+                    "kind": "func",
+                    "func_name": "STRFTIME",
+                    "args": [
+                      {
+                        "kind": "literal",
+                        "value": "%s"
+                      },
+                      {
+                        "kind": "column",
+                        "alias": "t1",
+                        "column_name": "closed_at"
+                      }
+                    ]
+                  },
+                  "right": {
+                    "kind": "func",
+                    "func_name": "STRFTIME",
+                    "args": [
+                      {
+                        "kind": "literal",
+                        "value": "%s"
+                      },
+                      {
+                        "kind": "column",
+                        "alias": "t1",
+                        "column_name": "opened_at"
+                      }
+                    ]
+                  }
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 3600.0
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "plain",
+    "when": "\"average time to close a support ticket, broken down by ticket category\"",
+    "payload": "### Root Cause\n\nTwo separate problems are compounding:\n\n1. **Functional:** `JULIANDAY` is not in the allowed function whitelist, and the planner's own reasoning text shows it looping (\"JULIANDAY not allowed → use binary subtraction → that's wrong → JULIANDAY...\"). That indecision is why **no plan was emitted at all** this round.\n2. **Process:** The planner must commit to one expression and build the full plan node. Do not deliberate about portability in the plan text — just emit the whitelisted construct.\n\n### Required Fixes (Plan-level, no SQL)\n\n1. **Single table only — `tickets`.** No joins are needed. `category`, `opened_at`, `closed_at` all live on `tickets`. Do not pull in `agents`, `customers`, or `ticket_messages`.\n\n2. **Duration expression — use `STRFTIME` with the `'%s'` epoch format.** This is the only whitelisted way to turn these TEXT timestamps into a number. The elapsed value is:\n   `STRFTIME('%s', closed_at) - STRFTIME('%s', opened_at)`\n   Remember the format literal is the **first** argument, the column the **second**. Do not use `JULIANDAY`, `DATEDIFF`, `UNIX_TIMESTAMP`, or `EXTRACT(EPOCH ...)` — none are available.\n\n3. **Never subtract the raw TEXT columns.** `closed_at - opened_at` will silently coerce `'2013-12-20 15:22:09'` to `2013` and return 0. Abandon this fallback entirely; it is a correctness bug, not a validation error, so it will pass the validator and produce garbage.\n\n4. **Convert seconds to a human unit inside the aggregate.** Divide the epoch difference by `3600.0` (hours) or `86400.0` (days) before wrapping in `AVG(...)`. Use the decimal divisor — an integer divisor truncates short tickets to 0. Hours is the better fit here, since sample tickets close within 1–3 days.\n\n5. **Round the result.** Wrap the aggregate in `ROUND(..., 2)`; `ROUND` is whitelisted and keeps the output readable.\n\n6. **Alias must name the unit.** Use `avg_hours_to_close` (or `avg_days_to_close` if you chose 86400.0). A bare `avg_time_to_close` is ambiguous and should be avoided.\n\n7. **Filter with unary IS NOT NULL predicates.** Add a WHERE condition on `closed_at IS NOT NULL` expressed as a *unary null check* node, not a binary comparison against a NULL literal. Add the same check on `opened_at`, since both operands feed the arithmetic. Open/pending/escalated tickets have no close time and must be excluded.\n\n8. **GROUP BY `category` — unchanged.** This directly satisfies \"broken down by ticket category.\" The select list must contain exactly two items: `category` and the single rounded average.\n\n9. **ORDER BY: reference the select alias, not a repeated expression.** Order by `avg_hours_to_close` (descending is most useful — slowest categories first). If you re-type the full expression in `order_by` and leave any `JULIANDAY` remnant there, the same validation error fires again. Safest option: omit ORDER BY entirely if alias ordering is uncertain — it is not required by the query.\n\n10. **Optionally add `COUNT(*)` as a volume column** so categories with only one or two closed tickets are not mistaken for reliable averages. This is a nice-to-have; if added, it does not change the GROUP BY."
+  },
+  {
+    "name": "AggregatedResponse",
+    "when": "What is the average time to close a ticket, by category?",
+    "payload": {
+      "summary": "Average time to close a ticket varies by category, ranging from 86.84 (Account access) to 137.95 (Mobile app). Mobile app, Other, and Payment method tickets take the longest to resolve, while Account access closes notably faster than every other category — roughly 18 units below the next-fastest (Playback at 104.5) and about 51 units below the slowest. Most categories cluster in the 112–138 range, suggesting fairly consistent handling times outside of the Account access outlier.",
+      "format_type": "table",
+      "content": "| Rank | Category | Avg Time to Close |\n|------|----------------|-------------------|\n| 1 | Mobile app | 137.95 |\n| 2 | Other | 134.68 |\n| 3 | Payment method | 128.91 |\n| 4 | Download | 122.93 |\n| 5 | Feature request | 122.08 |\n| 6 | Subscription | 114.17 |\n| 7 | Billing | 112.46 |\n| 8 | Refund request | 112.07 |\n| 9 | Playback | 104.50 |\n| 10 | Account access | 86.84 |\n\n**Key takeaways**\n- **Slowest:** Mobile app (137.95) — likely involves device-specific troubleshooting or engineering escalation.\n- **Fastest:** Account access (86.84) — typically resolved with straightforward resets or verification steps.\n- **Spread:** 51.11 between the slowest and fastest categories; the middle eight categories fall within a tight ~26-unit band.\n- **Watch item:** \"Other\" ranking second-slowest may indicate miscategorized or hard-to-triage tickets worth reclassifying."
+    }
+  },
+  {
+    "name": "AnswerabilityResponse",
+    "when": "Which customers raised the most support tickets?",
+    "payload": {
+      "answerable_datasource_ids": [
+        "support"
+      ],
+      "reason": "The support datasource holds tickets linked to customers, allowing counting tickets per customer."
+    }
+  },
+  {
+    "name": "DecomposerResponse",
+    "when": "Which customers raised the most support tickets?",
+    "payload": {
+      "sub_queries": [
+        {
+          "id": "sq_1",
+          "datasource_id": "support",
+          "intent": "customers ranked by the number of support tickets they raised, highest first",
+          "metrics": [
+            {
+              "name": "ticket_count",
+              "aggregation": "count",
+              "description": "number of support tickets raised"
+            }
+          ],
+          "filters": [],
+          "group_by": [
+            {
+              "attribute": "customer"
+            }
+          ],
+          "order_by": [
+            {
+              "attribute": "ticket_count",
+              "direction": "desc"
+            }
+          ],
+          "limit": 10,
+          "expected_schema": [
+            {
+              "name": "customer",
+              "dtype": "string"
+            },
+            {
+              "name": "ticket_count",
+              "dtype": "int"
+            }
+          ]
+        }
+      ],
+      "combine_groups": [
+        {
+          "group_id": "cg_1",
+          "operation": "standalone",
+          "inputs": [
+            {
+              "subquery_id": "sq_1",
+              "role": "base"
+            }
+          ],
+          "join_keys": []
+        }
+      ],
+      "post_combine_ops": [],
+      "unmapped_subqueries": []
+    }
+  },
+  {
+    "name": "PlanModel",
+    "when": "customers ranked by the number of support tickets they raised, highest first",
+    "payload": {
+      "reasoning": "Join tickets to customers, group by customer full name, count tickets, order desc, limit 10.",
+      "tables": [
+        {
+          "name": "customers",
+          "alias": "t1"
+        },
+        {
+          "name": "tickets",
+          "alias": "t2"
+        }
+      ],
+      "joins": [
+        {
+          "left_alias": "t1",
+          "right_alias": "t2",
+          "join_type": "inner",
+          "condition": {
+            "kind": "binary",
+            "op": "=",
+            "left": {
+              "kind": "column",
+              "alias": "t1",
+              "column_name": "customer_id"
+            },
+            "right": {
+              "kind": "column",
+              "alias": "t2",
+              "column_name": "customer_id"
+            }
+          }
+        }
+      ],
+      "select_items": [
+        {
+          "expr": {
+            "kind": "binary",
+            "op": "||",
+            "left": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "column",
+                "alias": "t1",
+                "column_name": "first_name"
+              },
+              "right": {
+                "kind": "literal",
+                "value": " "
+              }
+            },
+            "right": {
+              "kind": "column",
+              "alias": "t1",
+              "column_name": "last_name"
+            }
+          },
+          "alias": "customer"
+        },
+        {
+          "expr": {
+            "kind": "func",
+            "func_name": "COUNT",
+            "args": [
+              {
+                "kind": "column",
+                "alias": "t2",
+                "column_name": "ticket_id"
+              }
+            ],
+            "is_aggregate": true
+          },
+          "alias": "ticket_count"
+        }
+      ],
+      "group_by": [
+        {
+          "expr": {
+            "kind": "binary",
+            "op": "||",
+            "left": {
+              "kind": "binary",
+              "op": "||",
+              "left": {
+                "kind": "column",
+                "alias": "t1",
+                "column_name": "first_name"
+              },
+              "right": {
+                "kind": "literal",
+                "value": " "
+              }
+            },
+            "right": {
+              "kind": "column",
+              "alias": "t1",
+              "column_name": "last_name"
+            }
+          }
+        }
+      ],
+      "order_by": [
+        {
+          "expr": {
+            "kind": "func",
+            "func_name": "COUNT",
+            "args": [
+              {
+                "kind": "column",
+                "alias": "t2",
+                "column_name": "ticket_id"
+              }
+            ],
+            "is_aggregate": true
+          },
+          "direction": "desc"
+        }
+      ],
+      "limit": 10
+    }
+  },
+  {
+    "name": "AggregatedResponse",
+    "when": "Which customers raised the most support tickets?",
+    "payload": {
+      "summary": "Luís Gonçalves leads with 10 support tickets, followed by a four-way tie at 9 tickets (Fernanda Ramos, Martha Silk, Patrick Gray, Wyatt Girard) and a five-way tie at 8 tickets. Ticket volume is tightly clustered across the top 10 customers, ranging only from 8 to 10.",
+      "format_type": "table",
+      "content": "| Rank | Customer | Ticket Count |\n|-----:|----------|-------------:|\n| 1 | Luís Gonçalves | 10 |\n| 2 | Fernanda Ramos | 9 |\n| 2 | Martha Silk | 9 |\n| 2 | Patrick Gray | 9 |\n| 2 | Wyatt Girard | 9 |\n| 6 | Alexandre Rocha | 8 |\n| 6 | Bjørn Hansen | 8 |\n| 6 | František Wichterlová | 8 |\n| 6 | Jennifer Peterson | 8 |\n| 6 | Lucas Mancini | 8 |\n\n**Key observations**\n- **Top customer:** Luís Gonçalves (10 tickets) is the only customer in double digits.\n- **Narrow spread:** Only a 2-ticket gap separates 1st from 10th place, so no single customer is a dramatic outlier.\n- **Ties:** Four customers tie at 9 tickets and five tie at 8, so rank ordering below 1st place is effectively arbitrary."
+    }
+  },
+  {
+    "name": "AnswerabilityResponse",
+    "when": "Which pages were viewed the most last year?",
+    "payload": {
+      "answerable_datasource_ids": [
+        "webanalytics"
+      ],
+      "reason": "Page view counts by page and date are held in the web analytics page_views/sessions tables."
+    }
+  },
+  {
+    "name": "DecomposerResponse",
+    "when": "Which pages were viewed the most last year?",
+    "payload": {
+      "sub_queries": [
+        {
+          "id": "sq_1",
+          "datasource_id": "webanalytics",
+          "intent": "pages with the highest number of views last year",
+          "kind": "scan",
+          "metrics": [
+            {
+              "name": "page_views",
+              "aggregation": "count",
+              "description": "total number of page views"
+            }
+          ],
+          "filters": [
+            {
+              "attribute": "time_period",
+              "operator": "=",
+              "value": "last_year"
+            }
+          ],
+          "group_by": [
+            {
+              "attribute": "page"
+            }
+          ],
+          "order_by": [
+            {
+              "attribute": "page_views",
+              "direction": "desc"
+            }
+          ],
+          "limit": 10,
+          "expected_schema": [
+            {
+              "name": "page",
+              "dtype": "string"
+            },
+            {
+              "name": "page_views",
+              "dtype": "int"
+            }
+          ]
+        }
+      ],
+      "combine_groups": [
+        {
+          "group_id": "cg_1",
+          "operation": "standalone",
+          "inputs": [
+            {
+              "subquery_id": "sq_1",
+              "role": "base"
+            }
+          ],
+          "join_keys": []
+        }
+      ],
+      "post_combine_ops": [],
+      "unmapped_subqueries": []
+    }
+  },
+  {
+    "name": "PlanModel",
+    "when": "pages with the highest number of views last year",
+    "payload": {
+      "reasoning": "Count page views per page_path for last year (data is from 2013), order by count desc, limit 10.",
+      "tables": [
+        {
+          "name": "page_views",
+          "alias": "t1"
+        }
+      ],
+      "joins": [],
+      "where": {
+        "kind": "binary",
+        "op": "=",
+        "left": {
+          "kind": "func",
+          "func_name": "DATE_PART",
+          "args": [
+            {
+              "kind": "literal",
+              "value": "year"
+            },
+            {
+              "kind": "column",
+              "alias": "t1",
+              "column_name": "viewed_at"
+            }
+          ]
+        },
+        "right": {
+          "kind": "literal",
+          "value": 2013
+        }
+      },
+      "select_items": [
+        {
+          "expr": {
+            "kind": "column",
+            "alias": "t1",
+            "column_name": "page_path"
+          },
+          "alias": "page"
+        },
+        {
+          "expr": {
+            "kind": "func",
+            "func_name": "COUNT",
+            "args": [
+              {
+                "kind": "column",
+                "alias": "t1",
+                "column_name": "page_view_id"
+              }
+            ],
+            "is_aggregate": true
+          },
+          "alias": "page_views"
+        }
+      ],
+      "group_by": [
+        {
+          "expr": {
+            "kind": "column",
+            "alias": "t1",
+            "column_name": "page_path"
+          }
+        }
+      ],
+      "order_by": [
+        {
+          "direction": "desc",
+          "expr": {
+            "kind": "func",
+            "func_name": "COUNT",
+            "args": [
+              {
+                "kind": "column",
+                "alias": "t1",
+                "column_name": "page_view_id"
+              }
+            ],
+            "is_aggregate": true
+          }
+        }
+      ],
+      "limit": 10
+    }
+  },
+  {
+    "name": "AggregatedResponse",
+    "when": "Which pages were viewed the most last year?",
+    "payload": {
+      "summary": "The top 10 most-viewed pages last year ranged from 40 views (/pricing) down to 30 views (/catalog/jazz), totaling 352 views. Traffic is remarkably evenly distributed — only a 10-view spread separates the most and least viewed pages in the top 10 — with /pricing, /account, and /catalog/classical leading the list.",
+      "format_type": "table",
+      "content": "| Rank | Page | Page Views |\n| --- | --- | ---: |\n| 1 | /pricing | 40 |\n| 2 | /account | 39 |\n| 3 | /catalog/classical | 38 |\n| 4 | /albums | 37 |\n| 5 | /signup | 36 |\n| 6 | / | 35 |\n| 7 | /blog/whats-new | 34 |\n| 8 | /artists | 32 |\n| 9 | /catalog/rock | 31 |\n| 10 | /catalog/jazz | 30 |\n| | **Total (top 10)** | **352** |\n\n**Observations**\n- **Conversion-oriented pages lead:** /pricing, /account, and /signup all rank in the top 5, suggesting strong intent-driven traffic.\n- **Catalog pages are well represented:** three genre pages (/catalog/classical, /catalog/rock, /catalog/jazz) appear in the top 10, with classical clearly outperforming the others.\n- **Flat distribution:** the gap between #1 and #10 is only 10 views (~25%), so no single page dominates traffic."
+    }
+  },
+  {
+    "name": "AnswerabilityResponse",
+    "when": "How many sessions came from each marketing channel?",
+    "payload": {
+      "answerable_datasource_ids": [
+        "webanalytics"
+      ],
+      "reason": "Web analytics holds sessions and referrer marketing channel data."
+    }
+  },
+  {
+    "name": "DecomposerResponse",
+    "when": "How many sessions came from each marketing channel?",
+    "payload": {
+      "sub_queries": [
+        {
+          "id": "sq_1",
+          "datasource_id": "webanalytics",
+          "intent": "count of sessions broken down by marketing channel",
+          "kind": "scan",
+          "metrics": [
+            {
+              "name": "session_count",
+              "aggregation": "count",
+              "description": "number of sessions"
+            }
+          ],
+          "filters": [],
+          "group_by": [
+            {
+              "attribute": "marketing_channel"
+            }
+          ],
+          "expected_schema": [
+            {
+              "name": "marketing_channel",
+              "dtype": "string"
+            },
+            {
+              "name": "session_count",
+              "dtype": "int"
+            }
+          ]
+        }
+      ],
+      "combine_groups": [
+        {
+          "group_id": "cg_1",
+          "operation": "standalone",
+          "inputs": [
+            {
+              "subquery_id": "sq_1",
+              "role": "base"
+            }
+          ],
+          "join_keys": []
+        }
+      ],
+      "post_combine_ops": [],
+      "unmapped_subqueries": []
+    }
+  },
+  {
+    "name": "PlanModel",
+    "when": "count of sessions broken down by marketing channel",
+    "payload": {
+      "reasoning": "Join sessions to referrers on referrer_id, group by channel and count sessions.",
+      "tables": [
+        {
+          "name": "sessions",
+          "alias": "t1"
+        },
+        {
+          "name": "referrers",
+          "alias": "t2"
+        }
+      ],
+      "joins": [
+        {
+          "left_alias": "t1",
+          "right_alias": "t2",
+          "join_type": "inner",
+          "condition": {
+            "kind": "binary",
+            "op": "=",
+            "left": {
+              "kind": "column",
+              "alias": "t1",
+              "column_name": "referrer_id"
+            },
+            "right": {
+              "kind": "column",
+              "alias": "t2",
+              "column_name": "referrer_id"
+            }
+          }
+        }
+      ],
+      "select_items": [
+        {
+          "expr": {
+            "kind": "column",
+            "alias": "t2",
+            "column_name": "channel"
+          },
+          "alias": "marketing_channel"
+        },
+        {
+          "expr": {
+            "kind": "func",
+            "func_name": "COUNT",
+            "args": [
+              {
+                "kind": "column",
+                "alias": "t1",
+                "column_name": "session_id"
+              }
+            ],
+            "is_aggregate": true
+          },
+          "alias": "session_count"
+        }
+      ],
+      "group_by": [
+        {
+          "expr": {
+            "kind": "column",
+            "alias": "t2",
+            "column_name": "channel"
+          }
+        }
+      ],
+      "order_by": [
+        {
+          "expr": {
+            "kind": "func",
+            "func_name": "COUNT",
+            "args": [
+              {
+                "kind": "column",
+                "alias": "t1",
+                "column_name": "session_id"
+              }
+            ],
+            "is_aggregate": true
+          },
+          "direction": "desc"
+        }
+      ]
+    }
+  },
+  {
+    "name": "AggregatedResponse",
+    "when": "How many sessions came from each marketing channel?",
+    "payload": {
+      "summary": "Sessions totaled 768 across six marketing channels. Organic (199) and social (189) led the way, together accounting for just over half of all sessions (50.5%), followed by referral (147). Direct and paid tied at 83 sessions each, while email contributed the fewest at 67.",
+      "format_type": "table",
+      "content": "| Marketing Channel | Sessions | % of Total |\n| --- | ---: | ---: |\n| Organic | 199 | 25.9% |\n| Social | 189 | 24.6% |\n| Referral | 147 | 19.1% |\n| Direct | 83 | 10.8% |\n| Paid | 83 | 10.8% |\n| Email | 67 | 8.7% |\n| **Total** | **768** | **100%** |"
+    }
+  },
+  {
+    "name": "AnswerabilityResponse",
+    "when": "What is the bounce rate by device type?",
+    "payload": {
+      "answerable_datasource_ids": [
+        "webanalytics"
+      ],
+      "reason": "Web analytics holds sessions with bounce flags and device info."
+    }
+  },
+  {
+    "name": "DecomposerResponse",
+    "when": "What is the bounce rate by device type?",
+    "payload": {
+      "sub_queries": [
+        {
+          "id": "sq_1",
+          "datasource_id": "webanalytics",
+          "intent": "bounce rate broken down by device type",
+          "metrics": [
+            {
+              "name": "bounce_rate",
+              "aggregation": "avg",
+              "description": "share of sessions that bounced"
+            }
+          ],
+          "filters": [],
+          "group_by": [
+            {
+              "attribute": "device_type"
+            }
+          ],
+          "expected_schema": [
+            {
+              "name": "device_type",
+              "dtype": "string"
+            },
+            {
+              "name": "bounce_rate",
+              "dtype": "float"
+            }
+          ]
+        }
+      ],
+      "combine_groups": [
+        {
+          "group_id": "cg_1",
+          "operation": "standalone",
+          "inputs": [
+            {
+              "subquery_id": "sq_1",
+              "role": "base"
+            }
+          ],
+          "join_keys": []
+        }
+      ],
+      "post_combine_ops": [],
+      "unmapped_subqueries": []
+    }
+  },
+  {
+    "name": "PlanModel",
+    "when": "bounce rate broken down by device type",
+    "payload": {
+      "reasoning": "Join sessions to devices, group by device_type, bounce rate = AVG(is_bounce).",
+      "tables": [
+        {
+          "name": "sessions",
+          "alias": "t1"
+        },
+        {
+          "name": "devices",
+          "alias": "t2"
+        }
+      ],
+      "joins": [
+        {
+          "left_alias": "t1",
+          "right_alias": "t2",
+          "join_type": "inner",
+          "condition": {
+            "kind": "binary",
+            "op": "=",
+            "left": {
+              "kind": "column",
+              "alias": "t1",
+              "column_name": "device_id"
+            },
+            "right": {
+              "kind": "column",
+              "alias": "t2",
+              "column_name": "device_id"
+            }
+          }
+        }
+      ],
+      "select_items": [
+        {
+          "expr": {
+            "kind": "column",
+            "alias": "t2",
+            "column_name": "device_type"
+          },
+          "alias": "device_type"
+        },
+        {
+          "expr": {
+            "kind": "func",
+            "func_name": "AVG",
+            "args": [
+              {
+                "kind": "column",
+                "alias": "t1",
+                "column_name": "is_bounce"
+              }
+            ],
+            "is_aggregate": true
+          },
+          "alias": "bounce_rate"
+        }
+      ],
+      "group_by": [
+        {
+          "expr": {
+            "kind": "column",
+            "alias": "t2",
+            "column_name": "device_type"
+          }
+        }
+      ],
+      "order_by": [
+        {
+          "expr": {
+            "kind": "func",
+            "func_name": "AVG",
+            "args": [
+              {
+                "kind": "column",
+                "alias": "t1",
+                "column_name": "is_bounce"
+              }
+            ],
+            "is_aggregate": true
+          },
+          "direction": "desc"
+        }
+      ]
+    }
+  },
+  {
+    "name": "AggregatedResponse",
+    "when": "What is the bounce rate by device type?",
+    "payload": {
+      "summary": "Bounce rates vary modestly across device types, ranging from 18.8% to 23.6%. Mobile users bounce most often (23.58%), followed by desktop (19.84%) and tablet (18.75%) — a spread of about 4.8 percentage points between the highest and lowest.",
+      "format_type": "table",
+      "content": "| Device Type | Bounce Rate |\n|---|---|\n| Mobile | 23.58% |\n| Desktop | 19.84% |\n| Tablet | 18.75% |\n\n**Key takeaways:**\n- **Mobile** has the highest bounce rate at **23.58%**, roughly 3.7 points above desktop and 4.8 points above tablet.\n- **Desktop** (19.84%) and **tablet** (18.75%) perform similarly, with only ~1.1 points separating them.\n- The elevated mobile bounce rate may warrant a review of mobile page load times, layout, and above-the-fold content."
+    }
+  },
+  {
+    "name": "AnswerabilityResponse",
+    "when": "How many purchases were there per month in 2013?",
+    "payload": {
+      "answerable_datasource_ids": [
+        "chinook",
+        "webanalytics"
+      ],
+      "reason": "Purchases per month can come from Chinook invoices or from webanalytics purchase conversion events."
+    }
+  },
+  {
+    "name": "DecomposerResponse",
+    "when": "How many purchases were there per month in 2013?",
+    "payload": {
+      "sub_queries": [
+        {
+          "id": "sq_1",
+          "datasource_id": "chinook",
+          "intent": "count of purchases per month in 2013",
+          "metrics": [
+            {
+              "name": "purchase_count",
+              "aggregation": "count",
+              "description": "number of purchases"
+            }
+          ],
+          "filters": [
+            {
+              "attribute": "year",
+              "operator": "=",
+              "value": 2013
+            }
+          ],
+          "group_by": [
+            {
+              "attribute": "month"
+            }
+          ],
+          "order_by": [
+            {
+              "attribute": "month",
+              "direction": "asc"
+            }
+          ],
+          "expected_schema": [
+            {
+              "name": "month",
+              "dtype": "string"
+            },
+            {
+              "name": "purchase_count",
+              "dtype": "int"
+            }
+          ]
+        }
+      ],
+      "combine_groups": [
+        {
+          "group_id": "cg_1",
+          "operation": "standalone",
+          "inputs": [
+            {
+              "subquery_id": "sq_1",
+              "role": "base"
+            }
+          ],
+          "join_keys": []
+        }
+      ],
+      "post_combine_ops": [],
+      "unmapped_subqueries": []
+    }
+  },
+  {
+    "name": "PlanModel",
+    "when": "count of purchases per month in 2013",
+    "payload": {
+      "reasoning": "Count invoices (purchases) grouped by month in 2013. Filter year with DATE_PART('year', InvoiceDate) = 2013, group by DATE_TRUNC('month', InvoiceDate), ordered ascending.",
+      "tables": [
+        {
+          "name": "Invoice",
+          "alias": "t1"
+        }
+      ],
+      "joins": [],
+      "where": {
+        "kind": "binary",
+        "op": "=",
+        "left": {
+          "kind": "func",
+          "func_name": "DATE_PART",
+          "args": [
+            {
+              "kind": "literal",
+              "value": "year"
+            },
+            {
+              "kind": "column",
+              "alias": "t1",
+              "column_name": "InvoiceDate"
+            }
+          ]
+        },
+        "right": {
+          "kind": "literal",
+          "value": 2013
+        }
+      },
+      "select_items": [
+        {
+          "expr": {
+            "kind": "func",
+            "func_name": "DATE_TRUNC",
+            "args": [
+              {
+                "kind": "literal",
+                "value": "month"
+              },
+              {
+                "kind": "column",
+                "alias": "t1",
+                "column_name": "InvoiceDate"
+              }
+            ]
+          },
+          "alias": "month"
+        },
+        {
+          "expr": {
+            "kind": "func",
+            "func_name": "COUNT",
+            "args": [
+              {
+                "kind": "column",
+                "alias": "t1",
+                "column_name": "InvoiceId"
+              }
+            ],
+            "is_aggregate": true
+          },
+          "alias": "purchase_count"
+        }
+      ],
+      "group_by": [
+        {
+          "expr": {
+            "kind": "func",
+            "func_name": "DATE_TRUNC",
+            "args": [
+              {
+                "kind": "literal",
+                "value": "month"
+              },
+              {
+                "kind": "column",
+                "alias": "t1",
+                "column_name": "InvoiceDate"
+              }
+            ]
+          }
+        }
+      ],
+      "order_by": [
+        {
+          "expr": {
+            "kind": "func",
+            "func_name": "DATE_TRUNC",
+            "args": [
+              {
+                "kind": "literal",
+                "value": "month"
+              },
+              {
+                "kind": "column",
+                "alias": "t1",
+                "column_name": "InvoiceDate"
+              }
+            ]
+          },
+          "direction": "asc"
+        }
+      ]
+    }
+  },
+  {
+    "name": "AggregatedResponse",
+    "when": "How many purchases were there per month in 2013?",
+    "payload": {
+      "summary": "In 2013 there were 80 purchases total, averaging about 6.7 per month. Monthly counts were highly consistent: 10 of the 12 months recorded 7 purchases, while February and April each recorded 5 — the only dips in the year.",
+      "format_type": "table",
+      "content": "| Month | Purchase Count |\n|---|---|\n| Jan 2013 | 7 |\n| Feb 2013 | 5 |\n| Mar 2013 | 7 |\n| Apr 2013 | 5 |\n| May 2013 | 7 |\n| Jun 2013 | 7 |\n| Jul 2013 | 7 |\n| Aug 2013 | 7 |\n| Sep 2013 | 7 |\n| Oct 2013 | 7 |\n| Nov 2013 | 7 |\n| Dec 2013 | 7 |\n| **Total** | **80** |\n\n**Highlights**\n- **Peak months:** January, March, May–December (7 purchases each)\n- **Lowest months:** February and April (5 purchases each)\n- **Average:** ~6.7 purchases per month\n- All 12 months of 2013 are represented, with no gaps in the data."
+    }
+  }
+]
