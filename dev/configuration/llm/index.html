@@ -4602,7 +4602,7 @@ keeps its own key, endpoint and cache behaviour: the planner's system prompt is
 cache-marked for Anthropic, the others are sent unmarked to OpenAI. The model
 each call actually used is recorded per node in <code>QueryResult.usage.calls</code> and
 in a run trace's <code>llm.by_node</code> (see <a href="../../observability/debugging/">Debugging</a>).</p>
-<p>In the demo, the playground's <strong>Settings</strong> panel writes exactly these entries
+<p>In the demo, the playground's <strong>Settings</strong> page writes exactly these entries
 into <code>configs/llm.demo.yaml</code>. Choosing a provider and a model for a step adds
 an <code>agents:</code> entry with <code>provider</code>, <code>model</code> and the temperature that model
 takes: <code>0.0</code>, or <code>null</code> for <code>gpt-5.5</code>, <code>gpt-5-mini</code>, <code>claude-opus-5</code> and
@@ -4610,7 +4610,7 @@ takes: <code>0.0</code>, or <code>null</code> for <code>gpt-5.5</code>, <code>gp
 <code>base_url</code> and <code>api_key</code> reference; a step on another provider gets that
 provider's own <code>${env:...}</code> reference and no <code>base_url</code>. Choosing "Default"
 removes the entry. The running engine reloads the file, so the change applies
-to the next question. The panel offers the providers and models in
+to the next question. The page offers the providers and models in
 <code>VERIFIED_MODELS</code> (<code>nl2sql/llm/providers.py</code>), OpenAI and Anthropic for
 now, and a provider only once its key is saved. See
 <a href="../../getting_started/demo/#the-settings-page">the Settings page</a>.</p>

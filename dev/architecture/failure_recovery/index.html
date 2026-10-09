@@ -4859,7 +4859,7 @@
 <h3 id="retry-scope">Retry scope</h3>
 <ul>
 <li>Only the SQL agent subgraph retries (planner and validation loop).</li>
-<li>Other nodes (resolver, decomposer, global planner, generator, executor, aggregator, answer synthesizer) do not retry.</li>
+<li>Other nodes (resolver, decomposer, generator, executor, aggregator, answer synthesizer) do not retry.</li>
 </ul>
 <h3 id="backoff">Backoff</h3>
 <ul>
@@ -4898,11 +4898,11 @@
 <h3 id="what-must-restart">What must restart</h3>
 <ul>
 <li>Any graph-level failure (timeout, cancellation, unknown exception) requires a new run.</li>
-<li>Resolver failures, decomposer failures, global planner failures, generator failures, executor failures, and aggregator failures have no local recovery and require a new run.</li>
+<li>Resolver failures, decomposer failures, generator failures, executor failures, and aggregator failures have no local recovery and require a new run.</li>
 </ul>
 <h3 id="what-is-unrecoverable">What is unrecoverable</h3>
 <ul>
-<li><code>FATAL_ERRORS</code> or <code>CRITICAL</code> severity errors (security violations, missing datasource ID, missing LLM, invalid state) terminate the subgraph or graph without retry.</li>
+<li><code>FATAL_ERRORS</code> or <code>CRITICAL</code> severity errors (security violations, missing datasource ID, missing LLM, invalid state, and every <code>PROVIDER_*</code> error, since a retry would make the same call to the same provider) terminate the subgraph or graph without retry.</li>
 </ul>
 <hr />
 <h2 id="replay-support">Replay Support</h2>

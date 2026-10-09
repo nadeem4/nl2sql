@@ -4358,7 +4358,7 @@ no storage.</p>
 </tr>
 <tr>
 <td>Query timeout</td>
-<td>60s</td>
+<td>300s</td>
 <td><code>GLOBAL_TIMEOUT_SEC</code></td>
 <td>the run</td>
 </tr>
@@ -4510,9 +4510,10 @@ command rather than saved into <code>.git/config</code>.</p>
 <p><strong>When it runs.</strong> On every push to <code>main</code> that touches something the Space is
 built from -- <code>deploy/huggingface/**</code> (its root), <code>packages/nl2sql/**</code> (the
 engine the image installs) or <code>web/playground/**</code> (the page the engine serves)
--- and on demand. A docs-only merge changes none of those and does not
-redeploy. One deploy runs at a time; a run overtaken by a newer push is
-cancelled.</p>
+-- or the workflow file itself, <code>.github/workflows/publish_space.yml</code>, so a
+change to the deploy logic redeploys too -- and on demand. A docs-only merge
+changes none of those and does not redeploy. One deploy runs at a time; a run
+overtaken by a newer push is cancelled.</p>
 <p><strong>What it reports.</strong> The job never calls a build that did not happen a success.
 If the push produced a commit, the workflow checks the Space's head is that
 commit, then waits for a build to actually start and finish; a Space that never
