@@ -159,12 +159,20 @@ How the engine uses it:
   `function_calling` method), for every node. Anthropic's native JSON outputs
   (`output_config.format`) do not accept recursive schemas, and the planner's
   `PlanModel` is recursive; neither does strict tool use (`strict: true`).
-  Claude now and then nests a tool call's arguments one level down, as
-  `{"input": {...}}` or `{"inputs": {...}}` -- a recording run on
-  `claude-opus-5` failed the decomposer this way. The wire unwraps exactly that
-  shape before the node parses it: a single key the schema does not declare,
-  holding an object with every required field. Any other malformed answer still
-  fails validation as before.
+  Claude now and then nests a tool call's arguments one level down under a key
+  of its own choosing (`{"input": {...}}`, `{"query": {...}}`, `{"dtype": {...}}`).
+  Recording runs on `claude-opus-5` failed the decomposer this way on up to 9
+  of 20 questions, and no other node. The root cause was the decomposer's tool:
+  it went out with an empty description and no field descriptions, while its
+  prompt asked for "JSON only" rather than a tool call. `DecomposerResponse`
+  now describes itself and each top-level field ("call this tool with the
+  decomposition itself as the arguments ... do not wrap them"), and the prompt
+  asks for the tool call. As a safety net the wire also unwraps that shape
+  before any node parses it: a dict with exactly one key the schema does not
+  declare, holding an object with every required field and at least one
+  declared one. Any other malformed answer still fails validation as before.
+  A new node's response model should carry a docstring and field descriptions
+  for the same reason.
 - **Prompt caching.** The resolver, decomposer, planner and refiner send a
   stable system message and a variable human message. On the `anthropic` wire
   only, the last system

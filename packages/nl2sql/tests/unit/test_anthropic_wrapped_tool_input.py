@@ -1,4 +1,4 @@
-"""Claude sometimes nests a forced tool call's arguments under ``input``/``inputs``.
+"""Claude sometimes nests a forced tool call's arguments under one extra key.
 
 A real recording run on ``claude-opus-5`` failed the decomposer twice with::
 
@@ -6,10 +6,12 @@ A real recording run on ``claude-opus-5`` failed the decomposer twice with::
     combine_groups Field required
     [input_value={'input': {'sub_queries': ..., 'mapped_subqueries': []}}]
 
-and once with the key ``inputs``. The anthropic wire unwraps that one shape --
-a single ``input``/``inputs`` key the schema does not declare, holding an
-object with every required field -- and nothing else. Everything here runs
-against ``FakeLLMServer``; no key, no network.
+and once with the key ``inputs``; a second run found ``query`` and ``dtype``
+as well. The root cause was the decomposer's tool and prompt
+(``test_decomposer_tool_schema.py``). As a safety net the anthropic wire
+unwraps that one shape -- a single key the schema does not declare, holding an
+object with every required field and at least one declared one -- and nothing
+else. Everything here runs against ``FakeLLMServer``; no key, no network.
 """
 from __future__ import annotations
 
@@ -42,8 +44,9 @@ SCHEMA = {
 }
 
 
-@pytest.mark.parametrize("key", ["input", "inputs"])
+@pytest.mark.parametrize("key", ["input", "inputs", "query", "dtype", "payload"])
 def test_a_payload_wrapped_in_one_undeclared_key_is_unwrapped(key):
+    """A second real run wrapped it under ``query`` and ``dtype`` too: the key is arbitrary."""
     assert unwrap_tool_input({key: DECOMPOSED}, SCHEMA) == DECOMPOSED
 
 
@@ -64,10 +67,12 @@ def test_a_wrapped_value_missing_required_fields_is_left_for_validation_to_repor
     assert unwrap_tool_input(args, SCHEMA) == args
 
 
-def test_other_wrapper_keys_and_non_objects_are_left_alone():
-    assert unwrap_tool_input({"payload": DECOMPOSED}, SCHEMA) == {"payload": DECOMPOSED}
+def test_non_objects_siblings_and_unrelated_objects_are_left_alone():
     assert unwrap_tool_input({"input": "text"}, SCHEMA) == {"input": "text"}
     assert unwrap_tool_input({"input": DECOMPOSED, "extra": 1}, SCHEMA) == {"input": DECOMPOSED, "extra": 1}
+    # Nothing the schema declares inside: not the answer, so not unwrapped.
+    no_required = {"type": "object", "properties": {"reason": {"type": "string"}}}
+    assert unwrap_tool_input({"dtype": {"name": "x"}}, no_required) == {"dtype": {"name": "x"}}
 
 
 PROMPT = ChatPromptTemplate.from_messages([("system", "Answer with the tool."), ("human", "{question}")])
@@ -76,6 +81,8 @@ PROMPT = ChatPromptTemplate.from_messages([("system", "Answer with the tool."), 
 @pytest.mark.parametrize("schema, payload, key", [
     (DecomposerResponse, DECOMPOSED, "input"),
     (DecomposerResponse, DECOMPOSED, "inputs"),
+    (DecomposerResponse, DECOMPOSED, "query"),
+    (DecomposerResponse, {**DECOMPOSED, "mapped_subqueries": []}, "dtype"),
     (AnswerabilityResponse, {"answerable_datasource_ids": ["chinook"], "reason": "music store"}, "input"),
 ])
 def test_every_structured_call_on_claude_survives_a_wrapped_answer(schema, payload, key):

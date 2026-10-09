@@ -128,8 +128,8 @@ Map of LLM name → config (API key excluded).
   whose requests go through the adapter's `mark_cache` (a
   `cache_control: {"type": "ephemeral"}` breakpoint on the last system block),
   with `max_tokens=16000`, and whose tool calls go through the adapter's
-  `repair_tool_calls` (arguments Claude nested under a single undeclared
-  `input`/`inputs` key are unwrapped). It needs the `nl2sql-engine[anthropic]` extra;
+  `repair_tool_calls` (arguments Claude nested under a single key the schema
+  does not declare -- `input`, `query`, ... -- are unwrapped). It needs the `nl2sql-engine[anthropic]` extra;
   without it the first `get_llm()` raises a `ValueError` naming the extra. See
   [LLM configuration → Anthropic](../../configuration/llm.md#anthropic-claude).
 - `openai`, `anthropic` and `openrouter` require an API key (`OPENAI_API_KEY`,

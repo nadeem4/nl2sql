@@ -133,10 +133,30 @@ class UnmappedSubQuery(BaseModel):
 
 
 class DecomposerResponse(BaseModel):
-    sub_queries: List[SubQuery]
-    combine_groups: List[CombineGroup]
-    post_combine_ops: List[PostCombineOp] = Field(default_factory=list)
-    unmapped_subqueries: List[UnmappedSubQuery] = Field(default_factory=list)
+    """The question decomposed into semantic sub-queries and how to combine them.
+
+    Call this tool with the decomposition itself as the arguments: sub_queries,
+    combine_groups, post_combine_ops and unmapped_subqueries at the top level.
+    Do not wrap them in another object or under any other key.
+    """
+    # This docstring is the tool's description on the wire. Without it the tool
+    # went out with an empty description and Claude nested the arguments under
+    # a key of its own ("input", "query", "dtype") on almost half the questions.
+
+    sub_queries: List[SubQuery] = Field(
+        description="One semantic sub-query per datasource-level intent of the question."
+    )
+    combine_groups: List[CombineGroup] = Field(
+        description="How the sub-queries' results combine; a single sub-query is one standalone group."
+    )
+    post_combine_ops: List[PostCombineOp] = Field(
+        default_factory=list,
+        description="Operations on a combined group's result. Empty when one sub-query answers the question.",
+    )
+    unmapped_subqueries: List[UnmappedSubQuery] = Field(
+        default_factory=list,
+        description="Intents no resolved datasource can answer.",
+    )
 
     @model_validator(mode="after")
     def validate_references(self):
