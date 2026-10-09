@@ -4656,7 +4656,7 @@
 </ul>
 <h3 id="user_context"><code>user_context</code></h3>
 <ul>
-<li>Creation: passed into <code>GraphState</code> in <code>run_with_graph</code> (or default factory).</li>
+<li>Creation: passed into <code>GraphState</code> in <code>run_with_graph</code>; a caller that passes none (or <code>None</code>) gets an empty <code>UserContext</code>, the field's default.</li>
 <li>Mutation: none in code.</li>
 <li>Read points: <code>DatasourceResolverNode</code> (RBAC), <code>ExecutorNode</code>, and subgraph state in <code>wrap_subgraph</code>.</li>
 <li>Reset: none.</li>
