@@ -37,19 +37,21 @@ class CachingChatAnthropic(ChatAnthropic):
 
     def _generate(self, *args: Any, **kwargs: Any):
         try:
-            return super()._generate(*args, **kwargs)
+            result = super()._generate(*args, **kwargs)
         except anthropic.BadRequestError as exc:
             if "temperature" in str(exc):
                 raise self._explain(exc) from exc
             raise
+        return _WIRE.repair_tool_calls(result, kwargs.get("tools"))
 
     async def _agenerate(self, *args: Any, **kwargs: Any):
         try:
-            return await super()._agenerate(*args, **kwargs)
+            result = await super()._agenerate(*args, **kwargs)
         except anthropic.BadRequestError as exc:
             if "temperature" in str(exc):
                 raise self._explain(exc) from exc
             raise
+        return _WIRE.repair_tool_calls(result, kwargs.get("tools"))
 
 
 def build_claude_client(model: str, temperature: Any, **kwargs: Any) -> CachingChatAnthropic:
