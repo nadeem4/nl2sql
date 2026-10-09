@@ -87,7 +87,7 @@ The lifecycle below lists creation, mutation, reads, and resets based strictly o
 - Reset: none.
 
 ### `user_context`
-- Creation: passed into `GraphState` in `run_with_graph` (or default factory).
+- Creation: passed into `GraphState` in `run_with_graph`; a caller that passes none (or `None`) gets an empty `UserContext`, the field's default.
 - Mutation: none in code.
 - Read points: `DatasourceResolverNode` (RBAC), `ExecutorNode`, and subgraph state in `wrap_subgraph`.
 - Reset: none.

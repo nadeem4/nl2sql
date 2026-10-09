@@ -32,7 +32,7 @@ Parameters:
 | `natural_language` | `str` | yes | User query. |
 | `datasource_id` | `Optional[str]` | no | Datasource override; otherwise resolved. |
 | `execute` | `bool` | no | Whether to execute SQL against datasource. |
-| `user_context` | `Optional[UserContext]` | no | RBAC context. Pass one with a role: omitting it currently raises a pydantic `ValidationError` (the graph state does not accept `None`), and a role the policy does not know is refused. |
+| `user_context` | `Optional[UserContext]` | no | RBAC context. Omitted (or `None`), the run starts with an empty `UserContext`, a caller with no roles, and RBAC treats it exactly as it treats any roles list it has no policy for. Pass one with a role to be granted anything. |
 | `cancellation_token` | `Optional[CancellationToken]` | no | A token (`from nl2sql import CancellationToken`) the caller cancels from another thread to stop the run. No further step and no further model call starts once it is cancelled; the step in flight finishes, and the result carries one `CANCELLED` error. `NL2SQL.run_query` takes it too. The playground cancels it when the browser drops the request. |
 
 Returns:
