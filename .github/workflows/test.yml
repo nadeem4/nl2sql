@@ -142,3 +142,36 @@ jobs:
         with:
           name: dist
           path: dist/
+
+  # Installs the wheels `build` just made into an empty virtualenv the way a
+  # user does -- `pip install "nl2sql-engine[demo]"` -- and boots
+  # `nl2sql demo --hosted`, the command the Hugging Face Space runs, with no
+  # API key. Passes only when the page, /api/meta, /api/schema and /api/index
+  # all answer from that install. scripts/fresh_install_check.py is the whole
+  # check, so it runs the same locally: `python scripts/fresh_install_check.py --build`.
+  fresh-install:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Download distributions
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      # The same immutable model the integration job caches.
+      - name: Cache the local embedding model
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/chroma
+          key: chroma-onnx-all-MiniLM-L6-v2
+
+      - name: Install the wheels fresh and boot the demo
+        run: python scripts/fresh_install_check.py --dist dist
