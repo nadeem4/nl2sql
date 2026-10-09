@@ -88,6 +88,11 @@ deliberate act, never part of CI. Either:
   re-records the playground home page's clips, which needs no key: Ask's clip is
   made from these recordings, so record the answers first.
 
+The recordings ship inside the `nl2sql-engine` wheel, and the public Space runs
+released versions only, so merged recordings reach the Space with the next
+release (see [Deployed by the release](#deployed-by-the-release)), not when
+their pull request merges.
+
 `tests/e2e/test_record_demo_answers_fake_llm.py` runs the whole chain -- the
 script, the proxy on the Anthropic wire, a keyless hosted visitor replaying the
 result -- against a stand-in provider, so it is tested with no key and nothing
