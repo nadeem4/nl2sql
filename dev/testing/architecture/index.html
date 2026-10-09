@@ -1854,7 +1854,7 @@ four modules carry it - <code>test_ast_planner_real_data.py</code>,
 model directly. Nothing else in the directory needs a key: indexing skips its
 optional enrichment pass when no LLM is available, so tests that index real
 data run key-free.</p>
-<p><code>.github/workflows/test.yml</code> has two test jobs:</p>
+<p><code>.github/workflows/test.yml</code> has two test jobs over the source tree:</p>
 <ul>
 <li><strong><code>test</code></strong> runs <code>pytest -m "not integration"</code> across Python 3.12 and 3.13.
   This is the fast job and must stay fast.</li>
@@ -1865,9 +1865,31 @@ data run key-free.</p>
   aggregation and the local embedder against the real Chinook database; run
   it with <code>--collect-only -q</code> for the current list.</li>
 </ul>
+<p>Two more jobs test the package rather than the source tree:</p>
+<ul>
+<li><strong><code>build</code></strong> builds the three wheels and sdists, installs them into a clean
+  virtualenv and runs <code>import nl2sql</code> and <code>nl2sql --help</code>.</li>
+<li>
+<p><strong><code>fresh-install</code></strong> takes those wheels and installs them the way a user
+  does, <code>pip install "nl2sql-engine[demo]"</code>, into an empty virtualenv outside
+  the checkout. It then boots <code>nl2sql demo --hosted</code> (the command the Hugging
+  Face Space runs) with no API key, and passes only when the playground page,
+  <code>/api/meta</code>, <code>/api/schema</code> and <code>/api/index</code> all answer from that install. It
+  is what catches a wheel that imports but ships without the built playground,
+  the sample databases or a dependency the demo extra forgot.
+  <code>scripts/fresh_install_check.py</code> is the whole check, so it runs the same on a
+  laptop:</p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-1-1" id="__codelineno-1-1" name="__codelineno-1-1"></a>pip<span class="w"> </span>install<span class="w"> </span>build
+<a href="#__codelineno-1-2" id="__codelineno-1-2" name="__codelineno-1-2"></a>python<span class="w"> </span>scripts/fresh_install_check.py<span class="w"> </span>--build<span class="w">   </span><span class="c1"># builds into dist/ first</span>
+</code></pre></div>
+</li>
+</ul>
+<p>Any <code>*_API_KEY</code> in your environment is dropped for the run, so a key you
+  exported cannot make it pass where CI would fail. The decisions it makes are
+  unit-tested in <code>tests/unit/test_fresh_install_check.py</code>.</p>
 <p>Nothing selects <code>llm</code>. Those tests are run by hand with a key:</p>
-<div class="highlight"><pre><span></span><code><a href="#__codelineno-1-1" id="__codelineno-1-1" name="__codelineno-1-1"></a>nl2sql<span class="w"> </span>setup<span class="w"> </span>--demo
-<a href="#__codelineno-1-2" id="__codelineno-1-2" name="__codelineno-1-2"></a><span class="nv">EMBEDDING_PROVIDER</span><span class="o">=</span><span class="nb">local</span><span class="w"> </span><span class="nv">OPENAI_API_KEY</span><span class="o">=</span>sk-...<span class="w"> </span>pytest<span class="w"> </span>-m<span class="w"> </span>integration
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-2-1" id="__codelineno-2-1" name="__codelineno-2-1"></a>nl2sql<span class="w"> </span>setup<span class="w"> </span>--demo
+<a href="#__codelineno-2-2" id="__codelineno-2-2" name="__codelineno-2-2"></a><span class="nv">EMBEDDING_PROVIDER</span><span class="o">=</span><span class="nb">local</span><span class="w"> </span><span class="nv">OPENAI_API_KEY</span><span class="o">=</span>sk-...<span class="w"> </span>pytest<span class="w"> </span>-m<span class="w"> </span>integration
 </code></pre></div>
 <p>Collection is not enough to keep these honest. Every test in the directory
 imports cleanly even when it calls a method that no longer exists, so rot shows
