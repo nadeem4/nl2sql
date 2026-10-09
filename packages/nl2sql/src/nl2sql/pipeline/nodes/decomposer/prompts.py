@@ -93,6 +93,16 @@ Resolved Datasources (id + semantic metadata):
 
 User Query:
 {user_query}
+{feedback}"""
+
+# Appended to the human message (``{feedback}``) when the previous answer was
+# rejected before anything ran; empty on a first attempt.
+DECOMPOSER_RETRY_FEEDBACK = """
+PREVIOUS ANSWER REJECTED:
+{problems}
+A post-combine operation can only read columns its combine group produces: the expected_schema
+names of the group's sub-queries, minus the right-hand join keys, with any other right-hand name
+the left side also has suffixed "_right". Call the tool again with a corrected decomposition.
 """
 
 DECOMPOSER_PROMPT = ChatPromptTemplate.from_messages(

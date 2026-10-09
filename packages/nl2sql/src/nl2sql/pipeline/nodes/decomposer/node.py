@@ -8,7 +8,8 @@ if TYPE_CHECKING:
 
 from .dag import build_execution_dag
 from .schemas import DecomposerResponse, SubQuery, UnmappedSubQuery, PostCombineOp
-from .prompts import DECOMPOSER_PROMPT
+from .prompts import DECOMPOSER_PROMPT, DECOMPOSER_RETRY_FEEDBACK
+from nl2sql.aggregation.columns import combined_columns, input_order, missing_columns_message, post_op_columns
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.common.logger import get_logger
 from nl2sql.context import NL2SQLContext
@@ -70,6 +71,34 @@ def fold_single_input_ops(response: DecomposerResponse) -> DecomposerResponse:
     })
 
 
+def post_combine_problems(response: DecomposerResponse) -> List[str]:
+    """Why each post-combine op cannot run on what its combine group produces.
+
+    A sub-query's result columns are its ``expected_schema`` names (the logical
+    validator holds every plan to them), so the combined columns follow from
+    the decomposition alone, by the engine's own rules
+    (``nl2sql.aggregation.columns``). A group with a sub-query that declares no
+    ``expected_schema`` has unknown columns and is not checked.
+    """
+    sub_queries = {sq.id: sq for sq in response.sub_queries}
+    groups = {g.group_id: g for g in response.combine_groups}
+    problems: List[str] = []
+    for op in response.post_combine_ops:
+        group = groups.get(op.target_group_id)
+        if group is None:
+            continue
+        inputs = sorted(group.inputs, key=lambda i: input_order(i.role, i.subquery_id))
+        columns = [[c.name for c in sub_queries[i.subquery_id].expected_schema]
+                   if i.subquery_id in sub_queries else [] for i in inputs]
+        if not columns or not all(columns):
+            continue
+        available = combined_columns(group.operation, columns, [k.model_dump() for k in group.join_keys])
+        missing = [c for c in post_op_columns(op.operation, op.model_dump()) if c not in available]
+        if missing:
+            problems.append(missing_columns_message(missing, available))
+    return problems
+
+
 class DecomposerNode:
     """Orchestrates query decomposition and routing.
 
@@ -109,6 +138,17 @@ class DecomposerNode:
         Returns:
             Dict[str, Any]: Dictionary containing 'sub_queries', confidence, reasoning, etc.
         """
+        return self._decompose(state, feedback="")
+
+    def _decompose(self, state: GraphState, feedback: str) -> Dict[str, Any]:
+        """One attempt; ``feedback`` is why the previous one was rejected, or empty.
+
+        A decomposition is checked before anything runs (see
+        :func:`post_combine_problems`) and, when rejected, asked for once more
+        with the reason. After the decomposer nothing can ask for a new
+        decomposition, so a post-combine op on a column the combine will not
+        produce used to fail in the aggregator, after every scan had run.
+        """
         try:
             resolver_response = state.datasource_resolver_response
             if not resolver_response or not resolver_response.resolved_datasources:
@@ -130,6 +170,7 @@ class DecomposerNode:
                     "resolved_datasources": json.dumps(
                         resolved_payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False, default=str
                     ),
+                    "feedback": feedback,
                 }
             )
 
@@ -250,6 +291,28 @@ class DecomposerNode:
                 post_combine_ops=post_combine_ops,
                 unmapped_subqueries=unmapped,
             )
+
+            problems = post_combine_problems(response)
+            if problems and not feedback:
+                logger.warning(f"Decomposition rejected, asking again: {' '.join(problems)}")
+                return self._decompose(
+                    state, feedback=DECOMPOSER_RETRY_FEEDBACK.format(problems="\n".join(problems))
+                )
+            if problems:
+                message = f"Decomposition rejected: {' '.join(problems)}"
+                logger.error(message)
+                return {
+                    "decomposer_response": response,
+                    "reasoning": [{"node": self.node_name, "content": message, "type": "error"}],
+                    "errors": [
+                        PipelineError(
+                            node=self.node_name,
+                            message=message,
+                            severity=ErrorSeverity.ERROR,
+                            error_code=ErrorCode.PLANNER_FAILED,
+                        )
+                    ],
+                }
 
             # The execution DAG is a pure function of this response, so it is
             # built here rather than in a node of its own. It has its own

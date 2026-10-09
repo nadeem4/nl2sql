@@ -6,7 +6,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from nl2sql.llm.replay import Recording, RecordingProxy, ReplayStore, extract_question
 from nl2sql.pipeline.nodes.answer_synthesizer.prompts import ANSWER_SYNTHESIZER_PROMPT
 from nl2sql.pipeline.nodes.ast_planner.prompts import PLANNER_EXAMPLES, PLANNER_PROMPT
-from nl2sql.pipeline.nodes.decomposer.prompts import DECOMPOSER_PROMPT
+from nl2sql.pipeline.nodes.decomposer.prompts import DECOMPOSER_PROMPT, DECOMPOSER_RETRY_FEEDBACK
 from nl2sql.testing.fake_llm import FakeLLMServer, Rule
 
 QUESTION = "Which artist has the most albums?"
@@ -27,7 +27,11 @@ def _render(template: str, **values) -> str:
 def rendered_prompts():
     """The three real prompt templates, rendered with the same question."""
     return [
-        _render(DECOMPOSER_PROMPT, user_query=QUESTION, resolved_datasources=[]),
+        _render(DECOMPOSER_PROMPT, user_query=QUESTION, resolved_datasources=[], feedback=""),
+        # A decomposer retry carries the reason after the question; a recording
+        # of it must key on the same question, so it replaces the first answer.
+        _render(DECOMPOSER_PROMPT, user_query=QUESTION, resolved_datasources=[],
+                feedback=DECOMPOSER_RETRY_FEEDBACK.format(problems="Post-combine operation references 'x'.")),
         _render(
             PLANNER_PROMPT,
             relevant_tables="[]",
