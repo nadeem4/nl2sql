@@ -41,7 +41,7 @@ model directly. Nothing else in the directory needs a key: indexing skips its
 optional enrichment pass when no LLM is available, so tests that index real
 data run key-free.
 
-`.github/workflows/test.yml` has two test jobs:
+`.github/workflows/test.yml` has two test jobs over the source tree:
 
 - **`test`** runs `pytest -m "not integration"` across Python 3.12 and 3.13.
   This is the fast job and must stay fast.
@@ -51,6 +51,29 @@ data run key-free.
   subset covers schema indexing, datasource resolution, schema retrieval,
   aggregation and the local embedder against the real Chinook database; run
   it with `--collect-only -q` for the current list.
+
+Two more jobs test the package rather than the source tree:
+
+- **`build`** builds the three wheels and sdists, installs them into a clean
+  virtualenv and runs `import nl2sql` and `nl2sql --help`.
+- **`fresh-install`** takes those wheels and installs them the way a user
+  does, `pip install "nl2sql-engine[demo]"`, into an empty virtualenv outside
+  the checkout. It then boots `nl2sql demo --hosted` (the command the Hugging
+  Face Space runs) with no API key, and passes only when the playground page,
+  `/api/meta`, `/api/schema` and `/api/index` all answer from that install. It
+  is what catches a wheel that imports but ships without the built playground,
+  the sample databases or a dependency the demo extra forgot.
+  `scripts/fresh_install_check.py` is the whole check, so it runs the same on a
+  laptop:
+
+    ```bash
+    pip install build
+    python scripts/fresh_install_check.py --build   # builds into dist/ first
+    ```
+
+  Any `*_API_KEY` in your environment is dropped for the run, so a key you
+  exported cannot make it pass where CI would fail. The decisions it makes are
+  unit-tested in `tests/unit/test_fresh_install_check.py`.
 
 Nothing selects `llm`. Those tests are run by hand with a key:
 
