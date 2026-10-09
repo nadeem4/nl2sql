@@ -128,7 +128,7 @@ def run_with_graph(
     datasource_id: Optional[str] = None,
     execute: bool = True,
     callbacks: Optional[List] = None,
-    user_context: UserContext = None,
+    user_context: Optional[UserContext] = None,
     cancellation_token: Optional[CancellationToken] = None,
     trace_mode: Optional[str] = None,
 ) -> Dict:
@@ -149,9 +149,11 @@ def run_with_graph(
         execute=execute,
     )
 
+    # No role is an empty UserContext, the state's own default: RBAC then sees
+    # a caller with no roles, as it does for one whose roles list is empty.
     initial_state = GraphState(
         user_query=user_query,
-        user_context=user_context,
+        user_context=user_context or UserContext(),
         datasource_id=datasource_id,
     )
 

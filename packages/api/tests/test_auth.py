@@ -78,6 +78,16 @@ def test_the_dev_flag_still_needs_a_role(client, monkeypatch):
     assert _ask(http).status_code == 401
 
 
+@pytest.mark.parametrize("user_context", [None, {}, {"roles": []}, "not an object"],
+                         ids=["null", "empty", "no-roles", "malformed"])
+def test_a_body_with_no_role_is_a_401_not_a_500(client, monkeypatch, user_context):
+    monkeypatch.setenv("NL2SQL_API_TRUST_BODY_ROLE", "true")
+    http, engine = client
+    response = _ask(http, body={"user_context": user_context})
+    assert response.status_code == 401, response.text
+    assert engine.calls == []
+
+
 def test_the_dev_flag_logs_a_warning(monkeypatch, caplog):
     from nl2sql_api.auth import warn_if_body_role_trusted
 
