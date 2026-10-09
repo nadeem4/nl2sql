@@ -150,8 +150,9 @@ in headless Chromium at 1280x800 and writes a webm and a poster per feature
 and theme (each well under 2 MB; a test holds that). Pipeline and Retrieval
 call no model, so they are always real. Ask shows a model's answer, so it is
 recorded only from a guided question with a shipped recording
-(`scripts/record_demo_answers.py`); until those ship it is a "Clip coming"
-poster in both themes. Actions → **Record demo answers** → *Run workflow*
+(`scripts/record_demo_answers.py`): the shipped clip replays the first guided
+question with one, under its "Recorded run" badge. Without a recording it falls
+back to a "Clip coming" poster in both themes. Actions → **Record demo answers** → *Run workflow*
 with `record: clips` runs the same script in CI and opens a pull request.
 
 ## What the page shows
