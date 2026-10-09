@@ -1050,3 +1050,30 @@
   order_matters: false
   gold_sql: null
   gold_result: null
+
+- id: chinook_044
+  question: Which 5 customers bought the most jazz tracks?
+  difficulty: medium
+  tags: [multi-join, aggregation, top-n, rbac-denial]
+  needed_tables: [Customer, Genre, Invoice, InvoiceLine, Track]
+  needed_columns: [Customer.CustomerId, Customer.FirstName, Customer.LastName, Invoice.InvoiceId, Invoice.CustomerId, InvoiceLine.InvoiceLineId,
+    InvoiceLine.InvoiceId, InvoiceLine.TrackId, Track.TrackId, Track.GenreId, Genre.GenreId, Genre.Name]
+  expected: {admin: allowed, analyst: allowed, viewer: refused}
+  order_matters: true
+  gold_sql: |
+    SELECT c.FirstName, c.LastName, COUNT(il.InvoiceLineId) AS jazz_tracks
+    FROM Customer c
+    JOIN Invoice i ON i.CustomerId = c.CustomerId
+    JOIN InvoiceLine il ON il.InvoiceId = i.InvoiceId
+    JOIN Track t ON t.TrackId = il.TrackId
+    JOIN Genre g ON g.GenreId = t.GenreId
+    WHERE g.Name = 'Jazz'
+    GROUP BY c.CustomerId
+    ORDER BY jazz_tracks DESC, c.CustomerId
+    LIMIT 5
+  gold_result:
+  - {FirstName: Dominique, LastName: Lefebvre, jazz_tracks: 6}
+  - {FirstName: François, LastName: Tremblay, jazz_tracks: 5}
+  - {FirstName: Manoj, LastName: Pareek, jazz_tracks: 5}
+  - {FirstName: Puja, LastName: Srivastava, jazz_tracks: 5}
+  - {FirstName: Dan, LastName: Miller, jazz_tracks: 4}

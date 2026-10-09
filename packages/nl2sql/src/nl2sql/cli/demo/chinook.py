@@ -50,7 +50,7 @@ CHINOOK_QUESTIONS = [
     "What is the average invoice total by billing country?",
     "Which employees support the most customers?",
     "What is the longest track in each genre?",
-    "Which customers bought jazz tracks but never rock?",
+    "Which 5 customers bought the most jazz tracks?",
     "What was the monthly revenue in 2013 for customers in the USA?",
     "Which playlists contain tracks from more than three genres?",
     "Who are the top customers by total spend?",
