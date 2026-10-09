@@ -4407,7 +4407,13 @@ error as OpenAI (see <a href="#temperature">Temperature</a>).</p>
 <li><strong>Structured output</strong> is a forced tool call (<code>with_structured_output</code>'s
   <code>function_calling</code> method), for every node. Anthropic's native JSON outputs
   (<code>output_config.format</code>) do not accept recursive schemas, and the planner's
-  <code>PlanModel</code> is recursive.</li>
+  <code>PlanModel</code> is recursive; neither does strict tool use (<code>strict: true</code>).
+  Claude now and then nests a tool call's arguments one level down, as
+  <code>{"input": {...}}</code> or <code>{"inputs": {...}}</code> -- a recording run on
+  <code>claude-opus-5</code> failed the decomposer this way. The wire unwraps exactly that
+  shape before the node parses it: a single key the schema does not declare,
+  holding an object with every required field. Any other malformed answer still
+  fails validation as before.</li>
 <li><strong>Prompt caching.</strong> The resolver, decomposer, planner and refiner send a
   stable system message and a variable human message. On the <code>anthropic</code> wire
   only, the last system
