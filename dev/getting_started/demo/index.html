@@ -1552,6 +1552,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#what-to-expect" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What to expect
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#1-install-the-cli" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4048,6 +4059,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#what-to-expect" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What to expect
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#1-install-the-cli" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4281,6 +4303,36 @@ is involved in either. All three are shipped in the wheel and copied into your
 project by the CLI, so no data is downloaded or built when you set the demo up.
 The tables, columns and row counts are in
 <a href="https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/datasets/README.md">Demo datasets</a>.</p>
+<p>To see it before installing anything, the same playground runs at
+<a href="https://nadeem4nk-nl2sql-demo.hf.space">https://nadeem4nk-nl2sql-demo.hf.space</a>, where you bring your own model key.</p>
+<h2 id="what-to-expect">What to expect</h2>
+<p>After <code>pip install "nl2sql-engine[demo]"</code> and <code>nl2sql demo</code>:</p>
+<ol>
+<li><strong>No questions at the terminal.</strong> The command does not prompt. It looks for
+   a model key -- <code>--api-key</code>, then <code>OPENAI_API_KEY</code>, <code>OPENROUTER_API_KEY</code> or
+   <code>ANTHROPIC_API_KEY</code>, then a key saved in <code>.env.demo</code>, then an Ollama daemon
+   on <code>localhost:11434</code> -- and says which mode it chose: <strong>Live mode</strong> with
+   the provider, or <strong>Replay mode</strong> when it finds none.</li>
+<li><strong>A project folder and an index.</strong> It writes <code>./nl2sql-demo</code> (<code>--dir</code>
+   changes it), copies in the three databases above and indexes their schemas
+   on your machine. The first run downloads a ~79 MB embedding model; indexing
+   needs no key.</li>
+<li><strong>A local page.</strong> It prints <code>Playground ready at http://127.0.0.1:8765/</code> and
+   opens that address in your browser (<code>--no-browser</code> skips it, <code>--port</code>
+   changes it). Ctrl+C stops it.</li>
+<li><strong>No key yet?</strong> Paste an OpenAI or Anthropic key (or an OpenRouter one) into
+   <a href="#the-settings-page">the Settings page</a>; the running demo switches to live
+   without a restart.</li>
+<li><strong>Ask.</strong> Pick one of twenty guided questions or type your own, as <code>admin</code>,
+   <code>analyst</code> or <code>viewer</code>. A run shows the answer first, then the plan the model
+   wrote, the checks, the generated SQL, the rows, and cost and time.
+   <strong>Debug</strong> opens each step's model calls, prompts and responses, and
+   <a href="#the-pipeline-page">the Pipeline page</a> lists every step and which a model
+   decides.</li>
+</ol>
+<p>The <code>demo</code> command and the <code>[demo]</code> extra arrive on PyPI with 0.2.0. If pip
+says <code>nl2sql-engine</code> has no <code>demo</code> extra, you have an earlier release: install
+from a clone with <code>pip install -e packages/adapter-sdk -e "packages/nl2sql[demo]"</code>.</p>
 <h2 id="1-install-the-cli">1. Install the CLI</h2>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># Install from PyPI. Add the `demo` extra if you also want the browser</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="c1"># playground that `nl2sql demo` serves; `[all]` covers drivers only.</span>
@@ -4308,7 +4360,7 @@ The tables, columns and row counts are in
 <p>Setup then runs schema indexing once, automatically, and exits <code>1</code> if it fails.</p>
 <p>For the browser playground instead of the CLI, <code>nl2sql demo</code> does the same
 scaffolding in <code>./nl2sql-demo</code> and serves a page over it. See the
-<a href="https://github.com/nadeem4/nl2sql#try-it">README</a> for its flags, and
+<a href="https://github.com/nadeem4/nl2sql#quickstart-run-it-locally">README</a> for its flags, and
 <a href="#the-settings-page">the Settings page</a> for entering a key and choosing
 models from the page.</p>
 <h3 id="the-schemas">The schemas</h3>
