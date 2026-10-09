@@ -4259,7 +4259,7 @@ answer". <strong>Model output is not reproducible.</strong> What is stable is th
 run:</p>
 <ul>
 <li><strong>Stable sub-query and DAG ids.</strong> Both are SHA-256 content hashes over
-  canonical JSON, not counters or UUIDs (<a href="https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/pipeline/nodes/decomposer/node.py"><code>decomposer/node.py</code></a>, <a href="https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/pipeline/nodes/decomposer/dag.py"><code>decomposer/dag.py</code></a>). The same decomposition always yields the same ids.</li>
+  canonical JSON, not counters or UUIDs (<a href="https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/pipeline/nodes/decomposer/node.py"><code>decomposer/node.py</code></a>, <a href="https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/pipeline/nodes/decomposer/dag.py"><code>decomposer/dag.py</code></a>). The same decomposition always yields the same ids. Identical sub-queries hash alike, so a repeat takes an ordinal suffix (<code>sq_&lt;hash&gt;_2</code>) rather than sharing the first one's id.</li>
 <li><strong>Sorted layer order.</strong> The topological sort sorts each ready set and each
   dependent set, so the execution layers of a given DAG are fixed
   (<a href="https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/execution/dag.py"><code>execution/dag.py</code></a>).</li>
