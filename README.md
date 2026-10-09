@@ -173,6 +173,11 @@ question that spans two of them is not answerable yet -- each sub-query is
 planned against one datasource, so the engine cannot join across databases, and
 the shared customer identities are groundwork for when it can.
 
+While a question runs, **Ask** becomes **Stop**: it cancels the request, and
+the run stops before its next step or model call (the one in flight finishes).
+The same is available to SDK callers as `cancellation_token=` on
+`engine.run_query` (`nl2sql.CancellationToken`).
+
 The playground has no login. It binds to `127.0.0.1` by default; Settings,
 Rebuild, the Retrieval inspector and answer ratings are off on any other
 address unless you pass `--allow-settings`. Full guide:

@@ -479,7 +479,7 @@ serves, not from the Vite dev server.
 
 ## Scope
 
-React and Vite only -- no router library (`src/router.js` is 145 lines over the
+React and Vite only -- no router library (`src/router.js` is 144 lines over the
 hash), no state library, no component kit, no CSS framework, no TypeScript. Plain JSX and plain CSS, kept small enough to read in
 one sitting. Light and dark follow `prefers-color-scheme`; motion is the page
 crossfade, the nav indicator and the run arriving in order, and is off under

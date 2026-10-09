@@ -336,7 +336,7 @@ cache-marked for Anthropic, the others are sent unmarked to OpenAI. The model
 each call actually used is recorded per node in `QueryResult.usage.calls` and
 in a run trace's `llm.by_node` (see [Debugging](../observability/debugging.md)).
 
-In the demo, the playground's **Settings** panel writes exactly these entries
+In the demo, the playground's **Settings** page writes exactly these entries
 into `configs/llm.demo.yaml`. Choosing a provider and a model for a step adds
 an `agents:` entry with `provider`, `model` and the temperature that model
 takes: `0.0`, or `null` for `gpt-5.5`, `gpt-5-mini`, `claude-opus-5` and
@@ -344,7 +344,7 @@ takes: `0.0`, or `null` for `gpt-5.5`, `gpt-5-mini`, `claude-opus-5` and
 `base_url` and `api_key` reference; a step on another provider gets that
 provider's own `${env:...}` reference and no `base_url`. Choosing "Default"
 removes the entry. The running engine reloads the file, so the change applies
-to the next question. The panel offers the providers and models in
+to the next question. The page offers the providers and models in
 `VERIFIED_MODELS` (`nl2sql/llm/providers.py`), OpenAI and Anthropic for
 now, and a provider only once its key is saved. See
 [the Settings page](../getting_started/demo.md#the-settings-page).
