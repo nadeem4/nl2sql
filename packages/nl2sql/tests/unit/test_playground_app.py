@@ -1,6 +1,7 @@
 """The playground FastAPI app: meta, ask, schema and the served page."""
 import pathlib
 import re
+from urllib.parse import unquote
 
 import pytest
 
@@ -526,3 +527,51 @@ def test_a_dropped_request_cancels_its_run():
 
     # Assert
     assert engine.cancelled is True, "the server kept running a question nobody was waiting for"
+
+
+# ---------- the mark ----------
+#
+# One mark, the plan spine: a teal root bar and stem with two indented steps,
+# a typed plan in outline. `docs/assets/favicon.svg` is the one copy of it;
+# the playground inlines it as a data URI (the bundle stays self-contained),
+# the docs site names the file, and the social card draws the same shapes.
+
+MARK = REPO / "docs" / "assets" / "favicon.svg"
+
+
+def _icon_href(html: str) -> str:
+    match = re.search(r'<link rel="icon" type="image/svg\+xml" href="([^"]*)"', html)
+    assert match, "the page has no SVG icon link"
+    return match.group(1)
+
+
+def test_the_mark_follows_the_colour_scheme():
+    svg = MARK.read_text(encoding="utf-8")
+
+    assert "M3 3h26v6H9v20H3z" in svg  # the root bar and the stem
+    assert "prefers-color-scheme:dark" in svg
+    for colour in ("#0c6a5c", "#17201c", "#62c7b1", "#e2e9e5"):
+        assert colour in svg
+
+
+def test_the_served_page_s_icon_is_the_mark():
+    href = _icon_href(_served_page())
+
+    assert href.startswith("data:image/svg+xml,")
+    assert unquote(href.removeprefix("data:image/svg+xml,")) == MARK.read_text(encoding="utf-8").strip()
+
+
+def test_the_bundle_and_its_source_carry_the_same_icon():
+    source = (REPO / "web" / "playground" / "index.html").read_text(encoding="utf-8")
+    bundle = (REPO / "packages" / "nl2sql" / "src" / "nl2sql" / "cli" / "demo"
+              / "playground" / "static" / "index.html").read_text(encoding="utf-8")
+
+    assert _icon_href(source) == _icon_href(bundle)
+
+
+def test_the_docs_site_and_the_social_card_use_the_mark():
+    mkdocs = (REPO / "mkdocs.yml").read_text(encoding="utf-8")
+    card = (REPO / "scripts" / "social_card.html").read_text(encoding="utf-8")
+
+    assert re.search(r"^  favicon: assets/favicon\.svg$", mkdocs, re.MULTILINE)
+    assert "M3 3h26v6H9v20H3z" in card

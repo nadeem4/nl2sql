@@ -4,6 +4,7 @@ site_author: Platform Engineering
 
 theme:
   name: material
+  favicon: assets/favicon.svg
   features:
     - navigation.tabs
     - navigation.sections
