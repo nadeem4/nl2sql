@@ -133,7 +133,7 @@ Variables** can override any of them:
 | `PORT` | `7860` | the port the Space routes to (`app_port` above must match) |
 | `NL2SQL_DEMO_QUESTIONS_PER_MINUTE` | `6` | rate limit per visitor |
 | `NL2SQL_DEMO_QUESTIONS_PER_SESSION` | `30` | cap per browser session |
-| `GLOBAL_TIMEOUT_SEC` | `60` | how long one question may run |
+| `GLOBAL_TIMEOUT_SEC` | `300` (from `.env.demo`) | how long one question may run |
 | `TRACE_MODE` | `always` (from `.env.demo`) | what the playground's **Debug** drill-down reads. Every question writes a trace file to the container's own disk, which is wiped whenever the Space restarts; set it to `on_failure` to keep only the runs that went wrong |
 
 **Never add an API key as a Space secret.** The whole point of hosted mode is
