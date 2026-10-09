@@ -2023,7 +2023,7 @@
 <ol>
 <li>Validate resolver response; raise if no resolved datasources.</li>
 <li>Build <code>resolved_payload</code> and <code>schema_version_map</code>.</li>
-<li>Invoke LLM chain with <code>user_query</code> and resolved datasources. The prompt is two messages: the system message holds the fixed instructions and output format (cacheable), the human message holds the resolved datasources (as JSON with sorted keys) and then the question. A sub-query carries its own <code>filters</code> (a threshold on a metric included), <code>order_by</code> and <code>limit</code>: "the artist with the most albums" is <code>order_by album_count desc, limit 1</code>. <code>post_combine_ops</code> are only for operations across two or more combined sub-queries, and the prompt's example has none.</li>
+<li>Invoke LLM chain with <code>user_query</code> and resolved datasources. The prompt is two messages: the system message holds the fixed instructions and output format (cacheable), the human message holds the resolved datasources (as JSON with sorted keys) and then the question. A sub-query carries its own <code>filters</code> (a threshold on a metric included), <code>order_by</code> and <code>limit</code>: "the artist with the most albums" is <code>order_by album_count desc, limit 1</code>. <code>post_combine_ops</code> are only for operations across two or more combined sub-queries, and the prompt's example has none. The answer is a call to the <code>DecomposerResponse</code> tool whose arguments are the decomposition itself; both the prompt and the tool's description (the model's docstring) say not to wrap them under another key, which Claude did on the anthropic wire while the tool had no description.</li>
 <li><code>fold_single_input_ops()</code> then moves every <code>filter</code>, <code>sort</code> and <code>limit</code> op on a combine group with one sub-query (used by no other group) into that sub-query: filters are appended, <code>order_by</code> terms appended, and the smallest limit kept. With one input there is nothing to combine, and left as post-combine ops they reached only the aggregated answer, never the sub-query's SQL or rows (the first gpt-5.4 tier 2 run returned every row for ten superlative and top-N questions this way). A group with an <code>aggregate</code> or <code>project</code> op is left to the aggregator.</li>
 <li>For each LLM sub‑query:</li>
 <li>Validate datasource existence and RBAC allowance.</li>
@@ -2033,6 +2033,7 @@
 <li>Remap combine groups to stable sub‑query IDs.</li>
 <li>Assign deterministic IDs to post‑combine ops.</li>
 <li>Sort sub‑queries, combine groups, and post‑combine ops.</li>
+<li>Check every post-combine op against the columns its combine group will produce (<code>post_combine_problems()</code>). A sub-query's result columns are its <code>expected_schema</code> names (the logical validator holds each plan to them), and the combined columns follow by the engine's own rules in <code>nl2sql/aggregation/columns.py</code>: a <code>join</code>/<code>compare</code> drops the right-hand join keys and suffixes any other right-hand name the left also has with <code>_right</code>. A group whose sub-query declares no <code>expected_schema</code> is not checked. If an op reads a column that will not exist, the model is asked once more, with the reason appended to the human message ("PREVIOUS ANSWER REJECTED: ..."). A second rejected answer ends the run here with <code>PLANNER_FAILED</code> and the same reason, before any scan runs; nothing after the decomposer can ask for a new decomposition, so this used to fail in the aggregator after every scan.</li>
 <li>Return <code>DecomposerResponse</code>.</li>
 <li>On exception, emit <code>ORCHESTRATOR_CRASH</code> error.</li>
 </ol>
@@ -2059,13 +2060,14 @@
 <h2 id="error-handling">Error Handling</h2>
 <p>Emits <code>PipelineError</code> with:</p>
 <ul>
+<li><code>PLANNER_FAILED</code> when a decomposition is rejected twice (step 8), with the reason;</li>
 <li><code>ORCHESTRATOR_CRASH</code> on exceptions; a provider's refusal of the call is a <code>PROVIDER_*</code> error instead (see <a href="../../../observability/error-handling/#provider-failures">provider failures</a>).</li>
 </ul>
 <p>Logs failures via <code>logger.error</code>.</p>
 <hr/>
 <h2 id="retry-idempotency">Retry + Idempotency</h2>
 <ul>
-<li>No internal retry logic.</li>
+<li>One internal retry: a decomposition whose post-combine op reads a column its combine group will not produce is asked for again, once, with the reason (step 8). When recording, the retry's answer replaces the first under the same question, so replay serves the corrected decomposition.</li>
 <li>Idempotent for fixed LLM output; otherwise LLM variability can change output.</li>
 </ul>
 <hr/>

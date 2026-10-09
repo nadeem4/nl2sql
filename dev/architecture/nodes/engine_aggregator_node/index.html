@@ -2047,7 +2047,7 @@
 <li>Invoke <code>AggregationService.execute(dag, artifact_refs)</code>.</li>
 <li>A <code>join</code>/<code>compare</code> combine resolves each join key against its frame's columns. A key written with a side or sub-query prefix (<code>right.customer</code>, <code>sq_2.customer</code>) resolves to the bare column when only that exists; an unknown key is left for polars to report.</li>
 <li>A post-combine op (<code>PolarsDuckdbEngine.post_op</code>) applies every field it carries, in SQL's order: the reshaping its <code>operation</code> names (<code>aggregate</code> groups with polars' <code>group_by</code>, <code>project</code> selects <code>expected_schema</code>), then its <code>filters</code> (after an aggregate they filter the aggregated rows, as HAVING does), its <code>order_by</code>, and its <code>limit</code>. A <code>filter</code> op with <code>order_by</code> and <code>limit</code>, as the decomposer's prompt used to show, keeps all three.</li>
-<li>Before polars is asked for any column, a post-combine op's attributes (<code>group_by</code>, <code>metrics</code>, <code>project</code>'s <code>expected_schema</code>, <code>filters</code>, <code>order_by</code>) are checked against the combined frame. An attribute the frame does not have is refused with the columns it does have, and a side-qualified one (<code>right.customer</code>) with the reason — see <em>No anti-join</em> below.</li>
+<li>Before polars is asked for any column, a post-combine op's attributes (<code>group_by</code>, <code>metrics</code>, <code>project</code>'s <code>expected_schema</code>, <code>filters</code>, <code>order_by</code>) are checked against the combined frame. An attribute the frame does not have is refused with the columns it does have, and a side-qualified one (<code>right.customer</code>) with the reason — see <em>No anti-join</em> below. The decomposer runs the same check on the decomposition before anything executes (<code>nl2sql/aggregation/columns.py</code>, shared with this engine) and asks the model again once, so here it is the last line of defence.</li>
 <li>Build <code>AggregatorResponse</code> with <code>terminal_results</code>.</li>
 <li>Return success reasoning.</li>
 <li>On exception, emit <code>AGGREGATOR_FAILED</code>.</li>
@@ -2069,7 +2069,11 @@ what reached the caller was polars' own <code>unable to find column
 <p>Resolving the prefix away would be worse. <code>right.customer</code> would become
 <code>customer</code>, the filter would run against the <strong>intersection</strong>, and the answer
 would be the customers who bought <em>both</em> genres — wrong, and silently so. So
-the attribute check refuses the question and says why:</p>
+the attribute check refuses the question and says why. The decomposer now
+makes this check first and asks the model once more with the same message;
+a second answer with the same problem ends the run in the decomposer with it,
+before any scan runs. A recording run also met the made-up variant, a filter on
+<code>bought_rock</code>, which the same check catches. The message reads:</p>
 <div class="highlight"><pre><span></span><code><a href="#__codelineno-0-1" id="__codelineno-0-1" name="__codelineno-0-1"></a>Aggregator failed: Post-combine operation references 'right.customer', which
 <a href="#__codelineno-0-2" id="__codelineno-0-2" name="__codelineno-0-2"></a>the combined result does not have. Available columns: customer. A column
 <a href="#__codelineno-0-3" id="__codelineno-0-3" name="__codelineno-0-3"></a>qualified by side does not survive the combine: ... it cannot be expressed:

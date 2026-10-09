@@ -4408,12 +4408,20 @@ error as OpenAI (see <a href="#temperature">Temperature</a>).</p>
   <code>function_calling</code> method), for every node. Anthropic's native JSON outputs
   (<code>output_config.format</code>) do not accept recursive schemas, and the planner's
   <code>PlanModel</code> is recursive; neither does strict tool use (<code>strict: true</code>).
-  Claude now and then nests a tool call's arguments one level down, as
-  <code>{"input": {...}}</code> or <code>{"inputs": {...}}</code> -- a recording run on
-  <code>claude-opus-5</code> failed the decomposer this way. The wire unwraps exactly that
-  shape before the node parses it: a single key the schema does not declare,
-  holding an object with every required field. Any other malformed answer still
-  fails validation as before.</li>
+  Claude now and then nests a tool call's arguments one level down under a key
+  of its own choosing (<code>{"input": {...}}</code>, <code>{"query": {...}}</code>, <code>{"dtype": {...}}</code>).
+  Recording runs on <code>claude-opus-5</code> failed the decomposer this way on up to 9
+  of 20 questions, and no other node. The root cause was the decomposer's tool:
+  it went out with an empty description and no field descriptions, while its
+  prompt asked for "JSON only" rather than a tool call. <code>DecomposerResponse</code>
+  now describes itself and each top-level field ("call this tool with the
+  decomposition itself as the arguments ... do not wrap them"), and the prompt
+  asks for the tool call. As a safety net the wire also unwraps that shape
+  before any node parses it: a dict with exactly one key the schema does not
+  declare, holding an object with every required field and at least one
+  declared one. Any other malformed answer still fails validation as before.
+  A new node's response model should carry a docstring and field descriptions
+  for the same reason.</li>
 <li><strong>Prompt caching.</strong> The resolver, decomposer, planner and refiner send a
   stable system message and a variable human message. On the <code>anthropic</code> wire
   only, the last system
