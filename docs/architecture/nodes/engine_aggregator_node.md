@@ -68,7 +68,7 @@ Side effects:
 2. Invoke `AggregationService.execute(dag, artifact_refs)`.
    - A `join`/`compare` combine resolves each join key against its frame's columns. A key written with a side or sub-query prefix (`right.customer`, `sq_2.customer`) resolves to the bare column when only that exists; an unknown key is left for polars to report.
    - A post-combine op (`PolarsDuckdbEngine.post_op`) applies every field it carries, in SQL's order: the reshaping its `operation` names (`aggregate` groups with polars' `group_by`, `project` selects `expected_schema`), then its `filters` (after an aggregate they filter the aggregated rows, as HAVING does), its `order_by`, and its `limit`. A `filter` op with `order_by` and `limit`, as the decomposer's prompt used to show, keeps all three.
-   - Before polars is asked for any column, a post-combine op's attributes (`group_by`, `metrics`, `project`'s `expected_schema`, `filters`, `order_by`) are checked against the combined frame. An attribute the frame does not have is refused with the columns it does have, and a side-qualified one (`right.customer`) with the reason — see *No anti-join* below.
+   - Before polars is asked for any column, a post-combine op's attributes (`group_by`, `metrics`, `project`'s `expected_schema`, `filters`, `order_by`) are checked against the combined frame. An attribute the frame does not have is refused with the columns it does have, and a side-qualified one (`right.customer`) with the reason — see *No anti-join* below. The decomposer runs the same check on the decomposition before anything executes (`nl2sql/aggregation/columns.py`, shared with this engine) and asks the model again once, so here it is the last line of defence.
 3. Build `AggregatorResponse` with `terminal_results`.
 4. Return success reasoning.
 5. On exception, emit `AGGREGATOR_FAILED`.
@@ -93,7 +93,11 @@ what reached the caller was polars' own `unable to find column
 Resolving the prefix away would be worse. `right.customer` would become
 `customer`, the filter would run against the **intersection**, and the answer
 would be the customers who bought *both* genres — wrong, and silently so. So
-the attribute check refuses the question and says why:
+the attribute check refuses the question and says why. The decomposer now
+makes this check first and asks the model once more with the same message;
+a second answer with the same problem ends the run in the decomposer with it,
+before any scan runs. A recording run also met the made-up variant, a filter on
+`bought_rock`, which the same check catches. The message reads:
 
 ```
 Aggregator failed: Post-combine operation references 'right.customer', which

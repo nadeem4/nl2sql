@@ -80,8 +80,9 @@ Side effects:
 5. Remap combine groups to stable sub‑query IDs.
 6. Assign deterministic IDs to post‑combine ops.
 7. Sort sub‑queries, combine groups, and post‑combine ops.
-8. Return `DecomposerResponse`.
-9. On exception, emit `ORCHESTRATOR_CRASH` error.
+8. Check every post-combine op against the columns its combine group will produce (`post_combine_problems()`). A sub-query's result columns are its `expected_schema` names (the logical validator holds each plan to them), and the combined columns follow by the engine's own rules in `nl2sql/aggregation/columns.py`: a `join`/`compare` drops the right-hand join keys and suffixes any other right-hand name the left also has with `_right`. A group whose sub-query declares no `expected_schema` is not checked. If an op reads a column that will not exist, the model is asked once more, with the reason appended to the human message ("PREVIOUS ANSWER REJECTED: ..."). A second rejected answer ends the run here with `PLANNER_FAILED` and the same reason, before any scan runs; nothing after the decomposer can ask for a new decomposition, so this used to fail in the aggregator after every scan.
+9. Return `DecomposerResponse`.
+10. On exception, emit `ORCHESTRATOR_CRASH` error.
 
 ---
 
@@ -114,6 +115,7 @@ Key contracts:
 
 Emits `PipelineError` with:
 
+- `PLANNER_FAILED` when a decomposition is rejected twice (step 8), with the reason;
 - `ORCHESTRATOR_CRASH` on exceptions; a provider's refusal of the call is a `PROVIDER_*` error instead (see [provider failures](../../observability/error-handling.md#provider-failures)).
 
 Logs failures via `logger.error`.
@@ -122,7 +124,7 @@ Logs failures via `logger.error`.
 
 ## Retry + Idempotency
 
-- No internal retry logic.
+- One internal retry: a decomposition whose post-combine op reads a column its combine group will not produce is asked for again, once, with the reason (step 8). When recording, the retry's answer replaces the first under the same question, so replay serves the corrected decomposition.
 - Idempotent for fixed LLM output; otherwise LLM variability can change output.
 
 ---

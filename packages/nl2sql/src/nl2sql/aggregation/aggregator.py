@@ -6,6 +6,7 @@ import polars as pl
 from nl2sql.execution.contracts import ArtifactRef
 from nl2sql.execution.dag import ExecutionDAG, LogicalNode, LogicalEdge
 
+from .columns import input_order
 from .engines.polars_duckdb import PolarsDuckdbEngine
 
 
@@ -90,9 +91,5 @@ class AggregationService:
         edges: List[LogicalEdge],
         computed: Dict[str, pl.DataFrame],
     ) -> List[Tuple[str, pl.DataFrame]]:
-        def role_rank(role: str) -> int:
-            order = {"left": 0, "base": 0, "primary": 0, "right": 1, "compare": 1, "secondary": 1}
-            return order.get(role or "", 2)
-
-        ordered = sorted(edges, key=lambda e: (role_rank(e.role), e.from_id))
+        ordered = sorted(edges, key=lambda e: input_order(e.role, e.from_id))
         return [(edge.role or "", computed[edge.from_id]) for edge in ordered if edge.from_id in computed]
