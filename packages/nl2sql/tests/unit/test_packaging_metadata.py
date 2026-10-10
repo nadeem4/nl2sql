@@ -58,6 +58,12 @@ def test_every_distribution_links_home_docs_source_issues_and_demo(package):
 
 
 @pytest.mark.parametrize("package", PACKAGES)
+def test_the_demo_link_is_the_custom_domain_a_reader_can_remember(package):
+    # The domain redirects its root to the Space; a reader only ever needs the root.
+    assert _project(package)["urls"]["Demo"] == "https://nl2sql.codewithnk.com"
+
+
+@pytest.mark.parametrize("package", PACKAGES)
 def test_every_distribution_is_findable_and_classified(package):
     project = _project(package)
     assert project.get("description")

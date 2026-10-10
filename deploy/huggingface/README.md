@@ -99,7 +99,8 @@ git subtree push --prefix deploy/huggingface space main
 The Space builds on push; watch the log on its **Logs** tab. A first build takes
 a few minutes (installing the engine, generating the sample databases, indexing
 them and baking in the embedding model). The playground is live at
-<https://nadeem4nk-nl2sql-demo.hf.space> once the build is green.
+<https://nadeem4nk-nl2sql-demo.hf.space> once the build is green; <https://nl2sql.codewithnk.com> redirects
+to it.
 
 To deploy again after a change here, run the same `git subtree push`. Note that
 a change to the *engine* or the *playground* does not touch this folder, so it

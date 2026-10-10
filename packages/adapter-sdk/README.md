@@ -22,4 +22,4 @@ pip install nl2sql-adapter-sdk
 
 Writing an adapter:
 [Adapter development](https://nadeem4.github.io/nl2sql/adapters/development/).
-Try the engine without installing anything: <https://nadeem4nk-nl2sql-demo.hf.space>.
+Try the engine without installing anything: <https://nl2sql.codewithnk.com>.

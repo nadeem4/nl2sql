@@ -332,7 +332,10 @@ steps, and what each Space setting does, are in
 own front page, since a Docker Space reads its configuration from the
 front-matter of the `README.md` at its root.
 
-The Space serves at <https://nadeem4nk-nl2sql-demo.hf.space>.
+The Space serves at <https://nadeem4nk-nl2sql-demo.hf.space>, and its public address is <https://nl2sql.codewithnk.com>.
+That domain is a redirect to the Space root and answers 404 for any deeper
+path, so deep links and API calls (`/api/health`, `/api/meta`) must use the
+`hf.space` host.
 
 **Never give the Space an API key**, as a secret or otherwise. Hosted mode
 clears any provider key it finds in its environment at start-up rather than use
@@ -488,7 +491,7 @@ Two different links go around, and each unfurls from a different place:
 
 | Pasted link | The card comes from |
 | --- | --- |
-| <https://nadeem4nk-nl2sql-demo.hf.space> | the Open Graph and Twitter tags in the page the app serves |
+| <https://nl2sql.codewithnk.com> or <https://nadeem4nk-nl2sql-demo.hf.space> | the Open Graph and Twitter tags in the page the app serves |
 | <https://huggingface.co/spaces/nadeem4nk/nl2sql-demo> | `short_description` and `thumbnail` in `deploy/huggingface/README.md`'s front-matter |
 
 Both show the same 1200x630 card:
@@ -502,8 +505,11 @@ and `og:image` and `og:url` have to be absolute, while the same page is the
 Space, a container and `http://127.0.0.1:8000`. So the host comes off the
 request: `X-Forwarded-Proto` and `X-Forwarded-Host` when a proxy set them
 (which is what the Space does), the `Host` header otherwise, and the URL the
-app itself saw if neither is a host. The card is served by the app at
-`/social-card.png` and ships in the wheel, so a `pip install` serves it too.
+app itself saw if neither is a host. On the public Space, `og:url` names
+`https://nl2sql.codewithnk.com/` instead, so a shared link carries the short address; `og:image` stays
+on the Space, since the redirect serves nothing below its root. The card is
+served by the app at `/social-card.png` and ships in the wheel, so a
+`pip install` serves it too.
 
 **The Space's card** reads `thumbnail` over raw GitHub rather than from the
 Space, so it works before the Space has built and while it is asleep.

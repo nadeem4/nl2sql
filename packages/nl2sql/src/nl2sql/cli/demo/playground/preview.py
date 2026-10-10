@@ -51,6 +51,13 @@ DESCRIPTION = (
 # write a URL of its own into the page, and both fall back.
 _HOST = re.compile(r"[A-Za-z0-9.\-]{1,253}(:[0-9]{1,5})?")
 
+# The public Space has a short address of its own: nl2sql.codewithnk.com is a
+# registrar redirect that sends its root to the Space and answers 404 for any
+# deeper path. So a link shared from the Space names the short root as the
+# page, while the image stays on the Space, the only host that serves it.
+SPACE = "https://nadeem4nk-nl2sql-demo.hf.space"
+PUBLIC_URL = "https://nl2sql.codewithnk.com/"
+
 
 def _first(value: str | None) -> str | None:
     """The first entry of a forwarded header; proxies chain them with commas."""
@@ -75,7 +82,8 @@ def origin(request) -> str:
 
 def head_tags(site: str) -> str:
     """The preview's ``<head>`` tags, for a page served from ``site``."""
-    page, image = f"{site}/", f"{site}{CARD_ROUTE}"
+    page = PUBLIC_URL if site == SPACE else f"{site}/"
+    image = f"{site}{CARD_ROUTE}"
     tags = [
         ("name", "description", DESCRIPTION),
         ("property", "og:type", "website"),

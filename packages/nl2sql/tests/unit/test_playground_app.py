@@ -469,12 +469,22 @@ def test_the_served_page_carries_the_preview_tags_a_crawler_reads():
 
 def test_the_preview_urls_are_absolute_and_name_the_host_the_visitor_typed():
     html = _served_page(**{"x-forwarded-proto": "https",
-                           "x-forwarded-host": "nadeem4nk-nl2sql-demo.hf.space"})
+                           "x-forwarded-host": "other-demo.hf.space"})
 
-    assert _tag(html, "og:url") == "https://nadeem4nk-nl2sql-demo.hf.space/"
-    assert _tag(html, "og:image") == "https://nadeem4nk-nl2sql-demo.hf.space/social-card.png"
+    assert _tag(html, "og:url") == "https://other-demo.hf.space/"
+    assert _tag(html, "og:image") == "https://other-demo.hf.space/social-card.png"
     assert _tag(html, "og:image:width") == "1200"
     assert _tag(html, "og:image:height") == "630"
+
+
+def test_the_public_space_names_its_custom_domain_as_the_page_but_serves_the_image_itself():
+    html = _served_page(**{"x-forwarded-proto": "https",
+                           "x-forwarded-host": "nadeem4nk-nl2sql-demo.hf.space"})
+
+    # nl2sql.codewithnk.com redirects its root to the Space and 404s anything
+    # deeper, so it is the page a shared link names, never the image's host.
+    assert _tag(html, "og:url") == "https://nl2sql.codewithnk.com/"
+    assert _tag(html, "og:image") == "https://nadeem4nk-nl2sql-demo.hf.space/social-card.png"
 
 
 def test_without_a_proxy_the_preview_urls_are_the_ones_the_app_was_reached_on():
