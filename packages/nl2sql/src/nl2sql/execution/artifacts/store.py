@@ -18,6 +18,9 @@ from .parquet import polars_to_result_frame, read_parquet, result_frame_to_polar
 
 _PLACEHOLDER = re.compile(r"<([a-zA-Z0-9_]+)>")
 
+# Placeholders that tell one sub-query's artifact from another's in the same run.
+_UNIQUE_PLACEHOLDERS = {"sub_query_id", "dag_node_id"}
+
 
 @dataclass(frozen=True)
 class ArtifactStoreConfig:
@@ -43,7 +46,8 @@ class ArtifactStore:
         self.config = config
 
     def create_artifact_ref(self, frame: ResultFrame, metadata: Dict[str, str]) -> ArtifactRef:
-        uri = self._build_uri(metadata)
+        template = self._template_for(metadata)
+        uri = self._build_uri(template, metadata)
         df = result_frame_to_polars(frame)
         write_parquet(df, uri, storage_options=self._storage_options())
 
@@ -62,6 +66,8 @@ class ArtifactStore:
             content_hash=content_hash,
             bytes_written=self._bytes_written(uri, df),
             schema_version=metadata.get("schema_version"),
+            sub_query_id=metadata.get("sub_query_id"),
+            path_template=template,
         )
 
     def read_result_frame(self, artifact: ArtifactRef) -> ResultFrame:
@@ -70,23 +76,42 @@ class ArtifactStore:
     def read_parquet(self, artifact: ArtifactRef) -> pl.DataFrame:
         return read_parquet(artifact.uri, storage_options=self._storage_options())
 
-    def _render_path(self, metadata: Dict[str, str]) -> str:
+    def _template_for(self, metadata: Dict[str, str]) -> str:
+        """The template to render: the configured one, made unique per sub-query.
+
+        Every sub-query of a run shares its trace id (``request_id``), so a
+        template that names neither ``<sub_query_id>`` nor ``<dag_node_id>``
+        would give them all one file: written side by side it is corrupt,
+        written in turn it holds only the last result. Such a template gets
+        ``-<sub_query_id>`` added to its file name, before the extension.
+        """
+        template = self.config.path_template
+        if not metadata.get("sub_query_id") or _UNIQUE_PLACEHOLDERS & set(_PLACEHOLDER.findall(template)):
+            return template
+        head, sep, name = template.rpartition("/")
+        stem, dot, ext = name.rpartition(".")
+        if not dot or not stem:
+            stem, ext = name, ""
+        suffixed = f"{stem}-<sub_query_id>" + (f".{ext}" if ext else "")
+        return f"{head}{sep}{suffixed}"
+
+    def _render_path(self, template: str, metadata: Dict[str, str]) -> str:
         def substitute(match: re.Match) -> str:
             key = match.group(1)
             value = metadata.get(key)
             if value in (None, ""):
                 raise ValueError(
-                    f"Cannot render artifact path template '{self.config.path_template}': "
+                    f"Cannot render artifact path template '{template}': "
                     f"no value for placeholder '<{key}>'. Provide '{key}' in the artifact metadata "
                     f"or remove it from RESULT_ARTIFACT_PATH_TEMPLATE."
                 )
             return str(value)
 
-        return _PLACEHOLDER.sub(substitute, self.config.path_template)
+        return _PLACEHOLDER.sub(substitute, template)
 
-    def _build_uri(self, metadata: Dict[str, str]) -> str:
+    def _build_uri(self, template: str, metadata: Dict[str, str]) -> str:
         backend = self.config.backend
-        relative_path = self._render_path(metadata)
+        relative_path = self._render_path(template, metadata)
 
         if backend == "local":
             target = Path(self.config.base_uri) / relative_path
@@ -136,6 +161,8 @@ class ArtifactStore:
         content_hash: str,
         bytes_written: int,
         schema_version: Optional[str],
+        sub_query_id: Optional[str],
+        path_template: str,
     ) -> ArtifactRef:
         return ArtifactRef(
             uri=uri,
@@ -147,7 +174,8 @@ class ArtifactStore:
             content_hash=content_hash,
             created_at=datetime.utcnow(),
             schema_version=schema_version,
-            path_template=self.config.path_template,
+            sub_query_id=sub_query_id,
+            path_template=path_template,
         )
 
 

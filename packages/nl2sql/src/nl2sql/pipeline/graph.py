@@ -6,7 +6,7 @@ from nl2sql.pipeline.nodes.aggregator import EngineAggregatorNode
 from nl2sql.pipeline.nodes.answer_synthesizer import AnswerSynthesizerNode
 from nl2sql.pipeline.nodes.datasource_resolver import DatasourceResolverNode
 from nl2sql.pipeline.nodes.decomposer import DecomposerNode
-from nl2sql.pipeline.routes import build_scan_layer_router, resolver_route
+from nl2sql.pipeline.routes import aggregator_route, build_scan_layer_router, resolver_route
 from nl2sql.pipeline.state import GraphState
 from nl2sql.pipeline.subgraphs.sql_agent import build_sql_agent_graph
 
@@ -65,7 +65,11 @@ def build_graph(
     )
 
     graph.add_edge(SQL_AGENT_SUBGRAPH, "layer_router")
-    graph.add_edge("aggregator", "answer_synthesizer")
+    graph.add_conditional_edges(
+        "aggregator",
+        aggregator_route,
+        {"answer_synthesizer": "answer_synthesizer", END: END},
+    )
     graph.add_edge("answer_synthesizer", END)
 
     return graph.compile()

@@ -23,6 +23,9 @@ class ArtifactRef(BaseModel):
     content_hash: str
     created_at: datetime
     schema_version: Optional[str] = None
+    # The sub-query whose result this is; None for an artifact written outside a run.
+    sub_query_id: Optional[str] = None
+    # The template actually rendered, after any sub-query suffix was added.
     path_template: str
 
     model_config = ConfigDict(extra="ignore")

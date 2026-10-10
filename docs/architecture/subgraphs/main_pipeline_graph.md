@@ -44,6 +44,7 @@ Failure exits:
 Partial completion behavior:
 - If routing cannot schedule any scan-layer work but `execution_dag` exists and at least one scan produced an artifact, it routes to `aggregator` directly. If some scans produced artifacts and others did not, the aggregator still runs and reports the missing ones as `AGGREGATOR_FAILED`.
 - Errors added to `GraphState.errors` do not automatically stop the graph; the graph relies on routing logic and node behavior for termination.
+- `aggregator_route` ends the run when the aggregator failed (`AggregatorResponse.errors` is not empty), so the answer synthesizer never spends a model call on an empty result and `AGGREGATOR_FAILED` is the run's outcome.
 
 ---
 
@@ -67,7 +68,8 @@ flowchart TD
     subgraph_exec --> layer_router
     layer_router -->|aggregator| aggregator
     layer_router -->|end| END
-    aggregator --> answer_synthesizer --> END
+    aggregator -->|ok| answer_synthesizer --> END
+    aggregator -->|failed| END
 ```
 
 ---
@@ -94,7 +96,7 @@ Field ownership, reducers, and lifecycle are defined in `../graph_state.md`.
 5. Each subgraph execution returns `artifact_refs`, `subgraph_outputs`, and `errors` to `GraphState`.
 6. `layer_router` is re-entered until all scan-layer nodes produce artifacts.
 7. `aggregator` executes the DAG using the stored `artifact_refs`.
-8. `answer_synthesizer` summarizes aggregated results into a final answer.
+8. `aggregator_route` ends the run if aggregation failed; otherwise `answer_synthesizer` summarizes aggregated results into a final answer.
 9. Graph reaches `END`.
 
 ---

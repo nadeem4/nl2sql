@@ -13,10 +13,10 @@ flowchart TD
 
 ## Storage isolation
 
-Artifacts are persisted under a tenant-partitioned path on every backend, driven by `RESULT_ARTIFACT_PATH_TEMPLATE` (default `<tenant_id>/<request_id>.parquet`):
+Artifacts are persisted under a tenant-partitioned path on every backend, driven by `RESULT_ARTIFACT_PATH_TEMPLATE` (default `<tenant_id>/<request_id>/<sub_query_id>.parquet`):
 
 ```
-<backend root>/<tenant_id>/<request_id>.parquet
+<backend root>/<tenant_id>/<request_id>/<sub_query_id>.parquet
 ```
 
 This ensures per-tenant isolation for artifacts, and downstream aggregation only reads referenced artifacts from the current request.

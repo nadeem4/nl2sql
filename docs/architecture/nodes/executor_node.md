@@ -69,7 +69,7 @@ Mutations to `SubgraphExecutionState`:
 Side effects:
 
 - Executes SQL against datasource via executor service.
-- Persists results to artifact store.
+- Persists results to artifact store, one artifact per sub-query: the request's `node_id` (the sub-query id) is passed to the store as `sub_query_id` and `dag_node_id`, so two sub-queries of one run never write the same file (see [artifact store](../../storage/artifact-store.md#one-artifact-per-sub-query)). The `ArtifactRef` records it as `sub_query_id`.
 
 ---
 
