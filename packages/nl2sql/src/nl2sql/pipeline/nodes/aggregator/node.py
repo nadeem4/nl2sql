@@ -36,15 +36,15 @@ class EngineAggregatorNode:
             }
         except Exception as exc:
             logger.error(f"Node {self.node_name} failed: {exc}")
+            error = PipelineError(
+                node=self.node_name,
+                message=f"Aggregator failed: {str(exc)}",
+                severity=ErrorSeverity.ERROR,
+                error_code=ErrorCode.AGGREGATOR_FAILED,
+            )
+            # The error on the response is what `aggregator_route` ends the run on.
             return {
-                "aggregator_response": AggregatorResponse(),
+                "aggregator_response": AggregatorResponse(errors=[error]),
                 "reasoning": [{"node": self.node_name, "content": f"Error: {str(exc)}", "type": "error"}],
-                "errors": [
-                    PipelineError(
-                        node=self.node_name,
-                        message=f"Aggregator failed: {str(exc)}",
-                        severity=ErrorSeverity.ERROR,
-                        error_code=ErrorCode.AGGREGATOR_FAILED,
-                    )
-                ],
+                "errors": [error],
             }

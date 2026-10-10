@@ -27,7 +27,7 @@ Downstream:
 - Graph end.
 
 Trigger conditions:
-- Executed after aggregation completes.
+- Executed after aggregation succeeds. When the aggregator fails (`AGGREGATOR_FAILED`), `aggregator_route` ends the run instead, so this node never spends a model call on an empty result.
 
 ```mermaid
 flowchart LR

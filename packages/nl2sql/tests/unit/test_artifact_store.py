@@ -17,6 +17,11 @@ def _metadata():
     return {"tenant_id": "t1", "request_id": "r1", "schema_version": "v1"}
 
 
+def _executor_metadata():
+    # What SqlExecutorService passes for one sub-query of a run.
+    return {**_metadata(), "sub_query_id": "sq_1", "dag_node_id": "sq_1", "subgraph_name": "sql_agent"}
+
+
 def _local_config(base_uri, template="<tenant_id>/<request_id>.parquet"):
     return ArtifactStoreConfig(backend="local", base_uri=base_uri, path_template=template)
 
@@ -83,16 +88,16 @@ class TestPathTemplate:
                 store.create_artifact_ref(_frame(), _metadata())
 
     def test_default_setting_is_renderable_from_executor_metadata(self):
-        # Validates the shipped default because the executor supplies only these three keys.
+        # Validates the shipped default against the keys the SQL executor supplies.
         # Arrange
         with tempfile.TemporaryDirectory() as tmpdir:
             store = ArtifactStore(_local_config(tmpdir, settings.result_artifact_path_template))
 
             # Act
-            artifact = store.create_artifact_ref(_frame(), _metadata())
+            artifact = store.create_artifact_ref(_frame(), _executor_metadata())
 
             # Assert
-            assert Path(artifact.uri) == Path(tmpdir).resolve() / "t1" / "r1.parquet"
+            assert Path(artifact.uri) == Path(tmpdir).resolve() / "t1" / "r1" / "sq_1.parquet"
 
 
 class TestS3Backend:
@@ -294,4 +299,4 @@ class TestFactory:
 
         # Act / Assert
         with pytest.raises(ValueError, match="gcs"):
-            store.create_artifact_ref(_frame(), _metadata())
+            store.create_artifact_ref(_frame(), _executor_metadata())

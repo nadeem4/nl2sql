@@ -96,8 +96,19 @@ class SqlExecutorService:
                 tenant_id=request.tenant_id,
             )
     
+        # request_id is the run's trace id, shared by all its sub-queries;
+        # sub_query_id (the scan node's id) keeps their artifacts apart.
         artifact_ref = self.artifact_store.create_artifact_ref(
-            result_frame, {"schema_version": request.schema_version, "request_id": request.trace_id, "tenant_id": request.tenant_id} )
+            result_frame,
+            {
+                "schema_version": request.schema_version,
+                "request_id": request.trace_id,
+                "tenant_id": request.tenant_id,
+                "sub_query_id": request.node_id,
+                "dag_node_id": request.node_id,
+                "subgraph_name": request.subgraph_name,
+            },
+        )
         
         return ExecutorResponse(
             executor_name="sql_executor",

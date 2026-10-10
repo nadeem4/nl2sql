@@ -39,30 +39,40 @@ For ADLS, `RESULT_ARTIFACT_ADLS_CONNECTION_STRING` is forwarded to polars as `st
 - `row_count`, `columns`, `bytes`
 - `content_hash`, `created_at`
 - optional `schema_version`
-- `path_template`
+- optional `sub_query_id`, the sub-query whose result this is
+- `path_template`, the template actually rendered (see *One artifact per sub-query*)
 
 ## Path templating
 
 `Settings.result_artifact_path_template` defines the artifact path relative to the backend root, for every backend. It defaults to:
 
 ```
-<tenant_id>/<request_id>.parquet
+<tenant_id>/<request_id>/<sub_query_id>.parquet
 ```
 
-Each `<key>` placeholder is substituted from the metadata the executor passes to `create_artifact_ref`. The SQL executor supplies exactly three keys:
+Each `<key>` placeholder is substituted from the metadata the executor passes to `create_artifact_ref`. The SQL executor supplies these keys:
 
 - `tenant_id`
-- `request_id` (the trace ID)
+- `request_id` (the trace ID, shared by every sub-query of a run)
+- `sub_query_id` (the sub-query's id, which is also its scan node's id)
+- `dag_node_id` (the same value as `sub_query_id`)
+- `subgraph_name`
 - `schema_version`
 
-A template referencing any other placeholder — for example `<subgraph_name>` or `<dag_node_id>` — raises a `ValueError` naming the placeholder that could not be filled. A path is never written with an unrendered placeholder in it. Adding placeholders therefore requires threading the corresponding metadata through the executor first.
+A template referencing any other placeholder raises a `ValueError` naming the placeholder that could not be filled. A path is never written with an unrendered placeholder in it. Adding placeholders therefore requires threading the corresponding metadata through the executor first.
+
+### One artifact per sub-query
+
+A question that decomposes into several sub-queries runs them under one trace ID, often side by side, and each must write its own file. When they shared `<tenant_id>/<request_id>.parquet`, concurrent writes produced one corrupt Parquet file (`AGGREGATOR_FAILED: parquet: File out of specification`), and sequential writes kept only the last sub-query's rows, so a join combined a result with itself and returned a wrong answer with no error.
+
+A template that names neither `<sub_query_id>` nor `<dag_node_id>` is therefore made unique rather than rejected: the store adds `-<sub_query_id>` to the end of the file name, before its extension, so `<tenant_id>/<request_id>.parquet` writes `<tenant_id>/<request_id>-<sub_query_id>.parquet`. The `ArtifactRef` records the template actually rendered in `path_template` and the sub-query in `sub_query_id`. A store used directly, with no `sub_query_id` in its metadata, renders the template as written.
 
 ## Tenant-aware paths
 
 Because the default template starts with `<tenant_id>`, every backend partitions artifacts per tenant:
 
 ```
-<backend root>/<tenant_id>/<request_id>.parquet
+<backend root>/<tenant_id>/<request_id>/<sub_query_id>.parquet
 ```
 
 ## Source references

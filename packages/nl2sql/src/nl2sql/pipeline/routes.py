@@ -27,6 +27,19 @@ def resolver_route(state: GraphState) -> str:
     return "continue"
 
 
+def aggregator_route(state: GraphState) -> str:
+    """Ends the run when aggregation failed; otherwise on to the answer.
+
+    A failed aggregator leaves an empty result. Synthesizing an answer from it
+    spends a model call explaining ``{}`` and buries the aggregator's error
+    under an answer, so the run ends with that error as its outcome.
+    """
+    response = state.aggregator_response
+    if response is not None and response.errors:
+        return END
+    return "answer_synthesizer"
+
+
 def build_scan_layer_router(ctx: NL2SQLContext, execute: bool = True):
     """Builds the router that fans sub-queries out and then moves on.
 

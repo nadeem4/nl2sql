@@ -76,7 +76,7 @@ providers. The check runs on the read path only, so the fix is simply to re-run
 | `SCHEMA_STORE_MAX_VERSIONS` | `3` | Max schema versions retained per datasource. |
 | `RESULT_ARTIFACT_BACKEND` | `local` | Artifact backend: `local`, `s3`, `adls`. |
 | `RESULT_ARTIFACT_BASE_URI` | `./artifacts` | Base URI or path for artifact storage. |
-| `RESULT_ARTIFACT_PATH_TEMPLATE` | `<tenant_id>/<request_id>.parquet` | Artifact path relative to the backend root. Placeholders available: `<tenant_id>`, `<request_id>`, `<schema_version>`. |
+| `RESULT_ARTIFACT_PATH_TEMPLATE` | `<tenant_id>/<request_id>/<sub_query_id>.parquet` | Artifact path relative to the backend root. Placeholders available: `<tenant_id>`, `<request_id>`, `<sub_query_id>`, `<dag_node_id>`, `<subgraph_name>`, `<schema_version>`. Every sub-query of a run writes its own file: a template without `<sub_query_id>` or `<dag_node_id>` gets `-<sub_query_id>` added to its file name (see [artifact store](../storage/artifact-store.md#one-artifact-per-sub-query)). |
 | `RESULT_ARTIFACT_S3_BUCKET` | `—` | S3 bucket for artifact storage. |
 | `RESULT_ARTIFACT_S3_PREFIX` | `—` | S3 prefix for artifact storage. |
 | `RESULT_ARTIFACT_ADLS_ACCOUNT` | `—` | ADLS storage account name. |
