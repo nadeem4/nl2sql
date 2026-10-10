@@ -31,7 +31,7 @@ Homepage = "https://github.com/nadeem4/nl2sql"
 Documentation = "https://nadeem4.github.io/nl2sql/"
 Source = "https://github.com/nadeem4/nl2sql"
 Issues = "https://github.com/nadeem4/nl2sql/issues"
-Demo = "https://nadeem4nk-nl2sql-demo.hf.space"
+Demo = "https://nl2sql.codewithnk.com"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

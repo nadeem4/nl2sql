@@ -11,10 +11,10 @@ Full README and docs: <https://github.com/nadeem4/nl2sql>.
 
 ## Try it in your browser
 
-**<https://nadeem4nk-nl2sql-demo.hf.space>** — the playground on three sample
+**<https://nl2sql.codewithnk.com>** — the playground on three sample
 databases, nothing to install.
 
-[![Ask a database in plain English; the model plans, the code writes the SQL](https://raw.githubusercontent.com/nadeem4/nl2sql/main/docs/assets/social-card.png)](https://nadeem4nk-nl2sql-demo.hf.space)
+[![Ask a database in plain English; the model plans, the code writes the SQL](https://raw.githubusercontent.com/nadeem4/nl2sql/main/docs/assets/social-card.png)](https://nl2sql.codewithnk.com)
 
 The server holds no API key: you paste your own into the page, one per
 provider, and it stays in that browser tab, is used in memory for the question

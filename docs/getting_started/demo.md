@@ -14,7 +14,7 @@ The tables, columns and row counts are in
 [Demo datasets](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/datasets/README.md).
 
 To see it before installing anything, the same playground runs at
-<https://nadeem4nk-nl2sql-demo.hf.space>, where you bring your own model key.
+<https://nl2sql.codewithnk.com>, where you bring your own model key.
 
 ## What to expect
 

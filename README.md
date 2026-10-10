@@ -4,7 +4,7 @@ Ask a database questions in English. The model writes a typed query plan, never
 SQL text; the plan is checked against the real schema and the caller's role
 before any SQL is generated.
 
-**Live demo: <https://nadeem4nk-nl2sql-demo.hf.space>** — bring your own model
+**Live demo: <https://nl2sql.codewithnk.com>** — bring your own model
 key, nothing to install. [What you will see](#what-to-expect).
 
 [![Test](https://github.com/nadeem4/nl2sql/actions/workflows/test.yml/badge.svg)](https://github.com/nadeem4/nl2sql/actions/workflows/test.yml)
@@ -13,10 +13,10 @@ key, nothing to install. [What you will see](#what-to-expect).
 
 ## Try it in your browser
 
-**<https://nadeem4nk-nl2sql-demo.hf.space>** — the playground on three sample
+**<https://nl2sql.codewithnk.com>** — the playground on three sample
 databases, nothing to install.
 
-[![Ask a database in plain English; the model plans, the code writes the SQL](https://raw.githubusercontent.com/nadeem4/nl2sql/main/docs/assets/social-card.png)](https://nadeem4nk-nl2sql-demo.hf.space)
+[![Ask a database in plain English; the model plans, the code writes the SQL](https://raw.githubusercontent.com/nadeem4/nl2sql/main/docs/assets/social-card.png)](https://nl2sql.codewithnk.com)
 
 **Bring your own key.** The server holds none. You paste yours into the page —
 one per provider — it stays in that browser tab, travels with the question that
