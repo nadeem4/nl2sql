@@ -135,6 +135,7 @@ Failure in this system is represented as structured `PipelineError` objects accu
 - `RESULT_ARTIFACT_PATH_TEMPLATE` renders the artifact path for every backend from the metadata the executor supplies (`tenant_id`, `request_id`, `sub_query_id`, `dag_node_id`, `subgraph_name`, `schema_version`); an unfillable placeholder raises rather than writing a bad path (see `../storage/artifact-store.md`).
 - With the default template, paths are `<backend root>/<tenant_id>/<request_id>/<sub_query_id>.parquet`: the sub-queries of one run never share a file, and repeat execution of the same sub-query with the same trace ID targets the same object. A custom template with no sub-query placeholder gets `-<sub_query_id>` added to its file name, so it cannot collide either.
 - A failed aggregation ends the run with its `AGGREGATOR_FAILED` error; the answer synthesizer is not called on an empty result.
+- A `join`/`compare` input that reached its datasource's row cap ends the run with `RESULT_TRUNCATED` before combining, since its missing rows could make the answer wrong; a capped `union` input runs and adds a `RESULT_TRUNCATED` warning (see `nodes/engine_aggregator_node.md#row-cap-before-a-combine`).
 
 ### Cleanup
 - No cleanup or rollback is implemented for artifacts or partial aggregation results.

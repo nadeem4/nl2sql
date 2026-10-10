@@ -12,7 +12,7 @@ One case cannot use state: LangGraph conditional-edge routers may only return ro
 - `provider` and `provider_response`, set on a `PROVIDER_*` error (below), otherwise `None`
 - `is_retryable` derived from severity and error code
 
-Common error codes include `MISSING_SQL`, `EXECUTION_FAILED`, `PIPELINE_TIMEOUT`, `SECURITY_VIOLATION`, `QUESTION_NOT_ANSWERABLE`.
+Common error codes include `MISSING_SQL`, `EXECUTION_FAILED`, `PIPELINE_TIMEOUT`, `SECURITY_VIOLATION`, `QUESTION_NOT_ANSWERABLE`. `RESULT_TRUNCATED` marks a combine input that reached its datasource's row cap: an error for a join or compare, a warning for a union (see [row cap before a combine](../architecture/nodes/engine_aggregator_node.md#row-cap-before-a-combine)).
 
 `ErrorCode` carries only codes something can produce. Eleven members that no
 code path raised were removed (`MISSING_GROUP_BY`, `INVALID_ALIAS_USAGE`,

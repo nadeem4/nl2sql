@@ -20,6 +20,8 @@ class SubgraphOutput(BaseModel):
     # "cache" when the final plan came from the plan cache, not the planner LLM.
     plan_source: Literal["llm", "cache"] = "llm"
     sql_draft: Optional[str] = None
+    # The adapter row cap bounding the SQL, when the plan set no smaller LIMIT.
+    row_cap: Optional[int] = None
     artifact: Optional[ArtifactRef] = None
     errors: List[PipelineError] = Field(default_factory=list)
     validation: List[ValidationCheck] = Field(default_factory=list)
