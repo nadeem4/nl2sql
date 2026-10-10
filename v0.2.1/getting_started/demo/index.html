@@ -1,0 +1,4977 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Reference documentation for the NL2SQL engine, CLI and REST API">
+      
+      
+        <meta name="author" content="Platform Engineering">
+      
+      
+      
+        <link rel="prev" href="../source/">
+      
+      
+        <link rel="next" href="../../configuration/system/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/favicon.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Demo Data (CLI-first) - NL2SQL Platform</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="teal" data-md-color-accent="purple">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#demo-data-cli-first" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="NL2SQL Platform" class="md-header__button md-logo" aria-label="NL2SQL Platform" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            NL2SQL Platform
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Demo Data (CLI-first)
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="teal" data-md-color-accent="purple"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="teal" data-md-color-accent="lime"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../architecture/overview/" class="md-tabs__link">
+          
+  
+  
+  Architecture
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../" class="md-tabs__link">
+          
+  
+  
+  Getting Started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../configuration/system/" class="md-tabs__link">
+          
+  
+  
+  Configuration
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../adapters/" class="md-tabs__link">
+          
+  
+  
+  Adapters
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../schema/store/" class="md-tabs__link">
+          
+  
+  
+  Schema
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../execution/isolation/" class="md-tabs__link">
+          
+  
+  
+  Execution
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../storage/artifact-store/" class="md-tabs__link">
+          
+  
+  
+  Storage
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../observability/stack/" class="md-tabs__link">
+          
+  
+  
+  Observability
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../security/model/" class="md-tabs__link">
+          
+  
+  
+  Security
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../deployment/architecture/" class="md-tabs__link">
+          
+  
+  
+  Deployment
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../development/" class="md-tabs__link">
+          
+  
+  
+  Development
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../testing/architecture/" class="md-tabs__link">
+          
+  
+  
+  Testing
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../api/" class="md-tabs__link">
+          
+  
+  
+  API
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../glossary/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Glossary
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="NL2SQL Platform" class="md-nav__button md-logo" aria-label="NL2SQL Platform" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    NL2SQL Platform
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/graph_state/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Graph State
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/determinism/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Determinism
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/invariants/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Invariants
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/failure_recovery/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Failure + Recovery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/indexing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Indexing + Retrieval
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_8" id="__nav_2_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Subgraphs
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Subgraphs
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/subgraphs/main_pipeline_graph/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Main Pipeline Graph
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/subgraphs/sql_agent/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SQL Agent Subgraph
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_9" id="__nav_2_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Nodes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Nodes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/nodes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Node Catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/nodes/answer_synthesizer_node/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Answer Synthesizer
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/nodes/ast_planner_node/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AST Planner
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/nodes/datasource_resolver_node/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasource Resolver
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/nodes/decomposer_node/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decomposer
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/nodes/engine_aggregator_node/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engine Aggregator
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/nodes/executor_node/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Executor
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/nodes/generator_node/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Generator
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/nodes/logical_validator_node/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Logical Validator
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/nodes/refiner_node/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Refiner
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/nodes/schema_retriever_node/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema Retriever
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../pypi/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PyPI (Python API)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../docker/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Docker (REST API)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../source/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    From Source (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Demo Data (CLI-first)
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Demo Data (CLI-first)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#what-to-expect" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What to expect
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-install-the-cli" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Install the CLI
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-write-the-demo-project" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Write the demo project
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Write the demo project">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-schemas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The schemas
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-roles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The roles
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#api-keys-in-the-demo" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        API keys in the demo
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#index-health-and-repair" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Index health and repair
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-search-index-panel" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The search index panel
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#old-demo-folders" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Old demo folders
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pages
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-ask-page" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Ask page
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-pipeline-page" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Pipeline page
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-settings-page" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Settings page
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-retrieval-inspector" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Retrieval inspector
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rating-answers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rating answers
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-use-the-demo-from-the-cli" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Use the demo from the CLI
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sample-questions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sample questions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#regenerating-the-demo" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Regenerating the demo
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-datasets-that-are-not-here" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The datasets that are not here
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/system/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration System
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/datasources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/llm/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    LLMs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/policies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Policies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/secrets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Secrets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adapters
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Adapters
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adapters/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adapters/architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adapters/sdk/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SDK Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adapters/sqlalchemy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SQLAlchemy Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adapters/development/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Building Adapters
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adapters/duckdb/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DuckDB
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adapters/mssql/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Microsoft SQL Server
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adapters/mysql/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MySQL
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adapters/postgres/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PostgreSQL
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adapters/sqlite/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SQLite
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Schema
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../schema/store/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema Store + Metadata
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../execution/isolation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution Isolation + Concurrency
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Storage
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Storage
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../storage/artifact-store/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Artifact Store
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Observability
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Observability
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../observability/stack/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Observability Stack
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../observability/debugging/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Debugging a Run (Traces)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../observability/feedback/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feedback and Signals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../observability/error-handling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Error Handling + Circuit Breaker
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Security
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security Model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/multi-tenant/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multi-Tenant Isolation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Deployment
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../deployment/architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../deployment/docker/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Docker
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../deployment/kubernetes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kubernetes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../deployment/hosted-demo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hosted demo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_12" >
+        
+          
+          <label class="md-nav__link" for="__nav_12" id="__nav_12_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_12">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Development
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extending NL2SQL
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/releasing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Releasing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../extensions/add-adapter/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Add Adapter
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../extensions/add-chunk-types/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Add Chunk Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../extensions/extend-planner/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extend Planner
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../extensions/add-execution-backend/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Add Execution Backend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_13" >
+        
+          
+          <label class="md-nav__link" for="__nav_13" id="__nav_13_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_13_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_13">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Testing
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../testing/architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../testing/evaluation-dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../benchmarks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Benchmark Results
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_14" >
+        
+          
+          <label class="md-nav__link" for="__nav_14" id="__nav_14_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_14_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_14">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_14_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_14_2" id="__nav_14_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core API (Python)
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_14_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_14_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core API (Python)
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/core/public-facade/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Public Facade
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/core/auth/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Auth
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/core/datasource/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasource
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/core/llm/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    LLM
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/core/indexing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Indexing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/core/query/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Query
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/core/settings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Settings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_14_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_14_3" id="__nav_14_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    REST API (FastAPI)
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_14_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_14_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    REST API (FastAPI)
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/rest/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/rest/health/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Health
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/rest/query/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Query
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/rest/datasource/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasource
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/rest/llm/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    LLM
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/rest/indexing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Indexing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../glossary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Glossary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#what-to-expect" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What to expect
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-install-the-cli" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Install the CLI
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-write-the-demo-project" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Write the demo project
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Write the demo project">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-schemas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The schemas
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-roles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The roles
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#api-keys-in-the-demo" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        API keys in the demo
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#index-health-and-repair" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Index health and repair
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-search-index-panel" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The search index panel
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#old-demo-folders" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Old demo folders
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pages
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-ask-page" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Ask page
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-pipeline-page" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Pipeline page
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-settings-page" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Settings page
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-retrieval-inspector" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Retrieval inspector
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rating-answers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rating answers
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-use-the-demo-from-the-cli" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Use the demo from the CLI
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sample-questions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sample questions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#regenerating-the-demo" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Regenerating the demo
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-datasets-that-are-not-here" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The datasets that are not here
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="demo-data-cli-first">Demo Data (CLI-first)</h1>
+<p>The demo is three SQLite databases, registered as three datasources.
+<a href="https://github.com/lerocha/chinook-database">Chinook</a>, a small digital music
+store, leads; it is vendored in the wheel (MIT, v1.4.5, 1.02 MB). Beside it are
+<code>support</code>, a help-desk ticketing system (about 232 KiB), and <code>webanalytics</code>,
+website traffic (about 284 KiB). Both hold synthetic data generated by this
+repository from a fixed seed
+(<a href="https://github.com/nadeem4/nl2sql/blob/main/scripts/generate_demo_datasets.py"><code>scripts/generate_demo_datasets.py</code></a>),
+so a regeneration reproduces exactly what is committed and no third-party data
+is involved in either. All three are shipped in the wheel and copied into your
+project by the CLI, so no data is downloaded or built when you set the demo up.
+The tables, columns and row counts are in
+<a href="https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/datasets/README.md">Demo datasets</a>.</p>
+<p>To see it before installing anything, the same playground runs at
+<a href="https://nadeem4nk-nl2sql-demo.hf.space">https://nadeem4nk-nl2sql-demo.hf.space</a>, where you bring your own model key.</p>
+<h2 id="what-to-expect">What to expect</h2>
+<p>After <code>pip install "nl2sql-engine[demo]"</code> and <code>nl2sql demo</code>:</p>
+<ol>
+<li><strong>No questions at the terminal.</strong> The command does not prompt. It looks for
+   a model key -- <code>--api-key</code>, then <code>OPENAI_API_KEY</code>, <code>OPENROUTER_API_KEY</code> or
+   <code>ANTHROPIC_API_KEY</code>, then a key saved in <code>.env.demo</code>, then an Ollama daemon
+   on <code>localhost:11434</code> -- and says which mode it chose: <strong>Live mode</strong> with
+   the provider, or <strong>Replay mode</strong> when it finds none.</li>
+<li><strong>A project folder and an index.</strong> It writes <code>./nl2sql-demo</code> (<code>--dir</code>
+   changes it), copies in the three databases above and indexes their schemas
+   on your machine. The first run downloads a ~79 MB embedding model; indexing
+   needs no key.</li>
+<li><strong>A local page.</strong> It prints <code>Playground ready at http://127.0.0.1:8765/</code> and
+   opens that address in your browser (<code>--no-browser</code> skips it, <code>--port</code>
+   changes it). Ctrl+C stops it.</li>
+<li><strong>No key yet?</strong> Paste an OpenAI or Anthropic key (or an OpenRouter one) into
+   <a href="#the-settings-page">the Settings page</a>; the running demo switches to live
+   without a restart.</li>
+<li><strong>Ask.</strong> Pick one of twenty guided questions or type your own, as <code>admin</code>,
+   <code>analyst</code> or <code>viewer</code>. A run shows the answer first, then the plan the model
+   wrote, the checks, the generated SQL, the rows, and cost and time.
+   <strong>Debug</strong> opens each step's model calls, prompts and responses, and
+   <a href="#the-pipeline-page">the Pipeline page</a> lists every step and which a model
+   decides.</li>
+</ol>
+<p>The <code>demo</code> command and the <code>[demo]</code> extra arrive on PyPI with 0.2.0. If pip
+says <code>nl2sql-engine</code> has no <code>demo</code> extra, you have an earlier release: install
+from a clone with <code>pip install -e packages/adapter-sdk -e "packages/nl2sql[demo]"</code>.</p>
+<h2 id="1-install-the-cli">1. Install the CLI</h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># Install from PyPI. Add the `demo` extra if you also want the browser</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="c1"># playground that `nl2sql demo` serves; `[all]` covers drivers only.</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>pip<span class="w"> </span>install<span class="w"> </span>nl2sql-engine
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"nl2sql-engine[demo]"</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="c1"># Or install from source (dev)</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">"packages/nl2sql[all,demo]"</span>
+</code></pre></div>
+<h2 id="2-write-the-demo-project">2. Write the demo project</h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>nl2sql<span class="w"> </span>setup<span class="w"> </span>--demo
+</code></pre></div>
+<p>This writes the following, relative to the directory you run the command in:</p>
+<ul>
+<li><code>data/chinook.sqlite</code>, <code>data/support.sqlite</code>, <code>data/webanalytics.sqlite</code></li>
+<li><code>configs/datasources.demo.yaml</code></li>
+<li><code>configs/llm.demo.yaml</code></li>
+<li><code>configs/policies.demo.json</code></li>
+<li><code>configs/sample_questions.demo.yaml</code></li>
+<li><code>configs/secrets.demo.yaml</code></li>
+<li><code>.env.demo</code></li>
+<li><code>nl2sql-demo.json</code>, a small stamp recording which engine version wrote the
+  folder (see <a href="#old-demo-folders">Old demo folders</a>)</li>
+</ul>
+<p>Setup then runs schema indexing once, automatically, and exits <code>1</code> if it fails.</p>
+<p>For the browser playground instead of the CLI, <code>nl2sql demo</code> does the same
+scaffolding in <code>./nl2sql-demo</code> and serves a page over it. See the
+<a href="https://github.com/nadeem4/nl2sql#quickstart-run-it-locally">README</a> for its flags, and
+<a href="#the-settings-page">the Settings page</a> for entering a key and choosing
+models from the page.</p>
+<h3 id="the-schemas">The schemas</h3>
+<p>Chinook is eleven tables with real declared foreign keys: <code>Artist</code>, <code>Album</code>,
+<code>Track</code>, <code>Genre</code>, <code>MediaType</code>, <code>Playlist</code>, <code>PlaylistTrack</code>, <code>Customer</code>,
+<code>Employee</code>, <code>Invoice</code> and <code>InvoiceLine</code>. <code>support</code> adds four - <code>agents</code>,
+<code>customers</code>, <code>tickets</code> and <code>ticket_messages</code> - and <code>webanalytics</code> five -
+<code>devices</code>, <code>referrers</code>, <code>sessions</code>, <code>page_views</code> and <code>conversions</code>. All three
+declare their foreign keys, which matters: <code>LogicalValidatorNode</code> checks every
+join in a plan against a declared relationship, so a dataset without them cannot
+answer a join question at all.</p>
+<p>The three share their people. Both generated databases carry a <code>customer_email</code>
+column and a <code>customer_id</code> matching Chinook's <code>Customer.CustomerId</code>, so the same
+59 customers appear in all three, and every timestamp in them falls inside
+Chinook's invoice window, 2009-01-01 to 2013-12-22. That does <strong>not</strong> make a
+question spanning two databases answerable: the engine plans each sub-query
+against a single datasource, so it cannot join across them. The shared columns
+are groundwork for when it can.</p>
+<p>Three registered datasources also change how a question is routed. With one, the
+resolver took the only datasource and skipped the vector search; with three, the
+datasource search and the LLM answerability judge run on every question, so the
+demo exercises the part of the pipeline a single-dataset demo never reached.
+Indexing all three writes 162 entries - 87 for <code>chinook</code>, 36 for <code>support</code> and
+39 for <code>webanalytics</code> - and the build <code>nl2sql setup --demo</code> runs takes about
+seven or eight seconds once the embedding model is cached; the first run on a
+machine still downloads the model.</p>
+<h3 id="the-roles">The roles</h3>
+<p><code>configs/policies.demo.json</code> is generated with three roles, spanning all three
+datasources, so the RBAC check is visible without editing anything:</p>
+<table>
+<thead>
+<tr>
+<th>Role</th>
+<th>May read</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>admin</code></td>
+<td>every table in every demo database</td>
+</tr>
+<tr>
+<td><code>analyst</code></td>
+<td>everything except employee and support-agent records - no <code>chinook.Employee</code>, no <code>support.agents</code></td>
+</tr>
+<tr>
+<td><code>viewer</code></td>
+<td>no customer, invoice or ticket-message data: the Chinook music catalog plus <code>webanalytics.devices</code>, <code>webanalytics.page_views</code> and <code>webanalytics.referrers</code>, and no access to <code>support</code> at all</td>
+</tr>
+</tbody>
+</table>
+<p>Ask the <code>viewer</code> role about customers and the logical validator refuses the plan
+with a <code>SECURITY_VIOLATION</code> before any SQL is generated. The planner saw the
+<code>Customer</code> and <code>Invoice</code> tables' columns but none of their sample values or
+statistics. <code>.env.demo</code> sets <code>RBAC_REFUSAL_NAMES_TABLES=true</code>, so the demo's
+refusal names the role and table; outside the demo the message is the generic
+"You do not have permission to see the data this question requires." See
+<a href="../../security/model/#strict-refusal">Security Model</a>.</p>
+<h3 id="api-keys-in-the-demo">API keys in the demo</h3>
+<p><code>.env.demo</code> is generated with <code>EMBEDDING_PROVIDER=local</code>, so schema chunks are
+embedded with the key-free ONNX <code>all-MiniLM-L6-v2</code> model bundled with chromadb
+instead of the OpenAI embeddings API. The first indexing run downloads roughly
+79 MB of model files into a local cache, which can take a few minutes.</p>
+<p>This covers the embedding step only. The demo is <strong>not</strong> key-free end to end:</p>
+<ul>
+<li><code>nl2sql --env demo run "..."</code> calls a chat model, so it needs a working LLM key
+  (<code>OPENAI_API_KEY</code>, or an OpenRouter key with <code>configs/llm.demo.yaml</code> pointed at
+  <code>provider: openrouter</code>).</li>
+<li>The demo's model is <code>gpt-5.4</code> with <code>temperature: 0.0</code>. It replaced <code>gpt-4o</code>,
+  whose 30,000 tokens-per-minute limit on the owner's account was below one
+  question with a single retry; <code>gpt-5.4</code> had 500,000 and accepts
+  <code>temperature: 0</code>. To use a model that rejects it (<code>gpt-5.5</code>, <code>gpt-5-mini</code>),
+  set <code>temperature: null</code> in <code>configs/llm.demo.yaml</code> - see
+  <a href="../../configuration/llm/#temperature">LLM configuration → Temperature</a>. With an
+  OpenRouter key or Ollama, change <code>model</code> to one that provider serves: live
+  mode switches the provider, not the model name.</li>
+<li><code>nl2sql index</code> also runs an optional LLM enrichment pass over the schema.
+  Enrichment is best-effort: without a usable chat key it is skipped with an
+  <code>INFO</code> line naming the agent, the provider and the variable to set, and the
+  chunks are still indexed - just with no LLM-generated descriptions. An
+  enrichment failure never fails indexing. The demo's own indexing (the first
+  run, the startup repair and the playground's Rebuild) leaves enrichment
+  <strong>off</strong>, because it spends tokens on your key; the playground offers it as an
+  explicit checkbox. When it is on, the demo's indexing uses a key exported in
+  your shell, or one saved in <code>.env.demo</code>; the file's empty <code>OPENAI_API_KEY=</code>
+  placeholder no longer blanks an exported key while indexing runs.</li>
+<li>Both <code>nl2sql setup --api-key &lt;key&gt;</code> and <code>nl2sql demo --api-key &lt;key&gt;</code> take the
+  key on the command line and write it into the generated env file. The provider
+  follows the key's shape: a key beginning <code>sk-or-</code> is OpenRouter and is stored
+  as <code>OPENROUTER_API_KEY</code> with <code>provider: openrouter</code>; a key beginning <code>sk-ant-</code>
+  is Anthropic and is stored as <code>ANTHROPIC_API_KEY</code> with <code>provider: anthropic</code>,
+  model <code>claude-opus-5</code> and <code>temperature: null</code> (install
+  <code>nl2sql-engine[anthropic]</code>); anything else is OpenAI.
+  <code>.env</code> and <code>.env.*</code> are covered by <code>.gitignore</code>, but a key passed on the
+  command line is visible in shell history and to <code>ps</code>, so the environment
+  variable remains the more private route.</li>
+<li>So <code>nl2sql setup --demo</code> and <code>nl2sql --env demo index</code> complete with no chat
+  key at all, and <code>nl2sql index</code> exits <code>0</code>. It exits <code>1</code> if any datasource
+  actually fails to index, which is safe to rely on in a script. A missing key
+  surfaces when a chat model is first called. Fill in <code>OPENAI_API_KEY</code> in
+  <code>.env.demo</code> before running a query.</li>
+<li>Pointing <code>configs/llm.demo.yaml</code> at <code>provider: ollama</code> removes the chat key
+  requirement, but a local model's ability to satisfy the pipeline's structured
+  output is model-dependent - see
+  <a href="../../configuration/llm/#ollama">LLM configuration → Ollama</a>.</li>
+</ul>
+<p>Sharing the demo with other people is the one case where none of this applies:
+<code>nl2sql demo --hosted</code> serves the playground with <strong>no key on the server at
+all</strong>, and each visitor pastes their own into the page; a visitor without one
+can replay the guided questions from recorded runs. See
+<a href="../../deployment/hosted-demo/">Hosted demo</a>.</p>
+<p>Because the demo indexes with <code>local</code> and the default environment indexes with
+<code>openai</code>, the two use different vector dimensions. <code>.env.demo</code> keeps its own
+<code>VECTOR_STORE=data/vector_store_demo</code> directory, so they do not collide. If you
+change <code>EMBEDDING_PROVIDER</code> for an existing store, run <code>nl2sql index --full</code>:
+every datasource in a collection must share one embedding model, so the store
+otherwise raises <code>EmbeddingDimensionMismatchError</code> (or
+<code>EmbeddingModelMismatchError</code> for a different model of the same size).</p>
+<h3 id="index-health-and-repair">Index health and repair</h3>
+<p>The playground's schema panel reads the schema snapshot, for whichever database
+its <strong>Showing</strong> switcher names; the resolver, which
+picks the database for every question when more than one is registered, reads
+the separate vector index, and with three registered it searches on every
+question. After a run the answer header names the database it picked. The two
+can disagree: a folder once had its snapshot intact and 0 entries in its index,
+so the page looked fine while every question failed with
+<code>SCHEMA_RETRIEVAL_FAILED</code>. Three things now guard against that:</p>
+<ul>
+<li><strong>Startup repair.</strong> Every <code>nl2sql demo</code> start checks what the index
+  <em>contains</em>: it rebuilds when the index is missing or empty, or was built from
+  an older schema version than the latest snapshot. A failed rebuild is
+  reported (the playground still starts, and offers Rebuild) rather than
+  ignored.</li>
+<li><strong>Rebuilds never leave an empty index.</strong> A datasource's new entries are
+  written beside its current ones and switched in only when all are written;
+  a failure keeps the previous entries answering questions. See
+  <a href="../../architecture/indexing/#rebuilding-without-an-empty-index">Indexing</a>.</li>
+<li><strong>Actionable errors.</strong> With an empty index the resolver says
+  "The vector index is empty ... Re-index with <code>nl2sql index</code>", and
+  <code>nl2sql --env demo doctor</code> reports the index under <strong>Index</strong>: entries by type,
+  whether each datasource's schema version matches the latest snapshot, and
+  when it was built.</li>
+</ul>
+<h3 id="the-search-index-panel">The search index panel</h3>
+<p>The playground's left rail opens with the <strong>Database</strong> panel, and with the
+demo's three databases it carries a switcher for which of them to read: a
+segmented control while there are four or fewer, a <strong>Showing</strong> select beyond
+that. At the foot of the rail, <strong>Search index</strong> is one line when all is well --
+"Search index fresh. 162 entries, built 3 minutes ago." -- that opens to entries
+by type (datasource, tables, columns, relationships), the schema version they
+were built from, and when. One index holds every database, so with the demo's
+three the line inside says which they are -- "Covers chinook, support and
+webanalytics". With a single database both panels name it instead, and there
+is no switcher. When the index is empty, missing or out of date, or a rebuild
+is running or failed, the panel opens itself, a warning under the top bar says
+what that means for a question, and the panel's <strong>Rebuild the index</strong> button
+becomes the rail's one filled button. <strong>Rebuild</strong> is also always available on
+demand.</p>
+<ul>
+<li>Rebuild re-reads one database's schema into a new snapshot and rebuilds its
+  entries beside the current ones; questions keep using the current entries
+  until the new ones are complete, and questions in flight finish before the
+  switch. That database is the demo's own, named in the button's help;
+  <code>nl2sql --env demo index</code> rebuilds all three.</li>
+<li>It shows each step as it runs. The first run downloads the 79 MB embedding
+  model, so it can take a few minutes.</li>
+<li><strong>Write descriptions with the LLM</strong> is off by default because it spends
+  tokens on your key; it is unavailable in replay mode.</li>
+<li>It has the Settings page's guardrails (so does the
+  <a href="#the-retrieval-inspector">Retrieval inspector</a>): local only unless <code>--allow-settings</code>,
+  and only from the playground page itself.</li>
+<li>On the <a href="../../deployment/hosted-demo/">hosted demo</a> there is no button at all.
+  The panel says instead that the index was built before the demo started and
+  which databases it covers, and prints the server's own reason where the
+  button would be: rebuilding writes to disk, and the sample data never
+  changes.</li>
+</ul>
+<h3 id="old-demo-folders">Old demo folders</h3>
+<p>Demo folders are not upgraded in place: a folder written by an older engine
+keeps that engine's defaults (for example an older default model, or no
+<code>TRACE_MODE</code> line). New folders get a <code>nl2sql-demo.json</code> stamp; when <code>nl2sql demo</code>
+starts in a folder stamped by an older engine, or in one with no stamp at all,
+it warns and suggests a fresh <code>--dir</code>. The playground's index panel repeats the
+warning.</p>
+<h3 id="pages">Pages</h3>
+<p>The playground is five pages, named across the top of every one of them:
+<strong>Home</strong>, <strong>Ask</strong>, <strong>Pipeline</strong>, <strong>Settings</strong> and <strong>Retrieval</strong>. Each is a
+route in the address bar -- <code>#/</code>, <code>#/ask</code>, <code>#/pipeline</code>, <code>#/settings</code> and
+<code>#/retrieval</code> -- so a reload stays where you were, a
+link can be pasted to someone else, and Back and Forward walk the pages you
+visited. A route nobody serves lands on Home.</p>
+<p><strong>Home</strong> says what the engine does and shows it: the five steps a question
+travels (Question, Plan, Check, SQL, Rows, marked by whether a model or code
+decides each), then a short clip of Ask, Pipeline and Retrieval with a link
+into each. <strong>Try a sample question</strong> opens Ask and asks a guided question; on
+the hosted demo it picks one with a recorded answer, so it works before you
+add a key. The nav marks the page you are on,
+and marks Settings or Retrieval when the server has it off; the page itself
+then says why. Moving between pages keeps the question, the answer and the
+Debug choice: they belong to the visit, not to the page.</p>
+<p>At the right of the top bar a status pill says which mode the page is in --
+<strong>Live</strong>, <strong>Replay mode</strong> with how many guided questions it has recordings for,
+or on the hosted demo whether this tab has a key yet. Hover it, or let a screen
+reader read it, for the full sentence: how replay answers, or whose key answers
+and the hosted limits.</p>
+<h3 id="the-ask-page">The Ask page</h3>
+<p>Ask is the question box, then the run, answer first:</p>
+<ul>
+<li><strong>Suggestions.</strong> Under the question box, a row of chips offers three or four
+  guided questions for the database the rail is showing, and <strong>N more</strong> opens
+  every pile, one per database. On a phone the row is a strip you swipe
+  sideways. The run sits right below the box.</li>
+<li><strong>The answer leads.</strong> Once a run is back, its first block is the answer: the
+  question and the role it was asked as, the answer sentence in the largest
+  type on the page, and a strip such as <code>10 rows / 3 of 3 checks / 2 plans /
+  5.04 s / $0.0187</code>. Each item in the strip moves the keyboard to its station
+  below. A refusal gets the same block: <strong>Refused at the checks. No SQL was
+  written.</strong></li>
+<li><strong>The stations.</strong> Plan, Checks, SQL, Rows and Cost &amp; time follow, each with a
+  small heading, a tag for who decides it (<strong>Model · gpt-5.4</strong>, from the run's
+  usage, or <strong>Code</strong>) and the step's time. On the spine a round mark is a model
+  step and a square one is code; filled with a tick is done, an outline is
+  waiting and a dashed outline was not reached.</li>
+<li><strong>The gate.</strong> The Checks station shows the plans the checks saw (<strong>Plan 1
+  refused</strong>, then <strong>Plan 2 passed</strong> when the first was sent back), why, in one
+  sentence, and each check as a tile with a tick or a cross.</li>
+<li><strong>While it runs.</strong> Only the station being worked on is lit; the rest wait,
+  faded. A counter beside the button reads <strong>Running · 3.4 s</strong>, and after a
+  moment <strong>Ask</strong> becomes <strong>Stop</strong>, which cancels the request: the run then says
+  <strong>Stopped</strong> and every station is marked not reached. The server notices the
+  dropped request within a quarter of a second and cancels the run: no further
+  step starts and no further model call is sent, though the one already in
+  flight finishes (and is billed by the provider). On the hosted demo a stopped
+  question still counts toward both limits, because it is charged when it
+  arrives, before it runs.</li>
+<li><strong>When it fails.</strong> A provider's refusal is said in words with the next step,
+  for example <strong>OpenAI rejected this key.</strong> with <strong>Replace the key</strong>, which
+  opens Settings. The provider's own reply is folded under <strong>Provider
+  response</strong>.</li>
+<li><strong>On a phone</strong>, once a run is on the page, a bar at the bottom, <strong>Ask another
+  question</strong>, takes you back to the question box. It hides while the box is in
+  view.</li>
+</ul>
+<h3 id="the-pipeline-page">The Pipeline page</h3>
+<p><strong>Pipeline</strong> lists every step a question passes through, in the order a run
+takes them, and marks which of them a model decides. Five do: the answerability
+check, the question splitter, the query planner, the plan repair and the answer
+writer. The other eight are ordinary code -- the layer router, the SQL agent,
+the schema search, the plan checks, the retry bookkeeping, the SQL writer, the
+executor and the result combiner -- which is the point: the model plans, and
+deterministic code writes the SQL, checks it against the real schema and this
+role's policy, and runs it.</p>
+<p>The steps are grouped into three phases: <strong>Understand the question</strong>, <strong>Answer
+each sub-query</strong> (the SQL agent and its own steps, in a bracket, because they
+repeat per sub-query and again when the checks refuse a plan) and <strong>Combine and
+explain</strong>. A step a model decides is a raised row with a round mark and its
+model in a chip; a code step is a compact row with a square mark. A legend
+reads: asks a model, code, did not run, skipped.</p>
+<p>Each step gives its name in plain words, the graph node name the Debug ledger
+uses, and one sentence on what it decides. Before any question, each model step
+names the model it is set to use, so the page is worth reading on arrival.
+Without a key, where the guided questions replay recordings, it names instead
+the model the recordings were made with, tagged <strong>recorded</strong>.
+After a question, each row gets a time bar and its time, so the page doubles as
+the run's waterfall, and a model step names the model that answered it and its
+input, cached and output tokens. The timings record how long each step took,
+not when it started, so the bars are laid end to end in pipeline order, and a
+step that ran more than once is drawn for its longest run. A step passed over
+while a later one ran (the plan repair, when no retry was needed) is marked
+skipped; a step the run never reached is marked did not run.</p>
+<p>The list is not written by hand on the page: it comes from <code>GET /api/pipeline</code>,
+which reads it from the graph's own node names, and a test fails when a node is
+added, renamed or removed and the description does not follow. The per-node
+drill-down under <strong>Debug</strong> on the Ask page is unchanged; this page is the
+overview. The long version is in
+<a href="../../architecture/pipeline/">Pipeline architecture</a>.</p>
+<h3 id="the-settings-page">The Settings page</h3>
+<p>The playground that <code>nl2sql demo</code> serves has a <strong>Settings</strong> page in the header
+nav. It edits the same two files the CLI reads, and nothing else: there is no
+second settings store, and the browser keeps nothing but UI conveniences.</p>
+<ul>
+<li><strong>API keys, one per provider.</strong> Paste a key and press <strong>Save key</strong>. The
+  provider follows the key's shape by the same rule as <code>--api-key</code> (<code>sk-ant-</code>
+  is Anthropic, <code>sk-or-</code> is OpenRouter, anything else OpenAI). The key is
+  written to the demo project's <code>.env.demo</code>, replacing that provider's previous
+  key and keeping the others, and the default moves to that provider. The
+  running demo switches from replay to live <strong>without a restart</strong>: questions
+  already running finish on the model client they started with, then the
+  engine's LLM clients are rebuilt from <code>configs/llm.demo.yaml</code>. Keys are
+  write-only: no response, log line, trace or error carries one, only a masked
+  form such as <code>sk-...4f2a</code> per provider. On a later start the precedence above
+  still holds, so <code>--api-key</code> or a key exported in your shell wins over a saved
+  one, and every saved key is loaded so each step finds its own.</li>
+<li>
+<p><strong>A provider and a model for each LLM step.</strong> One selector each for the
+  answerability check (<code>datasourceresolver</code>), question splitter (<code>decomposer</code>),
+  query planner (<code>astplanner</code>), plan repair (<code>refiner</code>) and answer writer
+  (<code>answersynthesizer</code>). Each has a "Default" option that uses the <code>default</code>
+  agent, then one group of models per provider. A provider with no saved key is
+  listed but cannot be chosen, and a step already on a provider whose key is
+  gone says so under its selector. A choice is written to
+  <code>configs/llm.demo.yaml</code> under <code>agents:</code> with its <code>provider</code>, <code>model</code> and
+  temperature. It takes the default's endpoint and key reference when it is on
+  the default's provider, and its own provider's <code>${env:...}</code> reference
+  otherwise. It takes effect on the next question, and a step put on another
+  provider stays there when the default moves. The list is short on purpose. On
+  2026-09-20 each OpenAI model was sent the engine's parameters of the time
+  (<code>temperature=0</code>, <code>seed=42</code>, strict <code>json_schema</code>) and worked with them, two
+  of them only once the temperature was left out. The engine now asks every
+  model for a tool call instead, as it already did for every node but the
+  planner. That says the model accepts the engine's calls, not how well it
+  plans, which is the evaluation's question:</p>
+<table>
+<thead>
+<tr>
+<th>Model</th>
+<th>Written with</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>gpt-5.4</code> (the default), <code>gpt-5.4-mini</code>, <code>gpt-4.1</code>, <code>gpt-4.1-mini</code>, <code>gpt-4o</code></td>
+<td><code>temperature: 0.0</code></td>
+</tr>
+<tr>
+<td><code>gpt-5.5</code>, <code>gpt-5-mini</code></td>
+<td><code>temperature: null</code>: they reject temperature 0, so a step on one runs at the model's default temperature and its answers vary more from run to run</td>
+</tr>
+</tbody>
+</table>
+<p>Claude's list was not probed on a real account; its temperatures follow
+Anthropic's documented rules:</p>
+<table>
+<thead>
+<tr>
+<th>Model</th>
+<th>Written with</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>claude-opus-5</code> (the default), <code>claude-sonnet-5</code></td>
+<td><code>temperature: null</code>: both reject any temperature</td>
+</tr>
+<tr>
+<td><code>claude-haiku-4-5</code></td>
+<td><code>temperature: 0.0</code></td>
+</tr>
+</tbody>
+</table>
+<p>The list lives in one place, <code>VERIFIED_MODELS</code> in
+<code>nl2sql/llm/providers.py</code>. It covers OpenAI and Anthropic for now:
+with an OpenRouter key or Ollama as the default the panel says the default
+has no model list, and offers only the other providers whose keys are
+saved.
+- <strong>Local only by default.</strong> Settings work only when the playground is bound to
+  a loopback address (<code>127.0.0.1</code>, <code>localhost</code>, <code>::1</code>). On <code>0.0.0.0</code> or any
+  other address the panel says why it is off and the settings routes answer
+  <code>403</code>, because the playground has no login: a stranger who can reach it could
+  swap in their own key, or spend on yours. <code>nl2sql demo --allow-settings</code> turns
+  it on anyway, for a network you trust. Changes are also refused from another
+  site's page (a foreign <code>Origin</code>), through a hostname that is not a loopback
+  name, or in anything but JSON.
+- <strong>Hosted mode is a third state.</strong> With <code>nl2sql demo --hosted</code> the page shows a
+  key form and a <strong>Model for each step</strong> section that write only to this
+  browser tab's <code>sessionStorage</code>; the settings routes stay refused because
+  there is nothing on the server to save. Choosing a model needs nothing
+  saved, so hosted mode keeps it: one key per provider and the model each step
+  runs on travel with each question, in a header each. The Ask page there opens
+  with the key form itself: pick a provider, paste the key and <strong>Use this key</strong>,
+  under three facts about it -- <strong>Stored</strong> in this browser tab only, <strong>Sent</strong>
+  with each question in a request header, <strong>Never</strong> written to disk, logs or
+  traces. Nothing is held closed without a key: the guided questions the
+  server has recordings for are marked and answer from a recorded run,
+  labelled <strong>Recorded run</strong>, and any other question answers with a button to
+  Settings to add a key. With recordings the key form is folded under <strong>Use
+  your own key</strong>. Locally there is nothing to announce, and nothing is shown. See
+  <a href="../../deployment/hosted-demo/">Hosted demo</a>.</p>
+</li>
+</ul>
+<h3 id="the-retrieval-inspector">The Retrieval inspector</h3>
+<p><strong>Retrieval</strong> is the third page in the header nav. It embeds any text with the
+local model and runs the engine's own vector search against the live index: the pool of nearest entries with their similarity, the entries MMR picks
+in order, the score each won with, and what was dropped. There is no
+re-ranking model; the "re-ranking" is MMR, explained in
+<a href="../../architecture/indexing/#retrieval-mmr-not-a-re-ranking-model">Indexing</a>.</p>
+<ul>
+<li><strong>Knobs.</strong> Picks (<code>k</code>, the pool is <code>4 * k</code>), lambda (the engine uses 0.7; 1
+  is plain nearest-neighbour order, 0 favours entries unlike earlier picks),
+  which entry types to include, and a datasource filter. After the first
+  search, each change searches again. Each entry shows the text that was
+  embedded for it.</li>
+<li><strong>Reading it.</strong> The picks in order, and the entries MMR passed over, sit above
+  the pool as rows of chips. Each similarity has a bar placed within the
+  pool's own range, nearest full and farthest empty: raw cosine scores bunch
+  together, so this is what shows which entries are actually nearer.</li>
+<li><strong>Free.</strong> The embedder is local; nothing here calls the LLM.</li>
+<li><strong>For chunking experiments.</strong> Change the chunking, press Rebuild, search the
+  same text, and diff the <strong>Copy as text</strong> output of the two runs: one
+  fixed-width line per entry (rank, pick or drop, similarity, MMR score, type,
+  name).</li>
+<li><strong>Local only</strong>, like Settings and Rebuild, because it shows every index entry,
+  column statistics and sample values included, with no role filter: on a
+  non-loopback <code>--host</code> it is off (<code>POST /api/retrieval</code> answers <code>403</code>) unless
+  <code>--allow-settings</code> is given, and it refuses another site's page, a
+  non-loopback hostname and anything but JSON.</li>
+</ul>
+<p>A run's own retrieval is under <strong>Debug</strong>: open the <code>datasource_resolver</code> or
+<code>schema_retriever</code> row in the per-node table.</p>
+<h3 id="rating-answers">Rating answers</h3>
+<p>Below <strong>Cost &amp; time</strong>, each answer asks <strong>Was this answer right?</strong>: <strong>👍 Right</strong>
+or <strong>👎 Wrong</strong>, with an optional note (<strong>Wrong number</strong>, <strong>Wrong table</strong>,
+<strong>Wrong filter</strong>, <strong>Missing rows</strong>, or your own words). The rating is saved in
+the demo's <code>data/schema_store.db</code> with the question, role, SQL, the model per
+step and the engine version; never the rows. It is local only, like Settings:
+on a non-loopback <code>--host</code> it is off unless <code>--allow-settings</code>.
+<code>FEEDBACK_ENABLED=false</code> in <code>.env.demo</code> turns it off. Read the ratings back, with
+the refusal, retry, error and plan-cache rates, from the CLI (below). See
+<a href="../../observability/feedback/">Feedback and Signals</a>.</p>
+<h2 id="3-use-the-demo-from-the-cli">3. Use the demo from the CLI</h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># Run a query against the demo</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>run<span class="w"> </span><span class="s2">"How many customers do we have, by country?"</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="c1"># Ask as a role that is not allowed the answer</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>run<span class="w"> </span>--role<span class="w"> </span>viewer<span class="w"> </span><span class="s2">"Who are the top 5 customers by total spend?"</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="c1"># Plan and validate without touching the database</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>run<span class="w"> </span>--no-exec<span class="w"> </span><span class="s2">"Which artist has the most albums?"</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="c1"># Pin one datasource instead of letting the resolver pick</span>
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>run<span class="w"> </span>--ds-id<span class="w"> </span>support<span class="w"> </span><span class="s2">"How many support tickets are still open, by priority?"</span>
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>
+<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="c1"># Re-index after regenerating or editing the demo configs</span>
+<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>index
+<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>
+<a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a><span class="c1"># Re-index one datasource only; the others' entries are left untouched</span>
+<a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>index<span class="w"> </span>--datasource<span class="w"> </span>chinook
+<a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a>
+<a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a><span class="c1"># After changing the embedding model: rebuild every datasource, then switch</span>
+<a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>index<span class="w"> </span>--full
+<a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a>
+<a id="__codelineno-2-22" name="__codelineno-2-22" href="#__codelineno-2-22"></a><span class="c1"># Check the index: entries by type, schema version, when built</span>
+<a id="__codelineno-2-23" name="__codelineno-2-23" href="#__codelineno-2-23"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>doctor
+</code></pre></div>
+<p>The two flags that name a datasource are not the same flag: <code>run</code> takes
+<code>--ds-id</code>, which pins the datasource and makes the resolver skip its search;
+<code>index</code> takes <code>--datasource</code> (<code>-d</code>), which chooses what to re-index.</p>
+<p>The demo's <code>.env.demo</code> sets <code>TRACE_MODE=always</code>, so every run also writes a
+trace to <code>traces/</code> and prints its path. Inspect one with
+<code>nl2sql --env demo trace show &lt;file&gt;</code>, or re-run it on the recorded model
+answers with <code>nl2sql --env demo trace replay &lt;file&gt;</code>. See
+<a href="../../observability/debugging/">Debugging a Run</a>.</p>
+<p>Asking a question a second time reuses the first run's validated plan from the
+plan cache (in <code>data/schema_store.db</code>), so the SQL and rows are the same and the
+planner is not called; the playground's Debug view says "Plan from the plan
+cache". The plan is still validated for the role you ask as. To start fresh:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>cache<span class="w"> </span>clear
+</code></pre></div>
+<p>The playground's ratings, and the guardrail rates over every rated run and
+kept trace:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>feedback<span class="w"> </span>list<span class="w">               </span><span class="c1"># the ratings, newest first</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>feedback<span class="w"> </span>stats<span class="w">              </span><span class="c1"># thumbs up/down, refusals, retries, errors, plan cache</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>feedback<span class="w"> </span><span class="nb">export</span><span class="w"> </span>--good<span class="w">      </span><span class="c1"># thumbs-up runs as draft gold entries, for review</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>feedback<span class="w"> </span>clear<span class="w">              </span><span class="c1"># delete every rating</span>
+</code></pre></div>
+<p><code>export --good</code> writes <code>feedback_gold_drafts.yaml</code>, never the gold set itself. A
+person must review each draft and run <code>python -m nl2sql.evaluation.gold</code> before
+adding it; see
+<a href="../../observability/feedback/#growing-the-gold-set-nl2sql-feedback-export-good">Feedback and Signals</a>.</p>
+<p><code>nl2sql demo --record</code> turns the cache off while recording, so every planner
+answer is captured. It also stops with exit <code>1</code>, recording nothing, when the
+demo's indexing fails: a plain <code>nl2sql demo</code> keeps going and offers Rebuild,
+but answers recorded against no index would be the wrong ones. Only a
+question whose run succeeded (rows, an answer, no error) keeps its recordings;
+a failed run's are dropped, the question is listed as not recorded, and the
+command exits <code>1</code> after writing <code>recordings.json</code> with the rest. The file names
+the provider and the model that answered, and a replay reports that model --
+in the usage ledger, the Debug pane and on the Pipeline page, tagged recorded --
+rather than the one the replaying config names. See
+<a href="../../architecture/determinism/#the-plan-cache-determinism-from-the-architecture">Determinism → The plan cache</a>.</p>
+<p><code>--env &lt;name&gt;</code> loads <code>.env.&lt;name&gt;</code>. To point at an exact file instead, use
+<code>--env-file &lt;path&gt;</code>, which takes precedence over <code>--env</code>. Either flag also
+loads the file's variables into the process environment, so <code>doctor</code> and <code>run</code>
+find a key kept only in <code>.env.demo</code>; a variable already exported in your shell
+wins over the file. The equivalent environment variables (<code>ENV</code> and
+<code>ENV_FILE_PATH</code>) still work, but setting them yourself only feeds the settings
+object; use the flags when the file holds your key.</p>
+<p>Note: the demo datasource config uses relative database paths
+(<code>data/chinook.sqlite</code>, <code>data/support.sqlite</code>, <code>data/webanalytics.sqlite</code>), so
+run the CLI from the directory you ran <code>nl2sql setup --demo</code> in.</p>
+<h2 id="sample-questions">Sample questions</h2>
+<p><code>configs/sample_questions.demo.yaml</code> is written with twenty questions, the same
+ones the playground offers as guided questions -- a few as chips for the
+database the rail is showing, and all twenty behind <strong>N more</strong>, in one pile per
+database, each headed by the datasource id. Chinook's twelve come first, so the demo opens on familiar
+ground:</p>
+<ul>
+<li>How many customers do we have, by country?</li>
+<li>Who are the top 5 customers by total spend?</li>
+<li>Which artist has the most albums?</li>
+<li>What is the total revenue per year?</li>
+<li>Which genre sells the most tracks?</li>
+<li>What is the average invoice total by billing country?</li>
+<li>Which employees support the most customers?</li>
+<li>What is the longest track in each genre?</li>
+<li>Which 5 customers bought the most jazz tracks?</li>
+<li>What was the monthly revenue in 2013 for customers in the USA?</li>
+<li>Which playlists contain tracks from more than three genres?</li>
+<li>Who are the top customers by total spend?</li>
+</ul>
+<p>Then four on <code>support</code>:</p>
+<ul>
+<li>How many support tickets are still open, by priority?</li>
+<li>Which support agents resolved the most tickets?</li>
+<li>What is the average time to close a ticket, by category?</li>
+<li>Which customers raised the most support tickets?</li>
+</ul>
+<p>And four on <code>webanalytics</code>:</p>
+<ul>
+<li>Which pages were viewed the most last year?</li>
+<li>How many sessions came from each marketing channel?</li>
+<li>What is the bounce rate by device type?</li>
+<li>How many purchases were there per month in 2013?</li>
+</ul>
+<p>None of them spans two databases, deliberately: the engine cannot answer such a
+question yet. The rail says so too, under the database switcher: each question
+is answered from one database, and joining across them is planned. Clicking a
+question from another pile moves the switcher to that database, so the schema
+on the left is the one the question is about.</p>
+<p>They are also indexed, per datasource: the <code>schema.datasource</code> entry the
+resolver matches every question against carries that datasource's configured
+description and its own questions (<code>.env.demo</code> points <code>SAMPLE_QUESTIONS</code> at the
+file), which is how the resolver tells the three apart. Folders generated before
+that was fixed wrote the setting as <code>ROUTING_EXAMPLES</code>, which nothing read; the engine now accepts that name too, so re-index such a folder
+(<code>nl2sql --env demo index</code>) to pick the questions up.</p>
+<p>Whether a given question is answered correctly depends on the model; see
+<a href="https://github.com/nadeem4/nl2sql#known-limitations">Known limitations</a>.</p>
+<h2 id="regenerating-the-demo">Regenerating the demo</h2>
+<p>Re-running <code>nl2sql setup --demo</code> overwrites all three databases under <code>data/</code>
+and the <code>configs/*.demo.*</code> files with fresh copies. An existing <code>.env.demo</code> is
+overwritten too, so a key recorded there is lost - pass <code>--api-key</code> again, save it on the playground's Settings page, or
+re-add it afterwards.</p>
+<h2 id="the-datasets-that-are-not-here">The datasets that are not here</h2>
+<p><code>--lite</code> and <code>--docker</code> chose between a generated manufacturing dataset in
+SQLite and the same data in a Postgres/MySQL/MSSQL Compose stack. Both are gone:
+the manufacturing DDL declared no foreign keys, so it could not answer a join
+question, and it was the only dataset the test suite ran on. The Postgres, MySQL
+and MSSQL <strong>adapters</strong> are unaffected - they are product features, configured
+like any other datasource. The demo's three SQLite databases took their place.
+A question that has to read two of them at once is still not answerable: the
+engine plans each sub-query against a single datasource.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "toc.follow", "content.code.copy"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

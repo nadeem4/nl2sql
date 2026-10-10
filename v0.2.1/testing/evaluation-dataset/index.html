@@ -1,0 +1,5545 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Reference documentation for the NL2SQL engine, CLI and REST API">
+      
+      
+        <meta name="author" content="Platform Engineering">
+      
+      
+      
+        <link rel="prev" href="../architecture/">
+      
+      
+        <link rel="next" href="../../benchmarks/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/favicon.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Evaluation Dataset - NL2SQL Platform</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="teal" data-md-color-accent="purple">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#chinook-gold-evaluation-dataset" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="NL2SQL Platform" class="md-header__button md-logo" aria-label="NL2SQL Platform" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            NL2SQL Platform
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Evaluation Dataset
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="teal" data-md-color-accent="purple"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="teal" data-md-color-accent="lime"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../architecture/overview/" class="md-tabs__link">
+          
+  
+  
+  Architecture
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../getting_started/" class="md-tabs__link">
+          
+  
+  
+  Getting Started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../configuration/system/" class="md-tabs__link">
+          
+  
+  
+  Configuration
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../adapters/" class="md-tabs__link">
+          
+  
+  
+  Adapters
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../schema/store/" class="md-tabs__link">
+          
+  
+  
+  Schema
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../execution/isolation/" class="md-tabs__link">
+          
+  
+  
+  Execution
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../storage/artifact-store/" class="md-tabs__link">
+          
+  
+  
+  Storage
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../observability/stack/" class="md-tabs__link">
+          
+  
+  
+  Observability
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../security/model/" class="md-tabs__link">
+          
+  
+  
+  Security
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../deployment/architecture/" class="md-tabs__link">
+          
+  
+  
+  Deployment
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../development/" class="md-tabs__link">
+          
+  
+  
+  Development
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../architecture/" class="md-tabs__link">
+          
+  
+  
+  Testing
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../api/" class="md-tabs__link">
+          
+  
+  
+  API
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../glossary/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Glossary
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="NL2SQL Platform" class="md-nav__button md-logo" aria-label="NL2SQL Platform" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    NL2SQL Platform
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/graph_state/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Graph State
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/determinism/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Determinism
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/invariants/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Invariants
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/failure_recovery/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Failure + Recovery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/indexing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Indexing + Retrieval
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_8" id="__nav_2_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Subgraphs
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Subgraphs
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/subgraphs/main_pipeline_graph/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Main Pipeline Graph
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/subgraphs/sql_agent/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SQL Agent Subgraph
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_9" id="__nav_2_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Nodes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Nodes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/nodes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Node Catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/nodes/answer_synthesizer_node/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Answer Synthesizer
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/nodes/ast_planner_node/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AST Planner
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/nodes/datasource_resolver_node/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasource Resolver
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/nodes/decomposer_node/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decomposer
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/nodes/engine_aggregator_node/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engine Aggregator
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/nodes/executor_node/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Executor
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/nodes/generator_node/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Generator
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/nodes/logical_validator_node/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Logical Validator
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/nodes/refiner_node/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Refiner
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/nodes/schema_retriever_node/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema Retriever
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting_started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting_started/pypi/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PyPI (Python API)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting_started/docker/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Docker (REST API)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting_started/source/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    From Source (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting_started/demo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Demo Data (CLI-first)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/system/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration System
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/datasources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/llm/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    LLMs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/policies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Policies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/secrets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Secrets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adapters
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Adapters
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adapters/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adapters/architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adapters/sdk/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SDK Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adapters/sqlalchemy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SQLAlchemy Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adapters/development/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Building Adapters
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adapters/duckdb/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DuckDB
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adapters/mssql/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Microsoft SQL Server
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adapters/mysql/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MySQL
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adapters/postgres/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PostgreSQL
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adapters/sqlite/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SQLite
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Schema
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../schema/store/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema Store + Metadata
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../execution/isolation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution Isolation + Concurrency
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Storage
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Storage
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../storage/artifact-store/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Artifact Store
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Observability
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Observability
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../observability/stack/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Observability Stack
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../observability/debugging/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Debugging a Run (Traces)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../observability/feedback/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feedback and Signals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../observability/error-handling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Error Handling + Circuit Breaker
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Security
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security Model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/multi-tenant/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multi-Tenant Isolation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Deployment
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../deployment/architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../deployment/docker/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Docker
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../deployment/kubernetes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kubernetes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../deployment/hosted-demo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hosted demo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_12" >
+        
+          
+          <label class="md-nav__link" for="__nav_12" id="__nav_12_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_12">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Development
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extending NL2SQL
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/releasing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Releasing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../extensions/add-adapter/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Add Adapter
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../extensions/add-chunk-types/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Add Chunk Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../extensions/extend-planner/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extend Planner
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../extensions/add-execution-backend/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Add Execution Backend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_13" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_13" id="__nav_13_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_13_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_13">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Testing
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation Dataset
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#format" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Format
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#regenerating-the-results" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Regenerating the results
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-the-tests-check" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the tests check
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#running-the-benchmark" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Running the benchmark
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Running the benchmark">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#strict-and-lenient-accuracy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Strict and lenient accuracy
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#alternative-gold-answers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Alternative gold answers
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Alternative gold answers">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#when-to-add-one-and-when-not-to" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When to add one, and when not to
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tier-1-gold-plans-through-the-code-nodes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tier 1: gold plans through the code nodes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tier-2-the-real-model-end-to-end" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tier 2: the real model, end to end
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Tier 2: the real model, end to end">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#-model-and-the-presets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        --model and the presets
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#comparing-configs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Comparing configs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cost-and-the-cap" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cost and the cap
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-scoreboard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The scoreboard
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#answer-faithfulness" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Answer faithfulness
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#reading-a-run-intervals-flips-and-passk" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reading a run: intervals, flips and pass^k
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Reading a run: intervals, flips and pass^k">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-regression-gate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The regression gate
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#-passes-and-passk" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        --passes and pass^k
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#where-baselines-live" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where baselines live
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#results-over-time" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Results over time
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Results over time">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#comparable-runs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Comparable runs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#publishing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Publishing
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-tier-2-is-tested" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How tier 2 is tested
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#retrieval-recall" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Retrieval recall
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Retrieval recall">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#reading-the-numbers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reading the numbers
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../benchmarks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Benchmark Results
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_14" >
+        
+          
+          <label class="md-nav__link" for="__nav_14" id="__nav_14_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_14_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_14">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_14_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_14_2" id="__nav_14_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core API (Python)
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_14_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_14_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core API (Python)
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/core/public-facade/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Public Facade
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/core/auth/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Auth
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/core/datasource/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasource
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/core/llm/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    LLM
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/core/indexing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Indexing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/core/query/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Query
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/core/settings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Settings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_14_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_14_3" id="__nav_14_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    REST API (FastAPI)
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_14_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_14_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    REST API (FastAPI)
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/rest/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/rest/health/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Health
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/rest/query/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Query
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/rest/datasource/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasource
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/rest/llm/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    LLM
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/rest/indexing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Indexing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../glossary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Glossary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#format" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Format
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#regenerating-the-results" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Regenerating the results
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-the-tests-check" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the tests check
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#running-the-benchmark" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Running the benchmark
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Running the benchmark">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#strict-and-lenient-accuracy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Strict and lenient accuracy
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#alternative-gold-answers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Alternative gold answers
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Alternative gold answers">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#when-to-add-one-and-when-not-to" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When to add one, and when not to
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tier-1-gold-plans-through-the-code-nodes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tier 1: gold plans through the code nodes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tier-2-the-real-model-end-to-end" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tier 2: the real model, end to end
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Tier 2: the real model, end to end">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#-model-and-the-presets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        --model and the presets
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#comparing-configs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Comparing configs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cost-and-the-cap" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cost and the cap
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-scoreboard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The scoreboard
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#answer-faithfulness" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Answer faithfulness
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#reading-a-run-intervals-flips-and-passk" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reading a run: intervals, flips and pass^k
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Reading a run: intervals, flips and pass^k">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-regression-gate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The regression gate
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#-passes-and-passk" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        --passes and pass^k
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#where-baselines-live" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where baselines live
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#results-over-time" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Results over time
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Results over time">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#comparable-runs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Comparable runs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#publishing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Publishing
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-tier-2-is-tested" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How tier 2 is tested
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#retrieval-recall" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Retrieval recall
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Retrieval recall">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#reading-the-numbers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reading the numbers
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="chinook-gold-evaluation-dataset">Chinook Gold Evaluation Dataset</h1>
+<p>A set of about forty questions about the vendored Chinook database
+(<code>nl2sql/datasets/chinook.sqlite</code>), each with hand-written SQL and the rows
+that SQL returns. It is the reference an evaluation compares the engine's
+answers against.</p>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>What it holds</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>packages/nl2sql/src/nl2sql/evaluation/datasets/chinook_gold.yaml</code></td>
+<td>The dataset</td>
+</tr>
+<tr>
+<td><code>packages/nl2sql/src/nl2sql/evaluation/gold.py</code></td>
+<td><code>GoldQuestion</code> model (with <code>alt_gold_sql</code>), <code>load_gold_dataset()</code>, <code>execute_gold_sql()</code>, <code>regenerate()</code></td>
+</tr>
+<tr>
+<td><code>packages/nl2sql/src/nl2sql/evaluation/datasets/chinook_gold_plans.yaml</code></td>
+<td>A hand-written <code>PlanModel</code> per answerable question, for <a href="#tier-1-gold-plans-through-the-code-nodes">tier 1</a></td>
+</tr>
+<tr>
+<td><code>packages/nl2sql/src/nl2sql/evaluation/tier1.py</code></td>
+<td><code>load_gold_plans()</code>, the gold-plan fake LLM, <code>run_tier1()</code></td>
+</tr>
+<tr>
+<td><code>packages/nl2sql/src/nl2sql/evaluation/tier2.py</code></td>
+<td><a href="#tier-2-the-real-model-end-to-end">Tier 2</a>: the cost cap, the scoreboard, the comparison and the baseline check</td>
+</tr>
+<tr>
+<td><code>packages/nl2sql/src/nl2sql/evaluation/faithfulness.py</code></td>
+<td><a href="#answer-faithfulness">Answer faithfulness</a>: the written answer's numbers and names against the rows</td>
+</tr>
+<tr>
+<td><code>packages/nl2sql/src/nl2sql/evaluation/retrieval_recall.py</code></td>
+<td><a href="#retrieval-recall">Retrieval recall</a>: table and column recall of schema retrieval, no key</td>
+</tr>
+<tr>
+<td><code>packages/nl2sql/src/nl2sql/evaluation/prices.py</code></td>
+<td>The dated price table tier 2 bills every call from</td>
+</tr>
+<tr>
+<td><code>packages/nl2sql/src/nl2sql/evaluation/records.py</code></td>
+<td>Result records, comparable runs, <code>nl2sql benchmark publish</code> and <code>--from</code></td>
+</tr>
+<tr>
+<td><code>packages/nl2sql/src/nl2sql/evaluation/presets/</code></td>
+<td><code>--model</code> configs and the built-in <code>--llm</code> presets (<code>*.yaml</code>, shipped in the wheel)</td>
+</tr>
+<tr>
+<td><code>packages/nl2sql/src/nl2sql/evaluation/baselines/</code></td>
+<td>Where a committed tier 2 baseline scoreboard goes (none yet)</td>
+</tr>
+<tr>
+<td><code>benchmarks/&lt;kind&gt;/&lt;database&gt;/</code></td>
+<td>Committed result records: <code>tier2/</code> one per run and config, <code>retrieval/</code> one per run (<a href="#results-over-time">layout</a>)</td>
+</tr>
+<tr>
+<td><code>packages/nl2sql/src/nl2sql/evaluation/evaluator.py</code></td>
+<td>Row comparison (<code>compare_results</code>, <code>compare_results_lenient</code>) and per-role scoring (<code>score_case</code>, <code>score_case_lenient</code>)</td>
+</tr>
+<tr>
+<td><code>packages/nl2sql/tests/unit/test_chinook_gold_dataset.py</code></td>
+<td>Key-free checks, part of the normal unit suite</td>
+</tr>
+</tbody>
+</table>
+<h2 id="format">Format</h2>
+<p>The file is a YAML list. Each entry:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>id</code></td>
+<td>Unique id, <code>chinook_NNN</code></td>
+</tr>
+<tr>
+<td><code>question</code></td>
+<td>The natural-language question</td>
+</tr>
+<tr>
+<td><code>difficulty</code></td>
+<td><code>easy</code>, <code>medium</code> or <code>hard</code></td>
+</tr>
+<tr>
+<td><code>tags</code></td>
+<td>Categories: <code>single-table</code>, <code>filter</code>, <code>join</code>, <code>multi-join</code>, <code>aggregation</code>, <code>having</code>, <code>order-limit</code>, <code>ties</code>, <code>date</code>, <code>paraphrase</code>, <code>keyword-in-question</code>, <code>keyword-in-value</code>, <code>rbac-denial</code>, <code>unanswerable</code></td>
+</tr>
+<tr>
+<td><code>paraphrase_group</code></td>
+<td>Optional. Questions with the same intent share this id and the same <code>gold_result</code>, for determinism checks</td>
+</tr>
+<tr>
+<td><code>datasource</code></td>
+<td>The database the question is asked against. Defaults to <code>chinook</code> and is written out only where a question differs, so the file - and its sha256 - are unchanged. It is what the run is scored and identified by, so the demo's other databases do not widen it</td>
+</tr>
+<tr>
+<td><code>needed_tables</code></td>
+<td>Exactly the tables <code>gold_sql</code> reads, for retrieval recall</td>
+</tr>
+<tr>
+<td><code>needed_columns</code></td>
+<td><code>Table.Column</code> names the answer needs, for retrieval recall</td>
+</tr>
+<tr>
+<td><code>expected</code></td>
+<td>Per demo role (<code>admin</code>, <code>analyst</code>, <code>viewer</code>): <code>allowed</code>, <code>refused</code> or <code>unanswerable</code></td>
+</tr>
+<tr>
+<td><code>order_matters</code></td>
+<td>Whether a comparison should respect row order</td>
+</tr>
+<tr>
+<td><code>gold_sql</code></td>
+<td>Hand-written SQLite SQL, or <code>null</code> for an unanswerable question</td>
+</tr>
+<tr>
+<td><code>gold_result</code></td>
+<td>Rows <code>gold_sql</code> returns, as a list of <code>{column: value}</code> maps. Generated, never typed. <code>null</code> when <code>gold_sql</code> is <code>null</code></td>
+</tr>
+<tr>
+<td><code>alt_gold_sql</code></td>
+<td>Optional. <a href="#alternative-gold-answers">Reviewed alternative answers</a> to the same question, each hand-written SQLite SQL</td>
+</tr>
+<tr>
+<td><code>alt_gold_result</code></td>
+<td>The rows each <code>alt_gold_sql</code> returns, in the same order. Generated, never typed. Omitted with <code>alt_gold_sql</code></td>
+</tr>
+</tbody>
+</table>
+<p><code>expected</code> follows the demo policy in <code>nl2sql/cli/demo/chinook.py</code>
+(<code>CHINOOK_POLICIES</code>): a role gets <code>refused</code> when any of <code>needed_tables</code> is
+outside its <code>allowed_tables</code>, and <code>allowed</code> otherwise. Questions the database
+cannot answer are <code>unanswerable</code> for every role. The <code>rbac-denial</code> tag marks
+exactly the questions some role is refused.</p>
+<p>Where <code>ORDER BY</code> has ties, <code>gold_sql</code> breaks them on a key (<code>CustomerId</code>,
+<code>Country</code> and so on) so the result is deterministic, and the question carries
+the <code>ties</code> tag. When the tie is only about order, <code>order_matters</code> is <code>false</code>.</p>
+<h2 id="regenerating-the-results">Regenerating the results</h2>
+<p><code>gold_result</code> and <code>alt_gold_result</code> are always produced by running <code>gold_sql</code>
+and each <code>alt_gold_sql</code> against the database. After adding or editing a
+question, an alternative or any SQL, set its <code>gold_result</code> to <code>null</code> (or leave
+it stale) and run:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>python<span class="w"> </span>-m<span class="w"> </span>nl2sql.evaluation.gold
+</code></pre></div>
+<p>It re-executes every <code>gold_sql</code> and every <code>alt_gold_sql</code>, rewrites the file in
+its canonical layout and prints how many results it wrote. A question with no
+alternatives carries neither field. Commit the rewritten file.</p>
+<h2 id="what-the-tests-check">What the tests check</h2>
+<p><code>pytest packages/nl2sql/tests/unit/test_chinook_gold_dataset.py</code> runs without
+an API key and checks that:</p>
+<ul>
+<li>every entry validates against <code>GoldQuestion</code> and ids are unique;</li>
+<li>every <code>gold_sql</code> reproduces its committed <code>gold_result</code>, and the committed
+  file is byte-for-byte what the generator writes;</li>
+<li>every <code>alt_gold_sql</code> reproduces its committed <code>alt_gold_result</code> the same
+  way, reads no table outside <code>needed_tables</code>, returns between one and
+  twenty-five rows, and is not the gold answer written again;</li>
+<li>paraphrase groups share one result;</li>
+<li>every needed table and column exists, and <code>needed_tables</code> equals the tables
+  in <code>gold_sql</code>;</li>
+<li>every role in <code>expected</code> exists in the demo policy and each outcome follows
+  from it;</li>
+<li>Chinook's twelve guided questions (<code>CHINOOK_QUESTIONS</code>) are included
+  verbatim. The demo offers twenty in all (<code>DEMO_QUESTIONS</code>); the other eight
+  ask about <code>support</code> and <code>webanalytics</code>, which this Chinook-only gold set does
+  not cover.</li>
+</ul>
+<h2 id="running-the-benchmark">Running the benchmark</h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>benchmark<span class="w"> </span>--tier<span class="w"> </span><span class="m">1</span><span class="w">        </span><span class="c1"># gold plans, no API key</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>benchmark<span class="w"> </span>--tier<span class="w"> </span><span class="m">2</span><span class="w"> </span>--max-cost<span class="w"> </span><span class="m">5</span><span class="w">   </span><span class="c1"># the real model, scored and priced</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>benchmark<span class="w">                 </span><span class="c1"># full pipeline, the configured LLM</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>benchmark<span class="w"> </span>retrieval<span class="w">       </span><span class="c1"># schema retrieval recall, no API key</span>
+</code></pre></div>
+<p>Each question runs once per role in its <code>expected</code> map (narrow with
+<code>--include-ids</code> and <code>--role</code>; tier 2 runs as <code>admin</code> unless <code>--role</code> says
+otherwise), and each run is scored:</p>
+<table>
+<thead>
+<tr>
+<th>Expected</th>
+<th>Passes when</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>allowed</code></td>
+<td>Status <code>success</code>, one result set, and its rows equal <code>gold_result</code> or any <a href="#alternative-gold-answers">alternative</a></td>
+</tr>
+<tr>
+<td><code>refused</code></td>
+<td>Status <code>error</code>, a <code>SECURITY_VIOLATION</code> whose message is the generic refusal (it names no table), and no rows</td>
+</tr>
+<tr>
+<td><code>unanswerable</code></td>
+<td>Status <code>error</code>, a <code>QUESTION_NOT_ANSWERABLE</code> from the datasource resolver's answerability check, and no rows</td>
+</tr>
+</tbody>
+</table>
+<p>Rows are compared by value, in selected column order: column names and
+aliases are ignored, so <code>SELECT Country AS c</code> matches a gold <code>Country</code>
+column but a swapped column order does not. Numbers match within 0.005,
+because gold values are rounded to two decimals. A number also matches a
+string that spells one, within the same tolerance, so <code>'2009'</code> is <code>2009</code>:
+databases differ in which of the two they return for the same value. Other
+strings must be equal, and two strings compare as strings (<code>'2009'</code> is not
+<code>'2009.0'</code>). Row order counts only when <code>order_matters</code> is true.</p>
+<h3 id="strict-and-lenient-accuracy">Strict and lenient accuracy</h3>
+<p>Tier 2 scores every run twice and reports both, strict first.</p>
+<table>
+<thead>
+<tr>
+<th>Score</th>
+<th>What it is</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Strict</strong></td>
+<td>The execution match above, unchanged: the same columns, in the same order, and the same rows</td>
+</tr>
+<tr>
+<td><strong>Lenient</strong></td>
+<td>Every gold column is answered by <em>some</em> column of the result, wherever it sits</td>
+</tr>
+</tbody>
+</table>
+<p>Strict is the honest headline. Lenient exists because most of what it
+forgives is shape a person would accept: the same two names as
+<code>FirstName, LastName</code> or the other way round, one extra key column, a year
+labelled <code>2009-01-01</code> where the gold set writes <code>2009</code>. Academic and vendor
+practice has moved the same way -- Spider 2.0 counts a prediction correct
+when every gold column vector appears in the result
+(<a href="https://arxiv.org/html/2411.07763v2">paper</a>) and Defog's <code>sql-eval</code> falls
+back to <code>subset_df</code>, matching each gold column's values against some
+generated column with names, types and order ignored
+(<a href="https://defog.ai/blog/open-sourcing-sqleval/">post</a>).</p>
+<p>A run passes leniently when:</p>
+<ul>
+<li>every gold column is matched, as a <strong>multiset of values</strong>, by a <strong>distinct</strong>
+  column of the result, in any position, with column names ignored and the
+  same numeric tolerance;</li>
+<li>the rows of the matched columns then line up as the strict score requires,
+  so values swapped between rows still fail;</li>
+<li>the <strong>row count is equal</strong>, and row order still counts only when
+  <code>order_matters</code>.</li>
+</ul>
+<p>Two guardrails keep it from passing wrong answers:</p>
+<ul>
+<li><strong>A column cap.</strong> The result may carry at most <code>max(2 x gold columns,
+  gold columns + 2)</code> columns: three for a one-column gold answer, four for
+  two, six for three. Without it a <code>SELECT *</code> would pass by carrying the gold
+  columns among many others. Databricks Genie counts any extra column as bad
+  (<a href="https://docs.databricks.com/aws/en/genie/benchmarks">docs</a>), so a cap is
+  the middle ground.</li>
+<li><strong>No constant columns.</strong> Once a result has more than one row, a column
+  whose values are all the same -- all-null included -- may not answer for a
+  gold column: a hard-coded literal has the right height and tells the gold
+  column nothing. On a single row every column is constant, so the rule is
+  off there.</li>
+</ul>
+<p>One value normalisation is added, and only one: <strong>date and period labels</strong>.
+When a gold value is a <code>YYYY</code>, <code>YYYY-MM</code> or <code>YYYY-MM-DD</code> string and the
+predicted value is a date starting with it at a component boundary, the two
+are equal -- <code>'2009'</code> matches <code>'2009-01-01'</code>, <code>'2013-02'</code> matches
+<code>'2013-02-01'</code>. Only the gold side may be the shorter label, only strings are
+read this way (a number is a number, never a year), and nothing else is
+normalised. Anything broader belongs in an alternative gold answer, which is
+reviewed per question and cannot silently widen.</p>
+<p>Lenient is a superset of strict by construction: everything strict accepts is
+accepted. It is not partial credit -- a question passes a score or it does
+not -- and there is no model in either score, so both stay reproducible.</p>
+<p>Every result row carries <code>status</code> and <code>lenient_status</code>, so a question that
+passes one score and not the other is visible per question; the printed
+table shows a <strong>Strict</strong> and a <strong>Lenient</strong> column beside each other, and the
+scoreboard, the records, the README block and
+<a href="../../benchmarks/">docs/benchmarks.md</a> all report both.</p>
+<h3 id="alternative-gold-answers">Alternative gold answers</h3>
+<p>A question can have more than one right answer. "Who are the top 5 customers
+by total spend?" is answered just as well with the name in one column as with
+<code>FirstName</code> and <code>LastName</code> side by side; "What is the total revenue per year?"
+is answered with the year written <code>2009</code> or <code>2009-01-01</code>. <code>alt_gold_sql</code> holds
+those other answers, one SQL each, executed and committed exactly as
+<code>gold_sql</code> is. A run passes -- strictly or leniently -- when its rows match the
+gold answer <strong>or any alternative</strong>.</p>
+<p>This is how the field handles multiple right answers. Snowflake has humans
+pick every correct answer out of several models' SQL
+(<a href="https://www.snowflake.com/en/blog/engineering/cortex-analyst-text-to-sql-accuracy-bi/">post</a>);
+LinkedIn reports that about 60% of its benchmark questions now have several
+answers and that without them it <em>"underreported recall by 10-15%"</em>
+(<a href="https://www.linkedin.com/blog/engineering/ai/practical-text-to-sql-for-data-analytics">post</a>);
+Spider 2.0 supports multiple gold files per task
+(<a href="https://arxiv.org/html/2411.07763v2">paper</a>).</p>
+<h4 id="when-to-add-one-and-when-not-to">When to add one, and when not to</h4>
+<p>Prefer an alternative to loosening the comparator. An alternative is written
+down, reviewed once, and only ever affects the question it sits on; a looser
+rule applies to all forty-three at once and can quietly start passing wrong
+answers. The <a href="#strict-and-lenient-accuracy">lenient score</a> is deliberately
+narrow for the same reason.</p>
+<p>Add one when <strong>all</strong> of these hold:</p>
+<ol>
+<li>A real run produced it. Alternatives come from SQL a model actually wrote,
+   not from shapes someone imagined it might write.</li>
+<li>A person has <strong>read the rows</strong> and would accept them as an answer to the
+   question as written.</li>
+<li>It is the same question, from the same tables: an alternative may not read
+   a table outside <code>needed_tables</code>, and the test enforces that.</li>
+<li>It is deterministic -- ties broken on a key, as <code>gold_sql</code> does.</li>
+</ol>
+<p>Do not add one when the answer is a <em>different</em> question, however reasonable
+it looks. Two from the run this was built on, both refused:</p>
+<ul>
+<li><em>"Where do our customers from Germany live?"</em> answered with three distinct
+  cities. It drops the customers, so it cannot say who lives where. The
+  alternative kept for <code>chinook_021</code> is the gold answer with the name in one
+  column, not this.</li>
+<li><em>"Who are the top customers by total spend?"</em> answered with one row. "Top
+  customers" is a list with no N; one row answers "who is the top customer",
+  a different question. <code>chinook_007</code> is not the same case: <em>"which employees
+  support the </em><em>most</em><em> customers"</em> carries a superlative, and the one employee
+  who holds the maximum is a fair reading of it, so that one is kept.</li>
+</ul>
+<p>Write the SQL into <code>alt_gold_sql</code>, run <code>python -m nl2sql.evaluation.gold</code> to
+generate <code>alt_gold_result</code>, read the rows it wrote, and commit both. Never
+type an alternative's rows by hand.</p>
+<p>The command prints one row per question and role, then a pass/fail/skip/xfail
+count per role, writes the whole report as JSON (<code>--export-path</code>, default
+<code>benchmark_report.json</code>) and exits 1 if any case failed. Without <code>--tier</code>,
+<code>--bench-config-path</code> names a YAML map of LLM configs to run in turn; without
+it the context's own LLM config runs once.</p>
+<h2 id="tier-1-gold-plans-through-the-code-nodes">Tier 1: gold plans through the code nodes</h2>
+<p>Tier 1 checks the nodes that are plain code -- the logical validator
+(including RBAC), the SQL generator and the executor -- with no model
+involved. <code>chinook_gold_plans.yaml</code> holds, for every answerable question, a
+hand-written <code>PlanModel</code> (the typed AST the planner emits) that answers it. A
+local <code>FakeLLMServer</code> answers every LLM call: the datasource resolver's
+answerability check gets <code>["chinook"]</code> for a question with <code>gold_sql</code> and an
+empty list for an unanswerable one (so the resolver's refusal is what is
+scored), the decomposer gets one
+sub-query on <code>chinook</code> whose expected columns are the plan's select aliases,
+the planner gets the gold plan, the refiner "Keep the same plan." and the
+answer synthesizer a fixed sentence. The rest is the real pipeline on the
+indexed demo, so a failing case is a bug in a code node or in the plan, never
+in a model. Refusals are scored against the default, generic message: the
+demo's <code>.env.demo</code> sets <code>RBAC_REFUSAL_NAMES_TABLES=true</code> so the playground
+can show which table was refused, and tier 1 turns that off for its run.</p>
+<p>Each plan reads exactly the question's <code>needed_tables</code> (the RBAC outcome is
+derived from them) and selects the gold result's columns in order. PlanModel
+has no subqueries or window functions, so a few plans express the answer
+differently from <code>gold_sql</code>: anti-joins for "longest track per genre"
+(<code>chinook_008</code>) and "never purchased" (<code>chinook_039</code>), and conditional sums
+in HAVING for "jazz but never rock" (<code>chinook_009</code>). The header of the plans
+file lists these. <code>chinook_011</code> and <code>chinook_034</code> use <code>COUNT(DISTINCT x)</code>
+through the aggregate's <code>distinct: true</code> flag.</p>
+<p>Tier 1 runs on every PR as <code>packages/nl2sql/tests/e2e/test_benchmark_tier1.py</code>,
+in the key-free integration job: it generates the demo, runs
+<code>nl2sql benchmark --tier 1</code> with no API key in the environment, and requires
+every case -- allowed, refused and unanswerable, for every role -- to pass,
+with none skipped. <code>packages/nl2sql/tests/unit/test_tier1_gold_plans.py</code>
+checks in the unit job that every answerable question has a plan, that it
+reads exactly the needed tables and selects as many columns as the gold
+result, and that the answerability verdict served follows the gold dataset.</p>
+<p>When a gold plan fails, the fault is in the engine or in the plan. Fix an
+engine bug with a regression test; do not change the gold data to make a plan
+pass unless the gold data is itself wrong.</p>
+<h2 id="tier-2-the-real-model-end-to-end">Tier 2: the real model, end to end</h2>
+<p>Tier 2 runs the whole product -- every LLM node on a real model -- on the gold
+questions and scores it with the same runner and scoring as tier 1. It costs
+money, so it never runs in CI (it refuses when <code>CI</code> is set) and never runs
+without a dollar cap. The key comes from the environment or the LLM config
+(<code>${env:...}</code>), never from the command line; traces follow <code>TRACE_MODE</code> as for
+any run.</p>
+<p>The commands the owner runs, from the demo folder:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>benchmark<span class="w"> </span>--tier<span class="w"> </span><span class="m">2</span><span class="w"> </span>--model<span class="w"> </span>gpt-5.4<span class="w"> </span>--max-cost<span class="w"> </span><span class="m">5</span><span class="w">                        </span><span class="c1"># a run</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>benchmark<span class="w"> </span>--tier<span class="w"> </span><span class="m">2</span><span class="w"> </span>--model<span class="w"> </span>gpt-5.4<span class="w"> </span>--llm<span class="w"> </span>mini-helpers<span class="w"> </span>--max-cost<span class="w"> </span><span class="m">10</span><span class="w">    </span><span class="c1"># a comparison</span>
+</code></pre></div>
+<p>and then, from the repo, <code>nl2sql benchmark publish --from &lt;demo folder&gt;</code>
+(<a href="#results-over-time">results over time</a>).</p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--max-cost USD</code></td>
+<td>required</td>
+<td>Stop before a question that could take the run's total spend past this</td>
+</tr>
+<tr>
+<td><code>--model MODEL</code></td>
+<td>none</td>
+<td>A model to put on every LLM node, named in the scoreboard by itself (repeatable; below)</td>
+</tr>
+<tr>
+<td><code>--llm SPEC</code></td>
+<td>none</td>
+<td>An LLM config to compare (repeatable): a preset name, <code>PATH.yaml</code> (named by the file stem) or <code>NAME=PATH</code>. With no <code>--model</code> or <code>--llm</code>, the project's LLM config runs as <code>default</code></td>
+</tr>
+<tr>
+<td><code>--note TEXT</code></td>
+<td>none</td>
+<td>A short label for what changed, e.g. <code>"slim prompts"</code>, kept in each record and shown in the history</td>
+</tr>
+<tr>
+<td><code>--role ROLE</code></td>
+<td><code>admin</code></td>
+<td>Run as this role (repeatable)</td>
+</tr>
+<tr>
+<td><code>--passes N</code></td>
+<td><code>1</code></td>
+<td>Run every question N times per config and report determinism and pass^N. Use <code>--passes 3</code> for a baseline</td>
+</tr>
+<tr>
+<td><code>--questions ID_OR_TAG</code></td>
+<td>every question</td>
+<td>Only these question ids or tags (repeatable or comma-separated), e.g. <code>--questions unanswerable,chinook_001</code></td>
+</tr>
+<tr>
+<td><code>--export-path PATH</code></td>
+<td><code>&lt;project&gt;/benchmark_tier2.json</code></td>
+<td>Where to write the full scoreboard</td>
+</tr>
+<tr>
+<td><code>--results-dir DIR</code></td>
+<td><code>&lt;project&gt;/benchmarks</code></td>
+<td>The benchmarks folder; one record per config goes in <code>DIR/tier2/&lt;database&gt;/</code></td>
+</tr>
+<tr>
+<td><code>--baseline PATH</code></td>
+<td>none</td>
+<td>A committed scoreboard to check against (below)</td>
+</tr>
+<tr>
+<td><code>--max-regressions N</code></td>
+<td><code>2</code></td>
+<td>Baseline: how many questions may flip from pass to fail before the run fails; a smaller but significant drop fails too</td>
+</tr>
+<tr>
+<td><code>--max-accuracy-drop F</code></td>
+<td>none</td>
+<td>Deprecated: a flat accuracy drop gate. Smaller than one question at n = 43, so it fired on noise. Only applied when passed</td>
+</tr>
+<tr>
+<td><code>--max-cost-increase F</code></td>
+<td><code>0.2</code></td>
+<td>Baseline: largest allowed rise in cost per question (0.2 is 20%)</td>
+</tr>
+</tbody>
+</table>
+<p><code>&lt;project&gt;</code> is the folder of the env file the run is configured from: for
+<code>--env demo</code> that is <code>./.env.demo</code>, so the current folder; with <code>--env-file
+PATH</code> it is that file's folder.</p>
+<p>The option is <code>--llm</code>, not <code>--config</code>: on every <code>nl2sql</code> command <code>--config</code> is
+the datasource config and <code>--llm-config</code> the single LLM config path.</p>
+<p>Before anything is spent, the run prints its plan and carries on without a
+prompt (the cap is the safety):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>Plan: 43 questions x role admin x 1 pass, cap $10.00
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>  gpt-5.4: gpt-5.4 (every node)
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>  gpt-5.4-mini-helpers: gpt-5.4 (astplanner, refiner); gpt-5.4-mini (answersynthesizer, datasourceresolver, decomposer)
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>  Records: C:\demo\benchmarks\tier2  Scoreboard: C:\demo\benchmark_tier2.json
+</code></pre></div>
+<p>Exit codes: 0 when every config ran, 1 on a baseline regression or a failed
+run, 2 on a usage error (no <code>--max-cost</code>, an unknown <code>--model</code> or <code>--llm</code>, two
+configs with one name, <code>CI</code> set), 3 when the cap stopped the run early.</p>
+<h3 id="-model-and-the-presets"><code>--model</code> and the presets</h3>
+<p><code>--model MODEL</code> puts <code>MODEL</code> on all five LLM nodes. A model in
+<code>VERIFIED_MODELS</code> (<code>nl2sql/llm/providers.py</code>: <code>gpt-5.4</code>, <code>gpt-5.4-mini</code>,
+<code>gpt-4.1</code>, <code>gpt-4o</code>, <code>gpt-5.5</code>, <code>gpt-5-mini</code>, <code>claude-opus-5</code>,
+<code>claude-sonnet-5</code>, <code>claude-haiku-4-5</code>, ...) names its provider and its
+temperature: none is sent where the model rejects one (<code>gpt-5.5</code>,
+<code>gpt-5-mini</code>, <code>claude-opus-5</code>, <code>claude-sonnet-5</code>). Any other model is written
+<code>provider/model</code> (<code>openrouter/meta-llama/llama-3.3-70b-instruct</code>,
+<code>ollama/llama3</code>) and runs at temperature 0 (none for <code>anthropic</code>); a bare
+unknown model is a usage error. The key is the provider's <code>${env:...}</code>
+variable (<code>OPENAI_API_KEY</code>, <code>ANTHROPIC_API_KEY</code>, <code>OPENROUTER_API_KEY</code>), which
+<code>--env demo</code> loads from <code>.env.demo</code>. No <code>base_url</code> is written, so the provider
+preset's endpoint is used.</p>
+<p><code>--llm NAME</code> picks a preset, a config file shipped inside the package.
+<code>nl2sql benchmark presets</code> lists them:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>Tier 2 presets (--llm NAME):
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>  claude-planner: claude-opus-5 (astplanner, refiner); gpt-5.4 (answersynthesizer, datasourceresolver, decomposer)
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>  gpt-5.4: gpt-5.4 (every node)
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>  gpt-5.4-mini-helpers: gpt-5.4 (astplanner, refiner); gpt-5.4-mini (answersynthesizer, datasourceresolver, decomposer)
+</code></pre></div>
+<p>A preset matches by its full name or a <code>-</code>-separated suffix, so <code>--llm
+mini-helpers</code> is <code>gpt-5.4-mini-helpers</code>, and the scoreboard names it by its
+full name. <code>claude-planner</code> needs the <code>anthropic</code> extra and
+<code>ANTHROPIC_API_KEY</code>. <code>--llm PATH.yaml</code> runs your own file under its stem, and
+<code>--llm NAME=PATH</code> under <code>NAME</code>. <code>--model</code> and <code>--llm</code> combine: every one
+becomes a config in one comparison, <code>--model</code>s first.</p>
+<h3 id="comparing-configs">Comparing configs</h3>
+<p>Each config runs on the same questions, one after another, and the
+scoreboard puts them side by side and lists every question one config passed
+and another failed (with <code>--passes</code> &gt; 1 a question can also be <code>flaky</code>). Since
+<a href="../../configuration/llm/">per-node providers</a>, a config can put each LLM node
+(<code>datasourceresolver</code>, <code>decomposer</code>, <code>astplanner</code>, <code>refiner</code>,
+<code>answersynthesizer</code>) on its own provider and model, as the presets do:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>benchmark<span class="w"> </span>--tier<span class="w"> </span><span class="m">2</span><span class="w"> </span>--max-cost<span class="w"> </span><span class="m">10</span><span class="w"> </span>--model<span class="w"> </span>gpt-5.4<span class="w"> </span>--llm<span class="w"> </span>mini-helpers<span class="w"> </span>--llm<span class="w"> </span>claude-planner
+</code></pre></div>
+<p>A model that is not in <code>VERIFIED_MODELS</code> (<code>nl2sql/llm/providers.py</code>) gets
+a warning: the engine's parameters have not been checked against it.</p>
+<h3 id="cost-and-the-cap">Cost and the cap</h3>
+<p>Every LLM call is billed from <code>nl2sql/evaluation/prices.py</code>, a committed table
+of USD per 1M tokens, dated with the day it was checked:</p>
+<table>
+<thead>
+<tr>
+<th>Model</th>
+<th>Input</th>
+<th>Cached input</th>
+<th>Cache write</th>
+<th>Output</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>gpt-5.4</td>
+<td>2.50</td>
+<td>0.25</td>
+<td>2.50</td>
+<td>15.00</td>
+<td>OpenAI pricing page, 2026-09-21</td>
+</tr>
+<tr>
+<td>gpt-5.4-mini</td>
+<td>0.75</td>
+<td>0.075</td>
+<td>0.75</td>
+<td>4.50</td>
+<td>OpenAI pricing page, 2026-09-21</td>
+</tr>
+<tr>
+<td>claude-opus-5</td>
+<td>5.00</td>
+<td>0.50</td>
+<td>6.25</td>
+<td>25.00</td>
+<td>Anthropic model table (claude-api skill, cached 2026-06-24)</td>
+</tr>
+<tr>
+<td>claude-sonnet-5</td>
+<td>2.00</td>
+<td>0.20</td>
+<td>2.50</td>
+<td>10.00</td>
+<td>same</td>
+</tr>
+<tr>
+<td>claude-haiku-4-5</td>
+<td>1.00</td>
+<td>0.10</td>
+<td>1.25</td>
+<td>5.00</td>
+<td>same</td>
+</tr>
+</tbody>
+</table>
+<p>A call costs <code>(input - cached - cache_write) x input + cached x cached_input +
+cache_write x cache_write_rate + output x output</code>, from the token counts each
+wire adapter records in <code>QueryResult.usage</code>. Reasoning tokens are part of
+output and billed as output. OpenAI charges nothing extra to write its
+automatic cache; Anthropic bills a cache write at 1.25x input and a read at
+0.1x. Each call is priced by the model its node is configured with, so a dated
+snapshot name in the response still prices correctly.</p>
+<p>Before any call, every model any LLM node of any config would use must have a
+price; a missing one is an error naming the config, node and model. Before
+each question the run adds the dearest question seen so far to the running
+total and stops if that could pass <code>--max-cost</code>. The cap covers the whole run
+(every config and pass), and the first question always runs, so the total can
+exceed the cap only by what one question costs more than the dearest before
+it. The running spend prints after every question. A stopped run still writes
+its scoreboard, marked <code>"stopped": "max_cost"</code>, with <code>completed_cases</code> short
+of <code>planned_cases</code>.</p>
+<p>Tier 2 turns the plan cache off for its run (<code>PLAN_CACHE_ENABLED</code>), so a
+second pass asks the planner again instead of replaying the first, and scores
+refusals against the generic message, as tier 1 does.</p>
+<h3 id="the-scoreboard">The scoreboard</h3>
+<p><code>benchmark_tier2.json</code> holds the run (<code>passes</code>, <code>roles</code>, <code>questions</code>,
+<code>max_cost</code>, <code>spent</code>, <code>stopped</code>, <code>prices_checked_on</code>), one entry per config
+under <code>configs</code>, and a <code>comparison</code>. Each config has:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>What it is</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>models</code></td>
+<td><code>provider:model</code> per LLM node</td>
+</tr>
+<tr>
+<td><code>planned_cases</code>, <code>completed_cases</code></td>
+<td>Cases the run would make, and made</td>
+</tr>
+<tr>
+<td><code>summary</code></td>
+<td>pass/fail counts per role, as tier 1 reports</td>
+</tr>
+<tr>
+<td><code>accuracy</code></td>
+<td><code>overall</code> (strict) and <code>lenient</code>, each with a 95% Wilson <code>interval</code>; <code>pass_k</code> when <code>--passes</code> &gt; 1; then <code>by_tag</code> and <code>by_difficulty</code>, each with both counts and both rates</td>
+</tr>
+<tr>
+<td><code>answerability</code></td>
+<td><code>precision</code> and <code>recall</code> of refusing as unanswerable: true refusals of the four unanswerable questions, false refusals of answerable ones, and missed unanswerables</td>
+</tr>
+<tr>
+<td><code>tokens_by_node</code></td>
+<td>calls, input, cached input, cache write, output and reasoning tokens per node</td>
+</tr>
+<tr>
+<td><code>cost</code></td>
+<td>dollars <code>total</code> and <code>per_question</code> (each result row has its own <code>cost</code>)</td>
+</tr>
+<tr>
+<td><code>latency</code></td>
+<td>p50 and p95 seconds per question, and per node</td>
+</tr>
+<tr>
+<td><code>retries</code></td>
+<td>refiner retries in total, and questions that needed one</td>
+</tr>
+<tr>
+<td><code>errors_by_code</code></td>
+<td>error codes the runs ended with (<code>EXCEPTION</code> for a run that raised)</td>
+</tr>
+<tr>
+<td><code>determinism</code></td>
+<td>with <code>--passes</code> &gt; 1: the share of questions whose SQL and rows were identical in every pass, and which ones differed</td>
+</tr>
+<tr>
+<td><code>faithfulness</code></td>
+<td><a href="#answer-faithfulness">answer faithfulness</a>: <code>faithful</code> of <code>answers</code> written, the <code>rate</code>, and each <code>unfaithful</code> run with what it stated that the rows do not hold</td>
+</tr>
+<tr>
+<td><code>results</code></td>
+<td>one row per run: <code>status</code> and <code>reason</code> (strict), <code>lenient_status</code> and <code>lenient_reason</code>, SQL, cost, latency, tokens, retries, <code>faithfulness</code> (<code>null</code> when no answer was written), and <code>plans</code>: each sub-query's <code>id</code>, <code>intent</code> and <code>plan</code> (the <code>PlanModel</code> JSON the SQL was generated from, <code>null</code> if planning failed), so a wrong answer can be traced to the plan; and <code>answer</code>, the text the answer synthesizer wrote (summary, then content), which the faithfulness check read</td>
+</tr>
+</tbody>
+</table>
+<p><code>comparison.configs</code> is one row per config (strict and lenient accuracy, answerability, cost,
+latency, retries, determinism, faithfulness); <code>comparison.differences</code> lists
+the questions the configs disagree on. The command prints the same as tables:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>              Tier 2 scoreboard (accuracy with its 95% interval)
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>Config        Cases  Strict             Lenient            Ans. P  Ans. R  Cost     $/question  p50    p95    Retries  Determinism  Faithful
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>gpt-5.4       8/8    100.0% [67.6-100]  100.0% [67.6-100]  100.0%  100.0%  $0.0806  $0.0101     0.08s  0.25s  0        100.0%       100.0%
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>mini-helpers  8/8    75.0% [40.9-92.9]  87.5% [52.9-97.8]  100.0%  100.0%  $0.0372  $0.0046     0.09s  0.09s  0        100.0%       85.7%
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>                  Questions the configs disagree on
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>ID           Role   gpt-5.4  mini-helpers
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>chinook_018  admin  pass     fail
+<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>
+<a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>              Answers stating what the rows do not hold
+<a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a>Config        ID           Role   Pass  Unsupported
+<a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a>mini-helpers  chinook_018  admin  1     MPEG audio file
+</code></pre></div>
+<p>(a run against the fake LLM, with one plan deliberately wrong on the second
+server.)</p>
+<h3 id="answer-faithfulness">Answer faithfulness</h3>
+<p>Accuracy scores the rows. The answer synthesizer then writes a sentence about
+them, and that sentence can state a number the rows do not hold while the
+rows are right. Tier 2 checks every written answer (its <code>summary</code> and
+<code>content</code>) against the rows the run returned, deterministically, with no
+model (<code>nl2sql/evaluation/faithfulness.py</code>). It never changes pass or fail.</p>
+<table>
+<thead>
+<tr>
+<th>What the answer writes</th>
+<th>Supported when</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A number: <code>1,297</code>, <code>1234.5</code>, <code>$523.06</code>, <code>-5</code></td>
+<td>It equals a value in the rows at the precision written (<code>523.1</code> and <code>523</code> match <code>523.06</code>; <code>523.60</code> does not), the row count, or the sum of a numeric column</td>
+</tr>
+<tr>
+<td>A percentage: <code>37.2%</code></td>
+<td>As above, or it is a share in the rows times 100 (<code>0.3718</code>)</td>
+</tr>
+<tr>
+<td>A number inside a text cell or the question</td>
+<td>Always: the year of <code>2009-01-01</code>, <code>Symphony No. 5</code>, <code>top 5</code>, <code>in 2013</code></td>
+</tr>
+<tr>
+<td>A quoted (<code>"Jazz"</code>) or bold (<code>**Rock**</code>) name</td>
+<td>A text cell, a column name or the question contains it, or it contains a text cell</td>
+</tr>
+</tbody>
+</table>
+<p>Not read as numbers: ordinals (<code>2nd</code>), list markers (<code>1.</code> at the start of a
+line), numbers glued to a word or identifier (<code>chinook_001</code>, <code>MPEG-4</code>, <code>#7</code>),
+and the month and day of a date. Names are only checked when quoted or bold,
+and bold spans with a digit, ending in <code>:</code> (<code>**Note:**</code>) or longer than six
+words are skipped, so the name check flags little it should not. <code>1,300</code> for
+<code>1297</code>, <code>2013</code> when neither the rows nor the question hold it, and a bold
+genre the rows do not list are unsupported.</p>
+<p>Each result row carries <code>faithfulness</code>: <code>faithful</code>, <code>unsupported_numbers</code> and
+<code>unsupported_entities</code> (as written) and <code>checked</code> (how many numbers and names
+were checked). A refusal or error writes no answer and is <code>null</code>. Read the
+rate with the list: an unfaithful answer is a synthesizer problem to look at,
+not a failed question. Tier 1 does not report it: its fake synthesizer writes
+the same fixed sentence for every question, with nothing to check.</p>
+<h3 id="reading-a-run-intervals-flips-and-passk">Reading a run: intervals, flips and pass^k</h3>
+<p>Forty-three questions cannot settle much on their own. 25 of 43 is 58.1%, and
+its 95% Wilson interval is <strong>43.3%-71.6%</strong> -- about fourteen points either
+way. Every run therefore prints and records that interval next to both
+scores, written <code>58.1% [43.3-71.6]</code>, and the gate below is built on the
+questions that moved rather than on the headline
+(<a href="https://www.anthropic.com/research/statistical-approach-to-model-evals">Anthropic, <em>A statistical approach to model
+evals</em></a>).
+The interval is taken over the runs a config scored, so with <code>--passes</code> above
+one the runs of a single question are not independent and it reads narrower
+than it really is; pass^k below counts questions and does not.</p>
+<p><strong>Compare two runs question by question, not headline to headline.</strong> The same
+44 questions are run both times, so the runs are paired and most of the
+variance cancels. <code>--baseline PATH</code> prints, per config:</p>
+<ul>
+<li>the strict and lenient accuracy of each run, side by side;</li>
+<li>how many questions went <strong>pass -&gt; fail</strong> and how many <strong>fail -&gt; pass</strong>, and
+  which ones;</li>
+<li><strong>McNemar's exact two-sided p-value</strong> on those flips. Questions both runs
+  got right, and both got wrong, say nothing about a change; only the
+  discordant pairs do, and under "the two runs are equally good" each flip is
+  a fair coin. Ten lost and none gained is p = 0.002; five each way is p = 1.0.</li>
+</ul>
+<p>A question counts as passed only when <strong>every</strong> pass passed, so with
+<code>--passes 3</code> a question that has become flaky reads as a regression.</p>
+<p><code>docs/benchmarks.md</code> carries the same thing in its "Δ vs previous" column:
+the headline deltas, then <code>3 flipped to fail, 1 to pass (McNemar p=0.625)</code>.
+The README block keeps the deltas only.</p>
+<h4 id="the-regression-gate">The regression gate</h4>
+<p><code>--baseline</code> exits 1 when, for any config both scoreboards name:</p>
+<table>
+<thead>
+<tr>
+<th>Check</th>
+<th>Default</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>More than <code>--max-regressions</code> questions flipped from pass to fail</td>
+<td>2</td>
+<td>A handful of named questions is something a person can go and read</td>
+</tr>
+<tr>
+<td>The flips are one-sided enough that McNemar's exact p &lt; 0.05</td>
+<td>-</td>
+<td>A small but real drop should not pass because it is under the count</td>
+</tr>
+<tr>
+<td>Cost per question rose by more than <code>--max-cost-increase</code></td>
+<td>0.2</td>
+<td>Unchanged</td>
+</tr>
+</tbody>
+</table>
+<p><code>--max-accuracy-drop</code> is <strong>deprecated</strong>. It failed a run when accuracy fell by
+more than a flat fraction, two points by default -- and at n = 43 one question
+is 2.3 points, so the gate was tighter than the resolution of the benchmark
+and fired on run-to-run noise. It still works when it is passed explicitly,
+with a warning, and is no longer applied unless it is.</p>
+<h4 id="-passes-and-passk"><code>--passes</code> and pass^k</h4>
+<p><code>--passes</code> is 1 for an ordinary run: one pass is enough to see where the
+engine stands, and every call costs money. Run a <strong>baseline</strong> with
+<code>--passes 3</code>, so the run it is compared against is not a single sample:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>benchmark<span class="w"> </span>--tier<span class="w"> </span><span class="m">2</span><span class="w"> </span>--model<span class="w"> </span>gpt-5.4<span class="w"> </span>--passes<span class="w"> </span><span class="m">3</span><span class="w"> </span>--max-cost<span class="w"> </span><span class="m">15</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span>--export-path<span class="w"> </span>&lt;repo&gt;/packages/nl2sql/src/nl2sql/evaluation/baselines/gpt-5.4.json
+</code></pre></div>
+<p>With more than one pass the run also reports <strong>pass^k</strong>: the share of
+questions that passed in <em>every</em> pass, for both scores, beside mean accuracy.
+Mean accuracy counts runs, so a question that passes two times of three still
+lifts it; pass^k counts questions, and a flaky one never counts. It is the
+number to read when asking whether the engine can be relied on rather than
+how often it happens to be right (<a href="https://arxiv.org/abs/2406.12045">tau-bench</a>).
+<code>determinism</code> stays what it was: whether the SQL and rows were identical
+across passes, which is a stricter thing than passing every time.</p>
+<h4 id="where-baselines-live">Where baselines live</h4>
+<p><code>packages/nl2sql/src/nl2sql/evaluation/baselines/</code>; none is committed yet. A
+run is compared config by config, by name, and a config the baseline lacks is
+skipped:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>benchmark<span class="w"> </span>--tier<span class="w"> </span><span class="m">2</span><span class="w"> </span>--model<span class="w"> </span>gpt-5.4<span class="w"> </span>--max-cost<span class="w"> </span><span class="m">5</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">  </span>--baseline<span class="w"> </span>&lt;repo&gt;/packages/nl2sql/src/nl2sql/evaluation/baselines/gpt-5.4.json
+</code></pre></div>
+<h3 id="results-over-time">Results over time</h3>
+<p>Every tier 2 run writes one record per config, and <code>benchmark retrieval
+--record</code> one record, under the project's <code>benchmarks/</code> folder:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>benchmarks/&lt;kind&gt;/&lt;database&gt;/&lt;YYYY-MM-DD&gt;_&lt;shortsha&gt;_&lt;config&gt;.json
+</code></pre></div>
+<p><code>kind</code> is <code>tier2</code> or <code>retrieval</code>, <code>database</code> the datasource id (<code>chinook</code>),
+<code>shortsha</code> the first seven characters of the engine commit and <code>config</code> the
+config name (<code>retrieval</code> for a retrieval run). <code>-2</code>, <code>-3</code>... are added when the
+name is taken. Every record holds:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>What it is</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>schema</code>, <code>kind</code></td>
+<td>The record format (2) and the benchmark</td>
+</tr>
+<tr>
+<td><code>recorded_at</code></td>
+<td>UTC date and time</td>
+</tr>
+<tr>
+<td><code>engine_version</code></td>
+<td>The installed <code>nl2sql-engine</code> version (the same for every run until a release)</td>
+</tr>
+<tr>
+<td><code>git_commit</code>, <code>git_dirty</code></td>
+<td>The engine's commit and whether its tracked files had uncommitted changes. Found by walking up from the installed <code>nl2sql</code> package to its <code>.git</code>, so a run from the demo folder of an editable install still names the repo commit; <code>"unknown"</code> for a wheel install or without git, never null</td>
+</tr>
+<tr>
+<td><code>note</code></td>
+<td><code>--note</code>: what changed, e.g. <code>"slim prompts"</code> (null without one)</td>
+</tr>
+<tr>
+<td><code>dataset</code></td>
+<td><code>chinook_gold.yaml</code>'s name and sha256, taken with LF line endings so a Windows checkout hashes the same</td>
+</tr>
+<tr>
+<td><code>database</code></td>
+<td><code>datasource_id</code>, <code>engine</code> (<code>sqlite</code>), <code>schema_fingerprint</code> (a hash of the latest indexed schema snapshot's tables, columns, types and keys, so re-indexing an unchanged database keeps it) and the <code>tables</code> and <code>columns</code> counts. Built from the datasources the gold dataset's questions name, not from every datasource the project registered: the demo registers three and this set asks about Chinook, so a run there is still <code>chinook</code> with Chinook's fingerprint, and stays in the series recorded before the other two existed. Several datasources (a dataset that spans them) are joined with <code>+</code></td>
+</tr>
+<tr>
+<td><code>config</code></td>
+<td>The config name, and for tier 2 <code>provider:model</code> per node</td>
+</tr>
+<tr>
+<td><code>metrics</code></td>
+<td>Tier 2: accuracy (strict) and lenient_accuracy with their 95% intervals, <code>pass_k</code>, answerability precision and recall, dollars total and per question, input / cached / output tokens per question, p50 and p95 latency, determinism, answer faithfulness. Retrieval: the report's <code>summary</code></td>
+</tr>
+<tr>
+<td>tier 2 only</td>
+<td><code>roles</code>, <code>passes</code>, <code>stopped</code>, <code>partial</code> and the config's full <code>scoreboard</code></td>
+</tr>
+<tr>
+<td>retrieval only</td>
+<td><code>settings</code> and the full <code>report</code></td>
+</tr>
+</tbody>
+</table>
+<p>Records are never edited after writing: a run writes a new file, and
+<code>publish</code> and <code>publish --from</code> refuse to overwrite one. The first retrieval
+baseline was written before this layout and was moved into it with its
+database, the commit that added it and the note "first retrieval baseline"
+filled in (listed in its <code>backfilled</code> field).</p>
+<h4 id="comparable-runs">Comparable runs</h4>
+<p>Two runs are comparable when they share the benchmark kind, the dataset sha
+and the schema fingerprint, and for tier 2 the roles. <code>docs/benchmarks.md</code>
+groups the history by benchmark, then database, and lists each group's runs
+newest first. "Δ vs previous" compares a run with the previous run of the same
+config on the same database: the change in strict accuracy, lenient accuracy
+and faithfulness (in percentage points) and dollars per question for tier 2,
+in table and column recall for retrieval. For tier 2 it then says how many
+questions flipped each way and McNemar's exact p-value on them, read from the
+two records' committed per-question results -- <code>3 flipped to fail, 1 to pass
+(McNemar p=0.625)</code>. When the dataset, the schema or the roles changed, the
+run starts a new series and the cell says so, e.g. <code>new series (schema
+changed)</code>; a config's first run says <code>first run</code>. The README block has two
+headed tables, tier 2 accuracy (latest run per config and database) and then
+retrieval recall (latest run per database), with the headline deltas only; a
+benchmark with no recorded run says so under its heading. Accuracy in the
+history page carries its 95% interval, and the Passes column carries pass^k
+when a run made more than one pass.</p>
+<h4 id="publishing">Publishing</h4>
+<p><code>nl2sql benchmark publish</code> (no key, no network), run from the repo root,
+reads every record in <code>benchmarks/&lt;kind&gt;/&lt;database&gt;/</code> and rewrites
+<code>docs/benchmarks.md</code> and the block between <code>&lt;!-- BENCHMARKS:START --&gt;</code> and
+<code>&lt;!-- BENCHMARKS:END --&gt;</code> in <code>README.md</code>. It reads no clock, so the same
+records always give byte-identical pages. <code>--from DIR</code> (repeatable) first
+copies the records of another project folder (its <code>benchmarks/</code>) that the
+repo lacks: one already here with the same content is skipped, one with the
+same name and other content is reported as a conflict, left as it is, and
+makes the command exit 1 after publishing. Records in the old layout are
+skipped with a warning. The workflow:</p>
+<ol>
+<li>From the demo folder: <code>nl2sql --env demo benchmark --tier 2 --model gpt-5.4 --max-cost 5</code>.</li>
+<li>From the repo: <code>nl2sql benchmark publish --from &lt;demo folder&gt;</code>.</li>
+<li>Commit the new records in <code>benchmarks/</code> with the <code>README.md</code> and
+   <code>docs/benchmarks.md</code> changes.</li>
+</ol>
+<p><code>benchmarks/README.md</code> repeats the layout and workflow next to the records.
+<code>packages/nl2sql/tests/unit/test_benchmark_records.py</code> checks in CI, with no
+key, that the committed README block and <code>docs/benchmarks.md</code> are exactly what
+<code>publish</code> makes from the committed records, and that every committed record
+sits where its fields say.</p>
+<h3 id="how-tier-2-is-tested">How tier 2 is tested</h3>
+<p>With no key and no spending: <code>packages/nl2sql/tests/e2e/test_benchmark_tier2_fake_llm.py</code>
+points ordinary LLM config files at two <code>FakeLLMServer</code>s serving the gold
+plans with canned usage (cached and reasoning tokens included), one with a
+plan deliberately wrong. It checks the scoring, the comparison and its
+differences, the dollars against the price table, the cap stopping mid-run
+with a partial scoreboard, an unpriced model failing before any call, and two
+passes with the plan cache off. A <code>--model gpt-5.4</code> config writes no
+<code>base_url</code>, so its test points the OpenAI client at the fake server with the
+client's own <code>OPENAI_BASE_URL</code> variable, and checks the database identity
+the board records. Its fake synthesizer writes each answer from
+the gold rows, so the good server's answers are faithful and the bad server's
+answer on its wrong rows is not. <code>tests/unit/test_answer_faithfulness.py</code>
+covers the faithfulness rules with good and bad answers. <code>tests/unit/test_tier2_scoreboard.py</code> and
+<code>tests/cli/test_benchmark_tier2_command.py</code> cover the scoreboard, the lenient
+score, the Wilson interval on known counts, McNemar's exact test on a
+constructed table, pass^k, the gate firing and not firing, the deprecated
+<code>--max-accuracy-drop</code>, the refusal to start without <code>--max-cost</code>, the exit codes,
+<code>--model</code> and <code>--llm</code> resolution, the plan, the project-relative outputs,
+<code>benchmark presets</code> and <code>publish --from</code>. <code>tests/unit/test_benchmark_presets.py</code>
+covers the per-node <code>--model</code> config and preset lookup, and
+<code>tests/unit/test_benchmark_records.py</code> the records, the git commit lookup,
+comparability, the Δ and series breaks.</p>
+<h2 id="retrieval-recall">Retrieval recall</h2>
+<p>Before the planner sees a schema, the schema retriever picks the tables and
+columns it is given. A column it never sends is one the planner cannot use.
+<code>nl2sql benchmark retrieval</code> measures that, per answerable gold question,
+against <code>needed_tables</code> and <code>needed_columns</code>, with no key, no LLM and no cost:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>benchmark<span class="w"> </span>retrieval<span class="w">                       </span><span class="c1"># writes &lt;project&gt;/benchmark_retrieval.json</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>benchmark<span class="w"> </span>retrieval<span class="w"> </span>--record<span class="w"> </span>--note<span class="w"> </span><span class="s2">"k 10"</span><span class="w">  </span><span class="c1"># also writes a record to &lt;project&gt;/benchmarks/retrieval/&lt;database&gt;/</span>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>benchmark<span class="w"> </span>retrieval<span class="w"> </span>--baseline<span class="w"> </span>old.json<span class="w">   </span><span class="c1"># the change against an earlier report or record</span>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>benchmark<span class="w"> </span>retrieval<span class="w"> </span>--questions<span class="w"> </span>join,chinook_014
+</code></pre></div>
+<p>How it runs (<code>nl2sql/evaluation/retrieval_recall.py</code>):</p>
+<ul>
+<li>Chinook's 11 tables are under <code>SCHEMA_RETRIEVAL_FULL_SNAPSHOT_MAX_TABLES</code>
+  (15), which would send the whole schema without a search, so the limit is
+  set to 0 for the run and the vector search always runs.</li>
+<li>Each question is scored against the datasource its gold entry names, which
+  for this set is always <code>chinook</code>, whatever else the project has registered.
+  Which datasource the resolver's own vector search would have ranked first
+  is reported separately as <code>datasource_top1_accuracy</code>; its answerability
+  check is an LLM call and is skipped.</li>
+<li>The schema retriever runs as the pipeline runs it (MMR, k 8 table entries,
+  then k 12 column and relationship entries of those tables), on the index
+  and embedder the project has: the demo's is the local ONNX
+  all-MiniLM-L6-v2. Its query is the question alone, since the decomposer
+  that would add filters, groupings and expected columns is an LLM.</li>
+<li>What was sent is read from the retriever's retrieval record
+  (<code>indexing/retrieval_trace.py</code>), the one a run trace keeps: the tables and
+  columns the planner is given. A picked table with no picked column is sent
+  with all its columns, as in the pipeline.</li>
+</ul>
+<p>Per question the report has <code>table_recall</code> (needed tables sent / needed
+tables), <code>column_recall</code> (needed <code>Table.Column</code>s sent / needed), the
+<code>missed_tables</code> and <code>missed_columns</code>, <code>tables_sent</code> and <code>columns_sent</code>, and
+<code>sent</code> (every table and column sent), plus the <code>datasource_id</code> it was scored
+against and the <code>retrieved_datasource_id</code> the vector search ranked first.
+<code>summary</code> holds the means over questions, how many had every needed table
+(<code>perfect_tables</code>) or column (<code>perfect_columns</code>), the mean tables and columns
+sent, and <code>datasource_top1_accuracy</code>, the share of questions whose top
+candidate was the datasource the gold entry names. With one datasource
+registered there is nothing to choose and it is 1.0; the demo registers
+three, so it measures the router. <code>settings</code> holds
+the k, the MMR settings and the embedder, so two reports are only compared
+like for like. The command prints a row per question and the summary, and
+always exits 0 when it ran: it reports, it does not gate.</p>
+<h3 id="reading-the-numbers">Reading the numbers</h3>
+<p>Read recall with the amount sent: sending all 11 tables would score 100%, so
+a change that raises recall by sending more is not an improvement by itself.
+A missed column is one the planner cannot select, filter or join on. Compare
+runs with <code>--baseline</code>, which prints the change in each mean and every
+question whose recall moved, or with the committed records: each <code>--record</code>
+run is a JSON file in <code>benchmarks/retrieval/&lt;database&gt;/</code>, and <code>nl2sql
+benchmark publish</code> lists them newest first in <code>docs/benchmarks.md</code>, with the
+change in each recall against the previous comparable run.</p>
+<p>The committed baseline (2026-09-22, engine 0.1.2, 39 questions):</p>
+<table>
+<thead>
+<tr>
+<th>Table recall</th>
+<th>Column recall</th>
+<th>Every table</th>
+<th>Every column</th>
+<th>Sent on average</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>98.5%</td>
+<td>72.6%</td>
+<td>37 of 39</td>
+<td>15 of 39</td>
+<td>8.3 tables, 24.2 columns</td>
+</tr>
+</tbody>
+</table>
+<p>Most misses are columns of a table that was sent. Once one column entry of
+a table is picked, or a relationship entry adds its key columns, only those
+columns are sent rather than all of them, so <code>Invoice</code> often reaches the
+planner as <code>BillingCountry</code> or a key without <code>Total</code> or <code>InvoiceDate</code>
+(<code>chinook_014</code>, "How much did we earn in each year?", gets <code>Invoice</code> with
+<code>BillingCountry</code> only). The two table misses
+are <code>chinook_009</code> (<code>Customer</code>, <code>Invoice</code>) and <code>chinook_034</code> (<code>Artist</code>).</p>
+<p><code>packages/nl2sql/tests/e2e/test_benchmark_retrieval.py</code> runs the command on
+the generated demo in the key-free integration job and checks that it covers
+every answerable question and writes its report and record, not what the
+recall is. <code>tests/unit/test_retrieval_recall.py</code> covers the scoring, the
+means, the comparison and the records.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "toc.follow", "content.code.copy"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>
