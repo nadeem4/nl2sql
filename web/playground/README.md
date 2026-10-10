@@ -151,7 +151,8 @@ and theme (each well under 2 MB; a test holds that). Pipeline and Retrieval
 call no model, so they are always real. Ask shows a model's answer, so it is
 recorded only from a guided question with a shipped recording
 (`scripts/record_demo_answers.py`): the shipped clip replays the first guided
-question with one, under its "Recorded run" badge. Without a recording it falls
+question with one, under its "Recorded run" badge, and Pipeline's chips name
+the model those recordings were made with, tagged recorded. Without a recording it falls
 back to a "Clip coming" poster in both themes. Actions → **Record demo answers** → *Run workflow*
 with `record: clips` runs the same script in CI and opens a pull request.
 
@@ -348,7 +349,12 @@ with `record: clips` runs the same script in CI and opens a pull request.
   output tokens, and every row gets a waterfall bar and its time (`waterfall`:
   the timings say how long, not when, so bars are laid end to end in pipeline
   order, nested steps inside the SQL agent's span, scaled to the run's total),
-  joined to `usage.nodes` and `timings` by node name. `src/pipeline.js` and
+  joined to `usage.nodes` and `timings` by node name. While the tab answers
+  from recordings (local replay mode, or the hosted demo with no key) and
+  after a recorded run, each model chip instead names the model the recordings
+  were made with (`recorded_with` from `GET /api/pipeline`), tagged
+  **recorded** (`recordingShown`, `stepChip`), never the config's fallback
+  model; a live run is never tagged. `src/pipeline.js` and
   `src/pipelinePhases.js` do the joining and `npm test` covers them. The Debug
   drill-down is unchanged; this page is the overview, not a replacement.
 

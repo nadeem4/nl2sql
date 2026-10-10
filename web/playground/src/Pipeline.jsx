@@ -1,5 +1,5 @@
 import React from "react";
-import { countModelSteps, modelUsed, pipelineRows } from "./pipeline.js";
+import { countModelSteps, pipelineRows, recordingShown, stepChip } from "./pipeline.js";
 import { pipelinePhases, stepStates, waterfall } from "./pipelinePhases.js";
 import { providerName } from "./settings.js";
 import { secs } from "./runState.js";
@@ -35,10 +35,13 @@ export function Legend() {
   );
 }
 
-function Step({ row, state, bar, usage, ran }) {
+function Step({ row, state, bar, usage, ran, recording }) {
   const model = row.kind === "model";
-  const used = row.usage ? modelUsed(usage, row.node) || row.model : row.model;
+  const chip = stepChip(row, usage, recording);
   const spent = row.usage;
+  const title = chip.recorded
+    ? `Recorded with ${chip.model}${chip.provider ? ` at ${providerName(chip.provider)}` : ""}; replayed, not run just now`
+    : chip.provider ? `at ${providerName(chip.provider)}` : undefined;
   return (
     <li className="pstep" data-kind={row.kind} data-state={state} data-node={row.node}>
       <span className="pmark" data-kind={row.kind} data-state={state} aria-hidden="true" />
@@ -46,8 +49,9 @@ function Step({ row, state, bar, usage, ran }) {
         <h3>
           {row.label}
           {model && (
-            <span className="pchip" title={row.provider ? `at ${providerName(row.provider)}` : undefined}>
-              {used || "no model set"}
+            <span className="pchip" data-recorded={chip.recorded || undefined} title={title}>
+              {chip.model || "no model set"}
+              {chip.recorded && <span className="pchip-tag">recorded</span>}
             </span>
           )}
           {row.retried && <span className="pchip is-warn">{spent.calls} calls</span>}
@@ -108,7 +112,10 @@ export function PipelineSkeleton() {
   );
 }
 
-export default function Pipeline({ pipeline, error, result, asked }) {
+// `replaying`: this tab answers from recordings (local replay mode, or the
+// hosted demo with no key), so before a run each model step names the model
+// the recordings were made with, marked recorded, not the config's fallback.
+export default function Pipeline({ pipeline, error, result, asked, replaying }) {
   if (error) {
     return <p className="fault">The pipeline could not be loaded: {error}</p>;
   }
@@ -116,6 +123,7 @@ export default function Pipeline({ pipeline, error, result, asked }) {
   const steps = pipeline.steps || [];
   const ran = Boolean(result && asked);
   const usage = ran ? result.usage : null;
+  const recording = recordingShown(pipeline.recorded_with, { replaying, result: ran ? result : null });
   const rows = pipelineRows(steps, ran ? result : null);
   const phases = pipelinePhases(rows);
   const states = stepStates(rows, ran);
@@ -123,7 +131,8 @@ export default function Pipeline({ pipeline, error, result, asked }) {
   const models = countModelSteps(steps);
   const wall = ran && result.timings ? result.timings.LangGraph : undefined;
   const item = (row) => (
-    <Step key={row.node} row={row} state={states[row.node]} bar={bars[row.node]} usage={usage} ran={ran} />
+    <Step key={row.node} row={row} state={states[row.node]} bar={bars[row.node]} usage={usage} ran={ran}
+      recording={recording} />
   );
 
   return (
@@ -146,6 +155,8 @@ export default function Pipeline({ pipeline, error, result, asked }) {
             {wall !== undefined ? <>, which took {secs(wall)}.</> : "."} Each step is drawn
             for its longest run, end to end in this order.
           </>
+        ) : recording ? (
+          "Nothing has been asked in this tab yet. Without a key the guided questions replay recorded runs, so each model step shows the model those were recorded with. Ask one and each step's time appears here as a bar."
         ) : (
           "Nothing has been asked in this tab yet, so each model step shows the model it is set to use. Ask a question and each step's time appears here as a bar."
         )}

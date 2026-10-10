@@ -205,10 +205,14 @@ class LLMRegistry:
         if request.base_url:
             # One endpoint for the whole request (the hosted demo's replay
             # server): every step speaks the OpenAI wire to it, whatever it is
-            # configured on, and no per-step choice applies.
+            # configured on, and no per-step choice applies. It is asked for
+            # the request's model, when it names one: the replay server
+            # echoes it, so the run reports the model that recorded it.
             _, _, key = request.resolve(name, agent.provider)
-            return agent.model_copy(update={"provider": "openai", "base_url": request.base_url,
-                                            "api_key": None}), key
+            update = {"provider": "openai", "base_url": request.base_url, "api_key": None}
+            if request.model:
+                update["model"] = request.model
+            return agent.model_copy(update=update), key
 
         provider, model, key = request.resolve(name, agent.provider)
         if provider is None:

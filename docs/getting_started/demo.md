@@ -350,6 +350,8 @@ reads: asks a model, code, did not run, skipped.
 Each step gives its name in plain words, the graph node name the Debug ledger
 uses, and one sentence on what it decides. Before any question, each model step
 names the model it is set to use, so the page is worth reading on arrival.
+Without a key, where the guided questions replay recordings, it names instead
+the model the recordings were made with, tagged **recorded**.
 After a question, each row gets a time bar and its time, so the page doubles as
 the run's waterfall, and a model step names the model that answered it and its
 input, cached and output tokens. The timings record how long each step took,
@@ -555,7 +557,10 @@ demo's indexing fails: a plain `nl2sql demo` keeps going and offers Rebuild,
 but answers recorded against no index would be the wrong ones. Only a
 question whose run succeeded (rows, an answer, no error) keeps its recordings;
 a failed run's are dropped, the question is listed as not recorded, and the
-command exits `1` after writing `recordings.json` with the rest. See
+command exits `1` after writing `recordings.json` with the rest. The file names
+the provider and the model that answered, and a replay reports that model --
+in the usage ledger, the Debug pane and on the Pipeline page, tagged recorded --
+rather than the one the replaying config names. See
 [Determinism → The plan cache](../architecture/determinism.md#the-plan-cache-determinism-from-the-architecture).
 
 `--env <name>` loads `.env.<name>`. To point at an exact file instead, use

@@ -56,23 +56,46 @@ class Recording:
 
 
 class ReplayStore:
-    """An ordered collection of :class:`Recording`, unique by ``(name, when)``."""
+    """An ordered collection of :class:`Recording`, unique by ``(name, when)``.
 
-    def __init__(self, recordings: Iterable[Recording] = ()):
+    ``provider`` and ``model`` name what answered when the recordings were
+    made, so a replayed run can say which model produced it rather than the
+    model the replaying config happens to name. On disk the store is
+    ``{"provider", "model", "recordings": [...]}``; a bare list, the format
+    before the model was recorded, still loads, naming no model.
+    """
+
+    def __init__(self, recordings: Iterable[Recording] = (), provider: Optional[str] = None,
+                 model: Optional[str] = None):
         self._recordings: List[Recording] = []
         self._index: Dict[Tuple[str, Optional[str]], int] = {}
+        self.provider = provider
+        self.model = model
         for recording in recordings:
             self.add(recording)
+
+    @property
+    def recorded_with(self) -> Optional[Dict[str, Optional[str]]]:
+        """``{"provider", "model"}`` the recordings came from, or None when unknown."""
+        if not self.model:
+            return None
+        return {"provider": self.provider, "model": self.model}
 
     @classmethod
     def load(cls, path: pathlib.Path) -> "ReplayStore":
         raw = json.loads(pathlib.Path(path).read_text(encoding="utf-8"))
-        return cls(Recording(r["name"], r.get("when"), r["payload"]) for r in raw)
+        meta: Dict[str, Any] = {}
+        if isinstance(raw, dict):
+            meta, raw = raw, raw.get("recordings") or []
+        return cls((Recording(r["name"], r.get("when"), r["payload"]) for r in raw),
+                   provider=meta.get("provider"), model=meta.get("model"))
 
     def save(self, path: pathlib.Path) -> None:
         path = pathlib.Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
-        payload = [{"name": r.name, "when": r.when, "payload": r.payload} for r in self._recordings]
+        payload = {"provider": self.provider, "model": self.model,
+                   "recordings": [{"name": r.name, "when": r.when, "payload": r.payload}
+                                  for r in self._recordings]}
         path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
     def add(self, recording: Recording) -> None:
@@ -121,14 +144,20 @@ class RecordingProxy:
     with the key in ``x-api-key``. Either way a recording is keyed by the
     structured-output name and the question, so a store recorded on one wire
     replays on the other: the replay server answers both.
+
+    ``provider`` is the provider behind the upstream (OpenRouter speaks the
+    OpenAI wire); it defaults to the wire's own. Each answer recorded stamps
+    the store with it and with the model the request asked for.
     """
 
     def __init__(self, upstream_base_url: str, upstream_api_key: str, store: ReplayStore,
-                 host: str = "127.0.0.1", port: int = 0, wire: str = "openai"):
+                 host: str = "127.0.0.1", port: int = 0, wire: str = "openai",
+                 provider: Optional[str] = None):
         if wire not in ("openai", "anthropic"):
             raise ValueError(f"Unknown wire '{wire}': expected 'openai' or 'anthropic'.")
         self.upstream_base_url = upstream_base_url.rstrip("/")
         self.upstream_api_key = upstream_api_key
+        self.provider = provider or wire
         self.store = store
         self.host = host
         self.port = port
@@ -216,7 +245,8 @@ class RecordingProxy:
     def _record_anthropic(self, raw: bytes, body: bytes) -> None:
         """Stores an Anthropic answer under the same key an OpenAI one would get."""
         try:
-            name, prompt_text = classify_anthropic_request(json.loads(raw))
+            request = json.loads(raw)
+            name, prompt_text = classify_anthropic_request(request)
             content = json.loads(body)["content"]
             if name == "plain":
                 payload: Any = "".join(block.get("text") or "" for block in content
@@ -225,12 +255,20 @@ class RecordingProxy:
                 payload = next(block["input"] for block in content if block.get("type") == "tool_use")
         except (KeyError, TypeError, ValueError, StopIteration):
             return
-        self.store.add(Recording(name, extract_question(prompt_text), payload))
+        self._add(request, Recording(name, extract_question(prompt_text), payload))
+
+    def _add(self, request: Any, recording: Recording) -> None:
+        """Stores ``recording``, stamping the store with who answered it."""
+        model = request.get("model") if isinstance(request, dict) else None
+        if model:
+            self.store.provider, self.store.model = self.provider, model
+        self.store.add(recording)
 
     def _record(self, raw: bytes, body: bytes) -> None:
         """Stores the upstream payload, keyed exactly as the replay server dispatches."""
         try:
-            mode, name, prompt_text = classify_request(json.loads(raw))
+            request = json.loads(raw)
+            mode, name, prompt_text = classify_request(request)
             message = json.loads(body)["choices"][0]["message"]
             if mode == "tools":
                 payload = json.loads(message["tool_calls"][0]["function"]["arguments"])
@@ -243,7 +281,7 @@ class RecordingProxy:
             # the caller is recording, and a missing recording shows up as a
             # replay miss rather than as a crashed provider call.
             return
-        self.store.add(Recording(name, extract_question(prompt_text), payload))
+        self._add(request, Recording(name, extract_question(prompt_text), payload))
 
     def stop(self) -> None:
         if self._server is not None:

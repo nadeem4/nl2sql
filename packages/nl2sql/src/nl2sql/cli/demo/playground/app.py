@@ -11,7 +11,8 @@ Eighteen routes:
                                polls it on the Space for the version it published
 ``GET  /api/meta``             mode, dataset, every registered datasource, the guided
                                questions (flat, and grouped by datasource), the roles
-                               and how many guided questions have replay recordings
+                               and how many guided questions have replay recordings,
+                               and the provider and model those were recorded with
 ``GET  /api/schema``           the indexed schema of one datasource (``?datasource=``,
                                default the demo's own), so a visitor sees the database
                                first and can look at each of them
@@ -21,7 +22,8 @@ Eighteen routes:
                                that disconnects (the page's Stop) cancels the run
 ``GET  /api/trace/{trace_id}`` one run trace, read only from the traces directory
 ``GET  /api/pipeline``         every step of a run in order, which five call a model, and the
-                               model each of those is configured to use
+                               model each of those is configured to use, and the model
+                               the replay recordings were made with
 ``GET  /api/settings``         the settings panel: masked key, verified models, one model per node
 ``POST /api/settings/key``     save an API key to ``.env.demo`` and switch to live
 ``POST /api/settings/models``  write a model per LLM node into ``llm.demo.yaml``
@@ -71,7 +73,7 @@ from starlette.concurrency import run_in_threadpool
 from nl2sql import CancellationToken, QueryResult
 
 from nl2sql.auth.models import UserContext
-from nl2sql.cli.demo.playground.hosted import FEEDBACK_MESSAGE, REBUILD_MESSAGE, Hosted
+from nl2sql.cli.demo.playground.hosted import FEEDBACK_MESSAGE, REBUILD_MESSAGE, Hosted, Replay
 from nl2sql.cli.demo.playground.index_panel import IndexPanel
 from nl2sql.cli.demo.playground.preview import CARD, CARD_ROUTE, with_preview
 from nl2sql.cli.demo.playground.settings import SettingsPanel
@@ -272,12 +274,20 @@ def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset
               host: str = "127.0.0.1", allow_settings: bool = False,
               recorded_questions: int = 0,
               questions_by_datasource: Optional[Dict[str, List[str]]] = None,
-              hosted: Optional[Hosted] = None) -> FastAPI:
+              hosted: Optional[Hosted] = None,
+              replay: Optional[Replay] = None) -> FastAPI:
     """Builds the playground app over ``engine``.
 
     ``recorded_questions`` is how many of ``questions`` the loaded replay
     recordings can answer; ``/api/meta`` reports it so the page claims
     recorded answers only when there are some.
+
+    ``replay`` is local replay mode's recordings (hosted mode carries its own
+    on ``hosted``): while the playground is in replay mode each run is asked
+    under the model they were made with. Either way ``/api/meta`` and
+    ``/api/pipeline`` report that ``recorded_with``, so a page answering from
+    recordings names that model, marked recorded, instead of the one the
+    config falls back to.
 
     ``questions_by_datasource`` is the same guided questions, grouped, so the
     page can label each pile instead of running three databases' worth of them
@@ -295,6 +305,8 @@ def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset
     app = FastAPI(title="nl2sql playground")
     page = _read_page()
     hosted = hosted or Hosted(enabled=False)
+    recordings = replay or hosted.replay
+    recorded_with = recordings.recorded_with if recordings is not None else None
     panel = SettingsPanel(engine, project_dir, mode, host, allow_settings, hosted=hosted.enabled)
     index_panel = IndexPanel(engine, panel, _default_datasource(engine, dataset), project_dir)
     app.state.settings_panel = panel
@@ -398,7 +410,8 @@ def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset
                 # Every registered database, not only the ones with guided
                 # questions: the schema panel offers these as its choices.
                 "datasources": _datasource_ids(engine, dataset),
-                "recorded_questions": recorded_questions, **hosted.describe()}
+                "recorded_questions": recorded_questions, "recorded_with": recorded_with,
+                **hosted.describe()}
 
     @app.get("/api/schema")
     def schema(datasource: Optional[str] = None) -> Dict[str, Any]:
@@ -424,7 +437,9 @@ def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset
         # since it spends nothing; anything else is a replay miss that asks
         # for a key, and runs nothing.
         replaying = panel.mode == "replay"
-        llms = None
+        # Local replay: the config already points at the replay server; this
+        # asks it for the recorded model, so the run reports that model.
+        llms = replay.llms() if (replaying and replay is not None) else None
         if hosted.enabled and not hosted.brings_key(request):
             hosted.throttle(request)
             if not hosted.replays(req.question):
@@ -533,12 +548,18 @@ def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset
         graphs themselves, so the page cannot describe a pipeline that is not
         the one running. Only a provider and a model are taken from the LLM
         configuration; never a key.
+
+        ``recorded_with`` names the model the replay recordings were made
+        with. The steps keep the configured models, which a run with a key
+        uses; the page shows the recorded one, marked, while it answers from
+        recordings.
         """
         try:
             agents = engine.list_llms() or {}
         except Exception:  # an engine without a registry (a plan-only harness)
             agents = {}
-        return {"steps": describe_pipeline(agents), "docs": PIPELINE_DOCS}
+        return {"steps": describe_pipeline(agents), "docs": PIPELINE_DOCS,
+                "recorded_with": recorded_with}
 
     @app.get("/api/settings")
     def read_settings() -> Dict[str, Any]:

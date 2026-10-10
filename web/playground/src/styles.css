@@ -996,6 +996,11 @@ li[data-flag="denied"] .flag { color: var(--ink); background: var(--well); }
   background: var(--accent-soft); color: var(--accent);
 }
 .pchip.is-warn { background: var(--warn-soft); color: var(--warn); }
+/* A recorded run's model: said in words, not only in colour. */
+.pchip-tag {
+  margin-left: var(--sp-2); padding-left: var(--sp-2); border-left: 1px solid currentColor;
+  font-family: var(--sans); letter-spacing: 0.02em; opacity: 0.8;
+}
 
 /* The waterfall: each step's share of the run, laid end to end. */
 .wf {

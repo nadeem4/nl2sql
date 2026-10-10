@@ -73,12 +73,17 @@ class RequestLLMs(NamedTuple):
             to instead of its provider's own, or None. The hosted demo sets it
             to its local replay server to answer a keyless guided question from
             recordings; it lasts exactly as long as the request.
+        model: With ``base_url``, the model every step asks that endpoint
+            for, in place of the configured one. The replay server echoes it,
+            so a replayed run's usage names the model the recordings were made
+            with rather than the model the config falls back to.
     """
 
     keys: Mapping[str, str] = {}
     models: Mapping[str, Tuple[str, str]] = {}
     fallback: Optional[str] = None
     base_url: Optional[str] = None
+    model: Optional[str] = None
 
     @classmethod
     def from_key(cls, key: Optional[str]) -> "RequestLLMs":

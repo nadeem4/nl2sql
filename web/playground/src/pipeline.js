@@ -37,6 +37,29 @@ export function modelUsed(usage, node) {
   return models.length ? models.join(", ") : null;
 }
 
+// The recording whose model the page labels its model steps with, or null.
+// `recordedWith` is the server's ({provider, model}, from GET /api/pipeline);
+// `replaying` is whether this tab answers from recordings (local replay mode,
+// or the hosted demo with no key). Before a run that decides; after one, the
+// run does: a recorded run is labelled, a live one never is.
+export function recordingShown(recordedWith, { replaying, result }) {
+  if (!recordedWith) return null;
+  if (result) return result.recorded ? recordedWith : null;
+  return replaying ? recordedWith : null;
+}
+
+// What a model step's chip says: the model the run called (or, before a run,
+// the one it will use), its provider, and whether that is a recording's. The
+// config's fallback model is never shown for a recorded run.
+export function stepChip(row, usage, recording) {
+  const planned = recording ? recording.model : row.model;
+  return {
+    model: (row.usage && modelUsed(usage, row.node)) || planned,
+    provider: recording ? recording.provider : row.provider,
+    recorded: Boolean(recording),
+  };
+}
+
 export function countModelSteps(steps) {
   return (steps || []).filter((step) => step.kind === "model").length;
 }

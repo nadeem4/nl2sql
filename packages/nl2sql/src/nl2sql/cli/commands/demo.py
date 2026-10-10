@@ -413,6 +413,7 @@ def demo_command(
         )
 
     replay_server = None
+    local_replay = None
     recorded_questions = 0
     proxy = None
     store: Optional[ReplayStore] = None
@@ -428,7 +429,8 @@ def demo_command(
             anthropic_env = env_var_for_provider("anthropic")
             os.environ[anthropic_env] = os.environ.get(anthropic_env) or "proxy"
         else:
-            proxy = RecordingProxy(UPSTREAMS[record_provider], resolved_key, store).start()
+            proxy = RecordingProxy(UPSTREAMS[record_provider], resolved_key, store,
+                                   provider=record_provider).start()
             _point_llm_config_at(directory, proxy.base_url, provider="openai")
             os.environ["OPENAI_API_KEY"] = os.environ.get("OPENAI_API_KEY") or "proxy"
         # A plan served from the plan cache makes no planner call, so nothing
@@ -454,7 +456,7 @@ def demo_command(
         recorded_questions = len(covered)
         if covered:
             replay_server = FakeLLMServer(store.rules()).start()
-            hosted_mode.replay = Replay(replay_server.base_url, covered)
+            hosted_mode.replay = Replay(replay_server.base_url, covered, store.recorded_with)
         console.print(
             "[bold]Hosted mode:[/bold] the server holds no API key. Each visitor pastes their own "
             "under Settings; it stays in their browser tab, travels with each question and is "
@@ -472,6 +474,7 @@ def demo_command(
         store = ReplayStore.load(recordings) if recordings else ReplayStore()
         recorded_questions = len(store.covered(DEMO_QUESTIONS))
         replay_server = FakeLLMServer(store.rules()).start()
+        local_replay = Replay(replay_server.base_url, store.covered(DEMO_QUESTIONS), store.recorded_with)
         _point_llm_config_at(directory, replay_server.base_url)
         os.environ["OPENAI_API_KEY"] = "replay"
         console.print(replay_message(recorded_questions, len(DEMO_QUESTIONS), recordings))
@@ -517,6 +520,7 @@ def demo_command(
         hosted=hosted_mode,
         recorded_questions=recorded_questions,
         questions_by_datasource=DEMO_QUESTIONS_BY_DATASOURCE,
+        replay=local_replay,
     )
     url = f"http://{host}:{port}/"
     print_success(f"Playground ready at {url}")

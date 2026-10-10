@@ -228,3 +228,17 @@ def test_a_request_endpoint_moves_a_step_on_another_provider_onto_the_openai_wir
     config, key = LLMRegistry._for_request(reg._config_for("default"), "astplanner", replay)
 
     assert (config.provider, config.base_url, key) == ("openai", REPLAY_URL, "replay-only")
+
+
+def test_a_request_endpoint_asks_for_the_model_the_recordings_were_made_with(registry):
+    """A replayed run names the model that recorded it, not the configured one:
+    the replay server echoes the model it is asked for, and the usage ledger
+    reads it from the answer."""
+    replay = RequestLLMs(keys={"openai": "replay-only"}, fallback="replay-only", base_url=REPLAY_URL,
+                         model="claude-opus-5")
+
+    with use_request_llms(replay):
+        client = registry.get_llm("astplanner")
+
+    assert client.model_name == "claude-opus-5"
+    assert str(client.openai_api_base) == REPLAY_URL

@@ -56,6 +56,19 @@ With a key, every question -- guided or not -- runs live on that key, exactly as
 before. `/api/meta` lists the questions that replay as `recorded`, and the page
 marks those chips with a dot.
 
+**The model a replayed run names is the one that recorded it.** The recordings
+file says which provider and model answered (`{"provider": "anthropic", "model":
+"claude-opus-5", "recordings": [...]}`; a bare list, the older format, still
+loads and names none). The hosted server's own config falls back to an OpenAI
+default, so without this a keyless visitor would be told a model produced the
+answer that did not. Instead, a keyless replay asks the replay server for the
+recorded model, which echoes it, so every call in the run's usage ledger -- and
+the Debug pane and the trace with it -- names `claude-opus-5`. `/api/meta` and
+`/api/pipeline` report the same `recorded_with`, and the Pipeline page shows
+that model on each model step, tagged **recorded**, until the visitor adds a
+key; then it shows the models their run will use, as before. Local replay mode
+(`nl2sql demo` with no key) does the same.
+
 **If no recordings ship** (the file is missing or covers no guided question),
 the keyless path still works: the chips and the question box stay open and
 every question answers with the key prompt. The console line at start-up says
@@ -78,7 +91,8 @@ deliberate act, never part of CI. Either:
   prints the key), sets any OpenAI or OpenRouter key aside for the run, builds
   a fresh demo project, runs `nl2sql demo --record` through the recording proxy
   on Anthropic's own wire with the Anthropic preset's default model, and writes
-  `packages/nl2sql/src/nl2sql/cli/demo/recordings/chinook.json`. A question is
+  `packages/nl2sql/src/nl2sql/cli/demo/recordings/chinook.json`, stamped with
+  the provider and the model the proxy saw requested. A question is
   recorded only when its run succeeded -- rows, an answer, no error. A failed
   run's recordings are dropped, because every model call is recorded as it
   passes through the proxy and a run that failed in the aggregator would

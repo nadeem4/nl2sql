@@ -513,7 +513,8 @@ export default function App() {
 
         {page === "pipeline" && (
           <div className="sheet" id="pipeline-panel">
-            <Pipeline pipeline={pipeline} error={pipelineError} result={result} asked={asked} />
+            <Pipeline pipeline={pipeline} error={pipelineError} result={result} asked={asked}
+              replaying={replay || noKey} />
           </div>
         )}
 

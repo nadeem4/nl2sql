@@ -3,6 +3,7 @@
 The provider is a ``FakeLLMServer`` standing in for OpenAI, reached through the
 real ``RecordingProxy``. No real key is used and nothing is spent.
 """
+import json
 import shutil
 
 import pytest
@@ -12,6 +13,7 @@ pytest.importorskip("fastapi")
 
 from nl2sql.cli.demo.datasets import CHINOOK_QUESTIONS, DEMO_QUESTIONS  # noqa: E402
 from nl2sql.cli.main import app  # noqa: E402
+from nl2sql.llm.providers import DEFAULT_OPENAI_MODEL  # noqa: E402
 from nl2sql.llm.replay import ReplayStore  # noqa: E402
 from nl2sql.testing.fake_llm import FakeLLMServer  # noqa: E402
 
@@ -45,6 +47,7 @@ def test_record_then_replay_with_no_key(demo_project, tmp_path, monkeypatch):
         # The replay server stops when serving ends, so ask while "serving".
         client = TestClient(app_, base_url="http://127.0.0.1:8765")
         seen["meta"] = client.get("/api/meta").json()
+        seen["pipeline"] = client.get("/api/pipeline").json()
         seen["answered"] = client.post("/api/ask", json={"question": CHINOOK_QUESTIONS[0], "role": "admin"}).json()
         seen["missed"] = client.post("/api/ask", json={"question": UNRECORDED, "role": "admin"})
 
@@ -54,6 +57,11 @@ def test_record_then_replay_with_no_key(demo_project, tmp_path, monkeypatch):
     try:
         recorded = runner.invoke(app, ["demo", "--dir", str(project), "--no-browser", "--record"])
         provider.stop()  # replay must not need the provider
+        written = json.loads((project / "recordings.json").read_text(encoding="utf-8"))
+        # Replay must label the run with the recorded model, not the config's,
+        # so the file is made to name one the config does not.
+        (project / "recordings.json").write_text(
+            json.dumps({**written, "provider": "anthropic", "model": "claude-opus-5"}), encoding="utf-8")
         monkeypatch.delenv("OPENAI_API_KEY")
         replayed = runner.invoke(app, ["demo", "--dir", str(project), "--no-browser"])
     finally:
@@ -61,6 +69,8 @@ def test_record_then_replay_with_no_key(demo_project, tmp_path, monkeypatch):
         reload_settings()
 
     assert recorded.exit_code == 0, recorded.output
+    # The file names the provider and the model that answered.
+    assert (written["provider"], written["model"]) == ("openai", DEFAULT_OPENAI_MODEL)
     # --record walks every guided question, across all three datasources.
     assert set(ReplayStore.load(project / "recordings.json").covered(DEMO_QUESTIONS)) == set(DEMO_QUESTIONS)
 
@@ -75,6 +85,11 @@ def test_record_then_replay_with_no_key(demo_project, tmp_path, monkeypatch):
     assert answered["replay_miss"] is False
     assert answered["status"] == "success", answered["errors"]
     assert "COUNT(" in answered["sub_queries"][0]["sql"]
+    # Every step of the replayed run names the model that recorded it.
+    recorded_with = {"provider": "anthropic", "model": "claude-opus-5"}
+    assert meta["recorded_with"] == recorded_with and seen["pipeline"]["recorded_with"] == recorded_with
+    calls = answered["usage"]["calls"]
+    assert calls and {call["model"] for call in calls} == {"claude-opus-5"}
 
     assert missed.json()["replay_miss"] is True
     assert [e["message"] for e in missed.json()["errors"]] == [MISS_MESSAGE]

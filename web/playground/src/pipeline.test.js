@@ -1,7 +1,7 @@
 // Run with `npm test` (node's built-in runner; no test dependency).
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { countModelSteps, modelUsed, pipelineRows } from "./pipeline.js";
+import { countModelSteps, modelUsed, pipelineRows, recordingShown, stepChip } from "./pipeline.js";
 
 const STEPS = [
   { node: "datasource_resolver", label: "Answerability check", does: "a.", kind: "model",
@@ -81,4 +81,48 @@ test("modelUsed reports both when a step was served by two models", () => {
 test("countModelSteps counts the steps a model decides", () => {
   assert.equal(countModelSteps(STEPS), 2);
   assert.equal(countModelSteps(null), 0);
+});
+
+// --- a replayed run names the model that recorded it --------------------------
+
+const RECORDED_WITH = { provider: "anthropic", model: "claude-opus-5" };
+const OPENAI_STEP = STEPS[0]; // configured on the fallback, openai / gpt-5.4
+
+test("recordingShown labels a keyless tab before any run, and a recorded run after one", () => {
+  assert.equal(recordingShown(RECORDED_WITH, { replaying: true, result: null }), RECORDED_WITH);
+  assert.equal(recordingShown(RECORDED_WITH, { replaying: false, result: null }), null);
+  assert.equal(recordingShown(RECORDED_WITH, { replaying: false, result: { recorded: true } }), RECORDED_WITH);
+  // A live run, even in a tab that could replay: its own model, unmarked.
+  assert.equal(recordingShown(RECORDED_WITH, { replaying: true, result: { recorded: false } }), null);
+  // Recordings that name no model claim nothing.
+  assert.equal(recordingShown(null, { replaying: true, result: null }), null);
+});
+
+test("stepChip shows the recorded model, marked recorded, instead of the fallback config's", () => {
+  const [row] = pipelineRows([OPENAI_STEP], null);
+
+  assert.deepEqual(stepChip(row, null, RECORDED_WITH),
+    { model: "claude-opus-5", provider: "anthropic", recorded: true });
+  assert.deepEqual(stepChip(row, null, null),
+    { model: "gpt-5.4", provider: "openai", recorded: false });
+});
+
+test("stepChip after a recorded run names the model its calls reported, still marked", () => {
+  const result = { recorded: true, timings: { datasource_resolver: 0.1 },
+    usage: { nodes: { datasource_resolver: { calls: 1 } },
+             calls: [{ node: "datasource_resolver", model: "claude-opus-5" }] } };
+  const [row] = pipelineRows([OPENAI_STEP], result);
+
+  assert.deepEqual(stepChip(row, result.usage, RECORDED_WITH),
+    { model: "claude-opus-5", provider: "anthropic", recorded: true });
+});
+
+test("stepChip after a live run names the model its calls reported", () => {
+  const result = { recorded: false, timings: { datasource_resolver: 0.1 },
+    usage: { nodes: { datasource_resolver: { calls: 1 } },
+             calls: [{ node: "datasource_resolver", model: "gpt-5.5" }] } };
+  const [row] = pipelineRows([OPENAI_STEP], result);
+
+  assert.deepEqual(stepChip(row, result.usage, null),
+    { model: "gpt-5.5", provider: "openai", recorded: false });
 });
