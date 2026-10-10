@@ -2340,7 +2340,10 @@ steps, and what each Space setting does, are in
 <a href="https://github.com/nadeem4/nl2sql/blob/main/deploy/huggingface/README.md"><code>deploy/huggingface/README.md</code></a> -- that file is also the Space's
 own front page, since a Docker Space reads its configuration from the
 front-matter of the <code>README.md</code> at its root.</p>
-<p>The Space serves at <a href="https://nadeem4nk-nl2sql-demo.hf.space">https://nadeem4nk-nl2sql-demo.hf.space</a>.</p>
+<p>The Space serves at <a href="https://nadeem4nk-nl2sql-demo.hf.space">https://nadeem4nk-nl2sql-demo.hf.space</a>, and its public address is <a href="https://nl2sql.codewithnk.com">https://nl2sql.codewithnk.com</a>.
+That domain is a redirect to the Space root and answers 404 for any deeper
+path, so deep links and API calls (<code>/api/health</code>, <code>/api/meta</code>) must use the
+<code>hf.space</code> host.</p>
 <p><strong>Never give the Space an API key</strong>, as a secret or otherwise. Hosted mode
 clears any provider key it finds in its environment at start-up rather than use
 it, because a key there would be spent by every visitor.</p>
@@ -2492,7 +2495,7 @@ that, which is why it exists.</p>
 </thead>
 <tbody>
 <tr>
-<td><a href="https://nadeem4nk-nl2sql-demo.hf.space">https://nadeem4nk-nl2sql-demo.hf.space</a></td>
+<td><a href="https://nl2sql.codewithnk.com">https://nl2sql.codewithnk.com</a> or <a href="https://nadeem4nk-nl2sql-demo.hf.space">https://nadeem4nk-nl2sql-demo.hf.space</a></td>
 <td>the Open Graph and Twitter tags in the page the app serves</td>
 </tr>
 <tr>
@@ -2510,8 +2513,11 @@ and <code>og:image</code> and <code>og:url</code> have to be absolute, while the
 Space, a container and <code>http://127.0.0.1:8000</code>. So the host comes off the
 request: <code>X-Forwarded-Proto</code> and <code>X-Forwarded-Host</code> when a proxy set them
 (which is what the Space does), the <code>Host</code> header otherwise, and the URL the
-app itself saw if neither is a host. The card is served by the app at
-<code>/social-card.png</code> and ships in the wheel, so a <code>pip install</code> serves it too.</p>
+app itself saw if neither is a host. On the public Space, <code>og:url</code> names
+<code>https://nl2sql.codewithnk.com/</code> instead, so a shared link carries the short address; <code>og:image</code> stays
+on the Space, since the redirect serves nothing below its root. The card is
+served by the app at <code>/social-card.png</code> and ships in the wheel, so a
+<code>pip install</code> serves it too.</p>
 <p><strong>The Space's card</strong> reads <code>thumbnail</code> over raw GitHub rather than from the
 Space, so it works before the Space has built and while it is asleep.</p>
 <h3 id="regenerating-the-card">Regenerating the card</h3>
