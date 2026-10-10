@@ -33,8 +33,9 @@ flowchart TD
 
 The same chain runs on every pull request up to the point of publishing: the
 `build` and `fresh-install` jobs in `test.yml` build the wheels, install them
-the way a user does and boot the demo, so a release does not meet these
-checks for the first time.
+the way a user does and boot the demo, and the `api-image` job builds the GHCR
+image from `packages/api/Dockerfile` (without pushing it), so a release does
+not meet these checks for the first time.
 
 ### 1. Commit messages decide the version
 
@@ -133,7 +134,19 @@ changelog and the version it proposes is the release decision.
    `packages/api/packages/adapter-sdk`, which does not exist — that is what
    failed on `v0.1.0`. A root `.dockerignore` keeps that context small.
    `needs: pypi` is retained so the image is only published for a release that
-   reached PyPI, not because the image build needs PyPI.
+   reached PyPI, not because the image build needs PyPI. The image's
+   `FROM python:X.Y` has to satisfy every package's `requires-python`
+   (`>=3.12`): on `v0.2.0` it was still `python:3.11-slim`, pip refused to
+   install `nl2sql-adapter-sdk` into it, and this job failed after PyPI and
+   the docs had published. `tests/unit/test_docker_images.py` now checks every
+   Dockerfile's base against every `pyproject.toml`, and the `api-image` job
+   in `test.yml` builds this image on every pull request.
+
+    !!! note "There is no `nl2sql-api:0.2.0` image"
+        The job builds from the tagged commit, and `v0.2.0`'s Dockerfile cannot
+        build, so re-running it would fail the same way. The first image built
+        with the fix is published by the next release, `0.2.1`, which moves
+        `ghcr.io/nadeem4/nl2sql-api:latest` onto it.
 4. **`docs`** — `needs: pypi`, likewise after all three uploads.
    `mike deploy --push --update-aliases $TAG latest` adds a versioned copy of
    the docs to `gh-pages` and moves the `latest` alias onto it.
@@ -151,7 +164,13 @@ changelog and the version it proposes is the release decision.
    version that does not install from PyPI. Calls
    [`publish_space.yml`](../deployment/hosted-demo.md#deployed-by-the-release)
    with the tag, which pins the Space's image to
-   `nl2sql-engine[demo]==X.Y.Z`, pushes it and waits for the build.
+   `nl2sql-engine[demo]==X.Y.Z`, pushes it and waits for the build. That
+   `pypi-smoke` installed the version is not proof that the Hub's builder
+   will: on `v0.2.0` the Space build ran minutes later and its pip still saw
+   only `0.1.x`. So the workflow first waits, up to 20 times 30 seconds, until
+   `https://pypi.org/simple/nl2sql-engine/` lists `X.Y.Z`, and the Space's
+   Dockerfile retries its install up to 10 times, 30 seconds apart, with
+   pip's cache off.
    `secrets: inherit` carries `HF_TOKEN` down, from `release_please.yml`
    through this workflow into that one; without the secret the job skips
    green and says so.
@@ -259,6 +278,11 @@ touching PyPI, GHCR or the docs, dispatch the Space workflow with the tag:
 ```console
 $ gh workflow run publish_space.yml -f tag=v0.2.0
 ```
+
+When the Space root for that tag is already on the Space there is nothing to
+push, so a run by hand asks the Hub for a factory rebuild instead and waits for
+it; the job fails unless the Space ends `RUNNING`. See
+[Hosted demo](../deployment/hosted-demo.md#deployed-by-the-release).
 
 Every job resolves its tag from `${{ inputs.tag || github.ref_name }}`, never
 from the raw ref. On a dispatched run `github.ref_name` is the *branch* you

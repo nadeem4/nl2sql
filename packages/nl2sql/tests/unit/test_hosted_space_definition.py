@@ -5,8 +5,11 @@ Nobody can deploy the Space from here, so what is checkable is the drift: a
 front-matter field that goes missing, or an `app_port` that stops matching the
 port the container listens on, both fail the Space only after a push.
 """
+import os
 import pathlib
 import re
+import shutil
+import subprocess
 
 import pytest
 
@@ -124,3 +127,93 @@ def test_the_space_holds_no_api_key():
         text = (SPACE / name).read_text(encoding="utf-8")
         # No key, and no way to pass one in: the whole point of hosted mode.
         assert not re.search(r"(OPENAI|ANTHROPIC|OPENROUTER)_API_KEY\s*[:=]\s*\S", text), name
+
+
+# The release that published v0.2.0 pushed the Space minutes after PyPI took
+# the upload, and the Hugging Face builder's `pip install
+# "nl2sql-engine[demo]==0.2.0"` still saw only 0.1.x -- although a fresh
+# install from PyPI had already worked on a GitHub runner. The index a builder
+# sees can lag; the install retries, bounded, rather than failing the build.
+INSTALL_ATTEMPTS = 10
+INSTALL_DELAY_SEC = 30
+
+
+def _install_instruction() -> str:
+    """The shell of the `RUN` that installs NL2SQL_SPEC, continuations joined."""
+    lines = (SPACE / "Dockerfile").read_text(encoding="utf-8").splitlines()
+    for start, line in enumerate(lines):
+        if not line.startswith("RUN "):
+            continue
+        end = start
+        while lines[end].rstrip().endswith("\\"):
+            end += 1
+        instruction = "\n".join(lines[start:end + 1])
+        if "NL2SQL_SPEC" in instruction:
+            return instruction[len("RUN "):].replace("\\\n", " ")
+    raise AssertionError("no RUN instruction installs ${NL2SQL_SPEC}")
+
+
+def test_the_install_retries_a_bounded_number_of_times_without_pip_cache():
+    shell = _install_instruction()
+
+    assert '--no-cache-dir "${NL2SQL_SPEC}"' in shell
+    assert f"-ge {INSTALL_ATTEMPTS}" in shell
+    assert f"sleep {INSTALL_DELAY_SEC}" in shell
+
+
+def _run_install(tmp_path: pathlib.Path, failures: int) -> tuple[int, int, list[str]]:
+    """Runs the install shell against a fake pip that fails `failures` times.
+
+    Returns the exit code, how many times the engine install ran, and every
+    `sleep` argument.
+    """
+    sh = shutil.which("sh")
+    if sh is None:
+        pytest.skip("needs a POSIX sh")
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    (bin_dir / "pip").write_text(
+        "#!/bin/sh\n"
+        'case "$*" in *--upgrade*) exit 0 ;; esac\n'
+        'n=$(( $(cat "$STATE/count" 2>/dev/null || echo 0) + 1 ))\n'
+        'echo "$n" > "$STATE/count"\n'
+        '[ "$n" -gt "$FAILURES" ]\n',
+        encoding="utf-8", newline="\n",
+    )
+    (bin_dir / "sleep").write_text(
+        '#!/bin/sh\necho "$1" >> "$STATE/sleeps"\n', encoding="utf-8", newline="\n",
+    )
+    for stub in bin_dir.iterdir():
+        stub.chmod(0o755)
+
+    env = {
+        **os.environ,
+        "PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}",
+        "STATE": str(tmp_path),
+        "FAILURES": str(failures),
+        "NL2SQL_SPEC": "nl2sql-engine[demo]==9.9.9",
+    }
+    result = subprocess.run([sh, "-c", _install_instruction()], env=env, capture_output=True, text=True)
+    count = int((tmp_path / "count").read_text().strip())
+    sleeps_file = tmp_path / "sleeps"
+    sleeps = sleeps_file.read_text().split() if sleeps_file.exists() else []
+    return result.returncode, count, sleeps
+
+
+def test_an_install_that_succeeds_at_once_never_waits(tmp_path):
+    assert _run_install(tmp_path, failures=0) == (0, 1, [])
+
+
+def test_an_index_that_catches_up_is_retried_until_the_install_works(tmp_path):
+    code, count, sleeps = _run_install(tmp_path, failures=3)
+
+    assert (code, count) == (0, 4)
+    assert sleeps == [str(INSTALL_DELAY_SEC)] * 3
+
+
+def test_an_install_that_never_works_fails_the_build_after_the_last_attempt(tmp_path):
+    code, count, sleeps = _run_install(tmp_path, failures=INSTALL_ATTEMPTS + 5)
+
+    assert code != 0
+    assert count == INSTALL_ATTEMPTS
+    assert len(sleeps) == INSTALL_ATTEMPTS - 1

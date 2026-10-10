@@ -62,6 +62,14 @@ on:
         description: Name of the repository secret holding the Hugging Face write token.
         required: false
         default: HF_TOKEN
+      # A redeploy of a release whose Space root is unchanged pushes nothing,
+      # so the Hub starts no build on its own. A hand run is asked for because
+      # the Space needs rebuilding, so it asks the Hub for a factory rebuild.
+      factory_rebuild:
+        description: Rebuild the Space from scratch when there is nothing new to push.
+        required: false
+        type: boolean
+        default: true
 
 # One deploy at a time. A run superseded by a newer one is cancelled rather
 # than left to race it to the Space's main branch.
@@ -150,6 +158,34 @@ jobs:
           print(f"Space: {url}")
           PY
 
+      # A release pins the image to the version it just uploaded, and the Hub
+      # builds it straight away. v0.2.0's first Space build ran minutes after
+      # the upload and pip saw only 0.1.x, although `pypi-smoke` had already
+      # installed 0.2.0 from PyPI. So before pushing, wait (bounded: 20 x 30s)
+      # until PyPI's simple index lists the version. The Dockerfile retries
+      # its install as well, because the builder's view of the index can lag
+      # this runner's. A dispatch with no tag installs from git and skips this.
+      - name: Wait for PyPI's index to list the version
+        if: steps.token.outputs.present == 'true' && inputs.tag != ''
+        run: |
+          set -euo pipefail
+          version="${TAG#v}"
+          for attempt in $(seq 1 20); do
+            if curl -fsSL \
+                -H 'Accept: application/vnd.pypi.simple.v1+json' \
+                -H 'Cache-Control: no-cache' \
+                https://pypi.org/simple/nl2sql-engine/ \
+              | python -c 'import json, sys; sys.exit(sys.argv[1] not in json.load(sys.stdin)["versions"])' "$version"
+            then
+              echo "PyPI's index lists nl2sql-engine $version."
+              exit 0
+            fi
+            echo "Attempt $attempt of 20: PyPI's index does not list nl2sql-engine $version yet; retrying in 30s."
+            sleep 30
+          done
+          echo "PyPI's index never listed nl2sql-engine $version; not pushing a Space that cannot install it."
+          exit 1
+
       # Why a fresh working copy of the Space rather than `git subtree split`:
       # a split rewrites this repository's history for the prefix into a
       # synthetic one that shares no commits with whatever the Space already
@@ -229,6 +265,12 @@ jobs:
           fi
           echo "space_commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
+      # The job succeeds only when the Space ends RUNNING a build started for
+      # this run. A push starts one. A run that pushed nothing -- a redeploy of
+      # a release whose Space root is unchanged -- starts none, so it asks the
+      # Hub for a factory rebuild when the Space is not running (or whenever a
+      # hand run asks, which `factory_rebuild` does by default), then waits the
+      # same way. Redeploying v0.2.0 used to log BUILD_ERROR and go green.
       - name: Wait for the Space to rebuild
         id: wait
         if: steps.token.outputs.present == 'true'
@@ -236,6 +278,7 @@ jobs:
           PUSHED: ${{ steps.push.outputs.pushed }}
           SPACE_COMMIT: ${{ steps.push.outputs.space_commit }}
           SOURCE_SHA: ${{ steps.push.outputs.source_sha }}
+          FACTORY_REBUILD: ${{ inputs.factory_rebuild }}
         run: |
           python - <<'PY'
           import os
@@ -247,6 +290,7 @@ jobs:
           repo_id = os.environ["SPACE_ID"]
           source_sha = os.environ["SOURCE_SHA"]
           pushed = os.environ.get("PUSHED") == "true"
+          factory_rebuild = os.environ.get("FACTORY_REBUILD") == "true"
           expected = os.environ.get("SPACE_COMMIT") or ""
           timeout = int(os.environ["SPACE_BUILD_TIMEOUT_SEC"])
           api = HfApi()
@@ -269,23 +313,10 @@ jobs:
               return "".join(lines[-50:]) or "(the build log was empty)"
 
 
-          def deployed() -> None:
+          def output(key: str, value: str) -> None:
               with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as out:
-                  out.write("deployed=true\n")
+                  out.write(f"{key}={value}\n")
 
-
-          # Nothing was committed, so the Hub started no build and the Space is
-          # still serving an earlier one. Say that instead of reading RUNNING as
-          # this commit's success -- which is exactly how the Space came to
-          # serve four merges' worth of stale code. A re-run of a release that
-          # already reached the Space lands here, and that Space is the release.
-          if not pushed:
-              print(f"No rebuild: the Space root already carried this deploy, from {source_sha}.")
-              stage = stage_now()
-              print(f"The Space is at commit {api.space_info(repo_id).sha} and is {stage}.")
-              if stage == "RUNNING":
-                  deployed()
-              sys.exit(0)
 
           deadline = time.time() + timeout
 
@@ -302,9 +333,32 @@ jobs:
               time.sleep(5)
           print(f"The Space is at commit {head}, from {source_sha}.")
 
+          # Nothing was committed, so the Hub started no build: whatever the
+          # Space is serving, it is not this run's doing. Reading RUNNING as
+          # this commit's success is how the Space once served four merges'
+          # worth of stale code; reading BUILD_ERROR as nothing to do is how a
+          # redeploy of v0.2.0 went green on a broken Space.
+          if not pushed:
+              stage = stage_now()
+              print(f"Nothing to push: the Space root already carried this deploy. The Space is {stage}.")
+              if factory_rebuild or (stage != "RUNNING" and stage not in WORKING):
+                  why = "this run asked for one" if factory_rebuild else f"the Space is {stage}"
+                  print(f"Asking the Hub for a factory rebuild, because {why}.")
+                  api.restart_space(repo_id, factory_reboot=True)
+                  output("rebuilt", "true")
+              elif stage == "RUNNING":
+                  # A re-run of a release that already reached the Space.
+                  print("It is already serving this deploy.")
+                  output("deployed", "true")
+                  sys.exit(0)
+              # Otherwise a build is already under way; wait for it below.
+
           # A pushed commit always moves the Dockerfile's pin or SOURCE_SHA, so
-          # the Hub always has something to rebuild. If it never starts one,
-          # that is a failure to report, not a RUNNING to take credit for.
+          # the Hub always has something to rebuild. A stage read before that
+          # build starts can still be the previous build's error, so a broken
+          # or halted stage ends the wait only once this build has been seen
+          # working. One that never starts is a failure to report, not a
+          # RUNNING to take credit for, and nothing but RUNNING is a success.
           grace = time.time() + 300
           seen_working = False
           last = None
@@ -315,20 +369,21 @@ jobs:
                   print(f"stage: {stage}", flush=True)
                   last = stage
 
-              if stage in BROKEN:
+              if stage in WORKING:
+                  seen_working = True
+              elif seen_working and stage == "RUNNING":
+                  break
+              elif seen_working and stage in BROKEN:
                   print(f"The Space is {stage}. The last of its build log:\n")
                   print(tail_of_the_build_log())
                   sys.exit(1)
-              if stage in HALTED:
+              elif seen_working and stage in HALTED:
                   print(f"The Space is {stage}, so it will not come up on its own.")
                   sys.exit(1)
-              if stage in WORKING:
-                  seen_working = True
-              if seen_working and stage == "RUNNING":
-                  break
               if not seen_working and time.time() > grace:
-                  print(f"The Space never started a build in the 5 minutes after {head} landed; it is {stage}.")
-                  print("The commit is on the Space but the image it is running is older.")
+                  print(f"The Space never started a build in the 5 minutes after this run; it is {stage}.")
+                  if stage in BROKEN:
+                      print(tail_of_the_build_log())
                   sys.exit(1)
               if time.time() > deadline:
                   print(f"Gave up after {timeout}s with the Space in {stage}.")
@@ -337,7 +392,7 @@ jobs:
               time.sleep(15)
 
           print(f"The Space rebuilt from {source_sha} and is running: https://huggingface.co/spaces/{repo_id}")
-          deployed()
+          output("deployed", "true")
           PY
 
       - name: Summarise the deploy
@@ -348,9 +403,12 @@ jobs:
           if [ "${PUSHED:-false}" = "true" ]; then
             headline="### Hugging Face Space deployed"
             outcome="Rebuilt and running."
+          elif [ "${REBUILT:-false}" = "true" ]; then
+            headline="### Hugging Face Space rebuilt"
+            outcome="**Factory rebuild.** The Space root already carried this deploy, so nothing was pushed; the Space was rebuilt from it and is running."
           else
             headline="### Hugging Face Space unchanged"
-            outcome="**No rebuild.** The Space root already carried this deploy, so nothing was pushed and no build ran; the Space is still serving its previous image."
+            outcome="**No rebuild.** The Space root already carried this deploy and the Space was running it, so nothing was pushed and no build ran."
           fi
           {
             echo "$headline"
@@ -367,6 +425,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
         env:
           PUSHED: ${{ steps.push.outputs.pushed }}
+          REBUILT: ${{ steps.wait.outputs.rebuilt }}
           SPACE_COMMIT: ${{ steps.push.outputs.space_commit }}
           SOURCE_SHA: ${{ steps.push.outputs.source_sha }}
           SPEC: ${{ steps.push.outputs.spec }}

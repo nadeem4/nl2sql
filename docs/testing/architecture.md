@@ -52,7 +52,13 @@ data run key-free.
   aggregation and the local embedder against the real Chinook database; run
   it with `--collect-only -q` for the current list.
 
-Two more jobs test the package rather than the source tree:
+Three more jobs test the package rather than the source tree:
+
+- **`api-image`** builds `packages/api/Dockerfile` from the repository root,
+  the image the release pushes to GHCR, without pushing it, and imports
+  `nl2sql_api.main` inside it. `tests/unit/test_docker_images.py` separately
+  checks that every Dockerfile's `FROM python:X.Y` satisfies every package's
+  `requires-python`.
 
 - **`build`** builds the three wheels and sdists, installs them into a clean
   virtualenv and runs `import nl2sql` and `nl2sql --help`.

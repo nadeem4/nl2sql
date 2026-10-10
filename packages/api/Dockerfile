@@ -2,7 +2,11 @@
 #
 # Build context is the repo root:
 #   docker build -f packages/api/Dockerfile -t nl2sql-api .
-FROM python:3.11-slim
+#
+# The Python here has to satisfy every package's `requires-python` (>=3.12);
+# tests/unit/test_docker_images.py fails when it does not, and the `api-image`
+# job in test.yml builds this image on every pull request.
+FROM python:3.12-slim
 
 WORKDIR /app
 
