@@ -2069,8 +2069,8 @@ providers. The check runs on the read path only, so the fix is simply to re-run
 </tr>
 <tr>
 <td><code>RESULT_ARTIFACT_PATH_TEMPLATE</code></td>
-<td><code>&lt;tenant_id&gt;/&lt;request_id&gt;.parquet</code></td>
-<td>Artifact path relative to the backend root. Placeholders available: <code>&lt;tenant_id&gt;</code>, <code>&lt;request_id&gt;</code>, <code>&lt;schema_version&gt;</code>.</td>
+<td><code>&lt;tenant_id&gt;/&lt;request_id&gt;/&lt;sub_query_id&gt;.parquet</code></td>
+<td>Artifact path relative to the backend root. Placeholders available: <code>&lt;tenant_id&gt;</code>, <code>&lt;request_id&gt;</code>, <code>&lt;sub_query_id&gt;</code>, <code>&lt;dag_node_id&gt;</code>, <code>&lt;subgraph_name&gt;</code>, <code>&lt;schema_version&gt;</code>. Every sub-query of a run writes its own file: a template without <code>&lt;sub_query_id&gt;</code> or <code>&lt;dag_node_id&gt;</code> gets <code>-&lt;sub_query_id&gt;</code> added to its file name (see <a href="../../storage/artifact-store/#one-artifact-per-sub-query">artifact store</a>).</td>
 </tr>
 <tr>
 <td><code>RESULT_ARTIFACT_S3_BUCKET</code></td>

@@ -2023,7 +2023,7 @@
 <p>Side effects:</p>
 <ul>
 <li>Executes SQL against datasource via executor service.</li>
-<li>Persists results to artifact store.</li>
+<li>Persists results to artifact store, one artifact per sub-query: the request's <code>node_id</code> (the sub-query id) is passed to the store as <code>sub_query_id</code> and <code>dag_node_id</code>, so two sub-queries of one run never write the same file (see <a href="../../../storage/artifact-store/#one-artifact-per-sub-query">artifact store</a>). The <code>ArtifactRef</code> records it as <code>sub_query_id</code>.</li>
 </ul>
 <hr/>
 <h2 id="internal-flow-step-by-step">Internal Flow (Step-by-Step)</h2>

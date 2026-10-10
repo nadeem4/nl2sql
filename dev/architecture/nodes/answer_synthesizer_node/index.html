@@ -1989,7 +1989,7 @@
 <p>Downstream:
 - Graph end.</p>
 <p>Trigger conditions:
-- Executed after aggregation completes.</p>
+- Executed after aggregation succeeds. When the aggregator fails (<code>AGGREGATOR_FAILED</code>), <code>aggregator_route</code> ends the run instead, so this node never spends a model call on an empty result.</p>
 <pre class="mermaid"><code>flowchart LR
     Aggregator[EngineAggregatorNode] --&gt; Synthesizer[AnswerSynthesizerNode] --&gt; EndNode[PipelineEnd]</code></pre>
 <hr/>

@@ -1079,6 +1079,19 @@
       
     </span>
 </a>
+<nav aria-label="Path templating" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#one-artifact-per-sub-query">
+<span class="md-ellipsis">
+      
+        One artifact per sub-query
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
 </li>
 <li class="md-nav__item">
 <a class="md-nav__link" href="#tenant-aware-paths">
@@ -1778,6 +1791,19 @@
       
     </span>
 </a>
+<nav aria-label="Path templating" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#one-artifact-per-sub-query">
+<span class="md-ellipsis">
+      
+        One artifact per sub-query
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
 </li>
 <li class="md-nav__item">
 <a class="md-nav__link" href="#tenant-aware-paths">
@@ -1850,22 +1876,29 @@
 <li><code>row_count</code>, <code>columns</code>, <code>bytes</code></li>
 <li><code>content_hash</code>, <code>created_at</code></li>
 <li>optional <code>schema_version</code></li>
-<li><code>path_template</code></li>
+<li>optional <code>sub_query_id</code>, the sub-query whose result this is</li>
+<li><code>path_template</code>, the template actually rendered (see <em>One artifact per sub-query</em>)</li>
 </ul>
 <h2 id="path-templating">Path templating</h2>
 <p><code>Settings.result_artifact_path_template</code> defines the artifact path relative to the backend root, for every backend. It defaults to:</p>
-<div class="highlight"><pre><span></span><code><a href="#__codelineno-0-1" id="__codelineno-0-1" name="__codelineno-0-1"></a>&lt;tenant_id&gt;/&lt;request_id&gt;.parquet
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-0-1" id="__codelineno-0-1" name="__codelineno-0-1"></a>&lt;tenant_id&gt;/&lt;request_id&gt;/&lt;sub_query_id&gt;.parquet
 </code></pre></div>
-<p>Each <code>&lt;key&gt;</code> placeholder is substituted from the metadata the executor passes to <code>create_artifact_ref</code>. The SQL executor supplies exactly three keys:</p>
+<p>Each <code>&lt;key&gt;</code> placeholder is substituted from the metadata the executor passes to <code>create_artifact_ref</code>. The SQL executor supplies these keys:</p>
 <ul>
 <li><code>tenant_id</code></li>
-<li><code>request_id</code> (the trace ID)</li>
+<li><code>request_id</code> (the trace ID, shared by every sub-query of a run)</li>
+<li><code>sub_query_id</code> (the sub-query's id, which is also its scan node's id)</li>
+<li><code>dag_node_id</code> (the same value as <code>sub_query_id</code>)</li>
+<li><code>subgraph_name</code></li>
 <li><code>schema_version</code></li>
 </ul>
-<p>A template referencing any other placeholder — for example <code>&lt;subgraph_name&gt;</code> or <code>&lt;dag_node_id&gt;</code> — raises a <code>ValueError</code> naming the placeholder that could not be filled. A path is never written with an unrendered placeholder in it. Adding placeholders therefore requires threading the corresponding metadata through the executor first.</p>
+<p>A template referencing any other placeholder raises a <code>ValueError</code> naming the placeholder that could not be filled. A path is never written with an unrendered placeholder in it. Adding placeholders therefore requires threading the corresponding metadata through the executor first.</p>
+<h3 id="one-artifact-per-sub-query">One artifact per sub-query</h3>
+<p>A question that decomposes into several sub-queries runs them under one trace ID, often side by side, and each must write its own file. When they shared <code>&lt;tenant_id&gt;/&lt;request_id&gt;.parquet</code>, concurrent writes produced one corrupt Parquet file (<code>AGGREGATOR_FAILED: parquet: File out of specification</code>), and sequential writes kept only the last sub-query's rows, so a join combined a result with itself and returned a wrong answer with no error.</p>
+<p>A template that names neither <code>&lt;sub_query_id&gt;</code> nor <code>&lt;dag_node_id&gt;</code> is therefore made unique rather than rejected: the store adds <code>-&lt;sub_query_id&gt;</code> to the end of the file name, before its extension, so <code>&lt;tenant_id&gt;/&lt;request_id&gt;.parquet</code> writes <code>&lt;tenant_id&gt;/&lt;request_id&gt;-&lt;sub_query_id&gt;.parquet</code>. The <code>ArtifactRef</code> records the template actually rendered in <code>path_template</code> and the sub-query in <code>sub_query_id</code>. A store used directly, with no <code>sub_query_id</code> in its metadata, renders the template as written.</p>
 <h2 id="tenant-aware-paths">Tenant-aware paths</h2>
 <p>Because the default template starts with <code>&lt;tenant_id&gt;</code>, every backend partitions artifacts per tenant:</p>
-<div class="highlight"><pre><span></span><code><a href="#__codelineno-1-1" id="__codelineno-1-1" name="__codelineno-1-1"></a>&lt;backend root&gt;/&lt;tenant_id&gt;/&lt;request_id&gt;.parquet
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-1-1" id="__codelineno-1-1" name="__codelineno-1-1"></a>&lt;backend root&gt;/&lt;tenant_id&gt;/&lt;request_id&gt;/&lt;sub_query_id&gt;.parquet
 </code></pre></div>
 <h2 id="source-references">Source references</h2>
 <ul>

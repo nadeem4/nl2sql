@@ -4882,8 +4882,9 @@
 </ul>
 <h3 id="overwrites">Overwrites</h3>
 <ul>
-<li><code>RESULT_ARTIFACT_PATH_TEMPLATE</code> renders the artifact path for every backend from the metadata the executor supplies (<code>tenant_id</code>, <code>request_id</code>, <code>schema_version</code>); an unfillable placeholder raises rather than writing a bad path (see <code>../storage/artifact-store.md</code>).</li>
-<li>With the default template, paths are <code>&lt;backend root&gt;/&lt;tenant_id&gt;/&lt;request_id&gt;.parquet</code>, so repeat execution with the same trace ID targets the same object.</li>
+<li><code>RESULT_ARTIFACT_PATH_TEMPLATE</code> renders the artifact path for every backend from the metadata the executor supplies (<code>tenant_id</code>, <code>request_id</code>, <code>sub_query_id</code>, <code>dag_node_id</code>, <code>subgraph_name</code>, <code>schema_version</code>); an unfillable placeholder raises rather than writing a bad path (see <code>../storage/artifact-store.md</code>).</li>
+<li>With the default template, paths are <code>&lt;backend root&gt;/&lt;tenant_id&gt;/&lt;request_id&gt;/&lt;sub_query_id&gt;.parquet</code>: the sub-queries of one run never share a file, and repeat execution of the same sub-query with the same trace ID targets the same object. A custom template with no sub-query placeholder gets <code>-&lt;sub_query_id&gt;</code> added to its file name, so it cannot collide either.</li>
+<li>A failed aggregation ends the run with its <code>AGGREGATOR_FAILED</code> error; the answer synthesizer is not called on an empty result.</li>
 </ul>
 <h3 id="cleanup_1">Cleanup</h3>
 <ul>

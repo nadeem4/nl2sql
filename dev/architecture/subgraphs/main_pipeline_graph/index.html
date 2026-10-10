@@ -1998,7 +1998,8 @@ Source file path: <code>packages/nl2sql/src/nl2sql/pipeline/graph.py</code></p>
 - <code>layer_router</code> raises <code>PipelineExecutionError</code> (an <code>NL2SQLError</code> carrying the <code>PipelineError</code> payload on <code>.error</code>) when no compatible subgraph exists for a datasource; this propagates as an exception from the router function. A conditional-edge router may only return routing decisions, so it cannot report the failure as a <code>PipelineError</code> value in state the way a node does.</p>
 <p>Partial completion behavior:
 - If routing cannot schedule any scan-layer work but <code>execution_dag</code> exists and at least one scan produced an artifact, it routes to <code>aggregator</code> directly. If some scans produced artifacts and others did not, the aggregator still runs and reports the missing ones as <code>AGGREGATOR_FAILED</code>.
-- Errors added to <code>GraphState.errors</code> do not automatically stop the graph; the graph relies on routing logic and node behavior for termination.</p>
+- Errors added to <code>GraphState.errors</code> do not automatically stop the graph; the graph relies on routing logic and node behavior for termination.
+- <code>aggregator_route</code> ends the run when the aggregator failed (<code>AggregatorResponse.errors</code> is not empty), so the answer synthesizer never spends a model call on an empty result and <code>AGGREGATOR_FAILED</code> is the run's outcome.</p>
 <hr/>
 <h2 id="internal-node-composition">Internal Node Composition</h2>
 <p>Execution order (nominal path):
@@ -2017,7 +2018,8 @@ Source file path: <code>packages/nl2sql/src/nl2sql/pipeline/graph.py</code></p>
     subgraph_exec --&gt; layer_router
     layer_router --&gt;|aggregator| aggregator
     layer_router --&gt;|end| END
-    aggregator --&gt; answer_synthesizer --&gt; END</code></pre></p>
+    aggregator --&gt;|ok| answer_synthesizer --&gt; END
+    aggregator --&gt;|failed| END</code></pre></p>
 <hr/>
 <h2 id="state-contract">State Contract</h2>
 <p>State model: <code>GraphState</code> (<code>packages/nl2sql/src/nl2sql/pipeline/state.py</code>).</p>
@@ -2037,7 +2039,7 @@ Source file path: <code>packages/nl2sql/src/nl2sql/pipeline/graph.py</code></p>
 <li>Each subgraph execution returns <code>artifact_refs</code>, <code>subgraph_outputs</code>, and <code>errors</code> to <code>GraphState</code>.</li>
 <li><code>layer_router</code> is re-entered until all scan-layer nodes produce artifacts.</li>
 <li><code>aggregator</code> executes the DAG using the stored <code>artifact_refs</code>.</li>
-<li><code>answer_synthesizer</code> summarizes aggregated results into a final answer.</li>
+<li><code>aggregator_route</code> ends the run if aggregation failed; otherwise <code>answer_synthesizer</code> summarizes aggregated results into a final answer.</li>
 <li>Graph reaches <code>END</code>.</li>
 </ol>
 <hr/>

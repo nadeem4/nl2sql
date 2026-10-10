@@ -2013,7 +2013,8 @@
 <p>Upstream:
 - <code>layer_router</code> (after all scan artifacts are available)</p>
 <p>Downstream:
-- <code>AnswerSynthesizerNode</code></p>
+- <code>AnswerSynthesizerNode</code>, when aggregation succeeded
+- End of run, when it failed (<code>aggregator_route</code> in <code>pipeline/routes.py</code>)</p>
 <p>Trigger conditions:
 - Router dispatches to aggregator when no pending scan nodes remain.</p>
 <pre class="mermaid"><code>flowchart LR
@@ -2050,7 +2051,7 @@
 <li>Before polars is asked for any column, a post-combine op's attributes (<code>group_by</code>, <code>metrics</code>, <code>project</code>'s <code>expected_schema</code>, <code>filters</code>, <code>order_by</code>) are checked against the combined frame. An attribute the frame does not have is refused with the columns it does have, and a side-qualified one (<code>right.customer</code>) with the reason — see <em>No anti-join</em> below. The decomposer runs the same check on the decomposition before anything executes (<code>nl2sql/aggregation/columns.py</code>, shared with this engine) and asks the model again once, so here it is the last line of defence.</li>
 <li>Build <code>AggregatorResponse</code> with <code>terminal_results</code>.</li>
 <li>Return success reasoning.</li>
-<li>On exception, emit <code>AGGREGATOR_FAILED</code>.</li>
+<li>On exception, emit <code>AGGREGATOR_FAILED</code>, on the state's <code>errors</code> and on <code>AggregatorResponse.errors</code>. The graph's <code>aggregator_route</code> then ends the run: the answer synthesizer is not called on the empty result, so the aggregator's error is the run's outcome and no model call is spent explaining <code>{}</code>.</li>
 </ol>
 <h3 id="no-anti-join-what-bought-x-but-never-y-does-here">No anti-join: what "bought X but never Y" does here</h3>
 <p><code>CombineGroup.operation</code> is one of <code>standalone</code>, <code>compare</code>, <code>join</code> and <code>union</code>.

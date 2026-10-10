@@ -1758,8 +1758,8 @@
     Context --&gt; Executor[ExecutorNode/ExecutorRequest]
     Executor --&gt; Artifacts[ArtifactStore.create_artifact_ref]</code></pre>
 <h2 id="storage-isolation">Storage isolation</h2>
-<p>Artifacts are persisted under a tenant-partitioned path on every backend, driven by <code>RESULT_ARTIFACT_PATH_TEMPLATE</code> (default <code>&lt;tenant_id&gt;/&lt;request_id&gt;.parquet</code>):</p>
-<div class="highlight"><pre><span></span><code><a href="#__codelineno-0-1" id="__codelineno-0-1" name="__codelineno-0-1"></a>&lt;backend root&gt;/&lt;tenant_id&gt;/&lt;request_id&gt;.parquet
+<p>Artifacts are persisted under a tenant-partitioned path on every backend, driven by <code>RESULT_ARTIFACT_PATH_TEMPLATE</code> (default <code>&lt;tenant_id&gt;/&lt;request_id&gt;/&lt;sub_query_id&gt;.parquet</code>):</p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-0-1" id="__codelineno-0-1" name="__codelineno-0-1"></a>&lt;backend root&gt;/&lt;tenant_id&gt;/&lt;request_id&gt;/&lt;sub_query_id&gt;.parquet
 </code></pre></div>
 <p>This ensures per-tenant isolation for artifacts, and downstream aggregation only reads referenced artifacts from the current request.</p>
 <p>Tenant isolation is <strong>not</strong> applied to indexing; the vector store and schema store are global in the current implementation (see <code>../architecture/indexing.md</code>).</p>
