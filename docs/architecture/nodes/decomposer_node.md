@@ -77,7 +77,7 @@ Side effects:
    - Assign deterministic ID via `_stable_id()`, over the intent, metrics, filters, group_by, order_by, limit and expected schema.
    - Two sub-queries the model wrote identically hash to the same ID, but each is still a sub-query of its own (a combine group may name both), so a repeat takes the next ordinal: `sq_<hash>`, `sq_<hash>_2`, and so on. Both run, and the DAG gets one scan node per sub-query. Before this, the shared ID gave the DAG one node id for two nodes, and the run ended with `PLANNER_FAILED` ("contains a cycle").
    - Attach schema version.
-5. Remap combine groups to stable sub‑query IDs.
+5. Remap combine groups to stable sub‑query IDs. An input whose sub-query was dropped in step 4 is removed from its group, and a group left with no inputs is removed. A `join` or `compare` group left with fewer than two inputs is **refused**: the run ends here with `PLANNER_FAILED`, before any scan runs, and no DAG is built. The message names the group and why each input was dropped (`restricted_datasource`, `no_datasource`, `unsupported_datasource`) but not the datasource. The model is not asked again: a restricted or unresolved datasource is not something a new decomposition changes. Before this, the group was kept with its one input and the engine returned that side alone as the "join", so "customers with an open ticket who spent the most" was answered as "customers who spent the most", with no error. A `union` that lost an input still runs on the inputs that remain; the dropped intent is reported in `unmapped_subqueries`.
 6. Assign deterministic IDs to post‑combine ops.
 7. Sort sub‑queries, combine groups, and post‑combine ops.
 8. Check every post-combine op against the columns its combine group will produce (`post_combine_problems()`). A sub-query's result columns are its `expected_schema` names (the logical validator holds each plan to them), and the combined columns follow by the engine's own rules in `nl2sql/aggregation/columns.py`: a `join`/`compare` drops the right-hand join keys and suffixes any other right-hand name the left also has with `_right`. A group whose sub-query declares no `expected_schema` is not checked. If an op reads a column that will not exist, the model is asked once more, with the reason appended to the human message ("PREVIOUS ANSWER REJECTED: ..."). A second rejected answer ends the run here with `PLANNER_FAILED` and the same reason, before any scan runs; nothing after the decomposer can ask for a new decomposition, so this used to fail in the aggregator after every scan.
@@ -116,6 +116,7 @@ Key contracts:
 Emits `PipelineError` with:
 
 - `PLANNER_FAILED` when a decomposition is rejected twice (step 8), with the reason;
+- `PLANNER_FAILED` when a `join`/`compare` combine group has fewer than two inputs (step 5), for example because RBAC dropped one side;
 - `ORCHESTRATOR_CRASH` on exceptions; a provider's refusal of the call is a `PROVIDER_*` error instead (see [provider failures](../../observability/error-handling.md#provider-failures)).
 
 Logs failures via `logger.error`.

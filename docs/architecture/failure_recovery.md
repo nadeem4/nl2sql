@@ -23,6 +23,7 @@ Failure in this system is represented as structured `PipelineError` objects accu
 - Decomposer LLM failures return `ORCHESTRATOR_CRASH` (critical) and empty responses; a provider's refusal returns a `PROVIDER_*` error instead.
 - AST planner LLM failures return `PLANNING_FAILURE` and a `None` plan.
 - A decomposition that cannot be turned into an execution DAG returns `PLANNER_FAILED` and no `execution_dag`; the layer router ends the run.
+- A `join` or `compare` combine group left with fewer than two inputs (a sub-query dropped as restricted, unresolved or unsupported) returns `PLANNER_FAILED` the same way, before any scan runs, rather than answering from the side that remains.
 
 ### Validation
 - Logical validation returns structured errors for missing tables, columns, invalid plan structure, or security violations.

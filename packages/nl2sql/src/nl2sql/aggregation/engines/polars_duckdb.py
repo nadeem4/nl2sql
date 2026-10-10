@@ -96,17 +96,19 @@ class PolarsDuckdbEngine:
             return frames[0]
         if operation == "union":
             return pl.concat(frames, how="vertical")
+        if operation in ("join", "compare") and len(frames) < 2:
+            # The decomposer refuses such a group before anything runs; this is
+            # the last line of defence. The left frame alone is not the join.
+            raise ValueError(
+                f"A {operation} needs two inputs and got {len(frames)}; refusing to answer from one side."
+            )
         if operation == "join":
-            if len(frames) < 2:
-                return frames[0]
             left = frames[0]
             right = frames[1]
             left_on = [_column(left, k.get("left")) for k in join_keys]
             right_on = [_column(right, k.get("right")) for k in join_keys]
             return left.join(right, left_on=left_on, right_on=right_on, how="inner", suffix="_right")
         if operation == "compare":
-            if len(frames) < 2:
-                return frames[0]
             left = frames[0]
             right = frames[1]
             left_on = [_column(left, k.get("left")) for k in join_keys]
