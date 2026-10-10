@@ -1796,7 +1796,7 @@
 <li><code>provider</code> and <code>provider_response</code>, set on a <code>PROVIDER_*</code> error (below), otherwise <code>None</code></li>
 <li><code>is_retryable</code> derived from severity and error code</li>
 </ul>
-<p>Common error codes include <code>MISSING_SQL</code>, <code>EXECUTION_FAILED</code>, <code>PIPELINE_TIMEOUT</code>, <code>SECURITY_VIOLATION</code>, <code>QUESTION_NOT_ANSWERABLE</code>.</p>
+<p>Common error codes include <code>MISSING_SQL</code>, <code>EXECUTION_FAILED</code>, <code>PIPELINE_TIMEOUT</code>, <code>SECURITY_VIOLATION</code>, <code>QUESTION_NOT_ANSWERABLE</code>. <code>RESULT_TRUNCATED</code> marks a combine input that reached its datasource's row cap: an error for a join or compare, a warning for a union (see <a href="../../architecture/nodes/engine_aggregator_node/#row-cap-before-a-combine">row cap before a combine</a>).</p>
 <p><code>ErrorCode</code> carries only codes something can produce. Eleven members that no
 code path raised were removed (<code>MISSING_GROUP_BY</code>, <code>INVALID_ALIAS_USAGE</code>,
 <code>JOIN_MISSING_ON_CLAUSE</code>, <code>INVALID_DATE_FORMAT</code>, <code>INVALID_NUMERIC_VALUE</code>,

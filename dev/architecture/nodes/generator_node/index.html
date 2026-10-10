@@ -2011,7 +2011,7 @@
 <h2 id="outputs">Outputs</h2>
 <p>Mutations to <code>SubgraphExecutionState</code>:</p>
 <ul>
-<li><code>generator_response</code> (<code>GeneratorResponse</code> with <code>sql_draft</code>)</li>
+<li><code>generator_response</code> (<code>GeneratorResponse</code> with <code>sql_draft</code>, and <code>row_cap</code>: the adapter's <code>row_limit</code> when it, not the plan's own <code>LIMIT</code>, bounds the query; <code>None</code> when the plan asked for that many rows or fewer). The aggregator uses it to tell a sub-query cut short by the cap from a complete one (see <a href="../engine_aggregator_node/#row-cap-before-a-combine">EngineAggregatorNode</a>).</li>
 <li><code>reasoning</code></li>
 <li><code>errors</code> on failure</li>
 </ul>
@@ -2024,7 +2024,7 @@
 <ol>
 <li>Validate presence of datasource ID and plan.</li>
 <li>Resolve adapter and dialect.</li>
-<li>Compute effective limit from plan/adapter row limit.</li>
+<li>Compute effective limit from plan/adapter row limit (<code>row_limit</code>, 1000 when the datasource sets none): <code>min(plan.limit or row_limit, row_limit)</code>. When the cap is what bounds the query, record it as <code>row_cap</code>.</li>
 <li>Traverse AST with <code>SqlVisitor</code> to build <code>sqlglot</code> expression tree.</li>
 <li>Every operator becomes the node sqlglot's parser would build (<code>+</code> -&gt; <code>exp.Add</code>, <code>*</code> -&gt; <code>exp.Mul</code>, <code>IS NOT</code> -&gt; <code>NOT ... IS ...</code>, and so on), wherever it is nested. An operator with no mapping raises; it is never rendered as a function named after the operator.</li>
 <li>An operand that is itself an operator is parenthesised, because sqlglot prints a hand-built tree without adding the parentheses its parser would have seen (<code>(a + b) * c</code> would otherwise print as <code>a + b * c</code>).</li>

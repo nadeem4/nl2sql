@@ -3958,7 +3958,10 @@ more database connections that NL2SQL can query.</p>
 </li>
 <li>optional limits and metadata (commonly used):<ul>
 <li><code>statement_timeout_ms</code></li>
-<li><code>row_limit</code></li>
+<li><code>row_limit</code>: the most rows one sub-query returns (1000 when unset). It
+  is applied before results are combined, so a join input that reaches it
+  is refused (<code>RESULT_TRUNCATED</code>) and a union input that reaches it is
+  flagged with a warning; see <a href="../../architecture/nodes/engine_aggregator_node/#row-cap-before-a-combine">row cap before a combine</a>.</li>
 <li><code>max_bytes</code></li>
 <li><code>tags</code></li>
 </ul>

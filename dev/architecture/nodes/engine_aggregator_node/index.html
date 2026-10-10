@@ -596,6 +596,15 @@
 <nav aria-label="Internal Flow (Step-by-Step)" class="md-nav">
 <ul class="md-nav__list">
 <li class="md-nav__item">
+<a class="md-nav__link" href="#row-cap-before-a-combine">
+<span class="md-ellipsis">
+      
+        Row cap before a combine
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="#no-anti-join-what-bought-x-but-never-y-does-here">
 <span class="md-ellipsis">
       
@@ -1884,6 +1893,15 @@
 <nav aria-label="Internal Flow (Step-by-Step)" class="md-nav">
 <ul class="md-nav__list">
 <li class="md-nav__item">
+<a class="md-nav__link" href="#row-cap-before-a-combine">
+<span class="md-ellipsis">
+      
+        Row cap before a combine
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="#no-anti-join-what-bought-x-but-never-y-does-here">
 <span class="md-ellipsis">
       
@@ -2045,6 +2063,7 @@
 <h2 id="internal-flow-step-by-step">Internal Flow (Step-by-Step)</h2>
 <ol>
 <li>Read <code>execution_dag</code> and <code>artifact_refs</code>.</li>
+<li>Check every combine input against its row cap (see <em>Row cap before a combine</em> below). A capped input to a <code>join</code>/<code>compare</code> ends the run here with <code>RESULT_TRUNCATED</code>; a capped input to a <code>union</code> adds a <code>RESULT_TRUNCATED</code> warning and aggregation goes on.</li>
 <li>Invoke <code>AggregationService.execute(dag, artifact_refs)</code>.</li>
 <li>A <code>join</code>/<code>compare</code> combine resolves each join key against its frame's columns. A key written with a side or sub-query prefix (<code>right.customer</code>, <code>sq_2.customer</code>) resolves to the bare column when only that exists; an unknown key is left for polars to report. A <code>join</code>/<code>compare</code> with fewer than two inputs raises (<code>AGGREGATOR_FAILED</code>) instead of returning the one frame it has; the decomposer refuses such a group before anything runs, so this is the last line of defence.</li>
 <li>A post-combine op (<code>PolarsDuckdbEngine.post_op</code>) applies every field it carries, in SQL's order: the reshaping its <code>operation</code> names (<code>aggregate</code> groups with polars' <code>group_by</code>, <code>project</code> selects <code>expected_schema</code>), then its <code>filters</code> (after an aggregate they filter the aggregated rows, as HAVING does), its <code>order_by</code>, and its <code>limit</code>. A <code>filter</code> op with <code>order_by</code> and <code>limit</code>, as the decomposer's prompt used to show, keeps all three.</li>
@@ -2053,6 +2072,29 @@
 <li>Return success reasoning.</li>
 <li>On exception, emit <code>AGGREGATOR_FAILED</code>, on the state's <code>errors</code> and on <code>AggregatorResponse.errors</code>. The graph's <code>aggregator_route</code> then ends the run: the answer synthesizer is not called on the empty result, so the aggregator's error is the run's outcome and no model call is spent explaining <code>{}</code>.</li>
 </ol>
+<h3 id="row-cap-before-a-combine">Row cap before a combine</h3>
+<p>The generator caps every sub-query at its datasource's <code>row_limit</code> (1000 when
+none is set) unless the plan asks for fewer rows itself, and records that cap as
+<code>row_cap</code> on its response and on the sub-query's <code>SubgraphOutput</code>. The cap is
+applied in each sub-query's SQL, <strong>before</strong> the combine: a join input with
+2240 rows reaches the aggregator as 1000, and every match the other 1240 held
+is silently lost.</p>
+<p>So before combining, the aggregator looks at each combine input whose result
+has <code>row_cap</code> rows or more:</p>
+<ul>
+<li><strong><code>join</code> / <code>compare</code>: refused.</strong> The run ends with <code>RESULT_TRUNCATED</code>
+  (through <code>aggregator_route</code>, so no answer is synthesized), naming the
+  sub-query and the cap. Missing rows mean missing matches, so the combined
+  answer could be wrong, and a wrong answer is worse than none.</li>
+<li><strong><code>union</code>: a warning.</strong> The rows a union returns are still right, only
+  possibly incomplete, so it runs and a <code>RESULT_TRUNCATED</code> warning with the
+  sub-query's id is carried to <code>QueryResult.warnings</code>.</li>
+</ul>
+<p>A result of exactly <code>row_cap</code> rows may be complete; telling the two apart would
+mean fetching one row more, so it is treated as cut short. A plan's own top-N
+(<code>LIMIT 5</code>) is the answer, not truncation, and is never flagged. To answer such
+a question, ask something narrower (aggregate in the sub-query) or raise the
+datasource's <code>row_limit</code>.</p>
 <h3 id="no-anti-join-what-bought-x-but-never-y-does-here">No anti-join: what "bought X but never Y" does here</h3>
 <p><code>CombineGroup.operation</code> is one of <code>standalone</code>, <code>compare</code>, <code>join</code> and <code>union</code>.
 <code>join</code> and <code>compare</code> are both <strong>inner</strong> joins (<code>how="inner"</code> in
@@ -2109,6 +2151,7 @@ is a feature, not a fix, and is deliberately not done here.</p>
 <p>Emits <code>PipelineError</code> with:</p>
 <ul>
 <li><code>AGGREGATOR_FAILED</code></li>
+<li><code>RESULT_TRUNCATED</code>, an error when a <code>join</code>/<code>compare</code> input hit its row cap, a warning when a <code>union</code> input did</li>
 </ul>
 <p>Logs failures via <code>logger.error</code>.</p>
 <hr/>
