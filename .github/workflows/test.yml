@@ -143,6 +143,22 @@ jobs:
           name: dist
           path: dist/
 
+  # Builds the image the release's `ghcr` job publishes, the same way (repo
+  # root as context, packages/api/Dockerfile named explicitly), and never
+  # pushes it. Until this job existed nothing built that image before a
+  # release did, so v0.2.0 reached PyPI with an image still on Python 3.11
+  # that pip refused to install the packages into.
+  api-image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build the API image (no push)
+        run: docker build -f packages/api/Dockerfile -t nl2sql-api:ci .
+
+      - name: Import the API inside the image
+        run: docker run --rm nl2sql-api:ci python -c "import nl2sql, nl2sql_api.main"
+
   # Installs the wheels `build` just made into an empty virtualenv the way a
   # user does -- `pip install "nl2sql-engine[demo]"` -- and boots
   # `nl2sql demo --hosted`, the command the Hugging Face Space runs, with no
