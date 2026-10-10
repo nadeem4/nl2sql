@@ -176,6 +176,7 @@ def wrap_subgraph(
             plan=plan,
             plan_source=plan_source,
             sql_draft=sql_draft,
+            row_cap=generator_response.row_cap if generator_response else None,
             artifact=artifact,
             errors=errors,
             validation=(

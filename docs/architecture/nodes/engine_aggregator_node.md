@@ -66,6 +66,7 @@ Side effects:
 ## Internal Flow (Step-by-Step)
 
 1. Read `execution_dag` and `artifact_refs`.
+   - Check every combine input against its row cap (see *Row cap before a combine* below). A capped input to a `join`/`compare` ends the run here with `RESULT_TRUNCATED`; a capped input to a `union` adds a `RESULT_TRUNCATED` warning and aggregation goes on.
 2. Invoke `AggregationService.execute(dag, artifact_refs)`.
    - A `join`/`compare` combine resolves each join key against its frame's columns. A key written with a side or sub-query prefix (`right.customer`, `sq_2.customer`) resolves to the bare column when only that exists; an unknown key is left for polars to report. A `join`/`compare` with fewer than two inputs raises (`AGGREGATOR_FAILED`) instead of returning the one frame it has; the decomposer refuses such a group before anything runs, so this is the last line of defence.
    - A post-combine op (`PolarsDuckdbEngine.post_op`) applies every field it carries, in SQL's order: the reshaping its `operation` names (`aggregate` groups with polars' `group_by`, `project` selects `expected_schema`), then its `filters` (after an aggregate they filter the aggregated rows, as HAVING does), its `order_by`, and its `limit`. A `filter` op with `order_by` and `limit`, as the decomposer's prompt used to show, keeps all three.
@@ -73,6 +74,32 @@ Side effects:
 3. Build `AggregatorResponse` with `terminal_results`.
 4. Return success reasoning.
 5. On exception, emit `AGGREGATOR_FAILED`, on the state's `errors` and on `AggregatorResponse.errors`. The graph's `aggregator_route` then ends the run: the answer synthesizer is not called on the empty result, so the aggregator's error is the run's outcome and no model call is spent explaining `{}`.
+
+### Row cap before a combine
+
+The generator caps every sub-query at its datasource's `row_limit` (1000 when
+none is set) unless the plan asks for fewer rows itself, and records that cap as
+`row_cap` on its response and on the sub-query's `SubgraphOutput`. The cap is
+applied in each sub-query's SQL, **before** the combine: a join input with
+2240 rows reaches the aggregator as 1000, and every match the other 1240 held
+is silently lost.
+
+So before combining, the aggregator looks at each combine input whose result
+has `row_cap` rows or more:
+
+- **`join` / `compare`: refused.** The run ends with `RESULT_TRUNCATED`
+  (through `aggregator_route`, so no answer is synthesized), naming the
+  sub-query and the cap. Missing rows mean missing matches, so the combined
+  answer could be wrong, and a wrong answer is worse than none.
+- **`union`: a warning.** The rows a union returns are still right, only
+  possibly incomplete, so it runs and a `RESULT_TRUNCATED` warning with the
+  sub-query's id is carried to `QueryResult.warnings`.
+
+A result of exactly `row_cap` rows may be complete; telling the two apart would
+mean fetching one row more, so it is treated as cut short. A plan's own top-N
+(`LIMIT 5`) is the answer, not truncation, and is never flagged. To answer such
+a question, ask something narrower (aggregate in the sub-query) or raise the
+datasource's `row_limit`.
 
 ### No anti-join: what "bought X but never Y" does here
 
@@ -146,6 +173,7 @@ Key contracts:
 Emits `PipelineError` with:
 
 - `AGGREGATOR_FAILED`
+- `RESULT_TRUNCATED`, an error when a `join`/`compare` input hit its row cap, a warning when a `union` input did
 
 Logs failures via `logger.error`.
 

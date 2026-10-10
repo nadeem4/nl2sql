@@ -37,6 +37,8 @@ class ErrorCode(str, Enum):
     PLAN_FEEDBACK = "PLAN_FEEDBACK"
     UNKNOWN_ERROR = "UNKNOWN_ERROR"
     AGGREGATOR_FAILED = "AGGREGATOR_FAILED"
+    # A combine input reached the adapter's row cap, so it may be missing rows.
+    RESULT_TRUNCATED = "RESULT_TRUNCATED"
     ORCHESTRATOR_CRASH = "ORCHESTRATOR_CRASH"
     PIPELINE_TIMEOUT = "PIPELINE_TIMEOUT"
     CANCELLED = "CANCELLED"

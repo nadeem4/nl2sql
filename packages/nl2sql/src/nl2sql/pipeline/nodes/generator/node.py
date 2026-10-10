@@ -330,6 +330,8 @@ class GeneratorNode:
 
             row_limit = adapter.row_limit or 1000
             limit = min(int(plan.limit or row_limit), row_limit)
+            # A plan's own top-N is the answer; the adapter's cap is truncation.
+            row_cap = row_limit if plan.limit is None or int(plan.limit) > row_limit else None
 
             query = self._build_query(plan, limit, dialect)
             # The adapter renders the finished tree: its database's own spelling
@@ -340,6 +342,7 @@ class GeneratorNode:
 
             response = GeneratorResponse(
                 sql_draft=sql,
+                row_cap=row_cap,
                 reasoning=[{"node": self.node_name, "content": ["Generated SQL", sql]}],
             )
             return {

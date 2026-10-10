@@ -186,3 +186,44 @@ def test_two_sub_queries_on_one_datasource_keep_their_own_results(demo_project, 
     aggregator = [n for n in doc["nodes"] if n["node"] == "aggregator"]
     rows = json.dumps(aggregator)
     assert "invoice_count" in rows and "music_spend" in rows, rows[:2000]
+
+
+# InvoiceLine has 2240 rows; the demo's row cap is the generator's default 1000.
+LINES_INTENT = "Every invoice line with its customer"
+TICKET_CUSTOMERS_INTENT = "Customers who opened a support ticket"
+LINES_SQ = {
+    "id": "sq_lines", "datasource_id": "chinook", "intent": LINES_INTENT,
+    "metrics": [], "filters": [], "group_by": [],
+    "expected_schema": [{"name": "line_id", "dtype": "int"}, {"name": "customer_id", "dtype": "int"}],
+}
+TICKET_CUSTOMERS_SQ = {**OPEN_TICKETS_SQ, "id": "sq_ticket_customers", "intent": TICKET_CUSTOMERS_INTENT,
+                       "filters": []}
+LINES_PLAN = {
+    "query_type": "READ", "distinct": False,
+    "tables": [{"name": "InvoiceLine", "alias": "t1"}, {"name": "Invoice", "alias": "t2"}],
+    "joins": [{"left_alias": "t1", "right_alias": "t2", "join_type": "inner",
+               "condition": {"kind": "binary", "op": "=", "left": _column("t1", "InvoiceId"),
+                             "right": _column("t2", "InvoiceId")}}],
+    "select_items": [{"alias": "line_id", "expr": _column("t1", "InvoiceLineId")},
+                     {"alias": "customer_id", "expr": _column("t2", "CustomerId")}],
+    "group_by": [], "order_by": [],
+    "reasoning": "Every invoice line with the customer who bought it.",
+}
+TICKET_CUSTOMERS_PLAN = {**OPEN_TICKETS_PLAN, "where": None}
+
+
+@pytest.mark.e2e
+def test_a_join_input_cut_short_by_the_row_cap_is_refused(demo_project, tmp_path):
+    decomposition = _join_decomposition(LINES_SQ, TICKET_CUSTOMERS_SQ)
+    decomposition["post_combine_ops"] = []
+    rules = _rules(["chinook", "support"], decomposition,
+                   [(LINES_INTENT, LINES_PLAN), (TICKET_CUSTOMERS_INTENT, TICKET_CUSTOMERS_PLAN)])
+    server, r, doc = _run(demo_project, tmp_path, rules, "llm.multi-sq-capped.yaml",
+                          question="Which invoice lines belong to customers who opened a ticket?")
+
+    codes = [e["error_code"] for e in doc["result"]["errors"]]
+    assert codes == ["RESULT_TRUNCATED"], r.stdout + r.stderr
+    [error] = doc["result"]["errors"]
+    assert "1000" in error["message"] and "join" in error["message"]
+    # The run ends at the aggregator: no answer is written from a partial join.
+    assert "AggregatedResponse" not in [c["name"] for c in server.calls]

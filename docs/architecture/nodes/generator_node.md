@@ -57,7 +57,7 @@ Validation performed:
 
 Mutations to `SubgraphExecutionState`:
 
-- `generator_response` (`GeneratorResponse` with `sql_draft`)
+- `generator_response` (`GeneratorResponse` with `sql_draft`, and `row_cap`: the adapter's `row_limit` when it, not the plan's own `LIMIT`, bounds the query; `None` when the plan asked for that many rows or fewer). The aggregator uses it to tell a sub-query cut short by the cap from a complete one (see [EngineAggregatorNode](engine_aggregator_node.md#row-cap-before-a-combine)).
 - `reasoning`
 - `errors` on failure
 
@@ -71,7 +71,7 @@ Side effects:
 
 1. Validate presence of datasource ID and plan.
 2. Resolve adapter and dialect.
-3. Compute effective limit from plan/adapter row limit.
+3. Compute effective limit from plan/adapter row limit (`row_limit`, 1000 when the datasource sets none): `min(plan.limit or row_limit, row_limit)`. When the cap is what bounds the query, record it as `row_cap`.
 4. Traverse AST with `SqlVisitor` to build `sqlglot` expression tree.
    - Every operator becomes the node sqlglot's parser would build (`+` -> `exp.Add`, `*` -> `exp.Mul`, `IS NOT` -> `NOT ... IS ...`, and so on), wherever it is nested. An operator with no mapping raises; it is never rendered as a function named after the operator.
    - An operand that is itself an operator is parenthesised, because sqlglot prints a hand-built tree without adding the parentheses its parser would have seen (`(a + b) * c` would otherwise print as `a + b * c`).
