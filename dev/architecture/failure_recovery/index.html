@@ -4766,6 +4766,7 @@
 <li>Decomposer LLM failures return <code>ORCHESTRATOR_CRASH</code> (critical) and empty responses; a provider's refusal returns a <code>PROVIDER_*</code> error instead.</li>
 <li>AST planner LLM failures return <code>PLANNING_FAILURE</code> and a <code>None</code> plan.</li>
 <li>A decomposition that cannot be turned into an execution DAG returns <code>PLANNER_FAILED</code> and no <code>execution_dag</code>; the layer router ends the run.</li>
+<li>A <code>join</code> or <code>compare</code> combine group left with fewer than two inputs (a sub-query dropped as restricted, unresolved or unsupported) returns <code>PLANNER_FAILED</code> the same way, before any scan runs, rather than answering from the side that remains.</li>
 </ul>
 <h3 id="validation">Validation</h3>
 <ul>
