@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/nadeem4/nl2sql/compare/v0.2.0...v0.2.1) (2026-10-10)
+
+
+### Bug Fixes
+
+* release image on Python 3.12, and a Space deploy that survives a lagging PyPI and never passes broken ([#208](https://github.com/nadeem4/nl2sql/issues/208)) ([41dbfb0](https://github.com/nadeem4/nl2sql/commit/41dbfb0a9d6364a2a6aff62044319d736f13c2e4))
+
 ## [0.2.0](https://github.com/nadeem4/nl2sql/compare/v0.1.2...v0.2.0) (2026-10-10)
 
 
