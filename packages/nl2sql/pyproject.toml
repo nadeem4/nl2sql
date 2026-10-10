@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nl2sql-engine"
-version = "0.2.1" # x-release-please-version
+version = "0.2.2" # x-release-please-version
 description = "Ask a database questions in English: the model writes a typed query plan, never SQL, and the plan is checked against the schema and the caller's role before any SQL is generated"
 readme = "README.md"
 keywords = ["nl2sql", "text-to-sql", "natural language", "sql", "llm", "langgraph", "sqlglot", "database"]
