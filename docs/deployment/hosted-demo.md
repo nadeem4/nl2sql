@@ -332,10 +332,24 @@ steps, and what each Space setting does, are in
 own front page, since a Docker Space reads its configuration from the
 front-matter of the `README.md` at its root.
 
-The Space serves at <https://nadeem4nk-nl2sql-demo.hf.space>, and its public address is <https://nl2sql.codewithnk.com>.
-That domain is a redirect to the Space root and answers 404 for any deeper
-path, so deep links and API calls (`/api/health`, `/api/meta`) must use the
-`hf.space` host.
+The Space's public address is <https://nl2sql.codewithnk.com>, its custom
+domain; <https://nadeem4nk-nl2sql-demo.hf.space> serves the same app too. Both
+hosts serve every path, so deep links and API calls work on either:
+
+```bash
+curl https://nl2sql.codewithnk.com/api/health
+```
+
+The custom domain is set up in two places, and redoing it is the same two
+steps:
+
+1. **On the Space:** *Settings* -> *Custom domain*, enter `nl2sql.codewithnk.com`.
+2. **At the DNS host for `codewithnk.com`:** a `CNAME` record from `nl2sql` to
+   `hf.space`.
+
+Hugging Face checks the record and issues the TLS certificate itself; there is
+nothing to upload. Until it has, the domain fails with a certificate error and
+the `hf.space` address keeps working.
 
 **Never give the Space an API key**, as a secret or otherwise. Hosted mode
 clears any provider key it finds in its environment at start-up rather than use
@@ -367,7 +381,11 @@ flowchart LR
 3. **`space-smoke`** polls `https://nadeem4nk-nl2sql-demo.hf.space/api/health`
    until it reports `X.Y.Z`, then checks the page and `/api/meta`. A Space goes
    on serving its previous image while the new one builds, so a build that
-   finished is not yet proof that visitors see it.
+   finished is not yet proof that visitors see it. It then runs the same check
+   against the custom domain, `SPACE_CUSTOM_DOMAIN` at the top of
+   `publish_pypi.yaml`, which proves the DNS record and certificate still
+   reach the release; a fork sets its own domain there, or empties it to skip
+   the check.
 
 The whole release flow is in [Releasing](../development/releasing.md).
 
@@ -505,9 +523,10 @@ and `og:image` and `og:url` have to be absolute, while the same page is the
 Space, a container and `http://127.0.0.1:8000`. So the host comes off the
 request: `X-Forwarded-Proto` and `X-Forwarded-Host` when a proxy set them
 (which is what the Space does), the `Host` header otherwise, and the URL the
-app itself saw if neither is a host. On the public Space, `og:url` names
-`https://nl2sql.codewithnk.com/` instead, so a shared link carries the short address; `og:image` stays
-on the Space, since the redirect serves nothing below its root. The card is
+app itself saw if neither is a host. On the public Space, reached on either
+host, `og:url`, `og:image` and `twitter:image` all name
+`https://nl2sql.codewithnk.com` instead, so a shared link carries the short
+address. The card is
 served by the app at `/social-card.png` and ships in the wheel, so a
 `pip install` serves it too.
 

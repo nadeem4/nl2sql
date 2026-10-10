@@ -9,7 +9,8 @@
 # After PyPI: the image, the versioned docs, and a fresh install of the
 # release from PyPI that boots the demo. Only once that passes is the Hugging
 # Face Space deployed at the same version (publish_space.yml), and the live
-# Space is then polled until it serves it.
+# Space is then polled until it serves it, on hf.space and then on its custom
+# domain (SPACE_CUSTOM_DOMAIN; empty skips that check).
 #
 # Three entry points, one behaviour. GitHub does not start a workflow from an
 # event created with the default `GITHUB_TOKEN`, so the tag release-please
@@ -40,6 +41,11 @@ on:
         description: "Release tag to publish, e.g. v0.1.0"
         required: true
         type: string
+
+# The Space's custom domain, checked by `space-smoke` once the Space itself
+# serves the release. A fork sets its own, or empties it to skip the check.
+env:
+  SPACE_CUSTOM_DOMAIN: https://nl2sql.codewithnk.com
 
 jobs:
   # Same build + smoke-install commands as the `build` job in test.yml, so a
@@ -283,7 +289,8 @@ jobs:
   # The Space can report RUNNING on its new build before the router sends
   # traffic to it, and it serves the previous image until then. So the release
   # is checked where visitors meet it: the public URL, polled until
-  # /api/health reports this version, then the page and /api/meta.
+  # /api/health reports this version, then the page and /api/meta; then the
+  # same on the custom domain, unless SPACE_CUSTOM_DOMAIN is empty.
   space-smoke:
     needs: space
     if: needs.space.outputs.deployed == 'true'
@@ -305,3 +312,15 @@ jobs:
           --url https://nadeem4nk-nl2sql-demo.hf.space
           --expect-version "${TAG#v}"
           --timeout 900
+
+      # The custom domain is a CNAME to hf.space, so it serves the same build;
+      # this proves the DNS and certificate still reach it.
+      - name: Check the custom domain serves the release too
+        if: env.SPACE_CUSTOM_DOMAIN != ''
+        env:
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: >-
+          python scripts/fresh_install_check.py
+          --url "$SPACE_CUSTOM_DOMAIN"
+          --expect-version "${TAG#v}"
+          --timeout 300

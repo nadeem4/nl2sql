@@ -477,14 +477,15 @@ def test_the_preview_urls_are_absolute_and_name_the_host_the_visitor_typed():
     assert _tag(html, "og:image:height") == "630"
 
 
-def test_the_public_space_names_its_custom_domain_as_the_page_but_serves_the_image_itself():
-    html = _served_page(**{"x-forwarded-proto": "https",
-                           "x-forwarded-host": "nadeem4nk-nl2sql-demo.hf.space"})
+@pytest.mark.parametrize("host", ["nadeem4nk-nl2sql-demo.hf.space", "nl2sql.codewithnk.com"])
+def test_the_public_space_names_its_custom_domain_for_the_page_and_the_image(host):
+    html = _served_page(**{"x-forwarded-proto": "https", "x-forwarded-host": host})
 
-    # nl2sql.codewithnk.com redirects its root to the Space and 404s anything
-    # deeper, so it is the page a shared link names, never the image's host.
+    # nl2sql.codewithnk.com is the Space's own custom domain and serves every
+    # path the Space does, so a link shared from either host carries it.
     assert _tag(html, "og:url") == "https://nl2sql.codewithnk.com/"
-    assert _tag(html, "og:image") == "https://nadeem4nk-nl2sql-demo.hf.space/social-card.png"
+    assert _tag(html, "og:image") == "https://nl2sql.codewithnk.com/social-card.png"
+    assert _tag(html, "twitter:image") == "https://nl2sql.codewithnk.com/social-card.png"
 
 
 def test_without_a_proxy_the_preview_urls_are_the_ones_the_app_was_reached_on():

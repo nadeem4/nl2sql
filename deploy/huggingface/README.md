@@ -98,9 +98,11 @@ git subtree push --prefix deploy/huggingface space main
 
 The Space builds on push; watch the log on its **Logs** tab. A first build takes
 a few minutes (installing the engine, generating the sample databases, indexing
-them and baking in the embedding model). The playground is live at
-<https://nadeem4nk-nl2sql-demo.hf.space> once the build is green; <https://nl2sql.codewithnk.com> redirects
-to it.
+them and baking in the embedding model). Once the build is green the
+playground is live at <https://nl2sql.codewithnk.com> and at
+<https://nadeem4nk-nl2sql-demo.hf.space>. The first is the Space's custom
+domain: *Settings* -> *Custom domain* on the Space, plus a DNS `CNAME` from
+`nl2sql` to `hf.space`; Hugging Face issues the certificate.
 
 To deploy again after a change here, run the same `git subtree push`. Note that
 a change to the *engine* or the *playground* does not touch this folder, so it

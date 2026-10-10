@@ -103,6 +103,23 @@ def test_the_release_checks_the_live_space_serves_the_new_version():
     assert "--expect-version" in run
 
 
+def test_the_release_checks_the_custom_domain_serves_the_same_version_after_the_space():
+    workflow = _workflow(PUBLISH)
+    # One workflow-level setting a fork overrides, or empties to skip the check.
+    assert workflow["env"]["SPACE_CUSTOM_DOMAIN"] == "https://nl2sql.codewithnk.com"
+
+    steps = workflow["jobs"]["space-smoke"]["steps"]
+    space = next(i for i, step in enumerate(steps) if "nadeem4nk-nl2sql-demo.hf.space" in str(step.get("run")))
+    domain = next(i for i, step in enumerate(steps) if "SPACE_CUSTOM_DOMAIN" in str(step.get("run")))
+    assert space < domain, "the custom domain is checked only once the Space itself serves the release"
+
+    check = steps[domain]
+    assert check["if"] == "env.SPACE_CUSTOM_DOMAIN != ''"
+    # The same check as the Space: /api/health reports the version, / is 200.
+    assert "fresh_install_check.py" in check["run"]
+    assert "--expect-version" in check["run"]
+
+
 def test_one_deploy_at_a_time_and_a_superseded_run_is_cancelled():
     concurrency = _workflow()["concurrency"]
 

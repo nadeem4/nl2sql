@@ -83,7 +83,8 @@ Three more jobs test the package rather than the source tree:
   the same script runs twice more, from `publish_pypi.yaml`: with
   `--pypi X.Y.Z` to install the published version from PyPI itself, and with
   `--url https://nadeem4nk-nl2sql-demo.hf.space --expect-version X.Y.Z` to
-  wait for the live Space to serve it (see
+  wait for the live Space to serve it, then once more with its custom domain
+  as `--url` (see
   [Releasing](../development/releasing.md)).
 
 Nothing selects `llm`. Those tests are run by hand with a key:
