@@ -28,6 +28,29 @@ logger = get_logger("decomposer")
 _FOLDABLE_OPS = {"filter", "sort", "limit"}
 
 
+# Combine operations that need both sides: with one input left, the engine
+# would have nothing to join it to.
+_TWO_SIDED = {"join", "compare"}
+
+
+def one_sided_message(group_id: str, operation: str, lost_reasons: List[str]) -> str:
+    """Why a join/compare group with fewer than two inputs is refused.
+
+    Names the reason each input was dropped (``restricted_datasource``,
+    ``no_datasource``, ``unsupported_datasource``) but not the datasource: a
+    caller denied a datasource is not told which one it is.
+    """
+    if lost_reasons:
+        why = f"lost {len(lost_reasons)} of its inputs ({', '.join(sorted(set(lost_reasons)))})"
+    else:
+        why = "was given only one input"
+    return (
+        f"Combine group '{group_id}' is a {operation} that {why}. A {operation} needs both of its "
+        f"sides; answering from the one that remains would answer a different question, so the "
+        f"question is refused."
+    )
+
+
 def fold_single_input_ops(response: DecomposerResponse) -> DecomposerResponse:
     """Moves filter/sort/limit ops on a one-sub-query group into that sub-query.
 
@@ -251,16 +274,51 @@ class DecomposerNode:
                 final_sub_queries.append(sq)
 
             valid_ids = {sq.id for sq in final_sub_queries}
+            # Every sub-query the loop above dropped appended exactly one
+            # unmapped entry, in order, so the two line up.
+            dropped_reasons = dict(zip(
+                [sq.id for sq in llm_response.sub_queries if sq.id not in id_map],
+                [u.reason for u in unmapped],
+            ))
             combine_groups = []
+            one_sided: List[str] = []
             for group in llm_response.combine_groups:
                 updated_inputs = []
+                lost = []
                 for inp in group.inputs:
                     mapped_id = id_map.get(inp.subquery_id, inp.subquery_id)
                     if mapped_id in valid_ids:
                         updated_inputs.append(inp.model_copy(update={"subquery_id": mapped_id}))
+                    else:
+                        lost.append(dropped_reasons.get(inp.subquery_id, "no_datasource"))
                 if not updated_inputs:
                     continue
+                if group.operation in _TWO_SIDED and len(updated_inputs) < 2:
+                    one_sided.append(one_sided_message(group.group_id, group.operation, lost))
                 combine_groups.append(group.model_copy(update={"inputs": updated_inputs}))
+
+            if one_sided:
+                # Not asked again: a restricted or unresolved datasource is not
+                # something a new decomposition can change.
+                message = " ".join(one_sided)
+                logger.error(message)
+                return {
+                    "decomposer_response": DecomposerResponse(
+                        sub_queries=sorted(final_sub_queries, key=lambda s: s.id),
+                        combine_groups=sorted(combine_groups, key=lambda g: g.group_id),
+                        post_combine_ops=[],
+                        unmapped_subqueries=unmapped,
+                    ),
+                    "reasoning": [{"node": self.node_name, "content": message, "type": "error"}],
+                    "errors": [
+                        PipelineError(
+                            node=self.node_name,
+                            message=message,
+                            severity=ErrorSeverity.ERROR,
+                            error_code=ErrorCode.PLANNER_FAILED,
+                        )
+                    ],
+                }
 
             combine_groups = sorted(combine_groups, key=lambda g: g.group_id)
             final_sub_queries = sorted(final_sub_queries, key=lambda s: s.id)
