@@ -357,7 +357,10 @@ flowchart LR
    that does not install from PyPI.
 2. **`space`** calls [`publish_space.yml`][workflow] with the tag. It mirrors
    `deploy/huggingface/` onto the Space's root, pins the image to the release,
-   pushes, and waits for the Hub to build it.
+   pushes, and waits for the Hub to build it. Before pushing it waits until
+   PyPI's simple index lists `X.Y.Z`, and the Dockerfile retries its install
+   (10 attempts, 30 seconds apart): the index the Hub's builder sees can lag
+   a fresh upload, which is what failed `v0.2.0`'s first Space build.
 3. **`space-smoke`** polls `https://nadeem4nk-nl2sql-demo.hf.space/api/health`
    until it reports `X.Y.Z`, then checks the page and `/api/meta`. A Space goes
    on serving its previous image while the new one builds, so a build that
@@ -415,9 +418,15 @@ If the push produced a commit, the workflow checks the Space's head is that
 commit, then waits for a build to actually start and finish; a Space that never
 starts one within five minutes fails the job rather than reporting the previous
 build's `RUNNING`. If there was nothing to push -- the same release deployed
-twice -- the job says so plainly and the summary reads **"No rebuild"**, with
-the Space left on its previous image. One deploy runs at a time; a run
-overtaken by a newer one is cancelled.
+twice -- the Hub starts no build on its own, so the workflow asks it for a
+factory rebuild (`restart_space(..., factory_reboot=True)`) whenever the Space
+is not running, and on every run by hand unless `factory_rebuild` is unticked,
+then waits for that build the same way; the summary reads **"Factory
+rebuild"**. Only a release re-run against a Space already running that deploy
+skips the rebuild, and its summary reads **"No rebuild"**. The job succeeds
+only when the Space ends `RUNNING`: a redeploy of `v0.2.0` once found the Space
+in `BUILD_ERROR`, pushed nothing and still went green, which is what this
+closes. One deploy runs at a time; a run overtaken by a newer one is cancelled.
 
 **By hand.** Actions → **Publish Space** → *Run workflow*, or:
 
@@ -425,9 +434,10 @@ overtaken by a newer one is cancelled.
 $ gh workflow run publish_space.yml -f tag=v0.2.0
 ```
 
-Three optional inputs: `tag`, the release to deploy; `space_id`, which defaults
-to `nadeem4nk/nl2sql-demo`; and `token_secret`, the name of the secret holding
-the token, which defaults to `HF_TOKEN`. With a tag it does exactly what a
+Four optional inputs: `tag`, the release to deploy; `space_id`, which defaults
+to `nadeem4nk/nl2sql-demo`; `token_secret`, the name of the secret holding
+the token, which defaults to `HF_TOKEN`; and `factory_rebuild`, on by default,
+which rebuilds the Space from scratch when there is nothing new to push. With a tag it does exactly what a
 release does. With **no** tag it deploys the commit of the branch it was run
 from, installed from a GitHub archive of that commit -- which is how to try an
 unreleased change on a Space: point `space_id` at a scratch Space of your own.

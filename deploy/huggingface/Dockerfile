@@ -46,7 +46,21 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     NL2SQL_DEMO_QUESTIONS_PER_MINUTE=6 \
     NL2SQL_DEMO_QUESTIONS_PER_SESSION=30
 
-RUN pip install --upgrade pip && pip install "${NL2SQL_SPEC}"
+# Retried, bounded: 10 attempts, 30 seconds apart. A release pushes the Space
+# minutes after PyPI accepts the upload, and the index the Hub's builder sees
+# can still be the old one -- v0.2.0's first build failed with "from versions:
+# 0.1.0, 0.1.1, 0.1.2" although the release had already installed it from PyPI.
+RUN pip install --upgrade pip \
+    && attempt=1 \
+    && until pip install --no-cache-dir "${NL2SQL_SPEC}"; do \
+         if [ "$attempt" -ge 10 ]; then \
+           echo "pip could not install ${NL2SQL_SPEC} after $attempt attempts." >&2; \
+           exit 1; \
+         fi; \
+         echo "Install attempt $attempt of 10 failed; the index may lag a new release. Retrying in 30s."; \
+         attempt=$((attempt + 1)); \
+         sleep 30; \
+       done
 
 # A Space runs the container as uid 1000; so does everything else here, so the
 # prebuilt project and the model cache are readable by the process that needs

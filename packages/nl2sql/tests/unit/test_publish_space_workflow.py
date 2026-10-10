@@ -141,6 +141,29 @@ def test_a_release_pins_the_image_to_the_version_it_published():
     assert 'nl2sql-engine[demo]==${TAG#v}' in mirror
 
 
+def test_a_release_waits_for_pypis_index_to_list_the_version_before_pushing():
+    """v0.2.0's Space build ran minutes after the upload and pip saw only 0.1.x.
+
+    The deploy waits until PyPI's simple index lists the version, bounded, and
+    only for a tag: a dispatch with no tag installs from git, not PyPI.
+    """
+    job = next(iter(_workflow()["jobs"].values()))
+    names = [step.get("name") or "" for step in job["steps"]]
+    wait_at = next(i for i, name in enumerate(names) if "PyPI" in name and "index" in name)
+    push_at = next(i for i, name in enumerate(names) if "Push deploy/huggingface" in name)
+    wait = job["steps"][wait_at]
+
+    assert wait_at < push_at
+    assert "steps.token.outputs.present == 'true'" in wait["if"]
+    assert "inputs.tag != ''" in wait["if"]
+    run = wait["run"]
+    assert "https://pypi.org/simple/nl2sql-engine/" in run
+    assert "${TAG#v}" in run
+    # Bounded, so a version that never appears fails the job instead of hanging it.
+    assert re.search(r"seq 1 \d+", run)
+    assert "exit 1" in run
+
+
 def test_the_mirror_rewrites_exactly_one_line_and_checks_it_landed():
     """The rewrite has to keep matching the line it rewrites.
 
@@ -170,6 +193,163 @@ def test_the_wait_step_does_not_call_an_absent_rebuild_a_deploy():
     assert "No rebuild" in summary
     # The pushed commit is checked against the Space's head rather than assumed.
     assert "space_info" in wait
+
+
+# --- The wait step's decisions, run against a fake Hub ----------------------
+#
+# A redeploy of v0.2.0 pushed nothing (the Space root was identical), so the
+# Hub never rebuilt; the step logged that the Space was BUILD_ERROR and the job
+# still went green. The logic stays inline in the workflow -- a dispatch with a
+# tag checks out that tag, where a new script would not exist -- so these tests
+# run the step's own Python with `huggingface_hub` replaced by a fake.
+
+SPACE_SHA = "d6a6e92"
+
+
+class _FakeHub:
+    def __init__(self, stages: list[str]):
+        self.stages = list(stages)
+        self.restarts: list[dict] = []
+
+    def stage(self) -> str:
+        # The last stage repeats for as long as the step keeps asking.
+        return self.stages.pop(0) if len(self.stages) > 1 else self.stages[0]
+
+
+def _wait_script() -> str:
+    run = _step("Wait for the Space")["run"]
+    return run.split("<<'PY'\n", 1)[1].rsplit("\nPY", 1)[0]
+
+
+def _run_wait(monkeypatch, tmp_path, *, pushed: bool, stages: list[str], factory_rebuild: str = "") -> tuple[int, dict, _FakeHub]:
+    import sys
+    import time
+    import types
+
+    hub = _FakeHub(stages)
+
+    class HfApi:
+        def get_space_runtime(self, repo_id):
+            return types.SimpleNamespace(stage=hub.stage())
+
+        def space_info(self, repo_id):
+            return types.SimpleNamespace(sha=SPACE_SHA)
+
+        def restart_space(self, repo_id, **kwargs):
+            hub.restarts.append({"repo_id": repo_id, **kwargs})
+
+        def fetch_space_logs(self, repo_id, build=False):
+            return iter(["build log line\n"])
+
+    monkeypatch.setitem(sys.modules, "huggingface_hub", types.SimpleNamespace(HfApi=HfApi))
+    # A clock that moves only when the step sleeps, so the 5-minute grace and
+    # the build timeout pass instantly.
+    offset = [0.0]
+    real_time = time.time
+    monkeypatch.setattr(time, "time", lambda: real_time() + offset[0])
+    monkeypatch.setattr(time, "sleep", lambda seconds: offset.__setitem__(0, offset[0] + seconds))
+
+    out = tmp_path / "github_output"
+    out.write_text("", encoding="utf-8")
+    for key, value in {
+        "SPACE_ID": SPACE_ID,
+        "SOURCE_SHA": "abc123",
+        "PUSHED": "true" if pushed else "false",
+        "SPACE_COMMIT": SPACE_SHA,
+        "SPACE_BUILD_TIMEOUT_SEC": "1800",
+        "FACTORY_REBUILD": factory_rebuild,
+        "GITHUB_OUTPUT": str(out),
+    }.items():
+        monkeypatch.setenv(key, value)
+
+    code = 0
+    try:
+        exec(compile(_wait_script(), "wait-for-the-space", "exec"), {"__name__": "__main__"})
+    except SystemExit as exc:
+        code = exc.code or 0
+    outputs = dict(line.split("=", 1) for line in out.read_text(encoding="utf-8").splitlines() if line)
+    return code, outputs, hub
+
+
+def test_an_unchanged_running_space_is_reported_deployed_without_a_rebuild(monkeypatch, tmp_path):
+    code, outputs, hub = _run_wait(monkeypatch, tmp_path, pushed=False, stages=["RUNNING"])
+
+    assert code == 0
+    assert outputs.get("deployed") == "true"
+    assert hub.restarts == []
+
+
+@pytest.mark.parametrize("broken", ["BUILD_ERROR", "CONFIG_ERROR", "RUNTIME_ERROR", "NO_APP_FILE"])
+def test_an_unchanged_broken_space_gets_a_factory_rebuild(monkeypatch, tmp_path, broken):
+    code, outputs, hub = _run_wait(
+        monkeypatch, tmp_path, pushed=False, stages=[broken, broken, "BUILDING", "APP_STARTING", "RUNNING"],
+    )
+
+    assert hub.restarts == [{"repo_id": SPACE_ID, "factory_reboot": True}]
+    assert code == 0
+    assert outputs.get("deployed") == "true"
+    assert outputs.get("rebuilt") == "true"
+
+
+def test_an_explicit_redeploy_always_rebuilds_even_a_running_space(monkeypatch, tmp_path):
+    code, outputs, hub = _run_wait(
+        monkeypatch, tmp_path, pushed=False, stages=["RUNNING", "BUILDING", "RUNNING"], factory_rebuild="true",
+    )
+
+    assert hub.restarts == [{"repo_id": SPACE_ID, "factory_reboot": True}]
+    assert code == 0
+    assert outputs.get("deployed") == "true"
+
+
+def test_a_rebuild_that_fails_again_fails_the_job(monkeypatch, tmp_path):
+    code, outputs, hub = _run_wait(
+        monkeypatch, tmp_path, pushed=False, stages=["BUILD_ERROR", "BUILDING", "BUILD_ERROR"],
+    )
+
+    assert len(hub.restarts) == 1
+    assert code == 1
+    assert "deployed" not in outputs
+
+
+def test_a_rebuild_that_never_starts_fails_the_job(monkeypatch, tmp_path):
+    code, outputs, _ = _run_wait(monkeypatch, tmp_path, pushed=False, stages=["BUILD_ERROR"])
+
+    assert code == 1
+    assert "deployed" not in outputs
+
+
+def test_a_pushed_build_that_comes_up_is_deployed_without_a_restart(monkeypatch, tmp_path):
+    code, outputs, hub = _run_wait(monkeypatch, tmp_path, pushed=True, stages=["BUILDING", "RUNNING"])
+
+    assert code == 0
+    assert outputs.get("deployed") == "true"
+    assert hub.restarts == []
+
+
+def test_a_pushed_build_that_breaks_fails_the_job(monkeypatch, tmp_path):
+    code, outputs, _ = _run_wait(monkeypatch, tmp_path, pushed=True, stages=["BUILDING", "BUILD_ERROR"])
+
+    assert code == 1
+    assert "deployed" not in outputs
+
+
+@pytest.mark.parametrize("pushed", [True, False])
+@pytest.mark.parametrize("final", ["BUILD_ERROR", "RUNTIME_ERROR", "PAUSED", "STOPPED", "BUILDING"])
+def test_the_job_never_succeeds_unless_the_space_ends_running(monkeypatch, tmp_path, pushed, final):
+    code, outputs, _ = _run_wait(monkeypatch, tmp_path, pushed=pushed, stages=["BUILDING", final])
+
+    assert code == 1
+    assert "deployed" not in outputs
+
+
+def test_a_hand_run_asks_for_a_factory_rebuild_and_a_release_does_not():
+    dispatch = _triggers(_workflow())["workflow_dispatch"]["inputs"]
+    call = _triggers(_workflow())["workflow_call"]["inputs"]
+    wait = _step("Wait for the Space")
+
+    assert dispatch["factory_rebuild"]["default"] is True
+    assert "factory_rebuild" not in call
+    assert wait["env"]["FACTORY_REBUILD"] == "${{ inputs.factory_rebuild }}"
 
 
 def test_nothing_in_the_workflow_prints_the_token():
