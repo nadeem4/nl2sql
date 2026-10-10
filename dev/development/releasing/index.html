@@ -2098,8 +2098,9 @@ the outside before the release counts as done.</p>
     SP --&gt; SS[space-smoke: the live Space&lt;br/&gt;reports version X.Y.Z]</code></pre>
 <p>The same chain runs on every pull request up to the point of publishing: the
 <code>build</code> and <code>fresh-install</code> jobs in <code>test.yml</code> build the wheels, install them
-the way a user does and boot the demo, so a release does not meet these
-checks for the first time.</p>
+the way a user does and boot the demo, and the <code>api-image</code> job builds the GHCR
+image from <code>packages/api/Dockerfile</code> (without pushing it), so a release does
+not meet these checks for the first time.</p>
 <h3 id="1-commit-messages-decide-the-version">1. Commit messages decide the version</h3>
 <p>The bump comes from <a href="https://www.conventionalcommits.org/">Conventional Commits</a>
 on <code>main</code>, so the commit subject is the release input:</p>
@@ -2221,7 +2222,8 @@ changelog and the version it proposes is the release decision.</p>
    points <code>pypa/gh-action-pypi-publish</code> at it. One environment per package is
    what makes each PyPI trusted-publisher registration unique — see
    <a href="#pypi-pending-publishers">PyPI pending publishers</a>.</li>
-<li><strong><code>ghcr</code></strong> — <code>needs: pypi</code>, which waits for every leg of the matrix. Builds
+<li>
+<p><strong><code>ghcr</code></strong> — <code>needs: pypi</code>, which waits for every leg of the matrix. Builds
    <code>packages/api/Dockerfile</code> and pushes <code>ghcr.io/nadeem4/nl2sql-api</code> at both the
    tag and <code>latest</code>. The build context is the <strong>repository root</strong> (<code>context: .</code>)
    with the Dockerfile named explicitly (<code>file: packages/api/Dockerfile</code>),
@@ -2231,7 +2233,21 @@ changelog and the version it proposes is the release decision.</p>
    <code>packages/api/packages/adapter-sdk</code>, which does not exist — that is what
    failed on <code>v0.1.0</code>. A root <code>.dockerignore</code> keeps that context small.
    <code>needs: pypi</code> is retained so the image is only published for a release that
-   reached PyPI, not because the image build needs PyPI.</li>
+   reached PyPI, not because the image build needs PyPI. The image's
+   <code>FROM python:X.Y</code> has to satisfy every package's <code>requires-python</code>
+   (<code>&gt;=3.12</code>): on <code>v0.2.0</code> it was still <code>python:3.11-slim</code>, pip refused to
+   install <code>nl2sql-adapter-sdk</code> into it, and this job failed after PyPI and
+   the docs had published. <code>tests/unit/test_docker_images.py</code> now checks every
+   Dockerfile's base against every <code>pyproject.toml</code>, and the <code>api-image</code> job
+   in <code>test.yml</code> builds this image on every pull request.</p>
+<div class="admonition note">
+<p class="admonition-title">There is no <code>nl2sql-api:0.2.0</code> image</p>
+<p>The job builds from the tagged commit, and <code>v0.2.0</code>'s Dockerfile cannot
+build, so re-running it would fail the same way. The first image built
+with the fix is published by the next release, <code>0.2.1</code>, which moves
+<code>ghcr.io/nadeem4/nl2sql-api:latest</code> onto it.</p>
+</div>
+<ol>
 <li><strong><code>docs</code></strong> — <code>needs: pypi</code>, likewise after all three uploads.
    <code>mike deploy --push --update-aliases $TAG latest</code> adds a versioned copy of
    the docs to <code>gh-pages</code> and moves the <code>latest</code> alias onto it.</li>
@@ -2249,7 +2265,13 @@ changelog and the version it proposes is the release decision.</p>
    version that does not install from PyPI. Calls
    <a href="../../deployment/hosted-demo/#deployed-by-the-release"><code>publish_space.yml</code></a>
    with the tag, which pins the Space's image to
-   <code>nl2sql-engine[demo]==X.Y.Z</code>, pushes it and waits for the build.
+   <code>nl2sql-engine[demo]==X.Y.Z</code>, pushes it and waits for the build. That
+   <code>pypi-smoke</code> installed the version is not proof that the Hub's builder
+   will: on <code>v0.2.0</code> the Space build ran minutes later and its pip still saw
+   only <code>0.1.x</code>. So the workflow first waits, up to 20 times 30 seconds, until
+   <code>https://pypi.org/simple/nl2sql-engine/</code> lists <code>X.Y.Z</code>, and the Space's
+   Dockerfile retries its install up to 10 times, 30 seconds apart, with
+   pip's cache off.
    <code>secrets: inherit</code> carries <code>HF_TOKEN</code> down, from <code>release_please.yml</code>
    through this workflow into that one; without the secret the job skips
    green and says so.</li>
@@ -2258,6 +2280,8 @@ changelog and the version it proposes is the release decision.</p>
    to the old one, so this checks where visitors are: it polls
    <code>https://nadeem4nk-nl2sql-demo.hf.space/api/health</code> until it reports
    <code>X.Y.Z</code> (up to 15 minutes), then checks the page and <code>/api/meta</code>.</li>
+</ol>
+</li>
 </ol>
 <p>A release is fully out when all seven are green. A red <code>pypi-smoke</code> means the
 release is on PyPI but does not install or boot as published; yank it and ship
@@ -2337,6 +2361,10 @@ or a manual publish of just the missing packages, in the
 touching PyPI, GHCR or the docs, dispatch the Space workflow with the tag:</p>
 <div class="highlight"><pre><span></span><code><a href="#__codelineno-4-1" id="__codelineno-4-1" name="__codelineno-4-1"></a><span class="gp">$ </span>gh<span class="w"> </span>workflow<span class="w"> </span>run<span class="w"> </span>publish_space.yml<span class="w"> </span>-f<span class="w"> </span><span class="nv">tag</span><span class="o">=</span>v0.2.0
 </code></pre></div>
+<p>When the Space root for that tag is already on the Space there is nothing to
+push, so a run by hand asks the Hub for a factory rebuild instead and waits for
+it; the job fails unless the Space ends <code>RUNNING</code>. See
+<a href="../../deployment/hosted-demo/#deployed-by-the-release">Hosted demo</a>.</p>
 <p>Every job resolves its tag from <code>${{ inputs.tag || github.ref_name }}</code>, never
 from the raw ref. On a dispatched run <code>github.ref_name</code> is the <em>branch</em> you
 dispatched from, so the fallback would silently build <code>main</code> instead of the

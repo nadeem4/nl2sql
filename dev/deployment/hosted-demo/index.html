@@ -2359,7 +2359,10 @@ with nothing to do by hand. Merging the release pull request tags <code>vX.Y.Z</
    that does not install from PyPI.</li>
 <li><strong><code>space</code></strong> calls <a href="https://github.com/nadeem4/nl2sql/blob/main/.github/workflows/publish_space.yml"><code>publish_space.yml</code></a> with the tag. It mirrors
    <code>deploy/huggingface/</code> onto the Space's root, pins the image to the release,
-   pushes, and waits for the Hub to build it.</li>
+   pushes, and waits for the Hub to build it. Before pushing it waits until
+   PyPI's simple index lists <code>X.Y.Z</code>, and the Dockerfile retries its install
+   (10 attempts, 30 seconds apart): the index the Hub's builder sees can lag
+   a fresh upload, which is what failed <code>v0.2.0</code>'s first Space build.</li>
 <li><strong><code>space-smoke</code></strong> polls <code>https://nadeem4nk-nl2sql-demo.hf.space/api/health</code>
    until it reports <code>X.Y.Z</code>, then checks the page and <code>/api/meta</code>. A Space goes
    on serving its previous image while the new one builds, so a build that
@@ -2424,15 +2427,22 @@ If the push produced a commit, the workflow checks the Space's head is that
 commit, then waits for a build to actually start and finish; a Space that never
 starts one within five minutes fails the job rather than reporting the previous
 build's <code>RUNNING</code>. If there was nothing to push -- the same release deployed
-twice -- the job says so plainly and the summary reads <strong>"No rebuild"</strong>, with
-the Space left on its previous image. One deploy runs at a time; a run
-overtaken by a newer one is cancelled.</p>
+twice -- the Hub starts no build on its own, so the workflow asks it for a
+factory rebuild (<code>restart_space(..., factory_reboot=True)</code>) whenever the Space
+is not running, and on every run by hand unless <code>factory_rebuild</code> is unticked,
+then waits for that build the same way; the summary reads <strong>"Factory
+rebuild"</strong>. Only a release re-run against a Space already running that deploy
+skips the rebuild, and its summary reads <strong>"No rebuild"</strong>. The job succeeds
+only when the Space ends <code>RUNNING</code>: a redeploy of <code>v0.2.0</code> once found the Space
+in <code>BUILD_ERROR</code>, pushed nothing and still went green, which is what this
+closes. One deploy runs at a time; a run overtaken by a newer one is cancelled.</p>
 <p><strong>By hand.</strong> Actions → <strong>Publish Space</strong> → <em>Run workflow</em>, or:</p>
 <div class="highlight"><pre><span></span><code><a href="#__codelineno-4-1" id="__codelineno-4-1" name="__codelineno-4-1"></a><span class="gp">$ </span>gh<span class="w"> </span>workflow<span class="w"> </span>run<span class="w"> </span>publish_space.yml<span class="w"> </span>-f<span class="w"> </span><span class="nv">tag</span><span class="o">=</span>v0.2.0
 </code></pre></div>
-<p>Three optional inputs: <code>tag</code>, the release to deploy; <code>space_id</code>, which defaults
-to <code>nadeem4nk/nl2sql-demo</code>; and <code>token_secret</code>, the name of the secret holding
-the token, which defaults to <code>HF_TOKEN</code>. With a tag it does exactly what a
+<p>Four optional inputs: <code>tag</code>, the release to deploy; <code>space_id</code>, which defaults
+to <code>nadeem4nk/nl2sql-demo</code>; <code>token_secret</code>, the name of the secret holding
+the token, which defaults to <code>HF_TOKEN</code>; and <code>factory_rebuild</code>, on by default,
+which rebuilds the Space from scratch when there is nothing new to push. With a tag it does exactly what a
 release does. With <strong>no</strong> tag it deploys the commit of the branch it was run
 from, installed from a GitHub archive of that commit -- which is how to try an
 unreleased change on a Space: point <code>space_id</code> at a scratch Space of your own.

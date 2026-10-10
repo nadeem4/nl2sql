@@ -1865,10 +1865,19 @@ data run key-free.</p>
   aggregation and the local embedder against the real Chinook database; run
   it with <code>--collect-only -q</code> for the current list.</li>
 </ul>
-<p>Two more jobs test the package rather than the source tree:</p>
+<p>Three more jobs test the package rather than the source tree:</p>
 <ul>
-<li><strong><code>build</code></strong> builds the three wheels and sdists, installs them into a clean
-  virtualenv and runs <code>import nl2sql</code> and <code>nl2sql --help</code>.</li>
+<li>
+<p><strong><code>api-image</code></strong> builds <code>packages/api/Dockerfile</code> from the repository root,
+  the image the release pushes to GHCR, without pushing it, and imports
+  <code>nl2sql_api.main</code> inside it. <code>tests/unit/test_docker_images.py</code> separately
+  checks that every Dockerfile's <code>FROM python:X.Y</code> satisfies every package's
+  <code>requires-python</code>.</p>
+</li>
+<li>
+<p><strong><code>build</code></strong> builds the three wheels and sdists, installs them into a clean
+  virtualenv and runs <code>import nl2sql</code> and <code>nl2sql --help</code>.</p>
+</li>
 <li>
 <p><strong><code>fresh-install</code></strong> takes those wheels and installs them the way a user
   does, <code>pip install "nl2sql-engine[demo]"</code>, into an empty virtualenv outside
