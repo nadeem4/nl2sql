@@ -178,7 +178,9 @@ changelog and the version it proposes is the release decision.
    report `RUNNING` on its new build while the router still sends visitors
    to the old one, so this checks where visitors are: it polls
    `https://nadeem4nk-nl2sql-demo.hf.space/api/health` until it reports
-   `X.Y.Z` (up to 15 minutes), then checks the page and `/api/meta`.
+   `X.Y.Z` (up to 15 minutes), then checks the page and `/api/meta`; then
+   the same on the Space's custom domain, `SPACE_CUSTOM_DOMAIN` in the
+   workflow (`https://nl2sql.codewithnk.com`; empty skips it).
 
 A release is fully out when all seven are green. A red `pypi-smoke` means the
 release is on PyPI but does not install or boot as published; yank it and ship
