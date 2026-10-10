@@ -1899,7 +1899,8 @@ data run key-free.</p>
   the same script runs twice more, from <code>publish_pypi.yaml</code>: with
   <code>--pypi X.Y.Z</code> to install the published version from PyPI itself, and with
   <code>--url https://nadeem4nk-nl2sql-demo.hf.space --expect-version X.Y.Z</code> to
-  wait for the live Space to serve it (see
+  wait for the live Space to serve it, then once more with its custom domain
+  as <code>--url</code> (see
   <a href="../../development/releasing/">Releasing</a>).</p>
 <p>Nothing selects <code>llm</code>. Those tests are run by hand with a key:</p>
 <div class="highlight"><pre><span></span><code><a href="#__codelineno-2-1" id="__codelineno-2-1" name="__codelineno-2-1"></a>nl2sql<span class="w"> </span>setup<span class="w"> </span>--demo

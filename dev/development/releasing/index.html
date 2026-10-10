@@ -2279,7 +2279,9 @@ with the fix is published by the next release, <code>0.2.1</code>, which moves
    report <code>RUNNING</code> on its new build while the router still sends visitors
    to the old one, so this checks where visitors are: it polls
    <code>https://nadeem4nk-nl2sql-demo.hf.space/api/health</code> until it reports
-   <code>X.Y.Z</code> (up to 15 minutes), then checks the page and <code>/api/meta</code>.</li>
+   <code>X.Y.Z</code> (up to 15 minutes), then checks the page and <code>/api/meta</code>; then
+   the same on the Space's custom domain, <code>SPACE_CUSTOM_DOMAIN</code> in the
+   workflow (<code>https://nl2sql.codewithnk.com</code>; empty skips it).</li>
 </ol>
 </li>
 </ol>
