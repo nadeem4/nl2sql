@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.2.2](https://github.com/nadeem4/nl2sql/compare/v0.2.1...v0.2.2) (2026-10-10)
+
+
+### Features
+
+* **demo:** serve the link preview and release checks from nl2sql.codewithnk.com ([#212](https://github.com/nadeem4/nl2sql/issues/212)) ([d04bc74](https://github.com/nadeem4/nl2sql/commit/d04bc74059a7238d2c24528e46bbf1ef22bc74a6))
+
+
+### Bug Fixes
+
+* **aggregator:** refuse a join on a sub-query cut short by the row cap ([#215](https://github.com/nadeem4/nl2sql/issues/215)) ([8ae6212](https://github.com/nadeem4/nl2sql/commit/8ae6212b5deaa47c524da9382c87919e5b604b67))
+* **decomposer:** refuse a join or compare that lost one of its inputs ([#214](https://github.com/nadeem4/nl2sql/issues/214)) ([ae2a050](https://github.com/nadeem4/nl2sql/commit/ae2a0507395f2272d08a5a8d928fbfcaa1050233))
+* **execution:** write one result artifact per sub-query ([#213](https://github.com/nadeem4/nl2sql/issues/213)) ([24dba37](https://github.com/nadeem4/nl2sql/commit/24dba370ec73cf353f94a1c453612b3766abeab5))
+
+
+### Documentation
+
+* link the live demo at nl2sql.codewithnk.com ([#210](https://github.com/nadeem4/nl2sql/issues/210)) ([2465926](https://github.com/nadeem4/nl2sql/commit/24659261bc0ba15a01893751a0cdfb2a8c5f4d78))
+
+
+### Miscellaneous Chores
+
+* release 0.2.2 ([27adaf6](https://github.com/nadeem4/nl2sql/commit/27adaf62fbed497e6648e849c61ede42423eb30e))
+
 ## [0.2.1](https://github.com/nadeem4/nl2sql/compare/v0.2.0...v0.2.1) (2026-10-10)
 
 
