@@ -213,10 +213,14 @@ def test_a_question_without_a_key_and_no_recordings_is_a_replay_miss_not_a_401(p
     assert engine.seen == []
 
 
+RECORDED_WITH = {"provider": "anthropic", "model": "claude-opus-5"}
+
+
 def _replay_client(project, recorded, limits=None):
     engine = _Engine(project)
     hosted = Hosted(enabled=True, limits=limits,
-                    replay=Replay(base_url="http://127.0.0.1:9/v1", questions=recorded))
+                    replay=Replay(base_url="http://127.0.0.1:9/v1", questions=recorded,
+                                  recorded_with=RECORDED_WITH))
     app = build_app(engine, questions=["q1", "q2"], roles=["admin"], mode="hosted", dataset="chinook",
                     trace_dir=project / "traces", project_dir=project, host="0.0.0.0", hosted=hosted,
                     recorded_questions=len(recorded))
@@ -283,6 +287,51 @@ def test_meta_names_the_questions_a_keyless_visitor_can_replay(project):
 
     assert meta["recorded"] == ["q1"]
     assert meta["recorded_questions"] == 1
+
+
+# --- a replayed run names the model that recorded it ------------------------------
+
+
+def test_a_keyless_replay_runs_under_the_model_the_recordings_were_made_with(project):
+    """The config falls back to an OpenAI default; the recordings came from Claude.
+    The run's clients ask the replay server for the recorded model, so every
+    call in its usage ledger names that model, not the fallback's."""
+    engine, client = _replay_client(project, ["q1"])
+
+    _ask(client, question="q1")
+
+    (_, planner), = engine.seen
+    assert planner.model_name == "claude-opus-5"
+
+
+def test_with_a_key_the_run_keeps_the_configured_model(project):
+    engine, client = _replay_client(project, ["q1"])
+
+    _ask(client, VISITOR_KEY, question="q1")
+
+    (_, planner), = engine.seen
+    assert planner.model_name == "gpt-5.4"
+
+
+def test_meta_and_pipeline_name_the_model_the_recordings_were_made_with(project):
+    """The page shows this, marked recorded, wherever a keyless visitor would
+    otherwise see the fallback config's model."""
+    _, client = _replay_client(project, ["q1"])
+
+    meta = client.get("/api/meta").json()
+    pipeline = client.get("/api/pipeline").json()
+
+    assert meta["recorded_with"] == RECORDED_WITH
+    assert pipeline["recorded_with"] == RECORDED_WITH
+    # The configured models are still reported: a visitor with a key runs on them.
+    assert {s["model"] for s in pipeline["steps"] if s["kind"] == "model"} == {"gpt-5.4"}
+
+
+def test_without_recordings_nothing_claims_a_recorded_model(project):
+    _, client = _client(project)
+
+    assert client.get("/api/meta").json()["recorded_with"] is None
+    assert client.get("/api/pipeline").json()["recorded_with"] is None
 
 
 @pytest.mark.parametrize("bad", ["short", "has spaces in it and is long enough", "a" * 19])

@@ -121,6 +121,8 @@ def test_meta_and_ask():
         "mode": "replay", "dataset": "chinook", "questions": ["q1"],
         "question_groups": [{"datasource": "chinook", "questions": ["q1"]}],
         "roles": ["admin", "viewer"], "datasources": ["chinook"], "recorded_questions": 0,
+        # No recordings were given, so no recorded model is claimed.
+        "recorded_with": None,
         # Local mode: the public-demo server is off and has no limits to report.
         "hosted": False, "recorded": [], "limits": None}
     r = client.post("/api/ask", json={"question": "q1", "role": "viewer", "execute": False})

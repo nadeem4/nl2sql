@@ -151,3 +151,71 @@ def test_a_recording_made_on_the_anthropic_wire_replays_on_the_openai_wire():
 def test_the_proxy_refuses_a_wire_it_cannot_speak():
     with pytest.raises(ValueError):
         RecordingProxy("http://127.0.0.1:9", "k", ReplayStore(), wire="gemini")
+
+
+# --- which model made the recordings --------------------------------------------
+
+
+def test_a_store_names_the_provider_and_model_its_recordings_came_from(tmp_path):
+    store = ReplayStore([Recording("plain", None, "retry")], provider="anthropic", model="claude-opus-5")
+    store.save(tmp_path / "r.json")
+
+    saved = json.loads((tmp_path / "r.json").read_text(encoding="utf-8"))
+    loaded = ReplayStore.load(tmp_path / "r.json")
+
+    assert (saved["provider"], saved["model"]) == ("anthropic", "claude-opus-5")
+    assert [r["name"] for r in saved["recordings"]] == ["plain"]
+    assert loaded.recorded_with == {"provider": "anthropic", "model": "claude-opus-5"}
+    assert [r.name for r in loaded.rules()] == ["plain"]
+
+
+def test_a_recordings_file_from_before_the_model_was_recorded_still_loads(tmp_path):
+    """The old format is a bare list: it loads, and names no model."""
+    path = tmp_path / "old.json"
+    path.write_text(json.dumps([{"name": "plain", "when": None, "payload": "retry"}]), encoding="utf-8")
+
+    loaded = ReplayStore.load(path)
+
+    assert [r.name for r in loaded.rules()] == ["plain"]
+    assert loaded.recorded_with is None
+
+
+def test_the_proxy_records_the_model_it_was_asked_for_and_its_provider():
+    upstream = FakeLLMServer([Rule("PlanModel", {"tables": []})]).start()
+    store = ReplayStore()
+    proxy = RecordingProxy(upstream.base_url, "sk-upstream", store, provider="openrouter").start()
+    try:
+        body = {"model": "openai/gpt-5.4", "messages": [{"role": "user", "content": "User Query:\nQ?"}],
+                "tools": [{"type": "function", "function": {"name": "PlanModel"}}]}
+        _post(proxy.base_url + "/chat/completions", body)
+    finally:
+        proxy.stop()
+        upstream.stop()
+
+    assert store.recorded_with == {"provider": "openrouter", "model": "openai/gpt-5.4"}
+
+
+def test_the_anthropic_proxy_records_the_claude_model_it_was_asked_for():
+    upstream = FakeLLMServer([Rule("plain", "Fifty-nine.")]).start()
+    store = ReplayStore()
+    proxy = RecordingProxy(upstream.anthropic_base_url, "sk-ant-upstream", store, wire="anthropic").start()
+    try:
+        plain = {"model": "claude-opus-5", "max_tokens": 10,
+                 "messages": [{"role": "user", "content": [{"type": "text", "text": "User Query: How many?"}]}]}
+        _post(proxy.anthropic_base_url + "/v1/messages", plain)
+    finally:
+        proxy.stop()
+        upstream.stop()
+
+    assert store.recorded_with == {"provider": "anthropic", "model": "claude-opus-5"}
+
+
+def test_the_shipped_recordings_name_the_model_that_made_them():
+    """The keyless demo labels a replayed run with this, not the fallback config's model.
+
+    They were recorded with the Anthropic preset's default model (#205)."""
+    from importlib.resources import files
+
+    shipped = ReplayStore.load(files("nl2sql.cli.demo") / "recordings" / "chinook.json")
+
+    assert shipped.recorded_with == {"provider": "anthropic", "model": "claude-opus-5"}

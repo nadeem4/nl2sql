@@ -315,20 +315,26 @@ class Replay:
     ``base_url`` is the local replay server (``FakeLLMServer`` over the
     packaged recordings) and ``questions`` the guided questions it can answer
     from the start. A keyless question outside that set is a replay miss and
-    never runs.
+    never runs. ``recorded_with`` is the ``{"provider", "model"}`` the
+    recordings were made with (:attr:`nl2sql.llm.replay.ReplayStore.recorded_with`),
+    or None when they do not say.
     """
 
-    def __init__(self, base_url: str, questions: Iterable[str]) -> None:
+    def __init__(self, base_url: str, questions: Iterable[str],
+                 recorded_with: Optional[Dict[str, Optional[str]]] = None) -> None:
         self.base_url = base_url
         self.questions = list(questions)
+        self.recorded_with = recorded_with
         self._known = {q.strip() for q in self.questions}
 
     def answers(self, question: str) -> bool:
         return (question or "").strip() in self._known
 
     def llms(self) -> RequestLLMs:
-        """Every step of one run, pointed at the replay server."""
-        return RequestLLMs(keys={"openai": REPLAY_KEY}, fallback=REPLAY_KEY, base_url=self.base_url)
+        """Every step of one run, pointed at the replay server and asking it
+        for the recorded model, so the run reports that model."""
+        return RequestLLMs(keys={"openai": REPLAY_KEY}, fallback=REPLAY_KEY, base_url=self.base_url,
+                           model=(self.recorded_with or {}).get("model"))
 
 
 class Hosted:
