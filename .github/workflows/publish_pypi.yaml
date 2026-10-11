@@ -5,6 +5,7 @@
 #   build -> pypi -> ghcr
 #                 -> docs
 #                 -> pypi-smoke -> space -> space-smoke
+#   release-notes (independent, never fails the publish)
 #
 # After PyPI: the image, the versioned docs, and a fresh install of the
 # release from PyPI that boots the demo. Only once that passes is the Hugging
@@ -324,3 +325,28 @@ jobs:
           --url "$SPACE_CUSTOM_DOMAIN"
           --expect-version "${TAG#v}"
           --timeout 300
+
+  # Puts the summary block of docs/releases/X.Y.Z.md (written by the
+  # release-notes skill) above the changelog release-please generated for the
+  # GitHub Release. A missing page or summary is a warning, never a failed
+  # publish: this job is cosmetic and `continue-on-error` keeps it that way.
+  # Re-running it is safe; a summary already at the top is not added twice.
+  release-notes:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref_name }}
+
+      - name: Prepend the release page summary to the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          gh release view "$TAG" --json body --jq .body > "$RUNNER_TEMP/body.md"
+          if python3 scripts/release_notes.py body "${TAG#v}" "$RUNNER_TEMP/body.md" > "$RUNNER_TEMP/new.md"; then
+            gh release edit "$TAG" --notes-file "$RUNNER_TEMP/new.md"
+          fi

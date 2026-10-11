@@ -132,6 +132,12 @@ All three packages share one version and are released together. The checklist --
 bumping the versions and what publishing a GitHub release triggers -- is in
 `docs/development/releasing.md`.
 
+Every release needs a page at `docs/releases/X.Y.Z.md`. When the release-please
+PR is open, run the `release-notes` skill (`.claude/skills/release-notes/`). It
+writes the page and opens a `docs(release): notes for X.Y.Z` PR. Merge that PR
+first. The `release-notes` status on the release PR then turns green, and the
+owner merges the release PR.
+
 ## Creating a new adapter
 
 Choose the base class that matches your datasource:

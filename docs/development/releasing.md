@@ -7,7 +7,10 @@ resolves for users if every package declares the same version.
 
 Releases are automated. Nobody edits a version number and nobody edits
 `CHANGELOG.md` by hand — [release-please](https://github.com/googleapis/release-please)
-owns both. The one manual step is **merging the release pull request**.
+owns both. Two steps are manual. First, the release page
+`docs/releases/X.Y.Z.md` is written with the release-notes skill and merged.
+A status check on the release PR stays red until it is. Second, the owner
+**merges the release pull request**.
 Everything after that runs on its own: the three packages go to PyPI, the API
 image to GHCR, the versioned docs to `gh-pages`, and the hosted demo on Hugging
 Face is rebuilt on the version just published. Each of those is checked from
@@ -19,7 +22,10 @@ the outside before the release counts as done.
 flowchart TD
     C[Conventional Commit merged to main] --> RP[release_please.yml]
     RP --> PR[Release PR: CHANGELOG.md + version bumps]
-    PR -->|a human merges it| TAG[Tag vX.Y.Z + GitHub Release]
+    PR --> RN[release-notes skill: docs/releases/X.Y.Z.md<br/>merged to main in its own PR]
+    RN -->|release-notes status turns green| PR2[Release PR refreshed]
+    PR2 -->|the owner merges it| TAG[Tag vX.Y.Z + GitHub Release]
+    TAG --> NOTES[release-notes job: page summary<br/>above the generated changelog]
     TAG -->|release_please.yml calls it with tag_name<br/>the tag itself cannot trigger it| B[publish_pypi.yaml: build 3 dists]
     B --> S{wheels install and import?}
     S -->|no| STOP[Nothing is published]
@@ -48,7 +54,15 @@ on `main`, so the commit subject is the release input:
 | `feat:` | minor |
 | any type with `!` or a `BREAKING CHANGE:` footer | major |
 | `docs:`, `perf:`, `deps:`, `revert:` | patch, and shown in the changelog |
-| `chore:`, `ci:`, `test:`, `build:`, `refactor:`, `style:` | no release on their own |
+| `refactor:` | no release on its own, shown in the changelog |
+| `chore:`, `ci:`, `test:`, `build:`, `style:` | no release on their own, hidden from the changelog |
+
+Which types reach the changelog is set by `changelog-sections` in
+`release-please-config.json`. Miscellaneous Chores (`chore:`) is hidden there,
+and so are `ci:`, `test:`, `build:` and `style:`. A breaking change is shown
+whatever its type. A `chore:` commit carrying a `Release-As:` footer has still
+shown up under Miscellaneous Chores (`release 0.2.2`). If that keeps happening,
+put the footer on a commit of a visible type.
 
 !!! warning "The project is pre-1.0: a breaking change bumps the *minor*"
     `release-please-config.json` sets top-level `bump-minor-pre-major: true`,
@@ -97,16 +111,65 @@ TOML comment and has no effect on the build.
 Because `include-component-in-tag` is `false`, the tag is `vX.Y.Z` rather than
 `nl2sql-vX.Y.Z`.
 
-### 3. Merging the release PR is the gate
+### 3. Every release needs a release page
 
-**This is the only manual step in a release.** Merging the pull request makes
-release-please create the `vX.Y.Z` tag and publish the GitHub Release. Until
-someone merges it, nothing is tagged and nothing is published. Reviewing the
-changelog and the version it proposes is the release decision.
+Every version has a plain-language page at `docs/releases/X.Y.Z.md`, listed on
+the [Releases](../releases/index.md) page. The changelog lists commits. The
+page says what the release is for, what it does not do yet, and how to
+upgrade. It is written by the **release-notes** Claude Code skill
+(`.claude/skills/release-notes/SKILL.md`), which uses a fixed template
+(`template.md` next to it) and matches the last two pages. So every page has
+the same structure.
 
-### 4. The release publishes everything
+The order, once release-please has opened its PR:
 
-`publish_pypi.yaml` runs seven jobs:
+1. **Run the release-notes skill.** It reads the version from the release PR,
+   gathers the commits, PRs and changelog section, writes
+   `docs/releases/X.Y.Z.md`, adds it to `docs/releases/index.md` and the
+   `mkdocs.yml` nav, runs `mkdocs build --strict`, and opens a PR titled
+   `docs(release): notes for X.Y.Z`.
+2. **Merge the notes PR** to `main`. It cannot go on the release branch,
+   because release-please rewrites that branch every time `main` changes.
+3. **The gate goes green.** The merge is a push to `main`, so release-please
+   refreshes its PR, and the `release-notes-gate` job in `release_please.yml`
+   checks again.
+4. **The owner merges the release PR.**
+
+The gate is the **`release-notes`** commit status on the release PR's head
+commit. The `release-notes-gate` job sets it on every push to `main` that did
+not tag a release. It reads the version from the release branch's
+`.release-please-manifest.json`. Then it runs
+`python scripts/release_notes.py check --version X.Y.Z` against `main`. The
+check fails unless the page exists and has a summary block. While it fails, the
+status is red and its description says to run the release-notes skill.
+
+!!! note "Why a status from `release_please.yml`, not a `pull_request` check"
+    release-please pushes its branch with `GITHUB_TOKEN`. GitHub opens
+    `pull_request` runs for that push in the `action_required` state, and they
+    never start unless someone approves each one. That is why `test.yml` has
+    no runs on the release PRs. A job in `release_please.yml` runs on the same
+    push that refreshes the PR, so the status always describes the PR's latest
+    head. It needs no extra token: `statuses: write` on that job is enough.
+
+    The status blocks a merge only if it is required: add `release-notes` as a
+    required status check in a branch ruleset for `main`. Until then it is a red
+    mark that the owner reads before merging.
+
+The page's first paragraph, between `<!-- summary:start -->` and
+`<!-- summary:end -->`, also goes into the GitHub Release. See the
+`release-notes` job [below](#5-the-release-publishes-everything).
+
+### 4. Merging the release PR is the gate
+
+**This is the only manual step in a release**, after the release page.
+Merging the pull request makes release-please create the `vX.Y.Z` tag and
+publish the GitHub Release. Until someone merges it, nothing is tagged and
+nothing is published. Reviewing the changelog and the version it proposes is
+the release decision.
+
+### 5. The release publishes everything
+
+`publish_pypi.yaml` runs a chain of seven jobs:
 
 1. **`build`** — builds sdists and wheels for all three packages, then
    smoke-installs them into a clean virtualenv and runs `import nl2sql` and
@@ -182,7 +245,15 @@ changelog and the version it proposes is the release decision.
    the same on the Space's custom domain, `SPACE_CUSTOM_DOMAIN` in the
    workflow (`https://nl2sql.codewithnk.com`; empty skips it).
 
-A release is fully out when all seven are green. A red `pypi-smoke` means the
+One more job, **`release-notes`**, runs on its own, next to the chain. It reads
+the summary block of `docs/releases/X.Y.Z.md` at the tag
+(`python scripts/release_notes.py body`). It puts that block above the
+changelog release-please generated for the GitHub Release
+(`gh release edit --notes-file`). A missing page or summary is a warning, not a
+failure: the job has `continue-on-error: true` and never holds up a publish.
+It is safe to re-run, because a summary already at the top is not added again.
+
+A release is fully out when the seven jobs of the chain are green. A red `pypi-smoke` means the
 release is on PyPI but does not install or boot as published; yank it and ship
 a patch (see [Package order](#package-order)). A red `space` or `space-smoke`
 leaves PyPI as it is and the Space on its previous image; fix the cause and
