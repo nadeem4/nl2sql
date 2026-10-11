@@ -233,6 +233,15 @@
         </a>
 </li>
 <li class="md-tabs__item">
+<a class="md-tabs__link" href="../../releases/">
+          
+  
+  
+  Releases
+
+        </a>
+</li>
+<li class="md-tabs__item">
 <a class="md-tabs__link" href="../../glossary/">
         
   
@@ -1312,19 +1321,28 @@
 </a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="#3-merging-the-release-pr-is-the-gate">
+<a class="md-nav__link" href="#3-every-release-needs-a-release-page">
 <span class="md-ellipsis">
       
-        3. Merging the release PR is the gate
+        3. Every release needs a release page
       
     </span>
 </a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="#4-the-release-publishes-everything">
+<a class="md-nav__link" href="#4-merging-the-release-pr-is-the-gate">
 <span class="md-ellipsis">
       
-        4. The release publishes everything
+        4. Merging the release PR is the gate
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#5-the-release-publishes-everything">
+<span class="md-ellipsis">
+      
+        5. The release publishes everything
       
     </span>
 </a>
@@ -1841,6 +1859,116 @@
 </ul>
 </nav>
 </li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_15" type="checkbox"/>
+<label class="md-nav__link" for="__nav_15" id="__nav_15_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Releases
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_15_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_15">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Releases
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../releases/">
+<span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../releases/0.2.2/">
+<span class="md-ellipsis">
+    
+  
+    0.2.2
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../releases/0.2.1/">
+<span class="md-ellipsis">
+    
+  
+    0.2.1
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../releases/0.2.0/">
+<span class="md-ellipsis">
+    
+  
+    0.2.0
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../releases/0.1.2/">
+<span class="md-ellipsis">
+    
+  
+    0.1.2
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../releases/0.1.1/">
+<span class="md-ellipsis">
+    
+  
+    0.1.1
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../releases/0.1.0/">
+<span class="md-ellipsis">
+    
+  
+    0.1.0
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
 <li class="md-nav__item">
 <a class="md-nav__link" href="../../glossary/">
 <span class="md-ellipsis">
@@ -1896,19 +2024,28 @@
 </a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="#3-merging-the-release-pr-is-the-gate">
+<a class="md-nav__link" href="#3-every-release-needs-a-release-page">
 <span class="md-ellipsis">
       
-        3. Merging the release PR is the gate
+        3. Every release needs a release page
       
     </span>
 </a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="#4-the-release-publishes-everything">
+<a class="md-nav__link" href="#4-merging-the-release-pr-is-the-gate">
 <span class="md-ellipsis">
       
-        4. The release publishes everything
+        4. Merging the release PR is the gate
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#5-the-release-publishes-everything">
+<span class="md-ellipsis">
+      
+        5. The release publishes everything
       
     </span>
 </a>
@@ -2077,7 +2214,10 @@ dependencies use compatible-release constraints (<code>~=0.1</code>), so a relea
 resolves for users if every package declares the same version.</p>
 <p>Releases are automated. Nobody edits a version number and nobody edits
 <code>CHANGELOG.md</code> by hand — <a href="https://github.com/googleapis/release-please">release-please</a>
-owns both. The one manual step is <strong>merging the release pull request</strong>.
+owns both. Two steps are manual. First, the release page
+<code>docs/releases/X.Y.Z.md</code> is written with the release-notes skill and merged.
+A status check on the release PR stays red until it is. Second, the owner
+<strong>merges the release pull request</strong>.
 Everything after that runs on its own: the three packages go to PyPI, the API
 image to GHCR, the versioned docs to <code>gh-pages</code>, and the hosted demo on Hugging
 Face is rebuilt on the version just published. Each of those is checked from
@@ -2086,7 +2226,10 @@ the outside before the release counts as done.</p>
 <pre class="mermaid"><code>flowchart TD
     C[Conventional Commit merged to main] --&gt; RP[release_please.yml]
     RP --&gt; PR[Release PR: CHANGELOG.md + version bumps]
-    PR --&gt;|a human merges it| TAG[Tag vX.Y.Z + GitHub Release]
+    PR --&gt; RN[release-notes skill: docs/releases/X.Y.Z.md&lt;br/&gt;merged to main in its own PR]
+    RN --&gt;|release-notes status turns green| PR2[Release PR refreshed]
+    PR2 --&gt;|the owner merges it| TAG[Tag vX.Y.Z + GitHub Release]
+    TAG --&gt; NOTES[release-notes job: page summary&lt;br/&gt;above the generated changelog]
     TAG --&gt;|release_please.yml calls it with tag_name&lt;br/&gt;the tag itself cannot trigger it| B[publish_pypi.yaml: build 3 dists]
     B --&gt; S{wheels install and import?}
     S --&gt;|no| STOP[Nothing is published]
@@ -2129,11 +2272,21 @@ on <code>main</code>, so the commit subject is the release input:</p>
 <td>patch, and shown in the changelog</td>
 </tr>
 <tr>
-<td><code>chore:</code>, <code>ci:</code>, <code>test:</code>, <code>build:</code>, <code>refactor:</code>, <code>style:</code></td>
-<td>no release on their own</td>
+<td><code>refactor:</code></td>
+<td>no release on its own, shown in the changelog</td>
+</tr>
+<tr>
+<td><code>chore:</code>, <code>ci:</code>, <code>test:</code>, <code>build:</code>, <code>style:</code></td>
+<td>no release on their own, hidden from the changelog</td>
 </tr>
 </tbody>
 </table>
+<p>Which types reach the changelog is set by <code>changelog-sections</code> in
+<code>release-please-config.json</code>. Miscellaneous Chores (<code>chore:</code>) is hidden there,
+and so are <code>ci:</code>, <code>test:</code>, <code>build:</code> and <code>style:</code>. A breaking change is shown
+whatever its type. A <code>chore:</code> commit carrying a <code>Release-As:</code> footer has still
+shown up under Miscellaneous Chores (<code>release 0.2.2</code>). If that keeps happening,
+put the footer on a commit of a visible type.</p>
 <div class="admonition warning">
 <p class="admonition-title">The project is pre-1.0: a breaking change bumps the <em>minor</em></p>
 <p><code>release-please-config.json</code> sets top-level <code>bump-minor-pre-major: true</code>,
@@ -2198,13 +2351,58 @@ field by <code>jsonpath</code> and ignores the marker entirely. The comment is a
 TOML comment and has no effect on the build.</p>
 <p>Because <code>include-component-in-tag</code> is <code>false</code>, the tag is <code>vX.Y.Z</code> rather than
 <code>nl2sql-vX.Y.Z</code>.</p>
-<h3 id="3-merging-the-release-pr-is-the-gate">3. Merging the release PR is the gate</h3>
-<p><strong>This is the only manual step in a release.</strong> Merging the pull request makes
-release-please create the <code>vX.Y.Z</code> tag and publish the GitHub Release. Until
-someone merges it, nothing is tagged and nothing is published. Reviewing the
-changelog and the version it proposes is the release decision.</p>
-<h3 id="4-the-release-publishes-everything">4. The release publishes everything</h3>
-<p><code>publish_pypi.yaml</code> runs seven jobs:</p>
+<h3 id="3-every-release-needs-a-release-page">3. Every release needs a release page</h3>
+<p>Every version has a plain-language page at <code>docs/releases/X.Y.Z.md</code>, listed on
+the <a href="../../releases/">Releases</a> page. The changelog lists commits. The
+page says what the release is for, what it does not do yet, and how to
+upgrade. It is written by the <strong>release-notes</strong> Claude Code skill
+(<code>.claude/skills/release-notes/SKILL.md</code>), which uses a fixed template
+(<code>template.md</code> next to it) and matches the last two pages. So every page has
+the same structure.</p>
+<p>The order, once release-please has opened its PR:</p>
+<ol>
+<li><strong>Run the release-notes skill.</strong> It reads the version from the release PR,
+   gathers the commits, PRs and changelog section, writes
+   <code>docs/releases/X.Y.Z.md</code>, adds it to <code>docs/releases/index.md</code> and the
+   <code>mkdocs.yml</code> nav, runs <code>mkdocs build --strict</code>, and opens a PR titled
+   <code>docs(release): notes for X.Y.Z</code>.</li>
+<li><strong>Merge the notes PR</strong> to <code>main</code>. It cannot go on the release branch,
+   because release-please rewrites that branch every time <code>main</code> changes.</li>
+<li><strong>The gate goes green.</strong> The merge is a push to <code>main</code>, so release-please
+   refreshes its PR, and the <code>release-notes-gate</code> job in <code>release_please.yml</code>
+   checks again.</li>
+<li><strong>The owner merges the release PR.</strong></li>
+</ol>
+<p>The gate is the <strong><code>release-notes</code></strong> commit status on the release PR's head
+commit. The <code>release-notes-gate</code> job sets it on every push to <code>main</code> that did
+not tag a release. It reads the version from the release branch's
+<code>.release-please-manifest.json</code>. Then it runs
+<code>python scripts/release_notes.py check --version X.Y.Z</code> against <code>main</code>. The
+check fails unless the page exists and has a summary block. While it fails, the
+status is red and its description says to run the release-notes skill.</p>
+<div class="admonition note">
+<p class="admonition-title">Why a status from <code>release_please.yml</code>, not a <code>pull_request</code> check</p>
+<p>release-please pushes its branch with <code>GITHUB_TOKEN</code>. GitHub opens
+<code>pull_request</code> runs for that push in the <code>action_required</code> state, and they
+never start unless someone approves each one. That is why <code>test.yml</code> has
+no runs on the release PRs. A job in <code>release_please.yml</code> runs on the same
+push that refreshes the PR, so the status always describes the PR's latest
+head. It needs no extra token: <code>statuses: write</code> on that job is enough.</p>
+<p>The status blocks a merge only if it is required: add <code>release-notes</code> as a
+required status check in a branch ruleset for <code>main</code>. Until then it is a red
+mark that the owner reads before merging.</p>
+</div>
+<p>The page's first paragraph, between <code>&lt;!-- summary:start --&gt;</code> and
+<code>&lt;!-- summary:end --&gt;</code>, also goes into the GitHub Release. See the
+<code>release-notes</code> job <a href="#5-the-release-publishes-everything">below</a>.</p>
+<h3 id="4-merging-the-release-pr-is-the-gate">4. Merging the release PR is the gate</h3>
+<p><strong>This is the only manual step in a release</strong>, after the release page.
+Merging the pull request makes release-please create the <code>vX.Y.Z</code> tag and
+publish the GitHub Release. Until someone merges it, nothing is tagged and
+nothing is published. Reviewing the changelog and the version it proposes is
+the release decision.</p>
+<h3 id="5-the-release-publishes-everything">5. The release publishes everything</h3>
+<p><code>publish_pypi.yaml</code> runs a chain of seven jobs:</p>
 <ol>
 <li><strong><code>build</code></strong> — builds sdists and wheels for all three packages, then
    smoke-installs them into a clean virtualenv and runs <code>import nl2sql</code> and
@@ -2285,7 +2483,14 @@ with the fix is published by the next release, <code>0.2.1</code>, which moves
 </ol>
 </li>
 </ol>
-<p>A release is fully out when all seven are green. A red <code>pypi-smoke</code> means the
+<p>One more job, <strong><code>release-notes</code></strong>, runs on its own, next to the chain. It reads
+the summary block of <code>docs/releases/X.Y.Z.md</code> at the tag
+(<code>python scripts/release_notes.py body</code>). It puts that block above the
+changelog release-please generated for the GitHub Release
+(<code>gh release edit --notes-file</code>). A missing page or summary is a warning, not a
+failure: the job has <code>continue-on-error: true</code> and never holds up a publish.
+It is safe to re-run, because a summary already at the top is not added again.</p>
+<p>A release is fully out when the seven jobs of the chain are green. A red <code>pypi-smoke</code> means the
 release is on PyPI but does not install or boot as published; yank it and ship
 a patch (see <a href="#package-order">Package order</a>). A red <code>space</code> or <code>space-smoke</code>
 leaves PyPI as it is and the Space on its previous image; fix the cause and
