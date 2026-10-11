@@ -149,4 +149,12 @@ nav:
       - Datasource: api/rest/datasource.md
       - LLM: api/rest/llm.md
       - Indexing: api/rest/indexing.md
+  - Releases:
+    - Overview: releases/index.md
+    - "0.2.2": releases/0.2.2.md
+    - "0.2.1": releases/0.2.1.md
+    - "0.2.0": releases/0.2.0.md
+    - "0.1.2": releases/0.1.2.md
+    - "0.1.1": releases/0.1.1.md
+    - "0.1.0": releases/0.1.0.md
   - Glossary: glossary.md

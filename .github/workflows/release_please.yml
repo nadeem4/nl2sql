@@ -34,6 +34,53 @@ jobs:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
 
+  # Every release needs a page at docs/releases/X.Y.Z.md, written by the
+  # release-notes skill and merged to main in its own PR. This job sets a
+  # `release-notes` commit status on the open release PR's head: failure until
+  # that page is on main, success once it is.
+  #
+  # It lives here rather than on a `pull_request` trigger because release-please
+  # pushes its branch with GITHUB_TOKEN: GitHub opens those pull_request runs in
+  # `action_required` and they never start on their own. This job runs on every
+  # push to main, which is exactly when release-please refreshes its PR, so the
+  # status always describes the PR's latest head. The version comes from the
+  # release branch's manifest; the page is looked for on main, which is what
+  # merging the release PR will tag.
+  release-notes-gate:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.releases_created != 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+      statuses: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the release PR's version has a release page
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: release-please--branches--main
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          sha=$(gh pr list --head "$BRANCH" --state open --json headRefOid --jq '.[0].headRefOid // ""')
+          if [ -z "$sha" ]; then
+            echo "No open release PR; nothing to gate."
+            exit 0
+          fi
+          git fetch --depth=1 origin "$sha"
+          version=$(git show "$sha:.release-please-manifest.json" | python3 -c 'import json,sys; print(json.load(sys.stdin)["."])')
+          if message=$(python3 scripts/release_notes.py check --version "$version"); then
+            state=success
+          else
+            state=failure
+            echo "::error::$message"
+          fi
+          echo "$message" | tee -a "$GITHUB_STEP_SUMMARY"
+          gh api "repos/$GITHUB_REPOSITORY/statuses/$sha" \
+            -f state="$state" -f context=release-notes \
+            -f description="${message:0:140}" -f target_url="$RUN_URL"
+
   # Only runs on the push to main that actually tagged a release; every other
   # push leaves `releases_created` as `false` and this is skipped. The publish
   # pipeline itself - build, smoke gate, per-package PyPI legs, GHCR, docs, the
