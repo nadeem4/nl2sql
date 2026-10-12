@@ -4451,7 +4451,8 @@ as <code>PipelineError</code> values in graph state; see
 <a href="../../observability/error-handling/">Error Handling</a>.</p>
 <h3 id="adapter-level-limits">Adapter-level limits</h3>
 <p><code>row_limit</code> is real and is enforced where it cannot be talked around: the
-generator bakes <code>min(plan.limit, row_limit)</code> into the SQL it renders
+generator bakes <code>min(plan.limit, row_limit)</code> into the SQL it renders, where
+<code>row_limit</code> is the datasource's own bounded by <code>RESULT_ROW_LIMIT</code> (100,000)
 (<a href="https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/pipeline/nodes/generator/node.py"><code>pipeline/nodes/generator/node.py</code></a>).</p>
 <p><code>max_bytes</code> is <strong>not enforced</strong>. It is read from datasource options, stored on
 the adapter and reported by the datasource API, and nothing ever compares it to

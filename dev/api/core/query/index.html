@@ -4519,7 +4519,7 @@ No exceptions are raised by <code>run_query</code>; errors are returned in <code
 | name | type | required | meaning |
 | --- | --- | --- | --- |
 | <code>sub_queries</code> | <code>List[SubQueryResult]</code> | no | One entry per decomposed sub-query. |
-| <code>final_answer</code> | <code>Optional[Dict[str, Any]]</code> | no | Answer synthesizer payload (<code>summary</code>, <code>format_type</code>, <code>content</code>). |
+| <code>final_answer</code> | <code>Optional[Dict[str, Any]]</code> | no | Answer synthesizer payload (<code>summary</code>, <code>format_type</code>, <code>content</code>, <code>warnings</code>, and <code>truncated</code>: True when a result was cut at the row limit). |
 | <code>errors</code> | <code>List[Dict[str, Any]]</code> | no | Pipeline errors (<code>node</code>, <code>message</code>, <code>error_code</code>, <code>severity</code>, <code>provider</code>, <code>provider_response</code>). <code>provider</code> and <code>provider_response</code> are set for a <code>PROVIDER_*</code> code and <code>null</code> otherwise; see <a href="../../../observability/error-handling/#provider-failures">provider failures</a>. |
 | <code>trace_id</code> | <code>str</code> | no | Trace identifier. |
 | <code>reasoning</code> | <code>List[Dict[str, Any]]</code> | no | Reasoning events/logs. |
@@ -4528,7 +4528,8 @@ No exceptions are raised by <code>run_query</code>; errors are returned in <code
 | <code>status</code> | <code>str</code> | no | <code>"success"</code>, <code>"error"</code>, <code>"plan_only"</code>, or <code>""</code> when nothing ran. |
 | <code>timings</code> | <code>Dict[str, float]</code> | no | Wall-clock seconds per graph node, plus <code>LangGraph</code> for the whole run. |
 | <code>usage</code> | <code>QuestionUsage</code> | no | LLM calls, tokens and model time per node and for the whole question. See below. |
-| <code>trace_path</code> | <code>Optional[str]</code> | no | Where this run's trace file was written, or <code>None</code> when <code>TRACE_MODE</code> did not write one. See <a href="../../../observability/debugging/">Debugging a Run</a>. |</p>
+| <code>trace_path</code> | <code>Optional[str]</code> | no | Where this run's trace file was written, or <code>None</code> when <code>TRACE_MODE</code> did not write one. See <a href="../../../observability/debugging/">Debugging a Run</a>. |
+| <code>truncated</code> | <code>bool</code> | no | True when any sub-query's result reached its row limit, so rows may be missing. See <code>sub_queries[].truncated</code>. |</p>
 <p><code>errors</code> holds only <code>ERROR</code> and <code>CRITICAL</code> entries; <code>WARNING</code>-severity pipeline
 errors are appended to <code>warnings</code> as the same summary dict.</p>
 <p>A sub-query that succeeded contributes nothing to <code>errors</code>: the errors of the
@@ -4620,6 +4621,18 @@ result set lives in artifact storage, addressed through <code>artifact_refs</cod
 <td>no</td>
 <td><code>"cache"</code> when the plan came from the plan cache (no planner LLM call; still validated, generated and executed), otherwise <code>"llm"</code>. See <a href="../../../architecture/determinism/#the-plan-cache-determinism-from-the-architecture">Determinism → The plan cache</a>.</td>
 </tr>
+<tr>
+<td><code>row_cap</code></td>
+<td><code>Optional[int]</code></td>
+<td>no</td>
+<td>The row limit that bounded this sub-query's SQL (the datasource's <code>row_limit</code>, bounded by <code>RESULT_ROW_LIMIT</code>), or <code>None</code> when the plan's own <code>LIMIT</code> was smaller.</td>
+</tr>
+<tr>
+<td><code>truncated</code></td>
+<td><code>bool</code></td>
+<td>no</td>
+<td>True when the result has <code>row_cap</code> rows: it was cut at the limit and may be missing rows. A result of exactly <code>row_cap</code> rows may be whole; it is counted as cut.</td>
+</tr>
 </tbody>
 </table>
 <h3 id="rowsample">RowSample</h3>
@@ -4673,7 +4686,7 @@ model instances for nested values):</p>
 <td><code>subgraph_outputs[&lt;id&gt;].sub_query</code></td>
 </tr>
 <tr>
-<td><code>sub_queries[].plan</code> / <code>.validation</code> / <code>.status</code> / <code>.retry_count</code> / <code>.plan_source</code></td>
+<td><code>sub_queries[].plan</code> / <code>.validation</code> / <code>.status</code> / <code>.retry_count</code> / <code>.plan_source</code> / <code>.row_cap</code> / <code>.truncated</code></td>
 <td><code>subgraph_outputs[&lt;id&gt;]</code></td>
 </tr>
 <tr>
