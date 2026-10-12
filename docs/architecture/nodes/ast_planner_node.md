@@ -145,11 +145,19 @@ The schema block (`render_schema_for_prompt` in
 sorted by name and keys sorted, so the same snapshot and role render
 byte-identically. It drops empty fields and `schema_version`. Of the column
 statistics only `sample_values` is sent (it helps match literal filters such as
-`'Rock'` or `'USA'`). For a text column with at most 50 distinct values it is
-every value, so "heavy metal" can be matched to `'Heavy Metal'`; for a larger
-one it is the five most frequent (`ALL_VALUES_MAX_DISTINCT` in
-`adapters/sqlalchemy_base/adapter.py`). `min_value`, `max_value`, `null_percentage` and
-`distinct_count` stay in the snapshot.
+`'Rock'` or `'USA'`), plus `range`, `[min_value, max_value]`, for a date, time
+or numeric column that is not a key. For a text column with at most 50 distinct
+values `sample_values` is every value, so "heavy metal" can be matched to
+`'Heavy Metal'`; for a larger one it is the five most frequent
+(`ALL_VALUES_MAX_DISTINCT` in `adapters/sqlalchemy_base/adapter.py`). A date
+kept as text (every date in SQLite; `opened_at` in the support demo) is
+recognised by its ISO values and gets a `range` instead of `sample_values`. The
+range is what lets instruction 13 work: when "this year" or "the last 30 days"
+falls outside a date column's range, the planner uses the latest such period in
+the data and says so in its reasoning, rather than planning a filter that is
+certain to return nothing. `null_percentage` and `distinct_count` stay in the
+snapshot. On Chinook the ranges cost about 140 tokens of schema block (2,324 to
+2,466).
 
 Measured on Chinook with tiktoken `o200k_base`, its 12 demo questions, no LLM call
 (`python scripts/measure_prompt_tokens.py`):
