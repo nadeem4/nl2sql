@@ -65,7 +65,10 @@ The public facade delegates to modular APIs with the same signatures:
 `get_datasource_capabilities`, `configure_llm`, `configure_llm_from_config`,
 `list_llms`, `get_llm`, `index_datasource`, `index_all_datasources`, `clear_index`,
 `check_permissions`, `get_allowed_resources`, `get_current_settings`,
-`get_setting`, `validate_configuration`.
+`get_setting`, `validate_configuration`, and the saved-result reads
+`get_result_manifest`, `get_result_page` and `export_result_csv` (see
+[Query API → Reading a run's saved results](query.md#reading-a-runs-saved-results)),
+which `nl2sql-api` and the playground both serve.
 
 ### Schema, index and retrieval
 
@@ -93,6 +96,7 @@ engine.inspect_retrieval("top customers", k=4)["picks"]
 
 Clients import everything they need from `nl2sql` itself, never from an engine
 submodule: `NL2SQL`, `QueryResult`, `SubQueryResult`, `RowSample`,
-`QuestionUsage`, `UserContext`, `configure_logging`, the error types
+`ResultSummary`, `ResultManifest`, `ResultPage`, `ResultNotFound`,
+`MAX_RESULT_PAGE_SIZE`, `QuestionUsage`, `UserContext`, `configure_logging`, the error types
 (`PipelineError`, `ErrorCode`, `ErrorSeverity`) and the modular API classes.
 The REST API (`nl2sql-api`) is held to this rule by an architecture test.

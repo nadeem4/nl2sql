@@ -45,7 +45,7 @@ ENV=demo nl2sql-api --host 127.0.0.1 --port 8000   # then open http://localhost:
 | API | Router Path | Purpose |
 | --- | --- | --- |
 | [Health](health.md) | `routes/health.py` | Liveness/readiness checks. |
-| [Query](query.md) | `routes/query.py` | Execute natural language queries. |
+| [Query](query.md) | `routes/query.py` | Execute natural language queries; page through or download a run's saved result. |
 | [Datasource](datasource.md) | `routes/datasource.py` | Manage datasource configs. |
 | [LLM](llm.md) | `routes/llm.py` | Configure and inspect LLMs. |
 | [Indexing](indexing.md) | `routes/indexing.py` | Index management and status. |
@@ -104,7 +104,7 @@ wins:
 | `NL2SQL_API_ROLE` | One static role for every request, e.g. `admin` for a single-tenant deployment or the demo. |
 | `NL2SQL_API_TRUST_BODY_ROLE` | `true` takes `user_context` from the request body, as the API did before. For local testing only: any client can choose any role. The server logs a warning at startup when it is on. |
 
-With no role from any of them, `POST /api/v1/query` answers `HTTP 401` with a
+With no role from any of them, `POST /api/v1/query` and the result routes answer `HTTP 401` with a
 message naming these variables; the engine never runs. The variables are read
 on each request.
 

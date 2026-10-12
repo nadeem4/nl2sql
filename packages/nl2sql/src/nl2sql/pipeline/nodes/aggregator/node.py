@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Dict, Any, List, Tuple, TYPE_CHECKING
+from typing import Dict, Any, List, Set, Tuple, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from nl2sql.pipeline.state import GraphState
@@ -8,6 +8,7 @@ import polars as pl
 
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.common.settings import settings
+from nl2sql.execution.artifacts.results import ResultManifest, ResultSummary
 from nl2sql.execution.contracts import ArtifactRef
 from nl2sql.pipeline.nodes.aggregator.schemas import AggregatorResponse
 from nl2sql.common.logger import get_logger
@@ -62,9 +63,11 @@ class EngineAggregatorNode:
                 return self._truncated(refused)
             frames = self.service.execute(dag, state.artifact_refs)
             saved = {node_id: self._save(state, node_id, frame) for node_id, frame in frames.items()}
+            results = self._write_manifest(state, saved)
             aggregator_response = AggregatorResponse(
                 terminal_results={node_id: self._preview(ref) for node_id, ref in saved.items()},
                 computed_artifacts=saved,
+                results=results,
             )
             return {
                 "aggregator_response": aggregator_response,
@@ -107,16 +110,42 @@ class EngineAggregatorNode:
         A combined result has no subgraph or schema version of its own, so
         a template naming them gets ``aggregator`` and ``result``.
         """
-        name = f"result_{node_id}"
-        ref = self.service.engine.artifact_store.write_lazy(frame, {
-            "tenant_id": getattr(self.ctx, "tenant_id", None) or settings.tenant_id,
-            "request_id": state.trace_id,
-            "sub_query_id": name,
-            "dag_node_id": name,
-            "subgraph_name": "aggregator",
-            "schema_version": "result",
-        })
+        store = self.service.engine.artifact_store
+        ref = store.write_lazy(frame, store.run_metadata(self._tenant_id(), state.trace_id, f"result_{node_id}"))
         return ref.model_copy(update={"sub_query_id": None})
+
+    def _tenant_id(self) -> str:
+        return getattr(self.ctx, "tenant_id", None) or settings.tenant_id
+
+    def _write_manifest(self, state: GraphState, saved: Dict[str, ArtifactRef]) -> List[ResultSummary]:
+        """Writes the run's ``manifest.json`` beside its results: each result's columns,
+        row count and whether a sub-query feeding it was cut at its row ceiling."""
+        cut = {
+            output.sub_query.id
+            for output in (getattr(state, "subgraph_outputs", None) or {}).values()
+            if output.truncated and output.sub_query
+        }
+        results = [
+            ResultSummary(node_id=node_id, columns=list(ref.columns), row_count=ref.row_count,
+                          truncated=bool(cut & self._upstream(state, node_id)))
+            for node_id, ref in saved.items()
+        ]
+        self.service.engine.artifact_store.write_manifest(
+            self._tenant_id(), state.trace_id, ResultManifest(request_id=state.trace_id, results=results))
+        return results
+
+    @staticmethod
+    def _upstream(state: GraphState, node_id: str) -> Set[str]:
+        """``node_id`` and every DAG node it is built from."""
+        inputs = {node.node_id: list(node.inputs or []) for node in state.execution_dag.nodes}
+        seen: Set[str] = set()
+        pending = [node_id]
+        while pending:
+            current = pending.pop()
+            if current not in seen:
+                seen.add(current)
+                pending.extend(inputs.get(current, []))
+        return seen
 
     def _preview(self, ref: ArtifactRef) -> List[Dict[str, Any]]:
         """The first ``ANSWER_PREVIEW_ROWS`` rows of a saved result, read from its artifact."""

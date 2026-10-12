@@ -117,6 +117,31 @@ class NL2SQL:
             cancellation_token=cancellation_token,
         )
 
+    def get_result_manifest(self, request_id: str, tenant_id: Optional[str] = None):
+        """
+        Which results a run saved (node id, columns, row count, truncated), by
+        its ``trace_id``. Raises ``ResultNotFound`` for an unknown run.
+        """
+        return self.query.get_result_manifest(request_id, tenant_id=tenant_id)
+
+    def get_result_page(self, request_id: str, result_id: str, offset: int = 0, limit: int = 100,
+                        tenant_id: Optional[str] = None):
+        """
+        One page of a run's saved result, read lazily from its parquet file.
+        ``limit`` is capped at 1,000. Raises ``ResultNotFound`` for an unknown
+        run or result, ``ValueError`` for a negative offset or a limit below 1.
+        """
+        return self.query.get_result_page(request_id, result_id, offset=offset, limit=limit,
+                                          tenant_id=tenant_id)
+
+    def export_result_csv(self, request_id: str, result_id: str, tenant_id: Optional[str] = None):
+        """
+        The whole of a run's saved result as CSV: an iterator of UTF-8 chunks,
+        header first. Raises ``ResultNotFound`` before streaming for an unknown
+        run or result.
+        """
+        return self.query.export_result_csv(request_id, result_id, tenant_id=tenant_id)
+
     def add_datasource(self, config):
         """
         Programmatically add a datasource to the engine.
