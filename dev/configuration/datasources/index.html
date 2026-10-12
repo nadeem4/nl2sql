@@ -4289,7 +4289,10 @@ more database connections that NL2SQL can query.</p>
 <li>adapter-specific fields (host, port, database, driver, etc.)</li>
 </ul>
 </li>
-<li>optional limits and metadata (commonly used):<ul>
+<li>optional limits and metadata (commonly used). The three limits
+    (<code>statement_timeout_ms</code>, <code>row_limit</code>, <code>max_bytes</code>) go beside <code>connection</code>, as
+    above, or under an <code>options:</code> map; the two spellings are equivalent. If a
+    limit is set in both places, the lower value wins.<ul>
 <li><code>statement_timeout_ms</code></li>
 <li><code>row_limit</code>: the most rows one sub-query returns. Unset, it is
   <code>RESULT_ROW_LIMIT</code> (100,000); set higher, <code>RESULT_ROW_LIMIT</code> still bounds it.
