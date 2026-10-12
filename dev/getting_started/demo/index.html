@@ -4924,6 +4924,16 @@ and the hosted limits.</p>
   usage, or <strong>Code</strong>) and the step's time. On the spine a round mark is a model
   step and a square one is code; filled with a tick is done, an outline is
   waiting and a dashed outline was not reached.</li>
+<li><strong>Every sub-query.</strong> When a question is split into several sub-queries, the
+  Plan and SQL stations show each one under its own head (<strong>Sub-query 1 of 2</strong>,
+  its intent and its database).</li>
+<li><strong>Rows, at any size.</strong> The Rows station reads the run's saved results, not
+  the sample the answer model saw. Its head gives the whole result's row count,
+  and a result cut at its row ceiling says so: <strong>Cut at 1,000 rows, so some are
+  missing. Narrow the question to get them all.</strong> The table shows 100 rows at a
+  time, fetched from the server, with <strong>Previous</strong>, <strong>Next</strong> and <strong>Rows
+  101–200 of 3,340</strong>. A run with several results gets one tab per result.
+  <strong>Download CSV</strong> streams the whole result from the server, every row.</li>
 <li><strong>The gate.</strong> The Checks station shows the plans the checks saw (<strong>Plan 1
   refused</strong>, then <strong>Plan 2 passed</strong> when the first was sent back), why, in one
   sentence, and each check as a tile with a tick or a cross.</li>
