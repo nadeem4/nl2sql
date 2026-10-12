@@ -111,7 +111,7 @@ Failure in this system is represented as structured `PipelineError` objects accu
 ## Retry Architecture
 
 ### Retry scope
-- Only the SQL agent subgraph retries: planner failures, validation errors, and queries the database rejected as wrong (`EXECUTION_FAILED`) go back through the refiner.
+- Only the SQL agent subgraph retries: planner failures, validation errors, queries the database rejected as wrong (`EXECUTION_FAILED`), and, once, an empty result filtered on a value that does not exist when a close one does (`VALUE_NOT_FOUND`) go back through the refiner.
 - Other nodes (resolver, decomposer, generator, aggregator, answer synthesizer) do not retry.
 - A retry tells the planner and refiner about the latest attempt only, as `{node, error_code, message}`.
 

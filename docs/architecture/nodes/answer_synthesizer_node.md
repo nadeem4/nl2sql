@@ -43,6 +43,7 @@ From `GraphState`:
 - `user_query` (required)
 - `aggregator_response.terminal_results` (required)
 - `decomposer_response.unmapped_subqueries` (optional)
+- `warnings`: the `VALUE_NOT_FOUND` warnings ("There is no Genre with Name 'Polka'.") from sub-queries whose filter named a value that does not exist (see [ExecutorNode](executor_node.md#an-empty-results-filter-values)). An `ERROR`-severity one is not used: a retry replaced that attempt.
 
 Validation performed:
 
@@ -70,8 +71,8 @@ Side effects:
 2. If missing, emit `INVALID_STATE` error and stop.
 3. Serialize results to JSON.
 4. Serialize unmapped sub‑queries to JSON.
-5. Invoke LLM chain with structured output.
-6. Return `AnswerSynthesizerResponse`.
+5. Invoke LLM chain with structured output. The prompt's *Data Notes* lists the missing values and asks the answer to say the value does not exist instead of reporting the empty result as a finding.
+6. Append each missing-value note to the answer's `warnings`, whatever the model wrote, and return `AnswerSynthesizerResponse`.
 7. On exception, emit `AGGREGATOR_FAILED`.
 
 ---

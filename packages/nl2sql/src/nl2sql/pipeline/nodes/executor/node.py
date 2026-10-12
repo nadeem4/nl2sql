@@ -1,12 +1,15 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Dict, Any
+from typing import TYPE_CHECKING, Dict, Any, List
 
+from nl2sql.auth.rbac import table_allowed
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.common.logger import get_logger
+from nl2sql.common.settings import settings
 from nl2sql.context import NL2SQLContext
 from nl2sql.execution.contracts import ExecutorRequest
 from nl2sql.execution.executor import SqlExecutorService
+from nl2sql.pipeline.nodes.executor.value_check import check_values
 from nl2sql_adapter_sdk.capabilities import DatasourceCapability
 
 if TYPE_CHECKING:
@@ -23,6 +26,7 @@ class ExecutorNode:
         self.ds_registry = ctx.ds_registry
         self.executor = SqlExecutorService(ctx.ds_registry)
         self.tenant_id = ctx.tenant_id
+        self.rbac = getattr(ctx, "rbac", None)
 
     def _supports_sql(self, ds_id: str) -> bool:
         """Reports whether a datasource may be executed as SQL.
@@ -33,6 +37,35 @@ class ExecutorNode:
         registry's check fails closed.
         """
         return self.ds_registry.supports(ds_id, DatasourceCapability.SUPPORTS_SQL)
+
+    def _check_values(self, state: SubgraphExecutionState, ds_id: str, response) -> List[PipelineError]:
+        """``VALUE_NOT_FOUND`` for an empty result filtered on a value that does not exist.
+
+        Runs only when the query succeeded with no rows. One retry is spent on
+        it: a later empty result reports the value as missing instead. With no
+        RBAC to consult, nothing is probed. A failure here never fails the run.
+        """
+        if self.rbac is None or response.errors or response.metrics.get("row_count") != 0:
+            return []
+        planner_response = getattr(state, "ast_planner_response", None)
+        plan = planner_response.plan if planner_response else None
+        if plan is None:
+            return []
+        try:
+            allowed_tables = self.rbac.get_allowed_tables(state.user_context)
+            already_retried = any(e.error_code == ErrorCode.VALUE_NOT_FOUND for e in state.errors)
+            can_retry = not already_retried and state.retry_count < settings.sql_agent_max_retries
+            errors = check_values(
+                plan,
+                self.ds_registry.get_adapter(ds_id),
+                lambda table: table_allowed(allowed_tables, ds_id, table),
+                can_retry,
+            )
+            # The SQL agent retries only on this attempt's own finding.
+            return [e.model_copy(update={"details": {"attempt": state.retry_count}}) for e in errors]
+        except Exception as exc:
+            logger.warning(f"Value check skipped: {exc}")
+            return []
 
     def __call__(self, state: SubgraphExecutionState) -> Dict[str, Any]:
         try:
@@ -78,9 +111,10 @@ class ExecutorNode:
                 tenant_id=self.tenant_id,
             )
             response = executor.execute(request)
+            value_errors = self._check_values(state, ds_id, response)
             return {
                 "executor_response": response,
-                "errors": response.errors,
+                "errors": response.errors + value_errors,
                 "reasoning": response.reasoning,
             }
         except Exception as exc:

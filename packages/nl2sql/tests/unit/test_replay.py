@@ -46,6 +46,7 @@ def rendered_prompts():
             user_query=QUESTION,
             aggregated_result="{}",
             unmapped_subqueries="[]",
+            data_notes="None",
         ),
     ]
 

@@ -10,10 +10,14 @@ Aggregated Results (keyed by terminal node id):
 Unmapped Subqueries (if any):
 {unmapped_subqueries}
 
+Data Notes (values the question filtered on that do not exist):
+{data_notes}
+
 Instructions:
 1. Provide a concise summary.
 2. Choose the best output format: table, list, or text.
 3. Produce the formatted content for the chosen format.
 4. If results contain error messages, explain them clearly.
 5. If there are unmapped subqueries, add user-facing warnings that explain what was skipped and why.
+6. If there are data notes, say that the value does not exist (and name the closest values if given) instead of reporting an empty result as a finding.
 """

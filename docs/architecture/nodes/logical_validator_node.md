@@ -21,6 +21,9 @@ The adapter records at most five sample values per text column, which is a
 retrieval hint, not the column's domain; treating it as an allowlist rejected
 correct filters on any higher-cardinality column. Safety comes from the RBAC
 table allowlist and from schema resolution, neither of which depends on stats.
+A value that turns out not to exist is caught after execution instead, and
+only when the result is empty (see
+[ExecutorNode](executor_node.md#an-empty-results-filter-values)).
 
 ### Buildability: the validator runs the generator
 

@@ -149,16 +149,28 @@ def build_sql_agent_graph(
         new plan can fix it. A refusal (``DB_EXECUTION_ERROR``: permission,
         timeout, connection) or any other executor error ends the sub-query,
         as does running out of retries.
+
+        An empty result filtered on a value its column does not have, with a
+        close value to suggest, is retried the same way: a ``VALUE_NOT_FOUND``
+        ERROR raised on this attempt (its ``details`` carry the attempt). The
+        executor raises it at most once per sub-query.
         """
         if _is_cancelled(config):
             return "end"
-        errors = getattr(state.executor_response, "errors", None) or []
-        if not errors:
+        count = _get_retry_count(state)
+        if count >= settings.sql_agent_max_retries:
             return "end"
-        retryable = all(e.error_code == ErrorCode.EXECUTION_FAILED and e.is_retryable for e in errors)
-        if retryable and _get_retry_count(state) < settings.sql_agent_max_retries:
-            return "retry"
-        return "end"
+        errors = getattr(state.executor_response, "errors", None) or []
+        if errors:
+            retryable = all(e.error_code == ErrorCode.EXECUTION_FAILED and e.is_retryable for e in errors)
+            return "retry" if retryable else "end"
+        missing_value = any(
+            e.error_code == ErrorCode.VALUE_NOT_FOUND
+            and e.severity == ErrorSeverity.ERROR
+            and (e.details or {}).get("attempt") == count
+            for e in state.errors
+        )
+        return "retry" if missing_value else "end"
 
     graph.add_node("schema_retriever", schema_retriever)
     graph.add_node("ast_planner", ast_planner)

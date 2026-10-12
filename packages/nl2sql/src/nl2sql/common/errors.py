@@ -39,6 +39,8 @@ class ErrorCode(str, Enum):
     AGGREGATOR_FAILED = "AGGREGATOR_FAILED"
     # A combine input reached the adapter's row cap, so it may be missing rows.
     RESULT_TRUNCATED = "RESULT_TRUNCATED"
+    # An empty result filtered on a value its column does not have.
+    VALUE_NOT_FOUND = "VALUE_NOT_FOUND"
     ORCHESTRATOR_CRASH = "ORCHESTRATOR_CRASH"
     PIPELINE_TIMEOUT = "PIPELINE_TIMEOUT"
     CANCELLED = "CANCELLED"

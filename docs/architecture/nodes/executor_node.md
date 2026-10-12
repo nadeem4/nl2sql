@@ -79,7 +79,42 @@ Side effects:
 2. Check the adapter declares `supports_sql`; otherwise return `INVALID_STATE`.
 3. Build `ExecutorRequest` with trace/subgraph identifiers and schema version.
 4. Execute request and return `ExecutorResponse`.
-5. On exception, emit `EXECUTOR_CRASH`.
+5. If the query succeeded with no rows, check the filter values (below).
+6. On exception, emit `EXECUTOR_CRASH`.
+
+### An empty result's filter values
+
+"Which customers bought Metal?" planned as `Genre.Name = 'Metal'` returns no
+rows because Chinook's genre is 'Heavy Metal'. Reported as is, the answer says
+nobody bought any. So when a query succeeds with **zero rows**,
+`value_check.check_values()` looks at every string literal the plan's `WHERE`
+compares a bare column to with `=`, `IN` or `LIKE`, through `AND` and `OR`
+only (a negated or `!=` comparison, a column inside a function, and a number
+are left alone), at most five per sub-query:
+
+1. **Does it exist?** `SELECT 1 FROM <table> WHERE <column> = '<value>' LIMIT 1`
+   (`LIKE` for a pattern). If yes, nothing is said: the empty result stands.
+2. **The closest values.** A case-insensitive match first
+   (`LOWER(column) = LOWER('value')`, `DISTINCT`, `LIMIT 3`); failing that, a
+   bounded `SELECT DISTINCT column ... LIMIT n` (n is 500, or the adapter's
+   `row_limit` if lower) and the three most similar by `difflib` (cutoff 0.6).
+3. **What it reports**, as `VALUE_NOT_FOUND`:
+   - With a close value and a retry left, an `ERROR` telling the planner which
+     values exist: "No Genre.Name value is 'Jaz', so the query returned no rows.
+     The closest existing values are 'Jazz'; use one of them if it is what the
+     question means." The SQL agent sends it back through the refiner (see
+     [SQL agent](../subgraphs/sql_agent.md)). It is raised once per sub-query:
+     an empty result after that retry is reported as a warning instead.
+   - Otherwise a `WARNING`: "There is no Genre with Name 'Polka'." (with
+     "; the closest is ..." when there is one). The sub-query still succeeds
+     with its empty result, and the answer synthesizer is told the value does
+     not exist (see [AnswerSynthesizerNode](answer_synthesizer_node.md)).
+
+Every probe is a `SELECT` built with sqlglot and rendered by the adapter
+(`render_sql`), so no dialect is named here; each has a `LIMIT` no higher than
+the adapter's row cap. A table the role may not read (RBAC, as the logical
+validator checks it) is never probed, a probe the database refuses claims
+nothing, and a failure in the check never fails the run.
 
 ---
 
@@ -115,6 +150,7 @@ Emits `PipelineError` with:
 - `EXECUTION_FAILED`: the database rejected the query as wrong (the adapter's `retryable`); the SQL agent sends it back to the refiner while retries remain
 - `DB_EXECUTION_ERROR`: the database refused or could not run the query (permission, timeout, connection); fatal
 - `EXECUTOR_CRASH`: an exception escaped the adapter
+- `VALUE_NOT_FOUND`: an empty result filtered on a value its column does not have; an `ERROR` (retried once) when a close value exists, a `WARNING` otherwise
 
 ---
 
@@ -157,6 +193,7 @@ Emits `PipelineError` with:
 
 - Executes in‑process on the pipeline thread pool; there is no process sandbox (see `../../execution/isolation.md`).
 - No built‑in retries on transient execution failures.
+- The filter-value check covers string literals in `WHERE` only, not `HAVING`, and reads at most 500 distinct values to find a similar one, so on a high-cardinality column a near miss can go unsuggested (the value is then reported as missing).
 
 ---
 
@@ -164,3 +201,4 @@ Emits `PipelineError` with:
 
 - `packages/nl2sql/src/nl2sql/pipeline/nodes/executor/node.py`
 - `packages/nl2sql/src/nl2sql/execution/executor/sql_executor.py`
+- `packages/nl2sql/src/nl2sql/pipeline/nodes/executor/value_check.py`
