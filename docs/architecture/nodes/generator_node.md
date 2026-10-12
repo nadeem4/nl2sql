@@ -88,9 +88,10 @@ Side effects:
    - Constant items are skipped: they order nothing, and a bare number would be read as a position.
    - Every term, the plan's own and the tie-breakers, keeps the dialect's default NULL placement for its direction, so no `NULLS FIRST`/`NULLS LAST` clause is rendered (nor, on T-SQL and MySQL, a `CASE WHEN ... IS NULL` emulation, which is invalid when the term is an alias). For example, a plan ordering by `city` ascending and `c.Country` descending renders `ORDER BY city ASC, c.Country DESC, c.LastName` on SQLite, Postgres, T-SQL and MySQL alike.
    - The logical validator runs on the plan before this step and never sees the tie-breakers.
-7. Apply the effective limit and hand the finished tree to the adapter's `render_sql(expression)` (see [the adapter SDK](../../adapters/sdk.md)). An adapter without the hook is rendered with `query.sql(dialect=adapter.get_dialect())`. The SQLite adapter rewrites the date nodes with `STRFTIME`/`DATE(x, 'start of ...')`; the others use sqlglot's rendering.
-8. Return `GeneratorResponse` with SQL and reasoning.
-9. On exception, emit `SQL_GEN_FAILED`.
+7. Apply the effective limit, then the plan's `offset` when it is above zero: rows 11 to 20 are `limit: 10, offset: 10`. The limit is already capped, so a page is never longer than the row cap, and `row_cap` is reported exactly as without an offset. sqlglot renders the pair in each dialect's own form (`LIMIT 10 OFFSET 10`; `OFFSET 10 ROWS FETCH FIRST 10 ROWS ONLY` on T-SQL). An offset only means something in an order, so a plan with an `offset` and no `order_by`, or a negative `offset`, is refused here with a `ValueError`; the logical validator runs this builder, so the planner is asked to fix it before generation (see [Buildability](logical_validator_node.md#buildability-the-validator-runs-the-generator)). The tie-breakers of step 6 then make the page the same on every run.
+8. Hand the finished tree to the adapter's `render_sql(expression)` (see [the adapter SDK](../../adapters/sdk.md)). An adapter without the hook is rendered with `query.sql(dialect=adapter.get_dialect())`. The SQLite adapter rewrites the date nodes with `STRFTIME`/`DATE(x, 'start of ...')`; the others use sqlglot's rendering.
+9. Return `GeneratorResponse` with SQL and reasoning.
+10. On exception, emit `SQL_GEN_FAILED`.
 
 ---
 
@@ -177,7 +178,6 @@ Logs exceptions via `logger.exception`.
 ## Known Limitations
 
 - No SQL optimization beyond AST structure.
-- `PlanModel.offset` is not rendered.
 - The plan language has no subqueries or window functions.
 - No dialect fallback if adapter misconfigured.
 

@@ -31,7 +31,7 @@ The file is a YAML list. Each entry:
 | `id` | Unique id, `chinook_NNN` |
 | `question` | The natural-language question |
 | `difficulty` | `easy`, `medium` or `hard` |
-| `tags` | Categories: `single-table`, `filter`, `join`, `multi-join`, `aggregation`, `having`, `order-limit`, `ties`, `date`, `paraphrase`, `keyword-in-question`, `keyword-in-value`, `rbac-denial`, `unanswerable` |
+| `tags` | Categories: `single-table`, `filter`, `join`, `multi-join`, `aggregation`, `having`, `order-limit`, `offset`, `ties`, `date`, `paraphrase`, `keyword-in-question`, `keyword-in-value`, `rbac-denial`, `unanswerable` |
 | `paraphrase_group` | Optional. Questions with the same intent share this id and the same `gold_result`, for determinism checks |
 | `datasource` | The database the question is asked against. Defaults to `chinook` and is written out only where a question differs, so the file - and its sha256 - are unchanged. It is what the run is scored and identified by, so the demo's other databases do not widen it |
 | `needed_tables` | Exactly the tables `gold_sql` reads, for retrieval recall |
@@ -203,7 +203,7 @@ Spider 2.0 supports multiple gold files per task
 
 Prefer an alternative to loosening the comparator. An alternative is written
 down, reviewed once, and only ever affects the question it sits on; a looser
-rule applies to all forty-three at once and can quietly start passing wrong
+rule applies to all forty-five at once and can quietly start passing wrong
 answers. The [lenient score](#strict-and-lenient-accuracy) is deliberately
 narrow for the same reason.
 
@@ -507,7 +507,7 @@ one the runs of a single question are not independent and it reads narrower
 than it really is; pass^k below counts questions and does not.
 
 **Compare two runs question by question, not headline to headline.** The same
-44 questions are run both times, so the runs are paired and most of the
+45 questions are run both times, so the runs are paired and most of the
 variance cancels. `--baseline PATH` prints, per config:
 
 - the strict and lenient accuracy of each run, side by side;
