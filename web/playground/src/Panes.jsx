@@ -2,9 +2,10 @@ import React, { useState } from "react";
 import NodeInspector from "./NodeInspector.jsx";
 import Feedback from "./Feedback.jsx";
 import SqlCard from "./SqlCard.jsx";
-import RowsTable from "./RowsTable.jsx";
+import RowsTable, { SampleRows } from "./RowsTable.jsx";
 import Ledger, { Totals } from "./Ledger.jsx";
 import { planSections } from "./plan.js";
+import { subQueryHeads } from "./results.js";
 import { humanCheck, nodeLedger, traceFileName, traceUrl } from "./run.js";
 import { describeFault } from "./faults.js";
 import { missPrompt, recordedBadge } from "./firstRun.js";
@@ -150,12 +151,48 @@ function AnswerHead({ asked, busy, stopped, hosted, meta, result, sub, fault, an
   );
 }
 
-export function PlanPane({ sub, state, head }) {
+// With several sub-queries, each gets a head (`subQueryHeads`) over its own
+// block; with one, the block stands alone.
+function SubBlocks({ subs, children }) {
+  const heads = subQueryHeads(subs);
+  if (!heads.length) return subs.map((s, i) => <React.Fragment key={i}>{children(s)}</React.Fragment>);
+  return subs.map((s, i) => (
+    <div className="sub-block" key={heads[i].key}>
+      <p className="sub-head"><b>{heads[i].title}</b>{heads[i].detail && <span>{heads[i].detail}</span>}</p>
+      {children(s)}
+    </div>
+  ));
+}
+
+function PlanBody({ sub }) {
   const sections = planSections(sub && sub.plan);
+  if (!sections.length) return <p className="station-note">No plan came back.</p>;
+  return (
+    <>
+      <dl className="plan">
+        {sections.map((section) => (
+          <div className="clause" key={section.label}>
+            <dt>{section.label}</dt>
+            <dd>
+              {section.items.map((item, i) => (
+                <code key={i}>{item}</code>
+              ))}
+            </dd>
+          </div>
+        ))}
+      </dl>
+      {sub.plan.reasoning && <p className="reasoning">{sub.plan.reasoning}</p>}
+    </>
+  );
+}
+
+// `subs` is every sub-query of the run; `sub`, the first, decides the state.
+export function PlanPane({ sub, subs = sub ? [sub] : [], state, head }) {
+  const planned = subs.some((s) => planSections(s && s.plan).length > 0);
   const idle = "The model writes a typed plan here, never SQL.";
   return (
     <Station id="pane-plan" title="Plan" state={state} head={head}
-      note={state === "idle" ? idle : state === "done" && !sections.length ? "No plan came back, so nothing downstream ran." : null}>
+      note={state === "idle" ? idle : state === "done" && !planned ? "No plan came back, so nothing downstream ran." : null}>
       {state === "busy" && (
         <>
           <p className="reasoning is-live">Writing a typed plan from the retrieved tables.</p>
@@ -166,23 +203,7 @@ export function PlanPane({ sub, state, head }) {
           </div>
         </>
       )}
-      {sections.length > 0 && (
-        <>
-          <dl className="plan">
-            {sections.map((section) => (
-              <div className="clause" key={section.label}>
-                <dt>{section.label}</dt>
-                <dd>
-                  {section.items.map((item, i) => (
-                    <code key={i}>{item}</code>
-                  ))}
-                </dd>
-              </div>
-            ))}
-          </dl>
-          {sub.plan.reasoning && <p className="reasoning">{sub.plan.reasoning}</p>}
-        </>
-      )}
+      {planned && <SubBlocks subs={subs}>{(s) => <PlanBody sub={s} />}</SubBlocks>}
     </Station>
   );
 }
@@ -249,32 +270,40 @@ export function ValidationPane({ sub, result, state, role, head }) {
   );
 }
 
-export function SqlPane({ sub, state, refused, head }) {
-  const sql = (sub && sub.sql) || "";
+export function SqlPane({ sub, subs = sub ? [sub] : [], state, refused, head }) {
+  const written = subs.some((s) => s && s.sql);
   const note =
     state === "idle" ? "Generated from the approved plan, only after the checks pass."
       : state === "skipped" ? (refused ? "Not written. The plan never passed the checks." : null)
         : state === "busy" ? null
-          : sql ? null : "No SQL.";
+          : written ? null : "No SQL.";
   return (
     <Station id="pane-sql" title="SQL" state={state} note={note} head={head}>
-      {sql && <SqlCard sql={sql} plan={(sub.retry_count || 0) + 1} />}
+      {written && (
+        <SubBlocks subs={subs}>
+          {(s) => (s.sql ? <SqlCard sql={s.sql} plan={(s.retry_count || 0) + 1} /> : <p className="station-note">No SQL.</p>)}
+        </SubBlocks>
+      )}
     </Station>
   );
 }
 
+// The rows come from the run's saved results (`result_manifest`), paged from
+// the server; a run that saved none falls back to the sample in the response.
 export function RowsPane({ sub, result, state, head }) {
   const rows = sub && sub.rows;
+  const saved = Boolean(result && result.trace_id && (result.result_manifest || []).length);
   const planOnly = result && result.status === "plan_only";
   const note =
     state === "idle" ? "The query runs read-only against the database."
       : state === "skipped" ? null
         : state === "busy" ? null
           : planOnly ? "Plan only: nothing was executed."
-            : !rows ? "No rows." : null;
+            : !rows && !saved ? "No rows." : null;
   return (
     <Station id="pane-rows" title="Rows" state={state} note={note} head={head}>
-      {rows && <RowsTable rows={rows} result={result} />}
+      {state === "done" && saved && <RowsTable key={result.trace_id} result={result} />}
+      {state === "done" && !saved && rows && <SampleRows rows={rows} />}
     </Station>
   );
 }
@@ -362,6 +391,7 @@ export default function Run({ asked, result, sub, busy, stopped, hosted = false,
   const gateFailed = s.checks === "stopped";
   // A failed request carries only a sentence; an engine error carries a code.
   const fault = stopped ? null : error ? { message: error } : runFault(result, sub);
+  const subs = (result && result.sub_queries) || [];
   const outcome = !asked ? "idle" : busy ? "busy" : stopped ? "stopped" : gateFailed ? "refused" : "ran";
 
   return (
@@ -370,9 +400,9 @@ export default function Run({ asked, result, sub, busy, stopped, hosted = false,
         answered={answered} onAgain={onAgain} />
       <div className="spine" data-outcome={outcome} aria-busy={busy}>
         {busy && <span className="spine-run" aria-hidden="true" />}
-        <PlanPane sub={sub} state={s.plan} head={heads.plan} />
+        <PlanPane sub={sub} subs={subs} state={s.plan} head={heads.plan} />
         <ValidationPane sub={sub} result={result} state={s.checks} role={asked && asked.role} head={heads.checks} />
-        <SqlPane sub={sub} state={s.sql} refused={gateFailed} head={heads.sql} />
+        <SqlPane sub={sub} subs={subs} state={s.sql} refused={gateFailed} head={heads.sql} />
         <RowsPane sub={sub} result={result} state={s.rows} head={heads.rows} />
         <UsagePane key={(result && result.trace_id) || "none"} usage={result && result.usage} timings={result && result.timings}
           replay={replay} debug={debug} state={s.cost} result={result} head={heads.cost} />

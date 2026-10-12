@@ -288,12 +288,36 @@ with `record: clips` runs the same script in CI and opens a pull request.
   keyword tint: keywords, function names and numbers take `--kw`, `--fn` and
   `--num`. The tint comes from `src/sqlHighlight.js`, a small tokenizer with no
   library, rendered as React text so the SQL is never parsed as markup; a long
-  line scrolls inside the card. The rows card (`src/RowsTable.jsx`) fills the
-  column with 38px rows (44px on a phone) and a header that sticks. The first
-  numeric column carries an in-cell bar, a 6px track and fill sized to the
-  column's largest magnitude (a negative is drawn by its size, in ink), beside
-  the right-aligned number. NULL stays dimmed. The foot counts the rows and
-  offers **Download CSV**, built in the page from the rows it already has.
+  line scrolls inside the card. The rows card (`src/RowsTable.jsx`) reads the
+  run's saved results from `result_manifest` in `/api/ask`, never the sample
+  in `sub_queries[].rows`. With more than one result it opens with one tab per
+  result (`#rows-tabs`, the database switcher's segmented control, each tab
+  **Result 1**, **Result 2** with its row count and the internal `node_id`
+  only as the tooltip; arrow keys move between them); with one there are no
+  tabs. Picking a tab starts that result at its first page and fetches its
+  own rows (`rowsView` in `src/results.js`). The head says **Result** and the whole result's row count
+  (`#rows-total`) and offers **Download CSV** (`#rows-csv`), a plain link to
+  `GET /api/query/{trace_id}/results/{node_id}.csv`, so the file is every row,
+  streamed by the server. A result cut at its row ceiling gets one line under
+  the head in the warn ink (`#rows-truncated`: "Cut at 1,000 rows, so some are
+  missing. Narrow the question to get them all."). The rows come a page of 100
+  at a time from `GET /api/query/{trace_id}/results/{node_id}?offset=&limit=`;
+  the foot says **Rows 101–200 of 3,340** (`#rows-range`, out of the selected
+  result's own `row_count`, the number its tab and head show) beside **Previous**
+  and **Next** (`#rows-prev`, `#rows-next`, the latter following the server's
+  `next_offset`). While a page loads the one on screen stays, dimmed; the
+  first one shows skeleton lines, and a failed request says so with **Try
+  again**. A result with no rows makes no request and shows its columns over
+  "No rows came back." A run that saved nothing (an empty manifest) falls back
+  to the response's sample, with no paging and no download. The table fills
+  the column with 38px rows (44px on a phone) and a header that sticks. The
+  first numeric column carries an in-cell bar, a 6px track and fill sized to
+  the page's largest magnitude (a negative is drawn by its size, in ink),
+  beside the right-aligned number. NULL stays dimmed.
+- **Every sub-query.** The first sub-query decides each station's state, but
+  with several the Plan and SQL stations show every one, each under a head
+  (`.sub-head`: **Sub-query 1 of 2**, its intent and database,
+  `subQueryHeads`), and the rail marks the tables of all of them.
 - **Cost & time**: five figures (total time, waiting on the model, model calls,
   input tokens with the cached count, cost). With **Debug** on, a per-node
   ledger follows (`src/Ledger.jsx`): one row per node that ran, in execution
@@ -397,8 +421,9 @@ with `record: clips` runs the same script in CI and opens a pull request.
   non-loopback `--host` without `--allow-settings`) the page shows the reason
   (`#settings-unavailable`) instead of a form, and the nav marks it.
 
-Every run station renders the `/api/ask` response; nothing is computed
-server-side for the page.
+Every run station renders the `/api/ask` response, and the Rows station the
+saved result that response names, read through the engine's result routes;
+nothing is computed server-side for the page.
 
 ## Rebuild
 
@@ -451,7 +476,9 @@ when it opens itself),
 `src/retrieval.js` (the MMR summary line, picks
 in order, entries passed over, the copyable text form), `src/sqlHighlight.js`
 (the SQL card's tokenizer), `src/artifacts.js` (the rows bar and the ledger and
-pool bars, numeric columns, the CSV) and `src/feedback.js`
+pool bars, numeric columns), `src/results.js` (the result tabs, the page and
+CSV URLs, Previous and Next, the range line, the cut notice, the sub-query
+heads) and `src/feedback.js`
 (when a run can be rated, the request body, the saved line) with Node's built-in test runner; there is no test dependency.
 
 ## Look

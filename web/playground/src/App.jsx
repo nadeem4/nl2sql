@@ -320,8 +320,10 @@ export default function App() {
   const saveStepModel = (agent, choice) =>
     setStepModels((models) => writeModel(window.sessionStorage, models, agent, choice));
 
+  // The first sub-query decides each station's state; the Plan and SQL
+  // stations, and the tables the rail marks, cover every one.
   const sub = result && result.sub_queries && result.sub_queries[0];
-  const used = planTables(sub && sub.plan);
+  const used = [...new Set(((result && result.sub_queries) || []).flatMap((s) => planTables(s.plan)))];
   const denied = deniedTables(result && result.errors);
   const replay = meta && meta.mode === "replay";
   const hosted = Boolean(meta && meta.hosted);
