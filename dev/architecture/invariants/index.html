@@ -6940,9 +6940,11 @@
 <h2 id="plan-functions-are-known-functions">Plan Functions Are Known Functions</h2>
 <h3 id="definition_6">Definition</h3>
 <p>Every <code>func</code> expression names a function from <code>ALLOWED_FUNCTIONS</code> in <code>nl2sql.pipeline.nodes.ast_planner.functions</code>, written as a plain identifier (any case).</p>
+<p>The only date functions on the list are the ones the planner prompt offers: <code>DATE_PART</code> and <code>DATE_TRUNC</code>, plus <code>YEAR</code>, <code>QUARTER</code>, <code>MONTH</code>, <code>DAY</code> and <code>EXTRACT</code>, which are read as <code>DATE_PART</code>. <code>STRFTIME</code> is still accepted as a legacy name (<code>LEGACY_FUNCTIONS</code>): a recorded demo answer and three hand-written tier 1 gold plans call it. Nothing offers it to the model, and the validator's rejection message leaves it out of the functions it lists.</p>
 <h3 id="enforcement-points_6">Enforcement Points</h3>
 <ul>
 <li><code>LogicalValidatorNode._unsupported_functions()</code> in <code>nl2sql.pipeline.nodes.validator.node</code></li>
+<li><code>packages/nl2sql/tests/unit/test_date_functions_agree_with_prompt.py</code> reads the allow-list and the planner prompt together, so a date function cannot be allowed by one and forbidden by the other</li>
 </ul>
 <h3 id="failure-behavior_6">Failure Behavior</h3>
 <p>Returns <code>PipelineError</code> with <code>UNSUPPORTED_FUNCTION</code> (severity <code>ERROR</code>, so the refiner can retry).</p>

@@ -2250,7 +2250,9 @@ was validated, not only what failed. The names are fixed and always in this orde
      plain identifier (<code>^[A-Za-z_][A-Za-z0-9_]*$</code>) naming a function in
      <code>ast_planner.functions.ALLOWED_FUNCTIONS</code> (read-only aggregates and
      scalar functions, any case), with <code>UNSUPPORTED_FUNCTION</code> at <code>ERROR</code>
-     severity, so the refiner retries with the list in the message.
+     severity, so the refiner retries with the list in the message. The list
+     leaves out <code>LEGACY_FUNCTIONS</code> (<code>STRFTIME</code>), which older plans may still
+     call but which the planner prompt never offers.
      <code>func_name</code> becomes the function's name in the SQL, so this is what keeps
      model text such as <code>SELECT 1); DELETE FROM T; --</code> out of it.</li>
 <li><code>_date_operations()</code> rejects a date function whose unit is not <code>year</code>,
