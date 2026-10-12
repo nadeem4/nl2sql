@@ -8,7 +8,7 @@ the schema store, and what the planner node and the subgraph wrapper do with it.
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import date, datetime
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
@@ -116,6 +116,28 @@ def test_a_different_question_misses(store):
     assert cache.get(_sq(intent="How many customers are there in Brazil?")) is None
 
 
+def test_a_plan_cached_on_one_day_misses_on_the_next(store, monkeypatch):
+    """"The last 30 days" is planned as literal dates from the run date.
+
+    Served on another day, yesterday's plan would answer for yesterday's
+    window, so the run date is part of the key.
+    """
+    cache = PlanCache(store)
+    monkeypatch.setattr(settings, "today", date(2013, 12, 31))
+    cache.put(_sq(intent="Invoices in the last 30 days"), _plan("as of 2013-12-31"))
+
+    monkeypatch.setattr(settings, "today", date(2014, 1, 1))
+    assert cache.get(_sq(intent="Invoices in the last 30 days")) is None
+
+
+def test_a_plan_cached_today_still_hits_today(store, monkeypatch):
+    cache = PlanCache(store)
+    monkeypatch.setattr(settings, "today", date(2013, 12, 31))
+    cache.put(_sq(intent="Invoices in the last 30 days"), _plan("as of 2013-12-31"))
+
+    assert cache.get(_sq(intent="invoices in the last 30 days")).reasoning == "as of 2013-12-31"
+
+
 def test_a_sub_query_without_a_schema_version_is_never_cached(store):
     # Without a version nothing could invalidate the entry when the schema changes.
     cache = PlanCache(store)
@@ -178,7 +200,7 @@ def test_the_sqlite_cache_lives_in_the_schema_store_file_and_survives_a_reopen(t
 def test_an_unreadable_cached_plan_is_a_miss(tmp_path):
     store = SqliteSchemaStore(path=tmp_path / "schema_store.db")
     try:
-        store.put_cached_plan("how many customers are there", "chinook", "v1", "{not json")
+        store.put_cached_plan(*PlanCache._key(_sq()), "{not json")
         assert PlanCache(store).get(_sq()) is None
     finally:
         store.close()
@@ -200,7 +222,7 @@ def test_a_plan_cached_before_the_ordinal_fields_were_dropped_is_a_miss(tmp_path
     store = SqliteSchemaStore(path=tmp_path / "schema_store.db")
     try:
         cache = PlanCache(store)
-        store.put_cached_plan("how many customers are there", "chinook", "v1", stale)
+        store.put_cached_plan(*PlanCache._key(_sq()), stale)
 
         assert cache.get(_sq()) is None
 

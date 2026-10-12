@@ -41,7 +41,7 @@ Each `SchemaSnapshot` (contract + metadata) is versioned using a **deterministic
 
 Schema versions are timestamped and include a fingerprint prefix (e.g., `YYYYMMDDhhmmss_<fp8>`). Old versions are evicted beyond `schema_store_max_versions`.
 
-The store also holds the **plan cache**: validated, executed plans keyed by `(normalised sub-query intent, datasource_id, schema_version)`, in the `plan_cache` table of the SQLite store (a dict in the in-memory one). Evicting a schema version deletes its cached plans; `nl2sql cache clear` deletes them all and keeps the snapshots. See [Determinism → The plan cache](../architecture/determinism.md#the-plan-cache-determinism-from-the-architecture).
+The store also holds the **plan cache**: validated, executed plans keyed by `(normalised sub-query intent and run date, datasource_id, schema_version)`, in the `plan_cache` table of the SQLite store (a dict in the in-memory one). Evicting a schema version deletes its cached plans; `nl2sql cache clear` deletes them all and keeps the snapshots. See [Determinism → The plan cache](../architecture/determinism.md#the-plan-cache-determinism-from-the-architecture).
 
 The same SQLite file holds the playground's answer ratings, in a `feedback` table (one row per rated run; questions and SQL, never rows). It is written whatever `SCHEMA_STORE_BACKEND` is, at `SCHEMA_STORE_PATH`; `nl2sql feedback clear` empties it and nothing else. See [Feedback and Signals](../observability/feedback.md).
 

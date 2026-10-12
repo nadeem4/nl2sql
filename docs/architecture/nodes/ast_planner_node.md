@@ -87,8 +87,9 @@ validation and executed is reused
 - **Key:** `(normalised sub_query.intent, sub_query.datasource_id, sub_query.schema_version)`.
   When the sub-query has an `order_by` or `limit`, they are appended to the
   intent part (`... | order_by=album_count desc | limit=1`), so a top-1 and a
-  top-5 of the same intent are different entries while plain intents keep
-  their existing keys.
+  top-5 of the same intent are different entries. The run date is always
+  appended (`... | today=2026-10-12`): the planner is told today's date and
+  writes relative dates as literals, so a plan from another day misses.
   Normalisation case-folds, collapses whitespace and strips trailing `.?!,;:`;
   the match is exact. No `schema_version`, no caching.
 - **Read:** only on a first attempt (`retry_count == 0` and no errors). A hit

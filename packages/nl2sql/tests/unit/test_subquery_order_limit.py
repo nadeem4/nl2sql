@@ -17,9 +17,11 @@ never did, so the SQL and the rows scored returned everything. Now:
   limit as its semantic context, and is told to apply them.
 """
 import json
+from datetime import date
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
+from nl2sql.common.settings import settings
 from nl2sql.pipeline.nodes.ast_planner.node import ASTPlannerNode
 from nl2sql.pipeline.nodes.ast_planner.prompts import PLANNER_EXAMPLES, PLANNER_SYSTEM_PROMPT
 from nl2sql.pipeline.nodes.ast_planner.schemas import PlanModel
@@ -188,10 +190,12 @@ def test_the_planner_prompt_asks_for_order_by_and_limit():
 # --- the plan cache ---------------------------------------------------------------
 
 
-def test_the_plan_cache_key_tells_top_1_from_top_5():
+def test_the_plan_cache_key_tells_top_1_from_top_5(monkeypatch):
+    monkeypatch.setattr(settings, "today", date(2013, 12, 31))
     base = dict(schema_version="v1")
     key = PlanCache._key
 
     assert key(_sq(**base)) != key(_sq(limit=1, **base))
     assert key(_sq(limit=1, **base)) != key(_sq(limit=5, **base))
-    assert key(_sq(**base))[0] == "number of albums per artist"  # old entries still hit
+    # Ordering and limit are keyed only when present; the run date always is.
+    assert key(_sq(**base))[0] == "number of albums per artist | today=2013-12-31"
