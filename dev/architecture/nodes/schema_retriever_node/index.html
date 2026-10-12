@@ -2110,7 +2110,8 @@
   <a href="../../../security/model/#strict-refusal">Security Model</a>.</li>
 <li>The tables it returns keep every statistic, but the planner and refiner
   prompts render them with <code>render_schema_for_prompt</code> (<code>schema.py</code>), which
-  sends only <code>sample_values</code>. See
+  sends only <code>sample_values</code> and, for date, time and numeric columns other
+  than keys, a <code>range</code> of <code>[min_value, max_value]</code>. See
   <a href="../ast_planner_node/#prompt-layout-and-caching">AST Planner: prompt layout</a>.</li>
 </ul>
 <hr/>

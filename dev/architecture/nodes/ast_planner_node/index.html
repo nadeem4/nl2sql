@@ -2261,11 +2261,19 @@ cache seam: keep per-question content out of the system message.</p>
 sorted by name and keys sorted, so the same snapshot and role render
 byte-identically. It drops empty fields and <code>schema_version</code>. Of the column
 statistics only <code>sample_values</code> is sent (it helps match literal filters such as
-<code>'Rock'</code> or <code>'USA'</code>). For a text column with at most 50 distinct values it is
-every value, so "heavy metal" can be matched to <code>'Heavy Metal'</code>; for a larger
-one it is the five most frequent (<code>ALL_VALUES_MAX_DISTINCT</code> in
-<code>adapters/sqlalchemy_base/adapter.py</code>). <code>min_value</code>, <code>max_value</code>, <code>null_percentage</code> and
-<code>distinct_count</code> stay in the snapshot.</p>
+<code>'Rock'</code> or <code>'USA'</code>), plus <code>range</code>, <code>[min_value, max_value]</code>, for a date, time
+or numeric column that is not a key. For a text column with at most 50 distinct
+values <code>sample_values</code> is every value, so "heavy metal" can be matched to
+<code>'Heavy Metal'</code>; for a larger one it is the five most frequent
+(<code>ALL_VALUES_MAX_DISTINCT</code> in <code>adapters/sqlalchemy_base/adapter.py</code>). A date
+kept as text (every date in SQLite; <code>opened_at</code> in the support demo) is
+recognised by its ISO values and gets a <code>range</code> instead of <code>sample_values</code>. The
+range is what lets instruction 13 work: when "this year" or "the last 30 days"
+falls outside a date column's range, the planner uses the latest such period in
+the data and says so in its reasoning, rather than planning a filter that is
+certain to return nothing. <code>null_percentage</code> and <code>distinct_count</code> stay in the
+snapshot. On Chinook the ranges cost about 140 tokens of schema block (2,324 to
+2,466).</p>
 <p>Measured on Chinook with tiktoken <code>o200k_base</code>, its 12 demo questions, no LLM call
 (<code>python scripts/measure_prompt_tokens.py</code>):</p>
 <table>
