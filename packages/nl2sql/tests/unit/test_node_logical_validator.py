@@ -210,6 +210,15 @@ def test_logical_validator_column_not_found_strict_vs_warning(monkeypatch):
     assert any(e.error_code == ErrorCode.COLUMN_NOT_FOUND and e.severity.value == "ERROR" for e in result["errors"])
 
 
+def test_strict_columns_is_on_by_default(monkeypatch):
+    # An unresolved column used to be a WARNING by default, so the plan went
+    # on to the database and failed there instead of being retried here.
+    from nl2sql.common.settings import Settings
+
+    monkeypatch.delenv("LOGICAL_VALIDATOR_STRICT_COLUMNS", raising=False)
+    assert Settings().logical_validator_strict_columns is True
+
+
 def test_logical_validator_rejects_join_not_in_relationships():
     # Validates join relationship enforcement for deterministic planning.
     node = LogicalValidatorNode(_ctx())
