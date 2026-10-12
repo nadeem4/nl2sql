@@ -1054,6 +1054,24 @@
 </a>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="#batched-writes">
+<span class="md-ellipsis">
+      
+        Batched writes
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#the-combined-result">
+<span class="md-ellipsis">
+      
+        The combined result
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="#one-store-three-uri-schemes">
 <span class="md-ellipsis">
       
@@ -1900,6 +1918,24 @@
 </a>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="#batched-writes">
+<span class="md-ellipsis">
+      
+        Batched writes
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#the-combined-result">
+<span class="md-ellipsis">
+      
+        The combined result
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="#one-store-three-uri-schemes">
 <span class="md-ellipsis">
       
@@ -1974,13 +2010,25 @@
 <div class="md-content" data-md-component="content">
 <article class="md-content__inner md-typeset">
 <h1 id="artifact-store-architecture">Artifact Store Architecture</h1>
-<p>Execution results are persisted as <strong>artifacts</strong>. A single <code>ArtifactStore</code> writes Parquet to the configured backend (local, S3, ADLS) and emits <code>ArtifactRef</code> metadata used by aggregation and downstream consumers.</p>
+<p>Execution results are persisted as <strong>artifacts</strong>. A single <code>ArtifactStore</code> writes Parquet to the configured backend (local, S3, ADLS) and emits <code>ArtifactRef</code> metadata used by aggregation and downstream consumers. Each sub-query's result is one artifact, and the run's combined result is another, beside them.</p>
 <h2 id="storage-lifecycle">Storage lifecycle</h2>
 <pre class="mermaid"><code>flowchart TD
-    ResultFrame[ResultFrame] --&gt; Store[ArtifactStore.create_artifact_ref]
-    Store --&gt; Parquet[Parquet Object]
+    Adapter[Adapter: execute_batches or execute] --&gt; Batches[ResultFrame batches]
+    Batches --&gt; Store[ArtifactStore.write_batches]
+    Store --&gt; Parquet[Sub-query Parquet object]
     Parquet --&gt; Ref[ArtifactRef]
-    Ref --&gt; Aggregation[EngineAggregatorNode]</code></pre>
+    Ref --&gt; Aggregation[EngineAggregatorNode: polars scan]
+    Aggregation --&gt; Combined[ArtifactStore.write_lazy]
+    Combined --&gt; Result[Combined result Parquet object]
+    Result --&gt; Computed[AggregatorResponse.computed_artifacts]</code></pre>
+<h2 id="batched-writes">Batched writes</h2>
+<p>A result is written a batch at a time, so a large one is never held whole as Python rows. The executor reads it from the adapter's <code>execute_batches</code> when the adapter has one (the SDK's optional <code>StreamingAdapterProtocol</code>; every SQLAlchemy adapter does) in batches of <code>RESULT_FETCH_BATCH_SIZE</code> rows (default 10,000), and from <code>execute</code>, as one batch, when it does not.</p>
+<p><code>ArtifactStore.write_batches</code> writes a single batch straight to the artifact, exactly as before. From the second batch on, each batch is written to its own part file in a temporary folder as it arrives, and polars then streams the parts into the artifact (<code>sink_parquet</code>), concatenated with <code>vertical_relaxed</code> so a column that is empty in one batch and text in the next is text. At most one batch is in memory at a time. If the adapter reports a failure between batches, nothing is written, the parts are removed, and the sub-query fails as it would have from <code>execute</code>. <code>create_artifact_ref(frame, metadata)</code> is <code>write_batches([frame], metadata)</code>.</p>
+<h2 id="the-combined-result">The combined result</h2>
+<p>The aggregator reads each sub-query's artifact as a polars scan (<code>ArtifactStore.scan_parquet</code>), so combines and post-combine operations build one lazy plan, and writes each terminal result of the DAG to its own artifact with <code>ArtifactStore.write_lazy</code>, which streams the plan into the file and reads the row count and columns back from the file's metadata. It is rendered from the same template as the sub-query artifacts, with <code>result_&lt;node_id&gt;</code> as <code>sub_query_id</code> and <code>dag_node_id</code>, so the default template puts it in the run's folder:</p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-0-1" id="__codelineno-0-1" name="__codelineno-0-1"></a>&lt;tenant_id&gt;/&lt;request_id&gt;/result_&lt;node_id&gt;.parquet
+</code></pre></div>
+<p>A combined result has no subgraph or schema version of its own: a template that names <code>&lt;subgraph_name&gt;</code> or <code>&lt;schema_version&gt;</code> gets <code>aggregator</code> and <code>result</code>. Its <code>ArtifactRef</code> (with <code>sub_query_id</code> unset) is recorded in <code>AggregatorResponse.computed_artifacts</code> under the terminal node's id, and its <code>row_count</code> is the whole result's. <code>AggregatorResponse.terminal_results</code> holds only the first <code>ANSWER_PREVIEW_ROWS</code> rows of it, read from the saved file, for the answer model.</p>
 <h2 id="one-store-three-uri-schemes">One store, three URI schemes</h2>
 <p>There is no per-backend subclass. <code>ArtifactStore</code> builds a backend-specific URI, then uses the same polars read/write path for all backends, since polars addresses <code>s3://</code> and <code>abfs://</code> natively.</p>
 <table>
@@ -2024,9 +2072,9 @@
 </ul>
 <h2 id="path-templating">Path templating</h2>
 <p><code>Settings.result_artifact_path_template</code> defines the artifact path relative to the backend root, for every backend. It defaults to:</p>
-<div class="highlight"><pre><span></span><code><a href="#__codelineno-0-1" id="__codelineno-0-1" name="__codelineno-0-1"></a>&lt;tenant_id&gt;/&lt;request_id&gt;/&lt;sub_query_id&gt;.parquet
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-1-1" id="__codelineno-1-1" name="__codelineno-1-1"></a>&lt;tenant_id&gt;/&lt;request_id&gt;/&lt;sub_query_id&gt;.parquet
 </code></pre></div>
-<p>Each <code>&lt;key&gt;</code> placeholder is substituted from the metadata the executor passes to <code>create_artifact_ref</code>. The SQL executor supplies these keys:</p>
+<p>Each <code>&lt;key&gt;</code> placeholder is substituted from the metadata the executor passes to <code>write_batches</code>. The SQL executor supplies these keys:</p>
 <ul>
 <li><code>tenant_id</code></li>
 <li><code>request_id</code> (the trace ID, shared by every sub-query of a run)</li>
@@ -2041,7 +2089,7 @@
 <p>A template that names neither <code>&lt;sub_query_id&gt;</code> nor <code>&lt;dag_node_id&gt;</code> is therefore made unique rather than rejected: the store adds <code>-&lt;sub_query_id&gt;</code> to the end of the file name, before its extension, so <code>&lt;tenant_id&gt;/&lt;request_id&gt;.parquet</code> writes <code>&lt;tenant_id&gt;/&lt;request_id&gt;-&lt;sub_query_id&gt;.parquet</code>. The <code>ArtifactRef</code> records the template actually rendered in <code>path_template</code> and the sub-query in <code>sub_query_id</code>. A store used directly, with no <code>sub_query_id</code> in its metadata, renders the template as written.</p>
 <h2 id="tenant-aware-paths">Tenant-aware paths</h2>
 <p>Because the default template starts with <code>&lt;tenant_id&gt;</code>, every backend partitions artifacts per tenant:</p>
-<div class="highlight"><pre><span></span><code><a href="#__codelineno-1-1" id="__codelineno-1-1" name="__codelineno-1-1"></a>&lt;backend root&gt;/&lt;tenant_id&gt;/&lt;request_id&gt;/&lt;sub_query_id&gt;.parquet
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-2-1" id="__codelineno-2-1" name="__codelineno-2-1"></a>&lt;backend root&gt;/&lt;tenant_id&gt;/&lt;request_id&gt;/&lt;sub_query_id&gt;.parquet
 </code></pre></div>
 <h2 id="source-references">Source references</h2>
 <ul>

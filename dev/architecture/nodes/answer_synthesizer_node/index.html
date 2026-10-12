@@ -2185,7 +2185,8 @@
 <p>From <code>GraphState</code>:</p>
 <ul>
 <li><code>user_query</code> (required)</li>
-<li><code>aggregator_response.terminal_results</code> (required)</li>
+<li><code>aggregator_response.terminal_results</code> (required): the first rows of each terminal result</li>
+<li><code>aggregator_response.computed_artifacts</code>: the saved result behind each, for its row count and columns</li>
 <li><code>decomposer_response.unmapped_subqueries</code> (optional)</li>
 <li><code>subgraph_outputs[&lt;id&gt;].truncated</code> / <code>.row_cap</code>: whether a sub-query's result reached its row limit, and at how many rows.</li>
 <li><code>warnings</code>: the <code>VALUE_NOT_FOUND</code> warnings ("There is no Genre with Name 'Polka'.") from sub-queries whose filter named a value that does not exist (see <a href="../executor_node/#an-empty-results-filter-values">ExecutorNode</a>). An <code>ERROR</code>-severity one is not used: a retry replaced that attempt.</li>
@@ -2211,7 +2212,7 @@
 <ol>
 <li>Resolve aggregated result from <code>aggregator_response</code>.</li>
 <li>If missing, emit <code>INVALID_STATE</code> error and stop.</li>
-<li>Build the result preview (<code>result_preview()</code>): for each terminal result, its first <code>ANSWER_PREVIEW_ROWS</code> rows, <code>row_count</code>, <code>columns</code> and <code>partial</code> (true when rows were left out). Serialize it to JSON.</li>
+<li>Build the result preview (<code>result_preview()</code>): for each terminal result, its first <code>ANSWER_PREVIEW_ROWS</code> rows, <code>row_count</code>, <code>columns</code> and <code>partial</code> (true when rows were left out). The rows are the aggregator's <code>terminal_results</code>, already cut to the preview; <code>row_count</code> and <code>columns</code> come from the saved combined result in <code>computed_artifacts</code>, so they describe the whole result. Serialize it to JSON.</li>
 <li>Build the <em>Result Limit</em> note: one line per sub-query whose result reached its row limit ("The result was cut at 10,000 rows, the row limit, so it is incomplete. Narrow the question ..."), or <code>None</code>.</li>
 <li>Serialize unmapped sub‑queries to JSON.</li>
 <li>Invoke LLM chain with structured output. The prompt's <em>Data Notes</em> lists the missing values and asks the answer to say the value does not exist instead of reporting the empty result as a finding.</li>

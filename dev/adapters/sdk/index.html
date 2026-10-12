@@ -2052,6 +2052,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#optional-hook-execute_batchesrequest-batch_size" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Optional hook: execute_batches(request, batch_size)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#result-types-every-adapter-returns" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4472,6 +4483,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#optional-hook-execute_batchesrequest-batch_size" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Optional hook: execute_batches(request, batch_size)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#result-types-every-adapter-returns" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4616,6 +4638,27 @@ SQLite adapter, for example, rewrites <code>EXTRACT</code> and date truncation w
 DuckDB use the default.</p>
 <p><code>get_dialect()</code> must return a sqlglot dialect name (<code>postgres</code>, <code>tsql</code>,
 <code>mysql</code>, <code>duckdb</code>, <code>sqlite</code>, ...), not the SQLAlchemy name.</p>
+<h3 id="optional-hook-execute_batchesrequest-batch_size">Optional hook: <code>execute_batches(request, batch_size)</code></h3>
+<p><code>nl2sql_adapter_sdk.protocols.StreamingAdapterProtocol</code>. When the adapter has
+<code>execute_batches</code>, the engine reads the result through it, <code>RESULT_FETCH_BATCH_SIZE</code>
+rows at a time (default 10,000), and writes each batch to the sub-query's
+result artifact as it arrives, so a large result is never held whole in memory
+(see <a href="../../storage/artifact-store/#batched-writes">Artifact Store</a>). Without
+the hook the engine calls <code>execute</code> and writes its one <code>ResultFrame</code>, so an
+adapter written before the hook keeps working unchanged.</p>
+<p>The contract:</p>
+<ul>
+<li>It is a generator (or returns an iterator) of <code>ResultFrame</code>.</li>
+<li>Every frame carries the result's <code>columns</code> and at most <code>batch_size</code> rows. An empty result is one frame with its columns and no rows.</li>
+<li>A failure, before the first row or between batches, is one frame with <code>success=False</code> and an <code>error</code>, classified exactly as <code>execute</code> would (<code>retryable</code>, <code>safe_message</code>), and it is the last frame. The engine discards whatever it had written.</li>
+<li>The request is the same <code>AdapterRequest</code> <code>execute</code> gets; refuse one you cannot run the same way.</li>
+</ul>
+<p><code>BaseSQLAlchemyAdapter</code> implements it with <code>fetchmany</code> on a result opened with
+<code>stream_results</code>, a server-side cursor on drivers that have one (see
+<a href="../sqlalchemy/">SQLAlchemy adapters</a>).</p>
+<p>The hook is an optional protocol rather than a new required method so that the
+SDK change is additive: <code>DatasourceAdapterProtocol</code> is unchanged, and no
+third-party adapter has to be touched or re-released.</p>
 <h3 id="result-types-every-adapter-returns">Result types every adapter returns</h3>
 <p>These are part of the contract, so the same plan gives the same values on
 every database:</p>

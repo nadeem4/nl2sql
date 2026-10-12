@@ -2165,9 +2165,9 @@
 <hr/>
 <h2 id="responsibilities">Responsibilities</h2>
 <ul>
-<li>Load scan artifacts from <code>artifact_refs</code>.</li>
-<li>Execute combine and post‑operation nodes in DAG order.</li>
-<li>Produce <code>AggregatorResponse</code> with terminal results.</li>
+<li>Load scan artifacts from <code>artifact_refs</code>, lazily, as polars scans.</li>
+<li>Execute combine and post‑operation nodes in DAG order, as one lazy plan.</li>
+<li>Save each terminal result as its own artifact, and produce <code>AggregatorResponse</code> with those artifacts and a preview of each.</li>
 </ul>
 <hr/>
 <h2 id="position-in-execution-graph">Position in Execution Graph</h2>
@@ -2200,7 +2200,8 @@
 </ul>
 <p>Side effects:</p>
 <ul>
-<li>Reads artifacts from artifact store.</li>
+<li>Reads artifacts from the artifact store.</li>
+<li>Writes one artifact per terminal result, in the run's folder: <code>&lt;tenant_id&gt;/&lt;request_id&gt;/result_&lt;node_id&gt;.parquet</code> with the default template (see <a href="../../../storage/artifact-store/#the-combined-result">Artifact Store</a>).</li>
 </ul>
 <hr/>
 <h2 id="internal-flow-step-by-step">Internal Flow (Step-by-Step)</h2>
@@ -2211,7 +2212,10 @@
 <li>A <code>join</code>/<code>compare</code> combine resolves each join key against its frame's columns. A key written with a side or sub-query prefix (<code>right.customer</code>, <code>sq_2.customer</code>) resolves to the bare column when only that exists; an unknown key is left for polars to report. A <code>join</code>/<code>compare</code> with fewer than two inputs raises (<code>AGGREGATOR_FAILED</code>) instead of returning the one frame it has; the decomposer refuses such a group before anything runs, so this is the last line of defence.</li>
 <li>A post-combine op (<code>PolarsDuckdbEngine.post_op</code>) applies every field it carries, in SQL's order: the reshaping its <code>operation</code> names (<code>aggregate</code> groups with polars' <code>group_by</code>, <code>project</code> selects <code>expected_schema</code>), then its <code>filters</code> (after an aggregate they filter the aggregated rows, as HAVING does), its <code>order_by</code>, and its <code>limit</code>. A <code>filter</code> op with <code>order_by</code> and <code>limit</code>, as the decomposer's prompt used to show, keeps all three.</li>
 <li>Before polars is asked for any column, a post-combine op's attributes (<code>group_by</code>, <code>metrics</code>, <code>project</code>'s <code>expected_schema</code>, <code>filters</code>, <code>order_by</code>) are checked against the combined frame. An attribute the frame does not have is refused with the columns it does have, and a side-qualified one (<code>right.customer</code>) with the reason — see <em>No anti-join</em> below. The decomposer runs the same check on the decomposition before anything executes (<code>nl2sql/aggregation/columns.py</code>, shared with this engine) and asks the model again once, so here it is the last line of defence.</li>
-<li>Build <code>AggregatorResponse</code> with <code>terminal_results</code>.</li>
+<li><code>AggregationService.execute</code> returns each terminal node as a polars <code>LazyFrame</code>: the scans are <code>ArtifactStore.scan_parquet</code>, and the combines and post-combine ops only add to the plan, so no sub-query result is loaded whole before it is written.</li>
+<li>Save each terminal result with <code>ArtifactStore.write_lazy</code>, which streams the plan into a parquet artifact, and build <code>AggregatorResponse</code>:</li>
+<li><code>computed_artifacts[node_id]</code>: the saved result's <code>ArtifactRef</code>, with the whole result's <code>row_count</code> and <code>columns</code> (<code>sub_query_id</code> unset). Later steps (paging, CSV export) read the result from here.</li>
+<li><code>terminal_results[node_id]</code>: the first <code>ANSWER_PREVIEW_ROWS</code> rows, read back from that artifact. This is what the answer model is shown; it is not the whole result.</li>
 <li>Return success reasoning.</li>
 <li>On exception, emit <code>AGGREGATOR_FAILED</code>, on the state's <code>errors</code> and on <code>AggregatorResponse.errors</code>. The graph's <code>aggregator_route</code> then ends the run: the answer synthesizer is not called on the empty result, so the aggregator's error is the run's outcome and no model call is spent explaining <code>{}</code>.</li>
 </ol>
@@ -2307,8 +2311,8 @@ is a feature, not a fix, and is deliberately not done here.</p>
 <hr/>
 <h2 id="performance-characteristics">Performance Characteristics</h2>
 <ul>
-<li>Reads Parquet artifacts and executes joins/aggregations in Polars/DuckDB.</li>
-<li>Cost grows with artifact size and DAG complexity.</li>
+<li>Scans Parquet artifacts lazily and executes joins/aggregations in polars; the combined result is streamed to its artifact (<code>sink_parquet</code>), and only the preview rows are collected into Python.</li>
+<li>Cost grows with artifact size and DAG complexity. A join, sort or group-by may still need its inputs in memory as polars columns, never as Python rows.</li>
 </ul>
 <hr/>
 <h2 id="observability">Observability</h2>
@@ -2319,7 +2323,9 @@ is a feature, not a fix, and is deliberately not done here.</p>
 <hr/>
 <h2 id="configuration">Configuration</h2>
 <ul>
-<li>Uses <code>PolarsDuckdbEngine</code>; no direct settings consumed by the node.</li>
+<li>Uses <code>PolarsDuckdbEngine</code>.</li>
+<li><code>ANSWER_PREVIEW_ROWS</code>: rows of each terminal result kept in <code>terminal_results</code>.</li>
+<li><code>RESULT_ARTIFACT_*</code>: where the combined result is written, as for the sub-query artifacts.</li>
 </ul>
 <hr/>
 <h2 id="extension-points">Extension Points</h2>
@@ -2331,7 +2337,6 @@ is a feature, not a fix, and is deliberately not done here.</p>
 <h2 id="known-limitations">Known Limitations</h2>
 <ul>
 <li>Fails if required artifacts are missing.</li>
-<li>No streaming or partial aggregation.</li>
 <li>Several post-combine ops on one combine group are siblings, not a chain: each reads the combine's output and is its own terminal result.</li>
 </ul>
 <hr/>

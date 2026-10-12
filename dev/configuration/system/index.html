@@ -2372,6 +2372,11 @@ providers. The check runs on the read path only, so the fix is simply to re-run
 <td>The most rows one sub-query returns: a resource ceiling baked into the SQL as a <code>LIMIT</code>. A datasource's own <code>row_limit</code> applies when it is lower (the demo datasources set <code>10000</code>). A result that reaches it is flagged as truncated (<code>QueryResult.truncated</code>, <code>sub_queries[].truncated</code>) and the answer says it was cut.</td>
 </tr>
 <tr>
+<td><code>RESULT_FETCH_BATCH_SIZE</code></td>
+<td><code>10000</code></td>
+<td>Rows fetched from the database and written to the sub-query's result artifact at a time, for an adapter that streams (<code>execute_batches</code>; every built-in SQL adapter does). At most one batch is held in memory. See <a href="../../storage/artifact-store/#batched-writes">Artifact Store</a>.</td>
+</tr>
+<tr>
 <td><code>ANSWER_PREVIEW_ROWS</code></td>
 <td><code>20</code></td>
 <td>Result rows the answer model sees, with the total row count and the column names. The model writes about the result; it never copies it. See <a href="../../architecture/nodes/answer_synthesizer_node/">AnswerSynthesizerNode</a>.</td>

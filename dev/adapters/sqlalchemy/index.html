@@ -2042,6 +2042,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#execute_batchesrequest-batch_size" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        execute_batches(request, batch_size)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#is_retryable_errorexc-bool" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4390,6 +4401,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#execute_batchesrequest-batch_size" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        execute_batches(request, batch_size)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#is_retryable_errorexc-bool" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4480,6 +4502,16 @@
 registered under the <code>nl2sql.adapters</code> entry point.</p>
 <h4 id="explainsql-str-cost_estimatesql-str"><code>explain(sql: str)</code> / <code>cost_estimate(sql: str)</code></h4>
 <p>The base class provides stubs. Override these to implement database-specific optimization logic (e.g., <code>EXPLAIN ANALYZE</code>).</p>
+<h4 id="execute_batchesrequest-batch_size"><code>execute_batches(request, batch_size)</code></h4>
+<p>Implements the SDK's optional <code>StreamingAdapterProtocol</code> (see <a href="../sdk/#optional-hook-execute_batchesrequest-batch_size">the adapter SDK</a>).
+It opens the result with <code>stream_results=True</code> and yields it in frames of
+<code>fetchmany(batch_size)</code> rows, each with the columns, so no more than one batch
+is held as Python rows. <code>stream_results</code> is a server-side cursor on drivers
+that have one (psycopg2, the MySQL drivers); the others ignore it and buffer
+in the driver, which is still not a Python row list. A <code>SQLAlchemyError</code>,
+before the first row or between batches, is yielded as <code>query_failed(exc)</code>,
+the same failed frame <code>execute</code> returns. <code>execute</code> itself still reads the whole
+result with <code>fetchall</code>.</p>
 <h4 id="is_retryable_errorexc-bool"><code>is_retryable_error(exc) -&gt; bool</code></h4>
 <p><code>execute()</code> catches every <code>SQLAlchemyError</code> the query raises and returns it as
 a failed <code>ResultFrame</code> (<code>query_failed(exc)</code>), with <code>retryable</code> from this method
