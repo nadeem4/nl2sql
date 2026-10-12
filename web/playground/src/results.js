@@ -13,10 +13,28 @@ const base = (requestId, resultId) =>
   `/api/query/${encodeURIComponent(requestId)}/results/${encodeURIComponent(resultId)}`;
 
 // One tab per result, and none at all for a single one: a lone tab says nothing.
+// Tabs are numbered; the node id is internal, so it is only the tooltip.
 export function resultTabs(manifest) {
   const list = manifest || [];
   if (list.length < 2) return [];
-  return list.map((r) => ({ id: r.node_id, label: r.node_id, rows: rows(r.row_count) }));
+  return list.map((r, i) => ({ id: r.node_id, label: `Result ${i + 1}`, rows: rows(r.row_count), title: r.node_id }));
+}
+
+// Which result is shown and where its page starts. Picking a tab starts that
+// result at its first page; paging moves within the result on screen.
+export function initialView(manifest) {
+  const first = (manifest || [])[0];
+  return { active: first ? first.node_id : null, offset: 0 };
+}
+
+export function rowsView(view, action) {
+  if (action.type === "select") return { active: action.id, offset: 0 };
+  if (action.type === "page") return { ...view, offset: action.offset };
+  return view;
+}
+
+export function viewUrl(requestId, view, limit = PAGE_SIZE) {
+  return pageUrl(requestId, view.active, view.offset, limit);
 }
 
 export function pageUrl(requestId, resultId, offset, limit = PAGE_SIZE) {
@@ -36,11 +54,12 @@ export function pageNav(page) {
   return { prev, next };
 }
 
-// "Rows 101–200 of 3,340".
-export function pageRange(page) {
+// "Rows 101–200 of 3,340", out of the selected result's own row_count, the
+// same number its tab and head show.
+export function pageRange(page, summary) {
   const shown = (page.rows || []).length;
   if (!shown) return "No rows";
-  const total = page.total_rows;
+  const total = summary.row_count;
   if (total === 1) return "Row 1 of 1";
   return `Rows ${n(page.offset + 1)}–${n(page.offset + shown)} of ${n(total)}`;
 }

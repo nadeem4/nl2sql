@@ -1,7 +1,8 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useReducer, useRef, useState } from "react";
 import { barShares, firstNumericColumn, numericColumns } from "./artifacts.js";
 import {
-  PAGE_SIZE, csvUrl, firstPage, pageNav, pageRange, pageUrl, resultTabs, rowCount, truncatedNotice,
+  PAGE_SIZE, csvUrl, firstPage, initialView, pageNav, pageRange, resultTabs, rowCount, rowsView, truncatedNotice,
+  viewUrl,
 } from "./results.js";
 
 // A run's saved results as a card: one tab per result when there are several,
@@ -62,21 +63,23 @@ function Grid({ columns, rows, busy = false }) {
 
 // One result, a page at a time. The page on screen stays while the next one
 // loads, so Next never blanks the card.
-function PagedResult({ requestId, summary, subQueries }) {
+// `view` (results.js, `rowsView`) says which result and which offset; a new
+// result remounts this, so no page of the last one is shown under its tab.
+function PagedResult({ requestId, summary, subQueries, view, onPage }) {
   const empty = firstPage(summary);
-  const [offset, setOffset] = useState(0);
   const [page, setPage] = useState(empty);
   const [loading, setLoading] = useState(!empty);
   const [error, setError] = useState(null);
   const [attempt, setAttempt] = useState(0);
   const resultId = summary.node_id;
+  const offset = view.offset;
 
   useEffect(() => {
     if (empty) return undefined;
     const controller = new AbortController();
     setLoading(true);
     setError(null);
-    fetch(pageUrl(requestId, resultId, offset, PAGE_SIZE), { signal: controller.signal })
+    fetch(viewUrl(requestId, view, PAGE_SIZE), { signal: controller.signal })
       .then(async (response) => {
         if (!response.ok) {
           const reply = await response.json().catch(() => ({}));
@@ -128,13 +131,13 @@ function PagedResult({ requestId, summary, subQueries }) {
         </p>
       )}
       <div className="art-foot">
-        <span id="rows-range" aria-live="polite">{loading && !page ? "Loading rows" : page ? pageRange(page) : ""}</span>
+        <span id="rows-range" aria-live="polite">{loading && !page ? "Loading rows" : page ? pageRange(page, summary) : ""}</span>
         {(nav.prev !== null || nav.next !== null) && (
           <span className="rows-pager">
             <button type="button" className="inspect-close" id="rows-prev"
-              disabled={nav.prev === null || loading} onClick={() => setOffset(nav.prev)}>Previous</button>
+              disabled={nav.prev === null || loading} onClick={() => onPage(nav.prev)}>Previous</button>
             <button type="button" className="inspect-close" id="rows-next"
-              disabled={nav.next === null || loading} onClick={() => setOffset(nav.next)}>Next</button>
+              disabled={nav.next === null || loading} onClick={() => onPage(nav.next)}>Next</button>
           </span>
         )}
       </div>
@@ -164,11 +167,12 @@ export function SampleRows({ rows }) {
 export default function RowsTable({ result }) {
   const manifest = result.result_manifest || [];
   const tabs = resultTabs(manifest);
-  const [active, setActive] = useState(manifest[0] && manifest[0].node_id);
+  const [view, dispatch] = useReducer(rowsView, manifest, initialView);
   const tabRefs = useRef([]);
-  const summary = manifest.find((r) => r.node_id === active) || manifest[0];
+  const summary = manifest.find((r) => r.node_id === view.active) || manifest[0];
+  const select = (id) => dispatch({ type: "select", id });
   const pick = (i) => {
-    setActive(tabs[i].id);
+    select(tabs[i].id);
     if (tabRefs.current[i]) tabRefs.current[i].focus();
   };
   // Arrow keys move along the tabs, as a tablist does.
@@ -187,8 +191,8 @@ export default function RowsTable({ result }) {
             return (
               <button key={tab.id} type="button" role="tab" className="seg-opt" id={`rows-tab-${i}`}
                 ref={(el) => { tabRefs.current[i] = el; }}
-                aria-selected={on} aria-controls="rows-panel" tabIndex={on ? 0 : -1}
-                data-on={on ? "true" : undefined} onClick={() => setActive(tab.id)} onKeyDown={(e) => onKey(e, i)}>
+                aria-selected={on} aria-controls="rows-panel" tabIndex={on ? 0 : -1} title={tab.title}
+                data-on={on ? "true" : undefined} onClick={() => select(tab.id)} onKeyDown={(e) => onKey(e, i)}>
                 {tab.label}<span className="rows-tab-n">{tab.rows}</span>
               </button>
             );
@@ -198,7 +202,8 @@ export default function RowsTable({ result }) {
       <div id="rows-panel" role={tabs.length ? "tabpanel" : undefined}
         aria-labelledby={tabs.length ? `rows-tab-${tabs.findIndex((t) => t.id === summary.node_id)}` : undefined}>
         <PagedResult key={summary.node_id} requestId={result.trace_id} summary={summary}
-          subQueries={result.sub_queries} />
+          subQueries={result.sub_queries} view={{ ...view, active: summary.node_id }}
+          onPage={(offset) => dispatch({ type: "page", offset })} />
       </div>
     </div>
   );

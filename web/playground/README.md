@@ -292,15 +292,18 @@ with `record: clips` runs the same script in CI and opens a pull request.
   run's saved results from `result_manifest` in `/api/ask`, never the sample
   in `sub_queries[].rows`. With more than one result it opens with one tab per
   result (`#rows-tabs`, the database switcher's segmented control, each tab
-  the `node_id` and its row count; arrow keys move between them); with one
-  there are no tabs. The head says **Result** and the whole result's row count
+  **Result 1**, **Result 2** with its row count and the internal `node_id`
+  only as the tooltip; arrow keys move between them); with one there are no
+  tabs. Picking a tab starts that result at its first page and fetches its
+  own rows (`rowsView` in `src/results.js`). The head says **Result** and the whole result's row count
   (`#rows-total`) and offers **Download CSV** (`#rows-csv`), a plain link to
   `GET /api/query/{trace_id}/results/{node_id}.csv`, so the file is every row,
   streamed by the server. A result cut at its row ceiling gets one line under
   the head in the warn ink (`#rows-truncated`: "Cut at 1,000 rows, so some are
   missing. Narrow the question to get them all."). The rows come a page of 100
   at a time from `GET /api/query/{trace_id}/results/{node_id}?offset=&limit=`;
-  the foot says **Rows 101–200 of 3,340** (`#rows-range`) beside **Previous**
+  the foot says **Rows 101–200 of 3,340** (`#rows-range`, out of the selected
+  result's own `row_count`, the number its tab and head show) beside **Previous**
   and **Next** (`#rows-prev`, `#rows-next`, the latter following the server's
   `next_offset`). While a page loads the one on screen stays, dimmed; the
   first one shows skeleton lines, and a failed request says so with **Try

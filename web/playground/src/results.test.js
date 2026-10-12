@@ -5,7 +5,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  PAGE_SIZE, csvUrl, firstPage, pageNav, pageRange, pageUrl, resultTabs, rowCount, subQueryHeads, truncatedNotice,
+  PAGE_SIZE, csvUrl, firstPage, initialView, pageNav, pageRange, pageUrl, resultTabs, rowCount, rowsView,
+  subQueryHeads, truncatedNotice, viewUrl,
 } from "./results.js";
 
 const longest = { node_id: "combine_g1", columns: ["genre", "track", "ms"], row_count: 3340, truncated: false };
@@ -16,10 +17,26 @@ test("resultTabs: no tabs for a single result, one per result for more", () => {
   assert.deepEqual(resultTabs([longest]), []);
 
   const tabs = resultTabs([longest, { node_id: "sq_2", columns: ["n"], row_count: 1, truncated: false }]);
+  // Numbered for the reader; the internal node id is kept only as the tooltip.
   assert.deepEqual(tabs, [
-    { id: "combine_g1", label: "combine_g1", rows: "3,340 rows" },
-    { id: "sq_2", label: "sq_2", rows: "1 row" },
+    { id: "combine_g1", label: "Result 1", rows: "3,340 rows", title: "combine_g1" },
+    { id: "sq_2", label: "Result 2", rows: "1 row", title: "sq_2" },
   ]);
+});
+
+test("rowsView: a tab switch selects that result, starts at offset 0 and asks for its own rows", () => {
+  const second = { node_id: "sq_2", columns: ["n"], row_count: 1000, truncated: true };
+  let view = initialView([longest, second]);
+  assert.deepEqual(view, { active: "combine_g1", offset: 0 });
+
+  view = rowsView(view, { type: "page", offset: 200 });
+  assert.deepEqual(view, { active: "combine_g1", offset: 200 });
+  assert.equal(viewUrl("run-1", view), "/api/query/run-1/results/combine_g1?offset=200&limit=100");
+
+  view = rowsView(view, { type: "select", id: "sq_2" });
+  assert.deepEqual(view, { active: "sq_2", offset: 0 });
+  assert.equal(viewUrl("run-1", view), "/api/query/run-1/results/sq_2?offset=0&limit=100");
+  assert.equal(initialView([]).active, null);
 });
 
 test("pageUrl asks the paging endpoint for one page, 100 rows by default", () => {
@@ -44,11 +61,14 @@ test("pageNav: previous steps back a page, next follows the server's next_offset
   assert.deepEqual(pageNav({ offset: 40, limit: 100, total_rows: 45, next_offset: null }), { prev: 0, next: null });
 });
 
-test("pageRange says which rows are on screen out of how many", () => {
-  assert.equal(pageRange({ offset: 0, rows: new Array(100), total_rows: 3340 }), "Rows 1–100 of 3,340");
-  assert.equal(pageRange({ offset: 3300, rows: new Array(40), total_rows: 3340 }), "Rows 3,301–3,340 of 3,340");
-  assert.equal(pageRange({ offset: 0, rows: [[1]], total_rows: 1 }), "Row 1 of 1");
-  assert.equal(pageRange({ offset: 0, rows: [], total_rows: 0 }), "No rows");
+test("pageRange says which rows are on screen out of the selected result's row_count", () => {
+  assert.equal(pageRange({ offset: 0, rows: new Array(100) }, longest), "Rows 1–100 of 3,340");
+  assert.equal(pageRange({ offset: 3300, rows: new Array(40) }, longest), "Rows 3,301–3,340 of 3,340");
+  assert.equal(pageRange({ offset: 0, rows: [[1]] }, { row_count: 1 }), "Row 1 of 1");
+  assert.equal(pageRange({ offset: 0, rows: [] }, { row_count: 0 }), "No rows");
+  // The total is the selected tab's own count, whatever the page reply carries.
+  assert.equal(pageRange({ offset: 0, rows: new Array(100), total_rows: 3340 }, { row_count: 1000 }),
+    "Rows 1–100 of 1,000");
 });
 
 test("rowCount is the header's total", () => {
