@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.2.4](https://github.com/nadeem4/nl2sql/compare/v0.2.3...v0.2.4) (2026-10-12)
+
+
+### Bug Fixes
+
+* **cache:** key cached plans on the run date ([#228](https://github.com/nadeem4/nl2sql/issues/228)) ([cd37f43](https://github.com/nadeem4/nl2sql/commit/cd37f43fc1f27dcb66b5fcbcb200f0c6abedf0fc))
+
+
+### Documentation
+
+* **release:** notes for 0.2.4 ([#230](https://github.com/nadeem4/nl2sql/issues/230)) ([4c7af38](https://github.com/nadeem4/nl2sql/commit/4c7af386b0ee41942a0b72c50e1ea00a4180f129))
+
 ## [0.2.3](https://github.com/nadeem4/nl2sql/compare/v0.2.2...v0.2.3) (2026-10-12)
 
 
