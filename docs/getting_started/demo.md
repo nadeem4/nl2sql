@@ -317,6 +317,16 @@ Ask is the question box, then the run, answer first:
   usage, or **Code**) and the step's time. On the spine a round mark is a model
   step and a square one is code; filled with a tick is done, an outline is
   waiting and a dashed outline was not reached.
+- **Every sub-query.** When a question is split into several sub-queries, the
+  Plan and SQL stations show each one under its own head (**Sub-query 1 of 2**,
+  its intent and its database).
+- **Rows, at any size.** The Rows station reads the run's saved results, not
+  the sample the answer model saw. Its head gives the whole result's row count,
+  and a result cut at its row ceiling says so: **Cut at 1,000 rows, so some are
+  missing. Narrow the question to get them all.** The table shows 100 rows at a
+  time, fetched from the server, with **Previous**, **Next** and **Rows
+  101–200 of 3,340**. A run with several results gets one tab per result.
+  **Download CSV** streams the whole result from the server, every row.
 - **The gate.** The Checks station shows the plans the checks saw (**Plan 1
   refused**, then **Plan 2 passed** when the first was sent back), why, in one
   sentence, and each check as a tile with a tick or a cross.

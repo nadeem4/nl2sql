@@ -1,5 +1,5 @@
-// Pure helpers for the run's data artifacts: the rows table's magnitude bars,
-// its CSV, and the bars in the ledger and the retrieval pool. No React here, so
+// Pure helpers for the run's data artifacts: the rows table's magnitude bars
+// and the bars in the ledger and the retrieval pool. No React here, so
 // `npm test` covers them with node's own test runner.
 
 const isNum = (v) => typeof v === "number" && Number.isFinite(v);
@@ -34,23 +34,4 @@ export function minMaxShares(values) {
   const lo = Math.min(...nums);
   const hi = Math.max(...nums);
   return (values || []).map((v) => (isNum(v) ? (hi > lo ? (v - lo) / (hi - lo) : 1) : null));
-}
-
-// RFC 4180 CSV. Text a spreadsheet would run as a formula gets a leading
-// apostrophe; numbers are left as they are.
-function csvField(value) {
-  if (value === null || value === undefined) return "";
-  let text = typeof value === "object" ? JSON.stringify(value) : String(value);
-  if (typeof value === "string" && /^[=+\-@\t\r]/.test(text)) text = `'${text}`;
-  return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
-}
-
-export function toCsv(columns, rows) {
-  const line = (cells) => cells.map(csvField).join(",") + "\r\n";
-  return line(columns || []) + (rows || []).map(line).join("");
-}
-
-export function csvFileName(result) {
-  const id = result && result.trace_id;
-  return id ? `nl2sql-rows-${id}.csv` : "nl2sql-rows.csv";
 }

@@ -1251,6 +1251,30 @@ li[data-flag="denied"] .flag { color: var(--ink); background: var(--well); }
 .barcell { display: grid; grid-template-columns: minmax(48px, 1fr) var(--num-w, 7ch); gap: var(--sp-3); align-items: center; }
 .barcell > span:last-child { text-align: right; }
 
+/* Several results: the segmented control, on the card's own ground. */
+.rows-tabs { margin: var(--sp-3) var(--sp-5) 0; }
+.rows-tabs .seg-opt { gap: var(--sp-2); border: 0; background: transparent; }
+.rows-tabs .seg-opt[data-on] { background: var(--raised); }
+.rows-tab-n { color: var(--ink-3); }
+/* A result cut at its row ceiling: one line under the head, in the warn ink. */
+.rows-cut {
+  margin: 0; padding: var(--sp-2) var(--sp-5); border-bottom: 1px solid var(--hair);
+  font-size: var(--fs-2); color: var(--warn); background: var(--warn-soft);
+}
+.rows-wait { display: grid; gap: var(--sp-3); padding: var(--sp-5); }
+.rows-error { margin: 0; padding: var(--sp-3) var(--sp-5); font-size: var(--fs-2); color: var(--fault); }
+.rows-table td.rows-empty { font-family: var(--sans); color: var(--ink-3); }
+.art-scroll[data-busy] { opacity: .55; transition: opacity var(--dur-state) ease; }
+.rows-pager { display: inline-flex; gap: var(--sp-1); margin-left: auto; }
+.rows-pager .inspect-close { margin-left: 0; font-family: var(--sans); }
+.rows-pager .inspect-close:disabled { color: var(--ink-3); opacity: .6; }
+
+/* Several sub-queries: each plan and each SQL card under its own head. */
+.sub-block + .sub-block { margin-top: var(--sp-5); }
+.sub-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--sp-2); margin: 0 0 var(--sp-2); font-size: var(--fs-1); color: var(--ink-3); }
+.sub-head b { font-weight: var(--fw-bold); letter-spacing: .06em; text-transform: uppercase; }
+.sub-head span { font-family: var(--mono); color: var(--ink-2); }
+
 /* One bar for every magnitude: a 6px track and its fill. */
 .bar { display: block; height: 6px; border-radius: 99px; background: var(--well); overflow: hidden; }
 .bar i {
@@ -1314,6 +1338,8 @@ ol.chips.picks li { border-color: color-mix(in srgb, var(--accent) 45%, var(--ru
 
 @media (max-width: 640px) {
   .art-head, .art-foot { padding-left: var(--sp-4); }
+  .rows-cut, .rows-error { padding-left: var(--sp-4); padding-right: var(--sp-4); }
+  .rows-tabs { margin-left: var(--sp-4); margin-right: var(--sp-4); }
   .sql-code { padding: var(--sp-3) var(--sp-4); }
   .rows-table th, .rows-table td { padding-left: var(--sp-3); padding-right: var(--sp-3); }
   .rows-table td { height: 44px; }
