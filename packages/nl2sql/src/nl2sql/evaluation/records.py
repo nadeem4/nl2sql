@@ -386,7 +386,7 @@ def describe_change(new: Dict[str, Any], old: Optional[Dict[str, Any]], *, show_
 
     With ``show_flips`` the headline deltas are followed by how many questions
     flipped each way and McNemar's exact p-value on them, which is what says
-    whether a difference of a few points means anything at n = 43.
+    whether a difference of a few points means anything at n = 47.
     """
     if old is None:
         return "first run"
@@ -545,7 +545,7 @@ def render_history(recs: Sequence[Dict[str, Any]]) -> str:
             "`nl2sql benchmark publish` from the records in `benchmarks/`; do not edit by hand.\n"
             "Grouped by benchmark and database, newest first. Accuracy is given with its 95% Wilson\n"
             "interval. \"Δ vs previous\" is the change against the previous run of the same config, and\n"
-            "for tier 2 how many questions flipped each way with McNemar's exact p-value on them: at 43\n"
+            "for tier 2 how many questions flipped each way with McNemar's exact p-value on them: at 47\n"
             "questions a few points either way is noise, so read the flips and the p-value rather than\n"
             "the headline. Runs on another gold dataset (`@sha`), another schema or, for tier 2, other\n"
             "roles are not comparable and start a new series. See\n"

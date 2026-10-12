@@ -31,7 +31,7 @@ The file is a YAML list. Each entry:
 | `id` | Unique id, `chinook_NNN` |
 | `question` | The natural-language question |
 | `difficulty` | `easy`, `medium` or `hard` |
-| `tags` | Categories: `single-table`, `filter`, `join`, `multi-join`, `aggregation`, `having`, `order-limit`, `offset`, `ties`, `date`, `paraphrase`, `keyword-in-question`, `keyword-in-value`, `rbac-denial`, `unanswerable` |
+| `tags` | Categories: `single-table`, `filter`, `join`, `multi-join`, `aggregation`, `having`, `order-limit`, `offset`, `ties`, `date`, `paraphrase`, `keyword-in-question`, `keyword-in-value`, `data-range` (needs to know where the data ends: "the most recent month in the data"), `value-matching` (names a stored value in other words: "heavy metal" for `'Heavy Metal'`), `rbac-denial`, `unanswerable` |
 | `paraphrase_group` | Optional. Questions with the same intent share this id and the same `gold_result`, for determinism checks |
 | `datasource` | The database the question is asked against. Defaults to `chinook` and is written out only where a question differs, so the file - and its sha256 - are unchanged. It is what the run is scored and identified by, so the demo's other databases do not widen it |
 | `needed_tables` | Exactly the tables `gold_sql` reads, for retrieval recall |
@@ -203,7 +203,7 @@ Spider 2.0 supports multiple gold files per task
 
 Prefer an alternative to loosening the comparator. An alternative is written
 down, reviewed once, and only ever affects the question it sits on; a looser
-rule applies to all forty-five at once and can quietly start passing wrong
+rule applies to all forty-seven at once and can quietly start passing wrong
 answers. The [lenient score](#strict-and-lenient-accuracy) is deliberately
 narrow for the same reason.
 
@@ -312,7 +312,7 @@ and then, from the repo, `nl2sql benchmark publish --from <demo folder>`
 | `--results-dir DIR` | `<project>/benchmarks` | The benchmarks folder; one record per config goes in `DIR/tier2/<database>/` |
 | `--baseline PATH` | none | A committed scoreboard to check against (below) |
 | `--max-regressions N` | `2` | Baseline: how many questions may flip from pass to fail before the run fails; a smaller but significant drop fails too |
-| `--max-accuracy-drop F` | none | Deprecated: a flat accuracy drop gate. Smaller than one question at n = 43, so it fired on noise. Only applied when passed |
+| `--max-accuracy-drop F` | none | Deprecated: a flat accuracy drop gate. Smaller than one question at n = 47, so it fired on noise. Only applied when passed |
 | `--max-cost-increase F` | `0.2` | Baseline: largest allowed rise in cost per question (0.2 is 20%) |
 
 `<project>` is the folder of the env file the run is configured from: for
@@ -326,7 +326,7 @@ Before anything is spent, the run prints its plan and carries on without a
 prompt (the cap is the safety):
 
 ```
-Plan: 43 questions x role admin x 1 pass, cap $10.00
+Plan: 47 questions x role admin x 1 pass, cap $10.00
   gpt-5.4: gpt-5.4 (every node)
   gpt-5.4-mini-helpers: gpt-5.4 (astplanner, refiner); gpt-5.4-mini (answersynthesizer, datasourceresolver, decomposer)
   Records: C:\demo\benchmarks\tier2  Scoreboard: C:\demo\benchmark_tier2.json
@@ -495,10 +495,10 @@ the same fixed sentence for every question, with nothing to check.
 
 ### Reading a run: intervals, flips and pass^k
 
-Forty-three questions cannot settle much on their own. 25 of 43 is 58.1%, and
-its 95% Wilson interval is **43.3%-71.6%** -- about fourteen points either
+Forty-seven questions cannot settle much on their own. 27 of 47 is 57.4%, and
+its 95% Wilson interval is **43.3%-70.5%** -- about fourteen points either
 way. Every run therefore prints and records that interval next to both
-scores, written `58.1% [43.3-71.6]`, and the gate below is built on the
+scores, written `57.4% [43.3-70.5]`, and the gate below is built on the
 questions that moved rather than on the headline
 ([Anthropic, *A statistical approach to model
 evals*](https://www.anthropic.com/research/statistical-approach-to-model-evals)).
@@ -507,7 +507,7 @@ one the runs of a single question are not independent and it reads narrower
 than it really is; pass^k below counts questions and does not.
 
 **Compare two runs question by question, not headline to headline.** The same
-45 questions are run both times, so the runs are paired and most of the
+47 questions are run both times, so the runs are paired and most of the
 variance cancels. `--baseline PATH` prints, per config:
 
 - the strict and lenient accuracy of each run, side by side;
@@ -536,8 +536,8 @@ The README block keeps the deltas only.
 | Cost per question rose by more than `--max-cost-increase` | 0.2 | Unchanged |
 
 `--max-accuracy-drop` is **deprecated**. It failed a run when accuracy fell by
-more than a flat fraction, two points by default -- and at n = 43 one question
-is 2.3 points, so the gate was tighter than the resolution of the benchmark
+more than a flat fraction, two points by default -- and at n = 47 one question
+is 2.1 points, so the gate was tighter than the resolution of the benchmark
 and fired on run-to-run noise. It still works when it is passed explicitly,
 with a warning, and is no longer applied unless it is.
 

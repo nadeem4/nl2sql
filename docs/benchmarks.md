@@ -4,7 +4,7 @@ Recorded benchmark runs of the engine on the Chinook gold questions. Generated b
 `nl2sql benchmark publish` from the records in `benchmarks/`; do not edit by hand.
 Grouped by benchmark and database, newest first. Accuracy is given with its 95% Wilson
 interval. "Δ vs previous" is the change against the previous run of the same config, and
-for tier 2 how many questions flipped each way with McNemar's exact p-value on them: at 43
+for tier 2 how many questions flipped each way with McNemar's exact p-value on them: at 47
 questions a few points either way is noise, so read the flips and the p-value rather than
 the headline. Runs on another gold dataset (`@sha`), another schema or, for tier 2, other
 roles are not comparable and start a new series. See

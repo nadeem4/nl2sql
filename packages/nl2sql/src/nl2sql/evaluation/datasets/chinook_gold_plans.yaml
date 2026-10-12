@@ -769,3 +769,28 @@ chinook_045:
   limit: 10
   offset: 10
   reasoning: Sum invoice totals per customer, rank them, and keep ranks 11 to 20.
+
+chinook_046:
+  tables: [{name: Invoice, alias: t1}]
+  select_items:
+  - {alias: invoice_count, expr: {kind: func, func_name: COUNT, is_aggregate: true, args: [{kind: column, alias: t1, column_name: InvoiceId}]}}
+  where:
+    kind: binary
+    op: AND
+    left: {kind: binary, op: '>=', left: {kind: column, alias: t1, column_name: InvoiceDate}, right: {kind: literal, value: '2013-12-01'}}
+    right: {kind: binary, op: '<', left: {kind: column, alias: t1, column_name: InvoiceDate}, right: {kind: literal, value: '2014-01-01'}}
+  reasoning: The data ends on 2013-12-22, so the most recent month is December 2013; count its invoices.
+
+chinook_047:
+  tables:
+  - {name: Track, alias: t1}
+  - {name: Genre, alias: t2}
+  joins:
+  - left_alias: t1
+    right_alias: t2
+    join_type: inner
+    condition: {kind: binary, op: '=', left: {kind: column, alias: t1, column_name: GenreId}, right: {kind: column, alias: t2, column_name: GenreId}}
+  select_items:
+  - {alias: track_count, expr: {kind: func, func_name: COUNT, is_aggregate: true, args: [{kind: column, alias: t1, column_name: TrackId}]}}
+  where: {kind: binary, op: '=', left: {kind: column, alias: t2, column_name: Name}, right: {kind: literal, value: Heavy Metal}}
+  reasoning: "'heavy metal' is the genre value 'Heavy Metal'; count its tracks."
