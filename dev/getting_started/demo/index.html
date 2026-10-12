@@ -4756,6 +4756,13 @@ change <code>EMBEDDING_PROVIDER</code> for an existing store, run <code>nl2sql i
 every datasource in a collection must share one embedding model, so the store
 otherwise raises <code>EmbeddingDimensionMismatchError</code> (or
 <code>EmbeddingModelMismatchError</code> for a different model of the same size).</p>
+<p>Column statistics are read when a datasource is indexed, so a change to what
+indexing records reaches an existing demo folder only when it is indexed again.
+After 0.2.2, a text column with at most 50 distinct values keeps all of them
+rather than five. <code>nl2sql demo</code> does not re-index a folder whose index is
+healthy, so run <code>nl2sql --env demo index</code> in the folder, or start a fresh one
+with <code>nl2sql setup --demo</code>, which always re-indexes. The hosted image builds
+its index with <code>nl2sql setup --demo</code>, so a new image picks the change up.</p>
 <h3 id="index-health-and-repair">Index health and repair</h3>
 <p>The playground's schema panel reads the schema snapshot, for whichever database
 its <strong>Showing</strong> switcher names; the resolver, which

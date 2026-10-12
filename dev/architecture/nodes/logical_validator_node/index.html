@@ -2128,9 +2128,10 @@
 <li>Enforce RBAC table access using strict datasource namespacing.</li>
 </ul>
 <p>Literal filter values are <strong>not</strong> validated against a column's sampled values.
-The adapter records at most five sample values per text column, which is a
-retrieval hint, not the column's domain; treating it as an allowlist rejected
-correct filters on any higher-cardinality column. Safety comes from the RBAC
+The adapter records every value of a text column with at most 50 distinct
+values, but only the five most frequent of a larger one: a retrieval hint, not
+the column's domain. Treating it as an allowlist rejected correct filters on
+any higher-cardinality column. Safety comes from the RBAC
 table allowlist and from schema resolution, neither of which depends on stats.
 A value that turns out not to exist is caught after execution instead, and
 only when the result is empty (see
