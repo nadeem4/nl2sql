@@ -22,10 +22,16 @@ ALLOWED_FUNCTIONS = AGGREGATE_FUNCTIONS | frozenset({
     # Strings
     "LOWER", "UPPER", "LENGTH", "SUBSTR", "SUBSTRING", "TRIM", "LTRIM", "RTRIM", "REPLACE", "CONCAT",
     # Dates
-    "DATE", "DATETIME", "STRFTIME", "YEAR", "QUARTER", "MONTH", "DAY", "EXTRACT", "DATE_PART", "DATE_TRUNC",
+    "STRFTIME", "YEAR", "QUARTER", "MONTH", "DAY", "EXTRACT", "DATE_PART", "DATE_TRUNC",
     # The value list of an IN (built by the generator, never rendered as a call)
     "TUPLE", "LIST",
 })
+
+# Accepted so plans written before the portable date operations still validate
+# (a recorded demo answer and hand-written tier 1 gold plans call STRFTIME), but
+# never offered: the planner prompt names only DATE_PART and DATE_TRUNC, and the
+# validator's UNSUPPORTED_FUNCTION message leaves these out of its list.
+LEGACY_FUNCTIONS = frozenset({"STRFTIME"})
 
 
 # Portable date operations. A plan writes DATE_PART(unit, date), an integer,

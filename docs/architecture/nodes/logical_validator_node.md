@@ -146,7 +146,9 @@ Side effects:
      plain identifier (`^[A-Za-z_][A-Za-z0-9_]*$`) naming a function in
      `ast_planner.functions.ALLOWED_FUNCTIONS` (read-only aggregates and
      scalar functions, any case), with `UNSUPPORTED_FUNCTION` at `ERROR`
-     severity, so the refiner retries with the list in the message.
+     severity, so the refiner retries with the list in the message. The list
+     leaves out `LEGACY_FUNCTIONS` (`STRFTIME`), which older plans may still
+     call but which the planner prompt never offers.
      `func_name` becomes the function's name in the SQL, so this is what keeps
      model text such as `SELECT 1); DELETE FROM T; --` out of it.
    - `_date_operations()` rejects a date function whose unit is not `year`,

@@ -13,6 +13,7 @@ from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.pipeline.nodes.ast_planner.functions import (
     ALLOWED_FUNCTIONS,
     DATE_UNITS,
+    LEGACY_FUNCTIONS,
     date_operation,
     is_allowed_function,
 )
@@ -613,7 +614,7 @@ class LogicalValidatorNode:
                 continue
             if name not in rejected:
                 rejected.append(name)
-        allowed = ", ".join(sorted(ALLOWED_FUNCTIONS - {"TUPLE", "LIST"}))
+        allowed = ", ".join(sorted(ALLOWED_FUNCTIONS - LEGACY_FUNCTIONS - {"TUPLE", "LIST"}))
         return [
             PipelineError(
                 node="logical_validator",
