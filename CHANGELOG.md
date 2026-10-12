@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.3.0](https://github.com/nadeem4/nl2sql/compare/v0.2.4...v0.3.0) (2026-10-12)
+
+
+### Features
+
+* **answer:** send the answer model a 20-row preview and flag truncated results ([#231](https://github.com/nadeem4/nl2sql/issues/231)) ([3677d2e](https://github.com/nadeem4/nl2sql/commit/3677d2e9e9d200c993f46faf0586bd2be7d12741))
+* **api:** page through and download a run's saved result by request id ([#235](https://github.com/nadeem4/nl2sql/issues/235)) ([cdf2dd0](https://github.com/nadeem4/nl2sql/commit/cdf2dd06ca11ce23324506fd97315cd49465a874))
+* **api:** stream a run's progress and answer as Server-Sent Events ([#237](https://github.com/nadeem4/nl2sql/issues/237)) ([36ac61e](https://github.com/nadeem4/nl2sql/commit/36ac61e7c24f9094ef43295c162427765a8fb007))
+* **executor:** fetch results in batches and save the combined result as an artifact ([#234](https://github.com/nadeem4/nl2sql/issues/234)) ([a834e28](https://github.com/nadeem4/nl2sql/commit/a834e287cc12b7ff9cb9c4bbeb498610648d4d18))
+* **playground:** page through every saved result and download it whole ([#236](https://github.com/nadeem4/nl2sql/issues/236)) ([e9ca450](https://github.com/nadeem4/nl2sql/commit/e9ca4501e1a1938b7c7d562a215c0667e2b5b8b9))
+
+
+### Bug Fixes
+
+* **config:** honour a datasource's top-level row_limit ([#233](https://github.com/nadeem4/nl2sql/issues/233)) ([9e5ede2](https://github.com/nadeem4/nl2sql/commit/9e5ede21f22fc3dd7e28cb4650c20e3b59027777))
+
+
+### Documentation
+
+* **release:** notes for 0.3.0 ([#238](https://github.com/nadeem4/nl2sql/issues/238)) ([c964f77](https://github.com/nadeem4/nl2sql/commit/c964f7775fc132cdecc23dbf53658b6a0a566eff))
+
 ## [0.2.4](https://github.com/nadeem4/nl2sql/compare/v0.2.3...v0.2.4) (2026-10-12)
 
 
