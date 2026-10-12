@@ -145,7 +145,10 @@ The schema block (`render_schema_for_prompt` in
 sorted by name and keys sorted, so the same snapshot and role render
 byte-identically. It drops empty fields and `schema_version`. Of the column
 statistics only `sample_values` is sent (it helps match literal filters such as
-`'Rock'` or `'USA'`); `min_value`, `max_value`, `null_percentage` and
+`'Rock'` or `'USA'`). For a text column with at most 50 distinct values it is
+every value, so "heavy metal" can be matched to `'Heavy Metal'`; for a larger
+one it is the five most frequent (`ALL_VALUES_MAX_DISTINCT` in
+`adapters/sqlalchemy_base/adapter.py`). `min_value`, `max_value`, `null_percentage` and
 `distinct_count` stay in the snapshot.
 
 Measured on Chinook with tiktoken `o200k_base`, its 12 demo questions, no LLM call

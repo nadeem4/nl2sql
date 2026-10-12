@@ -25,8 +25,9 @@ from .recordings_chinook import (
 from .test_trace_fake_llm import _serve
 
 # Real Chinook Customer.Email values the demo's schema statistics carry: the
-# first of the column's sample_values (also its max_value) and its min_value.
-PROBES = ("wyatt.girard@yahoo.fr", "aaronmitchell@yahoo.ca")
+# first of the column's sample_values (ties are ordered by value, so it is also
+# the min_value) and its max_value, which no sample carries.
+PROBES = ("aaronmitchell@yahoo.ca", "wyatt.girard@yahoo.fr")
 QUESTION = "Who are the top customers by total spend?"
 GENERIC_REFUSAL = "You do not have permission to see the data this question requires."
 
@@ -125,11 +126,11 @@ def test_admin_planner_still_receives_sample_values(demo_project, tmp_path):
     assert r.returncode == 0, r.stdout + r.stderr
 
     # A readable table keeps its sample_values; the other statistics are never
-    # sent to any role (they stay in the snapshot), so the min_value probe is absent.
+    # sent to any role (they stay in the snapshot), so the max_value probe is absent.
     prompt = _planner_prompts(server)
-    sample_probe, min_value_probe = PROBES
+    sample_probe, max_value_probe = PROBES
     assert sample_probe in prompt and "sample_values" in prompt
-    assert min_value_probe not in prompt
+    assert max_value_probe not in prompt
     for stat in ("null_percentage", "distinct_count", "min_value", "max_value"):
         assert stat not in prompt
 

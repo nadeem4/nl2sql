@@ -21,7 +21,9 @@ Metadata complements contracts:
 - `SchemaMetadata`: datasource description/domains, table metadata
 - `TableMetadata`: table description, row_count, column metadata
 - `ColumnMetadata`: description, stats, synonyms, PII flag
-- `ColumnStatistics`: distinct counts, min/max, sample values
+- `ColumnStatistics`: distinct counts, min/max, sample values (for a text
+  column: every distinct value when there are at most 50, else the five most
+  frequent; most frequent first, ties by value)
 
 ## Snapshotting and fingerprinting
 
