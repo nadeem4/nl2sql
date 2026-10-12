@@ -38,23 +38,26 @@ def store(demo_project, tmp_path):
     return path
 
 
-def _env(store, trace_dir, enabled="true", policies=None):
+def _env(store, trace_dir, enabled="true", policies=None, today=None):
     env = _base_env()
     if policies:
         env["POLICIES_CONFIG"] = str(policies)
+    if today:
+        env["NL2SQL_TODAY"] = today
     env.update({"OPENAI_API_KEY": "sk-" + "fake-plan-cache", "TRACE_MODE": "always", "TRACE_DIR": str(trace_dir),
                 "SCHEMA_STORE_PATH": str(store), "PLAN_CACHE_ENABLED": enabled,
                 "SQL_AGENT_RETRY_BASE_DELAY_SEC": "0", "SQL_AGENT_RETRY_JITTER_SEC": "0"})
     return env
 
 
-def _ask(demo_project, tmp_path, store, n, rules, question, role="admin", enabled="true", policies=None):
+def _ask(demo_project, tmp_path, store, n, rules, question, role="admin", enabled="true", policies=None,
+         today=None):
     """One CLI run; returns (planner calls made, the trace document, the CLI result)."""
     config = f"llm.plan-cache-{tmp_path.name}-{n}.yaml"
     server = _serve(demo_project, rules, config)
     trace_dir = tmp_path / f"traces-{n}"
     try:
-        r = run_cli(demo_project, _env(store, trace_dir, enabled, policies), "run", "--role", role,
+        r = run_cli(demo_project, _env(store, trace_dir, enabled, policies, today), "run", "--role", role,
                     "--llm-config", f"configs/{config}", question)
     finally:
         server.stop()
@@ -169,6 +172,25 @@ def test_cache_clear_makes_the_next_run_call_the_planner(demo_project, tmp_path,
     assert "Cleared 1 cached plans" in " ".join(cleared.stdout.split())
 
     calls, doc, r = _ask(demo_project, tmp_path, store, 2, RULES_COUNT_CUSTOMERS, COUNT)
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert len(calls) == 1
+    assert _sub(doc)["plan_source"] == "llm"
+
+
+@pytest.mark.e2e
+def test_a_plan_cached_on_one_day_is_planned_again_the_next_day(demo_project, tmp_path, store):
+    # The planner turns "this year" or "the last 30 days" into literal dates
+    # from the run date, so a plan from another day may answer the wrong window.
+    calls, doc, r = _ask(demo_project, tmp_path, store, 1, RULES_COUNT_CUSTOMERS, COUNT, today="2013-12-31")
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert len(calls) == 1
+
+    calls, doc, r = _ask(demo_project, tmp_path, store, 2, RULES_COUNT_CUSTOMERS, COUNT, today="2013-12-31")
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert calls == []
+    assert _sub(doc)["plan_source"] == "cache"
+
+    calls, doc, r = _ask(demo_project, tmp_path, store, 3, RULES_COUNT_CUSTOMERS, COUNT, today="2014-01-01")
     assert r.returncode == 0, r.stdout + r.stderr
     assert len(calls) == 1
     assert _sub(doc)["plan_source"] == "llm"

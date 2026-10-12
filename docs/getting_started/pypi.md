@@ -271,7 +271,7 @@ The `QueryResult` includes `sub_queries` (each with its generated `sql`),
 observability. Each sub-query carries a capped sample of its rows (`rows`); the
 full result set lives in artifact storage and is addressed through `artifact_refs`.
 
-A repeated question reuses its validated plan from the plan cache (no planner
+A question repeated on the same day reuses its validated plan from the plan cache (no planner
 call, same SQL and rows; still validated every time), and
 `sub_query.plan_source` says `"cache"`. Turn it off with
 `PLAN_CACHE_ENABLED=false`; empty it with `nl2sql cache clear`. See

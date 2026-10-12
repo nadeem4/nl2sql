@@ -535,7 +535,7 @@ trace to `traces/` and prints its path. Inspect one with
 answers with `nl2sql --env demo trace replay <file>`. See
 [Debugging a Run](../observability/debugging.md).
 
-Asking a question a second time reuses the first run's validated plan from the
+Asking a question a second time on the same day reuses the first run's validated plan from the
 plan cache (in `data/schema_store.db`), so the SQL and rows are the same and the
 planner is not called; the playground's Debug view says "Plan from the plan
 cache". The plan is still validated for the role you ask as. To start fresh:

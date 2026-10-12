@@ -5,10 +5,18 @@ deterministic code. Reusing a plan that already passed validation and executed
 therefore makes a repeated question produce the same SQL and the same rows, at
 no planner cost.
 
-The key is ``(normalised sub-query intent, datasource_id, schema_version)``:
+The key is ``(normalised sub-query intent and run date, datasource_id,
+schema_version)``:
 
 * the sub-query intent, because the cache sits at the AST planner, which plans
   one sub-query at a time from its intent (not from the user's question);
+* the run date (:func:`~nl2sql.common.settings.run_date`), because the planner
+  is told today's date and writes "this year" or "the last 30 days" as literal
+  dates: a plan from yesterday would answer for yesterday's window. Every
+  entry is keyed on it, not just date-relative ones, because no test of the
+  intent or the plan can tell reliably which answers depend on today. So a
+  plan is reused for the rest of the day it was made, or for as long as
+  ``NL2SQL_TODAY`` pins the date;
 * the datasource, because the same words mean different tables elsewhere;
 * the schema version, so a rebuilt index with a changed schema misses.
 
@@ -28,7 +36,7 @@ from typing import Any, Optional
 
 from nl2sql.common.logger import get_logger
 from nl2sql.common.metrics import plan_cache_counter
-from nl2sql.common.settings import settings
+from nl2sql.common.settings import run_date, settings
 from nl2sql.pipeline.nodes.ast_planner.schemas import PlanModel
 
 logger = get_logger("plan_cache")
@@ -72,6 +80,8 @@ class PlanCache:
             question += " | order_by=" + ",".join(f"{o.attribute} {o.direction}" for o in order_by)
         if limit is not None:
             question += f" | limit={limit}"
+        # The planner resolves relative dates against the run date.
+        question += f" | today={run_date().isoformat()}"
         return question, sub_query.datasource_id, sub_query.schema_version
 
     def get(self, sub_query: Any) -> Optional[PlanModel]:
