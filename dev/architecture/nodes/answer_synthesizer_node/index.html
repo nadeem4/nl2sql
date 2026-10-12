@@ -2118,6 +2118,7 @@
 <li><code>user_query</code> (required)</li>
 <li><code>aggregator_response.terminal_results</code> (required)</li>
 <li><code>decomposer_response.unmapped_subqueries</code> (optional)</li>
+<li><code>warnings</code>: the <code>VALUE_NOT_FOUND</code> warnings ("There is no Genre with Name 'Polka'.") from sub-queries whose filter named a value that does not exist (see <a href="../executor_node/#an-empty-results-filter-values">ExecutorNode</a>). An <code>ERROR</code>-severity one is not used: a retry replaced that attempt.</li>
 </ul>
 <p>Validation performed:</p>
 <ul>
@@ -2142,8 +2143,8 @@
 <li>If missing, emit <code>INVALID_STATE</code> error and stop.</li>
 <li>Serialize results to JSON.</li>
 <li>Serialize unmapped sub‑queries to JSON.</li>
-<li>Invoke LLM chain with structured output.</li>
-<li>Return <code>AnswerSynthesizerResponse</code>.</li>
+<li>Invoke LLM chain with structured output. The prompt's <em>Data Notes</em> lists the missing values and asks the answer to say the value does not exist instead of reporting the empty result as a finding.</li>
+<li>Append each missing-value note to the answer's <code>warnings</code>, whatever the model wrote, and return <code>AnswerSynthesizerResponse</code>.</li>
 <li>On exception, emit <code>AGGREGATOR_FAILED</code>.</li>
 </ol>
 <hr/>

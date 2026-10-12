@@ -2131,7 +2131,10 @@
 The adapter records at most five sample values per text column, which is a
 retrieval hint, not the column's domain; treating it as an allowlist rejected
 correct filters on any higher-cardinality column. Safety comes from the RBAC
-table allowlist and from schema resolution, neither of which depends on stats.</p>
+table allowlist and from schema resolution, neither of which depends on stats.
+A value that turns out not to exist is caught after execution instead, and
+only when the result is empty (see
+<a href="../executor_node/#an-empty-results-filter-values">ExecutorNode</a>).</p>
 <h3 id="buildability-the-validator-runs-the-generator">Buildability: the validator runs the generator</h3>
 <p><code>_validate_columns()</code> resolves columns against a query in which every plan table
 is <strong>CROSS JOINed</strong> (<code>_build_validation_query()</code>). That is correct for column
