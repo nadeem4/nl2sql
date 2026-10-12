@@ -87,6 +87,31 @@ DuckDB use the default.
 `get_dialect()` must return a sqlglot dialect name (`postgres`, `tsql`,
 `mysql`, `duckdb`, `sqlite`, ...), not the SQLAlchemy name.
 
+### Optional hook: `execute_batches(request, batch_size)`
+
+`nl2sql_adapter_sdk.protocols.StreamingAdapterProtocol`. When the adapter has
+`execute_batches`, the engine reads the result through it, `RESULT_FETCH_BATCH_SIZE`
+rows at a time (default 10,000), and writes each batch to the sub-query's
+result artifact as it arrives, so a large result is never held whole in memory
+(see [Artifact Store](../storage/artifact-store.md#batched-writes)). Without
+the hook the engine calls `execute` and writes its one `ResultFrame`, so an
+adapter written before the hook keeps working unchanged.
+
+The contract:
+
+- It is a generator (or returns an iterator) of `ResultFrame`.
+- Every frame carries the result's `columns` and at most `batch_size` rows. An empty result is one frame with its columns and no rows.
+- A failure, before the first row or between batches, is one frame with `success=False` and an `error`, classified exactly as `execute` would (`retryable`, `safe_message`), and it is the last frame. The engine discards whatever it had written.
+- The request is the same `AdapterRequest` `execute` gets; refuse one you cannot run the same way.
+
+`BaseSQLAlchemyAdapter` implements it with `fetchmany` on a result opened with
+`stream_results`, a server-side cursor on drivers that have one (see
+[SQLAlchemy adapters](sqlalchemy.md)).
+
+The hook is an optional protocol rather than a new required method so that the
+SDK change is additive: `DatasourceAdapterProtocol` is unchanged, and no
+third-party adapter has to be touched or re-released.
+
 ### Result types every adapter returns
 
 These are part of the contract, so the same plan gives the same values on

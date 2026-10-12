@@ -18,7 +18,13 @@ class AggregationService:
         self,
         dag: ExecutionDAG,
         artifact_refs: Dict[str, ArtifactRef],
-    ) -> Dict[str, List[Dict]]:
+    ) -> Dict[str, pl.LazyFrame]:
+        """Each terminal node of the DAG as a lazy polars frame, keyed by node id.
+
+        Scans read their artifacts lazily, and combines and post-combine ops
+        only add to the plan: nothing is loaded until the caller writes or
+        collects a frame.
+        """
         if not dag:
             raise ValueError("No ExecutionDAG found for aggregation.")
 
@@ -33,7 +39,7 @@ class AggregationService:
             incoming_edges.setdefault(edge.to_id, []).append(edge)
             outgoing_edges.setdefault(edge.from_id, []).append(edge)
 
-        computed: Dict[str, pl.DataFrame] = {}
+        computed: Dict[str, pl.LazyFrame] = {}
 
         for layer in dag.layers:
             for node_id in layer:
@@ -81,7 +87,7 @@ class AggregationService:
             return {}
 
         return {
-            node_id: self.engine.to_rows(computed[node_id])
+            node_id: computed[node_id].lazy()
             for node_id in terminal_nodes
             if node_id in computed
         }
@@ -89,7 +95,7 @@ class AggregationService:
     def _ordered_inputs(
         self,
         edges: List[LogicalEdge],
-        computed: Dict[str, pl.DataFrame],
-    ) -> List[Tuple[str, pl.DataFrame]]:
+        computed: Dict[str, pl.LazyFrame],
+    ) -> List[Tuple[str, pl.LazyFrame]]:
         ordered = sorted(edges, key=lambda e: input_order(e.role, e.from_id))
         return [(edge.role or "", computed[edge.from_id]) for edge in ordered if edge.from_id in computed]

@@ -1,4 +1,5 @@
-from typing import Dict, Any, List, Optional
+import time
+from typing import Dict, Any, Iterator, List, Optional
 from sqlalchemy import create_engine, inspect, text, Engine, select, func, table, column, case, literal_column, Connection
 from sqlalchemy.engine.reflection import Inspector
 from typing import Tuple
@@ -28,6 +29,15 @@ logger = logging.getLogger(__name__)
 # Driver messages that mean the database refused the query, whatever its kind.
 _REFUSAL_WORDS = ("permission denied", "permission was denied", "access denied", "not authorized")
 _MAX_MESSAGE = 200
+
+
+def _estimated_bytes(rows: List[List[Any]]) -> int:
+    """Rough size of ``rows``: the text length of up to 50 of them, scaled to all."""
+    if not rows:
+        return 0
+    sample = rows[:50]
+    sample_bytes = sum(len(str(item)) for row in sample for item in row if item is not None)
+    return int(sample_bytes / len(sample) * len(rows))
 
 
 def _sqlstate(exc: BaseException):
@@ -148,47 +158,74 @@ class BaseSQLAlchemyAdapter:
         if not self.engine:
             raise RuntimeError(f"Not connected to {self}")
             
-        import time
         start = time.perf_counter()
-        
         with self.engine.connect() as conn:
             result = conn.execute(text(sql))
             if result.returns_rows:
                 rows = [list(row) for row in result.fetchall()]
-                cols = list(result.keys())
-                row_count = len(rows)
-            else:
-                rows = []
-                cols = []
-                row_count = result.rowcount
-            
-        duration = time.perf_counter() - start
-        
-        total_bytes = 0
-        if row_count > 0:
-            sample_size = min(50, row_count)
-            sample_bytes = 0
-            for i in range(sample_size):
-                row = rows[i]
-                for item in row:
-                    if item is not None:
-                        sample_bytes += len(str(item))
-            
-            avg_row_bytes = sample_bytes / sample_size
-            total_bytes = int(avg_row_bytes * row_count)
+                return self._frame(list(result.keys()), rows, len(rows), start)
+            return self._frame([], [], result.rowcount, start)
 
+    def execute(self, request: AdapterRequest) -> ResultFrame:
+        """Executes an adapter request and returns a ResultFrame."""
+        refused = self._refuse(request)
+        if refused is not None:
+            return refused
+        try:
+            return self.execute_sql(request.payload["sql"])
+        except SQLAlchemyError as exc:
+            return self.query_failed(exc)
+
+    def execute_batches(self, request: AdapterRequest, batch_size: int) -> Iterator[ResultFrame]:
+        """Yields the result of a request in frames of at most ``batch_size`` rows.
+
+        The rows are fetched with ``fetchmany`` from a result opened with
+        ``stream_results``, which is a server-side cursor on drivers that have
+        one (psycopg2, the MySQL drivers) and is ignored by the rest, so no more
+        than one batch is held as Python rows at a time. Every frame carries
+        the columns; an empty result is one frame with no rows. A failure,
+        before the first row or between batches, is one failed frame and the
+        last one (see ``StreamingAdapterProtocol``).
+        """
+        refused = self._refuse(request)
+        if refused is not None:
+            yield refused
+            return
+        if not self.engine:
+            raise RuntimeError(f"Not connected to {self}")
+        batch_size = max(1, int(batch_size))
+        try:
+            with self.engine.connect() as conn:
+                start = time.perf_counter()
+                result = conn.execution_options(stream_results=True).execute(text(request.payload["sql"]))
+                if not result.returns_rows:
+                    yield self._frame([], [], result.rowcount, start)
+                    return
+                cols = list(result.keys())
+                rows = [list(row) for row in result.fetchmany(batch_size)]
+                while True:
+                    yield self._frame(cols, rows, len(rows), start)
+                    if len(rows) < batch_size:
+                        return
+                    rows = [list(row) for row in result.fetchmany(batch_size)]
+                    if not rows:
+                        return
+        except SQLAlchemyError as exc:
+            yield self.query_failed(exc)
+
+    def _frame(self, cols: List[str], rows: List[List[Any]], row_count: int, start: float) -> ResultFrame:
         return ResultFrame(
             success=True,
             columns=cols,
             rows=rows,
             row_count=row_count,
-            bytes=total_bytes,
+            bytes=_estimated_bytes(rows),
             datasource_id=self.datasource_id,
-            execution_stats={"execution_time_ms": duration * 1000},
+            execution_stats={"execution_time_ms": (time.perf_counter() - start) * 1000},
         )
 
-    def execute(self, request: AdapterRequest) -> ResultFrame:
-        """Executes an adapter request and returns a ResultFrame."""
+    def _refuse(self, request: AdapterRequest) -> Optional[ResultFrame]:
+        """The failed result for a request this adapter cannot run, else None."""
         if request.plan_type.lower() != "sql":
             return ResultFrame(
                 success=False,
@@ -217,11 +254,7 @@ class BaseSQLAlchemyAdapter:
                     datasource_id=self.datasource_id,
                 ),
             )
-
-        try:
-            return self.execute_sql(sql)
-        except SQLAlchemyError as exc:
-            return self.query_failed(exc)
+        return None
 
     def query_failed(self, exc: SQLAlchemyError) -> ResultFrame:
         """The failed result for a query the database raised on.

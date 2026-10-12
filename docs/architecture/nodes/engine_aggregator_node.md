@@ -12,9 +12,9 @@
 
 ## Responsibilities
 
-- Load scan artifacts from `artifact_refs`.
-- Execute combine and post‑operation nodes in DAG order.
-- Produce `AggregatorResponse` with terminal results.
+- Load scan artifacts from `artifact_refs`, lazily, as polars scans.
+- Execute combine and post‑operation nodes in DAG order, as one lazy plan.
+- Save each terminal result as its own artifact, and produce `AggregatorResponse` with those artifacts and a preview of each.
 
 ---
 
@@ -59,7 +59,8 @@ Mutations to `GraphState`:
 
 Side effects:
 
-- Reads artifacts from artifact store.
+- Reads artifacts from the artifact store.
+- Writes one artifact per terminal result, in the run's folder: `<tenant_id>/<request_id>/result_<node_id>.parquet` with the default template (see [Artifact Store](../../storage/artifact-store.md#the-combined-result)).
 
 ---
 
@@ -71,7 +72,10 @@ Side effects:
    - A `join`/`compare` combine resolves each join key against its frame's columns. A key written with a side or sub-query prefix (`right.customer`, `sq_2.customer`) resolves to the bare column when only that exists; an unknown key is left for polars to report. A `join`/`compare` with fewer than two inputs raises (`AGGREGATOR_FAILED`) instead of returning the one frame it has; the decomposer refuses such a group before anything runs, so this is the last line of defence.
    - A post-combine op (`PolarsDuckdbEngine.post_op`) applies every field it carries, in SQL's order: the reshaping its `operation` names (`aggregate` groups with polars' `group_by`, `project` selects `expected_schema`), then its `filters` (after an aggregate they filter the aggregated rows, as HAVING does), its `order_by`, and its `limit`. A `filter` op with `order_by` and `limit`, as the decomposer's prompt used to show, keeps all three.
    - Before polars is asked for any column, a post-combine op's attributes (`group_by`, `metrics`, `project`'s `expected_schema`, `filters`, `order_by`) are checked against the combined frame. An attribute the frame does not have is refused with the columns it does have, and a side-qualified one (`right.customer`) with the reason — see *No anti-join* below. The decomposer runs the same check on the decomposition before anything executes (`nl2sql/aggregation/columns.py`, shared with this engine) and asks the model again once, so here it is the last line of defence.
-3. Build `AggregatorResponse` with `terminal_results`.
+   - `AggregationService.execute` returns each terminal node as a polars `LazyFrame`: the scans are `ArtifactStore.scan_parquet`, and the combines and post-combine ops only add to the plan, so no sub-query result is loaded whole before it is written.
+3. Save each terminal result with `ArtifactStore.write_lazy`, which streams the plan into a parquet artifact, and build `AggregatorResponse`:
+   - `computed_artifacts[node_id]`: the saved result's `ArtifactRef`, with the whole result's `row_count` and `columns` (`sub_query_id` unset). Later steps (paging, CSV export) read the result from here.
+   - `terminal_results[node_id]`: the first `ANSWER_PREVIEW_ROWS` rows, read back from that artifact. This is what the answer model is shown; it is not the whole result.
 4. Return success reasoning.
 5. On exception, emit `AGGREGATOR_FAILED`, on the state's `errors` and on `AggregatorResponse.errors`. The graph's `aggregator_route` then ends the run: the answer synthesizer is not called on the empty result, so the aggregator's error is the run's outcome and no model call is spent explaining `{}`.
 
@@ -189,8 +193,8 @@ Logs failures via `logger.error`.
 
 ## Performance Characteristics
 
-- Reads Parquet artifacts and executes joins/aggregations in Polars/DuckDB.
-- Cost grows with artifact size and DAG complexity.
+- Scans Parquet artifacts lazily and executes joins/aggregations in polars; the combined result is streamed to its artifact (`sink_parquet`), and only the preview rows are collected into Python.
+- Cost grows with artifact size and DAG complexity. A join, sort or group-by may still need its inputs in memory as polars columns, never as Python rows.
 
 ---
 
@@ -203,7 +207,9 @@ Logs failures via `logger.error`.
 
 ## Configuration
 
-- Uses `PolarsDuckdbEngine`; no direct settings consumed by the node.
+- Uses `PolarsDuckdbEngine`.
+- `ANSWER_PREVIEW_ROWS`: rows of each terminal result kept in `terminal_results`.
+- `RESULT_ARTIFACT_*`: where the combined result is written, as for the sub-query artifacts.
 
 ---
 
@@ -217,7 +223,6 @@ Logs failures via `logger.error`.
 ## Known Limitations
 
 - Fails if required artifacts are missing.
-- No streaming or partial aggregation.
 - Several post-combine ops on one combine group are siblings, not a chain: each reads the combine's output and is its own terminal result.
 
 ---

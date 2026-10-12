@@ -3,10 +3,12 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import shutil
+import tempfile
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Iterable, List, Optional
 
 import polars as pl
 
@@ -14,7 +16,14 @@ from nl2sql.common.settings import secret_value, settings
 from nl2sql.execution.contracts import ArtifactRef
 from nl2sql_adapter_sdk.contracts import ResultFrame
 
-from .parquet import polars_to_result_frame, read_parquet, result_frame_to_polars, write_parquet
+from .parquet import (
+    polars_to_result_frame,
+    read_parquet,
+    result_frame_to_polars,
+    scan_parquet,
+    sink_parquet,
+    write_parquet,
+)
 
 _PLACEHOLDER = re.compile(r"<([a-zA-Z0-9_]+)>")
 
@@ -46,35 +55,114 @@ class ArtifactStore:
         self.config = config
 
     def create_artifact_ref(self, frame: ResultFrame, metadata: Dict[str, str]) -> ArtifactRef:
+        return self.write_batches([frame], metadata)
+
+    def write_batches(self, frames: Iterable[ResultFrame], metadata: Dict[str, str]) -> ArtifactRef:
+        """Writes a result that arrives a batch at a time to one parquet artifact.
+
+        One batch is written as it always was. From the second on, each batch
+        is written to its own part file in a temporary folder as it arrives,
+        and the parts are then streamed into the artifact by polars
+        (``vertical_relaxed``, so a column that is empty in one batch and text
+        in the next is text). At most one batch is held in memory. If
+        ``frames`` raises, nothing is written and the parts are removed.
+        """
         template = self._template_for(metadata)
         uri = self._build_uri(template, metadata)
-        df = result_frame_to_polars(frame)
-        write_parquet(df, uri, storage_options=self._storage_options())
+        columns: Optional[List[str]] = None
+        row_count = 0
+        first: Optional[pl.DataFrame] = None
+        spill_dir: Optional[str] = None
+        parts: List[Path] = []
+        try:
+            for frame in frames:
+                if columns is None:
+                    columns = list(frame.columns)
+                row_count += frame.row_count or len(frame.rows)
+                df = result_frame_to_polars(frame)
+                if first is None and spill_dir is None:
+                    first = df
+                    continue
+                if spill_dir is None:
+                    spill_dir = tempfile.mkdtemp(prefix="nl2sql-batches-")
+                    parts.append(self._spill(first, spill_dir, 0))
+                    first = None
+                parts.append(self._spill(df, spill_dir, len(parts)))
 
-        payload = {
-            "columns": frame.columns,
-            "row_count": frame.row_count,
-            "path": uri,
-        }
-        content_hash = hashlib.sha256(
-            json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
-        ).hexdigest()
+            if parts:
+                combined = pl.concat([pl.scan_parquet(p) for p in parts], how="vertical_relaxed")
+                sink_parquet(combined, uri, storage_options=self._storage_options())
+                estimated = sum(p.stat().st_size for p in parts)
+            else:
+                df = first if first is not None else pl.DataFrame()
+                write_parquet(df, uri, storage_options=self._storage_options())
+                estimated = df.estimated_size()
+        finally:
+            if spill_dir is not None:
+                shutil.rmtree(spill_dir, ignore_errors=True)
 
-        return self._build_artifact_ref(
-            uri=uri,
-            frame=frame,
-            content_hash=content_hash,
-            bytes_written=self._bytes_written(uri, df),
-            schema_version=metadata.get("schema_version"),
-            sub_query_id=metadata.get("sub_query_id"),
-            path_template=template,
-        )
+        return self._artifact_ref(uri, template, columns or [], row_count, estimated, metadata)
+
+    def write_lazy(self, frame: pl.LazyFrame, metadata: Dict[str, str]) -> ArtifactRef:
+        """Writes a lazy result (the aggregator's combined result) to its own artifact.
+
+        polars streams the plan into the file; the row count and columns are
+        then read from the file's metadata, not by loading it.
+        """
+        template = self._template_for(metadata)
+        uri = self._build_uri(template, metadata)
+        sink_parquet(frame.lazy(), uri, storage_options=self._storage_options())
+        written = scan_parquet(uri, storage_options=self._storage_options())
+        row_count = int(written.select(pl.len()).collect().item())
+        columns = written.collect_schema().names()
+        return self._artifact_ref(uri, template, columns, row_count, 0, metadata)
 
     def read_result_frame(self, artifact: ArtifactRef) -> ResultFrame:
         return polars_to_result_frame(self.read_parquet(artifact))
 
     def read_parquet(self, artifact: ArtifactRef) -> pl.DataFrame:
         return read_parquet(artifact.uri, storage_options=self._storage_options())
+
+    def scan_parquet(self, artifact: ArtifactRef) -> pl.LazyFrame:
+        """The artifact as a polars scan: nothing is read until it is collected."""
+        return scan_parquet(artifact.uri, storage_options=self._storage_options())
+
+    @staticmethod
+    def _spill(df: pl.DataFrame, folder: str, index: int) -> Path:
+        path = Path(folder) / f"part-{index:05d}.parquet"
+        df.write_parquet(path)
+        return path
+
+    def _artifact_ref(
+        self,
+        uri: str,
+        template: str,
+        columns: List[str],
+        row_count: int,
+        estimated_bytes: int,
+        metadata: Dict[str, str],
+    ) -> ArtifactRef:
+        payload = {
+            "columns": columns,
+            "row_count": row_count,
+            "path": uri,
+        }
+        content_hash = hashlib.sha256(
+            json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
+        ).hexdigest()
+        return ArtifactRef(
+            uri=uri,
+            backend=self.config.backend,
+            format="parquet",
+            row_count=row_count,
+            columns=columns,
+            bytes=self._bytes_written(uri, estimated_bytes),
+            content_hash=content_hash,
+            created_at=datetime.utcnow(),
+            schema_version=metadata.get("schema_version"),
+            sub_query_id=metadata.get("sub_query_id"),
+            path_template=template,
+        )
 
     def _template_for(self, metadata: Dict[str, str]) -> str:
         """The template to render: the configured one, made unique per sub-query.
@@ -148,35 +236,12 @@ class ArtifactStore:
             return {"connection_string": self.config.adls_connection_string}
         return None
 
-    def _bytes_written(self, uri: str, df: pl.DataFrame) -> int:
+    def _bytes_written(self, uri: str, estimated: int) -> int:
+        """The file's size on a local backend; ``estimated`` on a remote one."""
         if self.config.backend == "local":
             path = Path(uri)
             return path.stat().st_size if path.exists() else 0
-        return df.estimated_size()
-
-    def _build_artifact_ref(
-        self,
-        uri: str,
-        frame: ResultFrame,
-        content_hash: str,
-        bytes_written: int,
-        schema_version: Optional[str],
-        sub_query_id: Optional[str],
-        path_template: str,
-    ) -> ArtifactRef:
-        return ArtifactRef(
-            uri=uri,
-            backend=self.config.backend,
-            format="parquet",
-            row_count=frame.row_count or len(frame.rows),
-            columns=frame.columns,
-            bytes=bytes_written,
-            content_hash=content_hash,
-            created_at=datetime.utcnow(),
-            schema_version=schema_version,
-            sub_query_id=sub_query_id,
-            path_template=path_template,
-        )
+        return estimated
 
 
 def build_artifact_store() -> ArtifactStore:

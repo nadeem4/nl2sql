@@ -42,3 +42,18 @@ def _traces_go_to_a_temp_dir(tmp_path_factory, monkeypatch):
     monkeypatch.setenv("TRACE_DIR", directory)
     monkeypatch.setattr(settings, "trace_dir", directory)
     yield
+
+
+@pytest.fixture(autouse=True)
+def _artifacts_go_to_a_temp_dir(tmp_path_factory, monkeypatch):
+    """Keep result artifacts out of the working tree.
+
+    ``RESULT_ARTIFACT_BASE_URI`` defaults to ``./artifacts``, and every run
+    writes its sub-query results and its combined result there.
+    """
+    from nl2sql.common.settings import settings
+
+    directory = str(tmp_path_factory.getbasetemp() / "artifacts")
+    monkeypatch.setenv("RESULT_ARTIFACT_BASE_URI", directory)
+    monkeypatch.setattr(settings, "result_artifact_base_uri", directory)
+    yield

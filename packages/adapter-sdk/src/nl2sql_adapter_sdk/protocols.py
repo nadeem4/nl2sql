@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional, Protocol, Set, runtime_checkable
+from typing import Any, Dict, Iterator, Optional, Protocol, Set, runtime_checkable
 
 from .capabilities import DatasourceCapability
 from .contracts import AdapterRequest, ResultFrame
@@ -43,6 +43,29 @@ class DatasourceAdapterProtocol(Protocol):
 
     def test_connection(self) -> bool:
         """Test if the connection to the datasource can be established."""
+        ...
+
+
+@runtime_checkable
+class StreamingAdapterProtocol(Protocol):
+    """Optional hook: return a result a batch at a time.
+
+    When the adapter has ``execute_batches``, the engine reads the result
+    through it and writes each batch to the result artifact as it arrives, so
+    a large result is never held whole in memory. Without the hook the engine
+    calls ``execute`` and writes its one ``ResultFrame``, so existing adapters
+    keep working.
+
+    Each yielded frame carries the result's ``columns`` and at most
+    ``batch_size`` rows; an empty result is one frame with its columns and no
+    rows. A failure, before or between batches, is one frame with
+    ``success=False`` and an ``error``, and nothing after it: the engine then
+    discards what it wrote. Failures are reported the way ``execute`` reports
+    them (``retryable`` when the query itself was at fault).
+    """
+
+    def execute_batches(self, request: AdapterRequest, batch_size: int) -> Iterator[ResultFrame]:
+        """Yield the result of ``request`` in frames of at most ``batch_size`` rows."""
         ...
 
 

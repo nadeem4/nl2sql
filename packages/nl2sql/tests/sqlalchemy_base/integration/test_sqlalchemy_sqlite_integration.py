@@ -125,3 +125,42 @@ def test_execute_sql_fails_for_directory_database(tmp_path):
     # Act / Assert
     with pytest.raises(Exception):
         adapter.execute_sql("SELECT 1")
+
+
+def test_execute_batches_yields_the_result_a_batch_at_a_time(sqlite_adapter, sqlite_db_path):
+    from nl2sql_adapter_sdk import AdapterRequest, StreamingAdapterProtocol
+
+    conn = sqlite3.connect(sqlite_db_path)
+    try:
+        conn.executemany("INSERT INTO users (name, age) VALUES (?, ?)", [("D", 4), ("E", 5)])
+        conn.commit()
+    finally:
+        conn.close()
+    request = AdapterRequest(plan_type="sql", payload={"sql": "SELECT id, name FROM users ORDER BY id"})
+
+    frames = list(sqlite_adapter.execute_batches(request, batch_size=2))
+
+    assert isinstance(sqlite_adapter, StreamingAdapterProtocol)
+    assert [f.row_count for f in frames] == [2, 2, 1]
+    assert all(f.success and f.columns == ["id", "name"] for f in frames)
+    assert [row[0] for f in frames for row in f.rows] == [1, 2, 3, 4, 5]
+
+
+def test_execute_batches_reports_a_failed_query_as_execute_does(sqlite_adapter):
+    from nl2sql_adapter_sdk import AdapterRequest
+
+    request = AdapterRequest(plan_type="sql", payload={"sql": "SELECT nope FROM users"})
+
+    [frame] = list(sqlite_adapter.execute_batches(request, batch_size=2))
+
+    assert frame.success is False
+    assert frame.error == sqlite_adapter.execute(request).error
+
+
+def test_execute_batches_refuses_a_non_sql_request(sqlite_adapter):
+    from nl2sql_adapter_sdk import AdapterRequest
+
+    [frame] = list(sqlite_adapter.execute_batches(AdapterRequest(plan_type="rest", payload={"sql": "SELECT 1"}), 2))
+
+    assert frame.success is False
+    assert frame.error.error_code == "CAPABILITY_VIOLATION"
