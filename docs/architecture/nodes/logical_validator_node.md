@@ -245,7 +245,7 @@ Emits `PipelineError` with:
 
 ## Configuration
 
-- `settings.logical_validator_strict_columns` controls severity of missing column errors.
+- `settings.logical_validator_strict_columns` (`LOGICAL_VALIDATOR_STRICT_COLUMNS`, default `true`) controls severity of missing column errors: `ERROR` (blocking, retried) when on, `WARNING` when off.
 
 ---
 

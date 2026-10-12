@@ -145,7 +145,7 @@ All column references must map to declared table aliases and be unambiguous.
 - `LogicalValidatorNode._validate_static()` converts resolution failures to `PipelineError`
 
 ### Failure Behavior
-Returns `PipelineError` with `COLUMN_NOT_FOUND` (severity depends on `logical_validator_strict_columns`).
+Returns `PipelineError` with `COLUMN_NOT_FOUND`: a retryable `ERROR` by default, a `WARNING` that does not block when `logical_validator_strict_columns` is turned off.
 
 ### Why It Exists
 Prevents queries from referencing non-existent or ambiguous columns.
@@ -385,7 +385,7 @@ The validator resolves columns against a throw-away query in which every table i
 
 ## Gaps
 
-- Column existence enforcement can degrade to warnings when `logical_validator_strict_columns` is disabled, so missing columns do not always block execution.
+- Column existence enforcement degrades to warnings when `logical_validator_strict_columns` is turned off (it is on by default), so missing columns then do not always block execution.
 - Schema version mismatch handling is policy-driven and may only emit warnings (e.g., `schema_version_mismatch_policy=warn`), so mismatch is not always enforced as a hard failure.
 - Semantic-only checks are pattern based: they block a field that opens with `SELECT ... FROM`, a statement terminator and comment markers, rather than parsing for every possible SQL construct. An intent that literally reads "select ... from ..." is rejected as SQL.
 - If the vector store is unavailable, datasource resolution can return a response without errors, relying on downstream stages to detect missing candidates.

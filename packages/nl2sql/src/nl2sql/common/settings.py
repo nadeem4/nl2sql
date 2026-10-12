@@ -164,9 +164,12 @@ class Settings(BaseSettings):
     )
 
     logical_validator_strict_columns: bool = Field(
-        default=False,
+        default=True,
         validation_alias="LOGICAL_VALIDATOR_STRICT_COLUMNS",
-        description="Treat missing columns as errors in logical validation."
+        description=(
+            "Treat a column the plan names but the schema does not have as a blocking, "
+            "retryable error. Off, it is a warning and the plan can reach the database."
+        ),
     )
 
     rbac_refusal_names_tables: bool = Field(
