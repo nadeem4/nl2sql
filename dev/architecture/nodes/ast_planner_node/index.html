@@ -2241,11 +2241,17 @@ caches a stable prefix of 1,024+ tokens automatically):</p>
 </tr>
 <tr>
 <td>human (<code>PLANNER_HUMAN_PROMPT</code>)</td>
-<td><code>[EXPECTED_SCHEMA]</code>, <code>[SEMANTIC_CONTEXT]</code>, <code>[FEEDBACK]</code>, <code>[USER_QUERY]</code></td>
+<td><code>[TODAY]</code>, <code>[EXPECTED_SCHEMA]</code>, <code>[SEMANTIC_CONTEXT]</code>, <code>[FEEDBACK]</code>, <code>[USER_QUERY]</code></td>
 <td>every call</td>
 </tr>
 </tbody>
 </table>
+<p><code>[TODAY]</code> is the run date (<code>run_date()</code> in <code>common/settings.py</code>: <code>NL2SQL_TODAY</code>
+when set, else the UTC date), so "this year" or "the last 30 days" resolve to
+real dates rather than a year the model guessed. It is in the human message
+because it changes daily; in the system message it would invalidate the cached
+prefix every midnight. It comes before <code>[USER_QUERY]</code>, because demo replay keys
+a recording on the line after that marker.</p>
 <p>The examples come before the schema so that the instructions and examples
 (about 1,300 tokens) stay cacheable even when vector retrieval picks a
 different set of tables per question. The system/human boundary is the single

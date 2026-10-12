@@ -4610,6 +4610,10 @@ served. It then compares the replayed <code>QueryResult</code> with the recorded
   call is replayed rather than answered from a plan cached since. If the
   recorded run used the cache, replay uses it too, and reports a divergence
   (<code>missing</code>) when the cached plan has since been cleared.</li>
+<li><strong>Date.</strong> The planner and refiner prompts carry today's date, and the trace
+  records it as <code>request.today</code>. Replay pins <code>NL2SQL_TODAY</code> to that date, so a
+  trace recorded yesterday replays without diverging. A trace written before
+  the date was recorded replays with the current setting.</li>
 <li><strong>Exit code</strong>: 0 when the replayed result matches the recording, 1 on a
   divergence, a different result, or a datasource that cannot be reached.</li>
 </ul>
