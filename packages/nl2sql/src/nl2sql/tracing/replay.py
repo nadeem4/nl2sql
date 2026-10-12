@@ -26,6 +26,7 @@ the configured embedding provider.
 """
 from __future__ import annotations
 
+import datetime as _dt
 import difflib
 import json
 import logging
@@ -265,6 +266,15 @@ def recorded_plan_cache_hit(doc: Dict[str, Any]) -> bool:
     return False
 
 
+def recorded_run_date(doc: Dict[str, Any]) -> Optional[_dt.date]:
+    """The date the recorded run's prompts were told, or None for an older trace."""
+    value = (doc.get("request") or {}).get("today")
+    try:
+        return _dt.date.fromisoformat(value) if value else None
+    except (TypeError, ValueError):
+        return None
+
+
 def replay_trace(doc: Dict[str, Any], ctx: Any) -> ReplayReport:
     """Re-runs the traced question, answering every LLM call from the recording."""
     from nl2sql.api.query_api import result_from_state
@@ -280,10 +290,13 @@ def replay_trace(doc: Dict[str, Any], ctx: Any) -> ReplayReport:
 
     # Retry back-off only waits; the recorded answers do not depend on it.
     saved = {k: getattr(settings, k)
-             for k in ("sql_agent_retry_base_delay_sec", "sql_agent_retry_jitter_sec", "plan_cache_enabled")}
+             for k in ("sql_agent_retry_base_delay_sec", "sql_agent_retry_jitter_sec", "plan_cache_enabled",
+                       "today")}
     for k in ("sql_agent_retry_base_delay_sec", "sql_agent_retry_jitter_sec"):
         setattr(settings, k, 0.0)
     settings.plan_cache_enabled = saved["plan_cache_enabled"] and recorded_plan_cache_hit(doc)
+    # The prompts carry the date; replay them on the day they were recorded.
+    settings.today = recorded_run_date(doc) or saved["today"]
     # Once the run has diverged, the nodes log the refused call as a failure with
     # a stack trace. That is the replay stopping, not a fault: the report says so.
     quiet = _AfterDivergence(playback)

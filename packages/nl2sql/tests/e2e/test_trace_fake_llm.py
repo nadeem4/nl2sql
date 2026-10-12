@@ -73,6 +73,8 @@ def test_a_run_writes_a_trace_with_every_node_its_llm_calls_and_no_secret(demo_p
 
     doc = json.loads(text)
     assert doc["trace_format_version"] == 1
+    # The date the prompts were told, so a replay on another day pins it.
+    assert re.fullmatch(r"\d{4}-\d{2}-\d{2}", doc["request"].pop("today"))
     assert doc["request"] == {"question": QUESTION, "roles": ["admin"], "tenant_id": "default_tenant",
                               "datasource_id": None, "execute": True}
     assert NODES <= {n["node"] for n in doc["nodes"]}
