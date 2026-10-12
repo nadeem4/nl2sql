@@ -64,6 +64,7 @@ nav:
     - Invariants: architecture/invariants.md
     - Failure + Recovery: architecture/failure_recovery.md
     - Indexing + Retrieval: architecture/indexing.md
+    - Curated Answers (design): architecture/curated_answers.md
     - Subgraphs:
       - Main Pipeline Graph: architecture/subgraphs/main_pipeline_graph.md
       - SQL Agent Subgraph: architecture/subgraphs/sql_agent.md
