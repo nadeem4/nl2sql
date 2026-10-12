@@ -4832,7 +4832,7 @@ answers against.</p>
 </tr>
 <tr>
 <td><code>tags</code></td>
-<td>Categories: <code>single-table</code>, <code>filter</code>, <code>join</code>, <code>multi-join</code>, <code>aggregation</code>, <code>having</code>, <code>order-limit</code>, <code>offset</code>, <code>ties</code>, <code>date</code>, <code>paraphrase</code>, <code>keyword-in-question</code>, <code>keyword-in-value</code>, <code>rbac-denial</code>, <code>unanswerable</code></td>
+<td>Categories: <code>single-table</code>, <code>filter</code>, <code>join</code>, <code>multi-join</code>, <code>aggregation</code>, <code>having</code>, <code>order-limit</code>, <code>offset</code>, <code>ties</code>, <code>date</code>, <code>paraphrase</code>, <code>keyword-in-question</code>, <code>keyword-in-value</code>, <code>data-range</code> (needs to know where the data ends: "the most recent month in the data"), <code>value-matching</code> (names a stored value in other words: "heavy metal" for <code>'Heavy Metal'</code>), <code>rbac-denial</code>, <code>unanswerable</code></td>
 </tr>
 <tr>
 <td><code>paraphrase_group</code></td>
@@ -5042,7 +5042,7 @@ Spider 2.0 supports multiple gold files per task
 <h4 id="when-to-add-one-and-when-not-to">When to add one, and when not to</h4>
 <p>Prefer an alternative to loosening the comparator. An alternative is written
 down, reviewed once, and only ever affects the question it sits on; a looser
-rule applies to all forty-five at once and can quietly start passing wrong
+rule applies to all forty-seven at once and can quietly start passing wrong
 answers. The <a href="#strict-and-lenient-accuracy">lenient score</a> is deliberately
 narrow for the same reason.</p>
 <p>Add one when <strong>all</strong> of these hold:</p>
@@ -5191,7 +5191,7 @@ any run.</p>
 <tr>
 <td><code>--max-accuracy-drop F</code></td>
 <td>none</td>
-<td>Deprecated: a flat accuracy drop gate. Smaller than one question at n = 43, so it fired on noise. Only applied when passed</td>
+<td>Deprecated: a flat accuracy drop gate. Smaller than one question at n = 47, so it fired on noise. Only applied when passed</td>
 </tr>
 <tr>
 <td><code>--max-cost-increase F</code></td>
@@ -5207,7 +5207,7 @@ PATH</code> it is that file's folder.</p>
 the datasource config and <code>--llm-config</code> the single LLM config path.</p>
 <p>Before anything is spent, the run prints its plan and carries on without a
 prompt (the cap is the safety):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>Plan: 43 questions x role admin x 1 pass, cap $10.00
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>Plan: 47 questions x role admin x 1 pass, cap $10.00
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>  gpt-5.4: gpt-5.4 (every node)
 <a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>  gpt-5.4-mini-helpers: gpt-5.4 (astplanner, refiner); gpt-5.4-mini (answersynthesizer, datasourceresolver, decomposer)
 <a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>  Records: C:\demo\benchmarks\tier2  Scoreboard: C:\demo\benchmark_tier2.json
@@ -5458,10 +5458,10 @@ rate with the list: an unfaithful answer is a synthesizer problem to look at,
 not a failed question. Tier 1 does not report it: its fake synthesizer writes
 the same fixed sentence for every question, with nothing to check.</p>
 <h3 id="reading-a-run-intervals-flips-and-passk">Reading a run: intervals, flips and pass^k</h3>
-<p>Forty-three questions cannot settle much on their own. 25 of 43 is 58.1%, and
-its 95% Wilson interval is <strong>43.3%-71.6%</strong> -- about fourteen points either
+<p>Forty-seven questions cannot settle much on their own. 27 of 47 is 57.4%, and
+its 95% Wilson interval is <strong>43.3%-70.5%</strong> -- about fourteen points either
 way. Every run therefore prints and records that interval next to both
-scores, written <code>58.1% [43.3-71.6]</code>, and the gate below is built on the
+scores, written <code>57.4% [43.3-70.5]</code>, and the gate below is built on the
 questions that moved rather than on the headline
 (<a href="https://www.anthropic.com/research/statistical-approach-to-model-evals">Anthropic, <em>A statistical approach to model
 evals</em></a>).
@@ -5469,7 +5469,7 @@ The interval is taken over the runs a config scored, so with <code>--passes</cod
 one the runs of a single question are not independent and it reads narrower
 than it really is; pass^k below counts questions and does not.</p>
 <p><strong>Compare two runs question by question, not headline to headline.</strong> The same
-45 questions are run both times, so the runs are paired and most of the
+47 questions are run both times, so the runs are paired and most of the
 variance cancels. <code>--baseline PATH</code> prints, per config:</p>
 <ul>
 <li>the strict and lenient accuracy of each run, side by side;</li>
@@ -5514,8 +5514,8 @@ The README block keeps the deltas only.</p>
 </tbody>
 </table>
 <p><code>--max-accuracy-drop</code> is <strong>deprecated</strong>. It failed a run when accuracy fell by
-more than a flat fraction, two points by default -- and at n = 43 one question
-is 2.3 points, so the gate was tighter than the resolution of the benchmark
+more than a flat fraction, two points by default -- and at n = 47 one question
+is 2.1 points, so the gate was tighter than the resolution of the benchmark
 and fired on run-to-run noise. It still works when it is passed explicitly,
 with a warning, and is no longer applied unless it is.</p>
 <h4 id="-passes-and-passk"><code>--passes</code> and pass^k</h4>
