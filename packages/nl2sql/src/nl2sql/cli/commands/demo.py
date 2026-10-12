@@ -70,6 +70,12 @@ from nl2sql.llm.registry import PROVIDER_PRESETS
 from nl2sql.llm.replay import RecordingProxy, ReplayStore
 from nl2sql.testing.fake_llm import FakeLLMServer
 
+# Seconds between the words of a recorded answer the playground streams
+# (``/api/ask/stream``): a recording replays at once, and an answer that lands
+# whole would not read as it is written. Kept short: the answer's ``content``
+# streams after its ``summary`` and holds the run open while it does.
+REPLAY_STREAM_DELAY = 0.012
+
 RECORDINGS = pathlib.Path(__file__).resolve().parent.parent / "demo" / "recordings"
 
 INSTALL_HINT = 'Install the demo extra: pip install "nl2sql-engine[demo]"'
@@ -455,7 +461,7 @@ def demo_command(
         covered = store.covered(DEMO_QUESTIONS)
         recorded_questions = len(covered)
         if covered:
-            replay_server = FakeLLMServer(store.rules()).start()
+            replay_server = FakeLLMServer(store.rules(), stream_delay=REPLAY_STREAM_DELAY).start()
             hosted_mode.replay = Replay(replay_server.base_url, covered, store.recorded_with)
         console.print(
             "[bold]Hosted mode:[/bold] the server holds no API key. Each visitor pastes their own "
@@ -473,7 +479,7 @@ def demo_command(
         recordings = replay_recordings(directory)
         store = ReplayStore.load(recordings) if recordings else ReplayStore()
         recorded_questions = len(store.covered(DEMO_QUESTIONS))
-        replay_server = FakeLLMServer(store.rules()).start()
+        replay_server = FakeLLMServer(store.rules(), stream_delay=REPLAY_STREAM_DELAY).start()
         local_replay = Replay(replay_server.base_url, store.covered(DEMO_QUESTIONS), store.recorded_with)
         _point_llm_config_at(directory, replay_server.base_url)
         os.environ["OPENAI_API_KEY"] = "replay"

@@ -45,7 +45,7 @@ ENV=demo nl2sql-api --host 127.0.0.1 --port 8000   # then open http://localhost:
 | API | Router Path | Purpose |
 | --- | --- | --- |
 | [Health](health.md) | `routes/health.py` | Liveness/readiness checks. |
-| [Query](query.md) | `routes/query.py` | Execute natural language queries; page through or download a run's saved result. |
+| [Query](query.md) | `routes/query.py` | Execute natural language queries, whole or streamed as Server-Sent Events; page through or download a run's saved result. |
 | [Datasource](datasource.md) | `routes/datasource.py` | Manage datasource configs. |
 | [LLM](llm.md) | `routes/llm.py` | Configure and inspect LLMs. |
 | [Indexing](indexing.md) | `routes/indexing.py` | Index management and status. |

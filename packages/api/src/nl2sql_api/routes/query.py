@@ -2,8 +2,9 @@ import logging
 
 from fastapi import APIRouter, HTTPException, Depends, Query
 from fastapi.responses import StreamingResponse
+from starlette.concurrency import iterate_in_threadpool
 from typing import Annotated
-from nl2sql import ResultNotFound, ResultPage, UserContext
+from nl2sql import CancellationToken, QueryEvent, ResultNotFound, ResultPage, UserContext
 from nl2sql_api import auth
 from nl2sql_api.models.query import QueryRequest, QueryResponse
 from nl2sql_api.dependencies import get_query_service
@@ -47,6 +48,59 @@ def execute_query(
         # here means something genuinely unexpected broke.
         logger.exception("Unexpected failure while executing query")
         raise HTTPException(status_code=500, detail="Failed to execute query.")
+
+
+# Proxies (nginx, a Space's) buffer a response unless told not to, which would
+# hold every event back until the run ends.
+SSE_HEADERS = {"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
+
+_STREAM_FAILED = QueryEvent(type="error", data={"message": "Failed to execute query.",
+                                                "error_code": "UNKNOWN_ERROR"})
+
+
+@router.post(
+    "/query/stream",
+    summary="Ask a question, streamed",
+    response_class=StreamingResponse,
+    responses={
+        200: {"content": {"text/event-stream": {}},
+              "description": "Server-Sent Events: `node_started`, `node_finished`, `result_manifest`, "
+                             "`answer_delta`, then one `final` (the `/query` response) or `error`."},
+        401: {"description": "No role for this request (see the auth settings)."},
+    },
+)
+def stream_query(payload: QueryRequest, service: QuerySvc, user_context: Caller):
+    """The same run as `POST /query`, reported as it happens, as Server-Sent Events.
+
+    Each event's `data` is one JSON object: `node_started` (`node`) and
+    `node_finished` (`node`, `seconds`, `ok`) per pipeline step;
+    `result_manifest` (`trace_id`, `results`) as soon as the results are saved,
+    so a client can start paging them; `answer_delta` (`field`: `summary` or
+    `content`, `text`) as the answer model writes; then exactly one of `final`,
+    whose data is the `/query` response, or `error` (`message`, `error_code`)
+    when the run could not finish. A refusal or a provider error is a `final`
+    with `status: "error"`, as `/query` returns it. Same body and auth as
+    `/query`; closing the connection cancels the run before its next step.
+    """
+    token = CancellationToken()
+
+    def events():
+        try:
+            for event in service.stream_query(payload, user_context, token):
+                yield event.sse()
+        except Exception:
+            logger.exception("Unexpected failure while streaming a query")
+            yield _STREAM_FAILED.sse()
+
+    async def body():
+        try:
+            async for chunk in iterate_in_threadpool(events()):
+                yield chunk
+        finally:
+            # The client went away, or the run is over: stop it before its next step.
+            token.cancel()
+
+    return StreamingResponse(body(), media_type="text/event-stream", headers=SSE_HEADERS)
 
 
 _NOT_FOUND = {404: {"description": "No such run or result for this tenant."},

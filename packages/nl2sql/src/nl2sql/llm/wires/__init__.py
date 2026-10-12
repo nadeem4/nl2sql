@@ -14,7 +14,8 @@ from .openai import OpenAIWire
 
 WIRES: Dict[str, Wire] = {"openai": OpenAIWire(), "anthropic": AnthropicWire()}
 
-__all__ = ["WIRES", "Wire", "structured", "temperature_error", "wire_named", "wire_of"]
+__all__ = ["WIRES", "Wire", "streaming_structured", "structured", "temperature_error", "wire_named",
+           "wire_of"]
 
 
 def wire_named(name: Optional[str]) -> Wire:
@@ -31,3 +32,30 @@ def wire_of(llm: Any) -> Wire:
 def structured(llm: Any, schema: Any) -> Any:
     """``llm.with_structured_output(schema)`` with the method its wire uses."""
     return llm.with_structured_output(schema, method=wire_of(llm).structured_output_method)
+
+
+def streaming_structured(llm: Any, schema: Any) -> Any:
+    """:func:`structured`, with the provider asked to stream its answer.
+
+    The call is the same request with ``stream`` on (and, on the OpenAI wire,
+    the usage asked for at the end of the stream), so each piece of the tool
+    call reaches the callbacks' ``on_llm_new_token`` as the model writes it.
+    The pieces are joined into one message before the parser sees it, so the
+    answer is the one :func:`structured` returns. A wire that repairs tool
+    calls (Anthropic's) repairs the joined message too: its own ``_generate``
+    hook is not on the streaming path.
+    """
+    from langchain_core.outputs import ChatGeneration, ChatResult
+    from langchain_core.runnables import RunnableLambda
+
+    chain = structured(llm, schema)
+    model, parser = chain.first, chain.last
+    tools = getattr(model, "kwargs", {}).get("tools")
+    repair = getattr(wire_of(llm), "repair_tool_calls", None)
+
+    def repaired(message: Any) -> Any:
+        if repair is None:
+            return message
+        return repair(ChatResult(generations=[ChatGeneration(message=message)]), tools).generations[0].message
+
+    return model.bind(stream=True, stream_usage=True) | RunnableLambda(repaired) | parser

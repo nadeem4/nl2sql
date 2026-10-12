@@ -9,10 +9,16 @@ end-to-end tests and by ``nl2sql demo`` replay mode.
 A POST to a path ending in ``/messages`` is answered the way Anthropic answers
 ``/v1/messages``: a ``tool_use`` block for a tool call, a ``text`` block
 otherwise. Point ``ChatAnthropic`` at :attr:`FakeLLMServer.anthropic_base_url`.
+
+A request with ``"stream": true`` is answered the way each provider streams:
+the same answer as Server-Sent Events, a word or so at a time
+(``stream_delay`` seconds apart), with the usage at the end. That is how
+replay mode streams a recorded answer.
 """
 from __future__ import annotations
 
 import json
+import re
 import threading
 import time
 from dataclasses import dataclass, field
@@ -98,6 +104,42 @@ def completion(body: Dict[str, Any], mode: str, name: str, payload: Any,
             "usage": usage or DEFAULT_USAGE}
 
 
+def _pieces(text: str) -> List[str]:
+    """``text`` a word at a time, each word with the space after it."""
+    return re.findall(r"\S+\s*|\s+", text) or [""]
+
+
+def completion_chunks(body: Dict[str, Any], mode: str, name: str, payload: Any,
+                      usage: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
+    """The ``chat.completion.chunk`` objects that stream :func:`completion`'s answer.
+
+    A tool call's arguments arrive a word at a time after a first chunk naming
+    the call; any other answer's content does. The usage comes in a last
+    chunk with no choices when the request asked for it
+    (``stream_options.include_usage``), as OpenAI sends it.
+    """
+    head = {"id": "chatcmpl-fake", "object": "chat.completion.chunk", "created": int(time.time()),
+            "model": body.get("model", "fake")}
+
+    def chunk(delta: Dict[str, Any], finish: Optional[str] = None) -> Dict[str, Any]:
+        return {**head, "choices": [{"index": 0, "delta": delta, "finish_reason": finish}]}
+
+    text = payload if isinstance(payload, str) else json.dumps(payload)
+    if mode == "tools":
+        out = [chunk({"role": "assistant", "content": None, "tool_calls": [
+            {"index": 0, "id": "call_1", "type": "function", "function": {"name": name, "arguments": ""}}]})]
+        out += [chunk({"tool_calls": [{"index": 0, "function": {"arguments": p}}]}) for p in _pieces(text)]
+        finish = "tool_calls"
+    else:
+        out = [chunk({"role": "assistant", "content": ""})]
+        out += [chunk({"content": p}) for p in _pieces(text if mode == "json_schema" else str(payload))]
+        finish = "stop"
+    out.append(chunk({}, finish))
+    if (body.get("stream_options") or {}).get("include_usage"):
+        out.append({**head, "choices": [], "usage": usage or DEFAULT_USAGE})
+    return out
+
+
 DEFAULT_ANTHROPIC_USAGE: Dict[str, Any] = {"input_tokens": 1, "output_tokens": 1}
 
 
@@ -132,6 +174,39 @@ def anthropic_message(body: Dict[str, Any], name: str, payload: Any,
             "usage": usage or DEFAULT_ANTHROPIC_USAGE}
 
 
+def anthropic_stream(body: Dict[str, Any], name: str, payload: Any,
+                     usage: Optional[Dict[str, Any]] = None) -> List[tuple]:
+    """``(event, data)`` pairs that stream :func:`anthropic_message`'s answer, as Anthropic does.
+
+    ``message_delta`` carries the whole usage, as Anthropic's API now sends
+    it (``message_start`` only the input); a tool call's input arrives as
+    ``input_json_delta`` pieces, text as ``text_delta`` pieces.
+    """
+    usage = dict(usage or DEFAULT_ANTHROPIC_USAGE)
+    message = anthropic_message(body, name, payload, {**usage, "output_tokens": 0})
+    block = message["content"][0]
+    out = [("message_start", {"type": "message_start",
+                              "message": {**message, "content": [], "stop_reason": None}})]
+    if block["type"] == "tool_use":
+        out.append(("content_block_start", {"type": "content_block_start", "index": 0,
+                                            "content_block": {**block, "input": {}}}))
+        out += [("content_block_delta", {"type": "content_block_delta", "index": 0,
+                                         "delta": {"type": "input_json_delta", "partial_json": p}})
+                for p in _pieces(json.dumps(block["input"]))]
+    else:
+        out.append(("content_block_start", {"type": "content_block_start", "index": 0,
+                                            "content_block": {"type": "text", "text": ""}}))
+        out += [("content_block_delta", {"type": "content_block_delta", "index": 0,
+                                         "delta": {"type": "text_delta", "text": p}})
+                for p in _pieces(block["text"])]
+    out += [("content_block_stop", {"type": "content_block_stop", "index": 0}),
+            ("message_delta", {"type": "message_delta",
+                               "delta": {"stop_reason": message["stop_reason"], "stop_sequence": None},
+                               "usage": usage}),
+            ("message_stop", {"type": "message_stop"})]
+    return out
+
+
 @dataclass
 class FakeLLMServer:
     """``reject_temperature`` answers any request carrying ``temperature`` with
@@ -139,6 +214,9 @@ class FakeLLMServer:
 
     ``fail_with`` answers every call with one ``(status, body)`` error, the way
     a provider refusing a key (401) or rate limiting it (429) does.
+
+    ``stream_delay`` is how long a streamed answer waits between its pieces;
+    replay mode sets it so a recorded answer reads as it is written.
 
     Each entry in ``calls`` keeps the request ``body``, and the ``authorization``
     header of a matched or unmatched call, so tests can check what was actually
@@ -151,6 +229,7 @@ class FakeLLMServer:
     reject_temperature: bool = False
     # (status, body): answer every call with this error, as a provider refusing it would.
     fail_with: Optional[tuple] = None
+    stream_delay: float = 0.0
     calls: List[Dict[str, Any]] = field(default_factory=list)
     _server: Optional[HTTPServer] = None
     _thread: Optional[threading.Thread] = None
@@ -181,6 +260,20 @@ class FakeLLMServer:
                 self.end_headers()
                 self.wfile.write(out)
 
+            def _stream(self, events: List[tuple]) -> None:
+                """Server-Sent Events, one ``(event name or None, data)`` at a time."""
+                self.send_response(200)
+                self.send_header("Content-Type", "text/event-stream")
+                self.send_header("Cache-Control", "no-cache")
+                self.end_headers()
+                for i, (event, data) in enumerate(events):
+                    if i and outer.stream_delay:
+                        time.sleep(outer.stream_delay)
+                    line = f"event: {event}\n" if event else ""
+                    payload = data if isinstance(data, str) else json.dumps(data)
+                    self.wfile.write(f"{line}data: {payload}\n\n".encode())
+                    self.wfile.flush()
+
             def _anthropic(self, body: Dict[str, Any]) -> None:
                 name, text = classify_anthropic_request(body)
                 call = {"name": name, "mode": "anthropic", "body": body, "api_key": self.headers.get("x-api-key")}
@@ -200,6 +293,9 @@ class FakeLLMServer:
                                                                 "message": f"fake llm: no rule for {name}"}})
                     return
                 payload = rule.payload(text) if callable(rule.payload) else rule.payload
+                if body.get("stream"):
+                    self._stream(anthropic_stream(body, name, payload, rule.usage))
+                    return
                 self._send(200, anthropic_message(body, name, payload, rule.usage))
 
             def do_POST(self):
@@ -228,6 +324,10 @@ class FakeLLMServer:
                     self._send(400, {"error": {"message": f"fake llm: no rule for {name}"}})
                     return
                 payload = rule.payload(text) if callable(rule.payload) else rule.payload
+                if body.get("stream"):
+                    chunks = completion_chunks(body, mode, name, payload, rule.usage)
+                    self._stream([(None, c) for c in chunks] + [(None, "[DONE]")])
+                    return
                 self._send(200, completion(body, mode, name, payload, rule.usage))
 
         self._server = HTTPServer((self.host, self.port), Handler)

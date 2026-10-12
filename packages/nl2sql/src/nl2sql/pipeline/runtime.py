@@ -131,6 +131,7 @@ def run_with_graph(
     user_context: Optional[UserContext] = None,
     cancellation_token: Optional[CancellationToken] = None,
     trace_mode: Optional[str] = None,
+    stream_answer: bool = False,
 ) -> Dict:
     """Convenience function to run the full pipeline.
 
@@ -138,6 +139,9 @@ def run_with_graph(
     ``trace_mode``, which wins) decides whether the trace is written. When it
     is, the returned state carries ``trace_path``. ``cancellation_token`` lets
     a caller stop the run (trace replay does, on divergence).
+    ``stream_answer`` asks the answer model to stream its answer, so a
+    callback's ``on_llm_new_token`` sees it as it is written
+    (``stream_query`` passes it with a :class:`~nl2sql.pipeline.events.RunEvents`).
     """
     token = cancellation_token or CancellationToken()
     run_done = threading.Event()
@@ -216,7 +220,7 @@ def run_with_graph(
         return graph.invoke(
             initial_state.model_dump(),
             config={
-                "configurable": {"cancellation_token": token},
+                "configurable": {"cancellation_token": token, "stream_answer": stream_answer},
                 "callbacks": [_StopWhenCancelled(token), *(callbacks or []), timing, usage, recorder],
             },
         )

@@ -145,7 +145,8 @@ The visitor pastes a key on the **Settings** page, one per provider. From there:
    provider's own name. Closing the tab clears it. Nothing else in the page
    reads it.
 2. **It travels as a request header of its own**, `X-NL2SQL-Api-Key-<provider>`
-   (`X-NL2SQL-Api-Key-anthropic`), on `POST /api/ask` and nowhere else. A
+   (`X-NL2SQL-Api-Key-anthropic`), on `POST /api/ask` (or its streamed twin,
+   `POST /api/ask/stream`, which applies the same rules) and nowhere else. A
    header rather than the body, because a body is what request logs and
    validation errors quote back; one header per provider, so a key never shares
    a header with anything else and nothing that parses or quotes a header can

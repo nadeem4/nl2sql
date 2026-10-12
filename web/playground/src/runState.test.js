@@ -2,8 +2,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  STOP_AFTER_MS, answerHead, askButton, chipRow, elapsedLabel, gateReason, gateTimeline, runFault,
-  runScroll, secs, stationHeads, stationStates, statusStrip, stoppedNote,
+  STOP_AFTER_MS, answerHead, askButton, chipRow, elapsedLabel, gateReason, gateTimeline, liveAnswer,
+  liveTimings, runFault, runScroll, secs, stationHeads, stationStates, statusStrip, stoppedNote,
 } from "./runState.js";
 
 const passed = (name) => ({ name, passed: true, message: `${name} ok` });
@@ -38,6 +38,29 @@ test("busy with no per-node progress: the first station is live, the rest are qu
   assert.deepEqual(stationStates({ asked: {}, busy: true }), {
     plan: "busy", checks: "queued", sql: "queued", rows: "queued", cost: "queued",
   });
+});
+
+test("busy and streaming: the stations follow the steps as they finish", () => {
+  const progress = { finished: ["decomposer", "ast_planner"], timings: { ast_planner: 2.31 } };
+  assert.deepEqual(stationStates({ asked: {}, busy: true, progress }), {
+    plan: "done", checks: "busy", sql: "queued", rows: "queued", cost: "queued",
+  });
+});
+
+test("a streamed station that is done shows its time while the run goes on", () => {
+  const progress = { finished: ["ast_planner"], timings: { ast_planner: 2.31 } };
+  const states = stationStates({ asked: {}, busy: true, progress });
+  const heads = stationHeads(liveTimings(progress), states);
+  assert.equal(heads.plan.time, "2.31 s");
+  assert.equal(heads.checks.time, null);
+  assert.equal(heads.sql.time, "waiting");
+});
+
+test("the answer header shows the streamed summary while it is written", () => {
+  assert.deepEqual(liveAnswer({ answer: { summary: "Rock sells", content: "" } }),
+    { kind: "answer", text: "Rock sells" });
+  assert.equal(liveAnswer({ answer: { summary: "", content: "" } }), null);
+  assert.equal(liveAnswer(null), null);
 });
 
 test("stopped: every station is skipped", () => {

@@ -204,6 +204,7 @@ def _every_route_response(client, trace_id="0b8f7d2e-1111-4222-8333-944455556666
         ("GET", "/api/meta"): lambda: client.get("/api/meta"),
         ("GET", "/api/schema"): lambda: client.get("/api/schema"),
         ("POST", "/api/ask"): lambda: client.post("/api/ask", json={"question": "q1", "role": "admin"}),
+        ("POST", "/api/ask/stream"): lambda: client.post("/api/ask/stream", json={"question": "q1", "role": "admin"}),
         ("GET", "/api/trace/{trace_id}"): lambda: client.get(f"/api/trace/{trace_id}"),
         ("GET", "/api/query/{request_id}/results/{result_id}"): lambda: client.get(
             f"/api/query/{trace_id}/results/combine_g1"),

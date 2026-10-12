@@ -234,9 +234,30 @@ with `record: clips` runs the same script in CI and opens a pull request.
   `question_groups`. With a single database the question box names it; with
   several it does not, because the resolver picks. An empty box with a key
   leaves **Ask** looking ready; pressing it puts the keyboard in the box.
-- **Busy and Stop**: while `/api/ask` is out, only the first unfinished
-  station is live (the API reports no per-node progress, so that is Plan) and
-  the rest are queued at 40% opacity, with skeleton bars in the live one, a 2px
+- **Streaming**: Ask posts to `/api/ask/stream` (`streamAsk` in
+  `src/stream.js`) and reads its Server-Sent Events as they arrive:
+  `node_started` / `node_finished` per step, `result_manifest` once the
+  results are saved, `answer_delta` as the answer is written, then `final`
+  (exactly the `/api/ask` reply) or `error`. `progressOf` folds them into
+  `progress` in `App`; `liveStations` lights each station as its step
+  finishes (the next unfinished one is live, Cost & time goes live once the
+  rows are in) and `liveTimings` gives the done ones their time; the Rows
+  station pages the saved result from the manifest (`liveResult`) before the
+  answer exists, and the same table stays when the run is back; the answer
+  sentence grows as the summary streams (`liveAnswer`, `#answer-live`, in
+  `--ink-2` until the result is back). The stations hold their body (plan,
+  checks, SQL) until `final`, and say nothing about it being missing while the
+  run is live. `StreamUnavailable` -- no fetch streaming in the browser, a
+  404 or 405 from an older server, a network failure before the reply, or a
+  stream that ends without `final` or `error` -- falls back to `/api/ask`; a
+  refusal (4xx with a `detail`), an `error` event and Stop are not fallbacks.
+  A browser that cannot read the body as it arrives reads it whole, without
+  asking twice.
+- **Busy and Stop**: while a run is out without a stream (the `/api/ask`
+  fallback), only the first unfinished station is live (that reply reports
+  no per-node progress, so that is Plan) and the rest are queued at 40%
+  opacity; streamed, the stations follow `progress` as above. Either way the
+  live one carries skeleton bars, a 2px
   accent segment travelling down the spine (`.spine-run`, held still under reduced
   motion) and `#elapsed` beside the button: **Running · 3.4 s**, drawn on
   `requestAnimationFrame`, with a visually hidden status that changes once a
@@ -421,7 +442,8 @@ with `record: clips` runs the same script in CI and opens a pull request.
   non-loopback `--host` without `--allow-settings`) the page shows the reason
   (`#settings-unavailable`) instead of a form, and the nav marks it.
 
-Every run station renders the `/api/ask` response, and the Rows station the
+Every run station renders the `/api/ask` response (the `final` event of
+`/api/ask/stream`), and while a streamed run is live, the events before it; the Rows station the
 saved result that response names, read through the engine's result routes;
 nothing is computed server-side for the page.
 
@@ -573,7 +595,8 @@ npm run dev
 
 Vite serves the page on its own port. Run `nl2sql demo --no-browser` alongside
 it and proxy or point `fetch` at `http://127.0.0.1:8765` to exercise the real
-API; the app calls `/api/meta`, `/api/schema`, `/api/ask`, `/api/trace/{id}`
+API; the app calls `/api/meta`, `/api/schema`, `/api/ask/stream` (and `/api/ask`
+when it cannot stream), `/api/trace/{id}`
 the settings routes (`GET /api/settings`, `POST /api/settings/key`,
 `POST /api/settings/models`) and the index routes (`GET /api/index`,
 `POST /api/index/rebuild`), the inspector's (`GET /api/retrieval`,

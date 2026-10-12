@@ -15,6 +15,7 @@ from .execution.artifacts.results import (
     ResultSummary,
 )
 from .services.callbacks.token_handler import QuestionUsage
+from .pipeline.events import QueryEvent
 from .common.logger import configure_logging
 
 # Also expose individual API modules for more granular access
@@ -69,6 +70,7 @@ __all__ = [
     "ResultNotFound",
     "MAX_RESULT_PAGE_SIZE",
     "QuestionUsage",
+    "QueryEvent",
     "configure_logging",
     "BenchmarkConfig",
 ]

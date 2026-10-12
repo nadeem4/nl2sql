@@ -45,6 +45,15 @@ class ConfiguredChatOpenAI(ChatOpenAI):
                 raise self._explain(exc) from exc
             raise
 
+    def _stream(self, *args: Any, **kwargs: Any):
+        # The streamed answer (``streaming_structured``) skips ``_generate``.
+        try:
+            yield from super()._stream(*args, **kwargs)
+        except openai.BadRequestError as exc:
+            if _rejects_temperature(exc):
+                raise self._explain(exc) from exc
+            raise
+
 
 def build_chat_client(model: str, temperature: Optional[float], **kwargs: Any) -> ConfiguredChatOpenAI:
     """Builds a client that sends exactly the configured temperature, or none.

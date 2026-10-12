@@ -27,6 +27,22 @@ class StubEngine:
             raise self.run_query_result
         return self.run_query_result
 
+    def stream_query(self, natural_language, datasource_id=None, execute=True, user_context=None,
+                     cancellation_token=None):
+        """The run as events: one per node, then ``final`` with ``run_query``'s result."""
+        from nl2sql import QueryEvent
+
+        self.calls.append({"natural_language": natural_language, "datasource_id": datasource_id,
+                           "execute": execute, "user_context": user_context, "stream": True,
+                           "cancellation_token": cancellation_token})
+        if isinstance(self.run_query_result, Exception):
+            raise self.run_query_result
+        yield QueryEvent(type="node_started", data={"node": "decomposer"})
+        yield QueryEvent(type="node_finished", data={"node": "decomposer", "seconds": 0.1, "ok": True})
+        yield QueryEvent(type="answer_delta", data={"field": "summary", "text": "Revenue "})
+        yield QueryEvent(type="final", data=(self.run_query_result.model_dump(mode="json")
+                                             if self.run_query_result is not None else {}))
+
 
 @pytest.fixture
 def api_client():
