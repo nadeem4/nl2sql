@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Tuple, Union
 
 import duckdb
 import polars as pl
@@ -10,12 +10,23 @@ from nl2sql.execution.contracts import ArtifactRef
 from nl2sql.execution.artifacts import build_artifact_store
 
 
-def _column(frame: pl.DataFrame, key: str) -> str:
+# Every frame here is a polars LazyFrame, or a DataFrame a caller passed in:
+# both have the operations used below, and nothing is collected until the
+# aggregator writes the result.
+Frame = Union[pl.DataFrame, pl.LazyFrame]
+
+
+def _names(frame: Frame) -> List[str]:
+    """The column names of ``frame``, without collecting a lazy one."""
+    return frame.collect_schema().names()
+
+
+def _column(frame: Frame, key: str) -> str:
     """A join key as a column of ``frame``; see :func:`~nl2sql.aggregation.columns.resolve_key`."""
-    return resolve_key(frame.columns, key)
+    return resolve_key(_names(frame), key)
 
 
-def _check_attributes(frame: pl.DataFrame, names: List[str]) -> None:
+def _check_attributes(frame: Frame, names: List[str]) -> None:
     """Refuses a post-combine attribute the combined frame does not have.
 
     polars reports this as ``unable to find column "right.customer"; valid
@@ -25,12 +36,13 @@ def _check_attributes(frame: pl.DataFrame, names: List[str]) -> None:
     again, so this is the last line of defence; the message explains why a
     side-qualified column cannot work (see ``missing_columns_message``).
     """
-    missing = [name for name in names if name and name not in frame.columns]
+    columns = _names(frame)
+    missing = [name for name in names if name and name not in columns]
     if missing:
-        raise ValueError(missing_columns_message(missing, frame.columns))
+        raise ValueError(missing_columns_message(missing, columns))
 
 
-def _filter(rows: pl.DataFrame, filters: List[Dict[str, Any]]) -> pl.DataFrame:
+def _filter(rows: Frame, filters: List[Dict[str, Any]]) -> Frame:
     for flt in filters:
         col, op, val = pl.col(flt.get("attribute")), flt.get("operator"), flt.get("value")
         if op == "=":
@@ -63,7 +75,7 @@ _AGGREGATIONS = {
 }
 
 
-def _aggregate(frame: pl.DataFrame, attributes: Dict[str, Any]) -> pl.DataFrame:
+def _aggregate(frame: Frame, attributes: Dict[str, Any]) -> Frame:
     group_by = [g.get("attribute") for g in attributes.get("group_by", []) if g.get("attribute")]
     exprs = [
         _AGGREGATIONS[m.get("aggregation")](pl.col(m.get("name"))).alias(m.get("name"))
@@ -80,18 +92,19 @@ class PolarsDuckdbEngine:
     def __init__(self):
         self.artifact_store = build_artifact_store()
 
-    def load_scan(self, artifact: ArtifactRef) -> pl.DataFrame:
-        return self.artifact_store.read_parquet(artifact)
+    def load_scan(self, artifact: ArtifactRef) -> pl.LazyFrame:
+        """A sub-query's artifact as a polars scan: read only when the result is written."""
+        return self.artifact_store.scan_parquet(artifact)
 
     def combine(
         self,
         operation: str,
-        inputs: List[Tuple[str, pl.DataFrame]],
+        inputs: List[Tuple[str, Frame]],
         join_keys: List[Dict[str, Any]],
-    ) -> pl.DataFrame:
+    ) -> Frame:
         frames = [frame for _, frame in inputs]
         if not frames:
-            return pl.DataFrame()
+            return pl.LazyFrame()
         if operation == "standalone":
             return frames[0]
         if operation == "union":
@@ -115,11 +128,12 @@ class PolarsDuckdbEngine:
             right_on = [_column(right, k.get("right")) for k in join_keys]
             joined = left.join(right, left_on=left_on, right_on=right_on, how="inner", suffix="_right")
             diff_cols = []
-            for col in left.columns:
+            joined_columns = _names(joined)
+            for col in _names(left):
                 if col in left_on:
                     continue
                 right_col = f"{col}_right"
-                if right_col in joined.columns:
+                if right_col in joined_columns:
                     diff_cols.append((col, right_col))
             if not diff_cols:
                 return joined
@@ -127,7 +141,7 @@ class PolarsDuckdbEngine:
             return joined.filter(pl.any_horizontal(diff_exprs))
         raise ValueError(f"Unsupported combine operation '{operation}'.")
 
-    def post_op(self, operation: str, frame: pl.DataFrame, attributes: Dict[str, Any]) -> pl.DataFrame:
+    def post_op(self, operation: str, frame: Frame, attributes: Dict[str, Any]) -> Frame:
         """Applies one post-combine op, every field it carries, in SQL's order.
 
         ``operation`` picks the reshaping step (``aggregate`` or ``project``);
@@ -156,5 +170,7 @@ class PolarsDuckdbEngine:
         limit = attributes.get("limit")
         return rows.head(limit) if limit is not None else rows
 
-    def to_rows(self, frame: pl.DataFrame) -> List[Dict[str, Any]]:
+    def to_rows(self, frame: Frame) -> List[Dict[str, Any]]:
+        if isinstance(frame, pl.LazyFrame):
+            frame = frame.collect()
         return frame.to_dicts()

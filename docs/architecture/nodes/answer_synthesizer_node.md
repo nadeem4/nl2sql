@@ -42,7 +42,8 @@ flowchart LR
 From `GraphState`:
 
 - `user_query` (required)
-- `aggregator_response.terminal_results` (required)
+- `aggregator_response.terminal_results` (required): the first rows of each terminal result
+- `aggregator_response.computed_artifacts`: the saved result behind each, for its row count and columns
 - `decomposer_response.unmapped_subqueries` (optional)
 - `subgraph_outputs[<id>].truncated` / `.row_cap`: whether a sub-query's result reached its row limit, and at how many rows.
 - `warnings`: the `VALUE_NOT_FOUND` warnings ("There is no Genre with Name 'Polka'.") from sub-queries whose filter named a value that does not exist (see [ExecutorNode](executor_node.md#an-empty-results-filter-values)). An `ERROR`-severity one is not used: a retry replaced that attempt.
@@ -71,7 +72,7 @@ Side effects:
 
 1. Resolve aggregated result from `aggregator_response`.
 2. If missing, emit `INVALID_STATE` error and stop.
-3. Build the result preview (`result_preview()`): for each terminal result, its first `ANSWER_PREVIEW_ROWS` rows, `row_count`, `columns` and `partial` (true when rows were left out). Serialize it to JSON.
+3. Build the result preview (`result_preview()`): for each terminal result, its first `ANSWER_PREVIEW_ROWS` rows, `row_count`, `columns` and `partial` (true when rows were left out). The rows are the aggregator's `terminal_results`, already cut to the preview; `row_count` and `columns` come from the saved combined result in `computed_artifacts`, so they describe the whole result. Serialize it to JSON.
 4. Build the *Result Limit* note: one line per sub-query whose result reached its row limit ("The result was cut at 10,000 rows, the row limit, so it is incomplete. Narrow the question ..."), or `None`.
 5. Serialize unmapped sub‑queries to JSON.
 6. Invoke LLM chain with structured output. The prompt's *Data Notes* lists the missing values and asks the answer to say the value does not exist instead of reporting the empty result as a finding.

@@ -240,6 +240,15 @@ class Settings(BaseSettings):
             "truncated."
         ),
     )
+    result_fetch_batch_size: int = Field(
+        default=10_000,
+        ge=1,
+        validation_alias="RESULT_FETCH_BATCH_SIZE",
+        description=(
+            "Rows fetched from the database and written to the result artifact at a time, "
+            "for an adapter that streams (execute_batches). At most one batch is held in memory."
+        ),
+    )
     answer_preview_rows: int = Field(
         default=20,
         validation_alias="ANSWER_PREVIEW_ROWS",

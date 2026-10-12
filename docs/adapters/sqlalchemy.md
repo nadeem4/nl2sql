@@ -48,6 +48,18 @@ registered under the `nl2sql.adapters` entry point.
 
 The base class provides stubs. Override these to implement database-specific optimization logic (e.g., `EXPLAIN ANALYZE`).
 
+#### `execute_batches(request, batch_size)`
+
+Implements the SDK's optional `StreamingAdapterProtocol` (see [the adapter SDK](sdk.md#optional-hook-execute_batchesrequest-batch_size)).
+It opens the result with `stream_results=True` and yields it in frames of
+`fetchmany(batch_size)` rows, each with the columns, so no more than one batch
+is held as Python rows. `stream_results` is a server-side cursor on drivers
+that have one (psycopg2, the MySQL drivers); the others ignore it and buffer
+in the driver, which is still not a Python row list. A `SQLAlchemyError`,
+before the first row or between batches, is yielded as `query_failed(exc)`,
+the same failed frame `execute` returns. `execute` itself still reads the whole
+result with `fetchall`.
+
 #### `is_retryable_error(exc) -> bool`
 
 `execute()` catches every `SQLAlchemyError` the query raises and returns it as

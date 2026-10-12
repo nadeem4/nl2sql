@@ -39,3 +39,24 @@ def read_parquet(
     if storage_options is None:
         return pl.read_parquet(source)
     return pl.read_parquet(source, storage_options=storage_options)
+
+
+def sink_parquet(
+    frame: pl.LazyFrame,
+    target: Any,
+    storage_options: Optional[Dict[str, Any]] = None,
+) -> None:
+    """Write a lazy frame with polars' streaming engine, never collecting it whole."""
+    if storage_options is None:
+        frame.sink_parquet(target)
+    else:
+        frame.sink_parquet(target, storage_options=storage_options)
+
+
+def scan_parquet(
+    source: Any,
+    storage_options: Optional[Dict[str, Any]] = None,
+) -> pl.LazyFrame:
+    if storage_options is None:
+        return pl.scan_parquet(source)
+    return pl.scan_parquet(source, storage_options=storage_options)

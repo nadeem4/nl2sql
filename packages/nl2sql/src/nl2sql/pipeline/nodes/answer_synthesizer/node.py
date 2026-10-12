@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from typing import Dict, Any, List, TYPE_CHECKING
+from typing import Dict, Any, List, Optional, TYPE_CHECKING
 
 from langchain_core.prompts import ChatPromptTemplate
 
@@ -34,21 +34,28 @@ def _missing_values(warnings: List[Dict[str, Any]]) -> List[str]:
     return notes
 
 
-def result_preview(result: Dict[str, Any], preview_rows: int) -> Dict[str, Any]:
+def result_preview(result: Dict[str, Any], preview_rows: int,
+                   saved: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """What the answer model sees of each terminal result: never the whole of it.
 
     The first ``preview_rows`` rows, the total ``row_count``, the column names,
     and ``partial`` when the preview leaves rows out. The full result is shown
-    to the user as a table; the model only writes about it.
+    to the user as a table; the model only writes about it. ``saved`` holds the
+    aggregator's artifact for each result (``computed_artifacts``): its row
+    count and columns are the whole result's, where ``result`` holds only the
+    first rows.
     """
     preview: Dict[str, Any] = {}
     for node_id, rows in result.items():
         rows = list(rows or [])
+        artifact = (saved or {}).get(node_id)
+        row_count = artifact.row_count if artifact is not None else len(rows)
+        columns = list(rows[0].keys()) if rows and isinstance(rows[0], dict) else []
         preview[node_id] = {
             "rows": rows[:preview_rows],
-            "row_count": len(rows),
-            "columns": list(rows[0].keys()) if rows and isinstance(rows[0], dict) else [],
-            "partial": len(rows) > preview_rows,
+            "row_count": row_count,
+            "columns": list(artifact.columns) if artifact is not None else columns,
+            "partial": row_count > preview_rows,
         }
     return preview
 
@@ -75,9 +82,9 @@ class AnswerSynthesizerNode:
         self.prompt = ChatPromptTemplate.from_template(ANSWER_SYNTHESIZER_PROMPT)
         self.chain = self.prompt | structured(self.llm, AggregatedResponse)
 
-    def _serialize_result(self, result: Any) -> str:
+    def _serialize_result(self, result: Any, saved: Optional[Dict[str, Any]] = None) -> str:
         if isinstance(result, dict) and all(isinstance(v, list) for v in result.values()):
-            result = result_preview(result, int(settings.answer_preview_rows))
+            result = result_preview(result, int(settings.answer_preview_rows), saved)
         try:
             return json.dumps(result, indent=2, ensure_ascii=True, default=str)
         except TypeError:
@@ -85,8 +92,10 @@ class AnswerSynthesizerNode:
 
     def __call__(self, state: GraphState) -> Dict[str, Any]:
         aggregated_result = None
+        saved = None
         if state.aggregator_response:
             aggregated_result = state.aggregator_response.terminal_results
+            saved = state.aggregator_response.computed_artifacts
         elif state.answer_synthesizer_response and state.answer_synthesizer_response.final_answer is not None:
             aggregated_result = state.answer_synthesizer_response.final_answer
 
@@ -114,7 +123,7 @@ class AnswerSynthesizerNode:
             response: AggregatedResponse = self.chain.invoke(
                 {
                     "user_query": state.user_query,
-                    "result_preview": self._serialize_result(aggregated_result),
+                    "result_preview": self._serialize_result(aggregated_result, saved),
                     "result_limit": "\n".join(f"- {c}" for c in cut) or "None",
                     "unmapped_subqueries": json.dumps(
                         unmapped_subqueries, indent=2, ensure_ascii=True

@@ -1,16 +1,53 @@
 from __future__ import annotations
 
-from typing import Optional, Dict, Any
+from typing import Any, Iterator, Optional
 
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.common.logger import get_logger
+from nl2sql.common.settings import settings
 from nl2sql.execution.contracts import ExecutorRequest, ExecutorResponse
 from nl2sql.execution.artifacts import build_artifact_store
 from nl2sql_adapter_sdk.capabilities import DatasourceCapability
 from nl2sql.datasources import DatasourceRegistry
-from nl2sql_adapter_sdk.contracts import AdapterRequest
+from nl2sql_adapter_sdk.contracts import AdapterRequest, ResultFrame
+from nl2sql_adapter_sdk.protocols import StreamingAdapterProtocol
 
 logger = get_logger("sql_executor")
+
+
+class _StreamFailed(Exception):
+    """Raised into the artifact writer when the adapter reports a failure mid-result."""
+
+
+def _frames(adapter: Any, request: AdapterRequest) -> Iterator[ResultFrame]:
+    """The adapter's result, a batch at a time when it streams, else in one frame.
+
+    ``execute_batches`` is the SDK's optional ``StreamingAdapterProtocol``; an
+    adapter without it (any written before it) is called through ``execute``.
+    """
+    if isinstance(adapter, StreamingAdapterProtocol):
+        yield from adapter.execute_batches(request, int(settings.result_fetch_batch_size))
+    else:
+        yield adapter.execute(request)
+
+
+class _Stream:
+    """Passes the adapter's frames to the writer, counting them and stopping at a failure."""
+
+    def __init__(self, frames: Iterator[ResultFrame]):
+        self._frames = frames
+        self.failure: Optional[ResultFrame] = None
+        self.row_count = 0
+        self.bytes = 0
+
+    def __iter__(self) -> Iterator[ResultFrame]:
+        for frame in self._frames:
+            if not frame.success:
+                self.failure = frame
+                raise _StreamFailed()
+            self.row_count += frame.row_count
+            self.bytes += frame.bytes or 0
+            yield frame
 
 
 class SqlExecutorService:
@@ -75,13 +112,27 @@ class SqlExecutorService:
             limits={}
         )
 
-        result_frame = adapter.execute(adapter_request)
+        # request_id is the run's trace id, shared by all its sub-queries;
+        # sub_query_id (the scan node's id) keeps their artifacts apart.
+        metadata = {
+            "schema_version": request.schema_version,
+            "request_id": request.trace_id,
+            "tenant_id": request.tenant_id,
+            "sub_query_id": request.node_id,
+            "dag_node_id": request.node_id,
+            "subgraph_name": request.subgraph_name,
+        }
+        stream = _Stream(_frames(adapter, adapter_request))
+        try:
+            artifact_ref = self.artifact_store.write_batches(stream, metadata)
+        except _StreamFailed:
+            artifact_ref = None
 
-        if not result_frame.success:
+        if stream.failure is not None:
             # The adapter is the only one that knows its driver, so it says
             # whether the query itself was at fault (``retryable``): such an
             # error goes back to the planner; anything else ends the sub-query.
-            adapter_error = result_frame.error
+            adapter_error = stream.failure.error
             retryable = bool(adapter_error and adapter_error.retryable)
             error = PipelineError(
                 node="sql_executor",
@@ -100,21 +151,7 @@ class SqlExecutorService:
                 errors=[error],
                 tenant_id=request.tenant_id,
             )
-    
-        # request_id is the run's trace id, shared by all its sub-queries;
-        # sub_query_id (the scan node's id) keeps their artifacts apart.
-        artifact_ref = self.artifact_store.create_artifact_ref(
-            result_frame,
-            {
-                "schema_version": request.schema_version,
-                "request_id": request.trace_id,
-                "tenant_id": request.tenant_id,
-                "sub_query_id": request.node_id,
-                "dag_node_id": request.node_id,
-                "subgraph_name": request.subgraph_name,
-            },
-        )
-        
+
         return ExecutorResponse(
             executor_name="sql_executor",
             subgraph_name=request.subgraph_name,
@@ -124,8 +161,8 @@ class SqlExecutorService:
             schema_version=request.schema_version,
             artifact=artifact_ref,
             metrics={
-                "row_count": result_frame.row_count,
-                "bytes_returned": result_frame.bytes or 0,
+                "row_count": stream.row_count,
+                "bytes_returned": stream.bytes,
             },
             tenant_id=request.tenant_id,
         )

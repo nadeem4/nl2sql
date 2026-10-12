@@ -4,7 +4,11 @@ from typing import Dict, Any, List, Tuple, TYPE_CHECKING
 if TYPE_CHECKING:
     from nl2sql.pipeline.state import GraphState
 
+import polars as pl
+
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
+from nl2sql.common.settings import settings
+from nl2sql.execution.contracts import ArtifactRef
 from nl2sql.pipeline.nodes.aggregator.schemas import AggregatorResponse
 from nl2sql.common.logger import get_logger
 from nl2sql.context import NL2SQLContext
@@ -56,10 +60,11 @@ class EngineAggregatorNode:
             refused = [c for c in capped if c[0] in _TWO_SIDED]
             if refused:
                 return self._truncated(refused)
-            terminal_results = self.service.execute(dag, state.artifact_refs)
+            frames = self.service.execute(dag, state.artifact_refs)
+            saved = {node_id: self._save(state, node_id, frame) for node_id, frame in frames.items()}
             aggregator_response = AggregatorResponse(
-                terminal_results=terminal_results,
-                computed_artifacts={},
+                terminal_results={node_id: self._preview(ref) for node_id, ref in saved.items()},
+                computed_artifacts=saved,
             )
             return {
                 "aggregator_response": aggregator_response,
@@ -92,6 +97,31 @@ class EngineAggregatorNode:
                 "reasoning": [{"node": self.node_name, "content": f"Error: {str(exc)}", "type": "error"}],
                 "errors": [error],
             }
+
+    def _save(self, state: GraphState, node_id: str, frame: pl.LazyFrame) -> ArtifactRef:
+        """Writes a terminal result to its own artifact, beside the run's sub-query results.
+
+        The path is the artifact template rendered for the run (``request_id``
+        is its trace id) with ``result_<node_id>`` as the sub-query and DAG
+        node id; the default template gives ``<tenant>/<run>/result_<node_id>.parquet``.
+        A combined result has no subgraph or schema version of its own, so
+        a template naming them gets ``aggregator`` and ``result``.
+        """
+        name = f"result_{node_id}"
+        ref = self.service.engine.artifact_store.write_lazy(frame, {
+            "tenant_id": getattr(self.ctx, "tenant_id", None) or settings.tenant_id,
+            "request_id": state.trace_id,
+            "sub_query_id": name,
+            "dag_node_id": name,
+            "subgraph_name": "aggregator",
+            "schema_version": "result",
+        })
+        return ref.model_copy(update={"sub_query_id": None})
+
+    def _preview(self, ref: ArtifactRef) -> List[Dict[str, Any]]:
+        """The first ``ANSWER_PREVIEW_ROWS`` rows of a saved result, read from its artifact."""
+        rows = int(settings.answer_preview_rows)
+        return self.service.engine.artifact_store.scan_parquet(ref).head(rows).collect().to_dicts()
 
     def _truncated(self, refused: List[Tuple[str, str, int]]) -> Dict[str, Any]:
         """Refuses a join/compare over an input cut short by the row cap."""
