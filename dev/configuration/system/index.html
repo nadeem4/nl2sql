@@ -2295,7 +2295,7 @@ providers. The check runs on the read path only, so the fix is simply to re-run
 <tr>
 <td><code>PLAN_CACHE_ENABLED</code></td>
 <td><code>true</code></td>
-<td>Reuse a plan that already passed validation and executed, for the same normalised sub-query intent, datasource and schema version, instead of calling the planner LLM. The cached plan is validated again on every use, so RBAC and policy changes still apply. Stored in the schema store (<code>SCHEMA_STORE_PATH</code>); <code>nl2sql cache clear</code> empties it. See <a href="../../architecture/determinism/#the-plan-cache-determinism-from-the-architecture">Determinism → The plan cache</a>.</td>
+<td>Reuse a plan that already passed validation and executed, for the same normalised sub-query intent, datasource and schema version on the same run date (<code>NL2SQL_TODAY</code>, else the UTC date), instead of calling the planner LLM. The cached plan is validated again on every use, so RBAC and policy changes still apply. Stored in the schema store (<code>SCHEMA_STORE_PATH</code>); <code>nl2sql cache clear</code> empties it. See <a href="../../architecture/determinism/#the-plan-cache-determinism-from-the-architecture">Determinism → The plan cache</a>.</td>
 </tr>
 <tr>
 <td><code>FEEDBACK_ENABLED</code></td>
@@ -2310,7 +2310,7 @@ providers. The check runs on the read path only, so the fix is simply to re-run
 <tr>
 <td><code>NL2SQL_TODAY</code></td>
 <td><code>—</code></td>
-<td>The date the planner and refiner are told it is, as an ISO date (<code>2013-12-31</code>). Unset, it is the real date in UTC. Pin it for tests and gold runs whose questions say "this year" or "the last 30 days". A trace records the date its run used, and <code>nl2sql trace replay</code> pins it.</td>
+<td>The date the planner and refiner are told it is, as an ISO date (<code>2013-12-31</code>). Unset, it is the real date in UTC. Pin it for tests and gold runs whose questions say "this year" or "the last 30 days". A trace records the date its run used, and <code>nl2sql trace replay</code> pins it. It is also part of the plan cache key, so a plan made on another date is not reused.</td>
 </tr>
 <tr>
 <td><code>TENANT_ID</code></td>

@@ -4603,12 +4603,19 @@ executed is therefore <strong>pinned</strong> and reused
   <code>datasource_id</code> and the schema snapshot at <code>schema_version</code>. Caching there
   reuses exactly the output that decides the SQL, and a multi-datasource
   question reuses each of its sub-queries' plans independently.</li>
-<li><strong>The key.</strong> <code>(normalised sub-query intent, datasource_id, schema_version)</code>.
+<li><strong>The key.</strong> <code>(normalised sub-query intent, run date, datasource_id, schema_version)</code>.
   Normalisation is case-folding, collapsing whitespace and stripping trailing
   <code>.?!,;:</code>, and nothing else; matching is exact, never by similarity. A
   sub-query without a <code>schema_version</code> is never cached.</li>
+<li><strong>The run date.</strong> The planner is told today's date (<code>NL2SQL_TODAY</code>, else the
+  UTC date) and writes "this year" or "the last 30 days" as literal dates, so a
+  plan made yesterday would answer for yesterday's window. Every entry is keyed
+  on the run date, date-relative or not, because nothing in the intent or the
+  plan says reliably which answers depend on today. A plan is therefore reused
+  for the rest of the day it was made, or for as long as <code>NL2SQL_TODAY</code> pins
+  the date.</li>
 <li><strong>Invalidation.</strong> Automatic through the schema version: a re-index with a
-  changed schema registers a new version, which misses. Plans for a version the
+  changed schema registers a new version, which misses. A new day misses too. Plans for a version the
   store evicts are deleted with it. There is no TTL and no LRU.</li>
 <li><strong>Always re-validated.</strong> A hit replaces only the planner's LLM call (and so
   the refiner, which only runs after a rejected plan). The logical validator,
@@ -4659,7 +4666,7 @@ gives every result a total row order.</p>
 <li>Deterministic: The decomposer sorts nodes and edges by IDs and roles before constructing the DAG, so the same decomposition always gives the same layers (<a href="https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/pipeline/nodes/decomposer/dag.py"><code>pipeline/nodes/decomposer/dag.py</code></a>).</li>
 <li>Deterministic: DAG layers are computed with a topological sort that sorts ready nodes and dependents, yielding stable layer ordering given the same node/edge sets (<a href="https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/execution/dag.py"><code>execution/dag.py</code></a>).</li>
 <li>Non-deterministic: The AST planner is LLM-driven; the PlanModel content is not stabilized inside the node (<a href="https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/pipeline/nodes/ast_planner/node.py"><code>pipeline/nodes/ast_planner/node.py</code></a>).</li>
-<li>Deterministic (conditional): Once a sub-query's plan has validated and executed, the plan cache pins it: the same normalised intent, datasource and schema version reuse that plan without a planner call, and it is validated again on every use (see <a href="#the-plan-cache-determinism-from-the-architecture">The plan cache</a>).</li>
+<li>Deterministic (conditional): Once a sub-query's plan has validated and executed, the plan cache pins it: the same normalised intent, datasource and schema version on the same run date reuse that plan without a planner call, and it is validated again on every use (see <a href="#the-plan-cache-determinism-from-the-architecture">The plan cache</a>).</li>
 <li>Deterministic: Generated SQL always has a total row order. The generator always appends <code>LIMIT</code>, so it also orders by every selected column: after the plan's own <code>ORDER BY</code> terms, the remaining selected columns follow as ascending tie-breakers, in select order. Aliased items are ordered by alias, never by position, and constants are skipped. Given the same plan and data, a truncated result is always the same rows in the same order (<a href="https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/pipeline/nodes/generator/node.py"><code>pipeline/nodes/generator/node.py</code></a>).</li>
 </ul>
 <h3 id="retrieval-ordering-and-chunk-selection">Retrieval Ordering and Chunk Selection</h3>

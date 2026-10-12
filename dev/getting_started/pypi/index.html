@@ -4675,7 +4675,7 @@ See <a href="../../configuration/secrets/">Secrets config</a> for supported prov
 <code>final_answer</code>, <code>errors</code>, <code>warnings</code>, <code>artifact_refs</code>, and a <code>trace_id</code> for
 observability. Each sub-query carries a capped sample of its rows (<code>rows</code>); the
 full result set lives in artifact storage and is addressed through <code>artifact_refs</code>.</p>
-<p>A repeated question reuses its validated plan from the plan cache (no planner
+<p>A question repeated on the same day reuses its validated plan from the plan cache (no planner
 call, same SQL and rows; still validated every time), and
 <code>sub_query.plan_source</code> says <code>"cache"</code>. Turn it off with
 <code>PLAN_CACHE_ENABLED=false</code>; empty it with <code>nl2sql cache clear</code>. See
