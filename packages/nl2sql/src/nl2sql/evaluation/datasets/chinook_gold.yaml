@@ -1103,3 +1103,33 @@
   - {FirstName: Jack, LastName: Smith, total_spend: 39.62}
   - {FirstName: Dan, LastName: Miller, total_spend: 39.62}
   - {FirstName: Heather, LastName: Leacock, total_spend: 39.62}
+
+- id: chinook_046
+  question: How many invoices were issued in the most recent month in the data?
+  difficulty: medium
+  tags: [single-table, filter, date, data-range, rbac-denial]
+  needed_tables: [Invoice]
+  needed_columns: [Invoice.InvoiceId, Invoice.InvoiceDate]
+  expected: {admin: allowed, analyst: allowed, viewer: refused}
+  order_matters: false
+  gold_sql: |
+    SELECT COUNT(InvoiceId) AS invoice_count
+    FROM Invoice
+    WHERE InvoiceDate >= '2013-12-01' AND InvoiceDate < '2014-01-01'
+  gold_result:
+  - {invoice_count: 7}
+
+- id: chinook_047
+  question: How many tracks are in the heavy metal genre?
+  difficulty: easy
+  tags: [join, filter, aggregation, value-matching]
+  needed_tables: [Genre, Track]
+  needed_columns: [Track.TrackId, Track.GenreId, Genre.GenreId, Genre.Name]
+  expected: {admin: allowed, analyst: allowed, viewer: allowed}
+  order_matters: false
+  gold_sql: |
+    SELECT COUNT(t.TrackId) AS track_count
+    FROM Track t JOIN Genre g ON g.GenreId = t.GenreId
+    WHERE g.Name = 'Heavy Metal'
+  gold_result:
+  - {track_count: 28}

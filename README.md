@@ -489,7 +489,7 @@ Details: [Security Model](docs/security/model.md),
 
 ## Evaluation and quality
 
-- **Gold set:** 43 Chinook questions (39 answerable, 4 deliberately not) with
+- **Gold set:** 47 Chinook questions (43 answerable, 4 deliberately not) with
   expected results per role, including refusals. A question may carry reviewed
   `alt_gold_sql` alternatives, so a second correct way to answer it scores as
   correct; gold data is never edited to make a run pass.
@@ -502,7 +502,7 @@ Details: [Security Model](docs/security/model.md),
   name in the written answer comes from the rows). Accuracy is scored twice:
   **strict**, where the rows must match the gold answer exactly, and
   **lenient**, which allows extra and reordered columns and date labels. Each
-  is published with a 95% Wilson interval, because 45 questions cannot separate
+  is published with a 95% Wilson interval, because 47 questions cannot separate
   small differences. Stops before spend could pass `--max-cost`. `--baseline`
   pairs each run's questions with the baseline's and fails when more than
   `--max-regressions` (default 2) flip from pass to fail, or when a smaller

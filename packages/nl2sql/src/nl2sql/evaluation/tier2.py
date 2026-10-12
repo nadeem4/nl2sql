@@ -45,8 +45,8 @@ _TOKEN_FIELDS = ("calls", "input_tokens", "cached_input_tokens", "cache_write_in
 DEFAULT_MAX_REGRESSIONS = 2
 DEFAULT_ALPHA = 0.05
 DEFAULT_MAX_COST_INCREASE = 0.20
-# Deprecated: the old gate's largest allowed accuracy drop. At n = 43 two points
-# is smaller than one question (2.3), so it fired on run-to-run noise. It is
+# Deprecated: the old gate's largest allowed accuracy drop. At n = 47 two points
+# is smaller than one question (2.1), so it fired on run-to-run noise. It is
 # only applied when ``--max-accuracy-drop`` is passed explicitly.
 DEFAULT_MAX_ACCURACY_DROP = 0.02
 # 1.96 is the two-sided 95% normal quantile.
@@ -169,8 +169,8 @@ def _interval(successes: int, total: int) -> Optional[List[float]]:
 def wilson_interval(successes: int, total: int, z: float = Z_95) -> Optional[Tuple[float, float]]:
     """The Wilson score interval for ``successes`` of ``total``; None for no runs.
 
-    A point estimate hides how little 43 questions can settle: 25/43 is 58.1%
-    with a 95% interval of 43.3%-71.6%, so a few points either way is noise.
+    A point estimate hides how little 47 questions can settle: 27/47 is 57.4%
+    with a 95% interval of 43.3%-70.5%, so a few points either way is noise.
     Wilson rather than the normal approximation because it stays inside
     [0, 1] and behaves at 0 and 100%
     (https://www.anthropic.com/research/statistical-approach-to-model-evals).
@@ -305,7 +305,7 @@ def score_config(records: List[Dict[str, Any]], passes: int) -> Dict[str, Any]:
         "accuracy": {
             "overall": overall["accuracy"],
             "lenient": overall["lenient_accuracy"],
-            # A 95% Wilson interval on each: at n = 43 it is about +-14 points,
+            # A 95% Wilson interval on each: at n = 47 it is about +-14 points,
             # so a few points' difference between runs says nothing. It is taken
             # over the runs scored, so with several passes the runs of one
             # question are not independent and the interval reads narrower than
@@ -387,7 +387,7 @@ def question_flips(records: Sequence[Dict[str, Any]], baseline_records: Sequence
 def compare_with_baseline(scoreboard: Dict[str, Any], baseline: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
     """Per config both scoreboards name, the run against the baseline question by question.
 
-    A single run of 45 questions has a 95% interval about 14 points wide, so
+    A single run of 47 questions has a 95% interval about 14 points wide, so
     the headline difference is read alongside the questions that actually
     flipped and McNemar's exact test on them
     (https://www.anthropic.com/research/statistical-approach-to-model-evals).
@@ -421,7 +421,7 @@ def check_baseline(scoreboard: Dict[str, Any], baseline: Dict[str, Any], *,
     by at most ``max_cost_increase``.
 
     ``max_accuracy_drop`` is the deprecated flat gate and is only applied when
-    it is passed: at n = 43 its old default of two points was smaller than one
+    it is passed: at n = 47 its old default of two points was smaller than one
     question, so it fired on run-to-run noise.
     """
     problems = []

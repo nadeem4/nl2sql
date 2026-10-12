@@ -271,9 +271,10 @@ def test_a_record_keeps_the_answer_text_the_faithfulness_check_read():
 # --- statistics ------------------------------------------------------------
 
 def test_the_wilson_interval_on_known_counts():
-    # n = 43 is the gold set: 25/43 is 58.1%, and the interval is about +-14 pp.
-    lo, hi = tier2.wilson_interval(25, 43)
-    assert (round(lo, 3), round(hi, 3)) == (0.433, 0.716)
+    # n = 47 is the gold set: 27/47 is 57.4%, and the interval is about +-14 pp.
+    lo, hi = tier2.wilson_interval(27, 47)
+    assert (round(lo, 3), round(hi, 3)) == (0.433, 0.705)
+    assert [round(b, 3) for b in tier2.wilson_interval(25, 43)] == [0.433, 0.716]
     assert [round(b, 3) for b in tier2.wilson_interval(18, 43)] == [0.284, 0.567]
     # The ends stay inside [0, 1] and never collapse to a point.
     assert tier2.wilson_interval(0, 10)[0] == 0.0
@@ -369,10 +370,10 @@ def test_the_gate_fires_on_a_statistically_significant_drop():
 
 
 def test_a_two_point_drop_no_longer_fires_the_gate_on_its_own():
-    # One question of 43 is 2.3 points; the old --max-accuracy-drop of 0.02
-    # fired on it, which at n = 43 is noise.
-    now = _run("fail", *["pass"] * 42)
-    before = _run(*["pass"] * 43)
+    # One question of 47 is 2.1 points; the old --max-accuracy-drop of 0.02
+    # fired on it, which at n = 47 is noise.
+    now = _run("fail", *["pass"] * 46)
+    before = _run(*["pass"] * 47)
     assert _gate(now, before) == []
     assert "accuracy fell" in _gate(now, before, max_accuracy_drop=0.02)[0]
 

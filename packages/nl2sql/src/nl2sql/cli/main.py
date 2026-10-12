@@ -366,7 +366,7 @@ def benchmark(
                                   "fails. A smaller, statistically significant drop fails too.",
     )] = DEFAULT_MAX_REGRESSIONS,
     max_accuracy_drop: Annotated[Optional[float], typer.Option(
-        "--max-accuracy-drop", help="Deprecated: a flat accuracy drop gate, as a fraction (0.02 = 2 points). At 43 "
+        "--max-accuracy-drop", help="Deprecated: a flat accuracy drop gate, as a fraction (0.02 = 2 points). At 47 "
                                     "questions that is less than one question, so it fires on noise. Use "
                                     "--max-regressions.",
     )] = None,
