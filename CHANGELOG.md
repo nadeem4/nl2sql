@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.2.3](https://github.com/nadeem4/nl2sql/compare/v0.2.2...v0.2.3) (2026-10-12)
+
+
+### Bug Fixes
+
+* **executor:** say when an empty result filtered on a value that does not exist ([#226](https://github.com/nadeem4/nl2sql/issues/226)) ([a4f40f3](https://github.com/nadeem4/nl2sql/commit/a4f40f39d829870cbb8d2a3c8ce247a7448b5197))
+* **generator:** render PlanModel.offset ([#221](https://github.com/nadeem4/nl2sql/issues/221)) ([1fb45b4](https://github.com/nadeem4/nl2sql/commit/1fb45b4193284732fc1e6960d9298b200910a7f7))
+* **indexing:** keep every value of a text column with few distinct values ([#222](https://github.com/nadeem4/nl2sql/issues/222)) ([3a34679](https://github.com/nadeem4/nl2sql/commit/3a3467947c89bdfa6c496b674eb17d179fb7b02f))
+* **planner:** send each date and numeric column's data range to the planner ([#224](https://github.com/nadeem4/nl2sql/issues/224)) ([e84d214](https://github.com/nadeem4/nl2sql/commit/e84d2145463c5dfc446c324185468f9325ff0ac1))
+* **planner:** tell the planner and refiner today's date ([#220](https://github.com/nadeem4/nl2sql/issues/220)) ([ed0e08e](https://github.com/nadeem4/nl2sql/commit/ed0e08e9db92ad5ad5e0b677fb8af4ee3dad67a5))
+* **planner:** the date-function allow-list agrees with the planner prompt ([#218](https://github.com/nadeem4/nl2sql/issues/218)) ([1e3248b](https://github.com/nadeem4/nl2sql/commit/1e3248b05341b2ca7cb81f2d201c1e898a4530c3))
+* **sql-agent:** retry a query the database rejects as wrong ([#223](https://github.com/nadeem4/nl2sql/issues/223)) ([6b62347](https://github.com/nadeem4/nl2sql/commit/6b6234721ccd6cc445f80a6315aae06ee6bc9e12))
+* **validator:** turn strict column checking on by default ([#219](https://github.com/nadeem4/nl2sql/issues/219)) ([6c7fad5](https://github.com/nadeem4/nl2sql/commit/6c7fad548153561e7846c9f407f589c3618f4f8b))
+
+
+### Documentation
+
+* **release:** a release page for every version, written by a skill and gated in CI ([#216](https://github.com/nadeem4/nl2sql/issues/216)) ([ab84f18](https://github.com/nadeem4/nl2sql/commit/ab84f18109f80a2b5f92de2764d70a48e5a4d253))
+* **release:** notes for 0.2.3 ([#227](https://github.com/nadeem4/nl2sql/issues/227)) ([035aeae](https://github.com/nadeem4/nl2sql/commit/035aeaedd9881273d26f27993412ad2420200ed1))
+
 ## [0.2.2](https://github.com/nadeem4/nl2sql/compare/v0.2.1...v0.2.2) (2026-10-10)
 
 
