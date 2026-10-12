@@ -40,6 +40,7 @@ def rendered_prompts():
             expected_schema=[],
             semantic_context="",
             user_query=QUESTION,
+            today="2013-12-31",
         ),
         _render(
             ANSWER_SYNTHESIZER_PROMPT,

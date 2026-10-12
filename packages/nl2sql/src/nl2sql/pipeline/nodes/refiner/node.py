@@ -7,6 +7,7 @@ if TYPE_CHECKING:
     from nl2sql.pipeline.state import SubgraphExecutionState
 from .prompts import REFINER_PROMPT
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
+from nl2sql.common.settings import run_date
 from nl2sql.llm.failures import provider_error
 from nl2sql.pipeline.nodes.refiner.schemas import RefinerResponse
 from nl2sql.pipeline.retry_feedback import as_refiner_errors
@@ -86,7 +87,8 @@ class RefinerNode:
                     "relevant_tables": relevant_tables,
                     "failed_plan": failed_plan_str,
                     "errors": errors_str,
-                    "reasoning": reasoning_str
+                    "reasoning": reasoning_str,
+                    "today": run_date().isoformat(),
                 })
                 
                 warning = PipelineError(

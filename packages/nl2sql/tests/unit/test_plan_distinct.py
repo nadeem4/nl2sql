@@ -145,7 +145,7 @@ def test_a_function_named_distinct_is_rejected():
 def test_the_planner_system_message_explains_distinct():
     messages = PLANNER_PROMPT.format_messages(
         examples="", relevant_tables="", expected_schema="", semantic_context="",
-        feedback="", user_query="q",
+        feedback="", user_query="q", today="2013-12-31",
     )
     system, human = messages[0].content, messages[1].content
 

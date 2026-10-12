@@ -19,6 +19,7 @@ Your goal is to analyze a failed SQL generation attempt and provide actionable, 
 
 REFINER_HUMAN_PROMPT = """### Context
 User Query: "{user_query}"
+Today's date: {today}
 
 ### Failed Plan
 {failed_plan}

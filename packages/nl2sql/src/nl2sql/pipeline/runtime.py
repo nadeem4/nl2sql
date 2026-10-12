@@ -15,7 +15,7 @@ from nl2sql.auth import UserContext
 from nl2sql.common.cancellation import CancellationToken
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.common.exceptions import PipelineExecutionError
-from nl2sql.common.settings import settings
+from nl2sql.common.settings import run_date, settings
 from nl2sql.context import NL2SQLContext
 from nl2sql.llm.failures import provider_error
 from nl2sql.pipeline.graph import build_graph
@@ -162,6 +162,9 @@ def run_with_graph(
     usage = TokenUsageCallback(prices=settings.llm_prices)
     recorder = TraceRecorder()
     started_at = _dt.datetime.now(_dt.timezone.utc).isoformat()
+    # The date the prompts were told; a trace replay pins it, or every planner
+    # prompt recorded on another day would differ from the replayed one.
+    today = run_date().isoformat()
     t0 = time.perf_counter()
 
     def _telemetry() -> Dict:
@@ -180,6 +183,7 @@ def run_with_graph(
                 "tenant_id": getattr(initial_state.user_context, "tenant_id", None),
                 "datasource_id": datasource_id,
                 "execute": execute,
+                "today": today,
             },
             started_at=started_at,
             finished_at=_dt.datetime.now(_dt.timezone.utc).isoformat(),

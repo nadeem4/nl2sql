@@ -194,7 +194,10 @@ PLANNER_SYSTEM_PROMPT = (
     "[RELEVANT_TABLES]\n{relevant_tables}"
 )
 
+# Today's date changes daily, so it sits here rather than in the cached system
+# message. Before [USER_QUERY]: replay keys on the line after that marker.
 PLANNER_HUMAN_PROMPT = (
+    "[TODAY]\n{today} (resolve relative dates such as 'this year' or 'the last 30 days' from it)\n\n"
     "[EXPECTED_SCHEMA]\n{expected_schema}\n\n"
     "[SEMANTIC_CONTEXT]\n{semantic_context}\n\n"
     "[FEEDBACK]\n{feedback}\n\n"

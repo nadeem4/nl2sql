@@ -1,3 +1,4 @@
+from datetime import date, datetime, timezone
 from typing import Any, Dict, Literal, Optional
 import os
 from pydantic import AliasChoices, Field, SecretStr
@@ -244,6 +245,16 @@ class Settings(BaseSettings):
         ),
     )
 
+    today: Optional[date] = Field(
+        default=None,
+        validation_alias="NL2SQL_TODAY",
+        description=(
+            "The date the planner and refiner are told it is, as an ISO date (2013-12-31). "
+            "Unset, it is the real date in UTC. Pin it for tests and gold runs whose "
+            "questions say 'this year' or 'the last 30 days'."
+        ),
+    )
+
     observability_exporter: str = Field(
         default="none",
         validation_alias="OBSERVABILITY_EXPORTER",
@@ -281,6 +292,11 @@ def load_settings() -> Settings:
 
 
 settings = load_settings()
+
+def run_date() -> date:
+    """Today, for the prompts: ``NL2SQL_TODAY`` when set, else the UTC date."""
+    return settings.today or datetime.now(timezone.utc).date()
+
 
 def reload_settings() -> Settings:
     """Re-read settings from the environment and refresh the module singleton.
