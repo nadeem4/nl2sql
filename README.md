@@ -346,11 +346,12 @@ wins:
 | `NL2SQL_API_ROLE=admin` | One static role for every request. |
 | `NL2SQL_API_TRUST_BODY_ROLE=true` | Dev only: `user_context` in the body. Any client can pick any role, so the server logs a warning at startup. |
 
-With none of them, `/api/v1/query` and the result routes answer HTTP 401.
+With none of them, `/api/v1/query`, `/api/v1/query/stream` and the result routes answer HTTP 401.
 
 | Method | Path | Purpose |
 | --- | --- | --- |
 | `POST` | `/api/v1/query` | Ask a question; returns the plan, checks, SQL, a row sample, the result manifest, answer, errors and usage |
+| `POST` | `/api/v1/query/stream` | The same run as Server-Sent Events: each step as it starts and ends, the result manifest, the answer as it is written, then the `/query` response |
 | `GET` | `/api/v1/query/{request_id}/results/{result_id}` | One page of a run's saved result (`offset`, `limit` up to 1,000) |
 | `GET` | `/api/v1/query/{request_id}/results/{result_id}.csv` | The whole of a run's saved result as CSV, streamed |
 | `GET` | `/api/v1/health` | Liveness check |

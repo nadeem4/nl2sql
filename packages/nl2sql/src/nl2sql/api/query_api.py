@@ -6,6 +6,9 @@ Provides functionality for executing natural language queries against databases.
 
 from __future__ import annotations
 
+import contextvars
+import queue
+import threading
 from typing import Optional, List, Dict, Any, Iterator
 
 from pydantic import BaseModel, Field
@@ -22,6 +25,7 @@ from nl2sql.execution.artifacts.results import (
     ResultSummary,
 )
 from nl2sql.execution.contracts import ArtifactRef
+from nl2sql.pipeline.events import QueryEvent, RunEvents
 from nl2sql.pipeline.nodes.validator.schemas import ValidationCheck
 from nl2sql.services.callbacks.token_handler import QuestionUsage
 
@@ -292,6 +296,70 @@ class QueryAPI:
             state,
             artifact_store=getattr(self._ctx, "artifact_store", None),
         )
+
+    def stream_query(
+        self,
+        natural_language: str,
+        datasource_id: Optional[str] = None,
+        execute: bool = True,
+        user_context: Optional[UserContext] = None,
+        cancellation_token: Optional[CancellationToken] = None,
+    ) -> Iterator[QueryEvent]:
+        """
+        Run a question as :meth:`run_query` does, yielding the run as it happens.
+
+        Yields ``node_started`` and ``node_finished`` per pipeline step,
+        ``result_manifest`` once the aggregator has saved the results,
+        ``answer_delta`` per piece of the answer as the model writes it, and
+        then exactly one of ``final`` (the :class:`QueryResult`
+        ``run_query`` would have returned, as JSON) or ``error`` (the run
+        could not start, or crashed outside the pipeline). A run that fails
+        inside the pipeline -- a refusal, a provider error -- ends in
+        ``final`` with ``status: "error"``, as ``run_query`` returns it. See
+        :mod:`nl2sql.pipeline.events`.
+
+        The run goes on in a thread of its own; the caller's context (a
+        request's keys) goes with it. Closing the iterator early -- a client
+        that went away -- cancels the run before its next step or model call.
+        """
+        token = cancellation_token or CancellationToken()
+        events: "queue.Queue[Optional[QueryEvent]]" = queue.Queue()
+
+        def run() -> None:
+            try:
+                state = run_with_graph(
+                    self._ctx,
+                    natural_language,
+                    datasource_id=datasource_id,
+                    execute=execute,
+                    callbacks=[RunEvents(events.put)],
+                    user_context=user_context,
+                    cancellation_token=token,
+                    stream_answer=True,
+                )
+                result = result_from_state(state, artifact_store=getattr(self._ctx, "artifact_store", None))
+                events.put(QueryEvent(type="final", data=result.model_dump(mode="json")))
+            except Exception as exc:
+                events.put(QueryEvent(type="error", data={"message": f"The run failed: {exc}",
+                                                          "error_code": "UNKNOWN_ERROR"}))
+            finally:
+                events.put(None)
+
+        worker = threading.Thread(target=contextvars.copy_context().run, args=(run,),
+                                  name="nl2sql-stream", daemon=True)
+        worker.start()
+        finished = False
+        try:
+            while (event := events.get()) is not None:
+                yield event
+                # A timed-out run's graph winds down in the background; whatever
+                # it reports after the terminal event is not this run's any more.
+                if event.type in ("final", "error"):
+                    finished = True
+                    return
+        finally:
+            if not finished:
+                token.cancel()
 
     def _results(self, tenant_id: Optional[str]) -> ResultReader:
         """A reader of one tenant's saved results: ``tenant_id``, else the engine's own."""

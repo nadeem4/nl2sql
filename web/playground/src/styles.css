@@ -1507,6 +1507,9 @@ ol.chips.picks li { border-color: color-mix(in srgb, var(--accent) 45%, var(--ru
 /* The largest text in the run. */
 .answer-text { font-size: 28px; line-height: 1.22; font-weight: var(--fw-medium); letter-spacing: -.018em; max-width: 30ch; text-wrap: balance; }
 .answer-text.is-quiet { font-size: var(--fs-4); color: var(--ink-2); max-width: 60ch; }
+/* The summary while the model is still writing it: a shade lighter, so it
+   reads as provisional and settles to full ink when the result is back. */
+.answer-text[data-live] { color: var(--ink-2); }
 .answer-note { font-size: var(--fs-2); color: var(--ink-2); }
 .answer-wait { display: flex; flex-direction: column; gap: var(--sp-3); padding: 6px 0 var(--sp-1); }
 .answer-wait .sk { height: 22px; }
@@ -1590,6 +1593,8 @@ ol.chips.picks li { border-color: color-mix(in srgb, var(--accent) 45%, var(--ru
 }
 @media (prefers-reduced-motion: no-preference) {
   .run .station[data-state="busy"] .mark { animation: breathe 1.4s var(--ease-in-out) infinite; }
+  /* A streamed run lights its stations one by one: a queued one comes up to full ink. */
+  .run .station { transition: opacity var(--dur-state) var(--ease-out); }
 }
 
 /* A 64px accent segment travels down the spine while a run is busy. */

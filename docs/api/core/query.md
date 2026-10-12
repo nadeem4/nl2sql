@@ -96,6 +96,77 @@ result set lives in artifact storage, addressed through `artifact_refs`; each
 combined result is listed in `result_manifest` and read back by the run's
 `trace_id` with the methods below.
 
+## Streaming a run
+
+### QueryAPI.stream_query
+
+Source:
+`packages/nl2sql/src/nl2sql/api/query_api.py`, events in
+`packages/nl2sql/src/nl2sql/pipeline/events.py`
+
+Signature:
+`stream_query(natural_language: str, datasource_id: Optional[str] = None, execute: bool = True, user_context: Optional[UserContext] = None, cancellation_token: Optional[CancellationToken] = None) -> Iterator[QueryEvent]`
+
+The same run as `run_query`, with the same parameters, yielded as it happens.
+`NL2SQL.stream_query` takes the same arguments.
+
+```python
+from nl2sql import NL2SQL, UserContext
+
+engine = NL2SQL(env="demo")
+for event in engine.stream_query("Which genre sells the most tracks?",
+                                 user_context=UserContext(roles=["admin"])):
+    if event.type == "node_finished":
+        print(f"{event.data['node']} took {event.data['seconds']} s")
+    elif event.type == "answer_delta" and event.data["field"] == "summary":
+        print(event.data["text"], end="", flush=True)
+    elif event.type == "final":
+        result = event.data          # run_query's QueryResult, as JSON
+```
+
+A `QueryEvent` has a `type` and a JSON-ready `data` dict; `event.sse()` is the
+event as one Server-Sent Event (`event: <type>` and `data: <json>`), which is how
+`nl2sql-api` and the playground send it.
+
+| type | data | when |
+| --- | --- | --- |
+| `node_started` | `node` | A pipeline step began (the SQL agent's steps once per sub-query, and again on a retry). |
+| `node_finished` | `node`, `seconds`, `ok` | The step ended; `ok` is False when it raised. |
+| `result_manifest` | `trace_id`, `results` | The aggregator saved the results: `results` is the run's `result_manifest` and `trace_id` its `request_id`, so `get_result_page` can be called before the answer is written. |
+| `answer_delta` | `field`, `text` | The next piece of `final_answer.summary` or `final_answer.content`, as the answer model writes it. |
+| `final` | `QueryResult.model_dump(mode="json")` | The run finished: exactly what `run_query` returns. A refusal, a provider failure, a timeout or a cancel is a `final` with `status: "error"`, as `run_query` returns it. |
+| `error` | `message`, `error_code` | The run could not start or finish (an exception outside the pipeline, such as a missing API key when the graph is built). |
+
+Every stream ends in exactly one `final` or `error`.
+
+How it works:
+
+- The run goes on a thread of its own, started on the first `next()`; the caller's
+  context goes with it, so request-scoped keys (`nl2sql.llm.request_key`) reach the
+  graph as they do in `run_query`.
+- `run_with_graph` is given a `RunEvents` callback, the same kind of LangChain
+  callback as the timing and usage ones. A node's own run (its name is its
+  `langgraph_node`) is a `node_started` / `node_finished`; the runnables inside a
+  node are not events. The aggregator's end carries the manifest.
+- `run_with_graph(stream_answer=True)` asks the answer synthesizer to stream: its
+  chain is `streaming_structured` (`nl2sql.llm.wires`) instead of `structured`, the
+  same request with `stream` on. Each piece of the answer's tool call reaches
+  `on_llm_new_token`; `RunEvents` parses the arguments so far as partial JSON and
+  emits what `summary` and `content` gained. The pieces are joined into one message
+  before the parser sees it, so the answer, and the token usage the call reports,
+  are the unstreamed call's. On the Anthropic wire the joined message gets the same
+  tool-call repair as an unstreamed one.
+- Closing the iterator before the last event (a client that went away) cancels the
+  run's token, so it stops before its next step or model call.
+
+Token by token, per wire: both the OpenAI wire (OpenAI, OpenRouter, Ollama, any
+OpenAI-compatible endpoint) and the Anthropic wire stream the answer's forced tool
+call, so the answer streams on every provider; how finely is the provider's choice,
+and one that sends the whole answer at once gives one `answer_delta` per field. The
+other model steps return a typed object the next step needs whole, and are not
+streamed. `FakeLLMServer` streams both wires, a word at a time, so replay mode and
+the keyless tests stream too.
+
 ## Reading a run's saved results
 
 The aggregator saves each terminal result of a run as

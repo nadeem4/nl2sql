@@ -21,6 +21,7 @@ import {
   createRouter, hashFor, indicatorTransform, navItems, pageFor, pageFromHash, swapView,
 } from "./router.js";
 import { deniedTables, planTables } from "./run.js";
+import { EMPTY_PROGRESS, StreamUnavailable, progressOf, streamAsk } from "./stream.js";
 
 const DEBUG_KEY = "nl2sql.playground.debug";
 
@@ -130,6 +131,9 @@ export default function App() {
   const [result, setResult] = useState(null);
   const [asked, setAsked] = useState(null);
   const [busy, setBusy] = useState(false);
+  // What the streamed run has reported so far (`stream.js`), or null when
+  // the page fell back to `/api/ask`, which reports nothing until it is done.
+  const [progress, setProgress] = useState(null);
   // When the run in flight started, whether it may be stopped yet, and whether
   // the visitor stopped the last one.
   const [startedAt, setStartedAt] = useState(null);
@@ -257,6 +261,7 @@ export default function App() {
     setStopped(false);
     setError(null);
     setResult(null);
+    setProgress(EMPTY_PROGRESS);
     const controller = new AbortController();
     abortRef.current = controller;
     setStartedAt(performance.now());
@@ -269,23 +274,35 @@ export default function App() {
     const head = document.getElementById("pane-question") || runRef.current;
     const scroll = head && runScroll(head.getBoundingClientRect(), window.innerHeight, { reduce: reducedMotion() });
     if (scroll) head.scrollIntoView(scroll);
+    const request = {
+      method: "POST",
+      // The key travels in a header, never in the body: a body is what
+      // request logs and validation errors quote back.
+      headers: askHeaders(apiKeys, stepModels),
+      body: JSON.stringify({ question: q, role, execute: !planOnly }),
+      signal: controller.signal,
+    };
     try {
-      setResult(
-        await getJson("/api/ask", {
-          method: "POST",
-          // The key travels in a header, never in the body: a body is what
-          // request logs and validation errors quote back.
-          headers: askHeaders(apiKeys, stepModels),
-          body: JSON.stringify({ question: q, role, execute: !planOnly }),
-          signal: controller.signal,
-        })
-      );
+      // The run streams: each station lights as its step finishes, the rows
+      // load once the result is saved and the answer appears as it is
+      // written. Where the stream cannot be used, `/api/ask` answers whole.
+      let reply;
+      try {
+        reply = await streamAsk(window.fetch && window.fetch.bind(window), "/api/ask/stream", request,
+          (event) => setProgress((p) => progressOf(p || EMPTY_PROGRESS, event)));
+      } catch (e) {
+        if (!(e instanceof StreamUnavailable)) throw e;
+        setProgress(null);
+        reply = await getJson("/api/ask", request);
+      }
+      setResult(reply);
     } catch (e) {
       if (e.name === "AbortError") setStopped(true);
       else setError(e.message);
     } finally {
       clearTimeout(stopTimer);
       abortRef.current = null;
+      setProgress(null);
       setBusy(false);
       setStoppable(false);
     }
@@ -498,6 +515,7 @@ export default function App() {
                 result={result}
                 sub={sub}
                 busy={busy}
+                progress={progress}
                 stopped={stopped}
                 hosted={hosted}
                 error={error}

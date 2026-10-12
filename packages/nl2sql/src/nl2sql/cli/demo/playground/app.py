@@ -1,6 +1,6 @@
 """The playground FastAPI app.
 
-Twenty routes:
+Twenty-one routes:
 
 ``GET  /``                     the built React page, with the link preview's
                                tags in its head (see :mod:`preview`)
@@ -20,6 +20,10 @@ Twenty routes:
                                (answered from recordings, not run live just now); a miss
                                carries one plain error instead of the raw ones; a client
                                that disconnects (the page's Stop) cancels the run
+``POST /api/ask/stream``       the same question as Server-Sent Events: each step as it
+                               starts and ends, the result manifest, the answer as it is
+                               written, then ``final`` (what ``/api/ask`` returns) or
+                               ``error``; the same refusals, before the stream starts
 ``GET  /api/trace/{trace_id}`` one run trace, read only from the traces directory
 ``GET  /api/query/{request_id}/results/{result_id}``
                                one page of a run's saved result (``offset``, ``limit``
@@ -44,8 +48,8 @@ Twenty routes:
 ``POST /api/feedback``         rate a run this playground answered: up or down, and a note
 
 Hosted mode (``nl2sql demo --hosted``, see
-:mod:`nl2sql.cli.demo.playground.hosted`) changes three of these: ``/api/ask``
-takes the visitor's own key from a header and uses it for that one call, or,
+:mod:`nl2sql.cli.demo.playground.hosted`) changes these: ``/api/ask`` (and
+``/api/ask/stream``, by the same rules) takes the visitor's own key from a header and uses it for that one call, or,
 with no key, replays a recorded guided question and answers anything else
 with a replay miss that asks for a key,
 ``/api/settings`` reports that there is nothing to save, and
@@ -77,7 +81,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
 
-from nl2sql import CancellationToken, QueryResult, ResultNotFound
+from nl2sql import CancellationToken, QueryEvent, QueryResult, ResultNotFound
 
 from nl2sql.auth.models import UserContext
 from nl2sql.cli.demo.playground.hosted import FEEDBACK_MESSAGE, REBUILD_MESSAGE, Hosted, Replay
@@ -113,6 +117,18 @@ def _replay_miss() -> Dict[str, Any]:
     body = QueryResult(status="error", errors=[dict(REPLAY_MISS_ERROR)]).model_dump(mode="json")
     body.update(replay_miss=True, recorded=False)
     return body
+
+
+# A proxy (the Space's) buffers a response unless told not to, which would hold
+# every event back until the run ends.
+SSE_HEADERS = {"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
+
+
+def _event_stream(chunks, cookies) -> StreamingResponse:
+    """A ``text/event-stream`` response carrying ``cookies`` (the hosted session's)."""
+    stream = StreamingResponse(chunks, media_type="text/event-stream", headers=SSE_HEADERS)
+    stream.raw_headers.extend(cookies)
+    return stream
 
 
 # How often a running question checks that its browser is still waiting.
@@ -424,25 +440,27 @@ def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset
     def schema(datasource: Optional[str] = None) -> Dict[str, Any]:
         return engine.get_schema(datasource or _default_datasource(engine, dataset))
 
-    @app.post("/api/ask")
-    async def ask(req: AskRequest, request: Request, response: Response) -> Dict[str, Any]:
-        # The engine blocks, so the question runs in Starlette's threadpool;
-        # the event loop meanwhile watches the connection, and a client that
-        # goes away (the page's Stop) cancels the run. A stopped question has
-        # already been charged against the hosted limits: it is spent below,
-        # before the run starts.
-        #
-        # Hosted: the keys arrive one header per provider, and the model each
-        # step is to run on in one compact JSON header. Both are bound to this
-        # call and to no other, and are gone when the block ends. A key is
-        # never written to a file, an environment variable or a module-level
-        # cache; the registry builds each step's client from it per request and
-        # keeps none (see ``nl2sql.llm.request_key``).
-        #
-        # Hosted, without a key: a guided question with a recording replays
-        # it, paced like any request but never counted against the session,
-        # since it spends nothing; anything else is a replay miss that asks
-        # for a key, and runs nothing.
+    def start_question(req: AskRequest, request: Request, response: Response):
+        """``(llms, replaying, miss)`` for a question about to run, or a refusal.
+
+        Shared by ``/api/ask`` and ``/api/ask/stream``, so both apply the
+        same rules. Hosted: the keys arrive one header per provider, and the
+        model each step is to run on in one compact JSON header. Both are
+        bound to this call and to no other, and are gone when the block
+        ends. A key is never written to a file, an environment variable or a
+        module-level cache; the registry builds each step's client from it
+        per request and keeps none (see ``nl2sql.llm.request_key``). A
+        question is charged against the hosted limits here, before it runs,
+        so a stopped one still counts.
+
+        Hosted, without a key: a guided question with a recording replays it,
+        paced like any request but never counted against the session, since
+        it spends nothing; anything else is ``miss``, a replay miss that asks
+        for a key, and runs nothing.
+
+        Raises:
+            HTTPException: a hosted refusal (no key, a bad key, a limit reached).
+        """
         replaying = panel.mode == "replay"
         # Local replay: the config already points at the replay server; this
         # asks it for the recorded model, so the run reports that model.
@@ -450,27 +468,16 @@ def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset
         if hosted.enabled and not hosted.brings_key(request):
             hosted.throttle(request)
             if not hosted.replays(req.question):
-                return _replay_miss()
+                return None, False, _replay_miss()
             llms = hosted.replay.llms()
             replaying = True
         elif hosted.enabled:
             llms = hosted.request_llms(request, panel.default_provider)
             hosted.spend(request, response)
-        token = CancellationToken()
+        return llms, replaying, None
 
-        def run():
-            with panel.gate.run(), use_request_llms(llms):
-                return engine.run_query(
-                    req.question, execute=req.execute, user_context=UserContext(roles=[req.role]),
-                    cancellation_token=token,
-                )
-
-        watcher = asyncio.ensure_future(cancel_when_disconnected(request, token))
-        try:
-            result = await run_in_threadpool(run)
-        finally:
-            watcher.cancel()
-        body = result.model_dump(mode="json")
+    def finish_question(req: AskRequest, body: Dict[str, Any], replaying: bool) -> Dict[str, Any]:
+        """``QueryResult`` JSON as the page reads it: plus ``replay_miss`` and ``recorded``."""
         errors = body.get("errors", [])
         codes = {e.get("error_code") for e in errors}
         missing = bool(codes & REPLAY_MISS_CODES) or any(
@@ -490,6 +497,80 @@ def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset
                     call["error"] = REPLAY_MISS_MESSAGE
         remember(req, body)
         return body
+
+    @app.post("/api/ask")
+    async def ask(req: AskRequest, request: Request, response: Response) -> Dict[str, Any]:
+        # The engine blocks, so the question runs in Starlette's threadpool;
+        # the event loop meanwhile watches the connection, and a client that
+        # goes away (the page's Stop) cancels the run.
+        llms, replaying, miss = start_question(req, request, response)
+        if miss is not None:
+            return miss
+        token = CancellationToken()
+
+        def run():
+            with panel.gate.run(), use_request_llms(llms):
+                return engine.run_query(
+                    req.question, execute=req.execute, user_context=UserContext(roles=[req.role]),
+                    cancellation_token=token,
+                )
+
+        watcher = asyncio.ensure_future(cancel_when_disconnected(request, token))
+        try:
+            result = await run_in_threadpool(run)
+        finally:
+            watcher.cancel()
+        return finish_question(req, result.model_dump(mode="json"), replaying)
+
+    @app.post("/api/ask/stream")
+    async def ask_stream(req: AskRequest, request: Request, response: Response) -> StreamingResponse:
+        # `/api/ask`, reported as it runs (``engine.stream_query``): each step
+        # as it starts and ends, the result manifest, the answer as it is
+        # written, then `final` with exactly what `/api/ask` returns, or
+        # `error`. A refusal comes before the stream, with the same status
+        # and sentence as `/api/ask`. The run's thread hands each event to
+        # the event loop; a client that goes away (the page's Stop) ends the
+        # response, which cancels the run.
+        llms, replaying, miss = start_question(req, request, response)
+        cookies = [(k, v) for k, v in response.headers.raw if k.lower() == b"set-cookie"]
+        if miss is not None:
+            return _event_stream(iter([QueryEvent(type="final", data=miss).sse()]), cookies)
+        token = CancellationToken()
+        loop = asyncio.get_running_loop()
+        events: "asyncio.Queue[Optional[QueryEvent]]" = asyncio.Queue()
+
+        def hand_over(event: Optional[QueryEvent]) -> None:
+            try:
+                loop.call_soon_threadsafe(events.put_nowait, event)
+            except RuntimeError:  # the server is shutting down; nobody is reading
+                pass
+
+        def run() -> None:
+            try:
+                with panel.gate.run(), use_request_llms(llms):
+                    for event in engine.stream_query(
+                        req.question, execute=req.execute, user_context=UserContext(roles=[req.role]),
+                        cancellation_token=token,
+                    ):
+                        hand_over(event)
+            except Exception as exc:
+                hand_over(QueryEvent(type="error", data={
+                    "message": f"The question could not be answered: {exc}", "error_code": "UNKNOWN_ERROR"}))
+            finally:
+                hand_over(None)
+
+        async def body():
+            asyncio.ensure_future(run_in_threadpool(run))
+            try:
+                while (event := await events.get()) is not None:
+                    if event.type == "final":
+                        event = QueryEvent(type="final", data=finish_question(req, event.data, replaying))
+                    yield event.sse()
+            finally:
+                # The client went away, or the run is over: stop it before its next step.
+                token.cancel()
+
+        return _event_stream(body(), cookies)
 
     @app.get("/api/trace/{trace_id}")
     def trace(trace_id: str) -> FileResponse:

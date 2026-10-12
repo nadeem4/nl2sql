@@ -4,6 +4,7 @@ import json
 from typing import Dict, Any, List, Optional, TYPE_CHECKING
 
 from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.runnables import RunnableConfig
 
 if TYPE_CHECKING:
     from nl2sql.pipeline.state import GraphState
@@ -13,7 +14,7 @@ from nl2sql.common.logger import get_logger
 from nl2sql.common.settings import settings
 from nl2sql.context import NL2SQLContext
 from nl2sql.llm.failures import provider_error
-from nl2sql.llm.wires import structured
+from nl2sql.llm.wires import streaming_structured, structured
 from .schemas import AggregatedResponse, AnswerSynthesizerResponse
 from .prompts import ANSWER_SYNTHESIZER_PROMPT
 
@@ -81,6 +82,19 @@ class AnswerSynthesizerNode:
         self.llm = ctx.llm_registry.get_llm(self.node_name)
         self.prompt = ChatPromptTemplate.from_template(ANSWER_SYNTHESIZER_PROMPT)
         self.chain = self.prompt | structured(self.llm, AggregatedResponse)
+        self._streaming_chain = None
+
+    def _chain_for(self, config: Optional[RunnableConfig]):
+        """The chain to answer with: streaming when the run asked for it (``stream_query``).
+
+        Same prompt, same parser, same answer; the provider is asked to stream
+        so the run's callbacks see the answer as it is written.
+        """
+        if not ((config or {}).get("configurable") or {}).get("stream_answer"):
+            return self.chain
+        if self._streaming_chain is None:
+            self._streaming_chain = self.prompt | streaming_structured(self.llm, AggregatedResponse)
+        return self._streaming_chain
 
     def _serialize_result(self, result: Any, saved: Optional[Dict[str, Any]] = None) -> str:
         if isinstance(result, dict) and all(isinstance(v, list) for v in result.values()):
@@ -90,7 +104,7 @@ class AnswerSynthesizerNode:
         except TypeError:
             return str(result)
 
-    def __call__(self, state: GraphState) -> Dict[str, Any]:
+    def __call__(self, state: GraphState, config: Optional[RunnableConfig] = None) -> Dict[str, Any]:
         aggregated_result = None
         saved = None
         if state.aggregator_response:
@@ -120,7 +134,7 @@ class AnswerSynthesizerNode:
                 ]
             notes = _missing_values(state.warnings)
             cut = _cut_results(state)
-            response: AggregatedResponse = self.chain.invoke(
+            response: AggregatedResponse = self._chain_for(config).invoke(
                 {
                     "user_query": state.user_query,
                     "result_preview": self._serialize_result(aggregated_result, saved),

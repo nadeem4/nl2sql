@@ -10,12 +10,17 @@ import { humanCheck, nodeLedger, traceFileName, traceUrl } from "./run.js";
 import { describeFault } from "./faults.js";
 import { missPrompt, recordedBadge } from "./firstRun.js";
 import {
-  answerHead, gateReason, gateTimeline, runFault, stationHeads, stationStates, statusStrip, stoppedNote,
+  answerHead, gateReason, gateTimeline, liveAnswer, liveTimings, runFault, stationHeads, stationStates, statusStrip,
+  stoppedNote,
 } from "./runState.js";
+import { liveResult } from "./stream.js";
 
 // The run reads answer first, then the sequence that produced it: plan,
 // checks, SQL, rows, cost. Each station is a renderer over the `/api/ask`
-// response. The checks sit between the plan and the SQL on purpose: that is
+// response. While a streamed run is live (`progress`), each station lights
+// as its step finishes, the rows load from the result manifest, and the
+// answer grows as it is written; the rest of each station fills in when the
+// result is back. The checks sit between the plan and the SQL on purpose: that is
 // where the engine stops a plan, before any SQL exists.
 
 // A station's head is a small label, its kind (a model decides it, or code
@@ -86,7 +91,7 @@ function Fault({ entry, onAgain }) {
 // run, and the strip under it summarises the stations below and jumps to them.
 // `answered` is the database the resolver picked, and is empty with a single
 // database registered: there is then nothing for it to have picked.
-function AnswerHead({ asked, busy, stopped, hosted, meta, result, sub, fault, answered = [], onAgain }) {
+function AnswerHead({ asked, busy, progress, stopped, hosted, meta, result, sub, fault, answered = [], onAgain }) {
   if (!asked) {
     return (
       <section className="answer-head is-idle" id="pane-question" tabIndex={-1} aria-labelledby="pane-question-title">
@@ -98,6 +103,9 @@ function AnswerHead({ asked, busy, stopped, hosted, meta, result, sub, fault, an
     );
   }
   const head = !busy && !stopped && !fault ? answerHead(result, sub) : null;
+  // The summary as far as the model has written it; it settles to full ink
+  // when the result is back.
+  const writing = busy ? liveAnswer(progress) : null;
   const strip = head ? statusStrip(result, sub) : [];
   const miss = busy ? null : missPrompt(result, meta);
   const badge = busy ? null : recordedBadge(result);
@@ -113,13 +121,14 @@ function AnswerHead({ asked, busy, stopped, hosted, meta, result, sub, fault, an
         <span className="role-tag">as {asked.role}{asked.planOnly && ", plan only"}</span>
         {badge && <span className="recorded-badge" id="recorded-badge" title={badge.title}>{badge.label}</span>}
       </div>
-      {busy && (
+      {busy && !writing && (
         <div className="answer-wait" aria-hidden="true">
           <span className="sk" style={{ width: "78%" }} />
           <span className="sk" style={{ width: "52%" }} />
         </div>
       )}
-      {busy && <p className="answer-note">The answer is written last, after the rows come back.</p>}
+      {busy && !writing && <p className="answer-note">The answer is written last, after the rows come back.</p>}
+      {writing && <p className="answer-text" id="answer-live" data-kind="answer" data-live="">{writing.text}</p>}
       {stopped && (
         <p className="answer-text is-quiet" role="status">{stoppedNote({ hosted })}</p>
       )}
@@ -187,12 +196,12 @@ function PlanBody({ sub }) {
 }
 
 // `subs` is every sub-query of the run; `sub`, the first, decides the state.
-export function PlanPane({ sub, subs = sub ? [sub] : [], state, head }) {
+export function PlanPane({ sub, subs = sub ? [sub] : [], state, head, live = false }) {
   const planned = subs.some((s) => planSections(s && s.plan).length > 0);
   const idle = "The model writes a typed plan here, never SQL.";
   return (
     <Station id="pane-plan" title="Plan" state={state} head={head}
-      note={state === "idle" ? idle : state === "done" && !planned ? "No plan came back, so nothing downstream ran." : null}>
+      note={state === "idle" ? idle : state === "done" && !planned && !live ? "No plan came back, so nothing downstream ran." : null}>
       {state === "busy" && (
         <>
           <p className="reasoning is-live">Writing a typed plan from the retrieved tables.</p>
@@ -220,13 +229,13 @@ function Glyph({ ok }) {
 // The gate: the plans the checks saw, why they did what they did, and each
 // check as a tile with a glyph, so a pass and a refusal differ in more than
 // colour.
-export function ValidationPane({ sub, result, state, role, head }) {
+export function ValidationPane({ sub, result, state, role, head, live = false }) {
   const checks = (sub && sub.validation) || [];
   const timeline = gateTimeline(sub);
   const reason = gateReason(sub, result);
   const note =
     state === "idle" ? "Checked against the real schema and your role, before any SQL exists."
-      : state === "done" && !checks.length ? "Nothing to check." : null;
+      : state === "done" && !checks.length && !live ? "Nothing to check." : null;
   const body = Boolean(timeline || reason || checks.length);
   return (
     <Station id="pane-validation" title="Checks" state={state} note={note} head={head}>
@@ -270,12 +279,12 @@ export function ValidationPane({ sub, result, state, role, head }) {
   );
 }
 
-export function SqlPane({ sub, subs = sub ? [sub] : [], state, refused, head }) {
+export function SqlPane({ sub, subs = sub ? [sub] : [], state, refused, head, live = false }) {
   const written = subs.some((s) => s && s.sql);
   const note =
     state === "idle" ? "Generated from the approved plan, only after the checks pass."
       : state === "skipped" ? (refused ? "Not written. The plan never passed the checks." : null)
-        : state === "busy" ? null
+        : state === "busy" || live ? null
           : written ? null : "No SQL.";
   return (
     <Station id="pane-sql" title="SQL" state={state} note={note} head={head}>
@@ -290,7 +299,8 @@ export function SqlPane({ sub, subs = sub ? [sub] : [], state, refused, head }) 
 
 // The rows come from the run's saved results (`result_manifest`), paged from
 // the server; a run that saved none falls back to the sample in the response.
-export function RowsPane({ sub, result, state, head }) {
+// Live, the rows load as soon as the manifest arrives, before the answer.
+export function RowsPane({ sub, result, state, head, live = false }) {
   const rows = sub && sub.rows;
   const saved = Boolean(result && result.trace_id && (result.result_manifest || []).length);
   const planOnly = result && result.status === "plan_only";
@@ -298,8 +308,9 @@ export function RowsPane({ sub, result, state, head }) {
     state === "idle" ? "The query runs read-only against the database."
       : state === "skipped" ? null
         : state === "busy" ? null
-          : planOnly ? "Plan only: nothing was executed."
-            : !rows && !saved ? "No rows." : null;
+          : live ? (saved ? null : "The rows load once the result is saved.")
+            : planOnly ? "Plan only: nothing was executed."
+              : !rows && !saved ? "No rows." : null;
   return (
     <Station id="pane-rows" title="Rows" state={state} note={note} head={head}>
       {state === "done" && saved && <RowsTable key={result.trace_id} result={result} />}
@@ -385,9 +396,10 @@ function list(names) {
 // `stopped` is a run the visitor cancelled; `onAgain` asks the same question
 // again, offered beside a fault; `hosted` adds that a stopped question still
 // counts toward the session's limit.
-export default function Run({ asked, result, sub, busy, stopped, hosted = false, meta = null, error, debug, replay, feedback, answered = [], onAgain }) {
-  const s = stationStates({ asked, busy, stopped, result, sub });
-  const heads = stationHeads(result, s);
+export default function Run({ asked, result, sub, busy, progress = null, stopped, hosted = false, meta = null, error, debug, replay, feedback, answered = [], onAgain }) {
+  const live = Boolean(busy && progress);
+  const s = stationStates({ asked, busy, stopped, result, sub, progress });
+  const heads = stationHeads(live ? liveTimings(progress) : result, s);
   const gateFailed = s.checks === "stopped";
   // A failed request carries only a sentence; an engine error carries a code.
   const fault = stopped ? null : error ? { message: error } : runFault(result, sub);
@@ -396,14 +408,14 @@ export default function Run({ asked, result, sub, busy, stopped, hosted = false,
 
   return (
     <>
-      <AnswerHead asked={asked} busy={busy} stopped={stopped} hosted={hosted} meta={meta} result={result} sub={sub} fault={fault}
+      <AnswerHead asked={asked} busy={busy} progress={progress} stopped={stopped} hosted={hosted} meta={meta} result={result} sub={sub} fault={fault}
         answered={answered} onAgain={onAgain} />
       <div className="spine" data-outcome={outcome} aria-busy={busy}>
         {busy && <span className="spine-run" aria-hidden="true" />}
-        <PlanPane sub={sub} subs={subs} state={s.plan} head={heads.plan} />
-        <ValidationPane sub={sub} result={result} state={s.checks} role={asked && asked.role} head={heads.checks} />
-        <SqlPane sub={sub} subs={subs} state={s.sql} refused={gateFailed} head={heads.sql} />
-        <RowsPane sub={sub} result={result} state={s.rows} head={heads.rows} />
+        <PlanPane sub={sub} subs={subs} state={s.plan} head={heads.plan} live={live} />
+        <ValidationPane sub={sub} result={result} state={s.checks} role={asked && asked.role} head={heads.checks} live={live} />
+        <SqlPane sub={sub} subs={subs} state={s.sql} refused={gateFailed} head={heads.sql} live={live} />
+        <RowsPane sub={sub} result={live ? liveResult(progress) : result} state={s.rows} head={heads.rows} live={live} />
         <UsagePane key={(result && result.trace_id) || "none"} usage={result && result.usage} timings={result && result.timings}
           replay={replay} debug={debug} state={s.cost} result={result} head={heads.cost} />
         <Feedback key={`rate-${(result && result.trace_id) || "none"}`} result={result} busy={busy} options={feedback} />

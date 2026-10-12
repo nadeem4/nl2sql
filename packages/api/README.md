@@ -20,11 +20,12 @@ The API does not authenticate callers and never takes the RBAC role from the
 request body. Set one of: `NL2SQL_API_ROLE_HEADER` (a header a trusted proxy
 sets), `NL2SQL_API_ROLE` (one static role) or, for local testing only,
 `NL2SQL_API_TRUST_BODY_ROLE=true` (the body's `user_context`; logs a warning).
-With none, `/api/v1/query` answers HTTP 401.
+With none, `/api/v1/query` and `/api/v1/query/stream` answer HTTP 401.
 
 ## Endpoints
 
 - `POST /api/v1/query` - Ask a question as the configured role
+- `POST /api/v1/query/stream` - The same, as Server-Sent Events: each step as it runs, the result manifest, the answer as it is written, then the `/query` response
 - `GET /api/v1/health` - Liveness check
 - `GET /api/v1/ready` - Readiness check (does not yet check dependencies)
 - `POST /api/v1/datasource` - Register a datasource in the running process

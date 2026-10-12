@@ -117,6 +117,30 @@ class NL2SQL:
             cancellation_token=cancellation_token,
         )
 
+    def stream_query(
+        self,
+        natural_language: str,
+        datasource_id: Optional[str] = None,
+        execute: bool = True,
+        user_context=None,
+        cancellation_token=None,
+    ):
+        """
+        Run a question as ``run_query`` does, yielding :class:`~nl2sql.QueryEvent`
+        values as it goes: ``node_started`` / ``node_finished`` per step,
+        ``result_manifest`` when the results are saved, ``answer_delta`` as the
+        answer is written, then ``final`` (``run_query``'s result, as JSON) or
+        ``error``. ``event.sse()`` is the event as one Server-Sent Event.
+        Closing the iterator early cancels the run.
+        """
+        return self.query.stream_query(
+            natural_language=natural_language,
+            datasource_id=datasource_id,
+            execute=execute,
+            user_context=user_context,
+            cancellation_token=cancellation_token,
+        )
+
     def get_result_manifest(self, request_id: str, tenant_id: Optional[str] = None):
         """
         Which results a run saved (node id, columns, row count, truncated), by

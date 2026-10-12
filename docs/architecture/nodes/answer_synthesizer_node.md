@@ -75,7 +75,7 @@ Side effects:
 3. Build the result preview (`result_preview()`): for each terminal result, its first `ANSWER_PREVIEW_ROWS` rows, `row_count`, `columns` and `partial` (true when rows were left out). The rows are the aggregator's `terminal_results`, already cut to the preview; `row_count` and `columns` come from the saved combined result in `computed_artifacts`, so they describe the whole result. Serialize it to JSON.
 4. Build the *Result Limit* note: one line per sub-query whose result reached its row limit ("The result was cut at 10,000 rows, the row limit, so it is incomplete. Narrow the question ..."), or `None`.
 5. Serialize unmapped sub‑queries to JSON.
-6. Invoke LLM chain with structured output. The prompt's *Data Notes* lists the missing values and asks the answer to say the value does not exist instead of reporting the empty result as a finding.
+6. Invoke LLM chain with structured output. The prompt's *Data Notes* lists the missing values and asks the answer to say the value does not exist instead of reporting the empty result as a finding. When the run was started by `stream_query` (`configurable.stream_answer`), the chain is `streaming_structured`: the same request with the provider asked to stream, so the run's `RunEvents` callback turns each piece of the tool call into an `answer_delta` event. The answer it returns is the unstreamed chain's ([Streaming a run](../../api/core/query.md#streaming-a-run)).
 7. Append each missing-value note and each result-limit note to the answer's `warnings`, whatever the model wrote, set `final_answer.truncated`, and return `AnswerSynthesizerResponse`.
 8. On exception, emit `AGGREGATOR_FAILED`.
 

@@ -15,7 +15,8 @@ from .anthropic import AnthropicWire
 from .base import temperature_error
 
 # The SDK refuses a non-streaming call whose max_tokens could outlast its
-# 10-minute timeout, and every node call here is non-streaming. 16,000 leaves
+# 10-minute timeout, and every node call here but the streamed answer of
+# ``stream_query`` is non-streaming. 16,000 leaves
 # room for adaptive thinking before the structured answer.
 MAX_TOKENS = 16000
 
@@ -43,6 +44,16 @@ class CachingChatAnthropic(ChatAnthropic):
                 raise self._explain(exc) from exc
             raise
         return _WIRE.repair_tool_calls(result, kwargs.get("tools"))
+
+    def _stream(self, *args: Any, **kwargs: Any):
+        # The streamed answer (``streaming_structured``) skips ``_generate``,
+        # and repairs its tool calls itself.
+        try:
+            yield from super()._stream(*args, **kwargs)
+        except anthropic.BadRequestError as exc:
+            if "temperature" in str(exc):
+                raise self._explain(exc) from exc
+            raise
 
     async def _agenerate(self, *args: Any, **kwargs: Any):
         try:

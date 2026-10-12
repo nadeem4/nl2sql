@@ -11,6 +11,6 @@ def test_every_route_is_in_the_readme_api_table():
     start = text.index("\n## REST API\n")
     section = text[start:text.index("\n## ", start + 1)]
     operations = [(method.upper(), path) for path, ops in app.openapi()["paths"].items() for method in ops]
-    assert len(operations) == 16
+    assert len(operations) == 17
     missing = [f"{m} {p}" for m, p in operations if f"| `{m}` | `{p}` |" not in section]
     assert not missing, f"add these routes to the README's REST API table: {missing}"

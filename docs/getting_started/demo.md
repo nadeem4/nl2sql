@@ -330,8 +330,17 @@ Ask is the question box, then the run, answer first:
 - **The gate.** The Checks station shows the plans the checks saw (**Plan 1
   refused**, then **Plan 2 passed** when the first was sent back), why, in one
   sentence, and each check as a tile with a tick or a cross.
-- **While it runs.** Only the station being worked on is lit; the rest wait,
-  faded. A counter beside the button reads **Running · 3.4 s**, and after a
+- **While it runs.** The run streams (`POST /api/ask/stream`, Server-Sent
+  Events): each station lights as its step finishes, with its time, and the
+  next one goes live; the rest wait, faded. The Rows station loads its first
+  page as soon as the result is saved, before the answer is written. The answer
+  sentence then appears as the model writes it, a shade lighter until the run
+  is back, when the plan, the checks and the SQL fill in. A recorded run on
+  the hosted demo streams its recorded answer the same way, a word at a time.
+  Where the stream cannot be used (an older server, a proxy that cuts it, a
+  browser that cannot read a streamed reply), the page asks `POST /api/ask`
+  instead and the first station stays lit until the whole run is back.
+  A counter beside the button reads **Running · 3.4 s**, and after a
   moment **Ask** becomes **Stop**, which cancels the request: the run then says
   **Stopped** and every station is marked not reached. The server notices the
   dropped request within a quarter of a second and cancels the run: no further

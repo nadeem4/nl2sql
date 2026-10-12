@@ -99,6 +99,24 @@ def test_replay_reads_the_recordings_written_by_record(tmp_path, monkeypatch):
     assert _meta(served_app)["recorded_questions"] == 1
 
 
+def test_replay_streams_a_recorded_answer_at_reading_pace(tmp_path, monkeypatch):
+    """A streamed recorded answer arrives a word at a time, not all at once."""
+    from nl2sql.cli.commands.demo import REPLAY_STREAM_DELAY
+    from nl2sql.testing.fake_llm import FakeLLMServer
+
+    servers = []
+
+    class Recorded(FakeLLMServer):
+        def start(self):
+            servers.append(self)
+            return super().start()
+
+    monkeypatch.setattr("nl2sql.cli.commands.demo.FakeLLMServer", Recorded)
+    _replay_demo(tmp_path, monkeypatch)
+
+    assert servers and all(s.stream_delay == REPLAY_STREAM_DELAY > 0 for s in servers)
+
+
 def test_replay_falls_back_to_the_packaged_recordings(tmp_path, monkeypatch):
     from nl2sql.cli.demo.datasets import CHINOOK_QUESTIONS, DEMO_QUESTIONS
     from nl2sql.llm.replay import Recording, ReplayStore

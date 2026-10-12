@@ -4,6 +4,7 @@
 // test runner.
 
 import { deniedTables } from "./run.js";
+import { liveStations } from "./stream.js";
 
 export const STATIONS = ["plan", "checks", "sql", "rows", "cost"];
 
@@ -27,11 +28,14 @@ const refused = (sub) => checksOf(sub).some((c) => !c.passed);
 // behind it), done, stopped (the gate held the plan), held (plan only: rows
 // were not fetched), skipped (never reached).
 //
-// `/api/ask` reports nothing until the whole run is back, so while it is busy
-// the first station is the live one and the rest wait behind it.
-export function stationStates({ asked, busy, stopped, result, sub }) {
+// While busy, a streamed run (`progress`, from `stream.js`) lights each
+// station as its step finishes. `/api/ask` reports nothing until the whole
+// run is back, so without a stream the first station is the live one and the
+// rest wait behind it.
+export function stationStates({ asked, busy, stopped, result, sub, progress }) {
   if (!asked) return all("idle");
   if (stopped) return all("skipped");
+  if (busy && progress) return liveStations(progress);
   if (busy) return { ...all("queued"), plan: "busy" };
   if (!result || result.replay_miss || !sub) {
     return { ...all("skipped"), cost: result && !result.replay_miss ? "done" : "skipped" };
@@ -71,6 +75,18 @@ export function stationHeads(result, states) {
     heads[name] = { kind, tag, time };
   }
   return heads;
+}
+
+// What `stationHeads` reads while a streamed run is live: the times of the
+// steps that have finished, and no usage yet.
+export function liveTimings(progress) {
+  return { timings: (progress && progress.timings) || {} };
+}
+
+// The answer as far as the model has written it, while the run is live.
+export function liveAnswer(progress) {
+  const text = progress && progress.answer && progress.answer.summary;
+  return text ? { kind: "answer", text } : null;
 }
 
 // What the answer header leads with, once a result is back.

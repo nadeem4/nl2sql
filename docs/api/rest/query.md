@@ -187,6 +187,77 @@ Example response:
 
 (Illustrative numbers. `usage.calls` is shortened to one entry; a real response lists all three.)
 
+### `POST /api/v1/query/stream`
+
+The same run as `POST /api/v1/query`, reported as it happens, as
+[Server-Sent Events](https://html.spec.whatwg.org/multipage/server-sent-events.html)
+(`Content-Type: text/event-stream`). The request body, the caller role and the 401
+are exactly those of `/query`. Delegates to `engine.stream_query(...)` (see
+[the core query API](../core/query.md#streaming-a-run)).
+
+Each event is an `event:` line naming its type and one `data:` line of JSON:
+
+| event | data | when |
+| --- | --- | --- |
+| `node_started` | `node` | A pipeline step began. The SQL agent's steps (`ast_planner`, `logical_validator`, `generator`, `executor`) come once per sub-query, and again on a retry. |
+| `node_finished` | `node`, `seconds`, `ok` | The step ended; `ok` is `false` when it raised. |
+| `result_manifest` | `trace_id`, `results` | The aggregator saved the run's results. `results` is the `result_manifest` the final response will carry, so a client can start paging the rows (with `trace_id` as `request_id`) before the answer is written. |
+| `answer_delta` | `field`, `text` | The next piece of the answer's `summary` or `content`, as the answer model writes it. Joined in order, the pieces of a field are that field of `final_answer`. |
+| `final` | the `QueryResponse` | The last event of a run that finished: exactly what `/query` returns for it. A refusal or a provider failure is a `final` with `status: "error"`, as `/query` returns it. |
+| `error` | `message`, `error_code` | The last event of a run that could not finish (an unexpected failure; the traceback is logged on the server). |
+
+Every stream ends in exactly one `final` or one `error`.
+
+```text
+event: node_started
+data: {"node": "datasource_resolver"}
+
+event: node_finished
+data: {"node": "datasource_resolver", "seconds": 0.41, "ok": true}
+
+...
+
+event: result_manifest
+data: {"trace_id": "0f1c...", "results": [{"node_id": "sq_1", "columns": ["customer", "revenue"], "row_count": 5, "truncated": false}]}
+
+event: node_started
+data: {"node": "answer_synthesizer"}
+
+event: answer_delta
+data: {"field": "summary", "text": "Acme leads "}
+
+event: answer_delta
+data: {"field": "summary", "text": "the top 5 customers"}
+
+...
+
+event: final
+data: {"sub_queries": [...], "final_answer": {...}, "status": "success", ...}
+```
+
+```bash
+curl -N -X POST http://localhost:8000/api/v1/query/stream \
+  -H "Content-Type: application/json" -H "X-NL2SQL-Role: admin" \
+  -d '{"natural_language": "Who are the top 5 customers by revenue?"}'
+```
+
+What streams token by token: only the answer. The answer model is asked to stream
+on this route (and on this route only; `/query` is unchanged), on both wires:
+OpenAI's (OpenAI, OpenRouter, Ollama and any OpenAI-compatible endpoint) streams
+the answer's tool call as argument pieces, Anthropic's as `input_json_delta`
+pieces, and the engine reads `summary` and `content` out of them as they grow.
+How finely the text arrives is the provider's choice: a provider or a local
+server that sends the whole answer in one piece gives one `answer_delta` per
+field. The other model steps (resolver, decomposer, planner, refiner) return a
+typed object the next step needs whole, so they are not streamed; their progress
+is their `node_started` and `node_finished`. A streamed answer reports the same
+token usage as an unstreamed one (`stream_options.include_usage` is sent on the
+OpenAI wire).
+
+The route answers `Cache-Control: no-cache` and `X-Accel-Buffering: no`, so a
+proxy passes each event on as it comes. Closing the connection cancels the run
+before its next step or model call.
+
 ### `GET /api/v1/query/{request_id}/results/{result_id}`
 
 One page of a run's saved result.
@@ -244,3 +315,8 @@ and `HTTP 401` without a role.
 caller (`get_user_context` override, role `admin`), so no datasource, LLM or
 network access is required. `packages/api/tests/test_auth.py` covers the role
 sources and the 401.
+
+`packages/api/tests/test_query_stream_route.py` covers the stream route the same
+way: the content type, the events in order, a `final` equal to the `/query`
+response, the 401 and the `error` event. `packages/nl2sql/tests/e2e/test_stream_fake_llm.py`
+streams a question on the demo databases through this route with no key.
