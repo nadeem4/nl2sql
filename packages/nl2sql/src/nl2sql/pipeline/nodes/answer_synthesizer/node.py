@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from typing import Dict, Any, TYPE_CHECKING
+from typing import Dict, Any, List, TYPE_CHECKING
 
 from langchain_core.prompts import ChatPromptTemplate
 
@@ -17,6 +17,20 @@ from .schemas import AggregatedResponse, AnswerSynthesizerResponse
 from .prompts import ANSWER_SYNTHESIZER_PROMPT
 
 logger = get_logger("answer_synthesizer")
+
+
+def _missing_values(warnings: List[Dict[str, Any]]) -> List[str]:
+    """The run's "there is no Genre with Name 'Polka'" notes.
+
+    Only ``VALUE_NOT_FOUND`` warnings: an ERROR one belonged to an attempt a
+    retry has since replaced.
+    """
+    notes: List[str] = []
+    for w in warnings or []:
+        if w.get("error_code") == "VALUE_NOT_FOUND" and w.get("severity") == "WARNING":
+            if w.get("message") and w["message"] not in notes:
+                notes.append(w["message"])
+    return notes
 
 
 class AnswerSynthesizerNode:
@@ -60,6 +74,7 @@ class AnswerSynthesizerNode:
                     u.model_dump()
                     for u in (state.decomposer_response.unmapped_subqueries or [])
                 ]
+            notes = _missing_values(state.warnings)
             response: AggregatedResponse = self.chain.invoke(
                 {
                     "user_query": state.user_query,
@@ -67,8 +82,12 @@ class AnswerSynthesizerNode:
                     "unmapped_subqueries": json.dumps(
                         unmapped_subqueries, indent=2, ensure_ascii=True
                     ),
+                    "data_notes": "\n".join(f"- {n}" for n in notes) or "None",
                 }
             )
+            # Said whatever the model wrote: an empty result on a value that
+            # does not exist is not a finding about the data.
+            response.warnings = list(response.warnings or []) + [n for n in notes if n not in (response.warnings or [])]
 
 
             return {
