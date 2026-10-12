@@ -1077,3 +1077,29 @@
   - {FirstName: Manoj, LastName: Pareek, jazz_tracks: 5}
   - {FirstName: Puja, LastName: Srivastava, jazz_tracks: 5}
   - {FirstName: Dan, LastName: Miller, jazz_tracks: 4}
+
+- id: chinook_045
+  question: Which customers rank 11th to 20th by total spend?
+  difficulty: medium
+  tags: [join, aggregation, order-limit, offset, ties, rbac-denial]
+  needed_tables: [Customer, Invoice]
+  needed_columns: [Customer.CustomerId, Customer.FirstName, Customer.LastName, Invoice.CustomerId, Invoice.Total]
+  expected: {admin: allowed, analyst: allowed, viewer: refused}
+  order_matters: false
+  gold_sql: |
+    SELECT c.FirstName, c.LastName, ROUND(SUM(i.Total), 2) AS total_spend
+    FROM Customer c JOIN Invoice i ON i.CustomerId = c.CustomerId
+    GROUP BY c.CustomerId
+    ORDER BY total_spend DESC, c.CustomerId
+    LIMIT 10 OFFSET 10
+  gold_result:
+  - {FirstName: Terhi, LastName: Hämäläinen, total_spend: 41.62}
+  - {FirstName: František, LastName: Wichterlová, total_spend: 40.62}
+  - {FirstName: Isabelle, LastName: Mercier, total_spend: 40.62}
+  - {FirstName: Johannes, LastName: Van der Berg, total_spend: 40.62}
+  - {FirstName: Luís, LastName: Gonçalves, total_spend: 39.62}
+  - {FirstName: François, LastName: Tremblay, total_spend: 39.62}
+  - {FirstName: Bjørn, LastName: Hansen, total_spend: 39.62}
+  - {FirstName: Jack, LastName: Smith, total_spend: 39.62}
+  - {FirstName: Dan, LastName: Miller, total_spend: 39.62}
+  - {FirstName: Heather, LastName: Leacock, total_spend: 39.62}

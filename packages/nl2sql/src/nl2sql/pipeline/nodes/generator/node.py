@@ -436,7 +436,24 @@ class GeneratorNode:
         return query
 
     def _build_query(self, plan: PlanModel, limit: int, dialect: str) -> exp.Select:
-        """Builds the query as a sqlglot tree; the adapter renders it."""
+        """Builds the query as a sqlglot tree; the adapter renders it.
+
+        Raises:
+            ValueError: If ``offset`` is negative, or set without an
+                ``order_by``: an offset pages through an order, and with none
+                the rows it skips are arbitrary (T-SQL cannot express it at
+                all). The validator runs this builder, so such a plan is
+                rejected there as retryable.
+        """
+        offset = int(plan.offset or 0)
+        if offset < 0:
+            raise ValueError(f"offset must be zero or more, got {plan.offset}.")
+        if offset and not plan.order_by:
+            raise ValueError(
+                "offset needs an order_by: rows 11 to 20 only mean something in an order. "
+                "Add order_by on the ranked value."
+            )
+
         visitor = SqlVisitor()
         query = exp.select()
         if plan.distinct:
@@ -490,4 +507,9 @@ class GeneratorNode:
             ordered_on.add(key.sql())
             query = query.order_by(exp.Ordered(this=key.copy(), nulls_first=default_nulls_first(False, dialect)))
 
-        return query.limit(limit)
+        # ``limit`` is already the smaller of the plan's and the row cap, so a
+        # page is never longer than the cap; the offset is where it starts.
+        query = query.limit(limit)
+        if offset:
+            query = query.offset(offset)
+        return query

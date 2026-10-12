@@ -58,6 +58,8 @@ cost is a second tree build, measured at ~2.4 ms against a ~3.4 s planner call.
 
 `test_logical_validator_generator_parity.py` asserts the invariant directly: for
 each broken plan shape, the generator rejects it **and** so does the validator.
+The same route rejects an `offset` with no `order_by`, or a negative one
+(`test_plan_offset.py`): a page only means something in an order.
 
 Column resolution is delegated to `sqlglot`'s optimizer. The node converts the
 plan into a throw‑away `sqlglot` expression tree (reusing the generator's

@@ -743,3 +743,29 @@ chinook_044:
   - {direction: asc, expr: {kind: column, alias: t1, column_name: CustomerId}}
   limit: 5
   reasoning: Count each customer's jazz invoice lines and keep the five largest.
+
+chinook_045:
+  tables:
+  - {name: Customer, alias: t1}
+  - {name: Invoice, alias: t2}
+  joins:
+  - left_alias: t1
+    right_alias: t2
+    join_type: inner
+    condition: {kind: binary, op: '=', left: {kind: column, alias: t1, column_name: CustomerId}, right: {kind: column, alias: t2, column_name: CustomerId}}
+  select_items:
+  - {alias: first_name, expr: {kind: column, alias: t1, column_name: FirstName}}
+  - {alias: last_name, expr: {kind: column, alias: t1, column_name: LastName}}
+  - alias: total_spend
+    expr: {kind: func, func_name: ROUND, args: [{kind: func, func_name: SUM, is_aggregate: true, args: [{kind: column, alias: t2, column_name: Total}]}, {kind: literal, value: 2}]}
+  group_by:
+  - {expr: {kind: column, alias: t1, column_name: CustomerId}}
+  - {expr: {kind: column, alias: t1, column_name: FirstName}}
+  - {expr: {kind: column, alias: t1, column_name: LastName}}
+  order_by:
+  - direction: desc
+    expr: {kind: func, func_name: ROUND, args: [{kind: func, func_name: SUM, is_aggregate: true, args: [{kind: column, alias: t2, column_name: Total}]}, {kind: literal, value: 2}]}
+  - {direction: asc, expr: {kind: column, alias: t1, column_name: CustomerId}}
+  limit: 10
+  offset: 10
+  reasoning: Sum invoice totals per customer, rank them, and keep ranks 11 to 20.
