@@ -31,7 +31,10 @@ datasources:
   - `connection`: connection details
     - `type`: adapter type (e.g., `postgres`, `mysql`, `mssql`, `sqlite`, `duckdb`)
     - adapter-specific fields (host, port, database, driver, etc.)
-  - optional limits and metadata (commonly used):
+  - optional limits and metadata (commonly used). The three limits
+    (`statement_timeout_ms`, `row_limit`, `max_bytes`) go beside `connection`, as
+    above, or under an `options:` map; the two spellings are equivalent. If a
+    limit is set in both places, the lower value wins.
     - `statement_timeout_ms`
     - `row_limit`: the most rows one sub-query returns. Unset, it is
       `RESULT_ROW_LIMIT` (100,000); set higher, `RESULT_ROW_LIMIT` still bounds it.

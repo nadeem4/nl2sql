@@ -1,7 +1,10 @@
 
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from typing import Optional, Dict, Any, List
+
+# Limits a datasource may set beside ``connection`` or under ``options``.
+LIMIT_KEYS = ("row_limit", "statement_timeout_ms", "max_bytes")
 
 # Connection args are free-form extras, so secrets are recognised by name.
 SECRET_ARG_HINTS = ("password", "secret", "token", "api_key")
@@ -34,6 +37,27 @@ class DatasourceConfig(BaseModel):
     description: Optional[str] = None
     connection: ConnectionConfig
     options: Dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _fold_top_level_limits(cls, data: Any) -> Any:
+        """Move ``row_limit``, ``statement_timeout_ms`` and ``max_bytes`` into ``options``.
+
+        A limit may be written beside ``connection`` or under ``options``; when
+        both are set, the lower value wins.
+        """
+        if not isinstance(data, dict) or not any(k in data for k in LIMIT_KEYS):
+            return data
+        data = dict(data)
+        options = dict(data.get("options") or {})
+        for key in LIMIT_KEYS:
+            top = data.pop(key, None)
+            if top is None:
+                continue
+            nested = options.get(key)
+            options[key] = top if nested is None else min(int(top), int(nested))
+        data["options"] = options
+        return data
 
 
 

@@ -1,6 +1,8 @@
 # Template: copy to configs/datasources.yaml and edit.
 # Every dialect adapter ships with nl2sql; an extra supplies the driver
 # (sqlite needs none). `${env:NAME}` is resolved from the environment.
+# The limits (statement_timeout_ms, row_limit, max_bytes) may also go under
+# `options:`; if one is set in both places, the lower value wins.
 version: 1
 datasources:
   - id: chinook
