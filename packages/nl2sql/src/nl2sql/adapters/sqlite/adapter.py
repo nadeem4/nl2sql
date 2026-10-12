@@ -1,6 +1,7 @@
 from typing import Any, List, Dict
 from sqlalchemy import create_engine, text, inspect
 from sqlalchemy.dialects import sqlite
+from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from nl2sql.adapters.sqlalchemy_base import (
     CostEstimate,
     DryRunResult,
@@ -45,6 +46,19 @@ def _sqlite_dates(node: exp.Expression) -> exp.Expression:
     if isinstance(node, exp.TimestampTrunc) and node.unit and node.unit.name.upper() in _DATE_TRUNCS:
         return _from_template(_DATE_TRUNCS[node.unit.name.upper()], node.this)
     return node
+
+# SQLite's messages for a query that is itself wrong; a new plan can fix these.
+_QUERY_MISTAKES = (
+    "no such column",
+    "no such table",
+    "no such function",
+    "syntax error",
+    "ambiguous column name",
+    "wrong number of arguments",
+    "misuse of aggregate",
+    "misuse of window function",
+)
+
 
 class SqliteConnectionConfig(BaseModel):
     """Strict configuration schema for SQLite adapter."""
@@ -129,6 +143,15 @@ class SqliteAdapter(BaseSQLAlchemyAdapter):
     def render_sql(self, expression: exp.Expression) -> str:
         """sqlglot's SQLite rendering, with date parts and truncation rewritten."""
         return expression.copy().transform(_sqlite_dates).sql(dialect=self.get_dialect())
+
+    def is_retryable_error(self, exc: SQLAlchemyError) -> bool:
+        """SQLite reports a mistake in the query as an ``OperationalError``,
+        the same kind as a locked or read-only database, and gives no
+        SQLSTATE, so the query's own mistakes are told apart by message."""
+        if isinstance(exc, OperationalError):
+            message = str(getattr(exc, "orig", None) or exc).lower()
+            return any(mistake in message for mistake in _QUERY_MISTAKES)
+        return super().is_retryable_error(exc)
 
     @property
     def exclude_schemas(self) -> set[str]:

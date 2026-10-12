@@ -59,6 +59,10 @@ FATAL_ERRORS = {
     ErrorCode.MISSING_DATASOURCE_ID,
     ErrorCode.MISSING_LLM,
     ErrorCode.INVALID_STATE,
+    # The database refused or could not run the query (permission, timeout,
+    # connection): a new plan would meet the same refusal. A query the
+    # database rejected as wrong is EXECUTION_FAILED, which is retried.
+    ErrorCode.DB_EXECUTION_ERROR,
     # A refinement retry would make the same call to the same provider.
     ErrorCode.PROVIDER_AUTH_FAILED,
     ErrorCode.PROVIDER_RATE_LIMITED,

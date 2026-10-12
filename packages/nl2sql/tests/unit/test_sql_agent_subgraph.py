@@ -7,6 +7,13 @@ from nl2sql.pipeline.nodes.ast_planner.schemas import ASTPlannerResponse, PlanMo
 from nl2sql.pipeline.nodes.validator.schemas import LogicalValidatorResponse
 from nl2sql.pipeline.nodes.generator.schemas import GeneratorResponse
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
+from nl2sql.execution.contracts import ExecutorResponse
+
+
+def _executed():
+    # A real response: the executor's output is routed on, so it is validated.
+    return ExecutorResponse(executor_name="sql_executor", subgraph_name="sql_agent", node_id="sq1",
+                            trace_id="t", tenant_id="t1")
 
 
 def _plan_ok():
@@ -32,7 +39,7 @@ def test_sql_agent_happy_path(monkeypatch):
         return {"generator_response": GeneratorResponse(sql_draft="SELECT 1")}
 
     def executor(state):
-        return {"executor_response": SimpleNamespace(errors=[], reasoning=[]), "errors": []}
+        return {"executor_response": _executed(), "errors": []}
 
     monkeypatch.setattr("nl2sql.pipeline.subgraphs.sql_agent.SchemaRetrieverNode", lambda _ctx: schema_retriever)
     monkeypatch.setattr("nl2sql.pipeline.subgraphs.sql_agent.ASTPlannerNode", lambda _ctx: planner)
@@ -74,7 +81,7 @@ def test_sql_agent_planner_retry(monkeypatch):
         return {"generator_response": GeneratorResponse(sql_draft="SELECT 1")}
 
     def executor(state):
-        return {"executor_response": SimpleNamespace(errors=[], reasoning=[]), "errors": []}
+        return {"executor_response": _executed(), "errors": []}
 
     def refiner(state):
         return {"reasoning": [{"node": "refiner", "content": "retry"}]}

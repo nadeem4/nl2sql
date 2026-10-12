@@ -112,13 +112,15 @@ Emits `PipelineError` with:
 - `MISSING_SQL`
 - `MISSING_DATASOURCE_ID`
 - `INVALID_STATE`
-- `EXECUTOR_CRASH`
+- `EXECUTION_FAILED`: the database rejected the query as wrong (the adapter's `retryable`); the SQL agent sends it back to the refiner while retries remain
+- `DB_EXECUTION_ERROR`: the database refused or could not run the query (permission, timeout, connection); fatal
+- `EXECUTOR_CRASH`: an exception escaped the adapter
 
 ---
 
 ## Retry + Idempotency
 
-- No internal retry logic.
+- No internal retry logic. The SQL agent's `check_execution` routes a retryable `EXECUTION_FAILED` back to the refiner (see [SQL agent](../subgraphs/sql_agent.md)).
 - Idempotency depends on datasource and query semantics.
 
 ---

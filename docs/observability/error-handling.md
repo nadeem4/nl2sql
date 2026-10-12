@@ -12,16 +12,16 @@ One case cannot use state: LangGraph conditional-edge routers may only return ro
 - `provider` and `provider_response`, set on a `PROVIDER_*` error (below), otherwise `None`
 - `is_retryable` derived from severity and error code
 
-Common error codes include `MISSING_SQL`, `EXECUTION_FAILED`, `PIPELINE_TIMEOUT`, `SECURITY_VIOLATION`, `QUESTION_NOT_ANSWERABLE`. `RESULT_TRUNCATED` marks a combine input that reached its datasource's row cap: an error for a join or compare, a warning for a union (see [row cap before a combine](../architecture/nodes/engine_aggregator_node.md#row-cap-before-a-combine)).
+A query the database rejects is `EXECUTION_FAILED` when the adapter says the query itself was wrong (retried through the refiner) and `DB_EXECUTION_ERROR` when the database refused or could not run it (fatal). Common error codes include `MISSING_SQL`, `EXECUTION_FAILED`, `PIPELINE_TIMEOUT`, `SECURITY_VIOLATION`, `QUESTION_NOT_ANSWERABLE`. `RESULT_TRUNCATED` marks a combine input that reached its datasource's row cap: an error for a join or compare, a warning for a union (see [row cap before a combine](../architecture/nodes/engine_aggregator_node.md#row-cap-before-a-combine)).
 
 `ErrorCode` carries only codes something can produce. Eleven members that no
 code path raised were removed (`MISSING_GROUP_BY`, `INVALID_ALIAS_USAGE`,
 `JOIN_MISSING_ON_CLAUSE`, `INVALID_DATE_FORMAT`, `INVALID_NUMERIC_VALUE`,
 `EXECUTION_ERROR`, `PERFORMANCE_WARNING`, `SERVICE_UNAVAILABLE`,
 `PHYSICAL_VALIDATOR_FAILED`, `EXECUTION_TIMEOUT`, `INTENT_VIOLATION`); a code
-nobody can emit is a promise to a caller the engine never keeps. `DB_EXECUTION_ERROR`
-and `SAFEGUARD_VIOLATION` are kept although nothing raises them yet: each has a
-caller-facing message in `SAFE_ERROR_MESSAGES`, so each is a declared refusal
+nobody can emit is a promise to a caller the engine never keeps.
+`SAFEGUARD_VIOLATION` is kept although nothing raises it yet: it has a
+caller-facing message in `SAFE_ERROR_MESSAGES`, so it is a declared refusal
 path. `test_boundary_tidy_ups.py` asserts the rule.
 
 A run that hits the global timeout returns `PIPELINE_TIMEOUT` **and** an

@@ -47,3 +47,21 @@ registered under the `nl2sql.adapters` entry point.
 #### `explain(sql: str)` / `cost_estimate(sql: str)`
 
 The base class provides stubs. Override these to implement database-specific optimization logic (e.g., `EXPLAIN ANALYZE`).
+
+#### `is_retryable_error(exc) -> bool`
+
+`execute()` catches every `SQLAlchemyError` the query raises and returns it as
+a failed `ResultFrame` (`query_failed(exc)`), with `retryable` from this method
+(see [the adapter SDK](sdk.md)). The default reads the driver's SQLSTATE when
+there is one: class `42` (syntax or an unknown name) and `22` (a data or type
+error) are the query's fault, except `42501`, insufficient privilege. With no
+SQLSTATE it falls back on the error's kind: `ProgrammingError` and `DataError`
+are retryable unless the message says permission or access was denied;
+`OperationalError` (timeouts, connections, locks) is not. The message the
+engine sees is the driver's first line, at most 200 characters, prefixed
+"The database rejected the query:"; a refusal gets a generic message instead,
+and the full error goes to the log.
+
+Override it when your driver reports a query mistake another way. SQLite does:
+it raises `OperationalError` with no SQLSTATE for `no such column` as well as
+for a read-only database, so `SqliteAdapter` reads the message.

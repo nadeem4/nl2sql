@@ -21,8 +21,31 @@ from nl2sql_adapter_sdk.schema import (
     ColumnStatistics,
     TableRef,
 )
+from sqlalchemy.exc import DataError, ProgrammingError, SQLAlchemyError
 import logging
 logger = logging.getLogger(__name__)
+
+# Driver messages that mean the database refused the query, whatever its kind.
+_REFUSAL_WORDS = ("permission denied", "permission was denied", "access denied", "not authorized")
+_MAX_MESSAGE = 200
+
+
+def _sqlstate(exc: BaseException):
+    """The five-character SQLSTATE the driver attached, if any."""
+    orig = getattr(exc, "orig", None)
+    for attr in ("sqlstate", "pgcode"):
+        value = getattr(orig, attr, None)
+        if isinstance(value, str) and len(value) == 5:
+            return value
+    return None
+
+
+def _driver_message(exc: BaseException) -> str:
+    """The driver's own first line, without SQLAlchemy's SQL echo and links."""
+    orig = getattr(exc, "orig", None) or exc
+    lines = [line.strip() for line in str(orig).splitlines() if line.strip()]
+    first = lines[0] if lines else type(orig).__name__
+    return first if len(first) <= _MAX_MESSAGE else first[: _MAX_MESSAGE - 3] + "..."
 
 class BaseSQLAlchemyAdapter:
     """
@@ -188,7 +211,59 @@ class BaseSQLAlchemyAdapter:
                 ),
             )
 
-        return self.execute_sql(sql)
+        try:
+            return self.execute_sql(sql)
+        except SQLAlchemyError as exc:
+            return self.query_failed(exc)
+
+    def query_failed(self, exc: SQLAlchemyError) -> ResultFrame:
+        """The failed result for a query the database raised on.
+
+        ``retryable`` is whether the query itself was at fault
+        (``is_retryable_error``); the engine then asks the planner for a new
+        one. Its message is the driver's first line, bounded: no SQL echo, no
+        stack trace. A refusal gets a generic message, since the driver's
+        words can name hosts and users; the log keeps them all.
+        """
+        retryable = self.is_retryable_error(exc)
+        logger.warning("Query failed on %s (retryable=%s): %s", self, retryable, exc)
+        if retryable:
+            message = f"The database rejected the query: {_driver_message(exc)}"
+        else:
+            message = (
+                "The database could not run the query: it refused access, timed out "
+                "or could not be reached."
+            )
+        return ResultFrame(
+            success=False,
+            datasource_id=self.datasource_id,
+            error=ResultError(
+                error_code="QUERY_REJECTED" if retryable else "QUERY_REFUSED",
+                safe_message=message,
+                severity="ERROR",
+                retryable=retryable,
+                stage="execute",
+                datasource_id=self.datasource_id,
+            ),
+        )
+
+    def is_retryable_error(self, exc: SQLAlchemyError) -> bool:
+        """Whether a new query could succeed where this one failed.
+
+        True for a mistake in the query: bad syntax, an unknown table, column
+        or function, a type mismatch. False for a refusal: permission, a
+        timeout, a lost connection, a read-only database. Read from the
+        standard SQLSTATE when the driver gives one (class 42 and 22 are the
+        query's fault, except 42501, insufficient privilege), otherwise from
+        SQLAlchemy's DBAPI error kind. An adapter whose driver reports query
+        mistakes some other way overrides this.
+        """
+        state = _sqlstate(exc)
+        if state:
+            return state != "42501" and state[:2] in ("42", "22")
+        if any(word in _driver_message(exc).lower() for word in _REFUSAL_WORDS):
+            return False
+        return isinstance(exc, (ProgrammingError, DataError))
 
 
     @property

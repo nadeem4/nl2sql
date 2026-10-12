@@ -32,6 +32,7 @@ def build_sql_agent_graph(
 
     Feedback Loop:
     (LogicalValidator Error) -> RetryHandler -> Refiner -> Planner
+    (Executor: query rejected by the database) -> RetryHandler -> Refiner -> Planner
 
     Args:
         ctx: The application context.
@@ -140,6 +141,25 @@ def build_sql_agent_graph(
             return "retry"
         return "end" if blocking else "ok"
 
+    def check_execution(state: SubgraphExecutionState, config: Optional[RunnableConfig] = None) -> str:
+        """Routes a query the database rejected back to the refiner.
+
+        Only ``EXECUTION_FAILED`` is retried: the adapter marked the query
+        itself as wrong (an unknown column, a type mismatch, bad syntax), so a
+        new plan can fix it. A refusal (``DB_EXECUTION_ERROR``: permission,
+        timeout, connection) or any other executor error ends the sub-query,
+        as does running out of retries.
+        """
+        if _is_cancelled(config):
+            return "end"
+        errors = getattr(state.executor_response, "errors", None) or []
+        if not errors:
+            return "end"
+        retryable = all(e.error_code == ErrorCode.EXECUTION_FAILED and e.is_retryable for e in errors)
+        if retryable and _get_retry_count(state) < settings.sql_agent_max_retries:
+            return "retry"
+        return "end"
+
     graph.add_node("schema_retriever", schema_retriever)
     graph.add_node("ast_planner", ast_planner)
     graph.add_node("logical_validator", logical_validator)
@@ -167,7 +187,11 @@ def build_sql_agent_graph(
 
     if execute:
         graph.add_edge("generator", "executor")
-        graph.add_edge("executor", END)
+        graph.add_conditional_edges(
+            "executor",
+            check_execution,
+            {"retry": "retry_handler", "end": END},
+        )
     else:
         graph.add_edge("generator", END)
 
