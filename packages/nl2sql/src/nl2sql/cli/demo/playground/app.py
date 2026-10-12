@@ -1,6 +1,6 @@
 """The playground FastAPI app.
 
-Eighteen routes:
+Twenty routes:
 
 ``GET  /``                     the built React page, with the link preview's
                                tags in its head (see :mod:`preview`)
@@ -21,6 +21,13 @@ Eighteen routes:
                                carries one plain error instead of the raw ones; a client
                                that disconnects (the page's Stop) cancels the run
 ``GET  /api/trace/{trace_id}`` one run trace, read only from the traces directory
+``GET  /api/query/{request_id}/results/{result_id}``
+                               one page of a run's saved result (``offset``, ``limit``
+                               capped at 1,000), as ``nl2sql-api`` serves it
+``GET  /api/query/{request_id}/results/{result_id}.csv``
+                               the whole saved result as CSV, streamed; both read the
+                               engine's own tenant folder only, so an unknown, foreign
+                               or crafted id is a 404
 ``GET  /api/pipeline``         every step of a run in order, which five call a model, and the
                                model each of those is configured to use, and the model
                                the replay recordings were made with
@@ -63,14 +70,14 @@ from collections import OrderedDict
 from importlib.resources import files
 from typing import Any, Dict, List, Literal, Optional, Union
 
-from fastapi import Depends, FastAPI, HTTPException, Request, Response
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
 
-from nl2sql import CancellationToken, QueryResult
+from nl2sql import CancellationToken, QueryResult, ResultNotFound
 
 from nl2sql.auth.models import UserContext
 from nl2sql.cli.demo.playground.hosted import FEEDBACK_MESSAGE, REBUILD_MESSAGE, Hosted, Replay
@@ -496,6 +503,28 @@ def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset
             raise HTTPException(status_code=404, detail="No trace with that id.")
         return FileResponse(path, media_type="application/json", filename=path.name,
                             content_disposition_type="inline")
+
+    # The CSV route first: ``{result_id}`` would otherwise match ``x.csv``.
+    @app.get("/api/query/{request_id}/results/{result_id}.csv")
+    def result_csv(request_id: str, result_id: str) -> StreamingResponse:
+        """The whole saved result as CSV, streamed from its parquet file. Read from the
+        engine's own tenant folder only; an unknown, foreign or crafted id is a 404."""
+        try:
+            chunks = engine.export_result_csv(request_id, result_id)
+        except ResultNotFound:
+            raise HTTPException(status_code=404, detail="No such result.")
+        return StreamingResponse(chunks, media_type="text/csv; charset=utf-8", headers={
+            "Content-Disposition": f'attachment; filename="{request_id}_{result_id}.csv"'})
+
+    @app.get("/api/query/{request_id}/results/{result_id}")
+    def result_page(request_id: str, result_id: str,
+                    offset: int = Query(0, ge=0), limit: int = Query(100, ge=1)) -> Dict[str, Any]:
+        """One page of a saved result (``limit`` capped at 1,000), as ``nl2sql-api`` serves it."""
+        try:
+            page = engine.get_result_page(request_id, result_id, offset=offset, limit=limit)
+        except ResultNotFound:
+            raise HTTPException(status_code=404, detail="No such result.")
+        return page.model_dump(mode="json")
 
     @app.get("/api/feedback")
     def read_feedback(request: Request) -> Dict[str, Any]:

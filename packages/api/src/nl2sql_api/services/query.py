@@ -1,4 +1,6 @@
-from nl2sql import NL2SQL, UserContext
+from typing import Iterator
+
+from nl2sql import NL2SQL, ResultPage, UserContext
 from nl2sql_api.models.query import QueryRequest, QueryResponse
 
 
@@ -15,3 +17,9 @@ class QueryService:
             user_context=user_context,
         )
         return QueryResponse.model_validate(result.model_dump())
+
+    def get_result_page(self, request_id: str, result_id: str, offset: int, limit: int) -> ResultPage:
+        return self.engine.get_result_page(request_id, result_id, offset=offset, limit=limit)
+
+    def export_result_csv(self, request_id: str, result_id: str) -> Iterator[bytes]:
+        return self.engine.export_result_csv(request_id, result_id)

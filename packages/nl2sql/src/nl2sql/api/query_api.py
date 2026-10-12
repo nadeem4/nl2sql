@@ -6,7 +6,7 @@ Provides functionality for executing natural language queries against databases.
 
 from __future__ import annotations
 
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Iterator
 
 from pydantic import BaseModel, Field
 from nl2sql.context import NL2SQLContext
@@ -14,6 +14,13 @@ from nl2sql.pipeline.runtime import run_with_graph
 from nl2sql.auth import UserContext
 from nl2sql.common.cancellation import CancellationToken
 from nl2sql.common.errors import ErrorSeverity
+from nl2sql.execution.artifacts.results import (
+    DEFAULT_RESULT_PAGE_SIZE,
+    ResultManifest,
+    ResultPage,
+    ResultReader,
+    ResultSummary,
+)
 from nl2sql.execution.contracts import ArtifactRef
 from nl2sql.pipeline.nodes.validator.schemas import ValidationCheck
 from nl2sql.services.callbacks.token_handler import QuestionUsage
@@ -56,8 +63,11 @@ class QueryResult(BaseModel):
     Carries everything a UI renders: the plan, the validation checks, a capped
     row sample, the SQL, per-node timings and the question's LLM token usage.
     The full result set still lives in artifact storage, addressable through
-    ``artifact_refs``. ``trace_path`` is where this run's trace file was
-    written, or None when ``TRACE_MODE`` did not write one.
+    ``artifact_refs``. ``result_manifest`` lists the run's saved results (its
+    manifest: node id, columns, row count, truncated), never their rows; read
+    those by ``trace_id`` with ``get_result_page`` or ``export_result_csv``.
+    ``trace_path`` is where this run's trace file was written, or None when
+    ``TRACE_MODE`` did not write one.
     """
     sub_queries: List[SubQueryResult] = Field(default_factory=list)
     final_answer: Optional[Dict[str, Any]] = None
@@ -72,6 +82,8 @@ class QueryResult(BaseModel):
     trace_path: Optional[str] = None
     # True when any sub-query's result was cut at its row ceiling.
     truncated: bool = False
+    # The run's saved results, one per terminal DAG node: the manifest, not the rows.
+    result_manifest: List[ResultSummary] = Field(default_factory=list)
 
 
 def _field(source: Any, name: str, default: Any = None) -> Any:
@@ -233,6 +245,7 @@ def result_from_state(
         usage=usage,
         trace_path=state.get("trace_path"),
         truncated=any(sq.truncated for sq in sub_queries),
+        result_manifest=list(_field(state.get("aggregator_response"), "results", None) or []),
     )
 
 
@@ -279,3 +292,57 @@ class QueryAPI:
             state,
             artifact_store=getattr(self._ctx, "artifact_store", None),
         )
+
+    def _results(self, tenant_id: Optional[str]) -> ResultReader:
+        """A reader of one tenant's saved results: ``tenant_id``, else the engine's own."""
+        store = getattr(self._ctx, "artifact_store", None)
+        if store is None:
+            from nl2sql.execution.artifacts import build_artifact_store
+
+            store = build_artifact_store()
+        return ResultReader(store, tenant_id or getattr(self._ctx, "tenant_id", None) or "")
+
+    def get_result_manifest(self, request_id: str, tenant_id: Optional[str] = None) -> ResultManifest:
+        """
+        Which results the run ``request_id`` (its ``trace_id``) saved: per result,
+        its node id, columns, row count and truncated flag. Never the rows.
+
+        Raises:
+            ResultNotFound: no such run for the tenant (the engine's own unless
+                ``tenant_id`` is given), or ``request_id`` is not a plain token.
+        """
+        return self._results(tenant_id).manifest(request_id)
+
+    def get_result_page(
+        self,
+        request_id: str,
+        result_id: str,
+        offset: int = 0,
+        limit: int = DEFAULT_RESULT_PAGE_SIZE,
+        tenant_id: Optional[str] = None,
+    ) -> ResultPage:
+        """
+        Rows ``offset`` to ``offset + limit`` of one saved result, read lazily
+        from its parquet file. ``result_id`` is a node id from
+        ``QueryResult.result_manifest``. ``limit`` is capped at ``MAX_RESULT_PAGE_SIZE``
+        (1,000); a page past the end is empty. ``next_offset`` is where the
+        next page starts, or None at the end.
+
+        Raises:
+            ResultNotFound: no such run or result for the tenant.
+            ValueError: a negative ``offset`` or a ``limit`` below 1.
+        """
+        return self._results(tenant_id).page(request_id, result_id, offset=offset, limit=limit)
+
+    def export_result_csv(
+        self, request_id: str, result_id: str, tenant_id: Optional[str] = None
+    ) -> Iterator[bytes]:
+        """
+        The whole of one saved result as UTF-8 CSV, header first, yielded a
+        slice at a time so it is never built in memory. The ids are checked
+        before the iterator is returned.
+
+        Raises:
+            ResultNotFound: no such run or result for the tenant.
+        """
+        return self._results(tenant_id).csv(request_id, result_id)

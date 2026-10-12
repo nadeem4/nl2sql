@@ -61,6 +61,7 @@ Side effects:
 
 - Reads artifacts from the artifact store.
 - Writes one artifact per terminal result, in the run's folder: `<tenant_id>/<request_id>/result_<node_id>.parquet` with the default template (see [Artifact Store](../../storage/artifact-store.md#the-combined-result)).
+- Writes the run's result manifest beside them, `<tenant_id>/<request_id>/manifest.json` (see [Artifact Store](../../storage/artifact-store.md#the-result-manifest)).
 
 ---
 
@@ -74,7 +75,8 @@ Side effects:
    - Before polars is asked for any column, a post-combine op's attributes (`group_by`, `metrics`, `project`'s `expected_schema`, `filters`, `order_by`) are checked against the combined frame. An attribute the frame does not have is refused with the columns it does have, and a side-qualified one (`right.customer`) with the reason — see *No anti-join* below. The decomposer runs the same check on the decomposition before anything executes (`nl2sql/aggregation/columns.py`, shared with this engine) and asks the model again once, so here it is the last line of defence.
    - `AggregationService.execute` returns each terminal node as a polars `LazyFrame`: the scans are `ArtifactStore.scan_parquet`, and the combines and post-combine ops only add to the plan, so no sub-query result is loaded whole before it is written.
 3. Save each terminal result with `ArtifactStore.write_lazy`, which streams the plan into a parquet artifact, and build `AggregatorResponse`:
-   - `computed_artifacts[node_id]`: the saved result's `ArtifactRef`, with the whole result's `row_count` and `columns` (`sub_query_id` unset). Later steps (paging, CSV export) read the result from here.
+   - `computed_artifacts[node_id]`: the saved result's `ArtifactRef`, with the whole result's `row_count` and `columns` (`sub_query_id` unset).
+   - `results`: one `ResultSummary` per saved result (`node_id`, `columns`, `row_count`, and `truncated`: a sub-query upstream of the node in the DAG was cut at its row cap), also written as the run's `manifest.json`. `QueryResult.result_manifest` carries it, and the facade's paging and CSV export read the result by it.
    - `terminal_results[node_id]`: the first `ANSWER_PREVIEW_ROWS` rows, read back from that artifact. This is what the answer model is shown; it is not the whole result.
 4. Return success reasoning.
 5. On exception, emit `AGGREGATOR_FAILED`, on the state's `errors` and on `AggregatorResponse.errors`. The graph's `aggregator_route` then ends the run: the answer synthesizer is not called on the empty result, so the aggregator's error is the run's outcome and no model call is spent explaining `{}`.

@@ -117,6 +117,76 @@ class ArtifactStore:
         columns = written.collect_schema().names()
         return self._artifact_ref(uri, template, columns, row_count, 0, metadata)
 
+    @staticmethod
+    def run_metadata(tenant_id: str, request_id: str, name: str) -> Dict[str, str]:
+        """The metadata a run's own files (a saved result, the manifest) are rendered with.
+
+        ``name`` stands in for the sub-query and DAG node id: ``result_<node_id>``
+        for a saved result, ``manifest`` for the manifest. These files have no
+        subgraph or schema version, so a template naming them gets
+        ``aggregator`` and ``result``.
+        """
+        return {
+            "tenant_id": tenant_id,
+            "request_id": request_id,
+            "sub_query_id": name,
+            "dag_node_id": name,
+            "subgraph_name": "aggregator",
+            "schema_version": "result",
+        }
+
+    def write_manifest(self, tenant_id: str, request_id: str, manifest: Any) -> str:
+        """Writes a run's result manifest (a pydantic model) as JSON beside its results."""
+        uri = self._manifest_uri(tenant_id, request_id, create=True)
+        text = manifest.model_dump_json()
+        if self.config.backend == "local":
+            Path(uri).write_text(text, encoding="utf-8")
+        else:
+            with self._open_remote(uri, "w") as handle:
+                handle.write(text)
+        return uri
+
+    def read_manifest(self, tenant_id: str, request_id: str) -> Optional[Dict[str, Any]]:
+        """A run's result manifest as a dict, or None when there is none."""
+        uri = self._manifest_uri(tenant_id, request_id, create=False)
+        try:
+            if self.config.backend == "local":
+                text = Path(uri).read_text(encoding="utf-8")
+            else:
+                with self._open_remote(uri, "r") as handle:
+                    text = handle.read()
+        except FileNotFoundError:
+            return None
+        return json.loads(text)
+
+    def scan_result(self, tenant_id: str, request_id: str, node_id: str) -> Optional[pl.LazyFrame]:
+        """A run's saved result as a polars scan, or None when the file is missing.
+
+        The path is rendered from the template, exactly as the aggregator wrote it.
+        """
+        metadata = self.run_metadata(tenant_id, request_id, f"result_{node_id}")
+        uri = self._build_uri(self._template_for(metadata), metadata, create=False)
+        if self.config.backend == "local" and not Path(uri).is_file():
+            return None
+        return scan_parquet(uri, storage_options=self._storage_options())
+
+    def _manifest_uri(self, tenant_id: str, request_id: str, create: bool) -> str:
+        """The result template rendered with ``manifest`` as the name, as a ``.json`` file.
+
+        The default template gives ``<tenant_id>/<request_id>/manifest.json``.
+        """
+        metadata = self.run_metadata(tenant_id, request_id, "manifest")
+        uri = self._build_uri(self._template_for(metadata), metadata, create=create)
+        stem = uri[: -len(".parquet")] if uri.endswith(".parquet") else uri
+        return f"{stem}.json"
+
+    def _open_remote(self, uri: str, mode: str):
+        # fsspec is what polars itself uses for s3:// and abfs://; imported here
+        # so a local store never needs it.
+        import fsspec
+
+        return fsspec.open(uri, mode, encoding="utf-8", **(self._storage_options() or {}))
+
     def read_result_frame(self, artifact: ArtifactRef) -> ResultFrame:
         return polars_to_result_frame(self.read_parquet(artifact))
 
@@ -197,13 +267,14 @@ class ArtifactStore:
 
         return _PLACEHOLDER.sub(substitute, template)
 
-    def _build_uri(self, template: str, metadata: Dict[str, str]) -> str:
+    def _build_uri(self, template: str, metadata: Dict[str, str], create: bool = True) -> str:
         backend = self.config.backend
         relative_path = self._render_path(template, metadata)
 
         if backend == "local":
             target = Path(self.config.base_uri) / relative_path
-            target.parent.mkdir(parents=True, exist_ok=True)
+            if create:
+                target.parent.mkdir(parents=True, exist_ok=True)
             return str(target.resolve())
 
         if backend == "s3":

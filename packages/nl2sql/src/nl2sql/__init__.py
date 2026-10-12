@@ -7,6 +7,13 @@ from .public_api import NL2SQL, QueryResult
 # The shapes a client renders and the hooks an application entry point needs,
 # so REST and SDK clients never import engine submodules.
 from .api.query_api import SubQueryResult, RowSample
+from .execution.artifacts.results import (
+    MAX_RESULT_PAGE_SIZE,
+    ResultManifest,
+    ResultNotFound,
+    ResultPage,
+    ResultSummary,
+)
 from .services.callbacks.token_handler import QuestionUsage
 from .common.logger import configure_logging
 
@@ -56,6 +63,11 @@ __all__ = [
     "UserContext",
     "SubQueryResult",
     "RowSample",
+    "ResultSummary",
+    "ResultManifest",
+    "ResultPage",
+    "ResultNotFound",
+    "MAX_RESULT_PAGE_SIZE",
     "QuestionUsage",
     "configure_logging",
     "BenchmarkConfig",

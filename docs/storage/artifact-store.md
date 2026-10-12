@@ -14,6 +14,9 @@ flowchart TD
     Aggregation --> Combined[ArtifactStore.write_lazy]
     Combined --> Result[Combined result Parquet object]
     Result --> Computed[AggregatorResponse.computed_artifacts]
+    Combined --> Manifest[manifest.json beside the results]
+    Manifest --> Reader[ResultReader: page or CSV by request id]
+    Result --> Reader
 ```
 
 ## Batched writes
@@ -31,6 +34,36 @@ The aggregator reads each sub-query's artifact as a polars scan (`ArtifactStore.
 ```
 
 A combined result has no subgraph or schema version of its own: a template that names `<subgraph_name>` or `<schema_version>` gets `aggregator` and `result`. Its `ArtifactRef` (with `sub_query_id` unset) is recorded in `AggregatorResponse.computed_artifacts` under the terminal node's id, and its `row_count` is the whole result's. `AggregatorResponse.terminal_results` holds only the first `ANSWER_PREVIEW_ROWS` rows of it, read from the saved file, for the answer model.
+
+## The result manifest
+
+After saving a run's results the aggregator writes a manifest beside them with `ArtifactStore.write_manifest`: which results the run produced, never their rows.
+
+```json
+{"request_id": "0f1c...", "results": [
+  {"node_id": "combine_g1", "columns": ["genre_name"], "row_count": 25, "truncated": false}]}
+```
+
+`truncated` is true when a sub-query upstream of that node in the DAG was cut at its row cap. The same entries are `AggregatorResponse.results` and `QueryResult.result_manifest`.
+
+Its path is the artifact template rendered like a saved result's, with `manifest` as the name and `.json` for `.parquet`, so the default template puts it at:
+
+```
+<tenant_id>/<request_id>/manifest.json
+```
+
+A template without `<sub_query_id>` or `<dag_node_id>` gets `-manifest` added, as any file of the run would (see *One artifact per sub-query*), so a flat template still gives each run its own manifest.
+
+### Reading a result back
+
+`ResultReader` (`execution/artifacts/results.py`), behind the facade's `get_result_manifest`, `get_result_page` and `export_result_csv` (see [Query API](../api/core/query.md#reading-a-runs-saved-results)), reads one tenant's results by request id:
+
+1. The request id and the result id must be plain tokens (letters, digits, `_`, `-`; up to 128 characters). Anything else is `ResultNotFound`, before any path is built.
+2. The manifest is read from the path rendered for the reader's tenant and that request id (`ArtifactStore.read_manifest`). No file there is `ResultNotFound`, so another tenant's run is not found, not refused.
+3. The result id must be a `node_id` the manifest lists. The parquet path is then rendered from the template, exactly as the aggregator wrote it (`ArtifactStore.scan_result`); the manifest never supplies a path.
+4. A page is `scan.slice(offset, limit).collect()` on a polars scan, so only that slice is read. A CSV export collects one `CSV_CHUNK_ROWS` (10,000) slice at a time and yields it as CSV text, header first.
+
+On S3 and ADLS the manifest is written and read through `fsspec` (polars' own cloud IO writes only tables), which needs `s3fs` or `adlfs` installed beside it; neither is an engine dependency. Like the rest of the remote backends this is unit-tested at the URI level only and not yet verified against live storage.
 
 ## One store, three URI schemes
 
@@ -99,4 +132,5 @@ Because the default template starts with `<tenant_id>`, every backend partitions
 
 - Artifact store: `packages/nl2sql/src/nl2sql/execution/artifacts/store.py`
 - Parquet helpers: `packages/nl2sql/src/nl2sql/execution/artifacts/parquet.py`
+- Manifest models and the result reader: `packages/nl2sql/src/nl2sql/execution/artifacts/results.py`
 - Artifact contracts: `packages/nl2sql/src/nl2sql/execution/contracts.py`

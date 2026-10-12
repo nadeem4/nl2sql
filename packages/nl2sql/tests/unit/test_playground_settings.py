@@ -20,7 +20,8 @@ pytest.importorskip("fastapi")
 from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
 
-from nl2sql.api.query_api import QueryResult
+from nl2sql.api.query_api import QueryAPI, QueryResult
+from nl2sql.execution.artifacts import ArtifactStore, ArtifactStoreConfig
 from nl2sql.llm.providers import VERIFIED_OPENAI_MODELS, mask_key
 from nl2sql.cli.commands.demo import _key_from_env_file
 from nl2sql.cli.demo.playground.app import build_app
@@ -85,6 +86,10 @@ class _Context:
         agents = dict(cfg.agents or {})
         agents["default"] = cfg.default
         self.llm_registry.register_llms(agents)
+        self.tenant_id = "default_tenant"
+        self.artifact_store = ArtifactStore(ArtifactStoreConfig(
+            backend="local", base_uri=str(project / "artifacts"),
+            path_template="<tenant_id>/<request_id>/<sub_query_id>.parquet"))
 
 
 class _Engine(NL2SQL):
@@ -94,6 +99,7 @@ class _Engine(NL2SQL):
         self._ctx = _Context(project)
         self.datasource = DatasourceAPI(self._ctx)
         self.llm = LLM_API(self._ctx)
+        self.query = QueryAPI(self._ctx)
         self.used = []
         self.release = None
         self.entered = threading.Event()
@@ -199,6 +205,10 @@ def _every_route_response(client, trace_id="0b8f7d2e-1111-4222-8333-944455556666
         ("GET", "/api/schema"): lambda: client.get("/api/schema"),
         ("POST", "/api/ask"): lambda: client.post("/api/ask", json={"question": "q1", "role": "admin"}),
         ("GET", "/api/trace/{trace_id}"): lambda: client.get(f"/api/trace/{trace_id}"),
+        ("GET", "/api/query/{request_id}/results/{result_id}"): lambda: client.get(
+            f"/api/query/{trace_id}/results/combine_g1"),
+        ("GET", "/api/query/{request_id}/results/{result_id}.csv"): lambda: client.get(
+            f"/api/query/{trace_id}/results/combine_g1.csv"),
         ("GET", "/api/pipeline"): lambda: client.get("/api/pipeline"),
         ("GET", "/api/settings"): lambda: client.get("/api/settings"),
         ("POST", "/api/settings/key"): lambda: client.post("/api/settings/key", json={"api_key": FAKE_KEY}),

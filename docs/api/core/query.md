@@ -74,6 +74,7 @@ Fields:
 | `usage` | `QuestionUsage` | no | LLM calls, tokens and model time per node and for the whole question. See below. |
 | `trace_path` | `Optional[str]` | no | Where this run's trace file was written, or `None` when `TRACE_MODE` did not write one. See [Debugging a Run](../../observability/debugging.md). |
 | `truncated` | `bool` | no | True when any sub-query's result reached its row limit, so rows may be missing. See `sub_queries[].truncated`. |
+| `result_manifest` | `List[ResultSummary]` | no | The run's saved results, one per terminal DAG node (`node_id`, `columns`, `row_count`, `truncated`): the manifest the aggregator writes beside them. Never the rows; see [Reading a run's saved results](#reading-a-runs-saved-results). Empty when nothing was saved. |
 
 `errors` holds only `ERROR` and `CRITICAL` entries; `WARNING`-severity pipeline
 errors are appended to `warnings` as the same summary dict.
@@ -91,7 +92,52 @@ run), otherwise `"success"`. A state with no sub-queries and no errors leaves it
 empty.
 
 Only a capped sample of the rows is inlined, in `sub_queries[].rows`. The full
-result set lives in artifact storage, addressed through `artifact_refs`.
+result set lives in artifact storage, addressed through `artifact_refs`; each
+combined result is listed in `result_manifest` and read back by the run's
+`trace_id` with the methods below.
+
+## Reading a run's saved results
+
+The aggregator saves each terminal result of a run as
+`<tenant_id>/<request_id>/result_<node_id>.parquet` and writes `manifest.json`
+beside them (see [Artifact Store → The result manifest](../../storage/artifact-store.md#the-result-manifest)).
+These `QueryAPI` methods, also on `NL2SQL` with the same signatures, read them
+back by the run's `trace_id` (the `request_id`). They read lazily from the
+parquet file: a page reads only its slice, and the CSV export reads and yields a
+slice at a time (`CSV_CHUNK_ROWS`, 10,000 rows), so neither holds the whole
+result in memory.
+
+| method | returns | meaning |
+| --- | --- | --- |
+| `get_result_manifest(request_id, tenant_id=None)` | `ResultManifest` | `request_id` and `results: List[ResultSummary]`, the same entries as `QueryResult.result_manifest`. |
+| `get_result_page(request_id, result_id, offset=0, limit=100, tenant_id=None)` | `ResultPage` | Rows `offset` to `offset + limit` of the result whose `node_id` is `result_id`. `limit` above `MAX_RESULT_PAGE_SIZE` (1,000) is cut to it, and the page's `limit` says so. A page past the end has no rows. `next_offset` is where the next page starts, `None` at the end. A negative `offset` or a `limit` below 1 raises `ValueError`. |
+| `export_result_csv(request_id, result_id, tenant_id=None)` | `Iterator[bytes]` | The whole result as UTF-8 CSV, header first, one chunk per slice. The ids are checked before the iterator is returned, so a missing result raises before any byte is sent. |
+
+`ResultPage` has `request_id`, `result_id`, `columns`, `rows` (`rows[i]` is row
+`offset + i`), `offset`, `limit`, `total_rows` and `next_offset`.
+
+Scope: results are read from one tenant's folder, `tenant_id` or else the
+engine's own `TENANT_ID`, the tenant every run of this engine writes under. Each
+of these raises `ResultNotFound` (a `LookupError`, exported from `nl2sql`): an
+unknown `request_id`, a run in another tenant's folder, a `result_id` the run's
+manifest does not list, and an id that is not a plain token (letters, digits,
+`_`, `-`; at most 128 characters). Ids are checked before any path is built, and
+the parquet path is rendered from the artifact template, never read from the
+manifest, so no id reaches a file outside the run's folder. Nothing else guards
+a result yet: any caller who knows a `trace_id` can read it.
+
+```python
+result = engine.run_query("List every genre.", user_context=UserContext(roles=["admin"]))
+[saved] = result.result_manifest                   # node_id, columns, row_count, truncated
+page = engine.get_result_page(result.trace_id, saved.node_id, offset=0, limit=20)
+with open("genres.csv", "wb") as out:
+    for chunk in engine.export_result_csv(result.trace_id, saved.node_id):
+        out.write(chunk)
+```
+
+`nl2sql-api` serves these as
+[`GET /api/v1/query/{request_id}/results/{result_id}`](../rest/query.md#get-apiv1queryrequest_idresultsresult_id)
+and `.../{result_id}.csv`; the playground serves the same two under `/api/query/...`.
 
 ### SubQueryResult
 
