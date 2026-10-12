@@ -110,7 +110,7 @@ See [Determinism → The plan cache](../determinism.md#the-plan-cache-determinis
 0. On a first attempt, look up the plan cache; on a hit, return the cached plan
    with `plan_source="cache"` and stop.
 1. Render `relevant_tables` with `render_schema_for_prompt` (see below).
-2. Build feedback string from existing errors (compact JSON).
+2. Build the feedback string from the latest attempt's errors only, one JSON object per line with `node`, `error_code` and `message` (`nl2sql.pipeline.retry_feedback`): an earlier attempt's errors, stack traces and `details` are never sent.
 3. Build `expected_schema` payload from sub‑query.
 4. Invoke the LLM chain with prompt + structured output (`PlanModel`).
 5. Return `ASTPlannerResponse` with plan and reasoning.

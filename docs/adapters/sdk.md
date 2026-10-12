@@ -38,6 +38,20 @@ Executes a plan-specific request and returns a normalized `ResultFrame`.
 * **Args**: `AdapterRequest` with `plan_type` and `payload`
 * **Returns**: `ResultFrame` with `columns`, `rows`, `row_count`, and error metadata
 
+A query the database rejects is a result, not an exception: return
+`ResultFrame(success=False, error=ResultError(...))`. Two fields of the
+`ResultError` decide what the engine does with it:
+
+| Field | Meaning |
+| --- | --- |
+| `retryable` | `True` when the query itself was wrong and a different query could succeed: bad syntax, an unknown table, column or function, a type mismatch. The engine reports `EXECUTION_FAILED` and sends the sub-query back to the planner, with `safe_message` as the feedback, while retries remain. `False` (the default) for a refusal the engine cannot plan its way out of: permission, a timeout, a lost connection, a read-only database. The engine reports `DB_EXECUTION_ERROR` and ends the sub-query. |
+| `safe_message` | Shown to the planner and the user. Keep it to one short line: no SQL echo, no stack trace, no driver dump, and for a refusal nothing that names a host or a user. |
+
+Only the adapter knows its driver, so the classification is the adapter's;
+the engine names no database. SQLAlchemy adapters inherit it from
+`BaseSQLAlchemyAdapter` (see [SQLAlchemy adapters](sqlalchemy.md)). An exception
+that escapes `execute` is still caught, as a non-retryable `EXECUTOR_CRASH`.
+
 #### `fetch_schema_snapshot()`
 
 Required by every adapter; there is no capability flag gating it.

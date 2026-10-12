@@ -9,6 +9,7 @@ from .prompts import REFINER_PROMPT
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.llm.failures import provider_error
 from nl2sql.pipeline.nodes.refiner.schemas import RefinerResponse
+from nl2sql.pipeline.retry_feedback import as_refiner_errors
 from nl2sql.pipeline.nodes.schema_retriever.schema import render_schema_for_prompt
 
 from nl2sql.common.logger import get_logger
@@ -70,8 +71,8 @@ class RefinerNode:
                 # Compact JSON with no nulls: the refiner prompt is already large.
                 failed_plan_str = state.ast_planner_response.plan.model_dump_json(exclude_none=True)
 
-            # Extract messages from PipelineError objects
-            errors_str = "\n".join(f"- {e.message}" for e in state.errors)
+            # The attempt being refined, not every earlier one again.
+            errors_str = as_refiner_errors(state.errors)
 
             reasoning_str = "No reasoning history."
             if state.reasoning:

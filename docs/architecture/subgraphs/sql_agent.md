@@ -39,10 +39,12 @@ Successful completion criteria:
 Failure exits:
 - `check_planner` returns `end` when planner output is missing and retries are exhausted or errors are non-retryable.
 - `check_logical_validation` returns `end` when validation errors are non-retryable or retries are exhausted.
+- `check_execution` returns `end` after `executor` unless the database rejected the query as wrong (`EXECUTION_FAILED`) and retries remain: a success, a refusal (`DB_EXECUTION_ERROR`: permission, timeout, connection) and any other executor error all end the subgraph.
 - Cancellation forces `end` in router checks and in the retry handler. The run's `CancellationToken` is read from the `RunnableConfig` (`configurable.cancellation_token`); when no token is present the subgraph behaves as not cancelled.
 
 Partial completion behavior:
 - If planner or logical validation errors are retryable and retry budget remains, execution loops via `retry_handler` → `refiner` → `ast_planner`.
+- So does a query the database rejected as wrong (an unknown column or table, a type mismatch, bad syntax): the adapter marks the error `retryable` and the executor reports it as `EXECUTION_FAILED`, with the database's own first line as the message.
 
 ---
 
@@ -68,7 +70,9 @@ flowchart TD
     logical_validator -->|retry| retry_handler
     logical_validator -->|end| END
     retry_handler --> refiner --> ast_planner
-    generator --> executor --> END
+    generator --> executor
+    executor -->|retry| retry_handler
+    executor -->|end| END
 ```
 
 ---
@@ -96,8 +100,9 @@ Field ownership, reducers, and lifecycle are defined in `../graph_state.md`.
    - `end` when errors are non-retryable or retries exhausted.
 6. `generator` converts the plan to SQL for the target datasource dialect.
 7. `executor` runs SQL via the datasource adapter and returns artifacts/errors.
+   `check_execution` routes `retry` when every executor error is a retryable `EXECUTION_FAILED` and retry budget remains, otherwise `end`.
 8. If routed to retry: `retry_handler` waits with exponential backoff and jitter, then increments `retry_count`.
-9. `refiner` uses LLM feedback to enrich error context, then loops back to `ast_planner`.
+9. `refiner` uses LLM feedback to enrich error context, then loops back to `ast_planner`. Both are told about the latest attempt only, as `{node, error_code, message}` (`nl2sql.pipeline.retry_feedback`): never an earlier attempt's errors again, never a stack trace or `details`.
 10. Subgraph terminates at `END`.
 
 ---
@@ -156,9 +161,9 @@ See `../failure_recovery.md` for retry scope and recovery behavior.
 
 ## Known Limitations
 
-- Generator and executor errors are not routed into the retry loop; failures proceed to `executor` or terminate at `END`.
+- Generator errors are not routed into the retry loop; a failure proceeds to `executor`, which reports `MISSING_SQL`, and terminates at `END`.
 - No subgraph-specific metrics or trace spans are emitted.
-- Retry loop only considers planner and logical validation errors.
+- The executor retries only what the adapter marks `retryable`. An adapter that raises instead of returning a failed `ResultFrame` ends the sub-query with `EXECUTOR_CRASH`.
 
 Because the generator has no retry edge, the invariant the loop depends on is
 that **`logical_validator` rejects every plan `generator` would refuse to

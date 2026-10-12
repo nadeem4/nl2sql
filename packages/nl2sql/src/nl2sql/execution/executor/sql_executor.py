@@ -78,12 +78,17 @@ class SqlExecutorService:
         result_frame = adapter.execute(adapter_request)
 
         if not result_frame.success:
-            error_msg = result_frame.error.safe_message if result_frame.error else "SQL execution failed."
+            # The adapter is the only one that knows its driver, so it says
+            # whether the query itself was at fault (``retryable``): such an
+            # error goes back to the planner; anything else ends the sub-query.
+            adapter_error = result_frame.error
+            retryable = bool(adapter_error and adapter_error.retryable)
             error = PipelineError(
                 node="sql_executor",
-                message=error_msg,
+                message=adapter_error.safe_message if adapter_error else "SQL execution failed.",
                 severity=ErrorSeverity.ERROR,
-                error_code=ErrorCode.EXECUTION_FAILED,
+                error_code=ErrorCode.EXECUTION_FAILED if retryable else ErrorCode.DB_EXECUTION_ERROR,
+                details={"adapter_error_code": adapter_error.error_code} if adapter_error else None,
             )
             return ExecutorResponse(
                 executor_name="sql_executor",

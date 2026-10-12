@@ -13,6 +13,7 @@ from nl2sql.context import NL2SQLContext
 from nl2sql.llm.failures import provider_error
 from nl2sql.llm.wires import structured
 from nl2sql.pipeline.plan_cache import PlanCache
+from nl2sql.pipeline.retry_feedback import as_planner_feedback
 
 if TYPE_CHECKING:
     from nl2sql.pipeline.state import SubgraphExecutionState
@@ -107,9 +108,7 @@ class ASTPlannerNode:
 
             relevant_tables = render_schema_for_prompt(state.relevant_tables)
 
-            feedback = ""
-            if state.errors:
-                feedback = "\n".join(e.model_dump_json(exclude_none=True) for e in state.errors)
+            feedback = as_planner_feedback(state.errors)
 
             query_text = state.sub_query.intent if state.sub_query else ""
             semantic_context = semantic_context_of(state.sub_query)

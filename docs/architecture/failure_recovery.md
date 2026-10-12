@@ -32,7 +32,7 @@ Failure in this system is represented as structured `PipelineError` objects accu
 ### Execution
 - SQL generation failures return `SQL_GEN_FAILED`.
 - Executor returns errors for missing SQL, missing datasource, missing executor, or executor crashes.
-- SQL execution failures return `EXECUTION_FAILED` based on adapter result.
+- A query the database rejected as wrong (the adapter's `ResultError.retryable`) returns `EXECUTION_FAILED`, which is retried through the refiner; a refusal (permission, timeout, connection, read-only) returns `DB_EXECUTION_ERROR`, which is fatal. The message is the adapter's `safe_message`: one short line, no SQL, no stack trace (see [the adapter SDK](../adapters/sdk.md)).
 - Execution is in-process on the pipeline thread pool. A driver-level crash is not contained and terminates the process; only Python-level exceptions become `PipelineError` values (see `../execution/isolation.md`).
 
 ### Storage
@@ -68,6 +68,7 @@ Failure in this system is represented as structured `PipelineError` objects accu
 - SQL agent subgraph routes to `END` when:
   - The planner fails to produce a plan and errors are non-retryable.
   - Logical validation returns non-retryable errors.
+  - The executor returns anything but a retryable `EXECUTION_FAILED` (including success).
   - Retry count reaches `sql_agent_max_retries` with a blocking (`ERROR`/`CRITICAL`) finding.
   - Cancellation is detected.
 - If errors are retryable and retry budget remains, the subgraph loops through `retry_handler -> refiner -> planner`.
@@ -110,8 +111,9 @@ Failure in this system is represented as structured `PipelineError` objects accu
 ## Retry Architecture
 
 ### Retry scope
-- Only the SQL agent subgraph retries (planner and validation loop).
-- Other nodes (resolver, decomposer, generator, executor, aggregator, answer synthesizer) do not retry.
+- Only the SQL agent subgraph retries: planner failures, validation errors, and queries the database rejected as wrong (`EXECUTION_FAILED`) go back through the refiner.
+- Other nodes (resolver, decomposer, generator, aggregator, answer synthesizer) do not retry.
+- A retry tells the planner and refiner about the latest attempt only, as `{node, error_code, message}`.
 
 ### Backoff
 - Exponential backoff with jitter in `retry_handler` using:
