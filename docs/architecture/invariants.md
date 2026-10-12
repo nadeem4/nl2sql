@@ -274,16 +274,33 @@ Prevents startup with incomplete indexing and schema storage configuration.
 ## SQL Generation Enforces a Row Limit Cap
 
 ### Definition
-Generated SQL must not exceed the datasource adapter’s row limit.
+Generated SQL must not exceed the row limit: the datasource adapter’s `row_limit`, bounded by the `RESULT_ROW_LIMIT` ceiling (100,000), which is also the limit when the datasource sets none. A result that reaches the limit is flagged as truncated.
 
 ### Enforcement Points
 - `GeneratorNode.__call__()` in `nl2sql.pipeline.nodes.generator.node`
+- `wrap_subgraph()` in `nl2sql.pipeline.graph_utils` sets `SubgraphOutput.truncated`, which `QueryResult` and the answer carry
 
 ### Failure Behavior
-No error; the limit is clamped to the adapter’s maximum.
+No error; the limit is clamped to the smaller of the two. A cut result is flagged (`truncated`), and the answer says it was cut at N rows.
 
 ### Why It Exists
-Protects execution resources and prevents runaway result sizes.
+Protects execution resources and prevents runaway result sizes, without passing off a cut result as complete.
+
+---
+
+## The Answer Model Sees a Preview, Never the Whole Result
+
+### Definition
+The answer synthesizer's prompt carries at most `ANSWER_PREVIEW_ROWS` (20) rows of each result, with its total row count, its column names and a `partial` flag. The model is told to state only numbers from the preview or the count, and not to reproduce the result.
+
+### Enforcement Points
+- `result_preview()` and `AnswerSynthesizerNode._serialize_result()` in `nl2sql.pipeline.nodes.answer_synthesizer.node`
+
+### Failure Behavior
+None; rows past the preview are left out of the prompt.
+
+### Why It Exists
+The prompt's size must not grow with the result: that is what kept the row limit at 1,000. The user sees the full result as a table, so the model has no need to copy it.
 
 ---
 
@@ -380,7 +397,7 @@ The validator resolves columns against a throw-away query in which every table i
 - **Execution**: SQL Execution Requires SQL, Datasource, and Capability; Execution DAG Must Be Valid and Acyclic; Aggregation Requires Scan Artifacts and Single-Input Post Nodes; Pipeline Execution Is Time-Bounded
 - **Security**: Policy Enforcement Is Namespaced and Fail-Closed; Datasource Access Is RBAC-Gated; Plan Model Is Strict and Read-Only
 - **Determinism**: Expected Schema Must Match Select List; Joins Must Be Valid and Schema-Backed
-- **Resource bounds**: SQL Generation Enforces a Row Limit Cap; Context Requires Vector Store and Schema Store Configuration
+- **Resource bounds**: SQL Generation Enforces a Row Limit Cap; The Answer Model Sees a Preview, Never the Whole Result; Context Requires Vector Store and Schema Store Configuration
 - **Boundaries**: Package Boundaries Are One-Way; Dialect Knowledge Lives in the Adapter
 - **Retryability**: The Validator Rejects Everything the Generator Can; Plan Functions Are Known Functions
 

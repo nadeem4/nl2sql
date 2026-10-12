@@ -7,11 +7,14 @@ customer names and email addresses so ``customers.customer_email`` and
 synthetic and owned by this repository; no third-party dataset is involved.
 """
 
+from nl2sql.cli.demo.chinook import DEMO_ROW_LIMIT
+
 SUPPORT_DATASOURCE = {
     "id": "support",
-    # Read-only, like the other two: see ``chinook.py``.
+    # Read-only and row-limited, like the other two: see ``chinook.py``.
     "connection": {"type": "sqlite", "database": "data/support.sqlite",
                    "options": {"read_only": True}},
+    "options": {"row_limit": DEMO_ROW_LIMIT},
     # Kept deliberately domain-led, and without a sentence about sharing
     # Chinook's customers. Indexing embeds this description, and an earlier
     # draft that named chinook and "customers" out-ranked Chinook itself on

@@ -7,10 +7,16 @@ class AggregatedResponse(BaseModel):
     """Structured response for the answer synthesizer."""
     summary: str = Field(description="A concise summary of the aggregated results.")
     format_type: Literal["table", "list", "text"] = Field(
-        description="The best format to present the data: 'table' for structured data, 'list' for items, 'text' for narrative."
+        description=(
+            "How content is written: 'text' for a paragraph, 'list' for a few items, 'table' "
+            "only for a few preview rows. The full result is shown to the user separately."
+        )
     )
     content: str = Field(
-        description="The aggregated content formatted according to format_type (e.g., Markdown table, bullet points, or paragraph)."
+        description=(
+            "The answer, written according to format_type, using only the preview rows and "
+            "the row count. Do not copy the whole result: it is shown as a table."
+        )
     )
     warnings: List[str] = Field(
         default_factory=list,

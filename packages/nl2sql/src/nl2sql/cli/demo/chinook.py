@@ -9,6 +9,12 @@ sit beside it and share its customer identities. ``nl2sql.cli.demo.datasets``
 gathers all three.
 """
 
+# The most rows one demo sub-query returns, for the local and the hosted
+# playground alike: lower than the engine's RESULT_ROW_LIMIT, so a public demo
+# stays light. A result that reaches it is flagged as truncated, and the
+# answer says so.
+DEMO_ROW_LIMIT = 10_000
+
 CHINOOK_DATASOURCE = {
     "id": "chinook",
     # Read-only: nothing in the engine writes to a demo database, and a hosted
@@ -16,6 +22,7 @@ CHINOOK_DATASOURCE = {
     # before any SQL is parsed (``SqliteAdapter.construct_uri``).
     "connection": {"type": "sqlite", "database": "data/chinook.sqlite",
                    "options": {"read_only": True}},
+    "options": {"row_limit": DEMO_ROW_LIMIT},
     "description": "Chinook digital music store: artists, albums, tracks, genres, playlists, customers, employees, invoices and invoice lines",
 }
 

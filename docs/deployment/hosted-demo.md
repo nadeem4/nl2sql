@@ -230,7 +230,7 @@ no storage.
 | Questions per minute | 6 | `NL2SQL_DEMO_QUESTIONS_PER_MINUTE` | client address (a token bucket) |
 | Questions per session | 30 | `NL2SQL_DEMO_QUESTIONS_PER_SESSION` | a random session cookie |
 | Query timeout | 300s | `GLOBAL_TIMEOUT_SEC` | the run |
-| Rows returned | 1000 | the datasource's `row_limit` option | the query |
+| Rows returned | 10,000 | the demo datasources' `row_limit` option, bounded by `RESULT_ROW_LIMIT` | the query |
 
 Hitting one is a `429` with a sentence, never a stack trace: the rate limit says
 to wait a moment, the session cap says to run the demo locally for no limit at

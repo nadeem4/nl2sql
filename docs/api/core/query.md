@@ -63,7 +63,7 @@ Fields:
 | name | type | required | meaning |
 | --- | --- | --- | --- |
 | `sub_queries` | `List[SubQueryResult]` | no | One entry per decomposed sub-query. |
-| `final_answer` | `Optional[Dict[str, Any]]` | no | Answer synthesizer payload (`summary`, `format_type`, `content`). |
+| `final_answer` | `Optional[Dict[str, Any]]` | no | Answer synthesizer payload (`summary`, `format_type`, `content`, `warnings`, and `truncated`: True when a result was cut at the row limit). |
 | `errors` | `List[Dict[str, Any]]` | no | Pipeline errors (`node`, `message`, `error_code`, `severity`, `provider`, `provider_response`). `provider` and `provider_response` are set for a `PROVIDER_*` code and `null` otherwise; see [provider failures](../../observability/error-handling.md#provider-failures). |
 | `trace_id` | `str` | no | Trace identifier. |
 | `reasoning` | `List[Dict[str, Any]]` | no | Reasoning events/logs. |
@@ -73,6 +73,7 @@ Fields:
 | `timings` | `Dict[str, float]` | no | Wall-clock seconds per graph node, plus `LangGraph` for the whole run. |
 | `usage` | `QuestionUsage` | no | LLM calls, tokens and model time per node and for the whole question. See below. |
 | `trace_path` | `Optional[str]` | no | Where this run's trace file was written, or `None` when `TRACE_MODE` did not write one. See [Debugging a Run](../../observability/debugging.md). |
+| `truncated` | `bool` | no | True when any sub-query's result reached its row limit, so rows may be missing. See `sub_queries[].truncated`. |
 
 `errors` holds only `ERROR` and `CRITICAL` entries; `WARNING`-severity pipeline
 errors are appended to `warnings` as the same summary dict.
@@ -107,6 +108,8 @@ result set lives in artifact storage, addressed through `artifact_refs`.
 | `status` | `str` | no | `"success"` or `"error"` for this sub-query, from its final attempt: `"success"` when it ended with SQL and, if executed, a result; otherwise `"error"`. A retry that recovers reports `"success"`. |
 | `retry_count` | `int` | no | Plan/SQL refinement attempts made. |
 | `plan_source` | `str` | no | `"cache"` when the plan came from the plan cache (no planner LLM call; still validated, generated and executed), otherwise `"llm"`. See [Determinism → The plan cache](../../architecture/determinism.md#the-plan-cache-determinism-from-the-architecture). |
+| `row_cap` | `Optional[int]` | no | The row limit that bounded this sub-query's SQL (the datasource's `row_limit`, bounded by `RESULT_ROW_LIMIT`), or `None` when the plan's own `LIMIT` was smaller. |
+| `truncated` | `bool` | no | True when the result has `row_cap` rows: it was cut at the limit and may be missing rows. A result of exactly `row_cap` rows may be whole; it is counted as cut. |
 
 ### RowSample
 
@@ -125,7 +128,7 @@ model instances for nested values):
 | --- | --- |
 | `sub_queries[].sql` | `subgraph_outputs[<id>].sql_draft` |
 | `sub_queries[].id` / `.intent` / `.datasource_id` / `.schema_version` | `subgraph_outputs[<id>].sub_query` |
-| `sub_queries[].plan` / `.validation` / `.status` / `.retry_count` / `.plan_source` | `subgraph_outputs[<id>]` |
+| `sub_queries[].plan` / `.validation` / `.status` / `.retry_count` / `.plan_source` / `.row_cap` / `.truncated` | `subgraph_outputs[<id>]` |
 | `usage.plan_cache_hits` | count of `sub_queries[]` with `plan_source == "cache"` |
 | `sub_queries[].rows` | `artifact_store.read_result_frame(subgraph_outputs[<id>].artifact)` |
 | `final_answer` | `answer_synthesizer_response.final_answer` |

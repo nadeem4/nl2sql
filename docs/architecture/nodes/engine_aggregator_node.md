@@ -77,12 +77,13 @@ Side effects:
 
 ### Row cap before a combine
 
-The generator caps every sub-query at its datasource's `row_limit` (1000 when
-none is set) unless the plan asks for fewer rows itself, and records that cap as
+The generator caps every sub-query at its datasource's `row_limit`, bounded by
+the `RESULT_ROW_LIMIT` ceiling (100,000, also the cap when none is set), unless the plan asks for fewer rows itself, and records that cap as
 `row_cap` on its response and on the sub-query's `SubgraphOutput`. The cap is
 applied in each sub-query's SQL, **before** the combine: a join input with
-2240 rows reaches the aggregator as 1000, and every match the other 1240 held
-is silently lost.
+2240 rows under a `row_limit` of 1000 reaches the aggregator as 1000, and every match the other 1240 held
+is silently lost. The wrapper marks such a sub-query's `SubgraphOutput.truncated`,
+which `QueryResult` and the answer carry (see [AnswerSynthesizerNode](answer_synthesizer_node.md#a-result-cut-at-the-row-limit)).
 
 So before combining, the aggregator looks at each combine input whose result
 has `row_cap` rows or more:

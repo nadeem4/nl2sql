@@ -10,6 +10,7 @@ if TYPE_CHECKING:
 
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.common.logger import get_logger
+from nl2sql.common.settings import settings
 from nl2sql.context import NL2SQLContext
 from nl2sql.llm.failures import provider_error
 from nl2sql.llm.wires import structured
@@ -33,6 +34,38 @@ def _missing_values(warnings: List[Dict[str, Any]]) -> List[str]:
     return notes
 
 
+def result_preview(result: Dict[str, Any], preview_rows: int) -> Dict[str, Any]:
+    """What the answer model sees of each terminal result: never the whole of it.
+
+    The first ``preview_rows`` rows, the total ``row_count``, the column names,
+    and ``partial`` when the preview leaves rows out. The full result is shown
+    to the user as a table; the model only writes about it.
+    """
+    preview: Dict[str, Any] = {}
+    for node_id, rows in result.items():
+        rows = list(rows or [])
+        preview[node_id] = {
+            "rows": rows[:preview_rows],
+            "row_count": len(rows),
+            "columns": list(rows[0].keys()) if rows and isinstance(rows[0], dict) else [],
+            "partial": len(rows) > preview_rows,
+        }
+    return preview
+
+
+def _cut_results(state: GraphState) -> List[str]:
+    """One user-facing note per sub-query whose result reached its row ceiling."""
+    cut = [o for o in (getattr(state, "subgraph_outputs", None) or {}).values() if o.truncated]
+    notes = []
+    for output in cut:
+        whose = f"The result of sub-query '{output.sub_query.id}'" if len(cut) > 1 and output.sub_query else "The result"
+        notes.append(
+            f"{whose} was cut at {output.row_cap:,} rows, the row limit, so it is incomplete. "
+            f"Narrow the question (a filter, or a top N) to get a complete result."
+        )
+    return notes
+
+
 class AnswerSynthesizerNode:
     """Summarizes aggregated results into a user-facing answer."""
 
@@ -43,8 +76,10 @@ class AnswerSynthesizerNode:
         self.chain = self.prompt | structured(self.llm, AggregatedResponse)
 
     def _serialize_result(self, result: Any) -> str:
+        if isinstance(result, dict) and all(isinstance(v, list) for v in result.values()):
+            result = result_preview(result, int(settings.answer_preview_rows))
         try:
-            return json.dumps(result, indent=2, ensure_ascii=True)
+            return json.dumps(result, indent=2, ensure_ascii=True, default=str)
         except TypeError:
             return str(result)
 
@@ -75,10 +110,12 @@ class AnswerSynthesizerNode:
                     for u in (state.decomposer_response.unmapped_subqueries or [])
                 ]
             notes = _missing_values(state.warnings)
+            cut = _cut_results(state)
             response: AggregatedResponse = self.chain.invoke(
                 {
                     "user_query": state.user_query,
-                    "aggregated_result": self._serialize_result(aggregated_result),
+                    "result_preview": self._serialize_result(aggregated_result),
+                    "result_limit": "\n".join(f"- {c}" for c in cut) or "None",
                     "unmapped_subqueries": json.dumps(
                         unmapped_subqueries, indent=2, ensure_ascii=True
                     ),
@@ -87,12 +124,15 @@ class AnswerSynthesizerNode:
             )
             # Said whatever the model wrote: an empty result on a value that
             # does not exist is not a finding about the data.
-            response.warnings = list(response.warnings or []) + [n for n in notes if n not in (response.warnings or [])]
-
+            # Likewise a cut result is said to be cut, whatever the model wrote.
+            said = list(response.warnings or [])
+            response.warnings = said + [n for n in notes + cut if n not in said]
+            final_answer = response.model_dump()
+            final_answer["truncated"] = bool(cut)
 
             return {
                 "answer_synthesizer_response": AnswerSynthesizerResponse(
-                    final_answer=response.model_dump(),
+                    final_answer=final_answer,
                 ),
                 "reasoning": [
                     {

@@ -231,6 +231,23 @@ class Settings(BaseSettings):
         validation_alias="TRACE_DIR",
         description="Directory run traces are written to, relative to the working directory.",
     )
+    result_row_limit: int = Field(
+        default=100_000,
+        validation_alias="RESULT_ROW_LIMIT",
+        description=(
+            "The most rows one sub-query returns: a resource ceiling. A datasource's own "
+            "row_limit applies when it is lower. A result that reaches it is flagged as "
+            "truncated."
+        ),
+    )
+    answer_preview_rows: int = Field(
+        default=20,
+        validation_alias="ANSWER_PREVIEW_ROWS",
+        description=(
+            "Result rows the answer model sees, with the total row count and the column "
+            "names. The full result is shown as a table, not written out by the model."
+        ),
+    )
     trace_sample_rows: int = Field(
         default=50,
         validation_alias="TRACE_SAMPLE_ROWS",
