@@ -4937,8 +4937,17 @@ and the hosted limits.</p>
 <li><strong>The gate.</strong> The Checks station shows the plans the checks saw (<strong>Plan 1
   refused</strong>, then <strong>Plan 2 passed</strong> when the first was sent back), why, in one
   sentence, and each check as a tile with a tick or a cross.</li>
-<li><strong>While it runs.</strong> Only the station being worked on is lit; the rest wait,
-  faded. A counter beside the button reads <strong>Running · 3.4 s</strong>, and after a
+<li><strong>While it runs.</strong> The run streams (<code>POST /api/ask/stream</code>, Server-Sent
+  Events): each station lights as its step finishes, with its time, and the
+  next one goes live; the rest wait, faded. The Rows station loads its first
+  page as soon as the result is saved, before the answer is written. The answer
+  sentence then appears as the model writes it, a shade lighter until the run
+  is back, when the plan, the checks and the SQL fill in. A recorded run on
+  the hosted demo streams its recorded answer the same way, a word at a time.
+  Where the stream cannot be used (an older server, a proxy that cuts it, a
+  browser that cannot read a streamed reply), the page asks <code>POST /api/ask</code>
+  instead and the first station stays lit until the whole run is back.
+  A counter beside the button reads <strong>Running · 3.4 s</strong>, and after a
   moment <strong>Ask</strong> becomes <strong>Stop</strong>, which cancels the request: the run then says
   <strong>Stopped</strong> and every station is marked not reached. The server notices the
   dropped request within a quarter of a second and cancels the run: no further

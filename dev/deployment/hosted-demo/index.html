@@ -2296,7 +2296,8 @@ mode.</p>
    provider's own name. Closing the tab clears it. Nothing else in the page
    reads it.</li>
 <li><strong>It travels as a request header of its own</strong>, <code>X-NL2SQL-Api-Key-&lt;provider&gt;</code>
-   (<code>X-NL2SQL-Api-Key-anthropic</code>), on <code>POST /api/ask</code> and nowhere else. A
+   (<code>X-NL2SQL-Api-Key-anthropic</code>), on <code>POST /api/ask</code> (or its streamed twin,
+   <code>POST /api/ask/stream</code>, which applies the same rules) and nowhere else. A
    header rather than the body, because a body is what request logs and
    validation errors quote back; one header per provider, so a key never shares
    a header with anything else and nothing that parses or quotes a header can

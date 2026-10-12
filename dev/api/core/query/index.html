@@ -3621,6 +3621,34 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#streaming-a-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Streaming a run
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Streaming a run">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#queryapistream_query" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        QueryAPI.stream_query
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#reading-a-runs-saved-results" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4422,6 +4450,34 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#streaming-a-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Streaming a run
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Streaming a run">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#queryapistream_query" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        QueryAPI.stream_query
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#reading-a-runs-saved-results" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4581,6 +4637,99 @@ empty.</p>
 result set lives in artifact storage, addressed through <code>artifact_refs</code>; each
 combined result is listed in <code>result_manifest</code> and read back by the run's
 <code>trace_id</code> with the methods below.</p>
+<h2 id="streaming-a-run">Streaming a run</h2>
+<h3 id="queryapistream_query">QueryAPI.stream_query</h3>
+<p>Source:
+<code>packages/nl2sql/src/nl2sql/api/query_api.py</code>, events in
+<code>packages/nl2sql/src/nl2sql/pipeline/events.py</code></p>
+<p>Signature:
+<code>stream_query(natural_language: str, datasource_id: Optional[str] = None, execute: bool = True, user_context: Optional[UserContext] = None, cancellation_token: Optional[CancellationToken] = None) -&gt; Iterator[QueryEvent]</code></p>
+<p>The same run as <code>run_query</code>, with the same parameters, yielded as it happens.
+<code>NL2SQL.stream_query</code> takes the same arguments.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql</span><span class="w"> </span><span class="kn">import</span> <span class="n">NL2SQL</span><span class="p">,</span> <span class="n">UserContext</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">engine</span> <span class="o">=</span> <span class="n">NL2SQL</span><span class="p">(</span><span class="n">env</span><span class="o">=</span><span class="s2">"demo"</span><span class="p">)</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="k">for</span> <span class="n">event</span> <span class="ow">in</span> <span class="n">engine</span><span class="o">.</span><span class="n">stream_query</span><span class="p">(</span><span class="s2">"Which genre sells the most tracks?"</span><span class="p">,</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>                                 <span class="n">user_context</span><span class="o">=</span><span class="n">UserContext</span><span class="p">(</span><span class="n">roles</span><span class="o">=</span><span class="p">[</span><span class="s2">"admin"</span><span class="p">])):</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="k">if</span> <span class="n">event</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s2">"node_finished"</span><span class="p">:</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">event</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s1">'node'</span><span class="p">]</span><span class="si">}</span><span class="s2"> took </span><span class="si">{</span><span class="n">event</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s1">'seconds'</span><span class="p">]</span><span class="si">}</span><span class="s2"> s"</span><span class="p">)</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="k">elif</span> <span class="n">event</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s2">"answer_delta"</span> <span class="ow">and</span> <span class="n">event</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">"field"</span><span class="p">]</span> <span class="o">==</span> <span class="s2">"summary"</span><span class="p">:</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>        <span class="nb">print</span><span class="p">(</span><span class="n">event</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">"text"</span><span class="p">],</span> <span class="n">end</span><span class="o">=</span><span class="s2">""</span><span class="p">,</span> <span class="n">flush</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    <span class="k">elif</span> <span class="n">event</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s2">"final"</span><span class="p">:</span>
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>        <span class="n">result</span> <span class="o">=</span> <span class="n">event</span><span class="o">.</span><span class="n">data</span>          <span class="c1"># run_query's QueryResult, as JSON</span>
+</code></pre></div>
+<p>A <code>QueryEvent</code> has a <code>type</code> and a JSON-ready <code>data</code> dict; <code>event.sse()</code> is the
+event as one Server-Sent Event (<code>event: &lt;type&gt;</code> and <code>data: &lt;json&gt;</code>), which is how
+<code>nl2sql-api</code> and the playground send it.</p>
+<table>
+<thead>
+<tr>
+<th>type</th>
+<th>data</th>
+<th>when</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>node_started</code></td>
+<td><code>node</code></td>
+<td>A pipeline step began (the SQL agent's steps once per sub-query, and again on a retry).</td>
+</tr>
+<tr>
+<td><code>node_finished</code></td>
+<td><code>node</code>, <code>seconds</code>, <code>ok</code></td>
+<td>The step ended; <code>ok</code> is False when it raised.</td>
+</tr>
+<tr>
+<td><code>result_manifest</code></td>
+<td><code>trace_id</code>, <code>results</code></td>
+<td>The aggregator saved the results: <code>results</code> is the run's <code>result_manifest</code> and <code>trace_id</code> its <code>request_id</code>, so <code>get_result_page</code> can be called before the answer is written.</td>
+</tr>
+<tr>
+<td><code>answer_delta</code></td>
+<td><code>field</code>, <code>text</code></td>
+<td>The next piece of <code>final_answer.summary</code> or <code>final_answer.content</code>, as the answer model writes it.</td>
+</tr>
+<tr>
+<td><code>final</code></td>
+<td><code>QueryResult.model_dump(mode="json")</code></td>
+<td>The run finished: exactly what <code>run_query</code> returns. A refusal, a provider failure, a timeout or a cancel is a <code>final</code> with <code>status: "error"</code>, as <code>run_query</code> returns it.</td>
+</tr>
+<tr>
+<td><code>error</code></td>
+<td><code>message</code>, <code>error_code</code></td>
+<td>The run could not start or finish (an exception outside the pipeline, such as a missing API key when the graph is built).</td>
+</tr>
+</tbody>
+</table>
+<p>Every stream ends in exactly one <code>final</code> or <code>error</code>.</p>
+<p>How it works:</p>
+<ul>
+<li>The run goes on a thread of its own, started on the first <code>next()</code>; the caller's
+  context goes with it, so request-scoped keys (<code>nl2sql.llm.request_key</code>) reach the
+  graph as they do in <code>run_query</code>.</li>
+<li><code>run_with_graph</code> is given a <code>RunEvents</code> callback, the same kind of LangChain
+  callback as the timing and usage ones. A node's own run (its name is its
+  <code>langgraph_node</code>) is a <code>node_started</code> / <code>node_finished</code>; the runnables inside a
+  node are not events. The aggregator's end carries the manifest.</li>
+<li><code>run_with_graph(stream_answer=True)</code> asks the answer synthesizer to stream: its
+  chain is <code>streaming_structured</code> (<code>nl2sql.llm.wires</code>) instead of <code>structured</code>, the
+  same request with <code>stream</code> on. Each piece of the answer's tool call reaches
+  <code>on_llm_new_token</code>; <code>RunEvents</code> parses the arguments so far as partial JSON and
+  emits what <code>summary</code> and <code>content</code> gained. The pieces are joined into one message
+  before the parser sees it, so the answer, and the token usage the call reports,
+  are the unstreamed call's. On the Anthropic wire the joined message gets the same
+  tool-call repair as an unstreamed one.</li>
+<li>Closing the iterator before the last event (a client that went away) cancels the
+  run's token, so it stops before its next step or model call.</li>
+</ul>
+<p>Token by token, per wire: both the OpenAI wire (OpenAI, OpenRouter, Ollama, any
+OpenAI-compatible endpoint) and the Anthropic wire stream the answer's forced tool
+call, so the answer streams on every provider; how finely is the provider's choice,
+and one that sends the whole answer at once gives one <code>answer_delta</code> per field. The
+other model steps return a typed object the next step needs whole, and are not
+streamed. <code>FakeLLMServer</code> streams both wires, a word at a time, so replay mode and
+the keyless tests stream too.</p>
 <h2 id="reading-a-runs-saved-results">Reading a run's saved results</h2>
 <p>The aggregator saves each terminal result of a run as
 <code>&lt;tenant_id&gt;/&lt;request_id&gt;/result_&lt;node_id&gt;.parquet</code> and writes <code>manifest.json</code>
@@ -4627,12 +4776,12 @@ manifest does not list, and an id that is not a plain token (letters, digits,
 the parquet path is rendered from the artifact template, never read from the
 manifest, so no id reaches a file outside the run's folder. Nothing else guards
 a result yet: any caller who knows a <code>trace_id</code> can read it.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">result</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">run_query</span><span class="p">(</span><span class="s2">"List every genre."</span><span class="p">,</span> <span class="n">user_context</span><span class="o">=</span><span class="n">UserContext</span><span class="p">(</span><span class="n">roles</span><span class="o">=</span><span class="p">[</span><span class="s2">"admin"</span><span class="p">]))</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="p">[</span><span class="n">saved</span><span class="p">]</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">result_manifest</span>                   <span class="c1"># node_id, columns, row_count, truncated</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">page</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">get_result_page</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">trace_id</span><span class="p">,</span> <span class="n">saved</span><span class="o">.</span><span class="n">node_id</span><span class="p">,</span> <span class="n">offset</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">limit</span><span class="o">=</span><span class="mi">20</span><span class="p">)</span>
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s2">"genres.csv"</span><span class="p">,</span> <span class="s2">"wb"</span><span class="p">)</span> <span class="k">as</span> <span class="n">out</span><span class="p">:</span>
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="k">for</span> <span class="n">chunk</span> <span class="ow">in</span> <span class="n">engine</span><span class="o">.</span><span class="n">export_result_csv</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">trace_id</span><span class="p">,</span> <span class="n">saved</span><span class="o">.</span><span class="n">node_id</span><span class="p">):</span>
-<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>        <span class="n">out</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">chunk</span><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">result</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">run_query</span><span class="p">(</span><span class="s2">"List every genre."</span><span class="p">,</span> <span class="n">user_context</span><span class="o">=</span><span class="n">UserContext</span><span class="p">(</span><span class="n">roles</span><span class="o">=</span><span class="p">[</span><span class="s2">"admin"</span><span class="p">]))</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="p">[</span><span class="n">saved</span><span class="p">]</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">result_manifest</span>                   <span class="c1"># node_id, columns, row_count, truncated</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">page</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">get_result_page</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">trace_id</span><span class="p">,</span> <span class="n">saved</span><span class="o">.</span><span class="n">node_id</span><span class="p">,</span> <span class="n">offset</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">limit</span><span class="o">=</span><span class="mi">20</span><span class="p">)</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s2">"genres.csv"</span><span class="p">,</span> <span class="s2">"wb"</span><span class="p">)</span> <span class="k">as</span> <span class="n">out</span><span class="p">:</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="k">for</span> <span class="n">chunk</span> <span class="ow">in</span> <span class="n">engine</span><span class="o">.</span><span class="n">export_result_csv</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">trace_id</span><span class="p">,</span> <span class="n">saved</span><span class="o">.</span><span class="n">node_id</span><span class="p">):</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>        <span class="n">out</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">chunk</span><span class="p">)</span>
 </code></pre></div>
 <p><code>nl2sql-api</code> serves these as
 <a href="../../rest/query/#get-apiv1queryrequest_idresultsresult_id"><code>GET /api/v1/query/{request_id}/results/{result_id}</code></a>

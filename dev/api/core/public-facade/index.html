@@ -4441,7 +4441,8 @@ modular APIs through a single class.</p>
 <code>get_datasource_capabilities</code>, <code>configure_llm</code>, <code>configure_llm_from_config</code>,
 <code>list_llms</code>, <code>get_llm</code>, <code>index_datasource</code>, <code>index_all_datasources</code>, <code>clear_index</code>,
 <code>check_permissions</code>, <code>get_allowed_resources</code>, <code>get_current_settings</code>,
-<code>get_setting</code>, <code>validate_configuration</code>, and the saved-result reads
+<code>get_setting</code>, <code>validate_configuration</code>, <code>stream_query</code> (the run as events: see
+<a href="../query/#streaming-a-run">Query API → Streaming a run</a>), and the saved-result reads
 <code>get_result_manifest</code>, <code>get_result_page</code> and <code>export_result_csv</code> (see
 <a href="../query/#reading-a-runs-saved-results">Query API → Reading a run's saved results</a>),
 which <code>nl2sql-api</code> and the playground both serve.</p>
@@ -4495,7 +4496,8 @@ to that.</p>
 <p>Clients import everything they need from <code>nl2sql</code> itself, never from an engine
 submodule: <code>NL2SQL</code>, <code>QueryResult</code>, <code>SubQueryResult</code>, <code>RowSample</code>,
 <code>ResultSummary</code>, <code>ResultManifest</code>, <code>ResultPage</code>, <code>ResultNotFound</code>,
-<code>MAX_RESULT_PAGE_SIZE</code>, <code>QuestionUsage</code>, <code>UserContext</code>, <code>configure_logging</code>, the error types
+<code>MAX_RESULT_PAGE_SIZE</code>, <code>QuestionUsage</code>, <code>QueryEvent</code>, <code>UserContext</code>, <code>CancellationToken</code>,
+<code>configure_logging</code>, the error types
 (<code>PipelineError</code>, <code>ErrorCode</code>, <code>ErrorSeverity</code>) and the modular API classes.
 The REST API (<code>nl2sql-api</code>) is held to this rule by an architecture test.</p>
 
