@@ -2114,9 +2114,11 @@ Source file path: <code>packages/nl2sql/src/nl2sql/pipeline/subgraphs/sql_agent.
 <p>Failure exits:
 - <code>check_planner</code> returns <code>end</code> when planner output is missing and retries are exhausted or errors are non-retryable.
 - <code>check_logical_validation</code> returns <code>end</code> when validation errors are non-retryable or retries are exhausted.
+- <code>check_execution</code> returns <code>end</code> after <code>executor</code> unless the database rejected the query as wrong (<code>EXECUTION_FAILED</code>) and retries remain: a success, a refusal (<code>DB_EXECUTION_ERROR</code>: permission, timeout, connection) and any other executor error all end the subgraph.
 - Cancellation forces <code>end</code> in router checks and in the retry handler. The run's <code>CancellationToken</code> is read from the <code>RunnableConfig</code> (<code>configurable.cancellation_token</code>); when no token is present the subgraph behaves as not cancelled.</p>
 <p>Partial completion behavior:
-- If planner or logical validation errors are retryable and retry budget remains, execution loops via <code>retry_handler</code> → <code>refiner</code> → <code>ast_planner</code>.</p>
+- If planner or logical validation errors are retryable and retry budget remains, execution loops via <code>retry_handler</code> → <code>refiner</code> → <code>ast_planner</code>.
+- So does a query the database rejected as wrong (an unknown column or table, a type mismatch, bad syntax): the adapter marks the error <code>retryable</code> and the executor reports it as <code>EXECUTION_FAILED</code>, with the database's own first line as the message.</p>
 <hr/>
 <h2 id="internal-node-composition">Internal Node Composition</h2>
 <p>Execution order (nominal path):
@@ -2137,7 +2139,9 @@ Source file path: <code>packages/nl2sql/src/nl2sql/pipeline/subgraphs/sql_agent.
     logical_validator --&gt;|retry| retry_handler
     logical_validator --&gt;|end| END
     retry_handler --&gt; refiner --&gt; ast_planner
-    generator --&gt; executor --&gt; END</code></pre></p>
+    generator --&gt; executor
+    executor --&gt;|retry| retry_handler
+    executor --&gt;|end| END</code></pre></p>
 <hr/>
 <h2 id="state-contract">State Contract</h2>
 <p>State model: <code>SubgraphExecutionState</code> (<code>packages/nl2sql/src/nl2sql/pipeline/state.py</code>).</p>
@@ -2157,9 +2161,10 @@ Source file path: <code>packages/nl2sql/src/nl2sql/pipeline/subgraphs/sql_agent.
 <li><code>retry</code> when retryable errors exist and retry budget remains.</li>
 <li><code>end</code> when errors are non-retryable or retries exhausted.</li>
 <li><code>generator</code> converts the plan to SQL for the target datasource dialect.</li>
-<li><code>executor</code> runs SQL via the datasource adapter and returns artifacts/errors.</li>
+<li><code>executor</code> runs SQL via the datasource adapter and returns artifacts/errors.
+   <code>check_execution</code> routes <code>retry</code> when every executor error is a retryable <code>EXECUTION_FAILED</code> and retry budget remains, otherwise <code>end</code>.</li>
 <li>If routed to retry: <code>retry_handler</code> waits with exponential backoff and jitter, then increments <code>retry_count</code>.</li>
-<li><code>refiner</code> uses LLM feedback to enrich error context, then loops back to <code>ast_planner</code>.</li>
+<li><code>refiner</code> uses LLM feedback to enrich error context, then loops back to <code>ast_planner</code>. Both are told about the latest attempt only, as <code>{node, error_code, message}</code> (<code>nl2sql.pipeline.retry_feedback</code>): never an earlier attempt's errors again, never a stack trace or <code>details</code>.</li>
 <li>Subgraph terminates at <code>END</code>.</li>
 </ol>
 <hr/>
@@ -2204,9 +2209,9 @@ Source file path: <code>packages/nl2sql/src/nl2sql/pipeline/subgraphs/sql_agent.
 <hr/>
 <h2 id="known-limitations">Known Limitations</h2>
 <ul>
-<li>Generator and executor errors are not routed into the retry loop; failures proceed to <code>executor</code> or terminate at <code>END</code>.</li>
+<li>Generator errors are not routed into the retry loop; a failure proceeds to <code>executor</code>, which reports <code>MISSING_SQL</code>, and terminates at <code>END</code>.</li>
 <li>No subgraph-specific metrics or trace spans are emitted.</li>
-<li>Retry loop only considers planner and logical validation errors.</li>
+<li>The executor retries only what the adapter marks <code>retryable</code>. An adapter that raises instead of returning a failed <code>ResultFrame</code> ends the sub-query with <code>EXECUTOR_CRASH</code>.</li>
 </ul>
 <p>Because the generator has no retry edge, the invariant the loop depends on is
 that <strong><code>logical_validator</code> rejects every plan <code>generator</code> would refuse to

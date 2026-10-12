@@ -2215,7 +2215,7 @@ validation and executed is reused
 <li>On a first attempt, look up the plan cache; on a hit, return the cached plan
    with <code>plan_source="cache"</code> and stop.</li>
 <li>Render <code>relevant_tables</code> with <code>render_schema_for_prompt</code> (see below).</li>
-<li>Build feedback string from existing errors (compact JSON).</li>
+<li>Build the feedback string from the latest attempt's errors only, one JSON object per line with <code>node</code>, <code>error_code</code> and <code>message</code> (<code>nl2sql.pipeline.retry_feedback</code>): an earlier attempt's errors, stack traces and <code>details</code> are never sent.</li>
 <li>Build <code>expected_schema</code> payload from sub‑query.</li>
 <li>Invoke the LLM chain with prompt + structured output (<code>PlanModel</code>).</li>
 <li>Return <code>ASTPlannerResponse</code> with plan and reasoning.</li>

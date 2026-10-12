@@ -2041,6 +2041,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#is_retryable_errorexc-bool" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        is_retryable_error(exc) -&gt; bool
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -4322,6 +4333,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#is_retryable_errorexc-bool" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        is_retryable_error(exc) -&gt; bool
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -4402,6 +4424,21 @@
 registered under the <code>nl2sql.adapters</code> entry point.</p>
 <h4 id="explainsql-str-cost_estimatesql-str"><code>explain(sql: str)</code> / <code>cost_estimate(sql: str)</code></h4>
 <p>The base class provides stubs. Override these to implement database-specific optimization logic (e.g., <code>EXPLAIN ANALYZE</code>).</p>
+<h4 id="is_retryable_errorexc-bool"><code>is_retryable_error(exc) -&gt; bool</code></h4>
+<p><code>execute()</code> catches every <code>SQLAlchemyError</code> the query raises and returns it as
+a failed <code>ResultFrame</code> (<code>query_failed(exc)</code>), with <code>retryable</code> from this method
+(see <a href="../sdk/">the adapter SDK</a>). The default reads the driver's SQLSTATE when
+there is one: class <code>42</code> (syntax or an unknown name) and <code>22</code> (a data or type
+error) are the query's fault, except <code>42501</code>, insufficient privilege. With no
+SQLSTATE it falls back on the error's kind: <code>ProgrammingError</code> and <code>DataError</code>
+are retryable unless the message says permission or access was denied;
+<code>OperationalError</code> (timeouts, connections, locks) is not. The message the
+engine sees is the driver's first line, at most 200 characters, prefixed
+"The database rejected the query:"; a refusal gets a generic message instead,
+and the full error goes to the log.</p>
+<p>Override it when your driver reports a query mistake another way. SQLite does:
+it raises <code>OperationalError</code> with no SQLSTATE for <code>no such column</code> as well as
+for a read-only database, so <code>SqliteAdapter</code> reads the message.</p>
 
 
 

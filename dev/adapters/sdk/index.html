@@ -4513,6 +4513,31 @@
 <li><strong>Args</strong>: <code>AdapterRequest</code> with <code>plan_type</code> and <code>payload</code></li>
 <li><strong>Returns</strong>: <code>ResultFrame</code> with <code>columns</code>, <code>rows</code>, <code>row_count</code>, and error metadata</li>
 </ul>
+<p>A query the database rejects is a result, not an exception: return
+<code>ResultFrame(success=False, error=ResultError(...))</code>. Two fields of the
+<code>ResultError</code> decide what the engine does with it:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>retryable</code></td>
+<td><code>True</code> when the query itself was wrong and a different query could succeed: bad syntax, an unknown table, column or function, a type mismatch. The engine reports <code>EXECUTION_FAILED</code> and sends the sub-query back to the planner, with <code>safe_message</code> as the feedback, while retries remain. <code>False</code> (the default) for a refusal the engine cannot plan its way out of: permission, a timeout, a lost connection, a read-only database. The engine reports <code>DB_EXECUTION_ERROR</code> and ends the sub-query.</td>
+</tr>
+<tr>
+<td><code>safe_message</code></td>
+<td>Shown to the planner and the user. Keep it to one short line: no SQL echo, no stack trace, no driver dump, and for a refusal nothing that names a host or a user.</td>
+</tr>
+</tbody>
+</table>
+<p>Only the adapter knows its driver, so the classification is the adapter's;
+the engine names no database. SQLAlchemy adapters inherit it from
+<code>BaseSQLAlchemyAdapter</code> (see <a href="../sqlalchemy/">SQLAlchemy adapters</a>). An exception
+that escapes <code>execute</code> is still caught, as a non-retryable <code>EXECUTOR_CRASH</code>.</p>
 <h4 id="fetch_schema_snapshot"><code>fetch_schema_snapshot()</code></h4>
 <p>Required by every adapter; there is no capability flag gating it.</p>
 <h3 id="optional-methods-sql-adapters">Optional Methods (SQL adapters)</h3>

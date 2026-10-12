@@ -2176,12 +2176,14 @@
 <li><code>MISSING_SQL</code></li>
 <li><code>MISSING_DATASOURCE_ID</code></li>
 <li><code>INVALID_STATE</code></li>
-<li><code>EXECUTOR_CRASH</code></li>
+<li><code>EXECUTION_FAILED</code>: the database rejected the query as wrong (the adapter's <code>retryable</code>); the SQL agent sends it back to the refiner while retries remain</li>
+<li><code>DB_EXECUTION_ERROR</code>: the database refused or could not run the query (permission, timeout, connection); fatal</li>
+<li><code>EXECUTOR_CRASH</code>: an exception escaped the adapter</li>
 </ul>
 <hr/>
 <h2 id="retry-idempotency">Retry + Idempotency</h2>
 <ul>
-<li>No internal retry logic.</li>
+<li>No internal retry logic. The SQL agent's <code>check_execution</code> routes a retryable <code>EXECUTION_FAILED</code> back to the refiner (see <a href="../../subgraphs/sql_agent/">SQL agent</a>).</li>
 <li>Idempotency depends on datasource and query semantics.</li>
 </ul>
 <hr/>
