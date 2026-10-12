@@ -22,6 +22,10 @@ class SubgraphOutput(BaseModel):
     sql_draft: Optional[str] = None
     # The adapter row cap bounding the SQL, when the plan set no smaller LIMIT.
     row_cap: Optional[int] = None
+    # True when the result reached ``row_cap``: rows may have been cut off. Exactly
+    # ``row_cap`` rows may also be the whole result; that cannot be told apart
+    # without fetching more, so it counts as cut.
+    truncated: bool = False
     artifact: Optional[ArtifactRef] = None
     errors: List[PipelineError] = Field(default_factory=list)
     validation: List[ValidationCheck] = Field(default_factory=list)

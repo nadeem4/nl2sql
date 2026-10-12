@@ -86,7 +86,8 @@ as `PipelineError` values in graph state; see
 ### Adapter-level limits
 
 `row_limit` is real and is enforced where it cannot be talked around: the
-generator bakes `min(plan.limit, row_limit)` into the SQL it renders
+generator bakes `min(plan.limit, row_limit)` into the SQL it renders, where
+`row_limit` is the datasource's own bounded by `RESULT_ROW_LIMIT` (100,000)
 ([`pipeline/nodes/generator/node.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/pipeline/nodes/generator/node.py)).
 
 `max_bytes` is **not enforced**. It is read from datasource options, stored on

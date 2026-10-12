@@ -29,6 +29,8 @@ Derives from `nl2sql.SubQueryResult`, so it has exactly the engine's fields.
 | `status` | `str` | no | `"success"` or `"error"` for this sub-query, from its final attempt: `"success"` when it ended with SQL and, if executed, a result; otherwise `"error"`. A retry that recovers reports `"success"`. |
 | `retry_count` | `int` | no | Plan/SQL refinement attempts made. |
 | `plan_source` | `str` | no | `"cache"` when the plan came from the plan cache (no planner call; still validated and executed), otherwise `"llm"`. |
+| `row_cap` | `Optional[int]` | no | The row limit that bounded this sub-query's SQL, or `null` when the plan's own `LIMIT` was smaller. |
+| `truncated` | `bool` | no | True when the result reached `row_cap`, so rows may be missing. |
 
 ### `QueryResponse`
 
@@ -38,7 +40,7 @@ Derives from `nl2sql.QueryResult` (only `sub_queries` is narrowed to
 | field | type | required | meaning |
 | --- | --- | --- | --- |
 | `sub_queries` | `List[SubQueryResponse]` | no | One entry per decomposed sub-query, each with its SQL. |
-| `final_answer` | `Optional[Dict[str, Any]]` | no | Answer synthesizer payload (`summary`, `format_type`, `content`). |
+| `final_answer` | `Optional[Dict[str, Any]]` | no | Answer synthesizer payload (`summary`, `format_type`, `content`, `warnings`, `truncated`). |
 | `errors` | `List[Dict[str, Any]]` | no | Pipeline errors (`node`, `message`, `error_code`, `severity`, `provider`, `provider_response`). `provider` and `provider_response` are set for a `PROVIDER_*` code and `null` otherwise; see [provider failures](../../observability/error-handling.md#provider-failures). |
 | `trace_id` | `str` | no | Trace identifier. |
 | `reasoning` | `List[Dict[str, Any]]` | no | Reasoning events/logs. |
@@ -48,6 +50,7 @@ Derives from `nl2sql.QueryResult` (only `sub_queries` is narrowed to
 | `timings` | `Dict[str, float]` | no | Wall-clock seconds per graph node. |
 | `usage` | `QuestionUsage` | no | LLM calls, input/cached/output/reasoning tokens and model time per node (`nodes`) and for the question (`total`), plus every call (`calls`) and the number of plans served from the plan cache (`plan_cache_hits`). The same model as `QueryResult.usage`; see [the core query API](../core/query.md#usage-tokens-calls-and-model-time). |
 | `trace_path` | `Optional[str]` | no | Where the run's trace file was written on the server, or `null`. See [Debugging a Run](../../observability/debugging.md). |
+| `truncated` | `bool` | no | True when any sub-query's result was cut at its row limit. |
 
 Only a capped sample of the rows is inlined, in `sub_queries[].rows`. The full
 result set is written to artifact storage and addressed through `artifact_refs`
@@ -118,13 +121,17 @@ Example response:
       "rows": {"columns": ["customer", "revenue"], "rows": [["acme", 42]], "total_rows": 5},
       "status": "success",
       "retry_count": 0,
-      "plan_source": "llm"
+      "plan_source": "llm",
+      "row_cap": null,
+      "truncated": false
     }
   ],
   "final_answer": {
-    "summary": "Top 5 customers by revenue",
-    "format_type": "table",
-    "content": "| customer | revenue |\n| --- | --- |"
+    "summary": "Acme leads the top 5 customers by revenue, with 42.",
+    "format_type": "text",
+    "content": "Acme leads with 42. The full list of 5 customers is in the table.",
+    "warnings": [],
+    "truncated": false
   },
   "errors": [],
   "trace_id": "0f1c...",

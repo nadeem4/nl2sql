@@ -100,7 +100,7 @@ class EngineAggregatorNode:
         message = (
             f"Cannot {' or '.join(operations)} complete results: {'; '.join(parts)}, so rows may be "
             f"missing and the combined answer could be wrong. Ask a narrower question, or raise the "
-            f"datasource's row_limit."
+            f"datasource's row_limit (up to RESULT_ROW_LIMIT)."
         )
         logger.error(message)
         error = PipelineError(

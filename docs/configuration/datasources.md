@@ -33,7 +33,9 @@ datasources:
     - adapter-specific fields (host, port, database, driver, etc.)
   - optional limits and metadata (commonly used):
     - `statement_timeout_ms`
-    - `row_limit`: the most rows one sub-query returns (1000 when unset). It
+    - `row_limit`: the most rows one sub-query returns. Unset, it is
+      `RESULT_ROW_LIMIT` (100,000); set higher, `RESULT_ROW_LIMIT` still bounds it.
+      A result that reaches it is flagged as truncated and the answer says so. It
       is applied before results are combined, so a join input that reaches it
       is refused (`RESULT_TRUNCATED`) and a union input that reaches it is
       flagged with a warning; see [row cap before a combine](../architecture/nodes/engine_aggregator_node.md#row-cap-before-a-combine).

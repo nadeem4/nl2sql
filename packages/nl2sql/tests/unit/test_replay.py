@@ -45,7 +45,8 @@ def rendered_prompts():
         _render(
             ANSWER_SYNTHESIZER_PROMPT,
             user_query=QUESTION,
-            aggregated_result="{}",
+            result_preview="{}",
+            result_limit="None",
             unmapped_subqueries="[]",
             data_notes="None",
         ),

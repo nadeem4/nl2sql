@@ -43,6 +43,11 @@ class SubQueryResult(BaseModel):
     # "cache" when the plan came from the plan cache (no planner LLM call; it
     # was still validated, generated and executed), else "llm".
     plan_source: str = Field(default="llm")
+    # The row ceiling that bounded this sub-query's SQL, when the plan asked for
+    # no smaller LIMIT; ``truncated`` is True when the result reached it, so
+    # rows may be missing.
+    row_cap: Optional[int] = None
+    truncated: bool = False
 
 
 class QueryResult(BaseModel):
@@ -65,6 +70,8 @@ class QueryResult(BaseModel):
     timings: Dict[str, float] = Field(default_factory=dict)
     usage: QuestionUsage = Field(default_factory=QuestionUsage)
     trace_path: Optional[str] = None
+    # True when any sub-query's result was cut at its row ceiling.
+    truncated: bool = False
 
 
 def _field(source: Any, name: str, default: Any = None) -> Any:
@@ -167,6 +174,8 @@ def _sub_query_results(
                 status=_field(output, "status", "") or "",
                 retry_count=int(_field(output, "retry_count", 0) or 0),
                 plan_source=_field(output, "plan_source", "llm") or "llm",
+                row_cap=_field(output, "row_cap"),
+                truncated=bool(_field(output, "truncated", False)),
             )
         )
     return results
@@ -223,6 +232,7 @@ def result_from_state(
         timings=dict(state.get("timings") or {}),
         usage=usage,
         trace_path=state.get("trace_path"),
+        truncated=any(sq.truncated for sq in sub_queries),
     )
 
 

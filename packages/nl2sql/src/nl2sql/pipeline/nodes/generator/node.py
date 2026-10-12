@@ -10,6 +10,7 @@ if TYPE_CHECKING:
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.datasources import DatasourceRegistry
 from nl2sql.common.logger import get_logger
+from nl2sql.common.settings import settings
 from nl2sql.pipeline.nodes.ast_planner.functions import DATE_UNITS, date_operation
 from nl2sql.pipeline.nodes.ast_planner.schemas import PlanModel, Expr, TableRef
 from nl2sql.pipeline.nodes.generator.schemas import GeneratorResponse
@@ -328,7 +329,9 @@ class GeneratorNode:
             adapter = self.ds_registry.get_adapter(datasource_id)
             dialect = adapter.get_dialect()
 
-            row_limit = adapter.row_limit or 1000
+            # RESULT_ROW_LIMIT is a resource ceiling; a datasource may set a lower one.
+            ceiling = int(settings.result_row_limit)
+            row_limit = min(int(adapter.row_limit or ceiling), ceiling)
             limit = min(int(plan.limit or row_limit), row_limit)
             # A plan's own top-N is the answer; the adapter's cap is truncation.
             row_cap = row_limit if plan.limit is None or int(plan.limit) > row_limit else None

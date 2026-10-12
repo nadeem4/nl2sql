@@ -168,6 +168,7 @@ def wrap_subgraph(
         if succeeded and execute and executed_cleanly and plan is not None and plan_source == "llm":
             PlanCache(getattr(ctx, "schema_store", None)).put(sub_query, plan)
 
+        row_cap = generator_response.row_cap if generator_response else None
         subgraph_output = SubgraphOutput(
             sub_query=sub_query,
             subgraph_name=subgraph_name,
@@ -176,7 +177,8 @@ def wrap_subgraph(
             plan=plan,
             plan_source=plan_source,
             sql_draft=sql_draft,
-            row_cap=generator_response.row_cap if generator_response else None,
+            row_cap=row_cap,
+            truncated=bool(row_cap and artifact is not None and artifact.row_count >= row_cap),
             artifact=artifact,
             errors=errors,
             validation=(

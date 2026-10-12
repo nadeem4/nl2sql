@@ -138,10 +138,10 @@ def _env(trace_dir):
     return env
 
 
-def _run(demo_project, tmp_path, rules, config_name, question=QUESTION):
+def _run(demo_project, tmp_path, rules, config_name, question=QUESTION, **extra_env):
     server = _serve(demo_project, rules, config_name)
     try:
-        r = run_cli(demo_project, _env(tmp_path), "run", "--llm-config", f"configs/{config_name}", question)
+        r = run_cli(demo_project, {**_env(tmp_path), **extra_env}, "run", "--llm-config", f"configs/{config_name}", question)
     finally:
         server.stop()
     [path] = list(tmp_path.glob("*.json"))
@@ -188,7 +188,7 @@ def test_two_sub_queries_on_one_datasource_keep_their_own_results(demo_project, 
     assert "invoice_count" in rows and "music_spend" in rows, rows[:2000]
 
 
-# InvoiceLine has 2240 rows; the demo's row cap is the generator's default 1000.
+# InvoiceLine has 2240 rows; the run caps each sub-query at 1000 (RESULT_ROW_LIMIT).
 LINES_INTENT = "Every invoice line with its customer"
 TICKET_CUSTOMERS_INTENT = "Customers who opened a support ticket"
 LINES_SQ = {
@@ -219,7 +219,8 @@ def test_a_join_input_cut_short_by_the_row_cap_is_refused(demo_project, tmp_path
     rules = _rules(["chinook", "support"], decomposition,
                    [(LINES_INTENT, LINES_PLAN), (TICKET_CUSTOMERS_INTENT, TICKET_CUSTOMERS_PLAN)])
     server, r, doc = _run(demo_project, tmp_path, rules, "llm.multi-sq-capped.yaml",
-                          question="Which invoice lines belong to customers who opened a ticket?")
+                          question="Which invoice lines belong to customers who opened a ticket?",
+                          RESULT_ROW_LIMIT="1000")
 
     codes = [e["error_code"] for e in doc["result"]["errors"]]
     assert codes == ["RESULT_TRUNCATED"], r.stdout + r.stderr
