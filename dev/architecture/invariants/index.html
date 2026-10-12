@@ -6970,7 +6970,7 @@
 <li><code>LogicalValidatorNode._validate_static()</code> converts resolution failures to <code>PipelineError</code></li>
 </ul>
 <h3 id="failure-behavior_8">Failure Behavior</h3>
-<p>Returns <code>PipelineError</code> with <code>COLUMN_NOT_FOUND</code> (severity depends on <code>logical_validator_strict_columns</code>).</p>
+<p>Returns <code>PipelineError</code> with <code>COLUMN_NOT_FOUND</code>: a retryable <code>ERROR</code> by default, a <code>WARNING</code> that does not block when <code>logical_validator_strict_columns</code> is turned off.</p>
 <h3 id="why-it-exists_8">Why It Exists</h3>
 <p>Prevents queries from referencing non-existent or ambiguous columns.</p>
 <hr />
@@ -7155,7 +7155,7 @@
 <hr />
 <h2 id="gaps">Gaps</h2>
 <ul>
-<li>Column existence enforcement can degrade to warnings when <code>logical_validator_strict_columns</code> is disabled, so missing columns do not always block execution.</li>
+<li>Column existence enforcement degrades to warnings when <code>logical_validator_strict_columns</code> is turned off (it is on by default), so missing columns then do not always block execution.</li>
 <li>Schema version mismatch handling is policy-driven and may only emit warnings (e.g., <code>schema_version_mismatch_policy=warn</code>), so mismatch is not always enforced as a hard failure.</li>
 <li>Semantic-only checks are pattern based: they block a field that opens with <code>SELECT ... FROM</code>, a statement terminator and comment markers, rather than parsing for every possible SQL construct. An intent that literally reads "select ... from ..." is rejected as SQL.</li>
 <li>If the vector store is unavailable, datasource resolution can return a response without errors, relying on downstream stages to detect missing candidates.</li>

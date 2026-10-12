@@ -2277,8 +2277,8 @@ providers. The check runs on the read path only, so the fix is simply to re-run
 </tr>
 <tr>
 <td><code>LOGICAL_VALIDATOR_STRICT_COLUMNS</code></td>
-<td><code>false</code></td>
-<td>Treat missing columns as errors in logical validation.</td>
+<td><code>true</code></td>
+<td>Treat a column the plan names but the retrieved schema does not have as a blocking, retryable <code>COLUMN_NOT_FOUND</code> error, so the planner is asked again instead of the plan reaching the database. Set <code>false</code> to downgrade it to a warning that lets the plan through once retries are spent.</td>
 </tr>
 <tr>
 <td><code>PLAN_CACHE_ENABLED</code></td>

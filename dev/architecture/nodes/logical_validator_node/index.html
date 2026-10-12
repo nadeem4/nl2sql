@@ -2335,7 +2335,7 @@ was validated, not only what failed. The names are fixed and always in this orde
 <hr/>
 <h2 id="configuration">Configuration</h2>
 <ul>
-<li><code>settings.logical_validator_strict_columns</code> controls severity of missing column errors.</li>
+<li><code>settings.logical_validator_strict_columns</code> (<code>LOGICAL_VALIDATOR_STRICT_COLUMNS</code>, default <code>true</code>) controls severity of missing column errors: <code>ERROR</code> (blocking, retried) when on, <code>WARNING</code> when off.</li>
 </ul>
 <hr/>
 <h2 id="extension-points">Extension Points</h2>

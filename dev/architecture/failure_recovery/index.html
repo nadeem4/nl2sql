@@ -5095,7 +5095,7 @@
 <li>Retry count reaches <code>sql_agent_max_retries</code> with a blocking (<code>ERROR</code>/<code>CRITICAL</code>) finding.</li>
 <li>Cancellation is detected.</li>
 <li>If errors are retryable and retry budget remains, the subgraph loops through <code>retry_handler -&gt; refiner -&gt; planner</code>.</li>
-<li>Validation findings that are only <code>WARNING</code> (<code>COLUMN_NOT_FOUND</code> with strict columns off) also loop while
+<li>Validation findings that are only <code>WARNING</code> (<code>COLUMN_NOT_FOUND</code> with <code>LOGICAL_VALIDATOR_STRICT_COLUMNS=false</code>; it is on by default) also loop while
   retry budget remains, but never end the sub-query: once the budget is spent the plan proceeds to generation.</li>
 </ul>
 <h3 id="sub-query-status">Sub-query status</h3>
