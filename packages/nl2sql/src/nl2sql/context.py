@@ -4,6 +4,7 @@ import pathlib
 from typing import Optional
 
 from nl2sql.configs import ConfigManager
+from nl2sql.configs.curated import check_curated
 from nl2sql.datasources import DatasourceRegistry
 from nl2sql.llm import LLMRegistry
 from nl2sql.indexing.vector_store import VectorStore
@@ -101,6 +102,21 @@ class NL2SQLContext:
         ds_configs = cm.load_datasources(ds_config_path)
         self.ds_registry = DatasourceRegistry(secret_manager)
         self.ds_registry.register_datasources(ds_configs)
+
+        # Curated answers: optional. A broken file fails startup, as a broken
+        # datasources.yaml does; checks that need the index are left to
+        # `nl2sql curated validate`.
+        self.curated = None
+        if settings.curated_enabled:
+            self.curated = cm.load_curated()
+            if self.curated is not None:
+                dialects = {ds_id: self.ds_registry.get_dialect(ds_id) for ds_id in self.ds_registry.list_ids()}
+                issues = check_curated(self.curated, dialects)
+                if issues:
+                    raise ValueError(
+                        f"Curated answers file {settings.curated_config_path} is invalid:\n  "
+                        + "\n  ".join(str(issue) for issue in issues)
+                    )
 
         llm_cfg = cm.load_llm(llm_config_path)
         self.llm_registry = LLMRegistry(secret_manager)

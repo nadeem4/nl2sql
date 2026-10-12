@@ -17,6 +17,7 @@ Configuration is split into **environment variables** (runtime settings) and **f
 | `SAMPLE_QUESTIONS` | `configs/sample_questions.yaml` | Path to the sample questions file (a map of datasource id to questions). They are indexed into each datasource's `schema.datasource` entry. `ROUTING_EXAMPLES`, the name `.env` files generated before 2026-09-21 wrote, is accepted as well. |
 | `POLICIES_CONFIG` | `configs/policies.json` | Path to the RBAC policies file. |
 | `SECRETS_CONFIG` | `configs/secrets.yaml` | Path to the secrets config file. |
+| `CURATED_CONFIG` | `configs/curated.yaml` | Path to the curated answers file (verified queries). Absent at the default path, the feature is off; set to any other path that does not exist, startup fails. See [Curated Answers](curated.md). |
 | `VECTOR_STORE` | `./chroma_db` | Persist directory for the vector store. |
 | `VECTOR_STORE_COLLECTION` | `nl2sql_store` | Collection name for schema embeddings. |
 
@@ -102,6 +103,7 @@ providers. The check runs on the read path only, so the fix is simply to re-run
 | `LOGICAL_VALIDATOR_STRICT_COLUMNS` | `true` | Treat a column the plan names but the retrieved schema does not have as a blocking, retryable `COLUMN_NOT_FOUND` error, so the planner is asked again instead of the plan reaching the database. Set `false` to downgrade it to a warning that lets the plan through once retries are spent. |
 | `PLAN_CACHE_ENABLED` | `true` | Reuse a plan that already passed validation and executed, for the same normalised sub-query intent, datasource and schema version on the same run date (`NL2SQL_TODAY`, else the UTC date), instead of calling the planner LLM. The cached plan is validated again on every use, so RBAC and policy changes still apply. Stored in the schema store (`SCHEMA_STORE_PATH`); `nl2sql cache clear` empties it. See [Determinism → The plan cache](../architecture/determinism.md#the-plan-cache-determinism-from-the-architecture). |
 | `FEEDBACK_ENABLED` | `true` | Let the playground record a thumbs up or down, with an optional note, for a run. Stored in the schema store's `feedback` table (`SCHEMA_STORE_PATH`): question, role, status, SQL, error codes, the model per node and the engine version, never result rows or sample values. Local only, like Settings. `nl2sql feedback clear` empties it. See [Feedback and Signals](../observability/feedback.md). |
+| `CURATED_ENABLED` | `true` | Load and check the curated answers file at startup. `false` turns the feature off without removing the file; `nl2sql curated validate` still checks it. See [Curated Answers](curated.md). |
 | `RBAC_REFUSAL_NAMES_TABLES` | `false` | Name the role and the forbidden table in the refusal the user sees. Off, the message is "You do not have permission to see the data this question requires."; the table and role are always in the log and the run trace. `nl2sql setup --demo` writes `true` into `.env.demo`. See [Security Model](../security/model.md#strict-refusal). |
 | `NL2SQL_TODAY` | `—` | The date the planner and refiner are told it is, as an ISO date (`2013-12-31`). Unset, it is the real date in UTC. Pin it for tests and gold runs whose questions say "this year" or "the last 30 days". A trace records the date its run used, and `nl2sql trace replay` pins it. It is also part of the plan cache key, so a plan made on another date is not reused. |
 | `TENANT_ID` | `default_tenant` | Default tenant ID for requests. |
@@ -148,6 +150,7 @@ flowchart TD
     ConfigManager --> LLM[llm.yaml]
     ConfigManager --> Policies[policies.json]
     ConfigManager --> Secrets[secrets.yaml]
+    ConfigManager --> Curated["curated.yaml (optional)"]
 ```
 
 ## Secret resolution
@@ -167,6 +170,8 @@ flowchart TD
   See [Policies config](policies.md).
 - `configs/secrets.yaml`: optional secret providers.
   See [Secrets config](secrets.md).
+- `configs/curated.yaml`: optional verified queries, keyed by datasource.
+  See [Curated answers](curated.md).
 
 ## Source references
 

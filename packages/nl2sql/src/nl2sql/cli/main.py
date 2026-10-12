@@ -36,6 +36,7 @@ from nl2sql.cli.commands.doctor import doctor_command
 from nl2sql.cli.commands.setup import setup_command
 from nl2sql.cli.commands.install import install_command
 from nl2sql.cli.commands.policy import app as policy_app
+from nl2sql.cli.commands.curated import app as curated_app
 from nl2sql.cli.commands.trace import app as trace_app, replay_command
 from nl2sql.cli.commands.cache import app as cache_app
 from nl2sql.cli.commands.feedback import app as feedback_app
@@ -50,6 +51,7 @@ app = typer.Typer(
 )
 
 app.add_typer(policy_app, name="policy", help="Manage RBAC policies and security.")
+app.add_typer(curated_app, name="curated", help="Check the curated answers file (`nl2sql curated validate`).")
 app.add_typer(trace_app, name="trace", help="Inspect and replay run traces.")
 app.add_typer(cache_app, name="cache", help="Manage the plan cache (`nl2sql cache clear`).")
 app.add_typer(feedback_app, name="feedback", help="Answer feedback and guardrail rates (`nl2sql feedback stats`).")

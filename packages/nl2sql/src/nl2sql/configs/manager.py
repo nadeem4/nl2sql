@@ -6,7 +6,8 @@ import pathlib
 from typing import List, Dict, Optional, Union
 from pydantic import ValidationError
 
-from nl2sql.common.settings import settings
+from nl2sql.common.settings import CURATED_CONFIG_DEFAULT, settings
+from .curated import CuratedFileConfig
 from .datasources import DatasourceConfig, DatasourceFileConfig
 from .llm import LLMFileConfig
 from .policies import PolicyFileConfig
@@ -52,6 +53,7 @@ class ConfigManager:
         self._policy_path = pathlib.Path(policies_config_path) if policies_config_path else root / settings.policies_config_path
         self._secrets_path = pathlib.Path(secrets_config_path) if secrets_config_path else root / settings.secrets_config_path
         self._sample_questions_path = root / settings.sample_questions_path
+        self._root = root
 
     def ensure_config_dirs(self) -> None:
         """Ensures that the configuration directories exist."""
@@ -148,6 +150,35 @@ class ConfigManager:
         except Exception as e:
             raise ValueError(f"Failed to load secrets: {e}")
 
+
+    def load_curated(self, path: Optional[pathlib.Path] = None) -> Optional[CuratedFileConfig]:
+        """Loads ``curated.yaml``, the verified queries.
+
+        Returns None when no path is given, ``CURATED_CONFIG`` is left at its
+        default and that file does not exist: the feature is off. A path given
+        here, or a ``CURATED_CONFIG`` naming any other file, that does not
+        exist raises ``FileNotFoundError``, so a typo cannot silently turn
+        verified answers off. A file that does not parse or match the models
+        raises ``ValueError``. Checks that need the datasources are
+        ``nl2sql.configs.curated.check_curated``.
+        """
+        if path is not None:
+            target_path = pathlib.Path(path)
+        else:
+            target_path = self._root / settings.curated_config_path
+        if not target_path.exists():
+            if path is None and settings.curated_config_path == CURATED_CONFIG_DEFAULT:
+                return None
+            raise FileNotFoundError(f"Curated answers file not found: {target_path}")
+
+        try:
+            raw = yaml.safe_load(target_path.read_text(encoding="utf-8")) or {}
+        except yaml.YAMLError as e:
+            raise ValueError(f"Failed to parse curated answers YAML from {target_path}: {e}")
+        try:
+            return CuratedFileConfig.model_validate(raw)
+        except ValidationError as e:
+            raise ValueError(f"Curated answers file {target_path} is invalid: {e}")
 
     def load_sample_questions(self, path: Optional[pathlib.Path] = None, ds_id: Optional[str] = None) -> Union[Dict[str, List[str]], List[str]]:
         """Loads sample questions from a YAML file."""
