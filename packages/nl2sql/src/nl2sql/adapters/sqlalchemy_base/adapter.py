@@ -1,4 +1,4 @@
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from sqlalchemy import create_engine, inspect, text, Engine, select, func, table, column, case, literal_column, Connection
 from sqlalchemy.engine.reflection import Inspector
 from typing import Tuple
@@ -46,6 +46,13 @@ def _driver_message(exc: BaseException) -> str:
     lines = [line.strip() for line in str(orig).splitlines() if line.strip()]
     first = lines[0] if lines else type(orig).__name__
     return first if len(first) <= _MAX_MESSAGE else first[: _MAX_MESSAGE - 3] + "..."
+
+
+# A text column with at most this many distinct values is indexed with all of
+# them, so a filter on any one ('Heavy Metal' among 25 genres) matches a real
+# value rather than a guess; a larger column keeps its five most frequent.
+ALL_VALUES_MAX_DISTINCT = 50
+SAMPLE_VALUES = 5
 
 class BaseSQLAlchemyAdapter:
     """
@@ -474,21 +481,25 @@ class BaseSQLAlchemyAdapter:
         result = conn.execute(stmt).fetchone()
         null_count, min_val, max_val, distinct_count = result
 
+        is_text = any(t in column_type.lower() for t in ['char', 'text', 'string', 'clob'])
+        limit = None if distinct_count <= ALL_VALUES_MAX_DISTINCT else SAMPLE_VALUES
         return ColumnStatistics(
             null_percentage=(null_count / row_count) if row_count > 0 else 0,
             distinct_count=distinct_count,
             min_value=min_val,
             max_value=max_val,
-            sample_values=self._get_sample_values(conn, table_ref, column_name) if any(t in column_type.lower() for t in ['char', 'text', 'string', 'clob']) else []
+            sample_values=self._get_sample_values(conn, table_ref, column_name, limit) if is_text else []
         )
 
-    def _get_sample_values(self, conn: Connection, table_ref: TableRef, column_name: str, limit: int = 5) -> List[Any]:
-        """Fetches frequently occurring sample values for a column.
+    def _get_sample_values(self, conn: Connection, table_ref: TableRef, column_name: str,
+                           limit: Optional[int] = SAMPLE_VALUES) -> List[Any]:
+        """A column's values, most frequent first and ties by value.
 
         Args:
             table_name (str): The table name.
             column_name (str): The column name.
-            limit (int, optional): Max samples to return. Defaults to 5.
+            limit (int, optional): Max values to return; None returns every
+                distinct value. Defaults to ``SAMPLE_VALUES``.
 
         Returns:
             List[Any]: A list of sample values.
@@ -501,10 +512,11 @@ class BaseSQLAlchemyAdapter:
             .select_from(t)
             .where(c != None)
             .group_by(c)
-            .order_by(func.count().desc())
-            .limit(limit)
+            .order_by(func.count().desc(), c)
         )
-        
+        if limit is not None:
+            stmt = stmt.limit(limit)
+
         return [row[0] for row in conn.execute(stmt).fetchall()]
 
     

@@ -195,6 +195,14 @@ every datasource in a collection must share one embedding model, so the store
 otherwise raises `EmbeddingDimensionMismatchError` (or
 `EmbeddingModelMismatchError` for a different model of the same size).
 
+Column statistics are read when a datasource is indexed, so a change to what
+indexing records reaches an existing demo folder only when it is indexed again.
+After 0.2.2, a text column with at most 50 distinct values keeps all of them
+rather than five. `nl2sql demo` does not re-index a folder whose index is
+healthy, so run `nl2sql --env demo index` in the folder, or start a fresh one
+with `nl2sql setup --demo`, which always re-indexes. The hosted image builds
+its index with `nl2sql setup --demo`, so a new image picks the change up.
+
 ### Index health and repair
 
 The playground's schema panel reads the schema snapshot, for whichever database
