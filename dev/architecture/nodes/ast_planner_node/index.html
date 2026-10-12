@@ -2304,8 +2304,9 @@ system message and the same for every database: <code>DATE_PART(unit, date)</cod
 integer, and <code>DATE_TRUNC(unit, date)</code>, the period's first day as <code>YYYY-MM-DD</code>,
 with the unit a string literal <code>year</code>, <code>quarter</code>, <code>month</code> or <code>day</code>. The prompt
 names no database; each adapter renders the functions (see the generator).
-Subqueries and window functions are not in the language; <code>offset</code> is accepted
-but not rendered.</p>
+Subqueries and window functions are not in the language. <code>offset</code> pages
+through the plan's <code>order_by</code> (rows 11 to 20 are <code>limit: 10, offset: 10</code>); a
+plan with an <code>offset</code> and no <code>order_by</code> is rejected by the validator.</p>
 <hr/>
 <h2 id="determinism-guarantees">Determinism Guarantees</h2>
 <ul>

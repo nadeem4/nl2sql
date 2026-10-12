@@ -4832,7 +4832,7 @@ answers against.</p>
 </tr>
 <tr>
 <td><code>tags</code></td>
-<td>Categories: <code>single-table</code>, <code>filter</code>, <code>join</code>, <code>multi-join</code>, <code>aggregation</code>, <code>having</code>, <code>order-limit</code>, <code>ties</code>, <code>date</code>, <code>paraphrase</code>, <code>keyword-in-question</code>, <code>keyword-in-value</code>, <code>rbac-denial</code>, <code>unanswerable</code></td>
+<td>Categories: <code>single-table</code>, <code>filter</code>, <code>join</code>, <code>multi-join</code>, <code>aggregation</code>, <code>having</code>, <code>order-limit</code>, <code>offset</code>, <code>ties</code>, <code>date</code>, <code>paraphrase</code>, <code>keyword-in-question</code>, <code>keyword-in-value</code>, <code>rbac-denial</code>, <code>unanswerable</code></td>
 </tr>
 <tr>
 <td><code>paraphrase_group</code></td>
@@ -5042,7 +5042,7 @@ Spider 2.0 supports multiple gold files per task
 <h4 id="when-to-add-one-and-when-not-to">When to add one, and when not to</h4>
 <p>Prefer an alternative to loosening the comparator. An alternative is written
 down, reviewed once, and only ever affects the question it sits on; a looser
-rule applies to all forty-three at once and can quietly start passing wrong
+rule applies to all forty-five at once and can quietly start passing wrong
 answers. The <a href="#strict-and-lenient-accuracy">lenient score</a> is deliberately
 narrow for the same reason.</p>
 <p>Add one when <strong>all</strong> of these hold:</p>
@@ -5469,7 +5469,7 @@ The interval is taken over the runs a config scored, so with <code>--passes</cod
 one the runs of a single question are not independent and it reads narrower
 than it really is; pass^k below counts questions and does not.</p>
 <p><strong>Compare two runs question by question, not headline to headline.</strong> The same
-44 questions are run both times, so the runs are paired and most of the
+45 questions are run both times, so the runs are paired and most of the
 variance cancels. <code>--baseline PATH</code> prints, per config:</p>
 <ul>
 <li>the strict and lenient accuracy of each run, side by side;</li>

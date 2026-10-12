@@ -2160,7 +2160,9 @@ columns:</p>
 error code and the generator's wording never replaces a more specific one. The
 cost is a second tree build, measured at ~2.4 ms against a ~3.4 s planner call.</p>
 <p><code>test_logical_validator_generator_parity.py</code> asserts the invariant directly: for
-each broken plan shape, the generator rejects it <strong>and</strong> so does the validator.</p>
+each broken plan shape, the generator rejects it <strong>and</strong> so does the validator.
+The same route rejects an <code>offset</code> with no <code>order_by</code>, or a negative one
+(<code>test_plan_offset.py</code>): a page only means something in an order.</p>
 <p>Column resolution is delegated to <code>sqlglot</code>'s optimizer. The node converts the
 plan into a throw‑away <code>sqlglot</code> expression tree (reusing the generator's
 <code>SqlVisitor</code>) and runs <code>sqlglot.optimizer.qualify.qualify()</code> against a schema
