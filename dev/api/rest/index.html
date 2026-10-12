@@ -4472,7 +4472,7 @@ server from the folder holding your env file and configs:</p>
 <tr>
 <td><a href="query/">Query</a></td>
 <td><code>routes/query.py</code></td>
-<td>Execute natural language queries.</td>
+<td>Execute natural language queries; page through or download a run's saved result.</td>
 </tr>
 <tr>
 <td><a href="datasource/">Datasource</a></td>
@@ -4546,7 +4546,7 @@ wins:</p>
 </tr>
 </tbody>
 </table>
-<p>With no role from any of them, <code>POST /api/v1/query</code> answers <code>HTTP 401</code> with a
+<p>With no role from any of them, <code>POST /api/v1/query</code> and the result routes answer <code>HTTP 401</code> with a
 message naming these variables; the engine never runs. The variables are read
 on each request.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># Demo: every request runs as admin.</span>

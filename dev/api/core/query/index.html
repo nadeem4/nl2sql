@@ -3615,6 +3615,23 @@
   
 </li>
         
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reading-a-runs-saved-results" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reading a run's saved results
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Reading a run&#39;s saved results">
+      <ul class="md-nav__list">
+        
           <li class="md-nav__item">
   <a href="#subqueryresult" class="md-nav__link">
     <span class="md-ellipsis">
@@ -4399,6 +4416,23 @@
   
 </li>
         
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reading-a-runs-saved-results" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reading a run's saved results
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Reading a run&#39;s saved results">
+      <ul class="md-nav__list">
+        
           <li class="md-nav__item">
   <a href="#subqueryresult" class="md-nav__link">
     <span class="md-ellipsis">
@@ -4529,7 +4563,8 @@ No exceptions are raised by <code>run_query</code>; errors are returned in <code
 | <code>timings</code> | <code>Dict[str, float]</code> | no | Wall-clock seconds per graph node, plus <code>LangGraph</code> for the whole run. |
 | <code>usage</code> | <code>QuestionUsage</code> | no | LLM calls, tokens and model time per node and for the whole question. See below. |
 | <code>trace_path</code> | <code>Optional[str]</code> | no | Where this run's trace file was written, or <code>None</code> when <code>TRACE_MODE</code> did not write one. See <a href="../../../observability/debugging/">Debugging a Run</a>. |
-| <code>truncated</code> | <code>bool</code> | no | True when any sub-query's result reached its row limit, so rows may be missing. See <code>sub_queries[].truncated</code>. |</p>
+| <code>truncated</code> | <code>bool</code> | no | True when any sub-query's result reached its row limit, so rows may be missing. See <code>sub_queries[].truncated</code>. |
+| <code>result_manifest</code> | <code>List[ResultSummary]</code> | no | The run's saved results, one per terminal DAG node (<code>node_id</code>, <code>columns</code>, <code>row_count</code>, <code>truncated</code>): the manifest the aggregator writes beside them. Never the rows; see <a href="#reading-a-runs-saved-results">Reading a run's saved results</a>. Empty when nothing was saved. |</p>
 <p><code>errors</code> holds only <code>ERROR</code> and <code>CRITICAL</code> entries; <code>WARNING</code>-severity pipeline
 errors are appended to <code>warnings</code> as the same summary dict.</p>
 <p>A sub-query that succeeded contributes nothing to <code>errors</code>: the errors of the
@@ -4543,7 +4578,65 @@ on warnings alone) adds a <code>MISSING_SQL</code> error, so the run reports <co
 run), otherwise <code>"success"</code>. A state with no sub-queries and no errors leaves it
 empty.</p>
 <p>Only a capped sample of the rows is inlined, in <code>sub_queries[].rows</code>. The full
-result set lives in artifact storage, addressed through <code>artifact_refs</code>.</p>
+result set lives in artifact storage, addressed through <code>artifact_refs</code>; each
+combined result is listed in <code>result_manifest</code> and read back by the run's
+<code>trace_id</code> with the methods below.</p>
+<h2 id="reading-a-runs-saved-results">Reading a run's saved results</h2>
+<p>The aggregator saves each terminal result of a run as
+<code>&lt;tenant_id&gt;/&lt;request_id&gt;/result_&lt;node_id&gt;.parquet</code> and writes <code>manifest.json</code>
+beside them (see <a href="../../../storage/artifact-store/#the-result-manifest">Artifact Store → The result manifest</a>).
+These <code>QueryAPI</code> methods, also on <code>NL2SQL</code> with the same signatures, read them
+back by the run's <code>trace_id</code> (the <code>request_id</code>). They read lazily from the
+parquet file: a page reads only its slice, and the CSV export reads and yields a
+slice at a time (<code>CSV_CHUNK_ROWS</code>, 10,000 rows), so neither holds the whole
+result in memory.</p>
+<table>
+<thead>
+<tr>
+<th>method</th>
+<th>returns</th>
+<th>meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>get_result_manifest(request_id, tenant_id=None)</code></td>
+<td><code>ResultManifest</code></td>
+<td><code>request_id</code> and <code>results: List[ResultSummary]</code>, the same entries as <code>QueryResult.result_manifest</code>.</td>
+</tr>
+<tr>
+<td><code>get_result_page(request_id, result_id, offset=0, limit=100, tenant_id=None)</code></td>
+<td><code>ResultPage</code></td>
+<td>Rows <code>offset</code> to <code>offset + limit</code> of the result whose <code>node_id</code> is <code>result_id</code>. <code>limit</code> above <code>MAX_RESULT_PAGE_SIZE</code> (1,000) is cut to it, and the page's <code>limit</code> says so. A page past the end has no rows. <code>next_offset</code> is where the next page starts, <code>None</code> at the end. A negative <code>offset</code> or a <code>limit</code> below 1 raises <code>ValueError</code>.</td>
+</tr>
+<tr>
+<td><code>export_result_csv(request_id, result_id, tenant_id=None)</code></td>
+<td><code>Iterator[bytes]</code></td>
+<td>The whole result as UTF-8 CSV, header first, one chunk per slice. The ids are checked before the iterator is returned, so a missing result raises before any byte is sent.</td>
+</tr>
+</tbody>
+</table>
+<p><code>ResultPage</code> has <code>request_id</code>, <code>result_id</code>, <code>columns</code>, <code>rows</code> (<code>rows[i]</code> is row
+<code>offset + i</code>), <code>offset</code>, <code>limit</code>, <code>total_rows</code> and <code>next_offset</code>.</p>
+<p>Scope: results are read from one tenant's folder, <code>tenant_id</code> or else the
+engine's own <code>TENANT_ID</code>, the tenant every run of this engine writes under. Each
+of these raises <code>ResultNotFound</code> (a <code>LookupError</code>, exported from <code>nl2sql</code>): an
+unknown <code>request_id</code>, a run in another tenant's folder, a <code>result_id</code> the run's
+manifest does not list, and an id that is not a plain token (letters, digits,
+<code>_</code>, <code>-</code>; at most 128 characters). Ids are checked before any path is built, and
+the parquet path is rendered from the artifact template, never read from the
+manifest, so no id reaches a file outside the run's folder. Nothing else guards
+a result yet: any caller who knows a <code>trace_id</code> can read it.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">result</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">run_query</span><span class="p">(</span><span class="s2">"List every genre."</span><span class="p">,</span> <span class="n">user_context</span><span class="o">=</span><span class="n">UserContext</span><span class="p">(</span><span class="n">roles</span><span class="o">=</span><span class="p">[</span><span class="s2">"admin"</span><span class="p">]))</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="p">[</span><span class="n">saved</span><span class="p">]</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">result_manifest</span>                   <span class="c1"># node_id, columns, row_count, truncated</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">page</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">get_result_page</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">trace_id</span><span class="p">,</span> <span class="n">saved</span><span class="o">.</span><span class="n">node_id</span><span class="p">,</span> <span class="n">offset</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">limit</span><span class="o">=</span><span class="mi">20</span><span class="p">)</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s2">"genres.csv"</span><span class="p">,</span> <span class="s2">"wb"</span><span class="p">)</span> <span class="k">as</span> <span class="n">out</span><span class="p">:</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="k">for</span> <span class="n">chunk</span> <span class="ow">in</span> <span class="n">engine</span><span class="o">.</span><span class="n">export_result_csv</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">trace_id</span><span class="p">,</span> <span class="n">saved</span><span class="o">.</span><span class="n">node_id</span><span class="p">):</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>        <span class="n">out</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">chunk</span><span class="p">)</span>
+</code></pre></div>
+<p><code>nl2sql-api</code> serves these as
+<a href="../../rest/query/#get-apiv1queryrequest_idresultsresult_id"><code>GET /api/v1/query/{request_id}/results/{result_id}</code></a>
+and <code>.../{result_id}.csv</code>; the playground serves the same two under <code>/api/query/...</code>.</p>
 <h3 id="subqueryresult">SubQueryResult</h3>
 <table>
 <thead>

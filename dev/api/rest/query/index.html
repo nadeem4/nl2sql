@@ -3753,6 +3753,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#resultpage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ResultPage
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -3775,6 +3786,39 @@
     <span class="md-ellipsis">
       
         POST /api/v1/query
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-apiv1queryrequest_idresultsresult_id" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/v1/query/{request_id}/results/{result_id}
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-apiv1queryrequest_idresultsresult_idcsv" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/v1/query/{request_id}/results/{result_id}.csv
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#errors-and-scope-of-the-result-routes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Errors and scope of the result routes
       
     </span>
   </a>
@@ -4316,6 +4360,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#resultpage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ResultPage
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -4338,6 +4393,39 @@
     <span class="md-ellipsis">
       
         POST /api/v1/query
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-apiv1queryrequest_idresultsresult_id" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/v1/query/{request_id}/results/{result_id}
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-apiv1queryrequest_idresultsresult_idcsv" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/v1/query/{request_id}/results/{result_id}.csv
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#errors-and-scope-of-the-result-routes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Errors and scope of the result routes
       
     </span>
   </a>
@@ -4594,11 +4682,72 @@
 <td>no</td>
 <td>True when any sub-query's result was cut at its row limit.</td>
 </tr>
+<tr>
+<td><code>result_manifest</code></td>
+<td><code>List[ResultSummary]</code></td>
+<td>no</td>
+<td>The run's saved results, one per terminal DAG node: <code>node_id</code>, <code>columns</code>, <code>row_count</code> (the whole result's) and <code>truncated</code> (a sub-query feeding it was cut at its row limit). Never the rows: read those with the two result routes below, <code>result_id</code> being the <code>node_id</code>. Empty when nothing was saved (<code>execute: false</code>, or the run failed before aggregation).</td>
+</tr>
 </tbody>
 </table>
 <p>Only a capped sample of the rows is inlined, in <code>sub_queries[].rows</code>. The full
 result set is written to artifact storage and addressed through <code>artifact_refs</code>
-(<code>uri</code>, <code>format</code>, <code>row_count</code>, <code>columns</code>).</p>
+(<code>uri</code>, <code>format</code>, <code>row_count</code>, <code>columns</code>). The run's combined results are listed in
+<code>result_manifest</code> and read back, a page at a time or as CSV, with
+<a href="#get-apiv1queryrequest_idresultsresult_id"><code>GET /api/v1/query/{request_id}/results/{result_id}</code></a>
+and <a href="#get-apiv1queryrequest_idresultsresult_idcsv"><code>.../{result_id}.csv</code></a>.</p>
+<h3 id="resultpage"><code>ResultPage</code></h3>
+<table>
+<thead>
+<tr>
+<th>field</th>
+<th>type</th>
+<th>meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>request_id</code></td>
+<td><code>str</code></td>
+<td>The run's <code>trace_id</code>.</td>
+</tr>
+<tr>
+<td><code>result_id</code></td>
+<td><code>str</code></td>
+<td>The result's <code>node_id</code> from <code>result_manifest</code>.</td>
+</tr>
+<tr>
+<td><code>columns</code></td>
+<td><code>List[str]</code></td>
+<td>Column names, in row order.</td>
+</tr>
+<tr>
+<td><code>rows</code></td>
+<td><code>List[List[Any]]</code></td>
+<td><code>rows[i]</code> is row <code>offset + i</code> of the result.</td>
+</tr>
+<tr>
+<td><code>offset</code></td>
+<td><code>int</code></td>
+<td>The first row returned, from 0.</td>
+</tr>
+<tr>
+<td><code>limit</code></td>
+<td><code>int</code></td>
+<td>The page size used, after the cap of 1,000.</td>
+</tr>
+<tr>
+<td><code>total_rows</code></td>
+<td><code>int</code></td>
+<td>Rows in the whole result.</td>
+</tr>
+<tr>
+<td><code>next_offset</code></td>
+<td><code>Optional[int]</code></td>
+<td>Where the next page starts, or <code>null</code> when this page reaches the end.</td>
+</tr>
+</tbody>
+</table>
 <p>An <code>errors[]</code> entry for a key the provider rejected:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="p">{</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="nt">"node"</span><span class="p">:</span><span class="w"> </span><span class="s2">"datasource_resolver"</span><span class="p">,</span>
@@ -4697,7 +4846,75 @@ event loop.</p>
 <a id="__codelineno-1-62" name="__codelineno-1-62" href="#__codelineno-1-62"></a><span class="p">}</span>
 </code></pre></div>
 <p>(Illustrative numbers. <code>usage.calls</code> is shortened to one entry; a real response lists all three.)</p>
+<h3 id="get-apiv1queryrequest_idresultsresult_id"><code>GET /api/v1/query/{request_id}/results/{result_id}</code></h3>
+<p>One page of a run's saved result.</p>
+<table>
+<thead>
+<tr>
+<th>parameter</th>
+<th>in</th>
+<th>default</th>
+<th>meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>request_id</code></td>
+<td>path</td>
+<td></td>
+<td>The run's <code>trace_id</code>.</td>
+</tr>
+<tr>
+<td><code>result_id</code></td>
+<td>path</td>
+<td></td>
+<td>A <code>node_id</code> from the run's <code>result_manifest</code>.</td>
+</tr>
+<tr>
+<td><code>offset</code></td>
+<td>query</td>
+<td><code>0</code></td>
+<td>First row, from 0. Negative is <code>HTTP 422</code>.</td>
+</tr>
+<tr>
+<td><code>limit</code></td>
+<td>query</td>
+<td><code>100</code></td>
+<td>Rows per page, at least 1 (else <code>HTTP 422</code>). Above 1,000 it is cut to 1,000; <code>limit</code> in the response says which.</td>
+</tr>
+</tbody>
+</table>
+<p>Response model: <code>ResultPage</code>. Delegates to <code>engine.get_result_page(...)</code>, which
+reads the rows lazily from the result's parquet artifact: only the slice asked for
+is read. A page past the end has no rows.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>curl<span class="w"> </span>-H<span class="w"> </span><span class="s2">"X-NL2SQL-Role: admin"</span><span class="w">   </span><span class="s2">"http://localhost:8000/api/v1/query/0f1c.../results/combine_g1?offset=100&amp;limit=100"</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="p">{</span><span class="nt">"request_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"0f1c..."</span><span class="p">,</span><span class="w"> </span><span class="nt">"result_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"combine_g1"</span><span class="p">,</span><span class="w"> </span><span class="nt">"columns"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"customer"</span><span class="p">,</span><span class="w"> </span><span class="s2">"revenue"</span><span class="p">],</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w"> </span><span class="nt">"rows"</span><span class="p">:</span><span class="w"> </span><span class="p">[[</span><span class="s2">"acme"</span><span class="p">,</span><span class="w"> </span><span class="mi">42</span><span class="p">],</span><span class="w"> </span><span class="p">[</span><span class="s2">"globex"</span><span class="p">,</span><span class="w"> </span><span class="mi">40</span><span class="p">]],</span><span class="w"> </span><span class="nt">"offset"</span><span class="p">:</span><span class="w"> </span><span class="mi">100</span><span class="p">,</span><span class="w"> </span><span class="nt">"limit"</span><span class="p">:</span><span class="w"> </span><span class="mi">100</span><span class="p">,</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w"> </span><span class="nt">"total_rows"</span><span class="p">:</span><span class="w"> </span><span class="mi">102</span><span class="p">,</span><span class="w"> </span><span class="nt">"next_offset"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">}</span>
+</code></pre></div>
+<h3 id="get-apiv1queryrequest_idresultsresult_idcsv"><code>GET /api/v1/query/{request_id}/results/{result_id}.csv</code></h3>
+<p>The whole of a run's saved result as <code>text/csv</code> (UTF-8, header first), sent as an
+attachment named <code>&lt;request_id&gt;_&lt;result_id&gt;.csv</code>. Delegates to
+<code>engine.export_result_csv(...)</code>, which reads the parquet artifact a slice at a time
+and streams each slice out, so the result is never built in memory on the server.</p>
+<h3 id="errors-and-scope-of-the-result-routes">Errors and scope of the result routes</h3>
+<ul>
+<li>Both need a role, as <code>/query</code> does: no role is <code>HTTP 401</code>.</li>
+<li>Results are read from the engine's own tenant folder (<code>TENANT_ID</code>, the
+  <code>&lt;tenant_id&gt;</code> of the artifact path) and nowhere else. An unknown <code>request_id</code>, a
+  run of another tenant, a <code>result_id</code> the run's manifest does not list, and an id
+  that is not a plain token (letters, digits, <code>_</code> and <code>-</code>, so no <code>/</code>, <code>.</code> or <code>..</code>)
+  are all <code>HTTP 404</code>, so a caller cannot tell one from the other or reach a path
+  outside the run's folder.</li>
+<li>There is no access control beyond that yet: any caller with a role who knows a
+  run's <code>trace_id</code> can read its result.</li>
+</ul>
 <h2 id="tests">Tests</h2>
+<p><code>packages/api/tests/test_query_results_routes.py</code> covers the result routes over the
+real facade and a local artifact store: paging, the cap, <code>HTTP 422</code> for a bad
+offset or limit, the complete CSV, <code>HTTP 404</code> for unknown, foreign and crafted ids,
+and <code>HTTP 401</code> without a role.</p>
 <p><code>packages/api/tests/test_query_routes.py</code> and
 <code>packages/api/tests/test_query_response_shape.py</code> cover this endpoint with FastAPI's
 <code>TestClient</code> and a stubbed engine (<code>get_engine</code> dependency override) and a stubbed
