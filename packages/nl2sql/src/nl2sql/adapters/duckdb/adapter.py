@@ -1,4 +1,7 @@
+import threading
 from typing import Any, Dict
+
+from sqlalchemy import event
 
 from nl2sql.adapters.sqlalchemy_base import (
     CostEstimate,
@@ -8,6 +11,9 @@ from nl2sql.adapters.sqlalchemy_base import (
 )
 
 from pydantic import BaseModel, Field
+
+# Connection.info key of the running statement's interrupt timer.
+_TIMER = "nl2sql_statement_timer"
 
 
 class DuckdbConnectionConfig(BaseModel):
@@ -35,6 +41,39 @@ class DuckdbAdapter(BaseSQLAlchemyAdapter):
         """
         config = DuckdbConnectionConfig(**args)
         return f"duckdb:///{config.database}"
+
+    def connect(self) -> None:
+        """Connects, and enforces ``statement_timeout_ms`` by interrupting.
+
+        DuckDB has no statement timeout setting, so each statement starts a
+        timer that calls the connection's ``interrupt()`` when the limit
+        passes; the statement then fails with DuckDB's ``InterruptException``,
+        reported as a refusal. The timer is cancelled when the statement
+        finishes or fails.
+        """
+        super().connect()
+        if not self.statement_timeout_ms:
+            return
+        seconds = self.statement_timeout_ms / 1000
+
+        def start_timer(conn, cursor, statement, parameters, context, executemany):
+            timer = threading.Timer(seconds, conn.connection.dbapi_connection.interrupt)
+            timer.daemon = True
+            conn.info[_TIMER] = timer
+            timer.start()
+
+        def stop_timer(conn, *args):
+            timer = conn.info.pop(_TIMER, None)
+            if timer is not None:
+                timer.cancel()
+
+        def stop_timer_on_error(context):
+            if context.connection is not None:
+                stop_timer(context.connection)
+
+        event.listen(self.engine, "before_cursor_execute", start_timer)
+        event.listen(self.engine, "after_cursor_execute", stop_timer)
+        event.listen(self.engine, "handle_error", stop_timer_on_error)
 
     def dry_run(self, query: str) -> DryRunResult:
         try:

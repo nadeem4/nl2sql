@@ -1,5 +1,5 @@
 from typing import Any, List, Dict
-from sqlalchemy import create_engine, text, inspect
+from sqlalchemy import URL, create_engine, text, inspect
 from sqlalchemy.dialects import mysql
 from nl2sql.adapters.sqlalchemy_base import (
     CostEstimate,
@@ -39,22 +39,17 @@ class MysqlAdapter(BaseSQLAlchemyAdapter):
         """
         config = MysqlConnectionConfig(**args)
         
-        user = config.user
-        password = config.password.get_secret_value()
-        host = config.host
-        port = config.port
-        database = config.database
-        options = config.options.copy()
-        
-        creds = f"{user}:{password}@" if user or password else ""
-        netloc = f"{host}:{port}"
-        
-        query_str = ""
-        if options:
-            from urllib.parse import urlencode
-            query_str = "?" + urlencode(options)
-            
-        return f"mysql+pymysql://{creds}{netloc}/{database}{query_str}"
+        # URL.create escapes the credentials, so a password holding @ : / # %
+        # stays a password instead of moving the host or port boundary.
+        return URL.create(
+            "mysql+pymysql",
+            username=config.user or None,
+            password=config.password.get_secret_value() or None,
+            host=config.host,
+            port=config.port,
+            database=config.database,
+            query={key: str(value) for key, value in config.options.items()},
+        ).render_as_string(hide_password=False)
 
     def connect(self) -> None:
         """MySQL-specific connection with Native Server-Side Timeout."""
