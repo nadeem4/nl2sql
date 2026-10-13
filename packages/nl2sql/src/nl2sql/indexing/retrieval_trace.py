@@ -50,6 +50,26 @@ def _first(results: Dict[str, Any], key: str) -> List[Any]:
     return list(rows[0])
 
 
+def _exact_pool(collection: Any, embedding: List[float], fetch_k: int,
+                where: Optional[Dict[str, Any]]) -> Tuple[List[Any], List[Any], List[Any], List[Any]]:
+    """The ``fetch_k`` entries passing ``where`` most similar to ``embedding``, nearest first.
+
+    Every entry is scored, so none is missed; ties keep id order, so the pool
+    is the same on every run.
+    """
+    got = collection.get(where=where, include=["metadatas", "documents", "embeddings"])
+    ids = list(got.get("ids") or [])
+    if not ids:
+        return [], [], [], []
+    vectors = list(got["embeddings"])
+    scores = cosine_similarity([embedding], vectors)[0]
+    order = sorted(range(len(ids)), key=lambda i: (-float(scores[i]), ids[i]))[:fetch_k]
+    texts = list(got.get("documents") or [None] * len(ids))
+    metadatas = list(got.get("metadatas") or [None] * len(ids))
+    return ([ids[i] for i in order], [texts[i] for i in order],
+            [metadatas[i] for i in order], [vectors[i] for i in order])
+
+
 def mmr_search(
     collection: Any,
     embeddings: Any,
@@ -60,6 +80,7 @@ def mmr_search(
     lambda_mult: float,
     where: Optional[Dict[str, Any]],
     with_text: bool = False,
+    exact: bool = False,
 ) -> Tuple[List[Document], Dict[str, Any]]:
     """Runs one MMR search and records it.
 
@@ -73,6 +94,10 @@ def mmr_search(
         where: The Chroma metadata filter.
         with_text: Also record each entry's embedded text (the playground's
             inspector only; a run trace never carries it).
+        exact: Rank every entry passing ``where`` by cosine similarity instead
+            of asking Chroma's approximate (HNSW) search, which with a filter
+            few entries pass can return fewer than exist. For small entry sets
+            only (the datasource entries); the pool then records no distance.
 
     Returns:
         The picked documents in pool order (as Chroma returns them), and the
@@ -80,17 +105,21 @@ def mmr_search(
         the order MMR made them, and what was dropped.
     """
     embedding = embeddings.embed_query(query)
-    results = collection.query(
-        query_embeddings=[embedding],
-        n_results=fetch_k,
-        where=where,
-        include=["metadatas", "documents", "distances", "embeddings"],
-    )
-    ids = _first(results, "ids")
-    texts = _first(results, "documents")
-    metadatas = _first(results, "metadatas")
-    distances = _first(results, "distances")
-    vectors = _first(results, "embeddings")
+    if exact:
+        ids, texts, metadatas, vectors = _exact_pool(collection, embedding, fetch_k, where)
+        distances: List[Any] = []
+    else:
+        results = collection.query(
+            query_embeddings=[embedding],
+            n_results=fetch_k,
+            where=where,
+            include=["metadatas", "documents", "distances", "embeddings"],
+        )
+        ids = _first(results, "ids")
+        texts = _first(results, "documents")
+        metadatas = _first(results, "metadatas")
+        distances = _first(results, "distances")
+        vectors = _first(results, "embeddings")
 
     picks: List[int] = (
         maximal_marginal_relevance(np.array(embedding, dtype=np.float32), vectors, k=k, lambda_mult=lambda_mult)

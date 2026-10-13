@@ -20,6 +20,10 @@ from .schemas import AnswerabilityResponse, DatasourceResolverResponse, Resolved
 
 logger = get_logger("datasource_resolver")
 
+# Table names per datasource the decomposer is shown; the rest are counted, so
+# a large schema does not bloat its prompt.
+MAX_DECOMPOSER_TABLES = 30
+
 
 class DatasourceResolverNode:
     """Picks the datasources a question goes to, and refuses what none can answer.
@@ -34,7 +38,10 @@ class DatasourceResolverNode:
     3. The schema-version mismatch policy.
     4. The answerability check: one small structured LLM call over the allowed
        candidates' descriptions and table lists. An empty verdict ends the run
-       with ``QUESTION_NOT_ANSWERABLE`` before the decomposer.
+       with ``QUESTION_NOT_ANSWERABLE`` before the decomposer. After a vector
+       search only the datasources the verdict names (and the role may read)
+       go forward, each with its description and a capped table list for the
+       decomposer.
     """
 
     def __init__(self, ctx: NL2SQLContext):
@@ -177,6 +184,16 @@ class DatasourceResolverNode:
             schema_version=self.schema_store.get_latest_version(datasource_id),
         )
 
+    def _summary(self, datasource_id: str) -> tuple[str, list[str]]:
+        """The datasource's description and its sorted, bare table names."""
+        snapshot = self.schema_store.get_latest_snapshot(datasource_id)
+        if not snapshot:
+            return "", []
+        description = (snapshot.metadata.description or "").strip()
+        # Bare table names: routing needs the topic, not the qualified name.
+        tables = sorted({t.table.table_name for t in snapshot.contract.tables.values()})
+        return description, tables
+
     def _answerability_input(self, datasource_ids: list[str]) -> str:
         """Each datasource's description and table list, serialized deterministically.
 
@@ -186,12 +203,18 @@ class DatasourceResolverNode:
         """
         entries = []
         for ds_id in sorted(datasource_ids):
-            snapshot = self.schema_store.get_latest_snapshot(ds_id)
-            description = (snapshot.metadata.description or "") if snapshot else ""
-            # Bare table names: the check needs the topic, not the qualified name.
-            tables = sorted({t.table.table_name for t in snapshot.contract.tables.values()}) if snapshot else []
-            entries.append({"description": description.strip(), "id": ds_id, "tables": tables})
+            description, tables = self._summary(ds_id)
+            entries.append({"description": description, "id": ds_id, "tables": tables})
         return json.dumps(entries, sort_keys=True, ensure_ascii=False)
+
+    def _with_context(self, datasource: ResolvedDatasource) -> ResolvedDatasource:
+        """The datasource with its description and a capped table list, for the decomposer."""
+        description, tables = self._summary(datasource.datasource_id)
+        return datasource.model_copy(update={
+            "description": description,
+            "tables": tables[:MAX_DECOMPOSER_TABLES],
+            "more_tables": max(0, len(tables) - MAX_DECOMPOSER_TABLES),
+        })
 
     def _judge_answerability(self, question: str, datasource_ids: list[str]) -> AnswerabilityResponse:
         return self.answerability_chain.invoke(
@@ -246,11 +269,13 @@ class DatasourceResolverNode:
                         error_code=ErrorCode.INVALID_STATE,
                     )
                 candidates = [self._direct_candidate(state.datasource_id)]
+                searched = False
                 how = "Using explicit datasource override."
             elif len(registered_ids) == 1:
                 # Searching one document for every question can only ever
                 # return it, and fails when the vector store is missing.
                 candidates = [self._direct_candidate(registered_ids[0])]
+                searched = False
                 how = "One datasource is registered, so it is used without a vector search."
             else:
                 if not self.vector_store:
@@ -287,6 +312,7 @@ class DatasourceResolverNode:
                         severity=ErrorSeverity.ERROR,
                         error_code=ErrorCode.SCHEMA_RETRIEVAL_FAILED,
                     )
+                searched = True
                 how = "Ranked by vector similarity."
 
             candidate_ids = [c.datasource_id for c in candidates]
@@ -315,7 +341,16 @@ class DatasourceResolverNode:
                 return mismatch_response
 
             verdict = self._judge_answerability(state.user_query, allowed_ids)
-            if not verdict.answerable_datasource_ids:
+            if searched:
+                # Only what the verdict accepted goes forward, and only what
+                # the role may read: the verdict cannot add a datasource.
+                answerable = set(verdict.answerable_datasource_ids)
+                forward_ids = [ds_id for ds_id in allowed_ids if ds_id in answerable]
+            else:
+                # One candidate, chosen without a search: a non-empty verdict
+                # accepts it.
+                forward_ids = allowed_ids if verdict.answerable_datasource_ids else []
+            if not forward_ids:
                 response = self._error_response(
                     resolved_datasources=candidates,
                     allowed_ids=[],
@@ -330,10 +365,16 @@ class DatasourceResolverNode:
                 response["reasoning"] = [{"node": self.node_name, "content": f"Not answerable: {verdict.reason}"}]
                 return response
 
+            # Sorted by id: the decomposer prints these into its prompt, and
+            # the vector store returns them in no fixed order.
+            forwarded = sorted(
+                (self._with_context(c) for c in candidates if c.datasource_id in forward_ids),
+                key=lambda c: c.datasource_id,
+            )
             return {
                 "datasource_resolver_response": DatasourceResolverResponse(
-                    resolved_datasources=candidates,
-                    allowed_datasource_ids=allowed_ids,
+                    resolved_datasources=forwarded,
+                    allowed_datasource_ids=sorted(forward_ids),
                     unsupported_datasource_ids=unsupported_ids,
                 ),
                 "reasoning": [

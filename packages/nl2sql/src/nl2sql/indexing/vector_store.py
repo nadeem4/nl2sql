@@ -586,6 +586,7 @@ class VectorStore:
         k: int,
         explain: Optional[List[Dict[str, Any]]],
         scope: Dict[str, Any],
+        exact: bool = False,
     ) -> List[Document]:
         from nl2sql.common.resilience import VECTOR_BREAKER
 
@@ -599,6 +600,7 @@ class VectorStore:
                 fetch_k=k * self.FETCH_MULTIPLIER,
                 lambda_mult=self.LAMBDA_MULT,
                 where=where,
+                exact=exact,
             )
 
         docs, record = _execute()
@@ -625,7 +627,10 @@ class VectorStore:
         """
         self.initialize_if_not_exists()
         where = self._and({"type": "schema.datasource"}, self._active_filter())
-        return self._mmr("datasources", query, where, k, explain, {"types": ["schema.datasource"]})
+        # Exact: one entry per datasource, a handful among hundreds, and
+        # Chroma's approximate search under a filter that selective can miss
+        # one, which would drop that datasource from the question's routing.
+        return self._mmr("datasources", query, where, k, explain, {"types": ["schema.datasource"]}, exact=True)
 
     def retrieve_schema_context(
         self,

@@ -151,7 +151,9 @@ object in `outputs`: what the vector search retrieved and how MMR chose among it
   for the schema retriever the sub-query's intent, filters, group-by, expected
   columns and metrics, one per line.
 - **`pool`** is every candidate, nearest first. `similarity` is the cosine
-  similarity MMR uses; `distance` is Chroma's (squared L2). `pick_order` is the
+  similarity MMR uses; `distance` is Chroma's (squared L2), and `null` for the
+  resolver's `datasources` search, which scores every datasource entry itself
+  rather than asking Chroma's approximate search. `pick_order` is the
   order MMR picked in, `mmr_score` the score the pick won with, and
   `redundancy` its similarity to the closest earlier pick.
 - **`searches`** lists each search in order; the schema retriever runs `tables`
