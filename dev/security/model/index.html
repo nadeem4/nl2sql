@@ -2023,7 +2023,11 @@ from depends on the client:</p>
   proxy (<code>NL2SQL_API_ROLE_HEADER</code>) or a static role (<code>NL2SQL_API_ROLE</code>), and
   answers <code>HTTP 401</code> when neither gives one. The body's <code>user_context</code> counts
   only with the dev flag <code>NL2SQL_API_TRUST_BODY_ROLE=true</code>, which logs a
-  warning at startup. See <a href="../../api/rest/#caller-role">Caller role</a>.</li>
+  warning at startup. See <a href="../../api/rest/#caller-role">Caller role</a>.
+  The routes that change datasources, LLMs or the index also need one of the
+  roles in <code>NL2SQL_API_ADMIN_ROLES</code> (default <code>admin</code>), else <code>HTTP 403</code>; with no
+  role source configured they answer loopback clients only. See
+  <a href="../../api/rest/#admin-routes">Admin routes</a>.</li>
 </ul>
 <p>The REST API still does not verify who the caller is. <strong>If you expose this
 service, put your own authentication in a proxy in front of it, derive the role

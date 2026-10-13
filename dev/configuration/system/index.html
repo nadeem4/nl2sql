@@ -833,6 +833,15 @@
     </span>
 </a>
 </li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#rest-api-nl2sql-api">
+<span class="md-ellipsis">
+      
+        REST API (nl2sql-api)
+      
+    </span>
+</a>
+</li>
 </ul>
 </nav>
 </li>
@@ -2059,6 +2068,15 @@
     </span>
 </a>
 </li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#rest-api-nl2sql-api">
+<span class="md-ellipsis">
+      
+        REST API (nl2sql-api)
+      
+    </span>
+</a>
+</li>
 </ul>
 </nav>
 </li>
@@ -2507,6 +2525,45 @@ registry and <code>${env:VAR}</code> references read <code>os.environ</code> rat
 variable already exported in the shell wins over the file.</p>
 <p>From Python, <code>NL2SQL(env="demo")</code> sets <code>ENV</code> and <code>NL2SQL(env_file=path)</code> sets
 <code>ENV_FILE_PATH</code>, reloading settings before any configuration path is resolved.</p>
+<h3 id="rest-api-nl2sql-api">REST API (<code>nl2sql-api</code>)</h3>
+<p>These are read by <code>nl2sql-api</code> only, not by <code>Settings</code>, on each request (CORS
+once at startup).</p>
+<table>
+<thead>
+<tr>
+<th>Env var</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>NL2SQL_API_ROLE_HEADER</code></td>
+<td><code>—</code></td>
+<td>Header a trusted, authenticating proxy sets with the caller's roles (comma-separated). See <a href="../../api/rest/#caller-role">Caller role</a>.</td>
+</tr>
+<tr>
+<td><code>NL2SQL_API_ROLE</code></td>
+<td><code>—</code></td>
+<td>One static role for every request.</td>
+</tr>
+<tr>
+<td><code>NL2SQL_API_TRUST_BODY_ROLE</code></td>
+<td><code>false</code></td>
+<td>Dev only: take <code>user_context</code> from the request body.</td>
+</tr>
+<tr>
+<td><code>NL2SQL_API_ADMIN_ROLES</code></td>
+<td><code>admin</code></td>
+<td>Comma-separated roles allowed on the routes that change datasources, LLMs or the index. With no role source set, those routes answer loopback clients only. See <a href="../../api/rest/#admin-routes">Admin routes</a>.</td>
+</tr>
+<tr>
+<td><code>NL2SQL_API_CORS_ORIGINS</code></td>
+<td><code>—</code></td>
+<td>Browser origins allowed to call the API. See <a href="../../api/rest/#cors-origins">CORS origins</a>.</td>
+</tr>
+</tbody>
+</table>
 <h2 id="config-manager-flow">Config manager flow</h2>
 <pre class="mermaid"><code>flowchart TD
     Env[Environment Variables] --&gt; Settings[Settings]

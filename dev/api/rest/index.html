@@ -3842,6 +3842,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#admin-routes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Admin routes
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -4539,6 +4550,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#admin-routes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Admin routes
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -4587,6 +4609,8 @@ engine over HTTP. Implementation lives in <code>packages/api/src/nl2sql_api/</co
   <code>IndexingService</code>, <code>HealthService</code>) are created per-request with the engine.</li>
 <li><code>get_user_context(request)</code> (in <code>nl2sql_api/auth.py</code>) returns the caller's
   <code>UserContext</code>; see <a href="#caller-role">Caller role</a>.</li>
+<li><code>require_admin(request)</code> (same module) guards the routes that change
+  datasources, LLMs or the index; see <a href="#admin-routes">Admin routes</a>.</li>
 </ul>
 <h2 id="interactive-docs">Interactive docs</h2>
 <p>FastAPI serves Swagger UI at <code>/docs</code>, ReDoc at <code>/redoc</code> and the OpenAPI schema at
@@ -4636,7 +4660,10 @@ server from the folder holding your env file and configs:</p>
 Datasource and delete endpoints map <code>ValueError</code> to <code>HTTP 404</code>.</p>
 <p><code>POST /api/v1/query</code> is the exception: pipeline errors are returned as a normal
 <code>HTTP 200</code> inside <code>QueryResponse.errors</code>, and an unexpected failure returns a
-generic <code>HTTP 500</code> with the traceback logged server-side rather than returned.</p>
+generic <code>HTTP 500</code> with the traceback logged server-side rather than returned.
+<code>POST /api/v1/datasource</code> does the same: its exception can carry a connection
+string, password included, so the response says only that it failed and the
+cause goes to the server log.</p>
 <p>Route handlers that call blocking engine code are declared with <code>def</code> rather than
 <code>async def</code>, so Starlette runs them in its threadpool instead of blocking the
 event loop.</p>
@@ -4698,6 +4725,50 @@ on each request.</p>
 <p>This is a seam, not an auth provider: to integrate one, override the
 <code>get_user_context</code> dependency (<code>app.dependency_overrides[get_user_context] = ...</code>)
 or put the provider in the proxy.</p>
+<h3 id="admin-routes">Admin routes</h3>
+<p>The routes that change the running process need an admin role, checked by the
+<code>require_admin</code> dependency in <code>nl2sql_api/auth.py</code>:</p>
+<ul>
+<li><code>POST /api/v1/datasource</code> and <code>DELETE /api/v1/datasource/{datasource_id}</code></li>
+<li><code>POST /api/v1/llm</code></li>
+<li><code>POST /api/v1/index/{datasource_id}</code>, <code>POST /api/v1/index-all</code> and <code>DELETE /api/v1/index</code></li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>NL2SQL_API_ADMIN_ROLES</code></td>
+<td><code>admin</code></td>
+<td>Comma-separated roles that may call the admin routes.</td>
+</tr>
+</tbody>
+</table>
+<p>The roles come from the same sources as <a href="#caller-role">Caller role</a>. A request
+whose roles include one in <code>NL2SQL_API_ADMIN_ROLES</code> is let through; one with
+roles but none of them admin is <code>HTTP 403</code>; one with no role is <code>HTTP 401</code>.</p>
+<p>With <strong>none</strong> of <code>NL2SQL_API_ROLE_HEADER</code>, <code>NL2SQL_API_ROLE</code> or
+<code>NL2SQL_API_TRUST_BODY_ROLE</code> set, admin routes answer only clients on loopback
+(<code>127.0.0.1</code>, <code>::1</code>) and return <code>HTTP 403</code> to everyone else, with a message
+naming the variables to set. A fresh local install can still register and
+index datasources, and a port published by mistake does not hand them out.
+Two consequences:</p>
+<ul>
+<li>In Docker, a request through a published port arrives from the bridge
+  gateway, not loopback, so admin routes need a role setting there.</li>
+<li>A reverse proxy on the same host makes every request look like loopback.
+  Behind one, configure <code>NL2SQL_API_ROLE_HEADER</code>.</li>
+</ul>
+<p>The read-only routes (<code>/health</code>, <code>/ready</code>, <code>GET /datasource</code>, <code>GET /llm</code>, which
+never returns API keys, and <code>GET /index/status</code>) need no role.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># The proxy sets X-NL2SQL-Role; only "ops" may change datasources and the index.</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="nv">NL2SQL_API_ROLE_HEADER</span><span class="o">=</span>X-NL2SQL-Role<span class="w"> </span><span class="nv">NL2SQL_API_ADMIN_ROLES</span><span class="o">=</span>ops<span class="w"> </span>nl2sql-api<span class="w"> </span>--port<span class="w"> </span><span class="m">8000</span>
+</code></pre></div>
 
 
 

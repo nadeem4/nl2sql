@@ -2894,6 +2894,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#api-roles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        API roles
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#notes" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4383,6 +4394,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#api-roles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        API roles
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#notes" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4438,9 +4460,19 @@ visitor brings their own API key, see <a href="../hosted-demo/">Hosted demo</a>.
 <li><code>SCHEMA_STORE_PATH</code> for the SQLite schema store.</li>
 <li><code>RESULT_ARTIFACT_BASE_URI</code> for artifact storage (local backend).</li>
 </ul>
+<h2 id="api-roles">API roles</h2>
+<p><code>nl2sql-api</code> does not authenticate callers. Set where the RBAC role comes from
+(<code>NL2SQL_API_ROLE_HEADER</code> from an authenticating proxy, or a static
+<code>NL2SQL_API_ROLE</code>) and which roles may change datasources, LLMs and the index
+(<code>NL2SQL_API_ADMIN_ROLES</code>, default <code>admin</code>). With no role setting, queries answer
+HTTP 401 and the admin routes answer HTTP 403, because a request through a
+published port does not come from loopback. See
+<a href="../../api/rest/#caller-role">Caller role</a> and
+<a href="../../api/rest/#admin-routes">Admin routes</a>.</p>
 <h2 id="notes">Notes</h2>
 <ul>
-<li>Schema indexing is not automatic; you must run indexing in your operational flow.</li>
+<li>Schema indexing is not automatic; you must run indexing in your operational flow.
+  Through the API, <code>POST /api/v1/index-all</code> needs an admin role.</li>
 <li>Observability exporters require network access and corresponding env vars.</li>
 </ul>
 <h2 id="reference-configuration">Reference configuration</h2>

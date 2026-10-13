@@ -4597,10 +4597,13 @@
 <p>Source: <code>packages/api/src/nl2sql_api/routes/datasource.py</code></p>
 <p>Request model: <code>DatasourceRequest</code></p>
 <p>Response model: <code>DatasourceResponse</code></p>
+<p>Admin only: see <a href="../#admin-routes">Admin routes</a>.</p>
 <p>Execution flow:
 - Delegates to <code>engine.add_datasource(...)</code>.</p>
 <p>Errors:
-- Unhandled exceptions return <code>HTTP 500</code>.</p>
+- No role -&gt; <code>HTTP 401</code>; a role not in <code>NL2SQL_API_ADMIN_ROLES</code> -&gt; <code>HTTP 403</code>.
+- A failure to add -&gt; <code>HTTP 500</code> with a generic message. The exception, which can
+  hold the connection string, is logged server-side and never returned.</p>
 <h3 id="get-apiv1datasource"><code>GET /api/v1/datasource</code></h3>
 <p>Response model: <code>Dict[str, Any]</code> (with <code>datasources</code> list)</p>
 <p>Execution flow:
@@ -4615,6 +4618,7 @@
 - Other exceptions -&gt; <code>HTTP 500</code>.</p>
 <h3 id="delete-apiv1datasourcedatasource_id"><code>DELETE /api/v1/datasource/{datasource_id}</code></h3>
 <p>Response model: <code>Dict[str, Any]</code></p>
+<p>Admin only: see <a href="../#admin-routes">Admin routes</a>.</p>
 <p>Execution flow:
 - Returns a fixed payload indicating removal is not supported.</p>
 <p>Errors:

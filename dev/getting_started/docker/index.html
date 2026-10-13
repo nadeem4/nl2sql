@@ -4471,6 +4471,11 @@ for example <code>"./packages/nl2sql[postgres,mysql,mssql]"</code>.</p>
 </code></pre></div>
 <p><code>NL2SQL_API_ROLE</code> pins the RBAC role for every request; without a role setting
 the query route answers HTTP 401. See <a href="../../api/rest/#caller-role">Caller role</a>.</p>
+<p>The routes that register datasources or LLMs and build or clear the index need a
+role listed in <code>NL2SQL_API_ADMIN_ROLES</code> (default <code>admin</code>), so <code>NL2SQL_API_ROLE=admin</code>
+above allows them. Without any role setting they answer loopback clients only,
+and a request through a published Docker port does not come from loopback: it
+gets HTTP 403. See <a href="../../api/rest/#admin-routes">Admin routes</a>.</p>
 <h2 id="configuration">Configuration</h2>
 <p>Mount or bake your config files into the container:</p>
 <ul>

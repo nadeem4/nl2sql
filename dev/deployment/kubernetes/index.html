@@ -4439,6 +4439,11 @@
 <h2 id="operational-considerations">Operational considerations</h2>
 <ul>
 <li>Run schema indexing as a separate job or init container.</li>
+<li>If you run <code>nl2sql-api</code>, set the role source (<code>NL2SQL_API_ROLE_HEADER</code> behind an
+  authenticating ingress, or <code>NL2SQL_API_ROLE</code>) and the admin roles
+  (<code>NL2SQL_API_ADMIN_ROLES</code>, default <code>admin</code>): pod traffic is not loopback, so
+  without them the admin routes answer HTTP 403. See
+  <a href="../../api/rest/#admin-routes">Admin routes</a>.</li>
 <li>Configure observability exporters via env (<code>OBSERVABILITY_EXPORTER</code>, <code>OTEL_EXPORTER_OTLP_ENDPOINT</code>).</li>
 </ul>
 <h2 id="reference-configuration">Reference configuration</h2>

@@ -4463,6 +4463,9 @@
 
 <h1 id="indexing-api">Indexing API</h1>
 <h2 id="endpoints">Endpoints</h2>
+<p><code>POST /api/v1/index/{datasource_id}</code>, <code>POST /api/v1/index-all</code> and
+<code>DELETE /api/v1/index</code> are admin only (see <a href="../#admin-routes">Admin routes</a>);
+<code>GET /api/v1/index/status</code> is open.</p>
 <h3 id="post-apiv1indexdatasource_id"><code>POST /api/v1/index/{datasource_id}</code></h3>
 <p>Execution flow:
 - Delegates to <code>engine.indexing.index_datasource(...)</code>.</p>
