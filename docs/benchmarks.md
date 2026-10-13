@@ -7,7 +7,7 @@ interval. "Δ vs previous" is the change against the previous run of the same co
 for tier 2 how many questions flipped each way with McNemar's exact p-value on them: at 47
 questions a few points either way is noise, so read the flips and the p-value rather than
 the headline. Runs on another gold dataset (`@sha`), another schema or, for tier 2, other
-roles are not comparable and start a new series. See
+roles or curated answers on (`--use-curated`) are not comparable and start a new series. See
 [the evaluation dataset](testing/evaluation-dataset.md).
 
 ## Tier 2: chinook (sqlite, 11 tables / 64 columns)

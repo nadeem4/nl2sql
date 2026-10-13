@@ -43,6 +43,12 @@ docker run --rm -p 8000:8000 -e ENV=demo -e NL2SQL_API_ROLE=admin nl2sql-api
 `NL2SQL_API_ROLE` pins the RBAC role for every request; without a role setting
 the query route answers HTTP 401. See [Caller role](../api/rest/index.md#caller-role).
 
+The routes that register datasources or LLMs and build or clear the index need a
+role listed in `NL2SQL_API_ADMIN_ROLES` (default `admin`), so `NL2SQL_API_ROLE=admin`
+above allows them. Without any role setting they answer loopback clients only,
+and a request through a published Docker port does not come from loopback: it
+gets HTTP 403. See [Admin routes](../api/rest/index.md#admin-routes).
+
 ## Configuration
 
 Mount or bake your config files into the container:

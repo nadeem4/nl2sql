@@ -1,4 +1,4 @@
-from typing import Dict, List, Any, Set
+from typing import Dict, List, Any, Optional, Set
 from threading import RLock
 
 from nl2sql_adapter_sdk.capabilities import DatasourceCapability
@@ -42,6 +42,7 @@ class DatasourceRegistry:
         self._adapters: Dict[str, DatasourceAdapterProtocol] = {}
         self._capabilities: Dict[str, Set[str]] = {}
         self._preferred: Dict[str, List[str]] = {}
+        self._descriptions: Dict[str, Optional[str]] = {}
         self._unavailable: Dict[str, str] = {}
         self._available_adapters = discover_adapters()
         self._secret_manager = secret_manager
@@ -187,6 +188,7 @@ class DatasourceRegistry:
                 self._adapters[ds_id] = adapter
                 self._capabilities[ds_id] = capabilities
                 self._preferred[ds_id] = list(config.preferred_tables)
+                self._descriptions[ds_id] = config.description
                 self._unavailable.pop(ds_id, None)
             return adapter
         else:
@@ -227,6 +229,11 @@ class DatasourceRegistry:
         """The datasource's ``preferred_tables``; empty for an unknown id."""
         with self._lock:
             return list(self._preferred.get(datasource_id, []))
+
+    def get_description(self, datasource_id: str) -> Optional[str]:
+        """The ``description`` the datasource was registered with; None for an unknown id."""
+        with self._lock:
+            return self._descriptions.get(datasource_id)
 
     def get_capabilities(self, datasource_id: str) -> Set[str]:
         """Returns the capability flags for a datasource."""

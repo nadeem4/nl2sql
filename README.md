@@ -283,7 +283,7 @@ folder (`cd nl2sql-demo`). Every command has `--help`.
 | `nl2sql demo` | Scaffold, index and serve the three-database playground | `--dir` (default `nl2sql-demo`), `--host` (default `127.0.0.1`), `--port` (default 8765), `--no-browser`, `--api-key`, `--record`, `--allow-settings`, `--hosted` |
 | `nl2sql setup` | Interactive wizard: writes `.env.dev`, `configs/datasources.yaml` (Postgres, MySQL, SQL Server, SQLite or DuckDB), `configs/llm.yaml`, `configs/policies.json`, offers to install a configured adapter's missing driver extra, checks connectivity, offers to index | `--demo` (write the demo project, all three sample databases, in the current folder and index it, no wizard), `--api-key` |
 | `nl2sql run "QUESTION"` | Ask a question and print the plan, checks, SQL, rows and answer | `--role` (default `admin`), `--no-exec` (plan and validate only), `--ds-id`, `--verbose`/`-v`, `--show-perf`, `--config`, `--llm-config`, `--policies-config`, `--secrets-config`, `--vector-store` |
-| `nl2sql index` | Index datasource schemas into the vector store, one datasource at a time | `--datasource`/`-d ID` (repeatable), `--full` (rebuild all, needed after changing the embedding model), `--curated-only` (re-index only the verified queries of `curated.yaml`, keeping the schema entries; no model call) |
+| `nl2sql index` | Index datasource schemas into the vector store, one datasource at a time | `--datasource`/`-d ID` (repeatable), `--full` (rebuild all, needed after changing the embedding model), `--curated-only` (re-index only the verified queries of `curated.yaml`, keeping the schema entries; no model call), `--enrich` (ask the `indexing_enrichment` LLM for descriptions the database lacks; spends tokens, off by default) |
 | `nl2sql doctor` | Check Python, installed drivers, datasource connectivity, the LLM key and the index | |
 | `nl2sql list-adapters` | List the installed datasource adapters | |
 | `nl2sql install NAME` | pip-install the driver extra for an adapter (`postgres`, `mysql`, `mssql`, `duckdb`, `sqlite`: the `connection.type` names), after a confirmation | |
@@ -299,7 +299,7 @@ folder (`cd nl2sql-demo`). Every command has `--help`.
 | `nl2sql feedback export --good` | Write thumbs-up runs as draft gold entries to a separate YAML for review | `--out` (default `feedback_gold_drafts.yaml`) |
 | `nl2sql feedback clear` | Delete every rating | `--yes` |
 | `nl2sql benchmark --tier 1` | Tier 1: the hand-written gold plans through the validator, generator and executor, with a local fake LLM (no key) | `--role` (repeatable), `--include-ids` (repeatable), `--export-path` |
-| `nl2sql benchmark --tier 2` | Tier 2: the real model end to end on the gold questions, per config, under a cost cap | `--max-cost USD` (no default; exits 2 without it), `--model` (repeatable), `--llm PRESET\|PATH` (repeatable), `--passes` (default 1), `--questions` (repeatable), `--note`, `--baseline`, `--max-regressions` (default 2), `--max-accuracy-drop` (deprecated), `--max-cost-increase` (default 0.20), `--results-dir` |
+| `nl2sql benchmark --tier 2` | Tier 2: the real model end to end on the gold questions, per config, under a cost cap | `--max-cost USD` (no default; exits 2 without it), `--model` (repeatable), `--llm PRESET\|PATH` (repeatable), `--passes` (default 1), `--questions` (repeatable), `--note`, `--baseline`, `--max-regressions` (default 2), `--max-accuracy-drop` (deprecated), `--max-cost-increase` (default 0.20), `--results-dir`, `--use-curated` (curated answers are off by default) |
 | `nl2sql benchmark` | Without `--tier`: the gold questions through the full pipeline with the configured LLM | `--iterations` (default 3), `--bench-config-path`, `--role`, `--include-ids` |
 | `nl2sql benchmark retrieval` | Table and column recall of schema retrieval on the gold questions; no key, no LLM | `--record`, `--note`, `--baseline`, `--questions`, `--export-path`, `--results-dir` |
 | `nl2sql benchmark presets` | List the built-in tier 2 LLM configs (`gpt-5.4`, `gpt-5.4-mini-helpers`, `claude-planner`) | |
@@ -353,6 +353,11 @@ wins:
 | `NL2SQL_API_TRUST_BODY_ROLE=true` | Dev only: `user_context` in the body. Any client can pick any role, so the server logs a warning at startup. |
 
 With none of them, `/api/v1/query`, `/api/v1/query/stream` and the result routes answer HTTP 401.
+
+The routes that change the process (`POST /api/v1/datasource`, `DELETE /api/v1/datasource/{id}`,
+`POST /api/v1/llm`, `POST /api/v1/index/{id}`, `POST /api/v1/index-all`, `DELETE /api/v1/index`)
+also need a role listed in `NL2SQL_API_ADMIN_ROLES` (default `admin`), else HTTP 403. With no
+role setting at all they answer loopback clients only.
 
 | Method | Path | Purpose |
 | --- | --- | --- |
@@ -432,7 +437,7 @@ runs on. Feedback is not on the facade; it is read through the CLI. See
 | --- | --- |
 | `configs/datasources.yaml` | Datasources and connections: PostgreSQL, MySQL, SQL Server, SQLite, DuckDB ([Datasources](docs/configuration/datasources.md)) |
 | `configs/llm.yaml` | A `default` agent and optional per-node agents ([LLM](docs/configuration/llm.md)) |
-| `configs/policies.json` | Roles: allowed datasources and `datasource.table` entries ([Policies](docs/configuration/policies.md)) |
+| `configs/policies.json` | Roles: allowed datasources and `datasource.schema.table` entries ([Policies](docs/configuration/policies.md)) |
 | `configs/secrets.yaml` | Secret providers for `${provider:key}` references ([Secrets](docs/configuration/secrets.md)) |
 
 **LLM providers.** `openai` (default model `gpt-5.4`), `anthropic` (Claude,
@@ -443,7 +448,8 @@ fill the recursive plan schema). Those defaults are what `nl2sql setup` and
 `nl2sql demo` write. Each of the six model-using steps can have its own
 provider and model under `agents`: `curatedmatcher`, `datasourceresolver`, `decomposer`,
 `astplanner`, `refiner` and `answersynthesizer`, plus `indexing_enrichment`
-for optional schema descriptions during indexing.
+for optional schema descriptions during indexing (off unless you run
+`nl2sql index --enrich`).
 
 **Key environment variables** ([System configuration](docs/configuration/system.md)):
 

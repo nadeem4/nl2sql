@@ -37,7 +37,7 @@ Fields:
 | `description` | `str` | yes | Human-readable role description. |
 | `role` | `str` | yes | Role ID for auditing/logging. |
 | `allowed_datasources` | `List[str]` | no | Allowed datasource IDs or `*`. |
-| `allowed_tables` | `List[str]` | no | Allowed tables in `datasource.table` format. |
+| `allowed_tables` | `List[str]` | no | Allowed tables: `*`, `datasource.*`, `datasource.schema.*`, `datasource.schema.table`, or `datasource.table` (default schema only). |
 
 ### AuthAPI.check_permissions
 
@@ -45,14 +45,15 @@ Source:
 `packages/nl2sql/src/nl2sql/api/auth_api.py`
 
 Signature:
-`check_permissions(user_context: UserContext, datasource_id: str, table: str) -> bool`
+`check_permissions(user_context: UserContext, datasource_id: str, table: str, schema: Optional[str] = None) -> bool`
 
 Parameters:
 | name | type | required | meaning |
 | --- | --- | --- | --- |
 | `user_context` | `UserContext` | yes | User identity + roles. |
 | `datasource_id` | `str` | yes | Datasource ID being accessed. |
-| `table` | `str` | yes | Table name (`datasource.table` format enforced by policy). |
+| `table` | `str` | yes | Bare table name. |
+| `schema` | `Optional[str]` | no | Schema of the table; `None` means the datasource's default schema. |
 
 Returns:
 `bool` indicating whether access is allowed.
@@ -92,10 +93,14 @@ Idempotency:
 Yes.
 
 ## Behavioral Contracts
-- Policies enforce table namespacing (`datasource.table` or `datasource.*`).
+- Policies enforce table namespacing (`datasource.*`, `datasource.schema.*`,
+  `datasource.schema.table`, or `datasource.table`, read as the datasource's
+  default schema only). See [Policies](../../configuration/policies.md).
 - Unknown roles yield empty permissions, and an empty `roles` list does too;
   neither raises. An unknown role beside a known one is ignored.
-- `table_allowed(allowed_tables, datasource_id, table)` is the single matching
-  rule (`*`, `datasource.*`, `datasource.table`) used by both the logical
-  validator (to refuse) and the schema retriever (to strip a forbidden table's
-  statistics).
+- `table_allowed(allowed_tables, datasource_id, table, schema, default_schema)`
+  is the single matching rule used by the logical validator (to refuse), the
+  schema retriever (to strip a forbidden table's statistics), the executor's
+  value check and the curated matcher. `default_schema(ds_registry,
+  datasource_id)` reads the default schema from the adapter; `main` stands in
+  when the adapter cannot report one.

@@ -131,13 +131,18 @@ def test_the_index_command_passes_datasource_and_full(monkeypatch):
 
     result = CliRunner().invoke(main.app, ["index", "--datasource", "chinook", "--datasource", "sales"])
     assert result.exit_code == 0, result.output
-    assert seen == {"datasource_ids": ["chinook", "sales"], "full": False, "curated_only": False}
+    assert seen == {"enrich": False, "datasource_ids": ["chinook", "sales"], "full": False,
+                    "curated_only": False}
 
     CliRunner().invoke(main.app, ["index", "--full"])
-    assert seen == {"datasource_ids": None, "full": True, "curated_only": False}
+    assert seen == {"enrich": False, "datasource_ids": None, "full": True, "curated_only": False}
 
     CliRunner().invoke(main.app, ["index", "--curated-only", "-d", "chinook"])
-    assert seen == {"datasource_ids": ["chinook"], "full": False, "curated_only": True}
+    assert seen == {"enrich": False, "datasource_ids": ["chinook"], "full": False, "curated_only": True}
+
+    # Enrichment spends tokens, so it runs only when asked for.
+    CliRunner().invoke(main.app, ["index", "--enrich"])
+    assert seen == {"enrich": True, "datasource_ids": None, "full": False, "curated_only": False}
 
 
 def test_full_and_curated_only_do_not_combine(monkeypatch):

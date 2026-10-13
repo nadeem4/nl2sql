@@ -322,7 +322,7 @@ agent name, and fall back to `default` when it is not configured:
 | `astplanner` | writes the query plan (the largest prompt: it carries the schema) |
 | `refiner` | explains a failed plan so the planner can retry |
 | `answersynthesizer` | writes the final answer from the rows |
-| `indexing_enrichment` | writes schema descriptions during `nl2sql index` (optional) |
+| `indexing_enrichment` | writes missing schema descriptions during `nl2sql index --enrich` (optional, off by default) |
 
 The key under `agents` is the agent's name; a `name:` field is not needed. Each
 entry is a complete agent config - nothing is inherited from `default` - so
@@ -459,9 +459,10 @@ for the embedding step. Switching embedding providers requires a re-index. See
 
 - `agents` overrides give individual nodes, or indexing enrichment, their own
   model and temperature; see [Per-node models](#per-node-models).
-- `indexing_enrichment` is optional. Omit it, or leave its key unset, and
-  `nl2sql index` still works - the schema is indexed without LLM-written
-  descriptions.
+- `indexing_enrichment` is optional and runs only when asked for
+  (`nl2sql index --enrich`, or `enrich=True` from Python). Omit it, or leave
+  its key unset, and indexing still works - the schema is indexed without
+  LLM-written descriptions. It never replaces a comment read from the database.
 - `nl2sql setup` prompts for `openai`, `anthropic` and `openrouter`, the hosted
   providers it can also collect a key for; `setup --api-key` picks the provider
   from the key's shape (`sk-ant-` is Anthropic, `sk-or-` is OpenRouter, anything

@@ -10,7 +10,7 @@ from typing import List, Optional
 
 from nl2sql.context import NL2SQLContext
 from nl2sql.auth.models import UserContext
-from nl2sql.auth.rbac import RBAC
+from nl2sql.auth.rbac import RBAC, default_schema
 
 
 class AuthAPI:
@@ -26,7 +26,8 @@ class AuthAPI:
         self,
         user_context: UserContext,
         datasource_id: str,
-        table: str
+        table: str,
+        schema: Optional[str] = None,
     ) -> bool:
         """
         Check if a user has permission to access a specific resource.
@@ -35,11 +36,13 @@ class AuthAPI:
             user_context: User context with roles
             datasource_id: ID of the datasource
             table: Name of the table
+            schema: Schema of the table; ``None`` means the datasource's default schema
             
         Returns:
             True if user has permission, False otherwise
         """
-        return self._rbac.is_allowed(user_context, datasource_id, table)
+        default = default_schema(getattr(self._ctx, "ds_registry", None), datasource_id)
+        return self._rbac.is_allowed(user_context, datasource_id, table, schema, default)
     
     def get_allowed_resources(
         self,

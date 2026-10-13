@@ -18,6 +18,7 @@ from nl2sql.adapters.sqlalchemy_base import BaseSQLAlchemyAdapter
 | **Automatic Stats** | Runs optimized generic SQL queries to fetch `min`, `max`, `null_percentage`, and `distinct_count`. |
 | **Connection Pooling** | Manages engine lifecycle and connection pools. |
 | **Transaction Safety** | Implements generic `dry_run` using transaction rollbacks. |
+| **Default Schema** | `default_schema` reports the schema an unqualified table resolves to (`inspect(engine).default_schema_name`); RBAC reads a two-part `datasource.table` policy entry as that table in this schema. |
 
 ### Required Overrides
 

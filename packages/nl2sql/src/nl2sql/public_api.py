@@ -228,17 +228,23 @@ class NL2SQL:
         """
         return self.llm.get_llm(llm_name)
     
-    def index_datasource(self, datasource_id: str):
+    def index_datasource(self, datasource_id: str, enrich: bool = False):
         """
         Index schema for a specific datasource.
-        """
-        return self.indexing.index_datasource(datasource_id)
 
-    def index_all_datasources(self):
+        ``enrich`` asks the ``indexing_enrichment`` LLM for descriptions and
+        spends tokens, so it is off unless asked for.
+        """
+        return self.indexing.index_datasource(datasource_id, enrich=enrich)
+
+    def index_all_datasources(self, enrich: bool = False):
         """
         Index schema for all registered datasources.
+
+        ``enrich`` asks the ``indexing_enrichment`` LLM for descriptions and
+        spends tokens, so it is off unless asked for.
         """
-        return self.indexing.index_all_datasources()
+        return self.indexing.index_all_datasources(enrich=enrich)
 
     def clear_index(self):
         """
@@ -247,11 +253,13 @@ class NL2SQL:
         return self.indexing.clear_index()
 
     # Auth API convenience methods
-    def check_permissions(self, user_context, datasource_id, table):
+    def check_permissions(self, user_context, datasource_id, table, schema=None):
         """
         Check if a user has permission to access a specific resource.
+
+        ``schema`` defaults to the datasource's default schema.
         """
-        return self.auth.check_permissions(user_context, datasource_id, table)
+        return self.auth.check_permissions(user_context, datasource_id, table, schema)
 
     def get_allowed_resources(self, user_context):
         """

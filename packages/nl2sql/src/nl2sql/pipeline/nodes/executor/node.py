@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Dict, Any, List
 
-from nl2sql.auth.rbac import table_allowed
+from nl2sql.auth.rbac import default_schema, table_allowed
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.common.logger import get_logger
 from nl2sql.common.settings import settings
@@ -53,12 +53,13 @@ class ExecutorNode:
             return []
         try:
             allowed_tables = self.rbac.get_allowed_tables(state.user_context)
+            default = default_schema(self.ds_registry, ds_id)
             already_retried = any(e.error_code == ErrorCode.VALUE_NOT_FOUND for e in state.errors)
             can_retry = not already_retried and state.retry_count < settings.sql_agent_max_retries
             errors = check_values(
                 plan,
                 self.ds_registry.get_adapter(ds_id),
-                lambda table: table_allowed(allowed_tables, ds_id, table),
+                lambda ref: table_allowed(allowed_tables, ds_id, ref.name, ref.schema_name, default),
                 can_retry,
             )
             # The SQL agent retries only on this attempt's own finding.
