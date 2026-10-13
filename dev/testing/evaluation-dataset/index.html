@@ -5397,6 +5397,11 @@ any run.</p>
 <td><code>0.2</code></td>
 <td>Baseline: largest allowed rise in cost per question (0.2 is 20%)</td>
 </tr>
+<tr>
+<td><code>--use-curated</code></td>
+<td>off</td>
+<td>Keep <a href="../../configuration/curated/">curated answers</a> on, so a verified query may answer a gold question (below)</td>
+</tr>
 </tbody>
 </table>
 <p><code>&lt;project&gt;</code> is the folder of the env file the run is configured from: for
@@ -5406,7 +5411,7 @@ PATH</code> it is that file's folder.</p>
 the datasource config and <code>--llm-config</code> the single LLM config path.</p>
 <p>Before anything is spent, the run prints its plan and carries on without a
 prompt (the cap is the safety):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>Plan: 47 questions x role admin x 1 pass, cap $10.00
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>Plan: 47 questions x role admin x 1 pass, cap $10.00, curated answers off
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>  gpt-5.4: gpt-5.4 (every node)
 <a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>  gpt-5.4-mini-helpers: gpt-5.4 (astplanner, refiner); gpt-5.4-mini (answersynthesizer, datasourceresolver, decomposer)
 <a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>  Records: C:\demo\benchmarks\tier2  Scoreboard: C:\demo\benchmark_tier2.json
@@ -5527,8 +5532,18 @@ of <code>planned_cases</code>.</p>
 <p>Tier 2 turns the plan cache off for its run (<code>PLAN_CACHE_ENABLED</code>), so a
 second pass asks the planner again instead of replaying the first, and scores
 refusals against the generic message, as tier 1 does.</p>
+<p>Tier 2 also runs with <a href="../../configuration/curated/">curated answers</a> off, as
+tier 1 does (<code>run_tier2()</code> clears the context's curated file for the run and
+restores it after). A verified query answers without a plan, so with them on
+a hit would be scored as if the model had planned it, and the run would not be
+comparable with the published ones. <code>--use-curated</code> keeps them on, to measure
+the product as a user with a curated file meets it. Either way every result
+row records its answer's <code>source</code> (<code>verified</code> or <code>generated</code>) and, for a
+verified one, the <code>verified_query</code> id, and <code>accuracy.by_source</code> splits the
+score by it. The scoreboard and each record say <code>"curated": true</code> for such a
+run, and it starts its own series in the history.</p>
 <h3 id="the-scoreboard">The scoreboard</h3>
-<p><code>benchmark_tier2.json</code> holds the run (<code>passes</code>, <code>roles</code>, <code>questions</code>,
+<p><code>benchmark_tier2.json</code> holds the run (<code>passes</code>, <code>roles</code>, <code>curated</code>, <code>questions</code>,
 <code>max_cost</code>, <code>spent</code>, <code>stopped</code>, <code>prices_checked_on</code>), one entry per config
 under <code>configs</code>, and a <code>comparison</code>. Each config has:</p>
 <table>
@@ -5553,7 +5568,7 @@ under <code>configs</code>, and a <code>comparison</code>. Each config has:</p>
 </tr>
 <tr>
 <td><code>accuracy</code></td>
-<td><code>overall</code> (strict) and <code>lenient</code>, each with a 95% Wilson <code>interval</code>; <code>pass_k</code> when <code>--passes</code> &gt; 1; then <code>by_tag</code> and <code>by_difficulty</code>, each with both counts and both rates</td>
+<td><code>overall</code> (strict) and <code>lenient</code>, each with a 95% Wilson <code>interval</code>; <code>pass_k</code> when <code>--passes</code> &gt; 1; then <code>by_tag</code>, <code>by_difficulty</code> and <code>by_source</code> (<code>verified</code>, <code>generated</code>; <code>unknown</code> for a run that raised), each with both counts and both rates</td>
 </tr>
 <tr>
 <td><code>answerability</code></td>
@@ -5589,7 +5604,7 @@ under <code>configs</code>, and a <code>comparison</code>. Each config has:</p>
 </tr>
 <tr>
 <td><code>results</code></td>
-<td>one row per run: <code>status</code> and <code>reason</code> (strict), <code>lenient_status</code> and <code>lenient_reason</code>, SQL, cost, latency, tokens, retries, <code>faithfulness</code> (<code>null</code> when no answer was written), and <code>plans</code>: each sub-query's <code>id</code>, <code>intent</code> and <code>plan</code> (the <code>PlanModel</code> JSON the SQL was generated from, <code>null</code> if planning failed), so a wrong answer can be traced to the plan; and <code>answer</code>, the text the answer synthesizer wrote (summary, then content), which the faithfulness check read</td>
+<td>one row per run: <code>status</code> and <code>reason</code> (strict), <code>lenient_status</code> and <code>lenient_reason</code>, SQL, cost, latency, tokens, retries, <code>faithfulness</code> (<code>null</code> when no answer was written), and <code>plans</code>: each sub-query's <code>id</code>, <code>intent</code> and <code>plan</code> (the <code>PlanModel</code> JSON the SQL was generated from, <code>null</code> if planning failed), so a wrong answer can be traced to the plan; and <code>answer</code>, the text the answer synthesizer wrote (summary, then content), which the faithfulness check read; <code>source</code> (<code>verified</code> or <code>generated</code>, <code>null</code> for a run that raised) and <code>verified_query</code>, the verified query's id when one answered</td>
 </tr>
 </tbody>
 </table>
@@ -5794,7 +5809,7 @@ name is taken. Every record holds:</p>
 </tr>
 <tr>
 <td>tier 2 only</td>
-<td><code>roles</code>, <code>passes</code>, <code>stopped</code>, <code>partial</code> and the config's full <code>scoreboard</code></td>
+<td><code>roles</code>, <code>passes</code>, <code>curated</code> (whether curated answers were on; a record without it ran with them off), <code>stopped</code>, <code>partial</code> and the config's full <code>scoreboard</code></td>
 </tr>
 <tr>
 <td>retrieval only</td>
@@ -5809,7 +5824,8 @@ database, the commit that added it and the note "first retrieval baseline"
 filled in (listed in its <code>backfilled</code> field).</p>
 <h4 id="comparable-runs">Comparable runs</h4>
 <p>Two runs are comparable when they share the benchmark kind, the dataset sha
-and the schema fingerprint, and for tier 2 the roles. <code>docs/benchmarks.md</code>
+and the schema fingerprint, and for tier 2 the roles and whether curated
+answers were on. <code>docs/benchmarks.md</code>
 groups the history by benchmark, then database, and lists each group's runs
 newest first. "Δ vs previous" compares a run with the previous run of the same
 config on the same database: the change in strict accuracy, lenient accuracy
@@ -5817,7 +5833,7 @@ and faithfulness (in percentage points) and dollars per question for tier 2,
 in table and column recall for retrieval. For tier 2 it then says how many
 questions flipped each way and McNemar's exact p-value on them, read from the
 two records' committed per-question results -- <code>3 flipped to fail, 1 to pass
-(McNemar p=0.625)</code>. When the dataset, the schema or the roles changed, the
+(McNemar p=0.625)</code>. When the dataset, the schema, the roles or curated answers changed, the
 run starts a new series and the cell says so, e.g. <code>new series (schema
 changed)</code>; a config's first run says <code>first run</code>. The README block has two
 headed tables, tier 2 accuracy (latest run per config and database) and then
@@ -5869,7 +5885,10 @@ constructed table, pass^k, the gate firing and not firing, the deprecated
 <code>benchmark presets</code> and <code>publish --from</code>. <code>tests/unit/test_benchmark_presets.py</code>
 covers the per-node <code>--model</code> config and preset lookup, and
 <code>tests/unit/test_benchmark_records.py</code> the records, the git commit lookup,
-comparability, the Δ and series breaks.</p>
+comparability, the Δ and series breaks. <code>tests/unit/test_tier2_curated.py</code>
+covers curated answers off by default and restored after, <code>--use-curated</code>
+keeping them on, each row's <code>source</code> and the <code>by_source</code> split, and an old
+record without a <code>source</code> still scoring.</p>
 <h2 id="retrieval-recall">Retrieval recall</h2>
 <p>Before the planner sees a schema, the schema retriever picks the tables and
 columns it is given. A column it never sends is one the planner cannot use.
