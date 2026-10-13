@@ -23,12 +23,13 @@ Source:
 `packages/nl2sql/src/nl2sql/api/indexing_api.py`
 
 Signature:
-`index_datasource(datasource_id: str) -> Dict[str, int]`
+`index_datasource(datasource_id: str, enrich: bool = False) -> Dict[str, int]`
 
 Parameters:
 | name | type | required | meaning |
 | --- | --- | --- | --- |
 | `datasource_id` | `str` | yes | Datasource ID to index. |
+| `enrich` | `bool` | no | Ask the `indexing_enrichment` LLM for table and column descriptions. Off by default: it spends tokens. |
 
 Returns:
 Indexing statistics by chunk type (includes `datasource_id` and `schema_version`).
@@ -54,7 +55,9 @@ Idempotency:
 ### IndexingAPI.index_all_datasources
 
 Signature:
-`index_all_datasources() -> Dict[str, Dict[str, int]]`
+`index_all_datasources(enrich: bool = False) -> Dict[str, Dict[str, int]]`
+
+`enrich` is passed to `index_datasource` for every datasource; off by default.
 
 Returns:
 Map of datasource ID → stats; on error, value is `{"error": "<message>"}`.
@@ -74,8 +77,10 @@ index, re-index instead, which never leaves it empty.
 
 ## Execution Lifecycle
 - Fetch schema via adapter.
-- Enrich schema metadata using the `indexing_enrichment` LLM. Optional: if the
-  client cannot be built (no API key), the endpoint is unreachable, or the call
-  fails, the unenriched snapshot is used and indexing continues.
+- Only with `enrich=True`: enrich schema metadata using the `indexing_enrichment`
+  LLM. Enrichment fills blanks only: a table or column comment read from the
+  database is never replaced. If the client cannot be built (no API key), the
+  endpoint is unreachable, or the call fails, the unenriched snapshot is used
+  and indexing continues.
 - Register schema snapshot and version.
 - Build schema chunks and refresh vector store.
