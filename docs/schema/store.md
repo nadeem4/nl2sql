@@ -23,7 +23,9 @@ Metadata complements contracts:
 - `ColumnMetadata`: description, stats, synonyms, PII flag
 - `ColumnStatistics`: distinct counts, min/max, sample values (for a text
   column: every distinct value when there are at most 50, else the five most
-  frequent; most frequent first, ties by value)
+  frequent; most frequent first, ties by value). A column the adapter could
+  not profile has no statistics; see
+  [Column statistics](../adapters/sqlalchemy.md#column-statistics)
 
 ## Snapshotting and fingerprinting
 

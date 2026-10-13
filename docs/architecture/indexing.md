@@ -16,6 +16,11 @@ flowchart TD
     Refresh --> Store[Chroma Vector Store]
 ```
 
+The snapshot profiles each column on its own: a column, row count or table the
+database cannot profile is indexed without statistics and logged, rather than
+failing the datasource's index (see
+[Column statistics](../adapters/sqlalchemy.md#column-statistics)).
+
 ## What is indexed today
 
 Schema-derived chunks, and the verified queries of [`curated.yaml`](../configuration/curated.md)
