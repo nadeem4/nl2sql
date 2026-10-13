@@ -4620,6 +4620,10 @@
 <td style="text-align: left;"><strong>Transaction Safety</strong></td>
 <td style="text-align: left;">Implements generic <code>dry_run</code> using transaction rollbacks.</td>
 </tr>
+<tr>
+<td style="text-align: left;"><strong>Default Schema</strong></td>
+<td style="text-align: left;"><code>default_schema</code> reports the schema an unqualified table resolves to (<code>inspect(engine).default_schema_name</code>); RBAC reads a two-part <code>datasource.table</code> policy entry as that table in this schema.</td>
+</tr>
 </tbody>
 </table>
 <h3 id="required-overrides">Required Overrides</h3>

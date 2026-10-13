@@ -4551,6 +4551,7 @@ does not apply it (see the <a href="../sqlalchemy/#connect">reference</a>).</p>
 <li>Fetching and normalizing schema metadata.</li>
 <li>Executing queries and formatting results.</li>
 <li>Implementing safety breakers (<code>row_limit</code>).</li>
+<li>Optionally, a <code>default_schema</code> attribute naming the schema an unqualified table resolves to. RBAC reads a two-part <code>datasource.table</code> policy entry as that table in this schema; without it, <code>main</code> is assumed.</li>
 </ul>
 <h3 id="example_1">Example</h3>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql.datasources.protocols</span><span class="w"> </span><span class="kn">import</span> <span class="n">DatasourceAdapterProtocol</span>

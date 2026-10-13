@@ -2083,8 +2083,9 @@ trace to the user who produced it is left to a multi-user deployment.</p>
 <h2 id="security-controls">Security controls</h2>
 <ul>
 <li><strong>RBAC policies</strong> loaded from <code>configs/policies.json</code> and evaluated by <code>RBAC</code>.
-  A policy is a per-role allowlist of datasources and of <code>datasource.table</code>
-  strings — nothing finer. There is no column masking and no row-level security.</li>
+  A policy is a per-role allowlist of datasources and of tables
+  (<code>datasource.schema.table</code>, with schema and datasource wildcards) — nothing
+  finer. There is no column masking and no row-level security.</li>
 <li><strong>Logical validation</strong> enforces schema constraints and policy-based table access.</li>
 <li><strong>Audit logging</strong> records <code>llm_interaction</code> events only, and only when the CLI
   attaches its monitor callback. The Python and REST APIs emit none. See
@@ -2109,7 +2110,11 @@ the engine a read-only database user.</strong></p>
 <h2 id="rbac-enforcement-details">RBAC enforcement details</h2>
 <p><code>LogicalValidatorNode</code> enforces <strong>strict namespacing</strong>:</p>
 <ul>
-<li>Allowed tables must match <code>datasource.table</code> or <code>datasource.*</code>.</li>
+<li>Allowed tables must match <code>datasource.*</code>, <code>datasource.schema.*</code>,
+  <code>datasource.schema.table</code> or <code>datasource.table</code>. The schema counts: a grant
+  of <code>sales.orders</code> does not allow <code>audit.orders</code>, and a two-part
+  <code>datasource.table</code> means that table in the datasource's default schema only
+  (see <a href="../../configuration/policies/#two-part-entries-and-the-default-schema">Policies</a>).</li>
 <li>If no datasource ID is present, validation fails closed.</li>
 <li>Wildcard access is supported via <code>*</code> in policy lists.</li>
 <li>An unknown role, or no role, allows nothing and is refused like any denial.</li>

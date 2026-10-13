@@ -7430,11 +7430,12 @@
 <hr />
 <h2 id="policy-enforcement-is-namespaced-and-fail-closed">Policy Enforcement Is Namespaced and Fail-Closed</h2>
 <h3 id="definition_10">Definition</h3>
-<p>Allowed tables must be namespaced as <code>datasource.table</code> or <code>datasource.*</code>, and policy checks fail if datasource ID is missing.</p>
+<p>Allowed tables must be namespaced as <code>datasource.*</code>, <code>datasource.schema.*</code>, <code>datasource.schema.table</code> or <code>datasource.table</code>, and policy checks fail if datasource ID is missing. Access is decided on datasource, schema and table: a two-part <code>datasource.table</code> means that table in the datasource's default schema only, and a table the plan names without a schema is in the default schema. One function, <code>table_allowed()</code> in <code>nl2sql.auth.rbac</code>, decides for every node.</p>
 <h3 id="enforcement-points_10">Enforcement Points</h3>
 <ul>
 <li><code>RolePolicy.validate_namespace()</code> in <code>nl2sql.auth.models</code></li>
 <li><code>LogicalValidatorNode._validate_policy()</code> in <code>nl2sql.pipeline.nodes.validator.node</code></li>
+<li><code>table_allowed()</code> and <code>default_schema()</code> in <code>nl2sql.auth.rbac</code>, called with the same datasource, schema and table by the validator, the schema retriever, the executor's value check and the curated matcher</li>
 </ul>
 <h3 id="failure-behavior_10">Failure Behavior</h3>
 <p><code>ValueError</code> for invalid policy format; <code>PipelineError</code> with <code>SECURITY_VIOLATION</code> if datasource ID is missing or a table is not allowed. An unknown role, or no role, allows nothing and is refused the same way, never with <code>VALIDATOR_CRASH</code>. The user-facing refusal names no table unless <code>RBAC_REFUSAL_NAMES_TABLES</code> is set; the table and roles are in the error's <code>details</code>.</p>

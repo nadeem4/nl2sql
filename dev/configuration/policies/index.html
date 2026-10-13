@@ -1823,10 +1823,38 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#table-wildcards" class="md-nav__link">
+  <a href="#table-entries" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Table wildcards
+        Table entries
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Table entries">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#two-part-entries-and-the-default-schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Two-part entries and the default schema
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#one-rule-everywhere" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        One rule everywhere
       
     </span>
   </a>
@@ -4372,10 +4400,38 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#table-wildcards" class="md-nav__link">
+  <a href="#table-entries" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Table wildcards
+        Table entries
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Table entries">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#two-part-entries-and-the-default-schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Two-part entries and the default schema
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#one-rule-everywhere" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        One rule everywhere
       
     </span>
   </a>
@@ -4422,13 +4478,71 @@ datasources and tables.</p>
 <li><code>description</code>: human-readable role description</li>
 <li><code>role</code>: role ID used for logging and auditing</li>
 <li><code>allowed_datasources</code>: list of datasource IDs or <code>*</code></li>
-<li><code>allowed_tables</code>: list of tables in <code>datasource.table</code> format</li>
+<li><code>allowed_tables</code>: list of table entries (see below)</li>
 </ul>
-<h2 id="table-wildcards">Table wildcards</h2>
+<h2 id="table-entries">Table entries</h2>
+<table>
+<thead>
+<tr>
+<th>Entry</th>
+<th>Allows</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>*</code></td>
+<td>every table in every datasource</td>
+</tr>
+<tr>
+<td><code>datasource.*</code></td>
+<td>every table in every schema of one datasource</td>
+</tr>
+<tr>
+<td><code>datasource.schema.*</code></td>
+<td>every table in one schema</td>
+</tr>
+<tr>
+<td><code>datasource.schema.table</code></td>
+<td>one table in one schema</td>
+</tr>
+<tr>
+<td><code>datasource.table</code></td>
+<td>that table in the datasource's <strong>default schema only</strong></td>
+</tr>
+</tbody>
+</table>
+<p>Access is decided on the schema as well as the table. The plan names the
+schema a table is read from, and the SQL is written with it, so a grant of
+<code>sales.orders</code> does not let a plan read <code>audit.orders</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">"allowed_tables"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"warehouse.sales.orders"</span><span class="p">,</span><span class="w"> </span><span class="s2">"warehouse.reference.*"</span><span class="p">]</span>
+</code></pre></div>
+<h3 id="two-part-entries-and-the-default-schema">Two-part entries and the default schema</h3>
+<p>A two-part <code>datasource.table</code> entry predates schemas in the policy file. It is
+read as that table in the datasource's default schema, never in any schema:</p>
 <ul>
-<li><code>*</code> allows all tables</li>
-<li><code>datasource.*</code> allows all tables in a datasource</li>
+<li>The default schema is the one the adapter reports: the schema an unqualified
+  table name resolves to on that connection (<code>public</code> on PostgreSQL by default,
+  <code>dbo</code> on SQL Server, the connected database on MySQL, <code>main</code> on SQLite and
+  DuckDB).</li>
+<li>If an adapter cannot report one, <code>main</code> is the default.</li>
+<li>A table the plan names without a schema is in the default schema.</li>
 </ul>
+<p>So on a PostgreSQL datasource <code>warehouse</code>, <code>warehouse.orders</code> allows
+<code>public.orders</code> and refuses <code>audit.orders</code>. On SQLite and DuckDB, which have
+the one schema, two-part entries mean what they always did.</p>
+<p>The first two-part entry loaded logs a warning, once per process, saying it is
+read as the default schema. To grant a table outside the default schema, write
+the three-part form.</p>
+<p>An entry has two or three dot-separated parts (or is <code>*</code>), no part is empty,
+and <code>*</code> may only be the last part: <code>datasource.*.orders</code> is rejected when the
+file is loaded.</p>
+<h2 id="one-rule-everywhere">One rule everywhere</h2>
+<p><code>table_allowed()</code> in <code>nl2sql/auth/rbac.py</code> is the only place an entry is
+matched. The logical validator (which refuses the plan), the schema retriever
+(which strips the statistics of tables the role cannot read), the executor's
+value check (which only probes readable tables) and the curated matcher (which
+only answers with a verified query whose tables are all readable) call it with
+the same datasource, schema and table, so they cannot disagree.</p>
 
 
 
