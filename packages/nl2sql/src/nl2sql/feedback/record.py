@@ -2,7 +2,9 @@
 
 ``run_signals`` reads the counters the stats report from a ``QueryResult``
 (as JSON), and from the run's trace when there is one. ``run_record`` adds the
-question, role, status, SQL, the model per node and the engine version.
+question, role, status, SQL, the datasources it ran on, where the answer came
+from (a verified query or generated SQL), the model per node and the engine
+version.
 
 Privacy: a record never holds result rows, the written answer, sample values,
 error messages or keys; only error *codes*. It holds only what the run showed
@@ -76,14 +78,21 @@ def run_record(result: Mapping[str, Any], *, question: str, role: str,
     """Everything the feedback table keeps about one run, before it is rated."""
     signals = run_signals(result, trace)
     refused = "SECURITY_VIOLATION" in signals["error_codes"]
-    sql = [] if refused else [s.get("sql") for s in result.get("sub_queries") or []
-                              if isinstance(s, dict) and s.get("sql")]
+    sub_queries = [s for s in result.get("sub_queries") or [] if isinstance(s, dict)]
+    sql = [] if refused else [s.get("sql") for s in sub_queries if s.get("sql")]
+    datasource_ids: List[str] = []
+    for s in sub_queries:
+        if s.get("datasource_id") and s["datasource_id"] not in datasource_ids:
+            datasource_ids.append(str(s["datasource_id"]))
     return {
         "trace_id": str(result.get("trace_id") or ""),
         "question": question,
         "role": role,
         "status": str(result.get("status") or ""),
         "sql": sql,
+        # Each datasource a sub-query ran on, once; "verified" or "generated".
+        "datasource_ids": datasource_ids,
+        "source": (result.get("source") or {}).get("type"),
         "models": models_by_node(result, llm_configs),
         "engine_version": engine_version,
         **signals,

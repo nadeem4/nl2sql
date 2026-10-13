@@ -15,10 +15,14 @@ from typing import Any, Dict, List, Mapping, Optional
 RATINGS = ("up", "down")
 NOTE_MAX_CHARS = 280
 
-_JSON_COLUMNS = ("sql", "error_codes", "models")
+_JSON_COLUMNS = ("sql", "error_codes", "models", "datasource_ids")
 _COLUMNS = ("trace_id", "created_at", "rating", "note", "question", "role", "status", "sql",
             "error_codes", "retries", "validator_failures", "plan_cache_hits", "sub_queries",
-            "models", "engine_version")
+            "models", "engine_version", "datasource_ids", "source")
+
+# Columns added after the table first shipped: nullable, so a row rated before
+# them reads None, and a store from then gains them when it is opened.
+_ADDED_COLUMNS = {"datasource_ids": "TEXT", "source": "TEXT"}
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS feedback (
@@ -36,7 +40,9 @@ CREATE TABLE IF NOT EXISTS feedback (
     plan_cache_hits INTEGER NOT NULL DEFAULT 0,
     sub_queries INTEGER NOT NULL DEFAULT 0,
     models TEXT NOT NULL,
-    engine_version TEXT NOT NULL
+    engine_version TEXT NOT NULL,
+    datasource_ids TEXT,
+    source TEXT
 );
 """
 
@@ -50,6 +56,10 @@ class FeedbackStore:
         self._connection = sqlite3.connect(str(self._path), check_same_thread=False)
         self._connection.execute("PRAGMA journal_mode=WAL;")
         self._connection.execute(SCHEMA)
+        present = {r[1] for r in self._connection.execute("PRAGMA table_info(feedback);")}
+        for column, kind in _ADDED_COLUMNS.items():
+            if column not in present:
+                self._connection.execute(f"ALTER TABLE feedback ADD COLUMN {column} {kind};")
         self._connection.commit()
 
     def close(self) -> None:
@@ -76,6 +86,9 @@ class FeedbackStore:
             "sub_queries": int(record.get("sub_queries") or 0),
             "models": json.dumps(dict(record.get("models") or {})),
             "engine_version": record.get("engine_version") or "",
+            "datasource_ids": (None if record.get("datasource_ids") is None
+                               else json.dumps(list(record["datasource_ids"]))),
+            "source": record.get("source") or None,
         }
         with self._connection:
             self._connection.execute(
