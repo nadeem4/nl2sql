@@ -22,6 +22,10 @@ sets), `NL2SQL_API_ROLE` (one static role) or, for local testing only,
 `NL2SQL_API_TRUST_BODY_ROLE=true` (the body's `user_context`; logs a warning).
 With none, `/api/v1/query` and `/api/v1/query/stream` answer HTTP 401.
 
+The routes that change datasources, LLMs or the index need a role listed in
+`NL2SQL_API_ADMIN_ROLES` (default `admin`), else HTTP 403. With no role setting
+at all they answer loopback clients only.
+
 ## Endpoints
 
 - `POST /api/v1/query` - Ask a question as the configured role

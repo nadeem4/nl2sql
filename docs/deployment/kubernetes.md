@@ -20,6 +20,11 @@ If you persist schema/vector stores or artifacts, mount volumes for:
 ## Operational considerations
 
 - Run schema indexing as a separate job or init container.
+- If you run `nl2sql-api`, set the role source (`NL2SQL_API_ROLE_HEADER` behind an
+  authenticating ingress, or `NL2SQL_API_ROLE`) and the admin roles
+  (`NL2SQL_API_ADMIN_ROLES`, default `admin`): pod traffic is not loopback, so
+  without them the admin routes answer HTTP 403. See
+  [Admin routes](../api/rest/index.md#admin-routes).
 - Configure observability exporters via env (`OBSERVABILITY_EXPORTER`, `OTEL_EXPORTER_OTLP_ENDPOINT`).
 
 ## Reference configuration

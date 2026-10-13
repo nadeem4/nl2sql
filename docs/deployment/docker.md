@@ -19,9 +19,21 @@ If using persistent stores, mount these paths:
 - `SCHEMA_STORE_PATH` for the SQLite schema store.
 - `RESULT_ARTIFACT_BASE_URI` for artifact storage (local backend).
 
+## API roles
+
+`nl2sql-api` does not authenticate callers. Set where the RBAC role comes from
+(`NL2SQL_API_ROLE_HEADER` from an authenticating proxy, or a static
+`NL2SQL_API_ROLE`) and which roles may change datasources, LLMs and the index
+(`NL2SQL_API_ADMIN_ROLES`, default `admin`). With no role setting, queries answer
+HTTP 401 and the admin routes answer HTTP 403, because a request through a
+published port does not come from loopback. See
+[Caller role](../api/rest/index.md#caller-role) and
+[Admin routes](../api/rest/index.md#admin-routes).
+
 ## Notes
 
 - Schema indexing is not automatic; you must run indexing in your operational flow.
+  Through the API, `POST /api/v1/index-all` needs an admin role.
 - Observability exporters require network access and corresponding env vars.
 
 ## Reference configuration
