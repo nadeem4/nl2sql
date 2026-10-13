@@ -291,7 +291,8 @@ class NL2SQL:
         ``missing``), entry counts by type, when it was built, the embedding
         model, one entry per registered datasource, any problems found, and
         ``warnings`` that leave ``status`` alone (a ``curated.yaml`` changed
-        since it was indexed).
+        since it was indexed, a preferred table missing from the indexed
+        schema).
         """
         from nl2sql.indexing.curated import curated_hashes
         from nl2sql.indexing.health import IndexHealth, inspect_vector_store
@@ -302,7 +303,10 @@ class NL2SQL:
         registry = self._ctx.ds_registry
         ids = registry.list_ids() if registry is not None else []
         hashes = curated_hashes(getattr(self._ctx, "curated", None), ids)
-        return inspect_vector_store(store, self._ctx.schema_store, ids, curated_hashes=hashes).to_dict()
+        preferred_of = getattr(registry, "get_preferred_tables", None)
+        preferred = {ds: preferred_of(ds) for ds in ids} if preferred_of else None
+        return inspect_vector_store(store, self._ctx.schema_store, ids, curated_hashes=hashes,
+                                    preferred_tables=preferred).to_dict()
 
     def rebuild_index(self, datasource_ids=None, enrich: bool = False, full: bool = False,
                       on_progress=None, switch_guard=None):

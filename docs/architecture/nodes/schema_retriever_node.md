@@ -16,6 +16,9 @@
 - Retrieve candidate tables/columns/relationships from `VectorStore`.
 - Resolve authoritative tables from `SchemaStore`.
 - Fall back to full schema snapshot when retrieval returns no candidates.
+- Rank the datasource's `preferred_tables` first and set `preferred=True` on
+  them, on the full-snapshot path and the retrieval path; see
+  [Preferred tables](#preferred-tables).
 - Strip column statistics (`sample_values`, `min_value`, `max_value`,
   `distinct_count`, `null_percentage`) from every table the caller's role
   cannot read, on every path, while keeping its name, columns, types, keys and
@@ -59,6 +62,7 @@ From `NL2SQLContext`:
 
 - `vector_store` (optional)
 - `schema_store` (required for authoritative resolution)
+- `ds_registry` (optional): `get_preferred_tables(datasource_id)`
 
 Validation performed:
 
@@ -91,6 +95,26 @@ Side effects:
 6. Build `Table` objects with `_build_tables_from_snapshot()`.
 7. If no tables were found, return full snapshot with warning.
 8. On exception, log error and return empty `relevant_tables`.
+
+### Preferred tables
+
+A datasource's `preferred_tables` (in `datasources.yaml`, see
+[Datasources](../../configuration/datasources.md#preferred-tables)) are
+matched against snapshot tables by bare name or `schema.table`, case ignored.
+
+- Full snapshot: every preferred table is in the list, first.
+- Retrieval: preferred tables the `tables` search picked come first. A
+  preferred table the search scored but did not pick is added (before the
+  `planning` search, so its columns and relationships are fetched too) when
+  its similarity is at least the least similar pick's minus
+  `PREFERRED_MARGIN` (0.05).
+- Each preferred `Table` has `preferred=True`. `render_schema_for_prompt`
+  sorts preferred tables first, then by name, and prints `"preferred":true` on
+  them only; with no preferred tables the block is byte-identical to before.
+  Planner instruction 14 tells the model to plan against a preferred table
+  when it answers the question.
+- RBAC is unchanged: a preferred table the role cannot read is ranked and
+  marked, and loses its statistics like any other unreadable table.
 
 ---
 

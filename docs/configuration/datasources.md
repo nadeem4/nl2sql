@@ -20,6 +20,7 @@ datasources:
     statement_timeout_ms: 8000
     row_limit: 100
     max_bytes: 10485760
+    preferred_tables: [v_customer_revenue, v_monthly_sales]
 ```
 
 ## Fields
@@ -44,6 +45,34 @@ datasources:
       flagged with a warning; see [row cap before a combine](../architecture/nodes/engine_aggregator_node.md#row-cap-before-a-combine).
     - `max_bytes`
     - `tags`
+  - `preferred_tables`: optional list of tables or views the planner should
+    reach for first, usually views the data team built for common questions.
+    A name is the bare table name or `schema.table`, case ignored. See
+    [Preferred tables](#preferred-tables).
+
+## Preferred tables
+
+The package never creates a view. The data team creates it in the database,
+lists it under `preferred_tables`, and runs `nl2sql index`; every built-in
+adapter snapshots views as well as tables (PostgreSQL materialized views are
+not read). At question time the schema retriever lists preferred tables first
+and marks them `"preferred": true` in the schema the planner sees, and the
+planner is told to plan against a preferred table when it answers the
+question:
+
+- When the whole schema is sent (`SCHEMA_RETRIEVAL_FULL_SNAPSHOT_MAX_TABLES`
+  tables or fewer), every preferred table is in it, first.
+- Otherwise the retrieved tables are re-ordered so preferred ones come first,
+  and a preferred table the search scored but did not pick is added when its
+  similarity is within 0.05 of the least similar pick.
+
+RBAC is unchanged: a preferred table the role may not read loses its data like
+any other table, and the validator refuses a plan that reads it.
+
+A name that is not in the indexed schema is a warning, not an error: `nl2sql
+doctor` and the index status (`NL2SQL.index_health`, `GET /api/v1/index/status`)
+print "Preferred table 'v_x' of 'chinook' is not in the indexed schema". The
+usual cause is a view created after the last index; re-index the datasource.
 
 ## Notes
 
