@@ -65,17 +65,18 @@ def _configure_datasource(config_manager: ConfigManager):
     
     db_type = inquirer.select(
         message="Select Database Type:",
-        choices=["postgres", "mysql", "mssql", "sqlite"],
+        choices=["postgres", "mysql", "mssql", "sqlite", "duckdb"],
         default="postgres"
     ).execute()
-    
+
     ds_config = None
-    
-    if db_type == "sqlite":
-        db_path = inquirer.text(message="Database Path:", default="./my_database.db").execute()
-        conn = ConnectionConfig(type="sqlite", database=db_path)
+
+    if db_type in ("sqlite", "duckdb"):
+        default_path = "./my_database.db" if db_type == "sqlite" else "./my_database.duckdb"
+        db_path = inquirer.text(message="Database Path:", default=default_path).execute()
+        conn = ConnectionConfig(type=db_type, database=db_path)
         ds_config = DatasourceConfig(
-            id="my_sqlite_db",
+            id=f"my_{db_type}_db",
             description="Main application database",
             connection=conn
         )
@@ -321,19 +322,14 @@ def _install_required_adapters(config_manager: ConfigManager):
         return
 
     try:
-        # Use ConfigManager to load standardized objects
-        # load_datasources returns List[Dict]
         configs = config_manager.load_datasources()
-        
+
         required = set()
         for config in configs:
-            connection = config.get("connection", {})
-            engine = connection.get("type", "").lower() or config.get("type", "").lower()
-
-            for name, pkg in KNOWN_ADAPTERS.items():
-                if name in engine:
-                    required.add((name, pkg))
-                    break
+            # The type is the adapter's entry-point name; match it exactly.
+            engine = config.connection.type.lower()
+            if engine in KNOWN_ADAPTERS:
+                required.add((engine, KNOWN_ADAPTERS[engine]))
         
         if required:
             print_step("Checking Adapters...")

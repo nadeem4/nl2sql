@@ -6,7 +6,7 @@ This adapter extends `BaseSQLAlchemyAdapter`, leveraging automatic schema reflec
 
 ## Configuration
 
-**Type**: `postgres` (or `postgresql`)
+**Type**: `postgres`
 
 ```yaml
 
