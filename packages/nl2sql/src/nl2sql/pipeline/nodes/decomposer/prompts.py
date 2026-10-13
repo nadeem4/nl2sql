@@ -13,7 +13,7 @@ Answer by calling the DecomposerResponse tool; your answer must be deterministic
 The INPUTS (the user query and the resolved datasources) follow in the next message.
 
 RULES:
-1) Use resolved_datasources metadata to select the most appropriate datasource for each subquery.
+1) Use each resolved datasource's description and tables to select the most appropriate datasource for each subquery.
 2) If an intent cannot be mapped to any resolved datasource, emit it under unmapped_subqueries.
 3) SubQueries must contain ONLY semantic intent:
    - metrics

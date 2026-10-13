@@ -20,7 +20,8 @@
 - Validate datasource IDs against the registered adapter list.
 - Enforce RBAC datasource access.
 - Detect schema version mismatches and apply the configured policy.
-- Judge answerability over the allowed candidates, and refuse with `QUESTION_NOT_ANSWERABLE` when none can answer.
+- Judge answerability over the allowed candidates, refuse with `QUESTION_NOT_ANSWERABLE` when none can answer, and forward only the candidates the verdict names.
+- Give each forwarded datasource its description and a capped table list, for the decomposer to route on.
 - Populate `DatasourceResolverResponse` in `GraphState`.
 
 ---
@@ -57,7 +58,7 @@ Context dependencies (`NL2SQLContext`):
 
 - `vector_store`: needed only when more than one datasource is registered and no override is given; missing then, the resolver returns `SCHEMA_RETRIEVAL_FAILED`.
 - `ds_registry`: adapter registry for registered IDs.
-- `schema_store`: latest schema versions, and the latest snapshot's description and table list for the answerability check.
+- `schema_store`: latest schema versions, and the latest snapshot's description and table list for the answerability check and the decomposer's routing context.
 - `rbac`: filters allowed datasources.
 - `llm_registry`: the answerability check's model, agent name `datasourceresolver` (falls back to `default`).
 
@@ -94,8 +95,10 @@ Side effects:
 2. Role check: candidates the role may not read are dropped. None left is a `CRITICAL` `SECURITY_VIOLATION`, and no model call is made.
 3. Schema version mismatch policy (`fail` returns `INVALID_STATE`; `warn` adds a warning).
 4. Answerability check over the **allowed** candidates only (see below). An empty verdict returns `QUESTION_NOT_ANSWERABLE`.
-5. Return `DatasourceResolverResponse` with resolved, allowed and unsupported IDs.
-6. On exceptions, log and return `SCHEMA_RETRIEVAL_FAILED` with the exception text; a provider's refusal of the model call is a `PROVIDER_*` error instead (see [provider failures](../../observability/error-handling.md#provider-failures)).
+5. Narrow to the verdict. After a vector search, only the allowed candidates the verdict names go forward; a candidate the verdict rejects never reaches the decomposer, and a verdict naming only unknown ids is `QUESTION_NOT_ANSWERABLE`. With an override or a single datasource there is one candidate, and a non-empty verdict accepts it.
+6. Attach routing context to each forwarded datasource, from the latest schema snapshot: `description`, `tables` (sorted bare table names, at most 30) and `more_tables` (how many were left out).
+7. Return `DatasourceResolverResponse` with the forwarded datasources (sorted by id), their IDs as `allowed_datasource_ids`, and unsupported IDs.
+8. On exceptions, log and return `SCHEMA_RETRIEVAL_FAILED` with the exception text; a provider's refusal of the model call is a `PROVIDER_*` error instead (see [provider failures](../../observability/error-handling.md#provider-failures)).
 
 A single registered datasource is the shortcut, not the usual case: with more
 than one - the demo registers three - the vector search runs, and nothing else
@@ -136,7 +139,7 @@ User Query:
 
 - `{datasources}` is a JSON list, one entry per allowed candidate, sorted by id, with sorted keys: `description` (the datasource description from the latest schema snapshot, which indexing takes from the datasources config) and `tables` (sorted bare table names).
 - The instructions and datasources come first (the system message) and the question last (the human message), so the prompt is byte-identical across questions up to the question and a provider's prompt cache can serve the prefix. OpenAI caches only prompts of 1,024 tokens or more, so with one small datasource nothing is cached; the prefix grows, and becomes cacheable, with more datasources.
-- The verdict is used only to refuse: a non-empty list lets every allowed candidate through to the decomposer unchanged.
+- The verdict refuses and narrows: an empty list refuses the question, and after a vector search only the allowed candidates it names reach the decomposer. It cannot add a datasource the role may not read.
 - For Chinook on its own the rendered prompt is about 260 tokens (`o200k_base`), plus the `AnswerabilityResponse` function schema; the demo now registers three datasources, so its prompt is correspondingly longer.
 
 ---

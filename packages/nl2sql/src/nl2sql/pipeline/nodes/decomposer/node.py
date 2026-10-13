@@ -181,8 +181,17 @@ class DecomposerNode:
             resolved_payload = []
             resolved_ids = set()
             schema_version_map = {}
-            for datasource in resolved_datasources:
-                resolved_payload.append(datasource.model_dump())
+            for datasource in sorted(resolved_datasources, key=lambda d: d.datasource_id):
+                # What routing needs: the id, what the datasource holds and its
+                # table names (capped by the resolver), never the index metadata.
+                entry = {
+                    "datasource_id": datasource.datasource_id,
+                    "description": datasource.description,
+                    "tables": datasource.tables,
+                }
+                if datasource.more_tables:
+                    entry["more_tables"] = datasource.more_tables
+                resolved_payload.append(entry)
                 resolved_ids.add(datasource.datasource_id)
                 schema_version_map[datasource.datasource_id] = datasource.schema_version
 
