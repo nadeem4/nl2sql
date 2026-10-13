@@ -571,15 +571,13 @@ verified queries, and a new guided question would have no recording.
 
 The keyless demo replays recorded model answers, keyed on the structured-output
 name and the question. The matcher's call is a new name
-(`VerifiedQueryChoice`), so the recordings in `cli/demo/recordings/chinook.json`
-have no answer for it until they are re-recorded. Until then a replay miss on
-the matcher falls back (`model_failed`) and the demo still answers, generated.
-**Re-recording needs the owner's API key and the owner's go-ahead**; it is a
-step the owner runs (`python scripts/record_demo_answers.py`, which drives
-`nl2sql demo --record`), not something a pull request can do. PR 4 ships with
-the old recordings, so until they are re-recorded the hosted keyless demo
-shows no *Verified* badge: every keyless answer is generated, as before. With
-a visitor's key, the badge appears.
+(`VerifiedQueryChoice`), recorded for every guided question since the
+recordings in `cli/demo/recordings/chinook.json` were made again for 0.4.0
+(`python scripts/record_demo_answers.py`, which needs the owner's key). A
+guided question that matches a verified query replays verified, badge and all;
+the others replay the model's `none_of_these` and then their generated answer.
+A verified run never reaches the decomposer, so `ReplayStore.covered()` counts
+a question whose recorded choice picked a query as covered too.
 
 ## Settings
 

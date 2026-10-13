@@ -116,10 +116,14 @@ class ReplayStore:
     def covered(self, questions: Iterable[str]) -> List[str]:
         """The ``questions`` this store can start answering.
 
-        Every question begins with the decomposer, so a question without a
+        A generated answer begins with the decomposer, so a question without a
         decomposer recording keyed on it misses however much else is recorded.
+        A verified answer never reaches the decomposer: its run records only
+        the ``VerifiedQueryChoice`` that picked a query, so that counts too.
         """
         recorded = {r.when for r in self._recordings if r.name == "DecomposerResponse"}
+        recorded |= {r.when for r in self._recordings if r.name == "VerifiedQueryChoice"
+                     and (r.payload or {}).get("query_id") not in (None, "none_of_these")}
         return [q for q in questions if q in recorded]
 
     def rules(self) -> List[Rule]:

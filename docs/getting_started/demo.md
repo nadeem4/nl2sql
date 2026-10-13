@@ -123,14 +123,12 @@ year, sales by country, best-selling genres, top artists by tracks sold).
 `.env.demo` points `CURATED_CONFIG` at it, and indexing embeds their questions
 beside the schema. A question one of them answers runs its SQL with the values
 bound instead of a generated plan, and the playground labels the answer
-**Verified Â·** and the query's id. "What is the total revenue per year?" and
+**Verified ·** and the query's id. "What is the total revenue per year?" and
 "Which genre sells the most tracks?" among the guided questions are two of
 them. See [Curated answers](../configuration/curated.md#in-the-demo).
 
-The keyless replay has no recorded answer for the matcher's model call
-(`VerifiedQueryChoice`) until the owner records the demo again, so without a
-key every answer is generated, as before, and no badge appears. With a key, a
-matching question comes back verified.
+The keyless replay includes the matcher's recorded choices, so the badge
+appears without a key too, on the guided questions a verified query answers.
 
 ### The roles
 

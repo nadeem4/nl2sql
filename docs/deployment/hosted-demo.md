@@ -69,16 +69,15 @@ that model on each model step, tagged **recorded**, until the visitor adds a
 key; then it shows the models their run will use, as before. Local replay mode
 (`nl2sql demo` with no key) does the same.
 
-**Verified answers replay only once recorded.** The image's demo project has
-the six verified queries of `configs/curated.demo.yaml` indexed (see
+**Verified answers replay too.** The image's demo project has the six
+verified queries of `configs/curated.demo.yaml` indexed (see
 [Curated answers](../configuration/curated.md#in-the-demo)), so every question
-first asks the curated matcher's model call, `VerifiedQueryChoice`. The
-shipped recordings predate it and hold no answer for it: the replay server
-answers that call with a miss, the matcher falls back (`model_failed`), and
-the run goes on to the recorded generated answer, exactly as before. So until
-the recordings are made again (below), no keyless answer carries the
-**Verified** badge; with a visitor's key, a question a verified query answers
-does. A recording run made after this records the matcher's call too.
+first asks the curated matcher's model call, `VerifiedQueryChoice`. The shipped
+recordings hold that call for every guided question, so a guided question a
+verified query answers replays with the **Verified** badge, and the rest replay
+the model's `none_of_these` and their generated answer. If a recording ever
+lacks the call, the matcher falls back (`model_failed`) and the run goes on to
+the recorded generated answer.
 
 **If no recordings ship** (the file is missing or covers no guided question),
 the keyless path still works: the chips and the question box stay open and
