@@ -36,7 +36,7 @@ async function copyText(text, node) {
   }
 }
 
-export default function SqlCard({ sql, plan }) {
+export default function SqlCard({ sql, plan, label = "Generated SQL", meta = null }) {
   const text = formatSql(sql);
   const code = useRef(null);
   const [copied, setCopied] = useState(null);
@@ -49,13 +49,14 @@ export default function SqlCard({ sql, plan }) {
   return (
     <div className="art art-sql">
       <div className="art-head">
-        <span className="art-label">Generated SQL</span>
+        <span className="art-label">{label}</span>
         {plan && <span className="art-meta">from plan {plan}</span>}
+        {meta && <span className="art-meta">{meta}</span>}
         <button type="button" className="inspect-close art-copy" onClick={copy} aria-live="polite">
           <CopyIcon />{copied || "Copy"}
         </button>
       </div>
-      <pre className="sql-code" ref={code} tabIndex={0} aria-label="Generated SQL">
+      <pre className="sql-code" ref={code} tabIndex={0} aria-label={label}>
         {sqlLines(text).map((line, i) => (
           <span className="sql-line" key={i}>
             {line.map((t, j) => (t.kind === "plain" ? t.text : <span key={j} className={`tk-${t.kind}`}>{t.text}</span>))}

@@ -21,6 +21,7 @@ from nl2sql.cli.generators.llm import LLMGenerator
 from nl2sql.cli.generators.policies import PolicyGenerator
 
 from .datasets import (
+    DEMO_CURATED,
     DEMO_DATABASES,
     DEMO_DATASOURCES,
     DEMO_POLICIES,
@@ -28,6 +29,26 @@ from .datasets import (
 )
 from .defaults import DEMO_LLM_CONFIG
 from .stamp import write_stamp
+
+
+class _CuratedDumper(yaml.SafeDumper):
+    """Writes multi-line strings (the SQL) as ``|`` blocks, so the file reads as written."""
+
+
+_CuratedDumper.add_representer(
+    str,
+    lambda dumper, value: dumper.represent_scalar(
+        "tag:yaml.org,2002:str", value, style="|" if "\n" in value else None),
+)
+
+CURATED_HEADER = """# The demo's verified queries: SQL a person wrote and reviewed, with typed
+# params, and the questions each one answers. Written by `nl2sql demo`.
+#
+# Check it with `nl2sql --env demo curated validate`, run every query once with
+# `nl2sql --env demo curated test`, and after an edit re-index its questions
+# with `nl2sql --env demo index --curated-only`.
+# See docs/configuration/curated.md.
+"""
 
 
 def _load_demo_env(env_path: pathlib.Path) -> None:
@@ -104,7 +125,7 @@ class DemoManager:
         )
 
     def _write_common_artifacts(self, policies: Dict[str, Any], questions: Dict[str, List[str]]):
-        """Writes policies, sample questions and the LLM config."""
+        """Writes policies, sample questions, verified queries and the LLM config."""
         self.print_step("Writing policies...")
         policy_config = PolicyFileConfig(roles=policies)
         content = PolicyGenerator.generate(policy_config)
@@ -120,6 +141,12 @@ class DemoManager:
         samples_path = self.project_root / "configs" / "sample_questions.demo.yaml"
         with open(samples_path, "w") as f:
             yaml.dump(questions, f, sort_keys=False)
+
+        self.print_step("Writing verified queries...")
+        curated_path = self.project_root / "configs" / "curated.demo.yaml"
+        with open(curated_path, "w", encoding="utf-8") as f:
+            f.write(CURATED_HEADER)
+            yaml.dump(DEMO_CURATED, f, Dumper=_CuratedDumper, sort_keys=False, allow_unicode=True, width=120)
 
         self.print_step("Writing LLM config...")
         llm_config = LLMFileConfig(**DEMO_LLM_CONFIG)

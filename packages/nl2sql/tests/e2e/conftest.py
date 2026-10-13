@@ -21,8 +21,12 @@ CLI = [sys.executable, "-m", "nl2sql.cli.main"]
 
 
 def _base_env() -> dict:
+    # Curated answers are off unless a test turns them on: the demo's
+    # `.env.demo` points at its verified queries, and the tests here pin the
+    # generated pipeline's calls and nodes. The curated tests opt back in.
     env = {k: v for k, v in os.environ.items() if k not in ("OPENAI_API_KEY", "ENV", "ENV_FILE_PATH")}
-    env.update({"EMBEDDING_PROVIDER": "local", "NO_COLOR": "1", "TERM": "dumb", "COLUMNS": "200"})
+    env.update({"EMBEDDING_PROVIDER": "local", "NO_COLOR": "1", "TERM": "dumb", "COLUMNS": "200",
+                "CURATED_ENABLED": "false"})
     return env
 
 
@@ -37,13 +41,20 @@ def _no_shared_plan_cache(monkeypatch):
     """
     monkeypatch.setenv("PLAN_CACHE_ENABLED", "false")
     monkeypatch.setattr(settings, "plan_cache_enabled", False)
+    # Likewise the demo's verified queries (see ``_base_env``): a test that
+    # wants them sets CURATED_ENABLED=true itself.
+    monkeypatch.setenv("CURATED_ENABLED", "false")
+    monkeypatch.setattr(settings, "curated_enabled", False)
 
 
 @pytest.fixture(scope="session")
 def demo_project(tmp_path_factory):
     """A generated demo project (three SQLite databases, indexed locally, no key)."""
     root = tmp_path_factory.mktemp("demo")
-    subprocess.run(CLI + ["setup", "--demo"], cwd=root, env=_base_env(), check=True, timeout=900)
+    # Indexed as the demo is, verified queries included, so a test that turns
+    # curated answers on finds them.
+    env = {**_base_env(), "CURATED_ENABLED": "true"}
+    subprocess.run(CLI + ["setup", "--demo"], cwd=root, env=env, check=True, timeout=900)
     return root
 
 
@@ -155,6 +166,10 @@ def demo_env() -> SimpleNamespace:
     monkeypatch.setattr(settings, "schema_store_path", str(schema_store_path))
     monkeypatch.setattr(settings, "schema_store_max_versions", 3)
     monkeypatch.setattr(settings, "global_timeout_sec", 180)
+    # Built before the per-test fixtures run, so curated answers are turned
+    # off here too: a `.env.demo` in the repository root names the demo's
+    # verified queries, and these tests pin the generated pipeline.
+    monkeypatch.setattr(settings, "curated_enabled", False)
 
     ctx = NL2SQLContext(
         **_demo_config_paths(root, secrets_path),

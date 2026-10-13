@@ -161,6 +161,8 @@ def test_every_guided_question_replays_when_streamed_with_no_key(demo_project, t
     monkeypatch.chdir(project)
     monkeypatch.setenv("ENV", "demo")
     monkeypatch.setenv("LLM_CONFIG", "configs/llm.demo.yaml")
+    # As the Space runs it: with the demo's verified queries.
+    monkeypatch.setenv("CURATED_ENABLED", "true")
     reload_settings()
     replay = FakeLLMServer(store.rules(), stream_delay=REPLAY_STREAM_DELAY / 10).start()
     finals = {}
@@ -184,4 +186,9 @@ def test_every_guided_question_replays_when_streamed_with_no_key(demo_project, t
     assert all(body["recorded"] for (_, body), _ in finals.values())
     # Each recorded answer streamed in pieces, not as one block.
     assert all(deltas > 2 for _, deltas in finals.values())
-    assert not [c for c in replay.calls if not c["matched"]]
+    # Every recorded call answered. The curated matcher's choice is the one
+    # exception until the demo is recorded again: recordings made before it
+    # hold no VerifiedQueryChoice, so it misses and the run falls back to the
+    # recorded generated answer, as asserted above.
+    unrecorded = {c["name"] for c in replay.calls if not c["matched"]}
+    assert unrecorded <= {"VerifiedQueryChoice"}, unrecorded

@@ -5,7 +5,7 @@ import SqlCard from "./SqlCard.jsx";
 import RowsTable, { SampleRows } from "./RowsTable.jsx";
 import Ledger, { Totals } from "./Ledger.jsx";
 import { planSections } from "./plan.js";
-import { subQueryHeads } from "./results.js";
+import { subQueryHeads, verifiedSource } from "./results.js";
 import { humanCheck, nodeLedger, traceFileName, traceUrl } from "./run.js";
 import { describeFault } from "./faults.js";
 import { missPrompt, recordedBadge } from "./firstRun.js";
@@ -109,6 +109,7 @@ function AnswerHead({ asked, busy, progress, stopped, hosted, meta, result, sub,
   const strip = head ? statusStrip(result, sub) : [];
   const miss = busy ? null : missPrompt(result, meta);
   const badge = busy ? null : recordedBadge(result);
+  const verified = busy ? null : verifiedSource(result);
   const state = busy ? "busy" : stopped ? "stopped" : fault ? "fault" : head ? head.kind : "empty";
   return (
     <section className="answer-head" id="pane-question" tabIndex={-1} aria-labelledby="pane-question-title"
@@ -120,6 +121,11 @@ function AnswerHead({ asked, busy, progress, stopped, hosted, meta, result, sub,
         <span className="asked">{asked.question}</span>
         <span className="role-tag">as {asked.role}{asked.planOnly && ", plan only"}</span>
         {badge && <span className="recorded-badge" id="recorded-badge" title={badge.title}>{badge.label}</span>}
+        {verified && (
+          <span className="verified-badge" id="verified-badge" title={verified.title} aria-label={verified.title}>
+            <Glyph ok />Verified<span className="sep" aria-hidden="true">·</span><code>{verified.id}</code>
+          </span>
+        )}
       </div>
       {busy && !writing && (
         <div className="answer-wait" aria-hidden="true">
@@ -153,7 +159,8 @@ function AnswerHead({ asked, busy, progress, stopped, hosted, meta, result, sub,
       )}
       {!busy && answered.length > 0 && (
         <p className="answer-from" id="answered-from">
-          Answered from <strong>{answered.join(" and ")}</strong>, the database the resolver picked.
+          Answered from <strong>{answered.join(" and ")}</strong>,{" "}
+          {verified ? "the database the verified query belongs to." : "the database the resolver picked."}
         </p>
       )}
     </section>
@@ -195,13 +202,41 @@ function PlanBody({ sub }) {
   );
 }
 
+// A verified answer has no plan: the model chose a query the data team wrote,
+// and gave its values. Said in place of the plan, with the values it bound.
+function VerifiedBody({ verified }) {
+  return (
+    <>
+      <p className="reasoning" id="verified-plan">
+        No plan was written. The question matched the verified query <code>{verified.id}</code>, SQL your data team
+        wrote and reviewed; the model chose it and its values, and the checks below held them to their types and your role.
+      </p>
+      <dl className="plan">
+        <div className="clause">
+          <dt>Query</dt>
+          <dd><code>{verified.id}</code></dd>
+        </div>
+        <div className="clause">
+          <dt>Values</dt>
+          <dd>
+            {verified.params.length
+              ? verified.params.map((p) => <code key={p.name}>{`${p.name} = ${p.value}`}</code>)
+              : <code>none</code>}
+          </dd>
+        </div>
+      </dl>
+    </>
+  );
+}
+
 // `subs` is every sub-query of the run; `sub`, the first, decides the state.
-export function PlanPane({ sub, subs = sub ? [sub] : [], state, head, live = false }) {
+export function PlanPane({ sub, subs = sub ? [sub] : [], state, head, live = false, verified = null }) {
   const planned = subs.some((s) => planSections(s && s.plan).length > 0);
   const idle = "The model writes a typed plan here, never SQL.";
+  const empty = state === "done" && !planned && !verified && !live;
   return (
     <Station id="pane-plan" title="Plan" state={state} head={head}
-      note={state === "idle" ? idle : state === "done" && !planned && !live ? "No plan came back, so nothing downstream ran." : null}>
+      note={state === "idle" ? idle : empty ? "No plan came back, so nothing downstream ran." : null}>
       {state === "busy" && (
         <>
           <p className="reasoning is-live">Writing a typed plan from the retrieved tables.</p>
@@ -213,6 +248,7 @@ export function PlanPane({ sub, subs = sub ? [sub] : [], state, head, live = fal
         </>
       )}
       {planned && <SubBlocks subs={subs}>{(s) => <PlanBody sub={s} />}</SubBlocks>}
+      {state === "done" && verified && <VerifiedBody verified={verified} />}
     </Station>
   );
 }
@@ -290,7 +326,9 @@ export function SqlPane({ sub, subs = sub ? [sub] : [], state, refused, head, li
     <Station id="pane-sql" title="SQL" state={state} note={note} head={head}>
       {written && (
         <SubBlocks subs={subs}>
-          {(s) => (s.sql ? <SqlCard sql={s.sql} plan={(s.retry_count || 0) + 1} /> : <p className="station-note">No SQL.</p>)}
+          {(s) => (!s.sql ? <p className="station-note">No SQL.</p>
+            : s.plan_source === "verified" ? <SqlCard sql={s.sql} label="Verified SQL" meta="values bound, never pasted in" />
+              : <SqlCard sql={s.sql} plan={(s.retry_count || 0) + 1} />)}
         </SubBlocks>
       )}
     </Station>
@@ -412,7 +450,8 @@ export default function Run({ asked, result, sub, busy, progress = null, stopped
         answered={answered} onAgain={onAgain} />
       <div className="spine" data-outcome={outcome} aria-busy={busy}>
         {busy && <span className="spine-run" aria-hidden="true" />}
-        <PlanPane sub={sub} subs={subs} state={s.plan} head={heads.plan} live={live} />
+        <PlanPane sub={sub} subs={subs} state={s.plan} head={heads.plan} live={live}
+          verified={busy ? null : verifiedSource(result)} />
         <ValidationPane sub={sub} result={result} state={s.checks} role={asked && asked.role} head={heads.checks} live={live} />
         <SqlPane sub={sub} subs={subs} state={s.sql} refused={gateFailed} head={heads.sql} live={live} />
         <RowsPane sub={sub} result={live ? liveResult(progress) : result} state={s.rows} head={heads.rows} live={live} />

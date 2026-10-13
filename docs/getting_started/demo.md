@@ -71,6 +71,8 @@ This writes the following, relative to the directory you run the command in:
 - `configs/llm.demo.yaml`
 - `configs/policies.demo.json`
 - `configs/sample_questions.demo.yaml`
+- `configs/curated.demo.yaml`, six verified queries on Chinook (see
+  [Verified answers](#verified-answers))
 - `configs/secrets.demo.yaml`
 - `.env.demo`
 - `nl2sql-demo.json`, a small stamp recording which engine version wrote the
@@ -107,10 +109,28 @@ Three registered datasources also change how a question is routed. With one, the
 resolver took the only datasource and skipped the vector search; with three, the
 datasource search and the LLM answerability judge run on every question, so the
 demo exercises the part of the pipeline a single-dataset demo never reached.
-Indexing all three writes 162 entries - 87 for `chinook`, 36 for `support` and
+Indexing all three writes 186 entries - 111 for `chinook` (24 of them the verified queries' phrasings and descriptions), 36 for `support` and
 39 for `webanalytics` - and the build `nl2sql setup --demo` runs takes about
 seven or eight seconds once the embedding model is cached; the first run on a
 machine still downloads the model.
+
+### Verified answers
+
+`configs/curated.demo.yaml` holds six verified queries on Chinook: SQL written
+and reviewed in advance, with typed params, and the questions each answers
+(top customers by revenue in a year, revenue by year, monthly revenue in a
+year, sales by country, best-selling genres, top artists by tracks sold).
+`.env.demo` points `CURATED_CONFIG` at it, and indexing embeds their questions
+beside the schema. A question one of them answers runs its SQL with the values
+bound instead of a generated plan, and the playground labels the answer
+**Verified Â·** and the query's id. "What is the total revenue per year?" and
+"Which genre sells the most tracks?" among the guided questions are two of
+them. See [Curated answers](../configuration/curated.md#in-the-demo).
+
+The keyless replay has no recorded answer for the matcher's model call
+(`VerifiedQueryChoice`) until the owner records the demo again, so without a
+key every answer is generated, as before, and no badge appears. With a key, a
+matching question comes back verified.
 
 ### The roles
 
@@ -148,7 +168,7 @@ This covers the embedding step only. The demo is **not** key-free end to end:
   question with a single retry; `gpt-5.4` had 500,000 and accepts
   `temperature: 0`. To use a model that rejects it (`gpt-5.5`, `gpt-5-mini`),
   set `temperature: null` in `configs/llm.demo.yaml` - see
-  [LLM configuration → Temperature](../configuration/llm.md#temperature). With an
+  [LLM configuration â†’ Temperature](../configuration/llm.md#temperature). With an
   OpenRouter key or Ollama, change `model` to one that provider serves: live
   mode switches the provider, not the model name.
 - `nl2sql index` also runs an optional LLM enrichment pass over the schema.
@@ -179,7 +199,7 @@ This covers the embedding step only. The demo is **not** key-free end to end:
 - Pointing `configs/llm.demo.yaml` at `provider: ollama` removes the chat key
   requirement, but a local model's ability to satisfy the pipeline's structured
   output is model-dependent - see
-  [LLM configuration → Ollama](../configuration/llm.md#ollama).
+  [LLM configuration â†’ Ollama](../configuration/llm.md#ollama).
 
 Sharing the demo with other people is the one case where none of this applies:
 `nl2sql demo --hosted` serves the playground with **no key on the server at
@@ -235,7 +255,7 @@ The playground's left rail opens with the **Database** panel, and with the
 demo's three databases it carries a switcher for which of them to read: a
 segmented control while there are four or fewer, a **Showing** select beyond
 that. At the foot of the rail, **Search index** is one line when all is well --
-"Search index fresh. 162 entries, built 3 minutes ago." -- that opens to entries
+"Search index fresh. 186 entries, built 3 minutes ago." -- that opens to entries
 by type (datasource, tables, columns, relationships), the schema version they
 were built from, and when. One index holds every database, so with the demo's
 three the line inside says which they are -- "Covers chinook, support and
@@ -313,7 +333,7 @@ Ask is the question box, then the run, answer first:
   below. A refusal gets the same block: **Refused at the checks. No SQL was
   written.**
 - **The stations.** Plan, Checks, SQL, Rows and Cost & time follow, each with a
-  small heading, a tag for who decides it (**Model · gpt-5.4**, from the run's
+  small heading, a tag for who decides it (**Model Â· gpt-5.4**, from the run's
   usage, or **Code**) and the step's time. On the spine a round mark is a model
   step and a square one is code; filled with a tick is done, an outline is
   waiting and a dashed outline was not reached.
@@ -325,7 +345,7 @@ Ask is the question box, then the run, answer first:
   and a result cut at its row ceiling says so: **Cut at 1,000 rows, so some are
   missing. Narrow the question to get them all.** The table shows 100 rows at a
   time, fetched from the server, with **Previous**, **Next** and **Rows
-  101–200 of 3,340**. A run with several results gets one tab per result.
+  101â€“200 of 3,340**. A run with several results gets one tab per result.
   **Download CSV** streams the whole result from the server, every row.
 - **The gate.** The Checks station shows the plans the checks saw (**Plan 1
   refused**, then **Plan 2 passed** when the first was sent back), why, in one
@@ -340,7 +360,7 @@ Ask is the question box, then the run, answer first:
   Where the stream cannot be used (an older server, a proxy that cuts it, a
   browser that cannot read a streamed reply), the page asks `POST /api/ask`
   instead and the first station stays lit until the whole run is back.
-  A counter beside the button reads **Running · 3.4 s**, and after a
+  A counter beside the button reads **Running Â· 3.4 s**, and after a
   moment **Ask** becomes **Stop**, which cancels the request: the run then says
   **Stopped** and every station is marked not reached. The server notices the
   dropped request within a quarter of a second and cancels the run: no further
@@ -506,8 +526,8 @@ A run's own retrieval is under **Debug**: open the `datasource_resolver` or
 
 ### Rating answers
 
-Below **Cost & time**, each answer asks **Was this answer right?**: **👍 Right**
-or **👎 Wrong**, with an optional note (**Wrong number**, **Wrong table**,
+Below **Cost & time**, each answer asks **Was this answer right?**: **ðŸ‘ Right**
+or **ðŸ‘Ž Wrong**, with an optional note (**Wrong number**, **Wrong table**,
 **Wrong filter**, **Missing rows**, or your own words). The rating is saved in
 the demo's `data/schema_store.db` with the question, role, SQL, the model per
 step and the engine version; never the rows. It is local only, like Settings:
@@ -588,7 +608,7 @@ command exits `1` after writing `recordings.json` with the rest. The file names
 the provider and the model that answered, and a replay reports that model --
 in the usage ledger, the Debug pane and on the Pipeline page, tagged recorded --
 rather than the one the replaying config names. See
-[Determinism → The plan cache](../architecture/determinism.md#the-plan-cache-determinism-from-the-architecture).
+[Determinism â†’ The plan cache](../architecture/determinism.md#the-plan-cache-determinism-from-the-architecture).
 
 `--env <name>` loads `.env.<name>`. To point at an exact file instead, use
 `--env-file <path>`, which takes precedence over `--env`. Either flag also

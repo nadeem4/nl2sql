@@ -6,11 +6,15 @@ query answers.
 
 !!! note "What works today"
     The file is loaded and checked (at startup and with
-    `nl2sql curated validate`), its questions are indexed with `nl2sql index`,
-    and a question is matched to a verified query and answered by it (see
-    [What happens at question time](#what-happens-at-question-time)). The
-    playground's *Verified* badge, a demo file and `nl2sql curated test` come
-    in a later release.
+    `nl2sql curated validate`), every query can be run once with
+    `nl2sql curated test`, its questions are indexed with `nl2sql index`, a
+    question is matched to a verified query and answered by it (see
+    [What happens at question time](#what-happens-at-question-time)), and the
+    playground badges such an answer *Verified*. The demo ships six verified
+    queries ([In the demo](#in-the-demo)). Preferred tables
+    ([below](#preferred-tables)) and proposals from thumbs-up feedback
+    ([From feedback to verified queries](#from-feedback-to-verified-queries))
+    are built too. Business metrics are parsed but not used yet.
 
 ## Where the file lives
 
@@ -159,6 +163,41 @@ if not report.ok:
         print(entry.datasource_id, entry.query_id, entry.status, entry.details)
 ```
 
+## Testing the queries
+
+`validate` reads the SQL; it does not run it, so a column renamed under a
+query passes it. `nl2sql curated test` runs every verified query once against
+its database:
+
+```bash
+nl2sql curated test
+nl2sql curated test --curated configs/curated.yaml --config configs/datasources.yaml
+```
+
+It takes the same options as `validate`. Each param is bound to its
+`default`, else its `example`; a param with neither fails its query without
+running it, so give every required param an `example`. A query that fails the
+static checks (not read-only, placeholders that do not match the params) is
+never run. The rest run read-only through their datasource's adapter, the
+same path a matched question takes, with the values bound and only the first
+batch of rows fetched. It prints one row per query and exits 1 if any fails,
+so it can run in CI after a schema change:
+
+```text
+                                     Verified Queries
+┏━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Datasource ┃ Query                    ┃ Status ┃ Params          ┃ Details                                      ┃
+┡━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ chinook    │ top_customers_by_revenue │ PASS   │ n=10, year=2012 │ 10 rows in 0.00 s                            │
+│ chinook    │ revenue_by_year          │ FAIL   │                 │ The database rejected the query: no such     │
+│            │                          │        │                 │ column: Total                                │
+└────────────┴──────────────────────────┴────────┴─────────────────┴──────────────────────────────────────────────┘
+```
+
+From Python it is `CuratedAPI().test()`, which returns a report like
+`validate()`'s: `ok`, `errors`, and one entry per query with its `status`
+(`PASS` or `FAIL`), `params`, `row_count` and `details`.
+
 ## Indexing the questions
 
 `nl2sql index` embeds every phrasing of every verified query, and its
@@ -233,6 +272,13 @@ or `{"type": "generated", ...}` with the other fields `null`. The sub-query of
 a verified answer has `plan_source: "verified"`, its `sql` is your SQL with
 its `:name` placeholders, and its `plan` is `null`.
 
+In the playground a verified answer carries a green **Verified ·
+top_customers_by_revenue** label beside the question, with the bound values
+in its tooltip. The Plan station says no plan was written and lists the query
+and its values, the Checks station shows the matcher's three checks (read-only,
+params, role), and the SQL station shows your SQL as **Verified SQL**, with its
+placeholders. A generated answer looks as it always has.
+
 Why a question was not matched is in the run trace: the `curated_matcher`
 node's `curated_match` record lists the candidates and their similarities, the
 floor, the model's choice and reason, the checked values, and one reason code:
@@ -248,6 +294,33 @@ Parameters are bound by the datasource's adapter. Every built-in adapter
 binds them; a third-party adapter has to declare `SUPPORTS_BOUND_PARAMETERS`
 ([SDK](../adapters/sdk.md)), and a verified query with params on one that
 does not is never run (`capability_missing`).
+
+## In the demo
+
+`nl2sql demo` and `nl2sql setup --demo` write `configs/curated.demo.yaml`
+with six verified queries on Chinook, set `CURATED_CONFIG` to it in
+`.env.demo`, and index their questions with the schema:
+
+| Query | One of its phrasings | Params |
+| --- | --- | --- |
+| `top_customers_by_revenue` | "Who are our top {n} customers by revenue in {year}?" | `n` (default 10), `year` (example 2012) |
+| `revenue_by_year` | "What is the total revenue per year?" | none |
+| `monthly_revenue` | "What was the monthly revenue in {year}?" | `year` (example 2013) |
+| `sales_by_country` | "What are total sales by country?" | none |
+| `best_selling_genres` | "Which genre sells the most tracks?" | `n` (default 5) |
+| `top_artists_by_tracks_sold` | "Who are the top {n} artists by tracks sold?" | `n` (default 10) |
+
+Two of the guided questions, "What is the total revenue per year?" and "Which
+genre sells the most tracks?", are phrasings of these, so with a key they come
+back verified. Check and run the file with
+`nl2sql --env demo curated validate` and `nl2sql --env demo curated test`.
+
+The keyless demo (a hosted Space with no key, or `nl2sql demo` replaying
+recordings) answers from recorded model answers, and those were recorded
+before the curated matcher existed: they hold no `VerifiedQueryChoice` answer.
+Until the recordings are made again (`python scripts/record_demo_answers.py`,
+which needs the owner's key), the matcher's call misses, the run falls back
+(`model_failed`), and every keyless answer is generated, as before.
 
 ## Preferred tables
 
@@ -320,5 +393,7 @@ playground writes it either.
 - Startup load: `packages/nl2sql/src/nl2sql/context.py`
 - Facade: `packages/nl2sql/src/nl2sql/api/curated_api.py`
 - Command: `packages/nl2sql/src/nl2sql/cli/commands/curated.py`
+- The demo's verified queries: `CHINOOK_VERIFIED_QUERIES` in `packages/nl2sql/src/nl2sql/cli/demo/chinook.py`
+- The playground badge: `verifiedSource()` in `web/playground/src/results.js`
 - Matching and running: `packages/nl2sql/src/nl2sql/pipeline/nodes/curated_matcher/`
 - Proposals from feedback: `packages/nl2sql/src/nl2sql/feedback/proposals.py`

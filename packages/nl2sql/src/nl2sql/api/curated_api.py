@@ -3,20 +3,26 @@ Curated answers API for NL2SQL.
 
 Validates ``curated.yaml``: the checks startup runs, plus the one that needs
 the index (every table a verified query reads exists in its datasource's
-latest indexed schema).
+latest indexed schema). Tests it: every verified query run once against its
+database, with its defaults and examples bound.
 """
 
 from __future__ import annotations
 
 import pathlib
+import time
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
+
+from nl2sql_adapter_sdk.capabilities import DatasourceCapability
+from nl2sql_adapter_sdk.contracts import AdapterRequest
 
 from nl2sql.common.settings import settings
 from nl2sql.configs import ConfigManager
-from nl2sql.configs.curated import CuratedFileConfig, check_curated_queries
+from nl2sql.configs.curated import CuratedFileConfig, VerifiedQuery, check_curated_queries
 from nl2sql.context import NL2SQLContext
 from nl2sql.datasources import DatasourceRegistry
+from nl2sql.execution.executor.sql_executor import _frames as adapter_frames
 from nl2sql.schema import build_schema_store
 from nl2sql.secrets import secret_manager
 
@@ -36,6 +42,24 @@ class CuratedValidationReport:
     entries: List[CuratedValidationEntry] = field(default_factory=list)
     errors: List[str] = field(default_factory=list)
     notes: List[str] = field(default_factory=list)
+
+
+@dataclass
+class CuratedTestEntry:
+    datasource_id: str
+    query_id: str
+    status: str  # "PASS" or "FAIL"
+    details: str
+    params: Dict[str, Any] = field(default_factory=dict)
+    row_count: Optional[int] = None
+
+
+@dataclass
+class CuratedTestReport:
+    ok: bool
+    path: str = ""
+    entries: List[CuratedTestEntry] = field(default_factory=list)
+    errors: List[str] = field(default_factory=list)
 
 
 class CuratedAPI:
@@ -100,6 +124,78 @@ class CuratedAPI:
 
         report.ok = not report.errors and all(e.status == "OK" for e in report.entries)
         return report
+
+    def test(
+        self,
+        curated_path: Optional[pathlib.Path] = None,
+        datasources_path: Optional[pathlib.Path] = None,
+        secrets_path: Optional[pathlib.Path] = None,
+    ) -> CuratedTestReport:
+        """
+        Run every verified query once against its database.
+
+        Each param is bound to its ``default``, else its ``example``; a param
+        with neither fails the query without running it. A query that fails
+        the static checks ``validate()`` runs (read-only, placeholders) is
+        never run. The rest run read-only through their datasource's adapter,
+        with the values bound, and only the first batch of rows is fetched.
+        ``ok`` is False if any query fails.
+        """
+        cm = self._ctx.config_manager if self._ctx else ConfigManager()
+        path = pathlib.Path(curated_path or settings.curated_config_path)
+        try:
+            cfg = cm.load_curated(path)
+            registry = self._registry(cm, datasources_path, secrets_path)
+            dialects = {ds_id: registry.get_dialect(ds_id) for ds_id in registry.list_ids()}
+        except Exception as e:
+            return CuratedTestReport(ok=False, path=str(path), errors=[str(e)])
+
+        report = CuratedTestReport(ok=True, path=str(path))
+        check = check_curated_queries(cfg, dialects)
+        for issue in check.issues:
+            if issue.query_id is None:
+                report.errors.append(str(issue))
+            else:
+                report.entries.append(CuratedTestEntry(issue.datasource_id, issue.query_id, "FAIL", issue.message))
+
+        for ds_id, ds in cfg.datasources.items():
+            for query in ds.verified_queries:
+                if (ds_id, query.id) in check.parsed:
+                    report.entries.append(self._run_one(registry, ds_id, query))
+
+        report.ok = not report.errors and all(e.status == "PASS" for e in report.entries)
+        return report
+
+    @staticmethod
+    def _run_one(registry: DatasourceRegistry, ds_id: str, query: VerifiedQuery) -> CuratedTestEntry:
+        params: Dict[str, Any] = {}
+        for name, spec in query.params.items():
+            value = spec.default if spec.default is not None else spec.example
+            if value is None:
+                return CuratedTestEntry(ds_id, query.id, "FAIL",
+                                        f"param '{name}' has no default or example to test with")
+            params[name] = value
+        if params and not registry.supports(ds_id, DatasourceCapability.SUPPORTS_BOUND_PARAMETERS):
+            return CuratedTestEntry(ds_id, query.id, "FAIL",
+                                    f"the adapter for '{ds_id}' cannot bind parameters", params)
+
+        request = AdapterRequest(plan_type="sql", payload={"sql": query.sql}, parameters=params, limits={})
+        started = time.perf_counter()
+        frames = adapter_frames(registry.get_adapter(ds_id), request)
+        try:
+            frame = next(frames, None)
+        except Exception as e:  # a driver error the adapter did not wrap
+            return CuratedTestEntry(ds_id, query.id, "FAIL", str(e), params)
+        finally:
+            close = getattr(frames, "close", None)
+            if close is not None:
+                close()
+        if frame is None or not frame.success:
+            reason = frame.error.safe_message if frame is not None and frame.error else "no result"
+            return CuratedTestEntry(ds_id, query.id, "FAIL", reason, params)
+        elapsed = time.perf_counter() - started
+        rows = f"{frame.row_count} row{'' if frame.row_count == 1 else 's'}"
+        return CuratedTestEntry(ds_id, query.id, "PASS", f"{rows} in {elapsed:.2f} s", params, frame.row_count)
 
     def _registry(self, cm: ConfigManager, datasources_path, secrets_path) -> DatasourceRegistry:
         if self._ctx and datasources_path is None:

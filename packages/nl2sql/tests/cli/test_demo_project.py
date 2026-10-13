@@ -79,3 +79,30 @@ def test_setup_demo_writes_the_env_and_secrets_envelope(tmp_path):
     env = (tmp_path / ".env.demo").read_text()
     assert "EMBEDDING_PROVIDER=local" in env
     assert (tmp_path / "configs" / "secrets.demo.yaml").exists()
+
+
+def test_setup_demo_writes_verified_queries_that_pass_the_checks_and_run(tmp_path, monkeypatch):
+    from nl2sql import CuratedAPI
+
+    DemoManager(Console(), tmp_path).setup_demo()
+    curated = tmp_path / "configs" / "curated.demo.yaml"
+    assert "CURATED_CONFIG=configs/curated.demo.yaml" in (tmp_path / ".env.demo").read_text()
+
+    queries = yaml.safe_load(curated.read_text(encoding="utf-8"))["datasources"]["chinook"]["verified_queries"]
+    assert 4 <= len(queries) <= 6
+    for query in queries:
+        # Several phrasings each, so a reworded question still finds its query.
+        assert len(query["questions"]) >= 3, query["id"]
+        for name, spec in query.get("params", {}).items():
+            assert spec.get("default") is not None or spec.get("example") is not None, (query["id"], name)
+
+    # Every one passes the startup checks and runs against the demo's Chinook,
+    # whose path is relative to the project.
+    monkeypatch.chdir(tmp_path)
+    paths = {"curated_path": curated, "datasources_path": tmp_path / "configs" / "datasources.demo.yaml",
+             "secrets_path": tmp_path / "configs" / "secrets.demo.yaml"}
+    validated = CuratedAPI().validate(**paths)
+    tested = CuratedAPI().test(**paths)
+    assert validated.ok, validated
+    assert tested.ok, tested
+    assert all(e.row_count for e in tested.entries), tested

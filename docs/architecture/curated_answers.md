@@ -2,12 +2,12 @@
 
 !!! note "Status: partly built"
     The config and its checks (PR 1), indexing and candidates (PR 2),
-    matching and running verified queries (PR 3), preferred tables (PR 5)
-    and feedback proposals (PR 6) are built; see
+    matching and running verified queries (PR 3), the playground badge, the
+    demo file and `nl2sql curated test` (PR 4), preferred tables (PR 5) and
+    feedback proposals (PR 6) are built; see
     [Curated answers](../configuration/curated.md) and
     [Datasources](../configuration/datasources.md#preferred-tables) for how to
-    use them. The playground badge, the demo file and `nl2sql curated test`
-    are not built yet. Each pull request in
+    use them. Each pull request in
     [Implementation plan](#implementation-plan) updates this page and the
     reference docs it touches.
 
@@ -507,8 +507,11 @@ Every answer says where it came from:
   similarities, the floor, the model's choice and reason, the params after
   checking, and the fallback reason code if it fell back.
 - The playground shows a badge on the answer, "Verified · top_customers_by_revenue",
-  in the same place and style as the plan-cache chip in `web/playground/src/Panes.jsx`,
-  with the params on hover. A generated answer shows no badge.
+  with the params on hover. A generated answer shows no badge. Built in PR 4
+  beside the question, in the shape of the *Recorded run* label rather than
+  next to the plan-cache line, which only Debug shows: whether an answer was
+  verified matters to every reader. The Plan station, which has no plan to
+  show, names the query and its values instead.
 
 ## Feedback proposals
 
@@ -552,11 +555,19 @@ nor the playground ever writes it.
 ## Demo
 
 `nl2sql demo` writes `configs/curated.demo.yaml`, beside
-`sample_questions.demo.yaml`, with a few Chinook verified queries
-(`top_customers_by_revenue`, revenue by year, best-selling genre), and the
-generated `.env.demo` gains `CURATED_CONFIG=configs/curated{suffix}.yaml`
-(`cli/generators/env/templates.py`). The queries are data in
-`cli/demo/chinook.py`, written by `DemoManager._write_common_artifacts()`.
+`sample_questions.demo.yaml`, with six Chinook verified queries
+(`top_customers_by_revenue`, `revenue_by_year`, `monthly_revenue`,
+`sales_by_country`, `best_selling_genres`, `top_artists_by_tracks_sold`), and
+the generated `.env.demo` gains `CURATED_CONFIG=configs/curated.demo.yaml`
+(`cli/generators/env/templates.py`). Only the demo's env file sets it: for any
+other environment the file is optional, and a `CURATED_CONFIG` naming a file
+that does not exist fails startup. The queries are data in
+`cli/demo/chinook.py` (`CHINOOK_VERIFIED_QUERIES`), written by
+`DemoManager._write_common_artifacts()`, and `nl2sql setup --demo` indexes
+their questions with the schema, so the hosted Space's image has them too. No
+guided question was added: two of the existing ones ("What is the total
+revenue per year?", "Which genre sells the most tracks?") are phrasings of
+verified queries, and a new guided question would have no recording.
 
 The keyless demo replays recorded model answers, keyed on the structured-output
 name and the question. The matcher's call is a new name
@@ -565,7 +576,10 @@ have no answer for it until they are re-recorded. Until then a replay miss on
 the matcher falls back (`model_failed`) and the demo still answers, generated.
 **Re-recording needs the owner's API key and the owner's go-ahead**; it is a
 step the owner runs (`python scripts/record_demo_answers.py`, which drives
-`nl2sql demo --record`), not something a pull request can do.
+`nl2sql demo --record`), not something a pull request can do. PR 4 ships with
+the old recordings, so until they are re-recorded the hosted keyless demo
+shows no *Verified* badge: every keyless answer is generated, as before. With
+a visitor's key, the badge appears.
 
 ## Settings
 
@@ -710,7 +724,10 @@ The badge in `web/playground/src/`, `curated.demo.yaml` written by the demo,
 Tests: a vitest case beside `results.test.js` for the badge,
 `tests/e2e/test_playground_curated_fake_llm.py`, `tests/unit/test_cli_curated_test.py`
 (a renamed column fails), and the demo setup test for the new file. The owner
-then re-records the demo answers.
+then re-records the demo answers. *Built.* `nl2sql curated test` binds each
+param's `default`, else its `example`, runs the query read-only through the
+adapter (the static checks first, only the first batch of rows fetched) and
+exits 1 on any failure; `CuratedAPI.test()` returns the report.
 
 **5. Preferred tables.**
 `DatasourceConfig.preferred_tables`, the ordering in the schema retriever for

@@ -6,7 +6,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   PAGE_SIZE, csvUrl, firstPage, initialView, pageNav, pageRange, pageUrl, resultTabs, rowCount, rowsView,
-  subQueryHeads, truncatedNotice, viewUrl,
+  subQueryHeads, truncatedNotice, verifiedSource, viewUrl,
 } from "./results.js";
 
 const longest = { node_id: "combine_g1", columns: ["genre", "track", "ms"], row_count: 3340, truncated: false };
@@ -104,4 +104,29 @@ test("subQueryHeads: nothing for one sub-query, a numbered head for each of seve
     { key: "sq_1", title: "Sub-query 1 of 2", detail: "Tracks per genre · chinook" },
     { key: "sq_2", title: "Sub-query 2 of 2", detail: "northwind" },
   ]);
+});
+
+// A verified answer: `source.type` is "verified", and its sub-query has the
+// data team's SQL and no plan.
+const verified = {
+  source: { type: "verified", id: "top_customers_by_revenue", datasource_id: "chinook", params: { n: 5, year: 2012 } },
+  sub_queries: [{ id: "verified_top_customers_by_revenue", plan: null, plan_source: "verified", sql: "SELECT 1" }],
+};
+
+test("verifiedSource: a verified answer gets its badge, with the bound params; a generated one gets nothing", () => {
+  assert.deepEqual(verifiedSource(verified), {
+    id: "top_customers_by_revenue",
+    label: "Verified · top_customers_by_revenue",
+    title: "Answered by the verified query chinook.top_customers_by_revenue, SQL your data team wrote and reviewed. Values: n = 5, year = 2012.",
+    params: [{ name: "n", value: "5" }, { name: "year", value: "2012" }],
+  });
+  // No params: the title says so rather than listing nothing.
+  const plain = { source: { type: "verified", id: "revenue_by_year", datasource_id: "chinook", params: {} } };
+  assert.equal(verifiedSource(plain).title,
+    "Answered by the verified query chinook.revenue_by_year, SQL your data team wrote and reviewed.");
+  assert.deepEqual(verifiedSource(plain).params, []);
+  // Generated, an older server with no `source`, or no result: no badge.
+  assert.equal(verifiedSource({ source: { type: "generated", id: null, datasource_id: null, params: null } }), null);
+  assert.equal(verifiedSource({ sub_queries: [] }), null);
+  assert.equal(verifiedSource(null), null);
 });
