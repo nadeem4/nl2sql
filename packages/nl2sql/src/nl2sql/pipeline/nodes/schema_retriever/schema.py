@@ -25,6 +25,9 @@ class Table(BaseModel):
     description: Optional[str] = None
     primary_key: Optional[List[str]] = None
     foreign_keys: Optional[Dict[str, List[str]]] = None
+    # True for a table the datasource lists in ``preferred_tables``; None (and
+    # so absent from the prompt) otherwise.
+    preferred: Optional[bool] = None
 
     model_config = ConfigDict(extra="allow")
 
@@ -85,11 +88,15 @@ def _table_for_prompt(table: Table) -> Dict[str, Any]:
 def render_schema_for_prompt(tables: List[Table]) -> str:
     """The schema block the planner and refiner prompts carry.
 
-    One compact JSON object per table, tables sorted by name and keys sorted, so
-    the same snapshot and role always render byte-identically: the block sits in
-    the cached prompt prefix. Empty fields are dropped.
+    One compact JSON object per table, preferred tables first and then by name,
+    keys sorted, so the same snapshot and role always render byte-identically:
+    the block sits in the cached prompt prefix. Empty fields are dropped, so a
+    table that is not preferred carries no ``preferred`` key.
     """
-    rows = sorted((_table_for_prompt(t) for t in tables), key=lambda r: r.get("name", ""))
+    rows = sorted(
+        (_table_for_prompt(t) for t in tables),
+        key=lambda r: (not r.get("preferred"), r.get("name", "")),
+    )
     return "\n".join(
         json.dumps(r, sort_keys=True, separators=(",", ":"), ensure_ascii=False, default=str) for r in rows
     )

@@ -15,7 +15,9 @@ Status, worst first:
 
 Warnings never change the status. One is a ``curated.yaml`` edited since the
 datasource was indexed: its verified query entries are stale, but they still
-point at queries that exist, so questions keep working.
+point at queries that exist, so questions keep working. Another is a
+``preferred_tables`` entry missing from the indexed schema: there is nothing to
+rank first, and every other table still answers.
 """
 from __future__ import annotations
 
@@ -171,11 +173,40 @@ def summarize(
     return health
 
 
+def preferred_table_warnings(
+    preferred_tables: Dict[str, List[str]],
+    snapshot_of: Callable[[str], Any],
+) -> List[str]:
+    """One warning per ``preferred_tables`` entry missing from its datasource's snapshot.
+
+    ``snapshot_of`` returns the latest snapshot or None; a datasource with no
+    snapshot is skipped, since not being indexed is reported on its own.
+    """
+    from nl2sql.datasources.models import matches_table
+
+    warnings: List[str] = []
+    for ds_id, names in (preferred_tables or {}).items():
+        if not names:
+            continue
+        snapshot = snapshot_of(ds_id)
+        if snapshot is None:
+            continue
+        refs = [contract.table for contract in snapshot.contract.tables.values()]
+        for name in names:
+            if not any(matches_table(name, ref) for ref in refs):
+                warnings.append(
+                    f"Preferred table '{name}' of '{ds_id}' is not in the indexed schema; check the name, "
+                    f"or create it and run `nl2sql index --datasource {ds_id}`."
+                )
+    return warnings
+
+
 def inspect_vector_store(
     vector_store,
     schema_store,
     datasource_ids: Iterable[str],
     curated_hashes: Optional[Dict[str, str]] = None,
+    preferred_tables: Optional[Dict[str, List[str]]] = None,
 ) -> IndexHealth:
     """Health of a live :class:`VectorStore`, as the engine sees it."""
     try:
@@ -185,12 +216,15 @@ def inspect_vector_store(
         logger.warning(f"Could not read the vector index: {exc}")
         return IndexHealth(status="missing", problems=[f"The vector index could not be read: {exc}. {REINDEX_HINT}"])
     latest = schema_store.get_latest_version if schema_store is not None else (lambda _ds: None)
-    return summarize(
+    health = summarize(
         metadatas, latest, datasource_ids,
         collection_metadata=collection_metadata,
         configured_model=vector_store.embedding_model_id(),
         curated_hashes=curated_hashes,
     )
+    if preferred_tables and schema_store is not None:
+        health.warnings.extend(preferred_table_warnings(preferred_tables, schema_store.get_latest_snapshot))
+    return health
 
 
 def inspect_index_at(
@@ -199,6 +233,7 @@ def inspect_index_at(
     schema_store_path: Path,
     datasource_ids: Iterable[str],
     curated_hashes: Optional[Dict[str, str]] = None,
+    preferred_tables: Optional[Dict[str, List[str]]] = None,
 ) -> IndexHealth:
     """Health of an index on disk, without loading an embedding model.
 
@@ -222,6 +257,7 @@ def inspect_index_at(
         )
 
     versions: Dict[str, Optional[str]] = {}
+    preferred_warnings: List[str] = []
     schema_store_path = Path(schema_store_path)
     if schema_store_path.is_file():
         store = build_schema_store(settings.schema_store_backend, settings.schema_store_max_versions,
@@ -229,10 +265,14 @@ def inspect_index_at(
         try:
             ids = set(datasource_ids) | {md.get("datasource_id") for md in metadatas if md}
             versions = {ds: store.get_latest_version(ds) for ds in ids if ds}
+            if preferred_tables:
+                preferred_warnings = preferred_table_warnings(preferred_tables, store.get_latest_snapshot)
         finally:
             close = getattr(store, "close", None)
             if close:
                 close()
 
-    return summarize(metadatas, lambda ds: versions.get(ds), datasource_ids,
-                     collection_metadata=collection_metadata, curated_hashes=curated_hashes)
+    health = summarize(metadatas, lambda ds: versions.get(ds), datasource_ids,
+                       collection_metadata=collection_metadata, curated_hashes=curated_hashes)
+    health.warnings.extend(preferred_warnings)
+    return health

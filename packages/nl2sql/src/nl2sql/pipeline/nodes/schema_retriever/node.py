@@ -11,6 +11,7 @@ from nl2sql.auth.rbac import table_allowed
 from nl2sql.common.logger import get_logger
 from nl2sql.common.settings import settings
 from nl2sql.context import NL2SQLContext
+from nl2sql.datasources.models import matches_table
 from .schema import Table, Column
 from nl2sql_adapter_sdk.schema import SchemaSnapshot, TableRef
 
@@ -25,12 +26,48 @@ class SchemaRetrieverNode:
     # columns and relationships of the picked tables.
     TABLE_K = 8
     PLANNING_K = 12
+    # A preferred table the table search scored but did not pick is added when
+    # its similarity is at most this far below the least similar pick.
+    PREFERRED_MARGIN = 0.05
 
     def __init__(self, ctx: NL2SQLContext):
         self.node_name = self.__class__.__name__.lower().replace("node", "")
         self.vector_store = ctx.vector_store
         self.schema_store = ctx.schema_store
         self.rbac = getattr(ctx, "rbac", None)
+        self.ds_registry = getattr(ctx, "ds_registry", None)
+
+    def _preferred(self, datasource_id: str) -> Callable[[TableRef], bool]:
+        """Whether a table is one of the datasource's ``preferred_tables``."""
+        names = list(self.ds_registry.get_preferred_tables(datasource_id)) if self.ds_registry else []
+        return lambda ref: any(matches_table(name, ref) for name in names)
+
+    def _near_preferred(
+        self,
+        searches: List[Dict[str, Any]],
+        snapshot: Optional[SchemaSnapshot],
+        preferred: Callable[[TableRef], bool],
+    ) -> List[str]:
+        """Preferred tables the table search scored but did not pick, close enough to add."""
+        if not snapshot:
+            return []
+        pool = next((s.get("pool") or [] for s in searches if s.get("search") == "tables"), [])
+        picked = [e["similarity"] for e in pool if e.get("picked") and e.get("similarity") is not None]
+        if not picked:
+            return []
+        floor = min(picked) - self.PREFERRED_MARGIN
+        near = []
+        for entry in pool:
+            contract = snapshot.contract.tables.get(entry.get("table"))
+            if (
+                not entry.get("picked")
+                and entry.get("type") == "schema.table"
+                and contract is not None
+                and (entry.get("similarity") if entry.get("similarity") is not None else -1.0) >= floor
+                and preferred(contract.table)
+            ):
+                near.append(entry["table"])
+        return near
 
     def _readable(self, state: SubgraphExecutionState, datasource_id: str) -> Callable[[TableRef], bool]:
         """Whether the caller's role may read a table's data.
@@ -94,6 +131,7 @@ class SchemaRetrieverNode:
         schema_version: Optional[str] = None,
         *,
         readable: Callable[[TableRef], bool],
+        preferred: Callable[[TableRef], bool] = lambda _ref: False,
     ) -> List[Table]:
         if not snapshot:
             return []
@@ -159,10 +197,13 @@ class SchemaRetrieverNode:
                     primary_key=primary_keys,
                     schema_version=schema_version,
                     relationships=relationships,
+                    preferred=True if preferred(table_contract.table) else None,
                 )
 
-            tables_out.append( table )        
+            tables_out.append(table)
 
+        # Preferred tables first; the sort is stable, so the rest keep their order.
+        tables_out.sort(key=lambda t: not t.preferred)
         return tables_out
 
     @staticmethod
@@ -217,10 +258,12 @@ class SchemaRetrieverNode:
 
             snapshot = self._resolve_snapshot(datasource_id, schema_version)
             readable = self._readable(state, datasource_id)
+            preferred = self._preferred(datasource_id)
             limit = settings.schema_retrieval_full_snapshot_max_tables
             if snapshot and len(snapshot.contract.tables) <= limit:
                 tables_out = self._build_tables_from_snapshot(
-                    snapshot, resolved_tables=None, schema_version=schema_version, readable=readable
+                    snapshot, resolved_tables=None, schema_version=schema_version,
+                    readable=readable, preferred=preferred,
                 )
                 return {
                     "relevant_tables": tables_out,
@@ -256,6 +299,8 @@ class SchemaRetrieverNode:
                         table = doc.metadata.get("table")
                         if table:
                             tables[table].update([])
+                    for table in self._near_preferred(searches, snapshot, preferred):
+                        tables[table].update([])
                 else:
                     column_docs = self.vector_store.retrieve_column_candidates(
                         query, datasource_id, k=self.TABLE_K, explain=searches
@@ -299,6 +344,7 @@ class SchemaRetrieverNode:
                     resolved_tables=None,
                     schema_version=schema_version,
                     readable=readable,
+                    preferred=preferred,
                 )
                 return {
                     "relevant_tables": relevant_tables,
@@ -326,6 +372,7 @@ class SchemaRetrieverNode:
                 resolved_tables=tables,
                 schema_version=schema_version,
                 readable=readable,
+                preferred=preferred,
             )
 
 

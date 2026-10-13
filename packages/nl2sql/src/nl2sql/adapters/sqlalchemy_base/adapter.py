@@ -330,6 +330,20 @@ class BaseSQLAlchemyAdapter:
         raise NotImplementedError(f"Adapter {self.__class__.__name__} must implement exclude_schemas")
 
 
+    def _relation_names(self, inspector: Inspector, schema: str) -> List[str]:
+        """The schema's tables and views, sorted.
+
+        Views are snapshotted like tables: a datasource's ``preferred_tables``
+        are usually views its data team built. A driver that cannot list views
+        leaves them out rather than failing the snapshot.
+        """
+        names = set(inspector.get_table_names(schema=schema))
+        try:
+            names.update(inspector.get_view_names(schema=schema))
+        except Exception as e:
+            logger.warning(f"Failed to list views in schema {schema} for {self}: {e}")
+        return sorted(names)
+
     def fetch_schema_contact(self) -> SchemaContract:
         """Fetches the schema contract for the connected datasource.
 
@@ -354,8 +368,7 @@ class BaseSQLAlchemyAdapter:
 
         with self.engine.connect() as conn:
             for schema in sorted(schemas):
-                table_names = inspector.get_table_names(schema=schema)
-                for table_name in sorted(table_names):
+                for table_name in self._relation_names(inspector, schema):
                     table_ref = TableRef(schema_name=schema, table_name=table_name)
                     columns_contract = self._get_column_contract(inspector, conn, table_ref)
                     fks = self._get_fk_cols(inspector, table_ref)
@@ -397,8 +410,7 @@ class BaseSQLAlchemyAdapter:
 
         with self.engine.connect() as conn:
             for schema in sorted(schemas):
-                table_names = inspector.get_table_names(schema=schema)
-                for table_name in sorted(table_names):
+                for table_name in self._relation_names(inspector, schema):
                     table_ref = TableRef(schema_name=schema, table_name=table_name)
                     row_count = self._get_row_count(conn, table_ref)
                     columns_metadata = self._get_columns_metadata(inspector, conn, table_ref, row_count)
@@ -457,7 +469,14 @@ class BaseSQLAlchemyAdapter:
 
     def _get_column_contract(self, inspector: Inspector, conn: Connection, table_ref: TableRef) -> Dict[str, ColumnContract]:
         columns_contract = {}
-        pk_cols = set(inspector.get_pk_constraint(table_ref.table_name, schema=table_ref.schema_name).get("constrained_columns") or [])
+        try:
+            pk = inspector.get_pk_constraint(table_ref.table_name, schema=table_ref.schema_name)
+            pk_cols = set(pk.get("constrained_columns") or [])
+        except Exception as e:
+            # A view has no primary key, and some drivers (duckdb-engine) fail
+            # to look one up rather than return none.
+            logger.warning(f"Failed to fetch the primary key of {table_ref.full_name} for {self}: {e}")
+            pk_cols = set()
         for col_info in inspector.get_columns(table_ref.table_name, schema=table_ref.schema_name):
             columns_contract[col_info["name"]] = ColumnContract(
                 name=col_info["name"],

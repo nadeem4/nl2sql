@@ -249,6 +249,13 @@ binds them; a third-party adapter has to declare `SUPPORTS_BOUND_PARAMETERS`
 ([SDK](../adapters/sdk.md)), and a verified query with params on one that
 does not is never run (`capability_missing`).
 
+## Preferred tables
+
+Preferred tables are not in `curated.yaml`: they are a `preferred_tables` list
+on a datasource in `datasources.yaml`, naming views or tables (built by the
+data team, never by the package) the planner should reach for first. See
+[Datasources: preferred tables](datasources.md#preferred-tables).
+
 ## Source references
 
 - Models and SQL checks: `packages/nl2sql/src/nl2sql/configs/curated.py`

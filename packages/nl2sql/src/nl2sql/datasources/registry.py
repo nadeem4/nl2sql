@@ -41,6 +41,7 @@ class DatasourceRegistry:
         """Initializes the registry by eagerly creating adapters for all configs."""
         self._adapters: Dict[str, DatasourceAdapterProtocol] = {}
         self._capabilities: Dict[str, Set[str]] = {}
+        self._preferred: Dict[str, List[str]] = {}
         self._available_adapters = discover_adapters()
         self._secret_manager = secret_manager
         self._lock = RLock()
@@ -156,6 +157,7 @@ class DatasourceRegistry:
             with self._lock:
                 self._adapters[ds_id] = adapter
                 self._capabilities[ds_id] = capabilities
+                self._preferred[ds_id] = list(config.preferred_tables)
             return adapter
         else:
             raise ValueError(
@@ -190,6 +192,11 @@ class DatasourceRegistry:
             str: The dialect string (e.g., 'postgres').
         """
         return self.get_adapter(datasource_id).get_dialect()
+
+    def get_preferred_tables(self, datasource_id: str) -> List[str]:
+        """The datasource's ``preferred_tables``; empty for an unknown id."""
+        with self._lock:
+            return list(self._preferred.get(datasource_id, []))
 
     def get_capabilities(self, datasource_id: str) -> Set[str]:
         """Returns the capability flags for a datasource."""

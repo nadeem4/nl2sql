@@ -143,8 +143,11 @@ cache seam: keep per-question content out of the system message.
 
 The schema block (`render_schema_for_prompt` in
 `schema_retriever/schema.py`) is one compact JSON object per table, tables
-sorted by name and keys sorted, so the same snapshot and role render
-byte-identically. It drops empty fields and `schema_version`. Of the column
+sorted by name (a datasource's preferred tables first, each with
+`"preferred":true`) and keys sorted, so the same snapshot and role render
+byte-identically. Instruction 14 tells the model to plan against a preferred
+table when it answers the question; see
+[preferred tables](schema_retriever_node.md#preferred-tables). It drops empty fields and `schema_version`. Of the column
 statistics only `sample_values` is sent (it helps match literal filters such as
 `'Rock'` or `'USA'`), plus `range`, `[min_value, max_value]`, for a date, time
 or numeric column that is not a key. For a text column with at most 50 distinct

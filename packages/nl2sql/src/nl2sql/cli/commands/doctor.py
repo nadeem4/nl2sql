@@ -101,9 +101,11 @@ def _report_index_health() -> None:
     from nl2sql.indexing.curated import curated_hashes
 
     try:
-        datasource_ids = [ds.id for ds in ConfigManager().load_datasources()]
+        configs = ConfigManager().load_datasources()
     except Exception:
-        datasource_ids = []
+        configs = []
+    datasource_ids = [ds.id for ds in configs]
+    preferred = {ds.id: ds.preferred_tables for ds in configs if ds.preferred_tables}
     # A broken curated.yaml is `nl2sql curated validate`'s to report; here it
     # only means there is nothing to compare the index with.
     hashes = None
@@ -119,6 +121,7 @@ def _report_index_health() -> None:
             Path(settings.schema_store_path),
             datasource_ids,
             curated_hashes=hashes,
+            preferred_tables=preferred,
         )
     except Exception as exc:
         print_error(f"The vector index could not be inspected: {exc}")

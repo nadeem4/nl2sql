@@ -177,7 +177,9 @@ PLANNER_SYSTEM_PROMPT = (
     "13. A column's \"range\" is the [min, max] of the data it holds. When the question names a relative"
     " period (this year, last month, the last 30 days) that falls outside a date column's range, do not"
     " plan a filter that is certain to return nothing: use the latest such period inside the range"
-    " (the last 30 days up to the range's max) and say in reasoning that the data ends at that max.\n\n"
+    " (the last 30 days up to the range's max) and say in reasoning that the data ends at that max.\n"
+    "14. A table marked \"preferred\": true was prepared by the data team. When it answers the question,"
+    " plan against it rather than rebuilding the same result from other tables.\n\n"
 
     "[OUTPUT CONTRACT]\n"
     "- If [EXPECTED_SCHEMA] is provided and non-empty:\n"

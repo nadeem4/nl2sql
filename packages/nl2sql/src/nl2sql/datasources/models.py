@@ -1,7 +1,9 @@
 
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from typing import Optional, Dict, Any, List
+
+from nl2sql_adapter_sdk.schema import TableRef
 
 # Limits a datasource may set beside ``connection`` or under ``options``.
 LIMIT_KEYS = ("row_limit", "statement_timeout_ms", "max_bytes")
@@ -37,6 +39,17 @@ class DatasourceConfig(BaseModel):
     description: Optional[str] = None
     connection: ConnectionConfig
     options: Dict[str, Any] = Field(default_factory=dict)
+    # Tables (usually views the data team built) the planner should reach for
+    # first. The schema retriever ranks them first and marks them preferred.
+    preferred_tables: List[str] = Field(default_factory=list)
+
+    @field_validator("preferred_tables")
+    @classmethod
+    def _no_blank_preferred_tables(cls, value: List[str]) -> List[str]:
+        names = [name.strip() for name in value]
+        if any(not name for name in names):
+            raise ValueError("preferred_tables holds a blank name")
+        return names
 
     @model_validator(mode="before")
     @classmethod
@@ -60,4 +73,12 @@ class DatasourceConfig(BaseModel):
         return data
 
 
+def matches_table(name: str, ref: TableRef) -> bool:
+    """Whether a ``preferred_tables`` entry names ``ref``.
 
+    An entry is a bare table name, ``schema.table``, or the snapshot's
+    ``[schema].[table]`` key; case is ignored.
+    """
+    name = name.strip().lower()
+    table, schema = ref.table_name.lower(), (ref.schema_name or "").lower()
+    return name in (table, f"{schema}.{table}", f"[{schema}].[{table}]")
