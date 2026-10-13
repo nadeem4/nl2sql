@@ -1,0 +1,3151 @@
+
+<!DOCTYPE html>
+
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width,initial-scale=1" name="viewport"/>
+<meta content="Reference documentation for the NL2SQL engine, CLI and REST API" name="description"/>
+<meta content="Platform Engineering" name="author"/>
+<link href="../indexing/" rel="prev"/>
+<link href="../subgraphs/main_pipeline_graph/" rel="next"/>
+<link href="../../assets/favicon.svg" rel="icon"/>
+<meta content="mkdocs-1.6.1, mkdocs-material-9.7.7" name="generator"/>
+<title>Curated Answers (design) - NL2SQL Platform</title>
+<link href="../../assets/stylesheets/main.ec1eaa64.min.css" rel="stylesheet"/>
+<link href="../../assets/stylesheets/palette.ab4e12ef.min.css" rel="stylesheet"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&amp;display=fallback" rel="stylesheet"/>
+<style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+<link href="../../assets/_mkdocstrings.css" rel="stylesheet"/>
+<script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+</head>
+<body data-md-color-accent="purple" data-md-color-primary="teal" data-md-color-scheme="default" dir="ltr">
+<input autocomplete="off" class="md-toggle" data-md-toggle="drawer" id="__drawer" type="checkbox"/>
+<input autocomplete="off" class="md-toggle" data-md-toggle="search" id="__search" type="checkbox"/>
+<label class="md-overlay" for="__drawer"></label>
+<div data-md-component="skip">
+<a class="md-skip" href="#curated-answers-design">
+          Skip to content
+        </a>
+</div>
+<div data-md-component="announce">
+</div>
+<div data-md-color-scheme="default" data-md-component="outdated" hidden="">
+</div>
+<header class="md-header" data-md-component="header">
+<nav aria-label="Header" class="md-header__inner md-grid">
+<a aria-label="NL2SQL Platform" class="md-header__button md-logo" data-md-component="logo" href="../.." title="NL2SQL Platform">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"></path></svg>
+</a>
+<label class="md-header__button md-icon" for="__drawer">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"></path></svg>
+</label>
+<div class="md-header__title" data-md-component="header-title">
+<div class="md-header__ellipsis">
+<div class="md-header__topic">
+<span class="md-ellipsis">
+            NL2SQL Platform
+          </span>
+</div>
+<div class="md-header__topic" data-md-component="header-topic">
+<span class="md-ellipsis">
+            
+              Curated Answers (design)
+            
+          </span>
+</div>
+</div>
+</div>
+<form class="md-header__option" data-md-component="palette">
+<input aria-label="Switch to dark mode" class="md-option" data-md-color-accent="purple" data-md-color-media="" data-md-color-primary="teal" data-md-color-scheme="default" id="__palette_0" name="__palette" type="radio"/>
+<label class="md-header__button md-icon" for="__palette_1" hidden="" title="Switch to dark mode">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"></path></svg>
+</label>
+<input aria-label="Switch to light mode" class="md-option" data-md-color-accent="lime" data-md-color-media="" data-md-color-primary="teal" data-md-color-scheme="slate" id="__palette_1" name="__palette" type="radio"/>
+<label class="md-header__button md-icon" for="__palette_0" hidden="" title="Switch to light mode">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"></path></svg>
+</label>
+</form>
+<script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+<label class="md-header__button md-icon" for="__search">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"></path></svg>
+</label>
+<div class="md-search" data-md-component="search" role="dialog">
+<label class="md-search__overlay" for="__search"></label>
+<div class="md-search__inner" role="search">
+<form class="md-search__form" name="search">
+<input aria-label="Search" autocapitalize="off" autocomplete="off" autocorrect="off" class="md-search__input" data-md-component="search-query" name="query" placeholder="Search" required="" spellcheck="false" type="text"/>
+<label class="md-search__icon md-icon" for="__search">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"></path></svg>
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"></path></svg>
+</label>
+<nav aria-label="Search" class="md-search__options">
+<button aria-label="Clear" class="md-search__icon md-icon" tabindex="-1" title="Clear" type="reset">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"></path></svg>
+</button>
+</nav>
+</form>
+<div class="md-search__output">
+<div class="md-search__scrollwrap" data-md-scrollfix="" tabindex="0">
+<div class="md-search-result" data-md-component="search-result">
+<div class="md-search-result__meta">
+            Initializing search
+          </div>
+<ol class="md-search-result__list" role="presentation"></ol>
+</div>
+</div>
+</div>
+</div>
+</div>
+</nav>
+</header>
+<div class="md-container" data-md-component="container">
+<nav aria-label="Tabs" class="md-tabs" data-md-component="tabs">
+<div class="md-grid">
+<ul class="md-tabs__list">
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../..">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+</li>
+<li class="md-tabs__item md-tabs__item--active">
+<a class="md-tabs__link" href="../overview/">
+          
+  
+  
+  Architecture
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../getting_started/">
+          
+  
+  
+  Getting Started
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../configuration/system/">
+          
+  
+  
+  Configuration
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../adapters/">
+          
+  
+  
+  Adapters
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../schema/store/">
+          
+  
+  
+  Schema
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../execution/isolation/">
+          
+  
+  
+  Execution
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../storage/artifact-store/">
+          
+  
+  
+  Storage
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../observability/stack/">
+          
+  
+  
+  Observability
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../security/model/">
+          
+  
+  
+  Security
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../deployment/architecture/">
+          
+  
+  
+  Deployment
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../development/">
+          
+  
+  
+  Development
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../testing/architecture/">
+          
+  
+  
+  Testing
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../api/">
+          
+  
+  
+  API
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../releases/">
+          
+  
+  
+  Releases
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../glossary/">
+        
+  
+  
+    
+  
+  Glossary
+
+      </a>
+</li>
+</ul>
+</div>
+</nav>
+<main class="md-main" data-md-component="main">
+<div class="md-main__inner md-grid">
+<div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation">
+<div class="md-sidebar__scrollwrap">
+<div class="md-sidebar__inner">
+<nav aria-label="Navigation" class="md-nav md-nav--primary md-nav--lifted" data-md-level="0">
+<label class="md-nav__title" for="__drawer">
+<a aria-label="NL2SQL Platform" class="md-nav__button md-logo" data-md-component="logo" href="../.." title="NL2SQL Platform">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"></path></svg>
+</a>
+    NL2SQL Platform
+  </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../..">
+<span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+<input checked="" class="md-nav__toggle md-toggle" id="__nav_2" type="checkbox"/>
+<label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+<span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="true" aria-labelledby="__nav_2_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_2">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../overview/">
+<span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../pipeline/">
+<span class="md-ellipsis">
+    
+  
+    Pipeline
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../graph_state/">
+<span class="md-ellipsis">
+    
+  
+    Graph State
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../determinism/">
+<span class="md-ellipsis">
+    
+  
+    Determinism
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../invariants/">
+<span class="md-ellipsis">
+    
+  
+    Invariants
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../failure_recovery/">
+<span class="md-ellipsis">
+    
+  
+    Failure + Recovery
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../indexing/">
+<span class="md-ellipsis">
+    
+  
+    Indexing + Retrieval
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item md-nav__item--active">
+<input class="md-nav__toggle md-toggle" id="__toc" type="checkbox"/>
+<label class="md-nav__link md-nav__link--active" for="__toc">
+<span class="md-ellipsis">
+    
+  
+    Curated Answers (design)
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<a class="md-nav__link md-nav__link--active" href="./">
+<span class="md-ellipsis">
+    
+  
+    Curated Answers (design)
+  
+
+    
+  </span>
+</a>
+<nav aria-label="Table of contents" class="md-nav md-nav--secondary">
+<label class="md-nav__title" for="__toc">
+<span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+<ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#goal">
+<span class="md-ellipsis">
+      
+        Goal
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#who-does-what">
+<span class="md-ellipsis">
+      
+        Who does what
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#configuration">
+<span class="md-ellipsis">
+      
+        Configuration
+      
+    </span>
+</a>
+<nav aria-label="Configuration" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#configscuratedyaml">
+<span class="md-ellipsis">
+      
+        configs/curated.yaml
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#verified-queries-are-sql">
+<span class="md-ellipsis">
+      
+        Verified queries are SQL
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#preferred-tables">
+<span class="md-ellipsis">
+      
+        Preferred tables
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#validation">
+<span class="md-ellipsis">
+      
+        Validation
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#indexing">
+<span class="md-ellipsis">
+      
+        Indexing
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#matching-at-question-time">
+<span class="md-ellipsis">
+      
+        Matching at question time
+      
+    </span>
+</a>
+<nav aria-label="Matching at question time" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#where-the-step-goes">
+<span class="md-ellipsis">
+      
+        Where the step goes
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#the-steps">
+<span class="md-ellipsis">
+      
+        The steps
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#worked-examples">
+<span class="md-ellipsis">
+      
+        Worked examples
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#v1-limitation-one-question-one-query">
+<span class="md-ellipsis">
+      
+        v1 limitation: one question, one query
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#the-same-guards-as-generated-sql">
+<span class="md-ellipsis">
+      
+        The same guards as generated SQL
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#bound-parameters-through-the-adapter">
+<span class="md-ellipsis">
+      
+        Bound parameters through the adapter
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#provenance">
+<span class="md-ellipsis">
+      
+        Provenance
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#feedback-proposals">
+<span class="md-ellipsis">
+      
+        Feedback proposals
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#demo">
+<span class="md-ellipsis">
+      
+        Demo
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#settings">
+<span class="md-ellipsis">
+      
+        Settings
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#invariants-this-touches">
+<span class="md-ellipsis">
+      
+        Invariants this touches
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#deferred-and-out-of-scope">
+<span class="md-ellipsis">
+      
+        Deferred and out of scope
+      
+    </span>
+</a>
+<nav aria-label="Deferred and out of scope" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#business-metrics-deferred">
+<span class="md-ellipsis">
+      
+        Business metrics (deferred)
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#also-out-of-scope">
+<span class="md-ellipsis">
+      
+        Also out of scope
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#implementation-plan">
+<span class="md-ellipsis">
+      
+        Implementation plan
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#open-questions">
+<span class="md-ellipsis">
+      
+        Open questions
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--section md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_2_9" type="checkbox"/>
+<label class="md-nav__link" for="__nav_2_9" id="__nav_2_9_label" tabindex="">
+<span class="md-ellipsis">
+    
+  
+    Subgraphs
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_2_9_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_2_9">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Subgraphs
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../subgraphs/main_pipeline_graph/">
+<span class="md-ellipsis">
+    
+  
+    Main Pipeline Graph
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../subgraphs/sql_agent/">
+<span class="md-ellipsis">
+    
+  
+    SQL Agent Subgraph
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--section md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_2_10" type="checkbox"/>
+<label class="md-nav__link" for="__nav_2_10" id="__nav_2_10_label" tabindex="">
+<span class="md-ellipsis">
+    
+  
+    Nodes
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_2_10_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_2_10">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Nodes
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../nodes/">
+<span class="md-ellipsis">
+    
+  
+    Node Catalog
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../nodes/answer_synthesizer_node/">
+<span class="md-ellipsis">
+    
+  
+    Answer Synthesizer
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../nodes/ast_planner_node/">
+<span class="md-ellipsis">
+    
+  
+    AST Planner
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../nodes/curated_matcher_node/">
+<span class="md-ellipsis">
+    
+  
+    Curated Matcher
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../nodes/datasource_resolver_node/">
+<span class="md-ellipsis">
+    
+  
+    Datasource Resolver
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../nodes/decomposer_node/">
+<span class="md-ellipsis">
+    
+  
+    Decomposer
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../nodes/engine_aggregator_node/">
+<span class="md-ellipsis">
+    
+  
+    Engine Aggregator
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../nodes/executor_node/">
+<span class="md-ellipsis">
+    
+  
+    Executor
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../nodes/generator_node/">
+<span class="md-ellipsis">
+    
+  
+    Generator
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../nodes/logical_validator_node/">
+<span class="md-ellipsis">
+    
+  
+    Logical Validator
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../nodes/refiner_node/">
+<span class="md-ellipsis">
+    
+  
+    Refiner
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../nodes/schema_retriever_node/">
+<span class="md-ellipsis">
+    
+  
+    Schema Retriever
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_3" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_3">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../getting_started/">
+<span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../getting_started/pypi/">
+<span class="md-ellipsis">
+    
+  
+    PyPI (Python API)
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../getting_started/docker/">
+<span class="md-ellipsis">
+    
+  
+    Docker (REST API)
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../getting_started/source/">
+<span class="md-ellipsis">
+    
+  
+    From Source (Development)
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../getting_started/demo/">
+<span class="md-ellipsis">
+    
+  
+    Demo Data (CLI-first)
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_4" type="checkbox"/>
+<label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_4_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_4">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../configuration/system/">
+<span class="md-ellipsis">
+    
+  
+    Configuration System
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../configuration/datasources/">
+<span class="md-ellipsis">
+    
+  
+    Datasources
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../configuration/llm/">
+<span class="md-ellipsis">
+    
+  
+    LLMs
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../configuration/policies/">
+<span class="md-ellipsis">
+    
+  
+    Policies
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../configuration/secrets/">
+<span class="md-ellipsis">
+    
+  
+    Secrets
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../configuration/curated/">
+<span class="md-ellipsis">
+    
+  
+    Curated Answers
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_5" type="checkbox"/>
+<label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Adapters
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_5_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_5">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Adapters
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../adapters/">
+<span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../adapters/architecture/">
+<span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../adapters/sdk/">
+<span class="md-ellipsis">
+    
+  
+    SDK Reference
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../adapters/sqlalchemy/">
+<span class="md-ellipsis">
+    
+  
+    SQLAlchemy Reference
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../adapters/development/">
+<span class="md-ellipsis">
+    
+  
+    Building Adapters
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../adapters/duckdb/">
+<span class="md-ellipsis">
+    
+  
+    DuckDB
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../adapters/mssql/">
+<span class="md-ellipsis">
+    
+  
+    Microsoft SQL Server
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../adapters/mysql/">
+<span class="md-ellipsis">
+    
+  
+    MySQL
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../adapters/postgres/">
+<span class="md-ellipsis">
+    
+  
+    PostgreSQL
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../adapters/sqlite/">
+<span class="md-ellipsis">
+    
+  
+    SQLite
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_6" type="checkbox"/>
+<label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Schema
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_6_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_6">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Schema
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../schema/store/">
+<span class="md-ellipsis">
+    
+  
+    Schema Store + Metadata
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_7" type="checkbox"/>
+<label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_7_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_7">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../execution/isolation/">
+<span class="md-ellipsis">
+    
+  
+    Execution Isolation + Concurrency
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_8" type="checkbox"/>
+<label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Storage
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_8_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_8">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Storage
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../storage/artifact-store/">
+<span class="md-ellipsis">
+    
+  
+    Artifact Store
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_9" type="checkbox"/>
+<label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Observability
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_9_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_9">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Observability
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../observability/stack/">
+<span class="md-ellipsis">
+    
+  
+    Observability Stack
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../observability/debugging/">
+<span class="md-ellipsis">
+    
+  
+    Debugging a Run (Traces)
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../observability/feedback/">
+<span class="md-ellipsis">
+    
+  
+    Feedback and Signals
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../observability/error-handling/">
+<span class="md-ellipsis">
+    
+  
+    Error Handling + Circuit Breaker
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_10" type="checkbox"/>
+<label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Security
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_10_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_10">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Security
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../security/model/">
+<span class="md-ellipsis">
+    
+  
+    Security Model
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../security/multi-tenant/">
+<span class="md-ellipsis">
+    
+  
+    Multi-Tenant Isolation
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_11" type="checkbox"/>
+<label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Deployment
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_11_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_11">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Deployment
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../deployment/architecture/">
+<span class="md-ellipsis">
+    
+  
+    Deployment Architecture
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../deployment/docker/">
+<span class="md-ellipsis">
+    
+  
+    Docker
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../deployment/kubernetes/">
+<span class="md-ellipsis">
+    
+  
+    Kubernetes
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../deployment/hosted-demo/">
+<span class="md-ellipsis">
+    
+  
+    Hosted demo
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_12" type="checkbox"/>
+<label class="md-nav__link" for="__nav_12" id="__nav_12_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_12_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_12">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Development
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../development/">
+<span class="md-ellipsis">
+    
+  
+    Extending NL2SQL
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../development/releasing/">
+<span class="md-ellipsis">
+    
+  
+    Releasing
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../extensions/add-adapter/">
+<span class="md-ellipsis">
+    
+  
+    Add Adapter
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../extensions/add-chunk-types/">
+<span class="md-ellipsis">
+    
+  
+    Add Chunk Types
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../extensions/extend-planner/">
+<span class="md-ellipsis">
+    
+  
+    Extend Planner
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../extensions/add-execution-backend/">
+<span class="md-ellipsis">
+    
+  
+    Add Execution Backend
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_13" type="checkbox"/>
+<label class="md-nav__link" for="__nav_13" id="__nav_13_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_13_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_13">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Testing
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../testing/architecture/">
+<span class="md-ellipsis">
+    
+  
+    Testing Architecture
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../testing/evaluation-dataset/">
+<span class="md-ellipsis">
+    
+  
+    Evaluation Dataset
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../benchmarks/">
+<span class="md-ellipsis">
+    
+  
+    Benchmark Results
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_14" type="checkbox"/>
+<label class="md-nav__link" for="__nav_14" id="__nav_14_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_14_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_14">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    API
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/">
+<span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_14_2" type="checkbox"/>
+<label class="md-nav__link" for="__nav_14_2" id="__nav_14_2_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Core API (Python)
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_14_2_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_14_2">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Core API (Python)
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/core/public-facade/">
+<span class="md-ellipsis">
+    
+  
+    Public Facade
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/core/auth/">
+<span class="md-ellipsis">
+    
+  
+    Auth
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/core/datasource/">
+<span class="md-ellipsis">
+    
+  
+    Datasource
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/core/llm/">
+<span class="md-ellipsis">
+    
+  
+    LLM
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/core/indexing/">
+<span class="md-ellipsis">
+    
+  
+    Indexing
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/core/query/">
+<span class="md-ellipsis">
+    
+  
+    Query
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/core/settings/">
+<span class="md-ellipsis">
+    
+  
+    Settings
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_14_3" type="checkbox"/>
+<label class="md-nav__link" for="__nav_14_3" id="__nav_14_3_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    REST API (FastAPI)
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_14_3_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_14_3">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    REST API (FastAPI)
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/rest/">
+<span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/rest/health/">
+<span class="md-ellipsis">
+    
+  
+    Health
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/rest/query/">
+<span class="md-ellipsis">
+    
+  
+    Query
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/rest/datasource/">
+<span class="md-ellipsis">
+    
+  
+    Datasource
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/rest/llm/">
+<span class="md-ellipsis">
+    
+  
+    LLM
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/rest/indexing/">
+<span class="md-ellipsis">
+    
+  
+    Indexing
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_15" type="checkbox"/>
+<label class="md-nav__link" for="__nav_15" id="__nav_15_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Releases
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_15_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_15">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Releases
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../releases/">
+<span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../releases/0.4.0/">
+<span class="md-ellipsis">
+    
+  
+    0.4.0
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../releases/0.3.0/">
+<span class="md-ellipsis">
+    
+  
+    0.3.0
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../releases/0.2.4/">
+<span class="md-ellipsis">
+    
+  
+    0.2.4
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../releases/0.2.3/">
+<span class="md-ellipsis">
+    
+  
+    0.2.3
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../releases/0.2.2/">
+<span class="md-ellipsis">
+    
+  
+    0.2.2
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../releases/0.2.1/">
+<span class="md-ellipsis">
+    
+  
+    0.2.1
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../releases/0.2.0/">
+<span class="md-ellipsis">
+    
+  
+    0.2.0
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../releases/0.1.2/">
+<span class="md-ellipsis">
+    
+  
+    0.1.2
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../releases/0.1.1/">
+<span class="md-ellipsis">
+    
+  
+    0.1.1
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../releases/0.1.0/">
+<span class="md-ellipsis">
+    
+  
+    0.1.0
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../glossary/">
+<span class="md-ellipsis">
+    
+  
+    Glossary
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</div>
+</div>
+</div>
+<div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc">
+<div class="md-sidebar__scrollwrap">
+<div class="md-sidebar__inner">
+<nav aria-label="Table of contents" class="md-nav md-nav--secondary">
+<label class="md-nav__title" for="__toc">
+<span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+<ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#goal">
+<span class="md-ellipsis">
+      
+        Goal
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#who-does-what">
+<span class="md-ellipsis">
+      
+        Who does what
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#configuration">
+<span class="md-ellipsis">
+      
+        Configuration
+      
+    </span>
+</a>
+<nav aria-label="Configuration" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#configscuratedyaml">
+<span class="md-ellipsis">
+      
+        configs/curated.yaml
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#verified-queries-are-sql">
+<span class="md-ellipsis">
+      
+        Verified queries are SQL
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#preferred-tables">
+<span class="md-ellipsis">
+      
+        Preferred tables
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#validation">
+<span class="md-ellipsis">
+      
+        Validation
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#indexing">
+<span class="md-ellipsis">
+      
+        Indexing
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#matching-at-question-time">
+<span class="md-ellipsis">
+      
+        Matching at question time
+      
+    </span>
+</a>
+<nav aria-label="Matching at question time" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#where-the-step-goes">
+<span class="md-ellipsis">
+      
+        Where the step goes
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#the-steps">
+<span class="md-ellipsis">
+      
+        The steps
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#worked-examples">
+<span class="md-ellipsis">
+      
+        Worked examples
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#v1-limitation-one-question-one-query">
+<span class="md-ellipsis">
+      
+        v1 limitation: one question, one query
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#the-same-guards-as-generated-sql">
+<span class="md-ellipsis">
+      
+        The same guards as generated SQL
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#bound-parameters-through-the-adapter">
+<span class="md-ellipsis">
+      
+        Bound parameters through the adapter
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#provenance">
+<span class="md-ellipsis">
+      
+        Provenance
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#feedback-proposals">
+<span class="md-ellipsis">
+      
+        Feedback proposals
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#demo">
+<span class="md-ellipsis">
+      
+        Demo
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#settings">
+<span class="md-ellipsis">
+      
+        Settings
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#invariants-this-touches">
+<span class="md-ellipsis">
+      
+        Invariants this touches
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#deferred-and-out-of-scope">
+<span class="md-ellipsis">
+      
+        Deferred and out of scope
+      
+    </span>
+</a>
+<nav aria-label="Deferred and out of scope" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#business-metrics-deferred">
+<span class="md-ellipsis">
+      
+        Business metrics (deferred)
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#also-out-of-scope">
+<span class="md-ellipsis">
+      
+        Also out of scope
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#implementation-plan">
+<span class="md-ellipsis">
+      
+        Implementation plan
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#open-questions">
+<span class="md-ellipsis">
+      
+        Open questions
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</div>
+</div>
+</div>
+<div class="md-content" data-md-component="content">
+<article class="md-content__inner md-typeset">
+<h1 id="curated-answers-design">Curated Answers (design)</h1>
+<div class="admonition note">
+<p class="admonition-title">Status: partly built</p>
+<p>The config and its checks (PR 1), indexing and candidates (PR 2),
+matching and running verified queries (PR 3), the playground badge, the
+demo file and <code>nl2sql curated test</code> (PR 4), preferred tables (PR 5) and
+feedback proposals (PR 6) are built; see
+<a href="../../configuration/curated/">Curated answers</a> and
+<a href="../../configuration/datasources/#preferred-tables">Datasources</a> for how to
+use them. Each pull request in
+<a href="#implementation-plan">Implementation plan</a> updates this page and the
+reference docs it touches.</p>
+</div>
+<h2 id="goal">Goal</h2>
+<p>Before the model plans a query, check whether the business has already
+provided a trusted answer to the question. If it has, run that answer and say
+so. If it has not, run today's pipeline unchanged.</p>
+<p>Curated answers come in three kinds:</p>
+<table>
+<thead>
+<tr>
+<th>Kind</th>
+<th>What the data team writes</th>
+<th>Where</th>
+<th>This milestone</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Verified queries</strong></td>
+<td>A SQL query with typed parameters, and the questions it answers</td>
+<td><code>configs/curated.yaml</code></td>
+<td>Built</td>
+</tr>
+<tr>
+<td><strong>Preferred tables</strong></td>
+<td>Views or tables the planner should reach for first</td>
+<td><code>datasources.yaml</code>, <code>preferred_tables:</code></td>
+<td>Built</td>
+</tr>
+<tr>
+<td><strong>Business metrics</strong></td>
+<td>A named expression (<code>revenue = SUM(...)</code>) the planner refers to by name</td>
+<td><code>configs/curated.yaml</code>, <code>metrics:</code></td>
+<td>Designed only, <a href="#business-metrics-deferred">deferred</a></td>
+</tr>
+</tbody>
+</table>
+<p>A thumbs-up on a generated answer becomes a <em>proposal</em> for a verified query,
+which a person reviews and commits. Nothing ever writes <code>curated.yaml</code> but a
+person.</p>
+<h2 id="who-does-what">Who does what</h2>
+<ul>
+<li><strong>The data team</strong> writes the configuration. They know SQL, they keep config
+  in git, and they review changes like code. They run
+  <code>nl2sql curated validate</code> and <code>nl2sql curated test</code> in CI.</li>
+<li><strong>The person asking</strong> never sees the configuration. They ask a question and
+  get an answer; when a verified query produced it, the answer is labelled
+  <em>Verified</em> with the query's id.</li>
+<li><strong>The engine</strong> loads and validates the file at startup, indexes the
+  questions with <code>nl2sql index</code>, and matches each question against them at
+  run time.</li>
+</ul>
+<h2 id="configuration">Configuration</h2>
+<h3 id="configscuratedyaml"><code>configs/curated.yaml</code></h3>
+<p>It follows the pattern of every other config file: a path setting with an
+environment alias (<code>CURATED_CONFIG</code>, default <code>configs/curated.yaml</code>), a
+pydantic file model in <code>nl2sql/configs/curated.py</code>, and a loader on
+<code>ConfigManager</code> (<code>load_curated()</code>), next to <code>load_datasources()</code> and
+<code>load_policies()</code>.</p>
+<p>The file is optional. When the default path does not exist the feature is off
+and the pipeline is exactly today's. One file covers every datasource, keyed
+by datasource id, the way <code>sample_questions.yaml</code> is.</p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-0-1" id="__codelineno-0-1" name="__codelineno-0-1"></a><span class="nt">datasources</span><span class="p">:</span>
+<a href="#__codelineno-0-2" id="__codelineno-0-2" name="__codelineno-0-2"></a><span class="w">  </span><span class="nt">chinook</span><span class="p">:</span>
+<a href="#__codelineno-0-3" id="__codelineno-0-3" name="__codelineno-0-3"></a><span class="w">    </span><span class="nt">verified_queries</span><span class="p">:</span>
+<a href="#__codelineno-0-4" id="__codelineno-0-4" name="__codelineno-0-4"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">top_customers_by_revenue</span>
+<a href="#__codelineno-0-5" id="__codelineno-0-5" name="__codelineno-0-5"></a><span class="w">        </span><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="s">"Customers</span><span class="nv"> </span><span class="s">ranked</span><span class="nv"> </span><span class="s">by</span><span class="nv"> </span><span class="s">invoiced</span><span class="nv"> </span><span class="s">revenue</span><span class="nv"> </span><span class="s">in</span><span class="nv"> </span><span class="s">a</span><span class="nv"> </span><span class="s">calendar</span><span class="nv"> </span><span class="s">year"</span>
+<a href="#__codelineno-0-6" id="__codelineno-0-6" name="__codelineno-0-6"></a><span class="w">        </span><span class="nt">questions</span><span class="p">:</span>
+<a href="#__codelineno-0-7" id="__codelineno-0-7" name="__codelineno-0-7"></a><span class="w">          </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">"Who</span><span class="nv"> </span><span class="s">are</span><span class="nv"> </span><span class="s">our</span><span class="nv"> </span><span class="s">top</span><span class="nv"> </span><span class="s">{n}</span><span class="nv"> </span><span class="s">customers</span><span class="nv"> </span><span class="s">by</span><span class="nv"> </span><span class="s">revenue</span><span class="nv"> </span><span class="s">in</span><span class="nv"> </span><span class="s">{year}?"</span>
+<a href="#__codelineno-0-8" id="__codelineno-0-8" name="__codelineno-0-8"></a><span class="w">          </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">"Best</span><span class="nv"> </span><span class="s">{n}</span><span class="nv"> </span><span class="s">customers</span><span class="nv"> </span><span class="s">in</span><span class="nv"> </span><span class="s">{year}"</span>
+<a href="#__codelineno-0-9" id="__codelineno-0-9" name="__codelineno-0-9"></a><span class="w">        </span><span class="nt">params</span><span class="p">:</span>
+<a href="#__codelineno-0-10" id="__codelineno-0-10" name="__codelineno-0-10"></a><span class="w">          </span><span class="nt">n</span><span class="p">:</span><span class="w">    </span><span class="p p-Indicator">{</span><span class="nt"> type</span><span class="p">:</span><span class="w"> </span><span class="nv">int</span><span class="p p-Indicator">,</span><span class="nt"> default</span><span class="p">:</span><span class="w"> </span><span class="nv">10</span><span class="p p-Indicator">,</span><span class="nt"> min</span><span class="p">:</span><span class="w"> </span><span class="nv">1</span><span class="p p-Indicator">,</span><span class="nt"> max</span><span class="p">:</span><span class="w"> </span><span class="nv">100</span><span class="w"> </span><span class="p p-Indicator">}</span>
+<a href="#__codelineno-0-11" id="__codelineno-0-11" name="__codelineno-0-11"></a><span class="w">          </span><span class="nt">year</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> type</span><span class="p">:</span><span class="w"> </span><span class="nv">int</span><span class="p p-Indicator">,</span><span class="nt"> min</span><span class="p">:</span><span class="w"> </span><span class="nv">2000</span><span class="p p-Indicator">,</span><span class="nt"> max</span><span class="p">:</span><span class="w"> </span><span class="nv">2100</span><span class="p p-Indicator">,</span><span class="nt"> example</span><span class="p">:</span><span class="w"> </span><span class="nv">2012</span><span class="w"> </span><span class="p p-Indicator">}</span>
+<a href="#__codelineno-0-12" id="__codelineno-0-12" name="__codelineno-0-12"></a><span class="w">        </span><span class="nt">sql</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<a href="#__codelineno-0-13" id="__codelineno-0-13" name="__codelineno-0-13"></a><span class="w">          </span><span class="no">SELECT c.CustomerId,</span>
+<a href="#__codelineno-0-14" id="__codelineno-0-14" name="__codelineno-0-14"></a><span class="w">                 </span><span class="no">c.FirstName || ' ' || c.LastName AS customer,</span>
+<a href="#__codelineno-0-15" id="__codelineno-0-15" name="__codelineno-0-15"></a><span class="w">                 </span><span class="no">c.Country,</span>
+<a href="#__codelineno-0-16" id="__codelineno-0-16" name="__codelineno-0-16"></a><span class="w">                 </span><span class="no">ROUND(SUM(il.UnitPrice * il.Quantity), 2) AS revenue</span>
+<a href="#__codelineno-0-17" id="__codelineno-0-17" name="__codelineno-0-17"></a><span class="w">          </span><span class="no">FROM Customer c</span>
+<a href="#__codelineno-0-18" id="__codelineno-0-18" name="__codelineno-0-18"></a><span class="w">          </span><span class="no">JOIN Invoice i      ON i.CustomerId = c.CustomerId</span>
+<a href="#__codelineno-0-19" id="__codelineno-0-19" name="__codelineno-0-19"></a><span class="w">          </span><span class="no">JOIN InvoiceLine il ON il.InvoiceId = i.InvoiceId</span>
+<a href="#__codelineno-0-20" id="__codelineno-0-20" name="__codelineno-0-20"></a><span class="w">          </span><span class="no">WHERE CAST(strftime('%Y', i.InvoiceDate) AS INTEGER) = :year</span>
+<a href="#__codelineno-0-21" id="__codelineno-0-21" name="__codelineno-0-21"></a><span class="w">          </span><span class="no">GROUP BY c.CustomerId, customer, c.Country</span>
+<a href="#__codelineno-0-22" id="__codelineno-0-22" name="__codelineno-0-22"></a><span class="w">          </span><span class="no">ORDER BY revenue DESC, c.CustomerId</span>
+<a href="#__codelineno-0-23" id="__codelineno-0-23" name="__codelineno-0-23"></a><span class="w">          </span><span class="no">LIMIT :n</span>
+<a href="#__codelineno-0-24" id="__codelineno-0-24" name="__codelineno-0-24"></a><span class="w">    </span><span class="nt">metrics</span><span class="p">:</span><span class="w">            </span><span class="c1"># designed only; deferred</span>
+<a href="#__codelineno-0-25" id="__codelineno-0-25" name="__codelineno-0-25"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">revenue</span>
+<a href="#__codelineno-0-26" id="__codelineno-0-26" name="__codelineno-0-26"></a><span class="w">        </span><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="s">"Invoiced</span><span class="nv"> </span><span class="s">revenue,</span><span class="nv"> </span><span class="s">before</span><span class="nv"> </span><span class="s">refunds"</span>
+<a href="#__codelineno-0-27" id="__codelineno-0-27" name="__codelineno-0-27"></a><span class="w">        </span><span class="nt">expression</span><span class="p">:</span><span class="w"> </span><span class="s">"SUM(InvoiceLine.UnitPrice</span><span class="nv"> </span><span class="s">*</span><span class="nv"> </span><span class="s">InvoiceLine.Quantity)"</span>
+<a href="#__codelineno-0-28" id="__codelineno-0-28" name="__codelineno-0-28"></a><span class="w">        </span><span class="nt">table</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">InvoiceLine</span>
+</code></pre></div>
+<p>The models, all <code>extra="forbid"</code> so a misspelt key is an error rather than a
+silently ignored one:</p>
+<ul>
+<li><code>CuratedFileConfig</code>: <code>version: int = 1</code>, <code>datasources: Dict[str, CuratedDatasource]</code>.</li>
+<li><code>CuratedDatasource</code>: <code>verified_queries: List[VerifiedQuery]</code>, <code>metrics: List[MetricDefinition]</code>
+  (parsed and validated so the format is fixed now, but not used until metrics are built).</li>
+<li><code>VerifiedQuery</code>: <code>id</code> (a slug, unique within its datasource), <code>description</code>,
+  <code>questions</code> (at least one), <code>params: Dict[str, ParamSpec]</code>, <code>sql</code>.</li>
+<li><code>ParamSpec</code>: <code>type</code> (<code>int</code>, <code>float</code>, <code>string</code>, <code>date</code>), optional <code>default</code>,
+  <code>min</code>/<code>max</code> (numbers and dates), <code>choices</code> (strings), and <code>example</code>.</li>
+</ul>
+<p><code>example</code> is a refinement of the agreed design: it is the value used to fill a
+placeholder before embedding and to run <code>nl2sql curated test</code> when a parameter
+has no default (<code>year</code> above). Without it a required parameter is embedded as
+its own name ("... in year").</p>
+<h3 id="verified-queries-are-sql">Verified queries are SQL</h3>
+<p>A verified query is written as SQL in the dialect of its datasource, not in
+the engine's internal plan format. The data team already has this SQL; asking
+them to translate it into <code>PlanModel</code> JSON would make the feature unusable.</p>
+<p>This does not weaken <em>the model emits a typed plan, never SQL</em>: no model wrote
+this SQL. A person wrote it, reviewed it and committed it. The model's only
+part is to pick a query by id and supply parameter values, and those values
+are always <strong>bound parameters</strong> (<code>:name</code>, SQLAlchemy's named style, which every
+adapter's driver translates), never interpolated into the text. A value cannot
+change the shape of the query.</p>
+<p>Nor does it break <em>no dialect-specific SQL outside <code>nl2sql/adapters/</code></em>. That
+rule is about engine code, and <code>curated.yaml</code> is data the operator owns, like
+<code>datasources.yaml</code>. The engine never inspects the SQL by dialect name: it
+parses it with sqlglot using whatever <code>adapter.get_dialect()</code> returns.</p>
+<h3 id="preferred-tables">Preferred tables</h3>
+<p>Preferred tables are not in <code>curated.yaml</code>. They are one optional list on a
+datasource in <code>datasources.yaml</code>, because they describe the datasource and not
+an answer:</p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-1-1" id="__codelineno-1-1" name="__codelineno-1-1"></a><span class="nt">datasources</span><span class="p">:</span>
+<a href="#__codelineno-1-2" id="__codelineno-1-2" name="__codelineno-1-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">chinook</span>
+<a href="#__codelineno-1-3" id="__codelineno-1-3" name="__codelineno-1-3"></a><span class="w">    </span><span class="nt">connection</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="w"> </span><span class="nv">...</span><span class="w"> </span><span class="p p-Indicator">}</span>
+<a href="#__codelineno-1-4" id="__codelineno-1-4" name="__codelineno-1-4"></a><span class="w">    </span><span class="nt">preferred_tables</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">v_customer_revenue</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">v_monthly_sales</span><span class="p p-Indicator">]</span>
+</code></pre></div>
+<p><code>DatasourceConfig</code> (<code>nl2sql/datasources/models.py</code>) gains
+<code>preferred_tables: List[str] = []</code>. The package never creates a view: the data
+team creates them in their own database, and <code>nl2sql index</code> picks them up as
+it picks up any table (every built-in adapter snapshots views; see
+<a href="#open-questions">Views in snapshots</a>). A name is the bare table name or
+<code>schema.table</code>, case ignored. One that is not in the indexed schema is a
+warning in <code>nl2sql doctor</code> and the index status, not an error.</p>
+<p>At question time a preferred table is ranked first:</p>
+<ul>
+<li>When the schema is small enough to be passed whole
+  (<code>SCHEMA_RETRIEVAL_FULL_SNAPSHOT_MAX_TABLES</code>, 15 by default, which covers
+  every demo database), the schema retriever lists preferred tables first and
+  marks them <em>preferred</em> (<code>"preferred":true</code>) in the planner's schema block,
+  and planner instruction 14 says to plan against a preferred table when it
+  answers the question.</li>
+<li>Otherwise <code>VectorStore.retrieve_schema_context()</code> results are re-ordered so
+  any preferred table it found comes first, and a preferred table it missed is
+  added when its similarity is within 0.05 (<code>PREFERRED_MARGIN</code>) of the least
+  similar table picked.</li>
+</ul>
+<p>Nothing about RBAC changes: a preferred table the role may not read is
+withheld exactly like any other (<code>SchemaRetrieverNode._withhold_unreadable</code>).</p>
+<h2 id="validation">Validation</h2>
+<p>The file is checked at three moments, each catching what it can.</p>
+<p><strong>At startup</strong>, <code>NL2SQLContext.__init__</code> calls <code>ConfigManager.load_curated()</code>
+after the datasources load. A broken file fails startup loudly, as a broken
+<code>datasources.yaml</code> does. These checks need no database and no index:</p>
+<ul>
+<li>the YAML parses and matches the models;</li>
+<li>every datasource key is a configured datasource;</li>
+<li>query ids are unique within a datasource;</li>
+<li>every <code>{placeholder}</code> in a question is a declared param, and every declared
+  param appears in at least one question;</li>
+<li>the SQL parses with sqlglot in the datasource's dialect, is exactly one
+  statement, and is read-only (see <a href="#the-same-guards-as-generated-sql">Guards</a>);</li>
+<li>the <code>:name</code> placeholders in the SQL (<code>exp.Placeholder</code> nodes) are exactly the
+  declared params;</li>
+<li>defaults, examples, <code>min</code>/<code>max</code> and <code>choices</code> agree with the declared type.</li>
+</ul>
+<p>A refinement of the agreed design: when <code>CURATED_CONFIG</code> is <em>set</em> and the file
+it names does not exist, startup fails rather than turning the feature off. A
+typo should not silently turn verified answers off in production. When the
+setting is left at its default and the default file is absent, the feature is
+off.</p>
+<p><strong><code>nl2sql curated validate</code></strong> runs the startup checks plus the ones that need
+the index: every table the SQL reads (<code>exp.Table</code> nodes, minus CTE names)
+exists in the datasource's latest indexed schema
+(<code>schema_store.get_latest_snapshot(datasource_id)</code>). It prints a report table
+and exits non-zero on any error, modelled on <code>nl2sql policy validate</code>
+(<code>cli/commands/policy.py</code>). Like that command it calls a facade class,
+<code>CuratedAPI</code> (<code>nl2sql/api/curated_api.py</code>, exported from <code>nl2sql</code>), so the CLI
+holds no logic an SDK or REST caller would also need.</p>
+<p><strong><code>nl2sql curated test</code></strong> runs each verified query once against its database,
+with every param at its default or example value, through the same guarded
+execution path the pipeline uses, reading at most a few rows. A column renamed
+in the database then fails CI instead of failing a user. It runs as the
+operator, with no role, as <code>nl2sql index</code> does.</p>
+<h2 id="indexing">Indexing</h2>
+<p><code>nl2sql index</code> embeds each phrasing of each verified query as an entry of a
+new chunk type, <code>curated.verified_query</code>, in the existing vector store. The
+model is <code>VerifiedQueryChunk(BaseChunk)</code> in <code>nl2sql/indexing/models.py</code>, beside
+<code>TableChunk</code> and the others.</p>
+<ul>
+<li><strong>Text.</strong> The phrasing with every placeholder filled by its example or
+  default (<code>{n}</code> → <code>10</code>, <code>{year}</code> → <code>2012</code>), because a raw <code>{n}</code> embeds poorly.
+  The description is embedded as one more entry of the same query.</li>
+<li><strong>Metadata.</strong> <code>{id, type: "curated.verified_query", datasource_id, query_id, schema_version}</code>,
+  and the <code>build_id</code> every entry gets. The agreed design called the key
+  <code>datasource</code>; it is <code>datasource_id</code>, the key every other chunk, the
+  active-build filter and index health already use.</li>
+<li><strong>Ids.</strong> Deterministic, as <code>BaseChunk</code> requires:
+  <code>curated.verified_query:&lt;datasource_id&gt;:&lt;query_id&gt;:&lt;n&gt;</code>.</li>
+</ul>
+<p>The entries must be written <strong>in the same build as the datasource's schema
+entries.</strong> <code>VectorStore.refresh_schema_chunks()</code> replaces every entry of a
+datasource whose <code>build_id</code> is not the new one, so curated entries written on
+their own would be deleted by the next schema re-index, or would delete it.
+<code>IndexingOrchestrator.index_datasource()</code> therefore appends the curated chunks
+(built by a small <code>CuratedChunkBuilder</code>) to the schema chunks before calling
+<code>refresh_schema_chunks()</code>.</p>
+<p>Changing <code>curated.yaml</code> does <strong>not</strong> need a schema re-index (a change from the
+agreed design; see <a href="#open-questions">Re-index cost</a>).
+<code>nl2sql index --curated-only</code> writes a new build per datasource through the
+same write, switch and delete as any other, except that the active build's
+schema entries are copied into it with their stored vectors
+(<code>VectorStore.refresh_curated_chunks()</code>): no schema read, no enrichment call,
+and only the verified queries are embedded.</p>
+<p><strong>Staleness.</strong> At the switch, <code>refresh_schema_chunks()</code> also records
+<code>curated_hash:&lt;datasource_id&gt;</code> in the collection metadata, next to
+<code>build:&lt;datasource_id&gt;</code> and <code>built_at:&lt;datasource_id&gt;</code>: a SHA-256 of that
+datasource's section of <code>curated.yaml</code>, as canonical JSON. <code>IndexHealth</code>
+(<code>nl2sql/indexing/health.py</code>) compares it with the file as it is now and
+reports "curated.yaml changed for 'chinook' since it was indexed; run
+<code>nl2sql index --curated-only --datasource chinook</code>". <code>nl2sql doctor</code> and the
+facade's <code>index_health()</code> show it. Only the verified queries are hashed:
+metrics are not indexed yet, so editing one asks for nothing.
+It is a warning, not a failure: the stale entries still point at queries that
+exist, and the matcher re-reads every query from the loaded file, never from
+the index. A query id that is in the index but no longer in the file is
+skipped. <code>IndexHealth</code> gains a <code>warnings</code> list for this; <code>problems</code> stays the
+list that makes <code>ok</code> false.</p>
+<h2 id="matching-at-question-time">Matching at question time</h2>
+<h3 id="where-the-step-goes">Where the step goes</h3>
+<p>A new node, <code>curated_matcher</code> (<code>nl2sql/pipeline/nodes/curated_matcher/</code>),
+becomes the graph's entry point, ahead of <code>datasource_resolver</code>:</p>
+<pre class="mermaid"><code>flowchart TD
+    Q(["Question"]) --&gt; M{"Curated answers configured&lt;br/&gt;for a datasource this role may read?"}
+    M -- no --&gt; R["datasource_resolver"]
+    M -- yes --&gt; S["Vector search over curated.verified_query&lt;br/&gt;allowed datasources only, top K"]
+    S --&gt; F{"Best similarity at or above&lt;br/&gt;CURATED_MATCH_FLOOR?"}
+    F -- no --&gt; R
+    F -- yes --&gt; L["One structured-output call:&lt;br/&gt;pick a candidate and fill its params,&lt;br/&gt;or none_of_these"]
+    L -- "none_of_these, or the call failed" --&gt; R
+    L -- a candidate --&gt; P{"Params valid?&lt;br/&gt;type, min/max, choices, required"}
+    P -- no --&gt; R
+    P -- yes --&gt; A{"Every table the SQL reads&lt;br/&gt;allowed for this role?"}
+    A -- no --&gt; R
+    A -- yes --&gt; X["Run the saved SQL with bound params&lt;br/&gt;through the adapter, row-capped"]
+    X -- failed --&gt; R
+    X -- rows --&gt; G["layer_router"]
+    G --&gt; AG["aggregator: save the result, write the manifest"]
+    AG --&gt; AS["answer_synthesizer: reply from the 20-row preview"]
+    AS --&gt; V(["Answer, source = verified"])
+    R --&gt; D["decomposer, SQL agent, aggregator, answer_synthesizer:&lt;br/&gt;today's pipeline, unchanged"]
+    D --&gt; GEN(["Answer, source = generated"])</code></pre>
+<p>Running it before the resolver, rather than between the resolver and the
+decomposer, means a verified answer also skips the resolver's answerability
+call: a verified answer costs two model calls (the match and the reply)
+instead of four or more. The matcher does the one thing from the resolver it
+needs itself: it limits the search to datasources the role may read,
+<code>rbac.get_allowed_datasources(user_context)</code>, before searching, so
+<em>Datasource access is RBAC-gated</em> holds on this path too and the model only
+ever sees candidates from readable datasources. When the caller pinned a
+datasource (<code>GraphState.datasource_id</code>), only that one is searched.</p>
+<p>When it does not answer, the matcher returns nothing but its own trace record
+and the run continues at <code>datasource_resolver</code> as if it were not there. When
+the run is plan-only (<code>execute=False</code>) the matcher is skipped.</p>
+<p>A refinement made in PR 3: the node is added to the graph only when curated
+answers are on (<code>CURATED_ENABLED</code>, a loaded file with at least one verified
+query) and the run executes. Otherwise <code>datasource_resolver</code> stays the entry
+point, so with no curated file the graph, the trace and the answer are exactly
+what they were before, rather than gaining a node that does nothing. The
+first diamond above is therefore decided once when the graph is built
+("configured") and again at run time ("this role may read",
+<code>not_configured</code>).</p>
+<p>On a match, the node fills the state the way a one-sub-query generated run
+leaves it, so nothing downstream needs a second code path: a
+<code>DecomposerResponse</code> with one <code>SubQuery</code> (its intent is the question), the
+<code>ExecutionDAG</code> from <code>build_execution_dag()</code>, the <code>artifact_refs</code> entry, and a
+<code>SubgraphOutput</code> with <code>plan_source="verified"</code>, the SQL, <code>row_cap</code>,
+<code>truncated</code> and its checks as <code>ValidationCheck</code>s. It then routes to
+<code>layer_router</code>, which finds the scan already done and sends the run to
+<code>aggregator</code>. The aggregator saves the result and writes the run's manifest
+(the 0.3.0 result saving and paging), and <code>answer_synthesizer</code> writes the
+reply from the preview, as today.</p>
+<h3 id="the-steps">The steps</h3>
+<ol>
+<li><strong>Candidates.</strong> <code>VectorStore.retrieve_verified_query_candidates(query, datasource_ids, k)</code>
+   searches entries of type <code>curated.verified_query</code> in the active builds of
+   the allowed datasources. It is a plain similarity search, not MMR: several
+   phrasings of one query are exactly what should match, so the pool is
+   fetched at <code>k × phrasings</code>, de-duplicated by <code>(datasource_id, query_id)</code>
+   keeping each query's best cosine similarity, and cut to
+   <code>CURATED_MATCH_TOP_K</code> (5). The search is recorded with the same record
+   <code>mmr_search()</code> writes, so the trace and the playground's retrieval view can
+   show it. If no allowed datasource has a verified query, there is no search
+   and no embedding call.</li>
+<li><strong>Floor.</strong> If the best similarity is below <code>CURATED_MATCH_FLOOR</code> (0.6), the
+   run falls back with no model call.</li>
+<li>
+<p><strong>Choice.</strong> One structured-output call, through the existing
+   <code>structured(llm, schema)</code> in <code>nl2sql/llm/wires/</code>, which every provider and
+   keyless replay already support. The prompt presents the candidates like
+   tools: a qualified id (<code>chinook.top_customers_by_revenue</code>, since ids are
+   unique only within a datasource), the description, and each param with its
+   type, bounds, choices and default; plus the option <code>none_of_these</code>. The
+   model is told to pick a candidate only when it answers the whole question
+   as asked, and otherwise to pick <code>none_of_these</code>. The schema is fixed, so
+   its name on the wire is fixed:</p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-2-1" id="__codelineno-2-1" name="__codelineno-2-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">ParamValue</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+<a href="#__codelineno-2-2" id="__codelineno-2-2" name="__codelineno-2-2"></a>    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>
+<a href="#__codelineno-2-3" id="__codelineno-2-3" name="__codelineno-2-3"></a>    <span class="n">value</span><span class="p">:</span> <span class="nb">str</span>          <span class="c1"># typed and checked by code, step 4</span>
+<a href="#__codelineno-2-4" id="__codelineno-2-4" name="__codelineno-2-4"></a>
+<a href="#__codelineno-2-5" id="__codelineno-2-5" name="__codelineno-2-5"></a><span class="k">class</span><span class="w"> </span><span class="nc">VerifiedQueryChoice</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+<a href="#__codelineno-2-6" id="__codelineno-2-6" name="__codelineno-2-6"></a><span class="w">    </span><span class="sd">"""Pick the verified query that answers the question, or none_of_these."""</span>
+<a href="#__codelineno-2-7" id="__codelineno-2-7" name="__codelineno-2-7"></a>    <span class="n">query_id</span><span class="p">:</span> <span class="nb">str</span>       <span class="c1"># a candidate id, or "none_of_these"</span>
+<a href="#__codelineno-2-8" id="__codelineno-2-8" name="__codelineno-2-8"></a>    <span class="n">params</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">ParamValue</span><span class="p">]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
+<a href="#__codelineno-2-9" id="__codelineno-2-9" name="__codelineno-2-9"></a>    <span class="n">reason</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">""</span>
+</code></pre></div>
+<p>Params are a list of name/value strings rather than a per-query schema so
+that one schema serves every candidate set (a dynamic schema would change
+the tool on the wire from run to run, which replay keys on) and so no
+provider's strict-schema rules about open objects apply. The prompt puts
+the question after a <code>User Query:</code> line, a marker <code>extract_question()</code> in
+<code>nl2sql/llm/replay.py</code> already recognises, so a recording can key this
+call on the question like the decomposer's. The node's model is configured
+like any other step's: <code>LLM_AGENTS</code> in <code>nl2sql/llm/providers.py</code> gains
+<code>"curated_matcher": "curatedmatcher"</code>, and <code>PIPELINE_STEPS</code> in
+<code>nl2sql/pipeline/steps.py</code> gains the step.</p>
+<p>The model never sees every verified query, only the top K for this
+question, and never sees the SQL.
+4. <strong>Params.</strong> Code, not the model, decides whether the values are usable:
+   an unknown name, a value that does not parse as the declared type, a
+   number or date outside <code>min</code>/<code>max</code>, a string outside <code>choices</code>, or a
+   required param (no default) left empty all fall back. A param the model
+   left out takes its default.
+5. <strong>Access.</strong> Every table the SQL reads (sqlglot <code>exp.Table</code> nodes, CTE names
+   excluded) must pass <code>table_allowed(allowed_tables, datasource_id, table)</code>,
+   the function the logical validator and executor already use. If one does
+   not, the run falls back, and the normal pipeline then enforces RBAC as it
+   always does. The user is not told a verified query exists that they may
+   not use.
+6. <strong>Run.</strong> The saved SQL runs with the bound params through
+   <code>SqlExecutorService</code> and the adapter, the result is saved to the artifact
+   store, and the run continues at <code>layer_router</code> as described above. If
+   execution fails, the run falls back with a warning; the failure is in the
+   trace for the data team, and <code>nl2sql curated test</code> is how they catch it
+   before a user does.</p>
+</li>
+</ol>
+<p>Every fallback has a reason code in the matcher's trace record:
+<code>not_configured</code>, <code>no_candidates</code>, <code>below_floor</code>, <code>none_of_these</code>,
+<code>model_failed</code>, <code>unknown_query</code>, <code>param_invalid</code>, <code>param_missing</code>,
+<code>policy_denied</code>, <code>capability_missing</code>, <code>execution_failed</code>. A fallback is never
+an error of the run.</p>
+<h3 id="worked-examples">Worked examples</h3>
+<p>All on the demo's Chinook database, with the query in <a href="#configscuratedyaml">the example above</a>.</p>
+<p><strong>(a) A match.</strong> "Who were our top 5 customers in 2012?" as <code>analyst</code>.
+The best candidate is <code>top_customers_by_revenue</code> (the phrasing "Best 10
+customers in 2012" is close), above the floor. The model picks it with
+<code>n=5, year=2012</code>. Both are ints within bounds; <code>Customer</code>, <code>Invoice</code> and
+<code>InvoiceLine</code> are allowed for <code>analyst</code>. The SQL runs with
+<code>{"year": 2012, "n": 5}</code> bound and returns Richard Cunningham (25.84),
+João Fernandes (24.77), Fernanda Ramos (24.75), Joakim Johansson (24.75) and
+Mark Taylor (22.77). The answer carries
+<code>source = {type: "verified", id: "top_customers_by_revenue", params: {n: 5, year: 2012}}</code>.</p>
+<p><strong>(b) A near miss.</strong> "Top 5 customers by number of tracks bought in 2012."
+The same query is the best candidate and clears the floor, but it ranks by
+revenue, not by tracks. The model sees the description and picks another
+candidate that does rank by tracks if one exists, or <code>none_of_these</code>. With
+<code>none_of_these</code> the run continues at the resolver and the answer is
+generated, <code>source = {type: "generated"}</code>.</p>
+<p><strong>(c) A missing or out-of-range value.</strong> "Who are our top customers by
+revenue?" matches, but <code>year</code> has no default and the question gives none: the
+model leaves it empty and the run falls back (<code>param_missing</code>). Asking the
+user "which year?" belongs to the later Conversation milestone. "Top 500
+customers in 2012" matches with <code>n=500</code>, beyond <code>max: 100</code>, and falls back
+(<code>param_invalid</code>); the generated pipeline then answers it under its own row
+limit.</p>
+<p><strong>(d) No access.</strong> The same question as (a), asked as <code>viewer</code>, whose policy
+allows no <code>Customer</code>, <code>Invoice</code> or <code>InvoiceLine</code>. The candidate is found and
+chosen, the access check refuses <code>Invoice</code>, the run falls back
+(<code>policy_denied</code>), and the logical validator refuses the generated plan with
+the usual <code>SECURITY_VIOLATION</code>. The refusal is the same one <code>viewer</code> gets
+today.</p>
+<h3 id="v1-limitation-one-question-one-query">v1 limitation: one question, one query</h3>
+<p>Matching runs once, on the whole question. A question with two parts ("top
+customers in 2012 and how many tickets did they open") is either not matched
+or matched to <code>none_of_these</code>, because the prompt asks for a query that
+answers the whole question, so it falls back to the generated pipeline.
+Matching each decomposed sub-query against verified queries is a later step.</p>
+<h2 id="the-same-guards-as-generated-sql">The same guards as generated SQL</h2>
+<p>Verified SQL runs through the guards generated SQL runs through, plus one
+generated SQL does not need:</p>
+<ul>
+<li><strong>Read-only.</strong> Generated SQL is read-only by construction (<code>PlanModel.query_type</code>
+  is <code>Literal["READ"]</code>). Human SQL is checked instead: exactly one statement
+  (<code>sqlglot.parse</code> returns one), its root is a query (<code>exp.Query</code>: a <code>SELECT</code>,
+  a set operation, or a <code>WITH</code> around one), and no node anywhere in the tree
+  is a write or DDL (<code>Insert</code>, <code>Update</code>, <code>Delete</code>, <code>Merge</code>, <code>Create</code>, <code>Drop</code>,
+  <code>Alter</code>, <code>Command</code>). This is checked at load and again before running. The
+  datasource's own read-only connection (for SQLite <code>options.read_only</code>) and
+  database grants stay the backstop, as they are for generated SQL.</li>
+<li><strong>RBAC.</strong> Every table read must be allowed for the asker (step 5 above). A
+  view is checked by its own name, as policies name it; what the view reads
+  underneath is the database's grant to decide.</li>
+<li><strong>Row limit.</strong> The row ceiling is the one the generator uses:
+  <code>min(adapter.row_limit or RESULT_ROW_LIMIT, RESULT_ROW_LIMIT)</code>. Rather than
+  rewrite a person's SQL to add a <code>LIMIT</code> (which would mean rendering their
+  placeholders back through sqlglot in every dialect), the executor stops
+  reading the stream at the ceiling. <code>ExecutorRequest</code> gains <code>max_rows</code>; the
+  executor's <code>_Stream</code> stops after that many rows and the result is flagged
+  <code>truncated</code> exactly as a capped generated result is. A query whose own
+  <code>LIMIT :n</code> is lower is never cut. This is a refinement of the agreed design,
+  which named the guard but not the mechanism.</li>
+<li><strong>Result saving and paging.</strong> The result is written with
+  <code>artifact_store.write_batches()</code> and the manifest by the aggregator, so
+  paging (<code>get_result_page</code>) and CSV export (<code>export_result_csv</code>) work for a
+  verified answer as for any other.</li>
+<li><strong>Time.</strong> The run is inside <code>run_with_graph()</code>'s <code>GLOBAL_TIMEOUT_SEC</code> like
+  every node, and the datasource's <code>statement_timeout_ms</code> applies.</li>
+</ul>
+<h2 id="bound-parameters-through-the-adapter">Bound parameters through the adapter</h2>
+<p>The SDK already has a place for them: <code>AdapterRequest.parameters</code>
+(<code>nl2sql_adapter_sdk/contracts.py</code>, "Optional parameter bindings"). But no
+adapter reads it. <code>SqlAlchemyAdapter.execute_sql()</code> and <code>execute_batches()</code>
+call <code>conn.execute(text(sql))</code> and drop it, and <code>SqlExecutorService</code> never
+sets it. Sending parameterised SQL to an adapter that ignores the parameters
+would fail at best, so it must not be sent at all. The change, inside the
+package boundaries:</p>
+<ul>
+<li><strong>SDK</strong> (pydantic and the standard library only, unchanged in that
+  respect): a new capability, <code>DatasourceCapability.SUPPORTS_BOUND_PARAMETERS</code>,
+  and a docstring on <code>AdapterRequest.parameters</code> saying values are bound by
+  name to <code>:name</code> placeholders and never interpolated.</li>
+<li><strong>SQLAlchemy base adapter</strong>: <code>execute()</code> and <code>execute_batches()</code> pass
+  <code>request.parameters</code> to <code>conn.execute(text(sql), parameters)</code> when there are
+  any, and <code>capabilities()</code> declares the new capability. Every built-in
+  adapter (SQLite, Postgres, MySQL, SQL Server, DuckDB) inherits both. With
+  no parameters the call is byte-for-byte today's, so generated SQL is
+  unaffected.</li>
+<li><strong>Engine</strong>: <code>ExecutorRequest</code> gains <code>parameters</code> and <code>max_rows</code>;
+  <code>SqlExecutorService.execute()</code> copies <code>parameters</code> into the
+  <code>AdapterRequest</code>. The matcher checks
+  <code>ds_registry.supports(ds_id, DatasourceCapability.SUPPORTS_BOUND_PARAMETERS)</code>
+  before choosing a query with params, and falls back
+  (<code>capability_missing</code>) when an adapter cannot bind; it fails closed, as
+  <code>SUPPORTS_SQL</code> does. A third-party adapter opts in by binding and declaring
+  the capability. <code>nl2sql curated validate</code> warns about a datasource whose
+  adapter cannot bind.</li>
+</ul>
+<p>sqlglot parses <code>:name</code> as <code>exp.Placeholder</code> in the SQLite, Postgres, MySQL,
+DuckDB and T-SQL dialects, which is what validation reads the placeholders
+from.</p>
+<h2 id="provenance">Provenance</h2>
+<p>Every answer says where it came from:</p>
+<ul>
+<li><code>QueryResult</code> (<code>nl2sql/api/query_api.py</code>) gains
+  <code>source: AnswerSource</code>, <code>{type: "verified", id, datasource_id, params}</code> or
+  <code>{type: "generated"}</code>. The REST API's response model, <code>QueryResponse</code>,
+  subclasses <code>QueryResult</code>, so <code>POST /query</code> and the final event of <code>POST /query/stream</code> carry it with
+  no change to <code>nl2sql-api</code> beyond its docs.</li>
+<li><code>SubQueryResult.plan_source</code> and <code>SubgraphOutput.plan_source</code> gain the
+  value <code>"verified"</code>, next to <code>"llm"</code> and <code>"cache"</code>.</li>
+<li>The trace records the matcher as a node: the candidates with their
+  similarities, the floor, the model's choice and reason, the params after
+  checking, and the fallback reason code if it fell back.</li>
+<li>The playground shows a badge on the answer, "Verified · top_customers_by_revenue",
+  with the params on hover. A generated answer shows no badge. Built in PR 4
+  beside the question, in the shape of the <em>Recorded run</em> label rather than
+  next to the plan-cache line, which only Debug shows: whether an answer was
+  verified matters to every reader. The Plan station, which has no plan to
+  show, names the query and its values instead.</li>
+</ul>
+<h2 id="feedback-proposals">Feedback proposals</h2>
+<p>A thumbs-up on a generated answer is already stored, one row per run, in the
+<code>feedback</code> table (<code>nl2sql/feedback/store.py</code>), with the question, role, status
+and SQL. That row is the proposal; nothing new is stored and nothing writes
+<code>curated.yaml</code>.</p>
+<p><code>nl2sql curated proposals export --out configs/curated.proposals.yaml</code> turns
+thumbs-up runs into draft verified queries in <code>curated.yaml</code>'s shape, under
+the datasource the run used: an id derived from the question (a slug, <code>_2</code>
+on a clash), a description placeholder, the question as the one phrasing,
+no params, and the run's SQL with its literal values, under a header telling
+the reviewer to replace literals with <code>{params}</code>/<code>:params</code>, drop the row-cap
+<code>LIMIT</code> the generator added, and move the entry into <code>curated.yaml</code>. Without
+<code>--out</code> it prints to stdout. It is modelled on <code>nl2sql feedback export --good</code>
+(<code>feedback/drafts.py</code>), and like it skips runs with no SQL or more than one
+statement, refuses to write over <code>curated.yaml</code> itself (the active file, or
+<code>CURATED_CONFIG</code>), and lives in <code>nl2sql.feedback.proposals</code> (opt-in, imported
+lazily by the command). It also skips runs whose answer was already
+verified, runs that did not succeed, runs on more than one datasource and
+rows rated before the datasource was recorded, and proposes each question
+once per datasource, from its newest thumbs-up. Built in PR 6.</p>
+<p>The id comes from the question rather than the trace id (the first draft of
+this design said <code>proposal_&lt;trace id prefix&gt;</code>) because a reviewer keeps it:
+<code>how_many_customers_are_in_brazil</code> reads as what the query is, a trace prefix
+does not. The description is a placeholder rather than the question, so an
+unreviewed entry is obvious.</p>
+<p>Two refinements of the agreed design. First, there is no separate "approved"
+state: the person reviewing the exported drafts and committing them is the
+approval, as for gold drafts. Second, the feedback row does not record the
+datasource or the answer's source today, so the <code>feedback</code> table gains two
+nullable columns, <code>datasource_ids</code> and <code>source</code>, written by
+<code>feedback/record.py</code>'s <code>run_record()</code>.</p>
+<p><code>curated.yaml</code> stays the single source of truth, in git. Neither the REST API
+nor the playground ever writes it.</p>
+<h2 id="demo">Demo</h2>
+<p><code>nl2sql demo</code> writes <code>configs/curated.demo.yaml</code>, beside
+<code>sample_questions.demo.yaml</code>, with six Chinook verified queries
+(<code>top_customers_by_revenue</code>, <code>revenue_by_year</code>, <code>monthly_revenue</code>,
+<code>sales_by_country</code>, <code>best_selling_genres</code>, <code>top_artists_by_tracks_sold</code>), and
+the generated <code>.env.demo</code> gains <code>CURATED_CONFIG=configs/curated.demo.yaml</code>
+(<code>cli/generators/env/templates.py</code>). Only the demo's env file sets it: for any
+other environment the file is optional, and a <code>CURATED_CONFIG</code> naming a file
+that does not exist fails startup. The queries are data in
+<code>cli/demo/chinook.py</code> (<code>CHINOOK_VERIFIED_QUERIES</code>), written by
+<code>DemoManager._write_common_artifacts()</code>, and <code>nl2sql setup --demo</code> indexes
+their questions with the schema, so the hosted Space's image has them too. No
+guided question was added: two of the existing ones ("What is the total
+revenue per year?", "Which genre sells the most tracks?") are phrasings of
+verified queries, and a new guided question would have no recording.</p>
+<p>The keyless demo replays recorded model answers, keyed on the structured-output
+name and the question. The matcher's call is a new name
+(<code>VerifiedQueryChoice</code>), recorded for every guided question since the
+recordings in <code>cli/demo/recordings/chinook.json</code> were made again for 0.4.0
+(<code>python scripts/record_demo_answers.py</code>, which needs the owner's key). A
+guided question that matches a verified query replays verified, badge and all;
+the others replay the model's <code>none_of_these</code> and then their generated answer.
+A verified run never reaches the decomposer, so <code>ReplayStore.covered()</code> counts
+a question whose recorded choice picked a query as covered too.</p>
+<h2 id="settings">Settings</h2>
+<table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Env</th>
+<th>Default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>curated_config_path</code></td>
+<td><code>CURATED_CONFIG</code></td>
+<td><code>configs/curated.yaml</code></td>
+<td>The curated answers file. Absent at the default path: the feature is off. Set and absent: startup fails.</td>
+</tr>
+<tr>
+<td><code>curated_enabled</code></td>
+<td><code>CURATED_ENABLED</code></td>
+<td><code>true</code></td>
+<td>Turns matching off without removing the file. Validation commands still run.</td>
+</tr>
+<tr>
+<td><code>curated_match_floor</code></td>
+<td><code>CURATED_MATCH_FLOOR</code></td>
+<td><code>0.6</code></td>
+<td>Cosine similarity the best candidate must reach before the model is asked.</td>
+</tr>
+<tr>
+<td><code>curated_match_top_k</code></td>
+<td><code>CURATED_MATCH_TOP_K</code></td>
+<td><code>5</code></td>
+<td>Candidates shown to the model.</td>
+</tr>
+</tbody>
+</table>
+<p>The floor is a similarity in the configured embedding model's space, and
+models spread their scores differently. PR 2 calibrated it on the local ONNX
+model (<code>all-MiniLM-L6-v2</code>) with five Chinook verified queries (the example
+above, revenue by year, best-selling genre, tracks per artist, revenue by
+country) and the best candidate's similarity for 24 questions:</p>
+<table>
+<thead>
+<tr>
+<th>Questions</th>
+<th>Best similarity</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>12 that a verified query answers, reworded</td>
+<td>11 between 0.713 and 0.963; "biggest spenders last year" 0.479, and to the wrong query</td>
+</tr>
+<tr>
+<td>6 near misses ("top customers by number of tracks", "albums per artist", "revenue by month")</td>
+<td>0.582 to 0.813</td>
+</tr>
+<tr>
+<td>6 unrelated ("list all playlists", "media types", the weather)</td>
+<td>0.123 to 0.438; "Which tracks have no composer?" 0.681</td>
+</tr>
+</tbody>
+</table>
+<p>0.6 keeps every match the embeddings can make with a margin above 0.1, and
+drops five of six unrelated questions with no model call. Near misses mostly
+clear it, as they should: telling a near miss from a match is the model's
+choice (<code>none_of_these</code>), not the floor's. A question with no phrasing close
+to it, like "biggest spenders", is not rescued by any floor; another phrasing
+in <code>curated.yaml</code> is the fix. Calibration with OpenAI's embeddings is still
+open: it needs the owner's key.</p>
+<h2 id="invariants-this-touches">Invariants this touches</h2>
+<p>No invariant is weakened. PR 3 made these changes in
+<a href="../invariants/"><code>invariants.md</code></a>, each with its enforcement point:</p>
+<ul>
+<li>New: <strong>Verified SQL is human-authored, read-only and parameter-bound.</strong> The
+  model picks a verified query by id and supplies values; it never writes or
+  edits its SQL, and values are bound, never interpolated. Enforced in the
+  curated config model, the read-only check and the matcher.</li>
+<li><strong>SQL Generation Enforces a Row Limit Cap</strong> extends to verified SQL, through
+  the executor's <code>max_rows</code>.</li>
+<li><strong>Datasource Access Is RBAC-Gated</strong> gains the matcher as an enforcement
+  point.</li>
+<li><a href="../determinism/"><code>determinism.md</code></a>'s "the AST is checked ... before any SQL
+  exists, on every path" becomes "on every generated path"; a verified path
+  has no AST, and its checks are the matcher's.</li>
+</ul>
+<p><code>invariants.md</code> was not edited in the design PR, because its sections name
+enforcement points and none existed then; PR 3 added them.</p>
+<h2 id="deferred-and-out-of-scope">Deferred and out of scope</h2>
+<h3 id="business-metrics-deferred">Business metrics (deferred)</h3>
+<p>The format is fixed in this milestone (<code>metrics:</code> in <code>curated.yaml</code>, parsed
+and validated), but nothing uses it yet. The sketch:</p>
+<ul>
+<li>Each metric is indexed as the existing, so far unused, <code>schema.metric</code>
+  chunk (<code>MetricChunk</code> in <code>nl2sql/indexing/models.py</code>), so schema retrieval
+  returns the metrics a sub-query is about.</li>
+<li>The planner refers to a metric by name: a new <code>Expr</code> kind <code>metric</code> with a
+  <code>metric_name</code>, which, like <code>func_name</code>, is model text, so the logical
+  validator must check it against the datasource's metrics before anything
+  else reads it.</li>
+<li>The validator also requires the metric's <code>table</code> in the plan and allowed for
+  the role; the generator parses <code>expression</code> with sqlglot in the adapter's
+  dialect and splices the expression tree in place of the reference.</li>
+</ul>
+<p>This is the hardest part of the feature, which is why it waits. A metric is
+an aggregate, so it cannot be nested in another aggregate or used in a
+<code>WHERE</code>; its table must be joined at the right grain or the sum fans out
+across a one-to-many join; and the decomposer already has a <code>MetricSpec</code>
+(<code>SubQuery.metrics</code>) with a different meaning, so the names need sorting out
+first. Every rule the generator would need, the validator has to enforce
+first, so the planner gets a retry rather than a dead end.</p>
+<h3 id="also-out-of-scope">Also out of scope</h3>
+<ul>
+<li><strong>An MCP server</strong> exposing <code>ask</code>, plus one tool per verified query. The typed
+  params are already a tool's input schema, so this is close to free once
+  verified queries exist.</li>
+<li><strong>Per-sub-query matching</strong>, so one part of a multi-part question can be
+  verified and the rest generated.</li>
+<li><strong>Asking a follow-up question</strong> for a missing value, instead of falling
+  back; that is the Conversation milestone.</li>
+</ul>
+<h2 id="implementation-plan">Implementation plan</h2>
+<p>Six pull requests for verified queries and preferred tables, each written
+test first and each updating its docs in the same PR (this page,
+<code>configuration/</code>, the node catalog, the CLI and REST references).</p>
+<p><strong>1. Config, loader and <code>nl2sql curated validate</code>.</strong>
+<code>nl2sql/configs/curated.py</code>, <code>ConfigManager.load_curated()</code>, the
+<code>CURATED_CONFIG</code> and <code>CURATED_ENABLED</code> settings, the startup load in
+<code>NL2SQLContext</code>, the read-only and placeholder checks, <code>CuratedAPI.validate()</code>
+and <code>cli/commands/curated.py</code>. New page <code>docs/configuration/curated.md</code>; the
+settings table in <code>configuration/system.md</code>.
+Tests: <code>tests/unit/test_curated_config.py</code> (models, unique ids,
+placeholder and param agreement, defaults against types),
+<code>tests/unit/test_curated_sql_checks.py</code> (one statement, read-only, writes and
+DDL refused, CTEs, placeholders read in every built-in dialect),
+<code>tests/unit/test_cli_curated_validate.py</code> (report and exit codes, a table
+missing from the indexed schema), and a startup test that a broken file fails
+<code>NL2SQLContext</code>.</p>
+<p><strong>2. Indexing, staleness and candidates.</strong>
+<code>VerifiedQueryChunk</code>, <code>CuratedChunkBuilder</code>, the orchestrator writing curated
+chunks in the datasource's build, <code>curated_hash:&lt;id&gt;</code> in the collection
+metadata, <code>IndexHealth.warnings</code>, the <code>doctor</code> line,
+<code>VectorStore.retrieve_verified_query_candidates()</code> and
+<code>CURATED_MATCH_TOP_K</code>; calibrating <code>CURATED_MATCH_FLOOR</code> (the setting lands
+here, its use in PR 3); <code>nl2sql index --curated-only</code>.
+Tests: <code>tests/unit/test_curated_chunks.py</code> (placeholder filling, ids,
+metadata), <code>tests/unit/test_vector_store_curated.py</code> (same build as schema, a
+schema re-index keeps them, active-build and datasource filters, de-dup by
+query, the curated-only refresh), <code>tests/unit/test_index_health_curated.py</code>
+(hash changed is a warning and <code>ok</code> stays true),
+<code>tests/unit/test_index_curated_refresh.py</code> (a curated-only refresh reads no
+schema, makes no model call and keeps the schema entries).</p>
+<p><strong>3. The matcher and execution.</strong>
+The <code>curated_matcher</code> node and its prompt, <code>VerifiedQueryChoice</code>, param
+checks, the access check, <code>SUPPORTS_BOUND_PARAMETERS</code> in the SDK, parameters
+in the SQLAlchemy base adapter, <code>ExecutorRequest.parameters</code> and <code>max_rows</code>,
+the graph's new entry point and route, <code>CURATED_MATCH_FLOOR</code>, <code>source</code> on
+<code>QueryResult</code>, <code>plan_source="verified"</code>, <code>LLM_AGENTS</code> and <code>PIPELINE_STEPS</code>,
+the trace record, and the invariant edits above.
+Tests: <code>tests/unit/test_curated_params.py</code>, <code>tests/unit/test_curated_matcher.py</code>
+(each fallback reason), <code>tests/sqlalchemy_base/test_bound_parameters.py</code>
+(values bound, never interpolated: a value of <code>1; DROP TABLE x</code> is a value),
+<code>tests/unit/test_sql_executor_max_rows.py</code>, an entry in
+<code>tests/architecture/test_boundaries.py</code> if the SDK change needs one,
+<code>tests/unit/test_pipeline_steps.py</code> (already fails until the step is listed),
+and <code>tests/e2e/test_curated_fake_llm.py</code>, worked examples (a) to (d) end to
+end against Chinook with <code>FakeLLMServer</code> rules keyed on <code>VerifiedQueryChoice</code>,
+plus a run with no curated file whose graph and answer match today's.</p>
+<p><strong>4. Playground badge, demo file and <code>nl2sql curated test</code>.</strong>
+The badge in <code>web/playground/src/</code>, <code>curated.demo.yaml</code> written by the demo,
+<code>CURATED_CONFIG</code> in the env template, <code>CuratedAPI.test()</code> and the command.
+Tests: a vitest case beside <code>results.test.js</code> for the badge,
+<code>tests/e2e/test_playground_curated_fake_llm.py</code>, <code>tests/unit/test_cli_curated_test.py</code>
+(a renamed column fails), and the demo setup test for the new file. The owner
+then re-records the demo answers. <em>Built.</em> <code>nl2sql curated test</code> binds each
+param's <code>default</code>, else its <code>example</code>, runs the query read-only through the
+adapter (the static checks first, only the first batch of rows fetched) and
+exits 1 on any failure; <code>CuratedAPI.test()</code> returns the report.</p>
+<p><strong>5. Preferred tables.</strong>
+<code>DatasourceConfig.preferred_tables</code>, the ordering in the schema retriever for
+both the full-snapshot and the retrieval paths, planner instruction 14, views
+in the SQLAlchemy base adapter's snapshot, and the index health warning for a
+preferred table that is not indexed.
+Tests: <code>tests/unit/test_schema_retriever_preferred.py</code> (ordering, the
+<em>preferred</em> marker, an unreadable preferred table still withheld),
+<code>tests/unit/test_datasource_preferred_tables.py</code> (config, registry, warning)
+and <code>tests/adapters/unit/test_snapshot_views.py</code> (SQLite and DuckDB).</p>
+<p><strong>6. Feedback proposals.</strong>
+The two feedback columns, <code>nl2sql.feedback.proposals</code>, and
+<code>nl2sql curated proposals export</code>.
+Tests: <code>tests/unit/test_curated_proposals.py</code> (shape, skips, refusal to write
+over <code>curated.yaml</code>), and a store migration test for the new columns. Built.</p>
+<p><strong>Gold data.</strong> No existing gold entry changes. Tier 1 runs hand-written plans
+through the code nodes, and a verified answer has no plan, so tier 1 runs with
+curated answers off (it sets no <code>CURATED_CONFIG</code>, and PR 3 makes that explicit
+in <code>evaluation/tier1.py</code>) and needs no new entries. The verified path's own
+end-to-end check is the fake-LLM test in PR 3. Measuring how often real
+questions hit a verified query belongs to a later tier 2 run, with new entries
+added beside the existing ones, never in place of them.</p>
+<h2 id="open-questions">Open questions</h2>
+<ul>
+<li><strong>The floor.</strong> Is one global <code>CURATED_MATCH_FLOOR</code> enough, or does each
+  embedding model need its own default? Measured on the local model in PR 2
+  (0.6, see <a href="#settings">Settings</a>); OpenAI's embeddings are not measured yet.</li>
+<li><strong>Views in snapshots.</strong> Resolved in PR 5: no built-in adapter did. All five
+  (SQLite, PostgreSQL, MySQL, SQL Server, DuckDB) snapshot through the
+  SQLAlchemy base, which read only <code>get_table_names()</code>. It now reads
+  <code>get_view_names()</code> too, and a driver that cannot list views logs a warning
+  and keeps its tables. PostgreSQL materialized views are still not read.</li>
+<li><strong>Re-index cost.</strong> Resolved in PR 2: a <code>curated.yaml</code> change must not cost
+  a schema re-read or an enrichment model call. <code>nl2sql index --curated-only</code>
+  copies the active build's schema entries, with their stored vectors, into a
+  new build beside freshly embedded verified queries and switches to it. A
+  flag rather than detecting "only <code>curated.yaml</code> changed" on a plain
+  <code>nl2sql index</code>, because knowing whether the schema changed means reading it.</li>
+<li><strong>The synthesizer's context.</strong> Resolved in PR 3: on a verified answer the
+  answer synthesizer is given the query's qualified id and description, in a
+  <em>Verified Query</em> section added to its prompt, so it can say "invoiced
+  revenue, before refunds" rather than guess what the numbers mean. A
+  generated answer's prompt is unchanged.</li>
+</ul>
+</article>
+</div>
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+</div>
+<button class="md-top md-icon" data-md-component="top" hidden="" type="button">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"></path></svg>
+  Back to top
+</button>
+</main>
+<footer class="md-footer">
+<div class="md-footer-meta md-typeset">
+<div class="md-footer-meta__inner md-grid">
+<div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" rel="noopener" target="_blank">
+      Material for MkDocs
+    </a>
+</div>
+</div>
+</div>
+</footer>
+</div>
+<div class="md-dialog" data-md-component="dialog">
+<div class="md-dialog__inner md-typeset"></div>
+</div>
+<script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "toc.follow", "content.code.copy"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+<script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+</body>
+</html>
