@@ -11,6 +11,7 @@ from .chinook import (
     CHINOOK_DATASOURCE,
     CHINOOK_QUESTIONS,
     CHINOOK_TABLES_BY_ROLE,
+    CHINOOK_VERIFIED_QUERIES,
 )
 from .support import (
     SUPPORT_DATASOURCE,
@@ -40,6 +41,13 @@ DEMO_QUESTIONS_BY_DATASOURCE = {
     "chinook": list(CHINOOK_QUESTIONS),
     "support": list(SUPPORT_QUESTIONS),
     "webanalytics": list(WEBANALYTICS_QUESTIONS),
+}
+
+# The demo's curated answers file, ``configs/curated.demo.yaml``: verified
+# queries by datasource. Only Chinook has them.
+DEMO_CURATED = {
+    "version": 1,
+    "datasources": {"chinook": {"verified_queries": CHINOOK_VERIFIED_QUERIES}},
 }
 
 # The guided questions the playground offers, and the list ``--record`` walks.
@@ -102,6 +110,7 @@ __all__ = [
     "CHINOOK_QUESTIONS",
     "SUPPORT_QUESTIONS",
     "WEBANALYTICS_QUESTIONS",
+    "DEMO_CURATED",
     "DEMO_DATABASES",
     "DEMO_DATASOURCES",
     "DEMO_POLICIES",

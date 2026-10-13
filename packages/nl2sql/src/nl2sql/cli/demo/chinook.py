@@ -62,3 +62,135 @@ CHINOOK_QUESTIONS = [
     "Which playlists contain tracks from more than three genres?",
     "Who are the top customers by total spend?",
 ]
+
+# The demo's verified queries, written to ``configs/curated.demo.yaml`` (see
+# docs/configuration/curated.md). Questions a visitor is likely to ask, each
+# with several phrasings; the guided questions "What is the total revenue per
+# year?" and "Which genre sells the most tracks?" are among them. Revenue is
+# invoiced revenue (unit price times quantity, which equals Invoice.Total in
+# Chinook). Invoices run from 2009 to 2013, hence the examples.
+CHINOOK_VERIFIED_QUERIES = [
+    {
+        "id": "top_customers_by_revenue",
+        "description": "Customers ranked by invoiced revenue in a calendar year",
+        "questions": [
+            "Who are our top {n} customers by revenue in {year}?",
+            "Best {n} customers in {year}",
+            "Which {n} customers spent the most in {year}?",
+        ],
+        "params": {
+            "n": {"type": "int", "default": 10, "min": 1, "max": 100},
+            "year": {"type": "int", "min": 2009, "max": 2013, "example": 2012},
+        },
+        "sql": (
+            "SELECT c.CustomerId,\n"
+            "       c.FirstName || ' ' || c.LastName AS customer,\n"
+            "       c.Country,\n"
+            "       ROUND(SUM(il.UnitPrice * il.Quantity), 2) AS revenue\n"
+            "FROM Customer c\n"
+            "JOIN Invoice i      ON i.CustomerId = c.CustomerId\n"
+            "JOIN InvoiceLine il ON il.InvoiceId = i.InvoiceId\n"
+            "WHERE CAST(strftime('%Y', i.InvoiceDate) AS INTEGER) = :year\n"
+            "GROUP BY c.CustomerId, customer, c.Country\n"
+            "ORDER BY revenue DESC, c.CustomerId\n"
+            "LIMIT :n\n"
+        ),
+    },
+    {
+        "id": "revenue_by_year",
+        "description": "Invoiced revenue and number of invoices for each calendar year",
+        "questions": [
+            "What is the total revenue per year?",
+            "Revenue by year",
+            "How much did we sell each year?",
+        ],
+        "sql": (
+            "SELECT CAST(strftime('%Y', InvoiceDate) AS INTEGER) AS year,\n"
+            "       ROUND(SUM(Total), 2) AS revenue,\n"
+            "       COUNT(*) AS invoices\n"
+            "FROM Invoice\n"
+            "GROUP BY year\n"
+            "ORDER BY year\n"
+        ),
+    },
+    {
+        "id": "monthly_revenue",
+        "description": "Invoiced revenue and number of invoices for each month of a calendar year",
+        "questions": [
+            "What was the monthly revenue in {year}?",
+            "Revenue by month for {year}",
+            "How much did we sell each month in {year}?",
+        ],
+        "params": {"year": {"type": "int", "min": 2009, "max": 2013, "example": 2013}},
+        "sql": (
+            "SELECT strftime('%Y-%m', InvoiceDate) AS month,\n"
+            "       ROUND(SUM(Total), 2) AS revenue,\n"
+            "       COUNT(*) AS invoices\n"
+            "FROM Invoice\n"
+            "WHERE CAST(strftime('%Y', InvoiceDate) AS INTEGER) = :year\n"
+            "GROUP BY month\n"
+            "ORDER BY month\n"
+        ),
+    },
+    {
+        "id": "sales_by_country",
+        "description": "Customers, invoices and invoiced revenue for each billing country, highest revenue first",
+        "questions": [
+            "What are total sales by country?",
+            "Which countries bring in the most revenue?",
+            "Revenue by billing country",
+        ],
+        "sql": (
+            "SELECT BillingCountry AS country,\n"
+            "       COUNT(DISTINCT CustomerId) AS customers,\n"
+            "       COUNT(*) AS invoices,\n"
+            "       ROUND(SUM(Total), 2) AS revenue\n"
+            "FROM Invoice\n"
+            "GROUP BY BillingCountry\n"
+            "ORDER BY revenue DESC, country\n"
+        ),
+    },
+    {
+        "id": "best_selling_genres",
+        "description": "Genres ranked by the number of tracks sold, with their invoiced revenue",
+        "questions": [
+            "Which genre sells the most tracks?",
+            "What are the top {n} genres by tracks sold?",
+            "Best-selling genres",
+        ],
+        "params": {"n": {"type": "int", "default": 5, "min": 1, "max": 25}},
+        "sql": (
+            "SELECT g.Name AS genre,\n"
+            "       SUM(il.Quantity) AS tracks_sold,\n"
+            "       ROUND(SUM(il.UnitPrice * il.Quantity), 2) AS revenue\n"
+            "FROM InvoiceLine il\n"
+            "JOIN Track t ON t.TrackId = il.TrackId\n"
+            "JOIN Genre g ON g.GenreId = t.GenreId\n"
+            "GROUP BY g.GenreId, g.Name\n"
+            "ORDER BY tracks_sold DESC, g.Name\n"
+            "LIMIT :n\n"
+        ),
+    },
+    {
+        "id": "top_artists_by_tracks_sold",
+        "description": "Artists ranked by the number of their tracks sold, with their invoiced revenue",
+        "questions": [
+            "Who are the top {n} artists by tracks sold?",
+            "Which artists sell the most tracks?",
+            "Best-selling {n} artists",
+        ],
+        "params": {"n": {"type": "int", "default": 10, "min": 1, "max": 100}},
+        "sql": (
+            "SELECT ar.Name AS artist,\n"
+            "       SUM(il.Quantity) AS tracks_sold,\n"
+            "       ROUND(SUM(il.UnitPrice * il.Quantity), 2) AS revenue\n"
+            "FROM InvoiceLine il\n"
+            "JOIN Track t   ON t.TrackId = il.TrackId\n"
+            "JOIN Album al  ON al.AlbumId = t.AlbumId\n"
+            "JOIN Artist ar ON ar.ArtistId = al.ArtistId\n"
+            "GROUP BY ar.ArtistId, ar.Name\n"
+            "ORDER BY tracks_sold DESC, ar.Name\n"
+            "LIMIT :n\n"
+        ),
+    },
+]

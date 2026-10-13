@@ -1,0 +1,132 @@
+# The demo's verified queries: SQL a person wrote and reviewed, with typed
+# params, and the questions each one answers. Written by `nl2sql demo`.
+#
+# Check it with `nl2sql --env demo curated validate`, run every query once with
+# `nl2sql --env demo curated test`, and after an edit re-index its questions
+# with `nl2sql --env demo index --curated-only`.
+# See docs/configuration/curated.md.
+version: 1
+datasources:
+  chinook:
+    verified_queries:
+    - id: top_customers_by_revenue
+      description: Customers ranked by invoiced revenue in a calendar year
+      questions:
+      - Who are our top {n} customers by revenue in {year}?
+      - Best {n} customers in {year}
+      - Which {n} customers spent the most in {year}?
+      params:
+        n:
+          type: int
+          default: 10
+          min: 1
+          max: 100
+        year:
+          type: int
+          min: 2009
+          max: 2013
+          example: 2012
+      sql: |
+        SELECT c.CustomerId,
+               c.FirstName || ' ' || c.LastName AS customer,
+               c.Country,
+               ROUND(SUM(il.UnitPrice * il.Quantity), 2) AS revenue
+        FROM Customer c
+        JOIN Invoice i      ON i.CustomerId = c.CustomerId
+        JOIN InvoiceLine il ON il.InvoiceId = i.InvoiceId
+        WHERE CAST(strftime('%Y', i.InvoiceDate) AS INTEGER) = :year
+        GROUP BY c.CustomerId, customer, c.Country
+        ORDER BY revenue DESC, c.CustomerId
+        LIMIT :n
+    - id: revenue_by_year
+      description: Invoiced revenue and number of invoices for each calendar year
+      questions:
+      - What is the total revenue per year?
+      - Revenue by year
+      - How much did we sell each year?
+      sql: |
+        SELECT CAST(strftime('%Y', InvoiceDate) AS INTEGER) AS year,
+               ROUND(SUM(Total), 2) AS revenue,
+               COUNT(*) AS invoices
+        FROM Invoice
+        GROUP BY year
+        ORDER BY year
+    - id: monthly_revenue
+      description: Invoiced revenue and number of invoices for each month of a calendar year
+      questions:
+      - What was the monthly revenue in {year}?
+      - Revenue by month for {year}
+      - How much did we sell each month in {year}?
+      params:
+        year:
+          type: int
+          min: 2009
+          max: 2013
+          example: 2013
+      sql: |
+        SELECT strftime('%Y-%m', InvoiceDate) AS month,
+               ROUND(SUM(Total), 2) AS revenue,
+               COUNT(*) AS invoices
+        FROM Invoice
+        WHERE CAST(strftime('%Y', InvoiceDate) AS INTEGER) = :year
+        GROUP BY month
+        ORDER BY month
+    - id: sales_by_country
+      description: Customers, invoices and invoiced revenue for each billing country, highest revenue first
+      questions:
+      - What are total sales by country?
+      - Which countries bring in the most revenue?
+      - Revenue by billing country
+      sql: |
+        SELECT BillingCountry AS country,
+               COUNT(DISTINCT CustomerId) AS customers,
+               COUNT(*) AS invoices,
+               ROUND(SUM(Total), 2) AS revenue
+        FROM Invoice
+        GROUP BY BillingCountry
+        ORDER BY revenue DESC, country
+    - id: best_selling_genres
+      description: Genres ranked by the number of tracks sold, with their invoiced revenue
+      questions:
+      - Which genre sells the most tracks?
+      - What are the top {n} genres by tracks sold?
+      - Best-selling genres
+      params:
+        n:
+          type: int
+          default: 5
+          min: 1
+          max: 25
+      sql: |
+        SELECT g.Name AS genre,
+               SUM(il.Quantity) AS tracks_sold,
+               ROUND(SUM(il.UnitPrice * il.Quantity), 2) AS revenue
+        FROM InvoiceLine il
+        JOIN Track t ON t.TrackId = il.TrackId
+        JOIN Genre g ON g.GenreId = t.GenreId
+        GROUP BY g.GenreId, g.Name
+        ORDER BY tracks_sold DESC, g.Name
+        LIMIT :n
+    - id: top_artists_by_tracks_sold
+      description: Artists ranked by the number of their tracks sold, with their invoiced revenue
+      questions:
+      - Who are the top {n} artists by tracks sold?
+      - Which artists sell the most tracks?
+      - Best-selling {n} artists
+      params:
+        n:
+          type: int
+          default: 10
+          min: 1
+          max: 100
+      sql: |
+        SELECT ar.Name AS artist,
+               SUM(il.Quantity) AS tracks_sold,
+               ROUND(SUM(il.UnitPrice * il.Quantity), 2) AS revenue
+        FROM InvoiceLine il
+        JOIN Track t   ON t.TrackId = il.TrackId
+        JOIN Album al  ON al.AlbumId = t.AlbumId
+        JOIN Artist ar ON ar.ArtistId = al.ArtistId
+        GROUP BY ar.ArtistId, ar.Name
+        ORDER BY tracks_sold DESC, ar.Name
+        LIMIT :n

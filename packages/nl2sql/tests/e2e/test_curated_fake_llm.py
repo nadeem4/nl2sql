@@ -98,8 +98,9 @@ def _env(trace_dir, vector_store, schema_store, curated_file=None, enabled="true
                 "VECTOR_STORE": str(vector_store), "SCHEMA_STORE_PATH": str(schema_store),
                 "CURATED_ENABLED": enabled,
                 "SQL_AGENT_RETRY_BASE_DELAY_SEC": "0", "SQL_AGENT_RETRY_JITTER_SEC": "0"})
-    if curated_file is not None:
-        env["CURATED_CONFIG"] = str(curated_file)
+    # No file: the default path, which does not exist, so the feature is off
+    # whatever the demo's `.env.demo` names.
+    env["CURATED_CONFIG"] = str(curated_file) if curated_file is not None else "configs/curated.yaml"
     return env
 
 

@@ -1470,6 +1470,18 @@ ol.chips.picks li { border-color: color-mix(in srgb, var(--accent) 45%, var(--ru
   font-size: var(--fs-1); font-weight: var(--fw-bold); letter-spacing: .04em; text-transform: uppercase;
   color: var(--accent); background: var(--accent-soft); white-space: nowrap; cursor: help;
 }
+/* An answer from a verified query: the recorded badge's shape, in the pass
+   green the checks use, with the query's id in mono. Its values are the title. */
+.verified-badge {
+  display: inline-flex; align-items: center; gap: 6px; height: 22px; padding: 0 var(--sp-2); border-radius: 999px;
+  font-size: var(--fs-1); font-weight: var(--fw-bold); letter-spacing: .04em; text-transform: uppercase;
+  color: var(--ok); background: var(--ok-soft); white-space: nowrap; cursor: help; max-width: 100%;
+}
+.verified-badge .sep { font-weight: var(--fw-regular); opacity: .6; }
+.verified-badge code {
+  font-family: var(--mono); font-weight: var(--fw-regular); letter-spacing: 0; text-transform: none;
+  overflow: hidden; text-overflow: ellipsis;
+}
 /* A question nothing recorded can answer: say so, and offer the key. */
 .miss {
   display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3) var(--sp-4);

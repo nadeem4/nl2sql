@@ -63,9 +63,12 @@ const NODES = {
 export function stationHeads(result, states) {
   const usage = (result && result.usage && result.usage.nodes) || {};
   const timings = (result && result.timings) || {};
+  // A verified answer has no plan: the curated matcher chose the query instead.
+  const verified = Boolean(result && result.source && result.source.type === "verified");
   const heads = {};
   for (const name of STATIONS) {
-    const { node, kind } = NODES[name];
+    const { kind } = NODES[name];
+    const node = verified && name === "plan" ? "curated_matcher" : NODES[name].node;
     const model = usage[node] && usage[node].model;
     const tag = name === "cost" ? null : kind === "model" ? (model ? `Model · ${model}` : "Model") : "Code";
     const state = states[name];

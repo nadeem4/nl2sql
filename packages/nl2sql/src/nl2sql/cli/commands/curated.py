@@ -1,6 +1,7 @@
 """``nl2sql curated``: the curated answers file.
 
 * ``validate`` -- check ``curated.yaml`` before it ships.
+* ``test`` -- run every verified query once against its database.
 * ``proposals export`` -- thumbs-up generated answers as proposed verified
   queries, in their own file (or on stdout) for a person to review. It never
   writes ``curated.yaml``.
@@ -20,7 +21,7 @@ from typing_extensions import Annotated
 from nl2sql import CuratedAPI
 from nl2sql.cli.common.decorators import handle_cli_errors
 
-app = typer.Typer(help="Check the curated answers file.", no_args_is_help=True)
+app = typer.Typer(help="Check and test the curated answers file.", no_args_is_help=True)
 console = Console()
 
 
@@ -59,6 +60,42 @@ def validate(
         console.print("\n[bold red]Curated answers file has errors.[/bold red]")
         sys.exit(1)
     console.print("\n[bold green]✓ Curated answers file is valid[/bold green]")
+
+
+@app.command("test")
+@handle_cli_errors
+def test(
+    curated: Annotated[Optional[pathlib.Path], typer.Option("--curated", help="Path to curated.yaml")] = None,
+    config: Annotated[Optional[pathlib.Path], typer.Option("--config", help="Path to datasource config")] = None,
+    secrets: Annotated[Optional[pathlib.Path], typer.Option("--secrets", help="Path to secrets config")] = None,
+):
+    """
+    Run every verified query once against its database, read-only, with each
+    param's default or example bound. Exits 1 if any query fails.
+    """
+    report = CuratedAPI().test(curated_path=curated, datasources_path=config, secrets_path=secrets)
+    console.print(f"[bold blue]Testing verified queries from:[/bold blue] {escape(report.path)}")
+
+    for error in report.errors:
+        console.print(f"[bold red]Error:[/bold red] {escape(error)}")
+
+    if report.entries:
+        table = Table(title="Verified Queries")
+        table.add_column("Datasource", style="cyan")
+        table.add_column("Query", style="magenta")
+        table.add_column("Status")
+        table.add_column("Params", style="white")
+        table.add_column("Details", style="white")
+        for entry in report.entries:
+            status = "[green]PASS[/green]" if entry.status == "PASS" else f"[red]{entry.status}[/red]"
+            params = ", ".join(f"{k}={v}" for k, v in entry.params.items())
+            table.add_row(Text(entry.datasource_id), Text(entry.query_id), status, Text(params), Text(entry.details))
+        console.print(table)
+
+    if not report.ok:
+        console.print("\n[bold red]Some verified queries failed.[/bold red]")
+        sys.exit(1)
+    console.print(f"\n[bold green]✓ {len(report.entries)} verified queries ran[/bold green]")
 
 
 proposals_app = typer.Typer(help="Verified queries proposed from thumbs-up feedback.", no_args_is_help=True)

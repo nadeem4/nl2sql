@@ -13,6 +13,12 @@ SAMPLE_QUESTIONS=configs/sample_questions{suffix}.yaml
 # Settings appended for specific environments only.
 ENV_SPECIFIC_SETTINGS = {
     "demo": (
+        "\n# --- Curated answers ---\n"
+        "# The demo's verified queries. A question one of them answers runs its\n"
+        "# reviewed SQL instead of a generated plan. Only the demo sets this:\n"
+        "# elsewhere the file is optional, and a CURATED_CONFIG naming a file\n"
+        "# that does not exist fails startup.\n"
+        "CURATED_CONFIG=configs/curated.demo.yaml\n"
         "\n# --- Embeddings ---\n"
         "# Local ONNX embeddings keep `nl2sql index` key-free. The first index run\n"
         "# downloads a ~79 MB model. Running a query still needs an LLM key.\n"

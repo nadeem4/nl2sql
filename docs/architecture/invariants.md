@@ -399,7 +399,7 @@ The validator resolves columns against a throw-away query in which every table i
 A verified query's SQL is written, reviewed and committed by a person in `curated.yaml`. The model picks a verified query by id and supplies parameter values; it never writes or edits the SQL. The SQL must be exactly one read-only query whose `:name` placeholders are exactly its declared params. Values are typed and checked by code (type, `min`/`max`, `choices`, required) and bound by the adapter's driver, never interpolated into the SQL text. A query with params runs only on an adapter that declares `SUPPORTS_BOUND_PARAMETERS`.
 
 ### Enforcement Points
-- `VerifiedQuery`, `ParamSpec`, `inspect_verified_sql()` and `check_curated_queries()` in `nl2sql.configs.curated`, at startup and in `nl2sql curated validate`
+- `VerifiedQuery`, `ParamSpec`, `inspect_verified_sql()` and `check_curated_queries()` in `nl2sql.configs.curated`, at startup, in `nl2sql curated validate`, and in `nl2sql curated test` (`CuratedAPI.test()`), which runs only queries that pass them, with their values bound
 - `resolve_params()` in `nl2sql.pipeline.nodes.curated_matcher.params`
 - `CuratedMatcherNode._match()` in `nl2sql.pipeline.nodes.curated_matcher.node`: parses the SQL read-only again before running, and checks the capability
 - `BaseSQLAlchemyAdapter._run()` in `nl2sql.adapters.sqlalchemy_base.adapter`: `conn.execute(text(sql), parameters)`; without parameters the call is exactly `conn.execute(text(sql))`

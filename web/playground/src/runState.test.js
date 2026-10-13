@@ -109,6 +109,16 @@ test("a model step names its model from usage; code steps say Code", () => {
   assert.deepEqual(heads.cost, { kind: "code", tag: null, time: "5.04 s" });
 });
 
+test("a verified answer's Plan station reports the curated matcher, the step that chose the query", () => {
+  const r = {
+    source: { type: "verified", id: "revenue_by_year", datasource_id: "chinook", params: {} },
+    usage: { nodes: { curated_matcher: { model: "gpt-5.4", calls: 1 } } },
+    timings: { curated_matcher: 0.84, LangGraph: 2.1 },
+  };
+  const heads = stationHeads(r, { plan: "done", checks: "done", sql: "done", rows: "done", cost: "done" });
+  assert.deepEqual(heads.plan, { kind: "model", tag: "Model · gpt-5.4", time: "840 ms" });
+});
+
 test("a model step with no usage reported still says Model", () => {
   const heads = stationHeads(null, { plan: "idle", checks: "idle", sql: "idle", rows: "idle", cost: "idle" });
   assert.equal(heads.plan.tag, "Model");

@@ -95,3 +95,20 @@ export function subQueryHeads(subs) {
     detail: [s.intent, s.datasource_id].filter(Boolean).join(" · "),
   }));
 }
+
+// A verified answer's badge: the query's id, and the values that were bound,
+// for the tooltip and the Plan station. Null for a generated answer, so it
+// shows nothing new.
+export function verifiedSource(result) {
+  const source = result && result.source;
+  if (!source || source.type !== "verified" || !source.id) return null;
+  const params = Object.entries(source.params || {}).map(([name, value]) => ({ name, value: String(value) }));
+  const qualified = source.datasource_id ? `${source.datasource_id}.${source.id}` : source.id;
+  const values = params.length ? ` Values: ${params.map((p) => `${p.name} = ${p.value}`).join(", ")}.` : "";
+  return {
+    id: source.id,
+    label: `Verified · ${source.id}`,
+    title: `Answered by the verified query ${qualified}, SQL your data team wrote and reviewed.${values}`,
+    params,
+  };
+}
