@@ -239,6 +239,18 @@ def test_the_change_against_the_previous_run_of_the_same_config(tmp_path):
     assert previous[id(mini)] is None and records.describe_change(mini, None) == "first run"
 
 
+def test_a_run_with_curated_answers_on_is_marked_and_starts_its_own_series():
+    off = records.make_record(_board(), "gpt-5.4", recorded_at=WHEN, engine_version="1", code=CODE)
+    on = records.make_record({**_board(), "curated": True}, "gpt-5.4", recorded_at=WHEN, engine_version="1",
+                             code=CODE)
+    assert off["curated"] is False and on["curated"] is True
+    assert not records.comparable(on, off)
+    assert records.describe_change(on, off) == "new series (curated answers changed)"
+    # A record written before the field existed ran without the switch: the same series as "off".
+    old = {k: v for k, v in off.items() if k != "curated"}
+    assert records.comparable(old, off)
+
+
 def test_a_changed_schema_or_dataset_starts_a_new_series(tmp_path):
     _write(tmp_path, 19)
     _write(tmp_path, 20, database={**CHINOOK, "schema_fingerprint": "0123456789abcdef"})

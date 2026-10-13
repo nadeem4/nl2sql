@@ -317,6 +317,7 @@ and then, from the repo, `nl2sql benchmark publish --from <demo folder>`
 | `--max-regressions N` | `2` | Baseline: how many questions may flip from pass to fail before the run fails; a smaller but significant drop fails too |
 | `--max-accuracy-drop F` | none | Deprecated: a flat accuracy drop gate. Smaller than one question at n = 47, so it fired on noise. Only applied when passed |
 | `--max-cost-increase F` | `0.2` | Baseline: largest allowed rise in cost per question (0.2 is 20%) |
+| `--use-curated` | off | Keep [curated answers](../configuration/curated.md) on, so a verified query may answer a gold question (below) |
 
 `<project>` is the folder of the env file the run is configured from: for
 `--env demo` that is `./.env.demo`, so the current folder; with `--env-file
@@ -329,7 +330,7 @@ Before anything is spent, the run prints its plan and carries on without a
 prompt (the cap is the safety):
 
 ```
-Plan: 47 questions x role admin x 1 pass, cap $10.00
+Plan: 47 questions x role admin x 1 pass, cap $10.00, curated answers off
   gpt-5.4: gpt-5.4 (every node)
   gpt-5.4-mini-helpers: gpt-5.4 (astplanner, refiner); gpt-5.4-mini (answersynthesizer, datasourceresolver, decomposer)
   Records: C:\demo\benchmarks\tier2  Scoreboard: C:\demo\benchmark_tier2.json
@@ -422,9 +423,20 @@ Tier 2 turns the plan cache off for its run (`PLAN_CACHE_ENABLED`), so a
 second pass asks the planner again instead of replaying the first, and scores
 refusals against the generic message, as tier 1 does.
 
+Tier 2 also runs with [curated answers](../configuration/curated.md) off, as
+tier 1 does (`run_tier2()` clears the context's curated file for the run and
+restores it after). A verified query answers without a plan, so with them on
+a hit would be scored as if the model had planned it, and the run would not be
+comparable with the published ones. `--use-curated` keeps them on, to measure
+the product as a user with a curated file meets it. Either way every result
+row records its answer's `source` (`verified` or `generated`) and, for a
+verified one, the `verified_query` id, and `accuracy.by_source` splits the
+score by it. The scoreboard and each record say `"curated": true` for such a
+run, and it starts its own series in the history.
+
 ### The scoreboard
 
-`benchmark_tier2.json` holds the run (`passes`, `roles`, `questions`,
+`benchmark_tier2.json` holds the run (`passes`, `roles`, `curated`, `questions`,
 `max_cost`, `spent`, `stopped`, `prices_checked_on`), one entry per config
 under `configs`, and a `comparison`. Each config has:
 
@@ -433,7 +445,7 @@ under `configs`, and a `comparison`. Each config has:
 | `models` | `provider:model` per LLM node |
 | `planned_cases`, `completed_cases` | Cases the run would make, and made |
 | `summary` | pass/fail counts per role, as tier 1 reports |
-| `accuracy` | `overall` (strict) and `lenient`, each with a 95% Wilson `interval`; `pass_k` when `--passes` > 1; then `by_tag` and `by_difficulty`, each with both counts and both rates |
+| `accuracy` | `overall` (strict) and `lenient`, each with a 95% Wilson `interval`; `pass_k` when `--passes` > 1; then `by_tag`, `by_difficulty` and `by_source` (`verified`, `generated`; `unknown` for a run that raised), each with both counts and both rates |
 | `answerability` | `precision` and `recall` of refusing as unanswerable: true refusals of the four unanswerable questions, false refusals of answerable ones, and missed unanswerables |
 | `tokens_by_node` | calls, input, cached input, cache write, output and reasoning tokens per node |
 | `cost` | dollars `total` and `per_question` (each result row has its own `cost`) |
@@ -442,7 +454,7 @@ under `configs`, and a `comparison`. Each config has:
 | `errors_by_code` | error codes the runs ended with (`EXCEPTION` for a run that raised) |
 | `determinism` | with `--passes` > 1: the share of questions whose SQL and rows were identical in every pass, and which ones differed |
 | `faithfulness` | [answer faithfulness](#answer-faithfulness): `faithful` of `answers` written, the `rate`, and each `unfaithful` run with what it stated that the rows do not hold |
-| `results` | one row per run: `status` and `reason` (strict), `lenient_status` and `lenient_reason`, SQL, cost, latency, tokens, retries, `faithfulness` (`null` when no answer was written), and `plans`: each sub-query's `id`, `intent` and `plan` (the `PlanModel` JSON the SQL was generated from, `null` if planning failed), so a wrong answer can be traced to the plan; and `answer`, the text the answer synthesizer wrote (summary, then content), which the faithfulness check read |
+| `results` | one row per run: `status` and `reason` (strict), `lenient_status` and `lenient_reason`, SQL, cost, latency, tokens, retries, `faithfulness` (`null` when no answer was written), and `plans`: each sub-query's `id`, `intent` and `plan` (the `PlanModel` JSON the SQL was generated from, `null` if planning failed), so a wrong answer can be traced to the plan; and `answer`, the text the answer synthesizer wrote (summary, then content), which the faithfulness check read; `source` (`verified` or `generated`, `null` for a run that raised) and `verified_query`, the verified query's id when one answered |
 
 `comparison.configs` is one row per config (strict and lenient accuracy, answerability, cost,
 latency, retries, determinism, faithfulness); `comparison.differences` lists
@@ -600,7 +612,7 @@ name is taken. Every record holds:
 | `database` | `datasource_id`, `engine` (`sqlite`), `schema_fingerprint` (a hash of the latest indexed schema snapshot's tables, columns, types and keys, so re-indexing an unchanged database keeps it) and the `tables` and `columns` counts. Built from the datasources the gold dataset's questions name, not from every datasource the project registered: the demo registers three and this set asks about Chinook, so a run there is still `chinook` with Chinook's fingerprint, and stays in the series recorded before the other two existed. Several datasources (a dataset that spans them) are joined with `+` |
 | `config` | The config name, and for tier 2 `provider:model` per node |
 | `metrics` | Tier 2: accuracy (strict) and lenient_accuracy with their 95% intervals, `pass_k`, answerability precision and recall, dollars total and per question, input / cached / output tokens per question, p50 and p95 latency, determinism, answer faithfulness. Retrieval: the report's `summary` |
-| tier 2 only | `roles`, `passes`, `stopped`, `partial` and the config's full `scoreboard` |
+| tier 2 only | `roles`, `passes`, `curated` (whether curated answers were on; a record without it ran with them off), `stopped`, `partial` and the config's full `scoreboard` |
 | retrieval only | `settings` and the full `report` |
 
 Records are never edited after writing: a run writes a new file, and
@@ -612,7 +624,8 @@ filled in (listed in its `backfilled` field).
 #### Comparable runs
 
 Two runs are comparable when they share the benchmark kind, the dataset sha
-and the schema fingerprint, and for tier 2 the roles. `docs/benchmarks.md`
+and the schema fingerprint, and for tier 2 the roles and whether curated
+answers were on. `docs/benchmarks.md`
 groups the history by benchmark, then database, and lists each group's runs
 newest first. "Δ vs previous" compares a run with the previous run of the same
 config on the same database: the change in strict accuracy, lenient accuracy
@@ -620,7 +633,7 @@ and faithfulness (in percentage points) and dollars per question for tier 2,
 in table and column recall for retrieval. For tier 2 it then says how many
 questions flipped each way and McNemar's exact p-value on them, read from the
 two records' committed per-question results -- `3 flipped to fail, 1 to pass
-(McNemar p=0.625)`. When the dataset, the schema or the roles changed, the
+(McNemar p=0.625)`. When the dataset, the schema, the roles or curated answers changed, the
 run starts a new series and the cell says so, e.g. `new series (schema
 changed)`; a config's first run says `first run`. The README block has two
 headed tables, tier 2 accuracy (latest run per config and database) and then
@@ -676,7 +689,10 @@ constructed table, pass^k, the gate firing and not firing, the deprecated
 `benchmark presets` and `publish --from`. `tests/unit/test_benchmark_presets.py`
 covers the per-node `--model` config and preset lookup, and
 `tests/unit/test_benchmark_records.py` the records, the git commit lookup,
-comparability, the Δ and series breaks.
+comparability, the Δ and series breaks. `tests/unit/test_tier2_curated.py`
+covers curated answers off by default and restored after, `--use-curated`
+keeping them on, each row's `source` and the `by_source` split, and an old
+record without a `source` still scoring.
 
 ## Retrieval recall
 
