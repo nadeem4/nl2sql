@@ -4892,13 +4892,11 @@ year, sales by country, best-selling genres, top artists by tracks sold).
 <code>.env.demo</code> points <code>CURATED_CONFIG</code> at it, and indexing embeds their questions
 beside the schema. A question one of them answers runs its SQL with the values
 bound instead of a generated plan, and the playground labels the answer
-<strong>Verified Â·</strong> and the query's id. "What is the total revenue per year?" and
+<strong>Verified ·</strong> and the query's id. "What is the total revenue per year?" and
 "Which genre sells the most tracks?" among the guided questions are two of
 them. See <a href="../../configuration/curated/#in-the-demo">Curated answers</a>.</p>
-<p>The keyless replay has no recorded answer for the matcher's model call
-(<code>VerifiedQueryChoice</code>) until the owner records the demo again, so without a
-key every answer is generated, as before, and no badge appears. With a key, a
-matching question comes back verified.</p>
+<p>The keyless replay includes the matcher's recorded choices, so the badge
+appears without a key too, on the guided questions a verified query answers.</p>
 <h3 id="the-roles">The roles</h3>
 <p><code>configs/policies.demo.json</code> is generated with three roles, spanning all three
 datasources, so the RBAC check is visible without editing anything:</p>

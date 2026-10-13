@@ -5087,11 +5087,11 @@ genre sells the most tracks?", are phrasings of these, so with a key they come
 back verified. Check and run the file with
 <code>nl2sql --env demo curated validate</code> and <code>nl2sql --env demo curated test</code>.</p>
 <p>The keyless demo (a hosted Space with no key, or <code>nl2sql demo</code> replaying
-recordings) answers from recorded model answers, and those were recorded
-before the curated matcher existed: they hold no <code>VerifiedQueryChoice</code> answer.
-Until the recordings are made again (<code>python scripts/record_demo_answers.py</code>,
-which needs the owner's key), the matcher's call misses, the run falls back
-(<code>model_failed</code>), and every keyless answer is generated, as before.</p>
+recordings) answers from recorded model answers, and those include the
+matcher's <code>VerifiedQueryChoice</code> for every guided question. So without a key,
+"What is the total revenue per year?", "Which genre sells the most tracks?",
+"How many customers do we have, by country?" and "How many purchases were
+there per month in 2013?" come back verified, and the rest generated.</p>
 <h2 id="preferred-tables">Preferred tables</h2>
 <p>Preferred tables are not in <code>curated.yaml</code>: they are a <code>preferred_tables</code> list
 on a datasource in <code>datasources.yaml</code>, naming views or tables (built by the
