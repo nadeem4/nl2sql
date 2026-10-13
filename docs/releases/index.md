@@ -4,6 +4,7 @@ What each release is for, in plain words. The full list of commits is in
 [`CHANGELOG.md`](https://github.com/nadeem4/nl2sql/blob/main/CHANGELOG.md).
 How a release is cut is in [Releasing](../development/releasing.md).
 
+- [0.4.1](0.4.1.md): admin-only REST routes, opt-in enrichment, schema-aware policies and a datasource that fails no longer stops startup.
 - [0.4.0](0.4.0.md): curated answers, where a question that matches a verified query runs its reviewed SQL and is labelled verified.
 - [0.3.0](0.3.0.md): results at any size, paged and downloadable, with a 20-row preview for the answer and a streamed run.
 - [0.2.4](0.2.4.md): a cached plan is reused only on the day it was made, so relative dates stay current.
