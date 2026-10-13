@@ -20,6 +20,9 @@ def secret_value(value: Any) -> Optional[str]:
     return value
 
 
+CURATED_CONFIG_DEFAULT = "configs/curated.yaml"
+
+
 class Settings(BaseSettings):
     """Application configuration settings backed by environment variables.
 
@@ -60,7 +63,23 @@ class Settings(BaseSettings):
         validation_alias="POLICIES_CONFIG",
         description="Path to the JSON file containing RBAC policies and permissions."
     )
-    
+    curated_config_path: str = Field(
+        default=CURATED_CONFIG_DEFAULT,
+        validation_alias="CURATED_CONFIG",
+        description=(
+            "Path to the curated answers file (verified queries). Absent at the default path: "
+            "the feature is off. Set to any other path that does not exist: startup fails."
+        ),
+    )
+    curated_enabled: bool = Field(
+        default=True,
+        validation_alias="CURATED_ENABLED",
+        description=(
+            "Load the curated answers file at startup. False turns the feature off without "
+            "removing the file; `nl2sql curated validate` still checks it."
+        ),
+    )
+
     global_timeout_sec: int = Field(
         default=60,
         validation_alias="GLOBAL_TIMEOUT_SEC",

@@ -92,6 +92,7 @@ nav:
     - LLMs: configuration/llm.md
     - Policies: configuration/policies.md
     - Secrets: configuration/secrets.md
+    - Curated Answers: configuration/curated.md
   - Adapters:
     - Overview: adapters/index.md
     - Architecture: adapters/architecture.md

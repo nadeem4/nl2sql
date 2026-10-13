@@ -19,6 +19,7 @@ from nl2sql.api.indexing_api import IndexingAPI
 from nl2sql.api.auth_api import AuthAPI
 from nl2sql.api.settings_api import SettingsAPI
 from nl2sql.api.policy_api import PolicyAPI
+from nl2sql.api.curated_api import CuratedAPI
 
 
 class NL2SQL:
@@ -78,6 +79,7 @@ class NL2SQL:
         self.auth = AuthAPI(self._ctx)
         self.settings = SettingsAPI(self._ctx)
         self.policy = PolicyAPI(self._ctx)
+        self.curated = CuratedAPI(self._ctx)
         self._benchmark = None
 
     @property

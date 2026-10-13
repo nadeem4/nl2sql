@@ -26,6 +26,7 @@ from .api.indexing_api import IndexingAPI
 from .api.auth_api import AuthAPI
 from .api.settings_api import SettingsAPI
 from .api.policy_api import PolicyAPI
+from .api.curated_api import CuratedAPI
 
 # Also expose core models and enums
 from .common.errors import ErrorSeverity, ErrorCode, PipelineError
@@ -56,6 +57,7 @@ __all__ = [
     "AuthAPI",
     "SettingsAPI",
     "PolicyAPI",
+    "CuratedAPI",
     "BenchmarkAPI",
     "ErrorSeverity",
     "ErrorCode",
