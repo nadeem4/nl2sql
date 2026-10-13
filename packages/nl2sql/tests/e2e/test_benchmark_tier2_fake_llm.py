@@ -115,6 +115,9 @@ def test_two_configs_are_scored_priced_and_compared(demo_env, servers, tmp_path)
 
     assert board["stopped"] is None
     good_board, bad_board = board["configs"]["good"], board["configs"]["bad"]
+    # Curated answers are off by default, so every answer was planned by the model.
+    assert board["curated"] is False
+    assert {r["source"] for r in good_board["results"]} == {"generated"}
     assert good_board["completed_cases"] == good_board["planned_cases"] == len(QUESTIONS)
     assert good_board["accuracy"]["overall"] == 1.0
     assert bad_board["accuracy"]["overall"] == pytest.approx(0.75)

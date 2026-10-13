@@ -14,7 +14,11 @@ Every call costs money, so a run:
   question seen so far to the running total; if that could pass the cap it
   stops and returns a partial scoreboard marked ``stopped: max_cost``;
 * turns the plan cache off, so a second pass asks the planner again instead
-  of replaying the first.
+  of replaying the first;
+* turns curated answers off, as tier 1 does, so every answer scored is one
+  the model planned. ``use_curated=True`` keeps them on; each case record
+  names its answer's ``source`` (``verified`` or ``generated``) and the
+  accuracy is split by it.
 """
 from __future__ import annotations
 
@@ -144,6 +148,10 @@ def _record(question: GoldQuestion, row: Dict[str, Any], result: Optional[QueryR
         "plans": [{"id": sq.id, "intent": sq.intent, "plan": sq.plan}
                   for sq in (result.sub_queries if result else [])],
         "answer": answer_text(result.final_answer) if result else "",
+        # A verified query's answer has no plan the model wrote; with curated
+        # answers on, this is what tells the two apart.
+        "source": result.source.type if result else None,
+        "verified_query": result.source.id if result else None,
     }
 
 
@@ -248,10 +256,13 @@ def score_config(records: List[Dict[str, Any]], passes: int) -> Dict[str, Any]:
     """The scoreboard for one config's runs (every pass, every question)."""
     by_tag: Dict[str, List] = {}
     by_difficulty: Dict[str, List] = {}
+    by_source: Dict[str, List] = {}
     for r in records:
         for tag in r["tags"]:
             by_tag.setdefault(tag, []).append(r)
         by_difficulty.setdefault(r["difficulty"], []).append(r)
+        # A record written before sources were kept, or a case that raised, has none.
+        by_source.setdefault(r.get("source") or "unknown", []).append(r)
 
     unanswerable = [r for r in records if r["expected"] == "unanswerable"]
     true_refusals = sum(r["refused_unanswerable"] for r in unanswerable)
@@ -315,6 +326,7 @@ def score_config(records: List[Dict[str, Any]], passes: int) -> Dict[str, Any]:
             "pass_k": _pass_k(records, passes),
             "by_tag": {t: _pass_rate(rs) for t, rs in sorted(by_tag.items())},
             "by_difficulty": {d: _pass_rate(rs) for d, rs in sorted(by_difficulty.items())},
+            "by_source": {s: _pass_rate(rs) for s, rs in sorted(by_source.items())},
         },
         "answerability": {
             "true_refusals": true_refusals, "false_refusals": false_refusals,
@@ -455,6 +467,7 @@ def run_tier2(
     prices: Dict[str, ModelPrice] = PRICES,
     before_case: Optional[Callable[[GoldQuestion], None]] = None,
     on_case: Optional[Callable[[str, Dict[str, Any], float], None]] = None,
+    use_curated: bool = False,
 ) -> Dict[str, Any]:
     """Runs every config on the selected questions, sequentially, and returns the scoreboard.
 
@@ -462,6 +475,7 @@ def run_tier2(
     called after each question with the config name, its record and the
     dollars spent so far. ``before_case`` is passed to the runner (a test's
     fake LLM uses it). The context's LLM registry is left on the last config.
+    Curated answers are off for the run unless ``use_curated`` is set.
     """
     if not max_cost or max_cost <= 0:
         raise ValueError("Tier 2 needs a positive max_cost (dollars).")
@@ -478,6 +492,12 @@ def run_tier2(
     # afresh, so both settings are pinned for the run and restored after.
     saved = (settings.rbac_refusal_names_tables, settings.plan_cache_enabled)
     settings.rbac_refusal_names_tables, settings.plan_cache_enabled = False, False
+    # Curated answers are off unless asked for, as in tier 1: a verified answer
+    # has no plan, and the published runs score what the model planned.
+    # Without ``ctx.curated`` the graph has no curated matcher.
+    curated = getattr(ctx, "curated", None)
+    if not use_curated:
+        ctx.curated = None
     try:
         for name, cfg in llm_configs.items():
             agents = dict(cfg.agents or {})
@@ -504,6 +524,7 @@ def run_tier2(
                 break
     finally:
         settings.rbac_refusal_names_tables, settings.plan_cache_enabled = saved
+        ctx.curated = curated
 
     planned = len(cases) * passes
     boards = {}
@@ -514,6 +535,7 @@ def run_tier2(
         boards[name] = board
     return {
         "tier": 2, "dataset": str(config.dataset_path), "roles": config.roles, "passes": passes,
+        "curated": use_curated,
         "questions": sorted({q.id for q, _ in cases}), "max_cost": max_cost, "spent": round(spent, 6),
         "stopped": stopped, "prices_checked_on": PRICES_CHECKED_ON, "configs": boards, "comparison": compare(boards),
     }

@@ -126,18 +126,20 @@ class BenchmarkAPI:
         questions: Optional[List[str]] = None,
         before_case=None,
         on_case=None,
+        use_curated: bool = False,
     ) -> Dict[str, Any]:
         """Run the real model end to end on the gold questions, per config, under a dollar cap.
 
         See :mod:`nl2sql.evaluation.tier2`. ``questions`` narrows the run to
-        these question ids or tags. Returns the scoreboard.
+        these question ids or tags. Curated answers are off unless
+        ``use_curated`` is set. Returns the scoreboard.
         """
         dataset = load_gold_dataset(config.dataset_path)
         if questions:
             config = config.model_copy(update={"include_ids": select_question_ids(dataset, questions)})
         ctx = self._context(config)
         board = run_tier2(ctx, config, llm_configs, max_cost=max_cost, passes=passes,
-                          before_case=before_case, on_case=on_case)
+                          before_case=before_case, on_case=on_case, use_curated=use_curated)
         return {**board, "database": database_identity(ctx, dataset_datasources(dataset))}
 
     @staticmethod

@@ -388,6 +388,11 @@ def benchmark(
         "--results-dir", help="Tier 2: the benchmarks folder one record per config is written under, as "
                               "tier2/<database>/ (default: <project>/benchmarks).",
     )] = None,
+    use_curated: Annotated[bool, typer.Option(
+        "--use-curated", help="Tier 2: keep curated answers on, so a verified query may answer a gold question. "
+                              "Off by default, as in tier 1: each case records its answer's source and the "
+                              "scoreboard splits accuracy by it.",
+    )] = False,
     dataset: Annotated[pathlib.Path, typer.Option(help="Path to the gold dataset YAML")] = GOLD_DATASET_PATH,
     ds_config_path: DatasourceConfigOption = None,
     secrets_config_path: SecretsConfigOption = None,
@@ -436,7 +441,8 @@ def benchmark(
         exec_tier2_benchmark(bench_run_config, llm_specs=llm, model_specs=model, max_cost=max_cost, passes=passes,
                              questions=questions, baseline=baseline, max_regressions=max_regressions,
                              max_accuracy_drop=max_accuracy_drop,
-                             max_cost_increase=max_cost_increase, results_dir=results_dir, note=note)
+                             max_cost_increase=max_cost_increase, results_dir=results_dir, note=note,
+                             use_curated=use_curated)
         return
     exec_benchmark(bench_run_config, tier=tier)
 

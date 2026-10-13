@@ -70,6 +70,19 @@ def test_tier2_refuses_to_start_without_max_cost(tmp_path):
     assert _FakeAPI.calls == []
 
 
+def test_curated_answers_are_off_unless_use_curated_is_passed(tmp_path):
+    out = _invoke(tmp_path, "--max-cost", "5")
+    assert out.exit_code == 0, out.output
+    assert _FakeAPI.calls[1][3]["use_curated"] is False
+    assert "curated answers off" in out.output
+
+    _FakeAPI.calls = []
+    out = _invoke(tmp_path, "--max-cost", "5", "--use-curated")
+    assert out.exit_code == 0, out.output
+    assert _FakeAPI.calls[1][3]["use_curated"] is True
+    assert "curated answers on" in out.output
+
+
 def test_tier2_refuses_to_run_in_ci(tmp_path, monkeypatch):
     monkeypatch.setenv("CI", "true")
     out = _invoke(tmp_path, "--max-cost", "5")
