@@ -25,13 +25,24 @@ For 95% of use cases, you are connecting to a SQL database that already has a Py
 ### Example
 
 ```python
+from sqlalchemy import URL
 from nl2sql.adapters.sqlalchemy_base import BaseSQLAlchemyAdapter
 
 class PostgresAdapter(BaseSQLAlchemyAdapter):
     def construct_uri(self, args: Dict[str, Any]) -> str:
-        # Convert args to connection string
-        return f"postgresql+psycopg2://{args['user']}:{args['password']}@{args['host']}/{args['database']}"
+        # URL.create escapes the credentials; an f-string breaks on a password
+        # containing @ : / # or %.
+        return URL.create(
+            "postgresql+psycopg2",
+            username=args["user"],
+            password=args["password"],
+            host=args["host"],
+            database=args["database"],
+        ).render_as_string(hide_password=False)
 ```
+
+Enforce `statement_timeout_ms` in `connect()` too: the base class records it but
+does not apply it (see the [reference](sqlalchemy.md#connect)).
 
 > See the **[SQLAlchemy Adapter Reference](sqlalchemy.md)** for full API details.
 

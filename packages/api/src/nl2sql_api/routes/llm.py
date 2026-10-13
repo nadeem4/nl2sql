@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends
 from typing import Dict, Any, Annotated
 
+from nl2sql_api import auth
 from nl2sql_api.models.llm import LLMRequest, LLMResponse
 from nl2sql_api.dependencies import get_llm_service
 from nl2sql_api.services import LLMService
@@ -9,13 +10,14 @@ router = APIRouter(tags=["llm"])
 
 LLMSvc = Annotated[LLMService, Depends(get_llm_service)]
 
-@router.post("/llm", response_model=LLMResponse, summary="Configure an LLM")
+@router.post("/llm", response_model=LLMResponse, summary="Configure an LLM",
+             dependencies=[Depends(auth.require_admin)], responses=auth.ADMIN_RESPONSES)
 def configure_llm(
     payload: LLMRequest,
     service: LLMSvc,
 ):
     """Register an LLM in this process from `config` (`name` defaults to `default`).
-    It is not written to `configs/llm.yaml`.
+    It is not written to `configs/llm.yaml`. Admin only.
     """
     try:
         return service.configure_llm(payload)

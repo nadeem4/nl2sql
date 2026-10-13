@@ -110,7 +110,9 @@ Signature:
 `list_datasources() -> List[str]`
 
 Returns:
-List of registered datasource IDs.
+List of registered datasource IDs. A configured datasource that failed to start
+is not in it; `NL2SQL.list_unavailable_datasources()` maps each one to the
+reason.
 
 ### DatasourceAPI.get_adapter
 

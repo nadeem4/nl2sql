@@ -142,6 +142,19 @@ variable already exported in the shell wins over the file.
 From Python, `NL2SQL(env="demo")` sets `ENV` and `NL2SQL(env_file=path)` sets
 `ENV_FILE_PATH`, reloading settings before any configuration path is resolved.
 
+### REST API (`nl2sql-api`)
+
+These are read by `nl2sql-api` only, not by `Settings`, on each request (CORS
+once at startup).
+
+| Env var | Default | Description |
+| --- | --- | --- |
+| `NL2SQL_API_ROLE_HEADER` | `—` | Header a trusted, authenticating proxy sets with the caller's roles (comma-separated). See [Caller role](../api/rest/index.md#caller-role). |
+| `NL2SQL_API_ROLE` | `—` | One static role for every request. |
+| `NL2SQL_API_TRUST_BODY_ROLE` | `false` | Dev only: take `user_context` from the request body. |
+| `NL2SQL_API_ADMIN_ROLES` | `admin` | Comma-separated roles allowed on the routes that change datasources, LLMs or the index. With no role source set, those routes answer loopback clients only. See [Admin routes](../api/rest/index.md#admin-routes). |
+| `NL2SQL_API_CORS_ORIGINS` | `—` | Browser origins allowed to call the API. See [CORS origins](../api/rest/index.md#cors-origins). |
+
 ## Config manager flow
 
 ```mermaid

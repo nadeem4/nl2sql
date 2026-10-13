@@ -1,5 +1,5 @@
 from typing import Dict, Any
-from sqlalchemy import create_engine, inspect, text
+from sqlalchemy import URL, create_engine, inspect, text
 from nl2sql.adapters.sqlalchemy_base import (
     DryRunResult,
     QueryPlan,
@@ -38,24 +38,19 @@ class PostgresAdapter(BaseSQLAlchemyAdapter):
         """
         config = PostgresConnectionConfig(**args)
         
-        user = config.user
-        password = config.password.get_secret_value()
-        host = config.host
-        port = config.port
-        database = config.database
-        options = config.options.copy()
-        
-        creds = f"{user}:{password}@" if user or password else ""
-        netloc = f"{host}:{port}"
-        
-        query_str = ""
-        if options:
-            from urllib.parse import urlencode
-            query_str = "?" + urlencode(options)
-            
         # Name the driver: the `postgres` extra installs psycopg2, and a bare
         # `postgresql://` means psycopg (v3) from SQLAlchemy 2.1 onwards.
-        return f"postgresql+psycopg2://{creds}{netloc}/{database}{query_str}"
+        # URL.create escapes the credentials, so a password holding @ : / # %
+        # stays a password instead of moving the host or port boundary.
+        return URL.create(
+            "postgresql+psycopg2",
+            username=config.user or None,
+            password=config.password.get_secret_value() or None,
+            host=config.host,
+            port=config.port,
+            database=config.database,
+            query={key: str(value) for key, value in config.options.items()},
+        ).render_as_string(hide_password=False)
 
     def connect(self) -> None:
         """Postgres-specific connection with Native Server-Side Timeout."""

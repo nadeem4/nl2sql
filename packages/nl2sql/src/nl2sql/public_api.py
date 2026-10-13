@@ -185,7 +185,17 @@ class NL2SQL:
         List all registered datasource IDs.
         """
         return self.datasource.list_datasources()
-    
+
+    def list_unavailable_datasources(self) -> dict:
+        """
+        Configured datasources that failed to start, mapped to the reason.
+
+        They are left out of ``list_datasources``; a query or an index run
+        that names one fails with this reason.
+        """
+        unavailable = getattr(self._ctx.ds_registry, "unavailable", None)
+        return unavailable() if unavailable else {}
+
     def get_datasource_capabilities(self, datasource_id: str) -> dict:
         """
         Get capabilities of a specific datasource.
@@ -292,21 +302,27 @@ class NL2SQL:
         model, one entry per registered datasource, any problems found, and
         ``warnings`` that leave ``status`` alone (a ``curated.yaml`` changed
         since it was indexed, a preferred table missing from the indexed
-        schema).
+        schema, a datasource that failed to start).
         """
         from nl2sql.indexing.curated import curated_hashes
         from nl2sql.indexing.health import IndexHealth, inspect_vector_store
 
+        registry = self._ctx.ds_registry
+        unavailable = getattr(registry, "unavailable", None)
+        down = [f"Datasource '{ds}' is unavailable: {reason}"
+                for ds, reason in (unavailable() if unavailable else {}).items()]
         store = self._ctx.vector_store
         if store is None:
-            return IndexHealth(status="missing", problems=["No vector index is configured."]).to_dict()
-        registry = self._ctx.ds_registry
-        ids = registry.list_ids() if registry is not None else []
-        hashes = curated_hashes(getattr(self._ctx, "curated", None), ids)
-        preferred_of = getattr(registry, "get_preferred_tables", None)
-        preferred = {ds: preferred_of(ds) for ds in ids} if preferred_of else None
-        return inspect_vector_store(store, self._ctx.schema_store, ids, curated_hashes=hashes,
-                                    preferred_tables=preferred).to_dict()
+            health = IndexHealth(status="missing", problems=["No vector index is configured."])
+        else:
+            ids = registry.list_ids() if registry is not None else []
+            hashes = curated_hashes(getattr(self._ctx, "curated", None), ids)
+            preferred_of = getattr(registry, "get_preferred_tables", None)
+            preferred = {ds: preferred_of(ds) for ds in ids} if preferred_of else None
+            health = inspect_vector_store(store, self._ctx.schema_store, ids, curated_hashes=hashes,
+                                          preferred_tables=preferred)
+        health.warnings.extend(down)
+        return health.to_dict()
 
     def rebuild_index(self, datasource_ids=None, enrich: bool = False, full: bool = False,
                       on_progress=None, switch_guard=None):

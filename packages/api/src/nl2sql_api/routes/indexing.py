@@ -1,18 +1,20 @@
 from fastapi import APIRouter, HTTPException, Depends
 from typing import Dict, Any, Annotated
 
+from nl2sql_api import auth
 from nl2sql_api.dependencies import get_indexing_service
 from nl2sql_api.services import IndexingService
 router = APIRouter(tags=["indexing"])
 
 IndexingSvc = Annotated[IndexingService, Depends(get_indexing_service)]
+ADMIN = {"dependencies": [Depends(auth.require_admin)], "responses": auth.ADMIN_RESPONSES}
 
-@router.post("/index/{datasource_id}", response_model=Dict[str, Any], summary="Index one datasource")
+@router.post("/index/{datasource_id}", response_model=Dict[str, Any], summary="Index one datasource", **ADMIN)
 def index_datasource(
     datasource_id: str,
     service: IndexingSvc
 ):
-    """Index one datasource's schema into the vector store; returns the indexing stats."""
+    """Index one datasource's schema into the vector store; returns the indexing stats. Admin only."""
     try:
         result = service.index_datasource(datasource_id)
 
@@ -29,11 +31,11 @@ def index_datasource(
         )
 
 
-@router.post("/index-all", response_model=Dict[str, Any], summary="Index every datasource")
+@router.post("/index-all", response_model=Dict[str, Any], summary="Index every datasource", **ADMIN)
 def index_all_datasources(
     service: IndexingSvc
 ):
-    """Index every registered datasource; returns the stats per datasource."""
+    """Index every registered datasource; returns the stats per datasource. Admin only."""
     try:
         results = service.index_all_datasources()
 
@@ -49,11 +51,12 @@ def index_all_datasources(
         )
 
 
-@router.delete("/index", response_model=Dict[str, Any], summary="Clear the index")
+@router.delete("/index", response_model=Dict[str, Any], summary="Clear the index", **ADMIN)
 def clear_index(
     service: IndexingSvc
 ):
-    """Remove every entry from the vector store. Questions need a re-index before they can be answered."""
+    """Remove every entry from the vector store. Questions need a re-index before they can be answered.
+    Admin only."""
     try:
         return service.clear_index()
     except Exception as e:

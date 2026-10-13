@@ -24,15 +24,26 @@ connection:
 ### Connection Details
 
 * **Driver**: `pyodbc`. **Requires system ODBC headers installed.**
-* **URI Constructed**: `mssql+pyodbc://{user}:{pass}@{host}:{port}/{db}?driver={driver}`
+* **URI Constructed**: `mssql+pyodbc://{user}:{pass}@{host}:{port}/{db}?driver={driver}`.
+  Built with SQLAlchemy's `URL.create`, so the user name and password are
+  percent-escaped: a password containing `@ : / # %` works as written.
 
 ## Features
 
 | Feature | Implementation | Note |
 | :--- | :--- | :--- |
-| **Timeout** | Not strictly enforced by driver | Rely on global statement timeout. |
+| **Timeout** | pyodbc `Connection.timeout` | Client-side query timeout, in whole seconds. |
 | **Dry Run** | `SET NOEXEC ON` | Validates syntax without execution. |
 | **Costing** | `SET SHOWPLAN_XML ON` | Parses XML for `StatementSubTreeCost`. |
+
+### Statement Timeout
+
+SQL Server has no session setting for a statement timeout, so the adapter sets
+pyodbc's query timeout (`Connection.timeout`) on every new pooled connection.
+pyodbc counts whole seconds, so `statement_timeout_ms` is rounded **up**:
+`1500` becomes 2 seconds, and anything from 1 to 1000 becomes 1 second. When the
+limit passes, the driver cancels the query and the adapter reports it as a refusal
+(`QUERY_REFUSED`), which the engine does not retry.
 
 ### Optimization Details
 
