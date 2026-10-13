@@ -2235,7 +2235,8 @@
 <li>Validate datasource IDs against the registered adapter list.</li>
 <li>Enforce RBAC datasource access.</li>
 <li>Detect schema version mismatches and apply the configured policy.</li>
-<li>Judge answerability over the allowed candidates, and refuse with <code>QUESTION_NOT_ANSWERABLE</code> when none can answer.</li>
+<li>Judge answerability over the allowed candidates, refuse with <code>QUESTION_NOT_ANSWERABLE</code> when none can answer, and forward only the candidates the verdict names.</li>
+<li>Give each forwarded datasource its description and a capped table list, for the decomposer to route on.</li>
 <li>Populate <code>DatasourceResolverResponse</code> in <code>GraphState</code>.</li>
 </ul>
 <hr/>
@@ -2262,7 +2263,7 @@
 <ul>
 <li><code>vector_store</code>: needed only when more than one datasource is registered and no override is given; missing then, the resolver returns <code>SCHEMA_RETRIEVAL_FAILED</code>.</li>
 <li><code>ds_registry</code>: adapter registry for registered IDs.</li>
-<li><code>schema_store</code>: latest schema versions, and the latest snapshot's description and table list for the answerability check.</li>
+<li><code>schema_store</code>: latest schema versions, and the latest snapshot's description and table list for the answerability check and the decomposer's routing context.</li>
 <li><code>rbac</code>: filters allowed datasources.</li>
 <li><code>llm_registry</code>: the answerability check's model, agent name <code>datasourceresolver</code> (falls back to <code>default</code>).</li>
 </ul>
@@ -2292,13 +2293,15 @@
 <li>Candidates:<ul>
 <li><code>state.datasource_id</code> set: it must be registered (<code>INVALID_STATE</code> otherwise); it is the only candidate.</li>
 <li>Exactly one datasource registered: it is the only candidate; no vector search.</li>
-<li>Otherwise: the vector store must exist (<code>SCHEMA_RETRIEVAL_FAILED</code> otherwise); <code>retrieve_datasource_candidates(k=5)</code> gives the candidates, and none is <code>SCHEMA_RETRIEVAL_FAILED</code> (with a re-index hint when the index is empty).</li>
+<li>Otherwise: the vector store must exist (<code>SCHEMA_RETRIEVAL_FAILED</code> otherwise); <code>retrieve_datasource_candidates(k=5)</code> gives the candidates (an exact ranking of every datasource entry, so no datasource is missed by the approximate search), and none is <code>SCHEMA_RETRIEVAL_FAILED</code> (with a re-index hint when the index is empty).</li>
 </ul>
 </li>
 <li>Role check: candidates the role may not read are dropped. None left is a <code>CRITICAL</code> <code>SECURITY_VIOLATION</code>, and no model call is made.</li>
 <li>Schema version mismatch policy (<code>fail</code> returns <code>INVALID_STATE</code>; <code>warn</code> adds a warning).</li>
 <li>Answerability check over the <strong>allowed</strong> candidates only (see below). An empty verdict returns <code>QUESTION_NOT_ANSWERABLE</code>.</li>
-<li>Return <code>DatasourceResolverResponse</code> with resolved, allowed and unsupported IDs.</li>
+<li>Narrow to the verdict. After a vector search, only the allowed candidates the verdict names go forward; a candidate the verdict rejects never reaches the decomposer, and a verdict naming only unknown ids is <code>QUESTION_NOT_ANSWERABLE</code>. With an override or a single datasource there is one candidate, and a non-empty verdict accepts it.</li>
+<li>Attach routing context to each forwarded datasource, from the latest schema snapshot: <code>description</code>, <code>tables</code> (sorted bare table names, at most 30) and <code>more_tables</code> (how many were left out).</li>
+<li>Return <code>DatasourceResolverResponse</code> with the forwarded datasources (sorted by id), their IDs as <code>allowed_datasource_ids</code>, and unsupported IDs.</li>
 <li>On exceptions, log and return <code>SCHEMA_RETRIEVAL_FAILED</code> with the exception text; a provider's refusal of the model call is a <code>PROVIDER_*</code> error instead (see <a href="../../../observability/error-handling/#provider-failures">provider failures</a>).</li>
 </ol>
 <p>A single registered datasource is the shortcut, not the usual case: with more
@@ -2332,7 +2335,7 @@ in the flow changes.</p>
 <ul>
 <li><code>{datasources}</code> is a JSON list, one entry per allowed candidate, sorted by id, with sorted keys: <code>description</code> (the datasource description from the latest schema snapshot, which indexing takes from the datasources config) and <code>tables</code> (sorted bare table names).</li>
 <li>The instructions and datasources come first (the system message) and the question last (the human message), so the prompt is byte-identical across questions up to the question and a provider's prompt cache can serve the prefix. OpenAI caches only prompts of 1,024 tokens or more, so with one small datasource nothing is cached; the prefix grows, and becomes cacheable, with more datasources.</li>
-<li>The verdict is used only to refuse: a non-empty list lets every allowed candidate through to the decomposer unchanged.</li>
+<li>The verdict refuses and narrows: an empty list refuses the question, and after a vector search only the allowed candidates it names reach the decomposer. It cannot add a datasource the role may not read.</li>
 <li>For Chinook on its own the rendered prompt is about 260 tokens (<code>o200k_base</code>), plus the <code>AnswerabilityResponse</code> function schema; the demo now registers three datasources, so its prompt is correspondingly longer.</li>
 </ul>
 <hr/>
