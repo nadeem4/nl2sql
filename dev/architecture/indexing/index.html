@@ -2269,6 +2269,10 @@
     Chunker --&gt; Refresh[VectorStore.refresh_schema_chunks]
     CChunker --&gt; Refresh
     Refresh --&gt; Store[Chroma Vector Store]</code></pre>
+<p>The snapshot profiles each column on its own: a column, row count or table the
+database cannot profile is indexed without statistics and logged, rather than
+failing the datasource's index (see
+<a href="../../adapters/sqlalchemy/#column-statistics">Column statistics</a>).</p>
 <h2 id="what-is-indexed-today">What is indexed today</h2>
 <p>Schema-derived chunks, and the verified queries of <a href="../../configuration/curated/"><code>curated.yaml</code></a>
 when the file exists. There is no symbolic index, behavioral index, or other

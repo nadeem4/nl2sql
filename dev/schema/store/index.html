@@ -4466,7 +4466,9 @@
 <li><code>ColumnMetadata</code>: description, stats, synonyms, PII flag</li>
 <li><code>ColumnStatistics</code>: distinct counts, min/max, sample values (for a text
   column: every distinct value when there are at most 50, else the five most
-  frequent; most frequent first, ties by value)</li>
+  frequent; most frequent first, ties by value). A column the adapter could
+  not profile has no statistics; see
+  <a href="../../adapters/sqlalchemy/#column-statistics">Column statistics</a></li>
 </ul>
 <h2 id="snapshotting-and-fingerprinting">Snapshotting and fingerprinting</h2>
 <p>Each <code>SchemaSnapshot</code> (contract + metadata) is versioned using a <strong>deterministic fingerprint</strong>:</p>

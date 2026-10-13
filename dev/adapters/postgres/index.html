@@ -4551,7 +4551,7 @@
 <tr>
 <td style="text-align: left;"><strong>Stats</strong></td>
 <td style="text-align: left;">Optimized Queries</td>
-<td style="text-align: left;">Fetches <code>null_perc</code>, <code>distinct</code>, <code>min/max</code>.</td>
+<td style="text-align: left;">Fetches <code>null_perc</code>, <code>distinct</code>, <code>min/max</code> (no <code>min/max</code> for <code>boolean</code>, <code>uuid</code>; none for <code>jsonb</code>, <code>bytea</code>, arrays). A column that fails is skipped without aborting the transaction; see <a href="../sqlalchemy/#column-statistics">Column statistics</a>.</td>
 </tr>
 </tbody>
 </table>
