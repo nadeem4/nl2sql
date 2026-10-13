@@ -4488,7 +4488,9 @@
 <h3 id="connection-details">Connection Details</h3>
 <ul>
 <li><strong>Driver</strong>: <code>pymysql</code> (Pure Python).</li>
-<li><strong>URI Constructed</strong>: <code>mysql+pymysql://{user}:{pass}@{host}:{port}/{db}?{options}</code></li>
+<li><strong>URI Constructed</strong>: <code>mysql+pymysql://{user}:{pass}@{host}:{port}/{db}?{options}</code>.
+  Built with SQLAlchemy's <code>URL.create</code>, so the user name and password are
+  percent-escaped: a password containing <code>@ : / # %</code> works as written.</li>
 </ul>
 <h2 id="features">Features</h2>
 <table>

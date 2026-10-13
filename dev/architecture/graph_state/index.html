@@ -5254,7 +5254,7 @@
 <p>From code:
 - <code>GraphState</code> and <code>SubgraphExecutionState</code> are Pydantic <code>BaseModel</code> classes with <code>extra="ignore"</code> and <code>arbitrary_types_allowed=True</code>. No immutability or frozen settings are defined.
 - List fields (<code>errors</code>, <code>reasoning</code>, <code>warnings</code>) are merged using <code>operator.add</code>.
-- Dict fields (<code>artifact_refs</code>, <code>subgraph_outputs</code>) are merged using <code>update_results</code> ({<strong>current, </strong>new}).
+- Dict fields (<code>artifact_refs</code>, <code>subgraph_outputs</code>) are merged using <code>update_results</code> ({**current, **new}).
 - Subgraph boundary is a serialization boundary: <code>wrap_subgraph</code> uses <code>SubgraphExecutionState(...).model_dump()</code> to pass data into the subgraph and <code>SubgraphExecutionState.model_validate(...)</code> to rehydrate the result.</p>
 <p>No explicit copy-on-write mechanisms are defined beyond Pydantic serialization at subgraph boundaries.</p>
 <hr />

@@ -4632,6 +4632,12 @@
 <h3 id="optional-overrides">Optional Overrides</h3>
 <h4 id="connect"><code>connect()</code></h4>
 <p>Override to provide custom connection arguments (e.g., timeouts, isolation levels).</p>
+<p>The base class keeps <code>statement_timeout_ms</code> but does not enforce it: SQLAlchemy has
+no generic statement timeout and silently ignores an <code>execution_options["timeout"]</code>.
+Each adapter enforces it in <code>connect()</code> the way its driver allows: Postgres with
+<code>statement_timeout</code>, MySQL with <code>MAX_EXECUTION_TIME</code>, SQL Server with pyodbc's
+query timeout, DuckDB by interrupting the connection. An adapter that does nothing
+here has no statement timeout.</p>
 <h4 id="get_dialect-str"><code>get_dialect() -&gt; str</code></h4>
 <p>Returns the <strong>sqlglot</strong> dialect name the engine renders SQL in: <code>postgres</code>,
 <code>tsql</code>, <code>mysql</code>, <code>duckdb</code>, <code>sqlite</code>, or any other name

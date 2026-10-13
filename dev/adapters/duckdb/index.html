@@ -2137,6 +2137,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#statement-timeout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Statement Timeout
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#optimization-details" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4457,6 +4468,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#statement-timeout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Statement Timeout
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#optimization-details" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4515,8 +4537,9 @@
 <p>In-process analytical adapter for local files and ad-hoc analysis.</p>
 <div class="admonition info">
 <p class="admonition-title">Implementation</p>
-<p>This adapter extends <code>BaseSQLAlchemyAdapter</code> without overriding <code>connect()</code>: DuckDB
-runs in-process and exposes no server-side statement timeout to configure.</p>
+<p>This adapter extends <code>BaseSQLAlchemyAdapter</code>. It overrides <code>connect()</code> only to
+enforce <code>statement_timeout_ms</code>: DuckDB runs in-process and has no statement
+timeout setting, so the adapter interrupts a statement that runs too long.</p>
 </div>
 <h2 id="installation">Installation</h2>
 <p>The SQLAlchemy dialect lives in <code>duckdb-engine</code>, which ships in its own extra:</p>
@@ -4552,8 +4575,8 @@ when running in <strong>Docker</strong>.</p>
 <tbody>
 <tr>
 <td style="text-align: left;"><strong>Timeout</strong></td>
-<td style="text-align: left;">Not supported</td>
-<td style="text-align: left;">DuckDB is in-process and has no statement timeout.</td>
+<td style="text-align: left;"><code>interrupt()</code> on a timer</td>
+<td style="text-align: left;">See <a href="#statement-timeout">Statement Timeout</a>.</td>
 </tr>
 <tr>
 <td style="text-align: left;"><strong>Dry Run</strong></td>
@@ -4572,6 +4595,14 @@ when running in <strong>Docker</strong>.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="statement-timeout">Statement Timeout</h3>
+<p>When <code>statement_timeout_ms</code> is set, each statement starts a timer that calls the
+DuckDB connection's <code>interrupt()</code> once the limit passes. DuckDB stops the query and
+raises <code>InterruptException</code>, which the adapter reports as a refusal
+(<code>QUERY_REFUSED</code>) that the engine does not retry. The timer is cancelled as soon as
+the statement finishes or fails, so it never touches a later query. The limit
+covers running the statement; DuckDB materialises the result while it runs, so
+fetching rows afterwards is not timed.</p>
 <h3 id="optimization-details">Optimization Details</h3>
 <ul>
 <li><strong>Dry Run</strong>: Uses <code>EXPLAIN {sql}</code>. DuckDB binds and plans the statement without running

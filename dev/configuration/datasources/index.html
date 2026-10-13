@@ -4456,7 +4456,10 @@ more database connections that NL2SQL can query.</p>
     (<code>statement_timeout_ms</code>, <code>row_limit</code>, <code>max_bytes</code>) go beside <code>connection</code>, as
     above, or under an <code>options:</code> map; the two spellings are equivalent. If a
     limit is set in both places, the lower value wins.<ul>
-<li><code>statement_timeout_ms</code></li>
+<li><code>statement_timeout_ms</code>: the longest one statement may run. Postgres,
+  MySQL, SQL Server and DuckDB enforce it (SQL Server rounds up to whole
+  seconds); SQLite does not, and uses it only as its lock-wait timeout. See
+  each <a href="../../adapters/">adapter page</a> for how.</li>
 <li><code>row_limit</code>: the most rows one sub-query returns. Unset, it is
   <code>RESULT_ROW_LIMIT</code> (100,000); set higher, <code>RESULT_ROW_LIMIT</code> still bounds it.
   A result that reaches it is flagged as truncated and the answer says so. It
