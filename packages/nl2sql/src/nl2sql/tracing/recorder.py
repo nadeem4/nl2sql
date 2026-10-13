@@ -40,6 +40,7 @@ from nl2sql.tracing.document import jsonable
 # The state fields each node reads. What is not listed is not recorded as an
 # input (the node's own output already shows what it produced).
 NODE_INPUTS: Dict[str, Tuple[str, ...]] = {
+    "curated_matcher": ("user_query", "datasource_id", "user_context"),
     "datasource_resolver": ("user_query", "datasource_id", "user_context"),
     "decomposer": ("user_query", "datasource_resolver_response"),
     "layer_router": ("artifact_refs",),

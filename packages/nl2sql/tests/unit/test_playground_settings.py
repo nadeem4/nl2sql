@@ -380,7 +380,7 @@ def test_a_node_model_is_written_to_the_llm_demo_yaml_the_cli_reads(project):
     assert engine.context.llm_registry.get_llm("astplanner").model_name == "gpt-4.1"
     assert engine.context.llm_registry.get_llm("decomposer").model_name == "gpt-5.4"
     nodes = {n["agent"]: n["model"] for n in response.json()["nodes"]}
-    assert nodes == {"datasourceresolver": None, "decomposer": None, "astplanner": "gpt-4.1",
+    assert nodes == {"curatedmatcher": None, "datasourceresolver": None, "decomposer": None, "astplanner": "gpt-4.1",
                      "refiner": None, "answersynthesizer": None}
 
 
@@ -555,8 +555,8 @@ def test_the_settings_read_names_every_llm_node(project):
 
     read = client.get("/api/settings").json()
 
-    assert [n["agent"] for n in read["nodes"]] == ["datasourceresolver", "decomposer", "astplanner",
-                                                   "refiner", "answersynthesizer"]
+    assert [n["agent"] for n in read["nodes"]] == ["curatedmatcher", "datasourceresolver", "decomposer",
+                                                   "astplanner", "refiner", "answersynthesizer"]
     assert all(n["label"] and n["model"] is None for n in read["nodes"])
     assert read["provider"] == "openai" and read["default_model"] == "gpt-5.4"
     assert read["key"]["masked"] is None

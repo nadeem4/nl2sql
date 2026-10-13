@@ -1,9 +1,13 @@
 # Curated Answers (design)
 
-!!! note "Status: design, not built"
-    This page describes a feature that does not exist yet. Nothing below is in
-    the code until the pull requests in [Implementation plan](#implementation-plan)
-    land; each of them updates this page and the reference docs it touches.
+!!! note "Status: partly built"
+    The config and its checks (PR 1), indexing and candidates (PR 2), and
+    matching and running verified queries (PR 3) are built; see
+    [Curated answers](../configuration/curated.md) for how to use them. The
+    playground badge, the demo file, `nl2sql curated test`, preferred tables
+    and feedback proposals are not built yet. Each pull request in
+    [Implementation plan](#implementation-plan) updates this page and the
+    reference docs it touches.
 
 ## Goal
 
@@ -277,6 +281,15 @@ datasource (`GraphState.datasource_id`), only that one is searched.
 When it does not answer, the matcher returns nothing but its own trace record
 and the run continues at `datasource_resolver` as if it were not there. When
 the run is plan-only (`execute=False`) the matcher is skipped.
+
+A refinement made in PR 3: the node is added to the graph only when curated
+answers are on (`CURATED_ENABLED`, a loaded file with at least one verified
+query) and the run executes. Otherwise `datasource_resolver` stays the entry
+point, so with no curated file the graph, the trace and the answer are exactly
+what they were before, rather than gaining a node that does nothing. The
+first diamond above is therefore decided once when the graph is built
+("configured") and again at run time ("this role may read",
+`not_configured`).
 
 On a match, the node fills the state the way a one-sub-query generated run
 leaves it, so nothing downstream needs a second code path: a
@@ -567,8 +580,8 @@ open: it needs the owner's key.
 
 ## Invariants this touches
 
-No invariant is weakened. When the matcher is built (PR 3), these change
-in [`invariants.md`](invariants.md), each with its enforcement point:
+No invariant is weakened. PR 3 made these changes in
+[`invariants.md`](invariants.md), each with its enforcement point:
 
 - New: **Verified SQL is human-authored, read-only and parameter-bound.** The
   model picks a verified query by id and supplies values; it never writes or
@@ -582,8 +595,8 @@ in [`invariants.md`](invariants.md), each with its enforcement point:
   exists, on every path" becomes "on every generated path"; a verified path
   has no AST, and its checks are the matcher's.
 
-`invariants.md` is not edited in this design PR: its sections name
-enforcement points, and none exists yet.
+`invariants.md` was not edited in the design PR, because its sections name
+enforcement points and none existed then; PR 3 added them.
 
 ## Deferred and out of scope
 
@@ -714,6 +727,8 @@ added beside the existing ones, never in place of them.
   new build beside freshly embedded verified queries and switches to it. A
   flag rather than detecting "only `curated.yaml` changed" on a plain
   `nl2sql index`, because knowing whether the schema changed means reading it.
-- **The synthesizer's context.** Whether to pass the verified query's
-  description to the answer synthesizer, so it can say "invoiced revenue,
-  before refunds" rather than guess what the numbers mean. Left out of v1.
+- **The synthesizer's context.** Resolved in PR 3: on a verified answer the
+  answer synthesizer is given the query's qualified id and description, in a
+  *Verified Query* section added to its prompt, so it can say "invoiced
+  revenue, before refunds" rather than guess what the numbers mean. A
+  generated answer's prompt is unchanged.

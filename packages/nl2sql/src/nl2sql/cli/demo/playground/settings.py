@@ -62,6 +62,9 @@ ENV_FILE = Path(".env.demo")
 # What each LLM node does, for the page. The nodes and their agent names are
 # ``LLM_AGENTS``; anything not listed there uses ``default``.
 _NODE_TEXT = {
+    "curated_matcher": ("Verified query match",
+                        "Picks a verified query that answers the question, when curated answers are "
+                        "configured. A short prompt."),
     "datasource_resolver": ("Answerability check",
                             "Refuses a question the connected data cannot answer, before anything else runs. "
                             "A short prompt."),

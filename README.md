@@ -21,7 +21,7 @@ databases, nothing to install.
 **Bring your own key.** The server holds none. You paste yours into the page —
 one per provider — it stays in that browser tab, travels with the question that
 needs it, is used in memory for that question and dropped: never stored, never
-logged, never written to a trace. Settings also puts each of the five
+logged, never written to a trace. Settings also puts each of the six
 model-using steps on a provider and model of its own, so the planner can be on
 Claude while the rest stays on OpenAI. The sample databases are opened
 read-only, and questions are rate limited per visitor and capped per session.
@@ -83,8 +83,11 @@ flowchart LR
     G --> E[Executor] --> A([Answer])
 ```
 
-That is the shape of a run; the full pipeline is **13 steps**, five of them
-decided by a model, and the playground's Pipeline page lists them all.
+That is the shape of a run; the full pipeline is **14 steps**, six of them
+decided by a model, and the playground's Pipeline page lists them all. The
+first, matching the question to a verified query a data team wrote
+([curated answers](docs/configuration/curated.md)), runs only when
+`curated.yaml` is configured.
 
 Architecture detail: [System Architecture](docs/architecture/overview.md),
 [Pipeline](docs/architecture/pipeline.md),
@@ -242,7 +245,7 @@ model response.
 
 ![The per-node cost table with the datasource resolver opened on its model call](https://raw.githubusercontent.com/nadeem4/nl2sql/main/docs/assets/screenshots/playground-debug.png)
 
-**Pipeline:** every step of a run in order, with the five a model decides
+**Pipeline:** every step of a run in order, with the six a model decides
 marked and the deterministic ones left quiet. Before a question it shows the
 model each step is set to use; after one, the model that answered, that step's
 tokens and its time.
@@ -435,8 +438,8 @@ runs on. Feedback is not on the facade; it is read through the CLI. See
 `temperature: null`), `openrouter` (OpenAI-compatible gateway, default
 `anthropic/claude-sonnet-4.5`) and `ollama` (local; small models often cannot
 fill the recursive plan schema). Those defaults are what `nl2sql setup` and
-`nl2sql demo` write. Each of the five model-using steps can have its own
-provider and model under `agents`: `datasourceresolver`, `decomposer`,
+`nl2sql demo` write. Each of the six model-using steps can have its own
+provider and model under `agents`: `curatedmatcher`, `datasourceresolver`, `decomposer`,
 `astplanner`, `refiner` and `answersynthesizer`, plus `indexing_enrichment`
 for optional schema descriptions during indexing.
 

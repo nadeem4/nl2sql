@@ -27,6 +27,16 @@ def resolver_route(state: GraphState) -> str:
     return "continue"
 
 
+def curated_route(state: GraphState) -> str:
+    """``verified`` when the curated matcher answered with a verified query, else ``generated``.
+
+    A verified run has its scan done already, so it goes to the layer router,
+    which sends it on to the aggregator. Any fallback continues at the
+    datasource resolver as if the matcher were not there.
+    """
+    return "verified" if state.verified_match is not None else "generated"
+
+
 def aggregator_route(state: GraphState) -> str:
     """Ends the run when aggregation failed; otherwise on to the answer.
 

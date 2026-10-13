@@ -89,6 +89,7 @@ ANTHROPIC_UPSTREAM = "https://api.anthropic.com"
 # The pipeline's LLM nodes: the graph node name usage is recorded under, and
 # the agent key the LLM config names it by. Anything not listed uses ``default``.
 LLM_AGENTS: Dict[str, str] = {
+    "curated_matcher": "curatedmatcher",
     "datasource_resolver": "datasourceresolver",
     "decomposer": "decomposer",
     "ast_planner": "astplanner",

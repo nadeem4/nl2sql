@@ -257,6 +257,9 @@ indexed demo, so a failing case is a bug in a code node or in the plan, never
 in a model. Refusals are scored against the default, generic message: the
 demo's `.env.demo` sets `RBAC_REFUSAL_NAMES_TABLES=true` so the playground
 can show which table was refused, and tier 1 turns that off for its run.
+Tier 1 also runs with [curated answers](../configuration/curated.md) off
+(`run_tier1()` clears the context's curated file for the run): it scores
+plans, and a verified answer has none.
 
 Each plan reads exactly the question's `needed_tables` (the RBAC outcome is
 derived from them) and selects the gold result's columns in order. PlanModel
@@ -338,7 +341,7 @@ configs with one name, `CI` set), 3 when the cap stopped the run early.
 
 ### `--model` and the presets
 
-`--model MODEL` puts `MODEL` on all five LLM nodes. A model in
+`--model MODEL` puts `MODEL` on all six LLM nodes. A model in
 `VERIFIED_MODELS` (`nl2sql/llm/providers.py`: `gpt-5.4`, `gpt-5.4-mini`,
 `gpt-4.1`, `gpt-4o`, `gpt-5.5`, `gpt-5-mini`, `claude-opus-5`,
 `claude-sonnet-5`, `claude-haiku-4-5`, ...) names its provider and its

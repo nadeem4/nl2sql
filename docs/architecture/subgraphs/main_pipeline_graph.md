@@ -51,6 +51,7 @@ Partial completion behavior:
 ## Internal Node Composition
 
 Execution order (nominal path):
+- `curated_matcher` — `CuratedMatcherNode` — `packages/nl2sql/src/nl2sql/pipeline/nodes/curated_matcher/node.py` — only when curated answers are configured and the run executes: answer with a verified query (`curated_route` → `verified` → `layer_router`), or fall back (`generated` → `datasource_resolver`). Without curated answers the node is not in the graph and `datasource_resolver` is the entry point.
 - `datasource_resolver` — `DatasourceResolverNode` — `packages/nl2sql/src/nl2sql/pipeline/nodes/datasource_resolver/node.py` — resolve candidate datasources, RBAC, and the answerability check (an LLM call).
 - `decomposer` — `DecomposerNode` — `packages/nl2sql/src/nl2sql/pipeline/nodes/decomposer/node.py` — decompose query into sub-queries, and build the `ExecutionDAG` from them (`decomposer/dag.py`).
 - `layer_router` — inline lambda + `routes.build_scan_layer_router` — `packages/nl2sql/src/nl2sql/pipeline/routes.py` — route each scan layer to a subgraph or aggregator.
@@ -61,6 +62,8 @@ Execution order (nominal path):
 Mermaid diagram (main pipeline only):
 ```mermaid
 flowchart TD
+    curated_matcher -.->|verified| layer_router
+    curated_matcher -.->|generated| datasource_resolver
     datasource_resolver -->|continue| decomposer
     datasource_resolver -->|end| END
     decomposer --> layer_router
@@ -71,6 +74,8 @@ flowchart TD
     aggregator -->|ok| answer_synthesizer --> END
     aggregator -->|failed| END
 ```
+
+The dotted edges exist only when curated answers are configured.
 
 ---
 
@@ -84,6 +89,7 @@ Field ownership, reducers, and lifecycle are defined in `../graph_state.md`.
 
 ## Step-by-Step Execution Flow
 
+0. With curated answers configured, `curated_matcher` runs first. On a verified hit it has already run the query and filled `decomposer_response`, `execution_dag`, `artifact_refs` and `subgraph_outputs` as for one sub-query, so `layer_router` finds the scan done and goes straight to step 7. Any fallback continues at step 1 with nothing in the state changed.
 1. `datasource_resolver` resolves candidate datasources (vector search only when more than one datasource is registered), filters them by RBAC, then asks the LLM whether any allowed datasource can answer the question.
 2. `resolver_route` decides:
    - `continue` if allowed datasources exist and the question was judged answerable.

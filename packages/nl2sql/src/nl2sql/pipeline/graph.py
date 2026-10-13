@@ -4,9 +4,10 @@ from nl2sql.context import NL2SQLContext
 from nl2sql.pipeline.graph_utils import SQL_AGENT_SUBGRAPH, wrap_subgraph
 from nl2sql.pipeline.nodes.aggregator import EngineAggregatorNode
 from nl2sql.pipeline.nodes.answer_synthesizer import AnswerSynthesizerNode
+from nl2sql.pipeline.nodes.curated_matcher import CuratedMatcherNode, curated_answers_on
 from nl2sql.pipeline.nodes.datasource_resolver import DatasourceResolverNode
 from nl2sql.pipeline.nodes.decomposer import DecomposerNode
-from nl2sql.pipeline.routes import aggregator_route, build_scan_layer_router, resolver_route
+from nl2sql.pipeline.routes import aggregator_route, build_scan_layer_router, curated_route, resolver_route
 from nl2sql.pipeline.state import GraphState
 from nl2sql.pipeline.subgraphs.sql_agent import build_sql_agent_graph
 
@@ -18,6 +19,13 @@ def build_graph(
 
     Constructs the graph with Semantic Analysis, Decomposer, Execution branches,
     and Aggregator.
+
+    When curated answers are configured (``ctx.curated`` holds a verified
+    query) and the run executes, the curated matcher is the entry point: a hit
+    goes straight to the layer router, which finds the scan done and sends the
+    run to the aggregator; anything else continues at the datasource
+    resolver. Otherwise the matcher is not in the graph at all, so the graph
+    is exactly the one without curated answers.
 
     Args:
         ctx (NL2SQLContext): The application context containing registries and services.
@@ -45,7 +53,16 @@ def build_graph(
     graph.add_node("answer_synthesizer", synthesizer_node)
     graph.add_node("layer_router", lambda state: {})
 
-    graph.set_entry_point("datasource_resolver")
+    if execute and curated_answers_on(ctx):
+        graph.add_node("curated_matcher", CuratedMatcherNode(ctx))
+        graph.set_entry_point("curated_matcher")
+        graph.add_conditional_edges(
+            "curated_matcher",
+            curated_route,
+            {"verified": "layer_router", "generated": "datasource_resolver"},
+        )
+    else:
+        graph.set_entry_point("datasource_resolver")
 
     graph.add_conditional_edges(
         "datasource_resolver",

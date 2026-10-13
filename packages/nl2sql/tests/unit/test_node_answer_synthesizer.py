@@ -74,6 +74,48 @@ def test_answer_synthesizer_uses_final_answer_fallback():
     assert result["answer_synthesizer_response"].final_answer["summary"] == "fallback"
 
 
+def _prompt_capturing_node(monkeypatch, prompts):
+    from langchain_core.runnables import RunnableLambda
+
+    def answer(prompt_value):
+        prompts.append(prompt_value.to_string())
+        return AggregatedResponse(summary="ok", format_type="text", content="ok")
+
+    monkeypatch.setattr("nl2sql.pipeline.nodes.answer_synthesizer.node.structured",
+                        lambda llm, schema: RunnableLambda(answer))
+    ctx = SimpleNamespace(llm_registry=MagicMock())
+    return AnswerSynthesizerNode(ctx)
+
+
+def test_a_verified_answer_tells_the_model_what_the_numbers_mean(monkeypatch):
+    from nl2sql.pipeline.nodes.curated_matcher.schemas import VerifiedMatch
+
+    prompts = []
+    node = _prompt_capturing_node(monkeypatch, prompts)
+    match = VerifiedMatch(datasource_id="chinook", query_id="top_customers_by_revenue",
+                          description="Customers ranked by invoiced revenue, before refunds", params={"n": 5})
+
+    node(GraphState(user_query="q", verified_match=match,
+                    aggregator_response=AggregatorResponse(terminal_results={"r": [{"revenue": 1}]})))
+
+    [prompt] = prompts
+    assert "Customers ranked by invoiced revenue, before refunds" in prompt
+    assert "top_customers_by_revenue" in prompt
+
+
+def test_a_generated_answer_prompt_is_unchanged(monkeypatch):
+    from nl2sql.pipeline.nodes.answer_synthesizer.prompts import ANSWER_SYNTHESIZER_PROMPT
+
+    prompts = []
+    node = _prompt_capturing_node(monkeypatch, prompts)
+
+    node(GraphState(user_query="q", aggregator_response=AggregatorResponse(terminal_results={"r": [{"n": 1}]})))
+
+    [prompt] = prompts
+    assert "Verified Query" not in prompt
+    assert prompt.rstrip().endswith(ANSWER_SYNTHESIZER_PROMPT.rstrip().splitlines()[-1])
+
+
 def test_answer_synthesizer_handles_llm_error():
     # Validates error handling because LLM failures must surface as errors.
     llm = MagicMock()

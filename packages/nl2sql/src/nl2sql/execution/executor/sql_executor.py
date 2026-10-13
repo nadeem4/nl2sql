@@ -32,22 +32,38 @@ def _frames(adapter: Any, request: AdapterRequest) -> Iterator[ResultFrame]:
 
 
 class _Stream:
-    """Passes the adapter's frames to the writer, counting them and stopping at a failure."""
+    """Passes the adapter's frames to the writer, counting them and stopping at a failure.
 
-    def __init__(self, frames: Iterator[ResultFrame]):
+    With ``max_rows`` it also stops once that many rows have passed: the last
+    frame is cut to fit and the adapter's stream is closed, so the rest of the
+    result is never fetched.
+    """
+
+    def __init__(self, frames: Iterator[ResultFrame], max_rows: Optional[int] = None):
         self._frames = frames
+        self._max_rows = max_rows
         self.failure: Optional[ResultFrame] = None
         self.row_count = 0
         self.bytes = 0
 
     def __iter__(self) -> Iterator[ResultFrame]:
-        for frame in self._frames:
-            if not frame.success:
-                self.failure = frame
-                raise _StreamFailed()
-            self.row_count += frame.row_count
-            self.bytes += frame.bytes or 0
-            yield frame
+        try:
+            for frame in self._frames:
+                if not frame.success:
+                    self.failure = frame
+                    raise _StreamFailed()
+                if self._max_rows is not None and self.row_count + frame.row_count > self._max_rows:
+                    keep = self._max_rows - self.row_count
+                    frame = frame.model_copy(update={"rows": frame.rows[:keep], "row_count": keep})
+                self.row_count += frame.row_count
+                self.bytes += frame.bytes or 0
+                yield frame
+                if self._max_rows is not None and self.row_count >= self._max_rows:
+                    return
+        finally:
+            close = getattr(self._frames, "close", None)
+            if close is not None:
+                close()
 
 
 class SqlExecutorService:
@@ -109,6 +125,7 @@ class SqlExecutorService:
         adapter_request = AdapterRequest(
             plan_type="sql",
             payload={"sql": request.sql},
+            parameters=dict(request.parameters),
             limits={}
         )
 
@@ -122,7 +139,7 @@ class SqlExecutorService:
             "dag_node_id": request.node_id,
             "subgraph_name": request.subgraph_name,
         }
-        stream = _Stream(_frames(adapter, adapter_request))
+        stream = _Stream(_frames(adapter, adapter_request), request.max_rows)
         try:
             artifact_ref = self.artifact_store.write_batches(stream, metadata)
         except _StreamFailed:

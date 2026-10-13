@@ -14,7 +14,11 @@ run:
 - **Fixed graph topology.** The node sequence is compiled, not chosen by the
   model; only the retry loop varies, and only in how many times it runs.
 - **Validation before generation.** The AST is checked against the retrieved
-  schema and the RBAC policy before any SQL exists, on every path.
+  schema and the RBAC policy before any SQL exists, on every generated path. A
+  verified query has no AST: its SQL is a person's, checked read-only at load
+  and again before it runs, and the curated matcher checks its values and the
+  role's access to every table it reads
+  ([Curated answers](curated_answers.md#the-same-guards-as-generated-sql)).
 
 Everything else is best effort:
 

@@ -235,9 +235,9 @@ def test_benchmark_presets_lists_each_preset_with_the_model_on_each_node():
     lines = out.output.splitlines()
     assert "  gpt-5.4: gpt-5.4 (every node)" in lines
     assert ("  gpt-5.4-mini-helpers: gpt-5.4 (astplanner, refiner); "
-            "gpt-5.4-mini (answersynthesizer, datasourceresolver, decomposer)") in lines
+            "gpt-5.4-mini (answersynthesizer, curatedmatcher, datasourceresolver, decomposer)") in lines
     assert ("  claude-planner: claude-opus-5 (astplanner, refiner); "
-            "gpt-5.4 (answersynthesizer, datasourceresolver, decomposer)") in lines
+            "gpt-5.4 (answersynthesizer, curatedmatcher, datasourceresolver, decomposer)") in lines
 
 
 def _record_file(root, name, body):

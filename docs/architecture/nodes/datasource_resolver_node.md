@@ -28,14 +28,14 @@
 ## Position in Execution Graph
 
 Upstream:
-- Entry point (no upstream nodes).
+- Entry point (no upstream nodes), or `CuratedMatcherNode` when curated answers are configured and it fell back.
 
 Downstream:
 - `DecomposerNode` if resolution succeeds.
 - Terminates early (`END`) if no datasource is allowed, or the question is not answerable.
 
 Trigger conditions:
-- Always executed as the control graph entry node.
+- The control graph's entry node, unless curated answers are configured; then it runs whenever the [curated matcher](curated_matcher_node.md) did not answer.
 
 ```mermaid
 flowchart LR

@@ -6,7 +6,7 @@ from .public_api import NL2SQL, QueryResult
 
 # The shapes a client renders and the hooks an application entry point needs,
 # so REST and SDK clients never import engine submodules.
-from .api.query_api import SubQueryResult, RowSample
+from .api.query_api import AnswerSource, SubQueryResult, RowSample
 from .execution.artifacts.results import (
     MAX_RESULT_PAGE_SIZE,
     ResultManifest,
@@ -66,6 +66,7 @@ __all__ = [
     "UserContext",
     "SubQueryResult",
     "RowSample",
+    "AnswerSource",
     "ResultSummary",
     "ResultManifest",
     "ResultPage",

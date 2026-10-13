@@ -6,6 +6,7 @@ For pipeline-level wiring, see `../pipeline.md`. For subgraph wiring and lifecyc
 
 ## Control graph nodes (main pipeline)
 
+- [CuratedMatcherNode](curated_matcher_node.md) (only when curated answers are configured)
 - [DatasourceResolverNode](datasource_resolver_node.md)
 - [DecomposerNode](decomposer_node.md)
 - [EngineAggregatorNode](engine_aggregator_node.md)

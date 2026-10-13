@@ -645,7 +645,7 @@ def test_the_settings_page_offers_the_catalogue_but_never_a_key(project):
     assert read["available"] is False and read["hosted"] is True
     # But the page needs the choices in order to offer them, so they are here.
     assert [node["agent"] for node in read["nodes"]] == [
-        "datasourceresolver", "decomposer", "astplanner", "refiner", "answersynthesizer"]
+        "curatedmatcher", "datasourceresolver", "decomposer", "astplanner", "refiner", "answersynthesizer"]
     assert {p["id"] for p in read["providers"]} == {"openai", "anthropic"}
     assert all(p["models"] for p in read["providers"])
     # And nothing about a key: not a masked one, not the server's own.

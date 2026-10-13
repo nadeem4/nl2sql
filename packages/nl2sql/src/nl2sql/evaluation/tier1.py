@@ -131,6 +131,10 @@ def run_tier1(ctx: NL2SQLContext, config: Optional[BenchmarkConfig] = None) -> B
     # .env.demo), so the default is pinned for the run and restored after.
     names_tables = settings.rbac_refusal_names_tables
     settings.rbac_refusal_names_tables = False
+    # Curated answers are off for the run: tier 1 scores plans, and a verified
+    # answer has none. Without ``ctx.curated`` the graph has no curated matcher.
+    curated = getattr(ctx, "curated", None)
+    ctx.curated = None
     try:
         with GoldPlanLLM(plans) as llm:
             ctx.llm_registry.replace_llms({"default": llm.agent_config()})
@@ -138,3 +142,4 @@ def run_tier1(ctx: NL2SQLContext, config: Optional[BenchmarkConfig] = None) -> B
             return runner.run_dataset()
     finally:
         settings.rbac_refusal_names_tables = names_tables
+        ctx.curated = curated
