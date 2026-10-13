@@ -4765,7 +4765,9 @@ No (registrations happen each call).</p>
 <p>Signature:
 <code>list_datasources() -&gt; List[str]</code></p>
 <p>Returns:
-List of registered datasource IDs.</p>
+List of registered datasource IDs. A configured datasource that failed to start
+is not in it; <code>NL2SQL.list_unavailable_datasources()</code> maps each one to the
+reason.</p>
 <h3 id="datasourceapiget_adapter">DatasourceAPI.get_adapter</h3>
 <p>Signature:
 <code>get_adapter(datasource_id: str) -&gt; DatasourceAdapterProtocol</code></p>

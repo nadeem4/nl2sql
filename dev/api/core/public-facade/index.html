@@ -4608,7 +4608,12 @@ to that.</p>
 <tr>
 <td><code>index_health()</code></td>
 <td><code>dict</code></td>
-<td><code>status</code> (<code>ok</code>, <code>empty</code>, <code>stale</code>, <code>missing</code>), <code>total</code>, <code>counts</code> by entry type, <code>built_at</code>, <code>embedding_model</code>, one entry per registered datasource (<code>entries</code>, <code>index_version</code>, <code>snapshot_version</code>, <code>built_at</code>) and <code>problems</code>. <code>missing</code> when no vector store is configured.</td>
+<td><code>status</code> (<code>ok</code>, <code>empty</code>, <code>stale</code>, <code>missing</code>), <code>total</code>, <code>counts</code> by entry type, <code>built_at</code>, <code>embedding_model</code>, one entry per registered datasource (<code>entries</code>, <code>index_version</code>, <code>snapshot_version</code>, <code>built_at</code>), <code>problems</code> and <code>warnings</code>. <code>missing</code> when no vector store is configured. A datasource that failed to start is a warning: "Datasource 'x' is unavailable: <reason>".</td>
+</tr>
+<tr>
+<td><code>list_unavailable_datasources()</code></td>
+<td><code>dict</code></td>
+<td>Configured datasources that failed to start, mapped to the reason. They are not in <code>list_datasources()</code>. See <a href="../../../configuration/datasources/#when-a-datasource-fails-to-start">Datasources → When a datasource fails to start</a>.</td>
 </tr>
 <tr>
 <td><code>rebuild_index(datasource_ids=None, enrich=False, full=False, on_progress=None, switch_guard=None)</code></td>
