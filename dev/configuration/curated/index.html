@@ -1962,6 +1962,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#preferred-tables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Preferred tables
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#source-references" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4510,6 +4521,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#preferred-tables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Preferred tables
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#source-references" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4884,6 +4906,11 @@ that fails to run also adds a warning to the result.</p>
 binds them; a third-party adapter has to declare <code>SUPPORTS_BOUND_PARAMETERS</code>
 (<a href="../../adapters/sdk/">SDK</a>), and a verified query with params on one that
 does not is never run (<code>capability_missing</code>).</p>
+<h2 id="preferred-tables">Preferred tables</h2>
+<p>Preferred tables are not in <code>curated.yaml</code>: they are a <code>preferred_tables</code> list
+on a datasource in <code>datasources.yaml</code>, naming views or tables (built by the
+data team, never by the package) the planner should reach for first. See
+<a href="../datasources/#preferred-tables">Datasources: preferred tables</a>.</p>
 <h2 id="source-references">Source references</h2>
 <ul>
 <li>Models and SQL checks: <code>packages/nl2sql/src/nl2sql/configs/curated.py</code></li>

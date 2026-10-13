@@ -686,6 +686,19 @@
       
     </span>
 </a>
+<nav aria-label="Internal Flow (Step-by-Step)" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#preferred-tables">
+<span class="md-ellipsis">
+      
+        Preferred tables
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
 </li>
 <li class="md-nav__item">
 <a class="md-nav__link" href="#contracts-interfaces">
@@ -2059,6 +2072,19 @@
       
     </span>
 </a>
+<nav aria-label="Internal Flow (Step-by-Step)" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#preferred-tables">
+<span class="md-ellipsis">
+      
+        Preferred tables
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
 </li>
 <li class="md-nav__item">
 <a class="md-nav__link" href="#contracts-interfaces">
@@ -2173,6 +2199,9 @@
 <li>Retrieve candidate tables/columns/relationships from <code>VectorStore</code>.</li>
 <li>Resolve authoritative tables from <code>SchemaStore</code>.</li>
 <li>Fall back to full schema snapshot when retrieval returns no candidates.</li>
+<li>Rank the datasource's <code>preferred_tables</code> first and set <code>preferred=True</code> on
+  them, on the full-snapshot path and the retrieval path; see
+  <a href="#preferred-tables">Preferred tables</a>.</li>
 <li>Strip column statistics (<code>sample_values</code>, <code>min_value</code>, <code>max_value</code>,
   <code>distinct_count</code>, <code>null_percentage</code>) from every table the caller's role
   cannot read, on every path, while keeping its name, columns, types, keys and
@@ -2206,6 +2235,7 @@
 <ul>
 <li><code>vector_store</code> (optional)</li>
 <li><code>schema_store</code> (required for authoritative resolution)</li>
+<li><code>ds_registry</code> (optional): <code>get_preferred_tables(datasource_id)</code></li>
 </ul>
 <p>Validation performed:</p>
 <ul>
@@ -2236,6 +2266,25 @@
 <li>If no tables were found, return full snapshot with warning.</li>
 <li>On exception, log error and return empty <code>relevant_tables</code>.</li>
 </ol>
+<h3 id="preferred-tables">Preferred tables</h3>
+<p>A datasource's <code>preferred_tables</code> (in <code>datasources.yaml</code>, see
+<a href="../../../configuration/datasources/#preferred-tables">Datasources</a>) are
+matched against snapshot tables by bare name or <code>schema.table</code>, case ignored.</p>
+<ul>
+<li>Full snapshot: every preferred table is in the list, first.</li>
+<li>Retrieval: preferred tables the <code>tables</code> search picked come first. A
+  preferred table the search scored but did not pick is added (before the
+  <code>planning</code> search, so its columns and relationships are fetched too) when
+  its similarity is at least the least similar pick's minus
+  <code>PREFERRED_MARGIN</code> (0.05).</li>
+<li>Each preferred <code>Table</code> has <code>preferred=True</code>. <code>render_schema_for_prompt</code>
+  sorts preferred tables first, then by name, and prints <code>"preferred":true</code> on
+  them only; with no preferred tables the block is byte-identical to before.
+  Planner instruction 14 tells the model to plan against a preferred table
+  when it answers the question.</li>
+<li>RBAC is unchanged: a preferred table the role cannot read is ranked and
+  marked, and loses its statistics like any other unreadable table.</li>
+</ul>
 <hr/>
 <h2 id="contracts-interfaces">Contracts &amp; Interfaces</h2>
 <p>Implements a LangGraph node callable:</p>

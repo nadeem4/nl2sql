@@ -2373,7 +2373,8 @@ whose <code>curated.yaml</code> section has changed since it was indexed (its re
 <code>curated_hash</code> differs from the file's) gets "curated.yaml changed for
 'chinook' since it was indexed; run <code>nl2sql index --curated-only --datasource
 chinook</code>". Questions keep working meanwhile; the stale entries still name
-queries that exist. <code>nl2sql doctor</code> prints it under <strong>Index</strong>,
+queries that exist. A <code>preferred_tables</code> entry missing from the datasource's
+latest snapshot is a warning too. <code>nl2sql doctor</code> prints it under <strong>Index</strong>,
 <code>nl2sql demo</code> rebuilds at startup when it is not <code>ok</code>, and the playground and
 <code>GET /api/v1/index/status</code> show it (through <code>NL2SQL.index_health</code>), the playground
 with a Rebuild button.</p>
@@ -2489,6 +2490,10 @@ each of the demo's three schemas, at 11, 4 and 5 tables, is always sent whole);
 the resolver runs none when the request names a <code>datasource_id</code> or only one
 datasource is registered. The demo is no longer such a case: with three
 datasources registered, the resolver searches on every question.</p>
+<p>A datasource's <code>preferred_tables</code> change the order but not the searches: on
+either path they come first, and on the retrieval path a preferred table the
+<code>tables</code> search scored within 0.05 of its least similar pick is added (see
+<a href="../nodes/schema_retriever_node/#preferred-tables">SchemaRetrieverNode</a>).</p>
 <p><code>nl2sql.indexing.retrieval_trace.mmr_search</code> is the one implementation: it
 makes the Chroma query and calls the same <code>maximal_marginal_relevance</code>
 function Chroma's method does, and returns the documents with a record of the

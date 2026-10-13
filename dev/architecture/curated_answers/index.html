@@ -2346,11 +2346,12 @@
 <h1 id="curated-answers-design">Curated Answers (design)</h1>
 <div class="admonition note">
 <p class="admonition-title">Status: partly built</p>
-<p>The config and its checks (PR 1), indexing and candidates (PR 2), and
-matching and running verified queries (PR 3) are built; see
-<a href="../../configuration/curated/">Curated answers</a> for how to use them. The
-playground badge, the demo file, <code>nl2sql curated test</code>, preferred tables
-and feedback proposals are not built yet. Each pull request in
+<p>The config and its checks (PR 1), indexing and candidates (PR 2),
+matching and running verified queries (PR 3), and preferred tables (PR 5)
+are built; see <a href="../../configuration/curated/">Curated answers</a> and
+<a href="../../configuration/datasources/#preferred-tables">Datasources</a> for how to
+use them. The playground badge, the demo file, <code>nl2sql curated test</code> and
+feedback proposals are not built yet. Each pull request in
 <a href="#implementation-plan">Implementation plan</a> updates this page and the
 reference docs it touches.</p>
 </div>
@@ -2484,17 +2485,22 @@ an answer:</p>
 <p><code>DatasourceConfig</code> (<code>nl2sql/datasources/models.py</code>) gains
 <code>preferred_tables: List[str] = []</code>. The package never creates a view: the data
 team creates them in their own database, and <code>nl2sql index</code> picks them up as
-it picks up any table (adapters already snapshot views where the driver
-reports them; the PR checks this per adapter).</p>
+it picks up any table (every built-in adapter snapshots views; see
+<a href="#open-questions">Views in snapshots</a>). A name is the bare table name or
+<code>schema.table</code>, case ignored. One that is not in the indexed schema is a
+warning in <code>nl2sql doctor</code> and the index status, not an error.</p>
 <p>At question time a preferred table is ranked first:</p>
 <ul>
 <li>When the schema is small enough to be passed whole
   (<code>SCHEMA_RETRIEVAL_FULL_SNAPSHOT_MAX_TABLES</code>, 15 by default, which covers
   every demo database), the schema retriever lists preferred tables first and
-  marks them <em>preferred</em> in the planner's schema block.</li>
+  marks them <em>preferred</em> (<code>"preferred":true</code>) in the planner's schema block,
+  and planner instruction 14 says to plan against a preferred table when it
+  answers the question.</li>
 <li>Otherwise <code>VectorStore.retrieve_schema_context()</code> results are re-ordered so
   any preferred table it found comes first, and a preferred table it missed is
-  added when its similarity is within a small margin of the last one kept.</li>
+  added when its similarity is within 0.05 (<code>PREFERRED_MARGIN</code>) of the least
+  similar table picked.</li>
 </ul>
 <p>Nothing about RBAC changes: a preferred table the role may not read is
 withheld exactly like any other (<code>SchemaRetrieverNode._withhold_unreadable</code>).</p>
@@ -3033,9 +3039,13 @@ Tests: a vitest case beside <code>results.test.js</code> for the badge,
 then re-records the demo answers.</p>
 <p><strong>5. Preferred tables.</strong>
 <code>DatasourceConfig.preferred_tables</code>, the ordering in the schema retriever for
-both the full-snapshot and the retrieval paths.
+both the full-snapshot and the retrieval paths, planner instruction 14, views
+in the SQLAlchemy base adapter's snapshot, and the index health warning for a
+preferred table that is not indexed.
 Tests: <code>tests/unit/test_schema_retriever_preferred.py</code> (ordering, the
-<em>preferred</em> marker, an unreadable preferred table still withheld).</p>
+<em>preferred</em> marker, an unreadable preferred table still withheld),
+<code>tests/unit/test_datasource_preferred_tables.py</code> (config, registry, warning)
+and <code>tests/adapters/unit/test_snapshot_views.py</code> (SQLite and DuckDB).</p>
 <p><strong>6. Feedback proposals.</strong>
 The two feedback columns, <code>nl2sql.feedback.proposals</code>, and
 <code>nl2sql curated proposals export</code>.
@@ -3053,8 +3063,11 @@ added beside the existing ones, never in place of them.</p>
 <li><strong>The floor.</strong> Is one global <code>CURATED_MATCH_FLOOR</code> enough, or does each
   embedding model need its own default? Measured on the local model in PR 2
   (0.6, see <a href="#settings">Settings</a>); OpenAI's embeddings are not measured yet.</li>
-<li><strong>Views in snapshots.</strong> Whether every built-in adapter's
-  <code>fetch_schema_snapshot()</code> reports views, which preferred tables depend on.</li>
+<li><strong>Views in snapshots.</strong> Resolved in PR 5: no built-in adapter did. All five
+  (SQLite, PostgreSQL, MySQL, SQL Server, DuckDB) snapshot through the
+  SQLAlchemy base, which read only <code>get_table_names()</code>. It now reads
+  <code>get_view_names()</code> too, and a driver that cannot list views logs a warning
+  and keeps its tables. PostgreSQL materialized views are still not read.</li>
 <li><strong>Re-index cost.</strong> Resolved in PR 2: a <code>curated.yaml</code> change must not cost
   a schema re-read or an enrichment model call. <code>nl2sql index --curated-only</code>
   copies the active build's schema entries, with their stored vectors, into a

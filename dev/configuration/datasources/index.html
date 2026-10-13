@@ -1767,6 +1767,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#preferred-tables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Preferred tables
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#notes" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4344,6 +4355,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#preferred-tables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Preferred tables
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#notes" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4389,6 +4411,7 @@ more database connections that NL2SQL can query.</p>
 <a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="w">    </span><span class="nt">statement_timeout_ms</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">8000</span>
 <a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="w">    </span><span class="nt">row_limit</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">100</span>
 <a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="w">    </span><span class="nt">max_bytes</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10485760</span>
+<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="w">    </span><span class="nt">preferred_tables</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">v_customer_revenue</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">v_monthly_sales</span><span class="p p-Indicator">]</span>
 </code></pre></div>
 <h2 id="fields">Fields</h2>
 <ul>
@@ -4416,7 +4439,32 @@ more database connections that NL2SQL can query.</p>
 <li><code>tags</code></li>
 </ul>
 </li>
+<li><code>preferred_tables</code>: optional list of tables or views the planner should
+    reach for first, usually views the data team built for common questions.
+    A name is the bare table name or <code>schema.table</code>, case ignored. See
+    <a href="#preferred-tables">Preferred tables</a>.</li>
 </ul>
+<h2 id="preferred-tables">Preferred tables</h2>
+<p>The package never creates a view. The data team creates it in the database,
+lists it under <code>preferred_tables</code>, and runs <code>nl2sql index</code>; every built-in
+adapter snapshots views as well as tables (PostgreSQL materialized views are
+not read). At question time the schema retriever lists preferred tables first
+and marks them <code>"preferred": true</code> in the schema the planner sees, and the
+planner is told to plan against a preferred table when it answers the
+question:</p>
+<ul>
+<li>When the whole schema is sent (<code>SCHEMA_RETRIEVAL_FULL_SNAPSHOT_MAX_TABLES</code>
+  tables or fewer), every preferred table is in it, first.</li>
+<li>Otherwise the retrieved tables are re-ordered so preferred ones come first,
+  and a preferred table the search scored but did not pick is added when its
+  similarity is within 0.05 of the least similar pick.</li>
+</ul>
+<p>RBAC is unchanged: a preferred table the role may not read loses its data like
+any other table, and the validator refuses a plan that reads it.</p>
+<p>A name that is not in the indexed schema is a warning, not an error: <code>nl2sql
+doctor</code> and the index status (<code>NL2SQL.index_health</code>, <code>GET /api/v1/index/status</code>)
+print "Preferred table 'v_x' of 'chinook' is not in the indexed schema". The
+usual cause is a view created after the last index; re-index the datasource.</p>
 <h2 id="notes">Notes</h2>
 <ul>
 <li>Use <code>${env:VAR}</code> for environment variables or <code>${provider:key}</code> for secrets
