@@ -261,6 +261,13 @@ search for any text, with k, lambda, entry types and datasource exposed. That
 inspector is the tool for chunking experiments: change the chunks, rebuild,
 search the same text, and diff the **Copy as text** output.
 
+The resolver's `datasources` search is exact: instead of Chroma's nearest-neighbour
+query it scores every active `schema.datasource` entry by cosine similarity and
+takes the nearest. There is one such entry per datasource among hundreds of
+others, and Chroma's approximate (HNSW) search under a filter that selective can
+return fewer entries than exist, which dropped a datasource from a question's
+candidates now and then. The other searches stay approximate.
+
 ## Tenant isolation (current state)
 
 Tenant scoping is **not implemented** in indexing:

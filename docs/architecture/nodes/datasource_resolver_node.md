@@ -91,7 +91,7 @@ Side effects:
 1. Candidates:
     - `state.datasource_id` set: it must be registered (`INVALID_STATE` otherwise); it is the only candidate.
     - Exactly one datasource registered: it is the only candidate; no vector search.
-    - Otherwise: the vector store must exist (`SCHEMA_RETRIEVAL_FAILED` otherwise); `retrieve_datasource_candidates(k=5)` gives the candidates, and none is `SCHEMA_RETRIEVAL_FAILED` (with a re-index hint when the index is empty).
+    - Otherwise: the vector store must exist (`SCHEMA_RETRIEVAL_FAILED` otherwise); `retrieve_datasource_candidates(k=5)` gives the candidates (an exact ranking of every datasource entry, so no datasource is missed by the approximate search), and none is `SCHEMA_RETRIEVAL_FAILED` (with a re-index hint when the index is empty).
 2. Role check: candidates the role may not read are dropped. None left is a `CRITICAL` `SECURITY_VIOLATION`, and no model call is made.
 3. Schema version mismatch policy (`fail` returns `INVALID_STATE`; `warn` adds a warning).
 4. Answerability check over the **allowed** candidates only (see below). An empty verdict returns `QUESTION_NOT_ANSWERABLE`.
