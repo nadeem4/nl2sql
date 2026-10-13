@@ -2361,6 +2361,16 @@ providers. The check runs on the read path only, so the fix is simply to re-run
 <td>Load and check the curated answers file at startup. <code>false</code> turns the feature off without removing the file; <code>nl2sql curated validate</code> still checks it. See <a href="../curated/">Curated Answers</a>.</td>
 </tr>
 <tr>
+<td><code>CURATED_MATCH_TOP_K</code></td>
+<td><code>5</code></td>
+<td>Verified query candidates a question's search returns, one per query (<code>VectorStore.retrieve_verified_query_candidates</code>). See <a href="../curated/">Curated Answers</a>.</td>
+</tr>
+<tr>
+<td><code>CURATED_MATCH_FLOOR</code></td>
+<td><code>0.6</code></td>
+<td>Cosine similarity the best verified query candidate must reach before the model is asked to choose one. Calibrated on the local embedding model; not used until matching ships. See <a href="../curated/">Curated Answers</a>.</td>
+</tr>
+<tr>
 <td><code>RBAC_REFUSAL_NAMES_TABLES</code></td>
 <td><code>false</code></td>
 <td>Name the role and the forbidden table in the refusal the user sees. Off, the message is "You do not have permission to see the data this question requires."; the table and role are always in the log and the run trace. <code>nl2sql setup --demo</code> writes <code>true</code> into <code>.env.demo</code>. See <a href="../../security/model/#strict-refusal">Security Model</a>.</td>

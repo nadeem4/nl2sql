@@ -1912,6 +1912,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#indexing-the-questions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Indexing the questions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#source-references" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4438,6 +4449,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#indexing-the-questions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Indexing the questions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#source-references" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4471,10 +4493,10 @@ already written and reviewed, with typed parameters, and the questions each
 query answers.</p>
 <div class="admonition note">
 <p class="admonition-title">What works today</p>
-<p>This release loads and checks the file: at startup and with
-<code>nl2sql curated validate</code>. Matching a question to a verified query and
-running it comes in a later release; until then the file changes no
-answer.</p>
+<p>This release loads and checks the file (at startup and with
+<code>nl2sql curated validate</code>) and indexes its questions with <code>nl2sql index</code>.
+Matching a question to a verified query and running it comes in a later
+release; until then the file changes no answer.</p>
 </div>
 <h2 id="where-the-file-lives">Where the file lives</h2>
 <table>
@@ -4498,6 +4520,18 @@ answer.</p>
 <td><code>CURATED_ENABLED</code></td>
 <td><code>true</code></td>
 <td><code>false</code> turns the feature off without removing the file. <code>nl2sql curated validate</code> still checks it.</td>
+</tr>
+<tr>
+<td><code>curated_match_top_k</code></td>
+<td><code>CURATED_MATCH_TOP_K</code></td>
+<td><code>5</code></td>
+<td>Verified query candidates a question's search returns, one per query.</td>
+</tr>
+<tr>
+<td><code>curated_match_floor</code></td>
+<td><code>CURATED_MATCH_FLOOR</code></td>
+<td><code>0.6</code></td>
+<td>Cosine similarity the best candidate must reach before the model is asked to choose one. Calibrated on the local embedding model; see <a href="../../architecture/curated_answers/#settings">the design</a>. Not used until matching ships.</td>
 </tr>
 </tbody>
 </table>
@@ -4727,9 +4761,30 @@ query, and exits 1 on any error, so it can run in CI:</p>
 <a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>    <span class="k">for</span> <span class="n">entry</span> <span class="ow">in</span> <span class="n">report</span><span class="o">.</span><span class="n">entries</span><span class="p">:</span>
 <a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>        <span class="nb">print</span><span class="p">(</span><span class="n">entry</span><span class="o">.</span><span class="n">datasource_id</span><span class="p">,</span> <span class="n">entry</span><span class="o">.</span><span class="n">query_id</span><span class="p">,</span> <span class="n">entry</span><span class="o">.</span><span class="n">status</span><span class="p">,</span> <span class="n">entry</span><span class="o">.</span><span class="n">details</span><span class="p">)</span>
 </code></pre></div>
+<h2 id="indexing-the-questions">Indexing the questions</h2>
+<p><code>nl2sql index</code> embeds every phrasing of every verified query, and its
+description, beside the datasource's schema entries. Placeholders are filled
+first with the param's <code>example</code>, else its <code>default</code>: "Best {n} customers in
+{year}" is indexed as "Best 10 customers in 2012". The SQL is never indexed.</p>
+<p>After editing <code>curated.yaml</code>, re-index its questions:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>nl2sql<span class="w"> </span>index<span class="w"> </span>--curated-only<span class="w">                       </span><span class="c1"># every datasource</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>nl2sql<span class="w"> </span>index<span class="w"> </span>--curated-only<span class="w"> </span>--datasource<span class="w"> </span>chinook<span class="w">  </span><span class="c1"># one</span>
+</code></pre></div>
+<p><code>--curated-only</code> keeps each datasource's schema entries exactly as they are
+and embeds only the verified queries: it reads no schema and makes no
+enrichment model call, so it takes seconds. The datasource must have been
+indexed once with plain <code>nl2sql index</code>. A plain <code>nl2sql index</code> also picks up
+the file, and a schema re-index always keeps the verified queries.</p>
+<p>Until you re-index, <code>nl2sql doctor</code> and the index status (<code>NL2SQL.index_health()</code>,
+<code>GET /api/v1/index/status</code>) warn:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>Warning: curated.yaml changed for 'chinook' since it was indexed; run `nl2sql index --curated-only --datasource chinook`.
+</code></pre></div>
+<p>It is a warning, not a failure: the index stays <code>ok</code>, because the stale
+entries still name queries that exist.</p>
 <h2 id="source-references">Source references</h2>
 <ul>
 <li>Models and SQL checks: <code>packages/nl2sql/src/nl2sql/configs/curated.py</code></li>
+<li>Index entries and the change hash: <code>packages/nl2sql/src/nl2sql/indexing/curated.py</code></li>
 <li>Loader: <code>ConfigManager.load_curated()</code> in <code>packages/nl2sql/src/nl2sql/configs/manager.py</code></li>
 <li>Startup load: <code>packages/nl2sql/src/nl2sql/context.py</code></li>
 <li>Facade: <code>packages/nl2sql/src/nl2sql/api/curated_api.py</code></li>

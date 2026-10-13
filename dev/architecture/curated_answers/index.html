@@ -2539,16 +2539,23 @@ datasource whose <code>build_id</code> is not the new one, so curated entries wr
 their own would be deleted by the next schema re-index, or would delete it.
 <code>IndexingOrchestrator.index_datasource()</code> therefore appends the curated chunks
 (built by a small <code>CuratedChunkBuilder</code>) to the schema chunks before calling
-<code>refresh_schema_chunks()</code>. One consequence: changing <code>curated.yaml</code> needs
-<code>nl2sql index</code> for that datasource, which re-reads its schema too. A
-<code>--curated-only</code> shortcut can come later if that proves slow.</p>
+<code>refresh_schema_chunks()</code>.</p>
+<p>Changing <code>curated.yaml</code> does <strong>not</strong> need a schema re-index (a change from the
+agreed design; see <a href="#open-questions">Re-index cost</a>).
+<code>nl2sql index --curated-only</code> writes a new build per datasource through the
+same write, switch and delete as any other, except that the active build's
+schema entries are copied into it with their stored vectors
+(<code>VectorStore.refresh_curated_chunks()</code>): no schema read, no enrichment call,
+and only the verified queries are embedded.</p>
 <p><strong>Staleness.</strong> At the switch, <code>refresh_schema_chunks()</code> also records
 <code>curated_hash:&lt;datasource_id&gt;</code> in the collection metadata, next to
 <code>build:&lt;datasource_id&gt;</code> and <code>built_at:&lt;datasource_id&gt;</code>: a SHA-256 of that
 datasource's section of <code>curated.yaml</code>, as canonical JSON. <code>IndexHealth</code>
 (<code>nl2sql/indexing/health.py</code>) compares it with the file as it is now and
 reports "curated.yaml changed for 'chinook' since it was indexed; run
-<code>nl2sql index</code>". <code>nl2sql doctor</code> and the facade's <code>index_health()</code> show it.
+<code>nl2sql index --curated-only --datasource chinook</code>". <code>nl2sql doctor</code> and the
+facade's <code>index_health()</code> show it. Only the verified queries are hashed:
+metrics are not indexed yet, so editing one asks for nothing.
 It is a warning, not a failure: the stale entries still point at queries that
 exist, and the matcher re-reads every query from the loaded file, never from
 the index. A query id that is in the index but no longer in the file is
@@ -2862,9 +2869,39 @@ step the owner runs (<code>python scripts/record_demo_answers.py</code>, which d
 </tbody>
 </table>
 <p>The floor is a similarity in the configured embedding model's space, and
-models spread their scores differently, so 0.6 is a starting point to be
-calibrated against both the local ONNX model and OpenAI's in PR 2, not a
-constant.</p>
+models spread their scores differently. PR 2 calibrated it on the local ONNX
+model (<code>all-MiniLM-L6-v2</code>) with five Chinook verified queries (the example
+above, revenue by year, best-selling genre, tracks per artist, revenue by
+country) and the best candidate's similarity for 24 questions:</p>
+<table>
+<thead>
+<tr>
+<th>Questions</th>
+<th>Best similarity</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>12 that a verified query answers, reworded</td>
+<td>11 between 0.713 and 0.963; "biggest spenders last year" 0.479, and to the wrong query</td>
+</tr>
+<tr>
+<td>6 near misses ("top customers by number of tracks", "albums per artist", "revenue by month")</td>
+<td>0.582 to 0.813</td>
+</tr>
+<tr>
+<td>6 unrelated ("list all playlists", "media types", the weather)</td>
+<td>0.123 to 0.438; "Which tracks have no composer?" 0.681</td>
+</tr>
+</tbody>
+</table>
+<p>0.6 keeps every match the embeddings can make with a margin above 0.1, and
+drops five of six unrelated questions with no model call. Near misses mostly
+clear it, as they should: telling a near miss from a match is the model's
+choice (<code>none_of_these</code>), not the floor's. A question with no phrasing close
+to it, like "biggest spenders", is not rescued by any floor; another phrasing
+in <code>curated.yaml</code> is the fix. Calibration with OpenAI's embeddings is still
+open: it needs the owner's key.</p>
 <h2 id="invariants-this-touches">Invariants this touches</h2>
 <p>No invariant is weakened. When the matcher is built (PR 3), these change
 in <a href="../invariants/"><code>invariants.md</code></a>, each with its enforcement point:</p>
@@ -2938,12 +2975,15 @@ missing from the indexed schema), and a startup test that a broken file fails
 chunks in the datasource's build, <code>curated_hash:&lt;id&gt;</code> in the collection
 metadata, <code>IndexHealth.warnings</code>, the <code>doctor</code> line,
 <code>VectorStore.retrieve_verified_query_candidates()</code> and
-<code>CURATED_MATCH_TOP_K</code>; calibrating <code>CURATED_MATCH_FLOOR</code>.
+<code>CURATED_MATCH_TOP_K</code>; calibrating <code>CURATED_MATCH_FLOOR</code> (the setting lands
+here, its use in PR 3); <code>nl2sql index --curated-only</code>.
 Tests: <code>tests/unit/test_curated_chunks.py</code> (placeholder filling, ids,
 metadata), <code>tests/unit/test_vector_store_curated.py</code> (same build as schema, a
 schema re-index keeps them, active-build and datasource filters, de-dup by
-query), <code>tests/unit/test_index_health_curated.py</code> (hash changed is a warning
-and <code>ok</code> stays true).</p>
+query, the curated-only refresh), <code>tests/unit/test_index_health_curated.py</code>
+(hash changed is a warning and <code>ok</code> stays true),
+<code>tests/unit/test_index_curated_refresh.py</code> (a curated-only refresh reads no
+schema, makes no model call and keeps the schema entries).</p>
 <p><strong>3. The matcher and execution.</strong>
 The <code>curated_matcher</code> node and its prompt, <code>VerifiedQueryChoice</code>, param
 checks, the access check, <code>SUPPORTS_BOUND_PARAMETERS</code> in the SDK, parameters
@@ -2987,13 +3027,16 @@ added beside the existing ones, never in place of them.</p>
 <h2 id="open-questions">Open questions</h2>
 <ul>
 <li><strong>The floor.</strong> Is one global <code>CURATED_MATCH_FLOOR</code> enough, or does each
-  embedding model need its own default? PR 2 measures it on the demo
-  questions.</li>
+  embedding model need its own default? Measured on the local model in PR 2
+  (0.6, see <a href="#settings">Settings</a>); OpenAI's embeddings are not measured yet.</li>
 <li><strong>Views in snapshots.</strong> Whether every built-in adapter's
   <code>fetch_schema_snapshot()</code> reports views, which preferred tables depend on.</li>
-<li><strong>Re-index cost.</strong> A <code>curated.yaml</code> change re-indexes the datasource's
-  schema too (with enrichment, a model call). If that is too slow, a
-  curated-only refresh that copies the current schema entries into a new build.</li>
+<li><strong>Re-index cost.</strong> Resolved in PR 2: a <code>curated.yaml</code> change must not cost
+  a schema re-read or an enrichment model call. <code>nl2sql index --curated-only</code>
+  copies the active build's schema entries, with their stored vectors, into a
+  new build beside freshly embedded verified queries and switches to it. A
+  flag rather than detecting "only <code>curated.yaml</code> changed" on a plain
+  <code>nl2sql index</code>, because knowing whether the schema changed means reading it.</li>
 <li><strong>The synthesizer's context.</strong> Whether to pass the verified query's
   description to the answer synthesizer, so it can say "invoiced revenue,
   before refunds" rather than guess what the numbers mean. Left out of v1.</li>
