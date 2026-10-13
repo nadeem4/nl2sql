@@ -333,3 +333,40 @@ def test_retrieved_entries_do_not_carry_the_build_id(tmp_path):
     docs = store.retrieve_datasource_candidates("q", k=5) + store.retrieve_schema_context("q", "ds_a")
 
     assert docs and all("build_id" not in d.metadata for d in docs)
+
+
+# --- a datasource that failed to start ------------------------------------------
+
+
+def _ctx_with_unavailable(store, *datasource_ids, unavailable):
+    ctx = _ctx(store, *datasource_ids)
+    ctx.ds_registry.unavailable = lambda: dict(unavailable)
+    return ctx
+
+
+def test_indexing_every_datasource_indexes_the_rest_and_reports_the_unavailable_one(tmp_path, scripted):
+    _, holder, _ = scripted
+    store = _store(tmp_path)
+    holder.append(store)
+
+    result = rebuild_index(_ctx_with_unavailable(store, "ds_a", unavailable={"bad": "driver missing"}))
+
+    assert result.ok is False
+    assert [e["datasource_id"] for e in result.errors] == ["bad"]
+    assert "driver missing" in result.errors[0]["error"]
+    assert _entries(store, "ds_a")
+
+
+def test_a_full_rebuild_refuses_while_a_datasource_is_unavailable(tmp_path, scripted):
+    # Swapping in a collection without it would drop its entries.
+    _, holder, _ = scripted
+    store = _store(tmp_path)
+    holder.append(store)
+    rebuild_index(_ctx(store, "ds_a"))
+    before = _entries(store, "ds_a")
+
+    result = rebuild_index(_ctx_with_unavailable(store, "ds_a", unavailable={"bad": "driver missing"}), full=True)
+
+    assert result.ok is False
+    assert "driver missing" in result.errors[0]["error"]
+    assert _entries(store, "ds_a") == before

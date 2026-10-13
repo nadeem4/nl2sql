@@ -88,11 +88,22 @@ def rebuild_index(
     live = ctx.vector_store
 
     adapters = list(ctx.ds_registry.list_adapters())
+    # Datasources that failed to start: each one in scope is an error with its
+    # reason. A full rebuild stops here, since swapping in a collection without
+    # them would drop their entries; a per-datasource run indexes the rest.
+    unavailable = getattr(ctx.ds_registry, "unavailable", dict)()
+    in_scope = datasource_ids if datasource_ids is not None and not full else unavailable
+    for ds_id in dict.fromkeys(in_scope):
+        if ds_id in unavailable:
+            result.errors.append({"datasource_id": ds_id,
+                                  "error": f"Datasource '{ds_id}' is unavailable: {unavailable[ds_id]}"})
+    if full and result.errors:
+        return result
     if datasource_ids is not None and not full:
         wanted = list(dict.fromkeys(datasource_ids))
         known = {a.datasource_id for a in adapters}
         for ds_id in wanted:
-            if ds_id not in known:
+            if ds_id not in known and ds_id not in unavailable:
                 result.errors.append({"datasource_id": ds_id, "error": "No such datasource is configured."})
         adapters = [a for a in adapters if a.datasource_id in wanted]
         if result.errors:

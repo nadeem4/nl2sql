@@ -70,6 +70,7 @@ class PolicyAPI:
             registry = DatasourceRegistry(secret_manager)
             registry.register_datasources(ds_configs)
             available_ds = set(registry.list_ids())
+            unavailable_ds = registry.unavailable()
         except Exception as e:
             return PolicyValidationReport(ok=False, errors=[str(e)])
 
@@ -83,7 +84,17 @@ class PolicyAPI:
                         PolicyValidationEntry(role=role_id, target="Datasource: *", status="OK", details="Global Access")
                     )
                     continue
-                if ds not in available_ds:
+                if ds in unavailable_ds:
+                    entries.append(
+                        PolicyValidationEntry(
+                            role=role_id,
+                            target=f"Datasource: {ds}",
+                            status="UNAVAILABLE",
+                            details=f"Datasource failed to start: {unavailable_ds[ds]}",
+                        )
+                    )
+                    has_errors = True
+                elif ds not in available_ds:
                     entries.append(
                         PolicyValidationEntry(
                             role=role_id,

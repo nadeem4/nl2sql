@@ -230,11 +230,18 @@ class DatasourceResolverNode:
             if state.datasource_id:
                 unsupported_ids = self._get_unsupported_datasources([state.datasource_id])
                 if unsupported_ids:
+                    unavailable = getattr(self.ds_registry, "unavailable", dict)()
+                    reason = unavailable.get(state.datasource_id)
+                    message = (
+                        f"Datasource '{state.datasource_id}' is unavailable: {reason}"
+                        if reason is not None
+                        else f"Datasource not found: {state.datasource_id}."
+                    )
                     return self._error_response(
                         resolved_datasources=[],
                         allowed_ids=[],
                         unsupported_ids=unsupported_ids,
-                        message=f"Datasource not found: {state.datasource_id}.",
+                        message=message,
                         severity=ErrorSeverity.ERROR,
                         error_code=ErrorCode.INVALID_STATE,
                     )
