@@ -5,10 +5,13 @@ fonts, so it has to carry the project's LICENSE and the third-party notices.
 setuptools only packs license files from inside the project directory, so the
 package keeps copies of the repository-root files; this checks they match.
 """
+import json
 import tomllib
 from pathlib import Path
 
 import pytest
+from packaging.specifiers import SpecifierSet
+from packaging.version import Version
 
 ROOT = Path(__file__).resolve().parents[4]
 ENGINE = ROOT / "packages" / "nl2sql"
@@ -73,3 +76,24 @@ def test_every_distribution_is_findable_and_classified(package):
     assert any(c.startswith("Development Status ::") for c in classifiers)
     # PEP 639: alongside a `license` expression, a License :: classifier is an error.
     assert not any(c.startswith("License ::") for c in classifiers)
+
+
+def test_the_api_pins_the_engine_release_it_ships_with():
+    """`~=0.1` let the API install any 0.x engine, older ones without the facade methods it calls.
+
+    The three packages release together, so the pin is the engine's own version as a
+    compatible release (`~=X.Y.Z`: same minor, this patch or later). The line carries
+    the release-please marker and the file is in extra-files, so each release bumps it.
+    """
+    engine_version = Version(_project("nl2sql")["version"])
+    pin = next(d for d in _project("api")["dependencies"] if d.startswith("nl2sql-engine"))
+    spec = SpecifierSet(pin.removeprefix("nl2sql-engine"))
+    assert str(spec) == f"~={engine_version}", pin
+    assert not spec.contains(Version(f"{engine_version.major}.{engine_version.minor + 1}.0"))
+
+    lines = (ROOT / "packages" / "api" / "pyproject.toml").read_text(encoding="utf-8").splitlines()
+    assert any("nl2sql-engine" in line and "x-release-please-version" in line for line in lines)
+
+    config = json.loads((ROOT / "release-please-config.json").read_text(encoding="utf-8"))
+    extra = [f["path"] for p in config["packages"].values() for f in p.get("extra-files", [])]
+    assert "packages/api/pyproject.toml" in extra

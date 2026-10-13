@@ -36,6 +36,29 @@ Provider-specific fields:
 Use `${provider_id:key}` in config files to resolve a secret from a provider.
 Use `${env:VAR}` to read directly from environment variables.
 
+## When a provider fails to start
+
+A provider listed in `secrets.yaml` that cannot start fails startup at once
+(the engine, `nl2sql-api`, and `nl2sql doctor`, which prints it as
+"Connectivity check failed"). The error names the provider and the reason:
+
+```text
+Secret provider 'vault' (type 'hashi') failed to start: Missing dependency 'hvac'.
+Install 'nl2sql-engine[hashicorp]'. Fix or remove this entry in the secrets config.
+```
+
+The usual reasons are the provider's extra not being installed
+(`nl2sql-engine[aws]`, `[azure]`, `[hashicorp]`), a `${env:VAR}` credential whose
+variable is not set (the message names the variable), or the provider's own
+client refusing the config. Credentials are masked in the message.
+
+This is deliberate: every `${vault:...}` reference depends on the provider, so
+starting without it only moves the error to the first lookup, where it reads
+as "Unknown secret provider ID". A missing or empty `secrets.yaml` and the
+built-in `env` provider are unaffected. A datasource that fails to start, by
+contrast, leaves the others running: see
+[Datasources → When a datasource fails to start](datasources.md#when-a-datasource-fails-to-start).
+
 ## Secrets never print
 
 Credentials are held as pydantic `SecretStr`, so `repr`, `str`, log lines and

@@ -180,6 +180,12 @@ engine.add_datasource({
 engine.index_datasource("runtime_pg")
 ```
 
+The `description` is indexed as given, even though no datasources file lists
+`runtime_pg`. Indexing makes no LLM call unless you ask for one:
+`engine.index_datasource("runtime_pg", enrich=True)` has the
+`indexing_enrichment` agent write descriptions for tables and columns the
+database left without a comment.
+
 You can also register datasources from a config file at runtime:
 
 ```python

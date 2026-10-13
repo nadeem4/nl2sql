@@ -55,6 +55,7 @@ If you need to connect to something else (e.g., ElasticSearch, a CRM API, or a r
 * Fetching and normalizing schema metadata.
 * Executing queries and formatting results.
 * Implementing safety breakers (`row_limit`).
+* Optionally, a `default_schema` attribute naming the schema an unqualified table resolves to. RBAC reads a two-part `datasource.table` policy entry as that table in this schema; without it, `main` is assumed.
 
 ### Example
 

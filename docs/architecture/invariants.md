@@ -174,11 +174,12 @@ Prevents invalid joins and enforces schema-authorized relationships.
 ## Policy Enforcement Is Namespaced and Fail-Closed
 
 ### Definition
-Allowed tables must be namespaced as `datasource.table` or `datasource.*`, and policy checks fail if datasource ID is missing.
+Allowed tables must be namespaced as `datasource.*`, `datasource.schema.*`, `datasource.schema.table` or `datasource.table`, and policy checks fail if datasource ID is missing. Access is decided on datasource, schema and table: a two-part `datasource.table` means that table in the datasource's default schema only, and a table the plan names without a schema is in the default schema. One function, `table_allowed()` in `nl2sql.auth.rbac`, decides for every node.
 
 ### Enforcement Points
 - `RolePolicy.validate_namespace()` in `nl2sql.auth.models`
 - `LogicalValidatorNode._validate_policy()` in `nl2sql.pipeline.nodes.validator.node`
+- `table_allowed()` and `default_schema()` in `nl2sql.auth.rbac`, called with the same datasource, schema and table by the validator, the schema retriever, the executor's value check and the curated matcher
 
 ### Failure Behavior
 `ValueError` for invalid policy format; `PipelineError` with `SECURITY_VIOLATION` if datasource ID is missing or a table is not allowed. An unknown role, or no role, allows nothing and is refused the same way, never with `VALIDATOR_CRASH`. The user-facing refusal names no table unless `RBAC_REFUSAL_NAMES_TABLES` is set; the table and roles are in the error's `details`.

@@ -21,7 +21,8 @@ fingerprint, and stays comparable with the runs recorded before the other
 two existed.
 
 Two runs are comparable when they share the kind, the dataset sha and the
-schema fingerprint (and, for tier 2, the roles). ``publish`` groups the
+schema fingerprint (and, for tier 2, the roles and whether curated answers
+were on; a record from before that field ran with them off). ``publish`` groups the
 history by kind and database, lists runs newest first with the change
 against the previous comparable run of the same config, and marks a run that
 starts a new series. It reads no clock and calls nothing, so the same
@@ -175,6 +176,8 @@ def make_record(board: Dict[str, Any], name: str, *, recorded_at: dt.datetime, e
         "config": {"name": name, "models": cfg["models"]},
         "roles": board["roles"],
         "passes": board["passes"],
+        # Whether verified queries could answer; a record without the field ran without them.
+        "curated": bool(board.get("curated", False)),
         "metrics": {
             "cases": cases,
             "accuracy": cfg["accuracy"]["overall"],
@@ -328,9 +331,11 @@ def line_key(r: Dict[str, Any]) -> Tuple[str, str, str]:
 
 
 def series_key(r: Dict[str, Any]) -> Tuple:
-    """What must match for two runs to be comparable: dataset, schema, and for tier 2 the roles."""
-    roles = tuple(r.get("roles") or []) if r["kind"] == "tier2" else ()
-    return r["kind"], r["dataset"]["sha256"], r["database"]["schema_fingerprint"], roles
+    """What must match for two runs to be comparable: dataset, schema, and for tier 2 the roles and curated answers."""
+    tier2 = r["kind"] == "tier2"
+    roles = tuple(r.get("roles") or []) if tier2 else ()
+    curated = bool(r.get("curated", False)) if tier2 else False
+    return r["kind"], r["dataset"]["sha256"], r["database"]["schema_fingerprint"], roles, curated
 
 
 def comparable(a: Dict[str, Any], b: Dict[str, Any]) -> bool:
@@ -360,7 +365,8 @@ def _series_break(new: Dict[str, Any], old: Dict[str, Any]) -> str:
     changed = [label for label, same in (
         ("dataset", new["dataset"]["sha256"] == old["dataset"]["sha256"]),
         ("schema", new["database"]["schema_fingerprint"] == old["database"]["schema_fingerprint"]),
-        ("roles", series_key(new)[3] == series_key(old)[3])) if not same]
+        ("roles", series_key(new)[3] == series_key(old)[3]),
+        ("curated answers", series_key(new)[4] == series_key(old)[4])) if not same]
     return f"new series ({', '.join(changed)} changed)"
 
 
@@ -548,7 +554,7 @@ def render_history(recs: Sequence[Dict[str, Any]]) -> str:
             "for tier 2 how many questions flipped each way with McNemar's exact p-value on them: at 47\n"
             "questions a few points either way is noise, so read the flips and the p-value rather than\n"
             "the headline. Runs on another gold dataset (`@sha`), another schema or, for tier 2, other\n"
-            "roles are not comparable and start a new series. See\n"
+            "roles or curated answers on (`--use-curated`) are not comparable and start a new series. See\n"
             "[the evaluation dataset](testing/evaluation-dataset.md).\n")
     if not recs:
         return f"{head}\n{EMPTY}\n"

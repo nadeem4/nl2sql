@@ -148,8 +148,11 @@ def run_tier2_benchmark(
     max_cost_increase: float = DEFAULT_MAX_COST_INCREASE,
     results_dir: Optional[pathlib.Path] = None,
     note: Optional[str] = None,
+    use_curated: bool = False,
 ) -> None:
     """Runs tier 2 (the real model) per LLM config under a dollar cap and writes the scoreboard.
+
+    Curated answers are off unless ``use_curated`` (``--use-curated``) is set.
 
     The scoreboard goes to ``<project>/benchmark_tier2.json`` and one record
     per config under ``<project>/benchmarks/tier2/<database>/`` unless
@@ -192,13 +195,14 @@ def run_tier2_benchmark(
         for warning in unverified_models(llm_configs):
             presenter.print_warning(warning)
         plan = [f"Plan: {question_count} question{'s' if question_count != 1 else ''} x role "
-                f"{', '.join(config.roles)} x {passes} pass{'es' if passes > 1 else ''}, cap ${max_cost:.2f}"]
+                f"{', '.join(config.roles)} x {passes} pass{'es' if passes > 1 else ''}, cap ${max_cost:.2f}, "
+                f"curated answers {'on' if use_curated else 'off'}"]
         plan += [f"  {name}: {_node_models(cfg)}" for name, cfg in llm_configs.items()]
         plan.append(f"  Records: {results_dir / 'tier2'}  Scoreboard: {export_path}")
         for line in plan:
             presenter.console.print(escape(line), soft_wrap=True)
         board = api.run_tier2(config, llm_configs, max_cost=max_cost, passes=passes,
-                              questions=questions or None, on_case=on_case)
+                              questions=questions or None, on_case=on_case, use_curated=use_curated)
     except Exception as e:
         presenter.print_error(f"Benchmark Failed: {e}")
         sys.exit(1)

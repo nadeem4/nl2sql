@@ -1,4 +1,4 @@
-from typing import Dict, List, Any, Set
+from typing import Dict, List, Any, Optional, Set
 from threading import RLock
 
 from nl2sql_adapter_sdk.capabilities import DatasourceCapability
@@ -42,6 +42,8 @@ class DatasourceRegistry:
         self._adapters: Dict[str, DatasourceAdapterProtocol] = {}
         self._capabilities: Dict[str, Set[str]] = {}
         self._preferred: Dict[str, List[str]] = {}
+        self._descriptions: Dict[str, Optional[str]] = {}
+        self._unavailable: Dict[str, str] = {}
         self._available_adapters = discover_adapters()
         self._secret_manager = secret_manager
         self._lock = RLock()
@@ -84,11 +86,39 @@ class DatasourceRegistry:
         return ConnectionConfig(**resolved_connection)
 
     def register_datasources(self, configs: List[DatasourceConfig]):
+        """Registers every datasource that can start; records the rest as unavailable.
+
+        One bad datasource (unknown type, missing driver, invalid connection
+        config, unresolved secret) does not stop the others: it is logged,
+        kept in ``unavailable()`` with its reason, and anything that targets it
+        later fails with that reason. If datasources were configured and none
+        of them could start, this raises, since an engine with nothing to query
+        is not worth starting.
+        """
+        failures: Dict[str, str] = {}
         for config in configs:
             try:
                 self.register_datasource(config)
             except Exception as e:
-                raise ValueError(f"Failed to initialize adapter for '{config.id}': {e}") from e
+                reason = str(e) or type(e).__name__
+                failures[config.id] = reason
+                with self._lock:
+                    self._unavailable[config.id] = reason
+                logger.error(f"Datasource '{config.id}' is unavailable: {reason}")
+        if failures and not self.list_ids():
+            details = "; ".join(f"'{ds_id}': {reason}" for ds_id, reason in failures.items())
+            raise ValueError(f"No datasource could be started. {details}")
+
+    def unavailable(self) -> Dict[str, str]:
+        """Datasources that failed to start, mapped to the reason."""
+        with self._lock:
+            return dict(self._unavailable)
+
+    def _not_registered(self, datasource_id: str) -> ValueError:
+        reason = self._unavailable.get(datasource_id)
+        if reason is not None:
+            return ValueError(f"Datasource '{datasource_id}' is unavailable: {reason}")
+        return ValueError(f"Unknown datasource ID: {datasource_id}")
 
     def _normalize_capabilities(self, caps: Any) -> Set[str]:
         if not caps:
@@ -158,6 +188,8 @@ class DatasourceRegistry:
                 self._adapters[ds_id] = adapter
                 self._capabilities[ds_id] = capabilities
                 self._preferred[ds_id] = list(config.preferred_tables)
+                self._descriptions[ds_id] = config.description
+                self._unavailable.pop(ds_id, None)
             return adapter
         else:
             raise ValueError(
@@ -179,7 +211,7 @@ class DatasourceRegistry:
         """
         with self._lock:
             if datasource_id not in self._adapters:
-                raise ValueError(f"Unknown datasource ID: {datasource_id}")
+                raise self._not_registered(datasource_id)
             return self._adapters[datasource_id]
 
     def get_dialect(self, datasource_id: str) -> str:
@@ -198,11 +230,16 @@ class DatasourceRegistry:
         with self._lock:
             return list(self._preferred.get(datasource_id, []))
 
+    def get_description(self, datasource_id: str) -> Optional[str]:
+        """The ``description`` the datasource was registered with; None for an unknown id."""
+        with self._lock:
+            return self._descriptions.get(datasource_id)
+
     def get_capabilities(self, datasource_id: str) -> Set[str]:
         """Returns the capability flags for a datasource."""
         with self._lock:
             if datasource_id not in self._capabilities:
-                raise ValueError(f"Unknown datasource ID: {datasource_id}")
+                raise self._not_registered(datasource_id)
             return set(self._capabilities[datasource_id])
 
     def supports(self, datasource_id: str, *capabilities: Any) -> bool:

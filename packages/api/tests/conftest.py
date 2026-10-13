@@ -2,7 +2,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from nl2sql import UserContext
-from nl2sql_api.auth import get_user_context
+from nl2sql_api.auth import get_user_context, require_admin
 from nl2sql_api.dependencies import get_engine
 from nl2sql_api.main import app
 
@@ -60,6 +60,7 @@ def api_client():
         app.dependency_overrides[get_engine] = lambda: engine
         if authenticated:
             app.dependency_overrides[get_user_context] = lambda: UserContext(roles=["admin"])
+            app.dependency_overrides[require_admin] = lambda: UserContext(roles=["admin"])
         client = TestClient(app)
         clients.append(client)
         return client, engine

@@ -1,10 +1,6 @@
-from typing import Optional, Any, Dict, Type
-import logging
 from .interfaces import SecretProvider
 from nl2sql.common.settings import secret_value
 from .models import SecretProviderConfig, AwsSecretConfig, AzureSecretConfig, HashiCorpSecretConfig
-
-logger = logging.getLogger(__name__)
 
 class SecretProviderFactory:
     """Factory for creating SecretProvider instances.
@@ -16,35 +12,32 @@ class SecretProviderFactory:
     """
 
     @staticmethod
-    def create(config: SecretProviderConfig) -> Optional[SecretProvider]:
+    def create(config: SecretProviderConfig) -> SecretProvider:
         """Creates a provider instance from configuration.
         
         Args:
             config: A fully resolved configuration object (no placeholders).
         
         Returns:
-            The instantiated SecretProvider, or None if dependencies are missing.
+            The instantiated SecretProvider.
+
+        Raises:
+            ImportError: The provider's optional package is not installed; the
+                message names the extra to install.
+            ValueError: The provider type is unknown.
+            Exception: Whatever the provider raised while starting.
         """
-        try:
-            if isinstance(config, AwsSecretConfig):
-                return SecretProviderFactory._create_aws(config)
-            elif isinstance(config, AzureSecretConfig):
-                return SecretProviderFactory._create_azure(config)
-            elif isinstance(config, HashiCorpSecretConfig):
-                return SecretProviderFactory._create_hashi(config)
-            elif config.type == "env":
-                # Env provider is usually bootstrapped, but we support creating it explicitly too
-                from .providers.env import EnvironmentSecretProvider
-                return EnvironmentSecretProvider()
-            else:
-                logger.warning(f"Unknown provider type: {config.type}")
-                return None
-        except ImportError as e:
-            logger.warning(f"Skipping provider '{config.id}' ({config.type}): {e}")
-            return None
-        except Exception as e:
-            logger.error(f"Failed to create provider '{config.id}': {e}")
-            return None
+        if isinstance(config, AwsSecretConfig):
+            return SecretProviderFactory._create_aws(config)
+        if isinstance(config, AzureSecretConfig):
+            return SecretProviderFactory._create_azure(config)
+        if isinstance(config, HashiCorpSecretConfig):
+            return SecretProviderFactory._create_hashi(config)
+        if config.type == "env":
+            # Env provider is usually bootstrapped, but we support creating it explicitly too
+            from .providers.env import EnvironmentSecretProvider
+            return EnvironmentSecretProvider()
+        raise ValueError(f"Unknown secret provider type '{config.type}'.")
 
     @staticmethod
     def _create_aws(config: AwsSecretConfig) -> SecretProvider:
