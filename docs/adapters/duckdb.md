@@ -3,8 +3,9 @@
 In-process analytical adapter for local files and ad-hoc analysis.
 
 !!! info "Implementation"
-    This adapter extends `BaseSQLAlchemyAdapter` without overriding `connect()`: DuckDB
-    runs in-process and exposes no server-side statement timeout to configure.
+    This adapter extends `BaseSQLAlchemyAdapter`. It overrides `connect()` only to
+    enforce `statement_timeout_ms`: DuckDB runs in-process and has no statement
+    timeout setting, so the adapter interrupts a statement that runs too long.
 
 ## Installation
 
@@ -40,10 +41,20 @@ connection:
 
 | Feature | Implementation | Note |
 | :--- | :--- | :--- |
-| **Timeout** | Not supported | DuckDB is in-process and has no statement timeout. |
+| **Timeout** | `interrupt()` on a timer | See [Statement Timeout](#statement-timeout). |
 | **Dry Run** | `EXPLAIN` | Plans the query without executing it. |
 | **Explain** | `EXPLAIN` | Returns DuckDB's rendered operator tree as text. |
 | **Costing** | Stubbed | Returns a fixed cost of `1.0`; see below. |
+
+### Statement Timeout
+
+When `statement_timeout_ms` is set, each statement starts a timer that calls the
+DuckDB connection's `interrupt()` once the limit passes. DuckDB stops the query and
+raises `InterruptException`, which the adapter reports as a refusal
+(`QUERY_REFUSED`) that the engine does not retry. The timer is cancelled as soon as
+the statement finishes or fails, so it never touches a later query. The limit
+covers running the statement; DuckDB materialises the result while it runs, so
+fetching rows afterwards is not timed.
 
 ### Optimization Details
 

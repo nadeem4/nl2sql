@@ -18,6 +18,10 @@ from depends on the client:
   answers `HTTP 401` when neither gives one. The body's `user_context` counts
   only with the dev flag `NL2SQL_API_TRUST_BODY_ROLE=true`, which logs a
   warning at startup. See [Caller role](../api/rest/index.md#caller-role).
+  The routes that change datasources, LLMs or the index also need one of the
+  roles in `NL2SQL_API_ADMIN_ROLES` (default `admin`), else `HTTP 403`; with no
+  role source configured they answer loopback clients only. See
+  [Admin routes](../api/rest/index.md#admin-routes).
 
 The REST API still does not verify who the caller is. **If you expose this
 service, put your own authentication in a proxy in front of it, derive the role

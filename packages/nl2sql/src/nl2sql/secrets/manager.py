@@ -40,34 +40,49 @@ class SecretManager:
         
         Args:
             configs: A list of SecretProviderConfig objects.
+
+        Raises:
+            ValueError: A configured provider could not start (its package is
+                missing, a credential reference did not resolve, or the
+                provider itself raised). This is fatal on purpose: swallowing
+                it only moves the failure to the first ``${id:key}`` lookup,
+                where it reads as "Unknown secret provider ID".
         """
+        from pydantic import SecretStr
+
         from .factory import SecretProviderFactory
 
         for config in configs:
-            try:
-                if config.type == "env":
-                    continue
-                
-                from pydantic import SecretStr
+            if config.type == "env":
+                continue
 
+            resolved_values = []
+            try:
                 updates = {}
                 for key, value in config.model_dump(exclude={"id", "type"}).items():
                     # Credential fields are SecretStr; a reference in one is resolved too.
                     raw = value.get_secret_value() if isinstance(value, SecretStr) else value
                     if isinstance(raw, str) and raw.startswith("${") and raw.endswith("}"):
                         resolved = self.resolve(raw)
+                        resolved_values.append(resolved)
                         updates[key] = SecretStr(resolved) if isinstance(value, SecretStr) else resolved
-                
+
                 resolved_config = config.model_copy(update=updates)
                 provider = SecretProviderFactory.create(resolved_config)
-                    
-                if provider:
-                    self.register_provider(config.id, provider)
-                    logger.info(f"Registered secret provider '{config.id}' (type: {config.type})")
-                    
             except Exception as e:
-                logger.error(f"Failed to configure secret provider '{config.id}': {e}")
-                
+                reason = str(e) or type(e).__name__
+                for value in resolved_values:
+                    if value:
+                        reason = reason.replace(value, "***")
+                # No cause: the provider's own exception may carry a credential.
+                raise ValueError(
+                    f"Secret provider '{config.id}' (type '{config.type}') failed to start: {reason} "
+                    "Fix or remove this entry in the secrets config."
+                ) from None
+
+            self.register_provider(config.id, provider)
+            logger.info(f"Registered secret provider '{config.id}' (type: {config.type})")
+
     def resolve(self, secret_ref: str) -> str:
         """Resolves a secret reference string.
 

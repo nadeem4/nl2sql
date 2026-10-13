@@ -35,6 +35,13 @@ Converts a configuration dictionary into a SQLAlchemy connection string.
 
 Override to provide custom connection arguments (e.g., timeouts, isolation levels).
 
+The base class keeps `statement_timeout_ms` but does not enforce it: SQLAlchemy has
+no generic statement timeout and silently ignores an `execution_options["timeout"]`.
+Each adapter enforces it in `connect()` the way its driver allows: Postgres with
+`statement_timeout`, MySQL with `MAX_EXECUTION_TIME`, SQL Server with pyodbc's
+query timeout, DuckDB by interrupting the connection. An adapter that does nothing
+here has no statement timeout.
+
 #### `get_dialect() -> str`
 
 Returns the **sqlglot** dialect name the engine renders SQL in: `postgres`,

@@ -1,5 +1,6 @@
+import math
 from typing import Any, List, Dict
-from sqlalchemy import create_engine, text, inspect
+from sqlalchemy import URL, create_engine, event, text, inspect
 from nl2sql.adapters.sqlalchemy_base import (
     CostEstimate,
     DryRunResult,
@@ -40,26 +41,37 @@ class MssqlAdapter(BaseSQLAlchemyAdapter):
         """
         config = MssqlConnectionConfig(**args)
         
-        user = config.user or ""
-        password = config.password.get_secret_value() if config.password else ""
-        host = config.host
-        port = config.port
-        database = config.database
-        driver = config.driver
-        
-        options = config.options.copy()
-        options["driver"] = driver
-        
+        query = {key: str(value) for key, value in config.options.items()}
+        query["driver"] = config.driver
         if config.trusted_connection:
-            options["Trusted_Connection"] = "yes"
-            
-        creds = f"{user}:{password}@" if user or password else ""
-        netloc = f"{host}:{port}"
-        
-        from urllib.parse import urlencode
-        query_str = "?" + urlencode(options)
-        
-        return f"mssql+pyodbc://{creds}{netloc}/{database}{query_str}"
+            query["Trusted_Connection"] = "yes"
+
+        # URL.create escapes the credentials, so a password holding @ : / # %
+        # stays a password instead of moving the host or port boundary.
+        return URL.create(
+            "mssql+pyodbc",
+            username=config.user or None,
+            password=config.password.get_secret_value() if config.password else None,
+            host=config.host,
+            port=config.port,
+            database=config.database,
+            query=query,
+        ).render_as_string(hide_password=False)
+
+    def connect(self) -> None:
+        """Connects, and enforces ``statement_timeout_ms`` through pyodbc.
+
+        SQL Server has no session setting for a statement timeout; the client
+        cancels instead. pyodbc's ``Connection.timeout`` is that query timeout,
+        in whole seconds, so it is set on every new pooled connection, rounded
+        up so a sub-second limit is not read as "no timeout".
+        """
+        super().connect()
+        if self.statement_timeout_ms:
+            event.listen(self.engine, "connect", self._set_query_timeout)
+
+    def _set_query_timeout(self, dbapi_connection, connection_record) -> None:
+        dbapi_connection.timeout = math.ceil(self.statement_timeout_ms / 1000)
 
     def dry_run(self, sql: str) -> DryRunResult:
         try:

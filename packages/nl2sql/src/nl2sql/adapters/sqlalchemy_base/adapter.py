@@ -83,11 +83,10 @@ class BaseSQLAlchemyAdapter:
         self._row_limit = kwargs.get("row_limit")
         self._max_bytes = kwargs.get("max_bytes")
         
+        # SQLAlchemy has no generic statement timeout, so each adapter enforces
+        # this the way its driver allows (see its connect()).
         self.statement_timeout_ms = kwargs.get("statement_timeout_ms")
         self.execution_options = {}
-        
-        if self.statement_timeout_ms:
-            self.execution_options["timeout"] = self.statement_timeout_ms / 1000.0
 
         self.connection_args = connection_args
         self.connection_string = self.construct_uri(connection_args)

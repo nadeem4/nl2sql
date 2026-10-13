@@ -24,7 +24,9 @@ connection:
 ### Connection Details
 
 * **Driver**: `psycopg2` (via `sqlalchemy`).
-* **URI Constructed**: `postgresql+psycopg2://{user}:{pass}@{host}:{port}/{db}?{options}`
+* **URI Constructed**: `postgresql+psycopg2://{user}:{pass}@{host}:{port}/{db}?{options}`.
+  Built with SQLAlchemy's `URL.create`, so the user name and password are
+  percent-escaped: a password containing `@ : / # %` works as written.
 
 ## Features
 

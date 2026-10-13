@@ -222,9 +222,11 @@ def apply_enrichment(
 ) -> SchemaSnapshot:
     metadata = snapshot.metadata.model_copy(deep=True)
 
-    if enrichment.datasource.description:
+    # Enrichment only fills blanks: a comment read from the database is the
+    # data owner's own words and is never replaced by the model's guess.
+    if enrichment.datasource.description and not _normalize_text(metadata.description):
         metadata.description = enrichment.datasource.description
-    if enrichment.datasource.domains:
+    if enrichment.datasource.domains and not metadata.domains:
         metadata.domains = enrichment.datasource.domains
 
     for table_key, table_contract in snapshot.contract.tables.items():
@@ -234,7 +236,11 @@ def apply_enrichment(
             metadata.tables[table_key] = table_md
 
         table_enrichment = enrichment.tables.get(table_key)
-        if table_enrichment and table_enrichment.description:
+        if (
+            table_enrichment
+            and table_enrichment.description
+            and not _normalize_text(table_md.description)
+        ):
             table_md.description = table_enrichment.description
 
         for col_name in table_contract.columns.keys():
@@ -247,9 +253,9 @@ def apply_enrichment(
             column_enrichment = enrichment.columns.get(column_key)
             if not column_enrichment:
                 continue
-            if column_enrichment.description:
+            if column_enrichment.description and not _normalize_text(column_md.description):
                 column_md.description = column_enrichment.description
-            if column_enrichment.synonyms:
+            if column_enrichment.synonyms and not column_md.synonyms:
                 column_md.synonyms = column_enrichment.synonyms
 
     return snapshot.model_copy(update={"metadata": metadata})
@@ -298,13 +304,16 @@ def enrich_schema_snapshot(
         )
         return snapshot, existing_questions
     except Exception as exc:
-        # Anything else is a genuine surprise and stays fully visible, but it
-        # still must not take indexing down with it.
+        # Anything else (a 401, a timeout, a malformed answer) is reported as
+        # one warning line: the reason is what an operator needs, and a stack
+        # trace in the middle of an index run reads like a crash. It still
+        # must not take indexing down with it.
+        reason = " ".join(str(exc).split()) or type(exc).__name__
         logger.warning(
-            f"Schema enrichment failed for '{datasource_id}': {exc}. "
-            "Indexing continues without LLM-written descriptions.",
-            exc_info=True,
+            f"Schema enrichment failed for '{datasource_id}': {reason}. "
+            "Indexing continues without LLM-written descriptions."
         )
+        logger.debug("Schema enrichment failure detail", exc_info=True)
         return snapshot, existing_questions
 
     sanitized = sanitize_enrichment(snapshot, enrichment, max_questions=max_questions)

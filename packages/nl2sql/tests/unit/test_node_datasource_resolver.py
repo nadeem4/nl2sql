@@ -217,3 +217,16 @@ def test_no_match_in_a_populated_index_keeps_the_original_message(llm_registry):
     )
 
     assert result["errors"][0].message == "No datasource candidates resolved."
+
+
+def test_a_query_that_names_an_unavailable_datasource_fails_with_the_reason(llm_registry):
+    # A datasource that failed to start is not "not found": the user is told why.
+    ctx = _ctx(llm_registry, None, ["*"], ds_ids=["good", "other"])
+    ctx.ds_registry.unavailable = lambda: {"bad": "No adapter found for engine type: 'nosuchdb'"}
+    node = DatasourceResolverNode(ctx)
+
+    result = node(GraphState(user_query="q", user_context=UserContext(), datasource_id="bad"))
+
+    message = result["errors"][0].message
+    assert "unavailable" in message
+    assert "nosuchdb" in message

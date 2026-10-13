@@ -11,7 +11,7 @@ from nl2sql.indexing.rebuild import rebuild_index
 @handle_cli_errors
 def run_indexing(
     ctx: NL2SQLContext,
-    enrich: bool = True,
+    enrich: bool = False,
     datasource_ids: Optional[List[str]] = None,
     full: bool = False,
     curated_only: bool = False,
@@ -27,6 +27,7 @@ def run_indexing(
     Args:
         ctx: The initialized NL2SQLContext.
         enrich: Ask the LLM for table and column descriptions (spends tokens).
+            Off by default.
         datasource_ids: Only these datasources; every configured one when None.
         full: Rebuild every datasource into a new collection and swap it in.
             Needed after changing the embedding model.
