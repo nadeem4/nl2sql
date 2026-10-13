@@ -2277,6 +2277,16 @@ the Debug pane and the trace with it -- names <code>claude-opus-5</code>. <code>
 that model on each model step, tagged <strong>recorded</strong>, until the visitor adds a
 key; then it shows the models their run will use, as before. Local replay mode
 (<code>nl2sql demo</code> with no key) does the same.</p>
+<p><strong>Verified answers replay only once recorded.</strong> The image's demo project has
+the six verified queries of <code>configs/curated.demo.yaml</code> indexed (see
+<a href="../../configuration/curated/#in-the-demo">Curated answers</a>), so every question
+first asks the curated matcher's model call, <code>VerifiedQueryChoice</code>. The
+shipped recordings predate it and hold no answer for it: the replay server
+answers that call with a miss, the matcher falls back (<code>model_failed</code>), and
+the run goes on to the recorded generated answer, exactly as before. So until
+the recordings are made again (below), no keyless answer carries the
+<strong>Verified</strong> badge; with a visitor's key, a question a verified query answers
+does. A recording run made after this records the matcher's call too.</p>
 <p><strong>If no recordings ship</strong> (the file is missing or covers no guided question),
 the keyless path still works: the chips and the question box stay open and
 every question answers with the key prompt. The console line at start-up says

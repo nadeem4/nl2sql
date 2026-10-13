@@ -1940,6 +1940,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#testing-the-queries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Testing the queries
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#indexing-the-questions" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1955,6 +1966,17 @@
     <span class="md-ellipsis">
       
         What happens at question time
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#in-the-demo" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        In the demo
       
     </span>
   </a>
@@ -4510,6 +4532,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#testing-the-queries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Testing the queries
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#indexing-the-questions" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4525,6 +4558,17 @@
     <span class="md-ellipsis">
       
         What happens at question time
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#in-the-demo" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        In the demo
       
     </span>
   </a>
@@ -4588,11 +4632,15 @@ query answers.</p>
 <div class="admonition note">
 <p class="admonition-title">What works today</p>
 <p>The file is loaded and checked (at startup and with
-<code>nl2sql curated validate</code>), its questions are indexed with <code>nl2sql index</code>,
-and a question is matched to a verified query and answered by it (see
-<a href="#what-happens-at-question-time">What happens at question time</a>). The
-playground's <em>Verified</em> badge, a demo file and <code>nl2sql curated test</code> come
-in a later release.</p>
+<code>nl2sql curated validate</code>), every query can be run once with
+<code>nl2sql curated test</code>, its questions are indexed with <code>nl2sql index</code>, a
+question is matched to a verified query and answered by it (see
+<a href="#what-happens-at-question-time">What happens at question time</a>), and the
+playground badges such an answer <em>Verified</em>. The demo ships six verified
+queries (<a href="#in-the-demo">In the demo</a>). Preferred tables
+(<a href="#preferred-tables">below</a>) and proposals from thumbs-up feedback
+(<a href="#from-feedback-to-verified-queries">From feedback to verified queries</a>)
+are built too. Business metrics are parsed but not used yet.</p>
 </div>
 <h2 id="where-the-file-lives">Where the file lives</h2>
 <table>
@@ -4857,14 +4905,41 @@ query, and exits 1 on any error, so it can run in CI:</p>
 <a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>    <span class="k">for</span> <span class="n">entry</span> <span class="ow">in</span> <span class="n">report</span><span class="o">.</span><span class="n">entries</span><span class="p">:</span>
 <a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>        <span class="nb">print</span><span class="p">(</span><span class="n">entry</span><span class="o">.</span><span class="n">datasource_id</span><span class="p">,</span> <span class="n">entry</span><span class="o">.</span><span class="n">query_id</span><span class="p">,</span> <span class="n">entry</span><span class="o">.</span><span class="n">status</span><span class="p">,</span> <span class="n">entry</span><span class="o">.</span><span class="n">details</span><span class="p">)</span>
 </code></pre></div>
+<h2 id="testing-the-queries">Testing the queries</h2>
+<p><code>validate</code> reads the SQL; it does not run it, so a column renamed under a
+query passes it. <code>nl2sql curated test</code> runs every verified query once against
+its database:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>nl2sql<span class="w"> </span>curated<span class="w"> </span><span class="nb">test</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>nl2sql<span class="w"> </span>curated<span class="w"> </span><span class="nb">test</span><span class="w"> </span>--curated<span class="w"> </span>configs/curated.yaml<span class="w"> </span>--config<span class="w"> </span>configs/datasources.yaml
+</code></pre></div>
+<p>It takes the same options as <code>validate</code>. Each param is bound to its
+<code>default</code>, else its <code>example</code>; a param with neither fails its query without
+running it, so give every required param an <code>example</code>. A query that fails the
+static checks (not read-only, placeholders that do not match the params) is
+never run. The rest run read-only through their datasource's adapter, the
+same path a matched question takes, with the values bound and only the first
+batch of rows fetched. It prints one row per query and exits 1 if any fails,
+so it can run in CI after a schema change:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>                                     Verified Queries
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>┏━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>┃ Datasource ┃ Query                    ┃ Status ┃ Params          ┃ Details                                      ┃
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>┡━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>│ chinook    │ top_customers_by_revenue │ PASS   │ n=10, year=2012 │ 10 rows in 0.00 s                            │
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>│ chinook    │ revenue_by_year          │ FAIL   │                 │ The database rejected the query: no such     │
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>│            │                          │        │                 │ column: Total                                │
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>└────────────┴──────────────────────────┴────────┴─────────────────┴──────────────────────────────────────────────┘
+</code></pre></div>
+<p>From Python it is <code>CuratedAPI().test()</code>, which returns a report like
+<code>validate()</code>'s: <code>ok</code>, <code>errors</code>, and one entry per query with its <code>status</code>
+(<code>PASS</code> or <code>FAIL</code>), <code>params</code>, <code>row_count</code> and <code>details</code>.</p>
 <h2 id="indexing-the-questions">Indexing the questions</h2>
 <p><code>nl2sql index</code> embeds every phrasing of every verified query, and its
 description, beside the datasource's schema entries. Placeholders are filled
 first with the param's <code>example</code>, else its <code>default</code>: "Best {n} customers in
 {year}" is indexed as "Best 10 customers in 2012". The SQL is never indexed.</p>
 <p>After editing <code>curated.yaml</code>, re-index its questions:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>nl2sql<span class="w"> </span>index<span class="w"> </span>--curated-only<span class="w">                       </span><span class="c1"># every datasource</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>nl2sql<span class="w"> </span>index<span class="w"> </span>--curated-only<span class="w"> </span>--datasource<span class="w"> </span>chinook<span class="w">  </span><span class="c1"># one</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>nl2sql<span class="w"> </span>index<span class="w"> </span>--curated-only<span class="w">                       </span><span class="c1"># every datasource</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>nl2sql<span class="w"> </span>index<span class="w"> </span>--curated-only<span class="w"> </span>--datasource<span class="w"> </span>chinook<span class="w">  </span><span class="c1"># one</span>
 </code></pre></div>
 <p><code>--curated-only</code> keeps each datasource's schema entries exactly as they are
 and embeds only the verified queries: it reads no schema and makes no
@@ -4873,7 +4948,7 @@ indexed once with plain <code>nl2sql index</code>. A plain <code>nl2sql index</c
 the file, and a schema re-index always keeps the verified queries.</p>
 <p>Until you re-index, <code>nl2sql doctor</code> and the index status (<code>NL2SQL.index_health()</code>,
 <code>GET /api/v1/index/status</code>) warn:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>Warning: curated.yaml changed for 'chinook' since it was indexed; run `nl2sql index --curated-only --datasource chinook`.
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>Warning: curated.yaml changed for 'chinook' since it was indexed; run `nl2sql index --curated-only --datasource chinook`.
 </code></pre></div>
 <p>It is a warning, not a failure: the index stays <code>ok</code>, because the stale
 entries still name queries that exist.</p>
@@ -4910,11 +4985,17 @@ anything above does not hold, the run continues as if the file did not
 exist, and the answer is generated.</p>
 <p>Every answer says where it came from, in <code>QueryResult.source</code> (and the REST
 response):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="p">{</span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"verified"</span><span class="p">,</span><span class="w"> </span><span class="nt">"id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"top_customers_by_revenue"</span><span class="p">,</span><span class="w"> </span><span class="nt">"datasource_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"chinook"</span><span class="p">,</span><span class="w"> </span><span class="nt">"params"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"n"</span><span class="p">:</span><span class="w"> </span><span class="mi">5</span><span class="p">,</span><span class="w"> </span><span class="nt">"year"</span><span class="p">:</span><span class="w"> </span><span class="mi">2012</span><span class="p">}}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="p">{</span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"verified"</span><span class="p">,</span><span class="w"> </span><span class="nt">"id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"top_customers_by_revenue"</span><span class="p">,</span><span class="w"> </span><span class="nt">"datasource_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"chinook"</span><span class="p">,</span><span class="w"> </span><span class="nt">"params"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"n"</span><span class="p">:</span><span class="w"> </span><span class="mi">5</span><span class="p">,</span><span class="w"> </span><span class="nt">"year"</span><span class="p">:</span><span class="w"> </span><span class="mi">2012</span><span class="p">}}</span>
 </code></pre></div>
 <p>or <code>{"type": "generated", ...}</code> with the other fields <code>null</code>. The sub-query of
 a verified answer has <code>plan_source: "verified"</code>, its <code>sql</code> is your SQL with
 its <code>:name</code> placeholders, and its <code>plan</code> is <code>null</code>.</p>
+<p>In the playground a verified answer carries a green <strong>Verified ·
+top_customers_by_revenue</strong> label beside the question, with the bound values
+in its tooltip. The Plan station says no plan was written and lists the query
+and its values, the Checks station shows the matcher's three checks (read-only,
+params, role), and the SQL station shows your SQL as <strong>Verified SQL</strong>, with its
+placeholders. A generated answer looks as it always has.</p>
 <p>Why a question was not matched is in the run trace: the <code>curated_matcher</code>
 node's <code>curated_match</code> record lists the candidates and their similarities, the
 floor, the model's choice and reason, the checked values, and one reason code:
@@ -4928,6 +5009,61 @@ that fails to run also adds a warning to the result.</p>
 binds them; a third-party adapter has to declare <code>SUPPORTS_BOUND_PARAMETERS</code>
 (<a href="../../adapters/sdk/">SDK</a>), and a verified query with params on one that
 does not is never run (<code>capability_missing</code>).</p>
+<h2 id="in-the-demo">In the demo</h2>
+<p><code>nl2sql demo</code> and <code>nl2sql setup --demo</code> write <code>configs/curated.demo.yaml</code>
+with six verified queries on Chinook, set <code>CURATED_CONFIG</code> to it in
+<code>.env.demo</code>, and index their questions with the schema:</p>
+<table>
+<thead>
+<tr>
+<th>Query</th>
+<th>One of its phrasings</th>
+<th>Params</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>top_customers_by_revenue</code></td>
+<td>"Who are our top {n} customers by revenue in {year}?"</td>
+<td><code>n</code> (default 10), <code>year</code> (example 2012)</td>
+</tr>
+<tr>
+<td><code>revenue_by_year</code></td>
+<td>"What is the total revenue per year?"</td>
+<td>none</td>
+</tr>
+<tr>
+<td><code>monthly_revenue</code></td>
+<td>"What was the monthly revenue in {year}?"</td>
+<td><code>year</code> (example 2013)</td>
+</tr>
+<tr>
+<td><code>sales_by_country</code></td>
+<td>"What are total sales by country?"</td>
+<td>none</td>
+</tr>
+<tr>
+<td><code>best_selling_genres</code></td>
+<td>"Which genre sells the most tracks?"</td>
+<td><code>n</code> (default 5)</td>
+</tr>
+<tr>
+<td><code>top_artists_by_tracks_sold</code></td>
+<td>"Who are the top {n} artists by tracks sold?"</td>
+<td><code>n</code> (default 10)</td>
+</tr>
+</tbody>
+</table>
+<p>Two of the guided questions, "What is the total revenue per year?" and "Which
+genre sells the most tracks?", are phrasings of these, so with a key they come
+back verified. Check and run the file with
+<code>nl2sql --env demo curated validate</code> and <code>nl2sql --env demo curated test</code>.</p>
+<p>The keyless demo (a hosted Space with no key, or <code>nl2sql demo</code> replaying
+recordings) answers from recorded model answers, and those were recorded
+before the curated matcher existed: they hold no <code>VerifiedQueryChoice</code> answer.
+Until the recordings are made again (<code>python scripts/record_demo_answers.py</code>,
+which needs the owner's key), the matcher's call misses, the run falls back
+(<code>model_failed</code>), and every keyless answer is generated, as before.</p>
 <h2 id="preferred-tables">Preferred tables</h2>
 <p>Preferred tables are not in <code>curated.yaml</code>: they are a <code>preferred_tables</code> list
 on a datasource in <code>datasources.yaml</code>, naming views or tables (built by the
@@ -4937,21 +5073,21 @@ data team, never by the package) the planner should reach for first. See
 <p>A thumbs-up on a generated answer in the playground is a candidate verified
 query: a real question, and SQL a person said was right. Export them as
 proposals and review them like any other change to <code>curated.yaml</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>nl2sql<span class="w"> </span>curated<span class="w"> </span>proposals<span class="w"> </span><span class="nb">export</span><span class="w">                                   </span><span class="c1"># print to stdout</span>
-<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>nl2sql<span class="w"> </span>curated<span class="w"> </span>proposals<span class="w"> </span><span class="nb">export</span><span class="w"> </span>--out<span class="w"> </span>configs/curated.proposals.yaml
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>nl2sql<span class="w"> </span>curated<span class="w"> </span>proposals<span class="w"> </span><span class="nb">export</span><span class="w">                                   </span><span class="c1"># print to stdout</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>nl2sql<span class="w"> </span>curated<span class="w"> </span>proposals<span class="w"> </span><span class="nb">export</span><span class="w"> </span>--out<span class="w"> </span>configs/curated.proposals.yaml
 </code></pre></div>
 <p>Each proposal is an entry in <code>curated.yaml</code>'s shape, under the datasource the
 run used:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
-<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="nt">datasources</span><span class="p">:</span>
-<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">  </span><span class="nt">chinook</span><span class="p">:</span>
-<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">    </span><span class="nt">verified_queries</span><span class="p">:</span>
-<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">how_many_customers_are_in_brazil</span>
-<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="w">      </span><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="s">'TODO:</span><span class="nv"> </span><span class="s">say</span><span class="nv"> </span><span class="s">what</span><span class="nv"> </span><span class="s">this</span><span class="nv"> </span><span class="s">query</span><span class="nv"> </span><span class="s">returns.'</span>
-<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="w">      </span><span class="nt">questions</span><span class="p">:</span>
-<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">How many customers are in Brazil?</span>
-<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a><span class="w">      </span><span class="nt">sql</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
-<a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a><span class="w">        </span><span class="no">SELECT COUNT(*) AS n FROM Customer WHERE Country = 'Brazil'</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="nt">datasources</span><span class="p">:</span>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="w">  </span><span class="nt">chinook</span><span class="p">:</span>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="w">    </span><span class="nt">verified_queries</span><span class="p">:</span>
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">how_many_customers_are_in_brazil</span>
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a><span class="w">      </span><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="s">'TODO:</span><span class="nv"> </span><span class="s">say</span><span class="nv"> </span><span class="s">what</span><span class="nv"> </span><span class="s">this</span><span class="nv"> </span><span class="s">query</span><span class="nv"> </span><span class="s">returns.'</span>
+<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="w">      </span><span class="nt">questions</span><span class="p">:</span>
+<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">How many customers are in Brazil?</span>
+<a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a><span class="w">      </span><span class="nt">sql</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a><span class="w">        </span><span class="no">SELECT COUNT(*) AS n FROM Customer WHERE Country = 'Brazil'</span>
 </code></pre></div>
 <ul>
 <li><strong><code>id</code></strong> comes from the question: lower case, words joined by <code>_</code>, at most
@@ -4988,6 +5124,8 @@ playground writes it either.</p>
 <li>Startup load: <code>packages/nl2sql/src/nl2sql/context.py</code></li>
 <li>Facade: <code>packages/nl2sql/src/nl2sql/api/curated_api.py</code></li>
 <li>Command: <code>packages/nl2sql/src/nl2sql/cli/commands/curated.py</code></li>
+<li>The demo's verified queries: <code>CHINOOK_VERIFIED_QUERIES</code> in <code>packages/nl2sql/src/nl2sql/cli/demo/chinook.py</code></li>
+<li>The playground badge: <code>verifiedSource()</code> in <code>web/playground/src/results.js</code></li>
 <li>Matching and running: <code>packages/nl2sql/src/nl2sql/pipeline/nodes/curated_matcher/</code></li>
 <li>Proposals from feedback: <code>packages/nl2sql/src/nl2sql/feedback/proposals.py</code></li>
 </ul>

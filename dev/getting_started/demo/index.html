@@ -1673,6 +1673,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#verified-answers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verified answers
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#the-roles" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4549,6 +4560,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#verified-answers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verified answers
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#the-roles" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4797,6 +4819,8 @@ from a clone with <code>pip install -e packages/adapter-sdk -e "packages/nl2sql[
 <li><code>configs/llm.demo.yaml</code></li>
 <li><code>configs/policies.demo.json</code></li>
 <li><code>configs/sample_questions.demo.yaml</code></li>
+<li><code>configs/curated.demo.yaml</code>, six verified queries on Chinook (see
+  <a href="#verified-answers">Verified answers</a>)</li>
 <li><code>configs/secrets.demo.yaml</code></li>
 <li><code>.env.demo</code></li>
 <li><code>nl2sql-demo.json</code>, a small stamp recording which engine version wrote the
@@ -4828,10 +4852,25 @@ are groundwork for when it can.</p>
 resolver took the only datasource and skipped the vector search; with three, the
 datasource search and the LLM answerability judge run on every question, so the
 demo exercises the part of the pipeline a single-dataset demo never reached.
-Indexing all three writes 162 entries - 87 for <code>chinook</code>, 36 for <code>support</code> and
+Indexing all three writes 186 entries - 111 for <code>chinook</code> (24 of them the verified queries' phrasings and descriptions), 36 for <code>support</code> and
 39 for <code>webanalytics</code> - and the build <code>nl2sql setup --demo</code> runs takes about
 seven or eight seconds once the embedding model is cached; the first run on a
 machine still downloads the model.</p>
+<h3 id="verified-answers">Verified answers</h3>
+<p><code>configs/curated.demo.yaml</code> holds six verified queries on Chinook: SQL written
+and reviewed in advance, with typed params, and the questions each answers
+(top customers by revenue in a year, revenue by year, monthly revenue in a
+year, sales by country, best-selling genres, top artists by tracks sold).
+<code>.env.demo</code> points <code>CURATED_CONFIG</code> at it, and indexing embeds their questions
+beside the schema. A question one of them answers runs its SQL with the values
+bound instead of a generated plan, and the playground labels the answer
+<strong>Verified Â·</strong> and the query's id. "What is the total revenue per year?" and
+"Which genre sells the most tracks?" among the guided questions are two of
+them. See <a href="../../configuration/curated/#in-the-demo">Curated answers</a>.</p>
+<p>The keyless replay has no recorded answer for the matcher's model call
+(<code>VerifiedQueryChoice</code>) until the owner records the demo again, so without a
+key every answer is generated, as before, and no badge appears. With a key, a
+matching question comes back verified.</p>
 <h3 id="the-roles">The roles</h3>
 <p><code>configs/policies.demo.json</code> is generated with three roles, spanning all three
 datasources, so the RBAC check is visible without editing anything:</p>
@@ -4879,7 +4918,7 @@ instead of the OpenAI embeddings API. The first indexing run downloads roughly
   question with a single retry; <code>gpt-5.4</code> had 500,000 and accepts
   <code>temperature: 0</code>. To use a model that rejects it (<code>gpt-5.5</code>, <code>gpt-5-mini</code>),
   set <code>temperature: null</code> in <code>configs/llm.demo.yaml</code> - see
-  <a href="../../configuration/llm/#temperature">LLM configuration → Temperature</a>. With an
+  <a href="../../configuration/llm/#temperature">LLM configuration â†’ Temperature</a>. With an
   OpenRouter key or Ollama, change <code>model</code> to one that provider serves: live
   mode switches the provider, not the model name.</li>
 <li><code>nl2sql index</code> also runs an optional LLM enrichment pass over the schema.
@@ -4910,7 +4949,7 @@ instead of the OpenAI embeddings API. The first indexing run downloads roughly
 <li>Pointing <code>configs/llm.demo.yaml</code> at <code>provider: ollama</code> removes the chat key
   requirement, but a local model's ability to satisfy the pipeline's structured
   output is model-dependent - see
-  <a href="../../configuration/llm/#ollama">LLM configuration → Ollama</a>.</li>
+  <a href="../../configuration/llm/#ollama">LLM configuration â†’ Ollama</a>.</li>
 </ul>
 <p>Sharing the demo with other people is the one case where none of this applies:
 <code>nl2sql demo --hosted</code> serves the playground with <strong>no key on the server at
@@ -4961,7 +5000,7 @@ so the page looked fine while every question failed with
 demo's three databases it carries a switcher for which of them to read: a
 segmented control while there are four or fewer, a <strong>Showing</strong> select beyond
 that. At the foot of the rail, <strong>Search index</strong> is one line when all is well --
-"Search index fresh. 162 entries, built 3 minutes ago." -- that opens to entries
+"Search index fresh. 186 entries, built 3 minutes ago." -- that opens to entries
 by type (datasource, tables, columns, relationships), the schema version they
 were built from, and when. One index holds every database, so with the demo's
 three the line inside says which they are -- "Covers chinook, support and
@@ -5032,7 +5071,7 @@ and the hosted limits.</p>
   below. A refusal gets the same block: <strong>Refused at the checks. No SQL was
   written.</strong></li>
 <li><strong>The stations.</strong> Plan, Checks, SQL, Rows and Cost &amp; time follow, each with a
-  small heading, a tag for who decides it (<strong>Model · gpt-5.4</strong>, from the run's
+  small heading, a tag for who decides it (<strong>Model Â· gpt-5.4</strong>, from the run's
   usage, or <strong>Code</strong>) and the step's time. On the spine a round mark is a model
   step and a square one is code; filled with a tick is done, an outline is
   waiting and a dashed outline was not reached.</li>
@@ -5044,7 +5083,7 @@ and the hosted limits.</p>
   and a result cut at its row ceiling says so: <strong>Cut at 1,000 rows, so some are
   missing. Narrow the question to get them all.</strong> The table shows 100 rows at a
   time, fetched from the server, with <strong>Previous</strong>, <strong>Next</strong> and <strong>Rows
-  101–200 of 3,340</strong>. A run with several results gets one tab per result.
+  101â€“200 of 3,340</strong>. A run with several results gets one tab per result.
   <strong>Download CSV</strong> streams the whole result from the server, every row.</li>
 <li><strong>The gate.</strong> The Checks station shows the plans the checks saw (<strong>Plan 1
   refused</strong>, then <strong>Plan 2 passed</strong> when the first was sent back), why, in one
@@ -5059,7 +5098,7 @@ and the hosted limits.</p>
   Where the stream cannot be used (an older server, a proxy that cuts it, a
   browser that cannot read a streamed reply), the page asks <code>POST /api/ask</code>
   instead and the first station stays lit until the whole run is back.
-  A counter beside the button reads <strong>Running · 3.4 s</strong>, and after a
+  A counter beside the button reads <strong>Running Â· 3.4 s</strong>, and after a
   moment <strong>Ask</strong> becomes <strong>Stop</strong>, which cancels the request: the run then says
   <strong>Stopped</strong> and every station is marked not reached. The server notices the
   dropped request within a quarter of a second and cancels the run: no further
@@ -5242,8 +5281,8 @@ re-ranking model; the "re-ranking" is MMR, explained in
 <p>A run's own retrieval is under <strong>Debug</strong>: open the <code>datasource_resolver</code> or
 <code>schema_retriever</code> row in the per-node table.</p>
 <h3 id="rating-answers">Rating answers</h3>
-<p>Below <strong>Cost &amp; time</strong>, each answer asks <strong>Was this answer right?</strong>: <strong>👍 Right</strong>
-or <strong>👎 Wrong</strong>, with an optional note (<strong>Wrong number</strong>, <strong>Wrong table</strong>,
+<p>Below <strong>Cost &amp; time</strong>, each answer asks <strong>Was this answer right?</strong>: <strong>ðŸ‘ Right</strong>
+or <strong>ðŸ‘Ž Wrong</strong>, with an optional note (<strong>Wrong number</strong>, <strong>Wrong table</strong>,
 <strong>Wrong filter</strong>, <strong>Missing rows</strong>, or your own words). The rating is saved in
 the demo's <code>data/schema_store.db</code> with the question, role, SQL, the model per
 step and the engine version; never the rows. It is local only, like Settings:
@@ -5311,7 +5350,7 @@ command exits <code>1</code> after writing <code>recordings.json</code> with the
 the provider and the model that answered, and a replay reports that model --
 in the usage ledger, the Debug pane and on the Pipeline page, tagged recorded --
 rather than the one the replaying config names. See
-<a href="../../architecture/determinism/#the-plan-cache-determinism-from-the-architecture">Determinism → The plan cache</a>.</p>
+<a href="../../architecture/determinism/#the-plan-cache-determinism-from-the-architecture">Determinism â†’ The plan cache</a>.</p>
 <p><code>--env &lt;name&gt;</code> loads <code>.env.&lt;name&gt;</code>. To point at an exact file instead, use
 <code>--env-file &lt;path&gt;</code>, which takes precedence over <code>--env</code>. Either flag also
 loads the file's variables into the process environment, so <code>doctor</code> and <code>run</code>
