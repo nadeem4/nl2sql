@@ -166,6 +166,10 @@ def demo_env() -> SimpleNamespace:
     monkeypatch.setattr(settings, "schema_store_path", str(schema_store_path))
     monkeypatch.setattr(settings, "schema_store_max_versions", 3)
     monkeypatch.setattr(settings, "global_timeout_sec", 180)
+    # Built before the per-test fixtures run, so curated answers are turned
+    # off here too: a `.env.demo` in the repository root names the demo's
+    # verified queries, and these tests pin the generated pipeline.
+    monkeypatch.setattr(settings, "curated_enabled", False)
 
     ctx = NL2SQLContext(
         **_demo_config_paths(root, secrets_path),
