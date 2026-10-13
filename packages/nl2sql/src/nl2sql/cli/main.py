@@ -162,13 +162,22 @@ def index(
             "Needed after changing the embedding model, since every datasource must share one model."
         ),
     )] = False,
+    curated_only: Annotated[bool, typer.Option(
+        "--curated-only",
+        help=(
+            "Re-index only the verified queries from curated.yaml. Each datasource's schema entries "
+            "are kept as they are: no schema read and no enrichment model call."
+        ),
+    )] = False,
 ):
     """
     Index schemas and examples into the Vector Store, one datasource at a time.
     """
+    if full and curated_only:
+        raise typer.BadParameter("--full and --curated-only cannot be combined.")
     ctx = NL2SQLContext(ds_config_path, secrets_config_path, llm_config_path, vector_store_path)
 
-    run_indexing(ctx, datasource_ids=datasource or None, full=full)
+    run_indexing(ctx, datasource_ids=datasource or None, full=full, curated_only=curated_only)
     
 @app.command()
 def doctor():

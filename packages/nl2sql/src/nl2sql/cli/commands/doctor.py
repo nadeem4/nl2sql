@@ -98,16 +98,27 @@ def _report_index_health() -> None:
     from nl2sql.common.settings import settings
     from nl2sql.indexing.health import inspect_index_at
 
+    from nl2sql.indexing.curated import curated_hashes
+
     try:
         datasource_ids = [ds.id for ds in ConfigManager().load_datasources()]
     except Exception:
         datasource_ids = []
+    # A broken curated.yaml is `nl2sql curated validate`'s to report; here it
+    # only means there is nothing to compare the index with.
+    hashes = None
+    if settings.curated_enabled:
+        try:
+            hashes = curated_hashes(ConfigManager().load_curated(), datasource_ids)
+        except Exception:
+            hashes = None
     try:
         health = inspect_index_at(
             Path(settings.vector_store_path or ""),
             settings.vector_store_collection_name,
             Path(settings.schema_store_path),
             datasource_ids,
+            curated_hashes=hashes,
         )
     except Exception as exc:
         print_error(f"The vector index could not be inspected: {exc}")
@@ -126,6 +137,8 @@ def _report_index_health() -> None:
                 f"{escape(ds.datasource_id)}: schema version {escape(ds.index_version)} "
                 "matches the latest snapshot."
             )
+    for warning in health.warnings:
+        console.print(f"[yellow]Warning:[/yellow] {escape(warning)}")
     if health.ok:
         print_success("Index OK.")
     else:

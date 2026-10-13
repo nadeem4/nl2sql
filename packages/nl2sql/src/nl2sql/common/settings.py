@@ -79,6 +79,22 @@ class Settings(BaseSettings):
             "removing the file; `nl2sql curated validate` still checks it."
         ),
     )
+    curated_match_top_k: int = Field(
+        default=5,
+        ge=1,
+        validation_alias="CURATED_MATCH_TOP_K",
+        description="Verified query candidates a question's search returns, one per query.",
+    )
+    curated_match_floor: float = Field(
+        default=0.6,
+        ge=0.0,
+        le=1.0,
+        validation_alias="CURATED_MATCH_FLOOR",
+        description=(
+            "Cosine similarity the best verified query candidate must reach before the model is asked "
+            "to choose one. Calibrated on the local embedding model."
+        ),
+    )
 
     global_timeout_sec: int = Field(
         default=60,

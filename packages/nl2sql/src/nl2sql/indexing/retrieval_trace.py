@@ -38,6 +38,8 @@ def entry_label(metadata: Dict[str, Any]) -> str:
         return f"{metadata.get('from_table')} -> {metadata.get('to_table')}"
     if kind == "schema.metric":
         return str(metadata.get("name") or "")
+    if kind == "curated.verified_query":
+        return str(metadata.get("query_id") or "")
     return str(metadata.get("table") or metadata.get("id") or "")
 
 

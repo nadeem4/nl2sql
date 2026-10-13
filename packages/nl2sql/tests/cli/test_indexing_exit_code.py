@@ -131,7 +131,22 @@ def test_the_index_command_passes_datasource_and_full(monkeypatch):
 
     result = CliRunner().invoke(main.app, ["index", "--datasource", "chinook", "--datasource", "sales"])
     assert result.exit_code == 0, result.output
-    assert seen == {"datasource_ids": ["chinook", "sales"], "full": False}
+    assert seen == {"datasource_ids": ["chinook", "sales"], "full": False, "curated_only": False}
 
     CliRunner().invoke(main.app, ["index", "--full"])
-    assert seen == {"datasource_ids": None, "full": True}
+    assert seen == {"datasource_ids": None, "full": True, "curated_only": False}
+
+    CliRunner().invoke(main.app, ["index", "--curated-only", "-d", "chinook"])
+    assert seen == {"datasource_ids": ["chinook"], "full": False, "curated_only": True}
+
+
+def test_full_and_curated_only_do_not_combine(monkeypatch):
+    from typer.testing import CliRunner
+
+    from nl2sql.cli import main
+
+    monkeypatch.setattr(main, "NL2SQLContext", lambda *a, **k: "ctx")
+    monkeypatch.setattr(main, "run_indexing", lambda ctx, **kw: None)
+
+    result = CliRunner().invoke(main.app, ["index", "--full", "--curated-only"])
+    assert result.exit_code != 0

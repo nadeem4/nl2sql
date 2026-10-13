@@ -12,6 +12,10 @@ Status, worst first:
 ``stale``    a datasource has no entries, or its entries were built from an
              older schema version than the latest snapshot
 ``ok``       everything else
+
+Warnings never change the status. One is a ``curated.yaml`` edited since the
+datasource was indexed: its verified query entries are stale, but they still
+point at queries that exist, so questions keep working.
 """
 from __future__ import annotations
 
@@ -46,6 +50,7 @@ class IndexHealth:
     embedding_model: Optional[str] = None
     datasources: List[DatasourceIndexHealth] = field(default_factory=list)
     problems: List[str] = field(default_factory=list)
+    warnings: List[str] = field(default_factory=list)
 
     @property
     def ok(self) -> bool:
@@ -57,6 +62,7 @@ class IndexHealth:
 
 BUILD_KEY = "build:"
 BUILT_AT_KEY = "built_at:"
+CURATED_HASH_KEY = "curated_hash:"
 MODEL_KEY = "embedding_model"
 
 
@@ -70,12 +76,18 @@ def summarize(
     datasource_ids: Iterable[str],
     collection_metadata: Optional[Dict[str, Any]] = None,
     configured_model: Optional[str] = None,
+    curated_hashes: Optional[Dict[str, str]] = None,
 ) -> IndexHealth:
     """Judges an index from its entries' metadata and the snapshot store.
 
     Only each datasource's active build is counted (see
     ``VectorStore.refresh_schema_chunks``): entries of a build that was never
     switched in, or of a replaced one not yet deleted, are not what readers see.
+
+    ``curated_hashes`` maps a datasource id to the hash of its verified
+    queries as the file is now (``indexing.curated.curated_hashes``). An
+    indexed datasource whose recorded hash differs gets a warning; None
+    compares nothing.
     """
     collection_metadata = dict(collection_metadata or {})
     builds = _keyed(collection_metadata, BUILD_KEY)
@@ -140,6 +152,18 @@ def summarize(
                 f"Datasource '{ds.datasource_id}' was indexed from schema version {ds.index_version}, "
                 f"but the latest snapshot is {ds.snapshot_version}."
             )
+    if curated_hashes:
+        from nl2sql.indexing.curated import curated_hash
+
+        recorded = _keyed(collection_metadata, CURATED_HASH_KEY)
+        nothing = curated_hash(None)  # what an index from before curated answers holds
+        for ds in datasources:
+            current = curated_hashes.get(ds.datasource_id)
+            if current and ds.entries and recorded.get(ds.datasource_id, nothing) != current:
+                health.warnings.append(
+                    f"curated.yaml changed for '{ds.datasource_id}' since it was indexed; run "
+                    f"`nl2sql index --curated-only --datasource {ds.datasource_id}`."
+                )
     if health.problems:
         health.status = "stale"
         if not any("--full" in p for p in health.problems):
@@ -147,7 +171,12 @@ def summarize(
     return health
 
 
-def inspect_vector_store(vector_store, schema_store, datasource_ids: Iterable[str]) -> IndexHealth:
+def inspect_vector_store(
+    vector_store,
+    schema_store,
+    datasource_ids: Iterable[str],
+    curated_hashes: Optional[Dict[str, str]] = None,
+) -> IndexHealth:
     """Health of a live :class:`VectorStore`, as the engine sees it."""
     try:
         metadatas = vector_store.entry_metadatas(active_only=False)
@@ -160,6 +189,7 @@ def inspect_vector_store(vector_store, schema_store, datasource_ids: Iterable[st
         metadatas, latest, datasource_ids,
         collection_metadata=collection_metadata,
         configured_model=vector_store.embedding_model_id(),
+        curated_hashes=curated_hashes,
     )
 
 
@@ -168,6 +198,7 @@ def inspect_index_at(
     collection_name: str,
     schema_store_path: Path,
     datasource_ids: Iterable[str],
+    curated_hashes: Optional[Dict[str, str]] = None,
 ) -> IndexHealth:
     """Health of an index on disk, without loading an embedding model.
 
@@ -204,4 +235,4 @@ def inspect_index_at(
                 close()
 
     return summarize(metadatas, lambda ds: versions.get(ds), datasource_ids,
-                     collection_metadata=collection_metadata)
+                     collection_metadata=collection_metadata, curated_hashes=curated_hashes)

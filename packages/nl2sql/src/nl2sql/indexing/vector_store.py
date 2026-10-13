@@ -14,7 +14,7 @@ from nl2sql.indexing.embeddings import (
 )
 from nl2sql.common.exceptions import NL2SQLError
 from nl2sql.common.logger import get_logger
-from .models import BaseChunk
+from .models import BaseChunk, VerifiedQueryCandidate
 from .retrieval_trace import mmr_search
 
 logger = get_logger(__name__)
@@ -181,7 +181,9 @@ class VectorStore:
     # Every datasource lives in this one collection. Its entries carry a
     # ``build_id``; the collection's metadata names each datasource's active
     # build (``build:<datasource_id>``) and when it was switched in
-    # (``built_at:<datasource_id>``). Re-indexing a datasource writes a new build
+    # (``built_at:<datasource_id>``), plus the hash of the verified queries
+    # that build holds (``curated_hash:<datasource_id>``, see
+    # ``indexing.curated``). Re-indexing a datasource writes a new build
     # beside the active one, switches the pointer only when every entry is
     # written, and then deletes that datasource's other builds. Readers filter
     # on the active builds, so while two builds coexist they see exactly one,
@@ -194,6 +196,8 @@ class VectorStore:
 
     BUILD_KEY = "build:"
     BUILT_AT_KEY = "built_at:"
+    CURATED_HASH_KEY = "curated_hash:"
+    CURATED_TYPE = "curated.verified_query"
     MODEL_KEY = "embedding_model"
     STAGING_SUFFIX = "__staging"
     PREVIOUS_SUFFIX = "__previous"
@@ -298,6 +302,7 @@ class VectorStore:
         evicted_versions: Optional[List[str]] = None,
         switch_guard: Optional[Callable[[], ContextManager]] = None,
         batch_size: int = 256,
+        curated_hash: Optional[str] = None,
     ) -> Dict[str, int]:
         """
         Rebuilds one datasource's entries: write beside, switch, then delete.
@@ -315,11 +320,14 @@ class VectorStore:
         Args:
             datasource_id: Datasource identifier.
             schema_version: Schema version the chunks were built from.
-            chunks: Schema chunks to index.
+            chunks: The datasource's schema chunks and its verified query
+                chunks: every entry not in this build is deleted.
             evicted_versions: Unused; every previous build of the datasource
                 is replaced. Kept for callers of the old signature.
             switch_guard: Context manager factory held around the switch.
             batch_size: Entries embedded and written per call.
+            curated_hash: Recorded as ``curated_hash:<datasource_id>`` at the
+                switch when given (see ``indexing.curated``).
 
         Returns:
             Indexing statistics by chunk type.
@@ -327,34 +335,126 @@ class VectorStore:
         Raises:
             EmbeddingModelMismatchError: If the collection records another model.
         """
+        self.check_embedding_model()
+        self._write_build(datasource_id, self._prepare_chunk_documents(chunks), None,
+                          curated_hash, switch_guard, batch_size)
+        stats: Dict[str, Any] = {"datasource_id": datasource_id, "schema_version": schema_version}
+        for chunk in chunks:
+            stats[chunk.type] = stats.get(chunk.type, 0) + 1
+        return stats
+
+    def active_schema_version(self, datasource_id: str) -> Optional[str]:
+        """The schema version a datasource's active build was indexed from, or None."""
+        build = self.active_builds().get(datasource_id)
+        if not build:
+            return None
+        got = self.vectorstore._collection.get(
+            where={"$and": [{"datasource_id": datasource_id}, {"build_id": build}]},
+            include=["metadatas"],
+        )
+        metadatas = [md for md in got["metadatas"] or [] if md and md.get("schema_version")]
+        for md in metadatas:
+            if md.get("type") == "schema.datasource":
+                return md["schema_version"]
+        return metadatas[0]["schema_version"] if metadatas else None
+
+    def refresh_curated_chunks(
+        self,
+        datasource_id: str,
+        chunks: List[BaseChunk],
+        curated_hash: str,
+        switch_guard: Optional[Callable[[], ContextManager]] = None,
+        batch_size: int = 256,
+    ) -> Dict[str, Any]:
+        """
+        Replaces a datasource's verified query entries without touching its schema.
+
+        A new build is written as :meth:`refresh_schema_chunks` writes one,
+        except that its schema entries are copied from the active build with
+        their stored vectors, so only ``chunks`` are embedded and no schema is
+        read. The switch, and the deletion of the old build after it, are the
+        same.
+
+        Raises:
+            LookupError: If the datasource has no active build to copy.
+            EmbeddingModelMismatchError: If the collection records another model.
+        """
+        self.check_embedding_model()
+        build = self.active_builds().get(datasource_id)
+        if not build:
+            raise LookupError(
+                f"Datasource '{datasource_id}' has no index entries to keep; "
+                f"run `nl2sql index --datasource {datasource_id}` first."
+            )
+        schema_version = self.active_schema_version(datasource_id)
+        kept = self.vectorstore._collection.get(
+            where={"$and": [{"datasource_id": datasource_id}, {"build_id": build},
+                            {"type": {"$ne": self.CURATED_TYPE}}]},
+            include=["embeddings", "documents", "metadatas"],
+        )
+        documents = self._prepare_chunk_documents(chunks)
+        self._write_build(datasource_id, documents, kept, curated_hash, switch_guard, batch_size)
+
+        stats: Dict[str, Any] = {"datasource_id": datasource_id, "schema_version": schema_version or "-"}
+        for md in [*(kept["metadatas"] or []), *(d.metadata for d in documents)]:
+            kind = (md or {}).get("type", "unknown")
+            stats[kind] = stats.get(kind, 0) + 1
+        return stats
+
+    def _write_build(
+        self,
+        datasource_id: str,
+        documents: List[Document],
+        copied: Optional[Dict[str, Any]],
+        curated_hash: Optional[str],
+        switch_guard: Optional[Callable[[], ContextManager]],
+        batch_size: int,
+    ) -> str:
+        """Writes a datasource's new build, switches to it, deletes the old ones.
+
+        ``documents`` are embedded; ``copied`` (a Chroma ``get`` result with
+        embeddings) is written with the vectors it already has. Returns the
+        new build id.
+        """
         from datetime import datetime, timezone
         from uuid import uuid4
 
-        self.check_embedding_model()
         build_id = uuid4().hex[:12]
-        documents = self._prepare_chunk_documents(chunks)
         ids = []
         for i, doc in enumerate(documents):
             doc.metadata["build_id"] = build_id
             ids.append(f"{datasource_id}:{build_id}:{i}")
+        copied_count = len(copied["ids"]) if copied else 0
         this_build = {"$and": [{"datasource_id": datasource_id}, {"build_id": build_id}]}
 
         try:
+            for start in range(0, copied_count, batch_size):
+                stop = min(start + batch_size, copied_count)
+                self.vectorstore._collection.add(
+                    ids=[f"{datasource_id}:{build_id}:{len(documents) + i}" for i in range(start, stop)],
+                    embeddings=[list(v) for v in copied["embeddings"][start:stop]],
+                    documents=list(copied["documents"][start:stop]),
+                    metadatas=[{**md, "build_id": build_id} for md in copied["metadatas"][start:stop]],
+                )
             for start in range(0, len(documents), batch_size):
                 self.vectorstore.add_documents(
                     documents[start:start + batch_size], ids=ids[start:start + batch_size]
                 )
             written = len(self.vectorstore._collection.get(where=this_build, include=[])["ids"])
-            if written != len(documents):
+            expected = len(documents) + copied_count
+            if written != expected:
                 raise RuntimeError(
-                    f"Indexing {datasource_id}: wrote {written} of {len(documents)} entries."
+                    f"Indexing {datasource_id}: wrote {written} of {expected} entries."
                 )
+            updates = {
+                self.MODEL_KEY: self.embedding_model_id(),
+                f"{self.BUILD_KEY}{datasource_id}": build_id,
+                f"{self.BUILT_AT_KEY}{datasource_id}": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            }
+            if curated_hash is not None:
+                updates[f"{self.CURATED_HASH_KEY}{datasource_id}"] = curated_hash
             with (switch_guard() if switch_guard else nullcontext()):
-                self._update_metadata({
-                    self.MODEL_KEY: self.embedding_model_id(),
-                    f"{self.BUILD_KEY}{datasource_id}": build_id,
-                    f"{self.BUILT_AT_KEY}{datasource_id}": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-                })
+                self._update_metadata(updates)
         except BaseException:
             try:
                 self.vectorstore._collection.delete(where=this_build)
@@ -370,11 +470,7 @@ class VectorStore:
             )
         except Exception as exc:
             logger.warning(f"Could not delete the previous entries of {datasource_id}: {exc}")
-
-        stats: Dict[str, Any] = {"datasource_id": datasource_id, "schema_version": schema_version}
-        for chunk in chunks:
-            stats[chunk.type] = stats.get(chunk.type, 0) + 1
-        return stats
+        return build_id
 
     # --- full rebuild: a second collection, swapped in ------------------------
 
@@ -618,6 +714,97 @@ class VectorStore:
         )
         return self._mmr("planning", query, where, k, explain,
                          {"datasource_id": datasource_id, "types": types, "tables": list(tables)})
+
+    CURATED_FETCH_MULTIPLIER = 10
+
+    def retrieve_verified_query_candidates(
+        self,
+        query: str,
+        datasource_ids: List[str],
+        k: Optional[int] = None,
+        explain: Optional[List[Dict[str, Any]]] = None,
+    ) -> List[VerifiedQueryCandidate]:
+        """
+        The verified queries a question most resembles, one per query.
+
+        A plain similarity search, not MMR: several phrasings of one query are
+        exactly what should match. The pool is ``k * CURATED_FETCH_MULTIPLIER``
+        entries of the active builds of ``datasource_ids``; each query keeps its
+        best phrasing's cosine similarity, and the best ``k`` queries are
+        returned, most similar first. When none of the datasources has a
+        verified query entry, nothing is embedded.
+
+        Args:
+            query: The question.
+            datasource_ids: Search only these datasources' entries.
+            k: How many queries; ``CURATED_MATCH_TOP_K`` when not given.
+            explain: When given, the search's record is appended to it, shaped
+                like an MMR search's (``retrieval_trace.mmr_search``).
+
+        Returns:
+            One :class:`VerifiedQueryCandidate` per query, best first.
+        """
+        from langchain_chroma.vectorstores import cosine_similarity
+
+        from nl2sql.common.resilience import VECTOR_BREAKER
+        from nl2sql.common.settings import settings
+
+        k = k or settings.curated_match_top_k
+        if not datasource_ids:
+            return []
+        self.initialize_if_not_exists()
+        ids = list(dict.fromkeys(datasource_ids))
+        where = self._and(
+            {"type": self.CURATED_TYPE},
+            {"datasource_id": {"$in": ids}} if len(ids) > 1 else {"datasource_id": ids[0]},
+            self._active_filter(),
+        )
+        available = len(self.vectorstore._collection.get(where=where, include=[])["ids"])
+        if available == 0:
+            return []
+        fetch_k = min(available, k * self.CURATED_FETCH_MULTIPLIER)
+
+        @VECTOR_BREAKER
+        def _execute():
+            embedding = self.embeddings.embed_query(query)
+            return embedding, self.vectorstore._collection.query(
+                query_embeddings=[embedding], n_results=fetch_k, where=where,
+                include=["metadatas", "documents", "embeddings"],
+            )
+
+        embedding, results = _execute()
+        metadatas = list(results["metadatas"][0] or [])
+        texts = list(results["documents"][0] or [])
+        vectors = results["embeddings"][0]
+        scores = cosine_similarity([embedding], vectors)[0] if len(metadatas) else []
+
+        best: Dict[tuple, VerifiedQueryCandidate] = {}
+        best_entry: Dict[tuple, str] = {}
+        pool = []
+        for i, md in enumerate(metadatas):
+            score = float(scores[i])
+            key = (md.get("datasource_id"), md.get("query_id"))
+            pool.append({"id": md.get("id"), "label": md.get("query_id"), "type": md.get("type"),
+                         "datasource_id": md.get("datasource_id"), "similarity": round(score, 4)})
+            if key not in best or score > best[key].score:
+                best[key] = VerifiedQueryCandidate(datasource_id=key[0], query_id=key[1], score=score, text=texts[i])
+                best_entry[key] = md.get("id")
+        ranked = sorted(best.values(), key=lambda c: c.score, reverse=True)[:k]
+
+        if explain is not None:
+            pool.sort(key=lambda item: item["similarity"], reverse=True)
+            picks = [best_entry[(c.datasource_id, c.query_id)] for c in ranked]
+            for rank, item in enumerate(pool, start=1):
+                item["rank"] = rank
+                item["picked"] = item["id"] in picks
+            explain.append({
+                "search": "verified_queries",
+                "filter": {"datasource_ids": ids, "types": [self.CURATED_TYPE]},
+                "query": query, "k": k, "fetch_k": fetch_k,
+                "pool": pool, "picks": picks,
+                "dropped": [item["id"] for item in pool if not item["picked"]],
+            })
+        return ranked
 
     def inspect(
         self,

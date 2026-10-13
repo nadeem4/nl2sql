@@ -49,6 +49,7 @@ def rebuild_index(
     on_progress: Optional[Callable[[str], None]] = None,
     on_datasource: Optional[Callable[[str, str, Optional[str]], None]] = None,
     switch_guard: Optional[Callable[[], ContextManager]] = None,
+    curated_only: bool = False,
 ) -> RebuildResult:
     """Rebuilds the vector index.
 
@@ -66,14 +67,21 @@ def rebuild_index(
         switch_guard: A context manager factory held only around each switch,
             e.g. the playground's ``RunGate.change`` so questions in flight
             finish first.
+        curated_only: Re-index only the verified queries from
+            ``curated.yaml``, keeping each datasource's schema entries as they
+            are: no schema read, no enrichment call. Per datasource, like the
+            default; not with ``full``.
 
     Returns:
         A :class:`RebuildResult`.
 
     Raises:
+        ValueError: With both ``full`` and ``curated_only``.
         EmbeddingModelMismatchError: Without ``full``, when the collection
             records a different embedding model than the configured one.
     """
+    if full and curated_only:
+        raise ValueError("A full rebuild re-indexes everything; it cannot be curated-only.")
     say = on_progress or (lambda _msg: None)
     tell = on_datasource or (lambda *_args: None)
     result = RebuildResult()
@@ -105,14 +113,18 @@ def rebuild_index(
         orchestrator = IndexingOrchestrator(ctx, enrich=enrich)
         for adapter in adapters:
             ds_id = adapter.datasource_id
-            say(f"Indexing {ds_id}: reading the schema and embedding its entries")
             tell(ds_id, "start", None)
             try:
-                stats = orchestrator.index_datasource(
-                    adapter,
-                    vector_store=target,
-                    switch_guard=None if full else switch_guard,
-                )
+                if curated_only:
+                    say(f"Indexing {ds_id}: embedding its verified queries")
+                    stats = orchestrator.refresh_curated(ds_id, vector_store=target, switch_guard=switch_guard)
+                else:
+                    say(f"Indexing {ds_id}: reading the schema and embedding its entries")
+                    stats = orchestrator.index_datasource(
+                        adapter,
+                        vector_store=target,
+                        switch_guard=None if full else switch_guard,
+                    )
             except Exception as exc:
                 logger.error(f"Failed to index {ds_id}: {exc}")
                 result.errors.append({"datasource_id": ds_id, "error": str(exc)})

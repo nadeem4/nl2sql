@@ -10,13 +10,17 @@ flowchart TD
     Snapshot --> Enrich[LLM Enrichment - optional]
     Enrich --> Register[SchemaStore.register_snapshot]
     Register --> Chunker[SchemaChunkBuilder]
+    Curated[curated.yaml] --> CChunker[CuratedChunkBuilder]
     Chunker --> Refresh[VectorStore.refresh_schema_chunks]
+    CChunker --> Refresh
     Refresh --> Store[Chroma Vector Store]
 ```
 
 ## What is indexed today
 
-Only schema-derived chunks are indexed. There is no symbolic index, behavioral index, or non-schema catalogs in the current implementation.
+Schema-derived chunks, and the verified queries of [`curated.yaml`](../configuration/curated.md)
+when the file exists. There is no symbolic index, behavioral index, or other
+catalog in the current implementation.
 
 ## Chunk types and contracts
 
@@ -27,8 +31,53 @@ Chunk types are defined in `nl2sql.indexing.models`:
 - **ColumnChunk** (`schema.column`): column type, stats, synonyms, PII flags.
 - **RelationshipChunk** (`schema.relationship`): FK relationships, columns, cardinality.
 - **MetricChunk** (`schema.metric`): defined but **not emitted** by `SchemaChunkBuilder`.
+- **VerifiedQueryChunk** (`curated.verified_query`): one phrasing of a verified
+  query, or its description, built by `CuratedChunkBuilder`
+  (`nl2sql.indexing.curated`). Each `{placeholder}` is filled with the param's
+  `example`, else its `default`, else its own name, because a raw `{n}` embeds
+  poorly: "Best {n} customers in {year}" is embedded as "Best 10 customers in
+  2012". Metadata: `id`, `type`, `datasource_id`, `query_id`, `schema_version`.
+  Ids: `curated.verified_query:<datasource_id>:<query_id>:<n>`, the phrasings in
+  order, then the description. The SQL is never indexed.
 
 Chunk models live in `nl2sql.indexing.models` and are Pydantic models. IDs are deterministic and include `schema_version`.
+
+## Verified queries
+
+Verified query entries are written **in the same build as the datasource's
+schema entries**: `IndexingOrchestrator.index_datasource()` appends them to the
+schema chunks before `refresh_schema_chunks()`. A build replaces every entry of
+its datasource, so curated entries written on their own would be deleted by the
+next schema re-index.
+
+At the switch the collection metadata also records
+`curated_hash:<datasource_id>`, a SHA-256 of that datasource's verified queries
+as canonical JSON (metrics are left out; nothing indexes them yet). Index
+health compares it with the file as it is now (see [Index health](#index-health)).
+
+**Changing `curated.yaml` does not re-read the schema.**
+`nl2sql index --curated-only` (`rebuild_index(..., curated_only=True)`,
+`IndexingOrchestrator.refresh_curated()`,
+`VectorStore.refresh_curated_chunks()`) writes a new build for each datasource
+the usual way, except that the active build's schema entries are **copied**
+into it with their stored vectors: no schema read, no snapshot registered, no
+enrichment model call, and only the verified queries are embedded. The switch
+and the deletion of the old build are the ones described below, so the
+refresh is just as safe. It needs the datasource to have been indexed once;
+otherwise that datasource fails with a message saying to run `nl2sql index`.
+`--curated-only` cannot be combined with `--full`.
+
+`VectorStore.retrieve_verified_query_candidates(question, datasource_ids, k)`
+returns the verified queries a question most resembles. It is a plain
+similarity search, not MMR, because several phrasings of one query are exactly
+what should match: it reads the active builds of the given datasources only,
+fetches `k × 10` entries, keeps each query's best phrasing (by cosine
+similarity), and returns the best `k` (`CURATED_MATCH_TOP_K`, 5), each with its
+`score` and the phrasing that won. With no verified query entry among those
+datasources it returns nothing without embedding the question. Given an
+`explain` list, it appends a record shaped like the MMR one below. Nothing in
+the pipeline calls it yet; the matcher that will is described in
+[Curated Answers (design)](curated_answers.md).
 
 ## Chunk → index mapping (actual)
 
@@ -96,7 +145,12 @@ folder or collection), `empty` (0 entries), `stale` (a configured datasource has
 no entries, its entries were built from an older schema version than the latest
 snapshot, or the configured embedding model differs), `ok`. It reports entry
 counts by type, the schema version per datasource, when each was built and the
-recorded embedding model. `nl2sql doctor` prints it under **Index**,
+recorded embedding model. `warnings` never change the status: a datasource
+whose `curated.yaml` section has changed since it was indexed (its recorded
+`curated_hash` differs from the file's) gets "curated.yaml changed for
+'chinook' since it was indexed; run `nl2sql index --curated-only --datasource
+chinook`". Questions keep working meanwhile; the stale entries still name
+queries that exist. `nl2sql doctor` prints it under **Index**,
 `nl2sql demo` rebuilds at startup when it is not `ok`, and the playground and
 `GET /api/v1/index/status` show it (through `NL2SQL.index_health`), the playground
 with a Rebuild button.
@@ -238,7 +292,8 @@ Current failure behaviors:
   [Retrieval](#retrieval-mmr-not-a-re-ranking-model).
 - No caching or sharding layers are implemented.
 - Index refresh re-embeds every entry of the datasource being re-indexed; other
-  datasources are untouched.
+  datasources are untouched. `nl2sql index --curated-only` embeds only the
+  verified queries and copies the schema entries' stored vectors.
 
 ## Observability hooks
 
@@ -249,6 +304,7 @@ Current failure behaviors:
 
 - Chunk models: `packages/nl2sql/src/nl2sql/indexing/models.py`
 - Chunk builder: `packages/nl2sql/src/nl2sql/indexing/chunk_builder.py`
+- Verified query entries and their hash: `packages/nl2sql/src/nl2sql/indexing/curated.py`
 - Vector store: `packages/nl2sql/src/nl2sql/indexing/vector_store.py`
 - Schema retriever: `packages/nl2sql/src/nl2sql/pipeline/nodes/schema_retriever/node.py`
 - Indexing orchestrator: `packages/nl2sql/src/nl2sql/indexing/orchestrator.py`
