@@ -2,6 +2,10 @@
 
 ## Endpoints
 
+`POST /api/v1/index/{datasource_id}`, `POST /api/v1/index-all` and
+`DELETE /api/v1/index` are admin only (see [Admin routes](index.md#admin-routes));
+`GET /api/v1/index/status` is open.
+
 ### `POST /api/v1/index/{datasource_id}`
 
 Execution flow:
