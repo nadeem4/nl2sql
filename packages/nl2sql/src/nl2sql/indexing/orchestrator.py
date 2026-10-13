@@ -22,20 +22,21 @@ class IndexingOrchestrator:
     registration, chunk construction, and vector store refresh.
     """
 
-    def __init__(self, ctx: NL2SQLContext, enrich: bool = True):
+    def __init__(self, ctx: NL2SQLContext, enrich: bool = False):
         """
         Initializes the indexing orchestrator.
 
         Args:
             ctx: Initialized NL2SQLContext.
             enrich: Whether to ask the ``indexing_enrichment`` LLM for
-                descriptions. Enrichment spends tokens, so the demo and the
-                playground turn it on only when asked.
+                descriptions. Off by default: enrichment spends tokens, so
+                every caller turns it on only when asked.
         """
         self.enrich = enrich
         self.vector_store = ctx.vector_store
         self.schema_store = ctx.schema_store
         self.config_manager = ctx.config_manager
+        self.ds_registry = getattr(ctx, "ds_registry", None)
         self.llm_registry = ctx.llm_registry
         # The loaded curated.yaml, or None when the feature is off.
         self.curated = getattr(ctx, "curated", None)
@@ -67,9 +68,7 @@ class IndexingOrchestrator:
         schema_snapshot = adapter.fetch_schema_snapshot()
 
         questions = self.config_manager.get_example_questions(adapter.datasource_id)
-        datasource_description = self.config_manager.get_datasource_description(
-            adapter.datasource_id
-        )
+        datasource_description = self._datasource_description(adapter.datasource_id)
 
         # Best-effort: enrich_schema_snapshot owns resolving its own LLM and
         # degrades to the unenriched snapshot when none is usable, so indexing
@@ -120,6 +119,19 @@ class IndexingOrchestrator:
             switch_guard=switch_guard,
             curated_hash=curated_hash(curated),
         )
+
+    def _datasource_description(self, datasource_id: str):
+        """The description the datasource was registered with.
+
+        A datasource added in code (``engine.add_datasource``) is not in the
+        datasources file, so the registry is asked first; the file is read
+        only when the registry has no description for it.
+        """
+        get_description = getattr(self.ds_registry, "get_description", None)
+        description = get_description(datasource_id) if get_description else None
+        if description and description.strip():
+            return description
+        return self.config_manager.get_datasource_description(datasource_id)
 
     def refresh_curated(
         self,

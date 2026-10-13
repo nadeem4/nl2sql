@@ -20,6 +20,8 @@ Source: `packages/api/src/nl2sql_api/models/llm.py`
 
 ### `POST /api/v1/llm`
 
+Admin only: see [Admin routes](index.md#admin-routes).
+
 Execution flow:
 - Delegates to `engine.configure_llm(...)`.
 

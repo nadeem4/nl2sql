@@ -16,8 +16,16 @@ Sources, first match wins:
    choose any role.
 
 No role is a 401. The settings are read on each request.
+
+Admin routes (anything that changes datasources, LLMs or the index) also depend
+on ``require_admin``: one of the resolved roles must be in
+``NL2SQL_API_ADMIN_ROLES`` (comma-separated, default ``admin``), or the request is
+a 403. With none of the three role sources configured, admin routes answer
+loopback clients only, so a fresh local install still works and a published port
+does not hand out admin.
 """
 
+import ipaddress
 import logging
 import os
 from typing import Any, List
@@ -32,6 +40,8 @@ logger = logging.getLogger(__name__)
 ROLE_HEADER_ENV = "NL2SQL_API_ROLE_HEADER"
 STATIC_ROLE_ENV = "NL2SQL_API_ROLE"
 TRUST_BODY_ROLE_ENV = "NL2SQL_API_TRUST_BODY_ROLE"
+ADMIN_ROLES_ENV = "NL2SQL_API_ADMIN_ROLES"
+DEFAULT_ADMIN_ROLES = "admin"
 
 
 def _body_role_trusted() -> bool:
@@ -90,3 +100,57 @@ async def get_user_context(request: Request) -> UserContext:
             f"user_context is ignored unless {TRUST_BODY_ROLE_ENV}=true (local testing only)."
         ),
     )
+
+
+
+def _role_source_configured() -> bool:
+    return bool(os.getenv(ROLE_HEADER_ENV, "").strip() or os.getenv(STATIC_ROLE_ENV, "").strip()
+                or _body_role_trusted())
+
+
+def _admin_roles() -> List[str]:
+    return _roles(os.getenv(ADMIN_ROLES_ENV, "")) or [DEFAULT_ADMIN_ROLES]
+
+
+def _is_loopback(host: str) -> bool:
+    if host == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return False
+
+
+async def require_admin(request: Request) -> UserContext:
+    """Let the request through only if it carries an admin role; 401 with no role, 403 without admin.
+
+    With no role source configured, only a loopback client is let through.
+    """
+    if not _role_source_configured():
+        host = request.client.host if request.client else ""
+        if _is_loopback(host):
+            return UserContext(roles=_admin_roles())
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                "Admin routes answer only loopback clients until a role source is configured. "
+                f"Set a trusted proxy header ({ROLE_HEADER_ENV}) or a static role ({STATIC_ROLE_ENV}), "
+                f"and list the admin roles in {ADMIN_ROLES_ENV} (default: {DEFAULT_ADMIN_ROLES})."
+            ),
+        )
+
+    user_context = await get_user_context(request)
+    admin_roles = _admin_roles()
+    if not set(user_context.roles) & set(admin_roles):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"This route needs an admin role: one of {ADMIN_ROLES_ENV} ({', '.join(admin_roles)}).",
+        )
+    return user_context
+
+
+ADMIN_RESPONSES = {
+    401: {"description": "No role for this request (see the auth settings)."},
+    403: {"description": f"The request has no role listed in {ADMIN_ROLES_ENV}, or no role source "
+                         "is configured and the client is not on loopback."},
+}
