@@ -25,7 +25,7 @@ from nl2sql.pipeline.nodes.generator.node import (
     ordered,
 )
 from nl2sql.context import NL2SQLContext
-from nl2sql.auth.rbac import default_schema, table_allowed
+from nl2sql.auth.rbac import FALLBACK_DEFAULT_SCHEMA, default_schema, table_allowed
 from nl2sql.common.logger import get_logger
 from nl2sql.common.settings import settings
 from nl2sql.pipeline.nodes.validator.schemas import LogicalValidatorResponse, ValidationCheck
@@ -665,8 +665,9 @@ class LogicalValidatorNode:
             if table_allowed(allowed_tables, ds_id, t.name, t.schema_name, default):
                 continue
 
-            schema = t.schema_name or default
-            namespaced_name = f"{ds_id}.{schema}.{t.name}" if schema else f"{ds_id}.{t.name}"
+            # A table outside the default schema is named with its schema.
+            outside_default = t.schema_name and t.schema_name != (default or FALLBACK_DEFAULT_SCHEMA)
+            namespaced_name = f"{ds_id}.{t.schema_name}.{t.name}" if outside_default else f"{ds_id}.{t.name}"
             # The operator always gets the table and the role (log and trace);
             # the user gets them only when the deployment opts in, because
             # naming a table tells an unauthorised user that it exists.

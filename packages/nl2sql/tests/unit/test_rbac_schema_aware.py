@@ -250,3 +250,28 @@ def test_the_shipped_policies_still_validate(name):
     data = json.loads((root / "configs" / name).read_text(encoding="utf-8"))
     for role in data["roles"].values():
         Policy(**role)
+
+
+def test_the_refusal_names_the_schema_only_outside_the_default_one():
+    rbac = _rbac(f"{DS}.sales.customers")
+
+    def refused(schema):
+        plan = PlanModel(
+            query_type="READ",
+            tables=[PlanTableRef(name="orders", schema_name=schema, alias="t0")],
+            select_items=[SelectItem(expr=Expr(kind="column", alias="t0", column_name="id"))],
+            joins=[],
+        )
+        state = SubgraphExecutionState(
+            trace_id="t",
+            sub_query=SubQuery(id="sq1", datasource_id=DS, intent="orders"),
+            relevant_tables=[Table(name="orders", columns=[Column(name="id", type="INTEGER")])],
+            ast_planner_response=ASTPlannerResponse(plan=plan),
+            user_context=UserContext(roles=["r"]),
+        )
+        node = LogicalValidatorNode(SimpleNamespace(ds_registry=_registry(), rbac=rbac))
+        return node._validate_policy(state)[0].details["table"]
+
+    assert refused(None) == f"{DS}.orders"
+    assert refused(DEFAULT) == f"{DS}.orders"
+    assert refused("audit") == f"{DS}.audit.orders"
