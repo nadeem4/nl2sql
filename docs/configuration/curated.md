@@ -316,11 +316,11 @@ back verified. Check and run the file with
 `nl2sql --env demo curated validate` and `nl2sql --env demo curated test`.
 
 The keyless demo (a hosted Space with no key, or `nl2sql demo` replaying
-recordings) answers from recorded model answers, and those were recorded
-before the curated matcher existed: they hold no `VerifiedQueryChoice` answer.
-Until the recordings are made again (`python scripts/record_demo_answers.py`,
-which needs the owner's key), the matcher's call misses, the run falls back
-(`model_failed`), and every keyless answer is generated, as before.
+recordings) answers from recorded model answers, and those include the
+matcher's `VerifiedQueryChoice` for every guided question. So without a key,
+"What is the total revenue per year?", "Which genre sells the most tracks?",
+"How many customers do we have, by country?" and "How many purchases were
+there per month in 2013?" come back verified, and the rest generated.
 
 ## Preferred tables
 
