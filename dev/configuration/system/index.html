@@ -911,6 +911,18 @@
   </span>
 </a>
 </li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../curated/">
+<span class="md-ellipsis">
+    
+  
+    Curated Answers
+  
+
+    
+  </span>
+</a>
+</li>
 </ul>
 </nav>
 </li>
@@ -2128,6 +2140,11 @@
 <td>Path to the secrets config file.</td>
 </tr>
 <tr>
+<td><code>CURATED_CONFIG</code></td>
+<td><code>configs/curated.yaml</code></td>
+<td>Path to the curated answers file (verified queries). Absent at the default path, the feature is off; set to any other path that does not exist, startup fails. See <a href="../curated/">Curated Answers</a>.</td>
+</tr>
+<tr>
 <td><code>VECTOR_STORE</code></td>
 <td><code>./chroma_db</code></td>
 <td>Persist directory for the vector store.</td>
@@ -2339,6 +2356,11 @@ providers. The check runs on the read path only, so the fix is simply to re-run
 <td>Let the playground record a thumbs up or down, with an optional note, for a run. Stored in the schema store's <code>feedback</code> table (<code>SCHEMA_STORE_PATH</code>): question, role, status, SQL, error codes, the model per node and the engine version, never result rows or sample values. Local only, like Settings. <code>nl2sql feedback clear</code> empties it. See <a href="../../observability/feedback/">Feedback and Signals</a>.</td>
 </tr>
 <tr>
+<td><code>CURATED_ENABLED</code></td>
+<td><code>true</code></td>
+<td>Load and check the curated answers file at startup. <code>false</code> turns the feature off without removing the file; <code>nl2sql curated validate</code> still checks it. See <a href="../curated/">Curated Answers</a>.</td>
+</tr>
+<tr>
 <td><code>RBAC_REFUSAL_NAMES_TABLES</code></td>
 <td><code>false</code></td>
 <td>Name the role and the forbidden table in the refusal the user sees. Off, the message is "You do not have permission to see the data this question requires."; the table and role are always in the log and the run trace. <code>nl2sql setup --demo</code> writes <code>true</code> into <code>.env.demo</code>. See <a href="../../security/model/#strict-refusal">Security Model</a>.</td>
@@ -2458,7 +2480,8 @@ variable already exported in the shell wins over the file.</p>
     ConfigManager --&gt; Datasources[datasources.yaml]
     ConfigManager --&gt; LLM[llm.yaml]
     ConfigManager --&gt; Policies[policies.json]
-    ConfigManager --&gt; Secrets[secrets.yaml]</code></pre>
+    ConfigManager --&gt; Secrets[secrets.yaml]
+    ConfigManager --&gt; Curated["curated.yaml (optional)"]</code></pre>
 <h2 id="secret-resolution">Secret resolution</h2>
 <p><code>SecretManager</code> resolves secret references (<code>${provider:key}</code>):</p>
 <ul>
@@ -2475,6 +2498,8 @@ variable already exported in the shell wins over the file.</p>
   See <a href="../policies/">Policies config</a>.</li>
 <li><code>configs/secrets.yaml</code>: optional secret providers.
   See <a href="../secrets/">Secrets config</a>.</li>
+<li><code>configs/curated.yaml</code>: optional verified queries, keyed by datasource.
+  See <a href="../curated/">Curated answers</a>.</li>
 </ul>
 <h2 id="source-references">Source references</h2>
 <ul>
