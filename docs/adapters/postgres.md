@@ -6,7 +6,7 @@ This adapter extends `BaseSQLAlchemyAdapter`, leveraging automatic schema reflec
 
 ## Configuration
 
-**Type**: `postgres` (or `postgresql`)
+**Type**: `postgres`
 
 ```yaml
 
@@ -35,7 +35,7 @@ connection:
 | **Timeout** | Native `-c statement_timeout={ms}` | Enforced server-side. |
 | **Dry Run** | `EXPLAIN {sql}` | Highly accurate validation. |
 | **Costing** | `EXPLAIN (FORMAT JSON) {sql}` | Returns "Total Cost" and "Plan Rows". |
-| **Stats** | Optimized Queries | Fetches `null_perc`, `distinct`, `min/max`. |
+| **Stats** | Optimized Queries | Fetches `null_perc`, `distinct`, `min/max` (no `min/max` for `boolean`, `uuid`; none for `jsonb`, `bytea`, arrays). A column that fails is skipped without aborting the transaction; see [Column statistics](sqlalchemy.md#column-statistics). |
 
 ### Optimization Details
 

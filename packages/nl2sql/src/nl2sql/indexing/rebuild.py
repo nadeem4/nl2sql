@@ -43,7 +43,7 @@ class RebuildResult:
 
 def rebuild_index(
     ctx,
-    enrich: bool = True,
+    enrich: bool = False,
     datasource_ids: Optional[Iterable[str]] = None,
     full: bool = False,
     on_progress: Optional[Callable[[str], None]] = None,
@@ -56,7 +56,7 @@ def rebuild_index(
     Args:
         ctx: An ``NL2SQLContext`` (or anything with ``vector_store`` and
             ``ds_registry``).
-        enrich: Ask the LLM for descriptions; spends tokens.
+        enrich: Ask the LLM for descriptions; spends tokens. Off by default.
         datasource_ids: Only these datasources; all registered ones when None.
             Ignored with ``full``, which always rebuilds every datasource.
         full: Rebuild every datasource into a new collection and swap it in;

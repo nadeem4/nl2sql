@@ -1,7 +1,10 @@
+import datetime
+import decimal
 import time
 from typing import Dict, Any, Iterator, List, Optional
 from sqlalchemy import create_engine, inspect, text, Engine, select, func, table, column, case, literal_column, Connection
 from sqlalchemy.engine.reflection import Inspector
+from sqlalchemy.sql import sqltypes
 from typing import Tuple
 from nl2sql_adapter_sdk.capabilities import DatasourceCapability
 from nl2sql_adapter_sdk.contracts import (
@@ -64,6 +67,54 @@ def _driver_message(exc: BaseException) -> str:
 ALL_VALUES_MAX_DISTINCT = 50
 SAMPLE_VALUES = 5
 
+# Types MIN/MAX cannot order: Postgres raises on MIN(boolean) and MIN(uuid),
+# SQL Server on MIN(bit). Dialect types subclass these (postgresql UUID,
+# mssql BIT and UNIQUEIDENTIFIER), so isinstance covers them.
+_UNORDERED_TYPES = (sqltypes.Boolean, sqltypes.Uuid)
+# Types that get no statistics at all, by class and, for types a driver
+# reflects without a SQLAlchemy class, by name.
+_UNPROFILED_TYPES = (sqltypes.JSON, sqltypes.LargeBinary, sqltypes.ARRAY)
+_UNPROFILED_NAMES = ("json", "blob", "binary", "bytea", "xml", "array")
+
+
+def min_max_skip_reason(sa_type: Any) -> Optional[str]:
+    """Why a column of ``sa_type`` gets no MIN/MAX, or None if it does."""
+    if _unprofiled(sa_type):
+        return f"{_type_name(sa_type)} is not profiled"
+    if isinstance(sa_type, _UNORDERED_TYPES):
+        return f"{_type_name(sa_type)} has no ordering"
+    return None
+
+
+def as_scalar(value: Any) -> Any:
+    """``value`` as a statistics scalar (str, int, float, bool or None).
+
+    Drivers return dates, times, decimals and UUIDs for MIN/MAX, which the
+    statistics model does not accept: dates and times become ISO strings,
+    decimals floats, anything else its text.
+    """
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, (datetime.date, datetime.time)):
+        return value.isoformat()
+    if isinstance(value, decimal.Decimal):
+        return float(value)
+    return str(value)
+
+
+def _type_name(sa_type: Any) -> str:
+    try:
+        return str(sa_type)
+    except Exception:
+        return type(sa_type).__name__
+
+
+def _unprofiled(sa_type: Any) -> bool:
+    """A type that gets no statistics at all: JSON, binary, XML, arrays."""
+    if isinstance(sa_type, _UNPROFILED_TYPES):
+        return True
+    return any(name in _type_name(sa_type).lower() for name in _UNPROFILED_NAMES)
+
 class BaseSQLAlchemyAdapter:
     """
     Base class for all SQLAlchemy-based adapters.
@@ -106,6 +157,23 @@ class BaseSQLAlchemyAdapter:
     @property
     def max_bytes(self) -> int:
         return self._max_bytes
+
+    @property
+    def default_schema(self) -> Optional[str]:
+        """The schema an unqualified table name resolves to, or ``None`` if unknown.
+
+        RBAC reads a two-part ``datasource.table`` policy entry as that table
+        in this schema. Asked of the database once and remembered.
+        """
+        if not self.engine:
+            return None
+        if not hasattr(self, "_default_schema"):
+            try:
+                self._default_schema = inspect(self.engine).default_schema_name
+            except Exception as e:
+                logger.warning(f"Could not read the default schema of {self}: {e}")
+                return None
+        return self._default_schema
 
     def __str__(self):
         return f"{self.datasource_id} ({self.datasource_engine_type})"
@@ -411,8 +479,18 @@ class BaseSQLAlchemyAdapter:
             for schema in sorted(schemas):
                 for table_name in self._relation_names(inspector, schema):
                     table_ref = TableRef(schema_name=schema, table_name=table_name)
-                    row_count = self._get_row_count(conn, table_ref)
-                    columns_metadata = self._get_columns_metadata(inspector, conn, table_ref, row_count)
+                    try:
+                        row_count = self._get_row_count(conn, table_ref)
+                    except Exception as e:
+                        self._rollback(conn)
+                        logger.warning(f"Failed to fetch row count for {self}: {table_ref.full_name}: {_driver_message(e)}")
+                        row_count = 0
+                    try:
+                        columns_metadata = self._get_columns_metadata(inspector, conn, table_ref, row_count)
+                    except Exception as e:
+                        self._rollback(conn)
+                        logger.warning(f"Failed to profile {table_ref.full_name} for {self}: {_driver_message(e)}")
+                        columns_metadata = {}
                     try:
                         table_comment = inspector.get_table_comment(
                             table_ref.table_name,
@@ -454,17 +532,54 @@ class BaseSQLAlchemyAdapter:
 
 
     def _get_columns_metadata(self, inspector: Inspector, conn: Connection, table_ref: TableRef, row_count: int) -> Dict[str, ColumnMetadata]:
+        """Each column's description and statistics, profiled one at a time.
+
+        A column whose statistics query fails keeps no statistics, and the
+        read-only transaction is rolled back so the failed statement cannot
+        poison the queries after it (on Postgres it would abort them all).
+        """
         columns_metadata = {}
+        skipped, failed = [], []
 
         for col_info in inspector.get_columns(table_ref.table_name, schema=table_ref.schema_name):
-            columns_metadata[col_info["name"]] = ColumnMetadata(
+            name, sa_type = col_info["name"], col_info["type"]
+            reason = min_max_skip_reason(sa_type)
+            if reason:
+                skipped.append(f"{name} ({reason})")
+            try:
+                statistics = self._get_column_stats(conn, table_ref, name, row_count, sa_type)
+            except Exception as e:
+                self._rollback(conn)
+                failed.append(f"{name} ({_driver_message(e)})")
+                statistics = None
+            columns_metadata[name] = ColumnMetadata(
                 description=col_info.get("comment"),
-                statistics=self._get_column_stats(conn, table_ref, col_info["name"], row_count, str(col_info["type"])),
+                statistics=statistics,
                 synonyms=[],
                 pii=False
             )
 
+        if failed:
+            logger.warning(
+                f"Profiled {table_ref.full_name} for {self} without statistics for "
+                f"{len(failed)} column(s): {'; '.join(failed)}"
+                + (f". No MIN/MAX for: {'; '.join(skipped)}" if skipped else "")
+            )
+        elif skipped:
+            logger.debug(f"No MIN/MAX for {table_ref.full_name} in {self}: {'; '.join(skipped)}")
         return columns_metadata
+
+    def _rollback(self, conn: Connection) -> None:
+        """Ends a transaction a failed statement left behind.
+
+        Profiling only reads, so rolling back loses nothing, and it works on
+        every dialect, where a savepoint per column would not (pysqlite and
+        DuckDB) and would cost a round trip per column where it does.
+        """
+        try:
+            conn.rollback()
+        except Exception as e:
+            logger.warning(f"Failed to roll back after a profiling error for {self}: {_driver_message(e)}")
 
     def _get_column_contract(self, inspector: Inspector, conn: Connection, table_ref: TableRef) -> Dict[str, ColumnContract]:
         columns_contract = {}
@@ -506,27 +621,28 @@ class BaseSQLAlchemyAdapter:
 
         Returns:
             int: The total number of rows.
-        """
-        try:
-            stmt = select(func.count()).select_from(table(table_ref.table_name, schema=table_ref.schema_name))
-            return conn.execute(stmt).scalar()
-        except Exception as e:
-            logger.warning(f"Failed to fetch row count for {self}: {table_ref.full_name}: {e}")
-            return 0
 
-    def _get_column_stats(self, conn: Connection, table_ref: TableRef, column_name: str, row_count: int, column_type: str) -> ColumnStatistics:
+        Raises:
+            Exception: Whatever the driver raised; the caller rolls back.
+        """
+        stmt = select(func.count()).select_from(table(table_ref.table_name, schema=table_ref.schema_name))
+        return conn.execute(stmt).scalar()
+
+    def _get_column_stats(self, conn: Connection, table_ref: TableRef, column_name: str, row_count: int, column_type: Any) -> ColumnStatistics:
         """Fetches statistics for a specific column.
 
         Args:
             table_ref (TableRef): The table reference.
             column_name (str): The column name.
             row_count (int): Total rows in the table.
-            column_type (str): The column type string.
+            column_type: The reflected SQLAlchemy type.
 
         Returns:
-            ColumnStatistics: Statistical data about the column.
+            ColumnStatistics: Statistical data about the column. Types with no
+            ordering (``min_max_skip_reason``) get no MIN/MAX; JSON, binary,
+            XML and array columns get no statistics at all.
         """
-        if any(x in column_type.lower() for x in ['json', 'blob', 'binary', 'bytea', 'xml', 'array']):
+        if _unprofiled(column_type):
              return ColumnStatistics(
                 null_percentage=0.0,
                 distinct_count=0,
@@ -537,27 +653,30 @@ class BaseSQLAlchemyAdapter:
 
         t = table(table_ref.table_name, column(column_name), schema=table_ref.schema_name)
         c = t.c[column_name]
-        
+        ordered = min_max_skip_reason(column_type) is None
+
         stmt = (
             select(
                 func.count(case((c == None, 1))),
-                func.min(c),
-                func.max(c),
+                func.min(c) if ordered else literal_column("NULL"),
+                func.max(c) if ordered else literal_column("NULL"),
                 func.count(func.distinct(c))
             )
             .select_from(t)
         )
-        
+
         result = conn.execute(stmt).fetchone()
         null_count, min_val, max_val, distinct_count = result
 
-        is_text = any(t in column_type.lower() for t in ['char', 'text', 'string', 'clob'])
+        # A generic Uuid reads as CHAR(32), but its values are not text.
+        is_text = not isinstance(column_type, _UNORDERED_TYPES) and any(
+            t in _type_name(column_type).lower() for t in ['char', 'text', 'string', 'clob'])
         limit = None if distinct_count <= ALL_VALUES_MAX_DISTINCT else SAMPLE_VALUES
         return ColumnStatistics(
             null_percentage=(null_count / row_count) if row_count > 0 else 0,
             distinct_count=distinct_count,
-            min_value=min_val,
-            max_value=max_val,
+            min_value=as_scalar(min_val),
+            max_value=as_scalar(max_val),
             sample_values=self._get_sample_values(conn, table_ref, column_name, limit) if is_text else []
         )
 

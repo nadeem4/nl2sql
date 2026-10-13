@@ -7,7 +7,7 @@ if TYPE_CHECKING:
     from nl2sql.pipeline.state import SubgraphExecutionState
     from nl2sql.pipeline.nodes.decomposer.schemas import SubQuery
 
-from nl2sql.auth.rbac import table_allowed
+from nl2sql.auth.rbac import default_schema, table_allowed
 from nl2sql.common.logger import get_logger
 from nl2sql.common.settings import settings
 from nl2sql.context import NL2SQLContext
@@ -83,7 +83,8 @@ class SchemaRetrieverNode:
         if self.rbac is None:
             return lambda _ref: False
         allowed = self.rbac.get_allowed_tables(state.user_context)
-        return lambda ref: table_allowed(allowed, datasource_id, ref.table_name)
+        default = default_schema(self.ds_registry, datasource_id)
+        return lambda ref: table_allowed(allowed, datasource_id, ref.table_name, ref.schema_name, default)
 
     def _build_semantic_query(self, sub_query: SubQuery) -> str:
         parts: List[str] = []

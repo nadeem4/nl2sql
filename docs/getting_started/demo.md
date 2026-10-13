@@ -169,8 +169,9 @@ This covers the embedding step only. The demo is **not** key-free end to end:
   [LLM configuration â†’ Temperature](../configuration/llm.md#temperature). With an
   OpenRouter key or Ollama, change `model` to one that provider serves: live
   mode switches the provider, not the model name.
-- `nl2sql index` also runs an optional LLM enrichment pass over the schema.
-  Enrichment is best-effort: without a usable chat key it is skipped with an
+- `nl2sql index --enrich` also runs an optional LLM enrichment pass over the
+  schema; without `--enrich` no model is called. Enrichment only fills in
+  descriptions the database does not have, and is best-effort: without a usable chat key it is skipped with an
   `INFO` line naming the agent, the provider and the variable to set, and the
   chunks are still indexed - just with no LLM-generated descriptions. An
   enrichment failure never fails indexing. The demo's own indexing (the first

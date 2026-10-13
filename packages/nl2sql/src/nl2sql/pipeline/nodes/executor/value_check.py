@@ -149,7 +149,7 @@ def _quoted(values: List[str]) -> str:
 def check_values(
     plan: PlanModel,
     adapter: Any,
-    allowed: Callable[[str], bool],
+    allowed: Callable[[TableRef], bool],
     can_retry: bool,
 ) -> List[PipelineError]:
     """A ``VALUE_NOT_FOUND`` per filter value the column does not have.
@@ -162,7 +162,7 @@ def check_values(
     """
     errors: List[PipelineError] = []
     for literal in filter_literals(plan)[:MAX_LITERALS]:
-        if not allowed(literal.table.name):
+        if not allowed(literal.table):
             continue
         probe = _Probe(adapter, literal)
         try:

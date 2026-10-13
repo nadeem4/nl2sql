@@ -81,8 +81,9 @@ trace to the user who produced it is left to a multi-user deployment.
 ## Security controls
 
 - **RBAC policies** loaded from `configs/policies.json` and evaluated by `RBAC`.
-  A policy is a per-role allowlist of datasources and of `datasource.table`
-  strings — nothing finer. There is no column masking and no row-level security.
+  A policy is a per-role allowlist of datasources and of tables
+  (`datasource.schema.table`, with schema and datasource wildcards) — nothing
+  finer. There is no column masking and no row-level security.
 - **Logical validation** enforces schema constraints and policy-based table access.
 - **Audit logging** records `llm_interaction` events only, and only when the CLI
   attaches its monitor callback. The Python and REST APIs emit none. See
@@ -114,7 +115,11 @@ flowchart TD
 
 `LogicalValidatorNode` enforces **strict namespacing**:
 
-- Allowed tables must match `datasource.table` or `datasource.*`.
+- Allowed tables must match `datasource.*`, `datasource.schema.*`,
+  `datasource.schema.table` or `datasource.table`. The schema counts: a grant
+  of `sales.orders` does not allow `audit.orders`, and a two-part
+  `datasource.table` means that table in the datasource's default schema only
+  (see [Policies](../configuration/policies.md#two-part-entries-and-the-default-schema)).
 - If no datasource ID is present, validation fails closed.
 - Wildcard access is supported via `*` in policy lists.
 - An unknown role, or no role, allows nothing and is refused like any denial.

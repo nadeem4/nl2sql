@@ -15,9 +15,37 @@ from nl2sql.adapters.sqlalchemy_base import BaseSQLAlchemyAdapter
 | Feature | Description |
 | :--- | :--- |
 | **Automatic Schema** | Uses `sqlalchemy.inspect` to reflect tables, columns, and foreign keys automatically. |
-| **Automatic Stats** | Runs optimized generic SQL queries to fetch `min`, `max`, `null_percentage`, and `distinct_count`. |
+| **Automatic Stats** | Runs optimized generic SQL queries to fetch `min`, `max`, `null_percentage`, and `distinct_count` (see [Column statistics](#column-statistics)). |
 | **Connection Pooling** | Manages engine lifecycle and connection pools. |
 | **Transaction Safety** | Implements generic `dry_run` using transaction rollbacks. |
+| **Default Schema** | `default_schema` reports the schema an unqualified table resolves to (`inspect(engine).default_schema_name`); RBAC reads a two-part `datasource.table` policy entry as that table in this schema. |
+
+### Column statistics
+
+`fetch_schema_snapshot()` profiles every column of every table and view on one
+connection, one column at a time, so one column the database cannot profile
+does not fail the datasource's index:
+
+- **Type-aware.** The reflected SQLAlchemy type decides what is asked for.
+  `Boolean` and `Uuid` (and the dialect types built on them: Postgres `uuid`,
+  SQL Server `bit` and `uniqueidentifier`) get null and distinct counts but no
+  `MIN`/`MAX`, which Postgres and SQL Server reject for them. `JSON` (and
+  `jsonb`), `LargeBinary` (`bytea`, `blob`), `ARRAY` and any type whose name
+  says json, blob, binary, bytea, xml or array get no statistics at all.
+  `min_max_skip_reason(type)` in `nl2sql.adapters.sqlalchemy_base.adapter`
+  gives the reason. Dates, times, decimals and UUIDs a driver returns for
+  `MIN`/`MAX` are stored as ISO strings, floats and text.
+- **Isolated.** A statement that fails, for one column, a table's row count
+  or a whole table, is caught and the connection's read-only transaction is
+  rolled back, so on Postgres the aborted transaction does not fail every
+  query after it. A rollback rather than a savepoint per column: profiling only
+  reads, so it loses nothing, and it works on every dialect (pysqlite and DuckDB
+  savepoints do not) without a round trip per column.
+- **Recorded.** A column whose statistics failed keeps its description with
+  `statistics: None`; a failed row count is recorded as `0`; a table that could
+  not be profiled at all has no column metadata. Each table with failed columns
+  logs one warning naming them with the driver's error, and the columns that
+  skipped `MIN`/`MAX` by type; a table that only skipped by type logs at debug.
 
 ### Required Overrides
 
