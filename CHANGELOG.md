@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.4.1](https://github.com/nadeem4/nl2sql/compare/v0.4.0...v0.4.1) (2026-10-13)
+
+
+### Bug Fixes
+
+* **adapters:** escape connection credentials and enforce statement timeouts ([#249](https://github.com/nadeem4/nl2sql/issues/249)) ([20639a2](https://github.com/nadeem4/nl2sql/commit/20639a2c6232587ae557c5f7172bad014b0799bf))
+* **adapters:** profile each column in isolation so one odd column cannot fail indexing ([#256](https://github.com/nadeem4/nl2sql/issues/256)) ([15835d7](https://github.com/nadeem4/nl2sql/commit/15835d7100029abbe89d8bab40538760137a0e0f))
+* **api:** require an admin role on the routes that change the process ([#250](https://github.com/nadeem4/nl2sql/issues/250)) ([123e8d5](https://github.com/nadeem4/nl2sql/commit/123e8d5bec5f2d6e992a05c02c72021aabef17ee))
+* **cli:** make the setup wizard's adapter check work for bring-your-own databases ([#258](https://github.com/nadeem4/nl2sql/issues/258)) ([15a92d0](https://github.com/nadeem4/nl2sql/commit/15a92d0b0bf016135ae91f40f5bd754442e9c10f))
+* **evaluation:** run tier 2 with curated answers off and record each answer's source ([#255](https://github.com/nadeem4/nl2sql/issues/255)) ([4e37639](https://github.com/nadeem4/nl2sql/commit/4e37639fa71529fd559e5e07819c21a2761072a2))
+* **indexing:** make enrichment opt-in and keep registered descriptions ([#254](https://github.com/nadeem4/nl2sql/issues/254)) ([4355435](https://github.com/nadeem4/nl2sql/commit/43554358e2a9c0b3ff87b64ef9b6db2631bb46a5))
+* **rbac:** decide table access on datasource, schema and table ([#257](https://github.com/nadeem4/nl2sql/issues/257)) ([0ffac2b](https://github.com/nadeem4/nl2sql/commit/0ffac2bb4af798b8ee239a1da058dee54b61c354))
+* **routing:** forward only the verdict's datasources and give the decomposer their context ([#252](https://github.com/nadeem4/nl2sql/issues/252)) ([5c552e6](https://github.com/nadeem4/nl2sql/commit/5c552e6ac0c0830debc01a8040e5aaa231cb5c39))
+* **startup:** fail on a broken secret provider, degrade on a broken datasource ([#251](https://github.com/nadeem4/nl2sql/issues/251)) ([3f3005c](https://github.com/nadeem4/nl2sql/commit/3f3005c0758647de5e74fe812b9fcca0b54d2872))
+
+
+### Documentation
+
+* **release:** notes for 0.4.1 ([#259](https://github.com/nadeem4/nl2sql/issues/259)) ([e421cc5](https://github.com/nadeem4/nl2sql/commit/e421cc5b1b5a0480942492f87fec1466df4591e8))
+
 ## [0.4.0](https://github.com/nadeem4/nl2sql/compare/v0.3.0...v0.4.0) (2026-10-13)
 
 
