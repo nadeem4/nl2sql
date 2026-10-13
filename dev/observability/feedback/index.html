@@ -2654,6 +2654,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#proposing-verified-queries-nl2sql-curated-proposals-export" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Proposing verified queries: nl2sql curated proposals export
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#turning-it-off-and-clearing-it" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4388,6 +4399,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#proposing-verified-queries-nl2sql-curated-proposals-export" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Proposing verified queries: nl2sql curated proposals export
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#turning-it-off-and-clearing-it" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4420,7 +4442,7 @@
 small signals help: a person's rating of an answer in the playground, and the
 guardrail rates the engine already records for every run. <code>nl2sql feedback</code>
 reads both. Thumbs-up runs can then be exported as draft entries for the gold
-set.</p>
+set, and thumbs-up generated answers as proposed verified queries.</p>
 <h2 id="rating-an-answer-in-the-playground">Rating an answer in the playground</h2>
 <p>After a run, below <strong>Cost &amp; time</strong>, the playground asks <strong>Was this answer
 right?</strong> with two buttons, <strong>👍 Right</strong> and <strong>👎 Wrong</strong>. A click saves the
@@ -4501,8 +4523,19 @@ snapshots and the plan cache. No new service or file.</p>
 <td><code>engine_version</code></td>
 <td>The <code>nl2sql-engine</code> version, plus the git commit when run from a checkout.</td>
 </tr>
+<tr>
+<td><code>datasource_ids</code></td>
+<td>The datasources the run's sub-queries ran on, each once, as a JSON list.</td>
+</tr>
+<tr>
+<td><code>source</code></td>
+<td>Where the answer came from: <code>verified</code> (a verified query from <a href="../../configuration/curated/"><code>curated.yaml</code></a>) or <code>generated</code>.</td>
+</tr>
 </tbody>
 </table>
+<p><code>datasource_ids</code> and <code>source</code> were added after the table first shipped. A
+store from before them gains both columns, empty, the next time it is opened;
+the rows already in it keep their ratings and read the two as <code>null</code>.</p>
 <p><strong>Privacy.</strong> A row never holds result rows, the written answer, sample values,
 error messages or keys. It holds only what the run showed the role it ran as:
 the SQL of a refused run is dropped, and error messages (which can name a
@@ -4588,6 +4621,15 @@ entry into <code>chinook_gold.yaml</code>, and run the gold generator to write i
 <code>gold_result</code>:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>python<span class="w"> </span>-m<span class="w"> </span>nl2sql.evaluation.gold
 </code></pre></div>
+<h2 id="proposing-verified-queries-nl2sql-curated-proposals-export">Proposing verified queries: <code>nl2sql curated proposals export</code></h2>
+<p>A thumbs-up on a <em>generated</em> answer can also become a proposed verified query
+for <code>curated.yaml</code>, for a person to review and commit:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>curated<span class="w"> </span>proposals<span class="w"> </span><span class="nb">export</span><span class="w"> </span>--out<span class="w"> </span>configs/curated.proposals.yaml
+</code></pre></div>
+<p>Runs answered by a verified query, failed runs, runs on more than one
+datasource and runs with no SQL are skipped, and rows rated before the table
+recorded the datasource are skipped too. See
+<a href="../../configuration/curated/#from-feedback-to-verified-queries">From feedback to verified queries</a>.</p>
 <h2 id="turning-it-off-and-clearing-it">Turning it off and clearing it</h2>
 <ul>
 <li><code>FEEDBACK_ENABLED=false</code> stops the playground recording ratings.</li>

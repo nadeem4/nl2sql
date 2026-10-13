@@ -2347,11 +2347,12 @@
 <div class="admonition note">
 <p class="admonition-title">Status: partly built</p>
 <p>The config and its checks (PR 1), indexing and candidates (PR 2),
-matching and running verified queries (PR 3), and preferred tables (PR 5)
-are built; see <a href="../../configuration/curated/">Curated answers</a> and
+matching and running verified queries (PR 3), preferred tables (PR 5)
+and feedback proposals (PR 6) are built; see
+<a href="../../configuration/curated/">Curated answers</a> and
 <a href="../../configuration/datasources/#preferred-tables">Datasources</a> for how to
-use them. The playground badge, the demo file, <code>nl2sql curated test</code> and
-feedback proposals are not built yet. Each pull request in
+use them. The playground badge, the demo file and <code>nl2sql curated test</code>
+are not built yet. Each pull request in
 <a href="#implementation-plan">Implementation plan</a> updates this page and the
 reference docs it touches.</p>
 </div>
@@ -2829,15 +2830,25 @@ from.</p>
 and SQL. That row is the proposal; nothing new is stored and nothing writes
 <code>curated.yaml</code>.</p>
 <p><code>nl2sql curated proposals export --out configs/curated.proposals.yaml</code> turns
-thumbs-up runs into draft verified queries in <code>curated.yaml</code>'s shape: an id
-(<code>proposal_&lt;trace id prefix&gt;</code>), the question as the description and the one
-phrasing, no params, and the run's SQL, under a header telling the reviewer
-to replace literals with <code>:params</code>, drop the row-cap <code>LIMIT</code> the generator
-added, and move the entry into <code>curated.yaml</code>. It is modelled on
-<code>nl2sql feedback export --good</code> (<code>feedback/drafts.py</code>), and like it skips runs
-with no SQL or more than one statement, refuses to write over <code>curated.yaml</code>
-itself, and lives in <code>nl2sql.feedback</code> (opt-in, imported lazily by the
-command). Runs whose answer was already verified are skipped.</p>
+thumbs-up runs into draft verified queries in <code>curated.yaml</code>'s shape, under
+the datasource the run used: an id derived from the question (a slug, <code>_2</code>
+on a clash), a description placeholder, the question as the one phrasing,
+no params, and the run's SQL with its literal values, under a header telling
+the reviewer to replace literals with <code>{params}</code>/<code>:params</code>, drop the row-cap
+<code>LIMIT</code> the generator added, and move the entry into <code>curated.yaml</code>. Without
+<code>--out</code> it prints to stdout. It is modelled on <code>nl2sql feedback export --good</code>
+(<code>feedback/drafts.py</code>), and like it skips runs with no SQL or more than one
+statement, refuses to write over <code>curated.yaml</code> itself (the active file, or
+<code>CURATED_CONFIG</code>), and lives in <code>nl2sql.feedback.proposals</code> (opt-in, imported
+lazily by the command). It also skips runs whose answer was already
+verified, runs that did not succeed, runs on more than one datasource and
+rows rated before the datasource was recorded, and proposes each question
+once per datasource, from its newest thumbs-up. Built in PR 6.</p>
+<p>The id comes from the question rather than the trace id (the first draft of
+this design said <code>proposal_&lt;trace id prefix&gt;</code>) because a reviewer keeps it:
+<code>how_many_customers_are_in_brazil</code> reads as what the query is, a trace prefix
+does not. The description is a placeholder rather than the question, so an
+unreviewed entry is obvious.</p>
 <p>Two refinements of the agreed design. First, there is no separate "approved"
 state: the person reviewing the exported drafts and committing them is the
 approval, as for gold drafts. Second, the feedback row does not record the
@@ -3050,7 +3061,7 @@ and <code>tests/adapters/unit/test_snapshot_views.py</code> (SQLite and DuckDB).
 The two feedback columns, <code>nl2sql.feedback.proposals</code>, and
 <code>nl2sql curated proposals export</code>.
 Tests: <code>tests/unit/test_curated_proposals.py</code> (shape, skips, refusal to write
-over <code>curated.yaml</code>), and a store migration test for the new columns.</p>
+over <code>curated.yaml</code>), and a store migration test for the new columns. Built.</p>
 <p><strong>Gold data.</strong> No existing gold entry changes. Tier 1 runs hand-written plans
 through the code nodes, and a verified answer has no plan, so tier 1 runs with
 curated answers off (it sets no <code>CURATED_CONFIG</code>, and PR 3 makes that explicit

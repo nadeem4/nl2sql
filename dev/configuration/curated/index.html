@@ -1973,6 +1973,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#from-feedback-to-verified-queries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From feedback to verified queries
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#source-references" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4532,6 +4543,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#from-feedback-to-verified-queries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From feedback to verified queries
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#source-references" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4911,6 +4933,53 @@ does not is never run (<code>capability_missing</code>).</p>
 on a datasource in <code>datasources.yaml</code>, naming views or tables (built by the
 data team, never by the package) the planner should reach for first. See
 <a href="../datasources/#preferred-tables">Datasources: preferred tables</a>.</p>
+<h2 id="from-feedback-to-verified-queries">From feedback to verified queries</h2>
+<p>A thumbs-up on a generated answer in the playground is a candidate verified
+query: a real question, and SQL a person said was right. Export them as
+proposals and review them like any other change to <code>curated.yaml</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>nl2sql<span class="w"> </span>curated<span class="w"> </span>proposals<span class="w"> </span><span class="nb">export</span><span class="w">                                   </span><span class="c1"># print to stdout</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>nl2sql<span class="w"> </span>curated<span class="w"> </span>proposals<span class="w"> </span><span class="nb">export</span><span class="w"> </span>--out<span class="w"> </span>configs/curated.proposals.yaml
+</code></pre></div>
+<p>Each proposal is an entry in <code>curated.yaml</code>'s shape, under the datasource the
+run used:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="nt">datasources</span><span class="p">:</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">  </span><span class="nt">chinook</span><span class="p">:</span>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">    </span><span class="nt">verified_queries</span><span class="p">:</span>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">how_many_customers_are_in_brazil</span>
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="w">      </span><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="s">'TODO:</span><span class="nv"> </span><span class="s">say</span><span class="nv"> </span><span class="s">what</span><span class="nv"> </span><span class="s">this</span><span class="nv"> </span><span class="s">query</span><span class="nv"> </span><span class="s">returns.'</span>
+<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="w">      </span><span class="nt">questions</span><span class="p">:</span>
+<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">How many customers are in Brazil?</span>
+<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a><span class="w">      </span><span class="nt">sql</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a><span class="w">        </span><span class="no">SELECT COUNT(*) AS n FROM Customer WHERE Country = 'Brazil'</span>
+</code></pre></div>
+<ul>
+<li><strong><code>id</code></strong> comes from the question: lower case, words joined by <code>_</code>, at most
+  60 characters, <code>q_</code> in front when it would start with a digit, and <code>_2</code>,
+  <code>_3</code> after it when two questions give the same id.</li>
+<li><strong><code>questions</code></strong> holds the question as it was asked, as the one phrasing.</li>
+<li><strong><code>sql</code></strong> is the run's generated SQL, exactly as it ran. <strong>Every value in it
+  is literal</strong> (<code>'Brazil'</code> above): the proposal has no <code>params</code>.</li>
+<li><strong><code>description</code></strong> is a placeholder.</li>
+</ul>
+<p>The same question (ignoring case and spacing) on the same datasource is
+proposed once, from its newest thumbs-up. These are skipped, and counted by
+reason in the command's summary: thumbs-down ratings, answers that came from
+a verified query already, runs that did not succeed, runs with no SQL or more
+than one statement, runs on more than one datasource, and ratings recorded
+before the feedback table kept the datasource (see
+<a href="../../observability/feedback/#what-is-stored">Feedback and Signals</a>).</p>
+<p><strong>Reviewing is the approval.</strong> There is no approved state and no queue: a
+person reads each entry, checks the SQL answers the question, writes the
+description, turns the values a reader would change into <code>{params}</code> in the
+question and <code>:params</code> in the SQL with a <code>params:</code> entry, drops the row-cap
+<code>LIMIT</code> the generator added unless the question asks for it, adds other
+phrasings, moves the entry into <code>curated.yaml</code>, runs
+<code>nl2sql curated validate</code>, and commits it. The same steps head the exported
+file as comments.</p>
+<p><code>export</code> never writes <code>curated.yaml</code>: it refuses an <code>--out</code> that is the active
+curated file (<code>CURATED_CONFIG</code>) and exits 2. Neither the REST API nor the
+playground writes it either.</p>
 <h2 id="source-references">Source references</h2>
 <ul>
 <li>Models and SQL checks: <code>packages/nl2sql/src/nl2sql/configs/curated.py</code></li>
@@ -4920,6 +4989,7 @@ data team, never by the package) the planner should reach for first. See
 <li>Facade: <code>packages/nl2sql/src/nl2sql/api/curated_api.py</code></li>
 <li>Command: <code>packages/nl2sql/src/nl2sql/cli/commands/curated.py</code></li>
 <li>Matching and running: <code>packages/nl2sql/src/nl2sql/pipeline/nodes/curated_matcher/</code></li>
+<li>Proposals from feedback: <code>packages/nl2sql/src/nl2sql/feedback/proposals.py</code></li>
 </ul>
 
 

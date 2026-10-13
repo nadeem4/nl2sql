@@ -2365,7 +2365,7 @@ providers. The check runs on the read path only, so the fix is simply to re-run
 <tr>
 <td><code>FEEDBACK_ENABLED</code></td>
 <td><code>true</code></td>
-<td>Let the playground record a thumbs up or down, with an optional note, for a run. Stored in the schema store's <code>feedback</code> table (<code>SCHEMA_STORE_PATH</code>): question, role, status, SQL, error codes, the model per node and the engine version, never result rows or sample values. Local only, like Settings. <code>nl2sql feedback clear</code> empties it. See <a href="../../observability/feedback/">Feedback and Signals</a>.</td>
+<td>Let the playground record a thumbs up or down, with an optional note, for a run. Stored in the schema store's <code>feedback</code> table (<code>SCHEMA_STORE_PATH</code>): question, role, status, SQL, the datasources it ran on, whether the answer was verified or generated, error codes, the model per node and the engine version, never result rows or sample values. Local only, like Settings. <code>nl2sql feedback clear</code> empties it. See <a href="../../observability/feedback/">Feedback and Signals</a>.</td>
 </tr>
 <tr>
 <td><code>CURATED_ENABLED</code></td>
