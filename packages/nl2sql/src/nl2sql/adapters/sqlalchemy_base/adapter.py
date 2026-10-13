@@ -469,7 +469,14 @@ class BaseSQLAlchemyAdapter:
 
     def _get_column_contract(self, inspector: Inspector, conn: Connection, table_ref: TableRef) -> Dict[str, ColumnContract]:
         columns_contract = {}
-        pk_cols = set(inspector.get_pk_constraint(table_ref.table_name, schema=table_ref.schema_name).get("constrained_columns") or [])
+        try:
+            pk = inspector.get_pk_constraint(table_ref.table_name, schema=table_ref.schema_name)
+            pk_cols = set(pk.get("constrained_columns") or [])
+        except Exception as e:
+            # A view has no primary key, and some drivers (duckdb-engine) fail
+            # to look one up rather than return none.
+            logger.warning(f"Failed to fetch the primary key of {table_ref.full_name} for {self}: {e}")
+            pk_cols = set()
         for col_info in inspector.get_columns(table_ref.table_name, schema=table_ref.schema_name):
             columns_contract[col_info["name"]] = ColumnContract(
                 name=col_info["name"],
