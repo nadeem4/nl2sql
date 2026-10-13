@@ -9,7 +9,8 @@
 ### `POST /api/v1/index/{datasource_id}`
 
 Execution flow:
-- Delegates to `engine.indexing.index_datasource(...)`.
+- Delegates to `engine.indexing.index_datasource(...)`. No enrichment model call
+  is made: enrichment is opt-in in the engine and these routes do not ask for it.
 
 Response:
 `{"success": true, "datasource_id": "...", "indexing_stats": {...}, "message": "..."}`
@@ -17,7 +18,7 @@ Response:
 ### `POST /api/v1/index-all`
 
 Execution flow:
-- Delegates to `engine.indexing.index_all_datasources(...)`.
+- Delegates to `engine.indexing.index_all_datasources(...)`, without enrichment.
 
 ### `DELETE /api/v1/index`
 

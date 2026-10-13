@@ -26,7 +26,7 @@ catalog in the current implementation.
 
 Chunk types are defined in `nl2sql.indexing.models`:
 
-- **DatasourceChunk** (`schema.datasource`): datasource description, domains, and example questions. The description is the one in the datasources config (`description:`); it lives in the config rather than the database, so the orchestrator writes it into the snapshot's metadata, where it takes precedence over any description the adapter or enrichment produced. Example questions come from the `SAMPLE_QUESTIONS` file.
+- **DatasourceChunk** (`schema.datasource`): datasource description, domains, and example questions. The description is the one the datasource was registered with (`description:` in the datasources config, or the `description` passed to `engine.add_datasource`); the orchestrator reads it from the datasource registry, falling back to the datasources file only when the registry has none. It lives in the config rather than the database, so the orchestrator writes it into the snapshot's metadata, where it takes precedence over any description the adapter or enrichment produced. Example questions come from the `SAMPLE_QUESTIONS` file.
 - **TableChunk** (`schema.table`): table name, PKs, column list, FK summaries, row counts.
 - **ColumnChunk** (`schema.column`): column type, stats, synonyms, PII flags.
 - **RelationshipChunk** (`schema.relationship`): FK relationships, columns, cardinality.
@@ -65,7 +65,7 @@ enrichment model call, and only the verified queries are embedded. The switch
 and the deletion of the old build are the ones described below, so the
 refresh is just as safe. It needs the datasource to have been indexed once;
 otherwise that datasource fails with a message saying to run `nl2sql index`.
-`--curated-only` cannot be combined with `--full`.
+`--curated-only` cannot be combined with `--full` or `--enrich`.
 
 `VectorStore.retrieve_verified_query_candidates(question, datasource_ids, k)`
 returns the verified queries a question most resembles. It is a plain
@@ -276,11 +276,17 @@ Current failure behaviors:
 - Vector store retrieval wrapped by `VECTOR_BREAKER`; failures fast‑fail.
 - Vector retrieval errors in `SchemaRetrieverNode` return empty results with warnings.
 - If no candidates are found, the retriever falls back to full schema snapshot.
+- Enrichment is opt-in: `index_datasource`, `index_all_datasources`,
+  `rebuild_index`, `IndexingOrchestrator` and `nl2sql index` all default to
+  `enrich=False`; pass `enrich=True` (or `nl2sql index --enrich`) to spend
+  tokens on it. It only fills blanks: a table or column comment read from the
+  database is never overwritten.
 - Enrichment failures return the original snapshot without enrichment, and
   never fail indexing. `enrich_schema_snapshot` resolves its own LLM inside the
   guard, so a missing API key, an unreachable endpoint and a failed call all
-  degrade the same way. A missing/unusable LLM logs at `INFO`; anything
-  unexpected logs at `WARNING` with a stack trace.
+  degrade the same way. A missing/unusable LLM logs at `INFO`; any other
+  failure (a 401, a timeout) logs one `WARNING` line with the reason and no
+  stack trace (the trace is logged at `DEBUG`).
 - Retrieving from a vector store whose persisted vectors do not match the
   configured embedding provider raises `EmbeddingDimensionMismatchError`; a
   recorded embedding model that differs from the configured one raises

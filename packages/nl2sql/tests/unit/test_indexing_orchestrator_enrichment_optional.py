@@ -99,7 +99,7 @@ def keyless_registry(monkeypatch) -> LLMRegistry:
 def test_indexing_produces_chunks_without_an_api_key(keyless_registry):
     ctx = _context(keyless_registry)
 
-    stats = IndexingOrchestrator(ctx).index_datasource(_StubAdapter())
+    stats = IndexingOrchestrator(ctx, enrich=True).index_datasource(_StubAdapter())
 
     assert stats["chunks"] > 0
     assert ctx.vector_store.chunks, "indexing produced no chunks without a key"
@@ -135,7 +135,7 @@ def test_enrichment_failure_mid_invoke_degrades_instead_of_raising(caplog):
     ctx = _context(registry)
 
     with caplog.at_level("WARNING"):
-        stats = IndexingOrchestrator(ctx).index_datasource(_StubAdapter())
+        stats = IndexingOrchestrator(ctx, enrich=True).index_datasource(_StubAdapter())
 
     assert stats["chunks"] > 0
     assert "upstream 503" in caplog.text
@@ -150,19 +150,19 @@ def test_unusable_llm_client_degrades_instead_of_raising():
 
     ctx = _context(SimpleNamespace(get_llm=lambda name: _BrokenLLM()))
 
-    stats = IndexingOrchestrator(ctx).index_datasource(_StubAdapter())
+    stats = IndexingOrchestrator(ctx, enrich=True).index_datasource(_StubAdapter())
 
     assert stats["chunks"] > 0
 
 
 def test_enrichment_off_never_asks_for_an_llm():
-    """The demo and the playground index with enrich=False unless asked: no tokens spent."""
+    """Enrichment is off unless asked for: no LLM is even resolved, so no tokens are spent."""
 
     def _no_llm(name):
         raise AssertionError(f"enrichment asked for the '{name}' LLM while off")
 
     ctx = _context(SimpleNamespace(get_llm=_no_llm))
 
-    stats = IndexingOrchestrator(ctx, enrich=False).index_datasource(_StubAdapter())
+    stats = IndexingOrchestrator(ctx).index_datasource(_StubAdapter())
 
     assert stats["chunks"] > 0
