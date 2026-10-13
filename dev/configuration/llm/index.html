@@ -1132,6 +1132,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../architecture/nodes/curated_matcher_node/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Curated Matcher
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../architecture/nodes/datasource_resolver_node/" class="md-nav__link">
         
   
@@ -4974,7 +5002,7 @@ after the client is constructed, so the config - not the model name -
 decides what is sent.</p>
 </div>
 <h2 id="per-node-models">Per-node models</h2>
-<p>The five pipeline nodes that call a model each ask the registry for their own
+<p>The six pipeline nodes that call a model each ask the registry for their own
 agent name, and fall back to <code>default</code> when it is not configured:</p>
 <table>
 <thead>
@@ -4984,6 +5012,10 @@ agent name, and fall back to <code>default</code> when it is not configured:</p>
 </tr>
 </thead>
 <tbody>
+<tr>
+<td><code>curatedmatcher</code></td>
+<td>picks the verified query that answers the question, if any (one short call; only when <a href="../curated/">curated answers</a> are configured and a candidate clears the floor)</td>
+</tr>
 <tr>
 <td><code>datasourceresolver</code></td>
 <td>checks that the connected data can answer the question at all (one short call; refuses with <code>QUESTION_NOT_ANSWERABLE</code>)</td>
@@ -5035,7 +5067,7 @@ OpenAI, with one cheaper node that only accepts its default temperature:</p>
 <a id="__codelineno-7-16" name="__codelineno-7-16" href="#__codelineno-7-16"></a><span class="w">    </span><span class="nt">temperature</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">null</span><span class="w">        </span><span class="c1"># gpt-5-mini rejects temperature=0</span>
 <a id="__codelineno-7-17" name="__codelineno-7-17" href="#__codelineno-7-17"></a><span class="w">    </span><span class="nt">api_key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${env:OPENAI_API_KEY}</span>
 </code></pre></div>
-<p>Here <code>datasourceresolver</code>, <code>decomposer</code> and <code>refiner</code> use <code>default</code>. Each node
+<p>Here <code>curatedmatcher</code>, <code>datasourceresolver</code>, <code>decomposer</code> and <code>refiner</code> use <code>default</code>. Each node
 keeps its own key, endpoint and cache behaviour: the planner's system prompt is
 cache-marked for Anthropic, the others are sent unmarked to OpenAI. The model
 each call actually used is recorded per node in <code>QueryResult.usage.calls</code> and
@@ -5053,10 +5085,10 @@ to the next question. The page offers the providers and models in
 now, and a provider only once its key is saved. See
 <a href="../../getting_started/demo/#the-settings-page">the Settings page</a>.</p>
 <p>The playground's <strong>Pipeline</strong> page reads the same configuration back: it lists
-every step of a run and, for each of the five a model decides, the provider and
+every step of a run and, for each of the six a model decides, the provider and
 model it is set to use, then what it actually spent once a question has been
 asked. It is served by <code>GET /api/pipeline</code> from <code>nl2sql.pipeline.steps</code>, which
-takes its five model steps from <code>LLM_AGENTS</code> rather than repeating the table
+takes its six model steps from <code>LLM_AGENTS</code> rather than repeating the table
 above. See <a href="../../getting_started/demo/#the-pipeline-page">the Pipeline page</a>.</p>
 <p>On the <strong>hosted demo</strong> (<code>nl2sql demo --hosted</code>) the same choice is offered and
 nothing is written at all. The visitor keeps one key per provider and a model

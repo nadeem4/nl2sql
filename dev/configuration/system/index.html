@@ -509,6 +509,18 @@
 </a>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/nodes/curated_matcher_node/">
+<span class="md-ellipsis">
+    
+  
+    Curated Matcher
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="../../architecture/nodes/datasource_resolver_node/">
 <span class="md-ellipsis">
     
@@ -2358,7 +2370,7 @@ providers. The check runs on the read path only, so the fix is simply to re-run
 <tr>
 <td><code>CURATED_ENABLED</code></td>
 <td><code>true</code></td>
-<td>Load and check the curated answers file at startup. <code>false</code> turns the feature off without removing the file; <code>nl2sql curated validate</code> still checks it. See <a href="../curated/">Curated Answers</a>.</td>
+<td>Load and check the curated answers file at startup, and match questions to its verified queries. <code>false</code> turns the feature off without removing the file (every answer is generated); <code>nl2sql curated validate</code> still checks it. See <a href="../curated/">Curated Answers</a>.</td>
 </tr>
 <tr>
 <td><code>CURATED_MATCH_TOP_K</code></td>
@@ -2368,7 +2380,7 @@ providers. The check runs on the read path only, so the fix is simply to re-run
 <tr>
 <td><code>CURATED_MATCH_FLOOR</code></td>
 <td><code>0.6</code></td>
-<td>Cosine similarity the best verified query candidate must reach before the model is asked to choose one. Calibrated on the local embedding model; not used until matching ships. See <a href="../curated/">Curated Answers</a>.</td>
+<td>Cosine similarity the best verified query candidate must reach before the model is asked to choose one. Below it the question is answered by the normal pipeline with no model call. Calibrated on the local embedding model. See <a href="../curated/#what-happens-at-question-time">Curated Answers</a>.</td>
 </tr>
 <tr>
 <td><code>RBAC_REFUSAL_NAMES_TABLES</code></td>

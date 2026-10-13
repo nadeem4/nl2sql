@@ -1132,6 +1132,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../architecture/nodes/curated_matcher_node/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Curated Matcher
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../architecture/nodes/datasource_resolver_node/" class="md-nav__link">
         
   
@@ -4414,6 +4442,11 @@
 <ul>
 <li><code>supports_sql</code> if SQL execution is supported.</li>
 <li><code>supports_rest</code> if REST execution is supported.</li>
+<li><code>supports_bound_parameters</code> if <code>execute</code> (and <code>execute_batches</code>) bind
+  <code>AdapterRequest.parameters</code> by name to <code>:name</code> placeholders through the
+  driver. Without it, a verified query with parameters is never sent to the
+  adapter. Adapters built on <code>BaseSQLAlchemyAdapter</code> inherit both the binding
+  and the capability.</li>
 </ul>
 <h2 id="source-references">Source references</h2>
 <ul>

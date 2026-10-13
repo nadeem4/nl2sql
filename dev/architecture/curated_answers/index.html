@@ -766,6 +766,18 @@
 </a>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="../nodes/curated_matcher_node/">
+<span class="md-ellipsis">
+    
+  
+    Curated Matcher
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="../nodes/datasource_resolver_node/">
 <span class="md-ellipsis">
     
@@ -2333,10 +2345,14 @@
 <article class="md-content__inner md-typeset">
 <h1 id="curated-answers-design">Curated Answers (design)</h1>
 <div class="admonition note">
-<p class="admonition-title">Status: design, not built</p>
-<p>This page describes a feature that does not exist yet. Nothing below is in
-the code until the pull requests in <a href="#implementation-plan">Implementation plan</a>
-land; each of them updates this page and the reference docs it touches.</p>
+<p class="admonition-title">Status: partly built</p>
+<p>The config and its checks (PR 1), indexing and candidates (PR 2), and
+matching and running verified queries (PR 3) are built; see
+<a href="../../configuration/curated/">Curated answers</a> for how to use them. The
+playground badge, the demo file, <code>nl2sql curated test</code>, preferred tables
+and feedback proposals are not built yet. Each pull request in
+<a href="#implementation-plan">Implementation plan</a> updates this page and the
+reference docs it touches.</p>
 </div>
 <h2 id="goal">Goal</h2>
 <p>Before the model plans a query, check whether the business has already
@@ -2597,6 +2613,14 @@ datasource (<code>GraphState.datasource_id</code>), only that one is searched.</
 <p>When it does not answer, the matcher returns nothing but its own trace record
 and the run continues at <code>datasource_resolver</code> as if it were not there. When
 the run is plan-only (<code>execute=False</code>) the matcher is skipped.</p>
+<p>A refinement made in PR 3: the node is added to the graph only when curated
+answers are on (<code>CURATED_ENABLED</code>, a loaded file with at least one verified
+query) and the run executes. Otherwise <code>datasource_resolver</code> stays the entry
+point, so with no curated file the graph, the trace and the answer are exactly
+what they were before, rather than gaining a node that does nothing. The
+first diamond above is therefore decided once when the graph is built
+("configured") and again at run time ("this role may read",
+<code>not_configured</code>).</p>
 <p>On a match, the node fills the state the way a one-sub-query generated run
 leaves it, so nothing downstream needs a second code path: a
 <code>DecomposerResponse</code> with one <code>SubQuery</code> (its intent is the question), the
@@ -2903,8 +2927,8 @@ to it, like "biggest spenders", is not rescued by any floor; another phrasing
 in <code>curated.yaml</code> is the fix. Calibration with OpenAI's embeddings is still
 open: it needs the owner's key.</p>
 <h2 id="invariants-this-touches">Invariants this touches</h2>
-<p>No invariant is weakened. When the matcher is built (PR 3), these change
-in <a href="../invariants/"><code>invariants.md</code></a>, each with its enforcement point:</p>
+<p>No invariant is weakened. PR 3 made these changes in
+<a href="../invariants/"><code>invariants.md</code></a>, each with its enforcement point:</p>
 <ul>
 <li>New: <strong>Verified SQL is human-authored, read-only and parameter-bound.</strong> The
   model picks a verified query by id and supplies values; it never writes or
@@ -2918,8 +2942,8 @@ in <a href="../invariants/"><code>invariants.md</code></a>, each with its enforc
   exists, on every path" becomes "on every generated path"; a verified path
   has no AST, and its checks are the matcher's.</li>
 </ul>
-<p><code>invariants.md</code> is not edited in this design PR: its sections name
-enforcement points, and none exists yet.</p>
+<p><code>invariants.md</code> was not edited in the design PR, because its sections name
+enforcement points and none existed then; PR 3 added them.</p>
 <h2 id="deferred-and-out-of-scope">Deferred and out of scope</h2>
 <h3 id="business-metrics-deferred">Business metrics (deferred)</h3>
 <p>The format is fixed in this milestone (<code>metrics:</code> in <code>curated.yaml</code>, parsed
@@ -3037,9 +3061,11 @@ added beside the existing ones, never in place of them.</p>
   new build beside freshly embedded verified queries and switches to it. A
   flag rather than detecting "only <code>curated.yaml</code> changed" on a plain
   <code>nl2sql index</code>, because knowing whether the schema changed means reading it.</li>
-<li><strong>The synthesizer's context.</strong> Whether to pass the verified query's
-  description to the answer synthesizer, so it can say "invoiced revenue,
-  before refunds" rather than guess what the numbers mean. Left out of v1.</li>
+<li><strong>The synthesizer's context.</strong> Resolved in PR 3: on a verified answer the
+  answer synthesizer is given the query's qualified id and description, in a
+  <em>Verified Query</em> section added to its prompt, so it can say "invoiced
+  revenue, before refunds" rather than guess what the numbers mean. A
+  generated answer's prompt is unchanged.</li>
 </ul>
 </article>
 </div>

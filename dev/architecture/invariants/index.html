@@ -2213,6 +2213,67 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#verified-sql-is-human-authored-read-only-and-parameter-bound" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verified SQL Is Human-Authored, Read-Only and Parameter-Bound
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Verified SQL Is Human-Authored, Read-Only and Parameter-Bound">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#definition_22" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Definition
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#enforcement-points_22" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Enforcement Points
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#failure-behavior_22" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Failure Behavior
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#why-it-exists_22" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why It Exists
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#categories" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2587,6 +2648,34 @@
     
   
     AST Planner
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../nodes/curated_matcher_node/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Curated Matcher
   
 
     
@@ -7072,6 +7161,67 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#verified-sql-is-human-authored-read-only-and-parameter-bound" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verified SQL Is Human-Authored, Read-Only and Parameter-Bound
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Verified SQL Is Human-Authored, Read-Only and Parameter-Bound">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#definition_22" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Definition
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#enforcement-points_22" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Enforcement Points
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#failure-behavior_22" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Failure Behavior
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#why-it-exists_22" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why It Exists
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#categories" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -7269,9 +7419,10 @@
 <h3 id="enforcement-points_11">Enforcement Points</h3>
 <ul>
 <li><code>DatasourceResolverNode._get_allowed_datasource_ids()</code> and <code>__call__()</code> in <code>nl2sql.pipeline.nodes.datasource_resolver.node</code></li>
+<li><code>CuratedMatcherNode._searchable()</code> and <code>_check_access()</code> in <code>nl2sql.pipeline.nodes.curated_matcher.node</code>: the verified-query search covers only datasources the role may read, and every table a verified query's SQL reads must pass <code>table_allowed()</code></li>
 </ul>
 <h3 id="failure-behavior_11">Failure Behavior</h3>
-<p>Returns <code>PipelineError</code> with <code>SECURITY_VIOLATION</code> if no allowed datasource is available. The check runs before the resolver's answerability LLM call, so a denied caller triggers no model call and the model only ever sees datasources the role may read. It runs on every path, including the single-datasource shortcut that skips the vector search.</p>
+<p>Returns <code>PipelineError</code> with <code>SECURITY_VIOLATION</code> if no allowed datasource is available. The check runs before the resolver's answerability LLM call, so a denied caller triggers no model call and the model only ever sees datasources the role may read. It runs on every path, including the single-datasource shortcut that skips the vector search. The curated matcher refuses nothing itself: a verified query on a datasource or table the role may not read is never offered or never run, and the run falls back (<code>policy_denied</code>) to the resolver, which refuses as above.</p>
 <h3 id="why-it-exists_11">Why It Exists</h3>
 <p>Prevents execution against unauthorized datasources.</p>
 <hr />
@@ -7328,11 +7479,12 @@
 <hr />
 <h2 id="sql-generation-enforces-a-row-limit-cap">SQL Generation Enforces a Row Limit Cap</h2>
 <h3 id="definition_16">Definition</h3>
-<p>Generated SQL must not exceed the row limit: the datasource adapter’s <code>row_limit</code>, bounded by the <code>RESULT_ROW_LIMIT</code> ceiling (100,000), which is also the limit when the datasource sets none. A result that reaches the limit is flagged as truncated.</p>
+<p>Generated SQL must not exceed the row limit: the datasource adapter’s <code>row_limit</code>, bounded by the <code>RESULT_ROW_LIMIT</code> ceiling (100,000), which is also the limit when the datasource sets none. A result that reaches the limit is flagged as truncated. Verified SQL is held to the same limit, but a person's SQL is never rewritten: the executor stops reading its result at the limit (<code>ExecutorRequest.max_rows</code>).</p>
 <h3 id="enforcement-points_16">Enforcement Points</h3>
 <ul>
 <li><code>GeneratorNode.__call__()</code> in <code>nl2sql.pipeline.nodes.generator.node</code></li>
 <li><code>wrap_subgraph()</code> in <code>nl2sql.pipeline.graph_utils</code> sets <code>SubgraphOutput.truncated</code>, which <code>QueryResult</code> and the answer carry</li>
+<li><code>CuratedMatcherNode._run()</code> sets <code>max_rows</code> and <code>truncated</code> for a verified query; <code>_Stream</code> in <code>nl2sql.execution.executor.sql_executor</code> stops at <code>max_rows</code> and closes the adapter's stream</li>
 </ul>
 <h3 id="failure-behavior_16">Failure Behavior</h3>
 <p>No error; the limit is clamped to the smaller of the two. A cut result is flagged (<code>truncated</code>), and the answer says it was cut at N rows.</p>
@@ -7419,11 +7571,27 @@
 <h3 id="example_2">Example</h3>
 <p>The validator resolves columns against a throw-away query in which every table is <code>CROSS JOIN</code>ed — correct for column resolution, and deliberately blind to join topology. So a plan declaring three tables and joining only two validated CLEAN, then failed in the generator with <em>"Table alias(es) t3 are declared in the plan but never joined to the FROM table."</em> Three more join-shape mistakes behaved the same way. Every one is a pure function of <code>plan.tables</code> and <code>plan.joins</code> — no schema, no dialect — so each belongs in the validator, where the message reaches the planner.</p>
 <hr />
+<h2 id="verified-sql-is-human-authored-read-only-and-parameter-bound">Verified SQL Is Human-Authored, Read-Only and Parameter-Bound</h2>
+<h3 id="definition_22">Definition</h3>
+<p>A verified query's SQL is written, reviewed and committed by a person in <code>curated.yaml</code>. The model picks a verified query by id and supplies parameter values; it never writes or edits the SQL. The SQL must be exactly one read-only query whose <code>:name</code> placeholders are exactly its declared params. Values are typed and checked by code (type, <code>min</code>/<code>max</code>, <code>choices</code>, required) and bound by the adapter's driver, never interpolated into the SQL text. A query with params runs only on an adapter that declares <code>SUPPORTS_BOUND_PARAMETERS</code>.</p>
+<h3 id="enforcement-points_22">Enforcement Points</h3>
+<ul>
+<li><code>VerifiedQuery</code>, <code>ParamSpec</code>, <code>inspect_verified_sql()</code> and <code>check_curated_queries()</code> in <code>nl2sql.configs.curated</code>, at startup and in <code>nl2sql curated validate</code></li>
+<li><code>resolve_params()</code> in <code>nl2sql.pipeline.nodes.curated_matcher.params</code></li>
+<li><code>CuratedMatcherNode._match()</code> in <code>nl2sql.pipeline.nodes.curated_matcher.node</code>: parses the SQL read-only again before running, and checks the capability</li>
+<li><code>BaseSQLAlchemyAdapter._run()</code> in <code>nl2sql.adapters.sqlalchemy_base.adapter</code>: <code>conn.execute(text(sql), parameters)</code>; without parameters the call is exactly <code>conn.execute(text(sql))</code></li>
+<li><code>packages/nl2sql/tests/sqlalchemy_base/test_bound_parameters.py</code>: a value <code>1; DROP TABLE x</code> is compared as a value and the table survives</li>
+</ul>
+<h3 id="failure-behavior_22">Failure Behavior</h3>
+<p>A broken file fails startup. At question time a bad value, a denied table, a missing capability or a failed run falls back to the generated pipeline with a reason code in the matcher's trace record; it is never an error of the run.</p>
+<h3 id="why-it-exists_22">Why It Exists</h3>
+<p><em>The model emits a typed plan, never SQL</em> holds on this path too: no model wrote the SQL, and a value cannot change what the query does.</p>
+<hr />
 <h2 id="categories">Categories</h2>
 <ul>
 <li><strong>State</strong>: Plan Model Is Strict and Read-Only; Context Requires Vector Store and Schema Store Configuration</li>
 <li><strong>Execution</strong>: SQL Execution Requires SQL, Datasource, and Capability; Execution DAG Must Be Valid and Acyclic; Aggregation Requires Scan Artifacts and Single-Input Post Nodes; Pipeline Execution Is Time-Bounded</li>
-<li><strong>Security</strong>: Policy Enforcement Is Namespaced and Fail-Closed; Datasource Access Is RBAC-Gated; Plan Model Is Strict and Read-Only</li>
+<li><strong>Security</strong>: Policy Enforcement Is Namespaced and Fail-Closed; Datasource Access Is RBAC-Gated; Plan Model Is Strict and Read-Only; Verified SQL Is Human-Authored, Read-Only and Parameter-Bound</li>
 <li><strong>Determinism</strong>: Expected Schema Must Match Select List; Joins Must Be Valid and Schema-Backed</li>
 <li><strong>Resource bounds</strong>: SQL Generation Enforces a Row Limit Cap; The Answer Model Sees a Preview, Never the Whole Result; Context Requires Vector Store and Schema Store Configuration</li>
 <li><strong>Boundaries</strong>: Package Boundaries Are One-Way; Dialect Knowledge Lives in the Adapter</li>
@@ -7444,6 +7612,8 @@
 <li><code>packages/nl2sql/src/nl2sql/pipeline/nodes/ast_planner/schemas.py</code></li>
 <li><code>packages/nl2sql/src/nl2sql/pipeline/nodes/validator/node.py</code></li>
 <li><code>packages/nl2sql/src/nl2sql/pipeline/nodes/datasource_resolver/node.py</code></li>
+<li><code>packages/nl2sql/src/nl2sql/pipeline/nodes/curated_matcher/node.py</code></li>
+<li><code>packages/nl2sql/src/nl2sql/configs/curated.py</code></li>
 <li><code>packages/nl2sql/src/nl2sql/pipeline/nodes/generator/node.py</code></li>
 <li><code>packages/nl2sql/src/nl2sql/pipeline/nodes/executor/node.py</code></li>
 <li><code>packages/nl2sql/src/nl2sql/execution/executor/sql_executor.py</code></li>

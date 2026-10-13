@@ -1132,6 +1132,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../architecture/nodes/curated_matcher_node/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Curated Matcher
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../architecture/nodes/datasource_resolver_node/" class="md-nav__link">
         
   
@@ -5231,7 +5259,10 @@ answer synthesizer a fixed sentence. The rest is the real pipeline on the
 indexed demo, so a failing case is a bug in a code node or in the plan, never
 in a model. Refusals are scored against the default, generic message: the
 demo's <code>.env.demo</code> sets <code>RBAC_REFUSAL_NAMES_TABLES=true</code> so the playground
-can show which table was refused, and tier 1 turns that off for its run.</p>
+can show which table was refused, and tier 1 turns that off for its run.
+Tier 1 also runs with <a href="../../configuration/curated/">curated answers</a> off
+(<code>run_tier1()</code> clears the context's curated file for the run): it scores
+plans, and a verified answer has none.</p>
 <p>Each plan reads exactly the question's <code>needed_tables</code> (the RBAC outcome is
 derived from them) and selects the gold result's columns in order. PlanModel
 has no subqueries or window functions, so a few plans express the answer
@@ -5356,7 +5387,7 @@ prompt (the cap is the safety):</p>
 run, 2 on a usage error (no <code>--max-cost</code>, an unknown <code>--model</code> or <code>--llm</code>, two
 configs with one name, <code>CI</code> set), 3 when the cap stopped the run early.</p>
 <h3 id="-model-and-the-presets"><code>--model</code> and the presets</h3>
-<p><code>--model MODEL</code> puts <code>MODEL</code> on all five LLM nodes. A model in
+<p><code>--model MODEL</code> puts <code>MODEL</code> on all six LLM nodes. A model in
 <code>VERIFIED_MODELS</code> (<code>nl2sql/llm/providers.py</code>: <code>gpt-5.4</code>, <code>gpt-5.4-mini</code>,
 <code>gpt-4.1</code>, <code>gpt-4o</code>, <code>gpt-5.5</code>, <code>gpt-5-mini</code>, <code>claude-opus-5</code>,
 <code>claude-sonnet-5</code>, <code>claude-haiku-4-5</code>, ...) names its provider and its

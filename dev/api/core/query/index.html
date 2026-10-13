@@ -1132,6 +1132,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../architecture/nodes/curated_matcher_node/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Curated Matcher
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../architecture/nodes/datasource_resolver_node/" class="md-nav__link">
         
   
@@ -4704,7 +4732,8 @@ No exceptions are raised by <code>run_query</code>; errors are returned in <code
 | <code>usage</code> | <code>QuestionUsage</code> | no | LLM calls, tokens and model time per node and for the whole question. See below. |
 | <code>trace_path</code> | <code>Optional[str]</code> | no | Where this run's trace file was written, or <code>None</code> when <code>TRACE_MODE</code> did not write one. See <a href="../../../observability/debugging/">Debugging a Run</a>. |
 | <code>truncated</code> | <code>bool</code> | no | True when any sub-query's result reached its row limit, so rows may be missing. See <code>sub_queries[].truncated</code>. |
-| <code>result_manifest</code> | <code>List[ResultSummary]</code> | no | The run's saved results, one per terminal DAG node (<code>node_id</code>, <code>columns</code>, <code>row_count</code>, <code>truncated</code>): the manifest the aggregator writes beside them. Never the rows; see <a href="#reading-a-runs-saved-results">Reading a run's saved results</a>. Empty when nothing was saved. |</p>
+| <code>result_manifest</code> | <code>List[ResultSummary]</code> | no | The run's saved results, one per terminal DAG node (<code>node_id</code>, <code>columns</code>, <code>row_count</code>, <code>truncated</code>): the manifest the aggregator writes beside them. Never the rows; see <a href="#reading-a-runs-saved-results">Reading a run's saved results</a>. Empty when nothing was saved. |
+| <code>source</code> | <code>AnswerSource</code> | no | Where the answer came from: <code>type</code> <code>"verified"</code> with the verified query's <code>id</code>, <code>datasource_id</code> and the <code>params</code> it ran with, or <code>type</code> <code>"generated"</code> with the other fields <code>None</code>. See <a href="../../../configuration/curated/#what-happens-at-question-time">Curated answers</a>. |</p>
 <p><code>errors</code> holds only <code>ERROR</code> and <code>CRITICAL</code> entries; <code>WARNING</code>-severity pipeline
 errors are appended to <code>warnings</code> as the same summary dict.</p>
 <p>A sub-query that succeeded contributes nothing to <code>errors</code>: the errors of the
@@ -4945,7 +4974,7 @@ and <code>.../{result_id}.csv</code>; the playground serves the same two under <
 <td><code>plan_source</code></td>
 <td><code>str</code></td>
 <td>no</td>
-<td><code>"cache"</code> when the plan came from the plan cache (no planner LLM call; still validated, generated and executed), otherwise <code>"llm"</code>. See <a href="../../../architecture/determinism/#the-plan-cache-determinism-from-the-architecture">Determinism → The plan cache</a>.</td>
+<td><code>"cache"</code> when the plan came from the plan cache (no planner LLM call; still validated, generated and executed), <code>"verified"</code> when a verified query answered (no plan; <code>sql</code> is the verified query's own), otherwise <code>"llm"</code>. See <a href="../../../architecture/determinism/#the-plan-cache-determinism-from-the-architecture">Determinism → The plan cache</a>.</td>
 </tr>
 <tr>
 <td><code>row_cap</code></td>
@@ -5026,6 +5055,10 @@ model instances for nested values):</p>
 <tr>
 <td><code>final_answer</code></td>
 <td><code>answer_synthesizer_response.final_answer</code></td>
+</tr>
+<tr>
+<td><code>source</code></td>
+<td><code>verified_match</code> (set by the curated matcher on a verified answer; absent means <code>generated</code>)</td>
 </tr>
 <tr>
 <td><code>errors</code>, <code>reasoning</code>, <code>warnings</code>, <code>trace_id</code>, <code>artifact_refs</code>, <code>timings</code>, <code>usage</code></td>

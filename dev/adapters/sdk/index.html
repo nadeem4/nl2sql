@@ -1132,6 +1132,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../architecture/nodes/curated_matcher_node/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Curated Matcher
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../architecture/nodes/datasource_resolver_node/" class="md-nav__link">
         
   
@@ -4668,11 +4696,17 @@
 </table>
 <h3 id="mandatory-methods">Mandatory Methods</h3>
 <h4 id="capabilities-setdatasourcecapability"><code>capabilities() -&gt; set[DatasourceCapability]</code></h4>
-<p>Declares supported capabilities (e.g., <code>supports_sql</code>, <code>supports_rest</code>).</p>
+<p>Declares supported capabilities (e.g., <code>supports_sql</code>, <code>supports_rest</code>,
+<code>supports_bound_parameters</code>).</p>
+<p><code>supports_bound_parameters</code> (<code>DatasourceCapability.SUPPORTS_BOUND_PARAMETERS</code>)
+says the adapter binds <code>AdapterRequest.parameters</code> by name to the <code>:name</code>
+placeholders in the SQL, and never pastes a value into the SQL text. The
+engine sends parameters (for a <a href="../../configuration/curated/">verified query</a>)
+only to an adapter that declares it. Every built-in SQLAlchemy adapter does.</p>
 <h4 id="executerequest-adapterrequest-resultframe"><code>execute(request: AdapterRequest) -&gt; ResultFrame</code></h4>
 <p>Executes a plan-specific request and returns a normalized <code>ResultFrame</code>.</p>
 <ul>
-<li><strong>Args</strong>: <code>AdapterRequest</code> with <code>plan_type</code> and <code>payload</code></li>
+<li><strong>Args</strong>: <code>AdapterRequest</code> with <code>plan_type</code>, <code>payload</code>, and <code>parameters</code> (values to bind; empty for generated SQL)</li>
 <li><strong>Returns</strong>: <code>ResultFrame</code> with <code>columns</code>, <code>rows</code>, <code>row_count</code>, and error metadata</li>
 </ul>
 <p>A query the database rejects is a result, not an exception: return

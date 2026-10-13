@@ -695,6 +695,18 @@
 </a>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="../curated_matcher_node/">
+<span class="md-ellipsis">
+    
+  
+    Curated Matcher
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="../datasource_resolver_node/">
 <span class="md-ellipsis">
     
@@ -2209,7 +2221,7 @@
 <hr/>
 <h2 id="position-in-execution-graph">Position in Execution Graph</h2>
 <p>Upstream:
-- <code>EngineAggregatorNode</code></p>
+- <code>EngineAggregatorNode</code>, after a generated run or a verified one (the <a href="../curated_matcher_node/">curated matcher</a> ran the query)</p>
 <p>Downstream:
 - Graph end.</p>
 <p>Trigger conditions:
@@ -2225,6 +2237,7 @@
 <li><code>aggregator_response.computed_artifacts</code>: the saved result behind each, for its row count and columns</li>
 <li><code>decomposer_response.unmapped_subqueries</code> (optional)</li>
 <li><code>subgraph_outputs[&lt;id&gt;].truncated</code> / <code>.row_cap</code>: whether a sub-query's result reached its row limit, and at how many rows.</li>
+<li><code>verified_match</code> (optional): set when a verified query answered. Its qualified id and its <code>description</code> (the data team's words for what the query returns, e.g. "invoiced revenue, before refunds") are added to the prompt as a <em>Verified Query</em> section, and the model is told to describe the numbers that way. A generated answer's prompt has no such section and is exactly what it was.</li>
 <li><code>warnings</code>: the <code>VALUE_NOT_FOUND</code> warnings ("There is no Genre with Name 'Polka'.") from sub-queries whose filter named a value that does not exist (see <a href="../executor_node/#an-empty-results-filter-values">ExecutorNode</a>). An <code>ERROR</code>-severity one is not used: a retry replaced that attempt.</li>
 </ul>
 <p>Validation performed:</p>

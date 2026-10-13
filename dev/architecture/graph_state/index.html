@@ -1541,6 +1541,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../nodes/curated_matcher_node/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Curated Matcher
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../nodes/datasource_resolver_node/" class="md-nav__link">
         
   
@@ -5003,6 +5031,7 @@
 - <code>user_query: str</code>
 - <code>user_context: UserContext</code>
 - <code>datasource_id: Optional[str]</code>
+- <code>verified_match: Optional[VerifiedMatch]</code>
 - <code>datasource_resolver_response: Optional[DatasourceResolverResponse]</code>
 - <code>decomposer_response: Optional[DecomposerResponse]</code>
 - <code>execution_dag: Optional[ExecutionDAG]</code>
@@ -5160,6 +5189,7 @@
 <hr />
 <h2 id="ownership-model">Ownership Model</h2>
 <p>Ownership is defined by which node returns updates for a field:
+- <code>verified_match</code>: <code>CuratedMatcherNode</code>, on a verified answer only. On that path the matcher also writes <code>decomposer_response</code>, <code>execution_dag</code>, <code>artifact_refs</code> and <code>subgraph_outputs</code> (one sub-query, <code>plan_source="verified"</code>), and no resolver, decomposer or SQL agent runs.
 - <code>datasource_resolver_response</code>: <code>DatasourceResolverNode</code>
 - <code>decomposer_response</code>: <code>DecomposerNode</code>
 - <code>execution_dag</code>: <code>DecomposerNode</code>
@@ -5178,7 +5208,7 @@
 <h2 id="state-flow-across-dag">State Flow Across DAG</h2>
 <p>Step-by-step execution flow as defined in <code>build_graph</code> and routing:
 1. <code>run_with_graph</code> constructs <code>GraphState</code> with <code>user_query</code>, <code>user_context</code>, and optional <code>datasource_id</code>, then calls <code>graph.invoke(initial_state.model_dump())</code>.
-2. <code>DatasourceResolverNode</code> runs first and populates <code>datasource_resolver_response</code>, <code>reasoning</code>, and <code>errors</code>.
+2. <code>DatasourceResolverNode</code> runs first (after <code>CuratedMatcherNode</code> falls back, when curated answers are configured) and populates <code>datasource_resolver_response</code>, <code>reasoning</code>, and <code>errors</code>.
 3. <code>resolver_route</code> decides whether to continue based on <code>datasource_resolver_response</code>.
 4. <code>DecomposerNode</code> produces <code>decomposer_response</code>, the <code>execution_dag</code> built from it, and reasoning.
 5. <code>build_scan_layer_router</code> emits <code>Send</code> branches using <code>build_scan_payload</code> for each pending scan node. The payload contains <code>subgraph_id</code>, <code>subgraph_name</code>, <code>trace_id</code>, <code>user_context</code>, <code>decomposer_response</code>, and <code>datasource_resolver_response</code>.

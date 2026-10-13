@@ -673,6 +673,18 @@
 </a>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="../../nodes/curated_matcher_node/">
+<span class="md-ellipsis">
+    
+  
+    Curated Matcher
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="../../nodes/datasource_resolver_node/">
 <span class="md-ellipsis">
     
@@ -2182,6 +2194,7 @@ Source file path: <code>packages/nl2sql/src/nl2sql/pipeline/graph.py</code></p>
 <hr/>
 <h2 id="internal-node-composition">Internal Node Composition</h2>
 <p>Execution order (nominal path):
+- <code>curated_matcher</code> — <code>CuratedMatcherNode</code> — <code>packages/nl2sql/src/nl2sql/pipeline/nodes/curated_matcher/node.py</code> — only when curated answers are configured and the run executes: answer with a verified query (<code>curated_route</code> → <code>verified</code> → <code>layer_router</code>), or fall back (<code>generated</code> → <code>datasource_resolver</code>). Without curated answers the node is not in the graph and <code>datasource_resolver</code> is the entry point.
 - <code>datasource_resolver</code> — <code>DatasourceResolverNode</code> — <code>packages/nl2sql/src/nl2sql/pipeline/nodes/datasource_resolver/node.py</code> — resolve candidate datasources, RBAC, and the answerability check (an LLM call).
 - <code>decomposer</code> — <code>DecomposerNode</code> — <code>packages/nl2sql/src/nl2sql/pipeline/nodes/decomposer/node.py</code> — decompose query into sub-queries, and build the <code>ExecutionDAG</code> from them (<code>decomposer/dag.py</code>).
 - <code>layer_router</code> — inline lambda + <code>routes.build_scan_layer_router</code> — <code>packages/nl2sql/src/nl2sql/pipeline/routes.py</code> — route each scan layer to a subgraph or aggregator.
@@ -2190,6 +2203,8 @@ Source file path: <code>packages/nl2sql/src/nl2sql/pipeline/graph.py</code></p>
 - <code>answer_synthesizer</code> — <code>AnswerSynthesizerNode</code> — <code>packages/nl2sql/src/nl2sql/pipeline/nodes/answer_synthesizer/node.py</code> — produce final answer.</p>
 <p>Mermaid diagram (main pipeline only):
 <pre class="mermaid"><code>flowchart TD
+    curated_matcher -.-&gt;|verified| layer_router
+    curated_matcher -.-&gt;|generated| datasource_resolver
     datasource_resolver --&gt;|continue| decomposer
     datasource_resolver --&gt;|end| END
     decomposer --&gt; layer_router
@@ -2199,6 +2214,7 @@ Source file path: <code>packages/nl2sql/src/nl2sql/pipeline/graph.py</code></p>
     layer_router --&gt;|end| END
     aggregator --&gt;|ok| answer_synthesizer --&gt; END
     aggregator --&gt;|failed| END</code></pre></p>
+<p>The dotted edges exist only when curated answers are configured.</p>
 <hr/>
 <h2 id="state-contract">State Contract</h2>
 <p>State model: <code>GraphState</code> (<code>packages/nl2sql/src/nl2sql/pipeline/state.py</code>).</p>
@@ -2206,6 +2222,7 @@ Source file path: <code>packages/nl2sql/src/nl2sql/pipeline/graph.py</code></p>
 <hr/>
 <h2 id="step-by-step-execution-flow">Step-by-Step Execution Flow</h2>
 <ol>
+<li>With curated answers configured, <code>curated_matcher</code> runs first. On a verified hit it has already run the query and filled <code>decomposer_response</code>, <code>execution_dag</code>, <code>artifact_refs</code> and <code>subgraph_outputs</code> as for one sub-query, so <code>layer_router</code> finds the scan done and goes straight to step 7. Any fallback continues at step 1 with nothing in the state changed.</li>
 <li><code>datasource_resolver</code> resolves candidate datasources (vector search only when more than one datasource is registered), filters them by RBAC, then asks the LLM whether any allowed datasource can answer the question.</li>
 <li><code>resolver_route</code> decides:</li>
 <li><code>continue</code> if allowed datasources exist and the question was judged answerable.</li>

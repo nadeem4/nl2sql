@@ -1132,6 +1132,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../architecture/nodes/curated_matcher_node/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Curated Matcher
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../architecture/nodes/datasource_resolver_node/" class="md-nav__link">
         
   
@@ -1916,6 +1944,17 @@
     <span class="md-ellipsis">
       
         Indexing the questions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-happens-at-question-time" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What happens at question time
       
     </span>
   </a>
@@ -4460,6 +4499,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#what-happens-at-question-time" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What happens at question time
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#source-references" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4493,10 +4543,12 @@ already written and reviewed, with typed parameters, and the questions each
 query answers.</p>
 <div class="admonition note">
 <p class="admonition-title">What works today</p>
-<p>This release loads and checks the file (at startup and with
-<code>nl2sql curated validate</code>) and indexes its questions with <code>nl2sql index</code>.
-Matching a question to a verified query and running it comes in a later
-release; until then the file changes no answer.</p>
+<p>The file is loaded and checked (at startup and with
+<code>nl2sql curated validate</code>), its questions are indexed with <code>nl2sql index</code>,
+and a question is matched to a verified query and answered by it (see
+<a href="#what-happens-at-question-time">What happens at question time</a>). The
+playground's <em>Verified</em> badge, a demo file and <code>nl2sql curated test</code> come
+in a later release.</p>
 </div>
 <h2 id="where-the-file-lives">Where the file lives</h2>
 <table>
@@ -4519,19 +4571,19 @@ release; until then the file changes no answer.</p>
 <td><code>curated_enabled</code></td>
 <td><code>CURATED_ENABLED</code></td>
 <td><code>true</code></td>
-<td><code>false</code> turns the feature off without removing the file. <code>nl2sql curated validate</code> still checks it.</td>
+<td><code>false</code> turns the feature off without removing the file: no matching, and every answer is generated. <code>nl2sql curated validate</code> still checks it.</td>
 </tr>
 <tr>
 <td><code>curated_match_top_k</code></td>
 <td><code>CURATED_MATCH_TOP_K</code></td>
 <td><code>5</code></td>
-<td>Verified query candidates a question's search returns, one per query.</td>
+<td>Verified query candidates a question's search returns and the model is shown, one per query.</td>
 </tr>
 <tr>
 <td><code>curated_match_floor</code></td>
 <td><code>CURATED_MATCH_FLOOR</code></td>
 <td><code>0.6</code></td>
-<td>Cosine similarity the best candidate must reach before the model is asked to choose one. Calibrated on the local embedding model; see <a href="../../architecture/curated_answers/#settings">the design</a>. Not used until matching ships.</td>
+<td>Cosine similarity the best candidate must reach before the model is asked to choose one. Below it the question is answered as if the file did not exist, with no model call. Calibrated on the local embedding model; see <a href="../../architecture/curated_answers/#settings">the design</a>.</td>
 </tr>
 </tbody>
 </table>
@@ -4781,6 +4833,57 @@ the file, and a schema re-index always keeps the verified queries.</p>
 </code></pre></div>
 <p>It is a warning, not a failure: the index stays <code>ok</code>, because the stale
 entries still name queries that exist.</p>
+<h2 id="what-happens-at-question-time">What happens at question time</h2>
+<p>With the file loaded and at least one verified query in it, every question
+that executes starts at the curated matcher
+(<a href="../../architecture/nodes/curated_matcher_node/">node reference</a>):</p>
+<ol>
+<li>It searches the indexed phrasings of the verified queries of the
+   datasources the caller's role may read (only the pinned datasource when a
+   request names one), and keeps the best <code>CURATED_MATCH_TOP_K</code> queries.</li>
+<li>If the best one's similarity is below <code>CURATED_MATCH_FLOOR</code>, the question
+   goes to the normal pipeline. No model call is made.</li>
+<li>Otherwise one model call sees those candidates: each one's
+   <code>datasource.id</code>, <code>description</code> and params (type, bounds, choices,
+   default). Never the SQL. The model picks the one that answers the whole
+   question and gives its parameter values, or answers <code>none_of_these</code>.</li>
+<li>Code checks the values against the param specs. A param the question does
+   not give takes its <code>default</code>; a required one missing, or a value out of
+   bounds, sends the question to the normal pipeline.</li>
+<li>Every table the SQL reads must be allowed for the role in
+   <code>policies.json</code>. If one is not, the question goes to the normal pipeline,
+   which refuses it the way it always does. The user is never told a
+   verified query exists.</li>
+<li>The SQL runs with the values bound by the driver, through the same
+   executor as generated SQL. The row limit is the datasource's <code>row_limit</code>
+   (capped by <code>RESULT_ROW_LIMIT</code>): the executor stops reading there and marks
+   the result cut, rather than adding a <code>LIMIT</code> to your SQL. The result is
+   saved, paged and exported like any other, and the answer is written from
+   it, told what the numbers mean by the query's <code>description</code>.</li>
+</ol>
+<p>A verified answer costs two model calls (the choice and the answer). When
+anything above does not hold, the run continues as if the file did not
+exist, and the answer is generated.</p>
+<p>Every answer says where it came from, in <code>QueryResult.source</code> (and the REST
+response):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="p">{</span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"verified"</span><span class="p">,</span><span class="w"> </span><span class="nt">"id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"top_customers_by_revenue"</span><span class="p">,</span><span class="w"> </span><span class="nt">"datasource_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"chinook"</span><span class="p">,</span><span class="w"> </span><span class="nt">"params"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"n"</span><span class="p">:</span><span class="w"> </span><span class="mi">5</span><span class="p">,</span><span class="w"> </span><span class="nt">"year"</span><span class="p">:</span><span class="w"> </span><span class="mi">2012</span><span class="p">}}</span>
+</code></pre></div>
+<p>or <code>{"type": "generated", ...}</code> with the other fields <code>null</code>. The sub-query of
+a verified answer has <code>plan_source: "verified"</code>, its <code>sql</code> is your SQL with
+its <code>:name</code> placeholders, and its <code>plan</code> is <code>null</code>.</p>
+<p>Why a question was not matched is in the run trace: the <code>curated_matcher</code>
+node's <code>curated_match</code> record lists the candidates and their similarities, the
+floor, the model's choice and reason, the checked values, and one reason code:
+<code>not_configured</code>, <code>no_candidates</code>, <code>below_floor</code>, <code>none_of_these</code>,
+<code>model_failed</code>, <code>unknown_query</code>, <code>param_invalid</code>, <code>param_missing</code>,
+<code>policy_denied</code>, <code>capability_missing</code> or <code>execution_failed</code>. A verified query
+that fails to run also adds a warning to the result.</p>
+<p>The model for the choice is the <code>curatedmatcher</code> agent in the
+<a href="../llm/">LLM config</a>, falling back to <code>default</code>.</p>
+<p>Parameters are bound by the datasource's adapter. Every built-in adapter
+binds them; a third-party adapter has to declare <code>SUPPORTS_BOUND_PARAMETERS</code>
+(<a href="../../adapters/sdk/">SDK</a>), and a verified query with params on one that
+does not is never run (<code>capability_missing</code>).</p>
 <h2 id="source-references">Source references</h2>
 <ul>
 <li>Models and SQL checks: <code>packages/nl2sql/src/nl2sql/configs/curated.py</code></li>
@@ -4789,6 +4892,7 @@ entries still name queries that exist.</p>
 <li>Startup load: <code>packages/nl2sql/src/nl2sql/context.py</code></li>
 <li>Facade: <code>packages/nl2sql/src/nl2sql/api/curated_api.py</code></li>
 <li>Command: <code>packages/nl2sql/src/nl2sql/cli/commands/curated.py</code></li>
+<li>Matching and running: <code>packages/nl2sql/src/nl2sql/pipeline/nodes/curated_matcher/</code></li>
 </ul>
 
 
