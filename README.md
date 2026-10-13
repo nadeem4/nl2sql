@@ -354,6 +354,11 @@ wins:
 
 With none of them, `/api/v1/query`, `/api/v1/query/stream` and the result routes answer HTTP 401.
 
+The routes that change the process (`POST /api/v1/datasource`, `DELETE /api/v1/datasource/{id}`,
+`POST /api/v1/llm`, `POST /api/v1/index/{id}`, `POST /api/v1/index-all`, `DELETE /api/v1/index`)
+also need a role listed in `NL2SQL_API_ADMIN_ROLES` (default `admin`), else HTTP 403. With no
+role setting at all they answer loopback clients only.
+
 | Method | Path | Purpose |
 | --- | --- | --- |
 | `POST` | `/api/v1/query` | Ask a question; returns the plan, checks, SQL, a row sample, the result manifest, answer, errors and usage |

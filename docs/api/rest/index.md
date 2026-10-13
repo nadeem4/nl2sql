@@ -29,6 +29,8 @@ Source: `packages/api/src/nl2sql_api/dependencies.py`
   `IndexingService`, `HealthService`) are created per-request with the engine.
 - `get_user_context(request)` (in `nl2sql_api/auth.py`) returns the caller's
   `UserContext`; see [Caller role](#caller-role).
+- `require_admin(request)` (same module) guards the routes that change
+  datasources, LLMs or the index; see [Admin routes](#admin-routes).
 
 ## Interactive docs
 
@@ -58,6 +60,9 @@ Datasource and delete endpoints map `ValueError` to `HTTP 404`.
 `POST /api/v1/query` is the exception: pipeline errors are returned as a normal
 `HTTP 200` inside `QueryResponse.errors`, and an unexpected failure returns a
 generic `HTTP 500` with the traceback logged server-side rather than returned.
+`POST /api/v1/datasource` does the same: its exception can carry a connection
+string, password included, so the response says only that it failed and the
+cause goes to the server log.
 
 Route handlers that call blocking engine code are declared with `def` rather than
 `async def`, so Starlette runs them in its threadpool instead of blocking the
@@ -119,3 +124,40 @@ NL2SQL_API_ROLE_HEADER=X-NL2SQL-Role nl2sql-api --port 8000
 This is a seam, not an auth provider: to integrate one, override the
 `get_user_context` dependency (`app.dependency_overrides[get_user_context] = ...`)
 or put the provider in the proxy.
+
+### Admin routes
+
+The routes that change the running process need an admin role, checked by the
+`require_admin` dependency in `nl2sql_api/auth.py`:
+
+- `POST /api/v1/datasource` and `DELETE /api/v1/datasource/{datasource_id}`
+- `POST /api/v1/llm`
+- `POST /api/v1/index/{datasource_id}`, `POST /api/v1/index-all` and `DELETE /api/v1/index`
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `NL2SQL_API_ADMIN_ROLES` | `admin` | Comma-separated roles that may call the admin routes. |
+
+The roles come from the same sources as [Caller role](#caller-role). A request
+whose roles include one in `NL2SQL_API_ADMIN_ROLES` is let through; one with
+roles but none of them admin is `HTTP 403`; one with no role is `HTTP 401`.
+
+With **none** of `NL2SQL_API_ROLE_HEADER`, `NL2SQL_API_ROLE` or
+`NL2SQL_API_TRUST_BODY_ROLE` set, admin routes answer only clients on loopback
+(`127.0.0.1`, `::1`) and return `HTTP 403` to everyone else, with a message
+naming the variables to set. A fresh local install can still register and
+index datasources, and a port published by mistake does not hand them out.
+Two consequences:
+
+- In Docker, a request through a published port arrives from the bridge
+  gateway, not loopback, so admin routes need a role setting there.
+- A reverse proxy on the same host makes every request look like loopback.
+  Behind one, configure `NL2SQL_API_ROLE_HEADER`.
+
+The read-only routes (`/health`, `/ready`, `GET /datasource`, `GET /llm`, which
+never returns API keys, and `GET /index/status`) need no role.
+
+```bash
+# The proxy sets X-NL2SQL-Role; only "ops" may change datasources and the index.
+NL2SQL_API_ROLE_HEADER=X-NL2SQL-Role NL2SQL_API_ADMIN_ROLES=ops nl2sql-api --port 8000
+```

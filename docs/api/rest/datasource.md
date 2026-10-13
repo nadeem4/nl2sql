@@ -26,11 +26,15 @@ Request model: `DatasourceRequest`
 
 Response model: `DatasourceResponse`
 
+Admin only: see [Admin routes](index.md#admin-routes).
+
 Execution flow:
 - Delegates to `engine.add_datasource(...)`.
 
 Errors:
-- Unhandled exceptions return `HTTP 500`.
+- No role -> `HTTP 401`; a role not in `NL2SQL_API_ADMIN_ROLES` -> `HTTP 403`.
+- A failure to add -> `HTTP 500` with a generic message. The exception, which can
+  hold the connection string, is logged server-side and never returned.
 
 ### `GET /api/v1/datasource`
 
@@ -54,6 +58,8 @@ Errors:
 ### `DELETE /api/v1/datasource/{datasource_id}`
 
 Response model: `Dict[str, Any]`
+
+Admin only: see [Admin routes](index.md#admin-routes).
 
 Execution flow:
 - Returns a fixed payload indicating removal is not supported.
