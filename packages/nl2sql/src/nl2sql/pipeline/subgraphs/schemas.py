@@ -17,8 +17,9 @@ class SubgraphOutput(BaseModel):
     subgraph_name: Optional[str] = None
     retry_count: int = 0
     plan: Optional[PlanModel] = None
-    # "cache" when the final plan came from the plan cache, not the planner LLM.
-    plan_source: Literal["llm", "cache"] = "llm"
+    # "cache" when the final plan came from the plan cache, not the planner LLM;
+    # "verified" when there was no plan: the SQL is a verified query's.
+    plan_source: Literal["llm", "cache", "verified"] = "llm"
     sql_draft: Optional[str] = None
     # The adapter row cap bounding the SQL, when the plan set no smaller LIMIT.
     row_cap: Optional[int] = None

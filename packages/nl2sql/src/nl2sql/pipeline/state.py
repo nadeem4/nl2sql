@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from nl2sql.common.errors import PipelineError
 from nl2sql.auth import UserContext
+from nl2sql.pipeline.nodes.curated_matcher.schemas import VerifiedMatch
 from nl2sql.pipeline.nodes.datasource_resolver.schemas import DatasourceResolverResponse
 from nl2sql.pipeline.nodes.decomposer.schemas import DecomposerResponse, SubQuery
 from nl2sql.pipeline.nodes.aggregator.schemas import AggregatorResponse
@@ -37,6 +38,7 @@ class GraphState(BaseModel):
         user_query (str): Canonical user query.
         user_context (UserContext): User identity and permissions context.
         datasource_id (Optional[str]): Optional datasource override for resolution.
+        verified_match (Optional[VerifiedMatch]): Set by the curated matcher when a verified query answered.
         datasource_resolver_response (Optional[DatasourceResolverResponse]): Output of resolver node.
         decomposer_response (Optional[DecomposerResponse]): Output of decomposer node.
         execution_dag (Optional[ExecutionDAG]): The graph of sub-queries the decomposer built.
@@ -56,6 +58,8 @@ class GraphState(BaseModel):
     user_query: str = Field(description="Canonical user query.")
     user_context: UserContext = Field(default_factory=UserContext, description="User identity and permissions context.")
     datasource_id: Optional[str] = Field(default=None, description="Optional datasource override for resolution.")
+    verified_match: Optional[VerifiedMatch] = Field(
+        default=None, description="The verified query that answered the run, when one did.")
     datasource_resolver_response: Optional[DatasourceResolverResponse] = Field(default=None)
     decomposer_response: Optional[DecomposerResponse] = Field(default=None)
     execution_dag: Optional[ExecutionDAG] = Field(default=None)

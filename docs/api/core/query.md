@@ -75,6 +75,7 @@ Fields:
 | `trace_path` | `Optional[str]` | no | Where this run's trace file was written, or `None` when `TRACE_MODE` did not write one. See [Debugging a Run](../../observability/debugging.md). |
 | `truncated` | `bool` | no | True when any sub-query's result reached its row limit, so rows may be missing. See `sub_queries[].truncated`. |
 | `result_manifest` | `List[ResultSummary]` | no | The run's saved results, one per terminal DAG node (`node_id`, `columns`, `row_count`, `truncated`): the manifest the aggregator writes beside them. Never the rows; see [Reading a run's saved results](#reading-a-runs-saved-results). Empty when nothing was saved. |
+| `source` | `AnswerSource` | no | Where the answer came from: `type` `"verified"` with the verified query's `id`, `datasource_id` and the `params` it ran with, or `type` `"generated"` with the other fields `None`. See [Curated answers](../../configuration/curated.md#what-happens-at-question-time). |
 
 `errors` holds only `ERROR` and `CRITICAL` entries; `WARNING`-severity pipeline
 errors are appended to `warnings` as the same summary dict.
@@ -224,7 +225,7 @@ and `.../{result_id}.csv`; the playground serves the same two under `/api/query/
 | `rows` | `Optional[RowSample]` | no | Capped row sample; `None` when nothing executed or the artifact could not be read. |
 | `status` | `str` | no | `"success"` or `"error"` for this sub-query, from its final attempt: `"success"` when it ended with SQL and, if executed, a result; otherwise `"error"`. A retry that recovers reports `"success"`. |
 | `retry_count` | `int` | no | Plan/SQL refinement attempts made. |
-| `plan_source` | `str` | no | `"cache"` when the plan came from the plan cache (no planner LLM call; still validated, generated and executed), otherwise `"llm"`. See [Determinism → The plan cache](../../architecture/determinism.md#the-plan-cache-determinism-from-the-architecture). |
+| `plan_source` | `str` | no | `"cache"` when the plan came from the plan cache (no planner LLM call; still validated, generated and executed), `"verified"` when a verified query answered (no plan; `sql` is the verified query's own), otherwise `"llm"`. See [Determinism → The plan cache](../../architecture/determinism.md#the-plan-cache-determinism-from-the-architecture). |
 | `row_cap` | `Optional[int]` | no | The row limit that bounded this sub-query's SQL (the datasource's `row_limit`, bounded by `RESULT_ROW_LIMIT`), or `None` when the plan's own `LIMIT` was smaller. |
 | `truncated` | `bool` | no | True when the result has `row_cap` rows: it was cut at the limit and may be missing rows. A result of exactly `row_cap` rows may be whole; it is counted as cut. |
 
@@ -249,6 +250,7 @@ model instances for nested values):
 | `usage.plan_cache_hits` | count of `sub_queries[]` with `plan_source == "cache"` |
 | `sub_queries[].rows` | `artifact_store.read_result_frame(subgraph_outputs[<id>].artifact)` |
 | `final_answer` | `answer_synthesizer_response.final_answer` |
+| `source` | `verified_match` (set by the curated matcher on a verified answer; absent means `generated`) |
 | `errors`, `reasoning`, `warnings`, `trace_id`, `artifact_refs`, `timings`, `usage` | top-level state |
 
 `errors` are projected onto a client-safe summary; `stack_trace` and `details` are

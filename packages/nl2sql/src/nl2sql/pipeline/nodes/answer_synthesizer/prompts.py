@@ -27,3 +27,14 @@ Instructions:
 6. If there are unmapped subqueries, add user-facing warnings that explain what was skipped and why.
 7. If there are data notes, say that the value does not exist (and name the closest values if given) instead of reporting an empty result as a finding.
 """
+
+# Appended only when a verified query answered, so a generated answer's prompt
+# is unchanged. The description is the data team's own words for what the
+# query returns; it tells the model what the numbers mean.
+VERIFIED_QUERY_SECTION = """
+Verified Query (the result came from a query the data team wrote and checked):
+- id: {verified_query_id}
+- what it returns: {verified_query_description}
+
+8. Describe the numbers the way "what it returns" does (for example, revenue "before refunds"); do not guess another meaning.
+"""

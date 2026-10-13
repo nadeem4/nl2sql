@@ -40,6 +40,13 @@ class ExecutorRequest(BaseModel):
     sql: Optional[str] = None
     user_context: Optional[UserContext] = None
     tenant_id: str
+    # Values bound by name to the SQL's ``:name`` placeholders, never written
+    # into it. Set for a verified query; generated SQL has none.
+    parameters: Dict[str, Any] = Field(default_factory=dict)
+    # Stop reading the result after this many rows. The row ceiling for SQL a
+    # person wrote, which is never rewritten to add a LIMIT; generated SQL
+    # carries its LIMIT in the text and leaves this unset.
+    max_rows: Optional[int] = Field(default=None, ge=1)
 
     model_config = ConfigDict(extra="ignore")
 

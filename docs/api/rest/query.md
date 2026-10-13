@@ -28,7 +28,7 @@ Derives from `nl2sql.SubQueryResult`, so it has exactly the engine's fields.
 | `rows` | `Optional[RowSample]` | no | Capped row sample (`columns`, `rows`, `total_rows`). |
 | `status` | `str` | no | `"success"` or `"error"` for this sub-query, from its final attempt: `"success"` when it ended with SQL and, if executed, a result; otherwise `"error"`. A retry that recovers reports `"success"`. |
 | `retry_count` | `int` | no | Plan/SQL refinement attempts made. |
-| `plan_source` | `str` | no | `"cache"` when the plan came from the plan cache (no planner call; still validated and executed), otherwise `"llm"`. |
+| `plan_source` | `str` | no | `"cache"` when the plan came from the plan cache (no planner call; still validated and executed), `"verified"` when a [verified query](../../configuration/curated.md#what-happens-at-question-time) answered (there is no plan; `sql` is the verified query's own, with its `:name` placeholders), otherwise `"llm"`. |
 | `row_cap` | `Optional[int]` | no | The row limit that bounded this sub-query's SQL, or `null` when the plan's own `LIMIT` was smaller. |
 | `truncated` | `bool` | no | True when the result reached `row_cap`, so rows may be missing. |
 
@@ -52,6 +52,7 @@ Derives from `nl2sql.QueryResult` (only `sub_queries` is narrowed to
 | `trace_path` | `Optional[str]` | no | Where the run's trace file was written on the server, or `null`. See [Debugging a Run](../../observability/debugging.md). |
 | `truncated` | `bool` | no | True when any sub-query's result was cut at its row limit. |
 | `result_manifest` | `List[ResultSummary]` | no | The run's saved results, one per terminal DAG node: `node_id`, `columns`, `row_count` (the whole result's) and `truncated` (a sub-query feeding it was cut at its row limit). Never the rows: read those with the two result routes below, `result_id` being the `node_id`. Empty when nothing was saved (`execute: false`, or the run failed before aggregation). |
+| `source` | `AnswerSource` | no | Where the answer came from: `{"type": "verified", "id", "datasource_id", "params"}` when a verified query from `curated.yaml` answered, with the values it ran with; `{"type": "generated"}` (the other fields `null`) otherwise. The last event of `POST /query/stream` carries it too. |
 
 Only a capped sample of the rows is inlined, in `sub_queries[].rows`. The full
 result set is written to artifact storage and addressed through `artifact_refs`
@@ -163,6 +164,7 @@ Example response:
     }
   },
   "status": "success",
+  "source": {"type": "generated", "id": null, "datasource_id": null, "params": null},
   "timings": {"ast_planner": 0.02, "logical_validator": 0.001, "generator": 0.006, "executor": 0.038},
   "usage": {
     "total": {"calls": 3, "input_tokens": 13200, "cached_input_tokens": 0, "cache_write_input_tokens": 0,

@@ -195,9 +195,10 @@ Only datasources permitted by RBAC may be selected or resolved.
 
 ### Enforcement Points
 - `DatasourceResolverNode._get_allowed_datasource_ids()` and `__call__()` in `nl2sql.pipeline.nodes.datasource_resolver.node`
+- `CuratedMatcherNode._searchable()` and `_check_access()` in `nl2sql.pipeline.nodes.curated_matcher.node`: the verified-query search covers only datasources the role may read, and every table a verified query's SQL reads must pass `table_allowed()`
 
 ### Failure Behavior
-Returns `PipelineError` with `SECURITY_VIOLATION` if no allowed datasource is available. The check runs before the resolver's answerability LLM call, so a denied caller triggers no model call and the model only ever sees datasources the role may read. It runs on every path, including the single-datasource shortcut that skips the vector search.
+Returns `PipelineError` with `SECURITY_VIOLATION` if no allowed datasource is available. The check runs before the resolver's answerability LLM call, so a denied caller triggers no model call and the model only ever sees datasources the role may read. It runs on every path, including the single-datasource shortcut that skips the vector search. The curated matcher refuses nothing itself: a verified query on a datasource or table the role may not read is never offered or never run, and the run falls back (`policy_denied`) to the resolver, which refuses as above.
 
 ### Why It Exists
 Prevents execution against unauthorized datasources.
@@ -274,11 +275,12 @@ Prevents startup with incomplete indexing and schema storage configuration.
 ## SQL Generation Enforces a Row Limit Cap
 
 ### Definition
-Generated SQL must not exceed the row limit: the datasource adapter’s `row_limit`, bounded by the `RESULT_ROW_LIMIT` ceiling (100,000), which is also the limit when the datasource sets none. A result that reaches the limit is flagged as truncated.
+Generated SQL must not exceed the row limit: the datasource adapter’s `row_limit`, bounded by the `RESULT_ROW_LIMIT` ceiling (100,000), which is also the limit when the datasource sets none. A result that reaches the limit is flagged as truncated. Verified SQL is held to the same limit, but a person's SQL is never rewritten: the executor stops reading its result at the limit (`ExecutorRequest.max_rows`).
 
 ### Enforcement Points
 - `GeneratorNode.__call__()` in `nl2sql.pipeline.nodes.generator.node`
 - `wrap_subgraph()` in `nl2sql.pipeline.graph_utils` sets `SubgraphOutput.truncated`, which `QueryResult` and the answer carry
+- `CuratedMatcherNode._run()` sets `max_rows` and `truncated` for a verified query; `_Stream` in `nl2sql.execution.executor.sql_executor` stops at `max_rows` and closes the adapter's stream
 
 ### Failure Behavior
 No error; the limit is clamped to the smaller of the two. A cut result is flagged (`truncated`), and the answer says it was cut at N rows.
@@ -391,11 +393,31 @@ The validator resolves columns against a throw-away query in which every table i
 
 ---
 
+## Verified SQL Is Human-Authored, Read-Only and Parameter-Bound
+
+### Definition
+A verified query's SQL is written, reviewed and committed by a person in `curated.yaml`. The model picks a verified query by id and supplies parameter values; it never writes or edits the SQL. The SQL must be exactly one read-only query whose `:name` placeholders are exactly its declared params. Values are typed and checked by code (type, `min`/`max`, `choices`, required) and bound by the adapter's driver, never interpolated into the SQL text. A query with params runs only on an adapter that declares `SUPPORTS_BOUND_PARAMETERS`.
+
+### Enforcement Points
+- `VerifiedQuery`, `ParamSpec`, `inspect_verified_sql()` and `check_curated_queries()` in `nl2sql.configs.curated`, at startup and in `nl2sql curated validate`
+- `resolve_params()` in `nl2sql.pipeline.nodes.curated_matcher.params`
+- `CuratedMatcherNode._match()` in `nl2sql.pipeline.nodes.curated_matcher.node`: parses the SQL read-only again before running, and checks the capability
+- `BaseSQLAlchemyAdapter._run()` in `nl2sql.adapters.sqlalchemy_base.adapter`: `conn.execute(text(sql), parameters)`; without parameters the call is exactly `conn.execute(text(sql))`
+- `packages/nl2sql/tests/sqlalchemy_base/test_bound_parameters.py`: a value `1; DROP TABLE x` is compared as a value and the table survives
+
+### Failure Behavior
+A broken file fails startup. At question time a bad value, a denied table, a missing capability or a failed run falls back to the generated pipeline with a reason code in the matcher's trace record; it is never an error of the run.
+
+### Why It Exists
+*The model emits a typed plan, never SQL* holds on this path too: no model wrote the SQL, and a value cannot change what the query does.
+
+---
+
 ## Categories
 
 - **State**: Plan Model Is Strict and Read-Only; Context Requires Vector Store and Schema Store Configuration
 - **Execution**: SQL Execution Requires SQL, Datasource, and Capability; Execution DAG Must Be Valid and Acyclic; Aggregation Requires Scan Artifacts and Single-Input Post Nodes; Pipeline Execution Is Time-Bounded
-- **Security**: Policy Enforcement Is Namespaced and Fail-Closed; Datasource Access Is RBAC-Gated; Plan Model Is Strict and Read-Only
+- **Security**: Policy Enforcement Is Namespaced and Fail-Closed; Datasource Access Is RBAC-Gated; Plan Model Is Strict and Read-Only; Verified SQL Is Human-Authored, Read-Only and Parameter-Bound
 - **Determinism**: Expected Schema Must Match Select List; Joins Must Be Valid and Schema-Backed
 - **Resource bounds**: SQL Generation Enforces a Row Limit Cap; The Answer Model Sees a Preview, Never the Whole Result; Context Requires Vector Store and Schema Store Configuration
 - **Boundaries**: Package Boundaries Are One-Way; Dialect Knowledge Lives in the Adapter
@@ -418,6 +440,8 @@ The validator resolves columns against a throw-away query in which every table i
 - `packages/nl2sql/src/nl2sql/pipeline/nodes/ast_planner/schemas.py`
 - `packages/nl2sql/src/nl2sql/pipeline/nodes/validator/node.py`
 - `packages/nl2sql/src/nl2sql/pipeline/nodes/datasource_resolver/node.py`
+- `packages/nl2sql/src/nl2sql/pipeline/nodes/curated_matcher/node.py`
+- `packages/nl2sql/src/nl2sql/configs/curated.py`
 - `packages/nl2sql/src/nl2sql/pipeline/nodes/generator/node.py`
 - `packages/nl2sql/src/nl2sql/pipeline/nodes/executor/node.py`
 - `packages/nl2sql/src/nl2sql/execution/executor/sql_executor.py`

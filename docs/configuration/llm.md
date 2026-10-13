@@ -311,11 +311,12 @@ Nothing is retried without the parameter: what the config says is what is sent.
 
 ## Per-node models
 
-The five pipeline nodes that call a model each ask the registry for their own
+The six pipeline nodes that call a model each ask the registry for their own
 agent name, and fall back to `default` when it is not configured:
 
 | agent name | node |
 | --- | --- |
+| `curatedmatcher` | picks the verified query that answers the question, if any (one short call; only when [curated answers](curated.md) are configured and a candidate clears the floor) |
 | `datasourceresolver` | checks that the connected data can answer the question at all (one short call; refuses with `QUESTION_NOT_ANSWERABLE`) |
 | `decomposer` | splits the question into sub-queries |
 | `astplanner` | writes the query plan (the largest prompt: it carries the schema) |
@@ -351,7 +352,7 @@ agents:
     api_key: ${env:OPENAI_API_KEY}
 ```
 
-Here `datasourceresolver`, `decomposer` and `refiner` use `default`. Each node
+Here `curatedmatcher`, `datasourceresolver`, `decomposer` and `refiner` use `default`. Each node
 keeps its own key, endpoint and cache behaviour: the planner's system prompt is
 cache-marked for Anthropic, the others are sent unmarked to OpenAI. The model
 each call actually used is recorded per node in `QueryResult.usage.calls` and
@@ -371,10 +372,10 @@ now, and a provider only once its key is saved. See
 [the Settings page](../getting_started/demo.md#the-settings-page).
 
 The playground's **Pipeline** page reads the same configuration back: it lists
-every step of a run and, for each of the five a model decides, the provider and
+every step of a run and, for each of the six a model decides, the provider and
 model it is set to use, then what it actually spent once a question has been
 asked. It is served by `GET /api/pipeline` from `nl2sql.pipeline.steps`, which
-takes its five model steps from `LLM_AGENTS` rather than repeating the table
+takes its six model steps from `LLM_AGENTS` rather than repeating the table
 above. See [the Pipeline page](../getting_started/demo.md#the-pipeline-page).
 
 On the **hosted demo** (`nl2sql demo --hosted`) the same choice is offered and

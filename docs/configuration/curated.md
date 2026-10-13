@@ -5,19 +5,21 @@ already written and reviewed, with typed parameters, and the questions each
 query answers.
 
 !!! note "What works today"
-    This release loads and checks the file (at startup and with
-    `nl2sql curated validate`) and indexes its questions with `nl2sql index`.
-    Matching a question to a verified query and running it comes in a later
-    release; until then the file changes no answer.
+    The file is loaded and checked (at startup and with
+    `nl2sql curated validate`), its questions are indexed with `nl2sql index`,
+    and a question is matched to a verified query and answered by it (see
+    [What happens at question time](#what-happens-at-question-time)). The
+    playground's *Verified* badge, a demo file and `nl2sql curated test` come
+    in a later release.
 
 ## Where the file lives
 
 | Setting | Env | Default | Meaning |
 | --- | --- | --- | --- |
 | `curated_config_path` | `CURATED_CONFIG` | `configs/curated.yaml` | The curated answers file, relative to the working directory or absolute. |
-| `curated_enabled` | `CURATED_ENABLED` | `true` | `false` turns the feature off without removing the file. `nl2sql curated validate` still checks it. |
-| `curated_match_top_k` | `CURATED_MATCH_TOP_K` | `5` | Verified query candidates a question's search returns, one per query. |
-| `curated_match_floor` | `CURATED_MATCH_FLOOR` | `0.6` | Cosine similarity the best candidate must reach before the model is asked to choose one. Calibrated on the local embedding model; see [the design](../architecture/curated_answers.md#settings). Not used until matching ships. |
+| `curated_enabled` | `CURATED_ENABLED` | `true` | `false` turns the feature off without removing the file: no matching, and every answer is generated. `nl2sql curated validate` still checks it. |
+| `curated_match_top_k` | `CURATED_MATCH_TOP_K` | `5` | Verified query candidates a question's search returns and the model is shown, one per query. |
+| `curated_match_floor` | `CURATED_MATCH_FLOOR` | `0.6` | Cosine similarity the best candidate must reach before the model is asked to choose one. Below it the question is answered as if the file did not exist, with no model call. Calibrated on the local embedding model; see [the design](../architecture/curated_answers.md#settings). |
 
 The file is optional:
 
@@ -187,6 +189,66 @@ Warning: curated.yaml changed for 'chinook' since it was indexed; run `nl2sql in
 It is a warning, not a failure: the index stays `ok`, because the stale
 entries still name queries that exist.
 
+## What happens at question time
+
+With the file loaded and at least one verified query in it, every question
+that executes starts at the curated matcher
+([node reference](../architecture/nodes/curated_matcher_node.md)):
+
+1. It searches the indexed phrasings of the verified queries of the
+   datasources the caller's role may read (only the pinned datasource when a
+   request names one), and keeps the best `CURATED_MATCH_TOP_K` queries.
+2. If the best one's similarity is below `CURATED_MATCH_FLOOR`, the question
+   goes to the normal pipeline. No model call is made.
+3. Otherwise one model call sees those candidates: each one's
+   `datasource.id`, `description` and params (type, bounds, choices,
+   default). Never the SQL. The model picks the one that answers the whole
+   question and gives its parameter values, or answers `none_of_these`.
+4. Code checks the values against the param specs. A param the question does
+   not give takes its `default`; a required one missing, or a value out of
+   bounds, sends the question to the normal pipeline.
+5. Every table the SQL reads must be allowed for the role in
+   `policies.json`. If one is not, the question goes to the normal pipeline,
+   which refuses it the way it always does. The user is never told a
+   verified query exists.
+6. The SQL runs with the values bound by the driver, through the same
+   executor as generated SQL. The row limit is the datasource's `row_limit`
+   (capped by `RESULT_ROW_LIMIT`): the executor stops reading there and marks
+   the result cut, rather than adding a `LIMIT` to your SQL. The result is
+   saved, paged and exported like any other, and the answer is written from
+   it, told what the numbers mean by the query's `description`.
+
+A verified answer costs two model calls (the choice and the answer). When
+anything above does not hold, the run continues as if the file did not
+exist, and the answer is generated.
+
+Every answer says where it came from, in `QueryResult.source` (and the REST
+response):
+
+```json
+{"type": "verified", "id": "top_customers_by_revenue", "datasource_id": "chinook", "params": {"n": 5, "year": 2012}}
+```
+
+or `{"type": "generated", ...}` with the other fields `null`. The sub-query of
+a verified answer has `plan_source: "verified"`, its `sql` is your SQL with
+its `:name` placeholders, and its `plan` is `null`.
+
+Why a question was not matched is in the run trace: the `curated_matcher`
+node's `curated_match` record lists the candidates and their similarities, the
+floor, the model's choice and reason, the checked values, and one reason code:
+`not_configured`, `no_candidates`, `below_floor`, `none_of_these`,
+`model_failed`, `unknown_query`, `param_invalid`, `param_missing`,
+`policy_denied`, `capability_missing` or `execution_failed`. A verified query
+that fails to run also adds a warning to the result.
+
+The model for the choice is the `curatedmatcher` agent in the
+[LLM config](llm.md), falling back to `default`.
+
+Parameters are bound by the datasource's adapter. Every built-in adapter
+binds them; a third-party adapter has to declare `SUPPORTS_BOUND_PARAMETERS`
+([SDK](../adapters/sdk.md)), and a verified query with params on one that
+does not is never run (`capability_missing`).
+
 ## Source references
 
 - Models and SQL checks: `packages/nl2sql/src/nl2sql/configs/curated.py`
@@ -195,3 +257,4 @@ entries still name queries that exist.
 - Startup load: `packages/nl2sql/src/nl2sql/context.py`
 - Facade: `packages/nl2sql/src/nl2sql/api/curated_api.py`
 - Command: `packages/nl2sql/src/nl2sql/cli/commands/curated.py`
+- Matching and running: `packages/nl2sql/src/nl2sql/pipeline/nodes/curated_matcher/`

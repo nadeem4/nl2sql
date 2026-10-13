@@ -22,7 +22,7 @@
 ## Position in Execution Graph
 
 Upstream:
-- `EngineAggregatorNode`
+- `EngineAggregatorNode`, after a generated run or a verified one (the [curated matcher](curated_matcher_node.md) ran the query)
 
 Downstream:
 - Graph end.
@@ -46,6 +46,7 @@ From `GraphState`:
 - `aggregator_response.computed_artifacts`: the saved result behind each, for its row count and columns
 - `decomposer_response.unmapped_subqueries` (optional)
 - `subgraph_outputs[<id>].truncated` / `.row_cap`: whether a sub-query's result reached its row limit, and at how many rows.
+- `verified_match` (optional): set when a verified query answered. Its qualified id and its `description` (the data team's words for what the query returns, e.g. "invoiced revenue, before refunds") are added to the prompt as a *Verified Query* section, and the model is told to describe the numbers that way. A generated answer's prompt has no such section and is exactly what it was.
 - `warnings`: the `VALUE_NOT_FOUND` warnings ("There is no Genre with Name 'Polka'.") from sub-queries whose filter named a value that does not exist (see [ExecutorNode](executor_node.md#an-empty-results-filter-values)). An `ERROR`-severity one is not used: a retry replaced that attempt.
 
 Validation performed:

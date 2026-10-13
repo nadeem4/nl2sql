@@ -1,6 +1,6 @@
 """The HTTP response mirrors every field a UI renders off ``QueryResult``."""
 
-from nl2sql import QueryResult, QuestionUsage, RowSample, SubQueryResult
+from nl2sql import AnswerSource, QueryResult, QuestionUsage, RowSample, SubQueryResult
 from nl2sql.pipeline.nodes.validator.schemas import ValidationCheck
 from nl2sql.services.callbacks.token_handler import LLMCallUsage, UsageTotals
 
@@ -77,6 +77,28 @@ def test_the_response_says_when_a_plan_came_from_the_plan_cache(api_client):
 
     assert body["sub_queries"][0]["plan_source"] == "cache"
     assert body["usage"]["plan_cache_hits"] == 1
+
+
+def test_the_response_says_where_the_answer_came_from(api_client):
+    client, _engine = api_client(QueryResult(
+        sub_queries=[SubQueryResult(id="verified_top", sql="SELECT 1 LIMIT :n", status="success",
+                                    plan_source="verified")],
+        status="success",
+        source=AnswerSource(type="verified", id="top", datasource_id="chinook", params={"n": 5}),
+    ))
+
+    body = client.post("/api/v1/query", json={"natural_language": "q"}).json()
+
+    assert body["source"] == {"type": "verified", "id": "top", "datasource_id": "chinook", "params": {"n": 5}}
+    assert body["sub_queries"][0]["plan_source"] == "verified"
+
+
+def test_a_generated_answer_says_so(api_client):
+    client, _engine = api_client(QueryResult(status="success"))
+
+    body = client.post("/api/v1/query", json={"natural_language": "q"}).json()
+
+    assert body["source"]["type"] == "generated"
 
 
 def test_plan_only_run_reports_no_rows(api_client):

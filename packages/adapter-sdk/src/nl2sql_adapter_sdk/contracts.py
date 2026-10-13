@@ -13,7 +13,12 @@ class AdapterRequest(BaseModel):
         default_factory=dict, description="Plan-specific request payload."
     )
     parameters: Dict[str, Any] = Field(
-        default_factory=dict, description="Optional parameter bindings."
+        default_factory=dict,
+        description=(
+            "Optional parameter bindings: each value is bound by name to the "
+            "':name' placeholder in the SQL, never interpolated into its text. "
+            "Sent only to an adapter declaring SUPPORTS_BOUND_PARAMETERS."
+        ),
     )
     limits: Dict[str, int] = Field(
         default_factory=dict,

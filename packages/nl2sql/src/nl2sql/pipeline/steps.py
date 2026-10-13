@@ -9,10 +9,11 @@ docs can read the same list.
 The order is the order :func:`nl2sql.pipeline.graph.build_graph` and
 :func:`nl2sql.pipeline.subgraphs.sql_agent.build_sql_agent_graph` run their
 nodes, with the SQL agent's own nodes nested under it, exactly as the Debug
-ledger nests them. The five steps with an ``agent`` are the LLM nodes, and that
+ledger nests them. The six steps with an ``agent`` are the LLM nodes, and that
 mapping is :data:`nl2sql.llm.providers.LLM_AGENTS` rather than a second copy of
-it. ``tests/unit/test_pipeline_steps.py`` builds both graphs and fails when a
-node is added, renamed or removed and this list does not follow.
+it. The curated matcher is in the graph only when curated answers are
+configured. ``tests/unit/test_pipeline_steps.py`` builds both graphs and fails
+when a node is added, renamed or removed and this list does not follow.
 """
 from __future__ import annotations
 
@@ -56,6 +57,10 @@ def _step(node: str, label: str, does: str, parent: Optional[str] = None) -> Pip
 
 
 PIPELINE_STEPS: List[PipelineStep] = [
+    _step("curated_matcher", "Verified query match",
+          "Picks the verified query a data team wrote that answers the question, if one does, and "
+          "runs its SQL with the values bound; otherwise the steps below run. Only when curated "
+          "answers are configured."),
     _step("datasource_resolver", "Answerability check",
           "Decides whether the connected databases can answer the question at all, and which one "
           "it is about, before anything else runs."),

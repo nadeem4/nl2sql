@@ -15,6 +15,7 @@ Fields (exact names and types from code):
 - `user_query: str`
 - `user_context: UserContext`
 - `datasource_id: Optional[str]`
+- `verified_match: Optional[VerifiedMatch]`
 - `datasource_resolver_response: Optional[DatasourceResolverResponse]`
 - `decomposer_response: Optional[DecomposerResponse]`
 - `execution_dag: Optional[ExecutionDAG]`
@@ -163,6 +164,7 @@ The lifecycle below lists creation, mutation, reads, and resets based strictly o
 ## Ownership Model
 
 Ownership is defined by which node returns updates for a field:
+- `verified_match`: `CuratedMatcherNode`, on a verified answer only. On that path the matcher also writes `decomposer_response`, `execution_dag`, `artifact_refs` and `subgraph_outputs` (one sub-query, `plan_source="verified"`), and no resolver, decomposer or SQL agent runs.
 - `datasource_resolver_response`: `DatasourceResolverNode`
 - `decomposer_response`: `DecomposerNode`
 - `execution_dag`: `DecomposerNode`
@@ -185,7 +187,7 @@ Shared vs private:
 
 Step-by-step execution flow as defined in `build_graph` and routing:
 1. `run_with_graph` constructs `GraphState` with `user_query`, `user_context`, and optional `datasource_id`, then calls `graph.invoke(initial_state.model_dump())`.
-2. `DatasourceResolverNode` runs first and populates `datasource_resolver_response`, `reasoning`, and `errors`.
+2. `DatasourceResolverNode` runs first (after `CuratedMatcherNode` falls back, when curated answers are configured) and populates `datasource_resolver_response`, `reasoning`, and `errors`.
 3. `resolver_route` decides whether to continue based on `datasource_resolver_response`.
 4. `DecomposerNode` produces `decomposer_response`, the `execution_dag` built from it, and reasoning.
 5. `build_scan_layer_router` emits `Send` branches using `build_scan_payload` for each pending scan node. The payload contains `subgraph_id`, `subgraph_name`, `trace_id`, `user_context`, `decomposer_response`, and `datasource_resolver_response`.

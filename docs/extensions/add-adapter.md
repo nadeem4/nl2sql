@@ -40,6 +40,11 @@ Ensure `capabilities()` advertises the correct set for routing and execution:
 
 - `supports_sql` if SQL execution is supported.
 - `supports_rest` if REST execution is supported.
+- `supports_bound_parameters` if `execute` (and `execute_batches`) bind
+  `AdapterRequest.parameters` by name to `:name` placeholders through the
+  driver. Without it, a verified query with parameters is never sent to the
+  adapter. Adapters built on `BaseSQLAlchemyAdapter` inherit both the binding
+  and the capability.
 
 ## Source references
 

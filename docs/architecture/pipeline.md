@@ -16,6 +16,7 @@ flowchart TD
 
 ### Control graph nodes
 
+- [CuratedMatcherNode](nodes/curated_matcher_node.md): the entry point when [curated answers](../configuration/curated.md) are configured; a verified answer goes straight to the aggregator
 - [DatasourceResolverNode](nodes/datasource_resolver_node.md)
 - [DecomposerNode](nodes/decomposer_node.md)
 - `layer_router` (routing function, not a node class)

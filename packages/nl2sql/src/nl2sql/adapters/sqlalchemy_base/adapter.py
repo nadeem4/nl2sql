@@ -140,14 +140,32 @@ class BaseSQLAlchemyAdapter:
 
 
     def capabilities(self) -> set[DatasourceCapability]:
-        """Default capability set for SQL adapters."""
-        return {DatasourceCapability.SUPPORTS_SQL}
+        """Default capability set for SQL adapters.
 
-    def execute_sql(self, sql: str) -> ResultFrame:
+        Every SQLAlchemy adapter binds ``AdapterRequest.parameters`` through
+        the driver (``conn.execute(text(sql), parameters)``), so each declares
+        ``SUPPORTS_BOUND_PARAMETERS``.
+        """
+        return {DatasourceCapability.SUPPORTS_SQL, DatasourceCapability.SUPPORTS_BOUND_PARAMETERS}
+
+    @staticmethod
+    def _run(conn: Connection, sql: str, parameters: Optional[Dict[str, Any]]):
+        """``conn.execute`` with the values bound by name, never written into ``sql``.
+
+        Without parameters the call is exactly ``conn.execute(text(sql))``, so
+        generated SQL runs as it always has.
+        """
+        if parameters:
+            return conn.execute(text(sql), dict(parameters))
+        return conn.execute(text(sql))
+
+    def execute_sql(self, sql: str, parameters: Optional[Dict[str, Any]] = None) -> ResultFrame:
         """Executes a SQL query against the datasource.
 
         Args:
             sql (str): The SQL query string to execute.
+            parameters: Values bound by name to the ``:name`` placeholders in
+                ``sql``; never interpolated into it.
 
         Returns:
             ResultFrame: The results of the query execution.
@@ -157,10 +175,10 @@ class BaseSQLAlchemyAdapter:
         """
         if not self.engine:
             raise RuntimeError(f"Not connected to {self}")
-            
+
         start = time.perf_counter()
         with self.engine.connect() as conn:
-            result = conn.execute(text(sql))
+            result = self._run(conn, sql, parameters)
             if result.returns_rows:
                 rows = [list(row) for row in result.fetchall()]
                 return self._frame(list(result.keys()), rows, len(rows), start)
@@ -172,7 +190,7 @@ class BaseSQLAlchemyAdapter:
         if refused is not None:
             return refused
         try:
-            return self.execute_sql(request.payload["sql"])
+            return self.execute_sql(request.payload["sql"], request.parameters)
         except SQLAlchemyError as exc:
             return self.query_failed(exc)
 
@@ -197,7 +215,8 @@ class BaseSQLAlchemyAdapter:
         try:
             with self.engine.connect() as conn:
                 start = time.perf_counter()
-                result = conn.execution_options(stream_results=True).execute(text(request.payload["sql"]))
+                result = self._run(conn.execution_options(stream_results=True), request.payload["sql"],
+                                   request.parameters)
                 if not result.returns_rows:
                     yield self._frame([], [], result.rowcount, start)
                     return

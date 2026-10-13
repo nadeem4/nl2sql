@@ -10,8 +10,12 @@ from types import SimpleNamespace
 
 import pytest
 
+from nl2sql.configs.curated import CuratedFileConfig
 from nl2sql.llm.providers import LLM_AGENTS
 from nl2sql.pipeline.steps import PIPELINE_STEPS, SQL_AGENT_STEP, describe_pipeline
+
+CURATED = CuratedFileConfig.model_validate({"datasources": {"ds": {"verified_queries": [
+    {"id": "q", "description": "d", "questions": ["How many?"], "sql": "SELECT 1"}]}}})
 
 
 def _blank(_ctx=None):
@@ -25,14 +29,15 @@ def graph_nodes(monkeypatch):
     from nl2sql.pipeline import graph as control
     from nl2sql.pipeline.subgraphs import sql_agent
 
-    for name in ("DatasourceResolverNode", "DecomposerNode", "EngineAggregatorNode",
+    for name in ("CuratedMatcherNode", "DatasourceResolverNode", "DecomposerNode", "EngineAggregatorNode",
                  "AnswerSynthesizerNode"):
         monkeypatch.setattr(control, name, _blank)
     for name in ("SchemaRetrieverNode", "ASTPlannerNode", "LogicalValidatorNode",
                  "GeneratorNode", "ExecutorNode", "RefinerNode"):
         monkeypatch.setattr(sql_agent, name, _blank)
 
-    ctx = SimpleNamespace()
+    # With curated answers configured, so the optional curated matcher is in the graph too.
+    ctx = SimpleNamespace(curated=CURATED)
     top = set(control.build_graph(ctx, execute=True).nodes)
     inner = set(sql_agent.build_sql_agent_graph(ctx, execute=True).nodes)
     # LangGraph adds its own entry node; it is not a step of the pipeline.
@@ -75,6 +80,8 @@ def test_every_step_says_what_it_is_and_what_it_decides():
 def test_the_order_is_the_order_a_run_takes_them():
     order = [step.node for step in PIPELINE_STEPS]
 
+    assert order[0] == "curated_matcher"
+    assert order.index("curated_matcher") < order.index("datasource_resolver")
     assert order.index("datasource_resolver") < order.index("decomposer")
     assert order.index("decomposer") < order.index("sql_agent")
     assert order.index("sql_agent") < order.index("ast_planner")  # nested under it

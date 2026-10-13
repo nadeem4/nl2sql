@@ -9,7 +9,7 @@ from __future__ import annotations
 import contextvars
 import queue
 import threading
-from typing import Optional, List, Dict, Any, Iterator
+from typing import Optional, List, Dict, Any, Iterator, Literal
 
 from pydantic import BaseModel, Field
 from nl2sql.context import NL2SQLContext
@@ -52,13 +52,28 @@ class SubQueryResult(BaseModel):
     status: str = Field(default="")
     retry_count: int = Field(default=0)
     # "cache" when the plan came from the plan cache (no planner LLM call; it
-    # was still validated, generated and executed), else "llm".
+    # was still validated, generated and executed), "verified" when there was
+    # no plan because a verified query's SQL ran, else "llm".
     plan_source: str = Field(default="llm")
     # The row ceiling that bounded this sub-query's SQL, when the plan asked for
     # no smaller LIMIT; ``truncated`` is True when the result reached it, so
     # rows may be missing.
     row_cap: Optional[int] = None
     truncated: bool = False
+
+
+class AnswerSource(BaseModel):
+    """Where an answer came from.
+
+    ``{"type": "verified", "id", "datasource_id", "params"}`` when a verified
+    query from ``curated.yaml`` answered, with the values it ran with;
+    ``{"type": "generated"}`` (the other fields None) when the pipeline
+    planned and generated the SQL.
+    """
+    type: Literal["verified", "generated"] = "generated"
+    id: Optional[str] = None
+    datasource_id: Optional[str] = None
+    params: Optional[Dict[str, Any]] = None
 
 
 class QueryResult(BaseModel):
@@ -88,6 +103,8 @@ class QueryResult(BaseModel):
     truncated: bool = False
     # The run's saved results, one per terminal DAG node: the manifest, not the rows.
     result_manifest: List[ResultSummary] = Field(default_factory=list)
+    # A verified query's answer, or a generated one.
+    source: AnswerSource = Field(default_factory=AnswerSource)
 
 
 def _field(source: Any, name: str, default: Any = None) -> Any:
@@ -250,7 +267,17 @@ def result_from_state(
         trace_path=state.get("trace_path"),
         truncated=any(sq.truncated for sq in sub_queries),
         result_manifest=list(_field(state.get("aggregator_response"), "results", None) or []),
+        source=_source(state.get("verified_match")),
     )
+
+
+def _source(match: Any) -> AnswerSource:
+    """The run's provenance: the verified query that answered it, if one did."""
+    if not match:
+        return AnswerSource()
+    return AnswerSource(type="verified", id=_field(match, "query_id"),
+                        datasource_id=_field(match, "datasource_id"),
+                        params=dict(_field(match, "params", None) or {}))
 
 
 class QueryAPI:

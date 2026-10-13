@@ -16,7 +16,7 @@ from nl2sql.context import NL2SQLContext
 from nl2sql.llm.failures import provider_error
 from nl2sql.llm.wires import streaming_structured, structured
 from .schemas import AggregatedResponse, AnswerSynthesizerResponse
-from .prompts import ANSWER_SYNTHESIZER_PROMPT
+from .prompts import ANSWER_SYNTHESIZER_PROMPT, VERIFIED_QUERY_SECTION
 
 logger = get_logger("answer_synthesizer")
 
@@ -82,19 +82,27 @@ class AnswerSynthesizerNode:
         self.llm = ctx.llm_registry.get_llm(self.node_name)
         self.prompt = ChatPromptTemplate.from_template(ANSWER_SYNTHESIZER_PROMPT)
         self.chain = self.prompt | structured(self.llm, AggregatedResponse)
-        self._streaming_chain = None
+        # Built on first use: (streaming, verified) -> chain.
+        self._chains: Dict[tuple, Any] = {}
 
-    def _chain_for(self, config: Optional[RunnableConfig]):
+    def _chain_for(self, config: Optional[RunnableConfig], verified: bool = False):
         """The chain to answer with: streaming when the run asked for it (``stream_query``).
 
         Same prompt, same parser, same answer; the provider is asked to stream
-        so the run's callbacks see the answer as it is written.
+        so the run's callbacks see the answer as it is written. A verified
+        query's answer adds one section to the prompt, its description, so a
+        generated answer's prompt is exactly what it was.
         """
-        if not ((config or {}).get("configurable") or {}).get("stream_answer"):
+        stream = bool(((config or {}).get("configurable") or {}).get("stream_answer"))
+        if not stream and not verified:
             return self.chain
-        if self._streaming_chain is None:
-            self._streaming_chain = self.prompt | streaming_structured(self.llm, AggregatedResponse)
-        return self._streaming_chain
+        key = (stream, verified)
+        if key not in self._chains:
+            prompt = (ChatPromptTemplate.from_template(ANSWER_SYNTHESIZER_PROMPT + VERIFIED_QUERY_SECTION)
+                      if verified else self.prompt)
+            wire = streaming_structured if stream else structured
+            self._chains[key] = prompt | wire(self.llm, AggregatedResponse)
+        return self._chains[key]
 
     def _serialize_result(self, result: Any, saved: Optional[Dict[str, Any]] = None) -> str:
         if isinstance(result, dict) and all(isinstance(v, list) for v in result.values()):
@@ -134,17 +142,20 @@ class AnswerSynthesizerNode:
                 ]
             notes = _missing_values(state.warnings)
             cut = _cut_results(state)
-            response: AggregatedResponse = self._chain_for(config).invoke(
-                {
-                    "user_query": state.user_query,
-                    "result_preview": self._serialize_result(aggregated_result, saved),
-                    "result_limit": "\n".join(f"- {c}" for c in cut) or "None",
-                    "unmapped_subqueries": json.dumps(
-                        unmapped_subqueries, indent=2, ensure_ascii=True
-                    ),
-                    "data_notes": "\n".join(f"- {n}" for n in notes) or "None",
-                }
-            )
+            inputs = {
+                "user_query": state.user_query,
+                "result_preview": self._serialize_result(aggregated_result, saved),
+                "result_limit": "\n".join(f"- {c}" for c in cut) or "None",
+                "unmapped_subqueries": json.dumps(
+                    unmapped_subqueries, indent=2, ensure_ascii=True
+                ),
+                "data_notes": "\n".join(f"- {n}" for n in notes) or "None",
+            }
+            match = getattr(state, "verified_match", None)
+            if match is not None:
+                inputs["verified_query_id"] = f"{match.datasource_id}.{match.query_id}"
+                inputs["verified_query_description"] = match.description
+            response: AggregatedResponse = self._chain_for(config, verified=match is not None).invoke(inputs)
             # Said whatever the model wrote: an empty result on a value that
             # does not exist is not a finding about the data.
             # Likewise a cut result is said to be cut, whatever the model wrote.

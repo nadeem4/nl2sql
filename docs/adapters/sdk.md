@@ -29,13 +29,20 @@ from nl2sql_adapter_sdk.capabilities import DatasourceCapability
 
 #### `capabilities() -> set[DatasourceCapability]`
 
-Declares supported capabilities (e.g., `supports_sql`, `supports_rest`).
+Declares supported capabilities (e.g., `supports_sql`, `supports_rest`,
+`supports_bound_parameters`).
+
+`supports_bound_parameters` (`DatasourceCapability.SUPPORTS_BOUND_PARAMETERS`)
+says the adapter binds `AdapterRequest.parameters` by name to the `:name`
+placeholders in the SQL, and never pastes a value into the SQL text. The
+engine sends parameters (for a [verified query](../configuration/curated.md))
+only to an adapter that declares it. Every built-in SQLAlchemy adapter does.
 
 #### `execute(request: AdapterRequest) -> ResultFrame`
 
 Executes a plan-specific request and returns a normalized `ResultFrame`.
 
-* **Args**: `AdapterRequest` with `plan_type` and `payload`
+* **Args**: `AdapterRequest` with `plan_type`, `payload`, and `parameters` (values to bind; empty for generated SQL)
 * **Returns**: `ResultFrame` with `columns`, `rows`, `row_count`, and error metadata
 
 A query the database rejects is a result, not an exception: return
