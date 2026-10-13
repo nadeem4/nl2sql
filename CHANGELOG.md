@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.4.0](https://github.com/nadeem4/nl2sql/compare/v0.3.0...v0.4.0) (2026-10-13)
+
+
+### Features
+
+* **curated:** curated.yaml config and nl2sql curated validate ([#240](https://github.com/nadeem4/nl2sql/issues/240)) ([1f3a6e8](https://github.com/nadeem4/nl2sql/commit/1f3a6e85c81f08897232df49fd467e99fa256724))
+* **curated:** index verified queries and retrieve candidates ([#242](https://github.com/nadeem4/nl2sql/issues/242)) ([c6f08a2](https://github.com/nadeem4/nl2sql/commit/c6f08a23173b774c7269b2f0cc8dd37b13d1dcbe))
+* **curated:** match verified queries and run them with bound parameters ([#243](https://github.com/nadeem4/nl2sql/issues/243)) ([ec0646b](https://github.com/nadeem4/nl2sql/commit/ec0646b64c3416c684054c1580d0688b86ba8c8a))
+* **curated:** preferred tables in datasources.yaml ([#244](https://github.com/nadeem4/nl2sql/issues/244)) ([4636186](https://github.com/nadeem4/nl2sql/commit/4636186033b6b449199098895bb69cb8a2a5e658))
+* **curated:** propose verified queries from thumbs-up feedback ([#246](https://github.com/nadeem4/nl2sql/issues/246)) ([027cfc4](https://github.com/nadeem4/nl2sql/commit/027cfc48682129bae6454edf3445b733f8667e3b))
+* **curated:** verified badge, demo verified queries and nl2sql curated test ([#245](https://github.com/nadeem4/nl2sql/issues/245)) ([9473ea3](https://github.com/nadeem4/nl2sql/commit/9473ea36a26185de0fda73dd5ea57aa590b33ba2))
+
+
+### Bug Fixes
+
+* **demo:** record the curated matcher's choices for the keyless demo ([#248](https://github.com/nadeem4/nl2sql/issues/248)) ([f835818](https://github.com/nadeem4/nl2sql/commit/f835818ac03d07afe54e8f0a59d4958ae442a0f8))
+
+
+### Documentation
+
+* **design:** curated answers ([#239](https://github.com/nadeem4/nl2sql/issues/239)) ([72fe4f3](https://github.com/nadeem4/nl2sql/commit/72fe4f36005c21bf71176a3be241d6f9f7be211a))
+* **release:** notes for 0.4.0 ([#247](https://github.com/nadeem4/nl2sql/issues/247)) ([bd48110](https://github.com/nadeem4/nl2sql/commit/bd48110bac6f0e95058260a477edf86941cc04e1))
+
 ## [0.3.0](https://github.com/nadeem4/nl2sql/compare/v0.2.4...v0.3.0) (2026-10-12)
 
 
