@@ -4,7 +4,7 @@ Nothing in the engine can tell on its own whether a live answer was right. Two
 small signals help: a person's rating of an answer in the playground, and the
 guardrail rates the engine already records for every run. `nl2sql feedback`
 reads both. Thumbs-up runs can then be exported as draft entries for the gold
-set.
+set, and thumbs-up generated answers as proposed verified queries.
 
 ## Rating an answer in the playground
 
@@ -46,6 +46,12 @@ snapshots and the plan cache. No new service or file.
 | `retries`, `validator_failures`, `plan_cache_hits`, `sub_queries` | The run's guardrail counters (below). |
 | `models` | The provider and model each LLM node ran on, as JSON. |
 | `engine_version` | The `nl2sql-engine` version, plus the git commit when run from a checkout. |
+| `datasource_ids` | The datasources the run's sub-queries ran on, each once, as a JSON list. |
+| `source` | Where the answer came from: `verified` (a verified query from [`curated.yaml`](../configuration/curated.md)) or `generated`. |
+
+`datasource_ids` and `source` were added after the table first shipped. A
+store from before them gains both columns, empty, the next time it is opened;
+the rows already in it keep their ratings and read the two as `null`.
 
 **Privacy.** A row never holds result rows, the written answer, sample values,
 error messages or keys. It holds only what the run showed the role it ran as:
@@ -122,6 +128,20 @@ entry into `chinook_gold.yaml`, and run the gold generator to write its
 ```bash
 python -m nl2sql.evaluation.gold
 ```
+
+## Proposing verified queries: `nl2sql curated proposals export`
+
+A thumbs-up on a *generated* answer can also become a proposed verified query
+for `curated.yaml`, for a person to review and commit:
+
+```bash
+nl2sql --env demo curated proposals export --out configs/curated.proposals.yaml
+```
+
+Runs answered by a verified query, failed runs, runs on more than one
+datasource and runs with no SQL are skipped, and rows rated before the table
+recorded the datasource are skipped too. See
+[From feedback to verified queries](../configuration/curated.md#from-feedback-to-verified-queries).
 
 ## Turning it off and clearing it
 

@@ -2,11 +2,12 @@
 
 !!! note "Status: partly built"
     The config and its checks (PR 1), indexing and candidates (PR 2),
-    matching and running verified queries (PR 3), and preferred tables (PR 5)
-    are built; see [Curated answers](../configuration/curated.md) and
+    matching and running verified queries (PR 3), preferred tables (PR 5)
+    and feedback proposals (PR 6) are built; see
+    [Curated answers](../configuration/curated.md) and
     [Datasources](../configuration/datasources.md#preferred-tables) for how to
-    use them. The playground badge, the demo file, `nl2sql curated test` and
-    feedback proposals are not built yet. Each pull request in
+    use them. The playground badge, the demo file and `nl2sql curated test`
+    are not built yet. Each pull request in
     [Implementation plan](#implementation-plan) updates this page and the
     reference docs it touches.
 
@@ -517,15 +518,26 @@ and SQL. That row is the proposal; nothing new is stored and nothing writes
 `curated.yaml`.
 
 `nl2sql curated proposals export --out configs/curated.proposals.yaml` turns
-thumbs-up runs into draft verified queries in `curated.yaml`'s shape: an id
-(`proposal_<trace id prefix>`), the question as the description and the one
-phrasing, no params, and the run's SQL, under a header telling the reviewer
-to replace literals with `:params`, drop the row-cap `LIMIT` the generator
-added, and move the entry into `curated.yaml`. It is modelled on
-`nl2sql feedback export --good` (`feedback/drafts.py`), and like it skips runs
-with no SQL or more than one statement, refuses to write over `curated.yaml`
-itself, and lives in `nl2sql.feedback` (opt-in, imported lazily by the
-command). Runs whose answer was already verified are skipped.
+thumbs-up runs into draft verified queries in `curated.yaml`'s shape, under
+the datasource the run used: an id derived from the question (a slug, `_2`
+on a clash), a description placeholder, the question as the one phrasing,
+no params, and the run's SQL with its literal values, under a header telling
+the reviewer to replace literals with `{params}`/`:params`, drop the row-cap
+`LIMIT` the generator added, and move the entry into `curated.yaml`. Without
+`--out` it prints to stdout. It is modelled on `nl2sql feedback export --good`
+(`feedback/drafts.py`), and like it skips runs with no SQL or more than one
+statement, refuses to write over `curated.yaml` itself (the active file, or
+`CURATED_CONFIG`), and lives in `nl2sql.feedback.proposals` (opt-in, imported
+lazily by the command). It also skips runs whose answer was already
+verified, runs that did not succeed, runs on more than one datasource and
+rows rated before the datasource was recorded, and proposes each question
+once per datasource, from its newest thumbs-up. Built in PR 6.
+
+The id comes from the question rather than the trace id (the first draft of
+this design said `proposal_<trace id prefix>`) because a reviewer keeps it:
+`how_many_customers_are_in_brazil` reads as what the query is, a trace prefix
+does not. The description is a placeholder rather than the question, so an
+unreviewed entry is obvious.
 
 Two refinements of the agreed design. First, there is no separate "approved"
 state: the person reviewing the exported drafts and committing them is the
@@ -714,7 +726,7 @@ and `tests/adapters/unit/test_snapshot_views.py` (SQLite and DuckDB).
 The two feedback columns, `nl2sql.feedback.proposals`, and
 `nl2sql curated proposals export`.
 Tests: `tests/unit/test_curated_proposals.py` (shape, skips, refusal to write
-over `curated.yaml`), and a store migration test for the new columns.
+over `curated.yaml`), and a store migration test for the new columns. Built.
 
 **Gold data.** No existing gold entry changes. Tier 1 runs hand-written plans
 through the code nodes, and a verified answer has no plan, so tier 1 runs with

@@ -289,6 +289,7 @@ folder (`cd nl2sql-demo`). Every command has `--help`.
 | `nl2sql install NAME` | pip-install the driver extra for an adapter (e.g. `postgresql`, `mysql`), after a confirmation | |
 | `nl2sql policy validate` | Validate `policies.json` and check it against the configured datasources | `--policies`, `--config`, `--secrets` |
 | `nl2sql curated validate` | Check `curated.yaml` (verified queries): ids, params, read-only SQL in each datasource's dialect, tables against the index; exits 1 on any error | `--curated`, `--config`, `--secrets` |
+| `nl2sql curated proposals export` | Write thumbs-up generated answers as proposed verified queries, in `curated.yaml`'s shape, for review; never writes `curated.yaml` | `--out PATH` (default: print to stdout) |
 | `nl2sql trace show TARGET` | Print a run trace's timeline: nodes, attempts, durations, tokens, errors | a trace file, or a trace id in `TRACE_DIR` |
 | `nl2sql trace replay TARGET` | Re-run a traced question on its recorded LLM responses, with no model calls | `--config`, `--llm-config`, `--policies-config`, `--secrets-config`, `--vector-store` |
 | `nl2sql cache clear` | Empty the plan cache; schema snapshots are kept | |

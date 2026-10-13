@@ -131,3 +131,64 @@ def test_the_table_lives_in_the_schema_store_and_clear_leaves_the_rest(tmp_path)
     tables = {r[0] for r in store._connection.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     assert {"feedback", "schema_snapshots", "plan_cache"} <= tables
     store.close()
+
+
+def test_a_record_holds_the_datasources_and_where_the_answer_came_from():
+    generated = _result(sub_queries=[{"sql": "SELECT 1", "datasource_id": "chinook"},
+                                     {"sql": "SELECT 2", "datasource_id": "chinook"}],
+                        source={"type": "generated"})
+    verified = _result(sub_queries=[{"sql": "SELECT 1", "datasource_id": "chinook", "plan_source": "verified"}],
+                       source={"type": "verified", "id": "top_customers", "datasource_id": "chinook"})
+
+    record = run_record(generated, question="q", role="admin", llm_configs={}, engine_version="x")
+    assert record["datasource_ids"] == ["chinook"]
+    assert record["source"] == "generated"
+    assert run_record(verified, question="q", role="admin", llm_configs={},
+                      engine_version="x")["source"] == "verified"
+
+
+def test_the_store_keeps_the_datasources_and_the_source(tmp_path):
+    store = FeedbackStore(tmp_path / "schema_store.db")
+    record = run_record(_result(sub_queries=[{"sql": "SELECT 1", "datasource_id": "chinook"}],
+                                source={"type": "generated"}),
+                        question="q", role="admin", llm_configs={}, engine_version="x")
+    store.save(record, rating="up", note=None)
+
+    row = store.list()[0]
+    assert row["datasource_ids"] == ["chinook"] and row["source"] == "generated"
+    store.close()
+
+
+OLD_SCHEMA = """
+CREATE TABLE feedback (
+    trace_id TEXT PRIMARY KEY, created_at INTEGER NOT NULL,
+    rating TEXT NOT NULL CHECK (rating IN ('up', 'down')), note TEXT, question TEXT NOT NULL,
+    role TEXT NOT NULL, status TEXT NOT NULL, sql TEXT NOT NULL, error_codes TEXT NOT NULL,
+    retries INTEGER NOT NULL DEFAULT 0, validator_failures INTEGER NOT NULL DEFAULT 0,
+    plan_cache_hits INTEGER NOT NULL DEFAULT 0, sub_queries INTEGER NOT NULL DEFAULT 0,
+    models TEXT NOT NULL, engine_version TEXT NOT NULL
+);
+"""
+
+
+def test_a_store_from_before_the_new_columns_gains_them_and_keeps_its_rows(tmp_path):
+    import sqlite3
+
+    path = tmp_path / "schema_store.db"
+    with sqlite3.connect(path) as conn:
+        conn.execute(OLD_SCHEMA)
+        conn.execute("INSERT INTO feedback VALUES ('old', 1, 'up', NULL, 'How many?', 'admin', 'success', "
+                     "'[\"SELECT 1\"]', '[]', 0, 0, 0, 1, '{}', 'x')")
+
+    store = FeedbackStore(path)
+    columns = {r[1] for r in store._connection.execute("PRAGMA table_info(feedback)")}
+    assert {"datasource_ids", "source"} <= columns
+    old = store.list()[0]
+    assert old["question"] == "How many?" and old["datasource_ids"] is None and old["source"] is None
+
+    store.save(run_record(_result(sub_queries=[{"sql": "SELECT 2", "datasource_id": "chinook"}]),
+                          question="q", role="admin", llm_configs={}, engine_version="x"),
+               rating="up", note=None)
+    assert len(store.list()) == 2
+    store.close()
+    FeedbackStore(path).close()  # opening a migrated store again changes nothing

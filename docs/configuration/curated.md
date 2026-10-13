@@ -256,6 +256,62 @@ on a datasource in `datasources.yaml`, naming views or tables (built by the
 data team, never by the package) the planner should reach for first. See
 [Datasources: preferred tables](datasources.md#preferred-tables).
 
+## From feedback to verified queries
+
+A thumbs-up on a generated answer in the playground is a candidate verified
+query: a real question, and SQL a person said was right. Export them as
+proposals and review them like any other change to `curated.yaml`:
+
+```bash
+nl2sql curated proposals export                                   # print to stdout
+nl2sql curated proposals export --out configs/curated.proposals.yaml
+```
+
+Each proposal is an entry in `curated.yaml`'s shape, under the datasource the
+run used:
+
+```yaml
+version: 1
+datasources:
+  chinook:
+    verified_queries:
+    - id: how_many_customers_are_in_brazil
+      description: 'TODO: say what this query returns.'
+      questions:
+      - How many customers are in Brazil?
+      sql: |
+        SELECT COUNT(*) AS n FROM Customer WHERE Country = 'Brazil'
+```
+
+- **`id`** comes from the question: lower case, words joined by `_`, at most
+  60 characters, `q_` in front when it would start with a digit, and `_2`,
+  `_3` after it when two questions give the same id.
+- **`questions`** holds the question as it was asked, as the one phrasing.
+- **`sql`** is the run's generated SQL, exactly as it ran. **Every value in it
+  is literal** (`'Brazil'` above): the proposal has no `params`.
+- **`description`** is a placeholder.
+
+The same question (ignoring case and spacing) on the same datasource is
+proposed once, from its newest thumbs-up. These are skipped, and counted by
+reason in the command's summary: thumbs-down ratings, answers that came from
+a verified query already, runs that did not succeed, runs with no SQL or more
+than one statement, runs on more than one datasource, and ratings recorded
+before the feedback table kept the datasource (see
+[Feedback and Signals](../observability/feedback.md#what-is-stored)).
+
+**Reviewing is the approval.** There is no approved state and no queue: a
+person reads each entry, checks the SQL answers the question, writes the
+description, turns the values a reader would change into `{params}` in the
+question and `:params` in the SQL with a `params:` entry, drops the row-cap
+`LIMIT` the generator added unless the question asks for it, adds other
+phrasings, moves the entry into `curated.yaml`, runs
+`nl2sql curated validate`, and commits it. The same steps head the exported
+file as comments.
+
+`export` never writes `curated.yaml`: it refuses an `--out` that is the active
+curated file (`CURATED_CONFIG`) and exits 2. Neither the REST API nor the
+playground writes it either.
+
 ## Source references
 
 - Models and SQL checks: `packages/nl2sql/src/nl2sql/configs/curated.py`
@@ -265,3 +321,4 @@ data team, never by the package) the planner should reach for first. See
 - Facade: `packages/nl2sql/src/nl2sql/api/curated_api.py`
 - Command: `packages/nl2sql/src/nl2sql/cli/commands/curated.py`
 - Matching and running: `packages/nl2sql/src/nl2sql/pipeline/nodes/curated_matcher/`
+- Proposals from feedback: `packages/nl2sql/src/nl2sql/feedback/proposals.py`
