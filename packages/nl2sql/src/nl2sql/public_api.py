@@ -289,8 +289,11 @@ class NL2SQL:
         """
         Health of the vector index: ``status`` (``ok``, ``empty``, ``stale`` or
         ``missing``), entry counts by type, when it was built, the embedding
-        model, one entry per registered datasource and any problems found.
+        model, one entry per registered datasource, any problems found, and
+        ``warnings`` that leave ``status`` alone (a ``curated.yaml`` changed
+        since it was indexed).
         """
+        from nl2sql.indexing.curated import curated_hashes
         from nl2sql.indexing.health import IndexHealth, inspect_vector_store
 
         store = self._ctx.vector_store
@@ -298,7 +301,8 @@ class NL2SQL:
             return IndexHealth(status="missing", problems=["No vector index is configured."]).to_dict()
         registry = self._ctx.ds_registry
         ids = registry.list_ids() if registry is not None else []
-        return inspect_vector_store(store, self._ctx.schema_store, ids).to_dict()
+        hashes = curated_hashes(getattr(self._ctx, "curated", None), ids)
+        return inspect_vector_store(store, self._ctx.schema_store, ids, curated_hashes=hashes).to_dict()
 
     def rebuild_index(self, datasource_ids=None, enrich: bool = False, full: bool = False,
                       on_progress=None, switch_guard=None):

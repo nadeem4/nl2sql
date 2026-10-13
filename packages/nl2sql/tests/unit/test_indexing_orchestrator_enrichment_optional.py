@@ -60,7 +60,8 @@ class _RecordingVectorStore:
     def clear(self):
         self.chunks = []
 
-    def refresh_schema_chunks(self, datasource_id, schema_version, chunks, evicted_versions, switch_guard=None):
+    def refresh_schema_chunks(self, datasource_id, schema_version, chunks, evicted_versions, switch_guard=None,
+                              **_kw):
         self.chunks = list(chunks)
         return {"datasource_id": datasource_id, "schema_version": schema_version, "chunks": len(chunks)}
 

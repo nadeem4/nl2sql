@@ -5,6 +5,7 @@ from typing import Dict, TYPE_CHECKING
 from nl2sql.datasources.protocols import DatasourceAdapterProtocol
 from nl2sql.common.logger import get_logger
 from nl2sql.indexing.chunk_builder import SchemaChunkBuilder
+from nl2sql.indexing.curated import CuratedChunkBuilder, curated_hash, curated_section
 from nl2sql.indexing.enrichment_service import enrich_schema_snapshot
 
 if TYPE_CHECKING:
@@ -36,6 +37,8 @@ class IndexingOrchestrator:
         self.schema_store = ctx.schema_store
         self.config_manager = ctx.config_manager
         self.llm_registry = ctx.llm_registry
+        # The loaded curated.yaml, or None when the feature is off.
+        self.curated = getattr(ctx, "curated", None)
 
     def clear_store(self) -> None:
         """
@@ -100,7 +103,13 @@ class IndexingOrchestrator:
             questions=questions,
         )
 
-        chunks = chunk_builder.build()
+        # Verified queries go in the same build: a build replaces every entry
+        # of its datasource, so curated entries written on their own would be
+        # deleted by the next schema re-index.
+        curated = curated_section(self.curated, adapter.datasource_id)
+        chunks = chunk_builder.build() + CuratedChunkBuilder(
+            adapter.datasource_id, curated, schema_version
+        ).build()
 
         target = vector_store if vector_store is not None else self.vector_store
         return target.refresh_schema_chunks(
@@ -109,4 +118,29 @@ class IndexingOrchestrator:
             chunks=chunks,
             evicted_versions=evicted_versions,
             switch_guard=switch_guard,
+            curated_hash=curated_hash(curated),
+        )
+
+    def refresh_curated(
+        self,
+        datasource_id: str,
+        vector_store=None,
+        switch_guard=None,
+    ) -> Dict[str, int]:
+        """
+        Re-indexes a datasource's verified queries only.
+
+        Reads no schema and calls no model: the active build's schema entries
+        are copied into the new build as they are (see
+        ``VectorStore.refresh_curated_chunks``).
+
+        Raises:
+            LookupError: If the datasource has never been indexed.
+        """
+        target = vector_store if vector_store is not None else self.vector_store
+        curated = curated_section(self.curated, datasource_id)
+        schema_version = target.active_schema_version(datasource_id) or ""
+        chunks = CuratedChunkBuilder(datasource_id, curated, schema_version).build()
+        return target.refresh_curated_chunks(
+            datasource_id, chunks, curated_hash=curated_hash(curated), switch_guard=switch_guard
         )

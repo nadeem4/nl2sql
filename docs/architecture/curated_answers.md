@@ -209,9 +209,15 @@ datasource whose `build_id` is not the new one, so curated entries written on
 their own would be deleted by the next schema re-index, or would delete it.
 `IndexingOrchestrator.index_datasource()` therefore appends the curated chunks
 (built by a small `CuratedChunkBuilder`) to the schema chunks before calling
-`refresh_schema_chunks()`. One consequence: changing `curated.yaml` needs
-`nl2sql index` for that datasource, which re-reads its schema too. A
-`--curated-only` shortcut can come later if that proves slow.
+`refresh_schema_chunks()`.
+
+Changing `curated.yaml` does **not** need a schema re-index (a change from the
+agreed design; see [Re-index cost](#open-questions)).
+`nl2sql index --curated-only` writes a new build per datasource through the
+same write, switch and delete as any other, except that the active build's
+schema entries are copied into it with their stored vectors
+(`VectorStore.refresh_curated_chunks()`): no schema read, no enrichment call,
+and only the verified queries are embedded.
 
 **Staleness.** At the switch, `refresh_schema_chunks()` also records
 `curated_hash:<datasource_id>` in the collection metadata, next to
@@ -219,7 +225,9 @@ their own would be deleted by the next schema re-index, or would delete it.
 datasource's section of `curated.yaml`, as canonical JSON. `IndexHealth`
 (`nl2sql/indexing/health.py`) compares it with the file as it is now and
 reports "curated.yaml changed for 'chinook' since it was indexed; run
-`nl2sql index`". `nl2sql doctor` and the facade's `index_health()` show it.
+`nl2sql index --curated-only --datasource chinook`". `nl2sql doctor` and the
+facade's `index_health()` show it. Only the verified queries are hashed:
+metrics are not indexed yet, so editing one asks for nothing.
 It is a warning, not a failure: the stale entries still point at queries that
 exist, and the matcher re-reads every query from the loaded file, never from
 the index. A query id that is in the index but no longer in the file is
@@ -538,9 +546,24 @@ step the owner runs (`python scripts/record_demo_answers.py`, which drives
 | `curated_match_top_k` | `CURATED_MATCH_TOP_K` | `5` | Candidates shown to the model. |
 
 The floor is a similarity in the configured embedding model's space, and
-models spread their scores differently, so 0.6 is a starting point to be
-calibrated against both the local ONNX model and OpenAI's in PR 2, not a
-constant.
+models spread their scores differently. PR 2 calibrated it on the local ONNX
+model (`all-MiniLM-L6-v2`) with five Chinook verified queries (the example
+above, revenue by year, best-selling genre, tracks per artist, revenue by
+country) and the best candidate's similarity for 24 questions:
+
+| Questions | Best similarity |
+| --- | --- |
+| 12 that a verified query answers, reworded | 11 between 0.713 and 0.963; "biggest spenders last year" 0.479, and to the wrong query |
+| 6 near misses ("top customers by number of tracks", "albums per artist", "revenue by month") | 0.582 to 0.813 |
+| 6 unrelated ("list all playlists", "media types", the weather) | 0.123 to 0.438; "Which tracks have no composer?" 0.681 |
+
+0.6 keeps every match the embeddings can make with a margin above 0.1, and
+drops five of six unrelated questions with no model call. Near misses mostly
+clear it, as they should: telling a near miss from a match is the model's
+choice (`none_of_these`), not the floor's. A question with no phrasing close
+to it, like "biggest spenders", is not rescued by any floor; another phrasing
+in `curated.yaml` is the fix. Calibration with OpenAI's embeddings is still
+open: it needs the owner's key.
 
 ## Invariants this touches
 
@@ -623,12 +646,15 @@ missing from the indexed schema), and a startup test that a broken file fails
 chunks in the datasource's build, `curated_hash:<id>` in the collection
 metadata, `IndexHealth.warnings`, the `doctor` line,
 `VectorStore.retrieve_verified_query_candidates()` and
-`CURATED_MATCH_TOP_K`; calibrating `CURATED_MATCH_FLOOR`.
+`CURATED_MATCH_TOP_K`; calibrating `CURATED_MATCH_FLOOR` (the setting lands
+here, its use in PR 3); `nl2sql index --curated-only`.
 Tests: `tests/unit/test_curated_chunks.py` (placeholder filling, ids,
 metadata), `tests/unit/test_vector_store_curated.py` (same build as schema, a
 schema re-index keeps them, active-build and datasource filters, de-dup by
-query), `tests/unit/test_index_health_curated.py` (hash changed is a warning
-and `ok` stays true).
+query, the curated-only refresh), `tests/unit/test_index_health_curated.py`
+(hash changed is a warning and `ok` stays true),
+`tests/unit/test_index_curated_refresh.py` (a curated-only refresh reads no
+schema, makes no model call and keeps the schema entries).
 
 **3. The matcher and execution.**
 The `curated_matcher` node and its prompt, `VerifiedQueryChoice`, param
@@ -678,13 +704,16 @@ added beside the existing ones, never in place of them.
 ## Open questions
 
 - **The floor.** Is one global `CURATED_MATCH_FLOOR` enough, or does each
-  embedding model need its own default? PR 2 measures it on the demo
-  questions.
+  embedding model need its own default? Measured on the local model in PR 2
+  (0.6, see [Settings](#settings)); OpenAI's embeddings are not measured yet.
 - **Views in snapshots.** Whether every built-in adapter's
   `fetch_schema_snapshot()` reports views, which preferred tables depend on.
-- **Re-index cost.** A `curated.yaml` change re-indexes the datasource's
-  schema too (with enrichment, a model call). If that is too slow, a
-  curated-only refresh that copies the current schema entries into a new build.
+- **Re-index cost.** Resolved in PR 2: a `curated.yaml` change must not cost
+  a schema re-read or an enrichment model call. `nl2sql index --curated-only`
+  copies the active build's schema entries, with their stored vectors, into a
+  new build beside freshly embedded verified queries and switches to it. A
+  flag rather than detecting "only `curated.yaml` changed" on a plain
+  `nl2sql index`, because knowing whether the schema changed means reading it.
 - **The synthesizer's context.** Whether to pass the verified query's
   description to the answer synthesizer, so it can say "invoiced revenue,
   before refunds" rather than guess what the numbers mean. Left out of v1.

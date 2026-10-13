@@ -5,10 +5,10 @@ already written and reviewed, with typed parameters, and the questions each
 query answers.
 
 !!! note "What works today"
-    This release loads and checks the file: at startup and with
-    `nl2sql curated validate`. Matching a question to a verified query and
-    running it comes in a later release; until then the file changes no
-    answer.
+    This release loads and checks the file (at startup and with
+    `nl2sql curated validate`) and indexes its questions with `nl2sql index`.
+    Matching a question to a verified query and running it comes in a later
+    release; until then the file changes no answer.
 
 ## Where the file lives
 
@@ -16,6 +16,8 @@ query answers.
 | --- | --- | --- | --- |
 | `curated_config_path` | `CURATED_CONFIG` | `configs/curated.yaml` | The curated answers file, relative to the working directory or absolute. |
 | `curated_enabled` | `CURATED_ENABLED` | `true` | `false` turns the feature off without removing the file. `nl2sql curated validate` still checks it. |
+| `curated_match_top_k` | `CURATED_MATCH_TOP_K` | `5` | Verified query candidates a question's search returns, one per query. |
+| `curated_match_floor` | `CURATED_MATCH_FLOOR` | `0.6` | Cosine similarity the best candidate must reach before the model is asked to choose one. Calibrated on the local embedding model; see [the design](../architecture/curated_answers.md#settings). Not used until matching ships. |
 
 The file is optional:
 
@@ -155,9 +157,40 @@ if not report.ok:
         print(entry.datasource_id, entry.query_id, entry.status, entry.details)
 ```
 
+## Indexing the questions
+
+`nl2sql index` embeds every phrasing of every verified query, and its
+description, beside the datasource's schema entries. Placeholders are filled
+first with the param's `example`, else its `default`: "Best {n} customers in
+{year}" is indexed as "Best 10 customers in 2012". The SQL is never indexed.
+
+After editing `curated.yaml`, re-index its questions:
+
+```bash
+nl2sql index --curated-only                       # every datasource
+nl2sql index --curated-only --datasource chinook  # one
+```
+
+`--curated-only` keeps each datasource's schema entries exactly as they are
+and embeds only the verified queries: it reads no schema and makes no
+enrichment model call, so it takes seconds. The datasource must have been
+indexed once with plain `nl2sql index`. A plain `nl2sql index` also picks up
+the file, and a schema re-index always keeps the verified queries.
+
+Until you re-index, `nl2sql doctor` and the index status (`NL2SQL.index_health()`,
+`GET /api/v1/index/status`) warn:
+
+```text
+Warning: curated.yaml changed for 'chinook' since it was indexed; run `nl2sql index --curated-only --datasource chinook`.
+```
+
+It is a warning, not a failure: the index stays `ok`, because the stale
+entries still name queries that exist.
+
 ## Source references
 
 - Models and SQL checks: `packages/nl2sql/src/nl2sql/configs/curated.py`
+- Index entries and the change hash: `packages/nl2sql/src/nl2sql/indexing/curated.py`
 - Loader: `ConfigManager.load_curated()` in `packages/nl2sql/src/nl2sql/configs/manager.py`
 - Startup load: `packages/nl2sql/src/nl2sql/context.py`
 - Facade: `packages/nl2sql/src/nl2sql/api/curated_api.py`

@@ -14,6 +14,7 @@ def run_indexing(
     enrich: bool = True,
     datasource_ids: Optional[List[str]] = None,
     full: bool = False,
+    curated_only: bool = False,
 ) -> None:
     """
     Rebuilds the schema index, one datasource at a time.
@@ -29,6 +30,9 @@ def run_indexing(
         datasource_ids: Only these datasources; every configured one when None.
         full: Rebuild every datasource into a new collection and swap it in.
             Needed after changing the embedding model.
+        curated_only: Re-index only the verified queries from
+            ``curated.yaml``, keeping the schema entries; reads no schema and
+            calls no model.
 
     Raises:
         SystemExit: With code 1 if any datasource failed to index.
@@ -48,7 +52,8 @@ def run_indexing(
             presenter.print_error(f"Failed to index {ds_id}: {error}")
 
     result = rebuild_index(
-        ctx, enrich=enrich, datasource_ids=datasource_ids, full=full, on_datasource=on_datasource
+        ctx, enrich=enrich, datasource_ids=datasource_ids, full=full, on_datasource=on_datasource,
+        curated_only=curated_only,
     )
     total_adapters = len(result.stats) + len(result.empty) + len(result.errors)
 

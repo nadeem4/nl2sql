@@ -177,6 +177,43 @@ class RelationshipChunk(BaseChunk):
         }
 
 
+class VerifiedQueryChunk(BaseChunk):
+    """One phrasing, or the description, of a verified query in ``curated.yaml``.
+
+    Placeholders are already filled (see ``indexing.curated``); the SQL is
+    never indexed.
+    """
+
+    type: Literal["curated.verified_query"] = Field(
+        default="curated.verified_query", frozen=True
+    )
+
+    datasource_id: str
+    query_id: str
+    text: str
+    schema_version: str
+
+    def get_page_content(self) -> str:
+        return self.text
+
+    def get_metadata(self) -> Dict[str, Any]:
+        return {
+            **super().get_metadata(),
+            "datasource_id": self.datasource_id,
+            "query_id": self.query_id,
+            "schema_version": self.schema_version,
+        }
+
+
+class VerifiedQueryCandidate(BaseModel):
+    """A verified query a question resembles: its best phrasing and that phrasing's cosine similarity."""
+
+    datasource_id: str
+    query_id: str
+    score: float
+    text: str
+
+
 class MetricChunk(BaseChunk):
     type: Literal["schema.metric"] = Field(
         default="schema.metric", frozen=True

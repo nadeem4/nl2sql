@@ -82,3 +82,26 @@ def test_doctor_reports_a_stale_index(demo):
     out = _plain(runner.invoke(app, ["--env", "demo", "doctor"]).output)
 
     assert "latest snapshot is v2" in out
+
+
+def test_doctor_warns_when_curated_yaml_changed_since_indexing(demo, monkeypatch):
+    _index(demo, version="v7")
+    _snapshot(demo, "v7")
+    curated = demo / "curated_test.yaml"
+    curated.write_text(
+        "datasources:\n"
+        "  chinook:\n"
+        "    verified_queries:\n"
+        "      - id: track_count\n"
+        "        description: Number of tracks\n"
+        "        questions: [\"How many tracks are there?\"]\n"
+        "        sql: SELECT COUNT(*) FROM Track\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("CURATED_CONFIG", str(curated))
+
+    out = _plain(runner.invoke(app, ["--env", "demo", "doctor"]).output)
+
+    assert "curated.yaml changed for 'chinook'" in out
+    assert "nl2sql index --curated-only" in out
+    assert "Warning" in out
