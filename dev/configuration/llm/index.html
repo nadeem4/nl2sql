@@ -5066,7 +5066,7 @@ agent name, and fall back to <code>default</code> when it is not configured:</p>
 </tr>
 <tr>
 <td><code>indexing_enrichment</code></td>
-<td>writes schema descriptions during <code>nl2sql index</code> (optional)</td>
+<td>writes missing schema descriptions during <code>nl2sql index --enrich</code> (optional, off by default)</td>
 </tr>
 </tbody>
 </table>
@@ -5183,9 +5183,10 @@ for the embedding step. Switching embedding providers requires a re-index. See
 <ul>
 <li><code>agents</code> overrides give individual nodes, or indexing enrichment, their own
   model and temperature; see <a href="#per-node-models">Per-node models</a>.</li>
-<li><code>indexing_enrichment</code> is optional. Omit it, or leave its key unset, and
-  <code>nl2sql index</code> still works - the schema is indexed without LLM-written
-  descriptions.</li>
+<li><code>indexing_enrichment</code> is optional and runs only when asked for
+  (<code>nl2sql index --enrich</code>, or <code>enrich=True</code> from Python). Omit it, or leave
+  its key unset, and indexing still works - the schema is indexed without
+  LLM-written descriptions. It never replaces a comment read from the database.</li>
 <li><code>nl2sql setup</code> prompts for <code>openai</code>, <code>anthropic</code> and <code>openrouter</code>, the hosted
   providers it can also collect a key for; <code>setup --api-key</code> picks the provider
   from the key's shape (<code>sk-ant-</code> is Anthropic, <code>sk-or-</code> is OpenRouter, anything

@@ -4468,12 +4468,13 @@
 <code>GET /api/v1/index/status</code> is open.</p>
 <h3 id="post-apiv1indexdatasource_id"><code>POST /api/v1/index/{datasource_id}</code></h3>
 <p>Execution flow:
-- Delegates to <code>engine.indexing.index_datasource(...)</code>.</p>
+- Delegates to <code>engine.indexing.index_datasource(...)</code>. No enrichment model call
+  is made: enrichment is opt-in in the engine and these routes do not ask for it.</p>
 <p>Response:
 <code>{"success": true, "datasource_id": "...", "indexing_stats": {...}, "message": "..."}</code></p>
 <h3 id="post-apiv1index-all"><code>POST /api/v1/index-all</code></h3>
 <p>Execution flow:
-- Delegates to <code>engine.indexing.index_all_datasources(...)</code>.</p>
+- Delegates to <code>engine.indexing.index_all_datasources(...)</code>, without enrichment.</p>
 <h3 id="delete-apiv1index"><code>DELETE /api/v1/index</code></h3>
 <p>Execution flow:
 - Delegates to <code>engine.indexing.clear_index()</code>.</p>

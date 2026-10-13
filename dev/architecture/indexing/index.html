@@ -2276,7 +2276,7 @@ catalog in the current implementation.</p>
 <h2 id="chunk-types-and-contracts">Chunk types and contracts</h2>
 <p>Chunk types are defined in <code>nl2sql.indexing.models</code>:</p>
 <ul>
-<li><strong>DatasourceChunk</strong> (<code>schema.datasource</code>): datasource description, domains, and example questions. The description is the one in the datasources config (<code>description:</code>); it lives in the config rather than the database, so the orchestrator writes it into the snapshot's metadata, where it takes precedence over any description the adapter or enrichment produced. Example questions come from the <code>SAMPLE_QUESTIONS</code> file.</li>
+<li><strong>DatasourceChunk</strong> (<code>schema.datasource</code>): datasource description, domains, and example questions. The description is the one the datasource was registered with (<code>description:</code> in the datasources config, or the <code>description</code> passed to <code>engine.add_datasource</code>); the orchestrator reads it from the datasource registry, falling back to the datasources file only when the registry has none. It lives in the config rather than the database, so the orchestrator writes it into the snapshot's metadata, where it takes precedence over any description the adapter or enrichment produced. Example questions come from the <code>SAMPLE_QUESTIONS</code> file.</li>
 <li><strong>TableChunk</strong> (<code>schema.table</code>): table name, PKs, column list, FK summaries, row counts.</li>
 <li><strong>ColumnChunk</strong> (<code>schema.column</code>): column type, stats, synonyms, PII flags.</li>
 <li><strong>RelationshipChunk</strong> (<code>schema.relationship</code>): FK relationships, columns, cardinality.</li>
@@ -2311,7 +2311,7 @@ enrichment model call, and only the verified queries are embedded. The switch
 and the deletion of the old build are the ones described below, so the
 refresh is just as safe. It needs the datasource to have been indexed once;
 otherwise that datasource fails with a message saying to run <code>nl2sql index</code>.
-<code>--curated-only</code> cannot be combined with <code>--full</code>.</p>
+<code>--curated-only</code> cannot be combined with <code>--full</code> or <code>--enrich</code>.</p>
 <p><code>VectorStore.retrieve_verified_query_candidates(question, datasource_ids, k)</code>
 returns the verified queries a question most resembles. It is a plain
 similarity search, not MMR, because several phrasings of one query are exactly
@@ -2530,11 +2530,17 @@ search the same text, and diff the <strong>Copy as text</strong> output.</p>
 <li>Vector store retrieval wrapped by <code>VECTOR_BREAKER</code>; failures fast‑fail.</li>
 <li>Vector retrieval errors in <code>SchemaRetrieverNode</code> return empty results with warnings.</li>
 <li>If no candidates are found, the retriever falls back to full schema snapshot.</li>
+<li>Enrichment is opt-in: <code>index_datasource</code>, <code>index_all_datasources</code>,
+  <code>rebuild_index</code>, <code>IndexingOrchestrator</code> and <code>nl2sql index</code> all default to
+  <code>enrich=False</code>; pass <code>enrich=True</code> (or <code>nl2sql index --enrich</code>) to spend
+  tokens on it. It only fills blanks: a table or column comment read from the
+  database is never overwritten.</li>
 <li>Enrichment failures return the original snapshot without enrichment, and
   never fail indexing. <code>enrich_schema_snapshot</code> resolves its own LLM inside the
   guard, so a missing API key, an unreachable endpoint and a failed call all
-  degrade the same way. A missing/unusable LLM logs at <code>INFO</code>; anything
-  unexpected logs at <code>WARNING</code> with a stack trace.</li>
+  degrade the same way. A missing/unusable LLM logs at <code>INFO</code>; any other
+  failure (a 401, a timeout) logs one <code>WARNING</code> line with the reason and no
+  stack trace (the trace is logged at <code>DEBUG</code>).</li>
 <li>Retrieving from a vector store whose persisted vectors do not match the
   configured embedding provider raises <code>EmbeddingDimensionMismatchError</code>; a
   recorded embedding model that differs from the configured one raises

@@ -4774,6 +4774,11 @@ a key-free ONNX model (see
 <a id="__codelineno-8-19" name="__codelineno-8-19" href="#__codelineno-8-19"></a>
 <a id="__codelineno-8-20" name="__codelineno-8-20" href="#__codelineno-8-20"></a><span class="n">engine</span><span class="o">.</span><span class="n">index_datasource</span><span class="p">(</span><span class="s2">"runtime_pg"</span><span class="p">)</span>
 </code></pre></div>
+<p>The <code>description</code> is indexed as given, even though no datasources file lists
+<code>runtime_pg</code>. Indexing makes no LLM call unless you ask for one:
+<code>engine.index_datasource("runtime_pg", enrich=True)</code> has the
+<code>indexing_enrichment</code> agent write descriptions for tables and columns the
+database left without a comment.</p>
 <p>You can also register datasources from a config file at runtime:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql</span><span class="w"> </span><span class="kn">import</span> <span class="n">NL2SQL</span>
 <a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>
