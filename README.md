@@ -437,7 +437,7 @@ runs on. Feedback is not on the facade; it is read through the CLI. See
 | --- | --- |
 | `configs/datasources.yaml` | Datasources and connections: PostgreSQL, MySQL, SQL Server, SQLite, DuckDB ([Datasources](docs/configuration/datasources.md)) |
 | `configs/llm.yaml` | A `default` agent and optional per-node agents ([LLM](docs/configuration/llm.md)) |
-| `configs/policies.json` | Roles: allowed datasources and `datasource.table` entries ([Policies](docs/configuration/policies.md)) |
+| `configs/policies.json` | Roles: allowed datasources and `datasource.schema.table` entries ([Policies](docs/configuration/policies.md)) |
 | `configs/secrets.yaml` | Secret providers for `${provider:key}` references ([Secrets](docs/configuration/secrets.md)) |
 
 **LLM providers.** `openai` (default model `gpt-5.4`), `anthropic` (Claude,
