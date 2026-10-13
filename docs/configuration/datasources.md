@@ -36,7 +36,10 @@ datasources:
     (`statement_timeout_ms`, `row_limit`, `max_bytes`) go beside `connection`, as
     above, or under an `options:` map; the two spellings are equivalent. If a
     limit is set in both places, the lower value wins.
-    - `statement_timeout_ms`
+    - `statement_timeout_ms`: the longest one statement may run. Postgres,
+      MySQL, SQL Server and DuckDB enforce it (SQL Server rounds up to whole
+      seconds); SQLite does not, and uses it only as its lock-wait timeout. See
+      each [adapter page](../adapters/index.md) for how.
     - `row_limit`: the most rows one sub-query returns. Unset, it is
       `RESULT_ROW_LIMIT` (100,000); set higher, `RESULT_ROW_LIMIT` still bounds it.
       A result that reaches it is flagged as truncated and the answer says so. It

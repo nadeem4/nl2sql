@@ -60,8 +60,9 @@ def test_execute_rejects_missing_sql(monkeypatch):
     assert response.error.error_code == "MISSING_SQL"
 
 
-def test_statement_timeout_sets_execution_options(monkeypatch):
-    # Validates timeout wiring because queries must honor SLA limits.
+def test_statement_timeout_is_kept_for_the_adapter_to_enforce(monkeypatch):
+    # SQLAlchemy ignores execution_options["timeout"], so the base adapter only
+    # records the limit; each adapter's connect() enforces it.
     # Arrange
     monkeypatch.setattr("nl2sql.adapters.sqlalchemy_base.adapter.create_engine", lambda *a, **k: MagicMock())
 
@@ -76,6 +77,7 @@ def test_statement_timeout_sets_execution_options(monkeypatch):
     )
 
     # Assert
-    assert adapter.execution_options["timeout"] == 1.5
+    assert adapter.statement_timeout_ms == 1500
+    assert "timeout" not in adapter.execution_options
     assert adapter.row_limit == 10
     assert adapter.max_bytes == 100
