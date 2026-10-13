@@ -74,6 +74,31 @@ doctor` and the index status (`NL2SQL.index_health`, `GET /api/v1/index/status`)
 print "Preferred table 'v_x' of 'chinook' is not in the indexed schema". The
 usual cause is a view created after the last index; re-index the datasource.
 
+## When a datasource fails to start
+
+A datasource that cannot start (an unknown `type`, a missing driver, an invalid
+connection config, a `${...}` reference that does not resolve) does not stop the
+engine. At startup the others register and the broken one is marked
+unavailable:
+
+- the log has an error: `Datasource 'sales' is unavailable: <reason>`;
+- it is not in `list_datasources()` (or `GET /api/v1/datasource`);
+  `NL2SQL.list_unavailable_datasources()` maps it to the reason;
+- the index status (`NL2SQL.index_health()`, `GET /api/v1/index/status`) carries
+  the same sentence as a warning;
+- a query with `datasource_id` set to it, and `nl2sql index` or
+  `rebuild_index(datasource_ids=[...])` naming it, fail with that reason;
+- `nl2sql doctor` shows it as `Failed` in the connectivity table, with the
+  reason;
+- `nl2sql policy validate` reports a role that names it as `UNAVAILABLE`.
+
+If datasources are configured and none of them can start, startup fails with
+every reason. There is no setting yet to make one bad datasource fatal; run
+`nl2sql doctor` in a deploy check if you need that.
+
+A secret provider in `secrets.yaml` that cannot start is different: it fails
+startup. See [Secrets → When a provider fails to start](secrets.md#when-a-provider-fails-to-start).
+
 ## Notes
 
 - Use `${env:VAR}` for environment variables or `${provider:key}` for secrets
