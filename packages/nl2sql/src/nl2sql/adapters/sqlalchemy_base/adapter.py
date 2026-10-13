@@ -108,6 +108,23 @@ class BaseSQLAlchemyAdapter:
     def max_bytes(self) -> int:
         return self._max_bytes
 
+    @property
+    def default_schema(self) -> Optional[str]:
+        """The schema an unqualified table name resolves to, or ``None`` if unknown.
+
+        RBAC reads a two-part ``datasource.table`` policy entry as that table
+        in this schema. Asked of the database once and remembered.
+        """
+        if not self.engine:
+            return None
+        if not hasattr(self, "_default_schema"):
+            try:
+                self._default_schema = inspect(self.engine).default_schema_name
+            except Exception as e:
+                logger.warning(f"Could not read the default schema of {self}: {e}")
+                return None
+        return self._default_schema
+
     def __str__(self):
         return f"{self.datasource_id} ({self.datasource_engine_type})"
 

@@ -25,7 +25,7 @@ from nl2sql.pipeline.nodes.generator.node import (
     ordered,
 )
 from nl2sql.context import NL2SQLContext
-from nl2sql.auth.rbac import table_allowed
+from nl2sql.auth.rbac import default_schema, table_allowed
 from nl2sql.common.logger import get_logger
 from nl2sql.common.settings import settings
 from nl2sql.pipeline.nodes.validator.schemas import LogicalValidatorResponse, ValidationCheck
@@ -658,13 +658,15 @@ class LogicalValidatorNode:
              ]
 
         logger.debug("Policy validation context: Role=%s, Allowed=%s", role, allowed_tables)
+        default = default_schema(self.registry, ds_id)
 
         for t in plan.tables:
-            # STRICT namespacing: "*", "<datasource>.*" or "<datasource>.<table>".
-            if table_allowed(allowed_tables, ds_id, t.name):
+            # The schema the generator will write, or the default one.
+            if table_allowed(allowed_tables, ds_id, t.name, t.schema_name, default):
                 continue
 
-            namespaced_name = f"{ds_id}.{t.name}"
+            schema = t.schema_name or default
+            namespaced_name = f"{ds_id}.{schema}.{t.name}" if schema else f"{ds_id}.{t.name}"
             # The operator always gets the table and the role (log and trace);
             # the user gets them only when the deployment opts in, because
             # naming a table tells an unauthorised user that it exists.
@@ -672,7 +674,7 @@ class LogicalValidatorNode:
             if settings.rbac_refusal_names_tables:
                 message = (
                     f"Role '{role or '(none)'}' denied access to '{namespaced_name}'. "
-                    "Policy requires explicit 'datasource.table' allow."
+                    "Policy requires an explicit 'datasource.schema.table' allow."
                 )
             else:
                 message = REFUSAL_MESSAGE

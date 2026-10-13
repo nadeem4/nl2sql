@@ -237,11 +237,13 @@ class NL2SQL:
         return self.indexing.clear_index()
 
     # Auth API convenience methods
-    def check_permissions(self, user_context, datasource_id, table):
+    def check_permissions(self, user_context, datasource_id, table, schema=None):
         """
         Check if a user has permission to access a specific resource.
+
+        ``schema`` defaults to the datasource's default schema.
         """
-        return self.auth.check_permissions(user_context, datasource_id, table)
+        return self.auth.check_permissions(user_context, datasource_id, table, schema)
 
     def get_allowed_resources(self, user_context):
         """

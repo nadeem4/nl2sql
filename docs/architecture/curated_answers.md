@@ -364,8 +364,9 @@ reply from the preview, as today.
    required param (no default) left empty all fall back. A param the model
    left out takes its default.
 5. **Access.** Every table the SQL reads (sqlglot `exp.Table` nodes, CTE names
-   excluded) must pass `table_allowed(allowed_tables, datasource_id, table)`,
-   the function the logical validator and executor already use. If one does
+   excluded) must pass `table_allowed()` with its schema (the datasource's
+   default schema when the SQL names none), the function the logical
+   validator and executor already use. If one does
    not, the run falls back, and the normal pipeline then enforces RBAC as it
    always does. The user is not told a verified query exists that they may
    not use.

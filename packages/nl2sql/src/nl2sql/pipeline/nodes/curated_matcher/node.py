@@ -14,7 +14,7 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
-from nl2sql.auth.rbac import table_allowed
+from nl2sql.auth.rbac import default_schema, table_allowed
 from nl2sql.common.logger import get_logger
 from nl2sql.common.settings import settings
 from nl2sql.configs.curated import CuratedSqlError, VerifiedQuery, inspect_verified_sql
@@ -120,9 +120,10 @@ class CuratedMatcherNode:
 
     def _check_access(self, state: GraphState, ds_id: str, tables: List[Tuple[str, str]]) -> None:
         allowed = self.rbac.get_allowed_tables(state.user_context)
+        default = default_schema(self.ds_registry, ds_id)
         for schema, table in tables:
             name = f"{schema}.{table}" if schema else table
-            if not table_allowed(allowed, ds_id, name):
+            if not table_allowed(allowed, ds_id, table, schema, default):
                 raise _Fallback("policy_denied", f"'{ds_id}.{name}' is not allowed for this role")
 
     def _row_ceiling(self, ds_id: str) -> int:
