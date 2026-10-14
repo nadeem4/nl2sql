@@ -14,6 +14,7 @@ from nl2sql.testing.config import make_demo_config
 from nl2sql.pipeline.nodes.ast_planner.node import ASTPlannerNode
 from nl2sql.pipeline.nodes.decomposer.schemas import ExpectedColumn, SubQuery
 from nl2sql.pipeline.nodes.schema_retriever.node import SchemaRetrieverNode
+from nl2sql.policies import UserContext
 from nl2sql.pipeline.state import SubgraphExecutionState
 
 
@@ -83,6 +84,7 @@ def test_ast_planner_real_data(demo_env, datasource_id, user_query) -> None:
     subgraph_state = SubgraphExecutionState(
         trace_id="t",
         sub_query=sub_query,
+        user_context=UserContext(roles=["admin"]),
     )
     schema_result = schema_node(subgraph_state)
     subgraph_state.relevant_tables = schema_result["relevant_tables"]

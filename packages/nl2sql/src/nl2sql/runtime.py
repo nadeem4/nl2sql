@@ -22,10 +22,11 @@ from nl2sql.check import DatasourceStatus
 from nl2sql.common.logger import get_logger
 from nl2sql.config import Config, ConfigError
 from nl2sql.config.errors import Problem
+from nl2sql.policies import PolicyEngine
 from nl2sql.registry import Registry, RegistryError
 
 if TYPE_CHECKING:
-    from nl2sql.auth import UserContext
+    from nl2sql.policies import UserContext
     from nl2sql.config import LLM, Datasource
     from nl2sql.embeddings import EmbeddingInfo
     from nl2sql.llm.llm_set import LLMChange
@@ -76,7 +77,7 @@ class Runtime:
         """Step 2b of loading without opening the stores: what ``nl2sql config check`` builds.
 
         Loads every name ``config`` uses through the registry and builds the
-        secret manager, the RBAC policies, the adapters (not connected), the
+        secret manager, the policy engine, the adapters (not connected), the
         LLM clients (no model call), the embedder and the four stores
         named in ``storage`` (they open nothing yet). Nothing is written
         under ``storage.path`` and no process global is touched. The result
@@ -86,7 +87,6 @@ class Runtime:
             ConfigError: as ``from_config``. Each problem names the file it is
                 in (``config.locate``).
         """
-        from nl2sql.auth import RBAC
         from nl2sql.datasources import DatasourceRegistry
         from nl2sql.llm import LLMRegistry
         from nl2sql.secrets import SecretManager
@@ -150,7 +150,7 @@ class Runtime:
             raise ConfigError(problems, source=source)
 
         self._config = config
-        self.rbac = RBAC.from_policies(config.policies)
+        self.policy_engine = PolicyEngine(config.policies, self.ds_registry)
         self.index, self.state, self.traces, self.results = stores
         self.stores = StorePaths.under(config.storage.path)
         return self
@@ -338,6 +338,7 @@ class Runtime:
         run._lock = RLock()
         run._config = config
         run.curated = config.curated
+        run.policy_engine = PolicyEngine(config.policies, self.ds_registry)
         run.llm_registry = self.llm_registry.derive(config.llm)
         return run
 

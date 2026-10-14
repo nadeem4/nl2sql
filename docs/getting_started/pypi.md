@@ -201,7 +201,7 @@ from nl2sql import load_config
 engine.llm.replace(load_config("other/nl2sql.yaml").llm)
 ```
 
-### Policies configuration (RBAC)
+### Policies configuration
 
 `policies.yaml` defines which roles can access which datasources and tables:
 
@@ -212,17 +212,15 @@ admin_roles: [admin]
 roles:
   admin:
     description: System Administrator
-    allowed_datasources: ["*"]
-    allowed_tables: ["*"]
+    allow: ["*"]
   viewer:
     description: Read-only access to the catalogue
-    allowed_datasources: [my_postgres]
-    allowed_tables: ["my_postgres.public.products"]
+    allow: ["my_postgres.public.products"]
 ```
 
 `{allow_all: true}` (what `nl2sql init` writes) lets every caller read
 everything, for local use only. See
-[Policies config](../configuration/policies.md) for allowed table formats and
+[Policies config](../configuration/policies.md) for the allow and deny patterns and
 wildcards.
 
 ### Secrets configuration (optional)
@@ -245,7 +243,7 @@ A datasource then writes `password: "${azure-prod:db-password}"`. See
 
 ```python
 from nl2sql import NL2SQL
-from nl2sql.auth.models import UserContext
+from nl2sql import UserContext
 
 engine = NL2SQL.from_config("nl2sql.yaml")
 user_ctx = UserContext(user_id="user123", roles=["admin"])

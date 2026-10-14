@@ -115,6 +115,7 @@ openai = "nl2sql.llm.providers:OPENAI"
 anthropic = "nl2sql.llm.providers:ANTHROPIC"
 openrouter = "nl2sql.llm.providers:OPENROUTER"
 ollama = "nl2sql.llm.providers:OLLAMA"
+openai_compatible = "nl2sql.llm.providers:OPENAI_COMPATIBLE"
 
 [project.entry-points."nl2sql.embeddings"]
 local = "nl2sql.embeddings.local:LOCAL"

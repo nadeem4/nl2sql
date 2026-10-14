@@ -1,7 +1,9 @@
 
 """The LLM settings ``LLMRegistry`` builds clients from: one ``AgentConfig`` per agent."""
-from typing import Optional, Dict
-from pydantic import BaseModel, Field, SecretStr, field_serializer
+from typing import Dict, Literal, Optional
+
+from pydantic import BaseModel, Field, NonNegativeInt, PositiveFloat, PositiveInt, SecretStr, field_serializer
+
 
 class AgentConfig(BaseModel):
     """One agent's resolved LLM settings, as ``LLMRegistry`` builds a client from them.
@@ -29,12 +31,26 @@ class AgentConfig(BaseModel):
             "other OpenAI-compatible endpoint."
         ),
     )
+    structured_output: Optional[Literal["tool_calling", "json_schema", "json_mode"]] = Field(
+        None, description="How structured answers are asked for. None: the provider's default.")
+    max_tokens: Optional[PositiveInt] = Field(None, description="None: the provider's default.")
+    timeout_s: Optional[PositiveFloat] = Field(None, description="Per request. None: the client library's.")
+    max_retries: Optional[NonNegativeInt] = Field(
+        None, description="Network and rate-limit retries, done by the client. None: the client library's.")
+    headers: Dict[str, SecretStr] = Field(
+        default_factory=dict,
+        description="Sent with every request. A value may be a ${provider:key} reference; none ever prints.")
     name: str = Field("default", description="Name of the agent")
 
     @field_serializer("api_key", when_used="json")
     def _serialize_api_key(self, value, info):
         """Masked in JSON: a log, a trace or an API response never gets the key."""
         return None if value is None else str(value)
+
+    @field_serializer("headers", when_used="json")
+    def _serialize_headers(self, value, info):
+        """Masked in JSON, as the key is: only the header names show."""
+        return {name: str(secret) for name, secret in value.items()}
 
 
 class LLMFileConfig(BaseModel):

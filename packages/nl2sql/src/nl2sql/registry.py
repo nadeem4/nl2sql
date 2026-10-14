@@ -30,7 +30,7 @@ GROUPS: Dict[str, str] = {
 
 # The interface version this engine was built for, per kind. Anything else is
 # a load error: there are no minor versions and no window for old ones.
-INTERFACE_VERSIONS: Dict[str, int] = {"adapter": 1, "llm": 1, "embeddings": 2, "secrets": 1, "store": 1}
+INTERFACE_VERSIONS: Dict[str, int] = {"adapter": 1, "llm": 2, "embeddings": 2, "secrets": 1, "store": 1}
 
 # How a kind reads in a message.
 _LABELS: Dict[str, str] = {

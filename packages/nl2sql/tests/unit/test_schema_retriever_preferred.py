@@ -60,20 +60,12 @@ class _Registry:
         return list(self._preferred.get(datasource_id, []))
 
 
-class _Rbac:
-    def __init__(self, allowed):
-        self._allowed = allowed
-
-    def get_allowed_tables(self, _user):
-        return list(self._allowed)
-
-
 def _node(preferred, vector_store=None, allowed=("*",), settings=None):
     ctx = fake_runtime(
         settings=settings,
         vector_store=vector_store,
         schema_store=SimpleNamespace(get_latest_snapshot=lambda _id: _snapshot()),
-        rbac=_Rbac(allowed),
+        policies={"default_role": "r", "roles": {"r": {"description": "d", "allow": list(allowed)}}},
         ds_registry=_Registry({"ds1": preferred}),
     )
     return SchemaRetrieverNode(ctx)
@@ -92,7 +84,7 @@ def _doc(table, **extra):
 def _vector_store(picked, pool):
     """A store whose table search picks ``picked`` from ``pool`` (table, similarity)."""
 
-    def schema_context(_q, _ds, k=8, explain=None):
+    def schema_context(_q, _ds, k=8, explain=None, tables=None):
         if explain is not None:
             explain.append({
                 "search": "tables",
@@ -147,16 +139,13 @@ def test_a_preferred_table_may_be_named_with_its_schema():
     assert tables[0].name == "v_customer_revenue" and tables[0].preferred is True
 
 
-def test_an_unreadable_preferred_table_is_still_withheld():
-    # The role may read invoices only: the preferred view is ranked and marked
-    # like any preferred table, and loses its data like any unreadable one.
-    tables = _node(["v_customer_revenue"], allowed=["ds1.invoices"])(_state())["relevant_tables"]
+def test_a_denied_preferred_table_is_still_hidden():
+    # The role may read invoices only: being preferred never shows the planner
+    # a table the role's scope hides.
+    tables = _node(["v_customer_revenue"], allowed=["ds1.main.invoices"])(_state())["relevant_tables"]
 
-    view = tables[0]
-    assert view.name == "v_customer_revenue" and view.preferred is True
-    assert all(not c.stats for c in view.columns)
-    invoices = next(t for t in tables if t.name == "invoices")
-    assert invoices.columns[0].stats
+    assert [t.name for t in tables] == ["invoices"]
+    assert tables[0].columns[0].stats
 
 
 @pytest.fixture
@@ -203,7 +192,7 @@ def test_a_context_without_a_registry_still_retrieves():
     ctx = fake_runtime(
         vector_store=None,
         schema_store=SimpleNamespace(get_latest_snapshot=lambda _id: _snapshot()),
-        rbac=None,
+        policies={"allow_all": True},
     )
 
     tables = SchemaRetrieverNode(ctx)(_state())["relevant_tables"]

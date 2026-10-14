@@ -644,6 +644,7 @@ class VectorStore:
         datasource_id: str,
         k: int = 8,
         explain: Optional[List[Dict[str, Any]]] = None,
+        tables: Optional[List[str]] = None,
     ) -> List[Document]:
         """
         Retrieves schema-level context for a datasource.
@@ -653,6 +654,8 @@ class VectorStore:
             datasource_id: Selected datasource identifier.
             k: Number of schema documents to retrieve.
             explain: When given, the search's record is appended to it.
+            tables: When given, only these tables (fully qualified) are
+                searched, so the top ``k`` is taken among them.
 
         Returns:
             Retrieved schema documents.
@@ -662,9 +665,11 @@ class VectorStore:
         where = self._and(
             {"datasource_id": datasource_id},
             {"type": {"$in": types}},
+            {"table": {"$in": list(tables)}} if tables is not None else None,
             self._active_filter(datasource_id),
         )
-        return self._mmr("tables", query, where, k, explain, {"datasource_id": datasource_id, "types": types})
+        return self._mmr("tables", query, where, k, explain,
+                         self._filter_record(datasource_id, types, tables))
 
     def retrieve_column_candidates(
         self,
@@ -672,6 +677,7 @@ class VectorStore:
         datasource_id: str,
         k: int = 8,
         explain: Optional[List[Dict[str, Any]]] = None,
+        tables: Optional[List[str]] = None,
     ) -> List[Document]:
         """
         Retrieves candidate column documents for a datasource.
@@ -681,6 +687,7 @@ class VectorStore:
             datasource_id: Selected datasource identifier.
             k: Number of column documents to retrieve.
             explain: When given, the search's record is appended to it.
+            tables: When given, only these tables' columns are searched.
 
         Returns:
             Retrieved column documents.
@@ -689,10 +696,19 @@ class VectorStore:
         where = self._and(
             {"datasource_id": datasource_id},
             {"type": "schema.column"},
+            {"table": {"$in": list(tables)}} if tables is not None else None,
             self._active_filter(datasource_id),
         )
         return self._mmr("columns", query, where, k, explain,
-                         {"datasource_id": datasource_id, "types": ["schema.column"]})
+                         self._filter_record(datasource_id, ["schema.column"], tables))
+
+    @staticmethod
+    def _filter_record(datasource_id: str, types: List[str], tables: Optional[List[str]]) -> Dict[str, Any]:
+        """The search's filter, for the trace, with how many tables it was limited to."""
+        record: Dict[str, Any] = {"datasource_id": datasource_id, "types": types}
+        if tables is not None:
+            record["searched_tables"] = len(tables)
+        return record
 
     def retrieve_planning_context(
         self,

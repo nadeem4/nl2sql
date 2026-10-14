@@ -19,13 +19,17 @@
 - Rank the datasource's `preferred_tables` first and set `preferred=True` on
   them, on the full-snapshot path and the retrieval path; see
   [Preferred tables](#preferred-tables).
-- Strip column statistics (`sample_values`, `min_value`, `max_value`,
-  `distinct_count`, `null_percentage`) from every table the caller's role
-  cannot read, on every path, while keeping its name, columns, types, keys and
-  relationships ("structure yes, data no"). The rule is RBAC's
-  `table_allowed`, the one the logical validator refuses with; with no RBAC in
-  the context, every table is stripped. See
-  [Security Model](../../security/model.md#strict-refusal).
+- Hide every table the caller may not read, on every path. The caller's
+  `Scope` (`ctx.policy_engine.scope(user_context, datasource_id)`, the one the
+  logical validator refuses with) filters the snapshot's tables *before*
+  anything is chosen: the full-snapshot path sends the readable tables only
+  (and compares their count, not the snapshot's, with
+  `full_snapshot_max_tables`), and the vector searches run with
+  `tables=<the readable tables>`, so the top `k` is filled with readable ones.
+  A hidden table's name, columns, keys, statistics and data never reach the
+  prompt or the run trace, and a relationship from a readable table into a
+  hidden one is dropped. See
+  [Security Model](../../security/model.md#hidden-tables-and-strict-refusal).
 - The tables it returns keep every statistic, but the planner and refiner
   prompts render them with `render_schema_for_prompt` (`schema.py`), which
   sends only `sample_values` and, for date, time and numeric columns other
@@ -113,8 +117,8 @@ matched against snapshot tables by bare name or `schema.table`, case ignored.
   them only; with no preferred tables the block is byte-identical to before.
   Planner instruction 14 tells the model to plan against a preferred table
   when it answers the question.
-- RBAC is unchanged: a preferred table the role cannot read is ranked and
-  marked, and loses its statistics like any other unreadable table.
+- Being preferred never shows a hidden table: a preferred table the caller's
+  scope denies is left out like any other.
 
 ---
 

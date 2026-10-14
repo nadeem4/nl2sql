@@ -11,7 +11,7 @@ from typing import Callable, Dict, List, Optional
 
 from langchain_core.callbacks import BaseCallbackHandler
 
-from nl2sql.auth import UserContext
+from nl2sql.policies import UserContext
 from nl2sql.common.cancellation import CancellationToken
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.common.exceptions import PipelineExecutionError
@@ -179,7 +179,7 @@ def run_with_graph(
         run_llms.end()
         raise
 
-    # No role is an empty UserContext, the state's own default: RBAC then sees
+    # No role is an empty UserContext, the state's own default: policies then see
     # a caller with no roles, as it does for one whose roles list is empty.
     initial_state = GraphState(
         user_query=user_query,
@@ -245,13 +245,16 @@ def run_with_graph(
         }, "cancelled")
 
     def _invoke():
-        return graph.invoke(
-            initial_state.model_dump(),
-            config={
-                "configurable": {"cancellation_token": token, "stream_answer": stream_answer},
-                "callbacks": [_StopWhenCancelled(token), *(callbacks or []), timing, usage, recorder],
-            },
-        )
+        # The run's scopes are pinned in the worker's context: each
+        # datasource's Scope is built once, so every step decides the same way.
+        with ctx.policy_engine.run():
+            return graph.invoke(
+                initial_state.model_dump(),
+                config={
+                    "configurable": {"cancellation_token": token, "stream_answer": stream_answer},
+                    "callbacks": [_StopWhenCancelled(token), *(callbacks or []), timing, usage, recorder],
+                },
+            )
 
     # Deliberately not a ``with`` block: ``ThreadPoolExecutor.__exit__`` calls
     # ``shutdown(wait=True)``, which joins the worker, so a timed-out

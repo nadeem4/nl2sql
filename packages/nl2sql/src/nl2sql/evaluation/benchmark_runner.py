@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from nl2sql.api.query_api import QueryResult, result_from_state
-from nl2sql.auth import UserContext
+from nl2sql.policies import UserContext
 from nl2sql.runtime import Runtime
 from nl2sql.evaluation.evaluator import ModelEvaluator
 from nl2sql.evaluation.gold import GoldQuestion, load_gold_dataset

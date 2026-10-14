@@ -10,7 +10,7 @@ gold plans call it), but only as a legacy name: nothing offers it to the model.
 """
 from types import SimpleNamespace
 
-from nl2sql.auth import UserContext
+from nl2sql.policies import UserContext
 from nl2sql.common.errors import ErrorCode
 from nl2sql.pipeline.nodes.ast_planner.functions import (
     ALLOWED_FUNCTIONS,
@@ -37,7 +37,7 @@ def _unsupported_message(func_name):
         select_items=[SelectItem(alias="v", expr=Expr(kind="func", func_name=func_name, args=[DATE]))],
     )
     node = LogicalValidatorNode(fake_runtime(
-        ds_registry=SimpleNamespace(), rbac=SimpleNamespace(get_allowed_tables=lambda _: ["*"])))
+        ds_registry=SimpleNamespace(), policies={"allow_all": True}))
     state = SubgraphExecutionState(
         trace_id="t",
         sub_query=SubQuery(id="sq1", datasource_id="ds", intent="q"),

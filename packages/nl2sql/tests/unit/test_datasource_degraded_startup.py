@@ -122,14 +122,13 @@ def test_policy_validation_says_a_referenced_datasource_failed_to_start(tmp_path
     config = make_config(tmp_path, datasources=[
         {"id": "good", "type": "sqlite", "connection": {"database": ":memory:"}},
         {"id": "bad", "type": "sqlite", "connection": {"database": "no/such/folder/bad.db"}},
-    ], policies={"roles": {"analyst": {"description": "d", "allowed_datasources": ["bad"],
-                                       "allowed_tables": ["bad.*"]}}})
+    ], policies={"roles": {"analyst": {"description": "d", "allow": ["bad"]}}})
 
     with NL2SQL(config) as engine:
         engine.check()  # bad is optional: the engine runs without it
         report = engine.policies.validate()
 
-    entry = next(e for e in report.entries if e.target == "Datasource: bad")
+    entry = next(e for e in report.entries if e.target == "Allow: bad")
     assert entry.status == "UNAVAILABLE"
     assert "connection test failed" in entry.details
     assert not report.ok

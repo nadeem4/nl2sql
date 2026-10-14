@@ -8,7 +8,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from nl2sql.auth import UserContext
+from nl2sql.policies import UserContext
 from nl2sql.pipeline.nodes.ast_planner.schemas import (
     ASTPlannerResponse,
     Expr,
@@ -28,8 +28,8 @@ def _col(alias: str, name: str) -> Expr:
 
 
 def _ctx(allowed_tables):
-    rbac = SimpleNamespace(get_allowed_tables=lambda _ctx: list(allowed_tables))
-    return fake_runtime(ds_registry=SimpleNamespace(), rbac=rbac)
+    roles = {role: {"description": "d", "allow": list(allowed_tables)} for role in ("admin", "viewer")}
+    return fake_runtime(ds_registry=SimpleNamespace(), policies={"roles": roles})
 
 
 def _plan() -> PlanModel:
@@ -64,7 +64,7 @@ def valid_state():
 @pytest.fixture
 def denying_validator_node():
     # A role whose allowlist covers nothing in this plan.
-    return LogicalValidatorNode(_ctx(["other_ds.*"]))
+    return LogicalValidatorNode(_ctx(["other_ds"]))
 
 
 @pytest.fixture
@@ -86,7 +86,7 @@ def test_policy_denial_marks_policy_check_failed(
     by_name = {c.name: c for c in out["logical_validator_response"].checks}
     assert by_name["structure_and_schema"].passed is True
     assert by_name["policy"].passed is False
-    # The default refusal is generic: it names no table (see test_rbac_strict_refusal.py).
+    # The default refusal is generic: it names no table (see test_policy_refusal.py).
     assert by_name["policy"].message == "You do not have permission to see the data this question requires."
 
 

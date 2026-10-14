@@ -13,7 +13,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from nl2sql.auth import UserContext
+from nl2sql.policies import UserContext
 from nl2sql.common.errors import ErrorCode, ErrorSeverity
 from nl2sql.llm import LLMRegistry
 from nl2sql.llm.models import AgentConfig
@@ -74,7 +74,7 @@ class SpyStore:
 def _ctx(server, ds_ids, allowed=("*",), vector_store=None, **agents):
     return fake_runtime(
         vector_store=vector_store if vector_store is not None else SpyStore(ds_ids),
-        rbac=SimpleNamespace(get_allowed_datasources=lambda _ctx: list(allowed)),
+        policies={"default_role": "r", "roles": {role: {"description": "d", "allow": list(list(allowed))} for role in ("r", "admin")}},
         ds_registry=SimpleNamespace(list_ids=lambda: list(ds_ids)),
         schema_store=SimpleNamespace(
             get_latest_version=lambda _id: "v1",

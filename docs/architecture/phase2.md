@@ -638,6 +638,13 @@ A new boundary test: only `nl2sql/storage/` imports `chromadb` or `sqlite3`.
 
 ## 5. LLM and embeddings providers
 
+!!! note "Built: LLM providers and agent fields (PR L1)"
+    `openai_compatible`, with `openrouter` and `ollama` as its presets;
+    `structured_output`, `max_tokens`, `timeout_s`, `max_retries` and
+    `headers` on `LLM` and `AgentLLM`; `LLMProvider` on interface version 2.
+    `parse_retries` and parse-and-retry come with L2. See
+    [LLM configuration](../configuration/llm.md).
+
 ### The LLM config
 
 Phase 1's `llm` section stays flat. Six fields are added to `LLM` and to
@@ -795,6 +802,16 @@ As in Phase 1, the engine accepts exactly the version it was built for.
 | `VectorStore` dimension checks and the model-mismatch error | Deleted: the namespace carries the model and dimension |
 
 ## 6. Policies, step 1
+
+!!! note "Built: globs and `Scope` (PR P1)"
+    `allow` and `deny` on `Role`, the pattern rules, `PolicyEngine.scope` and
+    `Scope` in `nl2sql/policies/` (which replaces `nl2sql/auth/`), a run's
+    scopes pinned (`PolicyEngine.run`), every call site on `Scope`, the
+    retriever hiding denied tables, and the demo roles rewritten. Beyond the
+    table below, `engine.policies.allowed()` is replaced by
+    `engine.policies.scope()`, since a flat table list cannot say what a deny
+    does. The `check` block and `PolicyCheck` come with P2. See
+    [Policies](../configuration/policies.md).
 
 ### The config
 

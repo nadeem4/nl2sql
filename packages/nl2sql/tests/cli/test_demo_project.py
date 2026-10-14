@@ -8,6 +8,7 @@ from nl2sql.cli.demo.stamp import read_stamp
 from nl2sql.cli.main import app
 from nl2sql.config import load_config
 from nl2sql.datasets.demo import DEMO_QUESTIONS, DEMO_QUESTIONS_BY_DATASOURCE
+from nl2sql.policies import PolicyEngine, UserContext
 
 EXPECTED_TABLES = {
     "chinook.sqlite": {"Album", "Artist", "Customer", "Employee", "Genre", "Invoice",
@@ -74,23 +75,27 @@ def test_the_demo_policies_cover_every_datasource(tmp_path):
     policies = load_config(prepare_project(tmp_path)).policies
     assert set(policies.roles) == {"admin", "analyst", "viewer"}
 
-    admin = policies.roles["admin"]
-    assert admin.allowed_datasources == ["*"] and admin.allowed_tables == ["*"]
+    engine = PolicyEngine(policies)
+
+    def reads(role, ds_id, table):
+        return engine.scope(UserContext(roles=[role]), ds_id).allows("main", table)
+
+    assert policies.roles["admin"].allow == ["*"] and not policies.roles["admin"].deny
 
     # The analyst reads no employee or support-agent records.
-    analyst = policies.roles["analyst"].allowed_tables
-    assert "chinook.Employee" not in analyst
-    assert "support.agents" not in analyst
-    assert {"chinook.Customer", "support.tickets", "webanalytics.sessions"} <= set(analyst)
+    assert not reads("analyst", "chinook", "Employee")
+    assert not reads("analyst", "support", "agents")
+    assert reads("analyst", "chinook", "Customer")
+    assert reads("analyst", "support", "tickets")
+    assert reads("analyst", "webanalytics", "sessions")
 
     # The viewer reads no customer, invoice or ticket-message data.
-    viewer = policies.roles["viewer"]
-    assert "support" not in viewer.allowed_datasources
-    for forbidden in ("chinook.Customer", "chinook.Invoice", "chinook.InvoiceLine",
-                      "support.ticket_messages", "support.tickets",
-                      "webanalytics.sessions", "webanalytics.conversions"):
-        assert forbidden not in viewer.allowed_tables, forbidden
-    assert {"chinook.Track", "webanalytics.page_views"} <= set(viewer.allowed_tables)
+    assert not engine.scope(UserContext(roles=["viewer"]), "support").reaches_datasource()
+    for ds_id, forbidden in (("chinook", "Customer"), ("chinook", "Invoice"), ("chinook", "InvoiceLine"),
+                             ("chinook", "Employee"), ("support", "ticket_messages"), ("support", "tickets"),
+                             ("webanalytics", "sessions"), ("webanalytics", "conversions")):
+        assert not reads("viewer", ds_id, forbidden), forbidden
+    assert reads("viewer", "chinook", "Track") and reads("viewer", "webanalytics", "page_views")
 
 
 def test_the_demo_verified_queries_pass_the_checks_and_run(tmp_path):

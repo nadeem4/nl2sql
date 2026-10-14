@@ -37,7 +37,11 @@ def questions() -> List[str]:
 
 
 def chinook_tables(readable: Callable = lambda _ref: True):
-    """The schema_retriever's tables for Chinook: the full snapshot, stats included."""
+    """The schema_retriever's tables for Chinook: the full snapshot, stats included.
+
+    ``readable`` says which tables the caller may read; the others are hidden,
+    as the retriever hides a table the caller's scope denies.
+    """
     from nl2sql.adapters.sqlite.adapter import SqliteAdapter
     from nl2sql.pipeline.nodes.schema_retriever.node import SchemaRetrieverNode
 
@@ -48,8 +52,9 @@ def chinook_tables(readable: Callable = lambda _ref: True):
     )
     snapshot = adapter.fetch_schema_snapshot()
     retriever = SchemaRetrieverNode.__new__(SchemaRetrieverNode)
+    visible = {key: c for key, c in snapshot.contract.tables.items() if readable(c.table)}
     return retriever._build_tables_from_snapshot(
-        snapshot, resolved_tables=None, schema_version=SCHEMA_VERSION, readable=readable
+        snapshot, resolved_tables=None, schema_version=SCHEMA_VERSION, visible=visible
     )
 
 

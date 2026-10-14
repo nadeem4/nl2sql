@@ -163,7 +163,7 @@ def test_every_kind_has_add_and_a_decorator(kind):
 
 def test_a_missing_llm_requirement_reports_install_hint():
     registry = Registry.empty()
-    registry.add_llm("gemini", types.SimpleNamespace(interface_version=1, requires=("nl2sql_no_such_sdk",),
+    registry.add_llm("gemini", types.SimpleNamespace(interface_version=2, requires=("nl2sql_no_such_sdk",),
                                                      install_hint='pip install "nl2sql-gemini"'))
 
     with pytest.raises(RegistryError, match='pip install "nl2sql-gemini"'):
@@ -191,10 +191,10 @@ def test_the_default_registry_lists_every_built_in(kind):
     assert set(_declared(group)) <= set(Registry.default().names(kind))
 
 
-@pytest.mark.parametrize("name", ["openai", "anthropic", "openrouter", "ollama"])
+@pytest.mark.parametrize("name", ["openai", "anthropic", "openai_compatible", "openrouter", "ollama"])
 def test_every_built_in_llm_provider_loads(name):
     provider = Registry.default().load("llm", name)
-    assert provider.interface_version == 1
+    assert provider.interface_version == 2
 
 
 @pytest.mark.parametrize("name", ["local", "openai", "openai_compatible"])

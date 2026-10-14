@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import os
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional, Protocol, Tuple, runtime_checkable
 
 from .registry import PROVIDER_PRESETS, ProviderPreset
@@ -30,6 +30,7 @@ __all__ = [
     "OLLAMA",
     "OLLAMA_BASE_URL",
     "OPENAI",
+    "OPENAI_COMPATIBLE",
     "OPENROUTER",
     "ResolvedAgent",
     "api_key_from_env",
@@ -80,7 +81,7 @@ def looks_like_api_key(key: Optional[str]) -> bool:
 # Each provider as a person names it: in the settings panel, and in the message
 # of an error the provider caused (``nl2sql.llm.failures``).
 PROVIDER_LABELS: Dict[str, str] = {"openai": "OpenAI", "anthropic": "Anthropic", "openrouter": "OpenRouter",
-                                   "ollama": "Ollama"}
+                                   "ollama": "Ollama", "openai_compatible": "OpenAI-compatible"}
 
 OPENAI_ENV = PROVIDER_PRESETS["openai"].api_key_env
 OPENROUTER_ENV = PROVIDER_PRESETS["openrouter"].api_key_env
@@ -238,27 +239,37 @@ def describe_providers(registry: Any) -> List[Dict[str, Any]]:
 
 @dataclass(frozen=True)
 class ResolvedAgent:
-    """One agent's LLM settings, with its key already resolved.
+    """One agent's LLM settings, with its key and header values already resolved.
 
     ``api_key`` is the value, never a ``${provider:key}`` reference. None means
     the provider's own variable (or no key, for a provider that needs none).
+    ``structured_output`` is the agent's, or the provider's default. Any other
+    field left None is the provider's or the client library's default. Neither
+    the key nor a header value is in the ``repr``.
     """
 
     name: str
     model: str
     temperature: Optional[float]
-    api_key: Optional[str] = None
+    api_key: Optional[str] = field(default=None, repr=False)
     base_url: Optional[str] = None
+    structured_output: Optional[str] = None
+    max_tokens: Optional[int] = None
+    timeout_s: Optional[float] = None
+    max_retries: Optional[int] = None
+    headers: Dict[str, str] = field(default_factory=dict, repr=False)
 
 
 @runtime_checkable
 class LLMProvider(Protocol):
-    """An LLM provider: the code behind ``provider: <name>`` in the LLM config.
+    """An LLM provider, interface version 2: the code behind ``provider: <name>`` in the LLM config.
 
     Registered under the ``nl2sql.llms`` entry point group, or in code with
     ``Registry.add_llm``. The registry checks ``interface_version`` and finds
     each of ``requires`` before the provider is used, reporting
-    ``install_hint`` when one is missing.
+    ``install_hint`` when one is missing. ``structured_output`` is the method
+    an agent that sets none is asked with: ``tool_calling``, ``json_schema``
+    or ``json_mode``.
     """
 
     interface_version: ClassVar[int]
@@ -266,9 +277,14 @@ class LLMProvider(Protocol):
     api_key_env: Optional[str]
     requires: Tuple[str, ...]
     install_hint: str
+    structured_output: str
 
     def create(self, agent: ResolvedAgent) -> "BaseChatModel":
-        """The chat client for ``agent``. Builds it without calling the model."""
+        """The chat client for ``agent``. Builds it without calling the model.
+
+        Sends ``max_tokens``, ``timeout_s``, ``max_retries`` and ``headers``
+        when they are set, and leaves the client's own default otherwise.
+        """
         ...
 
 
@@ -276,11 +292,18 @@ _WIRE_REQUIRES = {"openai": ("langchain_openai",), "anthropic": ("langchain_anth
 _WIRE_HINTS = {"openai": 'pip install "nl2sql-engine"', "anthropic": EXTRA_HINT.split(": ", 1)[1]}
 
 
+def _client_options(agent: ResolvedAgent) -> Dict[str, Any]:
+    """The agent's optional client settings, as the wires' ``build_client`` takes them; unset ones left out."""
+    options = {"base_url": agent.base_url, "max_tokens": agent.max_tokens, "timeout": agent.timeout_s,
+               "max_retries": agent.max_retries, "default_headers": dict(agent.headers) or None}
+    return {name: value for name, value in options.items() if value is not None}
+
+
 @dataclass(frozen=True)
 class _PresetProvider:
     """A built-in provider, made from its entry in ``PROVIDER_PRESETS``."""
 
-    interface_version: ClassVar[int] = 1
+    interface_version: ClassVar[int] = 2
     name: str
 
     @property
@@ -304,6 +327,10 @@ class _PresetProvider:
     def install_hint(self) -> str:
         return _WIRE_HINTS[self.preset.wire]
 
+    @property
+    def structured_output(self) -> str:
+        return self.preset.structured_output
+
     def create(self, agent: ResolvedAgent) -> "BaseChatModel":
         """Raises ValueError naming the key variable when there is no key."""
         api_key = agent.api_key or self.preset.api_key_placeholder or api_key_from_env(self.name)
@@ -311,15 +338,40 @@ class _PresetProvider:
             raise ValueError(f"LLM agent '{agent.name}' uses provider '{self.name}', which requires an "
                              f"API key, but none was given. Set {self.api_key_env} or give the agent an "
                              "'api_key'.")
-        base_url = agent.base_url or self.preset.base_url
-        kwargs = {"base_url": base_url} if base_url else {}
+        options = _client_options(agent)
+        if self.preset.base_url and "base_url" not in options:
+            options["base_url"] = self.preset.base_url
         return WIRES[self.preset.wire].build_client(agent.model, agent.temperature, api_key=api_key,
-                                                    tags=[agent.name], **kwargs)
+                                                    tags=[agent.name], **options)
+
+
+@dataclass(frozen=True)
+class _OpenAICompatibleProvider(_PresetProvider):
+    """``openai_compatible``, and each named preset of it (``openrouter``, ``ollama``).
+
+    One code path: the endpoint is the agent's ``base_url``, else the preset's,
+    and there must be one. Without a key the preset's variable is read, else
+    its placeholder is sent; never ``OPENAI_API_KEY``.
+    """
+
+    def create(self, agent: ResolvedAgent) -> "BaseChatModel":
+        """Raises ValueError when there is no ``base_url``, or a keyed preset has no key."""
+        if not (agent.base_url or self.preset.base_url):
+            raise ValueError(f"LLM agent '{agent.name}' uses provider '{self.name}', which needs a base_url: "
+                             "the server's OpenAI-style endpoint, for example http://vllm:8000/v1. Set "
+                             "llm.base_url, or llm.agents.<agent>.base_url.")
+        return super().create(agent)
+
+
+def _built_in(name: str) -> _PresetProvider:
+    compatible = name == "openai_compatible" or PROVIDER_PRESETS[name].preset_of == "openai_compatible"
+    return _OpenAICompatibleProvider(name) if compatible else _PresetProvider(name)
 
 
 # The built-in providers, one per preset: the ``nl2sql.llms`` entry points name these.
-LLM_PROVIDERS: Dict[str, LLMProvider] = {name: _PresetProvider(name) for name in PROVIDER_PRESETS}
+LLM_PROVIDERS: Dict[str, LLMProvider] = {name: _built_in(name) for name in PROVIDER_PRESETS}
 OPENAI = LLM_PROVIDERS["openai"]
 ANTHROPIC = LLM_PROVIDERS["anthropic"]
+OPENAI_COMPATIBLE = LLM_PROVIDERS["openai_compatible"]
 OPENROUTER = LLM_PROVIDERS["openrouter"]
 OLLAMA = LLM_PROVIDERS["ollama"]

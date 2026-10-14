@@ -30,60 +30,61 @@ otherwise any client can send the header itself. An empty `roles` list
 denies everything, which is the correct default for an unauthenticated caller.
 
 A role name that is not present in the policy file grants nothing, exactly like
-an empty `roles` list. `RBAC` skips it, so the caller is refused with a normal
+an empty `roles` list. It grants nothing, so the caller is refused with a normal
 `SECURITY_VIOLATION`, not a crash: through the pipeline the datasource resolver
-refuses first (no datasource is allowed), and the validator on its own refuses
+refuses first (no datasource is reachable), and the validator on its own refuses
 every table with its `policy` check failed. An unknown name listed beside a
 known one is ignored, and the known role's permissions still apply.
 
-## Strict refusal
+## Hidden tables and strict refusal
 
-If a question needs a table the caller's role cannot read, the run is
-**refused**. Tables are never hidden from the planner, because a planner that
-cannot see a table quietly answers a *different* question from the tables it
-can see, and a confident wrong answer is worse than a refusal. The validator
-refuses the plan before any SQL exists, and the run ends there.
+Every access decision asks one `Scope`: what the caller may read in one
+datasource, from the roles' allow and deny patterns (see
+[Policies](../configuration/policies.md)). A run builds each datasource's
+scope once, so every step decides the same way.
 
-- **Structure yes, data no.** The planner and the refiner still see every
-  table's name, columns, types, primary key and relationships, so a plan can
-  name the forbidden table and be refused. For a table the role cannot read,
-  the **column statistics are stripped**: `sample_values`, `min_value`,
-  `max_value`, `distinct_count` and `null_percentage` never reach the prompt,
-  the LLM provider or the run trace. The schema retriever decides this with the
-  same rule the validator enforces (`table_allowed` in `auth/rbac.py`), on both
-  the full-snapshot path and the vector-retrieval path. Column and table
-  descriptions are kept: they are structure. (For tables the role can read,
-  the prompt carries `sample_values` and, for a date, time or numeric column,
-  its `[min, max]` as `range`; the other statistics stay in the snapshot.) If you let an enrichment step
-  write descriptions from real values, those descriptions are not stripped.
+- **Denied tables are hidden from the planner.** The schema retriever
+  searches only the tables the scope allows, on both the full-snapshot path and
+  the vector-retrieval path, so a denied table's name, columns, keys,
+  relationships, statistics and sample values never reach the prompt, the LLM
+  provider or the run trace. The answerability judge and the decomposer see
+  only the readable table names. A question that needs only denied tables gets
+  "no data for that question" from the planner rather than a refusal. (For
+  tables the role can read, the prompt carries `sample_values` and, for a
+  date, time or numeric column, its `[min, max]` as `range`; the other
+  statistics stay in the snapshot.)
+- **A plan naming a hidden table is refused.** The logical validator asks the
+  same scope for every table in the plan and refuses a denied one with
+  `SECURITY_VIOLATION` before any SQL exists. The run ends there.
 - **A generic message for the user.** The refusal the caller sees is
   "You do not have permission to see the data this question requires." It names
   no table, because naming one tells an unauthorised user that it exists. The
-  table and the role are logged as a warning and recorded in the error's
-  `details` (`datasource_id`, `table`, `roles`), which the run trace keeps and
-  the `QueryResult` error summary does not carry. The validator's `policy` check
-  is still present with `passed: false`, so a UI can show the gate firing.
+  table, the role and the rule that denied it are logged as a warning and
+  recorded in the error's `details` (`datasource_id`, `table`, `roles`,
+  `rule`), which the run trace keeps and the `QueryResult` error summary does
+  not carry. The validator's `policy` check is still present with
+  `passed: false`, so a UI can show the gate firing.
 - **Naming tables is an opt-in.** Set `policies.refusal_names_tables: true` to
   put the role and table in the user-facing message ("Role 'viewer' denied
-  access to 'chinook.Customer'. ..."). The demo's config (`nl2sql init --demo`)
+  access to 'chinook.Customer'."). The demo's config (`nl2sql init --demo`)
   sets it, because showing the refusal is the demo's point.
-- **The decision is deterministic code.** Only the validator decides, from the
+- **The decision is deterministic code.** Only the scope decides, from the
   policy and the plan's table list. Nothing the model writes (its reasoning, a
   claim that the role is allowed) is read by the policy check, so a crafted
   prompt cannot turn a refusal into an allow.
 
-This is a **table-level allowlist with data stripping**. It is not column
-masking and not row-level security: a role that may read a table reads every
-column and every row of it. A downloaded trace of a *permitted* run holds real
-rows, and the playground serves any trace by id with no login, so restricting a
-trace to the user who produced it is left to a multi-user deployment.
+This is **table-level** access control. It is not column masking and not
+row-level security: a role that may read a table reads every column and every
+row of it. A downloaded trace of a *permitted* run holds real rows, and the
+playground serves any trace by id with no login, so restricting a trace to the
+user who produced it is left to a multi-user deployment.
 
 ## Security controls
 
-- **RBAC policies**: the `policies` section of `nl2sql.yaml`, evaluated by `RBAC`.
-  A policy is a per-role allowlist of datasources and of tables
-  (`datasource.schema.table`, with schema and datasource wildcards) — nothing
-  finer. There is no column masking and no row-level security.
+- **Policies**: the `policies` section of `nl2sql.yaml`, evaluated by
+  `PolicyEngine` into a `Scope`. A role allows and denies tables with
+  patterns over `datasource.schema.table` (each part a glob, case ignored) —
+  nothing finer. There is no column masking and no row-level security.
 - **Logical validation** enforces schema constraints and policy-based table access.
 - **Audit logging** records `llm.changed` events only: each `engine.llm.replace`
   (the Python API, `PUT /api/v1/settings/llm`, the playground's model switch),
@@ -106,26 +107,30 @@ the engine a read-only database user.**
 
 ```mermaid
 flowchart TD
-    User[UserContext] --> RBAC[RBAC]
-    RBAC --> Validator[LogicalValidatorNode]
+    User[UserContext] --> Scope[PolicyEngine.scope]
+    Scope --> Retriever[SchemaRetrieverNode: hides denied tables]
+    Scope --> Validator[LogicalValidatorNode: refuses denied tables]
     Validator --> Executor[ExecutorNode]
     Executor --> Audit[EventLogger]
 ```
 
-## RBAC enforcement details
+## Policy enforcement details
 
-`LogicalValidatorNode` enforces **strict namespacing**:
+`LogicalValidatorNode` enforces **strict namespacing** through the `Scope`:
 
-- Allowed tables must match `datasource.*`, `datasource.schema.*`,
-  `datasource.schema.table` or `datasource.table`. The schema counts: a grant
-  of `sales.orders` does not allow `audit.orders`, and a two-part
-  `datasource.table` means that table in the datasource's default schema only
-  (see [Policies](../configuration/policies.md#two-part-entries-and-the-default-schema)).
+- A table is read in a schema: the plan's, or the adapter's default schema.
+  An allow of `sales.public.orders` does not allow `sales.audit.orders`.
+  Patterns have one part or three; a two-part pattern is rejected when the
+  config loads (see [Policies](../configuration/policies.md#patterns)).
+- Matching ignores case, so a deny cannot be dodged by `Orders` against
+  `orders`.
+- Deny beats allow within a role; across roles a table is readable when some
+  role allows it and that same role does not deny it.
 - If no datasource ID is present, validation fails closed.
-- Wildcard access is supported via `*` in policy lists.
 - An unknown role, or no role, allows nothing and is refused like any denial.
 - One `SECURITY_VIOLATION` per forbidden table, with the generic message unless
-  `RBAC_REFUSAL_NAMES_TABLES` is set, and `details` naming the table and roles.
+  `policies.refusal_names_tables` is set, and `details` naming the table, the
+  roles and the rule.
 
 ## Validation gates
 
@@ -133,7 +138,7 @@ Validation rules are enforced by `LogicalValidatorNode` and documented in `../ar
 
 ## Source references
 
-- RBAC: `packages/nl2sql/src/nl2sql/auth/rbac.py`
+- Policies: `packages/nl2sql/src/nl2sql/policies/` (`scope.py`, `patterns.py`)
 - Validator node: `packages/nl2sql/src/nl2sql/pipeline/nodes/validator/node.py`
-- Statistics stripping: `packages/nl2sql/src/nl2sql/pipeline/nodes/schema_retriever/node.py`
+- Hiding denied tables: `packages/nl2sql/src/nl2sql/pipeline/nodes/schema_retriever/node.py`
 - Audit logger: `packages/nl2sql/src/nl2sql/common/event_logger.py`

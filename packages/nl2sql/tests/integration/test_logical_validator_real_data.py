@@ -9,7 +9,7 @@ from types import SimpleNamespace
 import pytest
 import yaml
 
-from nl2sql.auth import UserContext
+from nl2sql.policies import UserContext
 from nl2sql.common.errors import ErrorSeverity
 from nl2sql.runtime import Runtime
 from nl2sql.testing.config import make_demo_config

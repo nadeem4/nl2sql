@@ -129,7 +129,7 @@ def test_a_policy_change_between_runs_takes_effect_on_a_cached_plan(demo_project
 
     policies = yaml.safe_load((demo_project / "policies.yaml").read_text(encoding="utf-8"))
     analyst = policies["roles"]["analyst"]
-    analyst["allowed_tables"] = [t for t in analyst["allowed_tables"] if t != "chinook.Customer"]
+    analyst["deny"] = [*analyst.get("deny", []), "chinook.main.Customer"]
     narrowed = policies
 
     calls, doc, _r = _ask(demo_project, tmp_path, store, 2, RULES_COUNT_CUSTOMERS, COUNT, role="analyst",

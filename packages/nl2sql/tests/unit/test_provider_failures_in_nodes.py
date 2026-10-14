@@ -111,7 +111,7 @@ def rejecting_registry():
 def _resolver_ctx(registry):
     return fake_runtime(
         vector_store=None,
-        rbac=SimpleNamespace(get_allowed_datasources=lambda _ctx: ["ds1"]),
+        policies={"default_role": "r", "roles": {role: {"description": "d", "allow": list(["ds1"])} for role in ("r", "admin")}},
         ds_registry=SimpleNamespace(get_capabilities=lambda _id: {"supports_sql"}, list_ids=lambda: ["ds1"]),
         schema_store=SimpleNamespace(get_latest_version=lambda _id: "v1", get_latest_snapshot=lambda _id: None),
         llm_registry=registry,
@@ -119,7 +119,7 @@ def _resolver_ctx(registry):
 
 
 def test_a_rejected_key_reaches_the_facade_as_provider_auth_failed(rejecting_registry):
-    from nl2sql.auth import UserContext
+    from nl2sql.policies import UserContext
 
     node = DatasourceResolverNode(_resolver_ctx(rejecting_registry))
     state = GraphState(user_query="How many customers?", user_context=UserContext(roles=["admin"]))

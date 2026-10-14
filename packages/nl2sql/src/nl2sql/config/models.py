@@ -14,11 +14,13 @@ from datetime import date
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
-from pydantic import BaseModel, ConfigDict, Field, PositiveInt, PrivateAttr, field_validator, model_validator
+from pydantic import (BaseModel, ConfigDict, Field, NonNegativeInt, PositiveFloat, PositiveInt, PrivateAttr,
+                      field_validator, model_validator)
 from pydantic.fields import FieldInfo
 from typing_extensions import Annotated
 
 from nl2sql.config.curated import CuratedDatasource
+from nl2sql.policies.patterns import parse_pattern
 
 
 class KeepsReferences:
@@ -57,7 +59,17 @@ def _annotation_keeps_references(annotation: Any) -> bool:
         return KEEPS_REFERENCES in args[1:] or _annotation_keeps_references(args[0])
     if typing.get_origin(annotation) in _UNIONS:
         return any(_annotation_keeps_references(a) for a in typing.get_args(annotation))
+    if typing.get_origin(annotation) is dict:
+        return _annotation_keeps_references(typing.get_args(annotation)[1])
     return False
+
+
+def _values_are_secrets(field: FieldInfo) -> bool:
+    """Whether ``field`` is a mapping of ``Secret`` values (``headers``): every value masks, whatever its key."""
+    annotation = field.annotation
+    while typing.get_origin(annotation) in _UNIONS:
+        annotation = next(a for a in typing.get_args(annotation) if a is not type(None))
+    return typing.get_origin(annotation) is dict and _annotation_keeps_references(annotation)
 
 
 def keeps_references(field: FieldInfo) -> bool:
@@ -100,7 +112,11 @@ class _Model(BaseModel):
         fields = type(self).model_fields
         for key, value in super().__repr_args__():
             if key in fields and keeps_references(fields[key]):
-                value = _masked_by_key(value) if isinstance(value, dict) else masked(value)
+                if isinstance(value, dict):
+                    value = ({k: masked(v) for k, v in value.items()} if _values_are_secrets(fields[key])
+                             else _masked_by_key(value))
+                else:
+                    value = masked(value)
             yield key, value
 
 
@@ -162,6 +178,11 @@ class Price(_Model):
     cache_write: Optional[float] = None
 
 
+# How a structured answer is asked for: a forced tool call, a JSON schema the
+# server decodes against, or plain JSON mode with the schema in the prompt.
+StructuredOutput = Literal["tool_calling", "json_schema", "json_mode"]
+
+
 class AgentLLM(_Model):
     """One agent's override. It takes each field it sets and inherits the rest.
 
@@ -174,6 +195,11 @@ class AgentLLM(_Model):
     temperature: Optional[float] = None
     api_key: Optional[Secret] = None
     base_url: Optional[str] = None
+    structured_output: Optional[StructuredOutput] = None  # None: the provider's
+    max_tokens: Optional[PositiveInt] = None  # None: the provider's
+    timeout_s: Optional[PositiveFloat] = None  # per request; None: the client library's
+    max_retries: Optional[NonNegativeInt] = None  # network and rate-limit retries; None: the client library's
+    headers: Dict[str, Secret] = Field(default_factory=dict)  # sent with every request; values never print
 
 
 class LLM(_Model):
@@ -184,6 +210,11 @@ class LLM(_Model):
     temperature: Optional[float] = 0.0
     api_key: Optional[Secret] = None  # None: the provider's standard variable
     base_url: Optional[str] = None
+    structured_output: Optional[StructuredOutput] = None
+    max_tokens: Optional[PositiveInt] = None
+    timeout_s: Optional[PositiveFloat] = None
+    max_retries: Optional[NonNegativeInt] = None
+    headers: Dict[str, Secret] = Field(default_factory=dict)
     agents: Dict[AgentName, AgentLLM] = Field(default_factory=dict)
     prices: Dict[str, Price] = Field(default_factory=dict)
 
@@ -218,26 +249,21 @@ class Embeddings(_Model):
 # ---------------------------------------------------------------- policies
 
 class Role(_Model):
-    """What one role may read."""
+    """What one role may read: allow and deny patterns over ``datasource.schema.table``.
+
+    A pattern is ``*``, ``datasource`` or ``datasource.schema.table``, each part
+    a glob; matching ignores case. Deny beats allow within the role.
+    """
 
     description: str
-    allowed_datasources: List[str] = Field(default_factory=list)
-    allowed_tables: List[str] = Field(default_factory=list)
+    allow: List[str] = Field(default_factory=list)
+    deny: List[str] = Field(default_factory=list)
 
-    @field_validator("allowed_tables")
+    @field_validator("allow", "deny")
     @classmethod
-    def _namespaced(cls, value: List[str]) -> List[str]:
-        """``*``, ``datasource.*``, ``datasource.schema.*``, ``datasource.schema.table``
-        or ``datasource.table`` (that table in the datasource's default schema)."""
-        for table in value:
-            if table == "*":
-                continue
-            parts = table.split(".")
-            if len(parts) not in (2, 3) or any(not p for p in parts) or "*" in parts[:-1]:
-                raise ValueError(
-                    f"Invalid table '{table}'. Use 'datasource.*', 'datasource.schema.*', "
-                    "'datasource.schema.table' or 'datasource.table'."
-                )
+    def _patterns(cls, value: List[str]) -> List[str]:
+        for pattern in value:
+            parse_pattern(pattern)
         return value
 
 

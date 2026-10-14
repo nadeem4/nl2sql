@@ -4,7 +4,7 @@ import pytest
 
 from nl2sql.pipeline.nodes.datasource_resolver.node import DatasourceResolverNode
 from nl2sql.pipeline.state import GraphState
-from nl2sql.auth import UserContext
+from nl2sql.policies import UserContext
 from nl2sql.common.errors import ErrorCode
 from nl2sql.llm import LLMRegistry
 from nl2sql.llm.models import AgentConfig
@@ -47,7 +47,7 @@ def _ctx(llm_registry, vector_store, allowed, ds_ids=TWO, version="v1", version_
     return fake_runtime(
         settings={"schema": {"version_mismatch": version_mismatch}},
         vector_store=vector_store,
-        rbac=SimpleNamespace(get_allowed_datasources=lambda _ctx: allowed),
+        policies={"default_role": "r", "roles": {role: {"description": "d", "allow": list(allowed)} for role in ("r", "admin")}},
         ds_registry=SimpleNamespace(
             get_capabilities=lambda _id: {"supports_sql"},
             list_ids=lambda: list(ds_ids),

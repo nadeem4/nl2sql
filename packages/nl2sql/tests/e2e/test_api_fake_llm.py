@@ -180,7 +180,7 @@ def test_usage_reaches_query_result_and_the_rest_response(demo_project, fake_llm
     from fastapi.testclient import TestClient
 
     from nl2sql.api.query_api import QueryResult
-    from nl2sql.auth.models import UserContext
+    from nl2sql.policies import UserContext
     from nl2sql_api.main import app
 
     server, env = fake_llm(_rules_with_one_retry())
