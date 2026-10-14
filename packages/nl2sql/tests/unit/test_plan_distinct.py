@@ -28,7 +28,8 @@ from nl2sql.pipeline.nodes.generator.node import GeneratorNode
 from nl2sql.pipeline.nodes.schema_retriever.schema import Column, Table
 from nl2sql.pipeline.nodes.validator.node import LogicalValidatorNode
 from nl2sql.pipeline.state import SubgraphExecutionState
-from nl2sql.testing.runtime import fake_runtime
+from nl2sql.testing.runtime import fake_runtime, stub_ds_registry
+from nl2sql_sdk import Limits
 
 
 def _col(name: str) -> Expr:
@@ -60,8 +61,8 @@ def _plan(*exprs: Expr, distinct: bool = False) -> PlanModel:
 
 
 def _sql(plan: PlanModel, dialect: str = "sqlite") -> str:
-    adapter = SimpleNamespace(row_limit=100, get_dialect=lambda: dialect)
-    node = GeneratorNode(fake_runtime(ds_registry=SimpleNamespace(get_adapter=lambda _id: adapter)))
+    adapter = SimpleNamespace(get_dialect=lambda: dialect)
+    node = GeneratorNode(fake_runtime(ds_registry=stub_ds_registry(adapter, limits=Limits(row_limit=100))))
     return node(_state(plan))["generator_response"].sql_draft
 
 

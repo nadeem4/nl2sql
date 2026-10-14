@@ -1,16 +1,17 @@
-"""A SQLite datasource opened read-only refuses a write at the driver.
+"""A SQLite datasource is always opened read-only, so the driver refuses a write.
 
-The demo's three sample databases are configured this way
-(``nl2sql.datasets.demo``), so a hosted public demo cannot be talked into
-changing the data it shows, whatever gets past the policy and the validator.
+The engine never writes, so there is no setting: a hosted public demo cannot
+be talked into changing the data it shows, whatever gets past the policy and
+the validator.
 """
 import sqlite3
 
 import pytest
+from pydantic import ValidationError
 from sqlalchemy import text
 
-from nl2sql.adapters.sqlite.adapter import SqliteAdapter
-from nl2sql.datasets.demo import DEMO_DATABASES
+from nl2sql.adapters.sqlite.adapter import SqliteAdapter, SqliteConnection
+from nl2sql_sdk import Limits
 
 
 @pytest.fixture
@@ -22,18 +23,8 @@ def database(tmp_path):
     return path
 
 
-def _adapter(database, read_only):
-    connection = {"type": "sqlite", "database": database.as_posix()}
-    if read_only:
-        connection["options"] = {"read_only": True}
-    adapter = SqliteAdapter(datasource_id="demo", datasource_engine_type="sqlite",
-                            connection_args=connection)
-    adapter.connect()
-    return adapter
-
-
-def test_read_only_reads_but_refuses_to_write(database):
-    adapter = _adapter(database, read_only=True)
+def test_sqlite_reads_but_refuses_to_write(database):
+    adapter = SqliteAdapter("demo", SqliteConnection(database=database.as_posix()), Limits())
 
     with adapter.engine.connect() as conn:
         assert conn.execute(text("SELECT Title FROM Album")).scalar() == "Let There Be Rock"
@@ -43,16 +34,6 @@ def test_read_only_reads_but_refuses_to_write(database):
     assert "readonly" in str(refused.value).lower()
 
 
-def test_without_the_option_the_connection_is_writable_as_before(database):
-    adapter = _adapter(database, read_only=False)
-
-    with adapter.engine.connect() as conn:
-        conn.execute(text("DELETE FROM Album"))
-
-    assert adapter.connection_string == f"sqlite:///{database.as_posix()}"
-
-
-def test_every_demo_database_is_configured_read_only():
-    options = [config["connection"].get("options", {}) for _, _, config in DEMO_DATABASES]
-
-    assert all(option.get("read_only") is True for option in options)
+def test_there_is_no_read_only_setting():
+    with pytest.raises(ValidationError):
+        SqliteConnection(database="x.sqlite", options={"read_only": True})

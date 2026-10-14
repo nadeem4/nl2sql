@@ -16,18 +16,19 @@ from nl2sql import NL2SQL
 from nl2sql.config import Datasource
 from nl2sql.datasources.registry import DatasourceRegistry
 from nl2sql.secrets import SecretManager
-from nl2sql.testing import adapter_registry
+from nl2sql.testing import OpenConnection, adapter_registry
 
 
 class _StubAdapter:
-    interface_version = 1
+    interface_version = 2
+    title = "Stub"
+    connection_model = OpenConnection
     driver_modules = ()
     install_hint = ""
 
-    def __init__(self, datasource_id, datasource_engine_type, connection_args, **kwargs):
+    def __init__(self, datasource_id, connection, limits, *, folder=None):
         self.datasource_id = datasource_id
-        self.datasource_engine_type = datasource_engine_type
-        self.connection_args = connection_args
+        self.connection_args = connection.model_dump()
 
     def capabilities(self):
         return {"supports_sql"}
@@ -129,7 +130,7 @@ def test_policy_validation_says_a_referenced_datasource_failed_to_start(tmp_path
 
     entry = next(e for e in report.entries if e.target == "Allow: bad")
     assert entry.status == "UNAVAILABLE"
-    assert "connection test failed" in entry.details
+    assert "unable to open database file" in entry.details
     assert not report.ok
 
 

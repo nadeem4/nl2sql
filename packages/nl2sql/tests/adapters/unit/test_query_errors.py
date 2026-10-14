@@ -13,7 +13,8 @@ import pytest
 from sqlalchemy import exc as sa_exc
 
 from nl2sql.adapters.sqlalchemy_base.adapter import BaseSQLAlchemyAdapter
-from nl2sql.adapters.sqlite.adapter import SqliteAdapter
+from nl2sql.adapters.sqlite.adapter import SqliteAdapter, SqliteConnection
+from nl2sql_sdk import Limits
 from nl2sql_sdk.contracts import AdapterRequest
 
 
@@ -23,11 +24,7 @@ def adapter(tmp_path):
     with sqlite3.connect(path) as con:
         con.execute("CREATE TABLE Album (AlbumId INTEGER PRIMARY KEY, Title TEXT)")
         con.execute("INSERT INTO Album VALUES (1, 'Let There Be Rock')")
-    return SqliteAdapter(
-        datasource_id="demo",
-        datasource_engine_type="sqlite",
-        connection_args={"type": "sqlite", "database": path.as_posix(), "options": {"read_only": True}},
-    )
+    return SqliteAdapter("demo", SqliteConnection(database=path.as_posix()), Limits())
 
 
 def _run(adapter, sql):
@@ -106,8 +103,7 @@ def _wrapped(kind, message, sqlstate=None):
 )
 def test_the_base_adapter_classifies_by_sqlstate_then_by_kind(error, retryable):
     adapter = BaseSQLAlchemyAdapter.__new__(BaseSQLAlchemyAdapter)
-    adapter._datasource_id = "ds"
-    adapter.datasource_engine_type = "any"
+    adapter.datasource_id = "ds"
 
     frame = adapter.query_failed(error)
 

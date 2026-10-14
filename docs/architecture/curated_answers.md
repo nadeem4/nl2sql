@@ -433,13 +433,13 @@ generated SQL does not need:
   a set operation, or a `WITH` around one), and no node anywhere in the tree
   is a write or DDL (`Insert`, `Update`, `Delete`, `Merge`, `Create`, `Drop`,
   `Alter`, `Command`). This is checked at load and again before running. The
-  datasource's own read-only connection (for SQLite `options.read_only`) and
+  datasource's own read-only connection (SQLite always opens read-only) and
   database grants stay the backstop, as they are for generated SQL.
 - **Policies.** Every table read must be allowed for the asker (step 5 above). A
   view is checked by its own name, as policies name it; what the view reads
   underneath is the database's grant to decide.
 - **Row limit.** The row ceiling is the one the generator uses:
-  `min(adapter.row_limit or RESULT_ROW_LIMIT, RESULT_ROW_LIMIT)`. Rather than
+  `min(limits.row_limit or RESULT_ROW_LIMIT, RESULT_ROW_LIMIT)`, from the datasource's `limits`. Rather than
   rewrite a person's SQL to add a `LIMIT` (which would mean rendering their
   placeholders back through sqlglot in every dialect), the executor stops
   reading the stream at the ceiling. `ExecutorRequest` gains `max_rows`; the
@@ -452,7 +452,7 @@ generated SQL does not need:
   paging (`engine.results.page`) and CSV export (`engine.results.csv`) work for a
   verified answer as for any other.
 - **Time.** The run is inside `run_with_graph()`'s `GLOBAL_TIMEOUT_SEC` like
-  every node, and the datasource's `statement_timeout_ms` applies.
+  every node, and the datasource's `limits.timeout_ms` applies.
 
 ## Bound parameters through the adapter
 

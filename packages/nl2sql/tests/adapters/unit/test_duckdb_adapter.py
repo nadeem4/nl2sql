@@ -2,7 +2,7 @@ import pytest
 from sqlalchemy import text
 
 from nl2sql_sdk.contracts import AdapterRequest, ResultFrame
-from nl2sql.adapters.duckdb.adapter import DuckdbAdapter
+from nl2sql.adapters.duckdb.adapter import DuckdbAdapter, DuckdbConnection
 
 from ..contract_harness import build_adapter
 
@@ -12,8 +12,7 @@ def memory_adapter():
     adapter = build_adapter(
         DuckdbAdapter,
         datasource_id="duck1",
-        engine_type="duckdb",
-        connection_args={"type": "duckdb", "database": ":memory:"},
+        connection={"database": ":memory:"},
     )
     # execute_sql never commits, so DDL used as test arrangement is written here.
     with adapter.engine.begin() as conn:
@@ -21,29 +20,29 @@ def memory_adapter():
     return adapter
 
 
-def test_construct_uri_for_file_database(memory_adapter, tmp_path):
+def test_url_for_file_database(memory_adapter, tmp_path):
     # Validates URI construction because a wrong prefix silently selects another dialect.
     # Arrange
     db_path = tmp_path / "warehouse.db"
 
     # Act
-    uri = memory_adapter.construct_uri({"type": "duckdb", "database": str(db_path)})
+    uri = memory_adapter.url(DuckdbConnection(database=str(db_path)))
 
     # Assert
     assert uri == f"duckdb:///{db_path}"
 
 
-def test_construct_uri_for_in_memory_database(memory_adapter):
+def test_url_for_in_memory_database(memory_adapter):
     # Validates the in-memory form because it is the default for ad-hoc analysis.
     # Act
-    uri = memory_adapter.construct_uri({"type": "duckdb", "database": ":memory:"})
+    uri = memory_adapter.url(DuckdbConnection(database=":memory:"))
 
     # Assert
     assert uri == "duckdb:///:memory:"
 
 
 def test_adapter_connects_and_reports_dialect(memory_adapter):
-    # Validates connectivity because the engine is built during construction.
+    # The engine is created on first use.
     # Assert
     assert memory_adapter.engine is not None
     assert memory_adapter.get_dialect() == "duckdb"

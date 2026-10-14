@@ -12,8 +12,8 @@ from nl2sql.datasets.chinook import DEMO_ROW_LIMIT
 WEBANALYTICS_DATASOURCE = {
     "id": "webanalytics",
     "type": "sqlite",
-    # Read-only and row-limited, like the other two: see ``chinook.py``.
-    "connection": {"database": "webanalytics.sqlite", "options": {"read_only": True}},
+    # Row-limited, like the other two: see ``chinook.py``.
+    "connection": {"database": "webanalytics.sqlite"},
     "limits": {"row_limit": DEMO_ROW_LIMIT},
     "description": (
         "Website traffic analytics: visitor sessions with their duration and bounce flag, the "

@@ -29,13 +29,15 @@ from nl2sql.pipeline.state import GraphState, SubgraphExecutionState
 from nl2sql.pipeline.subgraphs.schemas import SubgraphOutput
 from nl2sql.testing.runtime import fake_runtime
 from nl2sql_sdk.contracts import ResultFrame
+from nl2sql.testing.runtime import stub_ds_registry
+from nl2sql_sdk import Limits
 
 
 # --- the generator says when the cap, not the plan, bounds the query -------
 
 def _generate(plan_limit):
-    adapter = SimpleNamespace(row_limit=5, max_bytes=1000, get_dialect=lambda: "sqlite")
-    node = GeneratorNode(fake_runtime(ds_registry=SimpleNamespace(get_adapter=lambda _id: adapter)))
+    adapter = SimpleNamespace(get_dialect=lambda: "sqlite")
+    node = GeneratorNode(fake_runtime(ds_registry=stub_ds_registry(adapter, limits=Limits(row_limit=5))))
     plan = PlanModel(tables=[TableRef(name="users", alias="u")],
                      select_items=[SelectItem(expr=Expr(kind="column", alias="u", column_name="id"))],
                      joins=[], limit=plan_limit)

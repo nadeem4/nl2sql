@@ -106,9 +106,9 @@ def test_cancelled_is_a_string_not_a_one_tuple():
 def test_every_capability_flag_is_one_something_queries():
     """`DatasourceCapability` carries only flags a code path checks.
 
-    Six did not. `SUPPORTS_SQL` is the only flag the engine ever queries;
-    `SUPPORTS_REST` is kept as the stand-in for a datasource the SQL agent
-    cannot serve, which is what the capability-gating tests are about.
+    Six did not, and `SUPPORTS_REST` went with adapter interface 2. The two
+    enforcement flags are what an adapter proves to the conformance kit;
+    `check()` reads `ENFORCES_READ_ONLY` to warn when a session can write.
     """
     import re
 
@@ -117,7 +117,7 @@ def test_every_capability_flag_is_one_something_queries():
     source = "\n".join(path.read_text(encoding="utf-8") for path in SRC.rglob("*.py"))
     queried = set(re.findall(r"DatasourceCapability\.([A-Z_]+)", source))
 
-    assert {member.name for member in DatasourceCapability} - queried == {"SUPPORTS_REST"}
+    assert {member.name for member in DatasourceCapability} - queried <= {"ENFORCES_READ_ONLY", "ENFORCES_TIMEOUT"}
 
 
 def test_the_public_facade_exposes_nothing_without_methods():

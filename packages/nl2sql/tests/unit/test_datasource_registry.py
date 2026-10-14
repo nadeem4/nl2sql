@@ -1,24 +1,24 @@
 import pytest
 from pydantic import SecretStr
 
-from nl2sql.adapters.postgres.adapter import PostgresAdapter, PostgresConnectionConfig
+from nl2sql.adapters.postgres.adapter import PostgresAdapter
 from nl2sql.datasources.registry import DatasourceRegistry
 from nl2sql.config import Datasource, Limits
 from nl2sql.secrets.manager import SecretManager
 from nl2sql_sdk.capabilities import DatasourceCapability
-from nl2sql.testing import adapter_registry
+from nl2sql.testing import OpenConnection, adapter_registry
 
 
 class _StubAdapter:
-    interface_version = 1
+    interface_version = 2
+    title = "Stub"
+    connection_model = OpenConnection
     driver_modules = ()
     install_hint = ""
 
-    def __init__(self, datasource_id, datasource_engine_type, connection_args, **kwargs):
+    def __init__(self, datasource_id, connection, limits, *, folder=None):
         self.datasource_id = datasource_id
-        self.datasource_engine_type = datasource_engine_type
-        self.connection_args = connection_args
-        self.kwargs = kwargs
+        self.connection_args = connection.model_dump()
 
     def capabilities(self):
         return {DatasourceCapability.SUPPORTS_SQL, "custom"}
@@ -43,8 +43,8 @@ def test_registry_resolves_secrets_and_normalizes_capabilities(monkeypatch):
     caps = registry.get_capabilities("ds1")
 
     # Assert
-    # Resolution hands the adapter a plain string; the adapter's own config model
-    # is what declares a field secret. See the PostgresConnectionConfig test below.
+    # Resolution hands the model a plain string; the adapter's own connection
+    # model is what declares a field secret. See the PostgresConnection test below.
     assert adapter.connection_args["password"] == "resolved"
     assert DatasourceCapability.SUPPORTS_SQL.value in caps
     assert "custom" in caps
@@ -81,17 +81,19 @@ def test_resolved_connection_keeps_non_secret_fields_as_plain_strings(monkeypatc
     assert all(isinstance(resolved[k], str) for k in ("host", "user", "password"))
 
 
-def test_adapter_config_model_still_masks_the_resolved_password(monkeypatch):
+def test_adapter_connection_model_still_masks_the_resolved_password(monkeypatch):
     # The plain string must still land as a ``SecretStr`` on fields declared that
     # way, otherwise dropping the wrap would trade a bug for a leak.
     # Arrange
     monkeypatch.setenv("DEMO_USER", "ref_admin")
     monkeypatch.setenv("DEMO_PASSWORD", "ref-pw")
-    registry = DatasourceRegistry(SecretManager(), adapter_registry({"stub": _StubAdapter}))
+    registry = DatasourceRegistry(SecretManager(), adapter_registry({"postgres": PostgresAdapter}))
+
+    # Act
     adapter = registry.register_datasource(
         Datasource(
             id="ds_pg",
-            type="stub", connection=dict(host="analytics_db",
+            type="postgres", connection=dict(host="analytics_db",
                 port=5432,
                 user="${env:DEMO_USER}",
                 password="${env:DEMO_PASSWORD}",
@@ -99,9 +101,7 @@ def test_adapter_config_model_still_masks_the_resolved_password(monkeypatch):
             ),
         )
     )
-
-    # Act
-    config = PostgresConnectionConfig(**adapter.connection_args)
+    config = adapter.connection
 
     # Assert
     assert config.user == "ref_admin"
@@ -134,8 +134,8 @@ def test_fully_env_resolved_datasource_registers(monkeypatch):
     adapter = registry.register_datasource(config)
 
     # Assert
-    assert adapter.connection_string == (
-        "postgresql+psycopg2://ref_admin:ref-pw@analytics_db:5432/analytics_db"
+    assert adapter.url(adapter.connection).render_as_string(hide_password=False) == (
+        "postgresql+psycopg2://ref_admin:ref-pw@analytics_db:5432/analytics_db?sslmode=prefer"
     )
 
 

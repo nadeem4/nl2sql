@@ -1,58 +1,60 @@
-from typing import Any, ClassVar, Dict, Iterator, Optional, Protocol, Set, Tuple, runtime_checkable
+from pathlib import Path
+from typing import Any, Callable, ClassVar, Iterator, Optional, Protocol, Set, Tuple, Type, runtime_checkable
 
 from .capabilities import DatasourceCapability
 from .contracts import AdapterRequest, ResultFrame
+from .models import ConnectionCheck, ConnectionModel, IndexScope, Limits
+from .schema import SchemaSnapshot
 
 
 @runtime_checkable
-class DatasourceAdapterProtocol(Protocol):
-    """Contract for adapter implementations.
+class DatasourceAdapter(Protocol):
+    """Contract for adapter implementations, version 2.
 
-    Three class attributes tell the engine whether it can use the adapter
-    before it builds one:
+    Class attributes tell the engine about the adapter before it builds one:
 
     - ``interface_version``: the version of this contract the adapter was
-      written for. It is 1. The engine accepts exactly the version it was
+      written for. It is 2. The engine accepts exactly the version it was
       built for, and anything else is a load error.
+    - ``title``: the database's name for people, such as ``"PostgreSQL"``.
+    - ``connection_model``: the ``ConnectionModel`` subclass the
+      ``connection`` block is validated against. Its JSON Schema is the form
+      for connecting a database.
     - ``driver_modules``: the modules the adapter imports to connect, such as
       ``("psycopg2",)``. The engine looks for each with
-      ``importlib.util.find_spec`` before building the adapter.
+      ``importlib.util.find_spec`` before it builds the adapter.
     - ``install_hint``: what to install when one of them is missing, such as
       ``pip install "nl2sql-engine[postgres]"``.
 
     An adapter module must import without its driver: import the driver where
     it is used, not at the top of the module.
+
+    The engine validates the ``connection`` block against
+    ``connection_model`` and builds the adapter with
+    ``adapter_cls(datasource_id, connection, limits, folder=...)``. Building
+    never connects: the adapter connects on first use, and
+    ``test_connection`` connects.
     """
 
     interface_version: ClassVar[int]
+    title: ClassVar[str]
+    connection_model: ClassVar[Type[ConnectionModel]]
     driver_modules: ClassVar[Tuple[str, ...]]
     install_hint: ClassVar[str]
 
     datasource_id: str
-    datasource_engine_type: str
-    connection_args: Dict[str, Any]
-    statement_timeout_ms: Optional[int]
-    row_limit: Optional[int]
-    max_bytes: Optional[int]
+
+    def __init__(self, datasource_id: str, connection: ConnectionModel, limits: Limits,
+                 *, folder: Optional[Path] = None) -> None:
+        """Keeps the settings; never connects. ``folder`` is where a relative file path is read from."""
+        ...
 
     def capabilities(self) -> Set[DatasourceCapability]:
         """Returns supported capabilities for this adapter."""
         ...
 
-    def connect(self) -> None:
-        """Initialize connections / clients based on config."""
-        ...
-
-    def fetch_schema_snapshot(self) -> Any:
-        """Return a structured schema snapshot if supported."""
-        ...
-
-    def execute(self, request: AdapterRequest) -> ResultFrame:
-        """Execute a plan-specific request and return a ResultFrame."""
-        ...
-
     def get_dialect(self) -> str:
-        """Return the sqlglot dialect name the engine renders SQL in (SQL adapters).
+        """Return the sqlglot dialect name the engine renders SQL in.
 
         It must be a name ``sqlglot.Dialect.get_or_raise`` accepts, such as
         ``postgres``, ``tsql``, ``mysql``, ``duckdb`` or ``sqlite``, not the
@@ -60,9 +62,25 @@ class DatasourceAdapterProtocol(Protocol):
         """
         ...
 
+    def default_schema(self) -> Optional[str]:
+        """The schema an unqualified table name resolves to, or None when unknown."""
+        ...
 
-    def test_connection(self) -> bool:
-        """Test if the connection to the datasource can be established."""
+    def test_connection(self) -> ConnectionCheck:
+        """Connects and reports what it found: ``ok``, or the stage that failed and the fix."""
+        ...
+
+    def fetch_schema_snapshot(self, scope: IndexScope,
+                              on_table: Optional[Callable[[str], None]] = None) -> SchemaSnapshot:
+        """The schema of what ``scope`` wants indexed; ``on_table`` is called with each table's name."""
+        ...
+
+    def execute(self, request: AdapterRequest) -> ResultFrame:
+        """Execute a plan-specific request and return a ResultFrame."""
+        ...
+
+    def close(self) -> None:
+        """Releases the adapter's connections."""
         ...
 
 

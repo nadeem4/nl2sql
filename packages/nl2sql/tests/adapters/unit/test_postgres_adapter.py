@@ -1,4 +1,4 @@
-from nl2sql.adapters.postgres.adapter import PostgresAdapter
+from nl2sql.adapters.postgres.adapter import PostgresAdapter, PostgresConnection
 
 
 def test_uri_names_the_driver_the_postgres_extra_installs():
@@ -9,15 +9,8 @@ def test_uri_names_the_driver_the_postgres_extra_installs():
     adapter = PostgresAdapter.__new__(PostgresAdapter)
 
     # Act
-    uri = adapter.construct_uri(
-        {
-            "type": "postgres",
-            "host": "db.internal",
-            "user": "analyst",
-            "password": "pw",
-            "database": "sales",
-        }
-    )
+    url = adapter.url(PostgresConnection(host="db.internal", user="analyst", password="pw", database="sales"))
 
     # Assert
-    assert uri == "postgresql+psycopg2://analyst:pw@db.internal:5432/sales"
+    assert url.render_as_string(hide_password=False) == (
+        "postgresql+psycopg2://analyst:pw@db.internal:5432/sales?sslmode=prefer")

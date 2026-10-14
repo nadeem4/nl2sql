@@ -89,6 +89,8 @@ class TableMetadata(BaseModel):
     table: TableRef
     columns: Dict[str, ColumnMetadata] = Field(default_factory=dict)
     row_count: Optional[int] = None
+    # Where ``row_count`` came from: the catalog's estimate, or a count of the rows.
+    row_count_source: Optional[Literal["catalog", "exact"]] = None
     description: Optional[str] = None
 
     @property
@@ -112,6 +114,16 @@ class SchemaMetadata(BaseModel):
     tables: Dict[str, TableMetadata] = Field(default_factory=dict)
 
 
+class IndexIssue(BaseModel):
+    """A table or column indexed without something: a reflection, an estimate, a profile or its values."""
+
+    table: str
+    column: Optional[str] = None
+    stage: Literal["reflect", "estimate", "profile", "values"]
+    message: str
+
+
 class SchemaSnapshot(BaseModel):
     contract: SchemaContract
     metadata: SchemaMetadata
+    issues: List[IndexIssue] = Field(default_factory=list)

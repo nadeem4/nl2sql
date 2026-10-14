@@ -20,6 +20,8 @@ connection:
   user: nl2sql
   password: "${env:SALES_DB_PASSWORD}"
 limits: { row_limit: 1000, timeout_ms: 8000, max_bytes: 10485760 }
+index:
+  exclude_tables: ["*.*_audit"]
 preferred_tables: [public.revenue_daily, v_monthly_sales]
 domains: [revenue, customers, orders]
 sample_questions:
@@ -39,8 +41,9 @@ The section can also be a file holding the list
 | `id` | the file name in a folder, otherwise required | The datasource's id. In a folder, if it is given it must equal the file name. |
 | `type` | required | The adapter: `sqlite`, `duckdb`, `postgres`, `mysql`, `mssql`, or an adapter a plugin registers. A misspelt or uninstalled one is a `ConfigError` with "did you mean" and the install hint. |
 | `description` | none | What is in the database. The resolver's answerability check reads it, so write one. |
-| `connection` | `{}` | The adapter's own connection settings (host, port, database, driver, `options`, ...), validated by the adapter. Every value may be a `${provider:key}` reference and keeps it until the adapter is built. A relative SQLite or DuckDB `database` is relative to `nl2sql.yaml`. |
+| `connection` | `{}` | The adapter's connection settings, validated against its connection model; see [Connection](#connection). Every value may be a `${provider:key}` reference and keeps it until the adapter is built. A relative SQLite or DuckDB `database` is relative to `nl2sql.yaml`. |
 | `limits` | none | `row_limit`, `timeout_ms`, `max_bytes`; see [Limits](#limits). |
+| `index` | everything | What of the database is indexed; see [Index](#index). |
 | `preferred_tables` | `[]` | Tables or views the planner should reach for first. See [Preferred tables](#preferred-tables). |
 | `sample_questions` | `[]` | Questions the datasource answers. They are indexed into its `schema.datasource` entry, which routing reads. |
 | `domains` | `[]` | A routing hint written by people. Routing does not read it yet. |
@@ -48,6 +51,37 @@ The section can also be a file holding the list
 
 In Python, `Datasource(id=..., adapter=MyAdapter(...))` passes a built adapter
 object instead of `type`.
+
+## Connection
+
+Each adapter declares its `connection` keys in a connection model, and the
+keys are strict: a key the model does not have is an error when the engine is
+built, with the field it was probably meant to be.
+
+```text
+datasources[0].connection: connection.hostname: unknown key 'hostname'. Did you mean 'host'?
+```
+
+| Adapter | Keys |
+| --- | --- |
+| `sqlite` | `database` (the file) |
+| `duckdb` | `database` (the file, or `:memory:`) |
+| `postgres` | `host`, `port` (5432), `database`, `user`, `password`, `sslmode` (`disable`, `prefer` (default), `require`, `verify-full`) |
+| `mysql` | `host`, `port` (3306), `database`, `user`, `password` |
+| `mssql` | `host`, `port` (1433), `database`, `user`, `password`, `driver` (`ODBC Driver 17 for SQL Server`), `trusted_connection` (false), `trust_server_certificate` (false) |
+
+In Python, `connection` may also be the adapter's model, used as given:
+
+```python
+from nl2sql.adapters.postgres.adapter import PostgresConnection
+
+Datasource(id="sales", type="postgres",
+           connection=PostgresConnection(host="db.internal", database="sales", user="nl2sql",
+                                         password=os.environ["SALES_DB_PASSWORD"]))
+```
+
+The model's JSON Schema (`PostgresConnection.model_json_schema()`) describes
+the form for connecting that database; a password is `"format": "password"`.
 
 ## Limits
 
@@ -60,7 +94,7 @@ limits:
 
 - `timeout_ms`: Postgres, MySQL, SQL Server and DuckDB enforce it (SQL Server
   rounds up to whole seconds); SQLite does not, and uses it only as its
-  lock-wait timeout. See each [adapter page](../adapters/index.md) for how.
+  lock-wait timeout. A SQLite file is always opened read-only. See each [adapter page](../adapters/index.md) for how.
 - `row_limit`: unset, it is `settings.results.row_limit` (100,000); set higher,
   `settings.results.row_limit` still bounds it. A result that reaches it is
   flagged as truncated and the answer says so. It is applied before results
@@ -71,6 +105,37 @@ limits:
 
 There is one place for each limit: the 0.4 `options:` bag and the top-level
 spellings are gone.
+
+## Index
+
+`index` says what of the database is indexed. Every key is optional, and an
+unknown key is an error.
+
+```yaml
+index:
+  include_schemas: [public, reporting]
+  exclude_tables: ["*.*_audit", "public.tmp_*"]
+  exclude_columns: ["public.customers.email"]
+```
+
+| Key | Default | Meaning |
+| --- | --- | --- |
+| `include_schemas` | every schema but the database's system schemas | Schema globs |
+| `exclude_schemas` | none | Schema globs, applied after include |
+| `include_tables`, `exclude_tables` | all, none | `schema.table` globs; a pattern with no schema is an error with the fix (`'*.tmp_*'`) |
+| `exclude_columns` | none | `schema.table.column` globs: the column is neither indexed nor profiled. This is not access control: use [policies](policies.md). |
+| `profile` | `stats` | `catalog` or `stats` |
+| `sample_values` | `false` | Whether text columns' values are stored in the index |
+| `max_profile_rows` | 1,000,000 | A table estimated above this is profiled from the catalog only |
+
+Every glob ignores case, and an exclude wins over an include. A SQLite
+database has one schema, `main`.
+
+!!! note "Built so far"
+    The schema, table and column rules are applied. `profile`,
+    `sample_values` and `max_profile_rows` are validated, and take effect with
+    the profiling rework later in 0.6; until then every column is profiled
+    and text values are kept, as in 0.5.
 
 ## Preferred tables
 
@@ -131,7 +196,7 @@ A secret provider that cannot start is different: it fails startup. See [Secrets
 
 - Use `${env:VAR}` for environment variables, or `${provider:key}` for a secret
   from a provider in the [`secrets` section](secrets.md).
-- Adapter-specific fields under `connection` are passed through to the adapter.
+- The keys under `connection` are the adapter's; see [Connection](#connection).
 - From Python, `engine.datasources.add(Datasource(...))` adds one to a running
   engine (built, not connected), and `engine.datasources.remove(id)` takes one
   out; `nl2sql-api`'s `POST /api/v1/datasource` takes

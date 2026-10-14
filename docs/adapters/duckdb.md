@@ -3,8 +3,8 @@
 In-process analytical adapter for local files and ad-hoc analysis.
 
 !!! info "Implementation"
-    This adapter extends `BaseSQLAlchemyAdapter`. It overrides `connect()` only to
-    enforce `statement_timeout_ms`: DuckDB runs in-process and has no statement
+    This adapter extends `BaseSQLAlchemyAdapter`. It overrides `build_engine()` only to
+    enforce `limits.timeout_ms`: DuckDB runs in-process and has no statement
     timeout setting, so the adapter interrupts a statement that runs too long.
 
 ## Installation
@@ -20,11 +20,13 @@ pip install "nl2sql-engine[duckdb]"
 **Type**: `duckdb`
 
 ```yaml
-
+# datasources/warehouse.yaml
+type: duckdb
 connection:
-  type: "duckdb"
-  database: "./warehouse.duckdb" # File path, or ":memory:"
+  database: ./warehouse.duckdb # File path, or ":memory:"
 ```
+
+`database` is the only key (`DuckdbConnection`); any other is an error.
 
 !!! warning "Persistence"
     `:memory:` databases live for the lifetime of the process. Use a file path for
@@ -48,7 +50,7 @@ connection:
 
 ### Statement Timeout
 
-When `statement_timeout_ms` is set, each statement starts a timer that calls the
+When `limits.timeout_ms` is set, each statement starts a timer that calls the
 DuckDB connection's `interrupt()` once the limit passes. DuckDB stops the query and
 raises `InterruptException`, which the adapter reports as a refusal
 (`QUERY_REFUSED`) that the engine does not retry. The timer is cancelled as soon as

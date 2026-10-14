@@ -84,7 +84,7 @@ Executors produce `ResultFrame` objects, which are persisted via `ArtifactStore`
 
 ```mermaid
 sequenceDiagram
-    participant Adapter as DatasourceAdapterProtocol
+    participant Adapter as DatasourceAdapter
     participant Exec as SqlExecutorService
     participant Store as ArtifactStore
     participant Agg as AggregationService

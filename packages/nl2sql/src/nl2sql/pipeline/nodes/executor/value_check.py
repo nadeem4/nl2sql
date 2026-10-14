@@ -97,10 +97,10 @@ def filter_literals(plan: PlanModel) -> List[FilterLiteral]:
 class _Probe:
     """Runs bounded, read-only queries on one column through the adapter."""
 
-    def __init__(self, adapter: Any, literal: FilterLiteral):
+    def __init__(self, adapter: Any, literal: FilterLiteral, row_limit: Optional[int] = None):
         self.adapter = adapter
         self.literal = literal
-        self.cap = min(int(getattr(adapter, "row_limit", None) or MAX_DISTINCT_VALUES), MAX_DISTINCT_VALUES)
+        self.cap = min(int(row_limit or MAX_DISTINCT_VALUES), MAX_DISTINCT_VALUES)
         self.column = exp.column(literal.column, table=literal.table.alias)
 
     def _rows(self, query: exp.Select) -> List[list]:
@@ -151,6 +151,7 @@ def check_values(
     adapter: Any,
     allowed: Callable[[TableRef], bool],
     can_retry: bool,
+    row_limit: Optional[int] = None,
 ) -> List[PipelineError]:
     """A ``VALUE_NOT_FOUND`` per filter value the column does not have.
 
@@ -158,13 +159,13 @@ def check_values(
     planner which values exist. Otherwise it is a WARNING the answer reports:
     "There is no Genre with Name 'Polka'." A literal whose probe fails, or
     whose table ``allowed`` refuses, is not reported: nothing is claimed
-    without having looked.
+    without having looked. ``row_limit`` is the datasource's, and bounds each probe.
     """
     errors: List[PipelineError] = []
     for literal in filter_literals(plan)[:MAX_LITERALS]:
         if not allowed(literal.table):
             continue
-        probe = _Probe(adapter, literal)
+        probe = _Probe(adapter, literal, row_limit)
         try:
             if probe.exists():
                 continue

@@ -368,9 +368,11 @@ class _Loader:
         if isinstance(value, str):
             return self._interpolate(value, loc, keep)
         if isinstance(value, dict):
-            model = _model(annotation)
+            # A mapping in a file is the dict member of a union such as
+            # ``connection`` (a dict, or a model instance in code).
+            item = _item(annotation, dict)
+            model = _model(annotation) if item is None else None
             if model is None:
-                item = _item(annotation, dict)
                 return {k: self._walk(v, item, loc + (k,), keep) for k, v in value.items()}
             out = {}
             for key, child in value.items():

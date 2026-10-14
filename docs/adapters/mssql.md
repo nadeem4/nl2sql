@@ -9,22 +9,27 @@ This adapter extends `BaseSQLAlchemyAdapter` but provides specialized `dry_run` 
 **Type**: `mssql`
 
 ```yaml
-
+# datasources/my_db.yaml
+type: mssql
 connection:
-  type: "mssql"
-  host: "localhost"
+  host: localhost
   port: 1433
-  user: "sa"
+  user: sa
   password: "${env:DB_PASS}"
-  database: "my_db"
+  database: my_db
   driver: "ODBC Driver 17 for SQL Server" # Default
-  trusted_connection: false
+  trusted_connection: false               # true: log in as the account the engine runs under
+  trust_server_certificate: false         # true: accept a self-signed certificate (ODBC Driver 18 encrypts by default)
 ```
+
+The keys are `MssqlConnection`'s (`nl2sql.adapters.mssql.adapter`), and any
+other key is an error; see [Connection](../configuration/datasources.md#connection).
 
 ### Connection Details
 
 * **Driver**: `pyodbc`. **Requires system ODBC headers installed.**
-* **URI Constructed**: `mssql+pyodbc://{user}:{pass}@{host}:{port}/{db}?driver={driver}`.
+* **URI Constructed**: `mssql+pyodbc://{user}:{pass}@{host}:{port}/{db}?driver={driver}`, plus
+  `Trusted_Connection=yes` and `TrustServerCertificate=yes` when set.
   Built with SQLAlchemy's `URL.create`, so the user name and password are
   percent-escaped: a password containing `@ : / # %` works as written.
 
@@ -40,7 +45,7 @@ connection:
 
 SQL Server has no session setting for a statement timeout, so the adapter sets
 pyodbc's query timeout (`Connection.timeout`) on every new pooled connection.
-pyodbc counts whole seconds, so `statement_timeout_ms` is rounded **up**:
+pyodbc counts whole seconds, so `limits.timeout_ms` is rounded **up**:
 `1500` becomes 2 seconds, and anything from 1 to 1000 becomes 1 second. When the
 limit passes, the driver cancels the query and the adapter reports it as a refusal
 (`QUERY_REFUSED`), which the engine does not retry.

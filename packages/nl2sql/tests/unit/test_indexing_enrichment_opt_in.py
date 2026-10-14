@@ -30,6 +30,7 @@ from nl2sql.indexing.orchestrator import IndexingOrchestrator
 from nl2sql.schema import InMemorySchemaStore
 from nl2sql.secrets import SecretManager
 from nl2sql_sdk.stores import Filter
+from nl2sql_sdk import IndexScope
 from nl2sql_sdk.schema import (
     ColumnContract,
     ColumnMetadata,
@@ -79,7 +80,7 @@ def _indexed(ctx):
 class _StubAdapter:
     datasource_id = "ds1"
 
-    def fetch_schema_snapshot(self):
+    def fetch_schema_snapshot(self, scope, on_table=None):
         return _snapshot()
 
 
@@ -106,7 +107,7 @@ def _context(tmp_path, llm_registry, ds_registry=None, file_description="User re
         get_adapter=lambda ds_id: _StubAdapter(),
         list_ids=lambda: ["ds1"],
         get_description=lambda ds_id: file_description,
-        get_sample_questions=lambda ds_id: [],
+        get_index_scope=lambda _ds: IndexScope(), get_sample_questions=lambda ds_id: [],
     )
     ctx = TestIndex(tmp_path, FakeEmbeddings(size=8), schema_store=InMemorySchemaStore()).ctx
     ctx.llm_registry = llm_registry

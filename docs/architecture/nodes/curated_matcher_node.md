@@ -95,7 +95,7 @@ Always, outside the state (the trace keeps the node's whole return):
 5. Values: an unknown name, a name twice, a value that does not parse or is out of bounds: `param_invalid`; a param with no default left out or empty: `param_missing`. A param left out takes its default.
 6. Tables: any table the SQL reads not allowed for the role: `policy_denied`. The normal pipeline then enforces the policy as always; the user is not told a verified query exists.
 7. Capability: a query with params on an adapter without `SUPPORTS_BOUND_PARAMETERS`: `capability_missing`.
-8. Run with the values bound and `max_rows` set to `min(adapter.row_limit or row_limit, row_limit)` (`row_limit` is `settings.results.row_limit`). Failed or no result: `execution_failed`, with a warning.
+8. Run with the values bound and `max_rows` set to `min(limits.row_limit or row_limit, row_limit)` (`limits` is the datasource's, `row_limit` is `settings.results.row_limit`). Failed or no result: `execution_failed`, with a warning.
 9. Fill the state and route to `layer_router`.
 
 ### The choice prompt

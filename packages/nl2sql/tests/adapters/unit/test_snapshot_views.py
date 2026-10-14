@@ -10,7 +10,8 @@ import sqlite3
 from sqlalchemy import inspect, text
 
 from nl2sql.adapters.duckdb.adapter import DuckdbAdapter
-from nl2sql.adapters.sqlite.adapter import SqliteAdapter
+from nl2sql.adapters.sqlite.adapter import SqliteAdapter, SqliteConnection
+from nl2sql_sdk import IndexScope, Limits
 
 from ..contract_harness import build_adapter
 
@@ -27,11 +28,9 @@ def test_a_sqlite_snapshot_includes_views(tmp_path):
         con.execute(
             "CREATE VIEW v_customer_revenue AS SELECT customer, SUM(total) AS revenue FROM invoices GROUP BY customer"
         )
-    adapter = SqliteAdapter(datasource_id="t", datasource_engine_type="sqlite",
-                            connection_args={"type": "sqlite", "database": path.as_posix()})
-    adapter.connect()
+    adapter = SqliteAdapter("t", SqliteConnection(database=path.as_posix()), Limits())
 
-    snapshot = adapter.fetch_schema_snapshot()
+    snapshot = adapter.fetch_schema_snapshot(IndexScope())
 
     assert _names(snapshot) == ["invoices", "v_customer_revenue"]
     [view] = [c for c in snapshot.contract.tables.values() if c.table.table_name == "v_customer_revenue"]
@@ -44,8 +43,8 @@ def test_duckdb_lists_views_with_its_tables(tmp_path):
     # Only the listing: duckdb 1.5.6 with duckdb-engine 0.17 cannot reflect a
     # file database's columns at all (pg_catalog.pg_collation is missing), for
     # tables as much as views, so a full snapshot is not what this checks.
-    adapter = build_adapter(DuckdbAdapter, datasource_id="duck1", engine_type="duckdb",
-                            connection_args={"type": "duckdb", "database": str(tmp_path / "views.duckdb")})
+    adapter = build_adapter(DuckdbAdapter, datasource_id="duck1",
+                            connection={"database": str(tmp_path / "views.duckdb")})
     with adapter.engine.begin() as conn:
         conn.execute(text("CREATE TABLE invoices AS SELECT 1 AS id, 2.5 AS total"))
         conn.execute(text("CREATE VIEW v_revenue AS SELECT SUM(total) AS revenue FROM invoices"))

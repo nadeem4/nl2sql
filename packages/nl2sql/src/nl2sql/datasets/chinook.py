@@ -19,11 +19,10 @@ DEMO_ROW_LIMIT = 10_000
 CHINOOK_DATASOURCE = {
     "id": "chinook",
     "type": "sqlite",
-    # Read-only: nothing in the engine writes to a demo database, and a hosted
-    # demo must not be able to. ``mode=ro`` makes the driver refuse a write
-    # before any SQL is parsed (``SqliteAdapter.construct_uri``). ``database``
-    # is the packaged file's name; ``demo_config`` says which folder it is in.
-    "connection": {"database": "chinook.sqlite", "options": {"read_only": True}},
+    # The SQLite adapter always opens its file read-only (``mode=ro``), so a
+    # hosted demo cannot write to it. ``database`` is the packaged file's
+    # name; ``demo_config`` says which folder it is in.
+    "connection": {"database": "chinook.sqlite"},
     "limits": {"row_limit": DEMO_ROW_LIMIT},
     "description": "Chinook digital music store: artists, albums, tracks, genres, playlists, customers, employees, invoices and invoice lines",
 }

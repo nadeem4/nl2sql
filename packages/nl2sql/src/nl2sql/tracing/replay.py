@@ -207,8 +207,9 @@ def unreachable_datasources(doc: Dict[str, Any], ctx: Any) -> List[str]:
             problems.append(f"{ds_id}: not configured in this environment")
             continue
         try:
-            if not adapter.test_connection():
-                problems.append(f"{ds_id}: connection test failed")
+            check = adapter.test_connection()
+            if not check.ok:
+                problems.append(f"{ds_id}: {check.message or 'connection test failed'}")
         except Exception as exc:
             problems.append(f"{ds_id}: {exc}")
     return problems

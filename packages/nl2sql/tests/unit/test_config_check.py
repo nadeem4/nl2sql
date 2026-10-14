@@ -15,7 +15,7 @@ from nl2sql.registry import Registry
 
 
 def _adapter(drivers=(), hint=""):
-    return type("Adapter", (), {"interface_version": 1, "driver_modules": drivers, "install_hint": hint})
+    return type("Adapter", (), {"interface_version": 2, "driver_modules": drivers, "install_hint": hint})
 
 
 def _project(folder: Path, datasource: dict) -> Path:

@@ -9,28 +9,26 @@ adapter must escape them; parsing the URL back gives the original values.
 import pytest
 from sqlalchemy.engine import make_url
 
-from nl2sql.adapters.mssql.adapter import MssqlAdapter
+from nl2sql.adapters.mssql.adapter import MssqlAdapter, MssqlConnection
 from nl2sql.adapters.mysql.adapter import MysqlAdapter
-from nl2sql.adapters.postgres.adapter import PostgresAdapter
+from nl2sql.adapters.postgres.adapter import PostgresAdapter, PostgresConnection
 
 PASSWORD = "p@ss:w/rd#%?&="
 USER = "an@lyst:1/x"
 
 
 @pytest.mark.parametrize(
-    "adapter_cls, conn_type, port",
-    [(PostgresAdapter, "postgres", 5432), (MysqlAdapter, "mysql", 3306), (MssqlAdapter, "mssql", 1433)],
+    "adapter_cls, port",
+    [(PostgresAdapter, 5432), (MysqlAdapter, 3306), (MssqlAdapter, 1433)],
     ids=["postgres", "mysql", "mssql"],
 )
-def test_reserved_characters_in_credentials_round_trip(adapter_cls, conn_type, port):
+def test_reserved_characters_in_credentials_round_trip(adapter_cls, port):
     # Arrange
     adapter = adapter_cls.__new__(adapter_cls)
+    connection = adapter_cls.connection_model(host="db.internal", user=USER, password=PASSWORD, database="sales")
 
     # Act
-    uri = adapter.construct_uri(
-        {"type": conn_type, "host": "db.internal", "user": USER, "password": PASSWORD, "database": "sales"}
-    )
-    url = make_url(uri)
+    url = make_url(adapter.url(connection).render_as_string(hide_password=False))
 
     # Assert
     assert url.username == USER
@@ -40,19 +38,17 @@ def test_reserved_characters_in_credentials_round_trip(adapter_cls, conn_type, p
     assert url.database == "sales"
 
 
-def test_options_survive_alongside_escaped_credentials():
+def test_sslmode_survives_alongside_escaped_credentials():
     # Arrange
     adapter = PostgresAdapter.__new__(PostgresAdapter)
+    connection = PostgresConnection(host="h", user="u", password=PASSWORD, database="d", sslmode="require")
 
     # Act
-    url = make_url(adapter.construct_uri({
-        "type": "postgres", "host": "h", "user": "u", "password": PASSWORD,
-        "database": "d", "options": {"sslmode": "require", "connect_timeout": 5},
-    }))
+    url = make_url(adapter.url(connection).render_as_string(hide_password=False))
 
     # Assert
     assert url.password == PASSWORD
-    assert url.query == {"sslmode": "require", "connect_timeout": "5"}
+    assert url.query == {"sslmode": "require"}
 
 
 def test_mssql_keeps_driver_and_trusted_connection_without_credentials():
@@ -60,9 +56,7 @@ def test_mssql_keeps_driver_and_trusted_connection_without_credentials():
     adapter = MssqlAdapter.__new__(MssqlAdapter)
 
     # Act
-    url = make_url(adapter.construct_uri({
-        "type": "mssql", "host": "h", "database": "d", "trusted_connection": True,
-    }))
+    url = adapter.url(MssqlConnection(host="h", database="d", trusted_connection=True))
 
     # Assert
     assert url.username is None and url.password is None

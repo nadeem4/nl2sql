@@ -257,7 +257,7 @@ def test_nothing_outside_the_adapters_imports_an_adapter():
     ]
     assert not offenders, _broke(
         "Nothing outside nl2sql/adapters/ imports an adapter. Adapters are loaded through "
-        "the 'nl2sql.adapters' entry points and used through DatasourceAdapterProtocol, so "
+        "the 'nl2sql.adapters' entry points and used through DatasourceAdapter, so "
         "a datasource the repo has never heard of works the same way the bundled ones do.",
         offenders)
 

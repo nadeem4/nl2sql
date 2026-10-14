@@ -81,7 +81,7 @@ class DatasourcesAPI:
             status = "ready" if registry.is_ready(datasource.id) else "unchecked"
             capabilities = sorted(registry.get_capabilities(datasource.id))
         adapter = datasource.adapter
-        kind = datasource.type or getattr(adapter, "datasource_engine_type", None) or type(adapter).__name__
+        kind = datasource.type or getattr(adapter, "title", None) or type(adapter).__name__
         return DatasourceInfo(id=datasource.id, type=kind, description=datasource.description, status=status,
                               capabilities=capabilities, connection=mask_connection_args(datasource.connection),
                               reason=reason)

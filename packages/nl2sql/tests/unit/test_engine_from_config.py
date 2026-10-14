@@ -27,6 +27,8 @@ from nl2sql import (
     load_config,
 )
 from nl2sql.testing.config import make_config
+from nl2sql.testing import OpenConnection
+from nl2sql_sdk import ConnectionCheck
 
 KEY_VARIABLES = ("OPENAI_API_KEY", "ANTHROPIC_API_KEY", "OPENROUTER_API_KEY")
 
@@ -53,15 +55,16 @@ def _engine(tmp_path: Path, **sections) -> NL2SQL:
 class CountingAdapter:
     """An adapter that counts every call that would reach a database."""
 
-    interface_version = 1
+    interface_version = 2
+    title = "Stub"
+    connection_model = OpenConnection
     driver_modules = ()
     install_hint = ""
     instances: list = []
 
-    def __init__(self, datasource_id=None, datasource_engine_type=None, connection_args=None, **kwargs):
+    def __init__(self, datasource_id=None, connection=None, limits=None, *, folder=None):
         self.datasource_id = datasource_id
-        self.datasource_engine_type = datasource_engine_type
-        self.connection_args = connection_args or {}
+        self.connection_args = connection.model_dump() if connection is not None else {}
         self.calls = []
         self.disposed = 0
         self.healthy = self.connection_args.get("healthy", True)
@@ -70,14 +73,11 @@ class CountingAdapter:
     def capabilities(self):
         return set()
 
-    def connect(self):
-        self.calls.append("connect")
-
     def test_connection(self):
         self.calls.append("test_connection")
-        return self.healthy
+        return ConnectionCheck(ok=self.healthy, message=None if self.healthy else "refused")
 
-    def fetch_schema_snapshot(self):
+    def fetch_schema_snapshot(self, scope, on_table=None):
         self.calls.append("fetch_schema_snapshot")
         raise AssertionError("not reached")
 
@@ -415,7 +415,7 @@ def test_4_in_code_passing_objects(tmp_path):
     from nl2sql.storage.local import LocalResults
     from nl2sql.storage.sqlite import SqliteState
 
-    adapter = CountingAdapter(datasource_id="dw", datasource_engine_type="custom")
+    adapter = CountingAdapter(datasource_id="dw")
     model = FakeListChatModel(responses=["ok"])
     folder = tmp_path / ".nl2sql"
 

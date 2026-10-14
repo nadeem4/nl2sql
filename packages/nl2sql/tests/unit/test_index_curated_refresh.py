@@ -19,6 +19,7 @@ from nl2sql.indexing.curated import curated_hash
 from nl2sql.indexing.rebuild import rebuild_index
 from nl2sql.schema import InMemorySchemaStore
 from nl2sql_sdk.stores import Filter
+from nl2sql_sdk import IndexScope
 from nl2sql_sdk.schema import (
     ColumnContract,
     SchemaContract,
@@ -55,7 +56,7 @@ class _Adapter:
     def __init__(self):
         self.reads = 0
 
-    def fetch_schema_snapshot(self):
+    def fetch_schema_snapshot(self, scope, on_table=None):
         self.reads += 1
         return _snapshot()
 
@@ -69,7 +70,8 @@ def _ctx(tmp_path, curated):
     adapter = _Adapter()
     ctx = TestIndex(tmp_path, FakeEmbeddings(size=8), schema_store=InMemorySchemaStore()).ctx
     ctx.llm_registry = _NoLLM()
-    ctx.ds_registry = SimpleNamespace(list_adapters=lambda: [adapter], get_sample_questions=lambda _ds: [],
+    ctx.ds_registry = SimpleNamespace(list_adapters=lambda: [adapter], get_index_scope=lambda _ds: IndexScope(),
+                                      get_sample_questions=lambda _ds: [],
                                       get_description=lambda _ds: "Music store")
     ctx.curated = curated
     return ctx, adapter

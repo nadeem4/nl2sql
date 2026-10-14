@@ -12,8 +12,8 @@ from nl2sql.datasets.chinook import DEMO_ROW_LIMIT
 SUPPORT_DATASOURCE = {
     "id": "support",
     "type": "sqlite",
-    # Read-only and row-limited, like the other two: see ``chinook.py``.
-    "connection": {"database": "support.sqlite", "options": {"read_only": True}},
+    # Row-limited, like the other two: see ``chinook.py``.
+    "connection": {"database": "support.sqlite"},
     "limits": {"row_limit": DEMO_ROW_LIMIT},
     # Kept deliberately domain-led, and without a sentence about sharing
     # Chinook's customers. Indexing embeds this description, and an earlier

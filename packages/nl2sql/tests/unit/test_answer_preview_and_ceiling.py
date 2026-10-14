@@ -28,7 +28,8 @@ from nl2sql.pipeline.nodes.generator.node import GeneratorNode
 from nl2sql.pipeline.nodes.generator.schemas import GeneratorResponse
 from nl2sql.pipeline.state import GraphState, SubgraphExecutionState
 from nl2sql.pipeline.subgraphs.schemas import SubgraphOutput
-from nl2sql.testing.runtime import fake_runtime
+from nl2sql.testing.runtime import fake_runtime, stub_ds_registry
+from nl2sql_sdk import Limits
 
 
 def _rows(n):
@@ -115,8 +116,8 @@ def test_the_schema_no_longer_asks_for_a_markdown_table():
 # --- the ceiling -----------------------------------------------------------
 
 def _generate(adapter_row_limit, plan_limit=None, row_limit=100_000):
-    adapter = SimpleNamespace(row_limit=adapter_row_limit, max_bytes=1000, get_dialect=lambda: "sqlite")
-    node = GeneratorNode(fake_runtime(ds_registry=SimpleNamespace(get_adapter=lambda _id: adapter),
+    adapter = SimpleNamespace(get_dialect=lambda: "sqlite")
+    node = GeneratorNode(fake_runtime(ds_registry=stub_ds_registry(adapter, limits=Limits(row_limit=adapter_row_limit)),
                                       settings={"results": {"row_limit": row_limit}}))
     plan = PlanModel(tables=[TableRef(name="users", alias="u")],
                      select_items=[SelectItem(expr=Expr(kind="column", alias="u", column_name="id"))],

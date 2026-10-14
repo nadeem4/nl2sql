@@ -1,5 +1,9 @@
-from typing import Dict, Any
-from sqlalchemy import URL, create_engine, inspect, text
+from typing import Literal
+
+from pydantic import Field, SecretStr
+from sqlalchemy import URL, Engine, create_engine
+
+from nl2sql_sdk import ConnectionModel
 from nl2sql.adapters.sqlalchemy_base import (
     DryRunResult,
     QueryPlan,
@@ -7,73 +11,46 @@ from nl2sql.adapters.sqlalchemy_base import (
     BaseSQLAlchemyAdapter
 )
 
-from pydantic import BaseModel, Field, SecretStr
-from typing import Optional
 
-class PostgresConnectionConfig(BaseModel):
-    """Strict configuration schema for Postgres adapter."""
-    host: str = Field(..., description="Postgres server hostname")
-    user: str = Field(..., description="Username")
-    password: SecretStr = Field(..., description="Password")
-    port: int = 5432
-    database: str = Field(..., description="Database name")
-    options: Dict[str, Any] = Field(default_factory=dict)
-    
-    model_config = {"extra": "ignore"}
+class PostgresConnection(ConnectionModel):
+    """A PostgreSQL datasource's ``connection`` block."""
+
+    host: str = Field(title="Host", examples=["db.internal"])
+    port: int = Field(5432, title="Port")
+    database: str = Field(title="Database")
+    user: str = Field(title="User")
+    password: SecretStr = Field(title="Password")
+    sslmode: Literal["disable", "prefer", "require", "verify-full"] = Field(
+        "prefer", title="SSL mode", json_schema_extra={"group": "advanced"})
+
 
 class PostgresAdapter(BaseSQLAlchemyAdapter):
-    interface_version = 1
+    title = "PostgreSQL"
+    connection_model = PostgresConnection
     driver_modules = ("psycopg2",)
     install_hint = 'pip install "nl2sql-engine[postgres]"'
 
-    def construct_uri(self, args: Dict[str, Any]) -> str:
-        """Constructs the Postgres connection URI.
-
-        Args:
-            args: The raw connection arguments dictionary.
-
-        Returns:
-            str: The fully constructed SQLAlchemy connection URI.
-        
-        Raises:
-            ValidationError: If the configuration is invalid.
-        """
-        config = PostgresConnectionConfig(**args)
-        
+    def url(self, connection: PostgresConnection) -> URL:
         # Name the driver: the `postgres` extra installs psycopg2, and a bare
         # `postgresql://` means psycopg (v3) from SQLAlchemy 2.1 onwards.
         # URL.create escapes the credentials, so a password holding @ : / # %
         # stays a password instead of moving the host or port boundary.
         return URL.create(
             "postgresql+psycopg2",
-            username=config.user or None,
-            password=config.password.get_secret_value() or None,
-            host=config.host,
-            port=config.port,
-            database=config.database,
-            query={key: str(value) for key, value in config.options.items()},
-        ).render_as_string(hide_password=False)
+            username=connection.user,
+            password=connection.password.get_secret_value() or None,
+            host=connection.host,
+            port=connection.port,
+            database=connection.database,
+            query={"sslmode": connection.sslmode},
+        )
 
-    def connect(self) -> None:
-        """Postgres-specific connection with Native Server-Side Timeout."""
-        if not self.connection_string:
-             raise ValueError(f"Connection string is required for {self}")
-             
+    def build_engine(self) -> Engine:
+        """The engine, with ``limits.timeout_ms`` as the server's ``statement_timeout``."""
         connect_args = {}
-        if self.statement_timeout_ms:
-            connect_args["options"] = f"-c statement_timeout={self.statement_timeout_ms}"
-
-        try:
-            self.engine = create_engine(
-                self.connection_string, 
-                pool_pre_ping=True,
-                execution_options=self.execution_options, # Pass standard options too
-                connect_args=connect_args
-            )
-        except Exception as e:
-            import logging
-            logging.getLogger(__name__).error(f"Failed to connect to Postgres: {e}")
-            raise
+        if self.limits.timeout_ms:
+            connect_args["options"] = f"-c statement_timeout={self.limits.timeout_ms}"
+        return create_engine(self.url(self.connection), pool_pre_ping=True, connect_args=connect_args)
 
     def dry_run(self, sql: str) -> DryRunResult:
         try:

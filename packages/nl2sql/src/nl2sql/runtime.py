@@ -18,6 +18,8 @@ from pathlib import Path
 from threading import RLock
 from typing import TYPE_CHECKING, Any, Dict, List, Mapping, NamedTuple, Optional, Union
 
+from nl2sql_sdk import ConnectionCheck
+
 from nl2sql.check import DatasourceStatus
 from nl2sql.common.logger import get_logger
 from nl2sql.config import Config, ConfigError
@@ -405,18 +407,19 @@ class Runtime:
         datasource = datasources[i]
         adapter = self.ds_registry.all_adapters().get(datasource.id)
         try:
-            reason = None if adapter.test_connection() else "The connection test failed."
+            check = adapter.test_connection()
         except Exception as e:
-            reason = str(e) or type(e).__name__
-        if reason is None:
+            check = ConnectionCheck(ok=False, message=str(e) or type(e).__name__)
+        if check.ok:
             self.ds_registry.mark_available(datasource.id)
             return DatasourceStatus(id=datasource.id, status="ready", required=datasource.required)
+        reason = check.message or "The connection test failed."
         self.ds_registry.mark_unavailable(datasource.id, reason)
         return DatasourceStatus(
-            id=datasource.id, status="failed", required=datasource.required, stage="connect",
+            id=datasource.id, status="failed", required=datasource.required, stage=check.stage or "connect",
             reason=reason,
-            fix=f"Check datasources[{i}].connection for '{datasource.id}', and that the database "
-                "is reachable from this machine. The log has the driver's error.")
+            fix=check.fix or f"Check datasources[{i}].connection for '{datasource.id}', and that the database "
+                             "is reachable from this machine. The log has the driver's error.")
 
     def close(self) -> None:
         """Disposes the adapters' pools, closes the LLM clients and the stores. Calling it again does nothing."""

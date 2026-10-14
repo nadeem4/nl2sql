@@ -164,7 +164,7 @@ def test_no_role_or_an_unknown_role_reads_nothing(roles):
 
 
 def _registry(default):
-    adapter = SimpleNamespace(default_schema=default)
+    adapter = SimpleNamespace(default_schema=lambda: default)
     return SimpleNamespace(get_adapter=lambda _id: adapter)
 
 
@@ -192,7 +192,6 @@ def test_a_run_builds_each_datasources_scope_once():
     asked = []
 
     class Adapter:
-        @property
         def default_schema(self):
             asked.append(1)
             return "main"

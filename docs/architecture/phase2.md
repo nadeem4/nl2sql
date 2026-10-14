@@ -985,6 +985,19 @@ The docs page gets a 30-line example that calls an HTTP service.
 Wave B is built on the test bed. Every behaviour below that touches a
 database has a `realdb` test.
 
+!!! note "Built: B1, the contract"
+    `ConnectionModel`, `Limits`, `IndexScope`, `ConnectionCheck`,
+    `IndexIssue`, the two enforcement capabilities and `DatasourceAdapter`
+    version 2 are in `nl2sql_sdk`; the five built-ins declare public, strict
+    connection models (B18) and build their engine on first use; a
+    datasource has `index:`; the engine validates `connection` against the
+    adapter's model. Filled in on the way: the SQLAlchemy base already
+    applies `IndexScope`'s schema, table and column rules, SQLite is already
+    always `mode=ro` (its `options` bag went with strict keys), and
+    `test_connection` returns a `ConnectionCheck` with the driver's message
+    and no stage yet (B3 classifies). The pool settings, `profile`,
+    `sample_values` and `max_profile_rows` come with B2.
+
 ### The contract
 
 ```python

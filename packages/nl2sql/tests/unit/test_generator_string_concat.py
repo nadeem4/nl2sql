@@ -31,7 +31,8 @@ from nl2sql.pipeline.nodes.ast_planner.schemas import (
 from nl2sql.pipeline.nodes.decomposer.schemas import SubQuery
 from nl2sql.pipeline.nodes.generator.node import GeneratorNode, SqlVisitor
 from nl2sql.pipeline.state import SubgraphExecutionState
-from nl2sql.testing.runtime import fake_runtime
+from nl2sql.testing.runtime import fake_runtime, stub_ds_registry
+from nl2sql_sdk import Limits
 
 CHINOOK = Path(nl2sql.__file__).resolve().parent / "datasets" / "chinook.sqlite"
 
@@ -54,8 +55,8 @@ def _full_name(alias="t1", op="+"):
 
 
 def _sql(plan, dialect="sqlite"):
-    adapter = SimpleNamespace(row_limit=1000, get_dialect=lambda: dialect)
-    ctx = fake_runtime(ds_registry=SimpleNamespace(get_adapter=lambda _id: adapter))
+    adapter = SimpleNamespace(get_dialect=lambda: dialect)
+    ctx = fake_runtime(ds_registry=stub_ds_registry(adapter, limits=Limits(row_limit=1000)))
     state = SubgraphExecutionState(
         trace_id="t",
         sub_query=SubQuery(id="sq1", datasource_id="chinook", intent="q"),

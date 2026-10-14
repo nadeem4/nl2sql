@@ -24,6 +24,7 @@ from nl2sql.pipeline.plan_cache import PlanCache
 from nl2sql.pipeline.state import SubgraphExecutionState
 from nl2sql.schema import InMemorySchemaStore
 from nl2sql_sdk.contracts import ResultFrame
+from nl2sql.testing.runtime import stub_ds_registry
 
 
 def _settings(**sections) -> Settings:
@@ -39,8 +40,8 @@ def test_run_date_without_a_pin_is_today_in_utc():
 
 
 def _generate(settings: Settings):
-    adapter = SimpleNamespace(row_limit=None, max_bytes=1000, get_dialect=lambda: "sqlite")
-    ctx = SimpleNamespace(ds_registry=SimpleNamespace(get_adapter=lambda _id: adapter), settings=settings)
+    adapter = SimpleNamespace(get_dialect=lambda: "sqlite")
+    ctx = SimpleNamespace(ds_registry=stub_ds_registry(adapter), settings=settings)
     plan = PlanModel(tables=[TableRef(name="users", alias="u")],
                      select_items=[SelectItem(expr=Expr(kind="column", alias="u", column_name="id"))], joins=[])
     state = SubgraphExecutionState(trace_id="t", sub_query=SubQuery(id="sq1", datasource_id="ds", intent="q"),

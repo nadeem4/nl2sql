@@ -1,5 +1,5 @@
-from typing import Any, List, Dict
-from sqlalchemy import create_engine, text, inspect
+from pydantic import Field
+from sqlalchemy import Engine, create_engine, text
 from sqlalchemy.dialects import sqlite
 from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from nl2sql.adapters.sqlalchemy_base import (
@@ -9,8 +9,7 @@ from nl2sql.adapters.sqlalchemy_base import (
     BaseSQLAlchemyAdapter
 )
 
-from pydantic import BaseModel, Field
-from typing import Optional
+from nl2sql_sdk import ConnectionModel
 import sqlglot
 from sqlglot import exp
 
@@ -60,63 +59,41 @@ _QUERY_MISTAKES = (
 )
 
 
-class SqliteConnectionConfig(BaseModel):
-    """Strict configuration schema for SQLite adapter."""
-    database: str = Field(..., description="Path to SQLite database file")
-    options: Dict[str, Any] = Field(default_factory=dict)
-    
-    model_config = {"extra": "ignore"}
+class SqliteConnection(ConnectionModel):
+    """A SQLite datasource's ``connection`` block."""
+
+    database: str = Field(title="Database file", description="A path, relative to nl2sql.yaml",
+                          examples=["shop.sqlite"])
+
 
 class SqliteAdapter(BaseSQLAlchemyAdapter):
-    interface_version = 1
+    title = "SQLite"
+    connection_model = SqliteConnection
     driver_modules = ("sqlite3",)
     install_hint = 'sqlite3 ships with Python: use a Python build that includes it'
 
-    def construct_uri(self, args: Dict[str, Any]) -> str:
-        """Constructs the SQLite connection URI.
+    def url(self, connection: SqliteConnection) -> str:
+        """The file, always opened read-only.
 
-        With ``options.read_only`` the file is opened through SQLite's own URI
-        form with ``mode=ro``, so the driver refuses every write before any SQL
-        is parsed. That is the last line under the policy and validator checks,
-        and the one a public demo needs: the sample databases are ours to show
-        and nobody's to change.
-
-        Args:
-            args: The raw connection arguments dictionary.
-
-        Returns:
-            str: The fully constructed SQLAlchemy connection URI.
-
-        Raises:
-            ValidationError: If the configuration is invalid.
+        SQLite's own URI form with ``mode=ro`` makes the driver refuse every
+        write before any SQL is parsed: the last line under the policy and
+        validator checks. The engine never writes, so there is no setting to
+        turn it off. A file that does not exist is an error, not a new
+        database.
         """
-        config = SqliteConnectionConfig(**args)
-        if config.options.get("read_only"):
-            return f"sqlite:///file:{self.local_path(config.database)}?mode=ro&uri=true"
-        return f"sqlite:///{self.local_path(config.database)}"
+        return f"sqlite:///file:{self.local_path(connection.database)}?mode=ro&uri=true"
 
-    def connect(self) -> None:
-        """Sqlite-specific connection with Locking Timeout."""
-        if not self.connection_string:
-             raise ValueError(f"Connection string is required for {self}")
-             
+    def build_engine(self) -> Engine:
+        """The engine, with ``limits.timeout_ms`` as SQLite's lock-wait timeout.
+
+        SQLite's ``timeout`` is how long to wait for a lock, not how long a
+        statement may run, but it is the closest SQLite has.
+        """
         connect_args = {}
-        if self.statement_timeout_ms:
-            # SQLite 'timeout' is for waiting for the lock, not execution duration.
-            # But it's the closest/best we can do for "timeout".
-            connect_args["timeout"] = self.statement_timeout_ms / 1000.0
+        if self.limits.timeout_ms:
+            connect_args["timeout"] = self.limits.timeout_ms / 1000.0
+        return create_engine(self.url(self.connection), pool_pre_ping=True, connect_args=connect_args)
 
-        try:
-            self.engine = create_engine(
-                self.connection_string, 
-                pool_pre_ping=True, # Less relevant for sqlite but harmless
-                execution_options=self.execution_options,
-                connect_args=connect_args
-            )
-        except Exception as e:
-            import logging
-            logging.getLogger(__name__).error(f"Failed to connect to Sqlite: {e}")
-            raise
     def dry_run(self, query: str) -> DryRunResult:
         try:
             with self.engine.connect() as conn:

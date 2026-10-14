@@ -13,18 +13,18 @@ from nl2sql.pipeline.nodes.decomposer.schemas import SubQuery
 from nl2sql.pipeline.nodes.generator.node import GeneratorNode
 from nl2sql.pipeline.state import SubgraphExecutionState
 from nl2sql.secrets.manager import SecretManager
-from nl2sql.testing import adapter_registry
+from nl2sql.testing import OpenConnection, adapter_registry
 
 
 class _StubAdapter:
-    interface_version = 1
+    interface_version = 2
+    title = "Stub"
+    connection_model = OpenConnection
     driver_modules = ()
     install_hint = ""
 
-    def __init__(self, datasource_id, datasource_engine_type, connection_args, **kwargs):
-        self.kwargs = kwargs
-        self.row_limit = kwargs.get("row_limit")
-        self.max_bytes = kwargs.get("max_bytes")
+    def __init__(self, datasource_id, connection, limits, *, folder=None):
+        self.limits = limits
 
     def capabilities(self):
         return set()
@@ -60,6 +60,5 @@ def test_the_datasource_timeout_and_max_bytes_reach_the_adapter(registry):
         id="ds1", type="stub", limits=Limits(timeout_ms=8000, max_bytes=1024),
     ))
 
-    assert adapter.kwargs["statement_timeout_ms"] == 8000
-    assert adapter.kwargs["max_bytes"] == 1024
+    assert adapter.limits == Limits(timeout_ms=8000, max_bytes=1024)
 

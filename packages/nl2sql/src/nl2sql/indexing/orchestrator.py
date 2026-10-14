@@ -23,7 +23,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional
 from uuid import uuid4
 
 from nl2sql.common.logger import get_logger
-from nl2sql.datasources.protocols import DatasourceAdapterProtocol
+from nl2sql.datasources.protocols import DatasourceAdapter
 from nl2sql.indexing.chunk_builder import SchemaChunkBuilder
 from nl2sql.indexing.curated import CuratedChunkBuilder, curated_hash, curated_section
 from nl2sql.indexing.enrichment_service import enrich_schema_snapshot
@@ -66,14 +66,14 @@ class IndexingOrchestrator:
         # The loaded curated.yaml, or None when the feature is off.
         self.curated = getattr(ctx, "curated", None)
 
-    def index_datasource(self, adapter: DatasourceAdapterProtocol) -> Dict[str, Any]:
+    def index_datasource(self, adapter: DatasourceAdapter) -> Dict[str, Any]:
         """Reads the datasource's schema, builds its entries and switches its pointer to them.
 
         Returns:
             Entry counts by type, with ``datasource_id`` and ``schema_version``.
         """
-        schema_snapshot = adapter.fetch_schema_snapshot()
         datasource_id = adapter.datasource_id
+        schema_snapshot = adapter.fetch_schema_snapshot(self.ds_registry.get_index_scope(datasource_id))
 
         questions = self.ds_registry.get_sample_questions(datasource_id)
         datasource_description = self.ds_registry.get_description(datasource_id)

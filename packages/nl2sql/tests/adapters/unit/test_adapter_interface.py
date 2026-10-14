@@ -10,7 +10,7 @@ from importlib.metadata import entry_points
 
 import pytest
 
-from nl2sql_sdk import DatasourceAdapterProtocol
+from nl2sql_sdk import DatasourceAdapter
 
 # One per name: an editable install next to a checkout can list a name twice.
 ENTRY_POINTS = sorted({ep.name: ep for ep in entry_points(group="nl2sql.adapters")}.values(),
@@ -32,13 +32,13 @@ def test_every_bundled_adapter_is_checked():
 
 
 def test_the_protocol_declares_the_registry_attributes():
-    declared = DatasourceAdapterProtocol.__annotations__
-    assert {"interface_version", "driver_modules", "install_hint"} <= set(declared)
+    declared = DatasourceAdapter.__annotations__
+    assert {"interface_version", "title", "connection_model", "driver_modules", "install_hint"} <= set(declared)
 
 
 @pytest.mark.parametrize("entry_point", BUNDLED, ids=lambda ep: ep.name)
-def test_bundled_adapter_declares_interface_version_1(entry_point):
-    assert entry_point.load().interface_version == 1
+def test_bundled_adapter_declares_interface_version_2(entry_point):
+    assert entry_point.load().interface_version == 2
 
 
 @pytest.mark.parametrize("entry_point", BUNDLED, ids=lambda ep: ep.name)

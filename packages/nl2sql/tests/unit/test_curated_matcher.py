@@ -14,7 +14,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from nl2sql.adapters.sqlite.adapter import SqliteAdapter
+from nl2sql.adapters.sqlite.adapter import SqliteAdapter, SqliteConnection
+from nl2sql_sdk import Limits
 from nl2sql.policies import UserContext
 from nl2sql.config import Settings
 from nl2sql.config import Curated
@@ -116,6 +117,10 @@ class _Registry:
     def get_dialect(self, ds_id):
         return self.adapter.get_dialect()
 
+    def get_datasource(self, ds_id):
+        assert ds_id == "shop"
+        return SimpleNamespace(limits=self.adapter.limits)
+
     def supports(self, ds_id, *caps):
         return ds_id == "shop" and {getattr(c, "value", c) for c in caps} <= self.capabilities
 
@@ -144,8 +149,7 @@ def _ctx(db, server, candidates, capabilities=None, curated=None, settings=None)
     registry = LLMRegistry(SecretManager())
     registry.register_llm(AgentConfig(provider="openai", model="gpt-4o", api_key=FAKE_KEY,
                                       base_url=server.base_url, name="default"))
-    adapter = SqliteAdapter(datasource_id="shop", datasource_engine_type="sqlite",
-                            connection_args={"type": "sqlite", "database": str(db)})
+    adapter = SqliteAdapter("shop", SqliteConnection(database=str(db)), Limits())
     vector_store = _VectorStore(candidates)
     ctx = fake_runtime(
         settings={"tenant_id": "t1", **(settings or {})},

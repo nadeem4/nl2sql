@@ -93,7 +93,7 @@ class RealServer:
         block: Dict[str, Any] = {"host": self.url.host, "port": self.url.port, "user": self.url.username,
                                  "password": self.url.password, "database": database or self.sample_database}
         if self.name == "mssql":
-            block.update(driver=ODBC_DRIVER, options={"TrustServerCertificate": "yes"})
+            block.update(driver=ODBC_DRIVER, trust_server_certificate=True)
         return block
 
 

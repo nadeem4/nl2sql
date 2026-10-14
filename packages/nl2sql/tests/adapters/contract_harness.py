@@ -1,31 +1,29 @@
 from typing import Any, Dict, Type
 
-from nl2sql_sdk.protocols import DatasourceAdapterProtocol
+from nl2sql_sdk import Limits
+from nl2sql_sdk.protocols import DatasourceAdapter
 from nl2sql_sdk.capabilities import DatasourceCapability
 from nl2sql_sdk.contracts import AdapterRequest, ResultFrame
 
 
 def build_adapter(
-    adapter_cls: Type[DatasourceAdapterProtocol],
+    adapter_cls: Type[DatasourceAdapter],
     *,
     datasource_id: str,
-    engine_type: str,
-    connection_args: Dict[str, Any],
-) -> DatasourceAdapterProtocol:
-    return adapter_cls(
-        datasource_id=datasource_id,
-        datasource_engine_type=engine_type,
-        connection_args=connection_args,
-    )
+    connection: Dict[str, Any],
+) -> DatasourceAdapter:
+    """The adapter as the engine builds it: the connection validated against its model."""
+    return adapter_cls(datasource_id, adapter_cls.connection_model(**connection), Limits())
 
 
-def assert_adapter_protocol(adapter: DatasourceAdapterProtocol) -> None:
-    assert isinstance(adapter, DatasourceAdapterProtocol)
+def assert_adapter_protocol(adapter: DatasourceAdapter) -> None:
+    assert isinstance(adapter, DatasourceAdapter)
     assert adapter.datasource_id
-    assert adapter.datasource_engine_type
+    assert adapter.interface_version == 2
+    assert adapter.title
 
 
-def assert_sql_error_contracts(adapter: DatasourceAdapterProtocol) -> None:
+def assert_sql_error_contracts(adapter: DatasourceAdapter) -> None:
     non_sql = adapter.execute(AdapterRequest(plan_type="rest", payload={"sql": "SELECT 1"}))
     missing_sql = adapter.execute(AdapterRequest(plan_type="sql", payload={}))
 
@@ -38,6 +36,6 @@ def assert_sql_error_contracts(adapter: DatasourceAdapterProtocol) -> None:
     assert missing_sql.error and missing_sql.error.error_code == "MISSING_SQL"
 
 
-def assert_capabilities_include_sql(adapter: DatasourceAdapterProtocol) -> None:
+def assert_capabilities_include_sql(adapter: DatasourceAdapter) -> None:
     caps = {cap.value if isinstance(cap, DatasourceCapability) else str(cap) for cap in adapter.capabilities()}
     assert DatasourceCapability.SUPPORTS_SQL.value in caps
