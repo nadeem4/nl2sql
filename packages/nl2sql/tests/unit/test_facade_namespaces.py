@@ -27,6 +27,8 @@ from nl2sql import (
     UserContext,
 )
 from nl2sql.testing.config import make_config
+from nl2sql.testing import OpenConnection
+from nl2sql_sdk import ConnectionCheck
 
 SHOP = {"id": "shop", "type": "sqlite", "description": "Orders and customers",
         "connection": {"database": "shop.db"}}
@@ -58,20 +60,21 @@ def engine(tmp_path):
 class SecretAdapter:
     """An adapter that takes a password and never connects."""
 
-    interface_version = 1
+    interface_version = 2
+    title = "Stub"
+    connection_model = OpenConnection
     driver_modules = ()
     install_hint = ""
 
-    def __init__(self, datasource_id=None, datasource_engine_type=None, connection_args=None, **kwargs):
+    def __init__(self, datasource_id=None, connection=None, limits=None, *, folder=None):
         self.datasource_id = datasource_id
-        self.datasource_engine_type = datasource_engine_type
-        self.connection_args = connection_args or {}
+        self.connection_args = connection.model_dump() if connection is not None else {}
 
     def capabilities(self):
         return set()
 
     def test_connection(self):
-        return True
+        return ConnectionCheck(ok=True)
 
     def get_dialect(self):
         return "postgres"

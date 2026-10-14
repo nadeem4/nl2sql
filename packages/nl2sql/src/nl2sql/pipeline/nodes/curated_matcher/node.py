@@ -126,8 +126,8 @@ class CuratedMatcherNode:
 
     def _row_ceiling(self, ds_id: str) -> int:
         ceiling = self.row_limit
-        adapter = self.ds_registry.get_adapter(ds_id)
-        return min(int(getattr(adapter, "row_limit", None) or ceiling), ceiling)
+        limit_set = self.ds_registry.get_datasource(ds_id).limits.row_limit
+        return min(int(limit_set or ceiling), ceiling)
 
     # -- the node ---------------------------------------------------------
 

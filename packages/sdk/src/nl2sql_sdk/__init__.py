@@ -3,7 +3,8 @@
 
 from .capabilities import DatasourceCapability
 from .contracts import AdapterRequest, ResultError, ResultFrame
-from .protocols import DatasourceAdapterProtocol, SqlRenderingAdapterProtocol, StreamingAdapterProtocol
+from .models import ConnectionCheck, ConnectionModel, IndexScope, Limits
+from .protocols import DatasourceAdapter, SqlRenderingAdapterProtocol, StreamingAdapterProtocol
 from .secrets import SecretProvider
 from .schema import (
     TableRef,
@@ -17,6 +18,7 @@ from .schema import (
     SchemaMetadata,
     SchemaSnapshot,
     ColumnRef,
+    IndexIssue,
 )
 
 __all__ = [
@@ -24,7 +26,11 @@ __all__ = [
     "AdapterRequest",
     "ResultError",
     "ResultFrame",
-    "DatasourceAdapterProtocol",
+    "ConnectionCheck",
+    "ConnectionModel",
+    "IndexScope",
+    "Limits",
+    "DatasourceAdapter",
     "SqlRenderingAdapterProtocol",
     "StreamingAdapterProtocol",
     "SecretProvider",
@@ -39,4 +45,5 @@ __all__ = [
     "SchemaMetadata",
     "SchemaSnapshot",
     "ColumnRef",
+    "IndexIssue",
 ]

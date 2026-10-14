@@ -13,8 +13,6 @@ from nl2sql.testing import adapter_registry
 def test_core_registry_registers_adapter_and_executes_contract(monkeypatch):
     # Validates core↔adapter integration because registry powers runtime selection.
     # Arrange
-    monkeypatch.setattr("nl2sql.adapters.sqlite.adapter.create_engine", lambda *a, **k: MagicMock())
-
     registry = DatasourceRegistry(SecretManager(), adapter_registry({"sqlite": SqliteAdapter}))
     config = Datasource(
         id="ds1",
@@ -26,7 +24,7 @@ def test_core_registry_registers_adapter_and_executes_contract(monkeypatch):
     response = adapter.execute(AdapterRequest(plan_type="sql", payload={}))
 
     # Assert
-    assert adapter.datasource_engine_type == "sqlite"
+    assert adapter.title == "SQLite"
     assert isinstance(response, ResultFrame)
     assert response.success is False
     assert response.error.error_code == "MISSING_SQL"

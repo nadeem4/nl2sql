@@ -19,7 +19,7 @@ entry point group, and the built-ins are declared in
 
 | Kind | Entry point group | Interface | Built-ins |
 |---|---|---|---|
-| `adapter` | `nl2sql.adapters` | `nl2sql_sdk.DatasourceAdapterProtocol` | `sqlite`, `postgres`, `mysql`, `mssql`, `duckdb` |
+| `adapter` | `nl2sql.adapters` | `nl2sql_sdk.DatasourceAdapter` (version 2) | `sqlite`, `postgres`, `mysql`, `mssql`, `duckdb` |
 | `llm` | `nl2sql.llms` | `nl2sql.llm.providers.LLMProvider` (version 2: `structured_output` and `create`) | `openai`, `anthropic`, `openai_compatible`, and its presets `openrouter` and `ollama`, made from `PROVIDER_PRESETS` |
 | `embeddings` | `nl2sql.embeddings` | `nl2sql.embeddings.EmbeddingsProvider` (version 2: `create` and `describe`) | `local`, `openai`, `openai_compatible` |
 | `secrets` | `nl2sql.secrets` | `nl2sql_sdk.SecretProvider` | `env`, `aws`, `azure`, `hashicorp` |

@@ -42,15 +42,12 @@ def chinook_tables(readable: Callable = lambda _ref: True):
     ``readable`` says which tables the caller may read; the others are hidden,
     as the retriever hides a table the caller's scope denies.
     """
-    from nl2sql.adapters.sqlite.adapter import SqliteAdapter
+    from nl2sql_sdk import IndexScope, Limits
+    from nl2sql.adapters.sqlite.adapter import SqliteAdapter, SqliteConnection
     from nl2sql.pipeline.nodes.schema_retriever.node import SchemaRetrieverNode
 
-    adapter = SqliteAdapter(
-        datasource_id="chinook",
-        datasource_engine_type="sqlite",
-        connection_args={"type": "sqlite", "database": str(CHINOOK_DB)},
-    )
-    snapshot = adapter.fetch_schema_snapshot()
+    adapter = SqliteAdapter("chinook", SqliteConnection(database=str(CHINOOK_DB)), Limits())
+    snapshot = adapter.fetch_schema_snapshot(IndexScope())
     retriever = SchemaRetrieverNode.__new__(SchemaRetrieverNode)
     visible = {key: c for key, c in snapshot.contract.tables.items() if readable(c.table)}
     return retriever._build_tables_from_snapshot(

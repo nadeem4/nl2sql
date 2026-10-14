@@ -19,14 +19,12 @@ from sqlalchemy import Boolean, Date, Integer, JSON, LargeBinary, Numeric, Strin
 from sqlalchemy.dialects import mssql, postgresql
 
 from nl2sql.adapters.sqlalchemy_base.adapter import BaseSQLAlchemyAdapter, as_scalar, min_max_skip_reason
-from nl2sql.adapters.sqlite.adapter import SqliteAdapter
+from nl2sql.adapters.sqlite.adapter import SqliteAdapter, SqliteConnection
+from nl2sql_sdk import IndexScope, Limits
 
 
 def _sqlite(path):
-    adapter = SqliteAdapter(datasource_id="t", datasource_engine_type="sqlite",
-                            connection_args={"type": "sqlite", "database": path.as_posix()})
-    adapter.connect()
-    return adapter
+    return SqliteAdapter("t", SqliteConnection(database=path.as_posix()), Limits())
 
 
 def _failing_on(adapter, monkeypatch, bad_column):
@@ -74,7 +72,7 @@ def test_a_boolean_column_has_counts_but_no_min_or_max(tmp_path):
         con.execute("CREATE TABLE T (id INTEGER PRIMARY KEY, active BOOLEAN)")
         con.executemany("INSERT INTO T VALUES (?, ?)", [(1, 1), (2, 0), (3, None)])
 
-    [table] = _sqlite(path).fetch_schema_snapshot().metadata.tables.values()
+    [table] = _sqlite(path).fetch_schema_snapshot(IndexScope()).metadata.tables.values()
 
     active = table.columns["active"].statistics
     assert active.distinct_count == 2
@@ -97,7 +95,7 @@ def test_a_column_whose_stats_fail_does_not_stop_the_snapshot(tmp_path, monkeypa
                  lambda conn, cursor, statement, *args: events.append(statement))
 
     with caplog.at_level(logging.WARNING):
-        snapshot = adapter.fetch_schema_snapshot()
+        snapshot = adapter.fetch_schema_snapshot(IndexScope())
 
     failed_at = next(i for i, e in enumerate(events) if "no_such_table_for_profiling" in e)
     assert events[failed_at + 1] == "ROLLBACK", "the next statement ran in the failed transaction"
@@ -130,7 +128,7 @@ def test_a_failed_row_count_does_not_stop_the_snapshot(tmp_path, monkeypatch):
 
     monkeypatch.setattr(type(adapter), "_get_row_count", row_count)
 
-    tables = {m.table.table_name: m for m in adapter.fetch_schema_snapshot().metadata.tables.values()}
+    tables = {m.table.table_name: m for m in adapter.fetch_schema_snapshot(IndexScope()).metadata.tables.values()}
 
     assert tables["B"].row_count == 2
     assert tables["B"].columns["n"].statistics.max_value == 7
@@ -145,14 +143,14 @@ def test_a_table_that_cannot_be_profiled_does_not_stop_the_snapshot(tmp_path, mo
     adapter = _sqlite(path)
     original = BaseSQLAlchemyAdapter._get_columns_metadata
 
-    def columns_metadata(self, inspector, conn, table_ref, row_count):
+    def columns_metadata(self, inspector, conn, table_ref, *args):
         if table_ref.table_name == "A":
             raise RuntimeError("cannot reflect A")
-        return original(self, inspector, conn, table_ref, row_count)
+        return original(self, inspector, conn, table_ref, *args)
 
     monkeypatch.setattr(type(adapter), "_get_columns_metadata", columns_metadata)
 
-    tables = {m.table.table_name: m for m in adapter.fetch_schema_snapshot().metadata.tables.values()}
+    tables = {m.table.table_name: m for m in adapter.fetch_schema_snapshot(IndexScope()).metadata.tables.values()}
 
     assert tables["A"].columns == {}
     assert tables["B"].columns["n"].statistics.max_value == 7
@@ -165,13 +163,15 @@ POSTGRES_URL = os.environ.get("NL2SQL_TEST_POSTGRES_URL")
 def test_postgres_odd_columns_do_not_poison_the_transaction(monkeypatch):
     from nl2sql.adapters.postgres.adapter import PostgresAdapter
 
-    class UrlPostgres(PostgresAdapter):
-        def construct_uri(self, args):
-            return args["url"]
+    from sqlalchemy.engine import make_url
 
+    from nl2sql.adapters.postgres.adapter import PostgresConnection
+
+    url = make_url(POSTGRES_URL)
     schema = f"profiling_{uuid.uuid4().hex[:8]}"
-    adapter = UrlPostgres(datasource_id="pg", datasource_engine_type="postgres",
-                          connection_args={"url": POSTGRES_URL})
+    adapter = PostgresAdapter("pg", PostgresConnection(host=url.host, port=url.port or 5432, user=url.username,
+                                                       password=url.password or "", database=url.database),
+                              Limits())
     with adapter.engine.begin() as conn:
         conn.execute(text(f"CREATE SCHEMA {schema}"))
         conn.execute(text(f"CREATE TABLE {schema}.t (flag boolean, id uuid, doc jsonb, odd text, later integer)"))
@@ -180,7 +180,7 @@ def test_postgres_odd_columns_do_not_poison_the_transaction(monkeypatch):
     try:
         _failing_on(adapter, monkeypatch, "odd")
 
-        snapshot = adapter.fetch_schema_snapshot()
+        snapshot = adapter.fetch_schema_snapshot(IndexScope())
 
         [table] = [m for m in snapshot.metadata.tables.values() if m.table.schema_name == schema]
         assert table.columns["flag"].statistics.distinct_count == 2

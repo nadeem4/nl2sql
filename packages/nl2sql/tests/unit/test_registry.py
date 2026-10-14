@@ -32,7 +32,7 @@ def _plugin(monkeypatch, name, **attrs):
     return module
 
 
-def _adapter(version=1, drivers=(), hint=""):
+def _adapter(version=2, drivers=(), hint=""):
     return type("Adapter", (), {"interface_version": version, "driver_modules": drivers,
                                 "install_hint": hint})
 
@@ -65,7 +65,7 @@ def test_wrong_interface_version_is_rejected_with_package_name(monkeypatch):
     with pytest.raises(RegistryError) as excinfo:
         Registry.default().load("adapter", "snowflake")
 
-    assert str(excinfo.value) == "nl2sql-snowflake implements adapter interface 0; this engine needs 1."
+    assert str(excinfo.value) == "nl2sql-snowflake implements adapter interface 0; this engine needs 2."
 
 
 def test_missing_driver_reports_install_hint():

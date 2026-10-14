@@ -1,3 +1,3 @@
-from nl2sql_sdk.protocols import DatasourceAdapterProtocol
+from nl2sql_sdk.protocols import DatasourceAdapter
 
-__all__ = ["DatasourceAdapterProtocol"]
+__all__ = ["DatasourceAdapter"]

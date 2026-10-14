@@ -19,6 +19,8 @@ from pydantic import (BaseModel, ConfigDict, Field, NonNegativeInt, PositiveFloa
 from pydantic.fields import FieldInfo
 from typing_extensions import Annotated
 
+from nl2sql_sdk import ConnectionModel, IndexScope, Limits
+
 from nl2sql.config.curated import CuratedDatasource
 from nl2sql.policies.patterns import parse_pattern
 
@@ -122,23 +124,19 @@ class _Model(BaseModel):
 
 # ---------------------------------------------------------------- datasources
 
-class Limits(_Model):
-    """Per-datasource limits. Each one is set here and nowhere else."""
-
-    row_limit: Optional[PositiveInt] = None
-    timeout_ms: Optional[PositiveInt] = None
-    max_bytes: Optional[PositiveInt] = None
-
-
 class Datasource(_Model):
     """One database the engine can query."""
 
     id: str = Field(min_length=1)
     type: Optional[str] = None
     description: Optional[str] = None
-    # Validated by the adapter. Every value keeps its references.
-    connection: Annotated[Dict[str, Any], KEEPS_REFERENCES] = Field(default_factory=dict)
+    # Validated against the adapter's ``connection_model`` when the adapter is
+    # built. A dict keeps every reference until then; a model instance is used
+    # as given.
+    connection: Union[Annotated[Dict[str, Any], KEEPS_REFERENCES], ConnectionModel] = Field(
+        default_factory=dict, union_mode="left_to_right")
     limits: Limits = Field(default_factory=Limits)
+    index: IndexScope = Field(default_factory=IndexScope)
     preferred_tables: List[str] = Field(default_factory=list)
     sample_questions: List[str] = Field(default_factory=list)
     # Routing hint written by people. Domains generated at indexing are separate

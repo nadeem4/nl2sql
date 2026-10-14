@@ -3,29 +3,30 @@
 Support for MySQL 5.7+ and 8.0+.
 
 !!! info "Implementation"
-    This adapter extends `BaseSQLAlchemyAdapter`. It overrides `connect()` to handle `MAX_EXECUTION_TIME` session variables.
+    This adapter extends `BaseSQLAlchemyAdapter`. It overrides `build_engine()` to set the `MAX_EXECUTION_TIME` session variable.
 
 ## Configuration
 
 **Type**: `mysql`
 
 ```yaml
-
+# datasources/my_db.yaml
+type: mysql
 connection:
-  type: "mysql"
-  host: "localhost"
+  host: localhost
   port: 3306
-  user: "root"
+  user: root
   password: "${env:DB_PASS}"
-  database: "my_db"
-  options:
-    charset: "utf8mb4"
+  database: my_db
 ```
+
+The keys are `MysqlConnection`'s (`nl2sql.adapters.mysql.adapter`), and any
+other key is an error; see [Connection](../configuration/datasources.md#connection).
 
 ### Connection Details
 
 * **Driver**: `pymysql` (Pure Python).
-* **URI Constructed**: `mysql+pymysql://{user}:{pass}@{host}:{port}/{db}?{options}`.
+* **URI Constructed**: `mysql+pymysql://{user}:{pass}@{host}:{port}/{db}`.
   Built with SQLAlchemy's `URL.create`, so the user name and password are
   percent-escaped: a password containing `@ : / # %` works as written.
 

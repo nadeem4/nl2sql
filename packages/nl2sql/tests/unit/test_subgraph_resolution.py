@@ -39,7 +39,7 @@ def test_resolve_subgraph_selects_sql_agent_for_sql_capable_datasource():
 def test_resolve_subgraph_returns_none_without_sql_capability():
     # Pins the capability gate: a datasource lacking SUPPORTS_SQL has no subgraph.
     # Arrange
-    ctx = _ctx_with_capabilities({"rest_ds": {DatasourceCapability.SUPPORTS_REST.value}})
+    ctx = _ctx_with_capabilities({"rest_ds": {"supports_rest"}})
 
     # Act
     target = resolve_subgraph("rest_ds", ctx)
@@ -83,7 +83,7 @@ def _scan_state(datasource_id):
 def test_scan_layer_router_rejects_datasource_without_sql_capability():
     # Pins the routing path: an incompatible datasource fails closed, never dispatched.
     # Arrange
-    ctx = _ctx_with_capabilities({"rest_ds": {DatasourceCapability.SUPPORTS_REST.value}})
+    ctx = _ctx_with_capabilities({"rest_ds": {"supports_rest"}})
     route = build_scan_layer_router(ctx)
 
     # Act / Assert
@@ -96,7 +96,7 @@ def test_scan_layer_router_raise_is_a_real_exception_not_a_type_error():
     # so the interpreter raised `TypeError: exceptions must derive from BaseException`
     # and the diagnostic message never reached the caller.
     # Arrange
-    ctx = _ctx_with_capabilities({"rest_ds": {DatasourceCapability.SUPPORTS_REST.value}})
+    ctx = _ctx_with_capabilities({"rest_ds": {"supports_rest"}})
     route = build_scan_layer_router(ctx)
 
     # Act
@@ -112,7 +112,7 @@ def test_scan_layer_router_error_is_an_nl2sql_error_so_the_cli_catches_it():
     # The CLI decorator catches NL2SQLError to print a clean red message, so the
     # routing failure has to sit inside that hierarchy to be handled gracefully.
     # Arrange
-    ctx = _ctx_with_capabilities({"rest_ds": {DatasourceCapability.SUPPORTS_REST.value}})
+    ctx = _ctx_with_capabilities({"rest_ds": {"supports_rest"}})
     route = build_scan_layer_router(ctx)
 
     # Act
@@ -127,7 +127,7 @@ def test_scan_layer_router_error_preserves_the_structured_payload():
     # The payload is the point: error_code, severity and is_retryable drive downstream
     # handling, so the exception must carry the PipelineError rather than a bare string.
     # Arrange
-    ctx = _ctx_with_capabilities({"rest_ds": {DatasourceCapability.SUPPORTS_REST.value}})
+    ctx = _ctx_with_capabilities({"rest_ds": {"supports_rest"}})
     route = build_scan_layer_router(ctx)
 
     # Act
@@ -146,7 +146,7 @@ def test_scan_layer_router_error_preserves_the_structured_payload():
 def test_scan_layer_router_error_message_names_the_datasource():
     # The message is what the user reads; the datasource id is the actionable part.
     # Arrange
-    ctx = _ctx_with_capabilities({"rest_ds": {DatasourceCapability.SUPPORTS_REST.value}})
+    ctx = _ctx_with_capabilities({"rest_ds": {"supports_rest"}})
     route = build_scan_layer_router(ctx)
 
     # Act

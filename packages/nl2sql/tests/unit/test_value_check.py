@@ -18,9 +18,10 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from nl2sql.adapters.sqlite.adapter import SqliteAdapter
+from nl2sql.adapters.sqlite.adapter import SqliteAdapter, SqliteConnection
 from nl2sql.common.errors import ErrorCode, ErrorSeverity, PipelineError
-from nl2sql.testing.runtime import fake_runtime
+from nl2sql.testing.runtime import fake_runtime, stub_ds_registry
+from nl2sql_sdk import Limits
 from nl2sql.execution.contracts import ExecutorResponse
 from nl2sql.execution.executor.sql_executor import SqlExecutorService
 from nl2sql.pipeline.nodes.aggregator.schemas import AggregatorResponse
@@ -63,11 +64,7 @@ def adapter(tmp_path):
         con.execute("CREATE TABLE Genre (GenreId INTEGER PRIMARY KEY, Name TEXT)")
         con.executemany("INSERT INTO Genre (Name) VALUES (?)",
                         [("Rock",), ("Jazz",), ("Heavy Metal",), ("Blues",), ("Latin",)])
-    adapter = SqliteAdapter(datasource_id="music", datasource_engine_type="sqlite",
-                            connection_args={"type": "sqlite", "database": path.as_posix(),
-                                             "options": {"read_only": True}},
-                            row_limit=1000)
-    return adapter
+    return SqliteAdapter("music", SqliteConnection(database=path.as_posix()), Limits(row_limit=1000))
 
 
 class _Spy:
@@ -75,7 +72,6 @@ class _Spy:
 
     def __init__(self, adapter):
         self._adapter = adapter
-        self.row_limit = adapter.row_limit
         self.sql = []
 
     def render_sql(self, expression):
@@ -86,8 +82,8 @@ class _Spy:
         return self._adapter.execute(request)
 
 
-def _check(plan, adapter, allowed=lambda _table: True, can_retry=True):
-    return check_values(plan, adapter, allowed, can_retry)
+def _check(plan, adapter, allowed=lambda _table: True, can_retry=True, row_limit=1000):
+    return check_values(plan, adapter, allowed, can_retry, row_limit)
 
 
 # --- which literals are checked --------------------------------------------
@@ -171,9 +167,8 @@ def test_a_table_the_role_may_not_read_is_never_probed(adapter):
 
 def test_every_probe_is_a_bounded_read(adapter):
     spy = _Spy(adapter)
-    spy.row_limit = 3
 
-    _check(_plan(_bin("=", _col("g", "Name"), _lit("Polka"))), spy)
+    _check(_plan(_bin("=", _col("g", "Name"), _lit("Polka"))), spy, row_limit=3)
 
     assert spy.sql, "nothing was probed"
     for sql in spy.sql:
@@ -196,7 +191,7 @@ def _executor(adapter, monkeypatch, row_count, allowed=("*",)):
                                 trace_id="t", tenant_id="t1", metrics={"row_count": row_count})
 
     monkeypatch.setattr(SqlExecutorService, "execute", execute)
-    registry = SimpleNamespace(supports=lambda *_a: True, get_adapter=lambda _id: adapter)
+    registry = stub_ds_registry(adapter, limits=Limits(row_limit=1000), supports=lambda *_a: True)
     ctx = fake_runtime(settings={"tenant_id": "t1"}, ds_registry=registry,
                        policies={"default_role": "r", "roles": {"r": {"description": "d", "allow": list(allowed)}}})
     return ExecutorNode(ctx)

@@ -31,7 +31,8 @@ from nl2sql.pipeline.nodes.generator.node import GeneratorNode
 from nl2sql.pipeline.nodes.schema_retriever.schema import Column, Table
 from nl2sql.pipeline.nodes.validator.node import LogicalValidatorNode
 from nl2sql.pipeline.state import SubgraphExecutionState
-from nl2sql.testing.runtime import fake_runtime
+from nl2sql.testing.runtime import fake_runtime, stub_ds_registry
+from nl2sql_sdk import Limits
 
 
 def _col(name: str) -> Expr:
@@ -49,9 +50,9 @@ def _plan(**kwargs) -> PlanModel:
 
 
 def _ctx(dialect: str = "sqlite", row_limit: int = 1000):
-    adapter = SimpleNamespace(row_limit=row_limit, max_bytes=1000, get_dialect=lambda: dialect)
+    adapter = SimpleNamespace(get_dialect=lambda: dialect)
     return fake_runtime(
-        ds_registry=SimpleNamespace(get_adapter=lambda _id: adapter),
+        ds_registry=stub_ds_registry(adapter, limits=Limits(row_limit=row_limit)),
         policies={"allow_all": True},
     )
 

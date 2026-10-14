@@ -11,14 +11,13 @@ import sqlite3
 import pytest
 
 from nl2sql.adapters.sqlalchemy_base.adapter import ALL_VALUES_MAX_DISTINCT
-from nl2sql.adapters.sqlite.adapter import SqliteAdapter
+from nl2sql.adapters.sqlite.adapter import SqliteAdapter, SqliteConnection
+from nl2sql_sdk import IndexScope, Limits
 
 
 def _snapshot(path):
-    adapter = SqliteAdapter(datasource_id="t", datasource_engine_type="sqlite",
-                            connection_args={"type": "sqlite", "database": path.as_posix()})
-    adapter.connect()
-    snapshot = adapter.fetch_schema_snapshot()
+    adapter = SqliteAdapter("t", SqliteConnection(database=path.as_posix()), Limits())
+    snapshot = adapter.fetch_schema_snapshot(IndexScope())
     [table] = snapshot.metadata.tables.values()
     return {name: column.statistics for name, column in table.columns.items()}
 

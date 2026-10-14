@@ -116,7 +116,7 @@ _RUN_SCOPES: ContextVar[Optional[Tuple[threading.Lock, Dict[Any, Scope]]]] = Con
 def default_schema(ds_registry: Any, datasource_id: str) -> str:
     """The datasource's default schema as its adapter reports it, else ``main``."""
     try:
-        value = getattr(ds_registry.get_adapter(datasource_id), "default_schema", None)
+        value = ds_registry.get_adapter(datasource_id).default_schema()
     except Exception:
         return FALLBACK_DEFAULT_SCHEMA
     return value if isinstance(value, str) and value else FALLBACK_DEFAULT_SCHEMA

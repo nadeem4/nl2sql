@@ -11,12 +11,20 @@ import pytest
 from nl2sql.adapters.sqlalchemy_base.adapter import BaseSQLAlchemyAdapter
 from nl2sql.adapters.sqlalchemy_base.models import CostEstimate, QueryPlan
 from nl2sql_sdk.capabilities import DatasourceCapability
+from nl2sql_sdk import ConnectionModel, Limits
 from nl2sql_sdk.contracts import AdapterRequest
 
 
+class _File(ConnectionModel):
+    database: str
+
+
 class _SQLiteAdapter(BaseSQLAlchemyAdapter):
-    def construct_uri(self, args):
-        return f"sqlite:///{args['database']}"
+    title = "Test SQLite"
+    connection_model = _File
+
+    def url(self, connection):
+        return f"sqlite:///{connection.database}"
 
     def explain(self, sql: str):
         return QueryPlan(plan_text="explain")
@@ -47,8 +55,7 @@ def db_path(tmp_path):
 
 @pytest.fixture()
 def adapter(db_path):
-    return _SQLiteAdapter(datasource_id="ds", datasource_engine_type="sqlite",
-                          connection_args={"database": str(db_path)})
+    return _SQLiteAdapter("ds", _File(database=str(db_path)), Limits())
 
 
 def _request(sql, parameters=None):

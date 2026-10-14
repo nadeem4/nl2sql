@@ -215,7 +215,6 @@ def test_demo_config_opens_the_packaged_databases_read_only():
 
     chinook = next(d for d in config.datasources if d.id == "chinook")
     assert Path(chinook.connection["database"]) == CHINOOK_DB_PATH
-    assert all(d.connection["options"]["read_only"] is True for d in config.datasources)
     assert all(d.limits.row_limit == 10_000 for d in config.datasources)
 
 

@@ -24,7 +24,7 @@ from nl2sql.adapters.duckdb.adapter import DuckdbAdapter
 from nl2sql.adapters.mssql.adapter import MssqlAdapter
 from nl2sql.adapters.mysql.adapter import MysqlAdapter
 from nl2sql.adapters.postgres.adapter import PostgresAdapter
-from nl2sql.adapters.sqlite.adapter import SqliteAdapter
+from nl2sql.adapters.sqlite.adapter import SqliteAdapter, SqliteConnection
 from nl2sql.pipeline.nodes.ast_planner.prompts import PLANNER_SYSTEM_PROMPT
 from nl2sql.pipeline.nodes.ast_planner.schemas import (
     ASTPlannerResponse,
@@ -41,7 +41,8 @@ from nl2sql.pipeline.nodes.validator.node import LogicalValidatorNode
 from nl2sql.pipeline.state import SubgraphExecutionState
 
 from nl2sql.datasets import CHINOOK_DB_PATH as CHINOOK
-from nl2sql.testing.runtime import fake_runtime
+from nl2sql.testing.runtime import fake_runtime, stub_ds_registry
+from nl2sql_sdk import Limits
 DATE = Expr(kind="column", alias="t1", column_name="InvoiceDate")
 
 
@@ -62,15 +63,14 @@ def _state(plan):
 
 
 def _sql(plan, adapter):
-    ctx = fake_runtime(ds_registry=SimpleNamespace(get_adapter=lambda _id: adapter))
+    ctx = fake_runtime(ds_registry=stub_ds_registry(adapter, limits=Limits(row_limit=1000)))
     result = GeneratorNode(ctx)(_state(plan))
     assert not result.get("errors"), result.get("errors")
     return result["generator_response"].sql_draft
 
 
 def _sqlite_adapter():
-    return SqliteAdapter(datasource_id="chinook", datasource_engine_type="sqlite",
-                         connection_args={"type": "sqlite", "database": str(CHINOOK)})
+    return SqliteAdapter("chinook", SqliteConnection(database=str(CHINOOK)), Limits())
 
 
 def _run(sql):
@@ -183,9 +183,7 @@ def test_a_year_filter_compares_integers():
 
 def _adapter(cls):
     """An adapter instance with no connection: rendering needs only its dialect."""
-    adapter = cls.__new__(cls)
-    adapter._row_limit = 1000
-    return adapter
+    return cls.__new__(cls)
 
 
 @pytest.mark.parametrize("adapter, part, trunc", [
@@ -230,7 +228,7 @@ def test_duckdb_returns_the_same_types_as_sqlite():
 
 
 def test_an_adapter_without_the_hook_falls_back_to_its_dialect():
-    legacy = SimpleNamespace(row_limit=1000, get_dialect=lambda: "postgres")
+    legacy = SimpleNamespace(get_dialect=lambda: "postgres")
 
     sql = _sql(_revenue_by(_func("DATE_PART", _lit("year"), DATE)), legacy)
 
@@ -238,7 +236,7 @@ def test_an_adapter_without_the_hook_falls_back_to_its_dialect():
 
 
 def test_the_generator_hands_the_expression_to_the_adapter():
-    adapter = SimpleNamespace(row_limit=1000, get_dialect=lambda: "sqlite",
+    adapter = SimpleNamespace(get_dialect=lambda: "sqlite",
                               render_sql=MagicMock(return_value="SELECT 1"))
 
     assert _sql(_revenue_by(_func("DATE_PART", _lit("year"), DATE)), adapter) == "SELECT 1"

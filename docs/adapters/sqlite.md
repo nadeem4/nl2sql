@@ -10,11 +10,13 @@ Simple file-based adapter for local development and testing.
 **Type**: `sqlite`
 
 ```yaml
-
+# datasources/my_data.yaml
+type: sqlite
 connection:
-  type: "sqlite"
-  database: "./my_data.db" # Absolute or relative path
+  database: ./my_data.db # Absolute or relative path
 ```
+
+`database` is the only key (`SqliteConnection`); any other is an error.
 
 A relative `database` is read from the folder of `nl2sql.yaml` when the config
 was loaded from a file (so `nl2sql init --demo` can write `data/chinook.sqlite`),
@@ -27,7 +29,10 @@ does the same.
 ### Connection Details
 
 * **Driver**: Built-in `sqlite3`.
-* **URI Constructed**: `sqlite:///{database}`
+* **URI Constructed**: `sqlite:///file:{database}?mode=ro&uri=true`. The file is
+  always opened read-only: the driver refuses every write before any SQL is
+  parsed, and a file that does not exist is an error rather than a new, empty
+  database. There is no setting to turn it off; the engine never writes.
 
 ## Features
 

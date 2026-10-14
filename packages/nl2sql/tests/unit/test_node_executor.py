@@ -8,19 +8,21 @@ from nl2sql.execution.executor.sql_executor import SqlExecutorService
 from nl2sql.pipeline.nodes.executor.node import ExecutorNode
 from nl2sql.secrets.manager import SecretManager
 from nl2sql_sdk.capabilities import DatasourceCapability
-from nl2sql.testing import adapter_registry
+from nl2sql.testing import OpenConnection, adapter_registry
 from nl2sql.testing.runtime import fake_runtime
 
 
 class FakeAdapter:
-    interface_version = 1
+    interface_version = 2
+    title = "Fake"
+    connection_model = OpenConnection
     driver_modules = ()
     install_hint = ""
 
     def __init__(self, capabilities):
         self._capabilities = capabilities
 
-    def __call__(self, **kwargs):
+    def __call__(self, *args, **kwargs):
         # The registry builds adapters from a class; this stands in for one.
         return self
 
@@ -79,7 +81,7 @@ def test_executor_node_refuses_datasource_without_sql_capability(monkeypatch):
     # Pins the capability gate: no SUPPORTS_SQL means no executor, not a SQL run.
     # Arrange
     _patch_execute(monkeypatch)
-    node = ExecutorNode(_ctx({"rest_ds": FakeAdapter({DatasourceCapability.SUPPORTS_REST})}, monkeypatch))
+    node = ExecutorNode(_ctx({"rest_ds": FakeAdapter({"supports_rest"})}, monkeypatch))
 
     # Act
     result = node(_state("rest_ds"))

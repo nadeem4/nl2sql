@@ -4,7 +4,7 @@ This guide describes how to add a new datasource adapter and make it available t
 
 ## 1. Implement the adapter contract
 
-All adapters must implement `DatasourceAdapterProtocol`. See `../adapters/sdk.md` for the authoritative contract and required fields/methods.
+All adapters implement `DatasourceAdapter`, version 2, and declare a `connection_model`. See `../adapters/sdk.md` for the authoritative contract and required fields/methods.
 
 If you are building a SQL adapter, extending `BaseSQLAlchemyAdapter` can provide schema introspection and default SQL execution. See `../adapters/sqlalchemy.md`.
 
@@ -47,7 +47,7 @@ message that says how to fix each:
 
 | Check | Fails with |
 |---|---|
-| `interface_version` is the version this engine needs (1) | `nl2sql-snowflake implements adapter interface 0; this engine needs 1.` |
+| `interface_version` is the version this engine needs (2) | `nl2sql-snowflake implements adapter interface 1; this engine needs 2.` |
 | every module in `driver_modules` is installed (`importlib.util.find_spec`, without importing it) | the missing modules and your `install_hint` |
 | only one installed package declares the name | both package names |
 
@@ -65,24 +65,27 @@ type: postgres
 description: "Sales warehouse"
 connection:
   host: "${env:PG_HOST}"
+  database: sales
   user: "${env:PG_USER}"
   password: "${env:PG_PASSWORD}"
 ```
 
 References under `connection` are resolved by the engine's `SecretManager`
-when the adapter is built.
+when the adapter is built, and the block is then validated against the
+adapter's `connection_model`: an unknown key is an error.
 
 ## 4. Validate capabilities
 
 Ensure `capabilities()` advertises the correct set for routing and execution:
 
 - `supports_sql` if SQL execution is supported.
-- `supports_rest` if REST execution is supported.
 - `supports_bound_parameters` if `execute` (and `execute_batches`) bind
   `AdapterRequest.parameters` by name to `:name` placeholders through the
   driver. Without it, a verified query with parameters is never sent to the
   adapter. Adapters built on `BaseSQLAlchemyAdapter` inherit both the binding
   and the capability.
+- `enforces_read_only` and `enforces_timeout` only when the session cannot
+  write, and a statement past `limits.timeout_ms` is stopped, on a real server.
 
 ## Source references
 

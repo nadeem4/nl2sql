@@ -60,6 +60,7 @@ class ExecutorNode:
                 self.ds_registry.get_adapter(ds_id),
                 lambda ref: scope.allows(ref.schema_name, ref.name),
                 can_retry,
+                self.ds_registry.get_datasource(ds_id).limits.row_limit,
             )
             # The SQL agent retries only on this attempt's own finding.
             return [e.model_copy(update={"details": {"attempt": state.retry_count}}) for e in errors]

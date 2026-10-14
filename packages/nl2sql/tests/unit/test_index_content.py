@@ -17,6 +17,7 @@ from nl2sql.indexing.orchestrator import IndexingOrchestrator
 from nl2sql.schema import InMemorySchemaStore
 from nl2sql.schema.sqlite_store import SqliteSchemaStore
 from nl2sql_sdk.stores import Filter
+from nl2sql_sdk import IndexScope
 from nl2sql_sdk.schema import (
     ColumnContract,
     SchemaContract,
@@ -56,14 +57,14 @@ class _Adapter:
     def __init__(self, snapshot=None):
         self.snapshot = snapshot or _snapshot()
 
-    def fetch_schema_snapshot(self):
+    def fetch_schema_snapshot(self, scope, on_table=None):
         return self.snapshot
 
 
 def _ctx(tmp_path, description=DESCRIPTION, questions=QUESTIONS, schema_store=None):
     ctx = TestIndex(tmp_path, FakeEmbeddings(size=8), schema_store=schema_store or InMemorySchemaStore()).ctx
     ctx.ds_registry = SimpleNamespace(
-        get_sample_questions=lambda _ds: list(questions),
+        get_index_scope=lambda _ds: IndexScope(), get_sample_questions=lambda _ds: list(questions),
         get_description=lambda _ds: description,
     )
     ctx.llm_registry = SimpleNamespace(get_llm=lambda _name: (_ for _ in ()).throw(ValueError("no key")))

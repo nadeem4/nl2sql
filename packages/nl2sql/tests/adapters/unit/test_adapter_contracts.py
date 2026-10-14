@@ -1,11 +1,6 @@
-import importlib.util
-from unittest.mock import MagicMock
-
 import pytest
-from pydantic import SecretStr
 
-from nl2sql_sdk.protocols import DatasourceAdapterProtocol
-from nl2sql_sdk.capabilities import DatasourceCapability
+from nl2sql_sdk.protocols import DatasourceAdapter
 from nl2sql.adapters.duckdb.adapter import DuckdbAdapter
 from nl2sql.adapters.mssql.adapter import MssqlAdapter
 from nl2sql.adapters.mysql.adapter import MysqlAdapter
@@ -19,76 +14,26 @@ from ..contract_harness import (
     assert_capabilities_include_sql,
 )
 
+SERVER = {"host": "localhost", "user": "user", "password": "pw", "database": "db"}
 
 ADAPTER_SPECS = [
-    (
-        "sqlite",
-        SqliteAdapter,
-        "nl2sql.adapters.sqlite.adapter",
-        {"type": "sqlite", "database": ":memory:"},
-    ),
-    (
-        "duckdb",
-        DuckdbAdapter,
-        # DuckDB uses the base class's connect(), so that is where the engine
-        # factory has to be replaced.
-        "nl2sql.adapters.sqlalchemy_base.adapter",
-        {"type": "duckdb", "database": ":memory:"},
-    ),
-    (
-        "postgres",
-        PostgresAdapter,
-        "nl2sql.adapters.postgres.adapter",
-        {
-            "type": "postgres",
-            "host": "localhost",
-            "user": "user",
-            "password": SecretStr("pw"),
-            "database": "db",
-        },
-    ),
-    (
-        "mysql",
-        MysqlAdapter,
-        "nl2sql.adapters.mysql.adapter",
-        {
-            "type": "mysql",
-            "host": "localhost",
-            "user": "user",
-            "password": SecretStr("pw"),
-            "database": "db",
-        },
-    ),
-    pytest.param(
-        "mssql",
-        MssqlAdapter,
-        "nl2sql.adapters.mssql.adapter",
-        {"type": "mssql", "host": "localhost", "database": "db"},
-        marks=pytest.mark.skipif(
-            importlib.util.find_spec("pyodbc") is None,
-            reason="pyodbc driver is not installed",
-        ),
-    ),
+    (SqliteAdapter, {"database": ":memory:"}),
+    (DuckdbAdapter, {"database": ":memory:"}),
+    (PostgresAdapter, SERVER),
+    (MysqlAdapter, SERVER),
+    (MssqlAdapter, {"host": "localhost", "database": "db"}),
 ]
 
 
-@pytest.mark.parametrize("engine_type, adapter_cls, module_path, connection_args", ADAPTER_SPECS)
-def test_adapters_satisfy_protocol_and_error_contracts(
-    monkeypatch, engine_type, adapter_cls, module_path, connection_args
-):
+@pytest.mark.parametrize("adapter_cls, connection", ADAPTER_SPECS)
+def test_adapters_satisfy_protocol_and_error_contracts(adapter_cls, connection):
     # Validates adapter contracts because core assumes consistent behavior across engines.
-    # Arrange
-    monkeypatch.setattr(f"{module_path}.create_engine", lambda *a, **k: MagicMock())
-    adapter = build_adapter(
-        adapter_cls,
-        datasource_id="ds1",
-        engine_type=engine_type,
-        connection_args=connection_args,
-    )
+    # Building never connects, and a refused request never reaches the driver,
+    # so no driver or database is needed.
+    adapter = build_adapter(adapter_cls, datasource_id="ds1", connection=connection)
 
-    # Act / Assert
     assert_adapter_protocol(adapter)
     assert_capabilities_include_sql(adapter)
     assert_sql_error_contracts(adapter)
-    assert isinstance(adapter, DatasourceAdapterProtocol)
+    assert isinstance(adapter, DatasourceAdapter)
     assert isinstance(adapter.capabilities(), set)

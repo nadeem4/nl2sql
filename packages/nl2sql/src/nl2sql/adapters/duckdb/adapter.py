@@ -1,8 +1,9 @@
 import threading
-from typing import Any, Dict
 
-from sqlalchemy import event
+from pydantic import Field
+from sqlalchemy import Engine, event
 
+from nl2sql_sdk import ConnectionModel
 from nl2sql.adapters.sqlalchemy_base import (
     CostEstimate,
     DryRunResult,
@@ -10,42 +11,28 @@ from nl2sql.adapters.sqlalchemy_base import (
     BaseSQLAlchemyAdapter
 )
 
-from pydantic import BaseModel, Field
-
 # Connection.info key of the running statement's interrupt timer.
 _TIMER = "nl2sql_statement_timer"
 
 
-class DuckdbConnectionConfig(BaseModel):
-    """Strict configuration schema for DuckDB adapter."""
-    database: str = Field(..., description="Path to DuckDB database file, or ':memory:'")
-    options: Dict[str, Any] = Field(default_factory=dict)
+class DuckdbConnection(ConnectionModel):
+    """A DuckDB datasource's ``connection`` block."""
 
-    model_config = {"extra": "ignore"}
+    database: str = Field(title="Database file", description="A path, relative to nl2sql.yaml, or ':memory:'",
+                          examples=["warehouse.duckdb"])
 
 
 class DuckdbAdapter(BaseSQLAlchemyAdapter):
-    interface_version = 1
+    title = "DuckDB"
+    connection_model = DuckdbConnection
     driver_modules = ("duckdb", "duckdb_engine")
     install_hint = 'pip install "nl2sql-engine[duckdb]"'
 
-    def construct_uri(self, args: Dict[str, Any]) -> str:
-        """Constructs the DuckDB connection URI.
+    def url(self, connection: DuckdbConnection) -> str:
+        return f"duckdb:///{self.local_path(connection.database)}"
 
-        Args:
-            args: The raw connection arguments dictionary.
-
-        Returns:
-            str: The fully constructed SQLAlchemy connection URI.
-
-        Raises:
-            ValidationError: If the configuration is invalid.
-        """
-        config = DuckdbConnectionConfig(**args)
-        return f"duckdb:///{self.local_path(config.database)}"
-
-    def connect(self) -> None:
-        """Connects, and enforces ``statement_timeout_ms`` by interrupting.
+    def build_engine(self) -> Engine:
+        """The engine, enforcing ``limits.timeout_ms`` by interrupting.
 
         DuckDB has no statement timeout setting, so each statement starts a
         timer that calls the connection's ``interrupt()`` when the limit
@@ -53,10 +40,10 @@ class DuckdbAdapter(BaseSQLAlchemyAdapter):
         reported as a refusal. The timer is cancelled when the statement
         finishes or fails.
         """
-        super().connect()
-        if not self.statement_timeout_ms:
-            return
-        seconds = self.statement_timeout_ms / 1000
+        engine = super().build_engine()
+        if not self.limits.timeout_ms:
+            return engine
+        seconds = self.limits.timeout_ms / 1000
 
         def start_timer(conn, cursor, statement, parameters, context, executemany):
             timer = threading.Timer(seconds, conn.connection.dbapi_connection.interrupt)
@@ -73,9 +60,10 @@ class DuckdbAdapter(BaseSQLAlchemyAdapter):
             if context.connection is not None:
                 stop_timer(context.connection)
 
-        event.listen(self.engine, "before_cursor_execute", start_timer)
-        event.listen(self.engine, "after_cursor_execute", stop_timer)
-        event.listen(self.engine, "handle_error", stop_timer_on_error)
+        event.listen(engine, "before_cursor_execute", start_timer)
+        event.listen(engine, "after_cursor_execute", stop_timer)
+        event.listen(engine, "handle_error", stop_timer_on_error)
+        return engine
 
     def dry_run(self, query: str) -> DryRunResult:
         try:

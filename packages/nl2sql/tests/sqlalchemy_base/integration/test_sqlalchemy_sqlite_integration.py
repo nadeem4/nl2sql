@@ -4,11 +4,19 @@ import pytest
 
 from nl2sql.adapters.sqlalchemy_base.adapter import BaseSQLAlchemyAdapter
 from nl2sql.adapters.sqlalchemy_base.models import QueryPlan, CostEstimate
+from nl2sql_sdk import ConnectionModel, IndexScope, Limits
+
+
+class _File(ConnectionModel):
+    database: str
 
 
 class _SQLiteTestAdapter(BaseSQLAlchemyAdapter):
-    def construct_uri(self, args):
-        return f"sqlite:///{args['database']}"
+    title = "Test SQLite"
+    connection_model = _File
+
+    def url(self, connection):
+        return f"sqlite:///{connection.database}"
 
     def explain(self, sql: str):
         return QueryPlan(plan_text="explain")
@@ -44,11 +52,7 @@ def sqlite_db_path(tmp_path):
 
 @pytest.fixture()
 def sqlite_adapter(sqlite_db_path):
-    return _SQLiteTestAdapter(
-        datasource_id="sqlite_test",
-        datasource_engine_type="sqlite",
-        connection_args={"database": str(sqlite_db_path)},
-    )
+    return _SQLiteTestAdapter("sqlite_test", _File(database=str(sqlite_db_path)), Limits())
 
 
 def test_execute_sql_returns_rows_and_metrics(sqlite_adapter):
@@ -82,7 +86,7 @@ def test_dry_run_rolls_back_transaction(sqlite_adapter):
 def test_fetch_schema_snapshot_includes_contract_and_metadata(sqlite_adapter):
     # Validates schema reflection because core depends on accurate contracts.
     # Arrange / Act
-    snapshot = sqlite_adapter.fetch_schema_snapshot()
+    snapshot = sqlite_adapter.fetch_schema_snapshot(IndexScope())
 
     # Assert
     table_key = "[main].[users]"
@@ -116,11 +120,7 @@ def test_execute_sql_fails_for_directory_database(tmp_path):
     # Arrange
     db_dir = tmp_path / "db_dir"
     db_dir.mkdir()
-    adapter = _SQLiteTestAdapter(
-        datasource_id="sqlite_test",
-        datasource_engine_type="sqlite",
-        connection_args={"database": str(db_dir)},
-    )
+    adapter = _SQLiteTestAdapter("sqlite_test", _File(database=str(db_dir)), Limits())
 
     # Act / Assert
     with pytest.raises(Exception):

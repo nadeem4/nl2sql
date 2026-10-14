@@ -4,7 +4,7 @@ from nl2sql.datasources.models import (
     DatasourceConfig,
     ConnectionConfig,
 )
-from nl2sql.datasources.protocols import DatasourceAdapterProtocol
+from nl2sql.datasources.protocols import DatasourceAdapter
 from nl2sql_sdk.contracts import AdapterRequest, ResultFrame
 from nl2sql_sdk.capabilities import DatasourceCapability
 
@@ -12,7 +12,7 @@ __all__ = [
     "DatasourceRegistry", 
     "DatasourceConfig",
     "ConnectionConfig",
-    "DatasourceAdapterProtocol",
+    "DatasourceAdapter",
     "AdapterRequest",
     "DatasourceCapability",
     "ResultFrame",

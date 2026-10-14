@@ -1,13 +1,15 @@
 import datetime
 import decimal
+import threading
 import time
 from pathlib import Path
-from typing import Dict, Any, Iterator, List, Optional
-from sqlalchemy import create_engine, inspect, text, Engine, select, func, table, column, case, literal_column, Connection
+from typing import Callable, Dict, Any, Iterator, List, Optional, Union
+from sqlalchemy import URL, create_engine, inspect, text, Engine, select, func, table, column, case, literal_column, Connection
 from sqlalchemy.engine.reflection import Inspector
 from sqlalchemy.sql import sqltypes
 from typing import Tuple
 from nl2sql_sdk.capabilities import DatasourceCapability
+from nl2sql_sdk.models import ConnectionCheck, ConnectionModel, IndexScope, Limits
 from nl2sql_sdk.contracts import (
     AdapterRequest,
     ResultError,
@@ -117,60 +119,56 @@ def _unprofiled(sa_type: Any) -> bool:
     return any(name in _type_name(sa_type).lower() for name in _UNPROFILED_NAMES)
 
 class BaseSQLAlchemyAdapter:
+    """The base of the SQLAlchemy adapters: connection, execution and schema reading.
+
+    A subclass sets the class attributes of ``DatasourceAdapter`` and
+    implements ``url`` and ``get_dialect``. Building one never connects: the
+    SQLAlchemy engine is created on first use, so the driver is imported then.
     """
-    Base class for all SQLAlchemy-based adapters.
-    Implements common logic for connection, execution, and schema fetching.
-    """
-    def __init__(self, datasource_id: str = None, datasource_engine_type: str = None, connection_args: Dict[str, Any] = None, **kwargs):
-        """Initializes the SQLAlchemy adapter.
+
+    interface_version = 2
+
+    def __init__(self, datasource_id: str, connection: ConnectionModel, limits: Limits,
+                 *, folder: Optional[Path] = None):
+        """Keeps the settings. Never connects.
 
         Args:
-            datasource_id (str, optional): The unique identifier for the datasource.
-            datasource_engine_type (str, optional): The engine type (e.g., 'postgres').
-            connection_args (Dict[str, Any], optional): The resolved connection arguments.
-            **kwargs: Additional configuration parameters like 'row_limit' and 'max_bytes'.
+            datasource_id: The datasource's id.
+            connection: The validated ``connection_model`` instance.
+            limits: The datasource's limits. Each adapter enforces
+                ``timeout_ms`` the way its driver allows (see ``build_engine``).
+            folder: The folder of the nl2sql.yaml the datasource came from, or
+                None for the working directory. A relative file path is read from it.
         """
-        self._datasource_id = datasource_id
-        self.datasource_engine_type = datasource_engine_type
-        self._row_limit = kwargs.get("row_limit")
-        self._max_bytes = kwargs.get("max_bytes")
-        
-        # SQLAlchemy has no generic statement timeout, so each adapter enforces
-        # this the way its driver allows (see its connect()).
-        self.statement_timeout_ms = kwargs.get("statement_timeout_ms")
-        self.execution_options = {}
-        # The folder of the nl2sql.yaml the datasource came from, or None for
-        # the working directory. File-based adapters read a relative path from it.
-        self.base_dir = kwargs.get("base_dir")
-
-        self.connection_args = connection_args
-        self.connection_string = self.construct_uri(connection_args)
-
-        self.engine: Engine = None
-        if self.connection_string:
-            self.connect()
+        self.datasource_id = datasource_id
+        self.connection = connection
+        self.limits = limits
+        self.folder = folder
+        self._engine: Optional[Engine] = None
+        self._engine_lock = threading.Lock()
 
     @property
-    def datasource_id(self) -> str:
-        return self._datasource_id
+    def engine(self) -> Engine:
+        """The SQLAlchemy engine, created on first use. Creating it does not connect either."""
+        with self._engine_lock:
+            if self._engine is None:
+                self._engine = self.build_engine()
+            return self._engine
 
-    @property
-    def row_limit(self) -> int:
-        return self._row_limit
+    def build_engine(self) -> Engine:
+        """Creates the SQLAlchemy engine from ``url``. Override to add driver settings."""
+        return create_engine(self.url(self.connection), pool_pre_ping=True)
 
-    @property
-    def max_bytes(self) -> int:
-        return self._max_bytes
+    def url(self, connection: ConnectionModel) -> Union[URL, str]:
+        """The SQLAlchemy URL for ``connection``. Build it with ``URL.create``, so credentials are escaped."""
+        raise NotImplementedError(f"Adapter {self.__class__.__name__} must implement url")
 
-    @property
     def default_schema(self) -> Optional[str]:
         """The schema an unqualified table name resolves to, or ``None`` if unknown.
 
         Policies read a plan table with no schema as a table in this schema.
         Asked of the database once and remembered.
         """
-        if not self.engine:
-            return None
         if not hasattr(self, "_default_schema"):
             try:
                 self._default_schema = inspect(self.engine).default_schema_name
@@ -180,46 +178,20 @@ class BaseSQLAlchemyAdapter:
         return self._default_schema
 
     def __str__(self):
-        return f"{self.datasource_id} ({self.datasource_engine_type})"
-
-    def construct_uri(self, args: Dict[str, Any]) -> str:
-        """
-        Constructs a SQLAlchemy URL from a connection dictionary.
-        Must be implemented by subclasses.
-        """
-        raise NotImplementedError(f"Adapter {self.__class__.__name__} must implement construct_uri")
-
-    def connect(self) -> None:
-        """Establishes a connection to the database.
-
-        Raises:
-            ValueError: If the connection string is missing.
-            Exception: If connection fails.
-        """
-        conn_str = self.connection_string
-        if not conn_str:
-             raise ValueError(f"Connection string is required for {self}")
-        try:
-            self.engine = create_engine(
-                conn_str, 
-                pool_pre_ping=True,
-                execution_options=self.execution_options
-            )
-        except Exception as e:
-            logger.error(f"Failed to connect to database: {e}")
-            raise
-
+        return f"{self.datasource_id} ({getattr(self, 'title', type(self).__name__)})"
 
     def local_path(self, path: str) -> str:
-        """A database file path: a relative one is read from ``base_dir``, when there is one."""
-        if not self.base_dir or path == ":memory:" or Path(path).is_absolute():
+        """A database file path: a relative one is read from ``folder``, when there is one."""
+        if not self.folder or path == ":memory:" or Path(path).is_absolute():
             return path
-        return (Path(self.base_dir) / path).as_posix()
+        return (Path(self.folder) / path).as_posix()
 
     def close(self) -> None:
-        """Disposes the connection pool. The engine calls it once, from ``engine.close()``."""
-        if self.engine is not None:
-            self.engine.dispose()
+        """Disposes the connection pool, if one was made. The engine calls it once, from ``engine.close()``."""
+        with self._engine_lock:
+            engine, self._engine = self._engine, None
+        if engine is not None:
+            engine.dispose()
 
     def capabilities(self) -> set[DatasourceCapability]:
         """Default capability set for SQL adapters.
@@ -251,13 +223,7 @@ class BaseSQLAlchemyAdapter:
 
         Returns:
             ResultFrame: The results of the query execution.
-
-        Raises:
-            RuntimeError: If the adapter is not connected.
         """
-        if not self.engine:
-            raise RuntimeError(f"Not connected to {self}")
-
         start = time.perf_counter()
         with self.engine.connect() as conn:
             result = self._run(conn, sql, parameters)
@@ -291,8 +257,6 @@ class BaseSQLAlchemyAdapter:
         if refused is not None:
             yield refused
             return
-        if not self.engine:
-            raise RuntimeError(f"Not connected to {self}")
         batch_size = max(1, int(batch_size))
         try:
             with self.engine.connect() as conn:
@@ -426,18 +390,12 @@ class BaseSQLAlchemyAdapter:
             logger.warning(f"Failed to list views in schema {schema} for {self}: {e}")
         return sorted(names)
 
-    def fetch_schema_contact(self) -> SchemaContract:
+    def fetch_schema_contact(self, scope: IndexScope) -> SchemaContract:
         """Fetches the schema contract for the connected datasource.
 
         Returns:
             SchemaContract: The contract containing tables, columns, and relationships.
-
-        Raises:
-            RuntimeError: If the adapter is not connected.
         """
-        if not self.engine:
-            raise RuntimeError(f"Not connected to {self}. Please verify the connection details.")
-
         exclude_schemas = {schema.lower() for schema in self.exclude_schemas}
         inspector = inspect(self.engine)
         tables_contract = {}
@@ -452,7 +410,9 @@ class BaseSQLAlchemyAdapter:
             for schema in sorted(schemas):
                 for table_name in self._relation_names(inspector, schema):
                     table_ref = TableRef(schema_name=schema, table_name=table_name)
-                    columns_contract = self._get_column_contract(inspector, conn, table_ref)
+                    if not scope.wants_table(table_ref):
+                        continue
+                    columns_contract = self._get_column_contract(inspector, conn, table_ref, scope)
                     fks = self._get_fk_cols(inspector, table_ref)
 
                     table_contract = TableContract(
@@ -464,22 +424,17 @@ class BaseSQLAlchemyAdapter:
 
         return SchemaContract(
             datasource_id=self.datasource_id,
-            engine_type=self.datasource_engine_type,
+            engine_type=self.get_dialect(),
             tables=tables_contract
         )
 
-    def fetch_schema_metadata(self) -> SchemaMetadata:
+    def fetch_schema_metadata(self, scope: IndexScope,
+                              on_table: Optional[Callable[[str], None]] = None) -> SchemaMetadata:
         """Fetches the schema metadata for the connected datasource.
 
         Returns:
             SchemaMetadata: The metadata containing tables, columns, and relationships.
-
-        Raises:
-            RuntimeError: If the adapter is not connected.
         """
-        if not self.engine:
-            raise RuntimeError(f"Not connected to {self}. Please verify the connection details.")
-
         exclude_schemas = {schema.lower() for schema in self.exclude_schemas}
         inspector = inspect(self.engine)
         tables_metadata = {}
@@ -494,6 +449,10 @@ class BaseSQLAlchemyAdapter:
             for schema in sorted(schemas):
                 for table_name in self._relation_names(inspector, schema):
                     table_ref = TableRef(schema_name=schema, table_name=table_name)
+                    if not scope.wants_table(table_ref):
+                        continue
+                    if on_table is not None:
+                        on_table(f"{schema}.{table_name}")
                     try:
                         row_count = self._get_row_count(conn, table_ref)
                     except Exception as e:
@@ -501,7 +460,7 @@ class BaseSQLAlchemyAdapter:
                         logger.warning(f"Failed to fetch row count for {self}: {table_ref.full_name}: {_driver_message(e)}")
                         row_count = 0
                     try:
-                        columns_metadata = self._get_columns_metadata(inspector, conn, table_ref, row_count)
+                        columns_metadata = self._get_columns_metadata(inspector, conn, table_ref, row_count, scope)
                     except Exception as e:
                         self._rollback(conn)
                         logger.warning(f"Failed to profile {table_ref.full_name} for {self}: {_driver_message(e)}")
@@ -524,30 +483,27 @@ class BaseSQLAlchemyAdapter:
 
         return SchemaMetadata(
             datasource_id=self.datasource_id,
-            engine_type=self.datasource_engine_type,
+            engine_type=self.get_dialect(),
             description="",
             domains=[],
             tables=tables_metadata
         )
 
-    def fetch_schema_snapshot(self) -> SchemaSnapshot:
-        """Fetches the schema metadata for the connected datasource.
+    def fetch_schema_snapshot(self, scope: IndexScope,
+                              on_table: Optional[Callable[[str], None]] = None) -> SchemaSnapshot:
+        """The schema of the tables and views ``scope`` wants, with their metadata.
 
-        Returns:
-            SchemaMetadata: The metadata containing tables, columns, and relationships.
-
-        Raises:
-            RuntimeError: If the adapter is not connected.
+        ``on_table`` is called with each table's ``schema.table`` as it is profiled.
         """
-
-        schema_contract = self.fetch_schema_contact()
-        schema_metadata = self.fetch_schema_metadata()
+        schema_contract = self.fetch_schema_contact(scope)
+        schema_metadata = self.fetch_schema_metadata(scope, on_table)
 
         return SchemaSnapshot(contract=schema_contract, metadata=schema_metadata)
 
 
-    def _get_columns_metadata(self, inspector: Inspector, conn: Connection, table_ref: TableRef, row_count: int) -> Dict[str, ColumnMetadata]:
-        """Each column's description and statistics, profiled one at a time.
+    def _get_columns_metadata(self, inspector: Inspector, conn: Connection, table_ref: TableRef, row_count: int,
+                              scope: IndexScope) -> Dict[str, ColumnMetadata]:
+        """Each wanted column's description and statistics, profiled one at a time.
 
         A column whose statistics query fails keeps no statistics, and the
         read-only transaction is rolled back so the failed statement cannot
@@ -558,6 +514,8 @@ class BaseSQLAlchemyAdapter:
 
         for col_info in inspector.get_columns(table_ref.table_name, schema=table_ref.schema_name):
             name, sa_type = col_info["name"], col_info["type"]
+            if not scope.wants_column(table_ref, name):
+                continue
             reason = min_max_skip_reason(sa_type)
             if reason:
                 skipped.append(f"{name} ({reason})")
@@ -596,7 +554,8 @@ class BaseSQLAlchemyAdapter:
         except Exception as e:
             logger.warning(f"Failed to roll back after a profiling error for {self}: {_driver_message(e)}")
 
-    def _get_column_contract(self, inspector: Inspector, conn: Connection, table_ref: TableRef) -> Dict[str, ColumnContract]:
+    def _get_column_contract(self, inspector: Inspector, conn: Connection, table_ref: TableRef,
+                             scope: IndexScope) -> Dict[str, ColumnContract]:
         columns_contract = {}
         try:
             pk = inspector.get_pk_constraint(table_ref.table_name, schema=table_ref.schema_name)
@@ -607,6 +566,8 @@ class BaseSQLAlchemyAdapter:
             logger.warning(f"Failed to fetch the primary key of {table_ref.full_name} for {self}: {e}")
             pk_cols = set()
         for col_info in inspector.get_columns(table_ref.table_name, schema=table_ref.schema_name):
+            if not scope.wants_column(table_ref, col_info["name"]):
+                continue
             columns_contract[col_info["name"]] = ColumnContract(
                 name=col_info["name"],
                 data_type=str(col_info["type"]),
@@ -758,15 +719,13 @@ class BaseSQLAlchemyAdapter:
         raise NotImplementedError(f"Adapter {self.__class__.__name__} must implement cost_estimate")
     
 
-    def test_connection(self) -> bool:
-        """
-        Tests the database connection by executing a simple query.
-        """
+    def test_connection(self) -> ConnectionCheck:
+        """Connects and runs ``SELECT 1``: ``ok`` with the server's version, or the driver's reason."""
         try:
             with self.engine.connect() as conn:
                 conn.execute(text("SELECT 1"))
-            return True
+                info = conn.dialect.server_version_info
         except Exception as e:
             logger.error(f"Connection test failed for {self}: {e}")
-            return False
-        
+            return ConnectionCheck(ok=False, message=_driver_message(e))
+        return ConnectionCheck(ok=True, server_version=".".join(str(part) for part in info) if info else None)

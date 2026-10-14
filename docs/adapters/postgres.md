@@ -9,22 +9,25 @@ This adapter extends `BaseSQLAlchemyAdapter`, leveraging automatic schema reflec
 **Type**: `postgres`
 
 ```yaml
-
+# datasources/my_db.yaml
+type: postgres
 connection:
-  type: "postgres"
-  host: "localhost"
+  host: localhost
   port: 5432
-  user: "postgres"
+  user: postgres
   password: "${env:DB_PASS}"
-  database: "my_db"
-  options:
-    sslmode: "require" # Optional: passed to query string
+  database: my_db
+  sslmode: require # disable, prefer (default), require or verify-full
 ```
+
+The keys are `PostgresConnection`'s
+(`nl2sql.adapters.postgres.adapter`), and any other key is an error; see
+[Connection](../configuration/datasources.md#connection).
 
 ### Connection Details
 
 * **Driver**: `psycopg2` (via `sqlalchemy`).
-* **URI Constructed**: `postgresql+psycopg2://{user}:{pass}@{host}:{port}/{db}?{options}`.
+* **URI Constructed**: `postgresql+psycopg2://{user}:{pass}@{host}:{port}/{db}?sslmode={sslmode}`.
   Built with SQLAlchemy's `URL.create`, so the user name and password are
   percent-escaped: a password containing `@ : / # %` works as written.
 
@@ -51,4 +54,4 @@ The Postgres adapter leverages native `EXPLAIN` capabilities for robust validati
 
 ### SSL Verification
 
-If connecting to Azure or AWS RDS with strict SSL, ensure you pass the CA certificate path in options or standard libpq environment variables, or use `sslmode: disable` for testing.
+If connecting to Azure or AWS RDS with strict SSL, ensure you pass the CA certificate path through the standard libpq environment variables (`PGSSLROOTCERT`), or use `sslmode: disable` for testing.

@@ -65,7 +65,7 @@ flowchart LR
 - **Chunking + Retrieval**: `SchemaChunkBuilder` produces typed chunks; the `Retriever` provides staged retrieval for routing and planning context, over the index store's live builds.
 - **Validation layer**: `LogicalValidatorNode` enforces schema correctness and RBAC.
 - **Execution layer**: `ExecutorNode` routes to capability-driven executor services (e.g., SQL executor).
-- **Adapter / Plugin backend**: adapters implement `DatasourceAdapterProtocol` and are discovered via entry points.
+- **Adapter / Plugin backend**: adapters implement `DatasourceAdapter` and are discovered via entry points.
 - **Artifact store**: executor results are persisted as Parquet artifacts and referenced by `ArtifactRef`.
 - **Observability**: structured logs, OpenTelemetry metrics, and audit events.
 

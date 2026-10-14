@@ -18,11 +18,12 @@ from nl2sql.adapters.sqlalchemy_base import BaseSQLAlchemyAdapter
 | **Automatic Stats** | Runs optimized generic SQL queries to fetch `min`, `max`, `null_percentage`, and `distinct_count` (see [Column statistics](#column-statistics)). |
 | **Connection Pooling** | Manages engine lifecycle and connection pools. |
 | **Transaction Safety** | Implements generic `dry_run` using transaction rollbacks. |
-| **Default Schema** | `default_schema` reports the schema an unqualified table resolves to (`inspect(engine).default_schema_name`); RBAC reads a two-part `datasource.table` policy entry as that table in this schema. |
+| **Default Schema** | `default_schema()` reports the schema an unqualified table resolves to (`inspect(engine).default_schema_name`); RBAC reads a two-part `datasource.table` policy entry as that table in this schema. |
 
 ### Column statistics
 
-`fetch_schema_snapshot()` profiles every column of every table and view on one
+`fetch_schema_snapshot(scope)` profiles every column of every table and view
+the datasource's [`index` scope](../configuration/datasources.md#index) wants, on one
 connection, one column at a time, so one column the database cannot profile
 does not fail the datasource's index:
 
@@ -49,45 +50,46 @@ does not fail the datasource's index:
 
 ### Required class attributes
 
-`interface_version = 1`, `driver_modules` (the DBAPI driver your URL names,
-for example `("psycopg2",)`) and `install_hint`. See
+`title`, `connection_model` (a `ConnectionModel` subclass), `driver_modules`
+(the DBAPI driver your URL names, for example `("psycopg2",)`) and
+`install_hint`. The base class sets `interface_version = 2`. See
 [Class attributes](sdk.md#class-attributes).
 
 ### Required Overrides
 
-#### `construct_uri(args: Dict[str, Any]) -> str`
+#### `url(connection) -> URL | str`
 
-Converts a configuration dictionary into a SQLAlchemy connection string.
-
-* **Args**: `args` - The `connection` dictionary from `datasources.yaml`.
-* **Returns**: A valid URL (e.g., `postgresql://...`).
+Turns the validated `connection_model` instance into a SQLAlchemy URL. Build it
+with `sqlalchemy.URL.create`, so a password holding `@ : / # %` is escaped.
 
 ### Optional Overrides
 
-#### `connect()`
+#### `build_engine() -> Engine`
 
-Override to provide custom connection arguments (e.g., timeouts, isolation levels).
+Creates the SQLAlchemy engine from `url(connection)`, on first use: building
+the adapter creates none. Override it to pass driver settings (timeouts,
+isolation levels).
 
-The base class keeps `statement_timeout_ms` but does not enforce it: SQLAlchemy has
+The base class keeps `limits.timeout_ms` but does not enforce it: SQLAlchemy has
 no generic statement timeout and silently ignores an `execution_options["timeout"]`.
-Each adapter enforces it in `connect()` the way its driver allows: Postgres with
+Each adapter enforces it in `build_engine()` the way its driver allows: Postgres with
 `statement_timeout`, MySQL with `MAX_EXECUTION_TIME`, SQL Server with pyodbc's
 query timeout, DuckDB by interrupting the connection. An adapter that does nothing
 here has no statement timeout.
 
 #### `close()`
 
-Disposes the connection pool. The engine calls an adapter's `close()`, when it
-has one, once, from `engine.close()`. Building an adapter never connects:
-`create_engine` opens no connection until the first query or `test_connection()`.
+Disposes the connection pool, if one was made. The engine calls an adapter's
+`close()` once, from `engine.close()`. Building an adapter never connects: the
+engine (and the driver import) is made on the first query or `test_connection()`.
 
 #### `local_path(path) -> str`
 
-For a file-based database. The engine passes each adapter `base_dir`, the
+For a file-based database. The engine passes each adapter `folder`, the
 folder of the `nl2sql.yaml` the datasource came from (None when the config was
 built in code). `local_path` reads a relative path from there, and leaves an
 absolute path and `:memory:` as they are. The SQLite and DuckDB adapters call it
-in `construct_uri`.
+in `url`.
 
 #### `get_dialect() -> str`
 

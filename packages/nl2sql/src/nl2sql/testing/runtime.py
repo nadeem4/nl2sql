@@ -6,7 +6,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, Dict, Optional, Union
 
-from nl2sql.config import LLM, Config, Embeddings, Policies, Settings, Storage
+from nl2sql.config import LLM, Config, Embeddings, Limits, Policies, Settings, Storage
 from nl2sql.execution.artifacts import ArtifactStore, ArtifactStoreConfig
 from nl2sql.policies import PolicyEngine
 
@@ -63,3 +63,14 @@ def fake_runtime(*, settings: Union[Settings, dict, None] = None, policies: Unio
     if "traces_dir" not in attrs:
         attrs["traces_dir"] = Path(tempfile.mkdtemp(prefix="nl2sql-traces-"))
     return FakeRuntime(config=config, **attrs)
+
+
+def stub_ds_registry(adapter: Any, *, limits: Optional[Limits] = None, **attrs: Any) -> SimpleNamespace:
+    """A datasource registry that gives ``adapter`` for every id, and ``limits`` as each datasource's.
+
+    For a test of one node: the nodes read a datasource's ``row_limit`` from
+    the registry, not from its adapter. Other keywords become attributes
+    (``supports=...``).
+    """
+    datasource = SimpleNamespace(limits=limits or Limits())
+    return SimpleNamespace(get_adapter=lambda _id: adapter, get_datasource=lambda _id: datasource, **attrs)

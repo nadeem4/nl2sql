@@ -1,10 +1,15 @@
+import difflib
 from pathlib import Path
-from typing import TYPE_CHECKING, Dict, List, Any, Optional, Set
+from typing import TYPE_CHECKING, Dict, List, Any, Optional, Set, Type, Union
 from threading import RLock
+
+from pydantic import BaseModel, SecretStr, ValidationError
+
+from nl2sql_sdk import ConnectionModel, IndexScope
 
 from nl2sql_sdk.capabilities import DatasourceCapability
 from nl2sql.common.logger import get_logger
-from nl2sql.datasources.protocols import DatasourceAdapterProtocol
+from nl2sql.datasources.protocols import DatasourceAdapter
 from nl2sql.registry import Registry
 from nl2sql.secrets import SecretManager
 from .models import SECRET_ARG_HINTS, _is_secret_arg  # noqa: F401
@@ -19,20 +24,34 @@ logger = get_logger(__name__)
 # ValidationError repr -- has to mask them by name first.
 
 
-def mask_connection_args(connection_args: Dict[str, Any]) -> Dict[str, Any]:
-    """Returns a copy of the connection args with secret values masked."""
+def mask_connection_args(connection_args: Union[Dict[str, Any], BaseModel]) -> Dict[str, Any]:
+    """Returns a copy of the connection settings with secret values masked."""
+    if isinstance(connection_args, BaseModel):
+        connection_args = {key: "***" if isinstance(value, SecretStr) else value
+                           for key, value in connection_args.model_dump().items()}
     return {
         key: ("***" if _is_secret_arg(key) and value else value)
         for key, value in (connection_args or {}).items()
     }
 
 
-def redact_connection_secrets(text: str, connection_args: Dict[str, Any]) -> str:
-    """Replaces every secret value from the connection args found in ``text``."""
-    for key, value in (connection_args or {}).items():
-        if _is_secret_arg(key) and isinstance(value, str) and value:
-            text = text.replace(value, "***")
-    return text
+def connection_errors(error: ValidationError, model: Type[BaseModel]) -> str:
+    """One line per problem in ``error``, naming the key; an unknown key suggests the field meant.
+
+    Built from the error's locations and types only, so it never holds a
+    value from the connection.
+    """
+    fields = list(model.model_fields)
+    lines = []
+    for problem in error.errors(include_input=False, include_url=False):
+        path = ".".join(str(part) for part in ("connection", *problem["loc"]))
+        if problem["type"] == "extra_forbidden":
+            close = difflib.get_close_matches(str(problem["loc"][-1]), fields, n=1, cutoff=0.6)
+            hint = f" Did you mean '{close[0]}'?" if close else f" The fields are: {', '.join(fields)}."
+            lines.append(f"{path}: unknown key '{problem['loc'][-1]}'.{hint}")
+        else:
+            lines.append(f"{path}: {problem['msg']}")
+    return " ".join(lines)
 
 
 class DatasourceRegistry:
@@ -54,7 +73,7 @@ class DatasourceRegistry:
         file path in a connection (a SQLite or DuckDB file) is read from there.
         None means the working directory.
         """
-        self._adapters: Dict[str, DatasourceAdapterProtocol] = {}
+        self._adapters: Dict[str, DatasourceAdapter] = {}
         self._datasources: Dict[str, "Datasource"] = {}
         self._capabilities: Dict[str, Set[str]] = {}
         self._unavailable: Dict[str, str] = {}
@@ -82,6 +101,28 @@ class DatasourceRegistry:
             for key, value in (connection or {}).items()
         }
 
+    def connection_for(self, adapter_cls: Any, datasource: "Datasource") -> ConnectionModel:
+        """``datasource.connection`` as an instance of the adapter's ``connection_model``.
+
+        A model instance is used as given. A dict has its references resolved
+        and is then validated, so an unknown key is an error that suggests
+        the field meant, and no message ever holds a value.
+
+        Raises:
+            ValueError: the connection does not validate, or is another adapter's model.
+        """
+        model = adapter_cls.connection_model
+        connection = datasource.connection
+        if isinstance(connection, model):
+            return connection
+        if isinstance(connection, BaseModel):
+            raise ValueError(f"connection is a {type(connection).__name__}; the '{datasource.type}' "
+                             f"adapter takes a {model.__name__}.")
+        try:
+            return model.model_validate(self.resolved_connection(connection))
+        except ValidationError as error:
+            raise ValueError(connection_errors(error, model)) from None
+
     def register_datasources(self, datasources: List["Datasource"]) -> None:
         """Registers every datasource that can be built; records the rest as unavailable.
 
@@ -96,39 +137,25 @@ class DatasourceRegistry:
             except Exception as e:
                 self.mark_unavailable(datasource.id, str(e) or type(e).__name__)
 
-    def register_datasource(self, datasource: "Datasource") -> DatasourceAdapterProtocol:
+    def register_datasource(self, datasource: "Datasource") -> DatasourceAdapter:
         """Builds the datasource's adapter, without connecting, and registers it.
 
         A ``Datasource`` with an ``adapter`` object is registered as given.
-        Otherwise ``type`` is loaded from the registry, every reference in
-        ``connection`` is resolved, and the adapter class is built with the
-        datasource's limits.
+        Otherwise ``type`` is loaded from the registry, ``connection`` is
+        validated against its ``connection_model`` (``connection_for``), and
+        the adapter class is built with it and the datasource's limits.
 
         Raises:
             RegistryError: the type is unknown, implements another interface
                 version, or its driver is not installed.
-            ValueError: a reference did not resolve, or the adapter rejected
-                the connection settings (with every secret masked).
+            ValueError: a reference did not resolve, or the connection does
+                not validate against the adapter's model (no value is shown).
         """
         adapter = datasource.adapter
         if adapter is None:
             adapter_cls = self._registry.load("adapter", datasource.type)
-            connection_args = self.resolved_connection(datasource.connection)
-            try:
-                adapter = adapter_cls(
-                    datasource_id=datasource.id,
-                    datasource_engine_type=datasource.type,
-                    connection_args=connection_args,
-                    statement_timeout_ms=datasource.limits.timeout_ms,
-                    row_limit=datasource.limits.row_limit,
-                    max_bytes=datasource.limits.max_bytes,
-                    base_dir=self._base_dir,
-                )
-            except Exception as e:
-                # A pydantic ValidationError renders the whole input dict, which
-                # now holds the plaintext password. Re-raise without the cause so
-                # neither the message nor the traceback carries it.
-                raise ValueError(redact_connection_secrets(str(e), connection_args)) from None
+            connection = self.connection_for(adapter_cls, datasource)
+            adapter = adapter_cls(datasource.id, connection, datasource.limits, folder=self._base_dir)
         capabilities = self._read_capabilities(datasource.id, adapter)
         with self._lock:
             self._adapters[datasource.id] = adapter
@@ -172,7 +199,7 @@ class DatasourceRegistry:
         with self._lock:
             return dict(self._unavailable)
 
-    def all_adapters(self) -> Dict[str, DatasourceAdapterProtocol]:
+    def all_adapters(self) -> Dict[str, DatasourceAdapter]:
         """Every built adapter by id, available or not: what ``check()`` connects to."""
         with self._lock:
             return dict(self._adapters)
@@ -216,7 +243,7 @@ class DatasourceRegistry:
     def _available(self, datasource_id: str) -> bool:
         return datasource_id in self._adapters and datasource_id not in self._unavailable
 
-    def get_adapter(self, datasource_id: str) -> DatasourceAdapterProtocol:
+    def get_adapter(self, datasource_id: str) -> DatasourceAdapter:
         """The adapter for an available datasource.
 
         Raises:
@@ -263,6 +290,12 @@ class DatasourceRegistry:
             datasource = self._datasources.get(datasource_id)
             return list(datasource.sample_questions) if datasource else []
 
+    def get_index_scope(self, datasource_id: str) -> IndexScope:
+        """The datasource's ``index`` scope; everything for an unknown id."""
+        with self._lock:
+            datasource = self._datasources.get(datasource_id)
+            return datasource.index if datasource else IndexScope()
+
     def get_capabilities(self, datasource_id: str) -> Set[str]:
         """Returns the capability flags for a datasource."""
         with self._lock:
@@ -283,7 +316,7 @@ class DatasourceRegistry:
             return False
         return self._normalize_capabilities(capabilities) <= declared
 
-    def list_adapters(self) -> List[DatasourceAdapterProtocol]:
+    def list_adapters(self) -> List[DatasourceAdapter]:
         """Every available adapter."""
         with self._lock:
             return [a for ds_id, a in self._adapters.items() if ds_id not in self._unavailable]

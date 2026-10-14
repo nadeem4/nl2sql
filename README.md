@@ -516,10 +516,9 @@ environment is written in the YAML as `${env:VAR}`, for example
   masking and no row-level security.
 - **Read-only is a database setting, not something the executor checks.** The
   plan type only allows `SELECT` and the generator only builds one, but the
-  executor does not inspect the SQL. A SQLite datasource can be opened read-only
-  at the driver level with `options.read_only: true` (SQLite's `mode=ro` URI),
-  and all three sample databases are; the write is then refused by SQLite
-  itself. No other dialect opens read-only, so on PostgreSQL, MySQL, SQL Server
+  executor does not inspect the SQL. A SQLite datasource is always opened
+  read-only at the driver level (SQLite's `mode=ro` URI), so a write is refused
+  by SQLite itself. No other dialect opens read-only yet, so on PostgreSQL, MySQL, SQL Server
   or DuckDB, **give the engine a read-only database user.**
 - **No authentication** in the CLI, playground or REST API. The CLI and
   playground take the role from the caller. The REST API takes it from a trusted

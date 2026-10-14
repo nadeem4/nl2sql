@@ -331,7 +331,8 @@ class GeneratorNode:
 
             # settings.results.row_limit is a resource ceiling; a datasource may set a lower one.
             ceiling = self.row_limit
-            row_limit = min(int(adapter.row_limit or ceiling), ceiling)
+            limit_set = self.ds_registry.get_datasource(datasource_id).limits.row_limit
+            row_limit = min(int(limit_set or ceiling), ceiling)
             limit = min(int(plan.limit or row_limit), row_limit)
             # A plan's own top-N is the answer; the adapter's cap is truncation.
             row_cap = row_limit if plan.limit is None or int(plan.limit) > row_limit else None

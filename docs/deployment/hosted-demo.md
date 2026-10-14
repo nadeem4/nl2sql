@@ -283,9 +283,8 @@ retrieval inspector read-only.
 
 ## Read-only sample data
 
-The demo's three SQLite databases are configured with `read_only: true` under
-their connection options, which opens them through SQLite's own URI form with
-`mode=ro`. The driver refuses a write before any SQL is parsed, under the RBAC
+The SQLite adapter opens every database file through SQLite's own URI form
+with `mode=ro`, so the demo's three databases are read-only with no setting. The driver refuses a write before any SQL is parsed, under the RBAC
 policy and the validator rather than instead of them. This is not specific to
 hosted mode: nothing in the engine writes to a demo database, so they are opened
 read-only everywhere.

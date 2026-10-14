@@ -1,4 +1,4 @@
-"""``statement_timeout_ms`` is enforced, not merely recorded.
+"""``limits.timeout_ms`` is enforced, not merely recorded.
 
 SQLAlchemy ignores an unknown ``execution_options["timeout"]``, so the base
 adapter must not pretend to set one; each adapter enforces the limit the way
@@ -12,8 +12,9 @@ from sqlalchemy import event
 from sqlalchemy.dialects.mssql.pyodbc import MSDialect_pyodbc
 
 from nl2sql_sdk.contracts import AdapterRequest
-from nl2sql.adapters.duckdb.adapter import DuckdbAdapter
-from nl2sql.adapters.mssql.adapter import MssqlAdapter
+from nl2sql_sdk import Limits
+from nl2sql.adapters.duckdb.adapter import DuckdbAdapter, DuckdbConnection
+from nl2sql.adapters.mssql.adapter import MssqlAdapter, MssqlConnection
 
 SLOW_SQL = "SELECT sum(range) FROM range(10000000000000)"
 
@@ -26,12 +27,8 @@ def _fake_pyodbc(monkeypatch):
 
 
 def _mssql(timeout_ms):
-    return MssqlAdapter(
-        datasource_id="ms",
-        datasource_engine_type="mssql",
-        connection_args={"type": "mssql", "host": "h", "user": "u", "password": "p", "database": "d"},
-        statement_timeout_ms=timeout_ms,
-    )
+    return MssqlAdapter("ms", MssqlConnection(host="h", user="u", password="p", database="d"),
+                        Limits(timeout_ms=timeout_ms))
 
 
 def test_mssql_sets_the_pyodbc_query_timeout_on_each_new_connection(monkeypatch):
@@ -68,16 +65,11 @@ def test_base_adapter_does_not_set_the_ignored_timeout_execution_option(monkeypa
     adapter = _mssql(1500)
 
     # Assert
-    assert "timeout" not in adapter.execution_options
+    assert "timeout" not in adapter.engine.get_execution_options()
 
 
 def _duckdb(timeout_ms):
-    return DuckdbAdapter(
-        datasource_id="duck",
-        datasource_engine_type="duckdb",
-        connection_args={"type": "duckdb", "database": ":memory:"},
-        statement_timeout_ms=timeout_ms,
-    )
+    return DuckdbAdapter("duck", DuckdbConnection(database=":memory:"), Limits(timeout_ms=timeout_ms))
 
 
 def test_duckdb_interrupts_a_query_that_outlives_the_timeout():

@@ -17,20 +17,22 @@ from nl2sql.execution.executor.sql_executor import SqlExecutorService
 from nl2sql.pipeline.graph_utils import SQL_AGENT_SUBGRAPH, resolve_subgraph
 from nl2sql.secrets.manager import SecretManager
 from nl2sql_sdk.capabilities import DatasourceCapability
-from nl2sql.testing import adapter_registry
+from nl2sql.testing import OpenConnection, adapter_registry
 from nl2sql.testing.runtime import fake_runtime
 
 SQL = DatasourceCapability.SUPPORTS_SQL
 
 
 class _Adapter:
-    interface_version = 1
+    interface_version = 2
+    title = "Stub"
+    connection_model = OpenConnection
     driver_modules = ()
     install_hint = ""
 
     caps = {SQL}
 
-    def __init__(self, datasource_id, datasource_engine_type, connection_args, **kwargs):
+    def __init__(self, datasource_id, connection, limits, *, folder=None):
         self.datasource_id = datasource_id
 
     def capabilities(self):
@@ -43,7 +45,7 @@ class _Adapter:
 
 
 class _Rest(_Adapter):
-    caps = {DatasourceCapability.SUPPORTS_REST}
+    caps = {"supports_rest"}
 
 
 class _Broken(_Adapter):
@@ -51,11 +53,13 @@ class _Broken(_Adapter):
 
 
 class _NoCapabilities:
-    interface_version = 1
+    interface_version = 2
+    title = "Stub"
+    connection_model = OpenConnection
     driver_modules = ()
     install_hint = ""
 
-    def __init__(self, datasource_id, datasource_engine_type, connection_args, **kwargs):
+    def __init__(self, datasource_id, connection, limits, *, folder=None):
         pass
 
 

@@ -3,74 +3,183 @@
 The SDK, `nl2sql-sdk` (imported as `nl2sql_sdk`), holds the interfaces an
 extension implements. It depends on pydantic and the standard library only.
 
-- Adapters: `nl2sql_sdk.protocols.DatasourceAdapterProtocol`, with
-  `nl2sql_sdk.contracts.AdapterRequest` and `nl2sql_sdk.contracts.ResultFrame`
+- Adapters: `nl2sql_sdk.DatasourceAdapter` (interface version 2), with the
+  models it is built from (`ConnectionModel`, `Limits`, `IndexScope`) and
+  returns (`ConnectionCheck`, `SchemaSnapshot`, `ResultFrame`)
 - Secret providers: `nl2sql_sdk.secrets.SecretProvider`
+<<<<<<< HEAD
 - Stores: the four protocols in `nl2sql_sdk.stores`
 - Policy checks: `nl2sql_sdk.policy.PolicyCheck`, with `UserContext` and
   `Grant`
+=======
+- Stores: `nl2sql_sdk.stores`
+>>>>>>> 1359f1a4 (feat(sdk): adapter SDK v2 contract, strict connection models and the index scope (B1))
 
-Everything is also exported from `nl2sql_sdk` itself.
+Everything but the stores is also exported from `nl2sql_sdk` itself.
 
-## Interface: `DatasourceAdapterProtocol`
-
-Adapters expose a capability-driven interface:
+## Interface: `DatasourceAdapter`
 
 ```python
-from nl2sql_sdk.protocols import DatasourceAdapterProtocol
-from nl2sql_sdk.contracts import AdapterRequest, ResultFrame
-from nl2sql_sdk.capabilities import DatasourceCapability
+from nl2sql_sdk import (AdapterRequest, ConnectionCheck, ConnectionModel, DatasourceAdapter,
+                        DatasourceCapability, IndexScope, Limits, ResultFrame, SchemaSnapshot)
+```
+
+The contract, version 2:
+
+```python
+class DatasourceAdapter(Protocol):
+    interface_version: ClassVar[int]   # 2
+    title: ClassVar[str]               # "PostgreSQL", for people and forms
+    connection_model: ClassVar[type[ConnectionModel]]
+    driver_modules: ClassVar[tuple[str, ...]]
+    install_hint: ClassVar[str]
+
+    def __init__(self, datasource_id: str, connection: ConnectionModel, limits: Limits,
+                 *, folder: Path | None = None) -> None: ...      # never connects
+    def capabilities(self) -> set[DatasourceCapability]: ...
+    def get_dialect(self) -> str: ...                  # a sqlglot dialect name
+    def default_schema(self) -> str | None: ...
+    def test_connection(self) -> ConnectionCheck: ...
+    def fetch_schema_snapshot(self, scope: IndexScope,
+                              on_table: Callable[[str], None] | None = None) -> SchemaSnapshot: ...
+    def execute(self, request: AdapterRequest) -> ResultFrame: ...
+    def close(self) -> None: ...
 ```
 
 ### Class attributes
 
-Three class attributes let the engine check an adapter before it builds one.
+The class attributes let the engine check an adapter, and show it to people,
+before it builds one.
 
 | Attribute | Type | Description |
 | :--- | :--- | :--- |
-| `interface_version` | `int` | The version of this interface the adapter was written for: `1`. The engine accepts exactly the version it was built for, and any other version is a load error. |
+| `interface_version` | `int` | The version of this interface the adapter was written for: `2`. The engine accepts exactly the version it was built for, and any other version is a load error. |
+| `title` | `str` | The database's name for people, such as `"PostgreSQL"`. |
+| `connection_model` | `type[ConnectionModel]` | The model the datasource's `connection` block is validated against. See [The connection model](#the-connection-model). |
 | `driver_modules` | `tuple[str, ...]` | The modules the adapter needs to connect, for example `("psycopg2",)`. The engine looks for each one with `importlib.util.find_spec` before it builds the adapter. |
 | `install_hint` | `str` | What to install when a driver module is missing, for example `pip install "nl2sql-engine[postgres]"`. |
-
-```python
-class SnowflakeAdapter:
-    interface_version = 1
-    driver_modules = ("snowflake.connector",)
-    install_hint = 'pip install "nl2sql-snowflake"'
-```
 
 The adapter module must import without its driver, so import the driver where
 it is used and not at the top of the module. The built-in adapters declare:
 
-| Adapter | `driver_modules` | Extra |
-| :--- | :--- | :--- |
-| `sqlite` | `("sqlite3",)` | none: `sqlite3` ships with Python |
-| `postgres` | `("psycopg2",)` | `nl2sql-engine[postgres]` |
-| `mysql` | `("pymysql",)` | `nl2sql-engine[mysql]` |
-| `mssql` | `("pyodbc",)` | `nl2sql-engine[mssql]`, plus Microsoft's ODBC driver |
-| `duckdb` | `("duckdb", "duckdb_engine")` | `nl2sql-engine[duckdb]` |
+| Adapter | `title` | `connection_model` | `driver_modules` | Extra |
+| :--- | :--- | :--- | :--- | :--- |
+| `sqlite` | SQLite | `SqliteConnection` | `("sqlite3",)` | none: `sqlite3` ships with Python |
+| `postgres` | PostgreSQL | `PostgresConnection` | `("psycopg2",)` | `nl2sql-engine[postgres]` |
+| `mysql` | MySQL | `MysqlConnection` | `("pymysql",)` | `nl2sql-engine[mysql]` |
+| `mssql` | SQL Server | `MssqlConnection` | `("pyodbc",)` | `nl2sql-engine[mssql]`, plus Microsoft's ODBC driver |
+| `duckdb` | DuckDB | `DuckdbConnection` | `("duckdb", "duckdb_engine")` | `nl2sql-engine[duckdb]` |
 
-### Mandatory Properties
+Each connection model is public, next to its adapter
+(`from nl2sql.adapters.postgres.adapter import PostgresConnection`).
 
-| Property | Type | Description |
-| :--- | :--- | :--- |
-| `datasource_id` | `str` | Unique identifier (e.g., "production_db"). |
-| `datasource_engine_type` | `str` | Engine type string (e.g., `postgres`, `rest`). |
-| `row_limit` | `int` | Safety breaker (limit returned rows). |
-| `max_bytes` | `int` | Safety breaker (limit payload size). |
+### The connection model
 
-### Mandatory Methods
+`ConnectionModel` is a pydantic model with `extra="forbid"` and
+`hide_input_in_errors=True`. Subclass it with one field per setting:
+
+```python
+from typing import Literal
+
+from pydantic import Field, SecretStr
+
+from nl2sql_sdk import ConnectionModel
+
+
+class PostgresConnection(ConnectionModel):
+    host: str = Field(title="Host", examples=["db.internal"])
+    port: int = Field(5432, title="Port")
+    database: str = Field(title="Database")
+    user: str = Field(title="User")
+    password: SecretStr = Field(title="Password")
+    sslmode: Literal["disable", "prefer", "require", "verify-full"] = Field(
+        "prefer", title="SSL mode", json_schema_extra={"group": "advanced"})
+```
+
+- **Strict.** An unknown key is an error that names the field it was probably
+  meant to be: `connection.hostname: unknown key 'hostname'. Did you mean
+  'host'?`. No error message holds a value from the connection.
+- **Validated when the adapter is built.** The engine resolves every
+  `${provider:key}` reference in the `connection` block, validates it against
+  `connection_model`, and passes the instance to the constructor. From Python,
+  `Datasource(connection=PostgresConnection(...))` passes an instance, which
+  is used as given; another adapter's model is refused.
+- **Secrets.** Declare a credential as `SecretStr`: it never prints, and its
+  JSON Schema is `"format": "password", "writeOnly": true`.
+- **The form.** `connection_model.model_json_schema()` describes the form for
+  connecting a database: `Field(title, description, examples)` label it, and
+  `json_schema_extra={"group": "advanced"}` marks a field to fold away.
+
+### The constructor
+
+`adapter_cls(datasource_id, connection, limits, *, folder=None)`:
+
+| Argument | What it is |
+| :--- | :--- |
+| `datasource_id` | The datasource's id. Keep it as `self.datasource_id`. |
+| `connection` | The validated `connection_model` instance. |
+| `limits` | The datasource's `Limits`: `row_limit`, `timeout_ms`, `max_bytes`, each `None` when unset. Enforce `timeout_ms` the way your driver allows. The engine caps a query's rows itself, from the datasource's `limits`. |
+| `folder` | The folder of the `nl2sql.yaml` the datasource came from, or `None` when the config was built in code. Read a relative file path from it. |
+
+The constructor must not connect: the adapter connects on first use, and
+`engine.check()` connects through `test_connection()`.
+
+### Methods
 
 #### `capabilities() -> set[DatasourceCapability]`
 
-Declares supported capabilities (e.g., `supports_sql`, `supports_rest`,
-`supports_bound_parameters`).
+Declares what the adapter does. Declare a flag only when it holds on a real
+server.
 
-`supports_bound_parameters` (`DatasourceCapability.SUPPORTS_BOUND_PARAMETERS`)
-says the adapter binds `AdapterRequest.parameters` by name to the `:name`
-placeholders in the SQL, and never pastes a value into the SQL text. The
-engine sends parameters (for a [verified query](../configuration/curated.md))
-only to an adapter that declares it. Every built-in SQLAlchemy adapter does.
+| Flag | Meaning |
+| :--- | :--- |
+| `SUPPORTS_SQL` | The adapter runs SQL requests (`plan_type="sql"`). The SQL agent serves only a datasource that declares it. |
+| `SUPPORTS_BOUND_PARAMETERS` | The adapter binds `AdapterRequest.parameters` by name to the `:name` placeholders in the SQL, and never pastes a value into the SQL text. The engine sends parameters (for a [verified query](../configuration/curated.md)) only to an adapter that declares it. Every built-in SQLAlchemy adapter does. |
+| `ENFORCES_READ_ONLY` | The session cannot write: an `INSERT` or `CREATE TABLE` through `execute` fails. |
+| `ENFORCES_TIMEOUT` | A statement running past `limits.timeout_ms` is stopped by the server or the driver. |
+
+#### `get_dialect() -> str`
+
+The **sqlglot** dialect name the engine renders SQL in: `postgres`, `tsql`,
+`mysql`, `duckdb`, `sqlite`, or any other name `sqlglot.Dialect.get_or_raise`
+accepts. It is not the SQLAlchemy dialect name (`postgresql`, `mssql`).
+
+#### `default_schema() -> str | None`
+
+The schema an unqualified table name resolves to, or `None` when unknown.
+Policies read a plan table with no schema as a table in this schema; without
+one, `main` is assumed.
+
+#### `test_connection() -> ConnectionCheck`
+
+Connects and reports what it found. It returns a failure rather than raising
+it:
+
+| Field | Meaning |
+| :--- | :--- |
+| `ok` | Whether the adapter connected. |
+| `stage` | Which stage failed: `config`, `driver`, `network`, `auth`, `database` or `permission`; `None` when the adapter cannot tell. |
+| `message` | Why, in one line, with no secret in it. |
+| `fix` | What to do about it, when the adapter knows. |
+| `server_version` | The server's version, when connected. |
+
+`engine.check()` calls it for each datasource and reports the stage, message
+and fix in the datasource's status.
+
+#### `fetch_schema_snapshot(scope, on_table=None) -> SchemaSnapshot`
+
+The schema of the tables and views the datasource's `index` scope wants, with
+their metadata. `scope` is an `IndexScope` (see
+[`index`](../configuration/datasources.md#index)): call
+`scope.wants_table(ref)` and `scope.wants_column(ref, column)` rather than
+matching its patterns yourself, and leave out your database's system schemas.
+`on_table` is called with each table's `schema.table` as it is read, for
+progress.
+
+The snapshot's `issues` list holds an `IndexIssue` (`table`, `column`,
+`stage`, `message`) for each table or column indexed without something, and
+each table's `row_count_source` says where its `row_count` came from:
+`catalog` (an estimate) or `exact` (a count).
 
 #### `execute(request: AdapterRequest) -> ResultFrame`
 
@@ -93,23 +202,10 @@ the engine names no database. SQLAlchemy adapters inherit it from
 `BaseSQLAlchemyAdapter` (see [SQLAlchemy adapters](sqlalchemy.md)). An exception
 that escapes `execute` is still caught, as a non-retryable `EXECUTOR_CRASH`.
 
-#### `fetch_schema_snapshot()`
+#### `close()`
 
-Required by every adapter; there is no capability flag gating it.
-
-### Optional Methods (SQL adapters)
-
-#### `dry_run(sql: str)`
-
-Validates SQL without executing it (or safely rolling back).
-
-#### `explain(sql: str)`
-
-Returns the execution plan.
-
-#### `cost_estimate(sql: str)`
-
-Returns cost/row estimates. The pipeline does not currently call it, and there is no capability flag for it: `DatasourceCapability` carries only what something queries.
+Releases the adapter's connections. The engine calls it once, from
+`engine.close()`, and when a datasource is removed.
 
 ### Optional hook: `render_sql(expression)`
 
