@@ -8,18 +8,10 @@ It defines the official API boundaries and ensures backward compatibility.
 from __future__ import annotations
 
 import pathlib
-from typing import Optional, Union
-from dataclasses import dataclass
+from typing import TYPE_CHECKING, Optional, Union
 
-from nl2sql.context import NL2SQLContext
-from nl2sql.api.query_api import QueryAPI, QueryResult
-from nl2sql.api.datasource_api import DatasourceAPI
-from nl2sql.api.llm_api import LLM_API
-from nl2sql.api.indexing_api import IndexingAPI
-from nl2sql.api.auth_api import AuthAPI
-from nl2sql.api.settings_api import SettingsAPI
-from nl2sql.api.policy_api import PolicyAPI
-from nl2sql.api.curated_api import CuratedAPI
+if TYPE_CHECKING:
+    from nl2sql.context import NL2SQLContext
 
 
 class NL2SQL:
@@ -60,6 +52,17 @@ class NL2SQL:
         policies_config_path = pathlib.Path(policies_config_path) if policies_config_path else None
         env_file = pathlib.Path(env_file) if env_file else None
 
+        # The runtime is imported here, not at the top of the module, so
+        # ``import nl2sql`` stays light (docs/architecture/invariants.md).
+        from nl2sql.context import NL2SQLContext
+        from nl2sql.api.query_api import QueryAPI
+        from nl2sql.api.datasource_api import DatasourceAPI
+        from nl2sql.api.llm_api import LLM_API
+        from nl2sql.api.indexing_api import IndexingAPI
+        from nl2sql.api.auth_api import AuthAPI
+        from nl2sql.api.settings_api import SettingsAPI
+        from nl2sql.api.policy_api import PolicyAPI
+        from nl2sql.api.curated_api import CuratedAPI
 
         self._ctx = NL2SQLContext(
             ds_config_path=ds_config_path,
