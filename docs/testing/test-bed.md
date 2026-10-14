@@ -5,7 +5,8 @@ real server behaves (catalogs, quoting, permissions, read-only sessions,
 timeouts) is tested against real servers instead: PostgreSQL, MySQL and SQL
 Server, each loaded with a well-known sample database and a large generated
 schema. One compose file, `testbed/docker-compose.yml`, defines all of it,
-and the same file runs on your machine and on GitHub's runners in CI.
+and the same file runs on your machine, on GitHub's runners in CI, and on one
+small GCP VM started on demand.
 
 The design is in [Phase 2, section 3](../architecture/phase2.md#3-the-real-database-test-bed).
 
@@ -176,6 +177,151 @@ The unit job in `test.yml` runs `pytest -m "not integration and not realdb"`.
 
 The scripts under `testbed/` have their own unit tests, which need no
 database: `packages/nl2sql/tests/unit/test_testbed.py` (the wide schema, the
-checksums, skipping what is there, and the gate) and
+checksums, skipping what is there, and the gate),
 `packages/nl2sql/tests/unit/test_realdb_fixtures.py` (the skip, the failure
-under `REALDB_REQUIRED=1`, and the variables).
+under `REALDB_REQUIRED=1`, and the variables) and
+`packages/nl2sql/tests/unit/test_testbed_vm.py` (`scripts/testbed.py`, against
+a fake `gcloud` on `PATH`).
+
+## The GCP VM
+
+The same compose file also runs on one small VM, `nl2sql-testbed` in project
+`nl2sql-testbed-261014`, zone `us-central1-a`. It is started for a session
+and stopped after it. There are no GitHub-to-GCP credentials: the owner, or an
+agent the owner asks, runs it by hand, at least once before each release.
+
+| Setting | Value |
+|---|---|
+| Machine | `e2-standard-2` (2 vCPU, 8 GB: SQL Server alone wants 2 GB), Debian 12 |
+| Docker | Installed with the compose plugin by the VM's startup script on its first boot |
+| Disk | 30 GB standard persistent disk. It keeps the images and the data volumes while the VM is stopped, so a later session skips the load. |
+| External IP | Ephemeral, for outbound traffic only (image pulls, sample downloads). It is released, and free, while the VM is stopped. |
+| Network | Its own VPC, `nl2sql-testbed`, so none of the default network's open rules apply. One firewall rule admits TCP 22, 15432, 13306 and 11433 from IAP's range `35.235.240.0/20` only: no database port is public. |
+| Access | IAP: `gcloud compute ssh` and `scp` with `--tunnel-through-iap`, and `gcloud compute start-iap-tunnel` for the three servers |
+| Passwords | Secret Manager: `testbed-postgres-root-password`, `testbed-mysql-root-password` and `testbed-mssql-root-password` |
+
+### `scripts/testbed.py`
+
+You need the Google Cloud CLI, logged in (`gcloud auth login`) as an account
+with the access listed below. The script is Python so that it runs the same on
+Windows and Linux; it finds `gcloud` on `PATH`.
+
+```bash
+python scripts/testbed.py run -- pytest -m realdb    # the usual way: up, the command, down
+python scripts/testbed.py up                         # or step by step
+python scripts/testbed.py status
+python scripts/testbed.py down
+```
+
+| Command | What it does |
+|---|---|
+| `up` | Reads the three passwords from Secret Manager into memory, starts the VM, copies `testbed/` to it (never a local `testbed/.env`), runs `docker compose up -d --wait` there with `TESTBED_BIND=0.0.0.0`, then opens the three IAP tunnels in the background and waits until `localhost:15432`, `13306` and `11433` answer. The first session loads the samples, which takes several minutes. |
+| `run -- <cmd>` | `up`, then `<cmd>` with `REALDB_POSTGRES`, `REALDB_MYSQL` and `REALDB_MSSQL` pointing at the tunnels, then `down` in a `finally`: also after Ctrl-C, a failing command or a failed `up`. It exits with the command's code. |
+| `down` | Closes the tunnels it opened and stops the VM. Safe to run again. |
+| `status` | The VM's state, how long it has been running, and whether each tunnel answers. Never a password. |
+
+`--project`, `--zone` and `--instance` override the defaults above.
+
+The passwords reach the VM on the stdin of the `docker compose` command, so
+they live only in that command's environment there, and reach `<cmd>` through
+its own environment. They are never written to a file, put on a command line
+or printed, and the script never changes its own environment. The tunnels'
+process ids are kept in `nl2sql-testbed/tunnels.json` in the system's
+temporary folder, so a later `down` can close them.
+
+After `up` on its own, remember `down`: a running VM bills by the hour. If
+the script is killed hard or the VM is started by hand, the nightly stop job
+below stops it at 03:00 UTC.
+
+### Cost controls
+
+| Control | Why |
+|---|---|
+| The VM is stopped whenever no session runs | A running VM bills by the hour |
+| Ephemeral external IP only | Released, and free, while stopped |
+| No public database port; IAP's range only | Nothing else can reach the servers |
+| `run` always stops the VM in a `finally` | A failed test cannot leave it running |
+| The nightly stop at 03:00 UTC | The backstop for everything above |
+| A budget of $10 a month with alerts | The last line |
+
+| Item | Approximate cost (check the billing report after the first month) |
+|---|---|
+| Stopped | the 30 GB disk: about $1 to $2 a month |
+| Running | about $0.07 an hour |
+| The scheduler job | free: one job is inside Cloud Scheduler's free tier |
+
+### Access
+
+The owner's account holds `roles/owner` on the project, which covers both the
+set-up below and `scripts/testbed.py`. Anyone else who runs the script needs:
+
+| Role | For |
+|---|---|
+| `roles/compute.instanceAdmin.v1` | starting, stopping and describing the VM, and the SSH key `gcloud compute ssh` adds to it |
+| `roles/iap.tunnelResourceAccessor` | `--tunnel-through-iap` and `start-iap-tunnel` |
+| `roles/secretmanager.secretAccessor` on the three secrets | the passwords |
+
+### One-time set-up
+
+Nothing in the repository creates cloud resources. The owner runs these once,
+in a `bash` shell (Git Bash on Windows) logged in to `gcloud`. The three
+secrets already exist.
+
+```bash
+PROJECT=nl2sql-testbed-261014
+REGION=us-central1
+ZONE=us-central1-a
+VM=nl2sql-testbed
+STOPPER=testbed-stopper@$PROJECT.iam.gserviceaccount.com
+
+# 1. The APIs.
+gcloud services enable compute.googleapis.com iap.googleapis.com cloudscheduler.googleapis.com \
+    billingbudgets.googleapis.com --project=$PROJECT
+
+# 2. A network of its own, so the default network's open SSH and RDP rules do not apply.
+gcloud compute networks create nl2sql-testbed --subnet-mode=custom --project=$PROJECT
+gcloud compute networks subnets create nl2sql-testbed --network=nl2sql-testbed \
+    --region=$REGION --range=10.10.0.0/24 --project=$PROJECT
+
+# 3. The one inbound rule: SSH and the three servers, from IAP's range only.
+gcloud compute firewall-rules create nl2sql-testbed-allow-iap --network=nl2sql-testbed \
+    --direction=INGRESS --action=ALLOW --rules=tcp:22,tcp:15432,tcp:13306,tcp:11433 \
+    --source-ranges=35.235.240.0/20 --target-tags=nl2sql-testbed --project=$PROJECT
+
+# 4. The VM: e2-standard-2, Debian 12, a 30 GB standard disk, an ephemeral external IP,
+#    no service account. Its startup script installs Docker and the compose plugin once.
+gcloud compute instances create $VM --project=$PROJECT --zone=$ZONE \
+    --machine-type=e2-standard-2 --image-family=debian-12 --image-project=debian-cloud \
+    --boot-disk-size=30GB --boot-disk-type=pd-standard \
+    --network=nl2sql-testbed --subnet=nl2sql-testbed --tags=nl2sql-testbed \
+    --no-service-account --no-scopes \
+    --metadata=startup-script='#!/bin/bash
+command -v docker >/dev/null || curl -fsSL https://get.docker.com | sh'
+gcloud compute instances stop $VM --zone=$ZONE --project=$PROJECT    # stopped until a session needs it
+
+# 5. The nightly stop: a service account that may only stop this VM, and a scheduler job
+#    that calls the Compute Engine API with its token at 03:00 UTC.
+gcloud iam service-accounts create testbed-stopper --display-name="Stops the test-bed VM" --project=$PROJECT
+gcloud iam roles create testbedStopper --project=$PROJECT --title="Test-bed stopper" \
+    --permissions=compute.instances.stop --stage=GA
+gcloud compute instances add-iam-policy-binding $VM --zone=$ZONE --project=$PROJECT \
+    --member=serviceAccount:$STOPPER --role=projects/$PROJECT/roles/testbedStopper
+gcloud scheduler jobs create http nl2sql-testbed-nightly-stop --project=$PROJECT --location=$REGION \
+    --schedule="0 3 * * *" --time-zone=Etc/UTC --http-method=POST \
+    --uri=https://compute.googleapis.com/compute/v1/projects/$PROJECT/zones/$ZONE/instances/$VM/stop \
+    --oauth-service-account-email=$STOPPER \
+    --oauth-token-scope=https://www.googleapis.com/auth/cloud-platform
+
+# 6. The budget: $10 a month, with alerts at 50%, 90% and 100%.
+BILLING=$(gcloud billing projects describe $PROJECT --format='value(billingAccountName)')
+gcloud billing budgets create --billing-account=${BILLING#billingAccounts/} \
+    --display-name="nl2sql test bed" --budget-amount=10USD \
+    --filter-projects=projects/$PROJECT \
+    --threshold-rule=percent=0.5 --threshold-rule=percent=0.9 --threshold-rule=percent=1.0
+```
+
+To check the set-up, run `python scripts/testbed.py run -- pytest -m realdb`.
+To check the nightly job, start the VM with `python scripts/testbed.py up`,
+run `gcloud scheduler jobs run nl2sql-testbed-nightly-stop --location=$REGION --project=$PROJECT`,
+and `python scripts/testbed.py status` should then show it stopped; finish
+with `python scripts/testbed.py down` to close the tunnels.
