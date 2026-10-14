@@ -2,7 +2,7 @@
 
 ## Overview
 
-- Validates the AST plan (`PlanModel`) against schema and RBAC policies.
+- Validates the AST plan (`PlanModel`) against schema and policies.
 - Exists to enforce correctness and security before SQL generation.
 - Sits between `ASTPlannerNode` and `GeneratorNode` in the SQL agent subgraph.
 - Class: `LogicalValidatorNode`
@@ -14,13 +14,13 @@
 
 - Validate aliases, joins, and column references.
 - Reject any plan the generator could not build (see *Buildability* below).
-- Enforce RBAC table access using strict datasource namespacing.
+- Enforce table access through the caller's `Scope`, with strict datasource namespacing.
 
 Literal filter values are **not** validated against a column's sampled values.
 The adapter records every value of a text column with at most 50 distinct
 values, but only the five most frequent of a larger one: a retrieval hint, not
 the column's domain. Treating it as an allowlist rejected correct filters on
-any higher-cardinality column. Safety comes from the RBAC
+any higher-cardinality column. Safety comes from the policy
 table allowlist and from schema resolution, neither of which depends on stats.
 A value that turns out not to exist is caught after execution instead, and
 only when the result is empty (see
@@ -99,7 +99,7 @@ From `SubgraphExecutionState`:
 
 - `ast_planner_response.plan` (required)
 - `relevant_tables` (required)
-- `user_context` (required for RBAC)
+- `user_context` (required for the policy check)
 - `sub_query.datasource_id` (required for namespacing)
 - `sub_query.expected_schema` (optional validation)
 
@@ -178,12 +178,18 @@ Side effects:
    - `_validate_buildable()` runs last and is the **buildability** check: it
      calls the generator's own `_build_query()` and throws the tree away. See
      below.
-3. Run `_validate_policy()` for RBAC enforcement. This always runs, even when
+3. Run `_validate_policy()` for policy enforcement. This always runs, even when
    static validation failed or raised — the security check is never skipped.
+   It asks the caller's `Scope` (`ctx.policy_engine.scope(user_context,
+   datasource_id)`, the same one the schema retriever hid tables with) about
+   every table in the plan. The schema retriever never showed the planner a
+   denied table, so a plan that names one anyway is a model naming a table it
+   was not given, and is refused here.
    Each forbidden table yields a `CRITICAL` `SECURITY_VIOLATION` whose message
    is "You do not have permission to see the data this question requires."
-   (it names nothing), with `details` = `{datasource_id, table, roles}` for the
-   trace, and a warning log line. `policies.refusal_names_tables: true` puts the role
+   (it names nothing), with `details` = `{datasource_id, table, roles, rule}`
+   for the trace (`rule` is `Scope.rule_for`: the deny pattern, or the missing
+   allow), and a warning log line. `policies.refusal_names_tables: true` puts the role
    and table in the message instead. An unknown role, or no role, allows no
    table and is refused the same way. The decision reads only the policy and
    the plan's table list, never the model's reasoning.

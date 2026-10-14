@@ -33,8 +33,8 @@ before the generator is reached. That node:
 
 - resolves every column against the retrieved schema snapshot using
   `sqlglot.optimizer.qualify`;
-- enforces RBAC table policy via `RBAC.get_allowed_tables()`
-  ([`auth/rbac.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/auth/rbac.py)),
+- enforces the table policy through the caller's `Scope`
+  ([`policies/scope.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/policies/scope.py)),
   failing closed when no datasource ID is present.
 
 An unvalidated plan never becomes SQL, so it never reaches an adapter. This is
@@ -103,7 +103,7 @@ Neither is isolation in any case.
 
 | Mechanism | Module | What it bounds |
 | :--- | :--- | :--- |
-| AST validation + RBAC | `pipeline/nodes/validator/node.py` | What SQL may be generated at all |
+| AST validation + policies | `pipeline/nodes/validator/node.py` | What SQL may be generated at all |
 | `CancellationToken` | `common/cancellation.py` | One run, cooperatively |
 | `global_timeout_sec` | `pipeline/runtime.py` | How long the caller waits |
 | `VECTOR_BREAKER` | `common/resilience.py` | Vector retrieval only |

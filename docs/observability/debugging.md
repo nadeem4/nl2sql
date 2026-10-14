@@ -174,11 +174,10 @@ object in `outputs`: what the vector search retrieved and how MMR chose among it
   that entry's `llm_calls`, not in `retrieval`.
 
 The record carries entry ids and names, never an entry's embedded text, which
-for a column holds its statistics and sample values. It follows the prompt's
-rule, "structure yes, data no": a column entry of a table the run's role
-cannot read keeps its name, rank and whether it was picked, and its scores are
-`null` with a `withheld` note, because a similarity to text that contains
-sample values says something about those values. The record is built from the
+for a column holds its statistics and sample values. A table the run's role
+may not read is never searched at all (the searches run over the readable
+tables only, and the filter records how many as `searched_tables`), so it
+never appears in the record. The record is built from the
 numbers MMR computes anyway, so it is always there and costs no extra search.
 
 The file records what happened. A sub-query's `status` reflects its final
