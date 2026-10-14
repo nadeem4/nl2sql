@@ -119,6 +119,7 @@ ollama = "nl2sql.llm.providers:OLLAMA"
 [project.entry-points."nl2sql.embeddings"]
 local = "nl2sql.embeddings.local:LOCAL"
 openai = "nl2sql.embeddings.openai:OPENAI"
+openai_compatible = "nl2sql.embeddings.openai:OPENAI_COMPATIBLE"
 
 [project.entry-points."nl2sql.secrets"]
 env = "nl2sql.secrets.providers.env:EnvSecretProvider"

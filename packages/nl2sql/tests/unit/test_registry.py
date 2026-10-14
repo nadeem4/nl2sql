@@ -151,7 +151,8 @@ def test_a_name_in_code_replaces_an_installed_one_only_when_asked(monkeypatch):
 @pytest.mark.parametrize("kind", ["llm", "embeddings", "secrets"])
 def test_every_kind_has_add_and_a_decorator(kind):
     registry = Registry.empty()
-    thing = types.SimpleNamespace(interface_version=1, requires=(), install_hint="")
+    thing = types.SimpleNamespace(interface_version=registry_module.INTERFACE_VERSIONS[kind], requires=(),
+                                  install_hint="")
 
     getattr(registry, f"add_{kind}")("a", thing)
     getattr(registry, kind)("b")(thing)
@@ -180,7 +181,7 @@ def test_the_built_ins_are_declared_in_pyproject():
 
     assert set(_declared("nl2sql.adapters")) == {"duckdb", "mssql", "mysql", "postgres", "sqlite"}
     assert set(_declared("nl2sql.llms")) == set(PROVIDER_PRESETS)
-    assert set(_declared("nl2sql.embeddings")) == {"local", "openai"}
+    assert set(_declared("nl2sql.embeddings")) == {"local", "openai", "openai_compatible"}
     assert set(_declared("nl2sql.secrets")) == {"env", "aws", "azure", "hashicorp"}
 
 
@@ -196,11 +197,11 @@ def test_every_built_in_llm_provider_loads(name):
     assert provider.interface_version == 1
 
 
-@pytest.mark.parametrize("name", ["local", "openai"])
+@pytest.mark.parametrize("name", ["local", "openai", "openai_compatible"])
 def test_every_built_in_embeddings_provider_loads(name):
     provider = Registry.default().load("embeddings", name)
-    assert provider.interface_version == 1
-    assert provider.default_model
+    assert provider.interface_version == 2
+    assert provider.describe
 
 
 @pytest.mark.parametrize("name", ["env", "aws", "azure", "hashicorp"])

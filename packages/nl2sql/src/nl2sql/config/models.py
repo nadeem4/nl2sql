@@ -204,6 +204,8 @@ class Embeddings(_Model):
     provider: Optional[str] = None
     model: Optional[str] = None  # None: the provider's default
     api_key: Optional[Secret] = None  # None: the provider's standard variable
+    base_url: Optional[str] = None  # openai and openai_compatible; an error for local
+    dimension: Optional[PositiveInt] = None  # None: the provider's, else probed with one call
     instance: Any = None  # an embeddings object (code only)
 
     @model_validator(mode="after")
