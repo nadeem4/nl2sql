@@ -2,22 +2,9 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any, Dict, Optional
 
 from nl2sql.runtime import Runtime
-
-
-def read_trace(directory: Path, trace_id: str) -> Optional[Dict[str, Any]]:
-    """The trace ``trace_id`` in ``directory``, or None when there is none.
-
-    Raises:
-        ValueError: ``trace_id`` is not a plain token, or the file is not a trace.
-    """
-    from nl2sql.tracing.document import find_trace, load_trace
-
-    path = find_trace(trace_id, Path(directory))
-    return load_trace(path) if path is not None else None
 
 
 class TracesAPI:
@@ -29,19 +16,23 @@ class TracesAPI:
     def get(self, trace_id: str) -> Optional[Dict[str, Any]]:
         """One recorded run's trace document, by its ``trace_id``, or None when none was kept.
 
-        Read only from ``<storage.path>/traces``: the id must be a plain token
+        Read from the trace store (``storage.traces``; the ``files`` store
+        reads ``<storage.path>/traces``). The id must be a plain token
         (letters, digits, ``-`` and ``_``), so no id can name a file elsewhere.
-        Which runs are kept is ``settings.traces.mode``.
+        Which runs are kept is ``settings.traces.mode``, and for how long the
+        store's ``max_age_days``.
 
         Raises:
             ValueError: ``trace_id`` is not a plain token, or the file is not a trace.
         """
-        return read_trace(self._ctx.traces_dir, trace_id)
+        from nl2sql.tracing.document import validate_trace_id
+
+        return self._ctx.traces.get(validate_trace_id(trace_id))
 
     def replay(self, trace: Dict[str, Any]):
         """Re-run a traced question, answering every LLM call from the recording. No model is called.
 
-        ``trace`` is a trace document, as written under ``<storage.path>/traces``.
+        ``trace`` is a trace document, as ``get`` returns it.
         The replay runs the real pipeline against the same datasources, on a
         runtime of its own, so the engine's config and LLMs never change.
 

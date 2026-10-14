@@ -117,6 +117,7 @@ engine.curated       # validate, test
 engine.results       # manifest, page, csv
 engine.feedback      # record, list, stats, export, clear
 engine.traces        # get, replay
+engine.storage       # info, purge
 engine.benchmark     # run_matrix, run_tier1, run_retrieval, tier2_configs, run_tier2
 ```
 
@@ -187,10 +188,21 @@ engine.feedback.stats()["feedback"]   # {'up': 1, 'down': 0, 'up_rate': 1.0, 'do
 ### Traces
 
 `engine.traces.get(trace_id)` returns one recorded run's trace document, or
-`None` when none was kept (which runs are kept is `settings.traces.mode`). It
-reads only `<storage.path>/traces`, and the id must be a plain token (letters,
-digits, `-` and `_`), so no id can name a file elsewhere: anything else raises
-`ValueError`, as does a file in another trace format.
+`None` when none was kept (which runs are kept is `settings.traces.mode`, and
+for how long the trace store's `max_age_days`). It reads through the trace
+store, `storage.traces` (the `files` store reads only `<storage.path>/traces`),
+and the id must be a plain token (letters, digits, `-` and `_`), so no id can
+name a file elsewhere: anything else raises `ValueError`, as does a file in
+another trace format.
+
+### Storage
+
+`engine.storage.info()` returns each store slot's `type` and `location` (and
+`max_age_days` for the traces and results stores that have it) and the current
+index `namespace`. `engine.storage.purge()` deletes the traces and results
+older than their store's `max_age_days` and returns the counts,
+`{"traces": 3, "results": 12}`. See
+[Storage → Retention](../../configuration/storage.md#retention).
 
 `engine.traces.replay(trace)` re-runs a recorded question, answering every LLM
 call from the trace document (no model is called), on a runtime of its own so

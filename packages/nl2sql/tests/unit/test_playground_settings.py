@@ -24,7 +24,8 @@ from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
 
 from nl2sql.api.query_api import QueryResult
-from nl2sql.execution.artifacts import ArtifactStore, ArtifactStoreConfig
+from nl2sql.execution.artifacts import ArtifactStore
+from nl2sql.storage.local import LocalResults
 from nl2sql.llm.providers import VERIFIED_OPENAI_MODELS, mask_key
 from nl2sql.cli.commands.demo import _key_from_env_file
 from nl2sql.cli.demo.playground.app import build_app
@@ -32,6 +33,7 @@ from nl2sql import NL2SQL, load_config
 from nl2sql.llm import LLMRegistry
 from nl2sql.registry import Registry
 from nl2sql.runtime import StorePaths
+from nl2sql.storage.files import FilesTraces
 from nl2sql.secrets import SecretManager
 from nl2sql.testing.config import make_config
 
@@ -98,13 +100,11 @@ class _Context:
         self.llm_registry = LLMRegistry(SecretManager())
         self.registry = Registry.default()
         self.stores = StorePaths.under(project / ".nl2sql")
-        self.traces_dir = project / "traces"
+        self.traces = FilesTraces(project / "traces")
         self.config = load_config(project / "nl2sql.yaml")
         self.replace_llm(self.config.llm)
         self.tenant_id = "default_tenant"
-        self.artifact_store = ArtifactStore(ArtifactStoreConfig(
-            base_uri=str(project / "artifacts"),
-            path_template="<tenant_id>/<request_id>/<sub_query_id>.parquet"))
+        self.artifact_store = ArtifactStore(LocalResults(str(project / "artifacts")), path_template="<tenant_id>/<request_id>/<sub_query_id>.parquet")
 
 
     def replace_llm(self, llm, **kwargs):

@@ -11,38 +11,33 @@ from rich.table import Table
 from typing_extensions import Annotated
 
 from nl2sql.cli.console import console
-from nl2sql.cli.common.engine import store_paths
-from nl2sql.tracing.document import find_trace, load_trace
+from nl2sql.cli.common.engine import build_engine
+from nl2sql.tracing.document import load_trace
 
 app = typer.Typer(help="Inspect and replay run traces.", no_args_is_help=True)
 
 _STYLE = {"ok": "green", "warning": "yellow", "error": "red", "unfinished": "red"}
 
 
-def _resolve(ctx: typer.Context, target: str) -> pathlib.Path:
-    """A trace file path, or the newest file for a trace id in ``<storage.path>/traces``."""
-    path = pathlib.Path(target)
-    if path.is_file():
-        return path
-    traces = store_paths(ctx).traces
-    try:
-        found = find_trace(target, traces)
-    except ValueError:
-        found = None
-    if found is None:
-        console.print(f"[red][ERROR][/red] No trace file or trace id {escape(target)!s} "
-                      f"(looked in {escape(str(traces.resolve()))}).", soft_wrap=True)
-        raise typer.Exit(1)
-    return found
-
-
 def _load(ctx: typer.Context, target: str) -> Dict[str, Any]:
-    path = _resolve(ctx, target)
+    """A trace file, or the trace with id ``target`` in the configured trace store (``engine.traces.get``)."""
+    path = pathlib.Path(target)
     try:
-        return load_trace(path)
+        if path.is_file():
+            return load_trace(path)
+        engine = build_engine(ctx, check=False)
+        try:
+            doc = engine.traces.get(target)
+        finally:
+            engine.close()
     except ValueError as exc:
-        console.print(f"[red][ERROR][/red] {escape(str(exc))}")
+        console.print(f"[red][ERROR][/red] {escape(str(exc))}", soft_wrap=True)
         raise typer.Exit(1)
+    if doc is None:
+        console.print(f"[red][ERROR][/red] No trace file or trace id {escape(target)!s} "
+                      "in the trace store (storage.traces).", soft_wrap=True)
+        raise typer.Exit(1)
+    return doc
 
 
 def _tokens(node: Dict[str, Any]) -> int:
@@ -76,7 +71,7 @@ def first_failure(nodes: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
 
 @app.command("show")
 def show(ctx: typer.Context,
-         target: Annotated[str, typer.Argument(help="A trace file, or a trace id in <storage.path>/traces")]):
+         target: Annotated[str, typer.Argument(help="A trace file, or a trace id in the trace store")]):
     """Print a run's timeline: each node, attempt, duration, tokens, status and errors."""
     doc = _load(ctx, target)
     request = doc.get("request") or {}

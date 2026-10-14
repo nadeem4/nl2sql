@@ -17,6 +17,7 @@ from nl2sql.api.query_api import QueryResult, SubQueryResult
 from nl2sql.cli.demo.playground.app import build_app
 from nl2sql.feedback import FeedbackStore
 from nl2sql.runtime import StorePaths
+from nl2sql.storage.files import FilesTraces
 from nl2sql.testing.config import make_config
 
 TRACE_ID = "0b8f7d2e-1111-4222-8333-944455556666"
@@ -28,7 +29,7 @@ class _Engine(NL2SQL):
     def __init__(self, data, feedback=True):
         config = make_config(data / "config", settings={"feedback": {"enabled": feedback}})
         self._runtime = type("Ctx", (), {"schema_store": None, "vector_store": None, "ds_registry": None,
-                                         "stores": StorePaths.under(data), "traces_dir": data / "traces",
+                                         "stores": StorePaths.under(data), "traces": FilesTraces(data / "traces"),
                                          "config": config})()
 
     @property

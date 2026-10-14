@@ -23,9 +23,16 @@ one is still set from by the CLI and the playground is in brackets.
 | `settings.traces.sample_rows` | `50` | Result rows kept in the trace. |
 | `settings.traces.max_field_chars` | `20000` | Longest string kept in a node's recorded inputs and outputs. |
 
-Traces are written to `<storage.path>/traces/` (see
-[Storage](../configuration/storage.md)); `nl2sql init` puts `storage.path` in
-`.gitignore`.
+Traces are written through the trace store in `storage.traces` (see
+[Storage](../configuration/storage.md)). The built-in `files` store writes them
+to `<storage.path>/traces/`; `nl2sql init` puts `storage.path` in
+`.gitignore`. A trace store of your own (the `TraceStore` protocol in
+`nl2sql_sdk.stores`: `write`, `get`, `purge`) receives the whole document.
+
+Traces are kept for the store's `max_age_days`, 14 days by default
+(`traces: { type: files, max_age_days: 30 }`). `engine.storage.purge()` deletes
+the older ones; `nl2sql storage purge` calls it, and `nl2sql-api` calls it at
+startup and once a day.
 
 `on_failure` writes a trace when the run returned errors, needed a retry in any
 sub-query, had a node fail, or did not complete (timeout, cancellation, crash).
@@ -41,8 +48,9 @@ Writing a trace never fails a run; a write error is logged as a warning.
 Where the file went is reported back:
 
 - `QueryResult.trace_path` (Python API) and `trace_path` in the REST `/query`
-  response: the path, or `null` when no trace was written. `trace_id` is in the
-  file name.
+  response: the path, or `null` when no trace was written or the trace store is
+  not the `files` store. `trace_id` is in the file name, and
+  `engine.traces.get(trace_id)` reads the trace from any store.
 - `nl2sql run` prints `Trace written to <path>`.
 - The playground shows a **Download trace** link under Cost & time when Debug is on.
 
@@ -221,7 +229,7 @@ characters, and a whole trace is typically a few hundred kilobytes.
 
 ```bash
 nl2sql trace show traces/20260921T164837755710Z_159afe1f-....json
-nl2sql trace show 159afe1f-3305-4907-903a-55495d040665   # looks it up in <storage.path>/traces
+nl2sql trace show 159afe1f-3305-4907-903a-55495d040665   # looks it up in the trace store (engine.traces.get)
 ```
 
 It prints the question, then one row per node execution (nested SQL agent
@@ -304,9 +312,9 @@ naming the entries MMR passed over because they repeat an earlier pick. The **Re
 runs the same search for any text (see the
 [demo guide](../getting_started/demo.md#the-retrieval-inspector)). The page
 fetches the trace from `GET /api/trace/{trace_id}`, which reads it with
-`engine.traces.get`: only files directly inside the engine's traces folder, and
-any id that is not a plain token is rejected, so `../` or an absolute path never
-reaches the filesystem.
+`engine.traces.get`: any id that is not a plain token is rejected before the
+trace store sees it, and the `files` store reads only files directly inside its
+folder, so `../` or an absolute path never reaches the filesystem.
 
 Below the run, **Was this answer right?** records a rating keyed by the same
 trace id; `nl2sql feedback stats` reads the ratings together with the traces in

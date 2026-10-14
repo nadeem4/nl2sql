@@ -20,7 +20,7 @@ from nl2sql.execution.dag import (
 )
 from nl2sql.pipeline.nodes.aggregator.schemas import AggregatorResponse
 from nl2sql.pipeline.state import GraphState
-from nl2sql.execution.artifacts import ArtifactStore, ArtifactStoreConfig
+from nl2sql.execution.artifacts import ArtifactStore
 from nl2sql_sdk.contracts import ResultFrame
 
 
@@ -68,10 +68,7 @@ def _build_aggregator_response(ctx) -> AggregatorResponse:
     )
 
     store = ArtifactStore(
-        ArtifactStoreConfig(
-            base_uri=ctx.artifact_store.config.base_uri,
-            path_template="<tenant_id>/<request_id>/<subgraph_name>/<dag_node_id>/<schema_version>/part-00000.parquet",
-        )
+        ctx.results, path_template="<tenant_id>/<request_id>/<subgraph_name>/<dag_node_id>/<schema_version>/part-00000.parquet"
     )
     artifact = store.create_artifact_ref(
         ResultFrame.from_row_dicts([{"value": 5}, {"value": 20}]),

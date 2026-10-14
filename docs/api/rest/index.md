@@ -17,6 +17,11 @@ Source: `packages/api/src/nl2sql_api/main.py`
   does not start; an optional one that fails leaves it serving the others. The
   engine is stored in `app.state.engine` and closed at shutdown. When
   `settings.observability.exporter` is `otlp`, logs switch to JSON.
+- Retention: the lifespan calls `engine.storage.purge()` once before it
+  serves and then once a day (`purge_daily`, every `PURGE_INTERVAL_S`
+  seconds), so traces and results older than their store's `max_age_days`
+  are deleted (see [Storage → Retention](../../configuration/storage.md#retention)).
+  A failed purge is logged and never stops the server.
 - The package imports the engine only through the top-level `nl2sql` namespace
   (`from nl2sql import NL2SQL, QueryResult, UserContext, configure_logging, ...`),
   never an engine submodule. `packages/api/tests/test_architecture.py` enforces it.

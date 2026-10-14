@@ -24,7 +24,6 @@ from nl2sql.tracing.document import (
     cap,
     jsonable,
     should_write,
-    write_trace,
 )
 
 logger = get_logger("trace")
@@ -155,14 +154,22 @@ def build_trace(*, trace_id: str, request: Dict[str, Any], started_at: str, fini
 
 
 def write_run_trace(mode: str, **kwargs: Any) -> Optional[str]:
-    """Builds the trace and writes it if ``mode`` asks for it; returns the path or None."""
+    """Builds the trace and writes it to ``ctx.traces`` if ``mode`` asks for it.
+
+    Returns the file written when the store is the ``files`` store, else None.
+    """
     if mode == "off":
         return None
     try:
         doc = build_trace(**kwargs)
         if not should_write(mode, doc["failed"]):
             return None
-        return str(write_trace(doc, pathlib.Path(kwargs["ctx"].traces_dir)))
+        store = kwargs["ctx"].traces
+        write_file = getattr(store, "write_file", None)
+        if callable(write_file):  # the files store: the run reports the file
+            return str(write_file(doc["trace_id"], doc))
+        store.write(doc["trace_id"], doc)
+        return None
     except Exception:
         logger.warning("Could not write the run trace", exc_info=True)
         return None

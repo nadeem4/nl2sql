@@ -7,8 +7,10 @@ from types import SimpleNamespace
 from typing import Any, Dict, Optional, Union
 
 from nl2sql.config import LLM, Config, Embeddings, Limits, Policies, Settings, Storage
-from nl2sql.execution.artifacts import ArtifactStore, ArtifactStoreConfig
+from nl2sql.execution.artifacts import ArtifactStore
 from nl2sql.policies import PolicyEngine
+from nl2sql.storage.files import FilesTraces
+from nl2sql.storage.local import LocalResults
 
 
 class FakeRuntime(SimpleNamespace):
@@ -47,8 +49,10 @@ def fake_runtime(*, settings: Union[Settings, dict, None] = None, policies: Unio
 
     ``settings`` and ``policies`` are the config's sections, written as in YAML
     (``{"results": {"row_limit": 5}}``) or as models; both default to their
-    defaults. ``results`` is the results folder (``ctx.artifact_store``), a new
-    temporary folder by default, as is ``traces_dir``. Every other keyword becomes an attribute:
+    defaults. ``results`` is the results folder (``ctx.artifact_store``, on a
+    ``local`` store), a new temporary folder by default. ``traces`` is the
+    trace store, a ``files`` store on ``traces_dir`` (a folder), itself a new
+    temporary folder by default. Every other keyword becomes an attribute:
     ``ds_registry``, ``llm_registry``, ``vector_store`` and so on. ``policy_engine`` is
     built from ``policies`` (which read nothing by default; ``{"allow_all": True}``
     reads everything).
@@ -59,9 +63,10 @@ def fake_runtime(*, settings: Union[Settings, dict, None] = None, policies: Unio
     config = Config(datasources=[], llm=LLM(provider="openai", model="gpt-test"),
                     embeddings=Embeddings(provider="local"), policies=policies,
                     storage=Storage(path=folder.parent), settings=settings)
-    attrs.setdefault("artifact_store", ArtifactStore(ArtifactStoreConfig(base_uri=str(folder))))
-    if "traces_dir" not in attrs:
-        attrs["traces_dir"] = Path(tempfile.mkdtemp(prefix="nl2sql-traces-"))
+    attrs.setdefault("artifact_store", ArtifactStore(LocalResults(folder)))
+    if "traces" not in attrs:
+        traces_dir = attrs.pop("traces_dir", None) or Path(tempfile.mkdtemp(prefix="nl2sql-traces-"))
+        attrs["traces"] = FilesTraces(Path(traces_dir))
     return FakeRuntime(config=config, **attrs)
 
 

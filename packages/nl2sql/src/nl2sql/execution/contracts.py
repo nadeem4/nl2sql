@@ -9,14 +9,12 @@ from nl2sql.policies import UserContext
 from nl2sql.common.errors import PipelineError
 
 
-# Results are local files under <storage.path>/results/ (remote stores return in Phase 2).
-ArtifactBackend = Literal["local"]
 ArtifactFormat = Literal["parquet"]
 
 
 class ArtifactRef(BaseModel):
+    # The result's key in the engine's results store (storage.results), e.g. "default/<run>/<sub-query>.parquet".
     uri: str
-    backend: ArtifactBackend = "local"
     format: ArtifactFormat
     row_count: int
     columns: List[str]

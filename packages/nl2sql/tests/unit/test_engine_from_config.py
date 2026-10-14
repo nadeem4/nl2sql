@@ -125,8 +125,8 @@ def test_constructor_creates_the_stores_under_storage_path(tmp_path):
     # The index store opens its folder on the first build, not before.
     assert not (storage / "index").exists()
     assert (storage / "state.db").is_file()
-    assert Path(engine._runtime.artifact_store.config.base_uri) == storage / "results"
-    assert engine._runtime.traces_dir == storage / "traces"
+    assert engine._runtime.artifact_store.results.directory == storage / "results"
+    assert engine._runtime.traces.directory == storage / "traces"
 
 
 def test_registry_load_errors_are_gathered_into_one_config_error(tmp_path):

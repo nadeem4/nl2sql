@@ -4,7 +4,8 @@ from pathlib import Path
 import polars as pl
 import pytest
 
-from nl2sql.execution.artifacts import ArtifactStore, ArtifactStoreConfig
+from nl2sql.execution.artifacts import ArtifactStore
+from nl2sql.storage.local import LocalResults
 from nl2sql.execution.artifacts.store import DEFAULT_PATH_TEMPLATE
 from nl2sql_sdk.contracts import ResultFrame
 
@@ -22,8 +23,8 @@ def _executor_metadata():
     return {**_metadata(), "sub_query_id": "sq_1", "dag_node_id": "sq_1", "subgraph_name": "sql_agent"}
 
 
-def _local_config(base_uri, template="<tenant_id>/<request_id>.parquet"):
-    return ArtifactStoreConfig(base_uri=base_uri, path_template=template)
+def _store(folder, template="<tenant_id>/<request_id>.parquet"):
+    return ArtifactStore(LocalResults(folder), path_template=template)
 
 
 class TestLocalBackend:
@@ -31,7 +32,7 @@ class TestLocalBackend:
         # Validates the only backend reachable in CI because a lossy write would corrupt aggregation input.
         # Arrange
         with tempfile.TemporaryDirectory() as tmpdir:
-            store = ArtifactStore(_local_config(tmpdir))
+            store = _store(tmpdir)
             frame = _frame()
 
             # Act
@@ -48,14 +49,14 @@ class TestLocalBackend:
         # Arrange
         with tempfile.TemporaryDirectory() as tmpdir:
             template = "<tenant_id>/<request_id>/<schema_version>/part-00000.parquet"
-            store = ArtifactStore(_local_config(tmpdir, template))
+            store = _store(tmpdir, template)
 
             # Act
             artifact = store.create_artifact_ref(_frame(), _metadata())
 
             # Assert
-            expected = Path(tmpdir).resolve() / "t1" / "r1" / "v1" / "part-00000.parquet"
-            assert Path(artifact.uri) == expected
+            expected = Path(tmpdir) / "t1" / "r1" / "v1" / "part-00000.parquet"
+            assert artifact.uri == "t1/r1/v1/part-00000.parquet"
             assert expected.exists()
             assert artifact.bytes == expected.stat().st_size
 
@@ -63,7 +64,7 @@ class TestLocalBackend:
         # Validates the DataFrame read path because the aggregator consumes polars directly.
         # Arrange
         with tempfile.TemporaryDirectory() as tmpdir:
-            store = ArtifactStore(_local_config(tmpdir))
+            store = _store(tmpdir)
 
             # Act
             artifact = store.create_artifact_ref(_frame(), _metadata())
@@ -81,7 +82,7 @@ class TestPathTemplate:
         # Arrange
         with tempfile.TemporaryDirectory() as tmpdir:
             template = "<tenant_id>/<request_id>/<dag_node_id>.parquet"
-            store = ArtifactStore(_local_config(tmpdir, template))
+            store = _store(tmpdir, template)
 
             # Act / Assert
             with pytest.raises(ValueError, match="dag_node_id"):
@@ -91,10 +92,11 @@ class TestPathTemplate:
         # Validates the shipped default against the keys the SQL executor supplies.
         # Arrange
         with tempfile.TemporaryDirectory() as tmpdir:
-            store = ArtifactStore(_local_config(tmpdir, DEFAULT_PATH_TEMPLATE))
+            store = _store(tmpdir, DEFAULT_PATH_TEMPLATE)
 
             # Act
             artifact = store.create_artifact_ref(_frame(), _executor_metadata())
 
             # Assert
-            assert Path(artifact.uri) == Path(tmpdir).resolve() / "t1" / "r1" / "sq_1.parquet"
+            assert artifact.uri == "t1/r1/sq_1.parquet"
+            assert (Path(tmpdir) / "t1" / "r1" / "sq_1.parquet").is_file()

@@ -20,7 +20,8 @@ from nl2sql import NL2SQL, ResultManifest, ResultSummary  # noqa: E402
 from nl2sql.testing.facade import StubDatasources  # noqa: E402
 from nl2sql.cli.demo.playground.app import build_app  # noqa: E402
 from nl2sql.cli.demo.playground.hosted import Hosted  # noqa: E402
-from nl2sql.execution.artifacts import ArtifactStore, ArtifactStoreConfig  # noqa: E402
+from nl2sql.execution.artifacts import ArtifactStore
+from nl2sql.storage.local import LocalResults  # noqa: E402
 
 TEMPLATE = "<tenant_id>/<request_id>/<sub_query_id>.parquet"
 ROWS = [{"id": i, "name": f"n{i}"} for i in range(45)]
@@ -43,7 +44,7 @@ def _save(store, tenant, request, rows):
 
 @pytest.fixture(params=["local", "hosted"])
 def client(request, tmp_path):
-    store = ArtifactStore(ArtifactStoreConfig(base_uri=str(tmp_path), path_template=TEMPLATE))
+    store = ArtifactStore(LocalResults(str(tmp_path)), path_template=TEMPLATE)
     _save(store, "t1", "run-1", ROWS)
     _save(store, "t2", "theirs", [{"id": 1, "name": "secret"}])
     engine = _Engine(SimpleNamespace(tenant_id="t1", artifact_store=store))
