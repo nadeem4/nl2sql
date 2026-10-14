@@ -55,17 +55,33 @@ URLS = {"postgres": "postgresql://postgres:{password}@127.0.0.1:{port}/",
 # The tunnels' process ids, so a later `down` can close them. Never a password.
 STATE = Path(tempfile.gettempdir()) / "nl2sql-testbed" / "tunnels.json"
 
-RETRIES = 12            # the first ssh after a start waits for the VM to boot
-RETRY_DELAY = 10
+# The first ssh after a start can fail while the VM boots and the SSH key
+# propagates: retry a connection failure, and only that, a bounded few times.
+CONNECT_TRIES = 5
+CONNECT_DELAY = 15      # seconds between tries: about a minute in all
+CONNECTION_FAILURES = ("Remote side unexpectedly closed", "Connection closed", "Connection refused",
+                       "Connection timed out", "Connection reset", "Network error",
+                       "failed to connect to backend")
 TUNNEL_TIMEOUT = 60
 
+# The first boot installs Docker from the VM's startup script: wait for it, bounded.
+DOCKER_WAIT = 300       # seconds
+WAIT_FOR_DOCKER = (f"for i in $(seq {DOCKER_WAIT // 5}); do"
+                   " command -v docker >/dev/null && sudo docker compose version >/dev/null 2>&1 && exit 0;"
+                   " sleep 5; done; echo 'Docker is not installed on the VM yet.' >&2; exit 1")
+
 # Runs on the VM. The passwords arrive on stdin, one per line, and live only in
-# this command's environment. The first boot installs Docker, so wait for it.
+# this command's environment.
 COMPOSE = ("IFS= read -r TESTBED_POSTGRES_PASSWORD && IFS= read -r TESTBED_MYSQL_PASSWORD"
            " && IFS= read -r TESTBED_MSSQL_PASSWORD"
            " && export TESTBED_POSTGRES_PASSWORD TESTBED_MYSQL_PASSWORD TESTBED_MSSQL_PASSWORD TESTBED_BIND=0.0.0.0"
-           " && until sudo docker compose version >/dev/null 2>&1; do sleep 5; done"
            " && sudo -E docker compose -f testbed/docker-compose.yml up -d --wait")
+
+# On Windows gcloud drives PuTTY's plink and, by default, feeds it "y" to accept
+# the host key instead of passing this script's stdin on, so the passwords would
+# never arrive. The copy and the Docker wait keep that default, which caches the
+# host key; the compose step turns it off. OpenSSH ignores the setting.
+STDIN_THROUGH = {"CLOUDSDK_SSH_PUTTY_FORCE_CONNECT": "false"}
 
 
 class TestbedError(Exception):
@@ -90,25 +106,35 @@ def gcloud() -> str:
     return found
 
 
-def call(args: Sequence[str], *, input: Optional[str] = None, capture: bool = False) -> str:
+def call(args: Sequence[str], *, input: Optional[str] = None, capture: bool = False,
+         env: Optional[Dict[str, str]] = None) -> str:
     """Run ``gcloud args``; raise ``TestbedError`` naming the step when it fails."""
     result = subprocess.run([gcloud(), *args], input=input, text=True,
                             stdin=None if input is not None else subprocess.DEVNULL,
-                            stdout=subprocess.PIPE if capture else None)
+                            stdout=subprocess.PIPE if capture else None,
+                            env=None if env is None else {**os.environ, **env})
     if result.returncode != 0:
         raise TestbedError(f"`gcloud {' '.join(args[:3])}` failed with exit code {result.returncode}.")
     return result.stdout or ""
 
 
-def retried(args: Sequence[str], **kwargs) -> str:
-    for attempt in range(RETRIES):
-        try:
-            return call(args, **kwargs)
-        except TestbedError:
-            if attempt == RETRIES - 1:
-                raise
-            time.sleep(RETRY_DELAY)
-    raise AssertionError("unreachable")
+def connect(args: Sequence[str]) -> None:
+    """Run an ssh or scp step that needs no stdin, retrying a connection failure only."""
+    step = f"`gcloud {' '.join(args[:3])}`"
+    for attempt in range(1, CONNECT_TRIES + 1):
+        result = subprocess.run([gcloud(), *args], stdin=subprocess.DEVNULL, stderr=subprocess.PIPE,
+                                text=True, errors="replace")
+        sys.stderr.write(result.stderr)
+        if result.returncode == 0:
+            return
+        connection = result.returncode == 255 or any(m in result.stderr for m in CONNECTION_FAILURES)
+        if not connection:
+            raise TestbedError(f"{step} failed with exit code {result.returncode}.")
+        if attempt == CONNECT_TRIES:
+            raise TestbedError(f"{step} could not connect to the VM after {CONNECT_TRIES} tries.")
+        print(f"Could not connect yet (try {attempt} of {CONNECT_TRIES}); retrying in {CONNECT_DELAY} s ...",
+              file=sys.stderr)
+        time.sleep(CONNECT_DELAY)
 
 
 def passwords(target: Target) -> Dict[str, str]:
@@ -129,10 +155,12 @@ def up(target: Target) -> Dict[str, str]:
         copy = Path(staging) / "testbed"
         shutil.copytree(TESTBED, copy, ignore=shutil.ignore_patterns(".env", "__pycache__"))
         print("Copying testbed/ ...", file=sys.stderr)
-        retried(["compute", "scp", "--recurse", *ssh, str(copy), f"{target.instance}:."])
+        connect(["compute", "scp", "--recurse", *ssh, str(copy), f"{target.instance}:."])
+    print("Waiting for Docker on the VM (the first boot installs it) ...", file=sys.stderr)
+    connect(["compute", "ssh", target.instance, *ssh, f"--command={WAIT_FOR_DOCKER}"])
     print("Starting the servers (the first time loads the samples, a few minutes) ...", file=sys.stderr)
     call(["compute", "ssh", target.instance, *ssh, f"--command={COMPOSE}"],
-         input="".join(secrets[name] + "\n" for name in ("postgres", "mysql", "mssql")))
+         input="".join(secrets[name] + "\n" for name in ("postgres", "mysql", "mssql")), env=STDIN_THROUGH)
     open_tunnels(target)
     return secrets
 

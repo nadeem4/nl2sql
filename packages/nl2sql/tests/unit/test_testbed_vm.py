@@ -2,10 +2,12 @@
 
 docs/architecture/phase2.md, section 3, "The GCP VM". A fake ``gcloud`` on
 ``PATH`` records every call (its arguments, its stdin and the test-bed
-variables in its environment) and plays the parts that matter: it prints a
-password for ``secrets versions access``, a state for ``instances describe``,
-and for ``start-iap-tunnel`` it listens on the local port until it is killed.
-No cloud resource is touched.
+and gcloud variables in its environment) and plays the parts that matter: it
+prints a password for ``secrets versions access``, a state for ``instances
+describe``, and for ``start-iap-tunnel`` it listens on the local port until it
+is killed. ``FAKE_GCLOUD_FLAKY=scp`` makes the first ``FAKE_GCLOUD_FLAKY_TIMES``
+``scp`` calls fail the way plink does while the SSH key propagates. No cloud
+resource is touched.
 """
 from __future__ import annotations
 
@@ -28,11 +30,21 @@ FAKE_GCLOUD = textwrap.dedent('''
 
     argv = sys.argv[1:]
     record = {"argv": argv,
-              "env": {k: v for k, v in os.environ.items() if k.startswith(("TESTBED_", "REALDB_"))}}
+              "env": {k: v for k, v in os.environ.items()
+                      if k.startswith(("TESTBED_", "REALDB_", "CLOUDSDK_SSH_"))}}
     if "ssh" in argv:
         record["stdin"] = sys.stdin.read()
     with open(os.environ["FAKE_GCLOUD_LOG"], "a", encoding="utf-8") as log:
         log.write(json.dumps(record) + "\\n")
+
+    flaky = os.environ.get("FAKE_GCLOUD_FLAKY")
+    if flaky and flaky in argv:
+        counter = os.environ["FAKE_GCLOUD_LOG"] + ".flaky"
+        failed = int(open(counter).read()) if os.path.exists(counter) else 0
+        if failed < int(os.environ.get("FAKE_GCLOUD_FLAKY_TIMES", "1")):
+            open(counter, "w").write(str(failed + 1))
+            sys.stderr.write("FATAL ERROR: Remote side unexpectedly closed network connection\\n")
+            sys.exit(1)
 
     fail = os.environ.get("FAKE_GCLOUD_FAIL")
     if fail and fail in argv:
@@ -84,8 +96,7 @@ def tb(tmp_path, monkeypatch):
     monkeypatch.setattr(module, "TUNNELS", {name: (remote, _free_port())
                                              for name, (remote, _) in module.TUNNELS.items()})
     monkeypatch.setattr(module, "STATE", tmp_path / "state" / "tunnels.json")
-    monkeypatch.setattr(module, "RETRY_DELAY", 0)
-    monkeypatch.setattr(module, "RETRIES", 2)
+    monkeypatch.setattr(module, "CONNECT_DELAY", 0)
 
     def calls():
         if not log.exists():
@@ -106,6 +117,14 @@ def _kinds(calls):
     return [" ".join(c["argv"][:3]) for c in calls]
 
 
+def _compose(calls):
+    return next(c for c in calls if "ssh" in c["argv"] and any("up -d --wait" in a for a in c["argv"]))
+
+
+def _copies(calls):
+    return [c for c in calls if c["argv"][:2] == ["compute", "scp"]]
+
+
 def _port_answers(port: int) -> bool:
     try:
         with socket.create_connection(("127.0.0.1", port), timeout=0.5):
@@ -122,7 +141,8 @@ def test_up_starts_copies_composes_and_tunnels(tb):
     assert argv[0][:3] == ["compute", "instances", "start"]
     assert argv[1][:2] == ["compute", "scp"] and "--tunnel-through-iap" in argv[1] and "--recurse" in argv[1]
     assert argv[2][:2] == ["compute", "ssh"] and "--tunnel-through-iap" in argv[2]
-    command = next(a for a in argv[2] if "docker compose" in a)
+    assert argv[3][:2] == ["compute", "ssh"] and "--tunnel-through-iap" in argv[3]
+    command = next(a for a in argv[3] if "docker compose" in a)
     assert "TESTBED_BIND=0.0.0.0" in command and "up -d --wait" in command
     tunnels = [a for a in argv if a[:2] == ["compute", "start-iap-tunnel"]]
     assert sorted(int(a[3]) for a in tunnels) == [11433, 13306, 15432]
@@ -142,7 +162,7 @@ def test_passwords_reach_compose_and_the_child_only(tb, tmp_path, capfd):
     assert tb.main(["run", "--", *child]) == 0
 
     calls = tb.calls()
-    compose = next(c for c in calls if "ssh" in c["argv"])
+    compose = _compose(calls)
     assert compose["stdin"].splitlines() == [PASSWORDS["postgres"], PASSWORDS["mysql"], PASSWORDS["mssql"]]
     for c in calls:
         for password in PASSWORDS.values():
@@ -193,6 +213,59 @@ def test_run_stops_after_a_failed_up(tb, monkeypatch, capsys):
     monkeypatch.setattr(tb, "run_child", lambda command, env: ran.append(command) or 0)
 
     assert tb.main(["run", "--", "pytest"]) == 1
+    assert ran == []
+    assert "scp" in capsys.readouterr().err
+    assert len(_copies(tb.calls())) == 1        # not a connection failure: not retried
+    _stopped(tb)
+
+
+def test_every_ssh_and_scp_call_skips_the_host_key_prompt(tb):
+    assert tb.main(["up"]) == 0
+
+    remote = [c["argv"] for c in tb.calls() if c["argv"][:2] in (["compute", "ssh"], ["compute", "scp"])]
+    assert len(remote) == 3
+    for argv in remote:
+        assert "--strict-host-key-checking=no" in argv and "--tunnel-through-iap" in argv
+
+
+def test_compose_reads_its_stdin_through_plink(tb):
+    # gcloud on Windows feeds plink a "y" instead of our stdin unless told not to;
+    # the copy and the Docker wait keep that answer, which caches the host key.
+    assert tb.main(["up"]) == 0
+
+    calls = tb.calls()
+    assert _compose(calls)["env"]["CLOUDSDK_SSH_PUTTY_FORCE_CONNECT"] == "false"
+    earlier = [c for c in calls if c["argv"][:2] in (["compute", "ssh"], ["compute", "scp"]) and c is not _compose(calls)]
+    for c in earlier:
+        assert "CLOUDSDK_SSH_PUTTY_FORCE_CONNECT" not in c["env"]
+
+
+def test_waits_for_docker_before_compose_and_gives_up(tb):
+    assert tb.main(["up"]) == 0
+
+    ssh = [c["argv"] for c in tb.calls() if c["argv"][:2] == ["compute", "ssh"]]
+    wait = next(a for a in ssh[0] if a.startswith("--command="))
+    assert "command -v docker" in wait and "docker compose version" in wait
+    assert "seq" in wait and "exit 1" in wait          # bounded, not `until ...; done`
+    assert "until" not in next(a for a in ssh[1] if a.startswith("--command="))
+
+
+def test_a_connection_failure_while_the_key_propagates_is_retried(tb, monkeypatch):
+    monkeypatch.setenv("FAKE_GCLOUD_FLAKY", "scp")
+    monkeypatch.setenv("FAKE_GCLOUD_FLAKY_TIMES", "2")
+
+    assert tb.main(["up"]) == 0
+    assert len(_copies(tb.calls())) == 3
+
+
+def test_a_persistent_connection_failure_gives_up_and_run_stops_the_vm(tb, monkeypatch, capsys):
+    monkeypatch.setenv("FAKE_GCLOUD_FLAKY", "scp")
+    monkeypatch.setenv("FAKE_GCLOUD_FLAKY_TIMES", "99")
+    ran = []
+    monkeypatch.setattr(tb, "run_child", lambda command, env: ran.append(command) or 0)
+
+    assert tb.main(["run", "--", "pytest"]) == 1
+    assert len(_copies(tb.calls())) == tb.CONNECT_TRIES == 5
     assert ran == []
     assert "scp" in capsys.readouterr().err
     _stopped(tb)
