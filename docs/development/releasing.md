@@ -91,7 +91,7 @@ version bump applied everywhere it appears:
 | --- | --- |
 | `CHANGELOG.md` | the `python` release strategy |
 | `pyproject.toml` (repo root) | the `python` release strategy |
-| `packages/adapter-sdk/pyproject.toml` | an `extra-files` `generic` updater |
+| `packages/sdk/pyproject.toml` | an `extra-files` `generic` updater |
 | `packages/nl2sql/pyproject.toml` | an `extra-files` `generic` updater |
 | `packages/api/pyproject.toml` | an `extra-files` `generic` updater |
 | `.release-please-manifest.json` | release-please |
@@ -182,7 +182,7 @@ the release decision.
 2. **`pypi`** — `needs: build`, so a wheel that does not install or import
    fails the gate and this never runs. It is a matrix job with one leg per
    package: each leg runs in its own GitHub Environment
-   (`pypi-nl2sql-engine`, `pypi-nl2sql-api`, `pypi-nl2sql-adapter-sdk`),
+   (`pypi-nl2sql-engine`, `pypi-nl2sql-api`, `pypi-nl2sql-sdk`),
    stages only that package's sdist and wheel into an `upload/` directory and
    points `pypa/gh-action-pypi-publish` at it. One environment per package is
    what makes each PyPI trusted-publisher registration unique — see
@@ -194,13 +194,13 @@ the release decision.
    because the Dockerfile installs the three packages from their local sources
    and its `COPY ./packages/...` paths resolve against the build context. A
    context of `packages/api` makes them resolve to
-   `packages/api/packages/adapter-sdk`, which does not exist — that is what
+   `packages/api/packages/sdk`, which does not exist — that is what
    failed on `v0.1.0`. A root `.dockerignore` keeps that context small.
    `needs: pypi` is retained so the image is only published for a release that
    reached PyPI, not because the image build needs PyPI. The image's
    `FROM python:X.Y` has to satisfy every package's `requires-python`
    (`>=3.12`): on `v0.2.0` it was still `python:3.11-slim`, pip refused to
-   install `nl2sql-adapter-sdk` into it, and this job failed after PyPI and
+   install the SDK into it, and this job failed after PyPI and
    the docs had published. `tests/unit/test_docker_images.py` now checks every
    Dockerfile's base against every `pyproject.toml`, and the `api-image` job
    in `test.yml` builds this image on every pull request.
@@ -547,7 +547,7 @@ yet this is a **pending publisher**, created at
 [pypi.org/manage/account/publishing](https://pypi.org/manage/account/publishing/).
 
 Add one for each of the three names — `nl2sql-engine`, `nl2sql-api` and
-`nl2sql-adapter-sdk`. The engine publishes as `nl2sql-engine` because the
+`nl2sql-sdk`. The engine publishes as `nl2sql-engine` because the
 `nl2sql` name on PyPI is already taken by an unrelated project; the import
 package is still `nl2sql`.
 
@@ -572,7 +572,7 @@ same on all three entries. Only the project name and the environment differ:
 | --- | --- |
 | `nl2sql-engine` | `pypi-nl2sql-engine` |
 | `nl2sql-api` | `pypi-nl2sql-api` |
-| `nl2sql-adapter-sdk` | `pypi-nl2sql-adapter-sdk` |
+| `nl2sql-sdk` | `pypi-nl2sql-sdk` |
 
 | Field | Value |
 | --- | --- |
@@ -593,6 +593,23 @@ OIDC and adding a token secret would only widen the blast radius.
 
 Renaming `publish_pypi.yaml`, or renaming an environment in it, breaks
 publishing until the publisher entries are updated to match.
+
+#### Checklist before the first 0.5 release: `nl2sql-sdk`
+
+Until 0.4 the SDK published as `nl2sql-adapter-sdk`. From 0.5 it publishes as
+`nl2sql-sdk`, a project PyPI has never seen, so it needs its own pending
+publisher. Do both before merging the 0.5 release PR:
+
+- [ ] On PyPI, add a pending trusted publisher for project `nl2sql-sdk`:
+      owner `nadeem4`, repository `nl2sql`, workflow `publish_pypi.yaml`,
+      environment `pypi-nl2sql-sdk`.
+- [ ] On GitHub, create the environment `pypi-nl2sql-sdk` under
+      **Settings → Environments**.
+
+Without them the SDK leg of the release fails. The `pypi` matrix is
+`fail-fast: false`, so the engine and API legs would still publish, and
+`nl2sql-engine` would land on PyPI depending on an `nl2sql-sdk` that is not
+there. `nl2sql-adapter-sdk` is not published again.
 
 ### GHCR package visibility
 
@@ -630,11 +647,11 @@ of its dependency that is not.
 
 ```mermaid
 flowchart TD
-    SDK[nl2sql-adapter-sdk] --> CORE[nl2sql-engine]
+    SDK[nl2sql-sdk] --> CORE[nl2sql-engine]
     CORE --> API[nl2sql-api]
 ```
 
-1. `nl2sql-adapter-sdk` — no internal dependencies.
+1. `nl2sql-sdk` — no internal dependencies.
 2. `nl2sql-engine` — needs the SDK. Carries the engine, the CLI and all four dialect
    adapters, so its extras (`nl2sql-engine[postgres]` and friends) add only database
    drivers from PyPI and cannot be broken by publish order.

@@ -180,7 +180,7 @@ from nl2sql.pipeline.nodes.datasource_resolver.node import DatasourceResolverNod
 from nl2sql.pipeline.nodes.decomposer.schemas import SubQuery  # noqa: E402
 from nl2sql.pipeline.nodes.schema_retriever.node import SchemaRetrieverNode  # noqa: E402
 from nl2sql.pipeline.state import GraphState, SubgraphExecutionState  # noqa: E402
-from nl2sql_adapter_sdk.schema import (  # noqa: E402
+from nl2sql_sdk.schema import (  # noqa: E402
     ColumnContract,
     SchemaContract,
     SchemaMetadata,

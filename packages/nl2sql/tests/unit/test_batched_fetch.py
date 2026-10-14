@@ -17,8 +17,8 @@ from nl2sql.common.settings import settings
 from nl2sql.execution.artifacts import ArtifactStore, ArtifactStoreConfig
 from nl2sql.execution.contracts import ExecutorRequest
 from nl2sql.execution.executor.sql_executor import SqlExecutorService
-from nl2sql_adapter_sdk import StreamingAdapterProtocol
-from nl2sql_adapter_sdk.contracts import ResultError, ResultFrame
+from nl2sql_sdk import StreamingAdapterProtocol
+from nl2sql_sdk.contracts import ResultError, ResultFrame
 
 COLUMNS = ["id", "name", "note"]
 

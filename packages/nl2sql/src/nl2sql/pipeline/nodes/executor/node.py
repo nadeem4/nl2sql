@@ -10,7 +10,7 @@ from nl2sql.context import NL2SQLContext
 from nl2sql.execution.contracts import ExecutorRequest
 from nl2sql.execution.executor import SqlExecutorService
 from nl2sql.pipeline.nodes.executor.value_check import check_values
-from nl2sql_adapter_sdk.capabilities import DatasourceCapability
+from nl2sql_sdk.capabilities import DatasourceCapability
 
 if TYPE_CHECKING:
     from nl2sql.pipeline.state import SubgraphExecutionState

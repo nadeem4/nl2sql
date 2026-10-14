@@ -15,7 +15,7 @@ from nl2sql.datasources.registry import DatasourceRegistry
 from nl2sql.indexing.health import inspect_vector_store, preferred_table_warnings
 from nl2sql.indexing.vector_store import VectorStore
 from nl2sql.secrets.manager import SecretManager
-from nl2sql_adapter_sdk.schema import (
+from nl2sql_sdk.schema import (
     SchemaContract,
     SchemaMetadata,
     SchemaSnapshot,

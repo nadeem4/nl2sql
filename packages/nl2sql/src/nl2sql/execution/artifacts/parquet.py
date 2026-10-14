@@ -4,7 +4,7 @@ from typing import Any, Dict, Optional
 
 import polars as pl
 
-from nl2sql_adapter_sdk.contracts import ResultFrame
+from nl2sql_sdk.contracts import ResultFrame
 
 
 def result_frame_to_polars(frame: ResultFrame) -> pl.DataFrame:

@@ -1,5 +1,5 @@
 # Build context for packages/api/Dockerfile is the repo root, so without this
-# the whole working tree is sent to the daemon. Only packages/adapter-sdk,
+# the whole working tree is sent to the daemon. Only packages/sdk,
 # packages/nl2sql and packages/api are COPYed, and everything they need to
 # build must survive - including packages/nl2sql/README.md, which its
 # pyproject.toml declares via `readme = "README.md"`.

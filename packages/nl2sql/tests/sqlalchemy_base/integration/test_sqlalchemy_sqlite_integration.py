@@ -128,7 +128,7 @@ def test_execute_sql_fails_for_directory_database(tmp_path):
 
 
 def test_execute_batches_yields_the_result_a_batch_at_a_time(sqlite_adapter, sqlite_db_path):
-    from nl2sql_adapter_sdk import AdapterRequest, StreamingAdapterProtocol
+    from nl2sql_sdk import AdapterRequest, StreamingAdapterProtocol
 
     conn = sqlite3.connect(sqlite_db_path)
     try:
@@ -147,7 +147,7 @@ def test_execute_batches_yields_the_result_a_batch_at_a_time(sqlite_adapter, sql
 
 
 def test_execute_batches_reports_a_failed_query_as_execute_does(sqlite_adapter):
-    from nl2sql_adapter_sdk import AdapterRequest
+    from nl2sql_sdk import AdapterRequest
 
     request = AdapterRequest(plan_type="sql", payload={"sql": "SELECT nope FROM users"})
 
@@ -158,7 +158,7 @@ def test_execute_batches_reports_a_failed_query_as_execute_does(sqlite_adapter):
 
 
 def test_execute_batches_refuses_a_non_sql_request(sqlite_adapter):
-    from nl2sql_adapter_sdk import AdapterRequest
+    from nl2sql_sdk import AdapterRequest
 
     [frame] = list(sqlite_adapter.execute_batches(AdapterRequest(plan_type="rest", payload={"sql": "SELECT 1"}), 2))
 

@@ -1,5 +1,5 @@
 from nl2sql.schema import InMemorySchemaStore
-from nl2sql_adapter_sdk.schema import (
+from nl2sql_sdk.schema import (
     SchemaContract,
     SchemaMetadata,
     SchemaSnapshot,
@@ -58,7 +58,7 @@ def test_schema_store_versions_and_latest_snapshot():
 
 def _multi_fk_contract() -> SchemaContract:
     """A table with two foreign keys, as Chinook's InvoiceLine and Track have."""
-    from nl2sql_adapter_sdk.schema import ForeignKeyContract
+    from nl2sql_sdk.schema import ForeignKeyContract
 
     line = TableRef(schema_name="main", table_name="InvoiceLine")
     invoice = TableRef(schema_name="main", table_name="Invoice")

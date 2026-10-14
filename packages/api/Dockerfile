@@ -13,13 +13,13 @@ WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
-COPY ./packages/adapter-sdk /app/packages/adapter-sdk
+COPY ./packages/sdk /app/packages/sdk
 COPY ./packages/nl2sql /app/packages/nl2sql
 COPY ./packages/api /app/packages/api
 
 RUN pip install --no-cache-dir -U pip setuptools wheel \
     && pip install --no-cache-dir \
-        ./packages/adapter-sdk \
+        ./packages/sdk \
         "./packages/nl2sql[postgres,mysql]" \
         ./packages/api
 

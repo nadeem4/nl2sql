@@ -142,7 +142,7 @@ SQLite needs no extra.
 
 ## Status
 
-0.1.x. `nl2sql-adapter-sdk`, `nl2sql-engine` and `nl2sql-api` share one version
+0.1.x. `nl2sql-sdk`, `nl2sql-engine` and `nl2sql-api` share one version
 and are released together. Known limitations, benchmark results and the
 roadmap: <https://github.com/nadeem4/nl2sql#project-status-limitations-and-roadmap>.
 MIT licensed.

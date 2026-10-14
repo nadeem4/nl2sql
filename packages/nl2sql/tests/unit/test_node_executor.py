@@ -7,7 +7,7 @@ from nl2sql.execution.contracts import ExecutorRequest, ExecutorResponse
 from nl2sql.execution.executor.sql_executor import SqlExecutorService
 from nl2sql.pipeline.nodes.executor.node import ExecutorNode
 from nl2sql.secrets.manager import SecretManager
-from nl2sql_adapter_sdk.capabilities import DatasourceCapability
+from nl2sql_sdk.capabilities import DatasourceCapability
 
 
 class FakeAdapter:

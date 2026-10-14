@@ -9,7 +9,7 @@ The schema layer provides **authoritative, versioned snapshots** and **structure
 
 ## Schema contracts and metadata
 
-Schema contracts are defined in `nl2sql_adapter_sdk.schema`:
+Schema contracts are defined in `nl2sql_sdk.schema`:
 
 - `SchemaContract`: datasource_id, engine_type, tables
 - `TableContract`: table ref, column contracts, foreign keys
@@ -57,7 +57,7 @@ See `../architecture/indexing.md` for retrieval stages, chunk types, and vector 
 
 ## Source references
 
-- Contracts and metadata: `packages/adapter-sdk/src/nl2sql_adapter_sdk/schema.py`
+- Contracts and metadata: `packages/sdk/src/nl2sql_sdk/schema.py`
 - Fingerprinting: `packages/nl2sql/src/nl2sql/schema/protocol.py`
 - Schema store factory: `packages/nl2sql/src/nl2sql/schema/store.py`
 - Sqlite store: `packages/nl2sql/src/nl2sql/schema/sqlite_store.py`

@@ -32,7 +32,7 @@ plugins:
   - mkdocstrings:
       handlers:
         python:
-          paths: [packages/nl2sql/src, packages/adapter-sdk/src]
+          paths: [packages/nl2sql/src, packages/sdk/src]
 
 # mike writes one docs build per version to gh-pages; this makes the
 # Material theme render the version selector against mike's versions.json.

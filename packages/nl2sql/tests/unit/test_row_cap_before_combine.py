@@ -28,7 +28,7 @@ from nl2sql.pipeline.nodes.generator.schemas import GeneratorResponse
 from nl2sql.pipeline.routes import aggregator_route
 from nl2sql.pipeline.state import GraphState, SubgraphExecutionState
 from nl2sql.pipeline.subgraphs.schemas import SubgraphOutput
-from nl2sql_adapter_sdk.contracts import ResultFrame
+from nl2sql_sdk.contracts import ResultFrame
 
 
 # --- the generator says when the cap, not the plan, bounds the query -------

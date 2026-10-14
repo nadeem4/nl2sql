@@ -30,7 +30,7 @@ from nl2sql.pipeline.nodes.aggregator.node import EngineAggregatorNode
 from nl2sql.pipeline.nodes.decomposer.schemas import SubQuery
 from nl2sql.pipeline.state import GraphState
 from nl2sql.pipeline.subgraphs.schemas import SubgraphOutput
-from nl2sql_adapter_sdk.contracts import ResultFrame
+from nl2sql_sdk.contracts import ResultFrame
 
 TEMPLATE = "<tenant_id>/<request_id>/<sub_query_id>.parquet"
 ROWS = [{"id": i, "name": f"n{i}"} for i in range(45)]

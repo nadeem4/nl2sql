@@ -61,8 +61,8 @@ If you need to connect to something else (e.g., ElasticSearch, a CRM API, or a r
 
 ```python
 from nl2sql.datasources.protocols import DatasourceAdapterProtocol
-from nl2sql_adapter_sdk.contracts import AdapterRequest, ResultFrame
-from nl2sql_adapter_sdk.capabilities import DatasourceCapability
+from nl2sql_sdk.contracts import AdapterRequest, ResultFrame
+from nl2sql_sdk.capabilities import DatasourceCapability
 
 class MyRestAdapter(DatasourceAdapterProtocol):
     def capabilities(self):

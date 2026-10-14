@@ -28,7 +28,7 @@ from nl2sql.indexing.orchestrator import IndexingOrchestrator
 from nl2sql.public_api import NL2SQL
 from nl2sql.schema import InMemorySchemaStore
 from nl2sql.secrets import SecretManager
-from nl2sql_adapter_sdk.schema import (
+from nl2sql_sdk.schema import (
     ColumnContract,
     ColumnMetadata,
     SchemaContract,

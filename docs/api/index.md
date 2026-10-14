@@ -34,7 +34,7 @@ API for remote clients. Use the links below for the full technical references.
 
 - `GraphState` (`nl2sql.pipeline.state.GraphState`)
 - `ExecutorRequest` / `ExecutorResponse` (`nl2sql.execution.contracts`)
-- `ResultFrame` (`nl2sql_adapter_sdk.contracts`)
+- `ResultFrame` (`nl2sql_sdk.contracts`)
 
 ## Source references
 

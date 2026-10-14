@@ -16,7 +16,7 @@ from nl2sql.execution.contracts import ExecutorRequest
 from nl2sql.execution.executor.sql_executor import SqlExecutorService
 from nl2sql.pipeline.graph_utils import SQL_AGENT_SUBGRAPH, resolve_subgraph
 from nl2sql.secrets.manager import SecretManager
-from nl2sql_adapter_sdk.capabilities import DatasourceCapability
+from nl2sql_sdk.capabilities import DatasourceCapability
 
 SQL = DatasourceCapability.SUPPORTS_SQL
 

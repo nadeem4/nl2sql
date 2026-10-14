@@ -326,7 +326,7 @@ Ensures latency bounds and prevents hung requests.
 ## Package Boundaries Are One-Way
 
 ### Definition
-Dependencies point in one direction: `nl2sql-adapter-sdk` → nothing, `nl2sql.adapters.*` → the SDK, `nl2sql` (the engine) → the SDK, and every caller — the REST API, the CLI, the playground — → the top-level `nl2sql` facade.
+Dependencies point in one direction: `nl2sql-sdk` → nothing, `nl2sql.adapters.*` → the SDK, `nl2sql` (the engine) → the SDK, and every caller — the REST API, the CLI, the playground — → the top-level `nl2sql` facade.
 
 Concretely:
 
@@ -455,5 +455,5 @@ A broken file fails startup. At question time a bad value, a denied table, a mis
 - `packages/nl2sql/src/nl2sql/auth/models.py`
 - `packages/nl2sql/src/nl2sql/pipeline/nodes/ast_planner/functions.py`
 - `packages/nl2sql/src/nl2sql/llm/registry.py`
-- `packages/adapter-sdk/src/nl2sql_adapter_sdk/protocols.py`
+- `packages/sdk/src/nl2sql_sdk/protocols.py`
 - `packages/nl2sql/tests/architecture/test_boundaries.py`

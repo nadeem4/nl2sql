@@ -19,7 +19,7 @@ from nl2sql.indexing.curated import curated_hash
 from nl2sql.indexing.rebuild import rebuild_index
 from nl2sql.indexing.vector_store import VectorStore
 from nl2sql.schema import InMemorySchemaStore
-from nl2sql_adapter_sdk.schema import (
+from nl2sql_sdk.schema import (
     ColumnContract,
     SchemaContract,
     SchemaMetadata,

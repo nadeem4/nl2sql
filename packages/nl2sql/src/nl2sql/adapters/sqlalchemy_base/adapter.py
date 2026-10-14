@@ -6,14 +6,14 @@ from sqlalchemy import create_engine, inspect, text, Engine, select, func, table
 from sqlalchemy.engine.reflection import Inspector
 from sqlalchemy.sql import sqltypes
 from typing import Tuple
-from nl2sql_adapter_sdk.capabilities import DatasourceCapability
-from nl2sql_adapter_sdk.contracts import (
+from nl2sql_sdk.capabilities import DatasourceCapability
+from nl2sql_sdk.contracts import (
     AdapterRequest,
     ResultError,
     ResultFrame,
 )
 from .models import DryRunResult, QueryPlan, CostEstimate
-from nl2sql_adapter_sdk.schema import (
+from nl2sql_sdk.schema import (
     SchemaContract,
     SchemaMetadata,
     TableContract,

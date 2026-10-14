@@ -21,7 +21,7 @@ DOCKERFILES = [
     ROOT / "deploy" / "huggingface" / "Dockerfile",
 ]
 PYPROJECTS = [
-    ROOT / "packages" / "adapter-sdk" / "pyproject.toml",
+    ROOT / "packages" / "sdk" / "pyproject.toml",
     ROOT / "packages" / "nl2sql" / "pyproject.toml",
     ROOT / "packages" / "api" / "pyproject.toml",
 ]

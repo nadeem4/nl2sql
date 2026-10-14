@@ -48,7 +48,7 @@ Ensure `capabilities()` advertises the correct set for routing and execution:
 
 ## Source references
 
-- Adapter protocol: `packages/adapter-sdk/src/nl2sql_adapter_sdk/protocols.py`
+- Adapter protocol: `packages/sdk/src/nl2sql_sdk/protocols.py`
 - Adapter discovery: `packages/nl2sql/src/nl2sql/datasources/discovery.py`
 - Datasource registry: `packages/nl2sql/src/nl2sql/datasources/registry.py`
 - SQLAlchemy base adapter: `packages/nl2sql/src/nl2sql/adapters/sqlalchemy_base/adapter.py`

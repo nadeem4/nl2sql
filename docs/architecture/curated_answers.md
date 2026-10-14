@@ -462,7 +462,7 @@ generated SQL does not need:
 ## Bound parameters through the adapter
 
 The SDK already has a place for them: `AdapterRequest.parameters`
-(`nl2sql_adapter_sdk/contracts.py`, "Optional parameter bindings"). But no
+(`nl2sql_sdk/contracts.py`, "Optional parameter bindings"). But no
 adapter reads it. `SqlAlchemyAdapter.execute_sql()` and `execute_batches()`
 call `conn.execute(text(sql))` and drop it, and `SqlExecutorService` never
 sets it. Sending parameterised SQL to an adapter that ignores the parameters

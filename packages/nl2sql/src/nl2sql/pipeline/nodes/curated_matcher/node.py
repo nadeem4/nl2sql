@@ -26,7 +26,7 @@ from nl2sql.pipeline.nodes.decomposer.dag import build_execution_dag
 from nl2sql.pipeline.nodes.decomposer.schemas import CombineGroup, CombineInput, DecomposerResponse, SubQuery
 from nl2sql.pipeline.nodes.validator.schemas import ValidationCheck
 from nl2sql.pipeline.subgraphs.schemas import SubgraphOutput
-from nl2sql_adapter_sdk.capabilities import DatasourceCapability
+from nl2sql_sdk.capabilities import DatasourceCapability
 
 from .params import ParamError, resolve_params
 from .prompts import CURATED_MATCHER_PROMPT

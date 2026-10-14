@@ -14,7 +14,7 @@ import polars as pl
 
 from nl2sql.common.settings import secret_value, settings
 from nl2sql.execution.contracts import ArtifactRef
-from nl2sql_adapter_sdk.contracts import ResultFrame
+from nl2sql_sdk.contracts import ResultFrame
 
 from .parquet import (
     polars_to_result_frame,

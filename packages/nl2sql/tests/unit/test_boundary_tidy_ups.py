@@ -142,7 +142,7 @@ def test_every_capability_flag_is_one_something_queries():
     """
     import re
 
-    from nl2sql_adapter_sdk.capabilities import DatasourceCapability
+    from nl2sql_sdk.capabilities import DatasourceCapability
 
     source = "\n".join(path.read_text(encoding="utf-8") for path in SRC.rglob("*.py"))
     queried = set(re.findall(r"DatasourceCapability\.([A-Z_]+)", source))

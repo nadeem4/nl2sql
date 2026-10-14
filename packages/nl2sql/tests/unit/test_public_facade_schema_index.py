@@ -11,7 +11,7 @@ from nl2sql import NL2SQL
 from nl2sql.indexing.vector_store import VectorStore
 from nl2sql.llm.registry import LLMRegistry
 from nl2sql.secrets import SecretManager
-from nl2sql_adapter_sdk.schema import (
+from nl2sql_sdk.schema import (
     ColumnContract,
     ColumnMetadata,
     ForeignKeyContract,

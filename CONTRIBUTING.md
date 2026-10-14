@@ -15,7 +15,7 @@ fails the suite rather than review.
 - `packages/nl2sql`: Engine and pipeline, the CLI (`nl2sql.cli`), and the
   database adapters (`nl2sql.adapters.*`, including the SQLAlchemy base).
 - `packages/api`: FastAPI REST service.
-- `packages/adapter-sdk`: Adapter interfaces and contracts.
+- `packages/sdk`: the SDK (`nl2sql-sdk`, imported as `nl2sql_sdk`): the interfaces an extension implements, today the adapter contracts.
 - `docs/`: MkDocs documentation.
 
 ## Prerequisites
@@ -34,7 +34,7 @@ Example (PowerShell), using a 3.13 interpreter:
 ```powershell
 py -3.13 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install `
-    -e packages/adapter-sdk -e "packages/nl2sql[postgres,duckdb,demo]" -e packages/api
+    -e packages/sdk -e "packages/nl2sql[postgres,duckdb,demo]" -e packages/api
 .\.venv\Scripts\python.exe -m pip install --group dev
 ```
 
@@ -145,7 +145,7 @@ Choose the base class that matches your datasource:
 | Base | Package | Use Case | Dependencies |
 | --- | --- | --- | --- |
 | `BaseSQLAlchemyAdapter` | `nl2sql.adapters.sqlalchemy_base` | Relational databases | SQLAlchemy |
-| `DatasourceAdapter` (protocol) | `adapter-sdk` | Non-SQL or custom sources | None |
+| `DatasourceAdapterProtocol` | `nl2sql_sdk` | Non-SQL or custom sources | None |
 
 ### SQL adapter
 
@@ -161,12 +161,12 @@ class MyDbAdapter(BaseSQLAlchemyAdapter):
 
 ### Non-SQL adapter
 
-Implement the `DatasourceAdapter` protocol directly.
+Implement the `DatasourceAdapterProtocol` directly.
 
 ```python
-from nl2sql_adapter_sdk import DatasourceAdapter
+from nl2sql_sdk import DatasourceAdapterProtocol
 
-class MyApiAdapter(DatasourceAdapter):
+class MyApiAdapter(DatasourceAdapterProtocol):
     ...
 ```
 

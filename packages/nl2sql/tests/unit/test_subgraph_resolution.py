@@ -9,7 +9,7 @@ from nl2sql.execution.dag import (
 )
 from nl2sql.pipeline.routes import build_scan_layer_router
 from nl2sql.pipeline.subgraphs.sql_agent import build_sql_agent_graph
-from nl2sql_adapter_sdk.capabilities import DatasourceCapability
+from nl2sql_sdk.capabilities import DatasourceCapability
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 

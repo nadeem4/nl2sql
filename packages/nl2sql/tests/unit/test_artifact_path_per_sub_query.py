@@ -17,7 +17,7 @@ from nl2sql.common.settings import Settings, settings
 from nl2sql.execution.artifacts import ArtifactStore, ArtifactStoreConfig
 from nl2sql.execution.contracts import ExecutorRequest
 from nl2sql.execution.executor.sql_executor import SqlExecutorService
-from nl2sql_adapter_sdk.contracts import ResultFrame
+from nl2sql_sdk.contracts import ResultFrame
 
 DEFAULT_TEMPLATE = Settings.model_fields["result_artifact_path_template"].default
 
