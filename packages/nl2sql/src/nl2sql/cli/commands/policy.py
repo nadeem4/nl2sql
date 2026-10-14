@@ -1,42 +1,36 @@
-import typer
-import pathlib
+"""``nl2sql policy validate``: the config's policies, checked against its datasources."""
 import sys
-from typing import Optional
-from typing_extensions import Annotated
+
+import typer
 from rich.console import Console
 from rich.markup import escape
-from rich.text import Text
 from rich.table import Table
+from rich.text import Text
 
-from nl2sql import PolicyAPI
+from nl2sql.cli.common.decorators import handle_cli_errors
+from nl2sql.cli.common.engine import build_engine
 
 app = typer.Typer(help="Manage RBAC policies and security.")
 console = Console()
 
-from nl2sql.cli.common.decorators import handle_cli_errors
 
 @app.command("validate")
 @handle_cli_errors
-def validate(
-    config: Annotated[Optional[pathlib.Path], typer.Option("--config", help="Path to datasource config")] = None,
-    policies: Annotated[Optional[pathlib.Path], typer.Option("--policies", help="Path to policies.json")] = None,
-    secrets: Annotated[Optional[pathlib.Path], typer.Option("--secrets", help="Path to secrets config")] = None,
-):
+def validate(ctx: typer.Context):
     """
-    Validate policy syntax and integrity against defined datasources.
+    Check that every datasource and table rule the policies name is a configured datasource.
     """
-    console.print(f"[bold blue]Validating Policies from:[/bold blue] {escape(str(policies or 'default'))}")
-
-    api = PolicyAPI()
-    report = api.validate_policies(policies_path=policies, datasources_path=config, secrets_path=secrets)
+    engine = build_engine(ctx, check=False)
+    source = (engine.config.folder / "nl2sql.yaml").as_posix() if engine.config.folder else "Config"
+    console.print(f"[bold blue]Validating policies from:[/bold blue] {escape(source)}", soft_wrap=True)
+    report = engine.policy.validate_policies()
 
     if report.errors:
-        console.print(f"[bold red]Schema Validation Failed:[/bold red]\\n{escape(str(report.errors[0]))}")
+        console.print(f"[bold red]Policy validation failed:[/bold red] {escape(str(report.errors[0]))}")
         sys.exit(1)
 
-    console.print(f"[bold blue]Checking Integrity against Datasources:[/bold blue] {escape(str(config or 'default'))}")
     if report.available_datasources:
-        console.print(f"[dim]Available Datasources: {report.available_datasources}[/dim]")
+        console.print(f"[dim]Available datasources: {escape(', '.join(sorted(report.available_datasources)))}[/dim]")
 
     table = Table(title="Policy Integrity Report")
     table.add_column("Role", style="cyan")
@@ -53,5 +47,4 @@ def validate(
     if not report.ok:
         console.print("\n[bold red]Integrity Check Failed: Policies reference missing resources.[/bold red]")
         sys.exit(1)
-    else:
-        console.print("\n[bold green]✓ Policy Integrity Verified[/bold green]")
+    console.print("\n[bold green]✓ Policy Integrity Verified[/bold green]")

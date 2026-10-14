@@ -68,17 +68,13 @@ def _check_progress(events):
 @pytest.mark.e2e
 def test_the_engine_streams_a_run_that_ends_as_run_query_ends(demo_project, fake_llm, monkeypatch):
     from nl2sql import NL2SQL, UserContext
-    from nl2sql.common.settings import reload_settings
 
     server, env = fake_llm(RULES)
     _env(monkeypatch, demo_project, env)
     admin = UserContext(roles=["admin"])
-    try:
-        engine = NL2SQL._legacy()
-        events = [(e.type, e.data) for e in engine.stream_query(QUESTION, user_context=admin)]
-        plain = engine.run_query(QUESTION, user_context=admin).model_dump(mode="json")
-    finally:
-        reload_settings()
+    engine = NL2SQL.from_config()
+    events = [(e.type, e.data) for e in engine.stream_query(QUESTION, user_context=admin)]
+    plain = engine.run_query(QUESTION, user_context=admin).model_dump(mode="json")
 
     final = _check_progress(events)
     assert final["status"] == "success", final["errors"]
@@ -93,16 +89,12 @@ def test_the_rest_api_streams_server_sent_events(demo_project, fake_llm, monkeyp
     from fastapi.testclient import TestClient
 
     pytest.importorskip("nl2sql_api")
-    from nl2sql.common.settings import reload_settings
     from nl2sql_api.main import app
 
     server, env = fake_llm(RULES)
     _env(monkeypatch, demo_project, env)
-    try:
-        with TestClient(app) as client:
-            reply = client.post("/api/v1/query/stream", json={"natural_language": QUESTION})
-    finally:
-        reload_settings()
+    with TestClient(app) as client:
+        reply = client.post("/api/v1/query/stream", json={"natural_language": QUESTION})
 
     assert reply.status_code == 200
     assert reply.headers["content-type"].startswith("text/event-stream")
@@ -116,18 +108,14 @@ def test_the_playground_streams_server_sent_events(demo_project, fake_llm, monke
 
     from nl2sql import NL2SQL
     from nl2sql.cli.demo.playground.app import build_app
-    from nl2sql.common.settings import reload_settings
 
     server, env = fake_llm(RULES)
     _env(monkeypatch, demo_project, env)
-    try:
-        client = TestClient(build_app(NL2SQL._legacy(), questions=[], roles=["admin"], mode="live", dataset="chinook"))
-        reply = client.post("/api/ask/stream", json={"question": QUESTION, "role": "admin"})
-        final = _check_progress(parse_sse(reply.text))
-        [entry] = final["result_manifest"]
-        page = client.get(f"/api/query/{final['trace_id']}/results/{entry['node_id']}").json()
-    finally:
-        reload_settings()
+    client = TestClient(build_app(NL2SQL.from_config(), questions=[], roles=["admin"], mode="live", dataset="chinook"))
+    reply = client.post("/api/ask/stream", json={"question": QUESTION, "role": "admin"})
+    final = _check_progress(parse_sse(reply.text))
+    [entry] = final["result_manifest"]
+    page = client.get(f"/api/query/{final['trace_id']}/results/{entry['node_id']}").json()
 
     assert final["status"] == "success" and final["recorded"] is False
     assert len(page["rows"]) == 25
@@ -146,7 +134,6 @@ def test_every_guided_question_replays_when_streamed_with_no_key(demo_project, t
     from nl2sql.cli.demo.llm_config import point_llm_config_at
     from nl2sql.cli.demo.playground.app import build_app
     from nl2sql.cli.demo.playground.hosted import Hosted, Limits, Replay
-    from nl2sql.common.settings import reload_settings
     from nl2sql.llm.replay import ReplayStore
     from nl2sql.testing.fake_llm import FakeLLMServer
 
@@ -157,19 +144,14 @@ def test_every_guided_question_replays_when_streamed_with_no_key(demo_project, t
 
     for name in ("OPENAI_API_KEY", "OPENROUTER_API_KEY", "ANTHROPIC_API_KEY"):
         monkeypatch.delenv(name, raising=False)
+    # As the Space runs it: the demo's own nl2sql.yaml, verified queries included.
     point_llm_config_at(project, None, provider="openai")
-    monkeypatch.chdir(project)
-    monkeypatch.setenv("ENV", "demo")
-    monkeypatch.setenv("LLM_CONFIG", "configs/llm.demo.yaml")
-    # As the Space runs it: with the demo's verified queries.
-    monkeypatch.setenv("CURATED_ENABLED", "true")
-    reload_settings()
     replay = FakeLLMServer(store.rules(), stream_delay=REPLAY_STREAM_DELAY / 10).start()
     finals = {}
     try:
         hosted = Hosted(enabled=True, limits=Limits(per_minute=100, per_session=100), replay=Replay(replay.base_url, store.covered(DEMO_QUESTIONS),
                                                     store.recorded_with))
-        app = build_app(NL2SQL._legacy(), questions=list(DEMO_QUESTIONS), roles=["admin"], mode="hosted",
+        app = build_app(NL2SQL.from_config(project / "nl2sql.yaml"), questions=list(DEMO_QUESTIONS), roles=["admin"], mode="hosted",
                         dataset="chinook", project_dir=project, host="0.0.0.0", hosted=hosted)
         client = TestClient(app, base_url="http://demo.example:7860")
         for question in DEMO_QUESTIONS:
@@ -177,7 +159,6 @@ def test_every_guided_question_replays_when_streamed_with_no_key(demo_project, t
             finals[question] = (events[-1], [n for n, _ in events].count("answer_delta"))
     finally:
         replay.stop()
-        reload_settings()
 
     missed = [q for q, ((name, body), _) in finals.items() if name != "final" or body["replay_miss"]]
     assert not missed, missed

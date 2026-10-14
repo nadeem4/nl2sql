@@ -28,7 +28,7 @@ markers. A test may carry both.
 
 | Marker | Means | Provided by |
 | --- | --- | --- |
-| `integration` | Needs external resources: the demo project's SQLite databases - vendored Chinook and the generated `support` and `webanalytics` - or the downloaded ONNX embedding model. | `nl2sql setup --demo` |
+| `integration` | Needs external resources: the demo's SQLite databases - vendored Chinook and the generated `support` and `webanalytics`, read from the installed package (`nl2sql.testing.config.make_demo_config`) - or the downloaded ONNX embedding model. | The package; `tests/e2e` writes its own project with `nl2sql init --demo` |
 | `llm` | Needs a real `OPENAI_API_KEY`. Costs money per run. | Nothing in CI - never selected. |
 
 Everything under `packages/nl2sql/tests/integration/` is marked `integration`
@@ -46,8 +46,9 @@ data run key-free.
 - **`test`** runs `pytest -m "not integration"` across Python 3.12 and 3.13.
   This is the fast job and must stay fast.
 - **`integration`** runs `pytest -m "integration and not llm"` on one Python
-  version, after generating the demo with `nl2sql setup --demo` and with
-  `EMBEDDING_PROVIDER=local`. The ONNX model is cached across runs. That
+  version, after writing and indexing a demo project (`nl2sql init --demo
+  demo-ci` and `nl2sql --config demo-ci/nl2sql.yaml index`), key-free with the
+  local embedder. The ONNX model is cached across runs. That
   subset covers schema indexing, datasource resolution, schema retrieval,
   aggregation and the local embedder against the real Chinook database; run
   it with `--collect-only -q` for the current list.
@@ -90,8 +91,7 @@ Three more jobs test the package rather than the source tree:
 Nothing selects `llm`. Those tests are run by hand with a key:
 
 ```bash
-nl2sql setup --demo
-EMBEDDING_PROVIDER=local OPENAI_API_KEY=sk-... pytest -m integration
+OPENAI_API_KEY=sk-... pytest -m integration
 ```
 
 Collection is not enough to keep these honest. Every test in the directory

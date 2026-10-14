@@ -27,68 +27,58 @@ Running a query needs an LLM key; only indexing is key-free. See
 
 ## Configure
 
-Create config files in your working directory:
-
-- `configs/datasources.yaml`
-- `configs/llm.yaml`
-- `configs/policies.json`
-- `configs/secrets.yaml` (optional)
-
-Start from `configs/datasources.example.yaml` and `configs/policies.example.json`.
-There is no example LLM or secrets file; their schemas are linked below.
-Detailed schemas for each file:
+The engine reads one config, `nl2sql.yaml`, and the files it includes.
+`nl2sql init` writes it (in Python, `nl2sql.config.init_project("my-project")`
+writes the same files); see
+[Start a config with `nl2sql init`](index.md#start-a-config-with-nl2sql-init).
+Each section has its own page:
 
 - [Datasources](../configuration/datasources.md)
 - [LLMs](../configuration/llm.md)
+- [Embeddings](../configuration/embeddings.md)
 - [Policies](../configuration/policies.md)
+- [Storage](../configuration/storage.md)
 - [Secrets](../configuration/secrets.md)
-
-!!! note "0.5: `nl2sql init`"
-    From 0.5 the engine reads one `nl2sql.yaml` instead of these files.
-    `nl2sql init` writes it, and in Python
-    `nl2sql.config.init_project("my-project")` writes the same files. See
-    [Start a config with `nl2sql init`](index.md#start-a-config-with-nl2sql-init-05).
+- [Settings](../configuration/settings.md)
 
 ### Building the engine in Python
-
-In Python the engine is built from one `nl2sql.yaml` (which `nl2sql init`
-writes), or from a `Config` built in code. The `configs/` files above are what
-the CLI commands still read until they move onto `nl2sql.yaml`.
 
 ```python
 from nl2sql import NL2SQL
 
-engine = NL2SQL.from_config("nl2sql.yaml")   # or $NL2SQL_CONFIG, then ./nl2sql.yaml
-engine.check()                               # connects, and reports what is ready
+with NL2SQL.from_config("nl2sql.yaml") as engine:   # or $NL2SQL_CONFIG, then ./nl2sql.yaml
+    report = engine.check()                         # connects, and reports what is ready
+    print(report)
 ```
 
-See [Public Facade](../api/core/public-facade.md#creating-an-engine) for every
-way to build it. Use the config for fixed, app-wide settings. Use runtime registration when
-you need to add or override datasources/LLMs per request, per tenant, or on a
-long-running process without restart.
+Building the engine never connects to a datasource or calls a model.
+`engine.check()` does: it raises `EngineNotReady` when a datasource with
+`required: true` fails, and otherwise leaves a failed datasource out of
+routing. The library never reads a `.env` file; call `python-dotenv` yourself
+before `from_config` if you keep keys in one. See
+[Public Facade](../api/core/public-facade.md#creating-an-engine) for every way
+to build it, including a `Config` built in code and `NL2SQL.demo()`. Use the
+config for fixed, app-wide settings. Use runtime registration when you need to
+add datasources on a long-running process without restart.
 
 ### Datasource configuration
 
-`configs/datasources.yaml` defines one or more database connections and limits:
+`datasources/` holds one file per datasource; the file name is its id:
 
 ```yaml
-version: 1
-datasources:
-  - id: my_postgres
-    description: "Primary analytics DB."
-    connection:
-      type: postgres
-      host: localhost
-      port: 5432
-      user: ${env:POSTGRES_USER}
-      password: ${env:POSTGRES_PASSWORD}
-      database: analytics
-    statement_timeout_ms: 8000
-    row_limit: 100
-    max_bytes: 10485760
+# datasources/my_postgres.yaml
+type: postgres
+description: Primary analytics DB.
+connection:
+  host: localhost
+  port: 5432
+  user: "${env:POSTGRES_USER}"
+  password: "${env:POSTGRES_PASSWORD}"
+  database: analytics
+limits: { row_limit: 100, timeout_ms: 8000, max_bytes: 10485760 }
 ```
 
-Install the adapter extras that match `connection.type`:
+Install the adapter extras that match `type`:
 
 ```bash
 pip install "nl2sql-engine[postgres]"
@@ -99,32 +89,25 @@ See [Datasource config](../configuration/datasources.md) for field definitions.
 
 ### LLM configuration
 
-`configs/llm.yaml` selects the default model and any per-agent overrides:
+`llm.yaml` selects the model and any per-agent overrides:
 
 ```yaml
-version: 1
-default:
-  provider: openai
-  model: gpt-5.2
-  temperature: 0.0
-  api_key: ${env:OPENAI_API_KEY}
+# llm.yaml
+provider: openai
+model: gpt-5.4
+temperature: 0.0
+# api_key is optional: without it OPENAI_API_KEY is read.
 agents:
-  indexing_enrichment:
-    provider: openai
-    model: gpt-5.2
-    temperature: 0.0
-    api_key: ${env:OPENAI_API_KEY}
+  indexing_enrichment: { model: gpt-5.4-mini }
 ```
+
 To route chat through [OpenRouter](https://openrouter.ai) instead — one key for
 Anthropic, Google, Meta and hundreds of other models, with no extra dependency:
 
 ```yaml
-version: 1
-default:
-  provider: openrouter
-  model: anthropic/claude-sonnet-4.5
-  temperature: 0.0
-  api_key: ${env:OPENROUTER_API_KEY}
+provider: openrouter
+model: anthropic/claude-sonnet-4.5
+temperature: 0.0
 ```
 
 To use Claude on Anthropic's own API, with the system prompts prompt-cached,
@@ -135,26 +118,22 @@ pip install "nl2sql-engine[anthropic]"
 ```
 
 ```yaml
-version: 1
-default:
-  provider: anthropic
-  model: claude-opus-5
-  temperature: null          # Claude Opus 5 rejects a temperature
-  api_key: ${env:ANTHROPIC_API_KEY}
+provider: anthropic
+model: claude-opus-5
+temperature: null          # Claude Opus 5 rejects a temperature
 ```
 
 See [LLM configuration → Anthropic](../configuration/llm.md#anthropic-claude).
 
 A local [Ollama](https://ollama.com) daemon is configured the same way, with
-`provider: ollama` and no `api_key`; how well a given local model handles the
-pipeline's structured output varies by model, so see
+`provider: ollama`; how well a given local model handles the pipeline's
+structured output varies by model, so see
 [LLM configuration → Ollama](../configuration/llm.md#ollama) first.
 
-Note that OpenRouter serves chat completions only. Embeddings are selected
-separately with `EMBEDDING_PROVIDER`: the default `openai` means `nl2sql index`
-needs `OPENAI_API_KEY` set as well, while `EMBEDDING_PROVIDER=local` embeds with
-a key-free ONNX model (see
-[System configuration → Embeddings](../configuration/system.md#embeddings)).
+Note that OpenRouter serves chat completions only. Embeddings are their own
+section: `embeddings: { provider: local }` (what `nl2sql init` writes) embeds
+with a key-free ONNX model, and `provider: openai` needs `OPENAI_API_KEY`. See
+[Embeddings](../configuration/embeddings.md).
 
 See [LLM config](../configuration/llm.md) for full schema details.
 
@@ -216,46 +195,55 @@ engine.configure_llm({
 })
 ```
 
-You can also load LLMs from a config file at runtime:
+You can also replace every LLM with the `llm` section of another config at
+runtime:
 
 ```python
 from nl2sql import NL2SQL
 
 engine = NL2SQL.from_config("nl2sql.yaml")
-engine.configure_llm_from_config("configs/llm.yaml")
+engine.configure_llm_from_config("other/nl2sql.yaml")
 ```
 
 ### Policies configuration (RBAC)
 
-`configs/policies.json` defines which roles can access which datasources/tables:
+`policies.yaml` defines which roles can access which datasources and tables:
 
-```json
-{
-  "version": 1,
-  "roles": {
-    "admin": {
-      "description": "System Administrator",
-      "role": "admin",
-      "allowed_datasources": ["*"],
-      "allowed_tables": ["*"]
-    }
-  }
-}
+```yaml
+# policies.yaml
+default_role: viewer
+admin_roles: [admin]
+roles:
+  admin:
+    description: System Administrator
+    allowed_datasources: ["*"]
+    allowed_tables: ["*"]
+  viewer:
+    description: Read-only access to the catalogue
+    allowed_datasources: [my_postgres]
+    allowed_tables: ["my_postgres.public.products"]
 ```
-See [Policies config](../configuration/policies.md) for allowed table formats and wildcards.
+
+`{allow_all: true}` (what `nl2sql init` writes) lets every caller read
+everything, for local use only. See
+[Policies config](../configuration/policies.md) for allowed table formats and
+wildcards.
 
 ### Secrets configuration (optional)
 
-`configs/secrets.yaml` is only needed when you want to pull secrets from a provider:
+A `secrets` section is only needed when you want to pull secrets from a
+provider other than the environment:
 
 ```yaml
-version: 1
+# secrets.yaml
 providers:
-  # - id: azure-prod
-  #   type: azure
-  #   vault_url: "https://my-vault.vault.azure.net/"
+  - id: azure-prod
+    type: azure
+    vault_url: "https://my-vault.vault.azure.net/"
 ```
-See [Secrets config](../configuration/secrets.md) for supported providers and fields.
+
+A datasource then writes `password: "${azure-prod:db-password}"`. See
+[Secrets config](../configuration/secrets.md) for supported providers and fields.
 
 ## Run a query
 
@@ -284,14 +272,15 @@ full result set lives in artifact storage and is addressed through `artifact_ref
 A question repeated on the same day reuses its validated plan from the plan cache (no planner
 call, same SQL and rows; still validated every time), and
 `sub_query.plan_source` says `"cache"`. Turn it off with
-`PLAN_CACHE_ENABLED=false`; empty it with `nl2sql cache clear`. See
+`settings.pipeline.plan_cache: false`; empty it with `nl2sql cache clear`. See
 [Determinism → The plan cache](../architecture/determinism.md#the-plan-cache-determinism-from-the-architecture).
 
-## Lifecycle (configure → index → query)
+## Lifecycle (configure → check → index → query)
 
-1. Configure datasources, LLMs, and policies.
-2. Index schemas at least once (and after schema changes).
-3. Run queries.
+1. Configure datasources, LLMs, and policies (`nl2sql init`).
+2. Build the engine and call `engine.check()`.
+3. Index schemas at least once (and after schema changes).
+4. Run queries.
 
 ## Index schema (required)
 
@@ -302,7 +291,7 @@ engine.index_all_datasources()
 
 ## Configure providers
 
-Secrets providers are installed via extras and selected in `configs/secrets.yaml`:
+Secrets providers are installed via extras and selected in the `secrets` section:
 
 ```bash
 pip install "nl2sql-engine[aws]"
@@ -310,4 +299,5 @@ pip install "nl2sql-engine[azure]"
 pip install "nl2sql-engine[hashicorp]"
 ```
 
-See [Configuration system](../configuration/system.md) for environment variables and defaults.
+See [Configuration](../configuration/system.md) for the whole config, the
+environment variables it reads, and where each 0.4 file and variable went.

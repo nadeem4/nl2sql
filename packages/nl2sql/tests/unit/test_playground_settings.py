@@ -4,8 +4,9 @@ Three rules, each tested here:
 
 (a) settings work only on a loopback bind unless ``--allow-settings`` is given,
     because the playground has no login;
-(b) the panel edits the demo project's own ``llm.demo.yaml`` and ``.env.demo``,
-    the files the CLI reads, and nothing else;
+(b) the panel edits the demo project's own ``llm.yaml`` (the ``llm`` section
+    its ``nl2sql.yaml`` includes) and ``.env``, the files the CLI reads, and
+    nothing else;
 (c) a saved key is write-only: no response carries it, only ``mask_key``'s form.
 """
 import os
@@ -25,10 +26,10 @@ from nl2sql.execution.artifacts import ArtifactStore, ArtifactStoreConfig
 from nl2sql.llm.providers import VERIFIED_OPENAI_MODELS, mask_key
 from nl2sql.cli.commands.demo import _key_from_env_file
 from nl2sql.cli.demo.playground.app import build_app
-from nl2sql.configs import ConfigManager
-from nl2sql import NL2SQL, DatasourceAPI, LLM_API
+from nl2sql import NL2SQL, DatasourceAPI, LLM_API, load_config
 from nl2sql.llm import LLMRegistry
 from nl2sql.secrets import SecretManager
+from nl2sql.testing.config import make_config
 
 # Built at run time so no scanner mistakes a test fixture for a leaked key.
 FAKE_KEY = "-".join(["sk", "proj", "settingspanel" + "x" * 24 + "4f2a"])
@@ -45,12 +46,14 @@ def _plain(text: str) -> str:
 
 @pytest.fixture(autouse=True)
 def _replay_environment(monkeypatch):
-    """What `nl2sql demo` leaves in the environment in replay mode."""
-    monkeypatch.setenv("OPENAI_API_KEY", "replay")
+    """What `nl2sql demo` leaves in the environment in replay mode: no key at all.
+
+    The replay server's placeholder key is in ``llm.yaml``, not the environment.
+    """
     # Saving a key writes os.environ directly. delenv on an absent variable
     # records nothing to restore, so set it first: the key a test saves is
     # then removed afterwards instead of leaking into later tests.
-    for name in ("OPENROUTER_API_KEY", "ANTHROPIC_API_KEY"):
+    for name in ("OPENAI_API_KEY", "OPENROUTER_API_KEY", "ANTHROPIC_API_KEY"):
         monkeypatch.setenv(name, "")
         monkeypatch.delenv(name)
     monkeypatch.delenv("OPENAI_API_BASE", raising=False)
@@ -59,21 +62,17 @@ def _replay_environment(monkeypatch):
 
 @pytest.fixture
 def project(tmp_path):
-    """A demo project as `nl2sql demo` leaves it in replay mode."""
-    (tmp_path / "configs").mkdir()
-    (tmp_path / "configs" / "llm.demo.yaml").write_text(yaml.safe_dump({
-        "version": 1,
-        "default": {"provider": "openai", "model": "gpt-5.4",
-                    "api_key": "${env:OPENAI_API_KEY}", "name": "default",
-                    "base_url": REPLAY_URL},
-        "agents": {},
+    """A demo project as `nl2sql demo` leaves it in replay mode: nl2sql.yaml includes llm.yaml."""
+    (tmp_path / "llm.yaml").write_text(yaml.safe_dump({
+        "provider": "openai", "model": "gpt-5.4", "api_key": "replay", "base_url": REPLAY_URL,
     }, sort_keys=False), encoding="utf-8")
-    (tmp_path / ".env.demo").write_text("ENV=demo\nOPENAI_API_KEY=\n", encoding="utf-8")
+    make_config(tmp_path, llm={"file": "llm.yaml"})
+    (tmp_path / ".env").write_text("OPENAI_API_KEY=\n", encoding="utf-8")
     return tmp_path
 
 
 def _llm_yaml(project):
-    return yaml.safe_load((project / "configs" / "llm.demo.yaml").read_text(encoding="utf-8"))
+    return yaml.safe_load((project / "llm.yaml").read_text(encoding="utf-8"))
 
 
 class _Context:
@@ -82,14 +81,16 @@ class _Context:
         self.vector_store = None
         self.ds_registry = type("R", (), {"list_ids": staticmethod(lambda: [])})()
         self.llm_registry = LLMRegistry(SecretManager())
-        cfg = ConfigManager().load_llm(project / "configs" / "llm.demo.yaml")
-        agents = dict(cfg.agents or {})
-        agents["default"] = cfg.default
-        self.llm_registry.register_llms(agents)
+        self.replace_llm(load_config(project / "nl2sql.yaml").llm)
         self.tenant_id = "default_tenant"
         self.artifact_store = ArtifactStore(ArtifactStoreConfig(
             base_uri=str(project / "artifacts"),
             path_template="<tenant_id>/<request_id>/<sub_query_id>.parquet"))
+
+
+    def replace_llm(self, llm, **kwargs):
+        """What the runtime's ``replace_llm`` does with the clients: build the new set, then swap it in."""
+        self.llm_registry.swap(self.llm_registry.build_from(llm))
 
 
 class _Engine(NL2SQL):
@@ -127,8 +128,8 @@ def _app(project, engine=None, host="127.0.0.1", allow_settings=False, mode="rep
 
 @pytest.mark.parametrize("host", ["0.0.0.0", "192.168.1.20", "::", "example.com"])
 def test_settings_are_refused_on_a_non_loopback_host_without_the_flag(project, host):
-    before_yaml = (project / "configs" / "llm.demo.yaml").read_text(encoding="utf-8")
-    before_env = (project / ".env.demo").read_text(encoding="utf-8")
+    before_yaml = (project / "llm.yaml").read_text(encoding="utf-8")
+    before_env = (project / ".env").read_text(encoding="utf-8")
     _, client = _app(project, host=host)
 
     read = client.get("/api/settings").json()
@@ -141,8 +142,8 @@ def test_settings_are_refused_on_a_non_loopback_host_without_the_flag(project, h
     assert client.post("/api/settings/models",
                        json={"models": {"astplanner": "gpt-4.1"}}).status_code == 403
 
-    assert (project / "configs" / "llm.demo.yaml").read_text(encoding="utf-8") == before_yaml
-    assert (project / ".env.demo").read_text(encoding="utf-8") == before_env
+    assert (project / "llm.yaml").read_text(encoding="utf-8") == before_yaml
+    assert (project / ".env").read_text(encoding="utf-8") == before_env
 
 
 def test_settings_are_allowed_on_a_non_loopback_host_with_the_flag(project):
@@ -188,7 +189,7 @@ def test_a_cross_site_request_cannot_change_settings(project):
     assert foreign_origin.status_code == 403
     assert rebound_host.status_code == 403
     assert not_json.status_code in (403, 415)
-    assert _key_from_env_file(project / ".env.demo") is None
+    assert _key_from_env_file(project / ".env") is None
 
 
 # --- (c) secrets are write-only ----------------------------------------------------
@@ -310,11 +311,11 @@ def test_saving_a_key_switches_replay_to_live_without_a_restart(project):
     assert live_client.openai_api_base in (None, "")
     assert live_client.openai_api_key.get_secret_value() == FAKE_KEY
     assert os.environ["OPENAI_API_KEY"] == FAKE_KEY
-    # Persisted through the same path `--api-key` uses, into `.env.demo`.
-    assert _key_from_env_file(project / ".env.demo") == FAKE_KEY
-    assert _llm_yaml(project)["default"].get("base_url") is None
+    # Persisted through the same path `--api-key` uses, into `.env`.
+    assert _key_from_env_file(project / ".env") == FAKE_KEY
+    assert _llm_yaml(project).get("base_url") is None and _llm_yaml(project).get("api_key") is None
     # The key is referenced, never inlined, in the LLM config.
-    assert FAKE_KEY not in (project / "configs" / "llm.demo.yaml").read_text(encoding="utf-8")
+    assert FAKE_KEY not in (project / "llm.yaml").read_text(encoding="utf-8")
 
 
 def test_an_openrouter_key_switches_to_openrouter(project):
@@ -322,8 +323,8 @@ def test_an_openrouter_key_switches_to_openrouter(project):
 
     assert client.post("/api/settings/key", json={"api_key": FAKE_OPENROUTER_KEY}).status_code == 200
 
-    assert _llm_yaml(project)["default"]["provider"] == "openrouter"
-    assert _key_from_env_file(project / ".env.demo") == FAKE_OPENROUTER_KEY
+    assert _llm_yaml(project)["provider"] == "openrouter"
+    assert _key_from_env_file(project / ".env") == FAKE_OPENROUTER_KEY
     # The replay placeholder must not be sent to OpenRouter as a key.
     assert "OPENAI_API_KEY" not in os.environ
     llm = engine.context.llm_registry.get_llm("astplanner")
@@ -359,23 +360,23 @@ def test_a_save_waits_for_a_run_in_flight(project):
     assert engine.used[0].openai_api_base == REPLAY_URL
 
 
-# --- (b) a model per node, in the same llm.demo.yaml -------------------------------
+# --- (b) a model per node, in the same llm.yaml -------------------------------------
 
 
-def test_a_node_model_is_written_to_the_llm_demo_yaml_the_cli_reads(project):
+def test_a_node_model_is_written_to_the_llm_yaml_the_cli_reads(project):
     engine, client = _app(project, mode="live")
 
     response = client.post("/api/settings/models", json={"models": {"astplanner": "gpt-4.1"}})
 
     assert response.status_code == 200
-    # The CLI's own loader, on the file the CLI reads.
-    cfg = ConfigManager().load_llm(project / "configs" / "llm.demo.yaml")
-    assert cfg.agents["astplanner"].model == "gpt-4.1"
-    assert cfg.agents["astplanner"].temperature == 0.0
-    assert cfg.default.model == "gpt-5.4"
-    # The node's endpoint and key reference follow the default's.
-    assert cfg.agents["astplanner"].base_url == REPLAY_URL
-    assert cfg.agents["astplanner"].api_key.get_secret_value() == "${env:OPENAI_API_KEY}"
+    # The CLI's own loader, on the config the CLI reads.
+    llm = load_config(project / "nl2sql.yaml").llm
+    assert llm.agents["ast_planner"].model == "gpt-4.1"
+    assert llm.agents["ast_planner"].temperature == 0.0
+    assert llm.model == "gpt-5.4"
+    # The node's endpoint and key follow the default's.
+    assert llm.agents["ast_planner"].base_url == REPLAY_URL
+    assert llm.agents["ast_planner"].api_key == "replay"
     # And it takes effect without a restart.
     assert engine.context.llm_registry.get_llm("astplanner").model_name == "gpt-4.1"
     assert engine.context.llm_registry.get_llm("decomposer").model_name == "gpt-5.4"
@@ -390,7 +391,7 @@ def test_choosing_a_model_that_rejects_temperature_writes_temperature_null(proje
     assert client.post("/api/settings/models",
                        json={"models": {"refiner": "gpt-5.5", "decomposer": "gpt-5-mini"}}).status_code == 200
 
-    text = (project / "configs" / "llm.demo.yaml").read_text(encoding="utf-8")
+    text = (project / "llm.yaml").read_text(encoding="utf-8")
     raw = yaml.safe_load(text)
     assert "temperature" in raw["agents"]["refiner"] and raw["agents"]["refiner"]["temperature"] is None
     assert raw["agents"]["decomposer"]["temperature"] is None
@@ -403,13 +404,13 @@ def test_use_the_default_removes_the_node_entry(project):
 
     assert client.post("/api/settings/models", json={"models": {"astplanner": None}}).status_code == 200
 
-    assert "astplanner" not in (_llm_yaml(project).get("agents") or {})
+    assert "ast_planner" not in (_llm_yaml(project).get("agents") or {})
     assert engine.context.llm_registry.get_llm("astplanner").model_name == "gpt-5.4"
 
 
 def test_only_verified_models_are_offered_and_accepted(project):
     _, client = _app(project)
-    before = (project / "configs" / "llm.demo.yaml").read_text(encoding="utf-8")
+    before = (project / "llm.yaml").read_text(encoding="utf-8")
 
     offered = client.get("/api/settings").json()["models"]
     rejected = client.post("/api/settings/models", json={"models": {"astplanner": "gpt-3.5-turbo"}})
@@ -418,7 +419,7 @@ def test_only_verified_models_are_offered_and_accepted(project):
     assert [m["id"] for m in offered] == list(VERIFIED_OPENAI_MODELS)
     assert {m["id"]: m["temperature"] for m in offered} == VERIFIED_OPENAI_MODELS
     assert rejected.status_code == 400 and unknown_node.status_code == 400
-    assert (project / "configs" / "llm.demo.yaml").read_text(encoding="utf-8") == before
+    assert (project / "llm.yaml").read_text(encoding="utf-8") == before
 
 
 def test_the_verified_list_is_the_one_probed_on_2026_09_20():
@@ -430,9 +431,9 @@ def test_the_verified_list_is_the_one_probed_on_2026_09_20():
 
 def test_models_cannot_be_chosen_for_a_provider_without_a_verified_list(project):
     cfg = _llm_yaml(project)
-    cfg["default"]["provider"] = "ollama"
-    cfg["default"]["model"] = "llama3.1"
-    (project / "configs" / "llm.demo.yaml").write_text(yaml.safe_dump(cfg), encoding="utf-8")
+    cfg["provider"] = "ollama"
+    cfg["model"] = "llama3.1"
+    (project / "llm.yaml").write_text(yaml.safe_dump(cfg), encoding="utf-8")
     _, client = _app(project, mode="live")
 
     read = client.get("/api/settings").json()
@@ -448,8 +449,9 @@ def test_models_cannot_be_chosen_for_a_provider_without_a_verified_list(project)
 def _live_on_openai(project, monkeypatch, anthropic_key=True):
     """A live demo on OpenAI, with an Anthropic key saved too (or not)."""
     cfg = _llm_yaml(project)
-    cfg["default"].pop("base_url")
-    (project / "configs" / "llm.demo.yaml").write_text(yaml.safe_dump(cfg), encoding="utf-8")
+    cfg.pop("base_url")
+    cfg.pop("api_key")
+    (project / "llm.yaml").write_text(yaml.safe_dump(cfg), encoding="utf-8")
     monkeypatch.setenv("OPENAI_API_KEY", FAKE_KEY)
     if anthropic_key:
         monkeypatch.setenv("ANTHROPIC_API_KEY", FAKE_ANTHROPIC_KEY)
@@ -466,12 +468,12 @@ def test_a_node_can_be_put_on_another_provider(project, monkeypatch):
         "models": {"astplanner": {"provider": "anthropic", "model": "claude-opus-5"}}})
 
     assert response.status_code == 200, response.text
-    entry = _llm_yaml(project)["agents"]["astplanner"]
-    # The node's own provider, key reference and temperature; not the default's.
+    entry = _llm_yaml(project)["agents"]["ast_planner"]
+    # The node's own provider and temperature; no key named, so ANTHROPIC_API_KEY is read.
     assert entry["provider"] == "anthropic" and entry["model"] == "claude-opus-5"
-    assert entry["api_key"] == "${env:ANTHROPIC_API_KEY}"
+    assert "api_key" not in entry
     assert entry["temperature"] is None and "base_url" not in entry
-    assert _llm_yaml(project)["default"]["provider"] == "openai"
+    assert _llm_yaml(project)["provider"] == "openai"
     # Applied without a restart, through the anthropic wire.
     assert engine.context.llm_registry.get_llm("astplanner")._llm_type == "anthropic-chat"
     assert engine.context.llm_registry.get_llm("decomposer")._llm_type == "openai-chat"
@@ -495,7 +497,7 @@ def test_the_read_lists_every_provider_with_its_own_masked_key(project, monkeypa
 
 def test_a_provider_without_a_key_cannot_be_chosen(project, monkeypatch):
     _, client = _live_on_openai(project, monkeypatch, anthropic_key=False)
-    before = (project / "configs" / "llm.demo.yaml").read_text(encoding="utf-8")
+    before = (project / "llm.yaml").read_text(encoding="utf-8")
 
     providers = {p["id"]: p for p in client.get("/api/settings").json()["providers"]}
     response = client.post("/api/settings/models", json={
@@ -504,14 +506,13 @@ def test_a_provider_without_a_key_cannot_be_chosen(project, monkeypatch):
     assert providers["anthropic"]["usable"] is False
     assert response.status_code == 400
     assert "key for Anthropic" in response.json()["detail"]
-    assert (project / "configs" / "llm.demo.yaml").read_text(encoding="utf-8") == before
+    assert (project / "llm.yaml").read_text(encoding="utf-8") == before
 
 
 def test_a_node_whose_provider_has_no_key_is_shown_unavailable(project, monkeypatch):
     cfg = _llm_yaml(project)
-    cfg["agents"] = {"astplanner": {"provider": "anthropic", "model": "claude-opus-5", "temperature": None,
-                                    "api_key": "${env:ANTHROPIC_API_KEY}", "name": "astplanner"}}
-    (project / "configs" / "llm.demo.yaml").write_text(yaml.safe_dump(cfg), encoding="utf-8")
+    cfg["agents"] = {"ast_planner": {"provider": "anthropic", "model": "claude-opus-5", "temperature": None}}
+    (project / "llm.yaml").write_text(yaml.safe_dump(cfg), encoding="utf-8")
     _, client = _live_on_openai(project, monkeypatch, anthropic_key=False)
 
     nodes = {n["agent"]: n for n in client.get("/api/settings").json()["nodes"]}
@@ -530,24 +531,23 @@ def test_a_second_key_keeps_the_first_and_the_nodes_on_its_provider(project, mon
                                                                   "decomposer": {"provider": "openai",
                                                                                  "model": "gpt-4.1"}}}).status_code == 200
 
-    # One key per provider, in the environment and in .env.demo.
+    # One key per provider, in the environment and in .env.
     assert os.environ["OPENAI_API_KEY"] == FAKE_KEY
     assert os.environ["ANTHROPIC_API_KEY"] == FAKE_ANTHROPIC_KEY
-    env_demo = (project / ".env.demo").read_text(encoding="utf-8")
+    env_demo = (project / ".env").read_text(encoding="utf-8")
     assert f"OPENAI_API_KEY={FAKE_KEY}" in env_demo and f"ANTHROPIC_API_KEY={FAKE_ANTHROPIC_KEY}" in env_demo
     cfg = _llm_yaml(project)
     # The default moved to the provider of the last key saved; the OpenAI step stayed.
-    assert cfg["default"]["provider"] == "anthropic"
-    assert cfg["agents"]["astplanner"]["provider"] == "anthropic"
-    assert cfg["agents"]["decomposer"] == {"provider": "openai", "model": "gpt-4.1", "temperature": 0.0,
-                                           "api_key": "${env:OPENAI_API_KEY}", "name": "decomposer"}
+    assert cfg["provider"] == "anthropic"
+    assert cfg["agents"]["ast_planner"]["provider"] == "anthropic"
+    assert cfg["agents"]["decomposer"] == {"provider": "openai", "model": "gpt-4.1", "temperature": 0.0}
     assert engine.context.llm_registry.get_llm("decomposer").openai_api_key.get_secret_value() == FAKE_KEY
 
     # Saving the OpenAI key again moves the default back; the Claude step stays on Claude.
     assert client.post("/api/settings/key", json={"api_key": FAKE_KEY}).status_code == 200
     cfg = _llm_yaml(project)
-    assert cfg["default"]["provider"] == "openai"
-    assert cfg["agents"]["astplanner"]["provider"] == "anthropic"
+    assert cfg["provider"] == "openai"
+    assert cfg["agents"]["ast_planner"]["provider"] == "anthropic"
 
 
 def test_the_settings_read_names_every_llm_node(project):

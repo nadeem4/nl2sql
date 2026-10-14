@@ -1,6 +1,8 @@
 from functools import wraps
 import sys
 import traceback
+
+import click
 from rich.console import Console
 from rich.markup import escape
 from nl2sql.common.exceptions import NL2SQLError
@@ -19,6 +21,8 @@ def handle_cli_errors(func):
     def wrapper(*args, **kwargs):
         try:
             return func(*args, **kwargs)
+        except (click.exceptions.Exit, click.exceptions.Abort, click.ClickException):
+            raise  # already reported: the command's own exit, e.g. a config that does not load
         except NL2SQLError as e:
             console.print(f"[bold red]Error:[/bold red] {escape(str(e))}")
             sys.exit(1)

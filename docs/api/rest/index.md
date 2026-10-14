@@ -9,14 +9,19 @@ engine over HTTP. Implementation lives in `packages/api/src/nl2sql_api/`.
 
 Source: `packages/api/src/nl2sql_api/main.py`
 
-- `lifespan` configures logging, initializes a single `NL2SQL` engine and stores it
-  in `app.state.engine`. When `observability_exporter` is `otlp` (read through
-  `engine.get_setting`), logs switch to JSON.
+- `lifespan` configures logging, loads the `.env` next to `nl2sql.yaml` (never
+  overriding a variable already set), builds one engine with
+  `NL2SQL.from_config()` (the file `NL2SQL_CONFIG` names, else `./nl2sql.yaml`)
+  and calls `engine.check()` before it serves. A `required` datasource that
+  fails, or no datasource ready at all, raises `EngineNotReady` and the server
+  does not start; an optional one that fails leaves it serving the others. The
+  engine is stored in `app.state.engine` and closed at shutdown. When
+  `settings.observability.exporter` is `otlp`, logs switch to JSON.
 - The package imports the engine only through the top-level `nl2sql` namespace
   (`from nl2sql import NL2SQL, QueryResult, UserContext, configure_logging, ...`),
   never an engine submodule. `packages/api/tests/test_architecture.py` enforces it.
 - Routers are included under `/api/v1`.
-- CORS is restricted to the origins listed in `NL2SQL_API_CORS_ORIGINS`
+- CORS is restricted to the origins in `api.cors_origins`
   (see [CORS origins](#cors-origins)); with none configured, no cross-origin
   browser access is allowed.
 
@@ -36,10 +41,10 @@ Source: `packages/api/src/nl2sql_api/dependencies.py`
 
 FastAPI serves Swagger UI at `/docs`, ReDoc at `/redoc` and the OpenAPI schema at
 `/openapi.json`, with a summary, description and tag on every route. Start the
-server from the folder holding your env file and configs:
+server on a config:
 
 ```bash
-ENV=demo nl2sql-api --host 127.0.0.1 --port 8000   # then open http://localhost:8000/docs
+NL2SQL_CONFIG=nl2sql-demo/nl2sql.yaml nl2sql-api --host 127.0.0.1 --port 8000   # then open http://localhost:8000/docs
 ```
 
 ## API Index
@@ -70,27 +75,31 @@ event loop.
 
 ## Configuration
 
-The REST API inherits all configuration from the Core engine. Beyond the runtime
-server options in `nl2sql_api.server` (`--host`, `--port`, `--reload`), it reads
-these environment variables of its own.
+The REST API is configured by the same `nl2sql.yaml` as the engine. Beyond the
+runtime server options in `nl2sql_api.server` (`--host`, `--port`, `--reload`),
+its own settings are the `api` section of that file (see
+[The `api` section](../../configuration/api.md)), and the admin roles are
+`policies.admin_roles`. The engine validates the `api` section and never reads it.
 
 ### CORS origins
 
-`NL2SQL_API_CORS_ORIGINS` is a comma-separated list of the browser origins
-allowed to call the API cross-origin. Each entry is a full origin (scheme, host
-and, if non-default, port); surrounding whitespace is ignored.
+`api.cors_origins` lists the browser origins allowed to call the API
+cross-origin. Each entry is a full origin (scheme, host and, if non-default,
+port).
 
-```bash
-export NL2SQL_API_CORS_ORIGINS="https://bi.corp.example,http://localhost:3000"
+```yaml
+# api.yaml
+cors_origins: [https://bi.corp.example, http://localhost:3000]
 ```
 
 With one or more origins configured, only those origins are accepted and
 credentialed requests (cookies, `Authorization`) are permitted.
 
-If the variable is unset or empty, no origins are allowed and credentials are
-disabled. That is the intended default, not a misconfiguration: a browser page
-served from another origin cannot call the API until you opt it in. The value is
-read once at import time, so changing it requires restarting the server.
+With none, no origins are allowed and credentials are disabled. That is the
+intended default, not a misconfiguration: a browser page served from another
+origin cannot call the API until you opt it in. The list is read from the
+engine's config, which is loaded at startup, so changing it requires
+restarting the server.
 
 This setting governs the browser same-origin policy only. Non-browser clients --
 `curl`, server-side callers, the Python SDK -- do not send an `Origin` header and
@@ -103,22 +112,23 @@ does not authenticate callers, and it never takes the role from the request body
 unless a dev flag says so. The `get_user_context` dependency reads, first match
 wins:
 
-| Variable | Role source |
+| `api` key | Role source |
 | --- | --- |
-| `NL2SQL_API_ROLE_HEADER` | The name of a header a trusted proxy sets, e.g. `X-NL2SQL-Role`. Comma-separated values are several roles. Configure it only when the proxy authenticates the caller and overwrites the header on every request; otherwise any client can pick its own role. |
-| `NL2SQL_API_ROLE` | One static role for every request, e.g. `admin` for a single-tenant deployment or the demo. |
-| `NL2SQL_API_TRUST_BODY_ROLE` | `true` takes `user_context` from the request body, as the API did before. For local testing only: any client can choose any role. The server logs a warning at startup when it is on. |
+| `role_header` | The name of a header a trusted proxy sets, e.g. `X-NL2SQL-Role`. Comma-separated values are several roles. Configure it only when the proxy authenticates the caller and overwrites the header on every request; otherwise any client can pick its own role. |
+| `role` | One static role for every request, e.g. `admin` for a single-tenant deployment or the demo. |
+| `trust_body_role` | `true` takes `user_context` from the request body. For local testing only: any client can choose any role. The server logs a warning at startup when it is on. |
 
 With no role from any of them, `POST /api/v1/query` and the result routes answer `HTTP 401` with a
-message naming these variables; the engine never runs. The variables are read
-on each request.
+message naming these keys; the engine never runs.
 
-```bash
-# Demo: every request runs as admin.
-ENV=demo NL2SQL_API_ROLE=admin nl2sql-api --port 8000
+```yaml
+# api.yaml for the demo: every request runs as admin.
+role: admin
+```
 
-# Behind an authenticating proxy that sets X-NL2SQL-Role.
-NL2SQL_API_ROLE_HEADER=X-NL2SQL-Role nl2sql-api --port 8000
+```yaml
+# api.yaml behind an authenticating proxy that sets X-NL2SQL-Role.
+role_header: X-NL2SQL-Role
 ```
 
 This is a seam, not an auth provider: to integrate one, override the
@@ -134,30 +144,32 @@ The routes that change the running process need an admin role, checked by the
 - `POST /api/v1/llm`
 - `POST /api/v1/index/{datasource_id}`, `POST /api/v1/index-all` and `DELETE /api/v1/index`
 
-| Variable | Default | Meaning |
+| Key | Default | Meaning |
 | --- | --- | --- |
-| `NL2SQL_API_ADMIN_ROLES` | `admin` | Comma-separated roles that may call the admin routes. |
+| `policies.admin_roles` | `[admin]` | The roles that may call the admin routes. |
 
 The roles come from the same sources as [Caller role](#caller-role). A request
-whose roles include one in `NL2SQL_API_ADMIN_ROLES` is let through; one with
+whose roles include one in `policies.admin_roles` is let through; one with
 roles but none of them admin is `HTTP 403`; one with no role is `HTTP 401`.
 
-With **none** of `NL2SQL_API_ROLE_HEADER`, `NL2SQL_API_ROLE` or
-`NL2SQL_API_TRUST_BODY_ROLE` set, admin routes answer only clients on loopback
-(`127.0.0.1`, `::1`) and return `HTTP 403` to everyone else, with a message
-naming the variables to set. A fresh local install can still register and
+With **none** of `api.role_header`, `api.role` or `api.trust_body_role` set,
+admin routes answer only clients on loopback (`127.0.0.1`, `::1`) and return
+`HTTP 403` to everyone else, with a message naming the keys to set. A fresh local install can still register and
 index datasources, and a port published by mistake does not hand them out.
 Two consequences:
 
 - In Docker, a request through a published port arrives from the bridge
   gateway, not loopback, so admin routes need a role setting there.
 - A reverse proxy on the same host makes every request look like loopback.
-  Behind one, configure `NL2SQL_API_ROLE_HEADER`.
+  Behind one, configure `api.role_header`.
 
 The read-only routes (`/health`, `/ready`, `GET /datasource`, `GET /llm`, which
 never returns API keys, and `GET /index/status`) need no role.
 
-```bash
+```yaml
 # The proxy sets X-NL2SQL-Role; only "ops" may change datasources and the index.
-NL2SQL_API_ROLE_HEADER=X-NL2SQL-Role NL2SQL_API_ADMIN_ROLES=ops nl2sql-api --port 8000
+# api.yaml
+role_header: X-NL2SQL-Role
+# policies.yaml (with the roles)
+admin_roles: [ops]
 ```

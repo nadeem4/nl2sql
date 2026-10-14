@@ -93,8 +93,12 @@ nav:
     - Datasources: configuration/datasources.md
     - LLMs: configuration/llm.md
     - Policies: configuration/policies.md
+    - Embeddings: configuration/embeddings.md
+    - Storage: configuration/storage.md
     - Secrets: configuration/secrets.md
     - Curated Answers: configuration/curated.md
+    - Settings: configuration/settings.md
+    - REST API settings: configuration/api.md
   - Adapters:
     - Overview: adapters/index.md
     - Architecture: adapters/architecture.md

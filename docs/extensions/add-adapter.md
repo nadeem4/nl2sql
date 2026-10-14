@@ -56,20 +56,21 @@ shows every registered adapter and whether it can be loaded.
 
 ## 3. Configure the datasource
 
-Add a datasource entry in `configs/datasources.yaml`:
+Add a datasource to the `datasources` section of `nl2sql.yaml`, for example as
+its own file in `datasources/`:
 
 ```yaml
-datasources:
-  - id: sales_db
-    description: "Sales warehouse"
-    connection:
-      type: postgres
-      host: ${env:PG_HOST}
-      user: ${env:PG_USER}
-      password: ${env:PG_PASSWORD}
+# datasources/sales_db.yaml
+type: postgres
+description: "Sales warehouse"
+connection:
+  host: "${env:PG_HOST}"
+  user: "${env:PG_USER}"
+  password: "${env:PG_PASSWORD}"
 ```
 
-Secrets are resolved by `SecretManager` before the registry initializes.
+References under `connection` are resolved by the engine's `SecretManager`
+when the adapter is built.
 
 ## 4. Validate capabilities
 

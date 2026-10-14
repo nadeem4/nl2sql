@@ -35,10 +35,11 @@ from nl2sql.cli.demo.playground.hosted import (
     Replay,
     key_header_for,
 )
-from nl2sql.configs import ConfigManager
+from nl2sql import load_config
 from nl2sql.llm import LLMRegistry
 from nl2sql.llm.request_key import current_api_key
 from nl2sql.secrets import SecretManager
+from nl2sql.testing.config import make_config
 
 # Built at run time so no scanner mistakes a test fixture for a leaked key.
 VISITOR_KEY = "-".join(["sk", "proj", "hostedvisitor" + "a" * 24 + "1f4d"])
@@ -48,14 +49,10 @@ OTHER_KEY = "-".join(["sk", "proj", "hostedother" + "b" * 24 + "9c7e"])
 @pytest.fixture
 def project(tmp_path):
     """A demo project as ``nl2sql demo --hosted`` leaves it: no key anywhere."""
-    (tmp_path / "configs").mkdir()
-    (tmp_path / "configs" / "llm.demo.yaml").write_text(yaml.safe_dump({
-        "version": 1,
-        "default": {"provider": "openai", "model": "gpt-5.4",
-                    "api_key": "${env:OPENAI_API_KEY}", "name": "default"},
-        "agents": {},
-    }, sort_keys=False), encoding="utf-8")
-    (tmp_path / ".env.demo").write_text("ENV=demo\nOPENAI_API_KEY=\n", encoding="utf-8")
+    (tmp_path / "llm.yaml").write_text(yaml.safe_dump({"provider": "openai", "model": "gpt-5.4"},
+                                                      sort_keys=False), encoding="utf-8")
+    make_config(tmp_path, llm={"file": "llm.yaml"})
+    (tmp_path / ".env").write_text("OPENAI_API_KEY=\n", encoding="utf-8")
     return tmp_path
 
 
@@ -65,8 +62,12 @@ class _Context:
         self.vector_store = None
         self.ds_registry = type("R", (), {"list_ids": staticmethod(lambda: [])})()
         self.llm_registry = LLMRegistry(SecretManager())
-        cfg = ConfigManager().load_llm(project / "configs" / "llm.demo.yaml")
-        self.llm_registry.register_llms({"default": cfg.default})
+        self.replace_llm(load_config(project / "nl2sql.yaml").llm)
+
+
+    def replace_llm(self, llm, **kwargs):
+        """What the runtime's ``replace_llm`` does with the clients: build the new set, then swap it in."""
+        self.llm_registry.swap(self.llm_registry.build_from(llm))
 
 
 class _Engine(NL2SQL):
@@ -139,8 +140,8 @@ def test_the_key_is_written_nowhere_in_the_project_and_is_in_no_response(project
         meta = client.get("/api/meta")
 
     assert answer.status_code == 200
-    # Not one byte of the demo project changed, so neither .env.demo nor
-    # llm.demo.yaml nor anything else took the key.
+    # Not one byte of the demo project changed, so neither .env nor
+    # llm.yaml nor anything else took the key.
     assert {path: path.read_bytes() for path in project.rglob("*") if path.is_file()} == before
     for path in project.rglob("*"):
         if path.is_file():
@@ -402,7 +403,7 @@ def test_a_visitors_cap_is_their_own(project):
 
 def test_settings_save_nothing_and_say_the_key_stays_in_the_browser(project):
     _, client = _client(project)
-    before = (project / ".env.demo").read_text(encoding="utf-8")
+    before = (project / ".env").read_text(encoding="utf-8")
 
     read = client.get("/api/settings").json()
     saved = client.post("/api/settings/key", json={"api_key": VISITOR_KEY})
@@ -411,7 +412,7 @@ def test_settings_save_nothing_and_say_the_key_stays_in_the_browser(project):
     assert read["available"] is False and read["hosted"] is True
     assert "browser tab" in read["reason"]
     assert (saved.status_code, models.status_code) == (403, 403)
-    assert (project / ".env.demo").read_text(encoding="utf-8") == before
+    assert (project / ".env").read_text(encoding="utf-8") == before
     assert VISITOR_KEY not in saved.text
 
 

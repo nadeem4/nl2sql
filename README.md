@@ -141,7 +141,8 @@ nl2sql demo
 1. **No questions at the terminal.** `nl2sql demo` does not prompt. It looks
    for a model key (the order is below) and says which mode it chose:
    **Live mode** with the provider, or replay mode when it finds none.
-2. **A project folder and an index.** It writes `./nl2sql-demo`, copies in
+2. **A project folder and an index.** It writes `./nl2sql-demo` with
+   `nl2sql init --demo` (an `nl2sql.yaml` and one file per section), copies in
    three SQLite databases -- Chinook (a music store), `support` (a help desk)
    and `webanalytics` (website traffic) -- and indexes their schemas on your
    machine. The first run downloads a ~79 MB embedding model; no key is needed
@@ -161,8 +162,8 @@ nl2sql demo
 
 The live demo above is the same playground with the key entry first.
 
-`nl2sql demo` writes a demo project into `./nl2sql-demo`, copies in three
-SQLite databases and indexes their schemas on your machine, serves the
+`nl2sql demo` writes a demo project into `./nl2sql-demo` (the same files
+`nl2sql init --demo` writes), copies in three SQLite databases and indexes their schemas on your machine, serves the
 playground on <http://127.0.0.1:8765/> and opens your browser. The databases
 are the [Chinook](THIRD_PARTY_NOTICES.md) sample database (11 tables, real
 foreign keys), `support`, a help desk (4 tables), and `webanalytics`, website
@@ -173,9 +174,10 @@ ONNX embedding model.
 
 **Answering a question needs a model.** The demo looks for one in this order:
 
-1. `--api-key KEY` (saved to the project's `.env.demo`, so later runs stay live)
+1. `--api-key KEY` (saved to the project's `.env`, next to its `nl2sql.yaml`,
+   so later runs stay live)
 2. `OPENAI_API_KEY`, `OPENROUTER_API_KEY` or `ANTHROPIC_API_KEY` in the environment
-3. a key already saved in `.env.demo`
+3. a key already saved in the project's `.env`
 4. an Ollama daemon on `localhost:11434`
 5. replay mode
 
@@ -223,8 +225,8 @@ run of it, labelled **Recorded run**; any other question asks for a key. Saving 
 Rebuild, answer ratings and `--record` are refused there, and the sample
 databases are opened read-only. Two limits keep the pace, both in process and
 both best-effort: 6 questions a minute keyed by client address
-(`NL2SQL_DEMO_QUESTIONS_PER_MINUTE`) and 30 a session keyed by a random cookie
-(`NL2SQL_DEMO_QUESTIONS_PER_SESSION`). `deploy/huggingface/` is that demo as a
+(`--questions-per-minute`) and 30 a session keyed by a random cookie
+(`--questions-per-session`). `deploy/huggingface/` is that demo as a
 Hugging Face Space, deployed by every release at the version just published to
 PyPI. See
 [Hosted demo](docs/deployment/hosted-demo.md).
@@ -253,8 +255,7 @@ tokens and its time.
 ![The Pipeline page listing each step of a run, the five marked as decided by a model, with tokens and time from the last run](https://raw.githubusercontent.com/nadeem4/nl2sql/main/docs/assets/screenshots/playground-pipeline.png)
 
 **Settings:** save an API key per provider and choose a provider and model for
-each LLM step. Written to the demo project's `.env.demo` and
-`configs/llm.demo.yaml`.
+each LLM step. Written to the demo project's `.env` and `llm.yaml`.
 
 ![The Settings page with the key form and a model per step](https://raw.githubusercontent.com/nadeem4/nl2sql/main/docs/assets/screenshots/playground-settings.png)
 
@@ -272,54 +273,60 @@ project with the question, role and SQL, never the rows;
 
 ## CLI reference
 
-Global options: `--env NAME` loads `.env.NAME`, `--env-file PATH` loads that
-file instead (and wins over `--env`), `--version` prints the installed version.
-Variables already exported in your shell win over the file. The demo project's
-configs use relative paths, so run `--env demo` commands from inside the demo
-folder (`cd nl2sql-demo`). Every command has `--help`.
+Global options: `--config PATH` names the `nl2sql.yaml` every command reads
+(without it, `NL2SQL_CONFIG`, then `./nl2sql.yaml`), and `--version` prints the
+installed version. The `.env` next to that `nl2sql.yaml` is loaded first;
+variables already exported in your shell win over the file. Paths inside the
+config are relative to `nl2sql.yaml`, so a command works from any folder. Every
+command has `--help`.
 
 | Command | Purpose | Key options |
 | --- | --- | --- |
-| `nl2sql demo` | Scaffold, index and serve the three-database playground | `--dir` (default `nl2sql-demo`), `--host` (default `127.0.0.1`), `--port` (default 8765), `--no-browser`, `--api-key`, `--record`, `--allow-settings`, `--hosted` |
-| `nl2sql init [DIR]` | Write the 0.5 config into `DIR` (default `.`): `nl2sql.yaml` plus one file per section, checked with `load_config`. Never writes a key and never overwrites a file without `--force`. The engine reads this config from 0.5 on | `--demo` (the three sample databases, their roles, verified queries and sample questions), `--provider` (`openai`, `anthropic` or `openrouter`; default `openai`), `--force` |
-| `nl2sql setup` | Interactive wizard: writes `.env.dev`, `configs/datasources.yaml` (Postgres, MySQL, SQL Server, SQLite or DuckDB), `configs/llm.yaml`, `configs/policies.json`, offers to install a configured adapter's missing driver extra, checks connectivity, offers to index | `--demo` (write the demo project, all three sample databases, in the current folder and index it, no wizard), `--api-key` |
-| `nl2sql run "QUESTION"` | Ask a question and print the plan, checks, SQL, rows and answer | `--role` (default `admin`), `--no-exec` (plan and validate only), `--ds-id`, `--verbose`/`-v`, `--show-perf`, `--config`, `--llm-config`, `--policies-config`, `--secrets-config`, `--vector-store` |
-| `nl2sql index` | Index datasource schemas into the vector store, one datasource at a time | `--datasource`/`-d ID` (repeatable), `--full` (rebuild all, needed after changing the embedding model), `--curated-only` (re-index only the verified queries of `curated.yaml`, keeping the schema entries; no model call), `--enrich` (ask the `indexing_enrichment` LLM for descriptions the database lacks; spends tokens, off by default) |
-| `nl2sql doctor` | Check Python, installed drivers, datasource connectivity, the LLM key and the index | |
+| `nl2sql demo` | Write (`init --demo`), check, index and serve the three-database playground | `--dir` (default `nl2sql-demo`), `--host` (default `127.0.0.1`), `--port` (default 8765), `--no-browser`, `--api-key`, `--record`, `--allow-settings`, `--hosted`, `--questions-per-minute` (default 6), `--questions-per-session` (default 30) |
+| `nl2sql init [DIR]` | Write a new config into `DIR` (default `.`): `nl2sql.yaml` plus one file per section, checked with `load_config`. Never writes a key and never overwrites a file without `--force` | `--demo` (the three sample databases, their roles, verified queries, sample questions and settings), `--provider` (`openai`, `anthropic` or `openrouter`; default `openai`), `--force` |
+| `nl2sql run "QUESTION"` | Ask a question and print the plan, checks, SQL, rows and answer | `--role` (default `admin`), `--no-exec` (plan and validate only), `--ds-id`, `--verbose`/`-v`, `--show-perf` |
+| `nl2sql index` | Index datasource schemas into the vector store, one datasource at a time | `--datasource`/`-d ID` (repeatable), `--full` (rebuild all, needed after changing the embedding model), `--curated-only` (re-index only the verified queries of the `curated` section, keeping the schema entries; no model call), `--enrich` (ask the `indexing_enrichment` LLM for descriptions the database lacks; spends tokens, off by default) |
+| `nl2sql doctor` | Check Python, installed drivers and provider keys, then build the configured engine and print `engine.check()`: each datasource, each agent's key, the index | |
 | `nl2sql list-adapters` | List the installed datasource adapters | |
 | `nl2sql install NAME` | pip-install the driver extra for an adapter (`postgres`, `mysql`, `mssql`, `duckdb`, `sqlite`: the `connection.type` names), after a confirmation | |
-| `nl2sql policy validate` | Validate `policies.json` and check it against the configured datasources | `--policies`, `--config`, `--secrets` |
-| `nl2sql curated validate` | Check `curated.yaml` (verified queries): ids, params, read-only SQL in each datasource's dialect, tables against the index; exits 1 on any error | `--curated`, `--config`, `--secrets` |
-| `nl2sql curated test` | Run every verified query once against its database, read-only, with each param's default or example bound; reports pass/fail per query and exits 1 on any failure | `--curated`, `--config`, `--secrets` |
-| `nl2sql curated proposals export` | Write thumbs-up generated answers as proposed verified queries, in `curated.yaml`'s shape, for review; never writes `curated.yaml` | `--out PATH` (default: print to stdout) |
-| `nl2sql trace show TARGET` | Print a run trace's timeline: nodes, attempts, durations, tokens, errors | a trace file, or a trace id in `TRACE_DIR` |
-| `nl2sql trace replay TARGET` | Re-run a traced question on its recorded LLM responses, with no model calls | `--config`, `--llm-config`, `--policies-config`, `--secrets-config`, `--vector-store` |
-| `nl2sql cache clear` | Empty the plan cache; schema snapshots are kept | |
+| `nl2sql policy validate` | Check the config's policies against its datasources | |
+| `nl2sql curated validate` | Check the `curated` section (verified queries): ids, params, read-only SQL in each datasource's dialect, tables against the index; exits 1 on any error | |
+| `nl2sql curated test` | Run every verified query once against its database, read-only, with each param's default or example bound; reports pass/fail per query and exits 1 on any failure | |
+| `nl2sql curated proposals export` | Write thumbs-up generated answers as proposed verified queries, in the `curated` section's shape, for review; never writes a file of the config | `--out PATH` (default: print to stdout) |
+| `nl2sql trace show TARGET` | Print a run trace's timeline: nodes, attempts, durations, tokens, errors | a trace file, or a trace id in `<storage.path>/traces` |
+| `nl2sql trace replay TARGET` | Re-run a traced question on its recorded LLM responses, with no model calls | |
+| `nl2sql cache clear` | Empty the plan cache in `<storage.path>/state.db`; schema snapshots are kept | |
 | `nl2sql feedback list` | Playground ratings, newest first | `--limit` (default 50) |
 | `nl2sql feedback stats` | Ratings plus guardrail rates: refusals, refiner retries, validator rejections, errors, plan-cache hits | `--json`, `--traces DIR` |
 | `nl2sql feedback export --good` | Write thumbs-up runs as draft gold entries to a separate YAML for review | `--out` (default `feedback_gold_drafts.yaml`) |
 | `nl2sql feedback clear` | Delete every rating | `--yes` |
 | `nl2sql benchmark --tier 1` | Tier 1: the hand-written gold plans through the validator, generator and executor, with a local fake LLM (no key) | `--role` (repeatable), `--include-ids` (repeatable), `--export-path` |
 | `nl2sql benchmark --tier 2` | Tier 2: the real model end to end on the gold questions, per config, under a cost cap | `--max-cost USD` (no default; exits 2 without it), `--model` (repeatable), `--llm PRESET\|PATH` (repeatable), `--passes` (default 1), `--questions` (repeatable), `--note`, `--baseline`, `--max-regressions` (default 2), `--max-accuracy-drop` (deprecated), `--max-cost-increase` (default 0.20), `--results-dir`, `--use-curated` (curated answers are off by default) |
-| `nl2sql benchmark` | Without `--tier`: the gold questions through the full pipeline with the configured LLM | `--iterations` (default 3), `--bench-config-path`, `--role`, `--include-ids` |
+| `nl2sql benchmark` | Without `--tier`: the gold questions through the full pipeline with the configured LLM | `--iterations` (default 3), `--bench-config-path` (a YAML mapping each name to an `llm` section), `--role`, `--include-ids` |
 | `nl2sql benchmark retrieval` | Table and column recall of schema retrieval on the gold questions; no key, no LLM | `--record`, `--note`, `--baseline`, `--questions`, `--export-path`, `--results-dir` |
 | `nl2sql benchmark presets` | List the built-in tier 2 LLM configs (`gpt-5.4`, `gpt-5.4-mini-helpers`, `claude-planner`) | |
 | `nl2sql benchmark publish` | Rebuild `docs/benchmarks.md` and the README results block from `benchmarks/`; run from the repo root | `--from DEMO_FOLDER` (repeatable: copy that folder's records in first) |
 
-Every `benchmark` command also takes `--dataset` (default: the Chinook gold set)
-and the same `--config`/`--llm-config`/`--policies-config`/`--secrets-config`/`--vector-store`
-overrides as `run`. `--llm` takes a preset name, a `.yaml` path or `NAME=PATH`,
-and a unique suffix will do: `--llm mini-helpers` finds `gpt-5.4-mini-helpers`.
+Every `benchmark` command also takes `--dataset` (default: the Chinook gold
+set) and runs on the engine `--config` names; its records go next to that
+`nl2sql.yaml`. `--llm` takes a preset name, a `.yaml` path holding an `llm`
+section (as `llm.yaml` does) or `NAME=PATH`, and a unique suffix will do:
+`--llm mini-helpers` finds `gpt-5.4-mini-helpers`.
 
-Examples, from the demo folder:
+Examples, from the demo folder (`cd nl2sql-demo`, so `./nl2sql.yaml` is the
+config; from anywhere else, add `--config nl2sql-demo/nl2sql.yaml`):
 
 ```bash
-nl2sql --env demo run "How many customers do we have, by country?"
-nl2sql --env demo run --role viewer "Who are the top 5 customers by total spend?"   # refused
-nl2sql --env demo run --no-exec "Which artist has the most albums?"                 # plan only
-nl2sql --env demo benchmark --tier 2 --model gpt-5.4 --max-cost 5
-nl2sql --env demo feedback stats
+nl2sql run "How many customers do we have, by country?"
+nl2sql run --role viewer "Who are the top 5 customers by total spend?"   # refused
+nl2sql run --no-exec "Which artist has the most albums?"                 # plan only
+nl2sql benchmark --tier 2 --model gpt-5.4 --max-cost 5
+nl2sql feedback stats
 ```
+
+`run`, `index` and `benchmark` call `engine.check()` before they start: a
+datasource marked `required: true` that cannot connect stops them with the
+report (exit 1); any other datasource that fails is printed and left out.
 
 `run` exits 1 when the run ends with an ERROR or CRITICAL error (a refusal
 included). More: [Demo guide](docs/getting_started/demo.md),
@@ -329,19 +336,31 @@ included). More: [Demo guide](docs/getting_started/demo.md),
 
 ## REST API
 
-The `nl2sql-api` package serves the engine over HTTP with FastAPI. It builds one
-`NL2SQL` engine at startup from the same env file and configs as the CLI.
+The `nl2sql-api` package serves the engine over HTTP with FastAPI. At startup
+it loads the `.env` next to `nl2sql.yaml` (never overriding a variable already
+set), builds one engine with `NL2SQL.from_config()` (`NL2SQL_CONFIG`, else
+`./nl2sql.yaml`) and calls `engine.check()` before it accepts a request: a
+`required` datasource that cannot connect stops it from starting.
 
 ```bash
 pip install nl2sql-api
-cd nl2sql-demo                               # the configs use relative paths
-ENV=demo NL2SQL_API_ROLE=admin nl2sql-api --host 127.0.0.1 --port 8000
-# or: ENV=demo NL2SQL_API_ROLE=admin uvicorn nl2sql_api.main:app --port 8000
+cd nl2sql-demo                               # ./nl2sql.yaml is the config
+nl2sql-api --host 127.0.0.1 --port 8000
+# or: NL2SQL_CONFIG=nl2sql-demo/nl2sql.yaml uvicorn nl2sql_api.main:app --port 8000
+```
+
+Its own settings are the `api` section of `nl2sql.yaml`, which the engine
+ignores:
+
+```yaml
+# api.yaml (included from nl2sql.yaml as  api: { file: api.yaml })
+role: admin                     # one static role for every request
+cors_origins: []                # browser origins allowed to call the API
 ```
 
 Full interactive docs at `http://localhost:8000/docs` (Swagger UI), with ReDoc
 at `/redoc` and the schema at `/openapi.json`. Browser access from other origins
-is off unless listed in `NL2SQL_API_CORS_ORIGINS`.
+is off unless listed in `api.cors_origins`.
 
 The API does not authenticate callers itself, and it never takes the RBAC role
 from the request body. The role comes from one of these settings, first match
@@ -349,15 +368,15 @@ wins:
 
 | Setting | Role source |
 | --- | --- |
-| `NL2SQL_API_ROLE_HEADER=X-NL2SQL-Role` | A header set by a trusted proxy that authenticates the caller. Comma-separated values are several roles. |
-| `NL2SQL_API_ROLE=admin` | One static role for every request. |
-| `NL2SQL_API_TRUST_BODY_ROLE=true` | Dev only: `user_context` in the body. Any client can pick any role, so the server logs a warning at startup. |
+| `api.role_header: X-NL2SQL-Role` | A header set by a trusted proxy that authenticates the caller. Comma-separated values are several roles. |
+| `api.role: admin` | One static role for every request. |
+| `api.trust_body_role: true` | Dev only: `user_context` in the body. Any client can pick any role, so the server logs a warning at startup. |
 
 With none of them, `/api/v1/query`, `/api/v1/query/stream` and the result routes answer HTTP 401.
 
 The routes that change the process (`POST /api/v1/datasource`, `DELETE /api/v1/datasource/{id}`,
 `POST /api/v1/llm`, `POST /api/v1/index/{id}`, `POST /api/v1/index-all`, `DELETE /api/v1/index`)
-also need a role listed in `NL2SQL_API_ADMIN_ROLES` (default `admin`), else HTTP 403. With no
+also need a role listed in `policies.admin_roles` (default `[admin]`), else HTTP 403. With no
 role setting at all they answer loopback clients only.
 
 | Method | Path | Purpose |
@@ -368,7 +387,7 @@ role setting at all they answer loopback clients only.
 | `GET` | `/api/v1/query/{request_id}/results/{result_id}.csv` | The whole of a run's saved result as CSV, streamed |
 | `GET` | `/api/v1/health` | Liveness check |
 | `GET` | `/api/v1/ready` | Readiness check (does not yet check datasources, the LLM or the index) |
-| `POST` | `/api/v1/datasource` | Register a datasource in the running process |
+| `POST` | `/api/v1/datasource` | Register a datasource in the running process; `config` has the shape of one `datasources` entry (`id`, `type`, `connection`, ...) |
 | `GET` | `/api/v1/datasource` | List registered datasource ids |
 | `GET` | `/api/v1/datasource/{datasource_id}` | Check that a datasource is registered |
 | `DELETE` | `/api/v1/datasource/{datasource_id}` | Not supported yet: always answers `success: false` |
@@ -402,6 +421,7 @@ from nl2sql import NL2SQL, UserContext
 
 engine = NL2SQL.demo()               # the bundled databases; reads OPENAI_API_KEY (or another provider's key)
 engine.index_all_datasources()       # once: builds the index under .nl2sql-demo/
+# Your own config instead:  engine = NL2SQL.from_config("nl2sql.yaml")
 result = engine.run_query(
     "How many customers are there?",
     user_context=UserContext(roles=["admin"]),
@@ -415,13 +435,15 @@ for sq in result.sub_queries:
 print(result.final_answer["summary"] if result.final_answer else result.errors)
 ```
 
-Run it from the demo folder. `run_query` also takes `datasource_id` and
+Building an engine never connects; `engine.check()` connects to each
+datasource and reports, and `with NL2SQL.from_config(...) as engine:` closes it.
+`run_query` also takes `datasource_id` and
 `execute=False` (plan and validate only). Pass a `user_context` with a role: with
 none the call currently raises a validation error, and a role the policy does
 not know is refused. `QueryResult` carries per sub-query the plan, checks, SQL,
 a capped row sample with the true total, status and retry count, and per run
 the status, errors, warnings, per-node timings, `usage` (LLM calls and tokens,
-and cost when `LLM_PRICES` is set) and `trace_path`. Asking the same question
+and cost when `llm.prices` covers the model) and `trace_path`. Asking the same question
 again reuses the validated plan from the plan cache (`sq.plan_source == "cache"`),
 still validated for the caller's role.
 
@@ -435,52 +457,52 @@ runs on. Feedback is not on the facade; it is read through the CLI. See
 
 ## Configuration
 
-| File | What it holds |
+One config, `nl2sql.yaml`, which `nl2sql init` writes with each section in its
+own file ([Configuration](docs/configuration/system.md)):
+
+| Section | What it holds |
 | --- | --- |
-| `configs/datasources.yaml` | Datasources and connections: PostgreSQL, MySQL, SQL Server, SQLite, DuckDB ([Datasources](docs/configuration/datasources.md)) |
-| `configs/llm.yaml` | A `default` agent and optional per-node agents ([LLM](docs/configuration/llm.md)) |
-| `configs/policies.json` | Roles: allowed datasources and `datasource.schema.table` entries ([Policies](docs/configuration/policies.md)) |
-| `configs/secrets.yaml` | Secret providers for `${provider:key}` references ([Secrets](docs/configuration/secrets.md)) |
+| `datasources` (`datasources/`, one file each) | Datasources and connections: PostgreSQL, MySQL, SQL Server, SQLite, DuckDB ([Datasources](docs/configuration/datasources.md)) |
+| `llm` (`llm.yaml`) | The provider and model, and optional per-node agents ([LLM](docs/configuration/llm.md)) |
+| `embeddings` (`embeddings.yaml`) | The embedder the index is built with; `local` needs no key ([Embeddings](docs/configuration/embeddings.md)) |
+| `policies` (`policies.yaml`) | Roles: allowed datasources and `datasource.schema.table` entries, `admin_roles` ([Policies](docs/configuration/policies.md)) |
+| `storage` (`storage.yaml`) | Where the index, `state.db`, traces and results live ([Storage](docs/configuration/storage.md)) |
+| `curated` (optional) | Verified queries; present means curated answers are on ([Curated answers](docs/configuration/curated.md)) |
+| `secrets` (optional) | Secret providers for `${provider:key}` references ([Secrets](docs/configuration/secrets.md)) |
+| `settings` (optional) | Tuning knobs, every one with a default ([Settings](docs/configuration/settings.md)) |
+| `api` (optional) | `nl2sql-api`'s role source and CORS origins ([API](docs/configuration/api.md)) |
+
+```bash
+nl2sql init                                   # writes nl2sql.yaml and its files here
+# edit datasources/example.yaml, then:
+nl2sql index
+nl2sql run "How many customers are there?"
+```
 
 **LLM providers.** `openai` (default model `gpt-5.4`), `anthropic` (Claude,
 `pip install "nl2sql-engine[anthropic]"`, `claude-opus-5` with
 `temperature: null`), `openrouter` (OpenAI-compatible gateway, default
 `anthropic/claude-sonnet-4.5`) and `ollama` (local; small models often cannot
-fill the recursive plan schema). Those defaults are what `nl2sql setup` and
+fill the recursive plan schema). Those defaults are what `nl2sql init` and
 `nl2sql demo` write. Each of the six model-using steps can have its own
-provider and model under `agents`: `curatedmatcher`, `datasourceresolver`, `decomposer`,
-`astplanner`, `refiner` and `answersynthesizer`, plus `indexing_enrichment`
+provider and model under `agents`: `curated_matcher`, `datasource_resolver`, `decomposer`,
+`ast_planner`, `refiner` and `answer_synthesizer`, plus `indexing_enrichment`
 for optional schema descriptions during indexing (off unless you run
 `nl2sql index --enrich`).
 
-**Key environment variables** ([System configuration](docs/configuration/system.md)):
-
-| Variable | Default | Purpose |
-| --- | --- | --- |
-| `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `OPENROUTER_API_KEY` | unset | Provider keys |
-| `ENV` (or `APP_ENV`) | unset | Loads `.env.<name>`; what `--env` sets |
-| `ENV_FILE_PATH` | unset | Load this env file instead; wins over `ENV` |
-| `DATASOURCE_CONFIG`, `LLM_CONFIG`, `POLICIES_CONFIG`, `SECRETS_CONFIG` | `configs/...` | Config file paths |
-| `VECTOR_STORE` | `./chroma_db` | Vector store directory |
-| `EMBEDDING_PROVIDER` | `openai` | `local` runs an ONNX embedder with no key (the demo sets it) |
-| `EMBEDDING_MODEL` | `text-embedding-3-small` | Embedding model; changing it needs `nl2sql index --full` |
-| `SCHEMA_STORE_PATH` | `data/schema_store.db` | Schema snapshots, the plan cache and the feedback table |
-| `RESULT_ARTIFACT_BASE_URI` | `./artifacts` | Where the full result set goes |
-| `GLOBAL_TIMEOUT_SEC` | 60 | How long the caller waits for a run (the demo sets 300) |
-| `SQL_AGENT_MAX_RETRIES` | 3 | Refiner retries per sub-query |
-| `SCHEMA_RETRIEVAL_FULL_SNAPSHOT_MAX_TABLES` | 15 | Send the whole schema, skipping vector search, up to this many tables |
-| `PLAN_CACHE_ENABLED` | `true` | Reuse validated plans for repeated questions |
-| `TRACE_MODE`, `TRACE_DIR` | `on_failure`, `traces` | Run traces: every node's inputs, outputs, prompts and responses |
-| `RBAC_REFUSAL_NAMES_TABLES` | `false` | Name the denied table in the refusal message |
-| `LLM_PRICES` | unset | Per-model prices, so `usage` reports cost |
-| `FEEDBACK_ENABLED` | `true` | Accept playground ratings |
+**Environment variables.** Two kinds are read directly: `NL2SQL_CONFIG` (the
+`nl2sql.yaml` to read) and the provider keys `OPENAI_API_KEY`, `ANTHROPIC_API_KEY` and `OPENROUTER_API_KEY`
+(the fallback when the config names no key). Anything else from the
+environment is written in the YAML as `${env:VAR}`, for example
+`path: "${env:NL2SQL_DATA_DIR}"`. The 0.4 variables and where each one went:
+[System configuration](docs/configuration/system.md).
 
 ## Security and what is sent to the model
 
 - **What reaches the LLM provider:** the question; the schema the planner needs
   (table and column names, types, keys, relationships, descriptions); **sample
   column values** for tables the role may read; and the **result rows**, which
-  the answer writer summarises. With `TRACE_MODE` on, run traces store prompts,
+  the answer writer summarises. With `settings.traces.mode` on, run traces store prompts,
   responses and sample rows on disk.
 - **RBAC is strict.** A plan that touches a table the role may not read is
   refused before any SQL exists, never answered from the tables the role can
@@ -498,7 +520,7 @@ for optional schema descriptions during indexing (off unless you run
   playground take the role from the caller. The REST API takes it from a trusted
   proxy header or a static setting, never from the body unless a dev flag is
   on; put your own auth in the proxy and derive the role from it.
-- `GLOBAL_TIMEOUT_SEC` bounds how long the caller waits, not how long the work
+- `settings.pipeline.timeout_s` bounds how long the caller waits, not how long the work
   runs; the graph runs in-process with no sandbox.
 
 Details: [Security Model](docs/security/model.md),
@@ -560,7 +582,6 @@ Known limitations:
   the per-session cap hangs on a cookie the visitor can clear.
 - The model's output is not reproducible; determinism is structural (fixed
   topology, validation before generation, plan cache) ([Determinism](docs/architecture/determinism.md)).
-- The S3 and ADLS result backends have not been verified against a real service.
 - No distributed tracing: OpenTelemetry metrics only, off by default. Audit
   events are emitted only by the CLI.
 - The REST API does not authenticate callers: it takes the role from a trusted
@@ -568,8 +589,8 @@ Known limitations:
   instead of refusing.
 
 Roadmap: using the engine on your own database (bring-your-own-database setup
-beyond the bundled demo databases) is planned. The `setup` wizard and the
-adapters exist, but that path is not yet documented or supported end to end.
+beyond the bundled demo databases) is planned. `nl2sql init` and the adapters
+exist, but the guided connect-scan-review flow arrives in a later release.
 
 ## Contributing and license
 

@@ -24,34 +24,27 @@ class DatasourceAPI:
         self._ctx = ctx
         self._registry: DatasourceRegistry = ctx.ds_registry
 
-    def add_datasource(self, config: Union[Datasource, Dict[str, Any]]) -> None:
+    def add_datasource(self, config: Datasource) -> None:
         """
         Add a datasource to the engine: built, not connected, and added to
         ``engine.config``.
 
         Args:
-            config: A ``Datasource``. The 0.4 shape (a dict with
-                ``connection.type``) is still read until the REST API moves to
-                the ``Datasource`` body.
+            config: A ``Datasource``.
         """
-        if not isinstance(config, Datasource):
-            from nl2sql._legacy import datasource_from_04
-
-            config = datasource_from_04(config)
         self._ctx.add_datasource(config)
 
     def add_datasource_from_config(self, config_path: Union[str, pathlib.Path]) -> None:
         """
-        Add the datasources in a 0.4 datasources file.
+        Add the datasources of another ``nl2sql.yaml``.
 
         Args:
-            config_path: Path to the datasource configuration file
+            config_path: Path to the ``nl2sql.yaml`` whose datasources to add
         """
-        from nl2sql._legacy import datasource_from_04
-        from nl2sql.configs import ConfigManager
+        from nl2sql.config import load_config
 
-        for config in ConfigManager().load_datasources(pathlib.Path(config_path)):
-            self._ctx.add_datasource(datasource_from_04(config))
+        for datasource in load_config(config_path).datasources:
+            self._ctx.add_datasource(datasource)
 
     def list_datasources(self) -> List[str]:
         """

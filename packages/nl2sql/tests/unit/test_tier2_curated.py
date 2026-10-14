@@ -9,7 +9,7 @@ accuracy by source.
 from types import SimpleNamespace
 
 from nl2sql.api.query_api import AnswerSource, QueryResult
-from nl2sql.configs.llm import AgentConfig, LLMFileConfig
+from nl2sql.llm.models import AgentConfig, LLMFileConfig
 from nl2sql.evaluation import tier2
 from nl2sql.testing.runtime import fake_runtime
 

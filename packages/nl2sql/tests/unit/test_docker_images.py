@@ -77,3 +77,13 @@ def test_a_pull_request_builds_the_api_image_the_release_publishes():
         steps = str(jobs[name]["steps"])
         assert "docker push" not in steps
         assert "docker/login-action" not in steps
+
+
+def test_the_api_image_reads_a_mounted_config_folder():
+    """``nl2sql-api`` starts from ``NL2SQL_CONFIG``: a config folder mounted at /etc/nl2sql."""
+    dockerfile = (ROOT / "packages" / "api" / "Dockerfile").read_text(encoding="utf-8")
+
+    assert re.search(r"(?m)^(ENV\s+|\s+)NL2SQL_CONFIG=/etc/nl2sql/nl2sql\.yaml", dockerfile)
+    assert "COPY ./packages/sdk" in dockerfile
+    for gone in ("DATASOURCE_CONFIG", "LLM_CONFIG", "POLICIES_CONFIG", "NL2SQL_API_", "ENV_FILE_PATH"):
+        assert gone not in dockerfile

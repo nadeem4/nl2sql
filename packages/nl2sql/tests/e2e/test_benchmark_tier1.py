@@ -19,7 +19,7 @@ from .conftest import _base_env, run_cli
 def test_tier1_passes_every_gold_plan_for_every_role(demo_project, tmp_path):
     report_path = tmp_path / "tier1.json"
     proc = run_cli(demo_project, _base_env(), "benchmark", "--tier", "1",
-                   "--export-path", str(report_path), timeout=900)
+                   "--export-path", str(report_path), config="nl2sql.yaml", timeout=900)
 
     assert report_path.exists(), proc.stdout + proc.stderr
     report = json.loads(report_path.read_text(encoding="utf-8"))

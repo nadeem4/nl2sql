@@ -1,8 +1,10 @@
 """`nl2sql demo` repairs a broken index at startup and flags old demo folders.
 
-The incident: a demo folder had ``data/vector_store_demo`` on disk and 0
-entries in it. ``prepare_project`` looked only at whether the folder existed,
-so every later start skipped indexing and every question failed.
+The incident: a demo folder had its index folder on disk and 0 entries in it.
+The demo looked only at whether the folder existed, so every later start
+skipped indexing and every question failed. The demo now builds the index
+whenever ``engine.check()`` reports it is not ``ok`` (``missing``, ``empty``
+or ``stale``, judged by its contents; see ``nl2sql.indexing.health``).
 """
 from __future__ import annotations
 
@@ -10,18 +12,11 @@ import json
 import re
 
 import pytest
-from langchain_core.documents import Document
-from langchain_core.embeddings import FakeEmbeddings
 
 from nl2sql.cli.commands import demo as demo_cmd
 from nl2sql.cli.demo import stamp
-from nl2sql.datasets.demo import DEMO_DATABASES
-from nl2sql.indexing.vector_store import VectorStore
-from nl2sql.schema.sqlite_store import SqliteSchemaStore
 
 _ANSI = re.compile(r"\x1b\[[0-9;]*m")
-
-DEMO_DATASOURCE_IDS = [ds_id for ds_id, _, _ in DEMO_DATABASES]
 
 
 def _plain(text: str) -> str:
@@ -30,113 +25,72 @@ def _plain(text: str) -> str:
 
 @pytest.fixture
 def calls(monkeypatch):
-    """Records index_demo_data calls instead of loading an embedding model."""
+    """Records the indexing runs instead of loading an embedding model."""
     seen = {"count": 0, "result": True}
 
-    def _index(self, enrich=False):
+    def _index(engine, **kwargs):
         seen["count"] += 1
-        return seen["result"]
+        if not seen["result"]:
+            raise SystemExit(1)  # what run_indexing does after printing why
 
-    monkeypatch.setattr("nl2sql.cli.demo.manager.DemoManager.index_demo_data", _index)
+    monkeypatch.setattr("nl2sql.cli.common.indexing.run_indexing", _index)
     return seen
 
 
 @pytest.fixture
-def project(tmp_path, calls, monkeypatch):
-    """A scaffolded demo folder whose first indexing was stubbed out."""
+def project(tmp_path):
+    """A demo folder, as `nl2sql demo` writes it with `nl2sql init --demo`."""
     directory = tmp_path / "demo"
-    monkeypatch.chdir(tmp_path)
     demo_cmd.prepare_project(directory)
-    calls["count"] = 0
     return directory
 
 
-def _index(directory, version=None):
-    """An index holding one datasource chunk per demo datasource.
+def _with_index(demo_engines, status):
+    class Engine(demo_engines.cls):
+        index = status
 
-    Health is judged across every datasource the demo registers, so a partial
-    index -- one covering only chinook -- is correctly reported as stale.
-    """
-    store = VectorStore("nl2sql_store", str(directory / "data" / "vector_store_demo"),
-                        embeddings=FakeEmbeddings(size=8))
-    if version:
-        store.vectorstore.add_documents([
-            Document(page_content=f"Datasource: {ds_id}",
-                     metadata={"type": "schema.datasource", "datasource_id": ds_id, "schema_version": version})
-            for ds_id in DEMO_DATASOURCE_IDS
-        ])
-    return store
+    demo_engines.cls = Engine
 
 
-def _snapshot(directory, version):
-    store = SqliteSchemaStore(directory / "data" / "schema_store.db")
-    for ds_id in DEMO_DATASOURCE_IDS:
-        store._connection.execute(
-            "INSERT INTO schema_snapshots VALUES (?, ?, 'f', '{}', '{}', 1)", (ds_id, version)
-        )
-    store._connection.commit()
-    store.close()
+@pytest.mark.parametrize("status", ["missing", "empty", "stale"])
+def test_an_index_that_is_not_ok_is_rebuilt_at_demo_startup(project, calls, capsys, demo_engines, status):
+    _with_index(demo_engines, status)
 
-
-def test_a_new_folder_is_indexed(tmp_path, calls, monkeypatch):
-    monkeypatch.chdir(tmp_path)
-    demo_cmd.prepare_project(tmp_path / "fresh")
+    demo_cmd.start_engine(project / "nl2sql.yaml")
 
     assert calls["count"] == 1
+    assert "indexing the schema" in _plain(capsys.readouterr().out)
 
 
-def test_an_empty_index_is_repaired_at_demo_startup(project, calls, capsys):
-    _index(project)  # the folder and the collection exist; nothing is in it
-    assert (project / "data" / "vector_store_demo").is_dir()
-
-    demo_cmd.prepare_project(project)
-
-    assert calls["count"] == 1
-    assert "empty" in _plain(capsys.readouterr().out).lower()
-
-
-def test_an_index_behind_the_latest_snapshot_is_rebuilt(project, calls):
-    _index(project, version="v1")
-    _snapshot(project, "v2")
-
-    demo_cmd.prepare_project(project)
-
-    assert calls["count"] == 1
-
-
-def test_a_healthy_index_is_left_alone(project, calls):
-    _index(project, version="v1")
-    _snapshot(project, "v1")
-
-    demo_cmd.prepare_project(project)
+def test_a_healthy_index_is_left_alone(project, calls, demo_engines):
+    demo_cmd.start_engine(project / "nl2sql.yaml")
 
     assert calls["count"] == 0
 
 
-def test_an_index_missing_a_datasource_is_rebuilt(project, calls):
-    """A demo folder indexed before the second and third databases existed."""
-    store = VectorStore("nl2sql_store", str(project / "data" / "vector_store_demo"),
-                        embeddings=FakeEmbeddings(size=8))
-    store.vectorstore.add_documents([
-        Document(page_content="Datasource: chinook",
-                 metadata={"type": "schema.datasource", "datasource_id": "chinook", "schema_version": "v1"}),
-    ])
-    _snapshot(project, "v1")
-
-    demo_cmd.prepare_project(project)
-
-    assert calls["count"] == 1
-
-
-def test_a_failed_repair_is_reported_not_ignored(project, calls, capsys):
-    _index(project)
+def test_a_failed_index_is_not_fatal_by_default(project, calls, capsys, demo_engines):
+    """Plain `nl2sql demo` keeps going: the playground offers Rebuild."""
+    _with_index(demo_engines, "empty")
     calls["result"] = False
 
-    demo_cmd.prepare_project(project)
+    engine = demo_cmd.start_engine(project / "nl2sql.yaml")
 
     out = _plain(capsys.readouterr().out)
-    assert "Indexing failed" in out
-    assert "Rebuild" in out
+    assert engine is demo_engines[0]
+    assert "Indexing failed" in out and "Rebuild" in out
+    assert "nl2sql --config" in out
+
+
+def test_a_failed_index_is_fatal_when_one_is_required(project, calls, capsys, demo_engines):
+    """`demo --record` must not record answers given against no index."""
+    _with_index(demo_engines, "missing")
+    calls["result"] = False
+
+    with pytest.raises(SystemExit) as exc:
+        demo_cmd.start_engine(project / "nl2sql.yaml", require_index=True)
+
+    assert exc.value.code == 1
+    assert "Nothing was recorded" in _plain(capsys.readouterr().out)
 
 
 def test_a_new_demo_folder_is_stamped_with_the_engine_version(project):
@@ -168,41 +122,3 @@ def test_a_folder_stamped_by_this_engine_is_not_flagged(project, capsys):
     demo_cmd.prepare_project(project)
 
     assert "older version" not in _plain(capsys.readouterr().out)
-
-
-def test_index_demo_data_reports_a_failed_run_instead_of_exiting(tmp_path, monkeypatch):
-    """`run_indexing` ends with sys.exit(1) on failure; the demo must survive it."""
-    from nl2sql.cli.demo.manager import DemoManager
-    from nl2sql.cli.console import console
-
-    monkeypatch.chdir(tmp_path)
-    manager = DemoManager(console, tmp_path)
-    manager.setup_demo()
-
-    def _failing(ctx, enrich=True):
-        raise SystemExit(1)
-
-    monkeypatch.setattr("nl2sql.cli.common.indexing.run_indexing", _failing)
-    monkeypatch.setattr("nl2sql._legacy.legacy_runtime", lambda **kwargs: object())
-
-    assert manager.index_demo_data() is False
-
-
-def test_a_failed_index_is_not_fatal_by_default(project, calls, capsys):
-    """Plain `nl2sql demo` keeps going: the playground offers Rebuild."""
-    calls["result"] = False
-
-    demo_cmd.prepare_project(project)
-
-    assert "Indexing failed" in _plain(capsys.readouterr().out)
-
-
-def test_a_failed_index_is_fatal_when_one_is_required(project, calls, capsys):
-    """`demo --record` must not record answers given against no index."""
-    calls["result"] = False
-
-    with pytest.raises(SystemExit) as exc:
-        demo_cmd.prepare_project(project, require_index=True)
-
-    assert exc.value.code == 1
-    assert "Nothing was recorded" in _plain(capsys.readouterr().out)

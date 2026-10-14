@@ -17,7 +17,7 @@ from langchain_core.embeddings import FakeEmbeddings
 
 from nl2sql.api.query_api import QueryResult
 from nl2sql.config import LLM, Embeddings
-from nl2sql.configs.llm import AgentConfig, LLMFileConfig
+from nl2sql.llm.models import AgentConfig, LLMFileConfig
 from nl2sql.evaluation import tier2
 from nl2sql.runtime import Runtime
 from nl2sql.testing.config import make_config

@@ -1,25 +1,23 @@
 """Curated answers end to end: the design's worked examples (a) to (d) on Chinook.
 
 Through the real CLI and the fake LLM, against the generated demo project. The
-module indexes one verified query into a private copy of the demo's vector
-store and schema store (``nl2sql index --curated-only``), so no other test
-sees it. The model's choice is a ``FakeLLMServer`` rule keyed on
+module indexes one verified query into a private copy of the demo's index and
+state store (``nl2sql index --curated-only`` on a config whose ``storage.path``
+is that copy), so no other test sees it. The model's choice is a ``FakeLLMServer`` rule keyed on
 ``VerifiedQueryChoice``; everything after it is the real engine.
 
-A run with no curated file, or with ``CURATED_ENABLED=false``, has no
-curated matcher in its graph at all: the same nodes and the same answer as
-before curated answers existed.
+A run whose config has no ``curated`` section has no curated matcher in its
+graph at all: the same nodes and the same answer as before curated answers
+existed.
 """
 from __future__ import annotations
 
 import json
-import shutil
-import sqlite3
 
 import pytest
 import yaml
 
-from .conftest import _base_env, run_cli
+from .conftest import _base_env, private_storage, run_cli
 from .recordings_chinook import RULES_COUNT_CUSTOMERS, RULES_TOP_CUSTOMERS, count_customers_answer
 from .test_trace_fake_llm import _serve
 from nl2sql.testing.fake_llm import Rule
@@ -70,49 +68,42 @@ def _verified_answer(prompt_text: str) -> dict:
             "content": f"Top customers by {meaning}.", "warnings": []}
 
 
-@pytest.fixture(scope="module")
-def curated(demo_project, tmp_path_factory):
-    """A private vector store and schema store holding the verified query, and the file naming it."""
-    root = tmp_path_factory.mktemp("curated")
-    vector_store = root / "vector_store"
-    shutil.copytree(demo_project / "data" / "vector_store_demo", vector_store)
-    schema_store = root / "schema_store.db"
-    source, target = sqlite3.connect(demo_project / "data" / "schema_store.db"), sqlite3.connect(schema_store)
-    try:
-        source.backup(target)
-    finally:
-        source.close()
-        target.close()
-    path = root / "curated.yaml"
-    path.write_text(yaml.safe_dump(CURATED, sort_keys=False), encoding="utf-8")
-
-    env = _env(root / "index-traces", vector_store, schema_store, path)
-    r = run_cli(demo_project, env, "index", "--curated-only", "--datasource", "chinook", timeout=600)
-    assert r.returncode == 0, r.stdout + r.stderr
-    return {"vector_store": vector_store, "schema_store": schema_store, "file": path}
-
-
-def _env(trace_dir, vector_store, schema_store, curated_file=None, enabled="true"):
+def _env():
     env = _base_env()
-    env.update({"OPENAI_API_KEY": "sk-" + "fake-curated", "TRACE_MODE": "always", "TRACE_DIR": str(trace_dir),
-                "VECTOR_STORE": str(vector_store), "SCHEMA_STORE_PATH": str(schema_store),
-                "CURATED_ENABLED": enabled,
-                "SQL_AGENT_RETRY_BASE_DELAY_SEC": "0", "SQL_AGENT_RETRY_JITTER_SEC": "0"})
-    # No file: the default path, which does not exist, so the feature is off
-    # whatever the demo's `.env.demo` names.
-    env["CURATED_CONFIG"] = str(curated_file) if curated_file is not None else "configs/curated.yaml"
+    env["OPENAI_API_KEY"] = "sk-" + "fake-curated"
     return env
 
 
-def _ask(demo_project, tmp_path, curated, name, rules, question, role="analyst", with_file=True, enabled="true"):
+def _with_storage(path, store):
+    """Point the config at ``path`` at the module's own store."""
+    document = yaml.safe_load(path.read_text(encoding="utf-8"))
+    document["storage"] = {"path": str(store)}
+    path.write_text(yaml.safe_dump(document, sort_keys=False), encoding="utf-8")
+
+
+@pytest.fixture(scope="module")
+def curated(demo_project, tmp_path_factory):
+    """A private index and state store holding the verified query."""
+    store = private_storage(demo_project, tmp_path_factory.mktemp("curated") / "store")
+    server = _serve(demo_project, RULES_COUNT_CUSTOMERS, "curated-index.yaml", curated=CURATED)
+    server.stop()
+    _with_storage(demo_project / "curated-index.yaml", store)
+    r = run_cli(demo_project, _env(), "index", "--curated-only", "--datasource", "chinook",
+                config="curated-index.yaml", timeout=600)
+    assert r.returncode == 0, r.stdout + r.stderr
+    return {"store": store}
+
+
+def _ask(demo_project, tmp_path, curated, name, rules, question, role="analyst", with_section=True):
     """One CLI run; returns (the fake server, the trace document, the CLI result)."""
-    config = f"llm.curated-{tmp_path.name}-{name}.yaml"
-    server = _serve(demo_project, rules, config)
-    trace_dir = tmp_path / f"traces-{name}"
-    env = _env(trace_dir, curated["vector_store"], curated["schema_store"],
-               curated["file"] if with_file else None, enabled)
+    config = f"curated-{tmp_path.name}-{name}.yaml"
+    server = _serve(demo_project, rules, config, mode="always", curated=CURATED if with_section else False)
+    _with_storage(demo_project / config, curated["store"])
+    trace_dir = curated["store"] / "traces"
+    for old in trace_dir.glob("*.json"):
+        old.unlink()
     try:
-        r = run_cli(demo_project, env, "run", "--role", role, "--llm-config", f"configs/{config}", question)
+        r = run_cli(demo_project, _env(), "run", "--role", role, question, config=config)
     finally:
         server.stop()
     paths = list(trace_dir.glob("*.json"))
@@ -222,15 +213,11 @@ def test_a_replay_with_no_recording_for_the_matcher_falls_back_and_still_answers
 
 
 @pytest.mark.e2e
-@pytest.mark.parametrize("with_file,enabled", [(False, "true"), (True, "false")],
-                         ids=["no-curated-file", "curated-disabled"])
-def test_without_curated_answers_the_graph_and_the_answer_are_todays(demo_project, tmp_path, curated,
-                                                                     with_file, enabled):
+def test_without_a_curated_section_the_graph_and_the_answer_are_todays(demo_project, tmp_path, curated):
     question = "How many customers are there?"
     rules = [Rule("VerifiedQueryChoice", _choice(n="5", year="2012")), *RULES_COUNT_CUSTOMERS]
 
-    server, doc, r = _ask(demo_project, tmp_path, curated, f"off-{enabled}", rules, question,
-                          with_file=with_file, enabled=enabled)
+    server, doc, r = _ask(demo_project, tmp_path, curated, "off", rules, question, with_section=False)
 
     assert r.returncode == 0, r.stdout + r.stderr
     assert "VerifiedQueryChoice" not in _calls(server)

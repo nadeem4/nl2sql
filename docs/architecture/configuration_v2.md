@@ -1,11 +1,11 @@
 # Configuration v2 and the extension registry (Phase 1 design)
 
-!!! note "Status: design, not built"
+!!! note "Status: being built"
     This page is the design for Phase 1 of the redesign, which ships as
-    release 0.5. Nothing on it is built yet. Each pull request in
-    [the PR plan](#11-pr-plan) updates this page and the reference pages it
-    touches. Until then, the [Configuration](../configuration/system.md)
-    pages describe how 0.4 works.
+    release 0.5. Each pull request in [the PR plan](#11-pr-plan) adds a
+    "Built" note to the sections it built, and updates the reference pages it
+    touches. Since PR 7b the [Configuration](../configuration/system.md)
+    pages describe the 0.5 config.
 
 ## Principles
 
@@ -90,8 +90,9 @@ Two rules from earlier decisions apply throughout:
     The models, `load_config`, `ConfigError`, `load_env_file` and the
     `nl2sql.testing.config.make_config` test helper are in `nl2sql.config`.
     The engine is built from them since PR 7a, and they
-    are exported from `nl2sql`. Until PR 7b this section stays the
-    reference. Building them settled these details:
+    are exported from `nl2sql`. Since PR 7b the
+    [Configuration](../configuration/system.md) pages are the reference.
+    Building them settled these details:
 
     - In `Settings`, the `schema` group is the attribute `schema_` in Python,
       because `schema` would shadow a pydantic method. The YAML key is
@@ -646,12 +647,8 @@ The variables read outside `Settings`:
       (not connected) and swaps in a new `engine.config` under the engine's
       lock. Indexing reads a datasource's description and sample questions
       from its `Datasource`, so one added in code keeps both (bug B9).
-      `sample_questions.yaml` is read only by the 0.4 entry points.
-    - **The 0.4 entry points.** The CLI, `nl2sql-api` and the playground
-      still start from the 0.4 files: `nl2sql._legacy` reads them into a
-      `Config` (`_legacy_config`) and keeps their stores where the 0.4
-      variables put them; the facade's private `NL2SQL._legacy(**paths)` is
-      what `nl2sql-api` and the playground call. PR 7b deletes the module.
+    - **The 0.4 entry points** (`nl2sql._legacy`, `NL2SQL._legacy()`) lived
+      for one PR; PR 7b deleted them with the 0.4 files.
     - **Tests.** `nl2sql.testing.config.make_demo_config(folder)` is
       `make_config` with the demo's databases and roles; the integration and
       end-to-end fixtures build their runtime from it.
@@ -1333,8 +1330,42 @@ users, yanking it adds nothing.
 
 ### CLI
 
+!!! note "Built: the callers on the new config (PR 7b)"
+    The CLI takes one global `--config`; `--env`, `--env-file`, every
+    per-command path flag and `nl2sql setup` are gone. The CLI, `nl2sql-api`
+    and `nl2sql demo` load the `.env` next to `nl2sql.yaml`
+    (`nl2sql.config.load_env_file`, never overriding a set variable) and call
+    `engine.check()` at startup. `ConfigManager`, the `nl2sql/configs/` file
+    envelopes, `sample_questions.py`, `nl2sql._legacy` and every 0.4 file in
+    the repository's `configs/` are deleted. Building it settled these
+    details:
+
+    - `load_env_file` is exported from `nl2sql` too: `nl2sql-api` imports only
+      the top-level package.
+    - The curated checks that need the datasources (`check_curated`,
+      `inspect_verified_sql`) moved to `nl2sql/config/curated.py`, with
+      sqlglot imported inside them. `AgentConfig` and `LLMFileConfig` (the
+      set of agents the benchmark compares, now built with
+      `LLMFileConfig.from_llm(llm)`) moved to `nl2sql/llm/models.py`.
+    - A command that only needs the stores (`trace show`, `cache clear`,
+      `feedback`, `curated proposals export`) reads `storage.path` from the
+      config without building the engine. `run`, `index`, `trace replay` and
+      `benchmark` build it and `check()` it; `policy validate` and `curated
+      validate`/`test` build it without connecting first. `curated proposals
+      export` refuses to write `nl2sql.yaml` or any file it includes.
+    - `nl2sql doctor` reports Python, the adapters' drivers, which provider key
+      variables are set, and the configured engine's `check()` report.
+    - `BenchmarkConfig` lost its path fields. A `--llm PATH.yaml` file, the
+      built-in presets and `--bench-config-path` hold `llm` sections.
+    - `configure_llm_from_config(path)` and `reload_llm_config(path)` take an
+      `nl2sql.yaml` and replace every agent with its `llm` section, until PR 9
+      and 10 bring `llm.replace`. `add_datasource` takes a `Datasource` only,
+      and so does `POST /api/v1/datasource`.
+    - `nl2sql-api` reads `api.cors_origins` per request from the engine's
+      config: the engine is built in the lifespan, after the middleware stack.
+
 !!! note "Built: `nl2sql init` (PR 6)"
-    `nl2sql init` is in the CLI, and `setup` stays until PR 7b. The engine
+    `nl2sql init` is in the CLI (PR 7b removed `setup`). The engine
     writes the files: `nl2sql.config.init_project(folder, demo=, provider=,
     force=)` returns the paths it wrote, after loading them with
     `load_config`. `nl2sql.config.demo_config(llm=, path=, data_dir=)` builds
@@ -1385,6 +1416,29 @@ data/                  # --demo only: the three bundled SQLite files, copied
 ```
 
 ### Demo and playground
+
+!!! note "Built (PR 7b)"
+    As designed, with these details:
+
+    - The demo writes the `llm` section to its own `llm.yaml` rather than
+      building the `LLM` in code: the playground's settings panel edits that
+      file and reloads the engine's LLMs from it, so the two must agree. In
+      replay and record mode it points `base_url` at the local replay server
+      or the recording proxy with the placeholder `api_key` that endpoint
+      takes (`replay`, `proxy`); live, it names no key, so the provider's
+      variable is read. A real key is never written into YAML.
+    - Keys still reach `os.environ` in two places until PR 10 and 13: a key
+      from `--api-key` or the demo's `.env`, and one saved in the settings
+      panel. `--record` turns the plan cache off in the engine's own config
+      (`settings.pipeline.plan_cache`), not through the environment; hosted
+      mode never turned it off, so nothing changes there.
+    - What 0.4's `.env.demo` set is now in the demo's config:
+      `demo_config()`, and so `init --demo` (which writes it as
+      `settings.yaml`), carries `settings.pipeline.timeout_s: 300`,
+      `settings.traces.mode: always` and `policies.refusal_names_tables: true`.
+    - `--questions-per-minute` and `--questions-per-session` replace the
+      `NL2SQL_DEMO_*` variables, and `NL2SQL_DEMO_HOSTED` is gone: `--hosted`
+      is the only switch.
 
 - `nl2sql demo` runs `init --demo` into `nl2sql-demo/` the first time, builds
   the index if `check()` reports it missing, then serves the playground on

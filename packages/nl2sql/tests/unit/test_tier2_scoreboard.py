@@ -4,7 +4,7 @@ The end-to-end run against a fake LLM is ``tests/e2e/test_benchmark_tier2_fake_l
 """
 import pytest
 
-from nl2sql.configs.llm import AgentConfig, LLMFileConfig
+from nl2sql.llm.models import AgentConfig, LLMFileConfig
 from nl2sql.evaluation import tier2
 from nl2sql.evaluation.gold import load_gold_dataset
 from nl2sql.evaluation.prices import PRICES, ModelPrice, call_cost
@@ -87,8 +87,9 @@ def test_the_built_in_presets_are_priced_verified_and_keyless():
     tier2.check_prices(configs)
     assert tier2.unverified_models(configs) == []
     for cfg in configs.values():
+        # No key is named: each provider's standard variable is read.
         for agent in [cfg.default, *cfg.agents.values()]:
-            assert agent.api_key.get_secret_value().startswith("${env:")
+            assert agent.api_key is None
     helpers = tier2.node_agents(configs["gpt-5.4-mini-helpers"])
     assert helpers["ast_planner"].model == helpers["refiner"].model == "gpt-5.4"
     assert {helpers[n].model for n in ("datasource_resolver", "decomposer", "answer_synthesizer")} == {"gpt-5.4-mini"}

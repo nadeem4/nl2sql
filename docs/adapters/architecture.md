@@ -6,7 +6,7 @@ Adapters integrate NL2SQL with external datasources. Each adapter implements a *
 
 ```mermaid
 flowchart TD
-    Config[configs/datasources.yaml] --> Registry[DatasourceRegistry]
+    Config["nl2sql.yaml: datasources"] --> Registry[DatasourceRegistry]
     Registry --> Lookup["Registry.load('adapter', type)"]
     Lookup --> EntryPoints["nl2sql.adapters entry points, or a class registered in code"]
     EntryPoints --> AdapterClass[Adapter Class]
@@ -67,7 +67,7 @@ To add a new adapter:
 
 1. Implement `DatasourceAdapterProtocol` (or extend a base adapter).
 2. Publish the adapter class as an `nl2sql.adapters` entry point, or register it in code (see [Adding a New Adapter](../extensions/add-adapter.md)).
-3. Configure the datasource in `configs/datasources.yaml`.
+3. Configure the datasource in the `datasources` section of `nl2sql.yaml`, with `type:` set to the adapter's name.
 
 ## Source references
 

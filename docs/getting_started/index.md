@@ -14,28 +14,15 @@ to use the platform:
 - [From Source (Development)](source.md)
 - [Demo Data (CLI-first)](demo.md)
 
-## Configuration prerequisites
+## One config: `nl2sql.yaml`
 
-All paths require configuration files. Start with the example configs:
+Every path reads the same config, `nl2sql.yaml`, and the files it includes. The
+CLI takes it from `--config PATH`, then the `NL2SQL_CONFIG` variable, then
+`./nl2sql.yaml`; `nl2sql-api` from `NL2SQL_CONFIG`, then `./nl2sql.yaml`; Python
+from `NL2SQL.from_config(path)`. The sections, their fields and every 0.4 file
+and variable they replace are in [Configuration](../configuration/system.md).
 
-- `configs/datasources.example.yaml` → copy to `configs/datasources.yaml`
-- `configs/policies.example.json` → copy to `configs/policies.json`
-
-`configs/llm.yaml` and `configs/secrets.yaml` are tracked in the repository as
-examples: an OpenAI default agent, and a secrets file whose providers are all
-commented out. Edit them against the schemas in [LLMs](../configuration/llm.md)
-and [Secrets](../configuration/secrets.md), or let `nl2sql setup` generate your
-own.
-
-See `configuration/system.md` for environment variables and defaults.
-
-## Start a config with `nl2sql init` (0.5)
-
-!!! note "0.5"
-    `nl2sql init` writes the 0.5 config, `nl2sql.yaml`. The engine reads it
-    from release 0.5 on (see
-    [Configuration v2](../architecture/configuration_v2.md)); until then the
-    files above are what it reads.
+## Start a config with `nl2sql init`
 
 ```bash
 nl2sql init my-project                       # writes my-project/nl2sql.yaml and its files
@@ -55,20 +42,37 @@ embeddings.yaml        # provider: local
 policies.yaml          # allow_all: true      (--demo: admin, analyst and viewer roles)
 storage.yaml           # path: .nl2sql
 curated.yaml           # --demo only: the demo's verified queries
+settings.yaml          # --demo only: a 300 s timeout and a trace for every run
 data/                  # --demo only: the three sample SQLite files
 .gitignore             # .nl2sql/ and .env are added to it
 ```
 
 - **No key is written.** `llm.yaml` names no `api_key`, so the provider's
   standard variable (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`,
-  `OPENROUTER_API_KEY`) is read. To read another variable, write
-  `api_key: "${env:MY_KEY}"`.
+  `OPENROUTER_API_KEY`) is read. Put it in your environment or in a `.env`
+  file next to `nl2sql.yaml`: the CLI, `nl2sql-api` and `nl2sql demo` load that
+  file at startup and never let it override a variable that is already set. To
+  read another variable, write `api_key: "${env:MY_KEY}"`.
 - **Nothing is overwritten** unless you pass `--force`. If any file `init`
   would write already exists, it names the files and writes nothing.
   `.gitignore` is never replaced; the lines it lacks are added.
 - **The result is checked.** `init` loads what it wrote with `load_config`
   before it reports success, then prints the next steps.
 - **`--provider`** is `openai` (the default), `anthropic` or `openrouter`.
+
+Then point `datasources/example.yaml` at your database (or rename it: the file
+name is the datasource id), and build the index:
+
+```bash
+cd my-project
+nl2sql index                                 # or, from elsewhere: nl2sql --config my-project/nl2sql.yaml index
+nl2sql run "How many customers are there?"
+```
+
+`nl2sql index` and `nl2sql run` first call `engine.check()`: each datasource
+connects, or is reported and left out. A datasource with `required: true` that
+cannot connect stops the command. `nl2sql doctor` prints the same report
+without running anything.
 
 From Python, `nl2sql.config.init_project(folder, demo=..., provider=..., force=...)`
 writes the same files, and `nl2sql.config.demo_config()` builds the demo's

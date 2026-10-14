@@ -6,16 +6,10 @@ Provides public entry points for policy validation and integrity checks.
 
 from __future__ import annotations
 
-import pathlib
 from dataclasses import dataclass, field
-from typing import List, Optional, Set
+from typing import List, Set
 
-from nl2sql.common.settings import settings
-from nl2sql.configs import ConfigManager
 from nl2sql.runtime import Runtime
-from nl2sql.datasources import DatasourceRegistry
-from nl2sql._legacy import datasource_from_04
-from nl2sql.secrets import SecretManager
 
 
 @dataclass
@@ -39,42 +33,19 @@ class PolicyAPI:
     API for policy validation and integrity checks.
     """
 
-    def __init__(self, ctx: Optional[Runtime] = None):
+    def __init__(self, ctx: Runtime):
         self._ctx = ctx
 
-    def validate_policies(
-        self,
-        policies_path: Optional[pathlib.Path] = None,
-        datasources_path: Optional[pathlib.Path] = None,
-        secrets_path: Optional[pathlib.Path] = None,
-    ) -> PolicyValidationReport:
+    def validate_policies(self) -> PolicyValidationReport:
         """
-        Validate policy syntax and integrity against defined datasources.
+        Check that every datasource and table rule the engine's ``policies``
+        name is one of its datasources. The policies' own shape was checked
+        when the config loaded.
         """
-        cm = ConfigManager()
-
-        policies_path = pathlib.Path(policies_path) if policies_path else pathlib.Path(settings.policies_config_path)
-        datasources_path = pathlib.Path(datasources_path) if datasources_path else pathlib.Path(settings.datasource_config_path)
-        secrets_path = pathlib.Path(secrets_path) if secrets_path else pathlib.Path(settings.secrets_config_path)
-
-        try:
-            policy_cfg = cm.load_policies(policies_path)
-        except Exception as e:
-            return PolicyValidationReport(ok=False, errors=[str(e)])
-
-        try:
-            secret_manager = SecretManager()
-            secret_configs = cm.load_secrets(secrets_path)
-            if secret_configs:
-                secret_manager.configure(secret_configs)
-
-            ds_configs = cm.load_datasources(datasources_path)
-            registry = DatasourceRegistry(secret_manager)
-            registry.register_datasources([datasource_from_04(d) for d in ds_configs])
-            available_ds = set(registry.list_ids())
-            unavailable_ds = registry.unavailable()
-        except Exception as e:
-            return PolicyValidationReport(ok=False, errors=[str(e)])
+        policy_cfg = self._ctx.config.policies
+        registry = self._ctx.ds_registry
+        available_ds = set(registry.list_ids())
+        unavailable_ds = registry.unavailable()
 
         entries: List[PolicyValidationEntry] = []
         has_errors = False

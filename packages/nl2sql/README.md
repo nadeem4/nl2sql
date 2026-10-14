@@ -82,19 +82,24 @@ rating per answer that `nl2sql feedback stats` reports on.
 
 ## CLI
 
-From the demo folder (`cd nl2sql-demo`):
+Every command reads one config: `--config PATH`, else `NL2SQL_CONFIG`, else
+`./nl2sql.yaml`, and loads the `.env` next to it. From the demo folder
+(`cd nl2sql-demo`):
 
 ```bash
-nl2sql --env demo run "How many customers do we have, by country?"
-nl2sql --env demo run --role viewer "Who are the top 5 customers by total spend?"   # refused
-nl2sql --env demo run --no-exec "Which artist has the most albums?"                 # plan only
-nl2sql --env demo index                       # re-index the schema
-nl2sql --env demo doctor                      # check drivers, connectivity, key and index
-nl2sql --env demo benchmark --tier 1          # gold plans, no key
-nl2sql --env demo benchmark --tier 2 --model gpt-5.4 --max-cost 5
-nl2sql --env demo benchmark retrieval         # retrieval recall, no key
-nl2sql --env demo feedback stats              # ratings and guardrail rates
+nl2sql run "How many customers do we have, by country?"
+nl2sql run --role viewer "Who are the top 5 customers by total spend?"   # refused
+nl2sql run --no-exec "Which artist has the most albums?"                 # plan only
+nl2sql index                       # re-index the schema
+nl2sql doctor                      # drivers, provider keys, and the engine's check
+nl2sql benchmark --tier 1          # gold plans, no key
+nl2sql benchmark --tier 2 --model gpt-5.4 --max-cost 5
+nl2sql benchmark retrieval         # retrieval recall, no key
+nl2sql feedback stats              # ratings and guardrail rates
 ```
+
+Your own database: `nl2sql init` writes `nl2sql.yaml` and one file per section
+(edit `datasources/example.yaml`), then `nl2sql index`.
 
 Every command: [CLI reference](https://github.com/nadeem4/nl2sql#cli-reference).
 
@@ -105,6 +110,7 @@ from nl2sql import NL2SQL, UserContext
 
 engine = NL2SQL.demo()               # the bundled databases; reads OPENAI_API_KEY (or another provider's key)
 engine.index_all_datasources()       # once: builds the index under .nl2sql-demo/
+# Your own config instead:  engine = NL2SQL.from_config("nl2sql.yaml")
 result = engine.run_query(
     "How many customers are there?",
     user_context=UserContext(roles=["admin"]),

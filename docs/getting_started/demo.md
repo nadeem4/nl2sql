@@ -22,12 +22,14 @@ After `pip install "nl2sql-engine[demo]"` and `nl2sql demo`:
 
 1. **No questions at the terminal.** The command does not prompt. It looks for
    a model key -- `--api-key`, then `OPENAI_API_KEY`, `OPENROUTER_API_KEY` or
-   `ANTHROPIC_API_KEY`, then a key saved in `.env.demo`, then an Ollama daemon
+   `ANTHROPIC_API_KEY`, then a key saved in the project's `.env`, then an Ollama daemon
    on `localhost:11434` -- and says which mode it chose: **Live mode** with
    the provider, or **Replay mode** when it finds none.
-2. **A project folder and an index.** It writes `./nl2sql-demo` (`--dir`
-   changes it), copies in the three databases above and indexes their schemas
-   on your machine. The first run downloads a ~79 MB embedding model; indexing
+2. **A project folder and an index.** The first time, it writes
+   `./nl2sql-demo` (`--dir` changes it) with `nl2sql init --demo`, which copies
+   in the three databases above; every start then builds the engine, calls
+   `engine.check()`, and indexes the schemas on your machine when the index is
+   missing, empty or out of date. The first run downloads a ~79 MB embedding model; indexing
    needs no key.
 3. **A local page.** It prints `Playground ready at http://127.0.0.1:8765/` and
    opens that address in your browser (`--no-browser` skips it, `--port`
@@ -61,38 +63,37 @@ pip install -e "packages/nl2sql[all,demo]"
 ## 2. Write the demo project
 
 ```bash
-nl2sql setup --demo
+nl2sql init --demo nl2sql-demo
+nl2sql --config nl2sql-demo/nl2sql.yaml index
 ```
 
-This writes the following, relative to the directory you run the command in:
+`init --demo` writes a complete config, relative to the folder you name:
 
-- `data/chinook.sqlite`, `data/support.sqlite`, `data/webanalytics.sqlite`
-- `configs/datasources.demo.yaml`
-- `configs/llm.demo.yaml`
-- `configs/policies.demo.json`
-- `configs/sample_questions.demo.yaml`
-- `configs/curated.demo.yaml`, six verified queries on Chinook (see
-  [Verified answers](#verified-answers))
-- `configs/secrets.demo.yaml`
-- `.env.demo`
-- `nl2sql-demo.json`, a small stamp recording which engine version wrote the
-  folder (see [Old demo folders](#old-demo-folders))
+```text
+nl2sql.yaml            # the table of contents
+datasources/
+  chinook.yaml         # each with its description, read-only connection,
+  support.yaml         # 10,000-row limit and sample questions
+  webanalytics.yaml
+llm.yaml               # the provider and model; no key
+embeddings.yaml        # provider: local
+policies.yaml          # the admin, analyst and viewer roles below
+storage.yaml           # path: .nl2sql (index, state.db, traces, results)
+curated.yaml           # six verified queries on Chinook
+settings.yaml          # a 300 s timeout and a trace for every run
+data/                  # chinook.sqlite, support.sqlite, webanalytics.sqlite
+.gitignore             # .nl2sql/ and .env
+```
 
-Setup then runs schema indexing once, automatically, and exits `1` if it fails.
+It is the same config `nl2sql.config.demo_config()` (and `NL2SQL.demo()`)
+builds in code. `nl2sql index` then builds the index, and exits `1` if any
+datasource fails. See
+[Start a config with `nl2sql init`](index.md#start-a-config-with-nl2sql-init).
 
-!!! note "0.5: `nl2sql init --demo`"
-    `nl2sql init --demo DIR` writes the demo as a 0.5 config: `nl2sql.yaml`,
-    one file per datasource under `datasources/` (each with its description,
-    read-only connection, 10,000-row limit and sample questions),
-    `policies.yaml` with the admin, analyst and viewer roles below,
-    `curated.yaml` with the verified queries, and the three databases in
-    `data/`. It is the same config `nl2sql.config.demo_config()` builds in
-    code. In 0.5 it replaces `nl2sql setup --demo`; until then the engine
-    reads the files listed above. See
-    [Start a config with `nl2sql init`](index.md#start-a-config-with-nl2sql-init-05).
-
-For the browser playground instead of the CLI, `nl2sql demo` does the same
-scaffolding in `./nl2sql-demo` and serves a page over it. See the
+For the browser playground instead of the CLI, `nl2sql demo` does both steps in
+`./nl2sql-demo` the first time (and adds a `nl2sql-demo.json` stamp recording
+which engine version wrote the folder; see [Old demo folders](#old-demo-folders)),
+then serves a page over it. See the
 [README](https://github.com/nadeem4/nl2sql#quickstart-run-it-locally) for its flags, and
 [the Settings page](#the-settings-page) for entering a key and choosing
 models from the page.
@@ -121,17 +122,18 @@ resolver took the only datasource and skipped the vector search; with three, the
 datasource search and the LLM answerability judge run on every question, so the
 demo exercises the part of the pipeline a single-dataset demo never reached.
 Indexing all three writes 186 entries - 111 for `chinook` (24 of them the verified queries' phrasings and descriptions), 36 for `support` and
-39 for `webanalytics` - and the build `nl2sql setup --demo` runs takes about
+39 for `webanalytics` - and `nl2sql index` takes about
 seven or eight seconds once the embedding model is cached; the first run on a
 machine still downloads the model.
 
 ### Verified answers
 
-`configs/curated.demo.yaml` holds six verified queries on Chinook: SQL written
+`curated.yaml` holds six verified queries on Chinook: SQL written
 and reviewed in advance, with typed params, and the questions each answers
 (top customers by revenue in a year, revenue by year, monthly revenue in a
 year, sales by country, best-selling genres, top artists by tracks sold).
-`.env.demo` points `CURATED_CONFIG` at it, and indexing embeds their questions
+`nl2sql.yaml` includes it as the `curated` section, so curated answers are
+on, and indexing embeds their questions
 beside the schema. A question one of them answers runs its SQL with the values
 bound instead of a generated plan, and the playground labels the answer
 **Verified ·** and the query's id. "What is the total revenue per year?" and
@@ -143,7 +145,7 @@ appears without a key too, on the guided questions a verified query answers.
 
 ### The roles
 
-`configs/policies.demo.json` is generated with three roles, spanning all three
+`policies.yaml` is written with three roles, spanning all three
 datasources, so the RBAC check is visible without editing anything:
 
 | Role | May read |
@@ -155,28 +157,30 @@ datasources, so the RBAC check is visible without editing anything:
 Ask the `viewer` role about customers and the logical validator refuses the plan
 with a `SECURITY_VIOLATION` before any SQL is generated. The planner saw the
 `Customer` and `Invoice` tables' columns but none of their sample values or
-statistics. `.env.demo` sets `RBAC_REFUSAL_NAMES_TABLES=true`, so the demo's
+statistics. `policies.yaml` sets `refusal_names_tables: true`, so the demo's
 refusal names the role and table; outside the demo the message is the generic
 "You do not have permission to see the data this question requires." See
 [Security Model](../security/model.md#strict-refusal).
 
 ### API keys in the demo
 
-`.env.demo` is generated with `EMBEDDING_PROVIDER=local`, so schema chunks are
+`embeddings.yaml` says `provider: local`, so schema chunks are
 embedded with the key-free ONNX `all-MiniLM-L6-v2` model bundled with chromadb
 instead of the OpenAI embeddings API. The first indexing run downloads roughly
 79 MB of model files into a local cache, which can take a few minutes.
 
 This covers the embedding step only. The demo is **not** key-free end to end:
 
-- `nl2sql --env demo run "..."` calls a chat model, so it needs a working LLM key
-  (`OPENAI_API_KEY`, or an OpenRouter key with `configs/llm.demo.yaml` pointed at
-  `provider: openrouter`).
+- `nl2sql run "..."` calls a chat model, so it needs a working LLM key
+  (`OPENAI_API_KEY`, or an OpenRouter key with `llm.yaml` pointed at
+  `provider: openrouter`). Keep it in the environment, or in a `.env` file next
+  to `nl2sql.yaml`, which the CLI loads without overriding a variable already
+  set.
 - The demo's model is `gpt-5.4` with `temperature: 0.0`. It replaced `gpt-4o`,
   whose 30,000 tokens-per-minute limit on the owner's account was below one
   question with a single retry; `gpt-5.4` had 500,000 and accepts
   `temperature: 0`. To use a model that rejects it (`gpt-5.5`, `gpt-5-mini`),
-  set `temperature: null` in `configs/llm.demo.yaml` - see
+  set `temperature: null` in `llm.yaml` - see
   [LLM configuration â†’ Temperature](../configuration/llm.md#temperature). With an
   OpenRouter key or Ollama, change `model` to one that provider serves: live
   mode switches the provider, not the model name.
@@ -189,24 +193,23 @@ This covers the embedding step only. The demo is **not** key-free end to end:
   run, the startup repair and the playground's Rebuild) leaves enrichment
   **off**, because it spends tokens on your key; the playground offers it as an
   explicit checkbox. When it is on, the demo's indexing uses a key exported in
-  your shell, or one saved in `.env.demo`; the file's empty `OPENAI_API_KEY=`
-  placeholder no longer blanks an exported key while indexing runs.
-- Both `nl2sql setup --api-key <key>` and `nl2sql demo --api-key <key>` take the
-  key on the command line and write it into the generated env file. The provider
-  follows the key's shape: a key beginning `sk-or-` is OpenRouter and is stored
-  as `OPENROUTER_API_KEY` with `provider: openrouter`; a key beginning `sk-ant-`
+  your shell, or one saved in the project's `.env`.
+- `nl2sql demo --api-key <key>` takes the key on the command line and writes it
+  into the project's `.env`, never into a YAML file. The provider follows the
+  key's shape: a key beginning `sk-or-` is OpenRouter and is stored as
+  `OPENROUTER_API_KEY` with `provider: openrouter`; a key beginning `sk-ant-`
   is Anthropic and is stored as `ANTHROPIC_API_KEY` with `provider: anthropic`,
   model `claude-opus-5` and `temperature: null` (install
-  `nl2sql-engine[anthropic]`); anything else is OpenAI.
-  `.env` and `.env.*` are covered by `.gitignore`, but a key passed on the
-  command line is visible in shell history and to `ps`, so the environment
-  variable remains the more private route.
-- So `nl2sql setup --demo` and `nl2sql --env demo index` complete with no chat
-  key at all, and `nl2sql index` exits `0`. It exits `1` if any datasource
-  actually fails to index, which is safe to rely on in a script. A missing key
-  surfaces when a chat model is first called. Fill in `OPENAI_API_KEY` in
-  `.env.demo` before running a query.
-- Pointing `configs/llm.demo.yaml` at `provider: ollama` removes the chat key
+  `nl2sql-engine[anthropic]`); anything else is OpenAI. `llm.yaml` names no
+  key, so the provider's own variable is read. `.env` is covered by
+  `.gitignore`, but a key passed on the command line is visible in shell
+  history and to `ps`, so the environment variable remains the more private
+  route.
+- So `nl2sql init --demo` and `nl2sql index` complete with no chat key at all,
+  and `nl2sql index` exits `0`. It exits `1` if any datasource actually fails
+  to index, which is safe to rely on in a script. A missing key surfaces when a
+  chat model is first called (`nl2sql doctor` names it before that).
+- Pointing `llm.yaml` at `provider: ollama` removes the chat key
   requirement, but a local model's ability to satisfy the pipeline's structured
   output is model-dependent - see
   [LLM configuration â†’ Ollama](../configuration/llm.md#ollama).
@@ -217,10 +220,10 @@ all**, and each visitor pastes their own into the page; a visitor without one
 can replay the guided questions from recorded runs. See
 [Hosted demo](../deployment/hosted-demo.md).
 
-Because the demo indexes with `local` and the default environment indexes with
-`openai`, the two use different vector dimensions. `.env.demo` keeps its own
-`VECTOR_STORE=data/vector_store_demo` directory, so they do not collide. If you
-change `EMBEDDING_PROVIDER` for an existing store, run `nl2sql index --full`:
+Each project keeps its index under its own `storage.path` (the demo's is
+`nl2sql-demo/.nl2sql/index`), so projects that embed differently never share a
+collection. If you change the `embeddings` section of an existing project, run
+`nl2sql index --full`:
 every datasource in a collection must share one embedding model, so the store
 otherwise raises `EmbeddingDimensionMismatchError` (or
 `EmbeddingModelMismatchError` for a different model of the same size).
@@ -229,9 +232,9 @@ Column statistics are read when a datasource is indexed, so a change to what
 indexing records reaches an existing demo folder only when it is indexed again.
 After 0.2.2, a text column with at most 50 distinct values keeps all of them
 rather than five. `nl2sql demo` does not re-index a folder whose index is
-healthy, so run `nl2sql --env demo index` in the folder, or start a fresh one
-with `nl2sql setup --demo`, which always re-indexes. The hosted image builds
-its index with `nl2sql setup --demo`, so a new image picks the change up.
+healthy, so run `nl2sql index` in the folder, or start a fresh one with
+`nl2sql demo --dir <new folder>`. The hosted image builds its index with
+`nl2sql init --demo` and `nl2sql index`, so a new image picks the change up.
 
 ### Index health and repair
 
@@ -244,9 +247,9 @@ can disagree: a folder once had its snapshot intact and 0 entries in its index,
 so the page looked fine while every question failed with
 `SCHEMA_RETRIEVAL_FAILED`. Three things now guard against that:
 
-- **Startup repair.** Every `nl2sql demo` start checks what the index
-  *contains*: it rebuilds when the index is missing or empty, or was built from
-  an older schema version than the latest snapshot. A failed rebuild is
+- **Startup repair.** Every `nl2sql demo` start calls `engine.check()`, which
+  reports what the index *contains*: the demo rebuilds it when it is missing or
+  empty, or was built from an older schema version than the latest snapshot. A failed rebuild is
   reported (the playground still starts, and offers Rebuild) rather than
   ignored.
 - **Rebuilds never leave an empty index.** A datasource's new entries are
@@ -255,9 +258,7 @@ so the page looked fine while every question failed with
   [Indexing](../architecture/indexing.md#rebuilding-without-an-empty-index).
 - **Actionable errors.** With an empty index the resolver says
   "The vector index is empty ... Re-index with `nl2sql index`", and
-  `nl2sql --env demo doctor` reports the index under **Index**: entries by type,
-  whether each datasource's schema version matches the latest snapshot, and
-  when it was built.
+  `nl2sql doctor` prints the engine's check, the index status included.
 
 ### The search index panel
 
@@ -280,7 +281,7 @@ demand.
   entries beside the current ones; questions keep using the current entries
   until the new ones are complete, and questions in flight finish before the
   switch. That database is the demo's own, named in the button's help;
-  `nl2sql --env demo index` rebuilds all three.
+  `nl2sql index` rebuilds all three.
 - It shows each step as it runs. The first run downloads the 79 MB embedding
   model, so it can take a few minutes.
 - **Write descriptions with the LLM** is off by default because it spends
@@ -297,8 +298,9 @@ demand.
 ### Old demo folders
 
 Demo folders are not upgraded in place: a folder written by an older engine
-keeps that engine's defaults (for example an older default model, or no
-`TRACE_MODE` line). New folders get a `nl2sql-demo.json` stamp; when `nl2sql demo`
+keeps that engine's defaults (for example an older default model). A folder
+written by a 0.4 engine (`configs/`, `.env.demo`) has no `nl2sql.yaml` and
+cannot be read by 0.5: start a new `--dir`. New folders get a `nl2sql-demo.json` stamp; when `nl2sql demo`
 starts in a folder stamped by an older engine, or in one with no stamp at all,
 it warns and suggests a fresh `--dir`. The playground's index panel repeats the
 warning.
@@ -433,26 +435,26 @@ second settings store, and the browser keeps nothing but UI conveniences.
 - **API keys, one per provider.** Paste a key and press **Save key**. The
   provider follows the key's shape by the same rule as `--api-key` (`sk-ant-`
   is Anthropic, `sk-or-` is OpenRouter, anything else OpenAI). The key is
-  written to the demo project's `.env.demo`, replacing that provider's previous
+  written to the demo project's `.env`, replacing that provider's previous
   key and keeping the others, and the default moves to that provider. The
   running demo switches from replay to live **without a restart**: questions
   already running finish on the model client they started with, then the
-  engine's LLM clients are rebuilt from `configs/llm.demo.yaml`. Keys are
+  engine's LLM clients are rebuilt from the project's `nl2sql.yaml` (its
+  `llm.yaml`). Keys are
   write-only: no response, log line, trace or error carries one, only a masked
   form such as `sk-...4f2a` per provider. On a later start the precedence above
   still holds, so `--api-key` or a key exported in your shell wins over a saved
   one, and every saved key is loaded so each step finds its own.
 - **A provider and a model for each LLM step.** One selector each for the
-  answerability check (`datasourceresolver`), question splitter (`decomposer`),
-  query planner (`astplanner`), plan repair (`refiner`) and answer writer
-  (`answersynthesizer`). Each has a "Default" option that uses the `default`
-  agent, then one group of models per provider. A provider with no saved key is
+  answerability check (`datasource_resolver`), question splitter (`decomposer`),
+  query planner (`ast_planner`), plan repair (`refiner`) and answer writer
+  (`answer_synthesizer`). Each has a "Default" option that uses the top-level
+  provider and model, then one group of models per provider. A provider with no saved key is
   listed but cannot be chosen, and a step already on a provider whose key is
   gone says so under its selector. A choice is written to
-  `configs/llm.demo.yaml` under `agents:` with its `provider`, `model` and
-  temperature. It takes the default's endpoint and key reference when it is on
-  the default's provider, and its own provider's `${env:...}` reference
-  otherwise. It takes effect on the next question, and a step put on another
+  `llm.yaml` under `agents:` with its `provider`, `model` and temperature. It
+  takes the top level's endpoint and key when it is on the same provider, and
+  names no key otherwise, so its own provider's variable is read. It takes effect on the next question, and a step put on another
   provider stays there when the default moves. The list is short on purpose. On
   2026-09-20 each OpenAI model was sent the engine's parameters of the time
   (`temperature=0`, `seed=42`, strict `json_schema`) and worked with them, two
@@ -539,68 +541,73 @@ A run's own retrieval is under **Debug**: open the `datasource_resolver` or
 Below **Cost & time**, each answer asks **Was this answer right?**: **ðŸ‘ Right**
 or **ðŸ‘Ž Wrong**, with an optional note (**Wrong number**, **Wrong table**,
 **Wrong filter**, **Missing rows**, or your own words). The rating is saved in
-the demo's `data/schema_store.db` with the question, role, SQL, the model per
+the demo's state store (`.nl2sql/state.db`) with the question, role, SQL, the model per
 step and the engine version; never the rows. It is local only, like Settings:
 on a non-loopback `--host` it is off unless `--allow-settings`.
-`FEEDBACK_ENABLED=false` in `.env.demo` turns it off. Read the ratings back, with
+`settings.feedback.enabled: false` in the project's config turns it off. Read the ratings back, with
 the refusal, retry, error and plan-cache rates, from the CLI (below). See
 [Feedback and Signals](../observability/feedback.md).
 
 ## 3. Use the demo from the CLI
 
+Every command reads one config: `--config PATH`, else `NL2SQL_CONFIG`, else
+`./nl2sql.yaml`. Paths inside it are relative to `nl2sql.yaml`, so from the demo
+folder (`cd nl2sql-demo`) no flag is needed; from anywhere else, add
+`--config nl2sql-demo/nl2sql.yaml` before the command.
+
 ```bash
 # Run a query against the demo
-nl2sql --env demo run "How many customers do we have, by country?"
+nl2sql run "How many customers do we have, by country?"
 
 # Ask as a role that is not allowed the answer
-nl2sql --env demo run --role viewer "Who are the top 5 customers by total spend?"
+nl2sql run --role viewer "Who are the top 5 customers by total spend?"
 
 # Plan and validate without touching the database
-nl2sql --env demo run --no-exec "Which artist has the most albums?"
+nl2sql run --no-exec "Which artist has the most albums?"
 
 # Pin one datasource instead of letting the resolver pick
-nl2sql --env demo run --ds-id support "How many support tickets are still open, by priority?"
+nl2sql run --ds-id support "How many support tickets are still open, by priority?"
 
-# Re-index after regenerating or editing the demo configs
-nl2sql --env demo index
+# Re-index after editing the demo's config
+nl2sql index
 
 # Re-index one datasource only; the others' entries are left untouched
-nl2sql --env demo index --datasource chinook
+nl2sql index --datasource chinook
 
 # After changing the embedding model: rebuild every datasource, then switch
-nl2sql --env demo index --full
+nl2sql index --full
 
-# Check the index: entries by type, schema version, when built
-nl2sql --env demo doctor
+# Check the install, the keys, and the engine: each datasource, each key, the index
+nl2sql doctor
 ```
 
 The two flags that name a datasource are not the same flag: `run` takes
 `--ds-id`, which pins the datasource and makes the resolver skip its search;
 `index` takes `--datasource` (`-d`), which chooses what to re-index.
 
-The demo's `.env.demo` sets `TRACE_MODE=always`, so every run also writes a
-trace to `traces/` and prints its path. Inspect one with
-`nl2sql --env demo trace show <file>`, or re-run it on the recorded model
-answers with `nl2sql --env demo trace replay <file>`. See
+The demo's `settings.yaml` sets `traces: { mode: always }`, so every run also
+writes a trace to `.nl2sql/traces/` and prints its path. Inspect one with
+`nl2sql trace show <file or trace id>`, or re-run it on the recorded model
+answers with `nl2sql trace replay <file>`. See
 [Debugging a Run](../observability/debugging.md).
 
 Asking a question a second time on the same day reuses the first run's validated plan from the
-plan cache (in `data/schema_store.db`), so the SQL and rows are the same and the
+plan cache (in `.nl2sql/state.db`), so the SQL and rows are the same and the
 planner is not called; the playground's Debug view says "Plan from the plan
 cache". The plan is still validated for the role you ask as. To start fresh:
 
 ```bash
-nl2sql --env demo cache clear
+nl2sql cache clear
 ```
 
 The playground's ratings, and the guardrail rates over every rated run and
 kept trace:
 
 ```bash
-nl2sql --env demo feedback list               # the ratings, newest first
-nl2sql --env demo feedback stats              # thumbs up/down, refusals, retries, errors, plan cache
-nl2sql --env demo feedback export --good      # thumbs-up runs as draft gold entries, for review
-nl2sql --env demo feedback clear              # delete every rating
+nl2sql feedback list               # the ratings, newest first
+nl2sql feedback stats              # thumbs up/down, refusals, retries, errors, plan cache
+nl2sql feedback export --good      # thumbs-up runs as draft gold entries, for review
+nl2sql feedback clear              # delete every rating
 ```
 
 `export --good` writes `feedback_gold_drafts.yaml`, never the gold set itself. A
@@ -608,7 +615,9 @@ person must review each draft and run `python -m nl2sql.evaluation.gold` before
 adding it; see
 [Feedback and Signals](../observability/feedback.md#growing-the-gold-set-nl2sql-feedback-export-good).
 
-`nl2sql demo --record` turns the cache off while recording, so every planner
+`nl2sql demo --record` turns the cache off while recording
+(`settings.pipeline.plan_cache` is off in the engine it builds; the files are
+not changed), so every planner
 answer is captured. It also stops with exit `1`, recording nothing, when the
 demo's indexing fails: a plain `nl2sql demo` keeps going and offers Rebuild,
 but answers recorded against no index would be the wrong ones. Only a
@@ -620,21 +629,18 @@ in the usage ledger, the Debug pane and on the Pipeline page, tagged recorded --
 rather than the one the replaying config names. See
 [Determinism â†’ The plan cache](../architecture/determinism.md#the-plan-cache-determinism-from-the-architecture).
 
-`--env <name>` loads `.env.<name>`. To point at an exact file instead, use
-`--env-file <path>`, which takes precedence over `--env`. Either flag also
-loads the file's variables into the process environment, so `doctor` and `run`
-find a key kept only in `.env.demo`; a variable already exported in your shell
-wins over the file. The equivalent environment variables (`ENV` and
-`ENV_FILE_PATH`) still work, but setting them yourself only feeds the settings
-object; use the flags when the file holds your key.
+The `.env` next to `nl2sql.yaml` is loaded by the CLI, `nl2sql-api` and
+`nl2sql demo` at startup, so `doctor` and `run` find a key kept only there; a
+variable already exported in your shell wins over the file. There is no
+`--env` flag and no `.env.<name>` lookup: one config folder, one `.env`.
 
-Note: the demo datasource config uses relative database paths
-(`data/chinook.sqlite`, `data/support.sqlite`, `data/webanalytics.sqlite`), so
-run the CLI from the directory you ran `nl2sql setup --demo` in.
+`run`, `index` and `benchmark` call `engine.check()` first. A datasource marked
+`required: true` that cannot connect stops them with the report (exit `1`); any
+other one that fails is printed and left out of routing.
 
 ## Sample questions
 
-`configs/sample_questions.demo.yaml` is written with twenty questions, the same
+The demo's datasource files carry twenty questions (`sample_questions`), the same
 ones the playground offers as guided questions -- a few as chips for the
 database the rail is showing, and all twenty behind **N more**, in one pile per
 database, each headed by the datasource id. Chinook's twelve come first, so the demo opens on familiar
@@ -675,20 +681,22 @@ on the left is the one the question is about.
 
 They are also indexed, per datasource: the `schema.datasource` entry the
 resolver matches every question against carries that datasource's configured
-description and its own questions (`.env.demo` points `SAMPLE_QUESTIONS` at the
-file), which is how the resolver tells the three apart. Folders generated before
-that was fixed wrote the setting as `ROUTING_EXAMPLES`, which nothing read; the engine now accepts that name too, so re-index such a folder
-(`nl2sql --env demo index`) to pick the questions up.
+description and its own questions (`sample_questions` in its datasource
+file), which is how the resolver tells the three apart. Re-index
+(`nl2sql index`) after editing them.
 
 Whether a given question is answered correctly depends on the model; see
 [Known limitations](https://github.com/nadeem4/nl2sql#known-limitations).
 
 ## Regenerating the demo
 
-Re-running `nl2sql setup --demo` overwrites all three databases under `data/`
-and the `configs/*.demo.*` files with fresh copies. An existing `.env.demo` is
-overwritten too, so a key recorded there is lost - pass `--api-key` again, save it on the playground's Settings page, or
-re-add it afterwards.
+`nl2sql init --demo DIR --force` overwrites the config files and all three
+databases under `data/` with fresh copies; without `--force` it names the files
+that exist and writes nothing. It never touches `.env`, so a saved key
+survives, and it leaves the index under `.nl2sql/` alone: run `nl2sql index`
+afterwards. `nl2sql demo` never rewrites an existing project's config (only
+`llm.yaml`, to point it at the mode it starts in); start a new `--dir` for a
+fresh one.
 
 ## The datasets that are not here
 

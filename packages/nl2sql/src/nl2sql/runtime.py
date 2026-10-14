@@ -60,13 +60,10 @@ class Runtime:
     registry: Registry
 
     @classmethod
-    def from_config(cls, config: Config, registry: Optional[Registry] = None, *,
-                    stores: Optional[StorePaths] = None) -> "Runtime":
+    def from_config(cls, config: Config, registry: Optional[Registry] = None) -> "Runtime":
         """Load and validate everything ``config`` names, and build the runtime. Never connects.
 
-        ``registry`` defaults to ``Registry.default()``. ``stores`` overrides
-        the store layout under ``storage.path``; only the 0.4 file entry point
-        (``nl2sql._legacy``) passes it.
+        ``registry`` defaults to ``Registry.default()``.
 
         Raises:
             ConfigError: every problem found: an unknown or uninstalled name,
@@ -122,7 +119,7 @@ class Runtime:
 
         self.curated = config.curated
         if config.curated is not None:
-            from nl2sql.configs.curated import check_curated
+            from nl2sql.config.curated import check_curated
 
             dialects = {ds_id: self.ds_registry.get_dialect(ds_id) for ds_id in self.ds_registry.list_ids()}
             for issue in check_curated(config.curated, dialects):
@@ -133,7 +130,7 @@ class Runtime:
             raise ConfigError(problems, source=source)
 
         self._config = config
-        self.stores = stores or StorePaths.under(config.storage.path)
+        self.stores = StorePaths.under(config.storage.path)
         _copy_into_global_settings(config, self.stores)
         self._build_stores()
         return self

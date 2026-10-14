@@ -1,12 +1,12 @@
 """``nl2sql feedback``: the playground's answer ratings, the guardrail rates, and draft gold entries.
 
 * ``list``   -- the ratings, newest first.
-* ``stats``  -- rates over the ratings plus any run traces in TRACE_DIR.
+* ``stats``  -- rates over the ratings plus any run traces in ``<storage.path>/traces``.
 * ``export --good`` -- thumbs-up runs as draft gold entries in their own YAML file.
 * ``clear``  -- empty the feedback table; schema snapshots and the plan cache stay.
 
-Every command reads the ``feedback`` table of the schema store
-(``SCHEMA_STORE_PATH``). None of them creates the store when it is missing.
+Every command reads the ``feedback`` table of the state store,
+``<storage.path>/state.db``. None of them creates the store when it is missing.
 """
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ from rich.table import Table
 from typing_extensions import Annotated
 
 from nl2sql.cli.console import console
-from nl2sql.common.settings import settings
+from nl2sql.cli.common.engine import store_paths
 from nl2sql.evaluation.gold import GOLD_DATASET_PATH
 from nl2sql.feedback import FeedbackStore, compute_stats, draft_entries, load_traces, write_drafts
 
@@ -31,12 +31,12 @@ app = typer.Typer(help="Answer feedback from the playground, and guardrail rates
 DEFAULT_DRAFTS = pathlib.Path("feedback_gold_drafts.yaml")
 
 
-def _store_path() -> pathlib.Path:
-    return pathlib.Path(settings.schema_store_path)
+def _store_path(ctx: typer.Context) -> pathlib.Path:
+    return store_paths(ctx).state
 
 
-def _rows() -> List[Dict[str, Any]]:
-    path = _store_path()
+def _rows(ctx: typer.Context) -> List[Dict[str, Any]]:
+    path = _store_path(ctx)
     if not path.exists():
         return []
     store = FeedbackStore(path)
@@ -51,11 +51,12 @@ def _pct(rate: Optional[float]) -> str:
 
 
 @app.command("list")
-def list_command(limit: Annotated[int, typer.Option(help="Show at most this many ratings.")] = 50) -> None:
+def list_command(ctx: typer.Context,
+                 limit: Annotated[int, typer.Option(help="Show at most this many ratings.")] = 50) -> None:
     """The ratings, newest first: question, role, rating, note and status."""
-    rows = _rows()[:limit]
+    rows = _rows(ctx)[:limit]
     if not rows:
-        console.print(f"No feedback recorded in {escape(str(_store_path().resolve()))}.")
+        console.print(f"No feedback recorded in {escape(str(_store_path(ctx).resolve()))}.", soft_wrap=True)
         return
     for row in rows:
         rating = "[green]up  [/green]" if row["rating"] == "up" else "[red]down[/red]"
@@ -67,13 +68,14 @@ def list_command(limit: Annotated[int, typer.Option(help="Show at most this many
 
 @app.command("stats")
 def stats_command(
+    ctx: typer.Context,
     as_json: Annotated[bool, typer.Option("--json", help="Print the numbers as JSON.")] = False,
     traces: Annotated[Optional[pathlib.Path], typer.Option(
-        "--traces", help="Directory of run traces to include (default: TRACE_DIR).")] = None,
+        "--traces", help="Directory of run traces to include (default: <storage.path>/traces).")] = None,
 ) -> None:
     """Rates over recorded runs: feedback, refusals, refiner retries, validator failures, errors, plan cache."""
-    trace_dir = traces if traces is not None else pathlib.Path(settings.trace_dir)
-    stats = compute_stats(_rows(), load_traces(trace_dir))
+    trace_dir = traces if traces is not None else store_paths(ctx).traces
+    stats = compute_stats(_rows(ctx), load_traces(trace_dir))
     if as_json:
         typer.echo(json.dumps(stats, indent=2))
         return
@@ -81,7 +83,7 @@ def stats_command(
     console.print(f"[bold]{runs} runs[/bold], {stats['rated']} rated "
                   f"(feedback table plus traces in {escape(str(trace_dir))})")
     if not runs:
-        console.print("Nothing recorded yet. Rate answers in the playground, or set TRACE_MODE=always.")
+        console.print("Nothing recorded yet. Rate answers in the playground, or set settings.traces.mode: always.")
         return
     fb = stats["feedback"]
     table = Table(box=box.SIMPLE_HEAD)
@@ -111,6 +113,7 @@ def stats_command(
 
 @app.command("export")
 def export_command(
+    ctx: typer.Context,
     good: Annotated[bool, typer.Option("--good", help="Export the thumbs-up runs.")] = False,
     out: Annotated[pathlib.Path, typer.Option("--out", help="Where to write the drafts.")] = DEFAULT_DRAFTS,
 ) -> None:
@@ -121,7 +124,7 @@ def export_command(
     if out.resolve() == GOLD_DATASET_PATH.resolve():
         console.print("[red][ERROR][/red] Drafts never go into the gold set itself. Pick another --out.")
         raise typer.Exit(2)
-    drafts, skipped = draft_entries(_rows())
+    drafts, skipped = draft_entries(_rows(ctx))
     write_drafts(drafts, out)
     console.print(f"[green]Wrote {len(drafts)} draft{'s' if len(drafts) != 1 else ''}[/green] to "
                   f"{escape(str(out.resolve()))}; skipped {skipped} (no SQL, or more than one statement).")
@@ -129,9 +132,10 @@ def export_command(
 
 
 @app.command("clear")
-def clear_command(yes: Annotated[bool, typer.Option("--yes", help="Do not ask to confirm.")] = False) -> None:
+def clear_command(ctx: typer.Context,
+                  yes: Annotated[bool, typer.Option("--yes", help="Do not ask to confirm.")] = False) -> None:
     """Delete every rating. Schema snapshots and the plan cache are kept."""
-    path = _store_path()
+    path = _store_path(ctx)
     if not path.exists():
         console.print(f"No feedback: {escape(str(path.resolve()))} does not exist.")
         return

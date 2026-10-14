@@ -178,6 +178,22 @@ def _absolute_imports(path: pathlib.Path):
             yield node.lineno, node.module, True
 
 
+def test_no_module_imports_nl2sql_configs():
+    """0.5 reads one config, ``nl2sql.config``; the 0.4 file envelopes in ``nl2sql.configs`` are gone."""
+    roots = [PACKAGES, PACKAGES.parent / "scripts"]
+    offenders = [
+        f"{path}:{lineno} {name}"
+        for path in python_files(*roots)
+        if "node_modules" not in path.parts
+        for lineno, name, _ in _absolute_imports(path)
+        if name in {"nl2sql.configs", "nl2sql._legacy"} or name.startswith(("nl2sql.configs.", "nl2sql._legacy."))
+    ]
+    assert not offenders, _broke(
+        "Nothing imports nl2sql.configs or nl2sql._legacy. The config is nl2sql.config "
+        "(Config, load_config); the curated checks are in nl2sql.config.curated.", offenders)
+    assert not (ENGINE / "configs").exists(), "nl2sql/configs/ is deleted in 0.5."
+
+
 # --------------------------------------------------------------------------
 # 2-4. The adapters are a leaf, and only they touch a database library
 # --------------------------------------------------------------------------
@@ -254,7 +270,7 @@ def test_nothing_outside_the_adapters_imports_a_database_library():
 # not here: it names adapters to install and configure them, which is registry
 # knowledge, not SQL. Neither is datasets/, whose literals are file names.
 DIALECT_SCAN = ["pipeline", "execution", "indexing", "evaluation", "api", "llm", "aggregation",
-                "schema", "services", "datasources", "auth", "tracing", "runtime.py", "_legacy.py", "public_api.py"]
+                "schema", "services", "datasources", "auth", "tracing", "runtime.py", "public_api.py"]
 
 DIALECT_NAMES = re.compile(r"(?i)\b(sqlite|postgres|postgresql|mysql|mssql|tsql|duckdb|snowflake|bigquery)\b")
 
@@ -584,22 +600,8 @@ def test_every_provider_key_variable_is_read_through_the_llm_presets():
 # "Staging it"). This list may only shrink: take a module off it when it stops
 # importing the global, and never add one. PR 13 deletes the global and this test.
 READS_THE_SETTINGS_GLOBAL = {
-    "nl2sql._legacy",
-    "nl2sql.api.curated_api",
-    "nl2sql.api.policy_api",
     "nl2sql.api.settings_api",
-    "nl2sql.cli.commands.cache",
-    "nl2sql.cli.commands.curated",
-    "nl2sql.cli.commands.demo",
-    "nl2sql.cli.commands.doctor",
-    "nl2sql.cli.commands.feedback",
-    "nl2sql.cli.commands.setup",
-    "nl2sql.cli.commands.trace",
-    "nl2sql.cli.demo.manager",
     "nl2sql.cli.demo.playground.app",
-    "nl2sql.cli.commands.run",
-    "nl2sql.cli.main",
-    "nl2sql.configs.manager",
     "nl2sql.runtime",
 }
 

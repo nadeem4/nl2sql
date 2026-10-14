@@ -1,7 +1,7 @@
 """The playground passes a verified answer's ``source`` through, so the page can badge it.
 
-The demo project ships ``configs/curated.demo.yaml`` and indexes its questions
-(``nl2sql setup --demo``). A question one of its verified queries answers
+The demo project has a ``curated`` section (``curated.yaml``, written by
+``nl2sql init --demo``) and its questions are in the index. A question one of its verified queries answers
 comes back from ``/api/ask``, and in the ``final`` event of
 ``/api/ask/stream``, with ``source.type == "verified"``, the query's id and the
 values that were bound, and a sub-query with the verified SQL and no plan. A
@@ -38,24 +38,26 @@ def _client(demo_project, fake_llm, monkeypatch, rules):
     from nl2sql import NL2SQL
     from nl2sql.cli.demo.playground.app import build_app
 
+    import yaml
+
     server, env = fake_llm(rules)
-    env["CURATED_ENABLED"] = "true"  # the demo's own file, from .env.demo
+    # The demo's own verified queries.
+    path = demo_project / "fake.yaml"
+    document = yaml.safe_load(path.read_text(encoding="utf-8"))
+    document["curated"] = {"file": "curated.yaml"}
+    path.write_text(yaml.safe_dump(document, sort_keys=False), encoding="utf-8")
     _env(monkeypatch, demo_project, env)
-    app = build_app(NL2SQL._legacy(), questions=[], roles=["admin"], mode="live", dataset="chinook")
+    app = build_app(NL2SQL.from_config(), questions=[], roles=["admin"], mode="live", dataset="chinook")
     return server, TestClient(app)
 
 
 @pytest.mark.e2e
 def test_a_verified_answer_carries_its_source_on_ask_and_on_the_stream(demo_project, fake_llm, monkeypatch):
-    from nl2sql.common.settings import reload_settings
 
     rules = [Rule("VerifiedQueryChoice", CHOICE), Rule("AggregatedResponse", ANSWER)]
-    try:
-        server, client = _client(demo_project, fake_llm, monkeypatch, rules)
-        asked = client.post("/api/ask", json={"question": QUESTION, "role": "admin"}).json()
-        events = parse_sse(client.post("/api/ask/stream", json={"question": QUESTION, "role": "admin"}).text)
-    finally:
-        reload_settings()
+    server, client = _client(demo_project, fake_llm, monkeypatch, rules)
+    asked = client.post("/api/ask", json={"question": QUESTION, "role": "admin"}).json()
+    events = parse_sse(client.post("/api/ask/stream", json={"question": QUESTION, "role": "admin"}).text)
 
     assert asked["status"] == "success", asked["errors"]
     assert asked["source"] == {"type": "verified", "id": "top_customers_by_revenue",
@@ -75,14 +77,10 @@ def test_a_verified_answer_carries_its_source_on_ask_and_on_the_stream(demo_proj
 
 @pytest.mark.e2e
 def test_a_generated_answer_says_so(demo_project, fake_llm, monkeypatch):
-    from nl2sql.common.settings import reload_settings
 
     rules = [Rule("VerifiedQueryChoice", NONE), *RULES_COUNT_CUSTOMERS]
-    try:
-        _, client = _client(demo_project, fake_llm, monkeypatch, rules)
-        asked = client.post("/api/ask", json={"question": "How many customers are there?", "role": "admin"}).json()
-    finally:
-        reload_settings()
+    _, client = _client(demo_project, fake_llm, monkeypatch, rules)
+    asked = client.post("/api/ask", json={"question": "How many customers are there?", "role": "admin"}).json()
 
     assert asked["status"] == "success", asked["errors"]
     assert asked["source"]["type"] == "generated"

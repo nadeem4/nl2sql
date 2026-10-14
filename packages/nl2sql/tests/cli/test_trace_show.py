@@ -7,7 +7,6 @@ import re
 from typer.testing import CliRunner
 
 from nl2sql.cli.main import app
-from nl2sql.common.settings import settings
 
 runner = CliRunner()
 ANSI = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
@@ -65,16 +64,15 @@ def test_show_flags_the_first_failing_node(tmp_path):
     assert "executor" in line
 
 
-def test_show_accepts_a_trace_id_from_the_traces_directory(tmp_path, monkeypatch):
-    _write(tmp_path)
-    monkeypatch.setattr(settings, "trace_dir", str(tmp_path))
+def test_show_accepts_a_trace_id_from_the_traces_directory(project_stores):
+    project_stores.traces.mkdir(parents=True)
+    _write(project_stores.traces)
     result, out = _show(TRACE_ID)
     assert result.exit_code == 0, out
     assert "decomposer" in out
 
 
-def test_show_explains_an_unknown_trace(tmp_path, monkeypatch):
-    monkeypatch.setattr(settings, "trace_dir", str(tmp_path))
+def test_show_explains_an_unknown_trace(project_stores):
     result, out = _show("no-such-trace")
     assert result.exit_code == 1
     assert "no-such-trace" in out

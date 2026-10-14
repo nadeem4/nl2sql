@@ -2,19 +2,13 @@
 """Unified CLI for the NL2SQL Ecosystem."""
 import typer
 import importlib.metadata
-import os
-import sys
 import pathlib
-import json
 from typing import Optional, List
 from typing_extensions import Annotated
-from dotenv import load_dotenv
 
 # Core Library Imports
-from nl2sql.common.env_hint import active_env_file
 from nl2sql.common.logger import configure_logging
-from nl2sql.common.settings import reload_settings, settings
-from nl2sql._legacy import legacy_runtime
+from nl2sql.config import load_env_file
 from nl2sql import BenchmarkConfig
 from nl2sql.evaluation.gold import GOLD_DATASET_PATH
 
@@ -29,11 +23,10 @@ from nl2sql.cli.commands.benchmark import (
 )
 from nl2sql.evaluation.records import BENCHMARKS_DIR, HISTORY_PATH, README_PATH
 from nl2sql.evaluation.tier2 import DEFAULT_MAX_COST_INCREASE, DEFAULT_MAX_REGRESSIONS
-from nl2sql.cli.commands.run import run_pipeline 
+from nl2sql.cli.commands.run import run_pipeline
 from nl2sql.cli.commands.info import list_available_adapters
-from nl2sql.cli.commands.demo import demo_command
+from nl2sql.cli.commands.demo import DEFAULT_QUESTIONS_PER_MINUTE, DEFAULT_QUESTIONS_PER_SESSION, demo_command
 from nl2sql.cli.commands.doctor import doctor_command
-from nl2sql.cli.commands.setup import setup_command
 from nl2sql.cli.commands.init import init_command
 from nl2sql.cli.commands.install import install_command
 from nl2sql.cli.commands.policy import app as policy_app
@@ -41,6 +34,7 @@ from nl2sql.cli.commands.curated import app as curated_app
 from nl2sql.cli.commands.trace import app as trace_app, replay_command
 from nl2sql.cli.commands.cache import app as cache_app
 from nl2sql.cli.commands.feedback import app as feedback_app
+from nl2sql.cli.common.engine import build_engine
 from nl2sql.cli.console import configure_output_encoding
 from nl2sql.cli.types import RunConfig
 
@@ -57,18 +51,12 @@ app.add_typer(trace_app, name="trace", help="Inspect and replay run traces.")
 app.add_typer(cache_app, name="cache", help="Manage the plan cache (`nl2sql cache clear`).")
 app.add_typer(feedback_app, name="feedback", help="Answer feedback and guardrail rates (`nl2sql feedback stats`).")
 
-DatasourceConfigOption = Annotated[Optional[pathlib.Path], typer.Option("--config", help="Path to datasource config YAML")]
-SecretsConfigOption = Annotated[Optional[pathlib.Path], typer.Option("--secrets-config", help="Path to secrets config YAML")]
-LLMConfigOption = Annotated[Optional[pathlib.Path], typer.Option("--llm-config", help="Path to LLM config YAML")]
-PoliciesConfigOption = Annotated[Optional[pathlib.Path], typer.Option("--policies-config", help="Path to policies config JSON")]
-VectorStoreOption = Annotated[Optional[str], typer.Option("--vector-store", help="Path to vector store directory")]
-
 
 def _version_callback(value: bool) -> None:
     """Prints the installed distribution version and exits.
 
     Eager, so `nl2sql --version` answers without a subcommand and without
-    building a context.
+    reading a config.
     """
     if value:
         typer.echo(importlib.metadata.version("nl2sql-engine"))
@@ -78,43 +66,32 @@ def _version_callback(value: bool) -> None:
 @app.callback()
 def global_callback(
     ctx: typer.Context,
-    env: Annotated[Optional[str], typer.Option("--env", help="Environment name to load (.env.<name>)")] = None,
-    env_file: Annotated[Optional[pathlib.Path], typer.Option("--env-file", help="Explicit path to an env file (wins over --env)")] = None,
+    config: Annotated[Optional[pathlib.Path], typer.Option(
+        "--config",
+        help="The nl2sql.yaml to read. Without it, NL2SQL_CONFIG, then ./nl2sql.yaml. "
+             "The .env next to it is loaded, never overriding a variable already set.",
+    )] = None,
     version: Annotated[bool, typer.Option("--version", help="Show the installed nl2sql-engine version and exit", callback=_version_callback, is_eager=True)] = False,
 ):
     """
     NL2SQL CLI Entry Point.
     """
-    # `settings` is built when nl2sql.common.settings is first imported, which
-    # happens above. Setting the variables is therefore not enough on its own;
-    # the singleton has to be refreshed before any command builds a context.
-    if env:
-        os.environ["ENV"] = env
-    if env_file:
-        os.environ["ENV_FILE_PATH"] = str(env_file)
-    if env or env_file:
-        # pydantic-settings reads the file into `settings` only, but doctor,
-        # the LLM registry and `${env:VAR}` references read os.environ. A
-        # variable already exported in the shell wins over the file.
-        load_dotenv(active_env_file(), override=False)
-        reload_settings()
+    ctx.obj = {"config": config}
+    load_env_file(config)
+
 
 @app.command()
 def run(
+    ctx: typer.Context,
     query: Annotated[str, typer.Argument(help="Natural language query")],
-    ds_config_path: DatasourceConfigOption = None,
-    secrets_config_path: SecretsConfigOption = None,
     ds_id: Annotated[Optional[str], typer.Option(help="Target specific datasource ID")] = None,
-    llm_config_path: LLMConfigOption = None,
-    vector_store_path: VectorStoreOption = None,
     role: Annotated[str, typer.Option(help="Role ID for RBAC policies")] = "admin",
     no_exec: Annotated[bool, typer.Option("--no-exec", help="Skip execution (plan & validate only)")] = False,
     verbose: Annotated[bool, typer.Option("--verbose", "-v", help="Show detailed reasoning")] = False,
     show_perf: Annotated[bool, typer.Option("--show-perf", help="Show performance metrics")] = False,
-    policies_config_path: PoliciesConfigOption = None,
 ):
     """
-    Execute a query against the knowledge graph.
+    Answer a question against the configured datasources.
     """
 
     run_config = RunConfig(
@@ -125,33 +102,23 @@ def run(
         verbose=verbose,
         show_perf=show_perf
     )
-    ctx = legacy_runtime(ds_config_path, secrets_config_path, llm_config_path, vector_store_path, policies_config_path)
-
-    run_pipeline(run_config, ctx)
+    run_pipeline(run_config, build_engine(ctx))
 
 
 @trace_app.command("replay")
 def trace_replay(
-    target: Annotated[str, typer.Argument(help="A trace file, or a trace id in TRACE_DIR")],
-    ds_config_path: DatasourceConfigOption = None,
-    secrets_config_path: SecretsConfigOption = None,
-    llm_config_path: LLMConfigOption = None,
-    vector_store_path: VectorStoreOption = None,
-    policies_config_path: PoliciesConfigOption = None,
+    ctx: typer.Context,
+    target: Annotated[str, typer.Argument(help="A trace file, or a trace id in <storage.path>/traces")],
 ):
     """
     Re-run a traced question feeding back the recorded LLM responses (no model calls).
     """
-    replay_command(target, lambda: legacy_runtime(ds_config_path, secrets_config_path, llm_config_path,
-                                                 vector_store_path, policies_config_path))
+    replay_command(target, lambda: build_engine(ctx).context, ctx)
 
 
 @app.command()
 def index(
-    ds_config_path: DatasourceConfigOption = None,
-    secrets_config_path: SecretsConfigOption = None,
-    vector_store_path: VectorStoreOption = None,
-    llm_config_path: LLMConfigOption = None,
+    ctx: typer.Context,
     datasource: Annotated[Optional[List[str]], typer.Option(
         "--datasource", "-d",
         help="Re-index only this datasource (repeatable). Other datasources' entries are left untouched.",
@@ -185,17 +152,16 @@ def index(
         raise typer.BadParameter("--full and --curated-only cannot be combined.")
     if enrich and curated_only:
         raise typer.BadParameter("--enrich and --curated-only cannot be combined.")
-    ctx = legacy_runtime(ds_config_path, secrets_config_path, llm_config_path, vector_store_path)
-
-    run_indexing(ctx, enrich=enrich, datasource_ids=datasource or None, full=full,
+    run_indexing(build_engine(ctx), enrich=enrich, datasource_ids=datasource or None, full=full,
                  curated_only=curated_only)
-    
+
+
 @app.command()
-def doctor():
+def doctor(ctx: typer.Context):
     """
-    Diagnose environment issues (Python, Packages, Connectivity).
+    Diagnose the install: Python, packages and adapters, provider keys, and the configured engine's readiness.
     """
-    doctor_command()
+    doctor_command(ctx)
 
 
 @app.command()
@@ -212,19 +178,8 @@ def init(
 
 
 @app.command()
-def setup(
-    demo: Annotated[bool, typer.Option("--demo", help="Scaffold the demo project (chinook, support and webanalytics) instead of running the wizard")] = False,
-    api_key: Annotated[Optional[str], typer.Option("--api-key", help="API Key for LLM provider (e.g. OpenAI)")] = None,
-):
-    """
-    Interactive setup wizard for first-time users.
-    """
-    setup_command(demo=demo, api_key=api_key)
-
-
-@app.command()
 def demo(
-    directory: Annotated[pathlib.Path, typer.Option("--dir", help="Where to write the demo project (database, configs and vector store)")] = pathlib.Path("nl2sql-demo"),
+    directory: Annotated[pathlib.Path, typer.Option("--dir", help="Where to write the demo project (`nl2sql init --demo`: nl2sql.yaml, its files, the databases and the index)")] = pathlib.Path("nl2sql-demo"),
     host: Annotated[str, typer.Option(help="Bind address. The default binds localhost only; 0.0.0.0 exposes the playground to your network")] = "127.0.0.1",
     port: Annotated[int, typer.Option(help="Port to serve the playground on")] = 8765,
     no_browser: Annotated[bool, typer.Option("--no-browser", help="Do not open a browser tab; just serve and print the URL")] = False,
@@ -232,10 +187,10 @@ def demo(
     api_key: Annotated[Optional[str], typer.Option(
         "--api-key",
         help=(
-            "API key for live mode, saved into the demo project's .env.demo so later runs "
+            "API key for live mode, saved into the demo project's .env so later runs "
             "from that directory stay live. The provider follows the key shape: an sk-or- key "
             "is OpenRouter, an sk-ant- key is Anthropic, anything else is OpenAI. Precedence: --api-key, then "
-            "OPENAI_API_KEY/OPENROUTER_API_KEY/ANTHROPIC_API_KEY in the environment, then .env.demo, then Ollama, "
+            "OPENAI_API_KEY, OPENROUTER_API_KEY or ANTHROPIC_API_KEY in the environment, then .env, then Ollama, "
             "then replay. A key on argv is visible in shell history and to ps, so the "
             "environment variable is the more private route."
         ),
@@ -258,13 +213,19 @@ def demo(
             "it is used in memory for that question only -- never written to a file, an "
             "environment variable, a log or a trace. Settings, Rebuild, feedback and --record are "
             "refused, the sample databases are opened read-only, and questions are rate limited "
-            "per visitor and capped per session. NL2SQL_DEMO_HOSTED=1 does the same for a "
-            "container."
+            "per visitor and capped per session (--questions-per-minute, --questions-per-session)."
         ),
     )] = False,
+    questions_per_minute: Annotated[int, typer.Option(
+        "--questions-per-minute", min=1, help="Hosted mode: how many questions a minute one visitor may ask.",
+    )] = DEFAULT_QUESTIONS_PER_MINUTE,
+    questions_per_session: Annotated[int, typer.Option(
+        "--questions-per-session", min=1, help="Hosted mode: how many questions one browser session may ask.",
+    )] = DEFAULT_QUESTIONS_PER_SESSION,
 ):
-    """One-command playground over the Chinook sample database."""
-    demo_command(directory, host, port, no_browser, record, api_key, allow_settings, hosted)
+    """One-command playground over the demo's sample databases (`nl2sql init --demo` into --dir)."""
+    demo_command(directory, host, port, no_browser, record, api_key, allow_settings, hosted,
+                 questions_per_minute=questions_per_minute, questions_per_session=questions_per_session)
 
 
 @app.command()
@@ -317,6 +278,7 @@ def benchmark_presets():
 
 @benchmark_app.command("retrieval")
 def benchmark_retrieval(
+    ctx: typer.Context,
     questions: Annotated[Optional[List[str]], typer.Option(
         "--questions", help="Only these question ids or tags (repeatable, or comma-separated).",
     )] = None,
@@ -335,11 +297,6 @@ def benchmark_retrieval(
     )] = None,
     export_path: Annotated[Optional[pathlib.Path], typer.Option(help="Where to write the JSON report (default: <project>/benchmark_retrieval.json)")] = None,
     dataset: Annotated[pathlib.Path, typer.Option(help="Path to the gold dataset YAML")] = GOLD_DATASET_PATH,
-    ds_config_path: DatasourceConfigOption = None,
-    secrets_config_path: SecretsConfigOption = None,
-    llm_config_path: LLMConfigOption = None,
-    vector_store_path: VectorStoreOption = None,
-    policies_config_path: PoliciesConfigOption = None,
 ):
     """
     Table and column recall of schema retrieval on the gold questions; no key, no LLM, no cost.
@@ -347,12 +304,10 @@ def benchmark_retrieval(
     Forces the vector search (the full-snapshot limit is set to 0), runs the
     schema retriever on each answerable question and scores what it sends
     the planner against the question's needed_tables and needed_columns.
-    Report-only: exits 0 whatever the recall. <project> is the folder of the
-    env file --env selects: the current folder for `--env demo`.
+    Report-only: exits 0 whatever the recall. <project> is the folder of
+    nl2sql.yaml.
     """
-    exec_retrieval(BenchmarkConfig(dataset_path=dataset, config_path=ds_config_path, llm_config_path=llm_config_path,
-                                   export_path=export_path, vector_store_path=vector_store_path,
-                                   secrets_path=secrets_config_path, policies_path=policies_config_path),
+    exec_retrieval(ctx, BenchmarkConfig(dataset_path=dataset, export_path=export_path),
                    questions=questions, record=record, results_dir=results_dir, baseline=baseline, note=note)
 
 
@@ -372,13 +327,14 @@ def benchmark(
         help="Tier 2: a model to put on every LLM node, named in the scoreboard by itself (repeatable). "
              "A verified model (gpt-5.4, claude-opus-5, ...) names its provider; any other is provider/model, "
              "e.g. openrouter/meta-llama/llama-3.3-70b-instruct or ollama/llama3. The key comes from the "
-             "provider's variable, which --env loads.",
+             "provider's variable, which the .env next to nl2sql.yaml may set.",
     )] = None,
     llm: Annotated[Optional[List[str]], typer.Option(
         "--llm",
         help="Tier 2: an LLM config to compare (repeatable): a built-in preset by name (`benchmark presets`; "
-             "mini-helpers is gpt-5.4-mini-helpers), a PATH.yaml named by its stem, or NAME=PATH. "
-             "Combines with --model. With neither, the project's LLM config runs as 'default'.",
+             "mini-helpers is gpt-5.4-mini-helpers), a PATH.yaml holding an llm section (as llm.yaml does) named "
+             "by its stem, or NAME=PATH. Combines with --model. With neither, the config's llm section runs as "
+             "'default'.",
     )] = None,
     note: Annotated[Optional[str], typer.Option(
         "--note", help="Tier 2: a short label for what changed in this run, e.g. \"slim prompts\"; kept in each record.",
@@ -418,12 +374,8 @@ def benchmark(
                               "scoreboard splits accuracy by it.",
     )] = False,
     dataset: Annotated[pathlib.Path, typer.Option(help="Path to the gold dataset YAML")] = GOLD_DATASET_PATH,
-    ds_config_path: DatasourceConfigOption = None,
-    secrets_config_path: SecretsConfigOption = None,
-    llm_config_path: LLMConfigOption = None,
-    vector_store_path: VectorStoreOption = None,
-    policies_config_path: PoliciesConfigOption = None,
-    bench_config_path: Annotated[Optional[pathlib.Path], typer.Option(help="Path to LLM matrix config")] = None,
+    bench_config_path: Annotated[Optional[pathlib.Path], typer.Option(
+        help="LLM configs to compare: a YAML mapping each name to an llm section")] = None,
     iterations: Annotated[int, typer.Option(help="Iterations per test case (tier 1 always runs once)")] = 3,
     include_ids: Annotated[Optional[List[str]], typer.Option(help="Specific Test IDs to run")] = None,
     role: Annotated[Optional[List[str]], typer.Option("--role", help="Only run as this role (repeatable; tier 2 defaults to admin)")] = None,
@@ -437,11 +389,11 @@ def benchmark(
     (benchmark_report.json unless --export-path is given) and exits 1 if any
     case failed.
 
-    Tier 2, from the demo folder: `nl2sql --env demo benchmark --tier 2 --model gpt-5.4 --max-cost 5`.
+    Tier 2, from the demo folder: `nl2sql benchmark --tier 2 --model gpt-5.4 --max-cost 5`.
     It prints its plan, then writes a scoreboard comparing every --model and
     --llm config to <project>/benchmark_tier2.json and one record per config
     under <project>/benchmarks/tier2/<database>/, where <project> is the folder
-    of the env file --env selects (the current folder for `--env demo`).
+    of nl2sql.yaml.
     Exits 0 when complete, 1 on a baseline regression, 2 without --max-cost
     and 3 when the cap stopped it early.
     """
@@ -449,35 +401,29 @@ def benchmark(
         return
     bench_run_config = BenchmarkConfig(
         dataset_path=dataset,
-        config_path=ds_config_path,
         bench_config_path=bench_config_path,
-        llm_config_path=llm_config_path,
         iterations=iterations,
         include_ids=include_ids,
         roles=role,
         export_path=export_path,
-        vector_store_path=vector_store_path,
-        secrets_path=secrets_config_path,
-        policies_path=policies_config_path,
     )
 
     if tier == 2:
-        exec_tier2_benchmark(bench_run_config, llm_specs=llm, model_specs=model, max_cost=max_cost, passes=passes,
+        exec_tier2_benchmark(ctx, bench_run_config, llm_specs=llm, model_specs=model, max_cost=max_cost, passes=passes,
                              questions=questions, baseline=baseline, max_regressions=max_regressions,
                              max_accuracy_drop=max_accuracy_drop,
                              max_cost_increase=max_cost_increase, results_dir=results_dir, note=note,
                              use_curated=use_curated)
         return
-    exec_benchmark(bench_run_config, tier=tier)
+    exec_benchmark(ctx, bench_run_config, tier=tier)
 
 
 def main():
     # The library no longer configures logging on import, so the application
-    # entry point owns it: without this call the CLI emits no log output.
-    configure_logging(
-        level="INFO",
-        json_format=(settings.observability_exporter == "otlp"),
-    )
+    # entry point owns it: without this call the CLI emits no log output. A
+    # command that builds the engine switches to JSON logs when its config's
+    # settings.observability.exporter is otlp (cli/common/engine.py).
+    configure_logging(level="INFO")
     # Before any command writes: rich emits symbols a legacy Windows code page
     # cannot encode, and an unconfigured stream turns that into a crash.
     configure_output_encoding()

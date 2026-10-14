@@ -32,7 +32,7 @@ _EXPORTS = {
     "nl2sql.auth.models": ("UserContext",),
     "nl2sql.registry": ("Registry",),
     # The config, and what building an engine from it reports.
-    "nl2sql.config": ("Config", "load_config", "ConfigError", "Datasource", "Limits", "LLM", "AgentLLM",
+    "nl2sql.config": ("Config", "load_config", "load_env_file", "ConfigError", "Datasource", "Limits", "LLM", "AgentLLM",
                       "Embeddings", "Policies", "Role", "Storage", "Secrets", "Curated", "Settings"),
     "nl2sql.check": ("CheckReport", "DatasourceStatus", "EngineNotReady"),
     # The benchmark lives in nl2sql.evaluation, which the runtime never needs.
@@ -86,6 +86,7 @@ __all__ = [
     "Registry",
     "Config",
     "load_config",
+    "load_env_file",
     "ConfigError",
     "Datasource",
     "Limits",

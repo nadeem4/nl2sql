@@ -68,14 +68,14 @@ jobs:
           path: ~/.cache/chroma
           key: chroma-onnx-all-MiniLM-L6-v2
 
-      # Copies the vendored Chinook database to data/chinook.sqlite and writes
-      # configs/*.demo.*. The schema-indexing step this also runs needs no key:
-      # .env.demo embeds locally and the LLM enrichment pass is optional, so it
-      # is skipped and logged at INFO. A datasource that genuinely fails to
-      # index exits non-zero and fails this step, which is the intent. The
-      # tests below build their own indexes.
+      # Writes the demo project (nl2sql.yaml, its section files and the three
+      # sample databases) and indexes it, as a user's first two commands do.
+      # No key is needed: the demo embeds locally and the LLM enrichment pass
+      # is opt-in. A datasource that genuinely fails to index exits non-zero
+      # and fails this step, which is the intent. The tests below build their
+      # own projects and indexes.
       - name: Generate demo data
-        run: nl2sql setup --demo
+        run: nl2sql init --demo demo-ci && nl2sql --config demo-ci/nl2sql.yaml index
 
       # Indexing, datasource resolution, schema retrieval, aggregation,
       # physical validation and the local embedder -- plus tests/e2e, which

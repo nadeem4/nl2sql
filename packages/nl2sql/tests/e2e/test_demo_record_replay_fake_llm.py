@@ -28,13 +28,8 @@ MISS_MESSAGE = "No recorded answer for this question. Add an API key to ask it l
 def test_record_then_replay_with_no_key(demo_project, tmp_path, monkeypatch):
     from fastapi.testclient import TestClient
 
-    from nl2sql.common.settings import reload_settings
-
     project = tmp_path / "demo"
     shutil.copytree(demo_project, project)
-    monkeypatch.chdir(tmp_path)  # the command chdirs; this puts the cwd back
-    monkeypatch.setenv("ENV", "demo")
-    monkeypatch.setenv("EMBEDDING_PROVIDER", "local")
     monkeypatch.setenv("OPENAI_API_KEY", FAKE_KEY)
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
@@ -66,7 +61,6 @@ def test_record_then_replay_with_no_key(demo_project, tmp_path, monkeypatch):
         replayed = runner.invoke(app, ["demo", "--dir", str(project), "--no-browser"])
     finally:
         provider.stop()
-        reload_settings()
 
     assert recorded.exit_code == 0, recorded.output
     # The file names the provider and the model that answered.

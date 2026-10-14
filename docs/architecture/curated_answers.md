@@ -21,9 +21,9 @@ Curated answers come in three kinds:
 
 | Kind | What the data team writes | Where | This milestone |
 | --- | --- | --- | --- |
-| **Verified queries** | A SQL query with typed parameters, and the questions it answers | `configs/curated.yaml` | Built |
-| **Preferred tables** | Views or tables the planner should reach for first | `datasources.yaml`, `preferred_tables:` | Built |
-| **Business metrics** | A named expression (`revenue = SUM(...)`) the planner refers to by name | `configs/curated.yaml`, `metrics:` | Designed only, [deferred](#business-metrics-deferred) |
+| **Verified queries** | A SQL query with typed parameters, and the questions it answers | the `curated` section (`curated.yaml`) | Built |
+| **Preferred tables** | Views or tables the planner should reach for first | each datasource's `preferred_tables:` | Built |
+| **Business metrics** | A named expression (`revenue = SUM(...)`) the planner refers to by name | the `curated` section, `metrics:` | Designed only, [deferred](#business-metrics-deferred) |
 
 A thumbs-up on a generated answer becomes a *proposal* for a verified query,
 which a person reviews and commits. Nothing ever writes `curated.yaml` but a
@@ -43,18 +43,16 @@ person.
 
 ## Configuration
 
-### `configs/curated.yaml`
+### `curated.yaml`
 
-It follows the pattern of every other config file: a path setting with an
-environment alias (`CURATED_CONFIG`, default `configs/curated.yaml`), a
-pydantic file model in `nl2sql/configs/curated.py` (its models are in
-`nl2sql/config/curated.py`), and a loader on
-`ConfigManager` (`load_curated()`), next to `load_datasources()` and
-`load_policies()`.
+Since 0.5 the verified queries are the `curated` section of `nl2sql.yaml`,
+usually its own file (`curated: { file: curated.yaml }`); see
+[Curated Answers](../configuration/curated.md). The models and the checks
+that need the datasources are in `nl2sql/config/curated.py`.
 
-The file is optional. When the default path does not exist the feature is off
-and the pipeline is exactly today's. One file covers every datasource, keyed
-by datasource id, the way `sample_questions.yaml` is.
+The section is optional. When it is absent the feature is off and the
+pipeline is exactly the generated one. One section covers every datasource,
+keyed by datasource id.
 
 ```yaml
 datasources:
@@ -177,11 +175,10 @@ a `ConfigError`, as a broken datasource does. These checks need no database and 
   declared params;
 - defaults, examples, `min`/`max` and `choices` agree with the declared type.
 
-A refinement of the agreed design: when `CURATED_CONFIG` is *set* and the file
-it names does not exist, startup fails rather than turning the feature off. A
-typo should not silently turn verified answers off in production. When the
-setting is left at its default and the default file is absent, the feature is
-off.
+A section that includes a file that does not exist (`curated: { file: ... }`)
+is a config error, so startup fails rather than turning the feature off: a
+typo should not silently turn verified answers off in production. Leaving the
+section out turns the feature off.
 
 **`nl2sql curated validate`** runs the startup checks plus the ones that need
 the index: every table the SQL reads (`exp.Table` nodes, minus CTE names)
@@ -291,8 +288,7 @@ and the run continues at `datasource_resolver` as if it were not there. When
 the run is plan-only (`execute=False`) the matcher is skipped.
 
 A refinement made in PR 3: the node is added to the graph only when curated
-answers are on (`CURATED_ENABLED`, a loaded file with at least one verified
-query) and the run executes. Otherwise `datasource_resolver` stays the entry
+answers are on (a `curated` section with at least one verified query) and the run executes. Otherwise `datasource_resolver` stays the entry
 point, so with no curated file the graph, the trace and the answer are exactly
 what they were before, rather than gaining a node that does nothing. The
 first diamond above is therefore decided once when the graph is built
@@ -386,7 +382,7 @@ an error of the run.
 
 ### Worked examples
 
-All on the demo's Chinook database, with the query in [the example above](#configscuratedyaml).
+All on the demo's Chinook database, with the query in [the example above](#curatedyaml).
 
 **(a) A match.** "Who were our top 5 customers in 2012?" as `analyst`.
 The best candidate is `top_customers_by_revenue` (the phrasing "Best 10
@@ -522,7 +518,7 @@ A thumbs-up on a generated answer is already stored, one row per run, in the
 and SQL. That row is the proposal; nothing new is stored and nothing writes
 `curated.yaml`.
 
-`nl2sql curated proposals export --out configs/curated.proposals.yaml` turns
+`nl2sql curated proposals export --out curated.proposals.yaml` turns
 thumbs-up runs into draft verified queries in `curated.yaml`'s shape, under
 the datasource the run used: an id derived from the question (a slug, `_2`
 on a clash), a description placeholder, the question as the one phrasing,
@@ -531,8 +527,8 @@ the reviewer to replace literals with `{params}`/`:params`, drop the row-cap
 `LIMIT` the generator added, and move the entry into `curated.yaml`. Without
 `--out` it prints to stdout. It is modelled on `nl2sql feedback export --good`
 (`feedback/drafts.py`), and like it skips runs with no SQL or more than one
-statement, refuses to write over `curated.yaml` itself (the active file, or
-`CURATED_CONFIG`), and lives in `nl2sql.feedback.proposals` (opt-in, imported
+statement, refuses to write over the config's own files (`nl2sql.yaml` and
+every file it includes), and lives in `nl2sql.feedback.proposals` (opt-in, imported
 lazily by the command). It also skips runs whose answer was already
 verified, runs that did not succeed, runs on more than one datasource and
 rows rated before the datasource was recorded, and proposes each question
@@ -556,17 +552,14 @@ nor the playground ever writes it.
 
 ## Demo
 
-`nl2sql demo` writes `configs/curated.demo.yaml`, beside
-`sample_questions.demo.yaml`, with six Chinook verified queries
-(`top_customers_by_revenue`, `revenue_by_year`, `monthly_revenue`,
-`sales_by_country`, `best_selling_genres`, `top_artists_by_tracks_sold`), and
-the generated `.env.demo` gains `CURATED_CONFIG=configs/curated.demo.yaml`
-(`cli/generators/env/templates.py`). Only the demo's env file sets it: for any
-other environment the file is optional, and a `CURATED_CONFIG` naming a file
-that does not exist fails startup. The queries are data in
-`datasets/chinook.py` (`CHINOOK_VERIFIED_QUERIES`), written by
-`DemoManager._write_common_artifacts()`, and `nl2sql setup --demo` indexes
-their questions with the schema, so the hosted Space's image has them too. No
+`nl2sql init --demo` (which `nl2sql demo` runs the first time) writes
+`curated.yaml` with six Chinook verified queries (`top_customers_by_revenue`,
+`revenue_by_year`, `monthly_revenue`, `sales_by_country`,
+`best_selling_genres`, `top_artists_by_tracks_sold`), included by its
+`nl2sql.yaml`; `NL2SQL.demo()` builds the same section in code. The queries
+are data in `datasets/chinook.py` (`CHINOOK_VERIFIED_QUERIES`), and
+`nl2sql index` indexes their questions with the schema, so the hosted Space's
+image has them too. No
 guided question was added: two of the existing ones ("What is the total
 revenue per year?", "Which genre sells the most tracks?") are phrasings of
 verified queries, and a new guided question would have no recording.
@@ -583,12 +576,11 @@ a question whose recorded choice picked a query as covered too.
 
 ## Settings
 
-| Setting | Env | Default | Meaning |
-| --- | --- | --- | --- |
-| `curated_config_path` | `CURATED_CONFIG` | `configs/curated.yaml` | The curated answers file. Absent at the default path: the feature is off. Set and absent: startup fails. |
-| `curated_enabled` | `CURATED_ENABLED` | `true` | Turns matching off without removing the file. Validation commands still run. |
-| `curated_match_floor` | `CURATED_MATCH_FLOOR` | `0.6` | Cosine similarity the best candidate must reach before the model is asked. |
-| `curated_match_top_k` | `CURATED_MATCH_TOP_K` | `5` | Candidates shown to the model. |
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| the `curated` section | absent | Present: curated answers are on. Absent: off. (0.4's `CURATED_CONFIG` and `CURATED_ENABLED`.) |
+| `settings.curated.match_floor` | `0.6` | Cosine similarity the best candidate must reach before the model is asked (0.4's `CURATED_MATCH_FLOOR`). |
+| `settings.curated.match_top_k` | `5` | Candidates shown to the model (0.4's `CURATED_MATCH_TOP_K`). |
 
 The floor is a similarity in the configured embedding model's space, and
 models spread their scores differently. PR 2 calibrated it on the local ONNX

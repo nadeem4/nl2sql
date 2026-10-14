@@ -8,8 +8,8 @@ from __future__ import annotations
 
 import pytest
 
-from nl2sql.configs.curated import (
-    CuratedFileConfig,
+from nl2sql.config import Curated
+from nl2sql.config.curated import (
     CuratedSqlError,
     check_curated,
     inspect_verified_sql,
@@ -76,8 +76,8 @@ def test_an_unknown_dialect_is_reported_not_raised_as_something_else():
 # check_curated: the whole file against the configured datasources
 # --------------------------------------------------------------------------
 
-def _cfg(sql: str, datasource: str = "chinook") -> CuratedFileConfig:
-    return CuratedFileConfig.model_validate({"datasources": {datasource: {"verified_queries": [{
+def _cfg(sql: str, datasource: str = "chinook") -> Curated:
+    return Curated.model_validate({"datasources": {datasource: {"verified_queries": [{
         "id": "top_customers",
         "description": "Top customers in a year",
         "questions": ["Top {n} customers in {year}"],

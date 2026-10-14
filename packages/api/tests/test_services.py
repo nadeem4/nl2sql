@@ -11,8 +11,8 @@ class FakeEngine:
         self._datasources = []
         self._llms = {}
 
-    def add_datasource(self, config):
-        self._datasources.append(config["id"])
+    def add_datasource(self, datasource):
+        self._datasources.append(datasource.id)
 
     def list_datasources(self):
         return list(self._datasources)
@@ -37,7 +37,8 @@ def test_datasource_service_live_update():
     engine = FakeEngine()
     service = DatasourceService(engine)
 
-    service.add_datasource(DatasourceRequest(config={"id": "ds-1"}))
+    service.add_datasource(DatasourceRequest(config={"id": "ds-1", "type": "sqlite",
+                                                     "connection": {"database": "ds.db"}}))
 
     assert "ds-1" in service.list_datasources()
 

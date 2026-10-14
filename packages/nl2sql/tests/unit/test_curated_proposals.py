@@ -10,8 +10,7 @@ import pytest
 import yaml
 from typer.testing import CliRunner
 
-from nl2sql.common.settings import settings
-from nl2sql.configs.curated import CuratedFileConfig
+from nl2sql.config import Curated
 from nl2sql.feedback import FeedbackStore
 from nl2sql.feedback.proposals import build_proposals, render_proposals, write_proposals
 
@@ -31,7 +30,7 @@ def _row(trace_id="t1", question="How many customers are in Brazil?", **override
 def test_a_thumbs_up_generated_answer_becomes_a_verified_query_draft():
     document, skipped = build_proposals([_row()])
 
-    assert document["version"] == 1
+    assert set(document) == {"datasources"}  # the curated section's body: no version
     [entry] = document["datasources"]["chinook"]["verified_queries"]
     assert entry["id"] == "how_many_customers_are_in_brazil"
     assert entry["questions"] == ["How many customers are in Brazil?"]
@@ -47,7 +46,7 @@ def test_the_rendered_yaml_loads_as_a_curated_file_and_says_values_are_literal()
     text = render_proposals(document)
 
     assert "literal" in text and "{params}" in text
-    loaded = CuratedFileConfig.model_validate(yaml.safe_load(text))
+    loaded = Curated.model_validate(yaml.safe_load(text))
     assert set(loaded.datasources) == {"chinook", "music"}
 
 
@@ -107,10 +106,14 @@ def test_write_refuses_to_write_over_curated_yaml(tmp_path):
 
 @pytest.fixture
 def store(tmp_path, monkeypatch):
-    path = tmp_path / "schema_store.db"
-    monkeypatch.setattr(settings, "schema_store_path", str(path))
-    monkeypatch.setattr(settings, "curated_config_path", str(tmp_path / "configs" / "curated.yaml"))
-    monkeypatch.delenv("CURATED_CONFIG", raising=False)
+    """A project whose nl2sql.yaml includes curated.yaml, with thumbs-up feedback in its state store."""
+    from nl2sql.testing.config import make_config
+
+    (tmp_path / "curated.yaml").write_text("datasources: {}\n", encoding="utf-8")
+    make_config(tmp_path, curated={"file": "curated.yaml"})
+    monkeypatch.setenv("NL2SQL_CONFIG", str(tmp_path / "nl2sql.yaml"))
+    path = tmp_path / ".nl2sql" / "state.db"
+    path.parent.mkdir(parents=True)
     feedback = FeedbackStore(path)
     feedback.save(_row(), rating="up", note=None)
     feedback.save(_row("t2", "Which genre sells best?", source="verified"), rating="up", note=None)
@@ -137,18 +140,14 @@ def test_export_writes_to_out(store, tmp_path):
     result = runner.invoke(_app(), ["curated", "proposals", "export", "--out", str(out)])
 
     assert result.exit_code == 0, result.output
-    loaded = CuratedFileConfig.model_validate(yaml.safe_load(out.read_text(encoding="utf-8")))
+    loaded = Curated.model_validate(yaml.safe_load(out.read_text(encoding="utf-8")))
     assert [q.id for q in loaded.datasources["chinook"].verified_queries] == ["how_many_customers_are_in_brazil"]
 
 
-def test_export_refuses_the_active_curated_yaml_and_curated_config(store, tmp_path, monkeypatch):
-    active = tmp_path / "configs" / "curated.yaml"
-    result = runner.invoke(_app(), ["curated", "proposals", "export", "--out", str(active)])
-    assert result.exit_code == 2
-    assert not active.exists()
-
-    other = tmp_path / "team" / "verified.yaml"
-    monkeypatch.setenv("CURATED_CONFIG", str(other))
-    result = runner.invoke(_app(), ["curated", "proposals", "export", "--out", str(other)])
-    assert result.exit_code == 2
-    assert not other.exists()
+def test_export_refuses_the_configs_own_files(store, tmp_path):
+    for name in ("curated.yaml", "nl2sql.yaml"):
+        target = tmp_path / name
+        before = target.read_bytes()
+        result = runner.invoke(_app(), ["curated", "proposals", "export", "--out", str(target)])
+        assert result.exit_code == 2, result.output
+        assert target.read_bytes() == before

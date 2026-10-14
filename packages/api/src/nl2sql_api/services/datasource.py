@@ -1,6 +1,4 @@
-from typing import Dict, Any, Optional
-
-from nl2sql import NL2SQL
+from nl2sql import NL2SQL, Datasource
 from nl2sql_api.models.datasource import DatasourceRequest, DatasourceResponse
 
 
@@ -9,12 +7,13 @@ class DatasourceService:
         self.engine = engine
 
     def add_datasource(self, request: DatasourceRequest) -> DatasourceResponse:
-        """Add a new datasource programmatically."""
-        self.engine.add_datasource(request.config)
+        """Add a datasource; ``config`` has the shape of one ``datasources`` entry in ``nl2sql.yaml``."""
+        datasource = Datasource.model_validate(request.config)
+        self.engine.add_datasource(datasource)
         return DatasourceResponse(
             success=True,
-            message=f"Datasource '{request.config.get('id')}' added successfully",
-            datasource_id=request.config.get('id')
+            message=f"Datasource '{datasource.id}' added successfully",
+            datasource_id=datasource.id,
         )
 
     def list_datasources(self) -> list:
@@ -26,7 +25,7 @@ class DatasourceService:
         datasource_ids = self.engine.list_datasources()
         if datasource_id not in datasource_ids:
             raise ValueError(f"Datasource '{datasource_id}' not found")
-        
+
         # In a real implementation, we would return detailed information about the datasource
         return {"datasource_id": datasource_id, "exists": True}
 
@@ -35,7 +34,7 @@ class DatasourceService:
         datasource_ids = self.engine.list_datasources()
         if datasource_id not in datasource_ids:
             raise ValueError(f"Datasource '{datasource_id}' not found")
-        
+
         return {
             "success": False,
             "message": "Removing datasources is not currently supported by the engine",

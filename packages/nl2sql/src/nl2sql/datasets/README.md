@@ -1,7 +1,7 @@
 # Demo datasets
 
 Three small SQLite databases, packaged in the wheel and copied into the demo
-project by `nl2sql setup --demo` and `nl2sql demo`. They are registered as
+project by `nl2sql init --demo` (and `nl2sql demo`, which runs it). They are registered as
 three separate datasources, so the demo shows the engine choosing between
 datasources rather than always falling through to the only one.
 

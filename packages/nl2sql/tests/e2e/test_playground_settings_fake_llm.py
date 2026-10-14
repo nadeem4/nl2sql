@@ -25,28 +25,23 @@ def test_a_key_saved_in_the_panel_turns_replay_into_live(demo_project, tmp_path,
 
     from nl2sql import NL2SQL
     from nl2sql.cli.demo.playground.app import build_app
-    from nl2sql.common.settings import reload_settings
-
     project = tmp_path / "demo"
     shutil.copytree(demo_project, project)
     replay = FakeLLMServer([]).start()  # records nothing: every question misses
     live = FakeLLMServer(RULES_COUNT_CUSTOMERS).start()
-    point_llm_config_at(project, replay.base_url)
+    # Replay mode, as `nl2sql demo` leaves it: llm.yaml on the replay server with its placeholder key.
+    point_llm_config_at(project, replay.base_url, api_key="replay")
 
-    monkeypatch.chdir(project)
-    monkeypatch.setenv("ENV", "demo")
-    monkeypatch.setenv("EMBEDDING_PROVIDER", "local")
-    monkeypatch.setenv("LLM_CONFIG", "configs/llm.demo.yaml")
-    monkeypatch.setenv("TRACE_MODE", "always")
-    monkeypatch.setenv("OPENAI_API_KEY", "replay")
-    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    # The panel writes the saved key into os.environ; set then delete, so it is restored afterwards.
+    for name in ("OPENAI_API_KEY", "OPENROUTER_API_KEY", "ANTHROPIC_API_KEY"):
+        monkeypatch.setenv(name, "")
+        monkeypatch.delenv(name)
     # Where a client with no configured base_url goes: the stand-in provider.
     monkeypatch.setenv("OPENAI_API_BASE", live.base_url)
     monkeypatch.setenv("OPENAI_BASE_URL", live.base_url)
-    reload_settings()
 
     try:
-        engine = NL2SQL._legacy()
+        engine = NL2SQL.from_config(project / "nl2sql.yaml")
         app = build_app(engine, questions=[], roles=["admin"], mode="replay", dataset="chinook",
                         project_dir=project, host="127.0.0.1")
         client = TestClient(app, base_url="http://127.0.0.1:8765")
@@ -61,7 +56,6 @@ def test_a_key_saved_in_the_panel_turns_replay_into_live(demo_project, tmp_path,
     finally:
         replay.stop()
         live.stop()
-        reload_settings()
 
     assert before["replay_miss"] is True
     assert replay.calls and live_calls_before == 0
@@ -78,4 +72,4 @@ def test_a_key_saved_in_the_panel_turns_replay_into_live(demo_project, tmp_path,
     for text in (saved.text, str(meta), str(after), trace.text):
         assert FAKE_KEY not in text
     assert saved.json()["key"]["masked"] == "sk-...7d3e"
-    assert f"OPENAI_API_KEY={FAKE_KEY}" in (project / ".env.demo").read_text(encoding="utf-8")
+    assert f"OPENAI_API_KEY={FAKE_KEY}" in (project / ".env").read_text(encoding="utf-8")

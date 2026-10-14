@@ -19,22 +19,20 @@ one is still set from by the CLI and the playground is in brackets.
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
-| `settings.traces.mode` (`TRACE_MODE`) | `on_failure` | `off`, `on_failure` or `always`. |
-| `settings.traces.sample_rows` (`TRACE_SAMPLE_ROWS`) | `50` | Result rows kept in the trace. |
-| `settings.traces.max_field_chars` (`TRACE_MAX_FIELD_CHARS`) | `20000` | Longest string kept in a node's recorded inputs and outputs. |
+| `settings.traces.mode` | `on_failure` | `off`, `on_failure` or `always`. |
+| `settings.traces.sample_rows` | `50` | Result rows kept in the trace. |
+| `settings.traces.max_field_chars` | `20000` | Longest string kept in a node's recorded inputs and outputs. |
 
-Traces go to the engine's trace folder, `traces/` under `storage.path`
-(`TRACE_DIR` for the CLI and the playground, default `traces` relative to the
-working directory). Add it to `.gitignore` (this repository does).
+Traces are written to `<storage.path>/traces/` (see
+[Storage](../configuration/storage.md)); `nl2sql init` puts `storage.path` in
+`.gitignore`.
 
 `on_failure` writes a trace when the run returned errors, needed a retry in any
 sub-query, had a node fail, or did not complete (timeout, cancellation, crash).
 A run that recovered on retry therefore still leaves a trace.
 
-`nl2sql demo` writes `TRACE_MODE=always` into the demo's generated `.env.demo`,
-so every playground question is traced. A demo project generated before this
-setting existed does not have the line; add `TRACE_MODE=always` to its
-`.env.demo`, or regenerate it.
+The demo's config (`nl2sql init --demo`) sets `settings.traces.mode: always`
+in its `settings.yaml`, so every playground question is traced.
 
 The trace is recorded by a callback that `run_with_graph` attaches to every
 run, so the CLI, the Python API, the REST API and the playground all produce it.
@@ -214,8 +212,8 @@ prompts, schema and a sample of result rows.
 
 Node inputs and outputs, and the result, are capped so a trace stays readable:
 result rows (`rows`, and the aggregator's `terminal_results`) keep
-`settings.traces.sample_rows` rows, other lists keep 200 items, and strings
-keep `settings.traces.max_field_chars` characters. Every cut leaves a `[truncated]` marker
+`settings.traces.sample_rows` rows, other lists keep 200 items, and strings keep
+`settings.traces.max_field_chars` characters. Every cut leaves a `[truncated]` marker
 saying how much was dropped. **LLM messages and raw responses are never cut**,
 because replay needs them whole; a planner prompt on Chinook is about 12 000
 characters, and a whole trace is typically a few hundred kilobytes.
@@ -224,7 +222,7 @@ characters, and a whole trace is typically a few hundred kilobytes.
 
 ```bash
 nl2sql trace show traces/20260921T164837755710Z_159afe1f-....json
-nl2sql trace show 159afe1f-3305-4907-903a-55495d040665   # looks it up in TRACE_DIR
+nl2sql trace show 159afe1f-3305-4907-903a-55495d040665   # looks it up in <storage.path>/traces
 ```
 
 It prints the question, then one row per node execution (nested SQL agent
@@ -236,7 +234,7 @@ set the retry off.
 ## Replaying a trace: `nl2sql trace replay`
 
 ```bash
-nl2sql --env demo trace replay traces/20260921T164837755710Z_159afe1f-....json
+nl2sql --config nl2sql-demo/nl2sql.yaml trace replay 159afe1f-3305-4907-903a-55495d040665
 ```
 
 Replay runs the real pipeline again for the recorded question, roles and
@@ -283,7 +281,7 @@ served. It then compares the replayed `QueryResult` with the recorded one
 - After a **prompt change** the recorded response is stale. Replay reports the
   node where the prompt diverged; one real run is needed to record a new trace.
 - The datasource must be reachable from where you replay, with the same
-  configuration (run it from the same project and `--env`). Replay says so and
+  configuration (the same `--config`). Replay says so and
   stops if it is not. Queries run again, so a database whose data changed
   gives a different result, and replay reports the difference.
 - The datasource resolver and schema retriever still run their vector search,
@@ -307,9 +305,9 @@ naming the entries MMR passed over because they repeat an earlier pick. The **Re
 runs the same search for any text (see the
 [demo guide](../getting_started/demo.md#the-retrieval-inspector)). The page
 fetches the file from `GET /api/trace/{trace_id}`, which serves only files
-directly inside `TRACE_DIR` and rejects any id that is not a plain token, so
+directly inside the traces folder and rejects any id that is not a plain token, so
 `../` or an absolute path never reaches the filesystem.
 
 Below the run, **Was this answer right?** records a rating keyed by the same
 trace id; `nl2sql feedback stats` reads the ratings together with the traces in
-`TRACE_DIR`. See [Feedback and Signals](feedback.md).
+`<storage.path>/traces`. See [Feedback and Signals](feedback.md).

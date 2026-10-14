@@ -7,6 +7,8 @@ table and exited 0. Warnings alone still exit 0.
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pytest
 
 from nl2sql.cli.commands import run as run_module
@@ -46,7 +48,7 @@ def test_a_blocking_error_in_the_final_state_exits_1(monkeypatch, capsys, severi
     monkeypatch.setattr(run_module, "PipelineRunner", _runner_returning([_error(severity)]))
 
     with pytest.raises(SystemExit) as exc:
-        run_module.run_pipeline(RunConfig(query="How many customers are there?"), ctx=fake_runtime())
+        run_module.run_pipeline(RunConfig(query="How many customers are there?"), SimpleNamespace(context=fake_runtime()))
 
     assert exc.value.code == 1
     assert "Pipeline Errors" in capsys.readouterr().out
@@ -57,4 +59,4 @@ def test_warnings_alone_exit_0(monkeypatch):
         run_module, "PipelineRunner", _runner_returning([_error(ErrorSeverity.WARNING)])
     )
 
-    run_module.run_pipeline(RunConfig(query="How many customers are there?"), ctx=fake_runtime())
+    run_module.run_pipeline(RunConfig(query="How many customers are there?"), SimpleNamespace(context=fake_runtime()))

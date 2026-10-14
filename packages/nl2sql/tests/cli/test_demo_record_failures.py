@@ -68,7 +68,7 @@ def test_a_run_with_rows_an_answer_and_no_error_succeeded():
     assert demo.run_succeeded(SimpleNamespace(status="success", final_answer={"summary": "59"}, errors=[]))
 
 
-def test_record_exits_non_zero_when_any_question_failed(tmp_path, monkeypatch):
+def test_record_exits_non_zero_when_any_question_failed(tmp_path, monkeypatch, demo_engines):
     from typer.testing import CliRunner
 
     from nl2sql.cli.main import app
@@ -76,18 +76,10 @@ def test_record_exits_non_zero_when_any_question_failed(tmp_path, monkeypatch):
     pytest.importorskip("fastapi")
     monkeypatch.setenv("OPENAI_API_KEY", "sk-" + "fake-record-test")
     monkeypatch.setattr("nl2sql.cli.commands.demo._ollama_reachable", lambda: False)
-    monkeypatch.setattr("nl2sql.cli.demo.manager.DemoManager.index_demo_data", lambda self: True)
     monkeypatch.setattr("nl2sql.cli.commands.demo.RecordingProxy", lambda *a, **k: SimpleNamespace(
         start=lambda: SimpleNamespace(base_url="http://127.0.0.1:9/v1", stop=lambda: None)))
-    monkeypatch.setattr("nl2sql.cli.commands.demo._build_engine",
-                        lambda: SimpleNamespace(context=SimpleNamespace(
-                            policies_cfg=SimpleNamespace(roles={"admin": None}))))
     monkeypatch.setattr("nl2sql.cli.commands.demo._record_all", lambda *args: [BROKEN])
-    cwd = pathlib.Path.cwd()
-    try:
-        result = CliRunner().invoke(app, ["demo", "--dir", str(tmp_path / "d"), "--no-browser", "--record"])
-    finally:
-        import os
-        os.chdir(cwd)
+
+    result = CliRunner().invoke(app, ["demo", "--dir", str(tmp_path / "d"), "--no-browser", "--record"])
 
     assert result.exit_code == 1, result.output

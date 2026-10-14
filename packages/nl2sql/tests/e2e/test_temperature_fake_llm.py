@@ -10,11 +10,10 @@ import json
 import re
 
 import pytest
-import yaml
 
 from nl2sql.testing.fake_llm import FakeLLMServer
 
-from .conftest import _base_env, run_cli
+from .conftest import _base_env, private_storage, project_config, run_cli
 from .recordings_chinook import RULES_COUNT_CUSTOMERS
 
 FAKE_KEY = "-".join(["fake", "key", "for", "e2e"])
@@ -22,18 +21,18 @@ QUESTION = "How many customers are there?"
 ANSI = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
 
 
-def _write_config(demo_project, name, server, default, agents=None):
-    common = {"provider": "openai", "base_url": server.base_url, "api_key": "${env:OPENAI_API_KEY}"}
-    cfg = {"version": 1, "default": {**common, **default},
-           "agents": {key: {**common, **agent} for key, agent in (agents or {}).items()}}
-    (demo_project / "configs" / name).write_text(yaml.safe_dump(cfg), encoding="utf-8")
+def _write_config(demo_project, name, server, default, agents=None, store=None):
+    """``<demo>/<name>``: the llm section on ``server``; with ``store``, a private store tracing every run."""
+    llm = {"provider": "openai", "base_url": server.base_url, "api_key": "${env:OPENAI_API_KEY}", **default,
+           "agents": agents or {}}
+    project_config(demo_project, name, llm=llm,
+                   settings={"traces": {"mode": "always"}} if store is not None else None,
+                   storage=private_storage(demo_project, store) if store is not None else None)
 
 
-def _env(trace_dir=None):
+def _env():
     env = _base_env()
     env["OPENAI_API_KEY"] = FAKE_KEY
-    if trace_dir is not None:
-        env.update({"TRACE_MODE": "always", "TRACE_DIR": str(trace_dir)})
     return env
 
 
@@ -41,9 +40,9 @@ def _env(trace_dir=None):
 def test_a_rejected_temperature_tells_the_user_what_to_set(demo_project):
     server = FakeLLMServer(RULES_COUNT_CUSTOMERS, reject_temperature=True).start()
     try:
-        _write_config(demo_project, "llm.temp-rejected.yaml", server,
+        _write_config(demo_project, "temp-rejected.yaml", server,
                       {"model": "gpt-5.5", "temperature": 0.0})
-        r = run_cli(demo_project, _env(), "run", "--llm-config", "configs/llm.temp-rejected.yaml", QUESTION)
+        r = run_cli(demo_project, _env(), "run", QUESTION, config="temp-rejected.yaml")
     finally:
         server.stop()
 
@@ -61,9 +60,9 @@ def test_a_rejected_temperature_tells_the_user_what_to_set(demo_project):
 def test_per_node_models_and_temperatures_reach_the_wire_and_the_trace(demo_project, tmp_path):
     server = FakeLLMServer(RULES_COUNT_CUSTOMERS).start()
     try:
-        _write_config(demo_project, "llm.per-node.yaml", server, {"model": "gpt-5.4"},
-                      agents={"astplanner": {"model": "gpt-5.5", "temperature": None}})
-        r = run_cli(demo_project, _env(tmp_path), "run", "--llm-config", "configs/llm.per-node.yaml", QUESTION)
+        _write_config(demo_project, "per-node.yaml", server, {"model": "gpt-5.4"},
+                      agents={"ast_planner": {"model": "gpt-5.5", "temperature": None}}, store=tmp_path)
+        r = run_cli(demo_project, _env(), "run", QUESTION, config="per-node.yaml")
     finally:
         server.stop()
     assert r.returncode == 0, r.stdout + r.stderr
@@ -76,7 +75,7 @@ def test_per_node_models_and_temperatures_reach_the_wire_and_the_trace(demo_proj
     assert sent["AggregatedResponse"]["model"] == "gpt-5.4"
     assert all(body["seed"] == 42 for body in sent.values())
 
-    [path] = list(tmp_path.glob("*.json"))
+    [path] = list((tmp_path / "traces").glob("*.json"))
     doc = json.loads(path.read_text(encoding="utf-8"))
     assert doc["llm"]["by_node"] == {"datasource_resolver": "gpt-5.4", "decomposer": "gpt-5.4",
                                      "ast_planner": "gpt-5.5", "answer_synthesizer": "gpt-5.4"}
@@ -91,7 +90,7 @@ def test_per_node_models_and_temperatures_reach_the_wire_and_the_trace(demo_proj
                             "ast_planner": "gpt-5.5", "answer_synthesizer": "gpt-5.4"}
 
     # Replay rebuilds each agent's client the same way and serves the recording.
-    replay = run_cli(demo_project, _env(), "trace", "replay", str(path))
+    replay = run_cli(demo_project, _env(), "trace", "replay", str(path), config="per-node.yaml")
     replay_out = ANSI.sub("", replay.stdout)
     assert replay.returncode == 0, replay_out + replay.stderr
     assert "matches the recording" in replay_out

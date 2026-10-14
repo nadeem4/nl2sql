@@ -3,14 +3,13 @@ import sys
 from typing import Dict, List, Optional
 
 from nl2sql.cli.reporting import ConsolePresenter
-from nl2sql.runtime import Runtime
 from nl2sql.cli.common.decorators import handle_cli_errors
 from nl2sql.indexing.rebuild import rebuild_index
 
 
 @handle_cli_errors
 def run_indexing(
-    ctx: Runtime,
+    engine,
     enrich: bool = False,
     datasource_ids: Optional[List[str]] = None,
     full: bool = False,
@@ -25,19 +24,20 @@ def run_indexing(
     and no datasource's rebuild touches another's entries.
 
     Args:
-        ctx: The initialized Runtime.
+        engine: The ``NL2SQL`` engine, built from the config and checked.
         enrich: Ask the LLM for table and column descriptions (spends tokens).
             Off by default.
         datasource_ids: Only these datasources; every configured one when None.
         full: Rebuild every datasource into a new collection and swap it in.
             Needed after changing the embedding model.
         curated_only: Re-index only the verified queries from
-            ``curated.yaml``, keeping the schema entries; reads no schema and
+            the ``curated`` section, keeping the schema entries; reads no schema and
             calls no model.
 
     Raises:
         SystemExit: With code 1 if any datasource failed to index.
     """
+    ctx = engine.context
     presenter = ConsolePresenter()
     presenter.print_info(f"Indexing schema to: {ctx.vector_store.persist_directory}")
 

@@ -119,8 +119,7 @@ def boot_demo(directory: pathlib.Path, port: int) -> subprocess.Popen:
     from nl2sql.llm.providers import PROVIDER_KEYS
 
     env = {k: v for k, v in os.environ.items() if k not in PROVIDER_KEYS}
-    env.update({"NL2SQL_DEMO_HOSTED": "1", "EMBEDDING_PROVIDER": "local"})
-    command = [sys.executable, "-m", "nl2sql.cli.main", "demo", "--dir", str(directory),
+    command = [sys.executable, "-m", "nl2sql.cli.main", "demo", "--hosted", "--dir", str(directory),
                "--port", str(port), "--no-browser"]
     return subprocess.Popen(command, env=env)
 

@@ -13,7 +13,7 @@ import re
 from datetime import date
 from typing import Any, Dict, List
 
-from nl2sql.configs.curated import ParamSpec, VerifiedQuery
+from nl2sql.config.curated import ParamSpec, VerifiedQuery
 
 from .schemas import ParamValue
 

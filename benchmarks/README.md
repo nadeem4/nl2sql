@@ -42,9 +42,9 @@ conflict.
 ## Workflow
 
 ```bash
-# from the demo folder
-nl2sql --env demo benchmark --tier 2 --model gpt-5.4 --max-cost 5 --note "what changed"
-nl2sql --env demo benchmark retrieval --record --note "what changed"
+# from the demo folder (./nl2sql.yaml is the config; elsewhere add --config PATH)
+nl2sql benchmark --tier 2 --model gpt-5.4 --max-cost 5 --note "what changed"
+nl2sql benchmark retrieval --record --note "what changed"
 
 # from the repo root
 nl2sql benchmark publish --from <demo folder>

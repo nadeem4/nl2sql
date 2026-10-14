@@ -92,10 +92,10 @@ an API key and checks that:
 ## Running the benchmark
 
 ```bash
-nl2sql --env demo benchmark --tier 1        # gold plans, no API key
-nl2sql --env demo benchmark --tier 2 --max-cost 5   # the real model, scored and priced
-nl2sql --env demo benchmark                 # full pipeline, the configured LLM
-nl2sql --env demo benchmark retrieval       # schema retrieval recall, no API key
+nl2sql benchmark --tier 1        # gold plans, no API key
+nl2sql benchmark --tier 2 --max-cost 5   # the real model, scored and priced
+nl2sql benchmark                 # full pipeline, the configured LLM
+nl2sql benchmark retrieval       # schema retrieval recall, no API key
 ```
 
 Each question runs once per role in its `expected` map (narrow with
@@ -255,7 +255,7 @@ the planner gets the gold plan, the refiner "Keep the same plan." and the
 answer synthesizer a fixed sentence. The rest is the real pipeline on the
 indexed demo, so a failing case is a bug in a code node or in the plan, never
 in a model. Refusals are scored against the default, generic message: the
-demo's `.env.demo` sets `RBAC_REFUSAL_NAMES_TABLES=true` so the playground
+demo's config sets `policies.refusal_names_tables: true` so the playground
 can show which table was refused, and tier 1 turns that off for its run.
 Tier 1 also runs with [curated answers](../configuration/curated.md) off
 (`run_tier1()` clears the context's curated file for the run): it scores
@@ -295,8 +295,8 @@ any run.
 The commands the owner runs, from the demo folder:
 
 ```bash
-nl2sql --env demo benchmark --tier 2 --model gpt-5.4 --max-cost 5                        # a run
-nl2sql --env demo benchmark --tier 2 --model gpt-5.4 --llm mini-helpers --max-cost 10    # a comparison
+nl2sql benchmark --tier 2 --model gpt-5.4 --max-cost 5                        # a run
+nl2sql benchmark --tier 2 --model gpt-5.4 --llm mini-helpers --max-cost 10    # a comparison
 ```
 
 and then, from the repo, `nl2sql benchmark publish --from <demo folder>`
@@ -319,12 +319,13 @@ and then, from the repo, `nl2sql benchmark publish --from <demo folder>`
 | `--max-cost-increase F` | `0.2` | Baseline: largest allowed rise in cost per question (0.2 is 20%) |
 | `--use-curated` | off | Keep [curated answers](../configuration/curated.md) on, so a verified query may answer a gold question (below) |
 
-`<project>` is the folder of the env file the run is configured from: for
-`--env demo` that is `./.env.demo`, so the current folder; with `--env-file
-PATH` it is that file's folder.
+`<project>` is the folder of the `nl2sql.yaml` the run is configured from
+(`--config`, else `NL2SQL_CONFIG`, else `./nl2sql.yaml`): run from the demo
+folder, that is the current folder.
 
-The option is `--llm`, not `--config`: on every `nl2sql` command `--config` is
-the datasource config and `--llm-config` the single LLM config path.
+The option is `--llm`, not `--config`: `nl2sql --config PATH` is the global
+flag naming the whole `nl2sql.yaml`. A `--llm` file holds an `llm` section, in
+the shape of `llm.yaml`.
 
 Before anything is spent, the run prints its plan and carries on without a
 prompt (the cap is the safety):
@@ -352,8 +353,8 @@ temperature: none is sent where the model rejects one (`gpt-5.5`,
 `ollama/llama3`) and runs at temperature 0 (none for `anthropic`); a bare
 unknown model is a usage error. The key is the provider's `${env:...}`
 variable (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `OPENROUTER_API_KEY`), which
-`--env demo` loads from `.env.demo`. No `base_url` is written, so the provider
-preset's endpoint is used.
+the `.env` next to `nl2sql.yaml` may set. No `base_url` is written, so the
+provider preset's endpoint is used.
 
 `--llm NAME` picks a preset, a config file shipped inside the package.
 `nl2sql benchmark presets` lists them:
@@ -382,7 +383,7 @@ and another failed (with `--passes` > 1 a question can also be `flaky`). Since
 `answersynthesizer`) on its own provider and model, as the presets do:
 
 ```bash
-nl2sql --env demo benchmark --tier 2 --max-cost 10 --model gpt-5.4 --llm mini-helpers --llm claude-planner
+nl2sql benchmark --tier 2 --max-cost 10 --model gpt-5.4 --llm mini-helpers --llm claude-planner
 ```
 
 A model that is not in `VERIFIED_MODELS` (`nl2sql/llm/providers.py`) gets
@@ -563,7 +564,7 @@ engine stands, and every call costs money. Run a **baseline** with
 `--passes 3`, so the run it is compared against is not a single sample:
 
 ```bash
-nl2sql --env demo benchmark --tier 2 --model gpt-5.4 --passes 3 --max-cost 15 \
+nl2sql benchmark --tier 2 --model gpt-5.4 --passes 3 --max-cost 15 \
   --export-path <repo>/packages/nl2sql/src/nl2sql/evaluation/baselines/gpt-5.4.json
 ```
 
@@ -583,7 +584,7 @@ run is compared config by config, by name, and a config the baseline lacks is
 skipped:
 
 ```bash
-nl2sql --env demo benchmark --tier 2 --model gpt-5.4 --max-cost 5 \
+nl2sql benchmark --tier 2 --model gpt-5.4 --max-cost 5 \
   --baseline <repo>/packages/nl2sql/src/nl2sql/evaluation/baselines/gpt-5.4.json
 ```
 
@@ -655,7 +656,7 @@ same name and other content is reported as a conflict, left as it is, and
 makes the command exit 1 after publishing. Records in the old layout are
 skipped with a warning. The workflow:
 
-1. From the demo folder: `nl2sql --env demo benchmark --tier 2 --model gpt-5.4 --max-cost 5`.
+1. From the demo folder: `nl2sql benchmark --tier 2 --model gpt-5.4 --max-cost 5`.
 2. From the repo: `nl2sql benchmark publish --from <demo folder>`.
 3. Commit the new records in `benchmarks/` with the `README.md` and
    `docs/benchmarks.md` changes.
@@ -702,10 +703,10 @@ columns it is given. A column it never sends is one the planner cannot use.
 against `needed_tables` and `needed_columns`, with no key, no LLM and no cost:
 
 ```bash
-nl2sql --env demo benchmark retrieval                       # writes <project>/benchmark_retrieval.json
-nl2sql --env demo benchmark retrieval --record --note "k 10"  # also writes a record to <project>/benchmarks/retrieval/<database>/
-nl2sql --env demo benchmark retrieval --baseline old.json   # the change against an earlier report or record
-nl2sql --env demo benchmark retrieval --questions join,chinook_014
+nl2sql benchmark retrieval                       # writes <project>/benchmark_retrieval.json
+nl2sql benchmark retrieval --record --note "k 10"  # also writes a record to <project>/benchmarks/retrieval/<database>/
+nl2sql benchmark retrieval --baseline old.json   # the change against an earlier report or record
+nl2sql benchmark retrieval --questions join,chinook_014
 ```
 
 How it runs (`nl2sql/evaluation/retrieval_recall.py`):

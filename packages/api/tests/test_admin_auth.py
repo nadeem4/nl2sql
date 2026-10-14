@@ -1,20 +1,21 @@
 """The admin routes (anything that changes datasources, LLMs or the index) need an admin role.
 
-The role comes from the same sources as ``/query`` (``nl2sql_api.auth``). A request
-is admin when one of its roles is in ``NL2SQL_API_ADMIN_ROLES`` (default ``admin``).
-With no role source configured at all, admin routes answer loopback clients only.
+The role comes from the same sources as ``/query`` (``nl2sql_api.auth``, the
+``api`` section of ``nl2sql.yaml``). A request is admin when one of its roles is
+in ``policies.admin_roles`` (default ``admin``). With no role source configured
+at all, admin routes answer loopback clients only.
 """
 import pytest
 from fastapi.testclient import TestClient
 
+from nl2sql.testing.config import make_config
 from nl2sql_api.dependencies import get_engine
 from nl2sql_api.main import app
 
-ENV_VARS = ("NL2SQL_API_ROLE_HEADER", "NL2SQL_API_ROLE", "NL2SQL_API_TRUST_BODY_ROLE",
-            "NL2SQL_API_ADMIN_ROLES")
+DATASOURCE = {"id": "ds", "type": "sqlite", "connection": {"database": "ds.db"}}
 
 ADMIN_ROUTES = [
-    ("post", "/api/v1/datasource", {"config": {"id": "ds"}}),
+    ("post", "/api/v1/datasource", {"config": DATASOURCE}),
     ("delete", "/api/v1/datasource/ds", None),
     ("post", "/api/v1/llm", {"config": {"name": "default"}}),
     ("post", "/api/v1/index/ds", None),
@@ -29,7 +30,8 @@ READ_ONLY_ROUTES = ["/api/v1/health", "/api/v1/datasource", "/api/v1/index/statu
 class AdminEngine:
     """Records every admin call so a refused request can be shown to do nothing."""
 
-    def __init__(self):
+    def __init__(self, config):
+        self.config = config
         self.calls = []
         self.add_datasource_error = None
         self.indexing = self  # IndexingService calls engine.indexing.<method>
@@ -62,13 +64,11 @@ class AdminEngine:
 
 
 @pytest.fixture
-def make_client(monkeypatch):
-    for name in ENV_VARS:
-        monkeypatch.delenv(name, raising=False)
+def make_client(tmp_path):
     clients = []
 
-    def _make(host="testclient"):
-        engine = AdminEngine()
+    def _make(host="testclient", **sections):
+        engine = AdminEngine(make_config(tmp_path / f"project-{len(clients)}", **sections))
         app.dependency_overrides[get_engine] = lambda: engine
         client = TestClient(app, client=(host, 50000))
         clients.append(client)
@@ -93,7 +93,7 @@ def test_no_role_source_refuses_a_remote_client(make_client, method, path, body)
     response = _call(client, method, path, body)
     assert response.status_code == 403, response.text
     detail = response.json()["detail"]
-    for name in ("NL2SQL_API_ROLE_HEADER", "NL2SQL_API_ROLE", "NL2SQL_API_ADMIN_ROLES"):
+    for name in ("api.role_header", "api.role", "policies.admin_roles"):
         assert name in detail
     assert engine.calls == []
 
@@ -107,42 +107,39 @@ def test_no_role_source_allows_a_loopback_client(make_client, method, path, body
 
 
 @pytest.mark.parametrize("method,path,body", ADMIN_ROUTES, ids=ADMIN_IDS)
-def test_a_role_that_is_not_admin_is_a_403_even_from_loopback(make_client, monkeypatch, method, path, body):
-    monkeypatch.setenv("NL2SQL_API_ROLE", "analyst")
-    client, engine = make_client(host="127.0.0.1")
+def test_a_role_that_is_not_admin_is_a_403_even_from_loopback(make_client, method, path, body):
+    client, engine = make_client(host="127.0.0.1", api={"role": "analyst"})
     response = _call(client, method, path, body)
     assert response.status_code == 403, response.text
-    assert "NL2SQL_API_ADMIN_ROLES" in response.json()["detail"]
+    assert "policies.admin_roles" in response.json()["detail"]
     assert engine.calls == []
 
 
 @pytest.mark.parametrize("method,path,body", ADMIN_ROUTES, ids=ADMIN_IDS)
-def test_the_admin_role_is_accepted(make_client, monkeypatch, method, path, body):
-    monkeypatch.setenv("NL2SQL_API_ROLE_HEADER", "X-NL2SQL-Role")
-    client, _ = make_client(host="203.0.113.7")
+def test_the_admin_role_is_accepted(make_client, method, path, body):
+    client, _ = make_client(host="203.0.113.7", api={"role_header": "X-NL2SQL-Role"})
     response = _call(client, method, path, body, headers={"X-NL2SQL-Role": "viewer, admin"})
     assert response.status_code == 200, response.text
 
 
-def test_a_configured_header_that_is_missing_is_a_401(make_client, monkeypatch):
-    monkeypatch.setenv("NL2SQL_API_ROLE_HEADER", "X-NL2SQL-Role")
-    client, engine = make_client(host="127.0.0.1")
+def test_a_configured_header_that_is_missing_is_a_401(make_client):
+    client, engine = make_client(host="127.0.0.1", api={"role_header": "X-NL2SQL-Role"})
     assert client.post("/api/v1/index-all").status_code == 401
     assert engine.calls == []
 
 
-def test_the_admin_roles_are_configurable(make_client, monkeypatch):
-    monkeypatch.setenv("NL2SQL_API_ROLE_HEADER", "X-NL2SQL-Role")
-    monkeypatch.setenv("NL2SQL_API_ADMIN_ROLES", "ops, owner")
-    client, _ = make_client()
+def test_the_admin_roles_come_from_the_policies(make_client, monkeypatch):
+    # NL2SQL_API_ADMIN_ROLES is not read any more: policies.admin_roles is the list.
+    monkeypatch.setenv("NL2SQL_API_ADMIN_ROLES", "admin")
+    client, _ = make_client(api={"role_header": "X-NL2SQL-Role"},
+                            policies={"allow_all": True, "admin_roles": ["ops", "owner"]})
     assert client.post("/api/v1/index-all", headers={"X-NL2SQL-Role": "owner"}).status_code == 200
     assert client.post("/api/v1/index-all", headers={"X-NL2SQL-Role": "admin"}).status_code == 403
 
 
-def test_the_dev_flag_takes_the_admin_role_from_the_body(make_client, monkeypatch):
-    monkeypatch.setenv("NL2SQL_API_TRUST_BODY_ROLE", "true")
-    client, engine = make_client()
-    body = {"config": {"id": "ds"}, "user_context": {"roles": ["admin"]}}
+def test_the_dev_flag_takes_the_admin_role_from_the_body(make_client):
+    client, engine = make_client(api={"trust_body_role": True})
+    body = {"config": DATASOURCE, "user_context": {"roles": ["admin"]}}
     assert client.post("/api/v1/datasource", json=body).status_code == 200
     assert engine.calls == ["add_datasource"]
 
@@ -157,7 +154,7 @@ def test_a_failed_add_datasource_does_not_echo_the_exception(make_client):
     client, engine = make_client(host="127.0.0.1")
     engine.add_datasource_error = RuntimeError(
         "could not connect to postgresql://app:hunter2@db.internal:5432/sales")
-    response = client.post("/api/v1/datasource", json={"config": {"id": "sales"}})
+    response = client.post("/api/v1/datasource", json={"config": {**DATASOURCE, "id": "sales"}})
     assert response.status_code == 500
     detail = response.json()["detail"]
     assert "hunter2" not in detail and "db.internal" not in detail

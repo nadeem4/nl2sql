@@ -42,12 +42,13 @@ class _StubStore:
 
 
 def _context(*datasource_ids: str) -> SimpleNamespace:
-    return SimpleNamespace(
+    """An engine whose runtime has these datasources and a stub index."""
+    return SimpleNamespace(context=SimpleNamespace(
         vector_store=_StubStore(),
         ds_registry=SimpleNamespace(
             list_adapters=lambda: [_StubAdapter(ds) for ds in datasource_ids]
         ),
-    )
+    ))
 
 
 @pytest.fixture()
@@ -126,7 +127,7 @@ def test_the_index_command_passes_datasource_and_full(monkeypatch):
     from nl2sql.cli import main
 
     seen = {}
-    monkeypatch.setattr(main, "legacy_runtime", lambda *a, **k: "ctx")
+    monkeypatch.setattr(main, "build_engine", lambda ctx: "engine")
     monkeypatch.setattr(main, "run_indexing", lambda ctx, **kw: seen.update(kw))
 
     result = CliRunner().invoke(main.app, ["index", "--datasource", "chinook", "--datasource", "sales"])
@@ -150,7 +151,7 @@ def test_full_and_curated_only_do_not_combine(monkeypatch):
 
     from nl2sql.cli import main
 
-    monkeypatch.setattr(main, "legacy_runtime", lambda *a, **k: "ctx")
+    monkeypatch.setattr(main, "build_engine", lambda ctx: "engine")
     monkeypatch.setattr(main, "run_indexing", lambda ctx, **kw: None)
 
     result = CliRunner().invoke(main.app, ["index", "--full", "--curated-only"])

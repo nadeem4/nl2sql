@@ -16,7 +16,7 @@ import yaml
 from pydantic import SecretStr
 
 from nl2sql.common.settings import Settings
-from nl2sql.configs.llm import AgentConfig, LLMFileConfig
+from nl2sql.llm.models import AgentConfig, LLMFileConfig
 from nl2sql.datasources.models import ConnectionConfig
 
 FAKE_KEY = "-".join(["sk", "proj", "neverprint" + "q" * 24 + "5e1d"])
@@ -176,43 +176,13 @@ def test_secret_manager_resolves_an_env_reference_in_a_secret_field(monkeypatch)
     assert "vault" in manager._providers
 
 
-# --- config writers still write the real value or the reference --------------
-
-
-def test_llm_yaml_writer_keeps_the_env_reference():
-    from nl2sql.cli.demo.defaults import DEMO_LLM_CONFIG
-    from nl2sql.cli.generators.llm.generator import LLMGenerator
-
-    written = yaml.safe_load(LLMGenerator.generate(LLMFileConfig(**DEMO_LLM_CONFIG)))
-    assert written["default"]["api_key"] == "${env:OPENAI_API_KEY}"
-
-
-def test_llm_yaml_writer_keeps_a_literal_key():
-    from nl2sql.cli.generators.llm.generator import LLMGenerator
-
-    config = LLMFileConfig(default=AgentConfig(provider="openai", model="gpt-5.4", api_key=FAKE_KEY))
-    written = yaml.safe_load(LLMGenerator.generate(config))
-    assert written["default"]["api_key"] == FAKE_KEY
-    assert "*" not in LLMGenerator.generate(config)
-
-
-def test_demo_scaffold_writes_the_real_key_and_the_reference(tmp_path):
-    from rich.console import Console
-
-    from nl2sql.cli.demo.manager import DemoManager
-
-    DemoManager(Console(quiet=True), tmp_path).setup_demo(api_key=FAKE_KEY)
-    env_text = (tmp_path / ".env.demo").read_text(encoding="utf-8")
-    assert f"OPENAI_API_KEY={FAKE_KEY}" in env_text
-    llm = yaml.safe_load((tmp_path / "configs" / "llm.demo.yaml").read_text(encoding="utf-8"))
-    assert llm["default"]["api_key"] == "${env:OPENAI_API_KEY}"
-    assert "**********" not in env_text
+# --- the demo's .env keeps the real value; no YAML ever holds a key ----------------
 
 
 def test_persisted_panel_key_is_the_real_value(tmp_path):
     from nl2sql.cli.demo.llm_config import persist_api_key
 
-    env_file = tmp_path / ".env.demo"
+    env_file = tmp_path / ".env"
     env_file.write_text("OPENAI_API_KEY=\n", encoding="utf-8")
     persist_api_key(env_file, FAKE_KEY)
     assert env_file.read_text(encoding="utf-8") == f"OPENAI_API_KEY={FAKE_KEY}\n"

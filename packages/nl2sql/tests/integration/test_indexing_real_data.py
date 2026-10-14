@@ -27,60 +27,8 @@ def _project_root() -> Path:
     return Path(__file__).resolve().parents[4]
 
 
-def _write_empty_secrets(tmp_path: Path) -> Path:
-    secrets_path = tmp_path / "secrets.yaml"
-    secrets_path.write_text("version: 1\nproviders: []\n", encoding="utf-8")
-    return secrets_path
-
-
-def _demo_config_paths(
-    root: Path, secrets_config_path: Path, ds_config_path: Path | None = None
-) -> dict[str, Path]:
-    return {
-        "ds_config_path": ds_config_path or root / "configs" / "datasources.demo.yaml",
-        "llm_config_path": root / "configs" / "llm.demo.yaml",
-        "policies_config_path": root / "configs" / "policies.demo.json",
-        "secrets_config_path": secrets_config_path,
-    }
-
-
-def _load_demo_datasources(root: Path) -> list[dict]:
-    config_path = root / "configs" / "datasources.demo.yaml"
-    payload = yaml.safe_load(config_path.read_text(encoding="utf-8"))
-    return payload.get("datasources", [])
-
-
-def _demo_db_paths(root: Path) -> list[Path]:
-    db_paths = []
-    for datasource in _load_demo_datasources(root):
-        connection = datasource.get("connection") or {}
-        database = connection.get("database")
-        if database:
-            db_paths.append(root / database)
-    return db_paths
-
-
-def _skip_if_missing_demo_dbs(root: Path) -> None:
-    missing = [str(path) for path in _demo_db_paths(root) if not path.exists()]
-    if missing:
-        pytest.skip(f"Missing demo databases: {', '.join(missing)}")
-
-
-def _write_datasource_config(
-    tmp_path: Path, base_datasource: dict, database_path: Path
-) -> Path:
-    datasource = copy.deepcopy(base_datasource)
-    datasource["connection"]["database"] = str(database_path)
-    config = {"version": 1, "datasources": [datasource]}
-    config_path = tmp_path / f"datasources_{uuid.uuid4().hex}.yaml"
-    config_path.write_text(yaml.safe_dump(config), encoding="utf-8")
-    return config_path
-
-
 def test_indexing_real_embeddings_and_versions(tmp_path, monkeypatch) -> None:
     root = _project_root()
-    _skip_if_missing_demo_dbs(root)
-    secrets_path = _write_empty_secrets(tmp_path)
 
     collection_name = f"itest_indexing_{uuid.uuid4().hex}"
     vector_store_path = tmp_path / "chroma"

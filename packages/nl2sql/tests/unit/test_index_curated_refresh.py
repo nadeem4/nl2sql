@@ -13,7 +13,7 @@ from types import SimpleNamespace
 import pytest
 from langchain_core.embeddings import FakeEmbeddings
 
-from nl2sql.configs.curated import CuratedFileConfig
+from nl2sql.config import Curated
 from nl2sql.indexing import enrichment_service, orchestrator as orchestrator_module
 from nl2sql.indexing.curated import curated_hash
 from nl2sql.indexing.rebuild import rebuild_index
@@ -42,8 +42,8 @@ def _snapshot() -> SchemaSnapshot:
     return SchemaSnapshot(contract=contract, metadata=metadata)
 
 
-def _curated(*questions) -> CuratedFileConfig:
-    return CuratedFileConfig.model_validate({"datasources": {"chinook": {"verified_queries": [{
+def _curated(*questions) -> Curated:
+    return Curated.model_validate({"datasources": {"chinook": {"verified_queries": [{
         "id": "top_customers", "description": "Customers by revenue",
         "questions": list(questions), "sql": "SELECT 1",
     }]}}})

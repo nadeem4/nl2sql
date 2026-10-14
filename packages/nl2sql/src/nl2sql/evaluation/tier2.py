@@ -29,7 +29,7 @@ import time
 from typing import Any, Callable, Dict, List, Optional, Sequence
 
 from nl2sql.api.query_api import QueryResult
-from nl2sql.configs.llm import AgentConfig, LLMFileConfig
+from nl2sql.llm.models import AgentConfig, LLMFileConfig
 from nl2sql.runtime import Runtime
 from nl2sql.evaluation.benchmark_runner import BenchmarkRunner
 from nl2sql.evaluation.evaluator import ModelEvaluator

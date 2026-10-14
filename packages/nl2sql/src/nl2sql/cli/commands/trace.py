@@ -11,7 +11,7 @@ from rich.table import Table
 from typing_extensions import Annotated
 
 from nl2sql.cli.console import console
-from nl2sql.common.settings import settings
+from nl2sql.cli.common.engine import store_paths
 from nl2sql.tracing.document import find_trace, load_trace
 
 app = typer.Typer(help="Inspect and replay run traces.", no_args_is_help=True)
@@ -19,24 +19,25 @@ app = typer.Typer(help="Inspect and replay run traces.", no_args_is_help=True)
 _STYLE = {"ok": "green", "warning": "yellow", "error": "red", "unfinished": "red"}
 
 
-def _resolve(target: str) -> pathlib.Path:
-    """A trace file path, or the newest file for a trace id in TRACE_DIR."""
+def _resolve(ctx: typer.Context, target: str) -> pathlib.Path:
+    """A trace file path, or the newest file for a trace id in ``<storage.path>/traces``."""
     path = pathlib.Path(target)
     if path.is_file():
         return path
+    traces = store_paths(ctx).traces
     try:
-        found = find_trace(target, pathlib.Path(settings.trace_dir))
+        found = find_trace(target, traces)
     except ValueError:
         found = None
     if found is None:
         console.print(f"[red][ERROR][/red] No trace file or trace id {escape(target)!s} "
-                      f"(looked in {escape(str(pathlib.Path(settings.trace_dir).resolve()))}).")
+                      f"(looked in {escape(str(traces.resolve()))}).", soft_wrap=True)
         raise typer.Exit(1)
     return found
 
 
-def _load(target: str) -> Dict[str, Any]:
-    path = _resolve(target)
+def _load(ctx: typer.Context, target: str) -> Dict[str, Any]:
+    path = _resolve(ctx, target)
     try:
         return load_trace(path)
     except ValueError as exc:
@@ -74,9 +75,10 @@ def first_failure(nodes: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
 
 
 @app.command("show")
-def show(target: Annotated[str, typer.Argument(help="A trace file, or a trace id in TRACE_DIR")]):
+def show(ctx: typer.Context,
+         target: Annotated[str, typer.Argument(help="A trace file, or a trace id in <storage.path>/traces")]):
     """Print a run's timeline: each node, attempt, duration, tokens, status and errors."""
-    doc = _load(target)
+    doc = _load(ctx, target)
     request = doc.get("request") or {}
     nodes = doc.get("nodes") or []
     first = first_failure(nodes)
@@ -125,11 +127,11 @@ def show(target: Annotated[str, typer.Argument(help="A trace file, or a trace id
         console.print("[green]No node failed.[/green]")
 
 
-def replay_command(target: str, ctx_factory) -> None:
+def replay_command(target: str, ctx_factory, cli: typer.Context) -> None:
     """Re-runs the traced question with the recorded LLM answers; see ``nl2sql.tracing.replay``."""
     from nl2sql.tracing.replay import replay_trace, unreachable_datasources
 
-    doc = _load(target)
+    doc = _load(cli, target)
     request = doc.get("request") or {}
     console.print(f"Replaying trace {escape(str(doc.get('trace_id')))}: {escape(str(request.get('question', '')))}")
     ctx = ctx_factory()
@@ -140,7 +142,7 @@ def replay_command(target: str, ctx_factory) -> None:
                       "and it is not reachable here:")
         for problem in problems:
             console.print(f"  - {escape(problem)}")
-        console.print("Run from the project the trace was recorded in (same --env and configs).")
+        console.print("Run with the config the trace was recorded with (the same --config).")
         raise typer.Exit(1)
 
     report = replay_trace(doc, ctx)

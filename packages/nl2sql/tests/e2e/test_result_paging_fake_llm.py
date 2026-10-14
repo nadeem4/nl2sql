@@ -42,15 +42,17 @@ def _read_back(client, prefix, body):
 
 
 def _env(monkeypatch, demo_project, env):
-    from nl2sql.common.settings import reload_settings
+    """``fake.yaml`` (from the ``fake_llm`` fixture) with a static ``admin`` role for ``nl2sql-api``, as NL2SQL_CONFIG."""
+    import yaml
 
-    monkeypatch.chdir(demo_project)
+    path = demo_project / "fake.yaml"
+    document = yaml.safe_load(path.read_text(encoding="utf-8"))
+    document["api"] = {"role": "admin"}
+    path.write_text(yaml.safe_dump(document, sort_keys=False), encoding="utf-8")
     for key, value in env.items():
         monkeypatch.setenv(key, value)
-    monkeypatch.setenv("ENV", "demo")
-    monkeypatch.setenv("LLM_CONFIG", "configs/llm.fake.yaml")
-    monkeypatch.setenv("NL2SQL_API_ROLE", "admin")
-    reload_settings()
+    monkeypatch.setenv("NL2SQL_CONFIG", str(path))
+    return path
 
 
 @pytest.mark.e2e
@@ -58,18 +60,14 @@ def test_the_rest_api_pages_and_exports_the_whole_result(demo_project, fake_llm,
     from fastapi.testclient import TestClient
 
     pytest.importorskip("nl2sql_api")
-    from nl2sql.common.settings import reload_settings
     from nl2sql_api.main import app
 
     server, env = fake_llm(RULES)
     _env(monkeypatch, demo_project, env)
-    try:
-        with TestClient(app) as client:
-            body = client.post("/api/v1/query", json={"natural_language": QUESTION}).json()
-            assert body["status"] == "success", body["errors"]
-            rows, pages, lines = _read_back(client, "/api/v1", body)
-    finally:
-        reload_settings()
+    with TestClient(app) as client:
+        body = client.post("/api/v1/query", json={"natural_language": QUESTION}).json()
+        assert body["status"] == "success", body["errors"]
+        rows, pages, lines = _read_back(client, "/api/v1", body)
 
     genres = _genres(demo_project)
     assert len(genres) == 25
@@ -83,19 +81,15 @@ def test_the_playground_pages_and_exports_the_whole_result(demo_project, fake_ll
 
     from nl2sql import NL2SQL
     from nl2sql.cli.demo.playground.app import build_app
-    from nl2sql.common.settings import reload_settings
 
     server, env = fake_llm(RULES)
     _env(monkeypatch, demo_project, env)
-    try:
-        app = build_app(NL2SQL._legacy(), questions=[], roles=["admin"], mode="live", dataset="chinook")
-        client = TestClient(app)
-        body = client.post("/api/ask", json={"question": QUESTION, "role": "admin"}).json()
-        assert body["status"] == "success", body["errors"]
-        rows, pages, lines = _read_back(client, "/api", body)
-        other = client.get(f"/api/query/{body['trace_id']}/results/nope").status_code
-    finally:
-        reload_settings()
+    app = build_app(NL2SQL.from_config(), questions=[], roles=["admin"], mode="live", dataset="chinook")
+    client = TestClient(app)
+    body = client.post("/api/ask", json={"question": QUESTION, "role": "admin"}).json()
+    assert body["status"] == "success", body["errors"]
+    rows, pages, lines = _read_back(client, "/api", body)
+    other = client.get(f"/api/query/{body['trace_id']}/results/nope").status_code
 
     genres = _genres(demo_project)
     assert rows == genres and pages == 4

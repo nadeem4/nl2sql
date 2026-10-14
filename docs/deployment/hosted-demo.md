@@ -5,16 +5,16 @@ databases**, where the server holds no API key and every visitor brings their
 own.
 
 It is a third state, not a loosened `--allow-settings`. Locally, `nl2sql demo`
-saves your key to the demo project's `.env.demo` and spends it on your
+saves your key to the demo project's `.env` and spends it on your
 questions; that is right on your own machine and wrong on a shared address.
 Hosted mode removes the key from the server entirely instead of relaxing the
 gate that protects it.
 
 | | local (`nl2sql demo`) | hosted (`nl2sql demo --hosted`) |
 | --- | --- | --- |
-| the API keys | saved to `.env.demo`, used by the process | one per provider, held by the browser tab, sent per request, used in memory, dropped |
-| a model per step | written to `configs/llm.demo.yaml` | chosen in the browser tab, sent per request, saved nowhere |
-| Settings | writes `.env.demo` and `configs/llm.demo.yaml` | writes nothing; the page keeps the keys and the choices |
+| the API keys | saved to the project's `.env`, used by the process | one per provider, held by the browser tab, sent per request, used in memory, dropped |
+| a model per step | written to the project's `llm.yaml` | chosen in the browser tab, sent per request, saved nowhere |
+| Settings | writes `.env` and `llm.yaml` | writes nothing; the page keeps the keys and the choices |
 | Rebuild | on (loopback, or `--allow-settings`) | refused |
 | Answer ratings | on (loopback, or `--allow-settings`) | off |
 | Retrieval inspector | on (loopback, or `--allow-settings`) | on, read only, at the hosted rate |
@@ -25,11 +25,11 @@ gate that protects it.
 | limits | none | a rate limit per visitor and a cap per session |
 
 ```bash
-nl2sql demo --hosted --host 0.0.0.0 --port 7860
+nl2sql demo --hosted --host 0.0.0.0 --port 7860 --questions-per-minute 6 --questions-per-session 30
 ```
 
-`NL2SQL_DEMO_HOSTED=1` does the same thing without a command line, which is how
-a container turns it on.
+There is no environment variable for it: hosted mode and its limits are flags
+on the command, and the container's `CMD` passes them.
 
 ## Recorded answers without a key
 
@@ -70,7 +70,7 @@ key; then it shows the models their run will use, as before. Local replay mode
 (`nl2sql demo` with no key) does the same.
 
 **Verified answers replay too.** The image's demo project has the six
-verified queries of `configs/curated.demo.yaml` indexed (see
+verified queries of its `curated.yaml` indexed (see
 [Curated answers](../configuration/curated.md#in-the-demo)), so every question
 first asks the curated matcher's model call, `VerifiedQueryChoice`. The shipped
 recordings hold that call for every guided question, so a guided question a
@@ -217,9 +217,9 @@ What it does **not** do:
 - It does not reach a trace. Run traces are written as usual (that is what the
   playground's **Debug** drill-down reads), and the trace redactor is told about
   the request's key along with every other credential, so it is masked if it ever
-  reaches a prompt or an error. The demo project ships `TRACE_MODE=always`, so
-  every question leaves a file on the container's own disk; `TRACE_MODE=on_failure`
-  keeps only the runs that went wrong.
+  reaches a prompt or an error. The demo project's `settings.yaml` sets
+  `traces: { mode: always }`, so every question leaves a file on the
+  container's own disk; `mode: on_failure` keeps only the runs that went wrong.
 - It does not reach the log. Nothing logs the header, and errors about a key
   report its type, never its value.
 - It does not reach your data. The hosted demo answers only from the three
@@ -236,12 +236,12 @@ model header by hand.
 Both live in this one process's memory. There are no accounts, no analytics and
 no storage.
 
-| Limit | Default | Environment variable | Keyed by |
+| Limit | Default | Set by | Keyed by |
 | --- | --- | --- | --- |
-| Questions per minute | 6 | `NL2SQL_DEMO_QUESTIONS_PER_MINUTE` | client address (a token bucket) |
-| Questions per session | 30 | `NL2SQL_DEMO_QUESTIONS_PER_SESSION` | a random session cookie |
-| Query timeout | 300s | `GLOBAL_TIMEOUT_SEC` | the run |
-| Rows returned | 10,000 | the demo datasources' `row_limit` option, bounded by `RESULT_ROW_LIMIT` | the query |
+| Questions per minute | 6 | `--questions-per-minute` | client address (a token bucket) |
+| Questions per session | 30 | `--questions-per-session` | a random session cookie |
+| Query timeout | 300s | `settings.pipeline.timeout_s` in the demo's `settings.yaml` | the run |
+| Rows returned | 10,000 | the demo datasources' `limits.row_limit`, bounded by `settings.results.row_limit` | the query |
 
 Hitting one is a `429` with a sentence, never a stack trace: the rate limit says
 to wait a moment, the session cap says to run the demo locally for no limit at
@@ -300,11 +300,13 @@ that is always **a released version from PyPI**,
 release pushes. The checked-in default is a GitHub archive of the tip of
 `main`, which is only what a local `docker build` gets; pass
 `--build-arg NL2SQL_SPEC="nl2sql-engine[demo]==X.Y.Z"` to build a release
-locally. Then it runs `nl2sql setup --demo` **at build time**. That bakes three
+locally. Then it runs `nl2sql init --demo /home/demo/demo` and `nl2sql index`
+**at build time**, with `NL2SQL_CONFIG=/home/demo/demo/nl2sql.yaml` set in the
+image so every command and the server read that config. That bakes three
 things into the image so the container reaches nothing but the model at run
 time and the first question is answered at once:
 
-- the three sample databases and their configs,
+- the three sample databases and their config,
 - their vector index, built with the local embedder,
 - the local embedding model itself, roughly 79 MB of ONNX `all-MiniLM-L6-v2`
   that chromadb would otherwise download on the first question. The 83 MB
@@ -316,8 +318,9 @@ default, which is what a Space routes to), and carries a healthcheck that polls
 `/api/health`. That route reads nothing but process state and answers
 `{"status": "ok", "version": "X.Y.Z"}`, the installed `nl2sql-engine`
 version, in every mode; the release pipeline polls it on the live Space to
-know the new version is the one being served. `NL2SQL_DEMO_HOSTED=1` is set in
-the image, so hosted mode holds even if the command is overridden.
+know the new version is the one being served. Its `CMD` runs
+`nl2sql demo --hosted --questions-per-minute 6 --questions-per-session 30`;
+a public demo must never be started without `--hosted`.
 
 ```bash
 cd deploy/huggingface

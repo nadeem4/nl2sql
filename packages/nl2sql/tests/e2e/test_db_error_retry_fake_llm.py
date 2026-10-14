@@ -46,17 +46,16 @@ def _prompt(call) -> str:
 
 @pytest.mark.e2e
 def test_a_query_the_database_rejects_is_refined_and_the_second_plan_answers(demo_project, tmp_path):
-    server = _serve(demo_project, RULES, "llm.db-retry.yaml")
+    server = _serve(demo_project, RULES, "db-retry.yaml", store=tmp_path, mode="always")
     env = _base_env()
-    env.update({"OPENAI_API_KEY": "sk-" + "fake-db-retry", "TRACE_MODE": "always", "TRACE_DIR": str(tmp_path),
-                "SQL_AGENT_RETRY_BASE_DELAY_SEC": "0", "SQL_AGENT_RETRY_JITTER_SEC": "0"})
+    env["OPENAI_API_KEY"] = "sk-" + "fake-db-retry"
     try:
-        r = run_cli(demo_project, env, "run", "--llm-config", "configs/llm.db-retry.yaml", QUESTION)
+        r = run_cli(demo_project, env, "run", QUESTION, config="db-retry.yaml")
     finally:
         server.stop()
 
     assert r.returncode == 0, r.stdout + r.stderr
-    [path] = list(tmp_path.glob("*.json"))
+    [path] = list((tmp_path / "traces").glob("*.json"))
     doc = json.loads(path.read_text(encoding="utf-8"))
     result = doc["result"]
     [sub] = result["sub_queries"]

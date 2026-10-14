@@ -32,7 +32,7 @@ default. `FEEDBACK_ENABLED=false` turns it off: the control then says so and
 ## What is stored
 
 One row per run in a `feedback` table inside the SQLite schema store
-(`SCHEMA_STORE_PATH`, `data/schema_store.db` in the demo), beside the schema
+(`<storage.path>/state.db`, `nl2sql-demo/.nl2sql/state.db` in the demo), beside the schema
 snapshots and the plan cache. No new service or file.
 
 | Column | Holds |
@@ -61,14 +61,14 @@ forbidden table) are not kept. `nl2sql feedback clear` deletes every row.
 ## Guardrail rates: `nl2sql feedback stats`
 
 ```bash
-nl2sql --env demo feedback stats          # a table
-nl2sql --env demo feedback stats --json   # the same numbers as JSON
-nl2sql --env demo feedback stats --traces other/traces
+nl2sql feedback stats          # a table
+nl2sql feedback stats --json   # the same numbers as JSON
+nl2sql feedback stats --traces other/traces
 ```
 
 `stats` counts every recorded run once, keyed by trace id: the feedback rows,
-plus every trace in `TRACE_DIR` when `TRACE_MODE` kept them (the demo writes
-`TRACE_MODE=always`). When a run has both, its counters come from the trace,
+plus every trace in `<storage.path>/traces` when `settings.traces.mode` kept
+them (the demo's config sets `always`). When a run has both, its counters come from the trace,
 which also sees a validator rejection a retry then fixed, and its rating from
 the row.
 
@@ -106,8 +106,8 @@ more traces):
 ## Growing the gold set: `nl2sql feedback export --good`
 
 ```bash
-nl2sql --env demo feedback export --good                     # feedback_gold_drafts.yaml
-nl2sql --env demo feedback export --good --out drafts.yaml
+nl2sql feedback export --good                     # feedback_gold_drafts.yaml
+nl2sql feedback export --good --out drafts.yaml
 ```
 
 Each thumbs-up run becomes a draft entry in the shape of
@@ -135,7 +135,7 @@ A thumbs-up on a *generated* answer can also become a proposed verified query
 for `curated.yaml`, for a person to review and commit:
 
 ```bash
-nl2sql --env demo curated proposals export --out configs/curated.proposals.yaml
+nl2sql curated proposals export --out curated.proposals.yaml
 ```
 
 Runs answered by a verified query, failed runs, runs on more than one

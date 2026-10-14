@@ -6,9 +6,9 @@ looser gate:
 ============  =========================  =================================
               local (``nl2sql demo``)    hosted (``nl2sql demo --hosted``)
 ============  =========================  =================================
-the keys      saved to ``.env.demo``     held by the browser, one per
-              and used by the process    provider, sent per request, used
-                                         in memory, dropped
+the keys      saved to the demo's        held by the browser, one per
+              ``.env``, used by the      provider, sent per request, used
+              process                    in memory, dropped
 model/step    written to disk            sent per request; nothing is saved
 settings      written to disk            saves nothing; the page keeps both
 rebuild       on (loopback)              refused
@@ -32,7 +32,6 @@ and never anywhere else.
 from __future__ import annotations
 
 import json
-import os
 import secrets
 import threading
 import time
@@ -95,14 +94,9 @@ MODELS_SHAPE_MESSAGE = (
 # random token this process made up, kept only in this process's memory.
 SESSION_COOKIE = "nl2sql_demo_session"
 
-# Turns hosted mode on for a container, where there is no command line.
-HOSTED_ENV = "NL2SQL_DEMO_HOSTED"
-
-# How many questions one visitor may ask per minute, and per session.
-QUESTIONS_PER_MINUTE = "NL2SQL_DEMO_QUESTIONS_PER_MINUTE"
-QUESTIONS_PER_SESSION = "NL2SQL_DEMO_QUESTIONS_PER_SESSION"
-DEFAULT_QUESTIONS_PER_MINUTE = 6
-DEFAULT_QUESTIONS_PER_SESSION = 30
+# How many questions one visitor may ask per minute, and per session, unless
+# `nl2sql demo --questions-per-minute N --questions-per-session N` says otherwise.
+from nl2sql.cli.demo.defaults import DEFAULT_QUESTIONS_PER_MINUTE, DEFAULT_QUESTIONS_PER_SESSION  # noqa: E402
 
 # A visitor who has not asked for an hour is forgotten, and the maps never grow
 # past this many visitors: a public demo must not run out of memory because
@@ -130,20 +124,6 @@ FEEDBACK_MESSAGE = (
     "Feedback is off on the hosted demo: it would keep the question and SQL of every rated run "
     "on a shared server."
 )
-
-
-def truthy(value: Optional[str]) -> bool:
-    """Whether an environment variable reads as on."""
-    return (value or "").strip().lower() in {"1", "true", "yes", "on"}
-
-
-def _positive_int(name: str, default: int) -> int:
-    """A count from the environment; anything unreadable leaves the default."""
-    try:
-        value = int(os.environ.get(name, "").strip())
-    except (TypeError, ValueError):
-        return default
-    return value if value > 0 else default
 
 
 class Limits:
@@ -345,10 +325,7 @@ class Hosted:
                  replay: Optional[Replay] = None) -> None:
         self.enabled = enabled
         self.replay = replay
-        self.limits = limits or Limits(
-            per_minute=_positive_int(QUESTIONS_PER_MINUTE, DEFAULT_QUESTIONS_PER_MINUTE),
-            per_session=_positive_int(QUESTIONS_PER_SESSION, DEFAULT_QUESTIONS_PER_SESSION),
-        )
+        self.limits = limits or Limits()
 
     def brings_key(self, request: Request) -> bool:
         """Whether this request carries any key at all, well-formed or not."""
@@ -436,8 +413,3 @@ class Hosted:
                 "recorded": list(self.replay.questions) if (self.enabled and self.replay) else [],
                 "limits": {"questions_per_minute": self.limits.per_minute,
                            "questions_per_session": self.limits.per_session} if self.enabled else None}
-
-
-def from_env(flag: bool = False) -> Hosted:
-    """Hosted mode as the flag and the environment ask for it."""
-    return Hosted(enabled=bool(flag) or truthy(os.environ.get(HOSTED_ENV)))

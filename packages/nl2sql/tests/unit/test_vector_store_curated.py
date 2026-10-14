@@ -16,7 +16,7 @@ from typing import List
 import pytest
 from langchain_core.embeddings import Embeddings
 
-from nl2sql.configs.curated import CuratedDatasource
+from nl2sql.config.curated import CuratedDatasource
 from nl2sql.indexing.curated import CuratedChunkBuilder, curated_hash
 from nl2sql.indexing.vector_store import VectorStore
 

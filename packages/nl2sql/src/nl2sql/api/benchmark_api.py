@@ -12,11 +12,12 @@ from typing import Any, Dict, List, Optional, Union
 
 import yaml
 
-from nl2sql.configs.llm import LLMFileConfig
+from nl2sql.config import LLM
+from nl2sql.llm.models import LLMFileConfig
 from nl2sql.runtime import Runtime
-from nl2sql._legacy import legacy_runtime
 from nl2sql.evaluation.benchmark_runner import BenchmarkRunner, BenchmarkResult
 from nl2sql.evaluation.gold import dataset_datasources, load_gold_dataset
+from nl2sql.evaluation.presets import load_llm_file
 from nl2sql.evaluation.records import database_identity
 from nl2sql.evaluation.retrieval_recall import run_retrieval_recall
 from nl2sql.evaluation.tier1 import run_tier1
@@ -36,18 +37,10 @@ class BenchmarkAPI:
     API for running dataset benchmarks using core evaluation tooling.
     """
 
-    def __init__(self, ctx: Optional[Runtime] = None):
+    def __init__(self, ctx: Runtime):
         self._ctx = ctx
 
     def _context(self, config: BenchmarkConfig) -> Runtime:
-        if self._ctx is None:
-            self._ctx = legacy_runtime(
-                ds_config_path=config.config_path,
-                secrets_config_path=config.secrets_path,
-                llm_config_path=config.llm_config_path,
-                vector_store_path=pathlib.Path(config.vector_store_path) if config.vector_store_path else None,
-                policies_config_path=config.policies_path,
-            )
         return self._ctx
 
     def run_matrix(
@@ -106,17 +99,15 @@ class BenchmarkAPI:
         self, config: BenchmarkConfig,
         llm_configs: Optional[Dict[str, Union[pathlib.Path, str, LLMFileConfig]]] = None,
     ) -> Dict[str, LLMFileConfig]:
-        """The named LLM configs tier 2 compares, or the context's own one as ``default``.
+        """The named LLM configs tier 2 compares, or the engine's own ``llm`` section as ``default``.
 
-        Each value is an ``LLMFileConfig`` (``--model``) or the path of an LLM
-        config in the normal ``llm.yaml`` format. Loading one makes no model call.
+        Each value is an ``LLMFileConfig`` (``--model``) or the path of a file
+        holding an ``llm`` section, as ``llm.yaml`` does. Loading one makes no
+        model call.
         """
-        from nl2sql.configs import ConfigManager
-
-        manager = ConfigManager(llm_config_path=pathlib.Path(config.llm_config_path) if config.llm_config_path else None)
         if not llm_configs:
-            return {"default": manager.load_llm()}
-        return {name: cfg if isinstance(cfg, LLMFileConfig) else manager.load_llm(pathlib.Path(cfg))
+            return {"default": LLMFileConfig.from_llm(self._ctx.config.llm)}
+        return {name: cfg if isinstance(cfg, LLMFileConfig) else load_llm_file(pathlib.Path(cfg))
                 for name, cfg in llm_configs.items()}
 
     def run_tier2(
@@ -147,13 +138,13 @@ class BenchmarkAPI:
 
     @staticmethod
     def _load_llm_configs(config: BenchmarkConfig) -> Dict[str, LLMFileConfig]:
-        """The named LLM configs in ``bench_config_path``, or none."""
+        """The named LLM configs in ``bench_config_path``, each an ``llm`` section, or none."""
         path = config.bench_config_path
         if not path or not pathlib.Path(path).exists():
             return {}
         bench_data = yaml.safe_load(pathlib.Path(path).read_text(encoding="utf-8")) or {}
         return {
-            name: LLMFileConfig.model_validate(cfg_data)
+            name: LLMFileConfig.from_llm(LLM.model_validate(cfg_data))
             for name, cfg_data in bench_data.items()
             if isinstance(cfg_data, dict)
         }

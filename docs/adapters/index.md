@@ -27,15 +27,14 @@ Can't find what you need? Check out the **[Building Adapters](development.md)** 
 
 ## Configuration
 
-All adapters are configured in your `configs/datasources.yaml` file.
+All adapters are configured in the `datasources` section of `nl2sql.yaml`, usually
+one file per datasource in `datasources/` (see [Datasources](../configuration/datasources.md)).
 
 ```yaml
-version: 1
-datasources:
-  - id: "sales_db"
-    connection:
-      type: "postgres"
-      host: "${env:DB_HOST}"
-      port: 5432
-      # ... see specific adapter docs for full reference
+# datasources/sales_db.yaml   (id defaults to the file name)
+type: postgres
+connection:
+  host: "${env:DB_HOST}"
+  port: 5432
+  # ... see specific adapter docs for full reference
 ```

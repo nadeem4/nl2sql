@@ -11,11 +11,10 @@ from __future__ import annotations
 import json
 
 import pytest
-import yaml
 
 from nl2sql.testing.fake_llm import FakeLLMServer, Rule
 
-from .conftest import _base_env, run_cli
+from .conftest import _base_env, private_storage, project_config, run_cli
 from .recordings_chinook import RULES_COUNT_CUSTOMERS
 
 pytest.importorskip("langchain_anthropic")
@@ -35,13 +34,13 @@ def test_a_question_runs_end_to_end_on_claude(demo_project, tmp_path):
     rules = [Rule(r.name, r.payload, r.when, CACHED_USAGE) for r in RULES_COUNT_CUSTOMERS]
     server = FakeLLMServer(rules).start()
     try:
-        cfg = {"version": 1, "agents": {},
-               "default": {"provider": "anthropic", "model": "claude-opus-5", "temperature": None,
-                           "base_url": server.anthropic_base_url, "api_key": "${env:ANTHROPIC_API_KEY}"}}
-        (demo_project / "configs" / "llm.claude.yaml").write_text(yaml.safe_dump(cfg), encoding="utf-8")
+        llm = {"provider": "anthropic", "model": "claude-opus-5", "temperature": None,
+               "base_url": server.anthropic_base_url, "api_key": "${env:ANTHROPIC_API_KEY}"}
+        project_config(demo_project, "claude.yaml", llm=llm, settings={"traces": {"mode": "always"}},
+                       storage=private_storage(demo_project, tmp_path))
         env = _base_env()
-        env.update({"ANTHROPIC_API_KEY": FAKE_KEY, "TRACE_MODE": "always", "TRACE_DIR": str(tmp_path)})
-        r = run_cli(demo_project, env, "run", "--llm-config", "configs/llm.claude.yaml", QUESTION)
+        env["ANTHROPIC_API_KEY"] = FAKE_KEY
+        r = run_cli(demo_project, env, "run", QUESTION, config="claude.yaml")
     finally:
         server.stop()
 
@@ -62,7 +61,7 @@ def test_a_question_runs_end_to_end_on_claude(demo_project, tmp_path):
         assert "temperature" not in sent[name]
     assert "system" not in sent["AggregatedResponse"]
 
-    [path] = list(tmp_path.glob("*.json"))
+    [path] = list((tmp_path / "traces").glob("*.json"))
     usage = json.loads(path.read_text(encoding="utf-8"))["result"]["usage"]["total"]
     assert usage["calls"] == 4
     assert usage["input_tokens"] == 4 * 3560
@@ -83,17 +82,16 @@ def test_a_mixed_config_sends_each_node_to_its_own_wire(demo_project, tmp_path):
              for r in RULES_COUNT_CUSTOMERS]
     server = FakeLLMServer(rules).start()
     try:
-        cfg = {"version": 1,
-               "default": {"provider": "openai", "model": "gpt-5.4", "temperature": 0.0,
-                           "base_url": server.base_url, "api_key": "${env:OPENAI_API_KEY}"},
-               "agents": {"astplanner": {"provider": "anthropic", "model": "claude-opus-5", "temperature": None,
-                                         "base_url": server.anthropic_base_url,
-                                         "api_key": "${env:ANTHROPIC_API_KEY}"}}}
-        (demo_project / "configs" / "llm.mixed.yaml").write_text(yaml.safe_dump(cfg), encoding="utf-8")
+        llm = {"provider": "openai", "model": "gpt-5.4", "temperature": 0.0,
+               "base_url": server.base_url, "api_key": "${env:OPENAI_API_KEY}",
+               "agents": {"ast_planner": {"provider": "anthropic", "model": "claude-opus-5", "temperature": None,
+                                          "base_url": server.anthropic_base_url,
+                                          "api_key": "${env:ANTHROPIC_API_KEY}"}}}
+        project_config(demo_project, "mixed.yaml", llm=llm, settings={"traces": {"mode": "always"}},
+                       storage=private_storage(demo_project, tmp_path))
         env = _base_env()
-        env.update({"OPENAI_API_KEY": OPENAI_FAKE_KEY, "ANTHROPIC_API_KEY": FAKE_KEY,
-                    "TRACE_MODE": "always", "TRACE_DIR": str(tmp_path)})
-        r = run_cli(demo_project, env, "run", "--llm-config", "configs/llm.mixed.yaml", QUESTION)
+        env.update({"OPENAI_API_KEY": OPENAI_FAKE_KEY, "ANTHROPIC_API_KEY": FAKE_KEY})
+        r = run_cli(demo_project, env, "run", QUESTION, config="mixed.yaml")
     finally:
         server.stop()
 
@@ -108,7 +106,7 @@ def test_a_mixed_config_sends_each_node_to_its_own_wire(demo_project, tmp_path):
     assert sent["DecomposerResponse"]["authorization"] == f"Bearer {OPENAI_FAKE_KEY}"
     assert "cache_control" not in json.dumps(sent["DecomposerResponse"]["body"])
 
-    doc = json.loads(next(tmp_path.glob("*.json")).read_text(encoding="utf-8"))
+    doc = json.loads(next((tmp_path / "traces").glob("*.json")).read_text(encoding="utf-8"))
     assert doc["llm"]["by_node"]["ast_planner"] == "claude-opus-5"
     assert doc["llm"]["by_node"]["decomposer"] == "gpt-5.4"
     # Each wire's usage lands in the same fields.

@@ -1,15 +1,14 @@
 """
 Curated answers API for NL2SQL.
 
-Validates ``curated.yaml``: the checks startup runs, plus the one that needs
-the index (every table a verified query reads exists in its datasource's
-latest indexed schema). Tests it: every verified query run once against its
-database, with its defaults and examples bound.
+Validates the engine's ``curated`` section: the checks startup runs, plus the
+one that needs the index (every table a verified query reads exists in its
+datasource's latest indexed schema). Tests it: every verified query run once
+against its database, with its defaults and examples bound.
 """
 
 from __future__ import annotations
 
-import pathlib
 import time
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Set, Tuple
@@ -17,15 +16,13 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 from nl2sql_sdk.capabilities import DatasourceCapability
 from nl2sql_sdk.contracts import AdapterRequest
 
-from nl2sql.common.settings import settings
-from nl2sql.configs import ConfigManager
-from nl2sql.configs.curated import CuratedFileConfig, VerifiedQuery, check_curated_queries
+from nl2sql.config import Curated
+from nl2sql.config.curated import VerifiedQuery, check_curated_queries
 from nl2sql.runtime import Runtime
 from nl2sql.datasources import DatasourceRegistry
 from nl2sql.execution.executor.sql_executor import _frames as adapter_frames
-from nl2sql.schema import build_schema_store
-from nl2sql._legacy import datasource_from_04
-from nl2sql.secrets import SecretManager
+
+NO_CURATED = "The config has no curated section, so there are no verified queries to check."
 
 
 @dataclass
@@ -65,40 +62,31 @@ class CuratedTestReport:
 
 class CuratedAPI:
     """
-    API for checking the curated answers file.
+    API for checking the engine's curated answers.
     """
 
-    def __init__(self, ctx: Optional[Runtime] = None):
+    def __init__(self, ctx: Runtime):
         self._ctx = ctx
 
-    def validate(
-        self,
-        curated_path: Optional[pathlib.Path] = None,
-        datasources_path: Optional[pathlib.Path] = None,
-        secrets_path: Optional[pathlib.Path] = None,
-    ) -> CuratedValidationReport:
+    def _source(self) -> str:
+        folder = self._ctx.config.folder
+        return (folder / "nl2sql.yaml").as_posix() if folder is not None else "Config"
+
+    def validate(self) -> CuratedValidationReport:
         """
-        Validate ``curated.yaml`` against the configured datasources and, where
-        a datasource has been indexed, its latest indexed schema.
+        Validate the ``curated`` section against the engine's datasources and,
+        where a datasource has been indexed, its latest indexed schema.
 
-        Runs whether or not ``CURATED_ENABLED`` is on. ``ok`` is False on any
-        error; ``notes`` say what could not be checked.
+        ``ok`` is False on any error; ``notes`` say what could not be checked.
         """
-        cm = ConfigManager()
-        path = pathlib.Path(curated_path or settings.curated_config_path)
+        cfg = self._ctx.config.curated
+        path = self._source()
+        if cfg is None:
+            return CuratedValidationReport(ok=False, path=path, errors=[NO_CURATED])
+        registry = self._ctx.ds_registry
+        dialects = {ds_id: registry.get_dialect(ds_id) for ds_id in registry.list_ids()}
 
-        try:
-            cfg = cm.load_curated(path)
-        except Exception as e:
-            return CuratedValidationReport(ok=False, path=str(path), errors=[str(e)])
-
-        try:
-            registry = self._registry(cm, datasources_path, secrets_path)
-            dialects = {ds_id: registry.get_dialect(ds_id) for ds_id in registry.list_ids()}
-        except Exception as e:
-            return CuratedValidationReport(ok=False, path=str(path), errors=[str(e)])
-
-        report = CuratedValidationReport(ok=True, path=str(path))
+        report = CuratedValidationReport(ok=True, path=path)
         check = check_curated_queries(cfg, dialects)
         for issue in check.issues:
             if issue.query_id is None:
@@ -126,12 +114,7 @@ class CuratedAPI:
         report.ok = not report.errors and all(e.status == "OK" for e in report.entries)
         return report
 
-    def test(
-        self,
-        curated_path: Optional[pathlib.Path] = None,
-        datasources_path: Optional[pathlib.Path] = None,
-        secrets_path: Optional[pathlib.Path] = None,
-    ) -> CuratedTestReport:
+    def test(self) -> CuratedTestReport:
         """
         Run every verified query once against its database.
 
@@ -142,16 +125,14 @@ class CuratedAPI:
         with the values bound, and only the first batch of rows is fetched.
         ``ok`` is False if any query fails.
         """
-        cm = ConfigManager()
-        path = pathlib.Path(curated_path or settings.curated_config_path)
-        try:
-            cfg = cm.load_curated(path)
-            registry = self._registry(cm, datasources_path, secrets_path)
-            dialects = {ds_id: registry.get_dialect(ds_id) for ds_id in registry.list_ids()}
-        except Exception as e:
-            return CuratedTestReport(ok=False, path=str(path), errors=[str(e)])
+        cfg = self._ctx.config.curated
+        path = self._source()
+        if cfg is None:
+            return CuratedTestReport(ok=False, path=path, errors=[NO_CURATED])
+        registry = self._ctx.ds_registry
+        dialects = {ds_id: registry.get_dialect(ds_id) for ds_id in registry.list_ids()}
 
-        report = CuratedTestReport(ok=True, path=str(path))
+        report = CuratedTestReport(ok=True, path=path)
         check = check_curated_queries(cfg, dialects)
         for issue in check.issues:
             if issue.query_id is None:
@@ -167,8 +148,7 @@ class CuratedAPI:
         report.ok = not report.errors and all(e.status == "PASS" for e in report.entries)
         return report
 
-    @staticmethod
-    def _run_one(registry: DatasourceRegistry, ds_id: str, query: VerifiedQuery) -> CuratedTestEntry:
+    def _run_one(self, registry: DatasourceRegistry, ds_id: str, query: VerifiedQuery) -> CuratedTestEntry:
         params: Dict[str, Any] = {}
         for name, spec in query.params.items():
             value = spec.default if spec.default is not None else spec.example
@@ -182,7 +162,7 @@ class CuratedAPI:
 
         request = AdapterRequest(plan_type="sql", payload={"sql": query.sql}, parameters=params, limits={})
         started = time.perf_counter()
-        frames = adapter_frames(registry.get_adapter(ds_id), request, int(settings.result_fetch_batch_size))
+        frames = adapter_frames(registry.get_adapter(ds_id), request, self._ctx.settings.results.fetch_batch_size)
         try:
             frame = next(frames, None)
         except Exception as e:  # a driver error the adapter did not wrap
@@ -198,50 +178,22 @@ class CuratedAPI:
         rows = f"{frame.row_count} row{'' if frame.row_count == 1 else 's'}"
         return CuratedTestEntry(ds_id, query.id, "PASS", f"{rows} in {elapsed:.2f} s", params, frame.row_count)
 
-    def _registry(self, cm: ConfigManager, datasources_path, secrets_path) -> DatasourceRegistry:
-        if self._ctx and datasources_path is None:
-            return self._ctx.ds_registry
-        secret_manager = SecretManager()
-        secret_configs = cm.load_secrets(pathlib.Path(secrets_path or settings.secrets_config_path))
-        if secret_configs:
-            secret_manager.configure(secret_configs)
-        registry = DatasourceRegistry(secret_manager)
-        registry.register_datasources([datasource_from_04(d) for d in cm.load_datasources(
-            pathlib.Path(datasources_path or settings.datasource_config_path))])
-        return registry
-
     def _indexed_tables(
-        self, cfg: CuratedFileConfig, dialects: Dict[str, str], report: CuratedValidationReport
+        self, cfg: Curated, dialects: Dict[str, str], report: CuratedValidationReport
     ) -> Dict[str, Set[Tuple[str, str]]]:
         """``(schema, table)`` names, lower-cased, per indexed datasource in ``cfg``.
 
-        Never creates a schema store: with no index, the table check is skipped
-        and a note says so.
+        With no snapshot for a datasource, its table check is skipped and a
+        note says so.
         """
-        wanted = [ds_id for ds_id in cfg.datasources if ds_id in dialects]
-        if not wanted:
-            return {}
-        store = self._ctx.schema_store if self._ctx else None
-        owned = False
-        if store is None:
-            store_path = pathlib.Path(settings.schema_store_path)
-            if not store_path.exists():
-                report.notes.append(f"No schema store at {store_path}: datasources not indexed, table check skipped.")
-                return {}
-            store = build_schema_store(settings.schema_store_backend, settings.schema_store_max_versions, path=store_path)
-            owned = True
-        try:
-            out: Dict[str, Set[Tuple[str, str]]] = {}
-            for ds_id in wanted:
-                snapshot = store.get_latest_snapshot(ds_id)
-                if snapshot is None:
-                    report.notes.append(f"'{ds_id}' is not indexed: table check skipped. Run `nl2sql index`.")
-                    continue
-                out[ds_id] = {
-                    (t.table.schema_name.lower(), t.table.table_name.lower())
-                    for t in snapshot.contract.tables.values()
-                }
-            return out
-        finally:
-            if owned and hasattr(store, "close"):
-                store.close()
+        out: Dict[str, Set[Tuple[str, str]]] = {}
+        for ds_id in (ds_id for ds_id in cfg.datasources if ds_id in dialects):
+            snapshot = self._ctx.schema_store.get_latest_snapshot(ds_id)
+            if snapshot is None:
+                report.notes.append(f"'{ds_id}' is not indexed: table check skipped. Run `nl2sql index`.")
+                continue
+            out[ds_id] = {
+                (t.table.schema_name.lower(), t.table.table_name.lower())
+                for t in snapshot.contract.tables.values()
+            }
+        return out
