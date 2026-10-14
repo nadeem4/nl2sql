@@ -353,6 +353,29 @@ The playground once read `engine.context.ds_registry`, `engine.context.schema_st
 
 ---
 
+## Importing nl2sql Is Light
+
+### Definition
+`import nl2sql` loads none of `chromadb`, `onnxruntime`, `sqlalchemy`, `psycopg2`, `psycopg`, `pymysql`, `pyodbc`, `pymssql`, `duckdb`, `duckdb_engine`, `textual` or `opentelemetry`, and its imports stay under 500 ms.
+
+Concretely:
+
+- `nl2sql/__init__.py` imports only the `NL2SQL` class. Every other public name (`QueryResult`, `QueryEvent`, `CancellationToken`, the API classes, the benchmark) is imported the first time it is asked for, through the module's `__getattr__`. `from nl2sql import QueryResult` works as it always did.
+- `nl2sql/public_api.py` imports the runtime (`NL2SQLContext` and the API classes) inside `NL2SQL.__init__`, not at the top of the module.
+- Runtime modules import their heavy libraries where they are used, as the adapters already do.
+
+### Enforcement Points
+- `test_importing_nl2sql_loads_no_heavy_library` in `packages/nl2sql/tests/architecture/test_boundaries.py` — imports `nl2sql` in a fresh interpreter and checks `sys.modules`
+- `test_import_nl2sql_stays_within_its_time_budget` in the same module — the cumulative figure `python -X importtime` reports for `nl2sql`, best of five, under 500 ms. It measures imports only, not wall-clock time, so a busy runner does not fail it.
+
+### Failure Behavior
+A failing test naming the heavy libraries that were loaded, or the import time against the budget.
+
+### Why It Exists
+Code that only needs a name — a type hint, `nl2sql --help`, a config check in CI, a REST client building a request — should not pay for a vector store, a database driver and a tracing stack. `import nl2sql` used to load chromadb, duckdb, opentelemetry, langgraph, langchain_openai and polars and took about 2.2 seconds; it now takes about 15 ms. The cost moves to `NL2SQL(...)`, which needs the runtime anyway.
+
+---
+
 ## Dialect Knowledge Lives in the Adapter
 
 ### Definition
@@ -421,7 +444,7 @@ A broken file fails startup. At question time a bad value, a denied table, a mis
 - **Security**: Policy Enforcement Is Namespaced and Fail-Closed; Datasource Access Is RBAC-Gated; Plan Model Is Strict and Read-Only; Verified SQL Is Human-Authored, Read-Only and Parameter-Bound
 - **Determinism**: Expected Schema Must Match Select List; Joins Must Be Valid and Schema-Backed
 - **Resource bounds**: SQL Generation Enforces a Row Limit Cap; The Answer Model Sees a Preview, Never the Whole Result; Context Requires Vector Store and Schema Store Configuration
-- **Boundaries**: Package Boundaries Are One-Way; Dialect Knowledge Lives in the Adapter
+- **Boundaries**: Package Boundaries Are One-Way; Importing nl2sql Is Light; Dialect Knowledge Lives in the Adapter
 - **Retryability**: The Validator Rejects Everything the Generator Can; Plan Functions Are Known Functions
 
 ---

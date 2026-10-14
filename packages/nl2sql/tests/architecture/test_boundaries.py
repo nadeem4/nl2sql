@@ -451,6 +451,42 @@ def test_import_nl2sql_does_not_load_evaluation():
         f"import nl2sql loaded nl2sql.evaluation. The rule is written down in {RULES}."
 
 
+FORBIDDEN_AT_IMPORT = ("chromadb", "onnxruntime", "sqlalchemy", "psycopg2", "psycopg", "pymysql",
+                       "pyodbc", "pymssql", "duckdb", "duckdb_engine", "textual", "opentelemetry")
+
+IMPORT_BUDGET_US = 500_000
+
+
+def test_importing_nl2sql_loads_no_heavy_library():
+    loaded = _run("import sys, nl2sql; "
+                  f"print(sorted({{m.split('.')[0] for m in sys.modules}} & set({FORBIDDEN_AT_IMPORT!r})))")
+    assert loaded == "[]", (
+        f"import nl2sql loaded {loaded}. Import heavy libraries where they are used, "
+        f"not at module scope on the import path of nl2sql. The rule is in {RULES}.")
+
+
+def _import_us(module: str) -> int:
+    """The cumulative microseconds ``python -X importtime`` reports for ``module``."""
+    out = subprocess.run([sys.executable, "-X", "importtime", "-c", f"import {module}"],
+                         capture_output=True, text=True, check=True)
+    for line in out.stderr.splitlines():
+        # "import time: <self us> | <cumulative us> | <module>"
+        fields = line.split("|")
+        if len(fields) == 3 and fields[2].strip() == module:
+            return int(fields[1].strip())
+    raise AssertionError(f"-X importtime reported no line for {module}:\n{out.stderr[-2000:]}")
+
+
+def test_import_nl2sql_stays_within_its_time_budget():
+    # Imports only, not wall-clock time, and the best of five, so a busy CI
+    # runner that slows one run down does not fail the build.
+    best = min(_import_us("nl2sql") for _ in range(5))
+    assert best < IMPORT_BUDGET_US, (
+        f"import nl2sql took {best / 1000:.0f} ms of imports, over the "
+        f"{IMPORT_BUDGET_US / 1000:.0f} ms budget. Something on the import path of nl2sql "
+        f"pulls in the runtime at module scope. The rule is in {RULES}.")
+
+
 def test_building_the_benchmark_api_loads_evaluation_on_demand():
     code = ("import sys, nl2sql; from nl2sql import BenchmarkAPI, BenchmarkConfig; "
             "print('nl2sql.evaluation' in sys.modules, BenchmarkConfig.__module__)")

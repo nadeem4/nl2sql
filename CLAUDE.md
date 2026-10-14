@@ -14,6 +14,7 @@ name the rule.
 - **Nothing outside `nl2sql/cli/` imports the CLI**, and `cli.demo` never imports `cli.commands`. Knowledge an SDK or REST caller also needs belongs in the engine, not behind a command.
 - **The REST API imports only the top-level `nl2sql` facade, and the playground never touches `engine.context`.** Whatever the playground needs is a facade method `nl2sql-api` can call too.
 - **The runtime never imports `nl2sql.evaluation` or `nl2sql.feedback` at module scope.** Both are opt-in tools; a lazy import inside a function is fine.
+- **`import nl2sql` loads no vector store, database driver, `textual` or `opentelemetry`.** `__init__` exports through `__getattr__` and the facade imports the runtime in its constructor, so a caller that only needs a name pays nothing.
 - **A provider's API-key environment variable is read in `nl2sql/llm/` only.** `PROVIDER_PRESETS` in `llm/registry.py` is the one table; everything else derives from it.
 
 ## The plan, the adapter, and SQL
