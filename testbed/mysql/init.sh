@@ -8,9 +8,12 @@ set -eo pipefail
 
 mysql_run=(mysql --protocol=socket -uroot "-p${MYSQL_ROOT_PASSWORD}")
 
+echo "mysql-init: loading Sakila"
 "${mysql_run[@]}" < /samples/sakila-schema.sql
 "${mysql_run[@]}" < /samples/sakila-data.sql
+echo "mysql-init: loading the wide schema"
 "${mysql_run[@]}" < /samples/wide_mysql.sql
+echo "mysql-init: wide schema loaded"
 
 reader_password=${MYSQL_ROOT_PASSWORD//\'/\'\'}
 "${mysql_run[@]}" <<SQL

@@ -46,6 +46,10 @@ def test_wide_schema_has_1200_tables_in_20_schemas(testbed):
     assert sorted(t.rows for t in tables if t.rows) == [1_000] * 50 + [1_000_000] * 3
     assert sum(1 for t in tables if t.name != t.name.lower()) == 10
     assert {c.kind for t in tables for c in t.columns} >= set(ws.ODD_KINDS)
+    # A foreign key's column has its parent's id type: MySQL and SQL Server refuse int against bigint.
+    for schema in schemas:
+        ids = {t.name: t.columns[0].kind for t in schema.tables}
+        assert all(c.kind == ids[c.references] for t in schema.tables for c in t.columns if c.references)
     assert any(c.references for t in tables for c in t.columns)
     commented = sum(1 for t in tables if t.comment) / len(tables)
     assert 0.2 < commented < 0.4

@@ -52,9 +52,10 @@ services:
     depends_on:
       samples:
         condition: service_completed_successfully
-    # Sakila's schema creates functions and triggers, which binary logging
-    # otherwise refuses to a non-SUPER creator.
-    command: ["--log-bin-trust-function-creators=1"]
+    # A test bed trades durability for loading speed: without these, MySQL
+    # syncs the disk on every one of the wide schema's 1,200 CREATE TABLEs.
+    command: ["--skip-log-bin", "--innodb-flush-log-at-trx-commit=0", "--innodb-doublewrite=OFF",
+              "--innodb-redo-log-capacity=1073741824"]
     environment:
       MYSQL_ROOT_PASSWORD: ${TESTBED_MYSQL_PASSWORD:-Nl2sql-Testbed-1}
     ports:

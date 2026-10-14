@@ -114,7 +114,7 @@ def build(seed: int = 7) -> List[Schema]:
             count = rows.get((s, t), 0)
             # A big table stays narrow and has no foreign keys, so filling it is quick.
             width = 6 if count == BIG_ROWS else rng.randint(5, 30)
-            parents = [] if count == BIG_ROWS else [p.name for p in schema.tables]
+            parents = [] if count == BIG_ROWS else list(schema.tables)
             schema.tables.append(_table(rng, name, width, parents, count))
         schema.views = [
             View(f"v_{schema_name}_columns", schema.tables[0].name,
@@ -136,11 +136,12 @@ def _comment(rng: random.Random, what: str) -> Optional[str]:
     return f"The {what}, generated for the test bed." if rng.random() < 0.3 else None
 
 
-def _table(rng: random.Random, name: str, width: int, parents: List[str], rows: int) -> Table:
+def _table(rng: random.Random, name: str, width: int, parents: List["Table"], rows: int) -> Table:
     columns = [Column("id", "bigint" if rows == BIG_ROWS else "int")]
     if parents and rng.random() < 0.5:
         parent = parents[rng.randrange(len(parents))]
-        columns.append(Column(f"{parent.lower()}_id", "int", references=parent))
+        # The parent's id type: MySQL and SQL Server refuse an int key against a bigint id.
+        columns.append(Column(f"{parent.name.lower()}_id", parent.columns[0].kind, references=parent.name))
     while len(columns) < width:
         kinds = ODD_KINDS if rng.random() < 0.15 else PLAIN_KINDS
         kind = kinds[rng.randrange(len(kinds))]

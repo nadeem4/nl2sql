@@ -5,7 +5,7 @@
 # quick. The reader login is created last: the `mssql` healthcheck waits for it.
 set -eo pipefail
 
-sqlcmd=(/opt/mssql-tools18/bin/sqlcmd -C -b -S mssql -U sa -P "$MSSQL_SA_PASSWORD")
+sqlcmd=(/opt/mssql-tools18/bin/sqlcmd -C -b -r1 -S mssql -U sa -P "$MSSQL_SA_PASSWORD")
 
 for _ in $(seq 1 90); do
   "${sqlcmd[@]}" -Q "SELECT 1" > /dev/null 2>&1 && break
@@ -26,12 +26,15 @@ fi
 
 if [ "$(exists wide)" != 1 ]; then
   echo "mssql-init: loading the wide schema"
-  "${sqlcmd[@]}" -Q "CREATE DATABASE wide"
+  # A test bed trades durability for loading speed: commits are not
+  # flushed one by one.
+  "${sqlcmd[@]}" -Q "CREATE DATABASE wide; ALTER DATABASE wide SET RECOVERY SIMPLE; ALTER DATABASE wide SET DELAYED_DURABILITY = FORCED"
   # A half-loaded `wide` would be skipped by the next run, so drop it on failure.
   if ! "${sqlcmd[@]}" -d wide -i /samples/wide_tsql.sql > /dev/null; then
     "${sqlcmd[@]}" -Q "DROP DATABASE wide"
     exit 1
   fi
+  echo "mssql-init: wide schema loaded"
 fi
 
 reader_password=${MSSQL_SA_PASSWORD//\'/\'\'}
