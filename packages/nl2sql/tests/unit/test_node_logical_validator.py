@@ -366,7 +366,7 @@ def test_logical_validator_accepts_fk_join_from_retriever_output():
     retriever = SchemaRetrieverNode(
         fake_runtime(
             vector_store=SimpleNamespace(snapshot=lambda _id: snapshot),
-            schema_store=SimpleNamespace(get_snapshot=lambda _id, _version: snapshot),
+            state=SimpleNamespace(get_snapshot=lambda _id, _version: snapshot),
             policies={"allow_all": True},
         )
     )
@@ -408,7 +408,7 @@ def test_logical_validator_still_rejects_non_fk_join_with_qualified_names():
     retriever = SchemaRetrieverNode(
         fake_runtime(
             vector_store=SimpleNamespace(snapshot=lambda _id: snapshot),
-            schema_store=SimpleNamespace(get_snapshot=lambda _id, _version: snapshot),
+            state=SimpleNamespace(get_snapshot=lambda _id, _version: snapshot),
             policies={"allow_all": True},
         )
     )

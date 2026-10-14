@@ -11,7 +11,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 import pytest
-from index_helpers import TestIndex  # same directory
+from index_helpers import TestIndex, memory_state  # same directory
 from langchain_core.embeddings import FakeEmbeddings
 from langchain_core.runnables import RunnableLambda
 
@@ -19,7 +19,6 @@ from nl2sql.indexing import enrichment_service
 from nl2sql.indexing.orchestrator import IndexingOrchestrator
 from nl2sql.llm.models import AgentConfig
 from nl2sql.llm.registry import LLMRegistry
-from nl2sql.schema import InMemorySchemaStore
 from nl2sql.secrets import SecretManager
 from nl2sql_sdk.stores import Filter
 from nl2sql_sdk import IndexScope
@@ -75,7 +74,7 @@ class _StubAdapter:
 
 
 def _context(tmp_path, llm_registry) -> SimpleNamespace:
-    ctx = TestIndex(tmp_path, FakeEmbeddings(size=8), schema_store=InMemorySchemaStore()).ctx
+    ctx = TestIndex(tmp_path, FakeEmbeddings(size=8), state=memory_state()).ctx
     ctx.ds_registry = SimpleNamespace(
         get_index_scope=lambda _ds: IndexScope(), get_sample_questions=lambda ds_id: ["How many users are there?"],
         get_description=lambda ds_id: "User records",

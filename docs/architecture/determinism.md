@@ -83,9 +83,9 @@ executed is therefore **pinned** and reused
   ([`pipeline/graph_utils.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/pipeline/graph_utils.py)).
   A refused plan, a failed plan and a plan-only (`--no-exec`) run are never
   stored.
-- **Where it is stored.** The `plan_cache` table of the schema store
-  (`SCHEMA_STORE_PATH`, `data/schema_store.db` by default); the `memory` backend
-  keeps it for the life of the process.
+- **Where it is stored.** The state store (`storage.state`): the `plan_cache`
+  table of `<storage.path>/state.db` with the built-in `sqlite` store. Deleting
+  a schema snapshot deletes the plans cached on it.
 - **Controls.** `PLAN_CACHE_ENABLED=false` turns reads and writes off
   ([System configuration](../configuration/system.md)); `nl2sql cache clear`
   empties it. `nl2sql demo --record` turns it off so every planner answer is
@@ -132,9 +132,9 @@ gives every result a total row order.
 - Partially deterministic: Table chunk column names are sorted for the table chunk payload, but chunk emission order depends on the schema contract’s insertion order (no sorting over `tables.items()` or `columns.items()` for column chunks) ([`indexing/chunk_builder.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/indexing/chunk_builder.py)).
 
 ### Schema Authority and Versioning
-- Deterministic: Schema fingerprints are computed from sorted tables, columns, and foreign keys with JSON serialization; same schema contract yields the same fingerprint ([`schema/protocol.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/schema/protocol.py)).
-- Deterministic: Both in-memory and SQLite schema stores deduplicate by fingerprint, returning an existing version if one matches; the metadata stored under that version is refreshed from the new snapshot ([`schema/in_memory_store.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/schema/in_memory_store.py), [`schema/sqlite_store.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/schema/sqlite_store.py)).
-- Non-deterministic: Schema versions are time-based (`YYYYMMDDhhmmss_<fingerprint>`). Latest version selection depends on registration time and order ([`schema/in_memory_store.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/schema/in_memory_store.py), [`schema/sqlite_store.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/schema/sqlite_store.py)).
+- Deterministic: Schema fingerprints are computed from sorted tables, columns, and foreign keys with JSON serialization; same schema contract yields the same fingerprint ([`schema/fingerprint.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/schema/fingerprint.py)).
+- Deterministic: Snapshots are immutable. Storing a snapshot whose contract and metadata match a stored one returns that version and writes nothing; any other snapshot is a new version ([`storage/sqlite.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/storage/sqlite.py)).
+- Non-deterministic: Schema versions are time-based (`YYYYMMDDhhmmss_<hash8>`). Which version is live is decided by the index's build pointer, not by time ([`storage/sqlite.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/storage/sqlite.py), [`indexing/orchestrator.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/indexing/orchestrator.py)).
 - Deterministic (conditional): If `schema_version` is provided by a sub-query, schema retrieval resolves that exact snapshot; otherwise it uses the latest available version, which is time-ordered ([`pipeline/nodes/schema_retriever/node.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/pipeline/nodes/schema_retriever/node.py)).
 
 ### Validation Gates
@@ -163,10 +163,10 @@ gives every result a total row order.
 - Potentially non-deterministic: GraphState merges dict fields with a last-write-wins reducer and concatenates lists; in parallel branches, merge order is not constrained in this code ([`pipeline/state.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/pipeline/state.py)).
 
 ### Hashing/Fingerprinting
-- Deterministic: Stable hashing is consistently performed with sorted JSON and fixed separators for sub-query IDs, schema fingerprints, and artifact content hashes ([`pipeline/nodes/decomposer/node.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/pipeline/nodes/decomposer/node.py), [`schema/protocol.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/schema/protocol.py), [`execution/artifacts/store.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/execution/artifacts/store.py)).
+- Deterministic: Stable hashing is consistently performed with sorted JSON and fixed separators for sub-query IDs, schema fingerprints, and artifact content hashes ([`pipeline/nodes/decomposer/node.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/pipeline/nodes/decomposer/node.py), [`schema/fingerprint.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/schema/fingerprint.py), [`execution/artifacts/store.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/execution/artifacts/store.py)).
 
 ### Time-Based Logic and Runtime Controls
-- Non-deterministic: Schema versions and artifact creation timestamps are derived from wall-clock time ([`schema/in_memory_store.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/schema/in_memory_store.py), [`schema/sqlite_store.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/schema/sqlite_store.py), [`execution/artifacts/store.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/execution/artifacts/store.py)).
+- Non-deterministic: Schema versions and artifact creation timestamps are derived from wall-clock time ([`storage/sqlite.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/storage/sqlite.py), [`execution/artifacts/store.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/execution/artifacts/store.py)).
 - Deterministic (conditional): Pipeline timeout handling is based on monotonic time; timeouts and cancellations depend on wall-clock progression and runtime scheduling ([`pipeline/runtime.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/pipeline/runtime.py)).
 
 ### External Calls

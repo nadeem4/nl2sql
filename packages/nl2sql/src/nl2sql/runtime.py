@@ -14,9 +14,8 @@ takes them as parameters, and nothing writes the environment.
 from __future__ import annotations
 
 import copy
-from pathlib import Path
 from threading import RLock
-from typing import TYPE_CHECKING, Any, Dict, List, Mapping, NamedTuple, Optional, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Union
 
 from nl2sql_sdk import ConnectionCheck, DatasourceCapability
 
@@ -36,20 +35,6 @@ if TYPE_CHECKING:
 
 logger = get_logger(__name__)
 llm_logger = get_logger("nl2sql.llm")
-
-class StorePaths(NamedTuple):
-    """Where one engine keeps its data."""
-
-    index: Path
-    state: Path
-    traces: Path
-    results: Path
-
-    @classmethod
-    def under(cls, path: Path) -> "StorePaths":
-        """The layout under ``storage.path``: ``index/``, ``state.db``, ``traces/`` and ``results/``."""
-        path = Path(path)
-        return cls(index=path / "index", state=path / "state.db", traces=path / "traces", results=path / "results")
 
 
 class Runtime:
@@ -164,7 +149,6 @@ class Runtime:
         self._config = config
         self.policy_engine = PolicyEngine(config.policies, self.ds_registry, self.policy_check)
         self.index, self.state, self.traces, self.results = stores
-        self.stores = StorePaths.under(config.storage.path)
         return self
 
     # ------------------------------------------------------------ building
@@ -208,18 +192,12 @@ class Runtime:
     def _resolve_stores(self, config: Config, problem) -> List[Any]:
         """The four ``storage`` slots' stores, built through the registry. Writes nothing.
 
-        The engine reads its index, traces and results through the
-        ``IndexStore``, ``TraceStore`` and ``ResultStore`` interfaces, so any
-        store works in those slots. Until Phase 2 moves the engine onto the
-        ``StateStore`` interface (S3), it reads ``state`` only through the
-        built-in store, so another store there is a problem rather than
-        silently unused.
+        The engine reads every slot through its interface (``IndexStore``,
+        ``StateStore``, ``TraceStore``, ``ResultStore``), so any store works
+        in any slot it fills.
         """
-        from nl2sql.config.models import BUILT_IN_STORES, STORE_SLOTS
+        from nl2sql.config.models import STORE_SLOTS
         from nl2sql.storage import build_store
-        from nl2sql.storage.sqlite import SqliteState
-
-        built_ins = {"state": SqliteState}
 
         stores: List[Any] = []
         for slot in STORE_SLOTS:
@@ -229,11 +207,6 @@ class Runtime:
                                     registry=self.registry, secrets=self.secret_manager)
             except (RegistryError, ValueError) as e:
                 problem(f"storage.{slot}", str(e))
-            else:
-                name = BUILT_IN_STORES[slot]
-                if slot in built_ins and not isinstance(store, built_ins[slot]):
-                    problem(f"storage.{slot}", f"This engine reads {slot} only through the built-in "
-                            f"'{name}' store for now.", fix=f"Remove storage.{slot}, or set it to {{type: {name}}}.")
             stores.append(store)
         return stores
 
@@ -241,7 +214,7 @@ class Runtime:
         from nl2sql.execution import ExecutionStore
         from nl2sql.execution.artifacts import ArtifactStore
 
-        self.schema_store = self.state.schema_store(self._config.settings.schema_.max_versions)
+        self.state.migrate()
         self.execution_store = ExecutionStore()
         self.artifact_store = ArtifactStore(self.results)
 
@@ -265,7 +238,7 @@ class Runtime:
 
         namespace = self.namespace
         return Retriever(self.index, namespace, self.embedder, self.index.pointers(namespace),
-                         schema_store=getattr(self, "schema_store", None))
+                         state=self.state)
 
     def pin_index(self) -> "Runtime":
         """A run-scoped runtime that reads the index through the pointers as they are now.
@@ -306,8 +279,12 @@ class Runtime:
         """Builds and registers ``datasource`` (not connected), and adds it to ``config``.
 
         Raises:
-            ValueError: its id is taken, or its adapter cannot be built.
+            ValueError: its id is taken, its ``index`` is not a valid
+                ``IndexScope``, or its adapter cannot be built.
         """
+        from nl2sql.datasources.registry import with_index_scope
+
+        datasource = with_index_scope(datasource)
         with self._lock:
             config = self._config.with_datasource(datasource)
             self.ds_registry.register_datasource(datasource)
@@ -424,6 +401,42 @@ class Runtime:
             fix=check.fix or f"Check datasources[{i}].connection for '{datasource.id}', and that the database "
                              "is reachable from this machine. The log has the driver's error.")
 
+    def try_datasource(self, datasource: "Datasource") -> DatasourceStatus:
+        """Builds ``datasource``'s adapter, tests its connection and closes it. Registers nothing.
+
+        A failure is reported, never raised, with the stage it failed at:
+        ``config`` (an unknown ``type``, or a connection the adapter's model
+        rejects), ``driver`` (a driver module is missing; the fix is the
+        adapter's install hint), or the stage the adapter's
+        ``test_connection`` names. An ``adapter`` object is tested as given
+        and not closed: the caller owns it.
+        """
+        from nl2sql.datasources.registry import close_adapter
+        from nl2sql.registry import missing_modules
+
+        def failed(stage: str, reason: str, fix: Optional[str]) -> DatasourceStatus:
+            return DatasourceStatus(id=datasource.id, status="failed", required=datasource.required, stage=stage,
+                                    reason=reason, fix=fix)
+
+        if datasource.adapter is not None:
+            return _connection_status(datasource, _test_connection(datasource.adapter))
+        try:
+            adapter_cls = self.registry.load("adapter", datasource.type, require_installed=False)
+        except RegistryError as e:
+            return failed("config", str(e), "Set type to one of the names engine.datasources.types() lists.")
+        missing = missing_modules("adapter", adapter_cls)
+        if missing:
+            return failed("driver", f"The adapter '{datasource.type}' needs {', '.join(missing)}, which is not "
+                                    "installed.", getattr(adapter_cls, "install_hint", None) or None)
+        try:
+            adapter = self.ds_registry.build(adapter_cls, datasource)
+        except Exception as e:
+            return failed("config", str(e) or type(e).__name__, "Correct the connection fields named above.")
+        try:
+            return _connection_status(datasource, _test_connection(adapter))
+        finally:
+            close_adapter(adapter)
+
     def close(self) -> None:
         """Disposes the adapters' pools, closes the LLM clients and the stores. Calling it again does nothing."""
         with self._lock:
@@ -432,7 +445,7 @@ class Runtime:
             self._closed = True
         self.ds_registry.close()
         self.llm_registry.close()
-        for store in (getattr(self, "schema_store", None), getattr(self, "index", None),
+        for store in (getattr(self, "state", None), getattr(self, "index", None),
                       getattr(self, "traces", None), getattr(self, "results", None)):
             close = getattr(store, "close", None)
             if callable(close):
@@ -440,6 +453,25 @@ class Runtime:
                     close()
                 except Exception as e:
                     logger.warning(f"Closing {type(store).__name__} failed: {e}")
+
+
+def _test_connection(adapter: Any) -> ConnectionCheck:
+    """``adapter.test_connection()``; an exception is a failed check with its message."""
+    try:
+        return adapter.test_connection()
+    except Exception as e:
+        return ConnectionCheck(ok=False, message=str(e) or type(e).__name__)
+
+
+def _connection_status(datasource: "Datasource", check: ConnectionCheck) -> DatasourceStatus:
+    """``check`` as the status of a datasource that is not added: its stage, message and fix."""
+    if check.ok:
+        return DatasourceStatus(id=datasource.id, status="ready", required=datasource.required)
+    return DatasourceStatus(
+        id=datasource.id, status="failed", required=datasource.required, stage=check.stage or "connect",
+        reason=check.message or "The connection test failed.",
+        fix=check.fix or f"Check the connection for '{datasource.id}', and that the database is reachable from "
+                         "this machine.")
 
 
 def _llm_providers(llm: "LLM"):

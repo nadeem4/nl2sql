@@ -336,7 +336,7 @@ The slots' methods:
 | Interface | Methods |
 | :--- | :--- |
 | `IndexStore` | `open(namespace, dimension)`, `add(namespace, entries)`, `query(namespace, vector, k, where=None, with_vectors=False)`, `get(namespace, where, with_vectors=False)`, `delete(namespace, where)`, `pointers(namespace)`, `set_pointers(namespace, updates)` (atomic), `namespaces()`, `drop(namespace)`, `close()` |
-| `StateStore` | `migrate()`, `put_snapshot(snapshot)`, `get_snapshot(datasource_id, schema_version)`, `keep_snapshots(datasource_id, keep)`, `get_plan`, `put_plan`, `clear_plans()`, `add_feedback(row)`, `list_feedback(limit=None)`, `clear_feedback()`, `lock(name, ttl_s)`, `close()` |
+| `StateStore` | `migrate()`, `put_snapshot(snapshot)`, `get_snapshot(datasource_id, schema_version)`, `list_versions(datasource_id)` (newest first), `keep_snapshots(datasource_id, keep)`, `get_plan`, `put_plan`, `clear_plans()`, `add_feedback(row)`, `list_feedback(limit=None)`, `clear_feedback()`, `lock(name, ttl_s)`, `close()` |
 | `TraceStore` | `write(trace_id, document)`, `get(trace_id)`, `purge(older_than)` |
 | `ResultStore` | `write(key, chunks)`, `open(key)`, `exists(key)`, `purge(older_than)`. Bytes only: the engine writes the Parquet. |
 

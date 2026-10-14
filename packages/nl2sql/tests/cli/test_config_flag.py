@@ -130,7 +130,8 @@ def test_cache_clear_reads_the_state_store_under_storage_path(tmp_path):
     result = runner.invoke(app, ["--config", str(config), "cache", "clear"])
 
     assert result.exit_code == 0, result.output
-    assert "state.db" in result.output.replace("\n", "")
+    assert "Cleared 0 cached plans" in result.output.replace("\n", "")
+    assert (tmp_path / ".nl2sql" / "state.db").exists()
 
 
 @pytest.mark.parametrize("args, seam", [

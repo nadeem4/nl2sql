@@ -2,8 +2,9 @@
 
 A build, in order (docs/architecture/phase2.md, section 4):
 
-1. The schema snapshot is stored in the state store. It gets a
-   ``schema_version``, and nothing reads it yet.
+1. The schema snapshot is stored in the state store, as an immutable row. It
+   gets a ``schema_version`` (an unchanged snapshot gets its old one), and
+   nothing reads it yet.
 2. Every entry is embedded by the engine's embedder and written to the index
    store's namespace under a new ``build_id``. Readers do not see them: they
    read only the builds the pointers name.
@@ -11,10 +12,17 @@ A build, in order (docs/architecture/phase2.md, section 4):
    schema version. That one write is the commit.
 4. The datasource's builds other than the new one and the one just replaced
    are deleted, so a run that pinned the previous pointer keeps its entries.
+5. Its snapshots are deleted except the versions a pointer names (in any
+   namespace), the one just replaced, and the newest
+   ``settings.schema.max_versions``.
 
 A failure before step 3 leaves the previous pointer, and so the previous
 build and schema version, live. Its stored snapshot and partial entries are
 referenced by no pointer; the next build of the datasource deletes the entries.
+
+``engine.index.build`` runs every build holding the state store's ``index``
+lock (``indexing/rebuild.py``), so two processes sharing a ``storage.path``
+never build at once.
 """
 from __future__ import annotations
 
@@ -60,7 +68,8 @@ class IndexingOrchestrator:
         self.namespace = ctx.namespace
         self.dimension = ctx.embedding_info.dimension
         self.embeddings = ctx.embedder
-        self.schema_store = ctx.schema_store
+        self.state = ctx.state
+        self.max_versions = ctx.settings.schema_.max_versions
         self.ds_registry = ctx.ds_registry
         self.llm_registry = ctx.llm_registry
         # The loaded curated.yaml, or None when the feature is off.
@@ -100,7 +109,7 @@ class IndexingOrchestrator:
             schema_snapshot = schema_snapshot.model_copy(update={"metadata": metadata})
 
         # Stored first, read by nothing until the pointer names it.
-        schema_version, _ = self.schema_store.register_snapshot(schema_snapshot)
+        schema_version = self.state.put_snapshot(schema_snapshot)
 
         # Verified queries go in the same build: a build replaces every entry
         # of its datasource, so curated entries written on their own would be
@@ -111,7 +120,9 @@ class IndexingOrchestrator:
             schema_version=schema_version, questions=questions,
         ).build() + CuratedChunkBuilder(datasource_id, curated, schema_version).build()
 
+        previous = self.index.pointers(self.namespace).get(datasource_id)
         self._commit(datasource_id, schema_version, chunks, [], curated_hash(curated))
+        self._keep_snapshots(datasource_id, previous.schema_version if previous else None)
         stats = _stats(datasource_id, schema_version, [c.type for c in chunks])
         if schema_snapshot.issues:
             # What a table or column was indexed without: reported, not only logged.
@@ -119,6 +130,24 @@ class IndexingOrchestrator:
             logger.warning(f"Indexed {datasource_id} with {len(schema_snapshot.issues)} issue(s); "
                            f"the first: {schema_snapshot.issues[0].table}: {schema_snapshot.issues[0].message}")
         return stats
+
+    def _keep_snapshots(self, datasource_id: str, replaced: Optional[str]) -> None:
+        """Deletes the datasource's snapshots that nothing can read any more.
+
+        Kept: every version a pointer names, in every namespace (another
+        embedding model's build may still be switched back to); the version
+        just replaced, which runs in flight may have pinned; and the newest
+        ``settings.schema.max_versions``. A failure only leaves old snapshots.
+        """
+        try:
+            keep = {pointer.schema_version for namespace in self.index.namespaces()
+                    for ds_id, pointer in self.index.pointers(namespace).items() if ds_id == datasource_id}
+            keep.update(self.state.list_versions(datasource_id)[:self.max_versions])
+            if replaced:
+                keep.add(replaced)
+            self.state.keep_snapshots(datasource_id, keep)
+        except Exception as exc:
+            logger.warning(f"Could not delete the old schema snapshots of {datasource_id}: {exc}")
 
     def refresh_curated(self, datasource_id: str) -> Dict[str, Any]:
         """Re-indexes a datasource's verified queries only.

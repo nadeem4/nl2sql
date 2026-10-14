@@ -10,7 +10,8 @@ from typer.testing import CliRunner
 
 from nl2sql.cli.main import app
 from nl2sql.evaluation.gold import GOLD_DATASET_PATH, GoldQuestion
-from nl2sql.feedback import FeedbackStore
+from nl2sql.feedback import rated_row
+from nl2sql.storage.sqlite import SqliteState
 from nl2sql.tracing.document import TRACE_FORMAT_VERSION
 
 runner = CliRunner()
@@ -27,13 +28,14 @@ def _seed(stores):
     path = stores.state
     trace_dir = stores.traces
     trace_dir.mkdir(parents=True)
-    store = FeedbackStore(path)
-    store.save(_record("a1", "How many customers are there?", ["SELECT COUNT(*) AS n FROM Customer"]),
-               rating="up", note=None)
-    store.save(_record("a2", "Which genre sells most?", ["SELECT 1", "SELECT 2"], sub_queries=2),
-               rating="up", note=None)
-    store.save(_record("a3", "Who earns most?", [], codes=["SECURITY_VIOLATION"], sub_queries=0),
-               rating="down", note="wrong table")
+    store = SqliteState(path)
+    store.migrate()
+    store.add_feedback(rated_row(_record("a1", "How many customers are there?", ["SELECT COUNT(*) AS n FROM Customer"]),
+                                 "up", None))
+    store.add_feedback(rated_row(_record("a2", "Which genre sells most?", ["SELECT 1", "SELECT 2"], sub_queries=2),
+                                 "up", None))
+    store.add_feedback(rated_row(_record("a3", "Who earns most?", [], codes=["SECURITY_VIOLATION"], sub_queries=0),
+                                 "down", "wrong table"))
     store.close()
     trace = {"trace_format_version": TRACE_FORMAT_VERSION, "trace_id": "t1", "nodes": [],
              "result": {"errors": [{"error_code": "QUESTION_NOT_ANSWERABLE"}], "sub_queries": []}}
@@ -119,8 +121,9 @@ def test_clear_removes_the_ratings(tmp_path, project_stores):
 
     assert result.exit_code == 0, _out(result)
     assert "Cleared 3" in _out(result)
-    store = FeedbackStore(path)
-    assert store.list() == []
+    store = SqliteState(path)
+    store.migrate()
+    assert store.list_feedback() == []
     store.close()
 
 

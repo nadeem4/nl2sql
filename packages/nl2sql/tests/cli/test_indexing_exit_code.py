@@ -21,8 +21,13 @@ class _StubAdapter:
 
 def _context(*datasource_ids: str) -> NL2SQL:
     """The facade over a runtime that has these datasources and a stub embedder."""
+    from nl2sql.storage.sqlite import SqliteState
+
+    state = SqliteState(":memory:")
+    state.migrate()
     engine = NL2SQL.__new__(NL2SQL)
     engine._runtime = SimpleNamespace(
+        state=state,
         config=SimpleNamespace(storage=SimpleNamespace(path="/tmp/.nl2sql")),
         embedder=SimpleNamespace(embed_query=lambda _text: [0.0]),
         ds_registry=SimpleNamespace(

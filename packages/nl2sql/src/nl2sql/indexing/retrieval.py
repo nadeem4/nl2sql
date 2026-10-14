@@ -123,7 +123,7 @@ def _public(metadata: Mapping[str, Any]) -> Dict[str, Any]:
 class Retriever:
     """MMR searches over the builds ``pointers`` name, in ``namespace`` of ``index``.
 
-    ``schema_store`` resolves each datasource's live snapshot through its
+    ``state`` (the state store) resolves each datasource's live snapshot through its
     pointer (:meth:`snapshot`).
     """
 
@@ -132,12 +132,12 @@ class Retriever:
     CURATED_FETCH_MULTIPLIER = 10
 
     def __init__(self, index: "IndexStore", namespace: str, embeddings: Any,
-                 pointers: Mapping[str, BuildPointer], schema_store: Any = None):
+                 pointers: Mapping[str, BuildPointer], state: Any = None):
         self.index = index
         self.namespace = namespace
         self.embeddings = embeddings
         self.pointers: Dict[str, BuildPointer] = dict(pointers)
-        self.schema_store = schema_store
+        self.state = state
 
     # ------------------------------------------------------------ the live builds
 
@@ -152,9 +152,9 @@ class Retriever:
     def snapshot(self, datasource_id: str) -> Optional["SchemaSnapshot"]:
         """The snapshot the datasource's live build was made from; None before its first build."""
         version = self.schema_version(datasource_id)
-        if version is None or self.schema_store is None:
+        if version is None or self.state is None:
             return None
-        return self.schema_store.get_snapshot(datasource_id, version)
+        return self.state.get_snapshot(datasource_id, version)
 
     def is_empty(self) -> bool:
         """True when no datasource has a live build."""

@@ -15,9 +15,8 @@ from nl2sql import NL2SQL
 from nl2sql.testing.facade import StubDatasources, StubLLMs
 from nl2sql.api.query_api import QueryResult, SubQueryResult
 from nl2sql.cli.demo.playground.app import build_app
-from nl2sql.feedback import FeedbackStore
-from nl2sql.runtime import StorePaths
 from nl2sql.storage.files import FilesTraces
+from nl2sql.storage.sqlite import SqliteState
 from nl2sql.testing.config import make_config
 
 TRACE_ID = "0b8f7d2e-1111-4222-8333-944455556666"
@@ -28,8 +27,10 @@ class _Engine(NL2SQL):
 
     def __init__(self, data, feedback=True):
         config = make_config(data / "config", settings={"feedback": {"enabled": feedback}})
-        self._runtime = type("Ctx", (), {"schema_store": None, "vector_store": None, "ds_registry": None,
-                                         "stores": StorePaths.under(data), "traces": FilesTraces(data / "traces"),
+        state = SqliteState(data / "state.db")
+        state.migrate()
+        self._runtime = type("Ctx", (), {"state": state, "vector_store": None, "ds_registry": None,
+                                         "traces": FilesTraces(data / "traces"),
                                          "config": config})()
 
     @property
@@ -64,8 +65,8 @@ def test_a_rating_is_stored_with_what_the_server_answered(tmp_path):
 
     assert response.status_code == 200, response.text
     assert response.json()["saved"]["rating"] == "down"
-    store = FeedbackStore(tmp_path / "data" / "state.db")
-    [row] = store.list()
+    store = SqliteState(tmp_path / "data" / "state.db")
+    [row] = store.list_feedback()
     store.close()
     assert row["trace_id"] == TRACE_ID and row["question"] == "How many customers?"
     assert row["role"] == "viewer" and row["status"] == "success"
@@ -109,7 +110,7 @@ def test_feedback_is_refused_on_a_remote_bind_without_the_flag(tmp_path, host):
     assert read["available"] is False and "entries" not in read
     assert "--allow-settings" in read["reason"]
     assert response.status_code == 403
-    assert not (tmp_path / "data" / "state.db").exists()
+    assert SqliteState(tmp_path / "data" / "state.db").list_feedback() == []
 
 
 def test_feedback_is_allowed_on_a_remote_bind_with_the_flag(tmp_path):

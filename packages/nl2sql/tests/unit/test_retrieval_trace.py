@@ -56,9 +56,9 @@ CHINOOK = [
 ]
 
 
-def _store(tmp_path, *more, schema_store=None, **other_datasources) -> Retriever:
+def _store(tmp_path, *more, state=None, **other_datasources) -> Retriever:
     """The Chinook entries (and ``more``) as one live build, and each of ``other_datasources``."""
-    index = TestIndex(tmp_path, BagEmbeddings(), schema_store=schema_store)
+    index = TestIndex(tmp_path, BagEmbeddings(), state=state)
     index.write("chinook", [*CHINOOK, *more])
     for ds, chunks in other_datasources.items():
         index.write(ds, chunks)
@@ -265,7 +265,7 @@ def _chinook_snapshot() -> SchemaSnapshot:
 
 
 def _retriever_store(tmp_path, schema_store) -> Retriever:
-    index = TestIndex(tmp_path, BagEmbeddings(), schema_store=schema_store)
+    index = TestIndex(tmp_path, BagEmbeddings(), state=schema_store)
     g, t, il = (REFS[n].full_name for n in ("Genre", "Track", "InvoiceLine"))
     index.write("chinook", [
         _doc("schema.table", "genre track", table=g),
@@ -284,7 +284,7 @@ def _retriever(tmp_path, allow, full_snapshot_max_tables=15):
     return SchemaRetrieverNode(fake_runtime(
         settings={"retrieval": {"full_snapshot_max_tables": full_snapshot_max_tables}},
         vector_store=_retriever_store(tmp_path, schema_store),
-        schema_store=schema_store,
+        state=schema_store,
         policies={"roles": {"analyst": {"description": "d", "allow": list(allow)}}},
     ))
 

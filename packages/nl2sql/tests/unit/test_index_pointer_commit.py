@@ -45,10 +45,11 @@ def _database(path: Path, *tables: str) -> None:
             connection.execute(f"CREATE TABLE IF NOT EXISTS {table} (id INTEGER PRIMARY KEY, name TEXT)")
 
 
-def _engine(tmp_path: Path, embedder=None) -> NL2SQL:
+def _engine(tmp_path: Path, embedder=None, max_versions: int = 3) -> NL2SQL:
     if not (tmp_path / "shop.db").exists():
         _database(tmp_path / "shop.db", "customers")
-    cfg = make_config(tmp_path, datasources=[SHOP], llm={"provider": "openai", "model": "gpt-test", "api_key": "sk-test"})
+    cfg = make_config(tmp_path, datasources=[SHOP], llm={"provider": "openai", "model": "gpt-test", "api_key": "sk-test"},
+                      settings={"schema": {"max_versions": max_versions}})
     embedder = embedder if embedder is not None else _Embedder(size=8)
     return NL2SQL(cfg.model_copy(update={"embeddings": Embeddings(instance=embedder, dimension=embedder.size)}))
 
@@ -72,20 +73,20 @@ def _failed_rebuild(engine: NL2SQL, tmp_path: Path) -> str:
     _database(tmp_path / "shop.db", "orders")
     ctx = engine._runtime
     stored = []
-    register = ctx.schema_store.register_snapshot
+    put = ctx.state.put_snapshot
 
     def spy(snapshot):
-        version, evicted = register(snapshot)
+        version = put(snapshot)
         stored.append(version)
-        return version, evicted
+        return version
 
-    ctx.schema_store.register_snapshot = spy
+    ctx.state.put_snapshot = spy
     ctx.embedder.fail = True
     try:
         assert not engine.index.build().ok
     finally:
         ctx.embedder.fail = False
-        ctx.schema_store.register_snapshot = register
+        ctx.state.put_snapshot = put
     assert stored, "the failed build never stored its snapshot"
     return stored[0]
 
@@ -175,3 +176,63 @@ def test_prune_keeps_only_the_current_namespace(engine, tmp_path):
 
 def test_the_namespace_names_the_model_and_dimension(engine):
     assert engine._runtime.namespace == "nl2sql__instance-fake-a__8"
+
+
+def test_keep_snapshots_keeps_every_pointed_version(engine, tmp_path):
+    """Eviction never removes a version a pointer names, in any namespace.
+
+    Model A's build points at the first version. Model B then builds three
+    more structures with ``max_versions: 1``: its oldest unpointed one goes,
+    and model A's pointed one stays, so switching back still reads its schema.
+    """
+    ctx = engine._runtime
+    pointed_by_a = ctx.vector_store.schema_version("shop")
+    engine.close()
+    versions = []
+    with _engine(tmp_path, _Embedder(size=16, model="fake-b"), max_versions=1) as other:
+        for table in ("orders", "items", "payments"):
+            _database(tmp_path / "shop.db", table)
+            assert other.index.build().ok
+            versions.append(other._runtime.vector_store.schema_version("shop"))
+        state = other._runtime.state
+        kept = set(state.list_versions("shop"))
+
+    # A's pointed version, B's live one and the one it replaced (runs may have pinned it).
+    assert kept == {pointed_by_a, versions[2], versions[1]}
+    with _engine(tmp_path) as again:
+        assert again.index.health()["status"] == "ok"
+        assert _tables(again) == ["customers"]
+
+
+def test_index_build_holds_the_lock(engine, tmp_path):
+    """``nl2sql index`` and nl2sql-api can share a ``storage.path``: one build at a time."""
+    from nl2sql.storage.sqlite import SqliteState
+
+    ctx = engine._runtime
+    held = []
+    put = ctx.state.put_snapshot
+
+    def spy(snapshot):
+        try:
+            with ctx.state.lock("index", ttl_s=60):
+                held.append(False)
+        except Exception:
+            held.append(True)
+        return put(snapshot)
+
+    ctx.state.put_snapshot = spy
+    try:
+        assert engine.index.build().ok
+    finally:
+        ctx.state.put_snapshot = put
+    assert held == [True]
+
+    other = SqliteState(ctx.state.path)
+    try:
+        with other.lock("index", ttl_s=60):
+            result = engine.index.build()
+    finally:
+        other.close()
+    assert not result.ok
+    assert result.errors and "index" in result.errors[0]["error"]
+    assert engine.index.build().ok   # released again

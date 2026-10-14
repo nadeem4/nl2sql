@@ -453,6 +453,39 @@ So even a daily session stays well inside $10.
       `Runtime.stores` (`StorePaths`) stays for the state store's callers
       until S3.
 
+!!! note "Built: the state store, migrations and the lock (S3)"
+    `nl2sql/storage/sqlite.py` is the `sqlite` state store: immutable
+    snapshots (a trigger refuses any `UPDATE`), the plan cache, feedback,
+    `nl2sql_meta` migrations (1 adopts 0.5's three tables, 2 adds the later
+    feedback columns, 3 adds the trigger and the `locks` table) and the lease.
+    `schema/sqlite_store.py`, `schema/in_memory_store.py`, `schema/store.py`,
+    `schema/protocol.py` (the fingerprint moved to `schema/fingerprint.py`) and
+    `feedback/store.py` are deleted; `Runtime.schema_store` is gone and the
+    engine reads `Runtime.state` through `StateStore`, so the state slot takes
+    any state store. The runtime calls `migrate()` when it opens the stores;
+    the store opens its file on first use. `health.py`, `nl2sql cache clear`
+    (through the new `engine.clear_plan_cache()`) and `nl2sql curated
+    proposals export` (through `engine.feedback.list()`) go through the
+    engine. Building it settled these details:
+
+    - `StateStore.list_versions(datasource_id)`, newest first, is added: the
+      engine needs it to keep "the newest `max_versions`".
+    - `put_snapshot` returns the stored version when the contract and metadata
+      are identical, and stores a new version otherwise, so a re-index whose
+      statistics changed gets a new version and a cold plan cache for that
+      datasource (the cache is already keyed on the run date).
+    - After a build, `keep` is every version a pointer names in any namespace,
+      the version the build replaced (runs in flight may have pinned it, as
+      with builds), and the newest `max_versions`.
+    - `engine.index.build()` holds the `index` lock with a one-hour lease; a
+      build started while it is held fails every datasource at once with the
+      holder's expiry. A store's `lock()` raises when the lease is held.
+    - The engine builds the feedback row (`nl2sql.feedback.rated_row`) and the
+      store keeps it as given, so `add_feedback` needs no rating rules.
+    - With every slot read through its interface, the runtime's "built-in only"
+      slot check, `Runtime.stores` (`StorePaths`) and the CLI's `store_paths`
+      are deleted.
+
 ### The config
 
 Every sub-block is optional. A config with only `path` stays valid and means
@@ -551,6 +584,7 @@ class StateStore(Protocol):
     def migrate(self) -> list[str]: ...                       # applied migration names
     def put_snapshot(self, snapshot: SchemaSnapshot) -> str: ...      # returns schema_version
     def get_snapshot(self, datasource_id: str, schema_version: str) -> SchemaSnapshot | None: ...
+    def list_versions(self, datasource_id: str) -> list[str]: ...              # newest first (S3)
     def keep_snapshots(self, datasource_id: str, keep: set[str]) -> int: ...   # deletes the rest
     def get_plan(self, key: str, datasource_id: str, schema_version: str) -> str | None: ...
     def put_plan(self, key: str, datasource_id: str, schema_version: str, plan_json: str) -> None: ...
@@ -1295,6 +1329,17 @@ The kit proves itself on the five built-ins: SQLite and DuckDB in the unit
 job, PostgreSQL, MySQL and SQL Server in the `realdb` job.
 
 ### `engine.datasources`: the methods behind Connect a database
+
+!!! note "Built: B5"
+    `types()` returns `DatasourceType`s (exported from `nl2sql`), `test()`
+    takes an id or a `Datasource`, and `add()` validates `index` as an
+    `IndexScope` again, since `model_copy(update=...)` skips validation. Filled
+    in on the way: `Registry.load(..., require_installed=False)` and
+    `missing_modules` describe an adapter without its driver; a `Datasource`
+    that cannot be built fails `test()` at `config` (unknown type, or a
+    connection the model rejects) or `driver` (the install hint is the fix),
+    and an adapter that names no stage still reports `connect` until B3
+    classifies. The REST routes and the form are Phase 4.
 
 | Method | What it does |
 |---|---|

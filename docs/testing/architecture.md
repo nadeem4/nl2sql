@@ -154,7 +154,7 @@ flowchart TD
 - Pipeline nodes (`test_node_*.py`)
 - Subgraph orchestration (`test_sql_agent_subgraph.py`)
 - DAG layering (`test_graph_layers.py`)
-- Registry and store behavior (`test_*_registry.py`, `test_schema_store.py`)
+- Registry and store behavior (`test_*_registry.py`, `test_state_store.py`)
 - REST contract (`packages/api/tests/`) via FastAPI `TestClient` with the
   `get_engine` dependency overridden, so no datasource, LLM or network is needed
 

@@ -96,7 +96,7 @@ def preferred_table_warnings(
 def index_health(
     index,
     namespace: str,
-    schema_store,
+    state,
     datasource_ids: Iterable[str],
     embedding_model: Optional[str] = None,
     curated_hashes: Optional[Dict[str, str]] = None,
@@ -159,14 +159,14 @@ def index_health(
 
     def snapshot_of(ds_id: str):
         pointer = pointers.get(ds_id)
-        if pointer is None or schema_store is None:
+        if pointer is None or state is None:
             return None
-        return schema_store.get_snapshot(ds_id, pointer.schema_version)
+        return state.get_snapshot(ds_id, pointer.schema_version)
 
     for ds in datasources:
         if ds.entries == 0:
             health.problems.append(f"Datasource '{ds.datasource_id}' has no entries in the vector index.")
-        elif schema_store is not None and snapshot_of(ds.datasource_id) is None:
+        elif state is not None and snapshot_of(ds.datasource_id) is None:
             health.problems.append(
                 f"Datasource '{ds.datasource_id}' was indexed from schema version {ds.index_version}, "
                 "which is no longer in the state store."

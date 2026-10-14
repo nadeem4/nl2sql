@@ -1,4 +1,4 @@
-"""The feedback table: one rating per run, kept beside the schema snapshots.
+"""The feedback table: one rating per run, kept by the state store.
 
 A row holds the question, the SQL and the run's signals, never result rows,
 sample values or keys. A run the role was refused keeps no SQL.
@@ -9,8 +9,8 @@ import json
 
 import pytest
 
-from nl2sql.feedback import FeedbackStore, run_record, run_signals
-from nl2sql.schema import SqliteSchemaStore
+from nl2sql.feedback import NOTE_MAX_CHARS, rated_row, run_record, run_signals
+from nl2sql.storage.sqlite import SqliteState
 
 TRACE_ID = "0b8f7d2e-1111-4222-8333-944455556666"
 
@@ -93,44 +93,46 @@ def test_signals_count_validator_failures_from_a_trace_when_there_is_one():
     assert run_signals(failed_check)["validator_failures"] == 1
 
 
-def test_store_saves_lists_and_replaces_a_rating(tmp_path):
-    store = FeedbackStore(tmp_path / "schema_store.db")
+@pytest.fixture
+def store():
+    state = SqliteState(":memory:")
+    state.migrate()
+    yield state
+    state.close()
+
+
+def test_store_saves_lists_and_replaces_a_rating(store):
     record = run_record(_result(), question="How many customers?", role="admin", llm_configs={},
                         engine_version="x")
 
-    store.save(record, rating="up", note=None)
-    store.save(record, rating="down", note="wrong number")
-    rows = store.list()
+    store.add_feedback(rated_row(record, "up", None))
+    store.add_feedback(rated_row(record, "down", "wrong number"))
+    rows = store.list_feedback()
 
     assert len(rows) == 1
     assert rows[0]["rating"] == "down" and rows[0]["note"] == "wrong number"
     assert rows[0]["sql"] == ["SELECT COUNT(*) AS n FROM Customer"]
     assert rows[0]["models"] == {"decomposer": {"provider": None, "model": "gpt-4.1-mini"},
                                  "ast_planner": {"provider": None, "model": "gpt-4.1"}}
-    assert store.counts() == {"up": 0, "down": 1}
-    store.close()
 
 
-def test_store_refuses_a_bad_rating(tmp_path):
-    store = FeedbackStore(tmp_path / "schema_store.db")
+def test_a_bad_rating_is_refused_and_a_long_note_is_cut():
     record = run_record(_result(), question="q", role="admin", llm_configs={}, engine_version="x")
+
     with pytest.raises(ValueError):
-        store.save(record, rating="meh", note=None)
-    store.close()
+        rated_row(record, "meh", None)
+    assert len(rated_row(record, "up", "x" * 1000)["note"]) == NOTE_MAX_CHARS
+    assert rated_row(record, "up", "   ")["note"] is None
 
 
-def test_the_table_lives_in_the_schema_store_and_clear_leaves_the_rest(tmp_path):
-    path = tmp_path / "data" / "schema_store.db"
-    SqliteSchemaStore(path=path).close()
-    store = FeedbackStore(path)
-    store.save(run_record(_result(), question="q", role="admin", llm_configs={}, engine_version="x"),
-               rating="up", note=None)
+def test_clear_empties_the_feedback_and_leaves_the_rest(store):
+    store.put_plan("q", "chinook", "v1", "{}")
+    store.add_feedback(rated_row(run_record(_result(), question="q", role="admin", llm_configs={},
+                                            engine_version="x"), "up", None))
 
-    assert store.clear() == 1
-    assert store.list() == []
-    tables = {r[0] for r in store._connection.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-    assert {"feedback", "schema_snapshots", "plan_cache"} <= tables
-    store.close()
+    assert store.clear_feedback() == 1
+    assert store.list_feedback() == []
+    assert store.get_plan("q", "chinook", "v1") == "{}"
 
 
 def test_a_record_holds_the_datasources_and_where_the_answer_came_from():
@@ -147,16 +149,14 @@ def test_a_record_holds_the_datasources_and_where_the_answer_came_from():
                       engine_version="x")["source"] == "verified"
 
 
-def test_the_store_keeps_the_datasources_and_the_source(tmp_path):
-    store = FeedbackStore(tmp_path / "schema_store.db")
+def test_the_store_keeps_the_datasources_and_the_source(store):
     record = run_record(_result(sub_queries=[{"sql": "SELECT 1", "datasource_id": "chinook"}],
                                 source={"type": "generated"}),
                         question="q", role="admin", llm_configs={}, engine_version="x")
-    store.save(record, rating="up", note=None)
+    store.add_feedback(rated_row(record, "up", None))
 
-    row = store.list()[0]
+    row = store.list_feedback()[0]
     assert row["datasource_ids"] == ["chinook"] and row["source"] == "generated"
-    store.close()
 
 
 OLD_SCHEMA = """
@@ -174,21 +174,21 @@ CREATE TABLE feedback (
 def test_a_store_from_before_the_new_columns_gains_them_and_keeps_its_rows(tmp_path):
     import sqlite3
 
-    path = tmp_path / "schema_store.db"
+    path = tmp_path / "state.db"
     with sqlite3.connect(path) as conn:
         conn.execute(OLD_SCHEMA)
         conn.execute("INSERT INTO feedback VALUES ('old', 1, 'up', NULL, 'How many?', 'admin', 'success', "
                      "'[\"SELECT 1\"]', '[]', 0, 0, 0, 1, '{}', 'x')")
+    conn.close()
 
-    store = FeedbackStore(path)
-    columns = {r[1] for r in store._connection.execute("PRAGMA table_info(feedback)")}
-    assert {"datasource_ids", "source"} <= columns
-    old = store.list()[0]
+    store = SqliteState(path)
+    store.migrate()
+    old = store.list_feedback()[0]
     assert old["question"] == "How many?" and old["datasource_ids"] is None and old["source"] is None
 
-    store.save(run_record(_result(sub_queries=[{"sql": "SELECT 2", "datasource_id": "chinook"}]),
-                          question="q", role="admin", llm_configs={}, engine_version="x"),
-               rating="up", note=None)
-    assert len(store.list()) == 2
+    store.add_feedback(rated_row(run_record(_result(sub_queries=[{"sql": "SELECT 2", "datasource_id": "chinook"}]),
+                                            question="q", role="admin", llm_configs={}, engine_version="x"),
+                                 "up", None))
+    assert len(store.list_feedback()) == 2
+    assert store.migrate() == []  # migrating again changes nothing
     store.close()
-    FeedbackStore(path).close()  # opening a migrated store again changes nothing

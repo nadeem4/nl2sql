@@ -1,16 +1,10 @@
+"""A schema's structural fingerprint: tables, columns, types, keys. Statistics and descriptions are left out."""
 from __future__ import annotations
 
 import hashlib
 import json
-from typing import List, Optional, Protocol, Tuple
 
-from nl2sql_sdk.schema import (
-    SchemaContract,
-    SchemaMetadata,
-    SchemaSnapshot,
-    TableContract,
-    TableMetadata,
-)
+from nl2sql_sdk.schema import SchemaContract
 
 
 def generate_schema_fingerprint(schema: SchemaContract) -> str:
@@ -54,44 +48,3 @@ def generate_schema_fingerprint(schema: SchemaContract) -> str:
 
     raw = json.dumps(payload, sort_keys=True, default=str)
     return hashlib.sha256(raw.encode()).hexdigest()
-
-
-class SchemaStore(Protocol):
-    """Unified interface for schema snapshot storage backends."""
-
-    def register_snapshot(self, snapshot: SchemaSnapshot) -> Tuple[str, List[str]]:
-        ...
-
-    def get_snapshot(
-        self, datasource_id: str, schema_version: str
-    ) -> Optional[SchemaSnapshot]:
-        ...
-
-    def list_versions(self, datasource_id: str) -> List[str]:
-        ...
-
-    def get_table_contract(
-        self,
-        datasource_id: str,
-        schema_version: str,
-        table_key: str,
-    ) -> Optional[TableContract]:
-        ...
-
-    def get_table_metadata(
-        self,
-        datasource_id: str,
-        schema_version: str,
-        table_key: str,
-    ) -> Optional[TableMetadata]:
-        ...
-
-    # The plan cache (nl2sql.pipeline.plan_cache) lives beside the snapshots.
-    def get_cached_plan(self, question_key: str, datasource_id: str, schema_version: str) -> Optional[str]:
-        ...
-
-    def put_cached_plan(self, question_key: str, datasource_id: str, schema_version: str, plan_json: str) -> None:
-        ...
-
-    def clear_plan_cache(self) -> int:
-        ...

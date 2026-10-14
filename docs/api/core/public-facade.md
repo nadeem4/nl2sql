@@ -55,7 +55,7 @@ embedder (from `embeddings`, or the `instance` given), and its stores:
 | store | location |
 | --- | --- |
 | Vector index | `<storage.path>/index/` |
-| Schema snapshots, plan cache, feedback | `<storage.path>/state.db` |
+| Schema snapshots, plan cache, feedback, the index lock | the state store, `<storage.path>/state.db` by default |
 | Run traces | `<storage.path>/traces/` |
 | Result files | `<storage.path>/results/` (see [Artifact Store](../../storage/artifact-store.md)) |
 
@@ -86,6 +86,7 @@ with NL2SQL.from_config("nl2sql.yaml") as engine:
 | --- | --- |
 | `check() -> CheckReport` | Connects to each datasource and records it `ready`, or `failed` with the stage the adapter found (`config`, `driver`, `network`, `auth`, `database` or `permission`; none when it cannot tell), the reason and a fix. A ready datasource whose adapter does not declare `ENFORCES_READ_ONLY` carries a warning in `warnings`: its session can write. A failed datasource is marked unavailable and left out of routing: the engine runs degraded, and a query that targets it fails with the reason. It also reports each agent whose API key does not resolve (no model is called) and the index status from `index.health()`. Raises `EngineNotReady` if a `required: true` datasource fails, or if datasources are configured and none is ready; the error carries the `report`. Safe to call again: a datasource that connects on a later call is routed to again. |
 | `close()` | Disposes each adapter's connection pool (an adapter's optional `close()`) and closes the state store and the vector store client. `run_query`, `stream_query` and `check` raise afterwards. Calling it twice is fine. |
+| `clear_plan_cache() -> int` | Removes every cached plan from the state store and returns how many there were. Schema snapshots and feedback stay; the next run of each question calls the planner. `nl2sql cache clear` calls it. |
 | `with NL2SQL(...) as engine:` | `__exit__` calls `close()`. |
 | `config` | The current frozen `Config`. |
 | `closed` | Whether `close()` ran. |
@@ -107,9 +108,9 @@ datasource fails.
 ```python
 engine.run_query(question, *, datasource_id=None, execute=True, user_context=None, cancellation_token=None)
 engine.stream_query(question, *, datasource_id=None, execute=True, user_context=None, cancellation_token=None)
-engine.check(); engine.close(); engine.config; engine.about()
+engine.check(); engine.close(); engine.config; engine.about(); engine.clear_plan_cache()
 
-engine.datasources   # list, get, add, remove, schema, test
+engine.datasources   # list, get, types, test, add, remove, schema
 engine.index         # build, health, clear, inspect, inspect_defaults
 engine.llm           # list, get, providers, replace
 engine.policies      # roles, allows, allowed, validate
@@ -166,7 +167,7 @@ about = engine.about()
 ### Feedback
 
 Ratings of answered runs, and the guardrail rates over recorded runs. They live
-in the `feedback` table of `<storage.path>/state.db`; the rates also read the
+in the state store (`<storage.path>/state.db` by default); the rates also read the
 traces in `<storage.path>/traces`. `nl2sql feedback` and the playground's
 thumbs up and down are built on it. See
 [Feedback and signals](../../observability/feedback.md) for what is stored.
@@ -228,7 +229,7 @@ submodule: `NL2SQL`, `QueryResult`, `SubQueryResult`, `RowSample`,
 `AnswerSource`, `ResultSummary`, `ResultManifest`, `ResultPage`,
 `ResultNotFound`, `MAX_RESULT_PAGE_SIZE`, `QuestionUsage`, `QueryEvent`,
 `UserContext`, `CancellationToken`, `configure_logging`, what the namespaces
-return (`DatasourceInfo`, `IndexProgress`, `LLMChange`), the config (`Config`,
+return (`DatasourceInfo`, `DatasourceType`, `IndexProgress`, `LLMChange`), the config (`Config`,
 `load_config`, `load_env_file`, `ConfigError`, `Registry` and the section
 classes `Datasource`, `Limits`, `LLM`, `AgentLLM`, `Embeddings`, `Policies`,
 `Role`, `Storage`, `StoreConfig`, `Secrets`, `Curated`, `Settings`), what `check()` reports

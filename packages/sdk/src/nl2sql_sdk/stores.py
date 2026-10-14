@@ -150,13 +150,22 @@ class StateStore(Store, Protocol):
         ...
 
     def put_snapshot(self, snapshot: SchemaSnapshot) -> str:
-        """Store an immutable snapshot; return its ``schema_version``."""
+        """Store an immutable snapshot; return its ``schema_version``.
+
+        A stored snapshot is never changed: new content gets a new version,
+        and content already stored returns its existing version.
+        """
         ...
 
     def get_snapshot(self, datasource_id: str, schema_version: str) -> Optional[SchemaSnapshot]: ...
 
+    def list_versions(self, datasource_id: str) -> List[str]:
+        """The datasource's stored snapshot versions, newest first."""
+        ...
+
     def keep_snapshots(self, datasource_id: str, keep: Set[str]) -> int:
-        """Delete every snapshot of ``datasource_id`` whose version is not in ``keep``; return how many."""
+        """Delete every snapshot of ``datasource_id`` whose version is not in ``keep``, and the plans
+        cached on them; return how many snapshots."""
         ...
 
     def get_plan(self, key: str, datasource_id: str, schema_version: str) -> Optional[str]: ...
@@ -172,7 +181,10 @@ class StateStore(Store, Protocol):
     def clear_feedback(self) -> int: ...
 
     def lock(self, name: str, ttl_s: int) -> ContextManager[None]:
-        """A lease on ``name``, held for the ``with`` block. It expires after ``ttl_s`` if its holder dies."""
+        """A lease on ``name``, held for the ``with`` block. It expires after ``ttl_s`` if its holder dies.
+
+        Raises when another holder has the lease; the message says until when.
+        """
         ...
 
     def close(self) -> None: ...
