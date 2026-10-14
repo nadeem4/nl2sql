@@ -887,3 +887,21 @@ def test_only_entry_points_load_dotenv():
 def test_the_settings_global_is_gone():
     assert not (ENGINE / "common" / "settings.py").exists()
     assert not (ENGINE / "common" / "env_hint.py").exists()
+
+
+def test_no_tracked_file_holds_a_merge_conflict_marker():
+    """A conflict left in a rebase must fail CI, not render on the docs site."""
+    tracked = subprocess.run(
+        ["git", "ls-files"], cwd=REPO, capture_output=True, text=True, check=True
+    ).stdout.split()
+    marker = re.compile(r"^(<{7}|>{7})( |$)", re.MULTILINE)
+    found = []
+    for name in tracked:
+        path = REPO / name
+        try:
+            text = path.read_text(encoding="utf-8")
+        except (UnicodeDecodeError, OSError):
+            continue
+        if marker.search(text):
+            found.append(name)
+    assert not found, f"Merge conflict markers in: {found}"
