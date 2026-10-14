@@ -29,12 +29,18 @@ SQL Server first, and the adapter work is proven on it.
 
 ## Owner decisions
 
-Decisions the owner made on this design. Each is written into the section it
-affects.
+The owner answered every question this design raised. Each answer is written
+into the section it affects.
 
 | # | Decision | Where |
 |---|---|---|
-| 1 | **The GCP test bed is deleted when idle and recreated per session.** Cloud SQL bills a stopped instance's public IPv4 address and will not drop it, and Private Service Connect can only be chosen at creation, so no instance exists between sessions. `up` creates them with session-unique names and imports the samples from the bucket; `down` deletes them; a nightly backstop deletes any left behind. | [The GCP test bed](#the-gcp-test-bed) |
+| 1 | **No Cloud SQL.** A stopped Cloud SQL instance still bills its public IPv4 address, so the test bed is one compose file instead, run locally, in CI and on one small GCP VM. | [The real-database test bed](#3-the-real-database-test-bed) |
+| 2 | **CI runs the real databases only when they matter:** on pull requests that change database-facing code, nightly on `main`, and on demand before a release. A small gate job that always runs is the required check, so a skipped run passes honestly. The containers run on GitHub's runners. | [CI: the `realdb` workflow](#ci-the-realdb-workflow) |
+| 3 | **The GCP test bed is one small VM running the same compose file,** started and stopped on demand, with an ephemeral external IP, no public database port, and access through IAP tunnels. A nightly scheduler job stops it. There are no GitHub-to-GCP credentials: it is run by hand, at least before each release. | [The GCP VM](#the-gcp-vm) |
+| 4 | **SQL Server declares `ENFORCES_READ_ONLY` false,** `check()` warns, and the docs recommend a login with only `db_datareader`. | [Read-only and timeouts, honestly](#read-only-and-timeouts-honestly) |
+| 5 | **Two-part policy patterns are rejected,** with the fix in the message. | [Pattern rules](#pattern-rules) |
+| 6 | **No S3 or ADLS result store in 0.6.** The `ResultStore` interface ships with a docs example; a community plugin can come later. | [The interfaces](#the-interfaces) |
+| 7 | **Built-in LLM providers stay minimal: `openai`, `anthropic` and `openai_compatible`.** There is no `azure_openai`; Azure's v1 endpoint, vLLM, Ollama, LiteLLM and OpenRouter all use `openai_compatible` with a `base_url`. Everything else is a plugin through the provider interface and the registry. The same holds for embeddings. `openrouter` and `ollama` stop being built-ins. | [LLM and embeddings providers](#5-llm-and-embeddings-providers) |
 
 ## Where Phase 1 left us
 
@@ -43,7 +49,7 @@ affects.
 | Config | One typed `Config` from `nl2sql.yaml` and split files; strict keys; `${provider:key}` references | Nothing for Phase 2 to fix |
 | Registry | `Registry.default()`, `add_*` and decorators for adapters, LLMs, embeddings and secrets | No store or policy-check kinds yet |
 | Storage | `storage.path` only. Under it: Chroma in `index/`, `state.db`, `traces/`, `results/` | One store class per thing, opened by path, Chroma private attributes used throughout, and bug B5 |
-| LLMs | `openai`, `anthropic`, `openrouter`, `ollama`; per-agent provider, model, temperature, key and `base_url` | No named OpenAI-compatible or Azure provider; one malformed structured answer ends the run |
+| LLMs | `openai`, `anthropic`, `openrouter`, `ollama`; per-agent provider, model, temperature, key and `base_url` | Two near-duplicate presets instead of one general OpenAI-compatible provider; one malformed structured answer ends the run |
 | Embeddings | `local` and `openai` | No `base_url`; a model change is refused instead of building a new index |
 | Policies | `allow_all`, `default_role`, `admin_roles`, `refusal_names_tables`, roles with `allowed_datasources` and `allowed_tables` | No deny; no globs; five call sites of `table_allowed`; denied tables still shown to the planner; no extension point |
 | Adapters | Interface version 1 with `driver_modules` and `install_hint`; typed connection models hidden inside each adapter | Unknown connection keys are ignored, read-only is enforced only on SQLite with an option, `test_connection` returns a bool, profiling reflects twice and counts every row |
@@ -54,10 +60,10 @@ affects.
 
 | Goal | What it means |
 |---|---|
-| **A real-database test bed** | PostgreSQL with Pagila, MySQL with Sakila and SQL Server 2022 with AdventureWorksLT, plus a generated schema of 1,200 tables in 20 schemas. They run as CI service containers, in `docker compose` locally, and on a GCP test bed that is created for each session and deleted after it. A `realdb` pytest marker and fixtures point the same tests at any of them. |
+| **A real-database test bed** | PostgreSQL with Pagila, MySQL with Sakila and SQL Server 2022 with AdventureWorksLT, plus a generated schema of 1,200 tables in 20 schemas. One `docker-compose.yml` runs them locally, on GitHub's runners in CI, and on one small GCP VM started on demand. A `realdb` pytest marker and fixtures point the same tests at any of them. |
 | **Four stores** | `storage` gets `index`, `state`, `traces` and `results`, each with a `type`, behind four small interfaces in the SDK. The index's build pointer is the commit, which fixes bug B5. The index has one namespace per embedding model. |
-| **More LLM providers** | `openai_compatible` (any server with an OpenAI-style API, at a `base_url`) and `azure_openai`. Each provider declares how it returns structured output, and a malformed answer is retried with the error fed back. |
-| **More embeddings providers** | `openai_compatible` and `azure_openai`, `base_url` on every hosted provider, and a known model and dimension for every embedder. |
+| **Fewer, more general LLM providers** | `openai`, `anthropic` and `openai_compatible` (any server with an OpenAI-style API at a `base_url`: Azure's v1 endpoint, vLLM, Ollama, LiteLLM, OpenRouter). Each provider declares how it returns structured output, and a malformed answer is retried with the error fed back. |
+| **Embeddings providers** | `local`, `openai` and `openai_compatible`, `base_url` on the hosted ones, and a known model and dimension for every embedder. |
 | **Policies, step 1** | Allow and deny globs over `datasource.schema.table`, one `Scope` object used at every place access is decided, denied tables hidden from the planner, and a `PolicyCheck` extension point. |
 | **Adapter SDK v2** | A typed `ConnectionModel` per adapter (which also drives a generated form), `IndexScope`, type-aware profiling with catalog row estimates, honest read-only and timeout capabilities checked against real servers, `test_connection` that names the failed stage, the SQLAlchemy base made public as an SDK extra, and a conformance kit run against all five built-in adapters. |
 | **Connect a database, in the package** | `engine.datasources.types()`, `test()` and `add()`: the package methods a Connect-a-database form calls. |
@@ -72,7 +78,7 @@ affects.
 | dbt as a knowledge source | Needs the knowledge-source interface | Later (owner) |
 | Async hooks; any event bus or hook | Nothing in Phase 2 consumes events | Phase 3 |
 | Snowflake and BigQuery adapters | The conformance kit comes first; a community package passes it, then is adopted | Later (owner) |
-| S3 or ADLS result stores | The results interface ships; remote stores come as plugins (see [open question 6](#14-open-questions)) | Later |
+| S3 or ADLS result stores | The results interface ships with a docs example; remote stores come as plugins (owner decision 6) | Later |
 | The runtime price table owned by `llm/` | It belongs with the cost observer | Phase 3 |
 | REST routes and forms for Connect a database, `datasources.scan()` and `draft()` | The package methods ship first; the apps render them | Phase 4 |
 | Retrieval limits as settings, incremental re-indexing | The wide schema in the test bed measures the problem first | After 0.6 |
@@ -85,7 +91,7 @@ database to test against.
 ```mermaid
 flowchart LR
   subgraph A["Wave A"]
-    T["Track 1: the real-database test bed<br/>CI containers, compose, GCP, realdb marker"]
+    T["Track 1: the real-database test bed<br/>one compose file, CI, GCP VM, realdb marker"]
     N["Track 2: work that needs no real database<br/>stores, providers, policies"]
   end
   T --> B["Wave B: adapter SDK v2<br/>built and proven on the test bed"]
@@ -105,23 +111,37 @@ flowchart LR
 
 ### What it is
 
-| Server | Sample database | Generated schema | Where it runs |
-|---|---|---|---|
-| PostgreSQL 16 | Pagila | `wide` (1,200 tables, 20 schemas) | CI, compose, GCP |
-| MySQL 8.0 | Sakila | `wide_s01` ... `wide_s20` (MySQL's schemas are databases) | CI, compose, GCP |
-| SQL Server 2022 | AdventureWorksLT 2022 | `wide` | CI, compose, GCP |
-| SQLite, DuckDB | the conformance kit's own seed | — | in process, in the unit job |
+One file, `testbed/docker-compose.yml`, defines the whole test bed. The same
+file runs in three places (owner decision 2):
 
-CI loads the generated schema into PostgreSQL only, to keep the job short.
-The GCP test bed and `--wide all` in compose load it everywhere, because
-`IndexScope` and catalog row estimates are per adapter.
+| Where | When | Cost |
+|---|---|---|
+| Your machine | whenever you want | free |
+| GitHub's runners (CI) | pull requests that change database-facing code, nightly on `main`, and on demand before a release | free; no IP address involved |
+| One small GCP VM | by hand, at least once before each release | about $0.07 an hour running; disk only (about $1 to $2 a month) when stopped |
+
+| Server | Sample database | Generated schema |
+|---|---|---|
+| PostgreSQL 16 | Pagila | `wide` (1,200 tables, 20 schemas) |
+| MySQL 8.0 | Sakila | `wide_s01` ... `wide_s20` (MySQL's schemas are databases) |
+| SQL Server 2022 | AdventureWorksLT 2022 | `wide` |
+| SQLite, DuckDB | the conformance kit's own seed, in process, in the unit job | — |
+
+The generated schema is loaded on all three servers everywhere, because
+`IndexScope` and catalog row estimates are per adapter, and one compose file
+means one behaviour.
+
+There is no Cloud SQL. An earlier draft of this page used three Cloud SQL
+instances; a stopped Cloud SQL instance still bills its public IPv4 address,
+and a VM running the same compose file is cheaper, simpler and identical to
+CI.
 
 ### The sample databases and their licences
 
-The loader downloads each sample from a pinned URL, checks its SHA-256, and
-caches it in `testbed/.cache/` (ignored by git). Nothing is committed to the
-repository, so we never redistribute the files. If we ever vendor one, its
-licence file goes beside it.
+The compose file's `samples` service downloads each sample from a pinned URL
+and checks its SHA-256. Nothing is committed to the repository, so we never
+redistribute the files. If we ever vendor one, its licence file goes beside
+it.
 
 | Sample | Files | Source | Licence | What we must do |
 |---|---|---|---|---|
@@ -131,9 +151,8 @@ licence file goes beside it.
 
 The server images have their own terms. The SQL Server image runs the free
 Developer edition, which needs `ACCEPT_EULA=Y` and is licensed for
-development and testing, which is all we do with it. Cloud SQL's SQL Server
-Express has no licence fee. The PostgreSQL and MySQL images are used as they
-are.
+development and testing, which is all we do with it. The PostgreSQL and MySQL
+images are used as they are.
 
 ### The generated wide schema
 
@@ -155,97 +174,96 @@ The big tables are filled on the server with a series function
 (`generate_series`, a recursive CTE, or a numbers table), so the file stays
 small. That SQL lives in the test bed, which is test code, not engine code.
 
-### Local: `docker compose`
+### The compose file
 
-`testbed/compose.yaml` starts the three servers, bound to `127.0.0.1` only,
-on ports that do not clash with a local install:
+`docker compose -f testbed/docker-compose.yml up -d --wait` starts and loads
+everything. Loading happens once per data volume, so a second `up` is quick.
 
-| Service | Image | Port | User and password |
-|---|---|---|---|
-| `postgres` | `postgres:16` | 15432 | `postgres` / `Nl2sql-Testbed-1` |
-| `mysql` | `mysql:8.0` | 13306 | `root` / `Nl2sql-Testbed-1` |
-| `mssql` | `mcr.microsoft.com/mssql/server:2022-latest` | 11433 | `sa` / `Nl2sql-Testbed-1` |
+| Service | Image | What it does |
+|---|---|---|
+| `samples` | `python:3.12-slim` | One-shot. Downloads the pinned samples, checks them, runs `wide_schema.py` for the three dialects, and writes the files into the `samples` volume. Skips what is already there. |
+| `postgres` | `postgres:16` | Starts after `samples`. Its first start runs Pagila and the wide schema from `/docker-entrypoint-initdb.d`, the image's own init mechanism. |
+| `mysql` | `mysql:8.0` | The same, with Sakila. The image's init uses the `mysql` client, which handles `DELIMITER` blocks. |
+| `mssql` | `mcr.microsoft.com/mssql/server:2022-latest` | Starts the server. |
+| `mssql-init` | the same image (it ships `sqlcmd`) | One-shot, after `mssql` is healthy. Restores AdventureWorksLT from the `.bak`, loads the wide schema, and creates the test logins. Skips each step whose database already exists. |
 
-The password is a fixed, throwaway value for local containers. It never
-leaves the machine.
+Every service has a healthcheck, so `--wait` returns only when every server
+is loaded. Each server also gets a login `nl2sql_reader` with read grants on
+its sample database only; the conformance kit uses it for the `permission`
+stage of `test_connection`.
+
+The file reads four variables, each with a default for local use and CI:
+
+| Variable | Default | On the GCP VM |
+|---|---|---|
+| `TESTBED_BIND` | `127.0.0.1` | `0.0.0.0` (the firewall admits only IAP, see below) |
+| `TESTBED_POSTGRES_PASSWORD` | `Nl2sql-Testbed-1` | from Secret Manager |
+| `TESTBED_MYSQL_PASSWORD` | `Nl2sql-Testbed-1` | from Secret Manager |
+| `TESTBED_MSSQL_PASSWORD` | `Nl2sql-Testbed-1` | from Secret Manager |
+
+The default password is a throwaway for containers bound to `127.0.0.1` or
+to a CI runner. It never protects anything reachable from outside.
+
+| Service | Published port | User |
+|---|---|---|
+| `postgres` | 15432 | `postgres` |
+| `mysql` | 13306 | `root` |
+| `mssql` | 11433 | `sa` |
+
+The ports avoid a clash with a database already installed locally.
+
+### Local use
 
 ```bash
-docker compose -f testbed/compose.yaml up -d --wait
-python testbed/load.py --target compose            # idempotent
+docker compose -f testbed/docker-compose.yml up -d --wait
 REALDB=compose pytest -m realdb
-docker compose -f testbed/compose.yaml down        # add -v to drop the data
+docker compose -f testbed/docker-compose.yml down        # add -v to drop the data
 ```
 
-### The loader
+### CI: the `realdb` workflow
 
-`testbed/load.py --target compose|ci [--wide postgres|all]` loads every
-sample and the wide schema, and is safe to run again.
+A new workflow, `.github/workflows/realdb.yml`, with three jobs (owner
+decision 2):
 
-- **Idempotent.** Each database holds a `testbed_meta(sample, version,
-  loaded_at)` table. A sample whose version is already there is skipped. A
-  changed pin reloads that database.
-- **Each server's own tool.** SQL scripts run through the server's own
-  client (`psql`, `mysql`, `sqlcmd`), which already handles `$$` bodies,
-  `DELIMITER` blocks and `GO` batches. Splitting scripts in Python would be
-  fragile.
-  - In compose and CI the client runs inside the server's container
-    (`docker exec -i <container> psql ... < file`). The SQL Server image
-    ships `sqlcmd`. The `.bak` file is copied in with `docker cp` and
-    restored with `RESTORE DATABASE ... WITH MOVE`.
-  - On GCP, `scripts/testbed.py up` loads the fresh instances with Cloud
-    SQL's own import from the bucket `gs://nl2sql-testbed-261014-samples`
-    (`gcloud sql import sql` for PostgreSQL and MySQL, `gcloud sql import
-    bak` for SQL Server), so no client is needed on the caller's machine.
-    The bucket holds a few megabytes: the samples, the generated wide
-    schemas and the logins script.
-- **Logins.** It also creates `nl2sql_reader`, with read grants on the
-  sample databases only. The conformance kit uses it for the `permission`
-  stage of `test_connection`.
+| Job | Runs | What it does |
+|---|---|---|
+| `changes` | always | Works out whether the pull request touches database-facing code (the paths below) |
+| `realdb` | on a pull request when `changes` says so; nightly on `main` (`schedule`); on demand (`workflow_dispatch`), which is run before every release | `docker compose ... up -d --wait` on the runner, installs Microsoft's `msodbcsql18` for pyodbc, installs `packages/nl2sql[postgres,mysql,mssql,duckdb]`, then `pytest -m realdb` with `REALDB=compose` and `REALDB_REQUIRED=1` |
+| `realdb-gate` | always (`if: always()`), after the other two | Passes when `realdb` passed or was skipped because nothing database-facing changed; fails when it failed or was cancelled. This is the required check, so a skipped job is an honest pass and never mistaken for one that ran. |
 
-### CI: the `realdb` job
+The paths that make `realdb` run:
 
-A new job in `.github/workflows/test.yml`, next to `integration`:
-
-```yaml
-realdb:
-  runs-on: ubuntu-latest
-  services:
-    postgres: { image: "postgres:16", ports: ["15432:5432"], env: {...}, options: --health-cmd ... }
-    mysql:    { image: "mysql:8.0",   ports: ["13306:3306"], env: {...}, options: --health-cmd ... }
-    mssql:    { image: "mcr.microsoft.com/mssql/server:2022-latest", ports: ["11433:1433"],
-                env: { ACCEPT_EULA: "Y", MSSQL_PID: Developer, MSSQL_SA_PASSWORD: ... } }
-  env: { REALDB: compose, REALDB_REQUIRED: "1" }
-  steps:
-    - checkout, Python 3.12
-    - install msodbcsql18 from Microsoft's apt repository (for pyodbc)
-    - pip install -e packages/sdk -e "packages/nl2sql[postgres,mysql,mssql,duckdb]" pytest
-    - cache testbed/.cache (keyed on the pins file)
-    - python testbed/load.py --target ci --wide postgres
-    - pytest -m realdb
+```text
+packages/sdk/**
+packages/nl2sql/src/nl2sql/adapters/**
+packages/nl2sql/src/nl2sql/indexing/**
+packages/nl2sql/src/nl2sql/storage/**        (and schema/** until S3 moves it)
+packages/nl2sql/tests/realdb/**
+testbed/**
+.github/workflows/realdb.yml
 ```
 
-The ports and passwords are the compose ones, so `REALDB=compose` works in
-both. `REALDB_REQUIRED=1` turns a skipped `realdb` test into a failure: a
-green run that skipped the real databases proves nothing.
-
-The unit job changes to `pytest -m "not integration and not realdb"`.
+`REALDB_REQUIRED=1` turns a skipped `realdb` test into a failure: a green run
+that skipped the real databases proves nothing. The unit job in `test.yml`
+changes to `pytest -m "not integration and not realdb"`. The containers run
+on GitHub's runners; no cloud credentials are involved.
 
 ### The `realdb` marker and fixtures
 
 `pytest.ini` registers the marker:
 
 ```ini
-realdb: needs a real PostgreSQL, MySQL or SQL Server (the test bed). Set
-    REALDB=compose for the local containers, or run it through
-    scripts/testbed.py for the GCP test bed.
+realdb: needs a real PostgreSQL, MySQL or SQL Server (the test bed). Start
+    testbed/docker-compose.yml and set REALDB=compose, or run it through
+    scripts/testbed.py for the GCP VM.
 ```
 
 The fixtures live in `packages/nl2sql/tests/realdb/conftest.py`:
 
 | Variable | Meaning |
 |---|---|
-| `REALDB=compose` | The compose or CI containers, at the fixed ports and passwords above |
-| `REALDB_POSTGRES`, `REALDB_MYSQL`, `REALDB_MSSQL` | A URL for one server, such as `postgresql://postgres:<password>@34.1.2.3:5432/`, with the password percent-encoded. It wins over `REALDB=compose`. `scripts/testbed.py` sets these. |
+| `REALDB=compose` | The compose servers on `127.0.0.1`, at the published ports, with the default password |
+| `REALDB_POSTGRES`, `REALDB_MYSQL`, `REALDB_MSSQL` | A URL for one server, such as `postgresql://postgres:<password>@127.0.0.1:15432/`, with the password percent-encoded. It wins over `REALDB=compose`. `scripts/testbed.py run` sets these. |
 | `REALDB_REQUIRED=1` | A missing server is a failure, not a skip |
 
 ```python
@@ -260,99 +278,75 @@ def engine_on(server, tmp_path) -> Callable[..., NL2SQL]: ...   # an engine on t
 ```
 
 The skip message names the fix: "realdb: no PostgreSQL. Run
-`docker compose -f testbed/compose.yaml up -d --wait` and set
+`docker compose -f testbed/docker-compose.yml up -d --wait` and set
 `REALDB=compose`, or run `python scripts/testbed.py run -- pytest -m realdb`."
 
 Test code may name dialects and use SQLAlchemy directly. The boundary tests
 cover `packages/*/src`, not the tests.
 
-### The GCP test bed
+### The GCP VM
 
-Cloud SQL bills a stopped instance's public IPv4 address (about $7.30 a month
-each) and will not drop it, and Private Service Connect can only be chosen
-when an instance is created. So the owner chose **delete when idle, recreate
-per session** ([owner decision 1](#owner-decisions)): no instance exists
-between test runs, idle cost is about $0, and each session pays about ten
-minutes to create the instances and import the samples.
+One small VM in `nl2sql-testbed-261014` runs the same compose file
+(owner decision 3). It is started for a session and stopped after it.
 
 | Setting | Value |
 |---|---|
-| Project | `nl2sql-testbed-261014` |
-| Region | `us-central1` |
-| Instances | None between sessions. Each session creates three, with names unique to it (below). |
-| Root passwords | Secret Manager: `testbed-postgres-root-password`, `testbed-mysql-root-password`, `testbed-mssql-root-password` |
-| Root users | `postgres`, `root`, `sqlserver` (Cloud SQL's names) |
-| Sample dumps | `gs://nl2sql-testbed-261014-samples` |
-| Budget | $10 a month, with alerts |
+| Machine | `e2-standard-2` (2 vCPU, 8 GB: SQL Server alone wants 2 GB) |
+| Image | Debian 12, with Docker and the compose plugin installed once by its startup script |
+| Disk | 30 GB standard persistent disk: the images and the data volumes, kept while stopped, so a later session skips the load |
+| External IP | Ephemeral only, for outbound traffic (image pulls, sample downloads). It is released, and free, while the VM is stopped. |
+| Inbound | No public database port. A firewall rule admits TCP 22, 15432, 13306 and 11433 from IAP's range `35.235.240.0/20` only. |
+| Access | `gcloud compute start-iap-tunnel`, which forwards `localhost:15432`, `13306` and `11433` on the caller's machine to the VM |
+| Passwords | Secret Manager: the existing `testbed-postgres-root-password`, `testbed-mysql-root-password` and `testbed-mssql-root-password`. Never in the repository. |
+| Bucket | `gs://nl2sql-testbed-261014-samples` is not needed: the VM downloads the samples itself, once |
 
-What `up` creates, all with `--edition=ENTERPRISE --no-backup
---no-storage-auto-increase --no-deletion-protection --storage-size=10GB`:
-
-| Server | Name | `--database-version` | `--tier` | Storage |
-|---|---|---|---|---|
-| PostgreSQL | `tb-pg-<yymmddhhmm>` | `POSTGRES_16` | `db-f1-micro` | HDD |
-| MySQL | `tb-my-<yymmddhhmm>` | `MYSQL_8_0` | `db-f1-micro` | HDD |
-| SQL Server | `tb-ms-<yymmddhhmm>` | `SQLSERVER_2022_EXPRESS` | `db-custom-1-3840` | SSD (SQL Server requires it) |
-
-Names are unique per session because Cloud SQL does not let a deleted
-instance's name be reused for about a week. The `tb-` prefix is how `status`
-and the backstop find them: `gcloud` has no GA flag to label a Cloud SQL
-instance.
+There are no GitHub-to-GCP credentials. The owner, or an agent the owner
+asks, runs the VM by hand.
 
 `scripts/testbed.py` is Python, not a shell script, because the owner works on
 Windows and CI runs Linux. It calls `gcloud` (found with `shutil.which`, so
-`gcloud.cmd` works) with `--format=json`, and never writes the environment of
-its own process. It records the current session in `testbed/.state.json`
-(not committed): the three instance names, when they were created and their
-addresses. Never a password.
+`gcloud.cmd` works) and never writes its own process's environment.
 
 | Command | What it does |
 |---|---|
-| `up` | Refuses if the state file already names a session. Finds the caller's IPv4 address (`https://checkip.amazonaws.com`; refuses without one). Chooses the names and writes the state file first, so a failure part-way still leaves a record for `down`. Creates the three instances in parallel (`gcloud sql instances create ... --async`) with `--root-password` from Secret Manager and `--authorized-networks=<caller IP>/32`, and waits for `RUNNABLE`. Grants each instance's service account `roles/storage.objectViewer` on the bucket, then imports: `gcloud sql import sql` for Pagila, Sakila, the wide schema and the test logins, and `gcloud sql import bak` for AdventureWorksLT. A dump is uploaded to the bucket only when its checksum is not there yet. |
-| `status` | Every `tb-` instance in the project (not only this session's), with state, creation time, address and authorized networks, and whether the state file names it. |
-| `down` | Deletes the instances the state file names (`gcloud sql instances delete --quiet`, in parallel), removes their bucket grants, then deletes the state file. With `--all`, deletes every `tb-` instance. Safe to run again. |
-| `run -- <cmd>` | `up`, then runs `<cmd>` with `REALDB_POSTGRES`, `REALDB_MYSQL` and `REALDB_MSSQL` in the child's environment only, then `down` in a `finally`: also on Ctrl-C, a failing command or a failed `up`. It exits with the command's code. |
+| `up` | Starts the VM (`gcloud compute instances start`). Copies `testbed/` to it (`gcloud compute scp --tunnel-through-iap`). Runs `docker compose up -d --wait` on it over `gcloud compute ssh --tunnel-through-iap`, with `TESTBED_BIND=0.0.0.0` and the three passwords from Secret Manager passed on that command's environment only. Then opens the three IAP tunnels in the background and waits until each local port answers. |
+| `run -- <cmd>` | `up`, then runs `<cmd>` with `REALDB_POSTGRES`, `REALDB_MYSQL` and `REALDB_MSSQL` (pointing at the local tunnel ports) in the child's environment only, then closes the tunnels and stops the VM in a `finally`: also on Ctrl-C, a failing command or a failed `up`. It exits with the command's code. |
+| `down` | Closes any tunnels it opened and stops the VM. Safe to run again. |
+| `status` | The VM's state, how long it has been running, and whether the tunnels are open. Never a password. |
 
 Passwords are read with `gcloud secrets versions access latest` into memory,
-passed to `gcloud` and to the child process, and never written to a file or
-printed. One session at a time: `up` refuses while the state file exists.
+and are never written to a file or printed.
 
-**The nightly backstop.** If `testbed.py` is killed hard, or an instance is
-created by hand, it would keep billing. Once a night (03:00 UTC) a backstop
-deletes every `tb-` instance older than 6 hours:
+**The nightly backstop.** If `testbed.py` is killed hard, or the VM is
+started by hand, it would keep billing. One Cloud Scheduler job calls the
+Compute Engine API directly at 03:00 UTC, with an OAuth token for a service
+account that may only stop instances in this project:
+`POST https://compute.googleapis.com/compute/v1/projects/nl2sql-testbed-261014/zones/<zone>/instances/<vm>/stop`.
+Stopping a stopped VM does nothing, so the job needs no logic, and one job is
+inside Cloud Scheduler's free tier.
 
-- a Cloud Run job on Google's Cloud SDK image, with a short script: list the
-  instances, keep those named `tb-` whose `createTime` is more than 6 hours
-  ago, delete them;
-- a Cloud Scheduler job that starts it, as a service account with
-  `roles/cloudsql.admin` on this project only;
-- at one run a night, both stay inside their free tiers.
-
-`docs/testing/test-bed.md` gives the commands for the owner to create the job
-and the schedule once. Nothing in the repository creates cloud resources by
-itself; `testbed.py` does so only when someone runs it.
+`docs/testing/test-bed.md` gives the commands for the owner to create the
+VM, the firewall rule and the scheduler job once. Nothing in the repository
+creates cloud resources by itself.
 
 ### Cost controls
 
 | Control | Why |
 |---|---|
-| No instance exists between sessions | Nothing bills while idle: no compute, no storage, no idle IPv4 |
-| `run` always calls `down` in a `finally` | A failed test cannot leave instances behind |
-| The nightly backstop deletes `tb-` instances older than 6 hours | Covers a killed script or a hand-made instance |
-| Authorized networks: only the caller's `/32` | Nothing else can reach an instance |
-| `--no-backup`, `--no-storage-auto-increase`, 10 GB, HDD where allowed | Backups and grown disks are billed; the data is reloadable |
-| Shared-core tiers for PostgreSQL and MySQL; the smallest custom tier for SQL Server Express | The cheapest that runs the samples |
+| The VM is stopped whenever no session runs | A running VM bills by the hour |
+| Ephemeral external IP only | Released, and free, while stopped |
+| No public database port; IAP's range only | Nothing else can reach the servers |
+| `run` always stops the VM in a `finally` | A failed test cannot leave it running |
+| The nightly stop at 03:00 UTC | The backstop for everything above |
+| CI runs on GitHub's runners | Free, and only when database-facing code changes, nightly, or on demand |
 | Budget of $10 a month with alerts | The last line |
 
-What it should cost, roughly (check the billing report after the first
-month):
-
-| Item | Approximate cost |
+| Item | Approximate cost (check the billing report after the first month) |
 |---|---|
-| Idle, between sessions | about $0: the bucket's few megabytes and three secrets |
-| A session | about $0.10 an hour while the three instances exist, including the ten minutes to create and load them |
+| Stopped | the 30 GB disk: about $1 to $2 a month |
+| Running | about $0.07 an hour |
 
-So even a session every day stays well inside $10.
+So even a daily session stays well inside $10.
 
 ## 4. Storage: four stores
 
@@ -620,8 +614,9 @@ headers: { X-Team: analytics }
 agents:
   ast_planner: { provider: anthropic, model: claude-opus-5, max_tokens: 16000 }
   answer_synthesizer:
-    provider: azure_openai
+    provider: openai_compatible     # Azure OpenAI's v1 endpoint
     base_url: https://my-resource.openai.azure.com/openai/v1/
+    api_key: "${env:AZURE_OPENAI_API_KEY}"
     model: gpt-5-4-prod             # the Azure deployment name
 ```
 
@@ -647,27 +642,33 @@ need no change there.
 
 ### Providers
 
+The built-ins stay minimal (owner decision 7):
+
 | Provider | Wire | Key variable | `base_url` | Default `structured_output` |
 |---|---|---|---|---|
 | `openai` | OpenAI | `OPENAI_API_KEY` | optional | `tool_calling` |
 | `anthropic` | Anthropic | `ANTHROPIC_API_KEY` | optional | `tool_calling` |
-| `openrouter` | OpenAI | `OPENROUTER_API_KEY` | preset | `tool_calling` |
-| `ollama` | OpenAI | none | preset (`localhost:11434`) | `tool_calling` |
-| **`openai_compatible`** | OpenAI | none: write `api_key` if the server needs one | **required** | `json_schema` |
-| **`azure_openai`** | OpenAI | `AZURE_OPENAI_API_KEY` | **required**, the resource's `/openai/v1/` endpoint | `tool_calling` |
+| **`openai_compatible`** | OpenAI | none: write `api_key` (usually `${env:...}`) if the server needs one | **required** | `json_schema` |
 
-- **`openai_compatible`** is vLLM, LiteLLM, LM Studio, llama.cpp's server, a
-  company gateway, or anything else with an OpenAI-style chat API. Without
-  `api_key` it sends a placeholder, because the OpenAI client refuses to
-  start without one. Its default is `json_schema` because local servers
-  support schema-guided decoding more often than tool calls.
-- **`azure_openai`** uses Azure OpenAI's v1 endpoint
-  (`https://<resource>.openai.azure.com/openai/v1/`), which the standard
-  OpenAI client speaks with no `api-version`. `model` is the deployment
-  name. Entra ID sign-in is a plugin for later. See
-  [open question 7](#14-open-questions).
-- Both are rows in `PROVIDER_PRESETS`, which stays the one table of key
-  variables.
+- **`openai_compatible`** is any server with an OpenAI-style chat API:
+  Azure OpenAI's v1 endpoint (`https://<resource>.openai.azure.com/openai/v1/`,
+  with `model` as the deployment name), vLLM, Ollama
+  (`http://localhost:11434/v1`), LiteLLM, LM Studio, llama.cpp's server,
+  OpenRouter (`https://openrouter.ai/api/v1`) or a company gateway. Without
+  `api_key` it sends a placeholder, because the OpenAI client refuses to start
+  without one. Its default is `json_schema` because local servers support
+  schema-guided decoding more often than tool calls; set `tool_calling` for
+  Azure or OpenRouter.
+- **`openrouter` and `ollama` are removed** as built-ins: each was only a
+  preset `base_url` on the OpenAI wire. `PROVIDER_PRESETS` keeps `openai`,
+  `anthropic` and `openai_compatible`, and stays the one table of key
+  variables. `nl2sql init --provider` accepts `openai` and `anthropic`, the
+  demo's key detection drops the `sk-or-` prefix, and the docs show the
+  `base_url` for each common server.
+- **Anything else is a plugin**: a class implementing `LLMProvider`,
+  registered with `registry.add_llm` or the `nl2sql.llms` entry point group.
+  An Azure provider with Entra ID sign-in, Bedrock or Gemini would each be
+  one.
 
 ### Structured output, and parse-and-retry
 
@@ -707,7 +708,7 @@ dimension: 768            # optional: otherwise asked of the provider, or probed
 | `model` | `str \| None` | the provider's default | Phase 1 |
 | `api_key` | `Secret \| None` | the provider's variable | Phase 1 |
 | `instance` | embeddings object | `None` | Phase 1 (code only) |
-| **`base_url`** | `str \| None` | `None` | For `openai`, `openai_compatible`, `azure_openai`. An error for `local`. |
+| **`base_url`** | `str \| None` | `None` | For `openai` and `openai_compatible`. An error for `local`. |
 | **`dimension`** | `int \| None` | `None` | Needed only when the provider does not know it and you want to skip the probe |
 
 | Provider | Default model | Dimension known? |
@@ -715,7 +716,6 @@ dimension: 768            # optional: otherwise asked of the provider, or probed
 | `local` | `all-MiniLM-L6-v2` | yes, 384 |
 | `openai` | `text-embedding-3-small` | yes, for OpenAI's own models |
 | **`openai_compatible`** | none: `model` is required | only with `dimension:`; otherwise probed |
-| **`azure_openai`** | none: `model` is the deployment | only with `dimension:`; otherwise probed |
 | an `instance` | its own | probed |
 
 **Model and dimension.** The engine needs both to name the index namespace.
@@ -738,8 +738,9 @@ As in Phase 1, the engine accepts exactly the version it was built for.
 | Today | 0.6 |
 |---|---|
 | `structured()` with no retry | Parse-and-retry as above |
+| `openrouter` and `ollama` presets, `DEFAULT_OPENROUTER_MODEL`, `OPENROUTER_ENV`, the `sk-or-` key prefix | Deleted; `openai_compatible` covers them |
 | Anthropic `max_tokens` fixed at 16,000 | `max_tokens` from the agent |
-| `embeddings/openai.py` without `base_url` | `base_url` passed through; `openai_compatible` and `azure_openai` added beside it |
+| `embeddings/openai.py` without `base_url` | `base_url` passed through; `openai_compatible` added beside it (Azure, Ollama and other servers use it) |
 | `VectorStore` dimension checks and the model-mismatch error | Deleted: the namespace carries the model and dimension |
 
 ## 6. Policies, step 1
@@ -785,7 +786,7 @@ replaced by `allow` and `deny`.
 | Rule | Detail |
 |---|---|
 | **Shape** | `*` (everything), `ds` (a whole datasource), or `ds.schema.table`. Each part is an `fnmatch` glob: `sales.audit.*`, `sales.*.*_pii`. |
-| **Two parts** | Rejected, with a fix: "`sales.orders` has two parts: write `sales.<schema>.orders`, or `sales.<schema>.*`". See [open question 5](#14-open-questions). |
+| **Two parts** | Rejected, with a fix: "`sales.orders` has two parts: write `sales.<schema>.orders`, or `sales.<schema>.*`". Owner decision 5. |
 | **Schemas** | SQLite and DuckDB tables are in `main`. A plan table with no schema is in the adapter's default schema (`public`, `dbo`, `main`), as in 0.5. |
 | **Case** | Matching ignores case, so a deny cannot be dodged by `Orders` against `orders`. |
 | **Within a role** | Deny beats allow. |
@@ -1041,7 +1042,7 @@ always makes its session read-only when it can. When it cannot (SQL Server),
 `engine.check()` adds a warning to that datasource's status: "sales (mssql):
 this adapter cannot make the session read-only. Connect with a login that
 has only `db_datareader`." The typed plan and the validator still block every
-write. [Open question 4](#14-open-questions) asks whether that is enough.
+write. This is owner decision 4.
 
 ### `test_connection`: which stage failed
 
@@ -1139,8 +1140,8 @@ Phase 1 decided.
 | Kind | Entry point group | Interface | Version in 0.6 | Built-ins |
 |---|---|---|---|---|
 | adapter | `nl2sql.adapters` | `nl2sql_sdk.DatasourceAdapter` | **2** | sqlite, postgres, mysql, mssql, duckdb |
-| llm | `nl2sql.llms` | `nl2sql.llm.LLMProvider` | **2** | openai, anthropic, openrouter, ollama, **openai_compatible**, **azure_openai** |
-| embeddings | `nl2sql.embeddings` | `nl2sql.embeddings.EmbeddingsProvider` | **2** | local, openai, **openai_compatible**, **azure_openai** |
+| llm | `nl2sql.llms` | `nl2sql.llm.LLMProvider` | **2** | openai, anthropic, **openai_compatible** (openrouter and ollama removed) |
+| embeddings | `nl2sql.embeddings` | `nl2sql.embeddings.EmbeddingsProvider` | **2** | local, openai, **openai_compatible** |
 | secrets | `nl2sql.secrets` | `nl2sql_sdk.secrets.SecretProvider` | 1 | env, aws, azure, hashicorp |
 | **store** | `nl2sql.stores` | `nl2sql_sdk.stores` (four protocols) | **1** | chroma, sqlite, files, local |
 | **policy check** | `nl2sql.policy_checks` | `nl2sql_sdk.policy.PolicyCheck` | **1** | none |
@@ -1201,11 +1202,11 @@ At most four PRs are open at once.
 
 ```mermaid
 flowchart TD
-  D["0. This design"] --> T1["T1. Test bed: compose, loader, realdb marker, CI job"]
+  D["0. This design"] --> T1["T1. Test bed: compose file, realdb marker, CI workflow"]
   D --> S1["S1. Store interfaces, config, registry kind"]
   D --> E1["E1. Embeddings providers v2"]
   D --> P1["P1. Policies: globs, Scope, hidden tables"]
-  T1 --> T2["T2. GCP test bed: testbed.py, nightly backstop"]
+  T1 --> T2["T2. GCP VM: testbed.py, IAP tunnels, nightly stop"]
   S1 --> S2["S2. Index store, pointer as commit (B5), namespaces"]
   E1 --> S2
   D --> L1["L1. LLM providers and agent fields"]
@@ -1230,12 +1231,12 @@ flowchart TD
 
 | # | PR | Depends on | Tests first | Docs |
 |---|---|---|---|---|
-| T1 | **Test bed.** `testbed/compose.yaml`, `testbed/load.py` (pins, checksums, `testbed_meta`, `--target compose\|ci`), `testbed/wide_schema.py`, the `realdb` marker, `tests/realdb/conftest.py`, the CI `realdb` job, the unit job's `not realdb`. Fixes B19. | — | `test_wide_schema_is_deterministic`, `test_wide_schema_has_1200_tables_in_20_schemas`, `test_loader_skips_a_loaded_sample`, `test_loader_rejects_a_bad_checksum`, `test_realdb_fixture_skips_with_the_fix_when_unset`, `test_realdb_fixture_fails_when_required`; `realdb`: `test_each_sample_is_loaded` (each sample's known tables are present) | new `testing/test-bed.md` (licences, compose, CI); `testing/architecture.md`; `CLAUDE.md` and `CONTRIBUTING.md` checks |
-| T2 | **GCP test bed.** `scripts/testbed.py` (`up`, `down`, `status`, `run`), the bucket uploads and imports, the state file, and the backstop's script and commands in the docs. | T1 | Unit tests with a fake `gcloud` on `PATH`: `test_up_creates_three_instances_with_session_names`, `test_up_authorizes_only_the_callers_ip`, `test_up_writes_state_before_waiting`, `test_up_refuses_while_a_session_exists`, `test_down_deletes_what_state_names_and_removes_grants`, `test_run_deletes_even_when_the_command_fails`, `test_run_deletes_on_keyboard_interrupt`, `test_run_deletes_after_a_failed_up`, `test_passwords_go_to_the_child_only`, `test_up_refuses_without_an_ipv4_address`, `test_backstop_selects_only_old_tb_instances` | `testing/test-bed.md` (GCP, cost controls, backstop commands) |
+| T1 | **Test bed.** `testbed/docker-compose.yml` (the `samples` and `mssql-init` one-shots, healthchecks, the four variables), `testbed/wide_schema.py`, the pinned samples with checksums, the `realdb` marker, `tests/realdb/conftest.py`, `.github/workflows/realdb.yml` (`changes`, `realdb`, `realdb-gate`), the unit job's `not realdb`. Fixes B19. | — | `test_wide_schema_is_deterministic`, `test_wide_schema_has_1200_tables_in_20_schemas`, `test_samples_reject_a_bad_checksum`, `test_samples_skip_what_is_there`, `test_realdb_fixture_skips_with_the_fix_when_unset`, `test_realdb_fixture_fails_when_required`, `test_gate_passes_on_skip_and_fails_on_failure` (the gate's script); `realdb`: `test_each_sample_is_loaded`, `test_reader_login_cannot_read_the_wide_schema` | new `testing/test-bed.md` (licences, compose, CI); `testing/architecture.md`; `CLAUDE.md` and `CONTRIBUTING.md` checks |
+| T2 | **GCP VM.** `scripts/testbed.py` (`up`, `run`, `down`, `status`) with `gcloud compute` start, stop, `scp` and `ssh` through IAP, and `start-iap-tunnel`; the one-time set-up commands (VM, firewall rule for `35.235.240.0/20`, scheduler stop job) in the docs. | T1 | Unit tests with a fake `gcloud` on `PATH`: `test_up_starts_copies_composes_and_tunnels`, `test_passwords_reach_compose_and_the_child_only`, `test_run_stops_even_when_the_command_fails`, `test_run_stops_on_keyboard_interrupt`, `test_run_stops_after_a_failed_up`, `test_down_closes_tunnels_and_is_idempotent`, `test_status_never_prints_a_password` | `testing/test-bed.md` (GCP VM, cost controls, set-up commands) |
 | S1 | **Store interfaces.** `nl2sql_sdk.stores` (four protocols, `Entry`, `Filter`, `BuildPointer`); `StoreConfig` and the four `Storage` sub-blocks; the `store` registry kind and `nl2sql.stores` group; slot checks. The built-ins are thin wrappers over today's classes. | — | `test_storage_with_only_path_is_valid`, `test_store_type_in_the_wrong_slot_names_the_installed_ones`, `test_store_block_keys_are_validated_by_its_config_model`, `test_store_object_is_used_as_given`, `test_the_sdk_stores_module_imports_only_pydantic` | `configuration/storage.md`, `adapters/sdk.md` (stores) |
-| E1 | **Embeddings providers v2.** `openai_compatible`, `azure_openai`, `base_url`, `dimension`, `describe()`, the one-call probe, `PROVIDER_PRESETS` rows. | — | `test_openai_compatible_needs_a_model_and_base_url`, `test_base_url_is_an_error_for_local`, `test_known_dimension_needs_no_call`, `test_unknown_dimension_is_probed_once`, `test_azure_key_is_read_from_its_preset_variable` | `configuration/embeddings.md` |
+| E1 | **Embeddings providers v2.** `openai_compatible`, `base_url`, `dimension`, `describe()`, the one-call probe. | — | `test_openai_compatible_needs_a_model_and_base_url`, `test_base_url_is_an_error_for_local`, `test_known_dimension_needs_no_call`, `test_unknown_dimension_is_probed_once`, `test_no_azure_embeddings_provider_is_built_in` | `configuration/embeddings.md` |
 | P1 | **Policies: globs and `Scope`.** `allow`/`deny`, the pattern rules, `PolicyEngine.scope`, a run's scopes pinned, every call site on `Scope`, the retriever hiding denied tables, `nl2sql/auth` to `nl2sql/policies`. Demo roles rewritten. | — | `test_deny_beats_allow_within_a_role`, `test_union_across_roles_keeps_each_roles_deny`, `test_two_part_pattern_is_rejected_with_the_fix`, `test_matching_ignores_case`, `test_denied_table_never_reaches_the_planner_prompt`, `test_plan_naming_a_hidden_table_is_refused`, `test_every_access_decision_goes_through_scope` (architecture), the tier 1 benchmark per demo role | `configuration/policies.md`, `security/model.md`, `architecture/nodes/schema_retriever_node.md`, `logical_validator_node.md` |
-| L1 | **LLM providers and agent fields.** `openai_compatible`, `azure_openai`, `structured_output`, `max_tokens`, `timeout_s`, `max_retries`, `headers`; provider interface version 2. | — | `test_openai_compatible_requires_base_url`, `test_openai_compatible_sends_a_placeholder_key`, `test_agent_inherits_each_new_field`, `test_headers_never_print`, `test_json_mode_puts_the_schema_in_the_prompt` (fake LLM), `test_provider_version_1_is_rejected` | `configuration/llm.md` |
+| L1 | **LLM providers and agent fields.** `openai_compatible`; `openrouter` and `ollama` removed (with `init --provider`, the demo's key detection and their constants); `structured_output`, `max_tokens`, `timeout_s`, `max_retries`, `headers`; provider interface version 2. | — | `test_built_in_llm_providers_are_openai_anthropic_and_openai_compatible`, `test_openai_compatible_requires_base_url`, `test_openai_compatible_sends_a_placeholder_key`, `test_agent_inherits_each_new_field`, `test_headers_never_print`, `test_json_mode_puts_the_schema_in_the_prompt` (fake LLM), `test_provider_version_1_is_rejected` | `configuration/llm.md` (a `base_url` table for Azure, vLLM, Ollama, LiteLLM, OpenRouter), `getting_started/*` where they name OpenRouter or Ollama |
 | S2 | **Index store and the pointer as commit (B5).** The `chroma` store on Chroma's public API; the engine embeds; MMR in the engine; pointers record `schema_version`; readers resolve through the pinned pointer; namespaces per model; `index.prune()`; staging, `full` and `switch_guard` deleted; `version_mismatch` deleted. | S1, E1 | `test_failed_build_leaves_the_live_schema_version` (B5), `test_readers_use_the_pointers_schema_version`, `test_run_pins_pointers_across_a_rebuild`, `test_model_change_opens_an_empty_namespace` (B25), `test_switching_back_finds_the_old_namespace_built`, `test_prune_keeps_only_the_current_namespace`, `test_only_storage_imports_chromadb` | `architecture/indexing.md`, `schema/store.md`, `configuration/storage.md`, `configuration/settings.md` (`schema.version_mismatch` removed) |
 | P2 | **`PolicyCheck`.** `nl2sql_sdk.policy` (`UserContext`, `Grant`, `PolicyCheck`); `policies.check`; intersection; fail closed; the registry kind. | P1 | `test_check_cannot_widen_yaml_roles`, `test_yaml_roles_cannot_widen_the_check`, `test_check_exception_denies_and_logs`, `test_check_is_called_once_per_datasource_per_run`, `test_allow_all_with_a_check_uses_the_check` | `configuration/policies.md` (with the HTTP example), `security/model.md` |
 | S3 | **State store.** The `sqlite` state store: immutable snapshots, plan cache, feedback, `nl2sql_meta` migrations (migration 1 adopts a 0.5 file), the lock; `FeedbackStore` and `schema/` stores folded in; `health.py` through the stores. | S2 | `test_snapshot_rows_are_never_updated`, `test_keep_snapshots_keeps_every_pointed_version`, `test_a_05_state_file_is_adopted`, `test_lock_blocks_a_second_holder_and_expires`, `test_index_build_holds_the_lock`, `test_only_storage_imports_sqlite3` | `schema/store.md`, `observability/feedback.md` |
@@ -1267,87 +1268,27 @@ The waves, with at most four PRs at once:
   (`allow`/`deny` replace `allowed_datasources`/`allowed_tables`; two-part
   patterns are rejected), denied tables hidden from the planner,
   `sample_values` off by default, strict connection keys, adapter interface
-  version 2, LLM and embeddings provider interface version 2, and the
+  version 2, LLM and embeddings provider interface version 2, `openrouter`
+  and `ollama` replaced by `openai_compatible`, and the
   deleted `index.build(full=..., switch_guard=...)` arguments and
   `settings.schema.version_mismatch`.
-- Before tagging, the owner runs `python scripts/testbed.py run -- pytest -m realdb`
-  once against the GCP test bed, and the result goes in the release notes.
+- Before tagging, the `realdb` workflow is run on demand on `main`, and the
+  owner runs `python scripts/testbed.py run -- pytest -m realdb` once on the
+  GCP VM. Both results go in the release notes.
 
 ## 14. Open questions
 
-Only decisions that the owner decisions and Phase 1 do not settle. Each has
-options and a recommendation.
+None. The owner answered all seven; see [Owner decisions](#owner-decisions).
 
-**1. Settled.** How to stop paying for idle public IPs on Cloud SQL: the
-owner chose delete when idle, recreate per session. See
-[Owner decisions](#owner-decisions).
+### Choices made without asking
 
-**2. When does the `realdb` CI job run?**
+The design made these choices itself. The owner may confirm or change each.
 
-- (a) On every pull request.
-- (b) Only on pull requests that touch `packages/sdk`, `adapters/`,
-  `indexing/` or `storage/`, plus `main`.
-- (c) Nightly only.
-
-*Recommendation: (a).* It adds a few minutes, runs beside the other jobs,
-and keeps one required check. Path filters make a required check skip, which
-is easy to misread as green.
-
-**3. Should CI ever start the GCP test bed?**
-
-- (a) No: the owner runs `scripts/testbed.py run` by hand, and once before
-  each release.
-- (b) Yes, from a manual (`workflow_dispatch`) workflow, with Workload
-  Identity Federation and a service account that can create and delete
-  Cloud SQL instances in the test-bed project.
-
-*Recommendation: (a) for Phase 2.* The CI containers cover every pull
-request. (b) means cloud credentials in GitHub for little gain until there
-are more contributors.
-
-**4. What happens when an adapter cannot make its session read-only (SQL
-Server)?**
-
-- (a) Declare `ENFORCES_READ_ONLY` false, show a warning in `check()`, and
-  document a `db_datareader`-only login. The typed plan and the validator
-  still block writes.
-- (b) Run every SQL Server query in a transaction that is always rolled
-  back, and declare it enforced.
-- (c) As (a), but refuse to start unless the datasource sets
-  `allow_writable_login: true`.
-
-*Recommendation: (a).* (b) holds locks and changes how queries behave for
-little gain, given the plan cannot express a write. (c) adds a setting whose
-only effect is to be turned on.
-
-**5. What does a two-part policy pattern mean?**
-
-- (a) Reject it, with the fix in the message (`sales.orders` must be
-  written `sales.<schema>.orders`).
-- (b) Read `ds.table` as that table in the default schema, as 0.5 does.
-- (c) Read `ds.x` as the schema `x`.
-
-*Recommendation: (a).* (b) and (c) each make the same text mean different
-things on different datasources. One loud error at load time is cheaper than
-a silent wrong grant.
-
-**6. Do remote result stores (S3, ADLS) come back in 0.6?**
-
-- (a) No: ship the `ResultStore` interface and a docs example, and adopt a
-  community plugin later.
-- (b) Ship `s3` as a built-in in 0.6.
-
-*Recommendation: (a).* The owner prefers extension points, multi-replica
-deployments (the main reason for remote results) are later, and the
-interface is four methods.
-
-**7. Which Azure OpenAI endpoints does `azure_openai` support?**
-
-- (a) Only the v1 endpoint (`/openai/v1/`), with `model` as the deployment
-  name and no `api_version`.
-- (b) Also the dated endpoints, adding `api_version` and `deployment`
-  fields.
-
-*Recommendation: (a).* Azure's v1 endpoint is what the standard OpenAI client
-speaks, so there is one code path and no Azure-only fields. A deployment that
-needs a dated API can use a plugin.
+| Choice | Where |
+|---|---|
+| There is no per-datasource `read_only` setting: every adapter makes its session read-only whenever it can. | [Read-only and timeouts, honestly](#read-only-and-timeouts-honestly) |
+| Policy patterns match regardless of case, so a deny cannot be dodged by `Orders` against `orders`. | [Pattern rules](#pattern-rules) |
+| A `PolicyCheck` is called once per user and datasource per run, with no cache across runs. | [The `PolicyCheck` extension point](#the-policycheck-extension-point) |
+| Sample values are off by default (`index.sample_values: false`); the demo turns them on. | [`IndexScope`: what gets indexed](#indexscope-what-gets-indexed) |
+| The runtime price table owned by `llm/` moves to Phase 3, with the cost observer. | [Not in Phase 2](#not-in-phase-2) |
+| The REST routes for Connect a database move to Phase 4; Phase 2 ships the package methods. | [Not in Phase 2](#not-in-phase-2) |
