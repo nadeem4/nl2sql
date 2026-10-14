@@ -34,8 +34,8 @@ without `model` or `base_url`, or a `local` section with a `base_url`, is a
 
 Notes on the `local` provider:
 
-- **No extra dependency.** The model ships with `chromadb`, which is already a
-  transitive dependency through `langchain-chroma`.
+- **No extra dependency.** The model ships with `chromadb`, which the engine
+  already depends on for its built-in `chroma` index store.
 - **One-time download.** The first indexing run downloads roughly 79 MB of ONNX
   model files into a local cache directory. Expect a pause of up to a few
   minutes; a log line is emitted before the download starts.

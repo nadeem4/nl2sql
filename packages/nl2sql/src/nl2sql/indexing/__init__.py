@@ -1,7 +1,7 @@
 from .orchestrator import IndexingOrchestrator
-from .vector_store import VectorStore
+from .retrieval import Retriever
 
 __all__ = [
     "IndexingOrchestrator",
-    "VectorStore"
+    "Retriever",
 ]

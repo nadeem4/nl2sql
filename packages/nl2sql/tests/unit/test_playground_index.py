@@ -1,9 +1,10 @@
 """The playground's index panel: health on load, and a guarded Rebuild.
 
 The owner's rule: the playground always offers an index action. Rebuild uses
-the settings panel's guardrails (local only unless ``--allow-settings``, the
-same ``RunGate`` so questions in flight finish before the switch), and LLM
-enrichment is an opt-in because it spends tokens.
+the settings panel's guard (local only unless ``--allow-settings``), and LLM
+enrichment is an opt-in because it spends tokens. A rebuild does not wait for
+questions in flight: each run pinned the index pointers when it started, and
+the build a switch replaces is kept for it.
 """
 from __future__ import annotations
 
@@ -14,14 +15,15 @@ import pytest
 
 pytest.importorskip("fastapi")
 from fastapi.testclient import TestClient
-from langchain_core.documents import Document
+from index_helpers import Chunk, TestIndex  # same directory
 from langchain_core.embeddings import FakeEmbeddings
 
 from nl2sql import NL2SQL
 from nl2sql.testing.facade import StubDatasources
 from nl2sql.cli.demo.playground.app import build_app
 from nl2sql.indexing import rebuild as rebuild_module
-from nl2sql.indexing.vector_store import VectorStore
+from nl2sql.indexing.orchestrator import IndexingOrchestrator
+from nl2sql_sdk.schema import SchemaContract, SchemaMetadata, SchemaSnapshot
 
 
 class _Adapter:
@@ -29,35 +31,42 @@ class _Adapter:
 
 
 class _Snapshots:
-    def __init__(self):
-        self.version = "v1"
+    def get_snapshot(self, ds, _version):
+        return SchemaSnapshot(contract=SchemaContract(datasource_id=ds, engine_type="stub", tables={}),
+                              metadata=SchemaMetadata(datasource_id=ds, engine_type="stub", tables={}))
 
-    def get_latest_version(self, _ds):
-        return self.version
 
-    def get_latest_snapshot(self, _ds):
-        return None
+class _Registry:
+    def list_ids(self):
+        return ["chinook"]
+
+    def list_adapters(self):
+        return [_Adapter()]
+
+    def unavailable(self):
+        return {}
+
+    def get_preferred_tables(self, _ds):
+        return []
 
 
 class _Context:
+    """The parts of the runtime the index panel reaches, over a real index store in ``tmp_path``."""
+
     def __init__(self, tmp_path):
-        self.vector_store = VectorStore("nl2sql_store", str(tmp_path / "vs"), embeddings=FakeEmbeddings(size=8))
-        self.schema_store = _Snapshots()
-        self.ds_registry = type("R", (), {"list_ids": staticmethod(lambda: ["chinook"]),
-                                          "list_adapters": staticmethod(lambda: [_Adapter()])})()
-        self.llm_registry = None
+        self.test_index = TestIndex(tmp_path, FakeEmbeddings(size=8), schema_store=_Snapshots())
+        for key, value in vars(self.test_index.ctx).items():
+            setattr(self, key, value)
+        self.ds_registry = _Registry()
+        self.curated = None
+
+    @property
+    def vector_store(self):
+        return self.test_index.retriever()
 
 
-class _Chunk:
-    def __init__(self, kind, text):
-        self.type = kind
-        self._text = text
-
-    def get_page_content(self):
-        return self._text
-
-    def get_metadata(self):
-        return {"type": self.type, "datasource_id": "chinook", "schema_version": "v1", "table": self._text}
+def _chunk(kind, text):
+    return Chunk(text, type=kind, datasource_id="chinook", schema_version="v1", table=text)
 
 
 class _Engine(NL2SQL):
@@ -81,12 +90,15 @@ def scripted(monkeypatch):
         def __init__(self, ctx, enrich=True):
             _Orchestrator.enrich_seen.append(enrich)
 
-        def index_datasource(self, adapter, vector_store=None, switch_guard=None):
-            return vector_store.refresh_schema_chunks(
+            self.ctx = ctx
+
+        def index_datasource(self, adapter):
+            IndexingOrchestrator(self.ctx)._commit(
                 "chinook", "v1",
-                [_Chunk("schema.datasource", "Datasource: chinook"), _Chunk("schema.table", "Table: Track")],
-                [], switch_guard=switch_guard,
+                [_chunk("schema.datasource", "Datasource: chinook"), _chunk("schema.table", "Table: Track")],
+                [], None,
             )
+            return {"datasource_id": "chinook", "schema_version": "v1", "schema.datasource": 1, "schema.table": 1}
 
     monkeypatch.setattr(rebuild_module, "IndexingOrchestrator", _Orchestrator)
     return _Orchestrator
@@ -108,12 +120,12 @@ def _wait_for(client, state, timeout=10.0):
     return body
 
 
-def test_health_is_shown_on_load_and_an_empty_index_offers_rebuild(tmp_path):
+def test_health_is_shown_on_load_and_a_missing_index_offers_rebuild(tmp_path):
     _, client = _client(tmp_path)
 
     body = client.get("/api/index").json()
 
-    assert body["health"]["status"] == "empty"
+    assert body["health"]["status"] == "missing"
     assert body["rebuild"]["available"] is True
     assert body["job"]["state"] == "idle"
 
@@ -185,7 +197,7 @@ def test_enrichment_is_passed_through_in_live_mode(tmp_path, scripted):
 def test_a_second_rebuild_while_one_runs_is_refused(tmp_path, monkeypatch):
     release = threading.Event()
 
-    def _slow(ctx, enrich=False, on_progress=None, switch_guard=None, **_kw):
+    def _slow(ctx, enrich=False, on_progress=None, **_kw):
         release.wait(5)
         return rebuild_module.RebuildResult(ok=True)
 
@@ -198,27 +210,15 @@ def test_a_second_rebuild_while_one_runs_is_refused(tmp_path, monkeypatch):
     _wait_for(client, "done")
 
 
-def test_the_switch_waits_for_questions_in_flight(tmp_path, monkeypatch):
-    events = []
-
-    def _fake(ctx, enrich=False, on_progress=None, switch_guard=None, **_kw):
-        with switch_guard():
-            events.append("switched")
-        return rebuild_module.RebuildResult(ok=True)
-
-    monkeypatch.setattr(rebuild_module, "rebuild_index", _fake)
+def test_a_rebuild_does_not_wait_for_questions_in_flight(tmp_path, scripted):
     engine = _Engine(tmp_path)
     app = build_app(engine, questions=[], roles=["admin"], mode="replay", dataset="chinook",
                     project_dir=tmp_path, host="127.0.0.1")
     client = TestClient(app, base_url="http://127.0.0.1:8765")
-    gate = app.state.settings_panel.gate
 
-    with gate.run():  # a question in flight
+    with app.state.settings_panel.gate.run():  # a question in flight
         assert client.post("/api/index/rebuild", json={}).status_code == 202
-        time.sleep(0.3)
-        assert events == []
-    assert _wait_for(client, "done")["job"]["state"] == "done"
-    assert events == ["switched"]
+        assert _wait_for(client, "done")["health"]["status"] == "ok"
 
 
 def test_a_failed_rebuild_is_reported_and_keeps_the_previous_index(tmp_path, monkeypatch):
@@ -226,13 +226,12 @@ def test_a_failed_rebuild_is_reported_and_keeps_the_previous_index(tmp_path, mon
         def __init__(self, ctx, enrich=True):
             pass
 
-        def index_datasource(self, adapter, vector_store=None, switch_guard=None):
+        def index_datasource(self, adapter):
             raise RuntimeError("database is locked")
 
     monkeypatch.setattr(rebuild_module, "IndexingOrchestrator", _Failing)
     engine, client = _client(tmp_path)
-    engine._runtime.vector_store.vectorstore.add_documents([Document(page_content="old", metadata={
-        "type": "schema.datasource", "datasource_id": "chinook", "schema_version": "v1"})])
+    engine._runtime.test_index.write("chinook", [_chunk("schema.datasource", "old")])
 
     client.post("/api/index/rebuild", json={})
     body = _wait_for(client, "failed")

@@ -57,14 +57,12 @@ class DatasourcesAPI:
 
         Tables sorted by name, each with its columns (type, nullable, primary
         key, description), foreign keys, row count and description. Read from
-        the latest schema snapshot, not the database; before the first index
-        ``tables`` is empty.
+        the snapshot the datasource's live index build was made from, not the
+        database; before the first index ``tables`` is empty.
         """
         from nl2sql.schema.view import schema_view
 
-        store = self._ctx.schema_store
-        snapshot = store.get_latest_snapshot(datasource_id) if store is not None else None
-        return schema_view(datasource_id, snapshot)
+        return schema_view(datasource_id, self._ctx.vector_store.snapshot(datasource_id))
 
     def test(self, datasource_id: str) -> DatasourceStatus:
         """Connect to one datasource, as ``check()`` does: ``ready`` puts it back in routing.

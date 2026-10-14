@@ -12,24 +12,23 @@ def run_indexing(
     engine,
     enrich: bool = False,
     datasource_ids: Optional[List[str]] = None,
-    full: bool = False,
     curated_only: bool = False,
 ) -> None:
     """
     Rebuilds the schema index, one datasource at a time.
 
-    Each datasource's new entries are written beside its current ones and
-    switched in only when all are written (see ``nl2sql.indexing.rebuild``):
-    a failure leaves that datasource's previous entries answering questions,
-    and no datasource's rebuild touches another's entries.
+    Each datasource's new entries are written beside its current ones, in
+    the index of the configured embedding model, and its build pointer is
+    switched to them only when all are written (see
+    ``nl2sql.indexing.rebuild``): a failure leaves that datasource's previous
+    entries answering questions, and no datasource's rebuild touches
+    another's entries.
 
     Args:
         engine: The ``NL2SQL`` engine, built from the config and checked.
         enrich: Ask the LLM for table and column descriptions (spends tokens).
             Off by default.
         datasource_ids: Only these datasources; every configured one when None.
-        full: Rebuild every datasource into a new collection and swap it in.
-            Needed after changing the embedding model.
         curated_only: Re-index only the verified queries from
             the ``curated`` section, keeping the schema entries; reads no schema and
             calls no model.
@@ -57,7 +56,7 @@ def run_indexing(
             presenter.print_error(f"Failed to index {ds_id}: {progress.reason}")
 
     result = engine.index.build(
-        datasource_ids, enrich=enrich, full=full, curated_only=curated_only, on_datasource=on_datasource,
+        datasource_ids, enrich=enrich, curated_only=curated_only, on_datasource=on_datasource,
     )
     total_adapters = len(result.stats) + len(result.empty) + len(result.errors)
 
@@ -119,12 +118,22 @@ def run_indexing(
     if not result.ok:
         # Any failure is fatal, not just a total one: scripts chaining
         # `nl2sql index && nl2sql run ...` need that signal.
-        kept = (
-            "The new collection was not switched in; the previous index is unchanged."
-            if full else
-            "Each failed datasource keeps its previous index entries unchanged."
+        presenter.print_warning(
+            "Indexing completed with errors. Each failed datasource keeps its previous index entries unchanged."
         )
-        presenter.print_warning(f"Indexing completed with errors. {kept}")
         sys.exit(1)
 
     presenter.print_success("Indexing complete.")
+
+
+@handle_cli_errors
+def run_prune(engine) -> None:
+    """Drops the index namespaces of every embedding model but the configured one, and says which."""
+    presenter = ConsolePresenter()
+    dropped = engine.index.prune()
+    if not dropped:
+        presenter.print_info("Nothing to prune: only the current embedding model's index exists.")
+        return
+    for name in dropped:
+        presenter.print_info(f"Dropped {name}")
+    presenter.print_success(f"Pruned {len(dropped)} index namespace(s); kept the current one.")

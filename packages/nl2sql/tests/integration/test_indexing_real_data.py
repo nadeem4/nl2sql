@@ -12,6 +12,7 @@ import yaml
 from nl2sql.runtime import Runtime
 from nl2sql.testing.config import make_demo_config
 from nl2sql.indexing.orchestrator import IndexingOrchestrator
+from nl2sql_sdk.stores import Filter
 
 
 def _cosine_similarity(left: np.ndarray, right: np.ndarray) -> float:
@@ -37,15 +38,11 @@ def test_indexing_real_embeddings_and_versions(tmp_path, monkeypatch) -> None:
     for adapter in ctx.ds_registry.list_adapters():
         orchestrator.index_datasource(adapter)
 
-    collection = ctx.vector_store.vectorstore._collection
     datasource_id = ctx.ds_registry.list_ids()[0]
-    result = collection.get(
-        where={"datasource_id": datasource_id},
-        include=["documents", "embeddings", "metadatas"],
-    )
-    assert result["documents"], "Expected documents after indexing."
-    doc = result["documents"][0]
-    stored_embedding = np.array(result["embeddings"][0])
+    entries = ctx.index.get(ctx.namespace, Filter(eq={"datasource_id": datasource_id}), with_vectors=True)
+    assert entries, "Expected entries after indexing."
+    doc = entries[0].text
+    stored_embedding = np.array(entries[0].vector)
     computed_embedding = np.array(
         ctx.embedder.embed_documents([doc])[0]
     )
@@ -53,12 +50,10 @@ def test_indexing_real_embeddings_and_versions(tmp_path, monkeypatch) -> None:
     assert similarity >= 0.999, f"Embedding similarity too low: {similarity:.6f}"
 
     for ds_id in ctx.ds_registry.list_ids():
-        latest = ctx.schema_store.get_latest_version(ds_id)
-        docs = collection.get(
-            where={"datasource_id": ds_id}, include=["metadatas"]
-        )
-        assert docs["metadatas"], f"Expected docs for datasource {ds_id}."
-        assert all(m["schema_version"] == latest for m in docs["metadatas"])
+        live = ctx.vector_store.schema_version(ds_id)
+        docs = ctx.index.get(ctx.namespace, Filter(eq={"datasource_id": ds_id}))
+        assert docs, f"Expected entries for datasource {ds_id}."
+        assert all(e.metadata["schema_version"] == live for e in docs)
 
 
 def test_indexing_eviction_with_schema_change(tmp_path, monkeypatch) -> None:
@@ -77,7 +72,7 @@ def test_indexing_eviction_with_schema_change(tmp_path, monkeypatch) -> None:
     orchestrator_1 = IndexingOrchestrator(ctx1)
     adapter_1 = ctx1.ds_registry.list_adapters()[0]
     orchestrator_1.index_datasource(adapter_1)
-    version_1 = ctx1.schema_store.get_latest_version(adapter_1.datasource_id)
+    version_1 = ctx1.vector_store.schema_version(adapter_1.datasource_id)
 
     modified_db = tmp_path / "modified.db"
     modified_db.write_bytes(base_db_path.read_bytes())
@@ -90,19 +85,13 @@ def test_indexing_eviction_with_schema_change(tmp_path, monkeypatch) -> None:
     orchestrator_2 = IndexingOrchestrator(ctx2)
     adapter_2 = ctx2.ds_registry.list_adapters()[0]
     orchestrator_2.index_datasource(adapter_2)
-    version_2 = ctx2.schema_store.get_latest_version(adapter_2.datasource_id)
+    version_2 = ctx2.vector_store.schema_version(adapter_2.datasource_id)
 
     assert version_1 != version_2
     versions = ctx2.schema_store.list_versions(adapter_2.datasource_id)
     assert versions == [version_2]
 
-    collection = ctx2.vector_store.vectorstore._collection
-    old_docs = collection.get(
-        where={
-            "$and": [
-                {"datasource_id": adapter_2.datasource_id},
-                {"schema_version": version_1},
-            ]
-        },
-    )
-    assert not old_docs["ids"]
+    # The live build is the new one; the build it replaced is kept for runs in flight.
+    live = ctx2.index.pointers(ctx2.namespace)[adapter_2.datasource_id]
+    entries = ctx2.index.get(ctx2.namespace, Filter(eq={"build_id": live.build_id}))
+    assert entries and all(e.metadata["schema_version"] == version_2 for e in entries)

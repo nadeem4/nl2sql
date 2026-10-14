@@ -60,11 +60,16 @@ class _Registry:
         return list(self._preferred.get(datasource_id, []))
 
 
+def _live():
+    """An index whose live build of ds1 was made from ``_snapshot()``; no search is expected."""
+    return SimpleNamespace(snapshot=lambda _id: _snapshot())
+
+
 def _node(preferred, vector_store=None, allowed=("*",), settings=None):
     ctx = fake_runtime(
         settings=settings,
-        vector_store=vector_store,
-        schema_store=SimpleNamespace(get_latest_snapshot=lambda _id: _snapshot()),
+        vector_store=vector_store if vector_store is not None else _live(),
+        schema_store=SimpleNamespace(get_snapshot=lambda _id, _version: _snapshot()),
         policies={"default_role": "r", "roles": {"r": {"description": "d", "allow": list(allowed)}}},
         ds_registry=_Registry({"ds1": preferred}),
     )
@@ -96,6 +101,7 @@ def _vector_store(picked, pool):
         return [_doc(t) for t in picked]
 
     return SimpleNamespace(
+        snapshot=lambda _id: _snapshot(),
         retrieve_schema_context=schema_context,
         retrieve_planning_context=lambda *_a, **_k: [],
         retrieve_column_candidates=lambda *_a, **_k: [],
@@ -190,8 +196,8 @@ def test_retrieval_leaves_out_a_missed_preferred_table_beyond_the_margin(retriev
 
 def test_a_context_without_a_registry_still_retrieves():
     ctx = fake_runtime(
-        vector_store=None,
-        schema_store=SimpleNamespace(get_latest_snapshot=lambda _id: _snapshot()),
+        vector_store=_live(),
+        schema_store=SimpleNamespace(get_snapshot=lambda _id, _version: _snapshot()),
         policies={"allow_all": True},
     )
 

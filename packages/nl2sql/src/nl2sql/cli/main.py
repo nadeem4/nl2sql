@@ -123,20 +123,17 @@ def trace_replay(
     replay_command(target, lambda: build_engine(ctx), ctx)
 
 
-@app.command()
+index_app = typer.Typer(help="Index schemas and verified queries, one datasource at a time; `nl2sql index prune`.")
+app.add_typer(index_app, name="index")
+
+
+@index_app.callback(invoke_without_command=True)
 def index(
     ctx: typer.Context,
     datasource: Annotated[Optional[List[str]], typer.Option(
         "--datasource", "-d",
         help="Re-index only this datasource (repeatable). Other datasources' entries are left untouched.",
     )] = None,
-    full: Annotated[bool, typer.Option(
-        "--full",
-        help=(
-            "Rebuild every datasource into a new collection and switch to it when all succeed. "
-            "Needed after changing the embedding model, since every datasource must share one model."
-        ),
-    )] = False,
     curated_only: Annotated[bool, typer.Option(
         "--curated-only",
         help=(
@@ -153,14 +150,23 @@ def index(
     )] = False,
 ):
     """
-    Index schemas and examples into the Vector Store, one datasource at a time.
+    Index schemas and examples into the index of the configured embedding model, one datasource at a time.
     """
-    if full and curated_only:
-        raise typer.BadParameter("--full and --curated-only cannot be combined.")
+    if ctx.invoked_subcommand is not None:
+        return
     if enrich and curated_only:
         raise typer.BadParameter("--enrich and --curated-only cannot be combined.")
-    run_indexing(build_engine(ctx), enrich=enrich, datasource_ids=datasource or None, full=full,
-                 curated_only=curated_only)
+    run_indexing(build_engine(ctx), enrich=enrich, datasource_ids=datasource or None, curated_only=curated_only)
+
+
+@index_app.command("prune")
+def index_prune(ctx: typer.Context):
+    """
+    Drop the index of every other embedding model, including 0.5's collection. The current one is kept.
+    """
+    from nl2sql.cli.common.indexing import run_prune
+
+    run_prune(build_engine(ctx, check=False))
 
 
 @app.command()

@@ -5,10 +5,10 @@ Each runs over a small fake context, so no database, model or key is needed.
 """
 import pytest
 import yaml
+from index_helpers import Chunk, TestIndex  # same directory
 from langchain_core.embeddings import FakeEmbeddings
 
 from nl2sql import NL2SQL
-from nl2sql.indexing.vector_store import VectorStore
 from nl2sql.llm.registry import LLMRegistry
 from nl2sql.secrets import SecretManager
 from nl2sql_sdk.schema import (
@@ -31,24 +31,42 @@ class _Registry:
     def list_ids(self):
         return list(self._ids)
 
+    def unavailable(self):
+        return {}
+
+    def get_preferred_tables(self, _ds):
+        return []
+
 
 class _SchemaStore:
     def __init__(self, snapshot=None):
         self.snapshot = snapshot
 
-    def get_latest_snapshot(self, _ds):
+    def get_snapshot(self, _ds, _version):
         return self.snapshot
-
-    def get_latest_version(self, _ds):
-        return "v1" if self.snapshot else None
 
 
 class _Context:
-    def __init__(self, vector_store=None, snapshot=None, llm_registry=None):
-        self.vector_store = vector_store
+    """The parts of the runtime these namespaces reach, over a real index store in ``tmp_path``.
+
+    With ``snapshot``, chinook is indexed at version v1 and the state store holds it.
+    """
+
+    def __init__(self, tmp_path, snapshot=None, llm_registry=None):
         self.schema_store = _SchemaStore(snapshot)
+        self.test_index = TestIndex(tmp_path, FakeEmbeddings(size=8), schema_store=self.schema_store)
+        for key, value in vars(self.test_index.ctx).items():
+            setattr(self, key, value)
+        if snapshot is not None:
+            self.test_index.write("chinook", [Chunk("Datasource: chinook", type="schema.datasource",
+                                                    datasource_id="chinook")])
         self.ds_registry = _Registry()
         self.llm_registry = llm_registry
+        self.curated = None
+
+    @property
+    def vector_store(self):
+        return self.test_index.retriever()
 
 
 def _engine(ctx) -> NL2SQL:
@@ -90,8 +108,8 @@ def _snapshot() -> SchemaSnapshot:
     return SchemaSnapshot(contract=contract, metadata=metadata)
 
 
-def test_datasources_schema_projects_the_indexed_snapshot():
-    schema = _engine(_Context(snapshot=_snapshot())).datasources.schema("chinook")
+def test_datasources_schema_projects_the_indexed_snapshot(tmp_path):
+    schema = _engine(_Context(tmp_path, snapshot=_snapshot())).datasources.schema("chinook")
 
     assert schema["datasource_id"] == "chinook"
     assert [t["name"] for t in schema["tables"]] == ["Album", "Artist"]
@@ -103,21 +121,20 @@ def test_datasources_schema_projects_the_indexed_snapshot():
                                       "references_columns": ["ArtistId"]}]
 
 
-def test_datasources_schema_before_the_first_index_has_no_tables():
-    assert _engine(_Context()).datasources.schema("chinook") == {"datasource_id": "chinook", "tables": []}
+def test_datasources_schema_before_the_first_index_has_no_tables(tmp_path):
+    assert _engine(_Context(tmp_path)).datasources.schema("chinook") == {"datasource_id": "chinook", "tables": []}
 
 
-def test_index_health_without_a_vector_store_is_missing():
-    health = _engine(_Context()).index.health()
+def test_index_health_before_the_first_index_is_missing(tmp_path):
+    health = _engine(_Context(tmp_path)).index.health()
     assert health["status"] == "missing"
     assert health["problems"]
 
 
 def test_index_health_reads_the_live_store(tmp_path):
-    store = VectorStore("nl2sql_store", str(tmp_path / "vs"), embeddings=FakeEmbeddings(size=8))
-    health = _engine(_Context(vector_store=store, snapshot=_snapshot())).index.health()
-    assert health["status"] in {"missing", "empty", "stale", "ok"}
-    assert "datasources" in health and "counts" in health
+    health = _engine(_Context(tmp_path, snapshot=_snapshot())).index.health()
+    assert health["status"] == "ok", health["problems"]
+    assert health["datasources"][0]["index_version"] == "v1" and health["counts"]
 
 
 def test_index_build_hands_the_runtime_to_the_rebuild(monkeypatch):
@@ -128,7 +145,7 @@ def test_index_build_hands_the_runtime_to_the_rebuild(monkeypatch):
         return "result"
 
     monkeypatch.setattr("nl2sql.indexing.rebuild.rebuild_index", _rebuild)
-    ctx = _Context()
+    ctx = object()
     assert _engine(ctx).index.build(["chinook"]) == "result"
     assert seen["ctx"] is ctx
     # Enrichment spends tokens, so it is off unless asked for.
@@ -137,11 +154,5 @@ def test_index_build_hands_the_runtime_to_the_rebuild(monkeypatch):
 
 
 def test_index_inspect_runs_the_stores_mmr_search(tmp_path):
-    store = VectorStore("nl2sql_store", str(tmp_path / "vs"), embeddings=FakeEmbeddings(size=8))
-    record = _engine(_Context(vector_store=store)).index.inspect("albums", k=3)
-    assert isinstance(record, dict)
-
-
-def test_index_inspect_without_a_vector_store_says_so():
-    with pytest.raises(LookupError, match="no vector index"):
-        _engine(_Context()).index.inspect("albums")
+    record = _engine(_Context(tmp_path, snapshot=_snapshot())).index.inspect("albums", k=3)
+    assert [e["datasource_id"] for e in record["pool"]] == ["chinook"]

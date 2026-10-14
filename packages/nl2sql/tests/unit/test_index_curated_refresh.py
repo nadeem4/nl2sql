@@ -10,15 +10,15 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-import pytest
+from index_helpers import TestIndex  # same directory
 from langchain_core.embeddings import FakeEmbeddings
 
 from nl2sql.config import Curated
 from nl2sql.indexing import enrichment_service, orchestrator as orchestrator_module
 from nl2sql.indexing.curated import curated_hash
 from nl2sql.indexing.rebuild import rebuild_index
-from nl2sql.indexing.vector_store import VectorStore
 from nl2sql.schema import InMemorySchemaStore
+from nl2sql_sdk.stores import Filter
 from nl2sql_sdk.schema import (
     ColumnContract,
     SchemaContract,
@@ -67,21 +67,21 @@ class _NoLLM:
 
 def _ctx(tmp_path, curated):
     adapter = _Adapter()
-    store = VectorStore("nl2sql_store", str(tmp_path / "vs"), embeddings=FakeEmbeddings(size=8))
-    return SimpleNamespace(
-        vector_store=store,
-        schema_store=InMemorySchemaStore(),
-        llm_registry=_NoLLM(),
-        ds_registry=SimpleNamespace(list_adapters=lambda: [adapter], get_sample_questions=lambda _ds: [],
-                                    get_description=lambda _ds: "Music store"),
-        curated=curated,
-    ), adapter
+    ctx = TestIndex(tmp_path, FakeEmbeddings(size=8), schema_store=InMemorySchemaStore()).ctx
+    ctx.llm_registry = _NoLLM()
+    ctx.ds_registry = SimpleNamespace(list_adapters=lambda: [adapter], get_sample_questions=lambda _ds: [],
+                                      get_description=lambda _ds: "Music store")
+    ctx.curated = curated
+    return ctx, adapter
 
 
-def _active(store, kind=None):
-    clauses = [{"datasource_id": "chinook"}, {"build_id": store.active_builds()["chinook"]}]
-    got = store.vectorstore._collection.get(where={"$and": clauses}, include=["documents", "metadatas", "embeddings"])
-    rows = [(d, m, tuple(e)) for d, m, e in zip(got["documents"], got["metadatas"], got["embeddings"])]
+def _pointer(ctx):
+    return ctx.index.pointers(ctx.namespace)["chinook"]
+
+
+def _active(ctx, kind=None):
+    entries = ctx.index.get(ctx.namespace, Filter(eq={"build_id": _pointer(ctx).build_id}), with_vectors=True)
+    rows = [(e.text, e.metadata, tuple(e.vector)) for e in entries]
     if kind == "curated":
         return sorted(d for d, m, _ in rows if m["type"] == "curated.verified_query")
     return sorted((d, v) for d, m, v in rows if m["type"] != "curated.verified_query")
@@ -93,15 +93,15 @@ def test_a_full_index_writes_the_curated_entries_and_their_hash(tmp_path):
     result = rebuild_index(ctx, enrich=False)
 
     assert result.ok
-    assert _active(ctx.vector_store, "curated") == ["Customers by revenue", "Top customers"]
-    assert ctx.vector_store._live_metadata()["curated_hash:chinook"] == curated_hash(
+    assert _active(ctx, "curated") == ["Customers by revenue", "Top customers"]
+    assert _pointer(ctx).curated_hash == curated_hash(
         ctx.curated.datasources["chinook"])
 
 
 def test_a_curated_only_refresh_makes_no_model_call_and_keeps_the_schema(tmp_path, monkeypatch):
     ctx, adapter = _ctx(tmp_path, _curated("Top customers"))
     rebuild_index(ctx, enrich=False)
-    schema_before = _active(ctx.vector_store)
+    schema_before = _active(ctx)
     reads_before = adapter.reads
 
     def _no_enrichment(*_a, **_k):
@@ -115,9 +115,9 @@ def test_a_curated_only_refresh_makes_no_model_call_and_keeps_the_schema(tmp_pat
 
     assert result.ok, result.errors
     assert adapter.reads == reads_before
-    assert _active(ctx.vector_store) == schema_before
-    assert _active(ctx.vector_store, "curated") == ["Best customers", "Customers by revenue", "Top customers"]
-    assert ctx.vector_store._live_metadata()["curated_hash:chinook"] == curated_hash(
+    assert _active(ctx) == schema_before
+    assert _active(ctx, "curated") == ["Best customers", "Customers by revenue", "Top customers"]
+    assert _pointer(ctx).curated_hash == curated_hash(
         ctx.curated.datasources["chinook"])
     assert result.stats[0]["curated.verified_query"] == 3
 
@@ -128,7 +128,7 @@ def test_removing_the_curated_file_and_refreshing_drops_the_entries(tmp_path):
     ctx.curated = None
 
     assert rebuild_index(ctx, curated_only=True).ok
-    assert _active(ctx.vector_store, "curated") == []
+    assert _active(ctx, "curated") == []
 
 
 def test_a_curated_only_refresh_of_an_unindexed_datasource_fails_for_that_datasource(tmp_path):
@@ -138,9 +138,3 @@ def test_a_curated_only_refresh_of_an_unindexed_datasource_fails_for_that_dataso
 
     assert not result.ok
     assert "nl2sql index" in result.errors[0]["error"]
-
-
-def test_curated_only_and_full_do_not_combine(tmp_path):
-    ctx, _ = _ctx(tmp_path, None)
-    with pytest.raises(ValueError, match="curated-only"):
-        rebuild_index(ctx, full=True, curated_only=True)

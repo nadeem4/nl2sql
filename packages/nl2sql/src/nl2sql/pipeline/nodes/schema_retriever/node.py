@@ -118,11 +118,10 @@ class SchemaRetrieverNode:
         return "\n".join(parts).strip()
 
     def _resolve_snapshot(self, datasource_id: str, schema_version: Optional[str]) -> Optional[SchemaSnapshot]:
-        if not self.schema_store:
-            return None
+        """The snapshot of ``schema_version``, else of the datasource's live build (the run's pinned pointer)."""
         if schema_version:
-            return self.schema_store.get_snapshot(datasource_id, schema_version)
-        return self.schema_store.get_latest_snapshot(datasource_id)
+            return self.schema_store.get_snapshot(datasource_id, schema_version) if self.schema_store else None
+        return self.vector_store.snapshot(datasource_id) if self.vector_store else None
 
     def _build_tables_from_snapshot(
         self,
@@ -311,9 +310,9 @@ class SchemaRetrieverNode:
                     from_table = doc.metadata.get("from_table")
                     to_table = doc.metadata.get("to_table")
                     if from_table:
-                        tables[from_table].update(doc.metadata.get("from_columns"))
+                        tables[from_table].update(doc.metadata.get("from_columns") or [])
                     if to_table and to_table in searchable:
-                        tables[to_table].update(doc.metadata.get("to_columns"))
+                        tables[to_table].update(doc.metadata.get("to_columns") or [])
 
             if not tables:
                 relevant_tables = self._build_tables_from_snapshot(

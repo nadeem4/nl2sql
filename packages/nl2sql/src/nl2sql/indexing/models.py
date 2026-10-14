@@ -170,8 +170,9 @@ class RelationshipChunk(BaseChunk):
             "from_table": self.from_table.full_name,
             "to_table": self.to_table.full_name,
             "table": self.from_table.full_name,
-            "from_columns": self.from_columns or [],
-            "to_columns": self.to_columns or [],
+            # Joined: an index entry holds scalars only. The retriever splits them.
+            "from_columns": ",".join(self.from_columns or []),
+            "to_columns": ",".join(self.to_columns or []),
             "cardinality": self.cardinality,
             "schema_version": self.schema_version,
         }

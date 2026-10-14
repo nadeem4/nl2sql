@@ -10,10 +10,13 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 import pytest
+from index_helpers import TestIndex  # same directory
+from langchain_core.embeddings import FakeEmbeddings
 
 from nl2sql.indexing.orchestrator import IndexingOrchestrator
 from nl2sql.schema import InMemorySchemaStore
 from nl2sql.schema.sqlite_store import SqliteSchemaStore
+from nl2sql_sdk.stores import Filter
 from nl2sql_sdk.schema import (
     ColumnContract,
     SchemaContract,
@@ -57,45 +60,40 @@ class _Adapter:
         return self.snapshot
 
 
-class _RecordingStore:
-    def __init__(self):
-        self.chunks = []
-
-    def refresh_schema_chunks(self, datasource_id, schema_version, chunks, evicted_versions, **_kw):
-        self.chunks = list(chunks)
-        return {"datasource_id": datasource_id, "schema_version": schema_version}
-
-
-def _ctx(description=DESCRIPTION, questions=QUESTIONS, schema_store=None):
-    return SimpleNamespace(
-        vector_store=_RecordingStore(),
-        schema_store=schema_store or InMemorySchemaStore(),
-        ds_registry=SimpleNamespace(
-            get_sample_questions=lambda _ds: list(questions),
-            get_description=lambda _ds: description,
-        ),
-        llm_registry=SimpleNamespace(get_llm=lambda _name: (_ for _ in ()).throw(ValueError("no key"))),
+def _ctx(tmp_path, description=DESCRIPTION, questions=QUESTIONS, schema_store=None):
+    ctx = TestIndex(tmp_path, FakeEmbeddings(size=8), schema_store=schema_store or InMemorySchemaStore()).ctx
+    ctx.ds_registry = SimpleNamespace(
+        get_sample_questions=lambda _ds: list(questions),
+        get_description=lambda _ds: description,
     )
+    ctx.llm_registry = SimpleNamespace(get_llm=lambda _name: (_ for _ in ()).throw(ValueError("no key")))
+    ctx.curated = None
+    return ctx
+
+
+def _live_version(ctx) -> str:
+    return ctx.index.pointers(ctx.namespace)["chinook"].schema_version
 
 
 def _datasource_text(ctx) -> str:
-    [chunk] = [c for c in ctx.vector_store.chunks if c.type == "schema.datasource"]
-    return chunk.get_page_content()
+    entries = ctx.index.get(ctx.namespace, Filter(eq={"type": "schema.datasource"}))
+    [entry] = [e for e in entries if e.metadata["build_id"] == ctx.index.pointers(ctx.namespace)["chinook"].build_id]
+    return entry.text
 
 
 # --- 1. the datasource entry gets its description -------------------------------
 
 
-def test_the_datasource_chunk_contains_the_configured_description():
-    ctx = _ctx()
+def test_the_datasource_chunk_contains_the_configured_description(tmp_path):
+    ctx = _ctx(tmp_path)
 
     IndexingOrchestrator(ctx).index_datasource(_Adapter())
 
     assert DESCRIPTION in _datasource_text(ctx)
 
 
-def test_the_datasource_chunk_contains_the_example_questions():
-    ctx = _ctx()
+def test_the_datasource_chunk_contains_the_example_questions(tmp_path):
+    ctx = _ctx(tmp_path)
 
     IndexingOrchestrator(ctx).index_datasource(_Adapter())
 
@@ -103,17 +101,17 @@ def test_the_datasource_chunk_contains_the_example_questions():
     assert all(q in text for q in QUESTIONS)
 
 
-def test_the_snapshot_stores_the_configured_description_too():
-    """The panel and the planner read the snapshot; it should say the same."""
-    ctx = _ctx()
+def test_the_snapshot_stores_the_configured_description_too(tmp_path):
+    """The panel and the planner read the live build's snapshot; it should say the same."""
+    ctx = _ctx(tmp_path)
 
     IndexingOrchestrator(ctx).index_datasource(_Adapter())
 
-    assert ctx.schema_store.get_latest_snapshot("chinook").metadata.description == DESCRIPTION
+    assert ctx.schema_store.get_snapshot("chinook", _live_version(ctx)).metadata.description == DESCRIPTION
 
 
-def test_a_description_the_database_reports_is_kept_when_none_is_configured():
-    ctx = _ctx(description=None)
+def test_a_description_the_database_reports_is_kept_when_none_is_configured(tmp_path):
+    ctx = _ctx(tmp_path, description=None)
 
     IndexingOrchestrator(ctx).index_datasource(_Adapter(_snapshot(description="from the catalog")))
 
@@ -143,45 +141,46 @@ def test_reregistering_an_unchanged_structure_keeps_the_version_and_updates_meta
     stored = store.get_snapshot("chinook", first)
     assert stored.metadata.description == "new"
     assert next(iter(stored.metadata.tables.values())).row_count == 11
-    assert store.get_latest_version("chinook") == first
+    assert store.list_versions("chinook") == [first]
 
 
-def test_an_unchanged_structure_that_returns_after_a_change_becomes_latest_again(tmp_path):
-    """Structure A, then B, then A again: A's version is reused, and it must be
-    the latest, or the resolver compares chunks against B."""
-    store = SqliteSchemaStore(tmp_path / "schema.db")
-    a1, _ = store.register_snapshot(_snapshot())
+def _changed() -> SchemaSnapshot:
     other = _snapshot()
     next(iter(other.contract.tables.values())).columns["Extra"] = ColumnContract(name="Extra", data_type="TEXT")
-    store.register_snapshot(other)
+    return other
 
-    import time
-    time.sleep(1.1)  # created_at has one-second resolution
-    a2, _ = store.register_snapshot(_snapshot(description="back"))
 
-    assert a2 == a1
-    assert store.get_latest_version("chinook") == a1
-    store._connection.close()
+def test_a_structure_that_returns_after_a_change_reuses_its_version_and_the_pointer_names_it(tmp_path):
+    """Structure A, then B, then A again: A's version is reused, and the build
+    pointer names it, so readers use A's snapshot and not B's."""
+    store = SqliteSchemaStore(tmp_path / "schema.db")
+    ctx = _ctx(tmp_path, schema_store=store)
+    orchestrator = IndexingOrchestrator(ctx)
+    orchestrator.index_datasource(_Adapter())
+    a1 = _live_version(ctx)
+    orchestrator.index_datasource(_Adapter(_changed()))
+    b = _live_version(ctx)
+
+    orchestrator.index_datasource(_Adapter(_snapshot(description="back")))
+
+    assert b != a1
+    assert _live_version(ctx) == a1
+    assert "Extra" not in next(iter(store.get_snapshot("chinook", a1).contract.tables.values())).columns
+    store.close()
 
 
 def test_health_sees_an_index_rebuilt_on_a_returning_structure_as_current(tmp_path):
-    """#110's startup repair compares the index's schema version with the latest
-    snapshot. After A, B, then A again, the index is built from A; A must be the
-    latest, or every start would call the index stale and rebuild it."""
-    import time
-
-    from nl2sql.indexing.health import summarize
+    """After A, B, then A again, the index is built from A; health reads the
+    pointer, so the index is current and no start would rebuild it."""
+    from nl2sql.indexing.health import index_health
 
     store = SqliteSchemaStore(tmp_path / "schema.db")
-    a, _ = store.register_snapshot(_snapshot())
-    other = _snapshot()
-    next(iter(other.contract.tables.values())).columns["Extra"] = ColumnContract(name="Extra", data_type="TEXT")
-    store.register_snapshot(other)
-    time.sleep(1.1)
-    store.register_snapshot(_snapshot())
+    ctx = _ctx(tmp_path, schema_store=store)
+    orchestrator = IndexingOrchestrator(ctx)
+    for snapshot in (_snapshot(), _changed(), _snapshot()):
+        orchestrator.index_datasource(_Adapter(snapshot))
 
-    entries = [{"type": "schema.datasource", "datasource_id": "chinook", "schema_version": a}]
-    health = summarize(entries, store.get_latest_version, ["chinook"])
+    health = index_health(ctx.index, ctx.namespace, store, ["chinook"])
 
     assert health.status == "ok", health.problems
     store.close()

@@ -39,7 +39,7 @@ def _snapshot(table_name: str) -> SchemaSnapshot:
     return SchemaSnapshot(contract=contract, metadata=metadata)
 
 
-def test_schema_store_versions_and_latest_snapshot():
+def test_schema_store_versions_and_snapshot_by_version():
     # Validates schema evolution because multiple versions must be tracked.
     # Arrange
     store = InMemorySchemaStore(max_versions=3)
@@ -52,8 +52,7 @@ def test_schema_store_versions_and_latest_snapshot():
 
     # Assert
     assert store.list_versions("ds1") == [v1, v2]
-    assert store.get_latest_version("ds1") == v2
-    assert store.get_latest_snapshot("ds1").contract.tables
+    assert list(store.get_snapshot("ds1", v1).contract.tables) != list(store.get_snapshot("ds1", v2).contract.tables)
 
 
 def _multi_fk_contract() -> SchemaContract:

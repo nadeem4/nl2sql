@@ -3,7 +3,7 @@ Curated answers API for NL2SQL.
 
 Validates the engine's ``curated`` section: the checks startup runs, plus the
 one that needs the index (every table a verified query reads exists in its
-datasource's latest indexed schema). Tests it: every verified query run once
+datasource's live indexed schema). Tests it: every verified query run once
 against its database, with its defaults and examples bound.
 """
 
@@ -75,7 +75,7 @@ class CuratedAPI:
     def validate(self) -> CuratedValidationReport:
         """
         Validate the ``curated`` section against the engine's datasources and,
-        where a datasource has been indexed, its latest indexed schema.
+        where a datasource has been indexed, the schema its live build was made from.
 
         ``ok`` is False on any error; ``notes`` say what could not be checked.
         """
@@ -187,8 +187,9 @@ class CuratedAPI:
         note says so.
         """
         out: Dict[str, Set[Tuple[str, str]]] = {}
+        live = self._ctx.vector_store
         for ds_id in (ds_id for ds_id in cfg.datasources if ds_id in dialects):
-            snapshot = self._ctx.schema_store.get_latest_snapshot(ds_id)
+            snapshot = live.snapshot(ds_id)
             if snapshot is None:
                 report.notes.append(f"'{ds_id}' is not indexed: table check skipped. Run `nl2sql index`.")
                 continue

@@ -51,6 +51,12 @@ class Store:
                                           "id": f"ds:{d}", "type": "schema.datasource"})
                 for d in self.ds_ids]
 
+    def schema_version(self, ds_id):
+        return "v1"
+
+    def snapshot(self, ds_id):
+        return SNAPSHOTS.get(ds_id)
+
 
 def _ctx(server, ds_ids, allowed=("*",)):
     registry = LLMRegistry(SecretManager())
@@ -60,10 +66,6 @@ def _ctx(server, ds_ids, allowed=("*",)):
         vector_store=Store(ds_ids),
         policies={"default_role": "r", "roles": {role: {"description": "d", "allow": list(list(allowed))} for role in ("r", "admin")}},
         ds_registry=SimpleNamespace(list_ids=lambda: list(ds_ids)),
-        schema_store=SimpleNamespace(
-            get_latest_version=lambda _id: "v1",
-            get_latest_snapshot=lambda ds_id: SNAPSHOTS.get(ds_id),
-        ),
         llm_registry=registry,
     )
 

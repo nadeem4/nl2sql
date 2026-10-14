@@ -278,6 +278,31 @@ def test_nothing_outside_the_adapters_imports_a_database_library():
         "stores, which are metadata, not a datasource.", offenders)
 
 
+STORAGE = ENGINE / "storage"
+
+# The vector library and its LangChain wrapper. The local embedder is the one
+# exception: its model is the ONNX all-MiniLM-L6-v2 that ships inside chromadb,
+# so it borrows chromadb's embedding function, not its index.
+INDEX_LIBRARIES = {"chromadb", "langchain_chroma"}
+INDEX_LIBRARY_EXCEPTIONS = {"nl2sql/src/nl2sql/embeddings/local.py": {"chromadb"}}
+
+
+def test_only_storage_imports_chromadb():
+    """The engine reaches its index through ``IndexStore``; Chroma is one store among any."""
+    offenders = []
+    for path in python_files(*SOURCES):
+        if path.is_relative_to(STORAGE):
+            continue
+        allowed = INDEX_LIBRARY_EXCEPTIONS.get(_where(path), set())
+        offenders += [f"{_where(path)}:{lineno} {name}"
+                      for lineno, name, _ in imports(path)
+                      if name.partition(".")[0] in INDEX_LIBRARIES - allowed]
+    assert not offenders, _broke(
+        "Only nl2sql/storage/ imports chromadb. The engine embeds, ranks and filters through "
+        "the IndexStore interface (nl2sql_sdk.stores), so a plugin index store works the same "
+        "way as the built-in one.", offenders)
+
+
 # --------------------------------------------------------------------------
 # 5-6. Dialect knowledge lives in the adapter
 # --------------------------------------------------------------------------

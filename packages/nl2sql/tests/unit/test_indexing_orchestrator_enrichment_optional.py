@@ -11,6 +11,8 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 import pytest
+from index_helpers import TestIndex  # same directory
+from langchain_core.embeddings import FakeEmbeddings
 from langchain_core.runnables import RunnableLambda
 
 from nl2sql.indexing import enrichment_service
@@ -19,6 +21,7 @@ from nl2sql.llm.models import AgentConfig
 from nl2sql.llm.registry import LLMRegistry
 from nl2sql.schema import InMemorySchemaStore
 from nl2sql.secrets import SecretManager
+from nl2sql_sdk.stores import Filter
 from nl2sql_sdk.schema import (
     ColumnContract,
     SchemaContract,
@@ -53,17 +56,14 @@ def _snapshot() -> SchemaSnapshot:
     return SchemaSnapshot(contract=contract, metadata=metadata)
 
 
-class _RecordingVectorStore:
-    def __init__(self):
-        self.chunks = []
+def _entries(stats) -> int:
+    """How many entries a build wrote, from its counts by type."""
+    return sum(v for v in stats.values() if isinstance(v, int) and not isinstance(v, bool))
 
-    def clear(self):
-        self.chunks = []
 
-    def refresh_schema_chunks(self, datasource_id, schema_version, chunks, evicted_versions, switch_guard=None,
-                              **_kw):
-        self.chunks = list(chunks)
-        return {"datasource_id": datasource_id, "schema_version": schema_version, "chunks": len(chunks)}
+def _indexed(ctx):
+    """Every entry in the index, as written."""
+    return ctx.index.get(ctx.namespace, Filter())
 
 
 class _StubAdapter:
@@ -73,16 +73,15 @@ class _StubAdapter:
         return _snapshot()
 
 
-def _context(llm_registry) -> SimpleNamespace:
-    return SimpleNamespace(
-        vector_store=_RecordingVectorStore(),
-        schema_store=InMemorySchemaStore(),
-        ds_registry=SimpleNamespace(
-            get_sample_questions=lambda ds_id: ["How many users are there?"],
-            get_description=lambda ds_id: "User records",
-        ),
-        llm_registry=llm_registry,
+def _context(tmp_path, llm_registry) -> SimpleNamespace:
+    ctx = TestIndex(tmp_path, FakeEmbeddings(size=8), schema_store=InMemorySchemaStore()).ctx
+    ctx.ds_registry = SimpleNamespace(
+        get_sample_questions=lambda ds_id: ["How many users are there?"],
+        get_description=lambda ds_id: "User records",
     )
+    ctx.llm_registry = llm_registry
+    ctx.curated = None
+    return ctx
 
 
 @pytest.fixture()
@@ -96,13 +95,13 @@ def keyless_registry(monkeypatch) -> LLMRegistry:
     return registry
 
 
-def test_indexing_produces_chunks_without_an_api_key(keyless_registry):
-    ctx = _context(keyless_registry)
+def test_indexing_produces_chunks_without_an_api_key(tmp_path, keyless_registry):
+    ctx = _context(tmp_path, keyless_registry)
 
     stats = IndexingOrchestrator(ctx, enrich=True).index_datasource(_StubAdapter())
 
-    assert stats["chunks"] > 0
-    assert ctx.vector_store.chunks, "indexing produced no chunks without a key"
+    assert _entries(stats) > 0
+    assert _indexed(ctx), "indexing produced no entries without a key"
 
 
 def test_missing_key_leaves_the_snapshot_unenriched(keyless_registry, caplog):
@@ -121,7 +120,7 @@ def test_missing_key_leaves_the_snapshot_unenriched(keyless_registry, caplog):
     assert "enrichment" in caplog.text.lower()
 
 
-def test_enrichment_failure_mid_invoke_degrades_instead_of_raising(caplog):
+def test_enrichment_failure_mid_invoke_degrades_instead_of_raising(tmp_path, caplog):
     """A reachable LLM that blows up during the call is no different to no LLM."""
 
     def _boom(_payload):
@@ -132,37 +131,37 @@ def test_enrichment_failure_mid_invoke_degrades_instead_of_raising(caplog):
             return RunnableLambda(_boom)
 
     registry = SimpleNamespace(get_llm=lambda name: _ExplodingLLM())
-    ctx = _context(registry)
+    ctx = _context(tmp_path, registry)
 
     with caplog.at_level("WARNING"):
         stats = IndexingOrchestrator(ctx, enrich=True).index_datasource(_StubAdapter())
 
-    assert stats["chunks"] > 0
+    assert _entries(stats) > 0
     assert "upstream 503" in caplog.text
 
 
-def test_unusable_llm_client_degrades_instead_of_raising():
+def test_unusable_llm_client_degrades_instead_of_raising(tmp_path):
     """``with_structured_output`` failing is caught too, not just ``invoke``."""
 
     class _BrokenLLM:
         def with_structured_output(self, *_args, **_kwargs):
             raise ValueError("structured output unsupported by this endpoint")
 
-    ctx = _context(SimpleNamespace(get_llm=lambda name: _BrokenLLM()))
+    ctx = _context(tmp_path, SimpleNamespace(get_llm=lambda name: _BrokenLLM()))
 
     stats = IndexingOrchestrator(ctx, enrich=True).index_datasource(_StubAdapter())
 
-    assert stats["chunks"] > 0
+    assert _entries(stats) > 0
 
 
-def test_enrichment_off_never_asks_for_an_llm():
+def test_enrichment_off_never_asks_for_an_llm(tmp_path):
     """Enrichment is off unless asked for: no LLM is even resolved, so no tokens are spent."""
 
     def _no_llm(name):
         raise AssertionError(f"enrichment asked for the '{name}' LLM while off")
 
-    ctx = _context(SimpleNamespace(get_llm=_no_llm))
+    ctx = _context(tmp_path, SimpleNamespace(get_llm=_no_llm))
 
     stats = IndexingOrchestrator(ctx).index_datasource(_StubAdapter())
 
-    assert stats["chunks"] > 0
+    assert _entries(stats) > 0

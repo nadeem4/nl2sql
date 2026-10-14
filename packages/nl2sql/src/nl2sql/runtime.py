@@ -196,18 +196,19 @@ class Runtime:
     def _resolve_stores(self, config: Config, problem) -> List[Any]:
         """The four ``storage`` slots' stores, built through the registry. Writes nothing.
 
-        Until Phase 2 moves each part of the engine onto its store interface
-        (S2 to S4), the engine reads only the built-in stores, so another
-        store in a slot is a problem rather than silently unused.
+        The engine reads its index through the ``IndexStore`` interface, so
+        any index store works. Until Phase 2 moves the rest of the engine
+        onto its store interfaces (S3 and S4), it reads ``state``, ``traces``
+        and ``results`` only through their built-in stores, so another store
+        in one of those slots is a problem rather than silently unused.
         """
         from nl2sql.config.models import BUILT_IN_STORES, STORE_SLOTS
         from nl2sql.storage import build_store
-        from nl2sql.storage.chroma import ChromaIndex
         from nl2sql.storage.files import FilesTraces
         from nl2sql.storage.local import LocalResults
         from nl2sql.storage.sqlite import SqliteState
 
-        built_ins = {"index": ChromaIndex, "state": SqliteState, "traces": FilesTraces, "results": LocalResults}
+        built_ins = {"state": SqliteState, "traces": FilesTraces, "results": LocalResults}
 
         stores: List[Any] = []
         for slot in STORE_SLOTS:
@@ -219,7 +220,7 @@ class Runtime:
                 problem(f"storage.{slot}", str(e))
             else:
                 name = BUILT_IN_STORES[slot]
-                if not isinstance(store, built_ins[slot]):
+                if slot in built_ins and not isinstance(store, built_ins[slot]):
                     problem(f"storage.{slot}", f"This engine reads {slot} only through the built-in "
                             f"'{name}' store for now.", fix=f"Remove storage.{slot}, or set it to {{type: {name}}}.")
             stores.append(store)
@@ -228,10 +229,43 @@ class Runtime:
     def _build_stores(self) -> None:
         from nl2sql.execution import ExecutionStore
 
-        self.vector_store = self.index.vector_store(self.embedder)
         self.schema_store = self.state.schema_store(self._config.settings.schema_.max_versions)
         self.execution_store = ExecutionStore()
         self.artifact_store = self.results.artifact_store()
+
+    # ------------------------------------------------------------ the index
+
+    @property
+    def namespace(self) -> str:
+        """The index namespace of the configured embedding model: ``nl2sql__<model slug>__<dimension>``."""
+        from nl2sql.indexing.retrieval import namespace_for
+
+        return namespace_for(self.embedding_info)
+
+    @property
+    def vector_store(self):
+        """A ``Retriever`` on the index: this run's pinned one, else one reading the live pointers now."""
+        pinned = getattr(self, "_pinned_retriever", None)
+        return pinned if pinned is not None else self._retriever()
+
+    def _retriever(self):
+        from nl2sql.indexing.retrieval import Retriever
+
+        namespace = self.namespace
+        return Retriever(self.index, namespace, self.embedder, self.index.pointers(namespace),
+                         schema_store=getattr(self, "schema_store", None))
+
+    def pin_index(self) -> "Runtime":
+        """A run-scoped runtime that reads the index through the pointers as they are now.
+
+        Every step of the run then uses the same build and schema version of
+        each datasource, even if a rebuild switches a pointer meanwhile; a
+        rebuild keeps the build it replaces, so the run's entries stay. It
+        shares everything else with this runtime and is never closed.
+        """
+        run = copy.copy(self)
+        run._pinned_retriever = self._retriever()
+        return run
 
     # ------------------------------------------------------------ reading
 
@@ -382,7 +416,7 @@ class Runtime:
             self._closed = True
         self.ds_registry.close()
         self.llm_registry.close()
-        for store in (getattr(self, "schema_store", None), getattr(self, "vector_store", None)):
+        for store in (getattr(self, "schema_store", None), getattr(self, "index", None)):
             close = getattr(store, "close", None)
             if callable(close):
                 try:

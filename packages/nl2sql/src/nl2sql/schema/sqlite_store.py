@@ -192,29 +192,6 @@ class SqliteSchemaStore:
         return SchemaSnapshot(contract=contract, metadata=metadata)
 
     @_locked
-    def get_latest_snapshot(self, datasource_id: str) -> Optional[SchemaSnapshot]:
-        latest_version = self.get_latest_version(datasource_id)
-        if not latest_version:
-            return None
-        return self.get_snapshot(datasource_id, latest_version)
-
-    @_locked
-    def get_latest_version(self, datasource_id: str) -> Optional[str]:
-        with self._connection:
-            row = self._connection.execute(
-                """
-                SELECT schema_version
-                FROM schema_snapshots
-                WHERE datasource_id = ?
-                ORDER BY created_at DESC
-                LIMIT 1;
-                """,
-                (datasource_id,),
-            ).fetchone()
-
-            return row[0] if row else None
-
-    @_locked
     def list_versions(self, datasource_id: str) -> List[str]:
         rows = self._connection.execute(
             """

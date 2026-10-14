@@ -3,13 +3,14 @@
 The checks that need no index run when the engine is built (a broken
 ``curated`` section is a ``ConfigError``, so the command exits 1 naming it).
 The command adds the one that needs the index: every table a verified query
-reads exists in its datasource's latest indexed schema. It prints a report and
+reads exists in the schema its datasource's live index build was made from. It prints a report and
 exits non-zero on any error.
 """
 from __future__ import annotations
 
 import re
 import sqlite3
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -20,6 +21,7 @@ from nl2sql import NL2SQL, load_config
 from nl2sql.cli.main import app
 from nl2sql.runtime import StorePaths
 from nl2sql.schema import SqliteSchemaStore
+from nl2sql.storage.chroma import ChromaIndex
 from nl2sql.testing.config import make_config
 from nl2sql_sdk.schema import (
     SchemaContract,
@@ -28,6 +30,10 @@ from nl2sql_sdk.schema import (
     TableContract,
     TableRef,
 )
+from nl2sql_sdk.stores import BuildPointer
+
+# The local embedder's index namespace: the config's embeddings are the default, local.
+NAMESPACE = "nl2sql__local-all-minilm-l6-v2__384"
 
 runner = CliRunner()
 ANSI = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
@@ -63,15 +69,21 @@ def _state(project: Path) -> Path:
 
 
 def _index(project: Path, *tables: str) -> None:
+    """Stores a snapshot of ``tables`` and points the books datasource's live build at it (no embedding)."""
     _state(project).parent.mkdir(parents=True, exist_ok=True)
     store = SqliteSchemaStore(path=_state(project))
     refs = [TableRef(schema_name="main", table_name=t) for t in tables]
-    store.register_snapshot(SchemaSnapshot(
+    version, _ = store.register_snapshot(SchemaSnapshot(
         contract=SchemaContract(datasource_id="books", engine_type="sqlite",
                                 tables={r.full_name: TableContract(table=r) for r in refs}),
         metadata=SchemaMetadata(datasource_id="books", engine_type="sqlite"),
     ))
     store.close()
+    index = ChromaIndex(project / ".nl2sql" / "index")
+    index.open(NAMESPACE, 384)
+    index.set_pointers(NAMESPACE, {"books": BuildPointer(build_id="b1", schema_version=version,
+                                                         built_at=datetime.now(timezone.utc))})
+    index.close()
 
 
 def _invoke(config: Path):

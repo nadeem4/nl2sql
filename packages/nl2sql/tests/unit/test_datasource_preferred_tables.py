@@ -7,14 +7,14 @@ created after the last index) is fixed by re-indexing.
 from __future__ import annotations
 
 import pytest
+from index_helpers import Chunk, TestIndex  # same directory
 from langchain_core.embeddings import FakeEmbeddings
 from pydantic import ValidationError
 
 from nl2sql.config import Datasource, Limits
 from nl2sql.datasources.models import matches_table
 from nl2sql.datasources.registry import DatasourceRegistry
-from nl2sql.indexing.health import inspect_vector_store, preferred_table_warnings
-from nl2sql.indexing.vector_store import VectorStore
+from nl2sql.indexing.health import index_health, preferred_table_warnings
 from nl2sql.secrets.manager import SecretManager
 from nl2sql.testing import adapter_registry
 from nl2sql_sdk.schema import (
@@ -104,29 +104,17 @@ def test_an_unindexed_datasource_gives_no_preferred_warning():
     assert preferred_table_warnings({"ds1": ["v_missing"]}, lambda _ds: None) == []
 
 
-class _Chunk:
-    type = "schema.datasource"
-
-    def get_page_content(self):
-        return "datasource ds1"
-
-    def get_metadata(self):
-        return {"type": self.type, "datasource_id": "ds1", "schema_version": "v1"}
-
-
 class _SchemaStore:
-    def get_latest_version(self, _ds):
-        return "v1"
-
-    def get_latest_snapshot(self, _ds):
+    def get_snapshot(self, _ds, _version):
         return _snapshot("invoices")
 
 
 def test_index_health_carries_the_warning_and_stays_ok(tmp_path):
-    store = VectorStore("nl2sql_store", str(tmp_path / "vs"), embeddings=FakeEmbeddings(size=8))
-    store.refresh_schema_chunks("ds1", "v1", [_Chunk()], [])
+    index = TestIndex(tmp_path, FakeEmbeddings(size=8))
+    index.write("ds1", [Chunk("datasource ds1", type="schema.datasource", datasource_id="ds1")])
 
-    health = inspect_vector_store(store, _SchemaStore(), ["ds1"], preferred_tables={"ds1": ["v_missing"]})
+    health = index_health(index.index, index.namespace, _SchemaStore(), ["ds1"],
+                          preferred_tables={"ds1": ["v_missing"]})
 
     assert health.ok
     assert any("v_missing" in w for w in health.warnings)

@@ -163,7 +163,7 @@ def test_index_build_reports_a_failed_datasource_with_its_reason(engine):
 
 
 def test_index_health_reads_the_live_index(engine):
-    assert engine.index.health()["status"] == "empty"
+    assert engine.index.health()["status"] == "missing"
     engine.index.build()
 
     assert engine.index.health()["status"] == "ok"
@@ -173,7 +173,7 @@ def test_index_clear_empties_the_index(engine):
     engine.index.build()
     engine.index.clear()
 
-    assert engine.index.health()["status"] == "empty"
+    assert engine.index.health()["status"] == "missing"
 
 
 def test_index_inspect_runs_the_mmr_search(engine):

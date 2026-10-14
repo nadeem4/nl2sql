@@ -64,5 +64,5 @@ def test_doctor_reports_the_engine_check(tmp_path):
     out = _out(result)
     assert "shop: ready" in out
     assert "lost (required): failed at connect" in out
-    assert "Index: empty" in out and "nl2sql index" in out
+    assert "Index: missing" in out and "nl2sql index" in out
     assert "not fully ready" in out

@@ -1,24 +1,21 @@
-"""Index rebuilds that never leave an empty or half-built index behind.
+"""Index builds that never leave an empty or half-built index behind.
 
-Two shapes, one entry point (:func:`rebuild_index`), used by ``nl2sql index``,
-the demo's startup repair and the playground's Rebuild button:
+:func:`rebuild_index` is the one entry point, used by ``nl2sql index``, the
+demo's startup repair and the playground's Rebuild button. Each datasource is
+built on its own (``IndexingOrchestrator``): its new entries are written
+beside its live ones, and its build pointer is switched to them only when all
+are written. A failure keeps that datasource's previous build and schema
+version live, and no other datasource's entries are read, deleted or
+rewritten.
 
-**Per datasource (the default).** All datasources share one collection. Each
-datasource is rebuilt on its own with
-:meth:`VectorStore.refresh_schema_chunks`: new entries under a new build id,
-a switch of that datasource's active build once all are written, then the
-old entries deleted. A failure keeps that datasource's previous entries
-active, and no other datasource's entries are read, deleted or rewritten.
-
-**Full (``full=True``).** For a change of embedding model, the one case where
-every datasource must move at once because a query is embedded in a single
-space. Every datasource is built into a staging collection that is swapped in
-(:meth:`VectorStore.promote`) only when all of them succeed.
+Every build goes into the namespace of the configured embedding model, so a
+model change needs no special rebuild: the new model's namespace starts
+empty, and ``nl2sql index`` fills it (docs/architecture/phase2.md, section 4).
 """
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Callable, ContextManager, Dict, Iterable, List, Optional
+from typing import Any, Callable, Dict, Iterable, List, Optional
 
 from nl2sql.api.types import IndexProgress
 from nl2sql.common.logger import get_logger
@@ -46,63 +43,42 @@ def rebuild_index(
     ctx,
     enrich: bool = False,
     datasource_ids: Optional[Iterable[str]] = None,
-    full: bool = False,
     on_progress: Optional[Callable[[str], None]] = None,
     on_datasource: Optional[Callable[["IndexProgress"], None]] = None,
-    switch_guard: Optional[Callable[[], ContextManager]] = None,
     curated_only: bool = False,
 ) -> RebuildResult:
-    """Rebuilds the vector index.
+    """Builds the index of each datasource, and switches each one's pointer as it succeeds.
 
     Args:
-        ctx: An ``Runtime`` (or anything with ``vector_store`` and
-            ``ds_registry``).
+        ctx: The engine's ``Runtime``.
         enrich: Ask the LLM for descriptions; spends tokens. Off by default.
         datasource_ids: Only these datasources; all registered ones when None.
-            Ignored with ``full``, which always rebuilds every datasource.
-        full: Rebuild every datasource into a new collection and swap it in;
-            required after changing the embedding model.
         on_progress: Called with a sentence before each step.
         on_datasource: Called with an :class:`~nl2sql.api.types.IndexProgress`
             as each datasource starts, is done (with its entry counts) or
             fails (with the reason).
-        switch_guard: A context manager factory held only around each switch,
-            e.g. the playground's ``RunGate.change`` so questions in flight
-            finish first.
         curated_only: Re-index only the verified queries from
             ``curated.yaml``, keeping each datasource's schema entries as they
-            are: no schema read, no enrichment call. Per datasource, like the
-            default; not with ``full``.
+            are: no schema read, no enrichment call.
 
     Returns:
         A :class:`RebuildResult`.
-
-    Raises:
-        ValueError: With both ``full`` and ``curated_only``.
-        EmbeddingModelMismatchError: Without ``full``, when the collection
-            records a different embedding model than the configured one.
     """
-    if full and curated_only:
-        raise ValueError("A full rebuild re-indexes everything; it cannot be curated-only.")
     say = on_progress or (lambda _msg: None)
     tell = on_datasource or (lambda _progress: None)
     result = RebuildResult()
-    live = ctx.vector_store
 
     adapters = list(ctx.ds_registry.list_adapters())
     # Datasources that failed to start: each one in scope is an error with its
-    # reason. A full rebuild stops here, since swapping in a collection without
-    # them would drop their entries; a per-datasource run indexes the rest.
+    # reason; the rest are indexed.
     unavailable = getattr(ctx.ds_registry, "unavailable", dict)()
-    in_scope = datasource_ids if datasource_ids is not None and not full else unavailable
+    in_scope = datasource_ids if datasource_ids is not None else unavailable
     for ds_id in dict.fromkeys(in_scope):
         if ds_id in unavailable:
             reason = f"Datasource '{ds_id}' is unavailable: {unavailable[ds_id]}"
             result.errors.append({"datasource_id": ds_id, "error": reason})
             tell(IndexProgress(ds_id, "failed", reason=reason))
-    if full and result.errors:
-        return result
-    if datasource_ids is not None and not full:
+    if datasource_ids is not None:
         wanted = list(dict.fromkeys(datasource_ids))
         known = {a.datasource_id for a in adapters}
         for ds_id in wanted:
@@ -113,60 +89,33 @@ def rebuild_index(
         if result.errors:
             return result
 
-    if not full:
-        # Before any work: a per-datasource rebuild must embed in the model
-        # the collection already holds.
-        live.check_embedding_model()
+    say(MODEL_STEP)
+    # Embeddings load lazily; warming them here puts the one slow,
+    # first-run-only download under its own step.
+    ctx.embedder.embed_query("warm up")
 
-    target = live.create_staging() if full else live
-    try:
-        say(MODEL_STEP)
-        # Embeddings load lazily; warming them here puts the one slow,
-        # first-run-only download under its own step.
-        target.embeddings.embed_query("warm up")
-
-        orchestrator = IndexingOrchestrator(ctx, enrich=enrich)
-        for adapter in adapters:
-            ds_id = adapter.datasource_id
-            tell(IndexProgress(ds_id, "started"))
-            try:
-                if curated_only:
-                    say(f"Indexing {ds_id}: embedding its verified queries")
-                    stats = orchestrator.refresh_curated(ds_id, vector_store=target, switch_guard=switch_guard)
-                else:
-                    say(f"Indexing {ds_id}: reading the schema and embedding its entries")
-                    stats = orchestrator.index_datasource(
-                        adapter,
-                        vector_store=target,
-                        switch_guard=None if full else switch_guard,
-                    )
-            except Exception as exc:
-                logger.error(f"Failed to index {ds_id}: {exc}")
-                result.errors.append({"datasource_id": ds_id, "error": str(exc)})
-                tell(IndexProgress(ds_id, "failed", reason=str(exc)))
-                continue
-            if stats:
-                result.stats.append(stats)
+    orchestrator = IndexingOrchestrator(ctx, enrich=enrich)
+    for adapter in adapters:
+        ds_id = adapter.datasource_id
+        tell(IndexProgress(ds_id, "started"))
+        try:
+            if curated_only:
+                say(f"Indexing {ds_id}: embedding its verified queries")
+                stats = orchestrator.refresh_curated(ds_id)
             else:
-                result.empty.append(ds_id)
-            tell(IndexProgress(ds_id, "done", counts={k: v for k, v in (stats or {}).items()
-                                                      if isinstance(v, int) and not isinstance(v, bool)}))
+                say(f"Indexing {ds_id}: reading the schema and embedding its entries")
+                stats = orchestrator.index_datasource(adapter)
+        except Exception as exc:
+            logger.error(f"Failed to index {ds_id}: {exc}")
+            result.errors.append({"datasource_id": ds_id, "error": str(exc)})
+            tell(IndexProgress(ds_id, "failed", reason=str(exc)))
+            continue
+        if stats:
+            result.stats.append(stats)
+        else:
+            result.empty.append(ds_id)
+        tell(IndexProgress(ds_id, "done", counts={k: v for k, v in (stats or {}).items()
+                                                  if isinstance(v, int) and not isinstance(v, bool)}))
 
-        if not full:
-            result.ok = not result.errors and bool(result.stats)
-            return result
-
-        if result.errors or not result.stats:
-            target.discard()
-            return result
-        say("Switching every datasource to the new index")
-        from contextlib import nullcontext
-
-        with (switch_guard() if switch_guard else nullcontext()):
-            live.promote(target)
-        result.ok = True
-        return result
-    except BaseException:
-        if full:
-            target.discard()
-        raise
+    result.ok = not result.errors and bool(result.stats)
+    return result

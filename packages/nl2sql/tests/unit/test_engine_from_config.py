@@ -122,7 +122,8 @@ def test_constructor_creates_the_stores_under_storage_path(tmp_path):
     storage = tmp_path / ".nl2sql"
 
     assert engine.config.storage.path == storage
-    assert (storage / "index").is_dir()
+    # The index store opens its folder on the first build, not before.
+    assert not (storage / "index").exists()
     assert (storage / "state.db").is_file()
     assert Path(engine._runtime.artifact_store.config.base_uri) == storage / "results"
     assert engine._runtime.traces_dir == storage / "traces"
@@ -302,7 +303,7 @@ def test_datasource_added_in_code_keeps_its_description(tmp_path):
 
     assert engine.index.build(["shop"]).ok
 
-    snapshot = engine._runtime.schema_store.get_latest_snapshot("shop")
+    snapshot = engine._runtime.vector_store.snapshot("shop")
     assert snapshot.metadata.description == "Customers of the shop."
     assert [d.id for d in engine.config.datasources] == ["shop"]
     assert engine._runtime.ds_registry.get_datasource("shop").sample_questions == [

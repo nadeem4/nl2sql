@@ -6,13 +6,14 @@ Rebuild re-reads the datasource's schema into a new snapshot and rebuilds its
 vector entries beside the current ones (``nl2sql.indexing.rebuild``); the
 current entries keep answering questions until the new ones are complete.
 
-Rebuild borrows every guardrail from the settings panel:
+Rebuild's guardrails:
 
 * **Local only.** The same ``SettingsPanel.guard``: refused on a host other
   machines can reach unless ``--allow-settings`` is given, and only from the
   playground page itself.
-* **Questions in flight finish first.** The switch to the new entries is held
-  under the settings panel's ``RunGate``.
+* **Questions in flight are not disturbed.** Each run reads the index
+  pointers once, when it starts, and the rebuild keeps the build it replaces,
+  so a question in flight finishes on the entries it started with.
 * **Enrichment is opt-in.** LLM-written descriptions spend tokens on the
   owner's key, so they are off unless asked for, and unavailable without a key.
 
@@ -119,7 +120,6 @@ class IndexPanel:
                 [self.datasource_id],
                 enrich=enrich,
                 on_progress=self._step,
-                switch_guard=self.settings.gate.change,
             )
         except Exception as exc:
             logger.error("Index rebuild failed: %s", exc)

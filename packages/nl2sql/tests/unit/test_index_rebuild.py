@@ -3,15 +3,11 @@ another datasource's entries.
 
 The old ``nl2sql index`` deleted the whole collection first and rebuilt it
 after, so any failure in between left 0 entries and every question failed at
-the resolver. Now all datasources share one collection and each is rebuilt on
-its own: its new entries are written under a new build id, the datasource's
-active build is switched in the collection's metadata only when every entry
-is written, and only then are its previous entries deleted. Readers filter on
-the active build, so they never see a half-built or mixed set.
-
-A change of embedding model is the one case that needs every datasource
-rebuilt at once; that is ``full=True``, which builds a second collection and
-swaps it in.
+the resolver. Now each datasource is rebuilt on its own: its new entries are
+written under a new build id, its build pointer is switched only when every
+entry is written, and only then are its older builds deleted. Readers read
+the builds the pointers name, so they never see a half-built or mixed set.
+The build a switch replaces is kept, for runs that pinned it.
 """
 from __future__ import annotations
 
@@ -19,82 +15,56 @@ from types import SimpleNamespace
 from typing import List
 
 import pytest
+from index_helpers import Chunk, TestIndex  # same directory
 from langchain_core.embeddings import Embeddings, FakeEmbeddings
 
 from nl2sql.indexing import rebuild as rebuild_module
 from nl2sql.indexing.rebuild import rebuild_index
-from nl2sql.indexing.vector_store import EmbeddingModelMismatchError, VectorStore
+from nl2sql_sdk.stores import Filter
 
 
-class _Chunk:
-    """The two methods VectorStore needs from a chunk."""
-
-    def __init__(self, ds, kind, text, version):
-        self.type = kind
-        self._text = text
-        self._md = {"type": kind, "datasource_id": ds, "schema_version": version}
-        if kind != "schema.datasource":
-            self._md["table"] = text
-
-    def get_page_content(self):
-        return self._text
-
-    def get_metadata(self):
-        return dict(self._md)
-
-
-def _chunks(ds, version="v1", tables=("T1", "T2", "T3")) -> List[_Chunk]:
-    return [_Chunk(ds, "schema.datasource", f"Datasource: {ds}", version)] + [
-        _Chunk(ds, "schema.table", f"{ds}.{t}", version) for t in tables
+def _chunks(ds, version="v1", tables=("T1", "T2", "T3")) -> List[Chunk]:
+    return [Chunk(f"Datasource: {ds}", type="schema.datasource", datasource_id=ds, schema_version=version)] + [
+        Chunk(f"{ds}.{t}", type="schema.table", datasource_id=ds, schema_version=version, table=f"{ds}.{t}")
+        for t in tables
     ]
 
 
-class _ModelA(FakeEmbeddings):
-    model: str = "model-a"
+def _live(index, ds):
+    """The datasource's live entries: ``(text, metadata without the build id)``, sorted."""
+    pointer = index.index.pointers(index.namespace)[ds]
+    entries = index.index.get(index.namespace, Filter(eq={"build_id": pointer.build_id}))
+    return sorted((e.text, tuple(sorted((k, v) for k, v in e.metadata.items() if k != "build_id")))
+                  for e in entries)
 
 
-class _ModelB(FakeEmbeddings):
-    model: str = "model-b"
+def _stored(index, ds):
+    """Every build id on disk for the datasource."""
+    return {e.metadata["build_id"] for e in index.index.get(index.namespace, Filter(eq={"datasource_id": ds}))}
 
 
-def _store(tmp_path, embeddings=None, name="nl2sql_store"):
-    return VectorStore(name, str(tmp_path / "vs"), embeddings=embeddings or _ModelA(size=8))
-
-
-def _entries(store, ds):
-    got = store.vectorstore._collection.get(where={"datasource_id": ds})
-    return sorted(zip(got["ids"], got["documents"], [tuple(sorted(m.items())) for m in got["metadatas"]]))
-
-
-def _index(store, ds, version="v1", **kwargs):
-    return store.refresh_schema_chunks(ds, version, _chunks(ds, version, **kwargs), [])
-
-
-# --- per-datasource rebuild ------------------------------------------------------
+# --- one datasource's build ------------------------------------------------------
 
 
 def test_reindexing_one_datasource_leaves_the_other_byte_identical(tmp_path):
-    store = _store(tmp_path)
-    _index(store, "ds_a")
-    _index(store, "ds_b")
-    before_b = _entries(store, "ds_b")
+    index = TestIndex(tmp_path, FakeEmbeddings(size=8))
+    index.write("ds_a", _chunks("ds_a"))
+    index.write("ds_b", _chunks("ds_b"))
+    before_b = _live(index, "ds_b")
 
-    _index(store, "ds_a", version="v2")
+    index.write("ds_a", _chunks("ds_a", "v2"), schema_version="v2")
 
-    assert _entries(store, "ds_b") == before_b
-    texts_a = sorted(e[1] for e in _entries(store, "ds_a"))
-    assert texts_a == ["Datasource: ds_a", "ds_a.T1", "ds_a.T2", "ds_a.T3"]
-    assert all(dict(e[2])["schema_version"] == "v2" for e in _entries(store, "ds_a"))
+    assert _live(index, "ds_b") == before_b
+    assert sorted(text for text, _ in _live(index, "ds_a")) == ["Datasource: ds_a", "ds_a.T1", "ds_a.T2", "ds_a.T3"]
+    assert all(dict(md)["schema_version"] == "v2" for _, md in _live(index, "ds_a"))
 
 
 class _FailsAfter(Embeddings):
     """Embeds the first ``ok_calls`` batches, then fails: a build dying midway."""
 
-    model = "model-a"
-
     def __init__(self, ok_calls):
         self.ok_calls = ok_calls
-        self.inner = _ModelA(size=8)
+        self.inner = FakeEmbeddings(size=8)
 
     def embed_documents(self, texts):
         if self.ok_calls <= 0:
@@ -106,88 +76,81 @@ class _FailsAfter(Embeddings):
         return self.inner.embed_query(text)
 
 
-def test_a_reindex_that_fails_midway_leaves_the_previous_entries_and_the_other_datasource(tmp_path):
+def test_a_reindex_that_fails_midway_leaves_the_previous_build_live(tmp_path, monkeypatch):
     embeddings = _FailsAfter(ok_calls=100)
-    store = _store(tmp_path, embeddings=embeddings)
-    _index(store, "ds_a")
-    _index(store, "ds_b")
-    before_a, before_b = _entries(store, "ds_a"), _entries(store, "ds_b")
+    index = TestIndex(tmp_path, embeddings)
+    index.write("ds_a", _chunks("ds_a"))
+    index.write("ds_b", _chunks("ds_b"))
+    before_a, before_b = _live(index, "ds_a"), _live(index, "ds_b")
+    pointer = index.index.pointers(index.namespace)["ds_a"]
 
+    monkeypatch.setattr("nl2sql.indexing.orchestrator.BATCH_SIZE", 2)
     embeddings.ok_calls = 1
     with pytest.raises(RuntimeError, match="went away"):
-        store.refresh_schema_chunks("ds_a", "v2", _chunks("ds_a", "v2", tables=("T1", "T2", "T3", "T4")), [],
-                                    batch_size=2)
+        index.write("ds_a", _chunks("ds_a", "v2", tables=("T1", "T2", "T3", "T4")), schema_version="v2")
 
-    # The first batch was written and then removed; nothing of v2 is left.
-    assert _entries(store, "ds_a") == before_a
-    assert _entries(store, "ds_b") == before_b
-    docs = store.retrieve_datasource_candidates("anything", k=5)
+    assert index.index.pointers(index.namespace)["ds_a"] == pointer
+    assert _live(index, "ds_a") == before_a
+    assert _live(index, "ds_b") == before_b
+    docs = index.retriever().retrieve_datasource_candidates("anything", k=5)
     assert sorted(d.metadata["datasource_id"] for d in docs) == ["ds_a", "ds_b"]
+    assert len(_stored(index, "ds_a")) == 2  # the partial build, named by no pointer
+
+    # The next build of the datasource deletes it.
+    embeddings.ok_calls = 100
+    index.write("ds_a", _chunks("ds_a", "v3"), schema_version="v3")
+    assert len(_stored(index, "ds_a")) == 2  # the new build and the one it replaced
 
 
 def test_readers_never_see_both_builds_while_they_coexist(tmp_path):
-    store = _store(tmp_path)
-    _index(store, "ds_a", version="v1")
+    index = TestIndex(tmp_path, FakeEmbeddings(size=8))
+    index.write("ds_a", _chunks("ds_a"))
     seen = {}
+    set_pointers = index.index.set_pointers
 
-    class _Peek:
-        """Held around the switch: the new build is written, not yet active."""
+    def peek(namespace, updates):
+        """Just before the switch: the new build is written, not yet live."""
+        seen["stored"] = len(index.index.get(namespace, Filter(eq={"datasource_id": "ds_a"})))
+        reader = index.retriever()
+        seen["resolver"] = reader.retrieve_datasource_candidates("q", k=5)
+        seen["tables"] = reader.retrieve_schema_context("q", "ds_a", k=8)
+        set_pointers(namespace, updates)
 
-        def __enter__(self):
-            all_a = store.vectorstore._collection.get(where={"datasource_id": "ds_a"})["ids"]
-            seen["stored"] = len(all_a)
-            seen["resolver"] = store.retrieve_datasource_candidates("q", k=5)
-            seen["tables"] = store.retrieve_schema_context("q", "ds_a", k=8)
-
-        def __exit__(self, *exc):
-            return False
-
-    store.refresh_schema_chunks("ds_a", "v2", _chunks("ds_a", "v2"), [], switch_guard=_Peek)
+    index.index.set_pointers = peek
+    index.write("ds_a", _chunks("ds_a", "v2"), schema_version="v2")
 
     assert seen["stored"] == 8  # old and new are both on disk at this moment
     assert [d.metadata["schema_version"] for d in seen["resolver"]] == ["v1"]
     assert {d.metadata["schema_version"] for d in seen["tables"]} == {"v1"}
     assert len(seen["tables"]) == 3
-    # After the switch only v2 is visible, and v1 is gone.
-    assert [d.metadata["schema_version"] for d in store.retrieve_datasource_candidates("q", k=5)] == ["v2"]
-    assert len(_entries(store, "ds_a")) == 4
+    # After the switch only v2 is visible.
+    assert [d.metadata["schema_version"] for d in index.retriever().retrieve_datasource_candidates("q", k=5)] \
+        == ["v2"]
 
 
-def test_entries_from_before_build_ids_are_replaced_on_the_first_reindex(tmp_path):
-    """An index written by an older engine has no build ids."""
-    from langchain_core.documents import Document
+def test_a_build_keeps_the_one_it_replaced_and_deletes_older_ones(tmp_path):
+    index = TestIndex(tmp_path, FakeEmbeddings(size=8))
+    first = index.write("ds_a", _chunks("ds_a"))
+    second = index.write("ds_a", _chunks("ds_a", "v2"), schema_version="v2")
 
-    store = _store(tmp_path)
-    store.vectorstore.add_documents([Document(page_content="legacy", metadata={
-        "type": "schema.datasource", "datasource_id": "ds_a", "schema_version": "v0"})])
-    store.vectorstore.add_documents([Document(page_content="legacy b", metadata={
-        "type": "schema.datasource", "datasource_id": "ds_b", "schema_version": "v0"})])
+    assert _stored(index, "ds_a") == {first, second}
 
-    assert sorted(d.page_content for d in store.retrieve_datasource_candidates("q", k=5)) == ["legacy", "legacy b"]
-    _index(store, "ds_a", version="v1")
+    third = index.write("ds_a", _chunks("ds_a", "v3"), schema_version="v3")
 
-    got = sorted(d.page_content for d in store.retrieve_datasource_candidates("q", k=5))
-    assert got == ["Datasource: ds_a", "legacy b"]
+    assert _stored(index, "ds_a") == {second, third}
 
 
-# --- one embedding model per collection -----------------------------------------
+def test_retrieved_entries_do_not_carry_the_build_id(tmp_path):
+    """The resolver prints a datasource entry's metadata into the decomposer
+    prompt; a build id there would change every prompt on every rebuild, and
+    the plan cache keys on the prompt."""
+    index = TestIndex(tmp_path, FakeEmbeddings(size=8))
+    index.write("ds_a", _chunks("ds_a"))
+    reader = index.retriever()
 
+    docs = reader.retrieve_datasource_candidates("q", k=5) + reader.retrieve_schema_context("q", "ds_a")
 
-def test_the_collection_records_its_embedding_model(tmp_path):
-    store = _store(tmp_path)
-    _index(store, "ds_a")
-
-    assert store.recorded_embedding_model() == "_ModelA/model-a"
-
-
-def test_a_same_dimension_different_model_is_refused_on_read_and_on_reindex(tmp_path):
-    _index(_store(tmp_path), "ds_a")
-    other = _store(tmp_path, embeddings=_ModelB(size=8))
-
-    with pytest.raises(EmbeddingModelMismatchError, match="full rebuild"):
-        other.retrieve_datasource_candidates("q", k=5)
-    with pytest.raises(EmbeddingModelMismatchError, match="--full"):
-        _index(other, "ds_a", version="v2")
+    assert docs and all("build_id" not in d.metadata for d in docs)
 
 
 # --- rebuild_index: the entry point for the CLI, the demo and the playground ------
@@ -198,16 +161,16 @@ class _Adapter:
         self.datasource_id = datasource_id
 
 
-def _ctx(store, *datasource_ids):
-    return SimpleNamespace(
-        vector_store=store,
-        ds_registry=SimpleNamespace(list_adapters=lambda: [_Adapter(d) for d in datasource_ids]),
-    )
+def _ctx(index, *datasource_ids, unavailable=None):
+    ctx = SimpleNamespace(**vars(index.ctx))
+    ctx.ds_registry = SimpleNamespace(list_adapters=lambda: [_Adapter(d) for d in datasource_ids],
+                                      unavailable=lambda: dict(unavailable or {}))
+    return ctx
 
 
 @pytest.fixture
 def scripted(monkeypatch):
-    """An orchestrator that writes a small chunk set per datasource, or raises."""
+    """An orchestrator that commits a small chunk set per datasource, or raises."""
     outcomes: dict = {}
 
     class _Orchestrator:
@@ -215,158 +178,79 @@ def scripted(monkeypatch):
 
         def __init__(self, ctx, enrich=True):
             _Orchestrator.seen.append(("enrich", enrich))
+            self.ctx = ctx
 
-        def index_datasource(self, adapter, vector_store=None, switch_guard=None):
+        def index_datasource(self, adapter):
             ds = adapter.datasource_id
             outcome = outcomes.get(ds, "v1")
             if isinstance(outcome, Exception):
                 raise outcome
-            target = vector_store if vector_store is not None else self_store[0]
-            return target.refresh_schema_chunks(ds, outcome, _chunks(ds, outcome), [], switch_guard=switch_guard)
+            from nl2sql.indexing.orchestrator import IndexingOrchestrator
 
-    self_store = []
+            IndexingOrchestrator(self.ctx)._commit(ds, outcome, _chunks(ds, outcome), [], None)
+            return {"datasource_id": ds, "schema_version": outcome, "schema.table": 3}
+
     monkeypatch.setattr(rebuild_module, "IndexingOrchestrator", _Orchestrator)
-    return outcomes, self_store, _Orchestrator
+    return outcomes, _Orchestrator
 
 
 def test_rebuilding_one_datasource_does_not_clear_the_others(tmp_path, scripted):
-    outcomes, holder, _ = scripted
-    store = _store(tmp_path)
-    holder.append(store)
-    rebuild_index(_ctx(store, "ds_a", "ds_b"))
-    before_b = _entries(store, "ds_b")
+    outcomes, _ = scripted
+    index = TestIndex(tmp_path, FakeEmbeddings(size=8))
+    rebuild_index(_ctx(index, "ds_a", "ds_b"))
+    before_b = _live(index, "ds_b")
     outcomes["ds_a"] = "v2"
 
-    result = rebuild_index(_ctx(store, "ds_a", "ds_b"), datasource_ids=["ds_a"])
+    result = rebuild_index(_ctx(index, "ds_a", "ds_b"), datasource_ids=["ds_a"])
 
     assert result.ok
-    assert _entries(store, "ds_b") == before_b
-    assert {dict(e[2])["schema_version"] for e in _entries(store, "ds_a")} == {"v2"}
+    assert _live(index, "ds_b") == before_b
+    assert {dict(md)["schema_version"] for _, md in _live(index, "ds_a")} == {"v2"}
 
 
 def test_one_failing_datasource_keeps_its_previous_entries_and_the_others_still_rebuild(tmp_path, scripted):
-    outcomes, holder, _ = scripted
-    store = _store(tmp_path)
-    holder.append(store)
-    rebuild_index(_ctx(store, "ds_a", "ds_b"))
-    before_a = _entries(store, "ds_a")
+    outcomes, _ = scripted
+    index = TestIndex(tmp_path, FakeEmbeddings(size=8))
+    rebuild_index(_ctx(index, "ds_a", "ds_b"))
+    before_a = _live(index, "ds_a")
     outcomes["ds_a"] = RuntimeError("connection refused")
     outcomes["ds_b"] = "v2"
 
-    result = rebuild_index(_ctx(store, "ds_a", "ds_b"))
+    result = rebuild_index(_ctx(index, "ds_a", "ds_b"))
 
     assert result.ok is False
     assert [e["datasource_id"] for e in result.errors] == ["ds_a"]
-    assert _entries(store, "ds_a") == before_a
-    assert {dict(e[2])["schema_version"] for e in _entries(store, "ds_b")} == {"v2"}
+    assert _live(index, "ds_a") == before_a
+    assert {dict(md)["schema_version"] for _, md in _live(index, "ds_b")} == {"v2"}
 
 
 def test_an_unknown_datasource_is_an_error_not_a_silent_no_op(tmp_path, scripted):
-    store = _store(tmp_path)
+    index = TestIndex(tmp_path, FakeEmbeddings(size=8))
 
-    result = rebuild_index(_ctx(store, "ds_a"), datasource_ids=["nope"])
+    result = rebuild_index(_ctx(index, "ds_a"), datasource_ids=["nope"])
 
     assert result.ok is False
     assert "nope" in result.errors[0]["datasource_id"]
 
 
-def test_rebuild_refuses_a_model_change_without_full(tmp_path, scripted):
-    _, holder, _ = scripted
-    _index(_store(tmp_path), "ds_a")
-    other = _store(tmp_path, embeddings=_ModelB(size=8))
-    holder.append(other)
-
-    with pytest.raises(EmbeddingModelMismatchError):
-        rebuild_index(_ctx(other, "ds_a"))
-
-
-def test_a_full_rebuild_switches_every_datasource_to_the_new_model(tmp_path, scripted):
-    _, holder, _ = scripted
-    _index(_store(tmp_path), "ds_a")
-    other = _store(tmp_path, embeddings=_ModelB(size=8))
-    holder.append(other)
-
-    result = rebuild_index(_ctx(other, "ds_a", "ds_b"), full=True)
-
-    assert result.ok
-    assert other.recorded_embedding_model() == "_ModelB/model-b"
-    assert sorted(d.metadata["datasource_id"] for d in other.retrieve_datasource_candidates("q", k=5)) == ["ds_a", "ds_b"]
-    names = sorted(c.name for c in other.vectorstore._client.list_collections())
-    assert names == ["nl2sql_store"]
-
-
-def test_a_full_rebuild_that_fails_leaves_the_live_collection_alone(tmp_path, scripted):
-    outcomes, holder, _ = scripted
-    store = _store(tmp_path)
-    holder.append(store)
-    rebuild_index(_ctx(store, "ds_a", "ds_b"))
-    before = _entries(store, "ds_a") + _entries(store, "ds_b")
-    outcomes["ds_b"] = RuntimeError("boom")
-
-    result = rebuild_index(_ctx(store, "ds_a", "ds_b"), full=True)
-
-    assert result.ok is False
-    assert _entries(store, "ds_a") + _entries(store, "ds_b") == before
-    assert sorted(c.name for c in store.vectorstore._client.list_collections()) == ["nl2sql_store"]
-
-
 def test_rebuild_passes_the_enrichment_choice_and_reports_steps(tmp_path, scripted):
-    _, holder, orchestrator = scripted
-    store = _store(tmp_path)
-    holder.append(store)
+    _, orchestrator = scripted
+    index = TestIndex(tmp_path, FakeEmbeddings(size=8))
     steps = []
 
-    rebuild_index(_ctx(store, "ds_a"), enrich=False, on_progress=steps.append)
+    rebuild_index(_ctx(index, "ds_a"), enrich=False, on_progress=steps.append)
 
     assert ("enrich", False) in orchestrator.seen
     assert steps[0].startswith("Loading the embedding model")
     assert any("ds_a" in s for s in steps)
 
 
-def test_retrieved_entries_do_not_carry_the_build_id(tmp_path):
-    """The resolver prints a datasource entry's metadata into the decomposer
-    prompt; a build id there would change every prompt on every rebuild, and
-    replay recordings and the plan cache key on the prompt."""
-    store = _store(tmp_path)
-    _index(store, "ds_a")
-
-    docs = store.retrieve_datasource_candidates("q", k=5) + store.retrieve_schema_context("q", "ds_a")
-
-    assert docs and all("build_id" not in d.metadata for d in docs)
-
-
-# --- a datasource that failed to start ------------------------------------------
-
-
-def _ctx_with_unavailable(store, *datasource_ids, unavailable):
-    ctx = _ctx(store, *datasource_ids)
-    ctx.ds_registry.unavailable = lambda: dict(unavailable)
-    return ctx
-
-
 def test_indexing_every_datasource_indexes_the_rest_and_reports_the_unavailable_one(tmp_path, scripted):
-    _, holder, _ = scripted
-    store = _store(tmp_path)
-    holder.append(store)
+    index = TestIndex(tmp_path, FakeEmbeddings(size=8))
 
-    result = rebuild_index(_ctx_with_unavailable(store, "ds_a", unavailable={"bad": "driver missing"}))
+    result = rebuild_index(_ctx(index, "ds_a", unavailable={"bad": "driver missing"}))
 
     assert result.ok is False
     assert [e["datasource_id"] for e in result.errors] == ["bad"]
     assert "driver missing" in result.errors[0]["error"]
-    assert _entries(store, "ds_a")
-
-
-def test_a_full_rebuild_refuses_while_a_datasource_is_unavailable(tmp_path, scripted):
-    # Swapping in a collection without it would drop its entries.
-    _, holder, _ = scripted
-    store = _store(tmp_path)
-    holder.append(store)
-    rebuild_index(_ctx(store, "ds_a"))
-    before = _entries(store, "ds_a")
-
-    result = rebuild_index(_ctx_with_unavailable(store, "ds_a", unavailable={"bad": "driver missing"}), full=True)
-
-    assert result.ok is False
-    assert "driver missing" in result.errors[0]["error"]
-    assert _entries(store, "ds_a") == before
+    assert _live(index, "ds_a")

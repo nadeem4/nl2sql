@@ -110,10 +110,9 @@ def rejecting_registry():
 
 def _resolver_ctx(registry):
     return fake_runtime(
-        vector_store=None,
+        vector_store=SimpleNamespace(schema_version=lambda _id: "v1", snapshot=lambda _id: None),
         policies={"default_role": "r", "roles": {role: {"description": "d", "allow": list(["ds1"])} for role in ("r", "admin")}},
         ds_registry=SimpleNamespace(get_capabilities=lambda _id: {"supports_sql"}, list_ids=lambda: ["ds1"]),
-        schema_store=SimpleNamespace(get_latest_version=lambda _id: "v1", get_latest_snapshot=lambda _id: None),
         llm_registry=registry,
     )
 

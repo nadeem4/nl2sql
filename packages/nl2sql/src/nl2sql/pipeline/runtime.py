@@ -141,6 +141,12 @@ def _begin_run(ctx: Runtime):
     return llms.begin_run() if llms is not None else _NoLLMs()
 
 
+def _pin_index(ctx: Runtime):
+    """A runtime reading the index through the pointers as they are now (``Runtime.pin_index``)."""
+    pin = getattr(ctx, "pin_index", None)
+    return pin() if callable(pin) else ctx
+
+
 def run_with_graph(
     ctx: Runtime,
     user_query: str,
@@ -167,8 +173,10 @@ def run_with_graph(
     restore_signals = _install_signal_handlers(token)
     _start_keyboard_cancel_listener(token, run_done)
 
-    # The run reads the engine's LLM set once, here: every node is built from
-    # it, and a swap while the run is in flight leaves the run on this set.
+    # The run reads the engine's LLM set and index pointers once, here: every
+    # node is built from them, and a swap or a rebuild while the run is in
+    # flight leaves the run on what it started with.
+    ctx = _pin_index(ctx)
     run_llms = _begin_run(ctx)
     try:
         graph = build_graph(
