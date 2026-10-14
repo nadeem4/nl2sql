@@ -1,8 +1,9 @@
-"""The nl2sql SDK: the interfaces an extension implements, starting with adapters."""
+"""The nl2sql SDK: the interfaces an extension implements: adapters and secret providers."""
 
 from .capabilities import DatasourceCapability
 from .contracts import AdapterRequest, ResultError, ResultFrame
 from .protocols import DatasourceAdapterProtocol, SqlRenderingAdapterProtocol, StreamingAdapterProtocol
+from .secrets import SecretProvider
 from .schema import (
     TableRef,
     ColumnStatistics,
@@ -14,7 +15,7 @@ from .schema import (
     SchemaContract,
     SchemaMetadata,
     SchemaSnapshot,
-    ColumnRef   
+    ColumnRef,
 )
 
 __all__ = [
@@ -25,6 +26,7 @@ __all__ = [
     "DatasourceAdapterProtocol",
     "SqlRenderingAdapterProtocol",
     "StreamingAdapterProtocol",
+    "SecretProvider",
     "TableRef",
     "ColumnStatistics",
     "ColumnMetadata",

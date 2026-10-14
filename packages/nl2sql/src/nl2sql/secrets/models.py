@@ -1,56 +1,40 @@
-from pydantic import BaseModel, Field, SecretStr
-from typing import Literal, Optional, Union
+from typing import Any
+
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
+
+from .factory import provider_class
 
 
-class BaseSecretConfig(BaseModel):
-    """Base configuration for all secret providers."""
-    id: str = Field(..., description="Unique identifier for this provider instance. Used as the scheme in secret references (e.g. ${id:key}).")
-    type: str
+class SecretProviderConfig(BaseModel):
+    """One entry of ``providers`` in the secrets config.
 
-class AwsSecretConfig(BaseSecretConfig):
-    """Configuration for AWS Secrets Manager.
-    
-    Attributes:
-        type: Must be 'aws'.
-        region_name: AWS Region (e.g. us-east-1). Defaults to env var if None.
-        profile_name: AWS Profile. Defaults to standard boto3 lookup if None.
+    ``id`` and ``type`` belong to every entry. The other keys are the
+    provider's own settings, validated by its ``config_model`` and held in
+    ``options``, so an unknown or misspelt key fails when the config loads.
+
+    Example:
+        ``SecretProviderConfig(id="vault", type="hashicorp", url="https://vault:8200",
+        token="${env:VAULT_TOKEN}")``
     """
-    type: Literal["aws"] = "aws"
-    region_name: Optional[str] = Field(None, description="AWS Region. If None, uses AWS_DEFAULT_REGION env var.")
-    profile_name: Optional[str] = Field(None, description="AWS Profile. If None, uses default profile.")
 
-class AzureSecretConfig(BaseSecretConfig):
-    """Configuration for Azure Key Vault.
-    
-    Attributes:
-        type: Must be 'azure'.
-        vault_url: The URL of the Key Vault.
-        client_id: Service Principal ID.
-        client_secret: Service Principal Secret.
-        tenant_id: Azure Tenant ID.
-    """
-    type: Literal["azure"] = "azure"
-    vault_url: str = Field(..., description="URL of the Key Vault.")
-    
-    client_id: Optional[str] = Field(None, description="Azure Client ID (Service Principal).")
-    client_secret: Optional[SecretStr] = Field(None, description="Azure Client Secret.")
-    tenant_id: Optional[str] = Field(None, description="Azure Tenant ID.")
+    model_config = ConfigDict(extra="forbid")
 
-class HashiCorpSecretConfig(BaseSecretConfig):
-    """Configuration for HashiCorp Vault."""
-    type: Literal["hashi"] = "hashi"
-    url: str = Field(..., description="URL of the HashiCorp Vault server.")
-    token: Optional[SecretStr] = Field(None, description="Vault Token.")
-    mount_point: str = Field("secret", description="Secrets engine mount point.")
+    id: str = Field(..., description="Used as the scheme in secret references (e.g. ${id:key}).")
+    type: str = Field(..., description="The provider: env, aws, azure or hashicorp.")
+    options: BaseModel = Field(..., description="The provider's settings, as its config_model.")
 
-class EnvSecretConfig(BaseSecretConfig):
-    """Configuration for Environment Variable Provider (Explicit)."""
-    type: Literal["env"] = "env"
-
-# Polymorphic Union
-SecretProviderConfig = Union[
-    AwsSecretConfig,
-    AzureSecretConfig,
-    HashiCorpSecretConfig,
-    EnvSecretConfig
-]
+    @model_validator(mode="before")
+    @classmethod
+    def _validate_the_provider_block(cls, data: Any) -> Any:
+        if not isinstance(data, dict) or "options" in data:
+            return data
+        block = dict(data)
+        head = {"id": block.pop("id", None), "type": block.pop("type", None)}
+        if not isinstance(head["type"], str):
+            return {**head, "options": None}
+        provider = provider_class(head["type"])
+        try:
+            options = provider.config_model.model_validate(block)
+        except ValidationError as e:
+            raise ValueError(f"Invalid settings for secret provider type '{head['type']}': {e}") from None
+        return {**head, "options": options}

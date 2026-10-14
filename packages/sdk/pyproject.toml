@@ -5,10 +5,10 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "nl2sql-sdk"
 version = "0.4.1" # x-release-please-version
-description = "Interfaces for nl2sql extensions, starting with database adapters; depends on pydantic only"
+description = "Interfaces for nl2sql extensions: adapters and secret providers"
 readme = "README.md"
 license = "MIT"
-keywords = ["nl2sql", "text-to-sql", "sql", "database", "adapter", "sdk"]
+keywords = ["nl2sql", "text-to-sql", "sql", "database", "adapter", "secrets", "sdk"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",

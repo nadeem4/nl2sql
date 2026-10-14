@@ -76,4 +76,4 @@ def test_configured_providers_still_parse(tmp_path):
         ("azure-prod", "azure"),
         ("aws-main", "aws"),
     ]
-    assert providers[0].vault_url == "https://my-vault.vault.azure.net/"
+    assert providers[0].options.vault_url == "https://my-vault.vault.azure.net/"

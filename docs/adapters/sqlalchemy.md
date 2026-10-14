@@ -47,6 +47,12 @@ does not fail the datasource's index:
   logs one warning naming them with the driver's error, and the columns that
   skipped `MIN`/`MAX` by type; a table that only skipped by type logs at debug.
 
+### Required class attributes
+
+`interface_version = 1`, `driver_modules` (the DBAPI driver your URL names,
+for example `("psycopg2",)`) and `install_hint`. See
+[Class attributes](sdk.md#class-attributes).
+
 ### Required Overrides
 
 #### `construct_uri(args: Dict[str, Any]) -> str`
