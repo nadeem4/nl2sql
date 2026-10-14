@@ -1077,6 +1077,19 @@ database has a `realdb` test.
     Not done here: the scope is not yet part of the snapshot's fingerprint,
     which lives in the state store (S3).
 
+!!! note "Built: B3, honest enforcement and stages"
+    `session_setup` and `classify` are on the SDK's base; the five built-ins
+    declare `ENFORCES_READ_ONLY` and `ENFORCES_TIMEOUT` as the table below
+    says, SQLite stops a slow statement with a progress handler (B20), and
+    `check()` reports the adapter's stage (B26) and warns about a session
+    that can write. Filled in on the way: `test_connection` also lists the
+    schemas, so a login that connects but cannot read the catalog is
+    `permission`; an error the adapter cannot place has no stage rather than
+    `connect`; DuckDB's `:memory:` cannot be opened read-only, so it does not
+    declare `ENFORCES_READ_ONLY`; the warning says "a login that can only
+    read", since the engine names no database, and the SQL Server page
+    recommends `db_datareader`.
+
 ### The contract
 
 ```python

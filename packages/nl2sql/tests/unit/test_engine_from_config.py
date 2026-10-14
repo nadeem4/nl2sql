@@ -208,7 +208,7 @@ def test_check_reports_failed_datasource_and_runs_degraded(tmp_path):
     status = {d.id: d for d in report.datasources}
     assert status["shop"].status == "ready"
     assert status["broken"].status == "failed"
-    assert status["broken"].stage == "connect" and status["broken"].reason and status["broken"].fix
+    assert status["broken"].stage == "database" and status["broken"].reason and status["broken"].fix
     assert "broken" in str(report)
     # Left out of routing, and a query that targets it gets the reason.
     assert [d.id for d in engine.datasources.list() if d.status == "ready"] == ["shop"]

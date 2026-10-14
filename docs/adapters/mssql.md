@@ -2,7 +2,7 @@
 
 Support for SQL Server 2017+ and Azure SQL.
 
-This adapter extends `SQLAlchemyAdapter`. Its row counts are the catalog's (`sys.partitions`), and it enforces `limits.timeout_ms` through pyodbc's query timeout.
+This adapter extends `SQLAlchemyAdapter`. Its row counts are the catalog's (`sys.partitions`), and it enforces `limits.timeout_ms` through pyodbc's query timeout. It **cannot make the session read-only**: see [Read-only](#read-only).
 
 ## Configuration
 
@@ -37,14 +37,41 @@ other key is an error; see [Connection](../configuration/datasources.md#connecti
 
 | Feature | Implementation | Note |
 | :--- | :--- | :--- |
-| **Timeout** | pyodbc `Connection.timeout` | Client-side query timeout, in whole seconds. |
+| **Read-only** | None | Does not declare `ENFORCES_READ_ONLY`; see [Read-only](#read-only). |
+| **Timeout** | pyodbc `Connection.timeout` | Client-side query timeout, in whole seconds. Declares `ENFORCES_TIMEOUT`. |
+| **Connection stages** | SQL Server's error number | 18456 is `auth`, 4060 `database`, 916 `permission`; ODBC's `08001`, `08S01` and `HYT00` are `network`. |
 | **Row counts** | `sys.partitions` | The row count SQL Server keeps for each table. |
 | **Stats** | One query per column | See [Reading a schema](sqlalchemy.md#reading-a-schema). |
 
+### Read-only
+
+SQL Server has no setting that makes a session read-only.
+`ApplicationIntent=ReadOnly` only routes the connection to a readable
+secondary replica; on a primary the session can still write. So the adapter
+does not declare `ENFORCES_READ_ONLY`, and `engine.check()` puts a warning on
+every SQL Server datasource's status:
+
+```text
+sales: ready
+  Warning: sales (mssql): this adapter cannot make the session read-only. Connect with a login that can only read.
+```
+
+The typed plan and the validator still block every write (see
+[the security model](../security/model.md#what-keeps-the-sql-read-only)). The
+third guard is yours: **connect with a login whose only role in the database
+is `db_datareader`.**
+
+```sql
+CREATE LOGIN nl2sql WITH PASSWORD = '...';
+CREATE USER nl2sql FOR LOGIN nl2sql;
+ALTER ROLE db_datareader ADD MEMBER nl2sql;
+```
+
 ### Statement Timeout
 
-SQL Server has no session setting for a statement timeout, so the adapter sets
-pyodbc's query timeout (`Connection.timeout`) on every new pooled connection.
+SQL Server has no session setting for a statement timeout, so the adapter's
+`session_setup` sets pyodbc's query timeout (`Connection.timeout`) on every new
+pooled connection.
 pyodbc counts whole seconds, so `limits.timeout_ms` is rounded **up**:
 `1500` becomes 2 seconds, and anything from 1 to 1000 becomes 1 second. When the
 limit passes, the driver cancels the query and the adapter reports it as a refusal

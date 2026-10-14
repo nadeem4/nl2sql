@@ -116,7 +116,7 @@ def test_every_capability_flag_is_one_something_queries():
     source = "\n".join(path.read_text(encoding="utf-8") for path in SRC.rglob("*.py"))
     queried = set(re.findall(r"DatasourceCapability\.([A-Z_]+)", source))
 
-    assert {member.name for member in DatasourceCapability} - queried <= {"ENFORCES_READ_ONLY", "ENFORCES_TIMEOUT"}
+    assert {member.name for member in DatasourceCapability} - queried <= {"ENFORCES_TIMEOUT"}
 
 
 def test_the_public_facade_exposes_nothing_without_methods():

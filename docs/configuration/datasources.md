@@ -112,9 +112,9 @@ limits:
   max_bytes: 10485760
 ```
 
-- `timeout_ms`: Postgres, MySQL, SQL Server and DuckDB enforce it (SQL Server
-  rounds up to whole seconds); SQLite does not, and uses it only as its
-  lock-wait timeout. A SQLite file is always opened read-only. See each [adapter page](../adapters/index.md) for how.
+- `timeout_ms`: every built-in adapter enforces it (SQL Server
+  rounds up to whole seconds; SQLite stops a statement with a progress handler).
+  Every session is read-only where the database allows it, with no setting; SQL Server cannot, and `check()` warns. See each [adapter page](../adapters/index.md) for how.
 - `row_limit`: unset, it is `settings.results.row_limit` (100,000); set higher,
   `settings.results.row_limit` still bounds it. A result that reaches it is
   flagged as truncated and the answer says so. It is applied before results

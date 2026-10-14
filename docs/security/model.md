@@ -107,10 +107,26 @@ which is the whole enforcement — and the generator renders that plan with
 `sqlglot` starting from `exp.select()`. A statement that is not a SELECT therefore cannot be
 produced, and free text from the model is never executed.
 
-What is **not** in place: database connections are **not** opened read-only on
-any dialect, and the executor has no statement-kind or statement-count gate of
-its own. The read-only property is structural, not defended in depth. **Grant
-the engine a read-only database user.**
+Below that, the session itself is read-only wherever the database allows it.
+There is no setting: the engine never writes, so every built-in adapter makes
+each new connection read-only when it can, and declares `ENFORCES_READ_ONLY`
+only where it does:
+
+| Adapter | Read-only session | `ENFORCES_READ_ONLY` |
+| :--- | :--- | :--- |
+| PostgreSQL | `SET default_transaction_read_only = on` | yes |
+| MySQL | `SET SESSION TRANSACTION READ ONLY` | yes |
+| SQL Server | none: the database has no such session setting | **no** |
+| DuckDB | `read_only=True` on the file | yes (not for `:memory:`) |
+| SQLite | `mode=ro` | yes |
+
+`engine.check()` warns about each datasource whose adapter does not declare
+it ("this adapter cannot make the session read-only"), and still routes to it.
+For those, the login is the third guard: on SQL Server, a login whose only role
+is `db_datareader` (see [the adapter](../adapters/mssql.md#read-only)). The
+executor has no statement-kind or statement-count gate of its own. **Grant the
+engine a read-only database user** anyway: a read-only session stops writes,
+not reads of tables you did not mean to expose.
 
 ```mermaid
 flowchart TD

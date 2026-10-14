@@ -3,9 +3,10 @@
 In-process analytical adapter for local files and ad-hoc analysis.
 
 !!! info "Implementation"
-    This adapter extends `SQLAlchemyAdapter`. It overrides `build_engine()` only to
-    enforce `limits.timeout_ms`: DuckDB runs in-process and has no statement
-    timeout setting, so the adapter interrupts a statement that runs too long.
+    This adapter extends `SQLAlchemyAdapter`. It overrides `build_engine()` to
+    open a file with `read_only=True` and to enforce `limits.timeout_ms`: DuckDB
+    runs in-process and has no statement timeout setting, so the adapter
+    interrupts a statement that runs too long.
 
 ## Installation
 
@@ -43,7 +44,9 @@ connection:
 
 | Feature | Implementation | Note |
 | :--- | :--- | :--- |
-| **Timeout** | `interrupt()` on a timer | See [Statement Timeout](#statement-timeout). |
+| **Read-only** | `read_only=True` on the connection | A file is always opened read-only, so it must exist, and declares `ENFORCES_READ_ONLY`. DuckDB cannot open `:memory:` read-only, and an in-memory database has nothing to protect, so it does not declare it. |
+| **Timeout** | `interrupt()` on a timer | See [Statement Timeout](#statement-timeout). Declares `ENFORCES_TIMEOUT`. |
+| **Connection stages** | The message | A file that does not exist is `database`. |
 | **Row counts** | `duckdb_tables().estimated_size` | The catalog's count. |
 | **Stats** | One query per column | See [Reading a schema](sqlalchemy.md#reading-a-schema). |
 
@@ -67,5 +70,6 @@ schemas of the attached database.
 
 * **Analytics**: DuckDB is columnar and vectorized, which suits aggregation-heavy
   generated SQL. It reads Parquet and CSV directly via `read_parquet()` / `read_csv()`.
-* **Concurrency**: A DuckDB file allows a single writing process. Treat it as a
-  single-writer analytical store, not a shared OLTP database.
+* **Concurrency**: A DuckDB file allows a single writing process, and a process
+  that has it open for writing keeps a read-only one out. Write to the file
+  from another process only while the engine is not using it.

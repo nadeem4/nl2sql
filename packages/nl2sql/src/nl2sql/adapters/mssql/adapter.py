@@ -1,10 +1,21 @@
 import math
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 from pydantic import Field, SecretStr
-from sqlalchemy import URL, Connection, Engine, event, text
+from sqlalchemy import URL, Connection, text
 
+from nl2sql_sdk import DatasourceCapability
 from nl2sql_sdk.sqlalchemy import SQLAlchemyAdapter, SQLAlchemyConnection
+
+# SQL Server's error numbers for a failed connection, as the ODBC message
+# carries them: "... (4060)". Checked in this order.
+_STAGE_BY_ERROR = (
+    (4060, "database"),    # cannot open the database requested by the login
+    (18456, "auth"),       # login failed
+    (916, "permission"),   # the login cannot access the database
+)
+# ODBC's SQLSTATEs for a server that was not reached: the first argument of pyodbc's error.
+_NETWORK_SQLSTATES = {"08001", "08S01", "HYT00"}
 
 
 class MssqlConnection(SQLAlchemyConnection):
@@ -51,21 +62,39 @@ class MssqlAdapter(SQLAlchemyAdapter):
             query=query,
         )
 
-    def build_engine(self) -> Engine:
-        """The engine, enforcing ``limits.timeout_ms`` through pyodbc.
+    def capabilities(self) -> set[DatasourceCapability]:
+        """The timeout only: SQL Server cannot make a session read-only.
 
-        SQL Server has no session setting for a statement timeout; the client
-        cancels instead. pyodbc's ``Connection.timeout`` is that query timeout,
-        in whole seconds, so it is set on every new pooled connection, rounded
-        up so a sub-second limit is not read as "no timeout".
+        ``ApplicationIntent=ReadOnly`` only routes to a readable replica, so
+        the guard is a login with only ``db_datareader``, and ``check()``
+        warns about every SQL Server datasource.
         """
-        engine = super().build_engine()
-        if self.limits.timeout_ms:
-            event.listen(engine, "connect", self._set_query_timeout)
-        return engine
+        return super().capabilities() | {DatasourceCapability.ENFORCES_TIMEOUT}
 
-    def _set_query_timeout(self, dbapi_connection, connection_record) -> None:
-        dbapi_connection.timeout = math.ceil(self.limits.timeout_ms / 1000)
+    def session_setup(self, dbapi_connection: Any) -> None:
+        """``limits.timeout_ms`` as pyodbc's query timeout: the client cancels.
+
+        SQL Server has no session setting for a statement timeout. pyodbc's
+        ``Connection.timeout`` counts whole seconds, so the limit is rounded
+        up and a sub-second one is not read as "no timeout".
+        """
+        if self.limits.timeout_ms:
+            dbapi_connection.timeout = math.ceil(self.limits.timeout_ms / 1000)
+
+    def classify(self, exc: BaseException) -> Optional[str]:
+        """SQL Server's error number in the message, else the ODBC SQLSTATE.
+
+        A missing database also says the login failed, so 4060 is read first.
+        """
+        orig = getattr(exc, "orig", None) or exc
+        message = str(orig)
+        for number, stage in _STAGE_BY_ERROR:
+            if f"({number})" in message:
+                return stage
+        args = getattr(orig, "args", ())
+        if args and isinstance(args[0], str) and args[0] in _NETWORK_SQLSTATES:
+            return "network"
+        return super().classify(exc)
 
     def get_dialect(self) -> str:
         """MSSQL uses T-SQL dialect."""

@@ -1,9 +1,25 @@
-from typing import Dict, Literal
+from typing import Any, Dict, Literal, Optional
 
 from pydantic import Field, SecretStr
-from sqlalchemy import URL, Connection, Engine, text
+from sqlalchemy import URL, Connection, text
 
+from nl2sql_sdk import DatasourceCapability
 from nl2sql_sdk.sqlalchemy import SQLAlchemyAdapter, SQLAlchemyConnection
+
+# libpq reports a failed connection before the server gives any SQLSTATE, so
+# psycopg2 has none: the message is all there is. Checked in this order.
+_STAGE_BY_MESSAGE = (
+    ("password authentication failed", "auth"),
+    ("no password supplied", "auth"),
+    ("no pg_hba.conf entry", "auth"),
+    ("does not exist", "database"),
+    ("permission denied", "permission"),
+    ("connection refused", "network"),
+    ("could not translate host name", "network"),
+    ("timeout expired", "network"),
+    ("no route to host", "network"),
+    ("could not connect", "network"),
+)
 
 
 class PostgresConnection(SQLAlchemyConnection):
@@ -39,12 +55,32 @@ class PostgresAdapter(SQLAlchemyAdapter):
             query={"sslmode": connection.sslmode},
         )
 
-    def build_engine(self) -> Engine:
-        """The engine, with ``limits.timeout_ms`` as the server's ``statement_timeout``."""
-        connect_args = {}
+    def capabilities(self) -> set[DatasourceCapability]:
+        return super().capabilities() | {DatasourceCapability.ENFORCES_READ_ONLY,
+                                         DatasourceCapability.ENFORCES_TIMEOUT}
+
+    def session_setup(self, dbapi_connection: Any) -> None:
+        """Every transaction read-only, and ``limits.timeout_ms`` as the server's ``statement_timeout``.
+
+        psycopg2 runs the SETs in a transaction, and a rollback would undo
+        them, so they are committed.
+        """
+        statements = ["SET default_transaction_read_only = on"]
         if self.limits.timeout_ms:
-            connect_args["options"] = f"-c statement_timeout={self.limits.timeout_ms}"
-        return super().build_engine(connect_args=connect_args)
+            statements.append(f"SET statement_timeout = {int(self.limits.timeout_ms)}")
+        cursor = dbapi_connection.cursor()
+        for statement in statements:
+            cursor.execute(statement)
+        cursor.close()
+        dbapi_connection.commit()
+
+    def classify(self, exc: BaseException) -> Optional[str]:
+        """The SQLSTATE when there is one, else libpq's message."""
+        stage = super().classify(exc)
+        if stage is not None:
+            return stage
+        message = str(getattr(exc, "orig", None) or exc).lower()
+        return next((stage for words, stage in _STAGE_BY_MESSAGE if words in message), None)
 
     def get_dialect(self) -> str:
         # A sqlglot dialect name (SQLAlchemy calls it "postgresql").

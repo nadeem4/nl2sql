@@ -5,11 +5,11 @@ import logging
 import threading
 import time
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterator, List, Optional, Union
+from typing import Any, Callable, Dict, Iterator, List, Literal, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field, NonNegativeInt, PositiveFloat, PositiveInt
-from sqlalchemy import URL, Connection, Engine, case, column, create_engine, func, inspect, literal_column, select, \
-    table, text
+from sqlalchemy import URL, Connection, Engine, case, column, create_engine, event, func, inspect, literal_column, \
+    select, table, text
 from sqlalchemy.engine.reflection import Inspector, ObjectKind
 from sqlalchemy.exc import DataError, ProgrammingError, SQLAlchemyError
 
@@ -37,6 +37,19 @@ logger = logging.getLogger(__name__)
 # Driver messages that mean the database refused the query, whatever its kind.
 _REFUSAL_WORDS = ("permission denied", "permission was denied", "access denied", "not authorized")
 _MAX_MESSAGE = 200
+
+Stage = Literal["config", "driver", "network", "auth", "database", "permission"]
+
+# The standard SQLSTATE classes of a failed connection.
+_STAGE_BY_SQLSTATE_CLASS = {"08": "network", "28": "auth", "3D": "database"}
+
+# What to do about a connection that failed at each stage. ``driver``'s fix is the adapter's install_hint.
+_FIXES = {
+    "network": "Check the host, port and firewall: the database server could not be reached.",
+    "auth": "Check the user and password.",
+    "database": "Check `database`: it does not exist, or this login cannot open it.",
+    "permission": "Connected, but the catalog could not be read: grant read access to the schemas you index.",
+}
 
 
 class Pool(BaseModel):
@@ -91,6 +104,11 @@ def driver_message(exc: BaseException) -> str:
     return first if len(first) <= _MAX_MESSAGE else first[: _MAX_MESSAGE - 3] + "..."
 
 
+def _read_catalog(conn: Connection) -> None:
+    """Lists the schemas: what ``test_connection`` asks of a connection to show it can index."""
+    inspect(conn).get_schema_names()
+
+
 def _by_name(reflected: Dict[Any, Any]) -> Dict[str, Any]:
     """``get_multi_*`` results keyed by table name: their keys are ``(schema, name)``."""
     return {key[1]: value for key, value in reflected.items()}
@@ -101,8 +119,8 @@ class SQLAlchemyAdapter:
 
     A subclass sets the class attributes of ``DatasourceAdapter`` and
     implements ``url`` and ``get_dialect``. Its other overridable methods are
-    ``system_schemas``, ``row_estimates``, ``column_profile`` and
-    ``render_sql``. Building one never connects: the SQLAlchemy engine is
+    ``session_setup``, ``classify``, ``system_schemas``, ``row_estimates``,
+    ``column_profile`` and ``render_sql``. Building one never connects: the SQLAlchemy engine is
     created on first use, so the driver is imported then.
     """
 
@@ -136,6 +154,33 @@ class SQLAlchemyAdapter:
     def get_dialect(self) -> str:
         """The sqlglot dialect name of this database."""
         raise NotImplementedError(f"Adapter {self.__class__.__name__} must implement get_dialect")
+
+    def session_setup(self, dbapi_connection: Any) -> None:
+        """Prepares each new pooled connection before its first query: the one place for session settings.
+
+        Make the session read-only and set the statement timeout
+        (``limits.timeout_ms``) here, where the database allows, and declare
+        ``ENFORCES_READ_ONLY`` and ``ENFORCES_TIMEOUT`` in ``capabilities``
+        only for what it really enforces. ``dbapi_connection`` is the
+        driver's own connection. The default does nothing.
+        """
+
+    def classify(self, exc: BaseException) -> Optional[Stage]:
+        """The stage a failed connection test failed at, or None when the error does not say.
+
+        The default reads a missing driver module (``driver``) and the
+        standard SQLSTATE: class ``08`` network, ``28`` auth, ``3D`` database,
+        and ``42501`` (insufficient privilege) permission. Override it to add
+        the driver's own error codes, calling ``super()`` for the rest.
+        """
+        if isinstance(exc, ImportError):
+            return "driver"
+        state = _sqlstate(exc)
+        if state is None:
+            return None
+        if state == "42501":
+            return "permission"
+        return _STAGE_BY_SQLSTATE_CLASS.get(state[:2].upper())
 
     def system_schemas(self) -> set[str]:
         """The database's own schemas, never indexed whatever the scope says. Matched ignoring case."""
@@ -176,14 +221,20 @@ class SQLAlchemyAdapter:
     def build_engine(self, **options: Any) -> Engine:
         """Creates the SQLAlchemy engine from ``url``, with the connection's ``pool``.
 
-        Override to add driver settings, passing them on as ``options``
-        (``connect_args``, for example).
+        ``session_setup`` runs on every new pooled connection. Override to
+        add driver settings, passing them on as ``options`` (``connect_args``,
+        for example).
         """
         pool = getattr(self.connection, "pool", None)
         if isinstance(pool, Pool):
             options = {"pool_size": pool.size, "max_overflow": pool.max_overflow,
                        "pool_timeout": pool.timeout_s, "pool_recycle": pool.recycle_s, **options}
-        return create_engine(self.url(self.connection), pool_pre_ping=True, **options)
+        engine = create_engine(self.url(self.connection), pool_pre_ping=True, **options)
+        event.listen(engine, "connect", self._on_connect)
+        return engine
+
+    def _on_connect(self, dbapi_connection: Any, connection_record: Any) -> None:
+        self.session_setup(dbapi_connection)
 
     def default_schema(self) -> Optional[str]:
         """The schema an unqualified table name resolves to, or ``None`` if unknown.
@@ -220,15 +271,28 @@ class SQLAlchemyAdapter:
         return {DatasourceCapability.SUPPORTS_SQL, DatasourceCapability.SUPPORTS_BOUND_PARAMETERS}
 
     def test_connection(self) -> ConnectionCheck:
-        """Connects and runs ``SELECT 1``: ``ok`` with the server's version, or the driver's reason."""
+        """Connects, runs ``SELECT 1`` and lists the schemas: ``ok`` with the server's version, or the stage that failed.
+
+        The stage comes from ``classify``; a connection that works but cannot
+        list the schemas failed at ``permission``. The message is the
+        driver's first line, and the fix says what to check at that stage.
+        """
         try:
             with self.engine.connect() as conn:
                 conn.execute(text("SELECT 1"))
                 info = conn.dialect.server_version_info
+                try:
+                    _read_catalog(conn)
+                except Exception as e:
+                    return self._failed_check(e, "permission")
         except Exception as e:
-            logger.error(f"Connection test failed for {self}: {e}")
-            return ConnectionCheck(ok=False, message=driver_message(e))
+            return self._failed_check(e, self.classify(e))
         return ConnectionCheck(ok=True, server_version=".".join(str(part) for part in info) if info else None)
+
+    def _failed_check(self, exc: BaseException, stage: Optional[Stage]) -> ConnectionCheck:
+        logger.error(f"Connection test failed for {self} at {stage or 'an unknown stage'}: {exc}")
+        fix = getattr(self, "install_hint", None) if stage == "driver" else _FIXES.get(stage or "")
+        return ConnectionCheck(ok=False, stage=stage, message=driver_message(exc), fix=fix)
 
     # --- Execution -------------------------------------------------------------
 

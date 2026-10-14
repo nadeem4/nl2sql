@@ -45,7 +45,7 @@ def test_entry_points_refuse_to_start_when_a_required_datasource_fails(tmp_path,
     assert result.exit_code == 1, result.output
     assert called == []
     output = result.output.replace("\n", " ")
-    assert "lost (required): failed at connect" in output
+    assert "lost (required): failed at database" in output
 
 
 @pytest.mark.parametrize("args, seam", [
@@ -61,7 +61,7 @@ def test_an_optional_datasource_that_fails_leaves_the_cli_running_degraded(tmp_p
 
     assert result.exit_code == 0, result.output
     assert len(called) == 1
-    assert "lost: failed at connect" in result.output.replace("\n", " ")
+    assert "lost: failed at database" in result.output.replace("\n", " ")
 
 
 def test_the_demo_refuses_to_start_when_a_required_datasource_fails(tmp_path):

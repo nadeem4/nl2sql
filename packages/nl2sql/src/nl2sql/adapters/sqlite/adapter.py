@@ -1,12 +1,18 @@
+import time
+from typing import Optional
+
 from pydantic import Field
-from sqlalchemy import Engine
+from sqlalchemy import Engine, event
 from sqlalchemy.dialects import sqlite
 from sqlalchemy.exc import OperationalError, SQLAlchemyError
 
-from nl2sql_sdk import ConnectionModel
+from nl2sql_sdk import ConnectionModel, DatasourceCapability
 from nl2sql_sdk.sqlalchemy import SQLAlchemyAdapter
 import sqlglot
 from sqlglot import exp
+
+# How many virtual-machine steps SQLite runs between calls to the progress handler.
+_PROGRESS_STEPS = 10_000
 
 # SQLite has no EXTRACT and no date truncation. Each template reads the date
 # with STRFTIME/DATE; ``__x__`` stands for the operand. The engine wraps a
@@ -78,16 +84,38 @@ class SqliteAdapter(SQLAlchemyAdapter):
         """
         return f"sqlite:///file:{self.local_path(connection.database)}?mode=ro&uri=true"
 
-    def build_engine(self) -> Engine:
-        """The engine, with ``limits.timeout_ms`` as SQLite's lock-wait timeout.
+    def capabilities(self) -> set[DatasourceCapability]:
+        return super().capabilities() | {DatasourceCapability.ENFORCES_READ_ONLY,
+                                         DatasourceCapability.ENFORCES_TIMEOUT}
 
-        SQLite's ``timeout`` is how long to wait for a lock, not how long a
-        statement may run, but it is the closest SQLite has.
+    def build_engine(self) -> Engine:
+        """The engine, stopping a statement that runs past ``limits.timeout_ms``.
+
+        SQLite has no statement timeout (its ``timeout`` is a lock wait), so
+        each statement installs a progress handler with its own deadline.
+        SQLite calls it every few thousand steps of its virtual machine, while
+        the statement runs and while its rows are fetched; past the deadline
+        it returns true and SQLite stops the statement with "interrupted",
+        reported as a refusal.
         """
-        connect_args = {}
-        if self.limits.timeout_ms:
-            connect_args["timeout"] = self.limits.timeout_ms / 1000.0
-        return super().build_engine(connect_args=connect_args)
+        engine = super().build_engine()
+        if not self.limits.timeout_ms:
+            return engine
+        seconds = self.limits.timeout_ms / 1000
+
+        def set_deadline(conn, cursor, statement, parameters, context, executemany):
+            deadline = time.monotonic() + seconds
+            conn.connection.dbapi_connection.set_progress_handler(lambda: time.monotonic() > deadline,
+                                                                  _PROGRESS_STEPS)
+
+        event.listen(engine, "before_cursor_execute", set_deadline)
+        return engine
+
+    def classify(self, exc: BaseException) -> Optional[str]:
+        """A file that cannot be opened is the ``database`` stage: read-only never creates one."""
+        if "unable to open database file" in str(getattr(exc, "orig", None) or exc):
+            return "database"
+        return super().classify(exc)
 
     def get_dialect(self) -> str:
         return sqlite.dialect.name

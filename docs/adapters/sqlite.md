@@ -3,7 +3,7 @@
 Simple file-based adapter for local development and testing.
 
 !!! info "Implementation"
-    This adapter extends `SQLAlchemyAdapter`. Note that `timeout` configurations apply to the *database lock*, not query execution time.
+    This adapter extends `SQLAlchemyAdapter`. It opens the file read-only and stops a statement that runs past `limits.timeout_ms` with a progress handler.
 
 ## Configuration
 
@@ -38,9 +38,21 @@ does the same.
 
 | Feature | Implementation | Note |
 | :--- | :--- | :--- |
-| **Timeout** | `connect_args["timeout"]` | Controls *Locking* timeout, not execution. |
+| **Read-only** | `mode=ro` | Always; declares `ENFORCES_READ_ONLY`. |
+| **Timeout** | A progress handler per statement | See [Statement Timeout](#statement-timeout). Declares `ENFORCES_TIMEOUT`. |
+| **Connection stages** | The message | A file that cannot be opened is `database`. |
 | **Row counts** | `COUNT(*)` | SQLite keeps no estimate, so rows are counted under `profile: stats`, and there is no row count under `catalog`. |
 | **Stats** | One query per column | See [Reading a schema](sqlalchemy.md#reading-a-schema). |
+
+### Statement Timeout
+
+SQLite has no statement timeout: its own `timeout` is how long to wait for a
+lock. So when `limits.timeout_ms` is set, each statement installs a progress
+handler with its own deadline. SQLite calls it every 10,000 steps of its
+virtual machine, while the statement runs and while its rows are fetched; once
+the deadline has passed, the handler stops the statement, which fails with
+"interrupted" and is reported as a refusal (`QUERY_REFUSED`) that the engine
+does not retry. The next statement on the connection gets a new deadline.
 
 ## Hints
 
