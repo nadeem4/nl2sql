@@ -1,12 +1,13 @@
 """Chinook demo dataset: datasource, policies and guided questions.
 
-The database itself is vendored at ``nl2sql/datasets/chinook.sqlite`` and
-is copied into the demo project by :meth:`DemoManager.setup_demo`. See
+The database itself is vendored at ``nl2sql/datasets/chinook.sqlite``. See
 ``THIRD_PARTY_NOTICES.md`` at the repository root for its license.
 
 Chinook is one of the demo's three databases; ``support`` and ``webanalytics``
-sit beside it and share its customer identities. ``nl2sql.cli.demo.datasets``
-gathers all three.
+sit beside it and share its customer identities. ``nl2sql.datasets.demo``
+gathers all three, and ``nl2sql.config.demo_config`` builds the demo config
+from them. The dicts here are in the shape of ``nl2sql.yaml``: a datasource is
+a ``nl2sql.config.Datasource``, a policy a ``nl2sql.config.Role``.
 """
 
 # The most rows one demo sub-query returns, for the local and the hosted
@@ -17,12 +18,13 @@ DEMO_ROW_LIMIT = 10_000
 
 CHINOOK_DATASOURCE = {
     "id": "chinook",
+    "type": "sqlite",
     # Read-only: nothing in the engine writes to a demo database, and a hosted
     # demo must not be able to. ``mode=ro`` makes the driver refuse a write
-    # before any SQL is parsed (``SqliteAdapter.construct_uri``).
-    "connection": {"type": "sqlite", "database": "data/chinook.sqlite",
-                   "options": {"read_only": True}},
-    "options": {"row_limit": DEMO_ROW_LIMIT},
+    # before any SQL is parsed (``SqliteAdapter.construct_uri``). ``database``
+    # is the packaged file's name; ``demo_config`` says which folder it is in.
+    "connection": {"database": "chinook.sqlite", "options": {"read_only": True}},
+    "limits": {"row_limit": DEMO_ROW_LIMIT},
     "description": "Chinook digital music store: artists, albums, tracks, genres, playlists, customers, employees, invoices and invoice lines",
 }
 
@@ -30,21 +32,21 @@ CHINOOK_ALL = ["Album", "Artist", "Customer", "Employee", "Genre", "Invoice", "I
 _CATALOG = ["Album", "Artist", "Genre", "MediaType", "Playlist", "PlaylistTrack", "Track"]
 
 # The tables each demo role may read. The same shape is defined for the other
-# two demo databases, and ``nl2sql.cli.demo.datasets`` merges the three into
-# the policy file the demo project gets.
+# two demo databases, and ``nl2sql.datasets.demo`` merges the three into the
+# demo's policies.
 CHINOOK_TABLES_BY_ROLE = {
     "analyst": [t for t in CHINOOK_ALL if t != "Employee"],
     "viewer": list(_CATALOG),
 }
 
 # Chinook on its own, as the tier 1 gold evaluation reads it. The demo project
-# gets ``nl2sql.cli.demo.datasets.DEMO_POLICIES``, which covers all three
+# gets ``nl2sql.datasets.demo.DEMO_POLICIES``, which covers all three
 # databases and grants the same Chinook tables to each role.
 CHINOOK_POLICIES = {
-    "admin": {"description": "Every table", "role": "admin", "allowed_datasources": ["*"], "allowed_tables": ["*"]},
-    "analyst": {"description": "Everything except employee records", "role": "analyst", "allowed_datasources": ["chinook"],
+    "admin": {"description": "Every table", "allowed_datasources": ["*"], "allowed_tables": ["*"]},
+    "analyst": {"description": "Everything except employee records", "allowed_datasources": ["chinook"],
                 "allowed_tables": [f"chinook.{t}" for t in CHINOOK_TABLES_BY_ROLE["analyst"]]},
-    "viewer": {"description": "Music catalog only, no customers or sales", "role": "viewer", "allowed_datasources": ["chinook"],
+    "viewer": {"description": "Music catalog only, no customers or sales", "allowed_datasources": ["chinook"],
                "allowed_tables": [f"chinook.{t}" for t in CHINOOK_TABLES_BY_ROLE["viewer"]]},
 }
 
@@ -63,7 +65,7 @@ CHINOOK_QUESTIONS = [
     "Who are the top customers by total spend?",
 ]
 
-# The demo's verified queries, written to ``configs/curated.demo.yaml`` (see
+# The demo's verified queries, its ``curated`` section (see
 # docs/configuration/curated.md). Questions a visitor is likely to ask, each
 # with several phrasings; the guided questions "What is the total revenue per
 # year?" and "Which genre sells the most tracks?" are among them. Revenue is

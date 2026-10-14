@@ -6,7 +6,7 @@ import yaml
 from rich.console import Console
 
 from nl2sql.cli.demo import DemoManager
-from nl2sql.cli.demo.datasets import DEMO_QUESTIONS, DEMO_QUESTIONS_BY_DATASOURCE
+from nl2sql.datasets.demo import DEMO_QUESTIONS, DEMO_QUESTIONS_BY_DATASOURCE
 from nl2sql.configs import PolicyFileConfig
 
 EXPECTED_TABLES = {

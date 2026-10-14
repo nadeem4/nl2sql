@@ -5,6 +5,10 @@
 so the demo shows several datasources rather than one. The resolver's
 single-datasource shortcut no longer applies with three registered, which is
 the point: the vector search and the answerability judge run for real.
+
+The dicts are in the shape of ``nl2sql.yaml``. ``nl2sql.config.demo_config``
+builds the demo ``Config`` from them, and ``nl2sql init --demo`` writes that
+config out as files.
 """
 
 from .chinook import (
@@ -25,8 +29,7 @@ from .webanalytics import (
 )
 
 # (datasource id, packaged file name, datasource config). The file name is both
-# what is copied out of ``nl2sql.datasets`` and what the connection points at
-# under the demo project's ``data/``.
+# what is copied out of ``nl2sql.datasets`` and the connection's ``database``.
 DEMO_DATABASES = (
     ("chinook", "chinook.sqlite", CHINOOK_DATASOURCE),
     ("support", "support.sqlite", SUPPORT_DATASOURCE),
@@ -43,10 +46,9 @@ DEMO_QUESTIONS_BY_DATASOURCE = {
     "webanalytics": list(WEBANALYTICS_QUESTIONS),
 }
 
-# The demo's curated answers file, ``configs/curated.demo.yaml``: verified
-# queries by datasource. Only Chinook has them.
+# The demo's ``curated`` section: verified queries by datasource. Only Chinook
+# has them.
 DEMO_CURATED = {
-    "version": 1,
     "datasources": {"chinook": {"verified_queries": CHINOOK_VERIFIED_QUERIES}},
 }
 
@@ -88,19 +90,16 @@ def _datasources_for(role: str) -> list[str]:
 DEMO_POLICIES = {
     "admin": {
         "description": "Every table in every demo database",
-        "role": "admin",
         "allowed_datasources": ["*"],
         "allowed_tables": ["*"],
     },
     "analyst": {
         "description": "Everything except employee and support-agent records",
-        "role": "analyst",
         "allowed_datasources": _datasources_for("analyst"),
         "allowed_tables": _qualified("analyst"),
     },
     "viewer": {
         "description": "Music catalog and anonymous web traffic; no customers, sales or support",
-        "role": "viewer",
         "allowed_datasources": _datasources_for("viewer"),
         "allowed_tables": _qualified("viewer"),
     },

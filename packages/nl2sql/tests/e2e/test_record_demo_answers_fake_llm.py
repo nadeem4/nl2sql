@@ -13,7 +13,7 @@ import pytest
 
 pytest.importorskip("fastapi")
 
-from nl2sql.cli.demo.datasets import CHINOOK_QUESTIONS, DEMO_QUESTIONS  # noqa: E402
+from nl2sql.datasets.demo import CHINOOK_QUESTIONS, DEMO_QUESTIONS  # noqa: E402
 from nl2sql.llm.replay import ReplayStore  # noqa: E402
 from nl2sql.testing.fake_llm import FakeLLMServer  # noqa: E402
 
