@@ -7991,7 +7991,7 @@ different <code>storage.path</code> values never share a store.</p>
 </ul>
 <h3 id="enforcement-points_21">Enforcement Points</h3>
 <ul>
-<li><code>test_no_module_writes_the_environment</code>, <code>test_environment_reads_only_from_the_allow_list</code> and <code>test_only_entry_points_load_dotenv</code> in <code>packages/nl2sql/tests/architecture/test_boundaries.py</code>, an AST scan of <code>packages/*/src</code> (<code>READS_THE_ENVIRONMENT</code> names each allowed reader and why)</li>
+<li><code>test_no_module_writes_the_environment</code>, <code>test_environment_reads_only_from_the_allow_list</code> and <code>test_only_entry_points_load_dotenv</code> in <code>packages/nl2sql/tests/architecture/test_boundaries.py</code>, an AST scan of <code>packages/*/src</code> (<code>READS_THE_ENVIRONMENT</code> names each allowed reader and why); the first also scans <code>scripts/</code>, so a maintenance script passes keys as arguments instead of writing the environment</li>
 <li><code>packages/nl2sql/tests/e2e/test_two_engines_fake_llm.py</code> — two engines in one process, each with its own row limit, plan cache, LLM, embedder and storage, and <code>os.environ</code> unchanged afterwards</li>
 </ul>
 <h3 id="failure-behavior_21">Failure Behavior</h3>

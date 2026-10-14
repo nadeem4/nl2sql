@@ -2372,9 +2372,11 @@ deliberate act, never part of CI. Either:</p>
 <div class="highlight"><pre><span></span><code><a href="#__codelineno-1-1" id="__codelineno-1-1" name="__codelineno-1-1"></a>python<span class="w"> </span>scripts/record_demo_answers.py
 </code></pre></div>
 <p>It reads <code>ANTHROPIC_API_KEY</code> from the environment or, failing that, from the
-  repository root's <code>.env</code> (python-dotenv, the loader the engine uses; nothing
-  prints the key), sets any OpenAI or OpenRouter key aside for the run, builds
-  a fresh demo project, runs <code>nl2sql demo --record</code> through the recording proxy
+  repository root's <code>.env</code> (read with python-dotenv, never loaded into the
+  environment; nothing prints the key), builds a fresh demo project, and runs
+  <code>nl2sql demo --record</code> with that key passed as <code>--api-key</code> would pass it, so
+  an exported OpenAI or OpenRouter key never wins. The script writes nothing to
+  the environment. The demo records through the recording proxy
   on Anthropic's own wire with the Anthropic preset's default model, and writes
   <code>packages/nl2sql/src/nl2sql/cli/demo/recordings/chinook.json</code>, stamped with
   the provider and the model the proxy saw requested. A question is

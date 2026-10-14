@@ -5104,7 +5104,9 @@ below adds variables. The architecture tests enforce both
 <p>Only the entry points load a <code>.env</code> file: the CLI, <code>nl2sql-api</code> and
 <code>nl2sql demo</code> load the <code>.env</code> <strong>next to <code>nl2sql.yaml</code></strong> into the process
 environment at startup. A variable that is already set always wins; the file
-never overrides it.</p>
+never overrides it. Each loads the <code>.env</code> before it configures logging, so a
+<code>NL2SQL_LOG_LEVEL</code> written there applies (<code>nl2sql demo</code> reads the demo
+project's <code>.env</code>, except with <code>--hosted</code>, which reads none).</p>
 <p>The library itself never reads a <code>.env</code> file. A Python caller that wants one
 loads it before building the engine:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">dotenv</span><span class="w"> </span><span class="kn">import</span> <span class="n">load_dotenv</span>
