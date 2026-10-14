@@ -47,7 +47,7 @@ def test_placeholders_take_the_example_then_the_default_then_the_name():
     params = _section().verified_queries[0].params
     assert fill_placeholders("Top {n} in {year}", params) == "Top 10 in 2012"
 
-    params["year"].example = None
+    params = {**params, "year": params["year"].model_copy(update={"example": None})}
     assert fill_placeholders("Top {n} in {year}", params) == "Top 10 in year"
 
 

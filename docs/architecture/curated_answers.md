@@ -47,7 +47,8 @@ person.
 
 It follows the pattern of every other config file: a path setting with an
 environment alias (`CURATED_CONFIG`, default `configs/curated.yaml`), a
-pydantic file model in `nl2sql/configs/curated.py`, and a loader on
+pydantic file model in `nl2sql/configs/curated.py` (its models are in
+`nl2sql/config/curated.py`), and a loader on
 `ConfigManager` (`load_curated()`), next to `load_datasources()` and
 `load_policies()`.
 
