@@ -4,8 +4,8 @@ from unittest.mock import MagicMock
 import pytest
 from pydantic import SecretStr
 
-from nl2sql_adapter_sdk.protocols import DatasourceAdapterProtocol
-from nl2sql_adapter_sdk.capabilities import DatasourceCapability
+from nl2sql_sdk.protocols import DatasourceAdapterProtocol
+from nl2sql_sdk.capabilities import DatasourceCapability
 from nl2sql.adapters.duckdb.adapter import DuckdbAdapter
 from nl2sql.adapters.mssql.adapter import MssqlAdapter
 from nl2sql.adapters.mysql.adapter import MysqlAdapter

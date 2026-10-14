@@ -25,7 +25,7 @@
       "extra-files": [
         {
           "type": "generic",
-          "path": "packages/adapter-sdk/pyproject.toml"
+          "path": "packages/sdk/pyproject.toml"
         },
         {
           "type": "generic",

@@ -1,4 +1,4 @@
-"""Adapter SDK: shared contracts for core and adapters."""
+"""The nl2sql SDK: the interfaces an extension implements, starting with adapters."""
 
 from .capabilities import DatasourceCapability
 from .contracts import AdapterRequest, ResultError, ResultFrame

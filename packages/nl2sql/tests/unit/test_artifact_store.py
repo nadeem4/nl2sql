@@ -6,7 +6,7 @@ import pytest
 
 from nl2sql.common.settings import settings
 from nl2sql.execution.artifacts import ArtifactStore, ArtifactStoreConfig, build_artifact_store
-from nl2sql_adapter_sdk.contracts import ResultFrame
+from nl2sql_sdk.contracts import ResultFrame
 
 
 def _frame():

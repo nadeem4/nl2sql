@@ -19,7 +19,7 @@ from nl2sql.llm.models import AgentConfig
 from nl2sql.llm.registry import LLMRegistry
 from nl2sql.schema import InMemorySchemaStore
 from nl2sql.secrets import SecretManager
-from nl2sql_adapter_sdk.schema import (
+from nl2sql_sdk.schema import (
     ColumnContract,
     SchemaContract,
     SchemaMetadata,

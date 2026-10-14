@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import List, Dict, Optional, Literal, Any
 from pydantic import BaseModel, Field
-from nl2sql_adapter_sdk.schema import TableRef, ColumnRef
+from nl2sql_sdk.schema import TableRef, ColumnRef
 
 
 class BaseChunk(BaseModel):

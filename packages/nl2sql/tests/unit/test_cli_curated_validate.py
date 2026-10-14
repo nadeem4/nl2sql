@@ -18,7 +18,7 @@ from nl2sql import CuratedAPI
 from nl2sql.cli.main import app
 from nl2sql.common.settings import settings
 from nl2sql.schema import SqliteSchemaStore
-from nl2sql_adapter_sdk.schema import (
+from nl2sql_sdk.schema import (
     SchemaContract,
     SchemaMetadata,
     SchemaSnapshot,

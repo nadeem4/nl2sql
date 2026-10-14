@@ -10,7 +10,7 @@ from nl2sql.execution.dag import ExecutionDAG
 from nl2sql.pipeline.plan_cache import PlanCache
 from nl2sql.pipeline.state import GraphState, SubgraphExecutionState
 from nl2sql.pipeline.subgraphs import SubgraphOutput
-from nl2sql_adapter_sdk.capabilities import DatasourceCapability
+from nl2sql_sdk.capabilities import DatasourceCapability
 import logging
 
 SQL_AGENT_SUBGRAPH = "sql_agent"

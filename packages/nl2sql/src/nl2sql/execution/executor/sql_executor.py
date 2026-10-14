@@ -7,10 +7,10 @@ from nl2sql.common.logger import get_logger
 from nl2sql.common.settings import settings
 from nl2sql.execution.contracts import ExecutorRequest, ExecutorResponse
 from nl2sql.execution.artifacts import build_artifact_store
-from nl2sql_adapter_sdk.capabilities import DatasourceCapability
+from nl2sql_sdk.capabilities import DatasourceCapability
 from nl2sql.datasources import DatasourceRegistry
-from nl2sql_adapter_sdk.contracts import AdapterRequest, ResultFrame
-from nl2sql_adapter_sdk.protocols import StreamingAdapterProtocol
+from nl2sql_sdk.contracts import AdapterRequest, ResultFrame
+from nl2sql_sdk.protocols import StreamingAdapterProtocol
 
 logger = get_logger("sql_executor")
 

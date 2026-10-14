@@ -6,7 +6,7 @@ from nl2sql.indexing.enrichment_service import (
     sanitize_enrichment,
     apply_enrichment,
 )
-from nl2sql_adapter_sdk.schema import (
+from nl2sql_sdk.schema import (
     SchemaSnapshot,
     SchemaContract,
     SchemaMetadata,

@@ -23,7 +23,7 @@ from nl2sql.pipeline.nodes.aggregator.node import EngineAggregatorNode
 from nl2sql.pipeline.nodes.aggregator.schemas import AggregatorResponse
 from nl2sql.pipeline.nodes.answer_synthesizer.node import AnswerSynthesizerNode
 from nl2sql.pipeline.state import GraphState
-from nl2sql_adapter_sdk.contracts import ResultFrame
+from nl2sql_sdk.contracts import ResultFrame
 
 TEMPLATE = "<tenant_id>/<request_id>/<sub_query_id>.parquet"
 

@@ -32,7 +32,7 @@ from nl2sql.pipeline.nodes.schema_retriever.node import SchemaRetrieverNode
 from nl2sql.pipeline.nodes.schema_retriever.schema import Column, Table
 from nl2sql.pipeline.nodes.validator.node import LogicalValidatorNode
 from nl2sql.pipeline.state import SubgraphExecutionState
-from nl2sql_adapter_sdk.schema import (
+from nl2sql_sdk.schema import (
     ColumnContract,
     ColumnMetadata,
     ColumnStatistics,

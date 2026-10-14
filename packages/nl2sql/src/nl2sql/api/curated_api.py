@@ -14,8 +14,8 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-from nl2sql_adapter_sdk.capabilities import DatasourceCapability
-from nl2sql_adapter_sdk.contracts import AdapterRequest
+from nl2sql_sdk.capabilities import DatasourceCapability
+from nl2sql_sdk.contracts import AdapterRequest
 
 from nl2sql.common.settings import settings
 from nl2sql.configs import ConfigManager

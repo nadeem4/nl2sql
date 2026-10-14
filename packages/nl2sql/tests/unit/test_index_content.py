@@ -14,7 +14,7 @@ import pytest
 from nl2sql.indexing.orchestrator import IndexingOrchestrator
 from nl2sql.schema import InMemorySchemaStore
 from nl2sql.schema.sqlite_store import SqliteSchemaStore
-from nl2sql_adapter_sdk.schema import (
+from nl2sql_sdk.schema import (
     ColumnContract,
     SchemaContract,
     SchemaMetadata,

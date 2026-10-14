@@ -22,7 +22,7 @@ from nl2sql.common.errors import ErrorCode, ErrorSeverity, PipelineError
 from nl2sql.common.logger import get_logger
 from nl2sql.pipeline.nodes.ast_planner.schemas import Expr, PlanModel, TableRef
 from nl2sql.pipeline.nodes.generator.node import _table
-from nl2sql_adapter_sdk.contracts import AdapterRequest
+from nl2sql_sdk.contracts import AdapterRequest
 
 logger = get_logger("value_check")
 

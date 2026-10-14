@@ -11,7 +11,7 @@ import types
 from sqlalchemy import event
 from sqlalchemy.dialects.mssql.pyodbc import MSDialect_pyodbc
 
-from nl2sql_adapter_sdk.contracts import AdapterRequest
+from nl2sql_sdk.contracts import AdapterRequest
 from nl2sql.adapters.duckdb.adapter import DuckdbAdapter
 from nl2sql.adapters.mssql.adapter import MssqlAdapter
 

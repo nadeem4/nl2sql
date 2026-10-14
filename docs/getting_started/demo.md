@@ -44,7 +44,7 @@ After `pip install "nl2sql-engine[demo]"` and `nl2sql demo`:
 
 The `demo` command and the `[demo]` extra arrive on PyPI with 0.2.0. If pip
 says `nl2sql-engine` has no `demo` extra, you have an earlier release: install
-from a clone with `pip install -e packages/adapter-sdk -e "packages/nl2sql[demo]"`.
+from a clone with `pip install -e packages/sdk -e "packages/nl2sql[demo]"`.
 
 ## 1. Install the CLI
 

@@ -14,7 +14,7 @@ from sqlalchemy import exc as sa_exc
 
 from nl2sql.adapters.sqlalchemy_base.adapter import BaseSQLAlchemyAdapter
 from nl2sql.adapters.sqlite.adapter import SqliteAdapter
-from nl2sql_adapter_sdk.contracts import AdapterRequest
+from nl2sql_sdk.contracts import AdapterRequest
 
 
 @pytest.fixture

@@ -2,7 +2,7 @@ from pydantic import BaseModel
 from typing import Optional, Any
 
 # Results and errors use the SDK's ResultFrame and ResultError
-# (nl2sql_adapter_sdk.contracts); these are the SQL-only extras.
+# (nl2sql_sdk.contracts); these are the SQL-only extras.
 
 
 class DryRunResult(BaseModel):

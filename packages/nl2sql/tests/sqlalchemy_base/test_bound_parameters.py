@@ -10,8 +10,8 @@ import pytest
 
 from nl2sql.adapters.sqlalchemy_base.adapter import BaseSQLAlchemyAdapter
 from nl2sql.adapters.sqlalchemy_base.models import CostEstimate, QueryPlan
-from nl2sql_adapter_sdk.capabilities import DatasourceCapability
-from nl2sql_adapter_sdk.contracts import AdapterRequest
+from nl2sql_sdk.capabilities import DatasourceCapability
+from nl2sql_sdk.contracts import AdapterRequest
 
 
 class _SQLiteAdapter(BaseSQLAlchemyAdapter):

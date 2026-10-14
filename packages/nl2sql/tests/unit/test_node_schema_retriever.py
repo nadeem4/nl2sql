@@ -6,7 +6,7 @@ import pytest
 from nl2sql.pipeline.nodes.schema_retriever.node import SchemaRetrieverNode
 from nl2sql.pipeline.nodes.decomposer.schemas import SubQuery
 from nl2sql.pipeline.state import SubgraphExecutionState
-from nl2sql_adapter_sdk.schema import (
+from nl2sql_sdk.schema import (
     SchemaSnapshot,
     SchemaContract,
     SchemaMetadata,

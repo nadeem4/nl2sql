@@ -276,7 +276,7 @@ def _album_artist_snapshot():
 
     Mirrors Chinook's ``Album.ArtistId -> Artist.ArtistId`` foreign key.
     """
-    from nl2sql_adapter_sdk.schema import (
+    from nl2sql_sdk.schema import (
         ColumnContract,
         ForeignKeyContract,
         SchemaContract,
@@ -285,7 +285,7 @@ def _album_artist_snapshot():
         TableContract,
         TableMetadata,
     )
-    from nl2sql_adapter_sdk.schema import TableRef as SdkTableRef
+    from nl2sql_sdk.schema import TableRef as SdkTableRef
 
     album = SdkTableRef(schema_name="main", table_name="Album")
     artist = SdkTableRef(schema_name="main", table_name="Artist")

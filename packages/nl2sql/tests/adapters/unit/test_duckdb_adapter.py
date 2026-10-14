@@ -1,7 +1,7 @@
 import pytest
 from sqlalchemy import text
 
-from nl2sql_adapter_sdk.contracts import AdapterRequest, ResultFrame
+from nl2sql_sdk.contracts import AdapterRequest, ResultFrame
 from nl2sql.adapters.duckdb.adapter import DuckdbAdapter
 
 from ..contract_harness import build_adapter

@@ -1108,6 +1108,9 @@ def test_two_engines_in_one_process_keep_their_own_config(tmp_path, fake_llm):
 
 ## 9. The SDK rename: `nl2sql-sdk`
 
+!!! note "Built"
+    The rename is built (PR 1). The `secrets` module comes with PR 4.
+
 | What | 0.4 | 0.5 |
 |---|---|---|
 | Distribution | `nl2sql-adapter-sdk` | `nl2sql-sdk` (free on PyPI on 2026-10-13) |
@@ -1115,7 +1118,7 @@ def test_two_engines_in_one_process_keep_their_own_config(tmp_path, fake_llm):
 | Folder | `packages/adapter-sdk/` | `packages/sdk/` |
 | Modules | `capabilities`, `contracts`, `protocols`, `schema` | the same four, plus `secrets` (the `SecretProvider` protocol). The `stores` and `policy` modules come in Phase 2. Everything is re-exported from `nl2sql_sdk`. |
 | Dependencies | `pydantic>=2.0` | unchanged: pydantic and the standard library only |
-| Engine dependency | `nl2sql-adapter-sdk~=0.1` | `nl2sql-sdk~=0.5.0` |
+| Engine dependency | `nl2sql-adapter-sdk~=0.1` | `nl2sql-sdk~=0.5.0`: the engine's own version as a compatible release, on a line release-please bumps |
 | Entry points | `nl2sql.adapters` | unchanged. Entry point groups name the engine's extension points, not the SDK package. |
 
 What has to change:

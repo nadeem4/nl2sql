@@ -18,7 +18,7 @@ We provide first-class support for the following SQL databases via SQLAlchemy.
 
 For developers building their own adapters, we provide detailed reference documentation for our core SDKs.
 
-* **[Adapter SDK Reference](sdk.md)**: The core interface (`DatasourceAdapter`) that all adapters must implement.
+* **[SDK Reference](sdk.md)**: The core interface (`DatasourceAdapterProtocol`, from `nl2sql-sdk`) that all adapters must implement.
 * **[SQLAlchemy Adapter Reference](sqlalchemy.md)**: The helper base class (`BaseSQLAlchemyAdapter`) for building SQL-based adapters.
 
 ## Missing your database?

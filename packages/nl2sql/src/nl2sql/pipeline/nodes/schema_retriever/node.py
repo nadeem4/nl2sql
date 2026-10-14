@@ -13,7 +13,7 @@ from nl2sql.common.settings import settings
 from nl2sql.context import NL2SQLContext
 from nl2sql.datasources.models import matches_table
 from .schema import Table, Column
-from nl2sql_adapter_sdk.schema import SchemaSnapshot, TableRef
+from nl2sql_sdk.schema import SchemaSnapshot, TableRef
 
 
 logger = get_logger("schema_retriever")
