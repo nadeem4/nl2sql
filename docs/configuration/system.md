@@ -166,7 +166,9 @@ below adds variables. The architecture tests enforce both
 Only the entry points load a `.env` file: the CLI, `nl2sql-api` and
 `nl2sql demo` load the `.env` **next to `nl2sql.yaml`** into the process
 environment at startup. A variable that is already set always wins; the file
-never overrides it.
+never overrides it. Each loads the `.env` before it configures logging, so a
+`NL2SQL_LOG_LEVEL` written there applies (`nl2sql demo` reads the demo
+project's `.env`, except with `--hosted`, which reads none).
 
 The library itself never reads a `.env` file. A Python caller that wants one
 loads it before building the engine:

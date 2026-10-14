@@ -170,3 +170,108 @@ def test_persisted_panel_key_is_the_real_value(tmp_path):
     persist_api_key(env_file, FAKE_KEY)
     assert env_file.read_text(encoding="utf-8") == f"OPENAI_API_KEY={FAKE_KEY}\n"
 
+
+# --- the typed config (nl2sql.config) -----------------------------------------
+#
+# A value written as a literal (or given in code, as the demo's key is) is
+# masked wherever the config prints; a ``${provider:key}`` reference is not a
+# secret and stays visible. The engine still reads the real value.
+
+
+def _config():
+    from nl2sql.config import (LLM, AgentLLM, Config, Datasource, Embeddings, Policies, SecretProviderConfig,
+                               Secrets, Storage)
+
+    return Config(
+        datasources=[Datasource(id="sales", type="postgres",
+                                connection={"host": "db.example", "user": "app", "password": FAKE_PASSWORD,
+                                            "token": "${env:SALES_TOKEN}"})],
+        llm=LLM(provider="openai", model="gpt-5.4", api_key=FAKE_KEY,
+                agents={"ast_planner": AgentLLM(provider="anthropic", api_key=FAKE_KEY + "-agent")}),
+        embeddings=Embeddings(provider="openai", api_key="${env:OPENAI_API_KEY}"),
+        policies=Policies(allow_all=True),
+        storage=Storage(path="."),
+        secrets=Secrets(providers=[SecretProviderConfig(id="vault", type="hashicorp", url="https://vault",
+                                                        token=FAKE_PASSWORD)]),
+    )
+
+
+def _printed(obj) -> str:
+    return "\n".join([repr(obj), str(obj), f"{obj}", f"{obj!r}"])
+
+
+def test_the_config_never_prints_a_key_or_a_password():
+    config = _config()
+    for obj in (config, config.llm, config.llm.agents["ast_planner"], config.datasources[0], config.secrets):
+        printed = _printed(obj)
+        assert FAKE_KEY not in printed, type(obj).__name__
+        assert FAKE_PASSWORD not in printed, type(obj).__name__
+
+
+def test_the_config_shows_references_and_everything_that_is_not_a_secret():
+    printed = _printed(_config())
+    assert "${env:OPENAI_API_KEY}" in printed
+    assert "${env:SALES_TOKEN}" in printed
+    assert "db.example" in printed and "gpt-5.4" in printed and "https://vault" in printed
+
+
+def test_the_config_still_holds_the_real_values():
+    config = _config()
+    assert config.llm.api_key == FAKE_KEY
+    assert config.llm.agents["ast_planner"].api_key == FAKE_KEY + "-agent"
+    assert config.datasources[0].connection["password"] == FAKE_PASSWORD
+    assert config.model_dump()["llm"]["api_key"] == FAKE_KEY
+
+
+# Short, so pydantic's error text cannot truncate it out of sight.
+SHORT_SECRET = "np-" + "z" * 5
+
+
+def _bad_llm():
+    from nl2sql.config import LLM
+    return LLM(api_key=SHORT_SECRET, model="")
+
+
+def _bad_agent():
+    from nl2sql.config import AgentLLM
+    return AgentLLM(temperature={"api_key": SHORT_SECRET})
+
+
+def _bad_datasource():
+    from nl2sql.config import Datasource
+    return Datasource(connection={"password": SHORT_SECRET}, id="sales")
+
+
+def _bad_secret_provider():
+    from nl2sql.config import SecretProviderConfig
+    return SecretProviderConfig(token=SHORT_SECRET, id="")
+
+
+@pytest.mark.parametrize("build", [_bad_llm, _bad_agent, _bad_datasource, _bad_secret_provider])
+def test_a_config_error_never_prints_the_value(build):
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError) as caught:
+        build()
+    text = f"{caught.value}\n{caught.value!r}"
+    assert SHORT_SECRET not in text
+
+
+def test_a_demo_key_given_in_memory_never_prints_from_the_engine(tmp_path):
+    from langchain_core.embeddings import DeterministicFakeEmbedding
+
+    from nl2sql import NL2SQL
+    from nl2sql.cli.demo.llm_config import with_api_keys
+    from nl2sql.config import Embeddings
+    from nl2sql.testing.config import make_config
+
+    config = make_config(tmp_path)
+    config = config.model_copy(update={"llm": with_api_keys(config.llm, {"openai": FAKE_KEY}),
+                                       "embeddings": Embeddings(instance=DeterministicFakeEmbedding(size=8))})
+    engine = NL2SQL(config)
+    try:
+        assert engine.config.llm.api_key == FAKE_KEY
+        assert FAKE_KEY not in _printed(engine.config)
+    finally:
+        engine.close()
+

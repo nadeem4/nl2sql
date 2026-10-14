@@ -204,7 +204,7 @@ available.
 | Rule | Detail |
 |---|---|
 | **Whole value only** | A reference is the entire string. `"postgres://${env:U}@db"` is an error. There is no default syntax (`${env:X:-y}`). |
-| **Secrets resolve late** | Fields of type `Secret` (every `api_key`, the secret providers' credentials) and every value under a datasource's `connection` hold the reference, not the value. They are resolved when the component is built, so `engine.config`, logs and errors never contain a plaintext secret. |
+| **Secrets resolve late** | Fields of type `Secret` (every `api_key`, the secret providers' credentials) and every value under a datasource's `connection` hold the reference, not the value. They are resolved when the component is built, so `engine.config`, logs and errors never contain a plaintext secret. A value written literally (or given in code, as the demo gives its key) stays a plain `str` the engine reads, and `repr`/`str` print it as `**********`: a `Secret` field always, and under `connection` or a secret provider's settings, a key whose name contains `password`, `secret`, `token` or `api_key`. A reference prints as written. A validation error never echoes its input (`hide_input_in_errors`). |
 | **Everything else resolves at load** | Any other field, for example `storage.path: "${env:NL2SQL_DATA_DIR}"`, is resolved by `load_config`. A missing variable is a load error that names the field. |
 | **Inside `secrets:`** | Only `${env:...}` is allowed, because one provider cannot depend on another. |
 
@@ -534,8 +534,10 @@ and the OpenTelemetry SDK still read their own standard variables.
     `test_only_entry_points_load_dotenv` allows `load_dotenv` only in
     `nl2sql/config/loader.py` (`load_env_file`), and `load_env_file` only in
     `cli/main.py`, `cli/commands/demo.py` and `nl2sql_api/main.py`.
-    `nl2sql-api` now loads the `.env` before `configure_logging()`, so a
-    `NL2SQL_LOG_LEVEL` there applies.
+    Every entry point loads the `.env` before `configure_logging()`, so a
+    `NL2SQL_LOG_LEVEL` there applies: `nl2sql-api` in its lifespan, the CLI
+    in its global callback (once `--config` is known), and `nl2sql demo`
+    again after it loads the demo project's `.env`.
 
 Only the entry points load `.env` (owner decision 2):
 - The CLI, `nl2sql-api` and the demo load the `.env` next to `nl2sql.yaml`

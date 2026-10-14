@@ -78,7 +78,7 @@ from nl2sql.cli.demo.llm_config import point_llm_config_at as _point_llm_config_
 from nl2sql.cli.demo.defaults import DEFAULT_QUESTIONS_PER_MINUTE, DEFAULT_QUESTIONS_PER_SESSION
 from nl2sql.cli.demo.stamp import outdated_warning, write_stamp
 from rich.markup import escape
-from nl2sql import load_env_file
+from nl2sql import configure_logging, load_env_file
 from nl2sql.llm.replay import RecordingProxy, ReplayStore
 from nl2sql.testing.fake_llm import FakeLLMServer
 
@@ -439,6 +439,9 @@ def demo_command(
         # The keys saved in .env: a node the settings panel put on another
         # provider reads that provider's key. A key already set wins.
         load_env_file(config_path)
+        # Again, now that the project's .env is loaded: a NL2SQL_LOG_LEVEL
+        # written there applies.
+        configure_logging()
     if key_source == "flag":
         # The flag beats an exported key, so it travels in the engine's LLM
         # config as a value rather than through the environment.

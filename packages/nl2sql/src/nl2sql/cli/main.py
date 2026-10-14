@@ -80,6 +80,11 @@ def global_callback(
     """
     ctx.obj = {"config": config}
     load_env_file(config)
+    # After the .env, so a NL2SQL_LOG_LEVEL written there applies. The library
+    # never configures logging on import: the entry point owns it. A command
+    # that builds the engine switches to JSON logs when its config's
+    # settings.observability.exporter is otlp (cli/common/engine.py).
+    configure_logging()
 
 
 @app.command()
@@ -421,11 +426,7 @@ def benchmark(
 
 
 def main():
-    # The library no longer configures logging on import, so the application
-    # entry point owns it: without this call the CLI emits no log output. A
-    # command that builds the engine switches to JSON logs when its config's
-    # settings.observability.exporter is otlp (cli/common/engine.py).
-    configure_logging()
+    # Logging is configured in global_callback, once the .env is loaded.
     # Before any command writes: rich emits symbols a legacy Windows code page
     # cannot encode, and an unconfigured stream turns that into a crash.
     configure_output_encoding()

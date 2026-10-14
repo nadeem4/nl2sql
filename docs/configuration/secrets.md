@@ -98,15 +98,27 @@ contrast, leaves the others running: see
 
 ## Secrets never print
 
-Credentials are held as pydantic `SecretStr`, so `repr`, `str`, log lines and
-tracebacks show `**********` instead of the value:
+A credential written as a value never prints: `repr`, `str`, log lines and
+tracebacks of the config show `**********` instead. A `${provider:key}`
+reference is not a secret and is shown as written. This covers:
 
-- `api_key` in the `llm` and `embeddings` sections, which hold the reference,
-  and the resolved key the LLM registry builds a client from (`AgentConfig`),
-  including `model_dump(mode="json")` and `model_dump_json()`;
-- `client_secret` (Azure) and `token` (HashiCorp) in the `secrets` section;
-- datasource connection fields whose name contains `password`, `secret`,
-  `token` or `api_key` (masked in the connection config's `repr`/`str`).
+- `api_key` in `llm`, in each of `llm.agents`, and in `embeddings`, including
+  a key the demo gives the engine in memory (`nl2sql demo --api-key`, or one
+  saved in the playground's settings panel): `repr(engine.config)` never
+  shows it;
+- in the `secrets` section, every provider setting whose name contains
+  `password`, `secret`, `token` or `api_key` (`client_secret` for Azure,
+  `token` for HashiCorp); the URL and the other settings still show;
+- in a datasource's `connection`, every field whose name contains one of the
+  same words;
+- the resolved key the LLM registry builds a client from (`AgentConfig`, a
+  pydantic `SecretStr`), including `model_dump(mode="json")` and
+  `model_dump_json()`.
+
+The config's own fields stay plain strings, so the engine (and
+`config.model_dump()`) reads the real value; only printing masks it. A
+config built in code that fails validation never echoes its input either:
+the error names the field and the problem, not the value.
 
 The real value is read only where it is used: building the LLM or embeddings
 client, a database connection, the artifact store's storage options or a
