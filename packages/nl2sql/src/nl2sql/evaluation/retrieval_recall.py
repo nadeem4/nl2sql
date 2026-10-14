@@ -32,7 +32,7 @@ import pathlib
 import uuid
 from typing import Any, Dict, List, Optional, Sequence
 
-from nl2sql.auth import UserContext
+from nl2sql.policies import UserContext
 from nl2sql.runtime import Runtime
 from nl2sql.evaluation.gold import GOLD_DATASET_PATH, GoldQuestion, load_gold_dataset
 

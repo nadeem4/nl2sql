@@ -12,7 +12,9 @@ import pytest
 import sqlglot
 from sqlglot import exp
 
+from nl2sql.config import Policies, Role
 from nl2sql.datasets.chinook import CHINOOK_POLICIES, CHINOOK_QUESTIONS
+from nl2sql.policies import PolicyEngine, UserContext
 from nl2sql.evaluation.gold import (
     CHINOOK_DB_PATH,
     GOLD_DATASET_PATH,
@@ -39,9 +41,12 @@ def _schema() -> dict[str, set[str]]:
 SCHEMA = _schema()
 
 
+POLICY = PolicyEngine(Policies(roles={name: Role(**role) for name, role in CHINOOK_POLICIES.items()}))
+
+
 def _allowed(role: str, tables: list[str]) -> bool:
-    allowed = CHINOOK_POLICIES[role]["allowed_tables"]
-    return "*" in allowed or all(f"chinook.{t}" in allowed for t in tables)
+    scope = POLICY.scope(UserContext(roles=[role]), "chinook")
+    return all(scope.allows(None, t) for t in tables)
 
 
 def _sorted_rows(rows: list[dict]) -> list[tuple]:
@@ -148,7 +153,7 @@ def test_rbac_denial_tag_marks_exactly_the_refused_questions():
 
 
 def test_every_restricted_role_is_refused_somewhere():
-    restricted = {r for r, p in CHINOOK_POLICIES.items() if "*" not in p["allowed_tables"]}
+    restricted = {r for r, p in CHINOOK_POLICIES.items() if p["allow"] != ["*"] or p.get("deny")}
     for role in restricted:
         assert any(q.expected[role] == "refused" for q in DATASET), role
 

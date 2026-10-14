@@ -7,7 +7,7 @@ import uuid
 from pydantic import BaseModel, ConfigDict, Field
 
 from nl2sql.common.errors import PipelineError
-from nl2sql.auth import UserContext
+from nl2sql.policies import UserContext
 from nl2sql.pipeline.nodes.curated_matcher.schemas import VerifiedMatch
 from nl2sql.pipeline.nodes.datasource_resolver.schemas import DatasourceResolverResponse
 from nl2sql.pipeline.nodes.decomposer.schemas import DecomposerResponse, SubQuery

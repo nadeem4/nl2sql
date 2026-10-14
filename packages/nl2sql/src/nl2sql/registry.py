@@ -17,7 +17,7 @@ import importlib.util
 from importlib.metadata import EntryPoint, entry_points
 from typing import Any, Callable, Dict, List, Literal, Optional, Tuple
 
-Kind = Literal["adapter", "llm", "embeddings", "secrets", "store"]
+Kind = Literal["adapter", "llm", "embeddings", "secrets", "store", "policy_check"]
 
 # The entry point group each kind is installed under.
 GROUPS: Dict[str, str] = {
@@ -26,11 +26,13 @@ GROUPS: Dict[str, str] = {
     "embeddings": "nl2sql.embeddings",
     "secrets": "nl2sql.secrets",
     "store": "nl2sql.stores",
+    "policy_check": "nl2sql.policy_checks",
 }
 
 # The interface version this engine was built for, per kind. Anything else is
 # a load error: there are no minor versions and no window for old ones.
-INTERFACE_VERSIONS: Dict[str, int] = {"adapter": 1, "llm": 2, "embeddings": 2, "secrets": 1, "store": 1}
+INTERFACE_VERSIONS: Dict[str, int] = {"adapter": 1, "llm": 2, "embeddings": 2, "secrets": 1, "store": 1,
+                                   "policy_check": 1}
 
 # How a kind reads in a message.
 _LABELS: Dict[str, str] = {
@@ -39,6 +41,7 @@ _LABELS: Dict[str, str] = {
     "embeddings": "embeddings provider",
     "secrets": "secret provider",
     "store": "store",
+    "policy_check": "policy check",
 }
 
 # The attribute naming the modules a kind needs before it can be built.
@@ -77,7 +80,7 @@ def _installed(module: str) -> bool:
 
 
 class Registry:
-    """Name -> code, per kind: adapters, LLM providers, embeddings providers, secret providers, stores."""
+    """Name -> code, per kind: adapters, LLM providers, embeddings providers, secret providers, stores, policy checks."""
 
     def __init__(self) -> None:
         self._installed: Dict[str, Dict[str, List[_Entry]]] = {kind: {} for kind in GROUPS}
@@ -119,6 +122,9 @@ class Registry:
     def add_store(self, name: str, cls: type, *, replace: bool = False) -> None:
         self._add("store", name, cls, replace)
 
+    def add_policy_check(self, name: str, cls: type, *, replace: bool = False) -> None:
+        self._add("policy_check", name, cls, replace)
+
     def adapter(self, name: str) -> Callable[[Any], Any]:
         return self._decorator("adapter", name)
 
@@ -133,6 +139,9 @@ class Registry:
 
     def store(self, name: str) -> Callable[[Any], Any]:
         return self._decorator("store", name)
+
+    def policy_check(self, name: str) -> Callable[[Any], Any]:
+        return self._decorator("policy_check", name)
 
     def _decorator(self, kind: str, name: str) -> Callable[[Any], Any]:
         def register(target: Any) -> Any:

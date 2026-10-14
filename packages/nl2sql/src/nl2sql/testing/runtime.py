@@ -8,6 +8,7 @@ from typing import Any, Dict, Optional, Union
 
 from nl2sql.config import LLM, Config, Embeddings, Policies, Settings, Storage
 from nl2sql.execution.artifacts import ArtifactStore, ArtifactStoreConfig
+from nl2sql.policies import PolicyEngine
 
 
 class FakeRuntime(SimpleNamespace):
@@ -20,6 +21,11 @@ class FakeRuntime(SimpleNamespace):
     @property
     def tenant_id(self) -> str:
         return self.config.settings.tenant_id
+
+    @property
+    def policy_engine(self) -> PolicyEngine:
+        """Built from ``config.policies`` and ``ds_registry``, as the runtime builds it."""
+        return PolicyEngine(self.config.policies, getattr(self, "ds_registry", None))
 
     def derive(self, changes: Dict[str, Any]) -> "FakeRuntime":
         """A copy with the derived config, as ``Runtime.derive``; other attributes are shared.
@@ -43,7 +49,9 @@ def fake_runtime(*, settings: Union[Settings, dict, None] = None, policies: Unio
     (``{"results": {"row_limit": 5}}``) or as models; both default to their
     defaults. ``results`` is the results folder (``ctx.artifact_store``), a new
     temporary folder by default, as is ``traces_dir``. Every other keyword becomes an attribute:
-    ``ds_registry``, ``rbac``, ``llm_registry``, ``vector_store`` and so on.
+    ``ds_registry``, ``llm_registry``, ``vector_store`` and so on. ``policy_engine`` is
+    built from ``policies`` (which read nothing by default; ``{"allow_all": True}``
+    reads everything).
     """
     settings = settings if isinstance(settings, Settings) else Settings.model_validate(settings or {})
     policies = policies if isinstance(policies, Policies) else Policies.model_validate(policies or {})

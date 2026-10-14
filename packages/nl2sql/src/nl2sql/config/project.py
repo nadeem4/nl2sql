@@ -195,8 +195,8 @@ POLICIES_HEADER = """\
 # roles:
 #   analyst:
 #     description: Sales, except the audit schema
-#     allowed_datasources: [example]
-#     allowed_tables: ["example.*"]
+#     allow: [example]
+#     deny: ["example.audit.*"]
 """
 
 EMBEDDINGS_HEADER = """\

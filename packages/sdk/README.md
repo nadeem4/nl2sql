@@ -2,7 +2,8 @@
 
 The interfaces an extension for the
 [nl2sql engine](https://github.com/nadeem4/nl2sql) implements: database
-adapters and secret providers. The import package is `nl2sql_sdk`. It depends
+adapters, secret providers, stores and policy checks. The import package is
+`nl2sql_sdk`. It depends
 on pydantic and the standard library only, so an extension built against it
 inherits nothing else.
 
@@ -17,6 +18,10 @@ inherits nothing else.
   describes its schema with.
 - `SecretProvider`: `interface_version = 1`, a strict `config_model` for its
   block in the secrets config, `from_config(cfg)` and `get_secret(key)`.
+- `nl2sql_sdk.stores`: the index, state, trace and results store interfaces.
+- `nl2sql_sdk.policy`: `PolicyCheck` (`interface_version = 1`, a strict
+  `config_model`, `from_config(cfg)` and `grant(user, datasource_id)`), with
+  `UserContext` and `Grant`.
 
 An adapter is published as an `nl2sql.adapters` entry point, and the engine
 finds it there; it never imports an adapter by name.

@@ -245,9 +245,8 @@ def test_llm_replace_never_reads_the_environment_outside_a_secret_field(tmp_path
 # ---------------------------------------------------------------- policies
 
 POLICIES = {"roles": {
-    "analyst": {"description": "Reads customers", "allowed_datasources": ["shop"],
-                "allowed_tables": ["shop.customers"]},
-    "admin": {"description": "Everything", "allowed_datasources": ["*"], "allowed_tables": ["*"]},
+    "analyst": {"description": "Reads customers", "allow": ["shop.main.customers"]},
+    "admin": {"description": "Everything", "allow": ["*"]},
 }}
 
 
@@ -266,20 +265,25 @@ def test_policies_allows_checks_one_table(tmp_path):
         assert not engine.policies.allows(analyst, "shop", "orders")
 
 
-def test_policies_allowed_lists_what_a_caller_may_read(tmp_path):
+def test_policies_scope_is_what_a_caller_may_read_in_one_datasource(tmp_path):
     with _engine(tmp_path, policies=POLICIES) as engine:
-        allowed = engine.policies.allowed(UserContext(roles=["analyst"]))
+        scope = engine.policies.scope(UserContext(roles=["analyst"]), "shop")
+        other = engine.policies.scope(UserContext(roles=["analyst"]), "elsewhere")
 
-    assert allowed == {"datasources": ["shop"], "tables": ["shop.customers"]}
+    assert scope.reaches_datasource() and scope.allows("main", "customers")
+    assert not scope.allows("main", "orders")
+    assert "no allow pattern" in scope.rule_for("main", "orders")
+    assert not other.reaches_datasource()
 
 
-def test_policies_validate_flags_a_rule_for_an_unknown_datasource(tmp_path):
-    policies = {"roles": {"analyst": {"description": "x", "allowed_datasources": ["ghost"]}}}
+def test_policies_validate_flags_a_pattern_for_an_unknown_datasource(tmp_path):
+    policies = {"roles": {"analyst": {"description": "x", "allow": ["ghost", "shop.main.*"], "deny": ["*.audit.*"]}}}
     with _engine(tmp_path, policies=policies) as engine:
         report = engine.policies.validate()
 
     assert not report.ok
-    assert [e.status for e in report.entries] == ["MISSING"]
+    assert [(e.target, e.status) for e in report.entries] == [
+        ("Allow: ghost", "MISSING"), ("Allow: shop.main.*", "OK"), ("Deny: *.audit.*", "OK")]
 
 
 # ---------------------------------------------------------------- curated

@@ -28,26 +28,25 @@ CHINOOK_DATASOURCE = {
     "description": "Chinook digital music store: artists, albums, tracks, genres, playlists, customers, employees, invoices and invoice lines",
 }
 
-CHINOOK_ALL = ["Album", "Artist", "Customer", "Employee", "Genre", "Invoice", "InvoiceLine", "MediaType", "Playlist", "PlaylistTrack", "Track"]
 _CATALOG = ["Album", "Artist", "Genre", "MediaType", "Playlist", "PlaylistTrack", "Track"]
 
-# The tables each demo role may read. The same shape is defined for the other
-# two demo databases, and ``nl2sql.datasets.demo`` merges the three into the
-# demo's policies.
-CHINOOK_TABLES_BY_ROLE = {
-    "analyst": [t for t in CHINOOK_ALL if t != "Employee"],
-    "viewer": list(_CATALOG),
+# What each demo role may read in Chinook, as policy patterns. Every table is
+# in SQLite's ``main`` schema. The analyst reads the whole database but the
+# employee records; the viewer reads the music catalog and nothing else. The
+# same shape is defined for the other two demo databases, and
+# ``nl2sql.datasets.demo`` merges the three into the demo's policies.
+CHINOOK_ROLES = {
+    "analyst": {"allow": ["chinook"], "deny": ["chinook.main.Employee"]},
+    "viewer": {"allow": [f"chinook.main.{t}" for t in _CATALOG]},
 }
 
 # Chinook on its own, as the tier 1 gold evaluation reads it. The demo project
 # gets ``nl2sql.datasets.demo.DEMO_POLICIES``, which covers all three
 # databases and grants the same Chinook tables to each role.
 CHINOOK_POLICIES = {
-    "admin": {"description": "Every table", "allowed_datasources": ["*"], "allowed_tables": ["*"]},
-    "analyst": {"description": "Everything except employee records", "allowed_datasources": ["chinook"],
-                "allowed_tables": [f"chinook.{t}" for t in CHINOOK_TABLES_BY_ROLE["analyst"]]},
-    "viewer": {"description": "Music catalog only, no customers or sales", "allowed_datasources": ["chinook"],
-               "allowed_tables": [f"chinook.{t}" for t in CHINOOK_TABLES_BY_ROLE["viewer"]]},
+    "admin": {"description": "Every table", "allow": ["*"]},
+    "analyst": {"description": "Everything except employee records", **CHINOOK_ROLES["analyst"]},
+    "viewer": {"description": "Music catalog only, no customers or sales", **CHINOOK_ROLES["viewer"]},
 }
 
 CHINOOK_QUESTIONS = [

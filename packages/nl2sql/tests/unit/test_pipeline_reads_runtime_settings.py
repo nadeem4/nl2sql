@@ -58,7 +58,7 @@ def test_two_runtimes_in_one_process_cap_rows_at_their_own_ceiling():
 
 def test_the_validator_takes_strict_columns_and_the_refusal_policy_from_its_runtime():
     def node(strict, names_tables):
-        ctx = SimpleNamespace(ds_registry=SimpleNamespace(), rbac=SimpleNamespace(),
+        ctx = SimpleNamespace(ds_registry=SimpleNamespace(), policy_engine=SimpleNamespace(),
                               settings=_settings(pipeline={"strict_columns": strict}),
                               config=SimpleNamespace(policies=Policies(refusal_names_tables=names_tables)))
         return LogicalValidatorNode(ctx)

@@ -148,7 +148,7 @@ def test_a_name_in_code_replaces_an_installed_one_only_when_asked(monkeypatch):
     assert registry.load("adapter", "postgres") is mine
 
 
-@pytest.mark.parametrize("kind", ["llm", "embeddings", "secrets"])
+@pytest.mark.parametrize("kind", ["llm", "embeddings", "secrets", "policy_check"])
 def test_every_kind_has_add_and_a_decorator(kind):
     registry = Registry.empty()
     thing = types.SimpleNamespace(interface_version=registry_module.INTERFACE_VERSIONS[kind], requires=(),

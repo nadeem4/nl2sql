@@ -1,0 +1,118 @@
+# The real-database test bed: PostgreSQL with Pagila, MySQL with Sakila and
+# SQL Server 2022 with AdventureWorksLT, each with the generated wide schema.
+# The same file runs on your machine, in CI and on the GCP VM.
+#
+#   python testbed/passwords.py > testbed/.env     # once; compose reads it by itself
+#   docker compose -f testbed/docker-compose.yml up -d --wait
+#   REALDB=compose pytest -m realdb                 # with testbed/.env's variables exported
+#   docker compose -f testbed/docker-compose.yml down        # add -v to drop the data
+#
+# Loading happens once per data volume, so a second `up` is quick, and it
+# keeps the passwords the volume was created with.
+# docs/testing/test-bed.md has the details; docs/architecture/phase2.md,
+# section 3, has the design.
+#
+# There is no default password, so none is written in the repository: the
+# three TESTBED_*_PASSWORD variables are required. CI generates new ones for
+# every run.
+
+name: nl2sql-testbed
+
+services:
+  # One-shot: downloads the pinned samples, checks their SHA-256 and writes the
+  # wide schema for each server. Skips what is already in the volume.
+  samples:
+    image: python:3.12-slim
+    command: ["python", "/testbed/samples.py", "/samples"]
+    volumes:
+      - ./:/testbed:ro
+      - samples:/samples
+    restart: "no"
+
+  postgres:
+    image: postgres:16
+    depends_on:
+      samples:
+        condition: service_completed_successfully
+    environment:
+      POSTGRES_PASSWORD: ${TESTBED_POSTGRES_PASSWORD:?}
+    ports:
+      - "${TESTBED_BIND:-127.0.0.1}:15432:5432"
+    volumes:
+      - samples:/samples:ro
+      - ./postgres/init.sh:/docker-entrypoint-initdb.d/init.sh:ro
+      - postgres-data:/var/lib/postgresql/data
+    # The image's init runs on a server listening on a socket only, so TCP
+    # answers only once every init script has finished.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 120
+
+  mysql:
+    image: mysql:8.0
+    depends_on:
+      samples:
+        condition: service_completed_successfully
+    # A test bed trades durability for loading speed: without these, MySQL
+    # syncs the disk on every one of the wide schema's 1,200 CREATE TABLEs.
+    command: ["--skip-log-bin", "--innodb-flush-log-at-trx-commit=0", "--innodb-doublewrite=OFF",
+              "--innodb-redo-log-capacity=1073741824"]
+    environment:
+      MYSQL_ROOT_PASSWORD: ${TESTBED_MYSQL_PASSWORD:?}
+    ports:
+      - "${TESTBED_BIND:-127.0.0.1}:13306:3306"
+    volumes:
+      - samples:/samples:ro
+      - ./mysql/init.sh:/docker-entrypoint-initdb.d/init.sh:ro
+      - mysql-data:/var/lib/mysql
+    # As with PostgreSQL, the init server skips networking.
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 120
+
+  mssql:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    depends_on:
+      samples:
+        condition: service_completed_successfully
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: Developer
+      MSSQL_SA_PASSWORD: ${TESTBED_MSSQL_PASSWORD:?}
+    ports:
+      - "${TESTBED_BIND:-127.0.0.1}:11433:1433"
+    volumes:
+      # The server itself reads the .bak during RESTORE.
+      - samples:/samples:ro
+      - mssql-data:/var/opt/mssql
+    # Healthy only once mssql-init has finished: it creates the reader login last.
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -C -b -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -Q \"IF SUSER_ID('nl2sql_reader') IS NULL THROW 50000, 'not loaded yet', 1\""]
+      interval: 5s
+      timeout: 10s
+      retries: 180
+
+  # One-shot: restores AdventureWorksLT, loads the wide schema and creates the
+  # reader login. Skips each database that already exists.
+  mssql-init:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    depends_on:
+      mssql:
+        condition: service_started
+    entrypoint: ["/bin/bash", "/testbed/mssql/init.sh"]
+    environment:
+      MSSQL_SA_PASSWORD: ${TESTBED_MSSQL_PASSWORD:?}
+    volumes:
+      - ./:/testbed:ro
+      - samples:/samples:ro
+    restart: "no"
+
+volumes:
+  samples:
+  postgres-data:
+  mysql-data:
+  mssql-data:

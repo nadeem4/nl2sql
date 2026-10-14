@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Union
 from nl2sql.runtime import Runtime, _config_agent_names
 
 if TYPE_CHECKING:
-    from nl2sql.auth import UserContext
+    from nl2sql.policies import UserContext
     from nl2sql.config import LLM
     from nl2sql.llm.llm_set import LLMChange
 

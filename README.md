@@ -599,7 +599,7 @@ exist, but the guided connect-scan-review flow arrives in a later release.
 ## Contributing and license
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for local setup and test markers
-(`pytest -m "not integration"` runs without a database or key).
+(`pytest -m "not integration and not realdb"` runs without a database or key).
 [`CLAUDE.md`](CLAUDE.md) is the short form of the rules a change has to keep —
 package boundaries, no dialect outside an adapter, validation before
 generation — and most of them are enforced, not just written down:

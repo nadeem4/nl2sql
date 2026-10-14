@@ -153,8 +153,8 @@ At question time a preferred table is ranked first:
   added when its similarity is within 0.05 (`PREFERRED_MARGIN`) of the least
   similar table picked.
 
-Nothing about RBAC changes: a preferred table the role may not read is
-withheld exactly like any other (`SchemaRetrieverNode._withhold_unreadable`).
+Nothing about access changes: a preferred table the caller's scope denies is
+hidden from the planner exactly like any other.
 
 ## Validation
 
@@ -278,8 +278,8 @@ decomposer, means a verified answer also skips the resolver's answerability
 call: a verified answer costs two model calls (the match and the reply)
 instead of four or more. The matcher does the one thing from the resolver it
 needs itself: it limits the search to datasources the role may read,
-`rbac.get_allowed_datasources(user_context)`, before searching, so
-*Datasource access is RBAC-gated* holds on this path too and the model only
+`Scope.reaches_datasource()` for each datasource, before searching, so
+*Datasource access is policy-gated* holds on this path too and the model only
 ever sees candidates from readable datasources. When the caller pinned a
 datasource (`GraphState.datasource_id`), only that one is searched.
 
@@ -361,10 +361,10 @@ reply from the preview, as today.
    required param (no default) left empty all fall back. A param the model
    left out takes its default.
 5. **Access.** Every table the SQL reads (sqlglot `exp.Table` nodes, CTE names
-   excluded) must pass `table_allowed()` with its schema (the datasource's
-   default schema when the SQL names none), the function the logical
-   validator and executor already use. If one does
-   not, the run falls back, and the normal pipeline then enforces RBAC as it
+   excluded) must pass `Scope.allows()` with its schema (the datasource's
+   default schema when the SQL names none), the scope the logical
+   validator and executor already ask. If one does
+   not, the run falls back, and the normal pipeline then enforces the policy as it
    always does. The user is not told a verified query exists that they may
    not use.
 6. **Run.** The saved SQL runs with the bound params through
@@ -437,7 +437,7 @@ generated SQL does not need:
   `Alter`, `Command`). This is checked at load and again before running. The
   datasource's own read-only connection (for SQLite `options.read_only`) and
   database grants stay the backstop, as they are for generated SQL.
-- **RBAC.** Every table read must be allowed for the asker (step 5 above). A
+- **Policies.** Every table read must be allowed for the asker (step 5 above). A
   view is checked by its own name, as policies name it; what the view reads
   underneath is the database's grant to decide.
 - **Row limit.** The row ceiling is the one the generator uses:
@@ -613,7 +613,7 @@ No invariant is weakened. PR 3 made these changes in
   curated config model, the read-only check and the matcher.
 - **SQL Generation Enforces a Row Limit Cap** extends to verified SQL, through
   the executor's `max_rows`.
-- **Datasource Access Is RBAC-Gated** gains the matcher as an enforcement
+- **Datasource Access Is Policy-Gated** gains the matcher as an enforcement
   point.
 - [`determinism.md`](determinism.md)'s "the AST is checked ... before any SQL
   exists, on every path" becomes "on every generated path"; a verified path
@@ -727,7 +727,7 @@ both the full-snapshot and the retrieval paths, planner instruction 14, views
 in the SQLAlchemy base adapter's snapshot, and the index health warning for a
 preferred table that is not indexed.
 Tests: `tests/unit/test_schema_retriever_preferred.py` (ordering, the
-*preferred* marker, an unreadable preferred table still withheld),
+*preferred* marker, a denied preferred table still hidden),
 `tests/unit/test_datasource_preferred_tables.py` (config, registry, warning)
 and `tests/adapters/unit/test_snapshot_views.py` (SQLite and DuckDB).
 

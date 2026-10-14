@@ -15,6 +15,7 @@ from nl2sql.indexing.orchestrator import IndexingOrchestrator
 from nl2sql.pipeline.nodes.decomposer.schemas import SubQuery
 from nl2sql.pipeline.nodes.schema_retriever.node import SchemaRetrieverNode
 from nl2sql.pipeline.state import SubgraphExecutionState
+from nl2sql.policies import UserContext
 
 
 def _project_root() -> Path:
@@ -70,6 +71,8 @@ def test_schema_retriever_real_data(indexed_env, datasource_id, user_query) -> N
     state = SubgraphExecutionState(
         trace_id="t",
         sub_query=SubQuery(id="sq1", datasource_id=datasource_id, intent=user_query),
+        # The demo has no default role, and a caller with none reads nothing.
+        user_context=UserContext(roles=["admin"]),
     )
 
     result = node(state)

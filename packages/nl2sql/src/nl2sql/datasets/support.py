@@ -28,16 +28,14 @@ SUPPORT_DATASOURCE = {
     ),
 }
 
-# Every table in the database, and the subsets each demo role may read.
-SUPPORT_ALL = ["agents", "customers", "ticket_messages", "tickets"]
-
-SUPPORT_TABLES_BY_ROLE = {
+# What each demo role may read here, as policy patterns.
+SUPPORT_ROLES = {
     # Analysts get the whole desk except the agents themselves, mirroring
     # Chinook's analyst, who cannot read Employee.
-    "analyst": [t for t in SUPPORT_ALL if t != "agents"],
+    "analyst": {"allow": ["support"], "deny": ["support.main.agents"]},
     # The viewer role reads no support data at all: every table here is either
     # customer data or the text of a customer's messages.
-    "viewer": [],
+    "viewer": {"allow": []},
 }
 
 SUPPORT_QUESTIONS = [

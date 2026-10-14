@@ -280,7 +280,7 @@ def recorded_run_date(doc: Dict[str, Any]) -> Optional[_dt.date]:
 def replay_trace(doc: Dict[str, Any], ctx: Any) -> ReplayReport:
     """Re-runs the traced question, answering every LLM call from the recording."""
     from nl2sql.api.query_api import result_from_state
-    from nl2sql.auth import UserContext
+    from nl2sql.policies import UserContext
     from nl2sql.pipeline.runtime import run_with_graph
 
     # The replay runs on a runtime of its own (``ctx.derive``): the engine's

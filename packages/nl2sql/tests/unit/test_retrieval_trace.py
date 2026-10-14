@@ -176,7 +176,7 @@ def test_the_inspector_honours_k_and_fetch_k(tmp_path):
 
 from types import SimpleNamespace  # noqa: E402
 
-from nl2sql.auth import UserContext  # noqa: E402
+from nl2sql.policies import UserContext  # noqa: E402
 from nl2sql.pipeline.nodes.datasource_resolver.node import DatasourceResolverNode  # noqa: E402
 from nl2sql.pipeline.nodes.decomposer.schemas import SubQuery  # noqa: E402
 from nl2sql.pipeline.nodes.schema_retriever.node import SchemaRetrieverNode  # noqa: E402
@@ -200,13 +200,13 @@ def _resolver(store, ds_ids=("chinook", "sales")):
     llm = ChatOpenAI(model="gpt-4o", api_key="sk-fake-never-called")
     node = DatasourceResolverNode(fake_runtime(
         vector_store=store,
-        rbac=SimpleNamespace(get_allowed_datasources=lambda _ctx: ["*"]),
+        policies={"allow_all": True},
         ds_registry=SimpleNamespace(list_ids=lambda: list(ds_ids)),
         schema_store=SimpleNamespace(get_latest_version=lambda _id: "v1", get_latest_snapshot=lambda _id: None),
         llm_registry=SimpleNamespace(get_llm=lambda _name: llm),
     ))
     # The answerability check is an LLM call with its own trace entry; here it says yes.
-    node._judge_answerability = lambda _q, ids: AnswerabilityResponse(answerable_datasource_ids=list(ids), reason="ok")
+    node._judge_answerability = lambda _u, _q, ids: AnswerabilityResponse(answerable_datasource_ids=list(ids), reason="ok")
     return node
 
 
@@ -280,14 +280,14 @@ def _retriever_store(tmp_path) -> VectorStore:
     return store
 
 
-def _retriever(tmp_path, allowed_tables, full_snapshot_max_tables=15):
+def _retriever(tmp_path, allow, full_snapshot_max_tables=15):
     # With 0, no snapshot is small enough to send whole: the vector search always runs.
     return SchemaRetrieverNode(fake_runtime(
         settings={"retrieval": {"full_snapshot_max_tables": full_snapshot_max_tables}},
         vector_store=_retriever_store(tmp_path),
         schema_store=SimpleNamespace(get_latest_snapshot=lambda _id: _chinook_snapshot(),
                                      get_snapshot=lambda _id, _v: _chinook_snapshot()),
-        rbac=SimpleNamespace(get_allowed_tables=lambda _ctx: allowed_tables),
+        policies={"roles": {"analyst": {"description": "d", "allow": list(allow)}}},
     ))
 
 
@@ -312,21 +312,16 @@ def test_the_schema_retriever_records_its_searches_and_what_survived(tmp_path):
     assert all(e["similarity"] is not None for s in retrieval["searches"] for e in s["pool"])
 
 
-def test_the_trace_withholds_column_scores_for_tables_the_role_cannot_read(tmp_path):
-    out = _retriever(tmp_path, ["chinook.Genre"], full_snapshot_max_tables=0)(_sub_query_state())
+def test_the_searches_never_see_a_table_the_role_cannot_read(tmp_path):
+    out = _retriever(tmp_path, ["chinook.main.Genre"], full_snapshot_max_tables=0)(_sub_query_state())
 
-    columns = [e for s in out["retrieval"]["searches"] for e in s["pool"] if e["type"] == "schema.column"]
-    assert columns
-    for entry in columns:
-        if entry["table"] == REFS["Genre"].full_name:
-            assert entry["similarity"] is not None and "withheld" not in entry
-        else:
-            # Structure stays: the entry, its rank, whether it was picked.
-            assert entry["similarity"] is None and entry["mmr_score"] is None
-            assert entry["withheld"] and entry["label"] and entry["rank"]
-    # Table entries carry names only, no data, so they keep their scores.
-    tables = [e for e in out["retrieval"]["searches"][0]["pool"]]
-    assert all(e["similarity"] is not None for e in tables)
+    searches = out["retrieval"]["searches"]
+    entries = [e for s in searches for e in s["pool"]]
+    assert entries and {e["table"] for e in entries} == {REFS["Genre"].full_name}
+    assert searches[0]["filter"]["searched_tables"] == 1
+    assert [t.name for t in out["relevant_tables"]] == ["Genre"]
+    for hidden in ("Track", "InvoiceLine"):
+        assert hidden not in str(out)
 
 
 def test_the_schema_retriever_says_when_the_schema_is_small_enough_to_skip(tmp_path):

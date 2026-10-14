@@ -36,9 +36,10 @@ jobs:
       # Anything needing generated demo data or a downloaded model is marked
       # `integration` and runs in the job below. Only the four modules whose
       # node under test calls a chat model are marked `llm`; those run nowhere
-      # in CI.
+      # in CI. Tests marked `realdb` need the test bed's real servers and run
+      # in realdb.yml.
       - name: Run tests
-        run: pytest -m "not integration"
+        run: pytest -m "not integration and not realdb"
 
   # The tests marked `integration` that need neither an LLM API key nor an
   # external database: the Chinook SQLite demo and the local ONNX embedder are

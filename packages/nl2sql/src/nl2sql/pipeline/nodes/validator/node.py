@@ -25,7 +25,6 @@ from nl2sql.pipeline.nodes.generator.node import (
     ordered,
 )
 from nl2sql.runtime import Runtime
-from nl2sql.auth.rbac import FALLBACK_DEFAULT_SCHEMA, default_schema, table_allowed
 from nl2sql.common.logger import get_logger
 from nl2sql.pipeline.nodes.validator.schemas import LogicalValidatorResponse, ValidationCheck
 
@@ -95,7 +94,7 @@ class LogicalValidatorNode:
             registry (DatasourceRegistry): The registry of datasources.
         """
         self.registry = ctx.ds_registry
-        self.rbac = ctx.rbac
+        self.policy_engine = ctx.policy_engine
         self.strict_columns = ctx.settings.pipeline.strict_columns
         self.refusal_names_tables = ctx.config.policies.refusal_names_tables
         # The validator does not render SQL, but it builds the generator's
@@ -638,9 +637,6 @@ class LogicalValidatorNode:
         errors: list[PipelineError] = []
 
         user_ctx = state.user_context
-        # An unknown role, or none, grants nothing: RBAC returns no tables and
-        # every table in the plan is refused below like any other denial.
-        allowed_tables = self.rbac.get_allowed_tables(user_ctx)
         roles = list(user_ctx.roles) if user_ctx else []
         role = ','.join(roles)
 
@@ -657,26 +653,26 @@ class LogicalValidatorNode:
                  )
              ]
 
-        logger.debug("Policy validation context: Role=%s, Allowed=%s", role, allowed_tables)
-        default = default_schema(self.registry, ds_id)
-
+        # An unknown role, or none, grants nothing: its scope allows no table,
+        # and every table in the plan is refused below like any other denial.
+        # The schema retriever never showed the planner a table the scope
+        # hides, so a plan naming one anyway is refused here.
+        scope = self.policy_engine.scope(user_ctx, ds_id)
         for t in plan.tables:
             # The schema the generator will write, or the default one.
-            if table_allowed(allowed_tables, ds_id, t.name, t.schema_name, default):
+            rule = scope.rule_for(t.schema_name, t.name)
+            if rule is None:
                 continue
 
             # A table outside the default schema is named with its schema.
-            outside_default = t.schema_name and t.schema_name != (default or FALLBACK_DEFAULT_SCHEMA)
+            outside_default = t.schema_name and t.schema_name.lower() != scope.default_schema.lower()
             namespaced_name = f"{ds_id}.{t.schema_name}.{t.name}" if outside_default else f"{ds_id}.{t.name}"
-            # The operator always gets the table and the role (log and trace);
-            # the user gets them only when the deployment opts in, because
-            # naming a table tells an unauthorised user that it exists.
-            logger.warning("Policy denied role(s) %s access to '%s'.", roles, namespaced_name)
+            # The operator always gets the table, the role and the rule (log
+            # and trace); the user gets the table only when the deployment opts
+            # in, because naming a table tells an unauthorised user that it exists.
+            logger.warning("Policy denied role(s) %s access to '%s': %s.", roles, namespaced_name, rule)
             if self.refusal_names_tables:
-                message = (
-                    f"Role '{role or '(none)'}' denied access to '{namespaced_name}'. "
-                    "Policy requires an explicit 'datasource.schema.table' allow."
-                )
+                message = f"Role '{role or '(none)'}' denied access to '{namespaced_name}'."
             else:
                 message = REFUSAL_MESSAGE
             errors.append(
@@ -685,7 +681,7 @@ class LogicalValidatorNode:
                     message=message,
                     severity=ErrorSeverity.CRITICAL,
                     error_code=ErrorCode.SECURITY_VIOLATION,
-                    details={"datasource_id": ds_id, "table": namespaced_name, "roles": roles},
+                    details={"datasource_id": ds_id, "table": namespaced_name, "roles": roles, "rule": rule},
                 )
             )
 
@@ -952,8 +948,10 @@ class LogicalValidatorNode:
                 )
 
             policy_errors = list(self._validate_policy(state))
-            errors.extend(static_errors)
+            # The refusal comes first: a table the scope hid from the planner
+            # is also missing from its schema, and the denial is the reason.
             errors.extend(policy_errors)
+            errors.extend(static_errors)
 
             role = ",".join(state.user_context.roles) if state.user_context else ""
             checks = [

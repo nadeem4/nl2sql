@@ -1,4 +1,5 @@
-"""The nl2sql SDK: the interfaces an extension implements: adapters, secret providers and (in ``nl2sql_sdk.stores``) stores."""
+"""The nl2sql SDK: the interfaces an extension implements: adapters, secret providers, and (in
+``nl2sql_sdk.stores`` and ``nl2sql_sdk.policy``) stores and policy checks."""
 
 from .capabilities import DatasourceCapability
 from .contracts import AdapterRequest, ResultError, ResultFrame

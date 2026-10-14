@@ -114,6 +114,23 @@ flowchart LR
 
 ## 3. The real-database test bed
 
+!!! note "Built: the compose file, the `realdb` marker and the CI workflow (PR T1)"
+    `testbed/` holds the compose file, `wide_schema.py`, `samples.py` (the
+    pinned samples with their checksums), `passwords.py`, the servers' init
+    scripts and `gate.py`; `packages/nl2sql/tests/realdb/` holds the
+    fixtures; and `.github/workflows/realdb.yml` runs them. Four details
+    differ from the first draft of this section. The passwords have no
+    default: `testbed/passwords.py` writes random ones to the git-excluded
+    `testbed/.env`, and CI generates new ones per run, so no password is
+    written in the repository. Pagila is pinned to commit `5ba5a57`, because
+    later commits need PostgreSQL 18. The `audit` schema is a small 21st
+    schema beside the 20 numbered ones that hold the 1,200 tables.
+    `datasource()` defaults to the server's own sample database (Pagila,
+    Sakila or AdventureWorksLT) and passes other keywords to `Datasource`,
+    since `Datasource.index` arrives with B1. The GCP VM and
+    `scripts/testbed.py` are PR T2. See
+    [The real-database test bed](../testing/test-bed.md).
+
 ### What it is
 
 One file, `testbed/docker-compose.yml`, defines the whole test bed. The same
@@ -197,17 +214,16 @@ is loaded. Each server also gets a login `nl2sql_reader` with read grants on
 its sample database only; the conformance kit uses it for the `permission`
 stage of `test_connection`.
 
-The file reads four variables, each with a default for local use and CI:
+The file reads four variables. The bind address has a default; the
+passwords do not, so no password is written in the repository:
 
 | Variable | Default | On the GCP VM |
 |---|---|---|
 | `TESTBED_BIND` | `127.0.0.1` | `0.0.0.0` (the firewall admits only IAP, see below) |
-| `TESTBED_POSTGRES_PASSWORD` | `Nl2sql-Testbed-1` | from Secret Manager |
-| `TESTBED_MYSQL_PASSWORD` | `Nl2sql-Testbed-1` | from Secret Manager |
-| `TESTBED_MSSQL_PASSWORD` | `Nl2sql-Testbed-1` | from Secret Manager |
+| `TESTBED_POSTGRES_PASSWORD` | none: required; `testbed/passwords.py` makes random ones, and CI makes new ones per run | from Secret Manager |
+| `TESTBED_MYSQL_PASSWORD` | none: required; `testbed/passwords.py` makes random ones, and CI makes new ones per run | from Secret Manager |
+| `TESTBED_MSSQL_PASSWORD` | none: required; `testbed/passwords.py` makes random ones, and CI makes new ones per run | from Secret Manager |
 
-The default password is a throwaway for containers bound to `127.0.0.1` or
-to a CI runner. It never protects anything reachable from outside.
 
 | Service | Published port | User |
 |---|---|---|
@@ -220,7 +236,9 @@ The ports avoid a clash with a database already installed locally.
 ### Local use
 
 ```bash
+python testbed/passwords.py > testbed/.env               # once
 docker compose -f testbed/docker-compose.yml up -d --wait
+set -a; . testbed/.env; set +a
 REALDB=compose pytest -m realdb
 docker compose -f testbed/docker-compose.yml down        # add -v to drop the data
 ```
@@ -267,7 +285,7 @@ The fixtures live in `packages/nl2sql/tests/realdb/conftest.py`:
 
 | Variable | Meaning |
 |---|---|
-| `REALDB=compose` | The compose servers on `127.0.0.1`, at the published ports, with the default password |
+| `REALDB=compose` | The compose servers on `127.0.0.1`, at the published ports, with the passwords in `TESTBED_*_PASSWORD` |
 | `REALDB_POSTGRES`, `REALDB_MYSQL`, `REALDB_MSSQL` | A URL for one server, such as `postgresql://postgres:<password>@127.0.0.1:15432/`, with the password percent-encoded. It wins over `REALDB=compose`. `scripts/testbed.py run` sets these. |
 | `REALDB_REQUIRED=1` | A missing server is a failure, not a skip |
 
@@ -291,7 +309,7 @@ cover `packages/*/src`, not the tests.
 
 ### The GCP VM
 
-One small VM in `nl2sql-testbed-261014` runs the same compose file
+One small VM, `nl2sql-testbed` in `nl2sql-testbed-261014` (zone `us-central1-a`), runs the same compose file
 (owner decision 3). It is started for a session and stopped after it.
 
 | Setting | Value |
@@ -300,7 +318,7 @@ One small VM in `nl2sql-testbed-261014` runs the same compose file
 | Image | Debian 12, with Docker and the compose plugin installed once by its startup script |
 | Disk | 30 GB standard persistent disk: the images and the data volumes, kept while stopped, so a later session skips the load |
 | External IP | Ephemeral only, for outbound traffic (image pulls, sample downloads). It is released, and free, while the VM is stopped. |
-| Inbound | No public database port. A firewall rule admits TCP 22, 15432, 13306 and 11433 from IAP's range `35.235.240.0/20` only. |
+| Inbound | No public database port. The VM sits in its own VPC, `nl2sql-testbed`, so the default network's open SSH and RDP rules do not apply, and one firewall rule admits TCP 22, 15432, 13306 and 11433 from IAP's range `35.235.240.0/20` only. |
 | Access | `gcloud compute start-iap-tunnel`, which forwards `localhost:15432`, `13306` and `11433` on the caller's machine to the VM |
 | Passwords | Secret Manager: the existing `testbed-postgres-root-password`, `testbed-mysql-root-password` and `testbed-mssql-root-password`. Never in the repository. |
 | Bucket | `gs://nl2sql-testbed-261014-samples` is not needed: the VM downloads the samples itself, once |
@@ -314,7 +332,7 @@ Windows and CI runs Linux. It calls `gcloud` (found with `shutil.which`, so
 
 | Command | What it does |
 |---|---|
-| `up` | Starts the VM (`gcloud compute instances start`). Copies `testbed/` to it (`gcloud compute scp --tunnel-through-iap`). Runs `docker compose up -d --wait` on it over `gcloud compute ssh --tunnel-through-iap`, with `TESTBED_BIND=0.0.0.0` and the three passwords from Secret Manager passed on that command's environment only. Then opens the three IAP tunnels in the background and waits until each local port answers. |
+| `up` | Starts the VM (`gcloud compute instances start`). Copies `testbed/` to it (`gcloud compute scp --tunnel-through-iap`). Runs `docker compose up -d --wait` on it over `gcloud compute ssh --tunnel-through-iap`, with `TESTBED_BIND=0.0.0.0` and the three passwords from Secret Manager passed on that command's environment only (they travel on its stdin, never on a command line). Then opens the three IAP tunnels in the background and waits until each local port answers. |
 | `run -- <cmd>` | `up`, then runs `<cmd>` with `REALDB_POSTGRES`, `REALDB_MYSQL` and `REALDB_MSSQL` (pointing at the local tunnel ports) in the child's environment only, then closes the tunnels and stops the VM in a `finally`: also on Ctrl-C, a failing command or a failed `up`. It exits with the command's code. |
 | `down` | Closes any tunnels it opened and stops the VM. Safe to run again. |
 | `status` | The VM's state, how long it has been running, and whether the tunnels are open. Never a password. |
@@ -326,7 +344,7 @@ and are never written to a file or printed.
 started by hand, it would keep billing. One Cloud Scheduler job calls the
 Compute Engine API directly at 03:00 UTC, with an OAuth token for a service
 account that may only stop instances in this project:
-`POST https://compute.googleapis.com/compute/v1/projects/nl2sql-testbed-261014/zones/<zone>/instances/<vm>/stop`.
+`POST https://compute.googleapis.com/compute/v1/projects/nl2sql-testbed-261014/zones/us-central1-a/instances/nl2sql-testbed/stop`.
 Stopping a stopped VM does nothing, so the job needs no logic, and one job is
 inside Cloud Scheduler's free tier.
 
@@ -789,6 +807,25 @@ As in Phase 1, the engine accepts exactly the version it was built for.
 | `VectorStore` dimension checks and the model-mismatch error | Deleted: the namespace carries the model and dimension |
 
 ## 6. Policies, step 1
+
+!!! note "Built: globs and `Scope` (PR P1)"
+    `allow` and `deny` on `Role`, the pattern rules, `PolicyEngine.scope` and
+    `Scope` in `nl2sql/policies/` (which replaces `nl2sql/auth/`), a run's
+    scopes pinned (`PolicyEngine.run`), every call site on `Scope`, the
+    retriever hiding denied tables, and the demo roles rewritten. Beyond the
+    table below, `engine.policies.allowed()` is replaced by
+    `engine.policies.scope()`, since a flat table list cannot say what a deny
+    does. See [Policies](../configuration/policies.md).
+
+!!! note "Built: `PolicyCheck` (PR P2)"
+    `nl2sql_sdk.policy` (`UserContext`, `Grant`, `PolicyCheck`), the
+    `policies.check` block (or a check object), the intersection with the
+    roles, failing closed, and the `policy_check` registry kind. The runtime
+    builds the block through the registry, and `PolicyEngine.run` makes the
+    check asked once per caller and datasource per run. A `grant` that
+    returns something other than a `Grant`, or a pattern that does not parse,
+    fails closed like an exception. See
+    [A policy check](../configuration/policies.md#a-policy-check).
 
 ### The config
 
