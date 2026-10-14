@@ -34,8 +34,16 @@ from .profiling import ALL_VALUES_MAX_DISTINCT, SAMPLE_VALUES, ColumnProfile, as
 
 logger = logging.getLogger(__name__)
 
-# Driver messages that mean the database refused the query, whatever its kind.
-_REFUSAL_WORDS = ("permission denied", "permission was denied", "access denied", "not authorized")
+# Driver messages that mean the database refused the query, whatever its kind
+# (MySQL's "SELECT command denied" carries SQLSTATE 42000, a query mistake's class, and
+# DuckDB reports a write to a read-only file as invalid input).
+_REFUSAL_WORDS = ("permission denied", "permission was denied", "access denied", "command denied",
+                  "not authorized", "read-only", "read only", "readonly")
+# What a driver says when a statement was stopped for running too long: PostgreSQL's
+# "statement timeout" (57014), ODBC's "Query timeout expired" (HYT00), MySQL's
+# "maximum statement execution time exceeded", and the interrupt SQLite and DuckDB report.
+_TIMEOUT_SQLSTATES = {"57014", "HYT00", "HYT01"}
+_TIMEOUT_WORDS = ("timeout", "timed out", "interrupted", "execution time exceeded")
 _MAX_MESSAGE = 200
 
 Stage = Literal["config", "driver", "network", "auth", "database", "permission"]
@@ -94,6 +102,15 @@ def _sqlstate(exc: BaseException):
         if isinstance(value, str) and len(value) == 5:
             return value
     return None
+
+
+def _timed_out(exc: BaseException) -> bool:
+    """Whether the server or the driver stopped the statement for running past the timeout."""
+    orig = getattr(exc, "orig", None) or exc
+    args = getattr(orig, "args", ())
+    if _sqlstate(exc) in _TIMEOUT_SQLSTATES or (args and args[0] in _TIMEOUT_SQLSTATES):
+        return True
+    return any(word in str(orig).lower() for word in _TIMEOUT_WORDS)
 
 
 def driver_message(exc: BaseException) -> str:
@@ -393,12 +410,16 @@ class SQLAlchemyAdapter:
         (``is_retryable_error``); the engine then asks the planner for a new
         one. Its message is the driver's first line, bounded: no SQL echo, no
         stack trace. A refusal gets a generic message, since the driver's
-        words can name hosts and users; the log keeps them all.
+        words can name hosts and users; the log keeps them all. A statement
+        stopped for running past ``limits.timeout_ms`` is ``QUERY_TIMEOUT``.
         """
         retryable = self.is_retryable_error(exc)
         logger.warning("Query failed on %s (retryable=%s): %s", self, retryable, exc)
+        code = "QUERY_REJECTED" if retryable else "QUERY_REFUSED"
         if retryable:
             message = f"The database rejected the query: {driver_message(exc)}"
+        elif _timed_out(exc):
+            code, message = "QUERY_TIMEOUT", "The database stopped the query: it ran past the datasource's timeout."
         else:
             message = (
                 "The database could not run the query: it refused access, timed out "
@@ -408,7 +429,7 @@ class SQLAlchemyAdapter:
             success=False,
             datasource_id=self.datasource_id,
             error=ResultError(
-                error_code="QUERY_REJECTED" if retryable else "QUERY_REFUSED",
+                error_code=code,
                 safe_message=message,
                 severity="ERROR",
                 retryable=retryable,
@@ -422,17 +443,20 @@ class SQLAlchemyAdapter:
 
         True for a mistake in the query: bad syntax, an unknown table, column
         or function, a type mismatch. False for a refusal: permission, a
-        timeout, a lost connection, a read-only database. Read from the
+        timeout, a lost connection, a read-only database. A message saying
+        access was denied, or that the database is read-only, is a refusal
+        whatever its SQLSTATE (MySQL files "SELECT command denied" under
+        42000). Otherwise read from the
         standard SQLSTATE when the driver gives one (class 42 and 22 are the
-        query's fault, except 42501, insufficient privilege), otherwise from
+        query's fault, except 42501, insufficient privilege), else from
         SQLAlchemy's DBAPI error kind. An adapter whose driver reports query
         mistakes some other way overrides this.
         """
+        if any(word in driver_message(exc).lower() for word in _REFUSAL_WORDS):
+            return False
         state = _sqlstate(exc)
         if state:
             return state != "42501" and state[:2] in ("42", "22")
-        if any(word in driver_message(exc).lower() for word in _REFUSAL_WORDS):
-            return False
         return isinstance(exc, (ProgrammingError, DataError))
 
     # --- Reading the schema ----------------------------------------------------

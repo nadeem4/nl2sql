@@ -51,7 +51,7 @@ lock. So when `limits.timeout_ms` is set, each statement installs a progress
 handler with its own deadline. SQLite calls it every 10,000 steps of its
 virtual machine, while the statement runs and while its rows are fetched; once
 the deadline has passed, the handler stops the statement, which fails with
-"interrupted" and is reported as a refusal (`QUERY_REFUSED`) that the engine
+"interrupted" and is reported as a timeout (`QUERY_TIMEOUT`) that the engine
 does not retry. The next statement on the connection gets a new deadline.
 
 ## Hints

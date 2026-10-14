@@ -337,7 +337,7 @@ Dependencies point in one direction: `nl2sql-sdk` → nothing, `nl2sql.adapters.
 
 Concretely:
 
-- The SDK's core imports only pydantic and the standard library. `nl2sql_sdk.sqlalchemy`, the SQLAlchemy base installed with `nl2sql-sdk[sqlalchemy]`, may also import SQLAlchemy and sqlglot, and the core never imports it.
+- The SDK's core imports only pydantic and the standard library. `nl2sql_sdk.sqlalchemy`, the SQLAlchemy base installed with `nl2sql-sdk[sqlalchemy]`, may also import SQLAlchemy and sqlglot, and the core never imports it. `nl2sql_sdk.testing`, the conformance kit installed with `nl2sql-sdk[testing]`, may import pytest and sqlglot, but not SQLAlchemy: it checks an adapter through `DatasourceAdapter` alone.
 - An adapter imports only the SDK, its driver, SQLAlchemy, sqlglot, pydantic and the standard library. SQLAlchemy and sqlglot are adapter-layer libraries: the shared connection layer, and the expression vocabulary the engine hands over to be rendered.
 - Nothing outside `nl2sql/adapters/` (and the SDK's SQLAlchemy base) imports an adapter, SQLAlchemy or a database driver. The engine reaches an adapter through the `nl2sql.adapters` entry points and `DatasourceAdapter`.
 - Only `nl2sql/storage/` imports `chromadb` (or `langchain_chroma`). The engine embeds, ranks and filters through the `IndexStore` interface (`nl2sql_sdk.stores`), so a plugin index store works the same way as the built-in `chroma` one. The one exception is the local embedder, `nl2sql/embeddings/local.py`, whose model is the ONNX all-MiniLM-L6-v2 that ships inside chromadb.
