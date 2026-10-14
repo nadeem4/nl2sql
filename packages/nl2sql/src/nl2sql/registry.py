@@ -79,6 +79,12 @@ def _installed(module: str) -> bool:
         return False
 
 
+def missing_modules(kind: str, target: Any) -> List[str]:
+    """The modules ``target``, a loaded adapter or provider, needs and are not installed."""
+    attribute = _REQUIRES.get(kind)
+    return [module for module in (getattr(target, attribute, ()) if attribute else ()) if not _installed(module)]
+
+
 class Registry:
     """Name -> code, per kind: adapters, LLM providers, embeddings providers, secret providers, stores, policy checks."""
 
@@ -162,8 +168,12 @@ class Registry:
         """Every name registered for ``kind``, sorted."""
         return sorted(set(self._installed[kind]) | set(self._added[kind]))
 
-    def load(self, kind: Kind, name: str) -> Any:
+    def load(self, kind: Kind, name: str, *, require_installed: bool = True) -> Any:
         """The code behind ``name``, imported and checked.
+
+        ``require_installed=False`` skips the check that the modules it needs
+        are installed (``missing_modules`` lists them), to describe an adapter
+        whose driver is not installed yet: its module imports without it.
 
         Raises:
             RegistryError: the name is unknown (with the closest name), two
@@ -181,7 +191,10 @@ class Registry:
             target, origin = self._import(kind, name)
         else:
             raise RegistryError(self._unknown(kind, name))
-        self._check(kind, name, target, origin)
+        self._check_version(kind, target, origin)
+        if not require_installed:
+            return target
+        self._check_installed(kind, name, target)
         self._loaded[key] = target
         return target
 
@@ -196,15 +209,16 @@ class Registry:
         return target, package
 
     @staticmethod
-    def _check(kind: str, name: str, target: Any, origin: str) -> None:
+    def _check_version(kind: str, target: Any, origin: str) -> None:
         version = getattr(target, "interface_version", 0)
         needed = INTERFACE_VERSIONS[kind]
         if version != needed:
             raise RegistryError(f"{origin} implements {_LABELS[kind]} interface {version}; "
                                 f"this engine needs {needed}.")
-        attribute = _REQUIRES.get(kind)
-        missing = [module for module in (getattr(target, attribute, ()) if attribute else ())
-                   if not _installed(module)]
+
+    @staticmethod
+    def _check_installed(kind: str, name: str, target: Any) -> None:
+        missing = missing_modules(kind, target)
         if missing:
             hint = getattr(target, "install_hint", "")
             raise RegistryError(f"The {_LABELS[kind]} '{name}' needs {', '.join(missing)}, which is not "

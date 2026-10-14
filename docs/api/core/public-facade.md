@@ -110,7 +110,7 @@ engine.run_query(question, *, datasource_id=None, execute=True, user_context=Non
 engine.stream_query(question, *, datasource_id=None, execute=True, user_context=None, cancellation_token=None)
 engine.check(); engine.close(); engine.config; engine.about(); engine.clear_plan_cache()
 
-engine.datasources   # list, get, add, remove, schema, test
+engine.datasources   # list, get, types, test, add, remove, schema
 engine.index         # build, health, clear, inspect, inspect_defaults
 engine.llm           # list, get, providers, replace
 engine.policies      # roles, allows, allowed, validate
@@ -229,7 +229,7 @@ submodule: `NL2SQL`, `QueryResult`, `SubQueryResult`, `RowSample`,
 `AnswerSource`, `ResultSummary`, `ResultManifest`, `ResultPage`,
 `ResultNotFound`, `MAX_RESULT_PAGE_SIZE`, `QuestionUsage`, `QueryEvent`,
 `UserContext`, `CancellationToken`, `configure_logging`, what the namespaces
-return (`DatasourceInfo`, `IndexProgress`, `LLMChange`), the config (`Config`,
+return (`DatasourceInfo`, `DatasourceType`, `IndexProgress`, `LLMChange`), the config (`Config`,
 `load_config`, `load_env_file`, `ConfigError`, `Registry` and the section
 classes `Datasource`, `Limits`, `LLM`, `AgentLLM`, `Embeddings`, `Policies`,
 `Role`, `Storage`, `StoreConfig`, `Secrets`, `Curated`, `Settings`), what `check()` reports

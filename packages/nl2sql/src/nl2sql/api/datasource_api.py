@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Union
 
-from nl2sql.api.types import DatasourceInfo
+from nl2sql.api.types import DatasourceInfo, DatasourceType
 from nl2sql.check import DatasourceStatus
 from nl2sql.config import Datasource
 from nl2sql.datasources.registry import mask_connection_args
@@ -35,10 +35,13 @@ class DatasourcesAPI:
     def add(self, datasource: Datasource) -> None:
         """Add ``datasource``: its adapter is built, not connected, and it joins ``engine.config``.
 
-        Index it next (``engine.index.build([datasource.id])``) so questions can reach it.
+        ``connection`` is validated against the adapter's connection model
+        and ``index`` as an ``IndexScope``. Index it next
+        (``engine.index.build([datasource.id])``) so questions can reach it.
 
         Raises:
-            ValueError: its id is taken, or its adapter cannot be built.
+            ValueError: its id is taken, its ``index`` or ``connection`` does
+                not validate (no value is shown), or its adapter cannot be built.
         """
         self._ctx.add_datasource(datasource)
 
@@ -64,13 +67,47 @@ class DatasourcesAPI:
 
         return schema_view(datasource_id, self._ctx.vector_store.snapshot(datasource_id))
 
-    def test(self, datasource_id: str) -> DatasourceStatus:
-        """Connect to one datasource, as ``check()`` does: ``ready`` puts it back in routing.
+    def types(self) -> List[DatasourceType]:
+        """Every adapter the engine's registry can name, installed or not, with its connection form.
+
+        Sorted by name. An adapter module imports without its driver, so an
+        uninstalled one is listed with ``installed=False``, its install hint
+        and its schema. A plugin that fails to import or implements another
+        interface version is left out.
+        """
+        from nl2sql.registry import missing_modules
+
+        registry = self._ctx.registry
+        found = []
+        for name in registry.names("adapter"):
+            try:
+                adapter_cls = registry.load("adapter", name, require_installed=False)
+            except Exception:  # a plugin that fails to import or its version check
+                continue
+            found.append(DatasourceType(
+                name=name, title=getattr(adapter_cls, "title", None) or name,
+                installed=not missing_modules("adapter", adapter_cls),
+                install_hint=getattr(adapter_cls, "install_hint", ""),
+                connection_schema=adapter_cls.connection_model.model_json_schema()))
+        return found
+
+    def test(self, datasource: Union[Datasource, str]) -> DatasourceStatus:
+        """Connect to a datasource and report the stage that failed, if one did.
+
+        With an id, connects to that configured datasource as ``check()``
+        does: ``ready`` puts it back in routing, ``failed`` keeps it out. With
+        a ``Datasource``, builds its adapter, runs ``test_connection`` and
+        closes it, and registers nothing: what a Connect a database form
+        calls before ``add``. Its failures are reported, not raised:
+        ``config`` (unknown type or connection), ``driver`` (with the install
+        hint as the fix), or the adapter's own stage.
 
         Raises:
-            ValueError: it is not configured.
+            ValueError: an id that is not configured.
         """
-        return self._ctx.check_datasource(datasource_id)
+        if isinstance(datasource, str):
+            return self._ctx.check_datasource(datasource)
+        return self._ctx.try_datasource(datasource)
 
     def _info(self, datasource: Datasource) -> DatasourceInfo:
         registry = self._ctx.ds_registry
