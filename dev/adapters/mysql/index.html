@@ -4639,7 +4639,7 @@
 <p>Support for MySQL 5.7+ and 8.0+.</p>
 <div class="admonition info">
 <p class="admonition-title">Implementation</p>
-<p>This adapter extends <code>SQLAlchemyAdapter</code>. It overrides <code>build_engine()</code> to set the <code>MAX_EXECUTION_TIME</code> session variable.</p>
+<p>This adapter extends <code>SQLAlchemyAdapter</code>. Its <code>session_setup</code> makes every new pooled connection read-only and sets the <code>MAX_EXECUTION_TIME</code> session variable.</p>
 </div>
 <h2 id="configuration">Configuration</h2>
 <p><strong>Type</strong>: <code>mysql</code></p>
@@ -4672,9 +4672,19 @@ other key is an error; see <a href="../../configuration/datasources/#connection"
 </thead>
 <tbody>
 <tr>
+<td style="text-align: left;"><strong>Read-only</strong></td>
+<td style="text-align: left;"><code>SET SESSION TRANSACTION READ ONLY</code></td>
+<td style="text-align: left;">An <code>INSERT</code> or <code>CREATE TABLE</code> fails even for a login that could write. Declares <code>ENFORCES_READ_ONLY</code>.</td>
+</tr>
+<tr>
 <td style="text-align: left;"><strong>Timeout</strong></td>
-<td style="text-align: left;"><code>SET MAX_EXECUTION_TIME={ms}</code></td>
-<td style="text-align: left;">Session-level enforcement.</td>
+<td style="text-align: left;"><code>SET SESSION MAX_EXECUTION_TIME = {ms}</code></td>
+<td style="text-align: left;">Server-side. It applies to <code>SELECT</code>, which is all the engine runs. Declares <code>ENFORCES_TIMEOUT</code>.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Connection stages</strong></td>
+<td style="text-align: left;">MySQL's error number</td>
+<td style="text-align: left;">1045 is <code>auth</code>, 1049 <code>database</code>, 1044 <code>permission</code>, 2003 and 2005 <code>network</code>.</td>
 </tr>
 <tr>
 <td style="text-align: left;"><strong>Row counts</strong></td>

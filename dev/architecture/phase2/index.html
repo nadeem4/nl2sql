@@ -4872,6 +4872,20 @@ is an issue on <code>schema.*</code>. <code>session_setup</code> and <code>class
 Not done here: the scope is not yet part of the snapshot's fingerprint,
 which lives in the state store (S3).</p>
 </div>
+<div class="admonition note">
+<p class="admonition-title">Built: B3, honest enforcement and stages</p>
+<p><code>session_setup</code> and <code>classify</code> are on the SDK's base; the five built-ins
+declare <code>ENFORCES_READ_ONLY</code> and <code>ENFORCES_TIMEOUT</code> as the table below
+says, SQLite stops a slow statement with a progress handler (B20), and
+<code>check()</code> reports the adapter's stage (B26) and warns about a session
+that can write. Filled in on the way: <code>test_connection</code> also lists the
+schemas, so a login that connects but cannot read the catalog is
+<code>permission</code>; an error the adapter cannot place has no stage rather than
+<code>connect</code>; DuckDB's <code>:memory:</code> cannot be opened read-only, so it does not
+declare <code>ENFORCES_READ_ONLY</code>; the warning says "a login that can only
+read", since the engine names no database, and the SQL Server page
+recommends <code>db_datareader</code>.</p>
+</div>
 <h3 id="the-contract">The contract</h3>
 <div class="highlight"><pre><span></span><code><a href="#__codelineno-15-1" id="__codelineno-15-1" name="__codelineno-15-1"></a><span class="c1"># nl2sql_sdk (core: pydantic and the standard library)</span>
 <a href="#__codelineno-15-2" id="__codelineno-15-2" name="__codelineno-15-2"></a><span class="k">class</span><span class="w"> </span><span class="nc">ConnectionModel</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>

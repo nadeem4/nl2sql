@@ -4896,9 +4896,9 @@ the form for connecting that database; a password is <code>"format": "password"<
 <a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">  </span><span class="nt">max_bytes</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10485760</span>
 </code></pre></div>
 <ul>
-<li><code>timeout_ms</code>: Postgres, MySQL, SQL Server and DuckDB enforce it (SQL Server
-  rounds up to whole seconds); SQLite does not, and uses it only as its
-  lock-wait timeout. A SQLite file is always opened read-only. See each <a href="../../adapters/">adapter page</a> for how.</li>
+<li><code>timeout_ms</code>: every built-in adapter enforces it (SQL Server
+  rounds up to whole seconds; SQLite stops a statement with a progress handler).
+  Every session is read-only where the database allows it, with no setting; SQL Server cannot, and <code>check()</code> warns. See each <a href="../../adapters/">adapter page</a> for how.</li>
 <li><code>row_limit</code>: unset, it is <code>settings.results.row_limit</code> (100,000); set higher,
   <code>settings.results.row_limit</code> still bounds it. A result that reaches it is
   flagged as truncated and the answer says so. It is applied before results

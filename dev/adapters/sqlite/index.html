@@ -2402,6 +2402,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Features">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#statement-timeout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Statement Timeout
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -4627,6 +4644,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Features">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#statement-timeout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Statement Timeout
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -4661,7 +4695,7 @@
 <p>Simple file-based adapter for local development and testing.</p>
 <div class="admonition info">
 <p class="admonition-title">Implementation</p>
-<p>This adapter extends <code>SQLAlchemyAdapter</code>. Note that <code>timeout</code> configurations apply to the <em>database lock</em>, not query execution time.</p>
+<p>This adapter extends <code>SQLAlchemyAdapter</code>. It opens the file read-only and stops a statement that runs past <code>limits.timeout_ms</code> with a progress handler.</p>
 </div>
 <h2 id="configuration">Configuration</h2>
 <p><strong>Type</strong>: <code>sqlite</code></p>
@@ -4698,9 +4732,19 @@ does the same.</p>
 </thead>
 <tbody>
 <tr>
+<td style="text-align: left;"><strong>Read-only</strong></td>
+<td style="text-align: left;"><code>mode=ro</code></td>
+<td style="text-align: left;">Always; declares <code>ENFORCES_READ_ONLY</code>.</td>
+</tr>
+<tr>
 <td style="text-align: left;"><strong>Timeout</strong></td>
-<td style="text-align: left;"><code>connect_args["timeout"]</code></td>
-<td style="text-align: left;">Controls <em>Locking</em> timeout, not execution.</td>
+<td style="text-align: left;">A progress handler per statement</td>
+<td style="text-align: left;">See <a href="#statement-timeout">Statement Timeout</a>. Declares <code>ENFORCES_TIMEOUT</code>.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Connection stages</strong></td>
+<td style="text-align: left;">The message</td>
+<td style="text-align: left;">A file that cannot be opened is <code>database</code>.</td>
 </tr>
 <tr>
 <td style="text-align: left;"><strong>Row counts</strong></td>
@@ -4714,6 +4758,14 @@ does the same.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="statement-timeout">Statement Timeout</h3>
+<p>SQLite has no statement timeout: its own <code>timeout</code> is how long to wait for a
+lock. So when <code>limits.timeout_ms</code> is set, each statement installs a progress
+handler with its own deadline. SQLite calls it every 10,000 steps of its
+virtual machine, while the statement runs and while its rows are fetched; once
+the deadline has passed, the handler stops the statement, which fails with
+"interrupted" and is reported as a refusal (<code>QUERY_REFUSED</code>) that the engine
+does not retry. The next statement on the connection gets a new deadline.</p>
 <h2 id="hints">Hints</h2>
 <ul>
 <li><strong>Concurrency</strong>: SQLite is poor at high concurrency. Use for <strong>Lite Mode</strong> or single-user testing only.</li>

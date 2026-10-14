@@ -4749,7 +4749,7 @@
 <li>Reporting what a table or column was indexed without as an <code>IndexIssue</code></li>
 </ul>
 <h3 id="example">Example</h3>
-<p>A complete adapter: the built-in PostgreSQL one, less its statement timeout.</p>
+<p>A complete adapter: the built-in PostgreSQL one, less its <code>session_setup</code>, <code>classify</code> and <code>capabilities</code>.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Literal</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pydantic</span><span class="w"> </span><span class="kn">import</span> <span class="n">Field</span><span class="p">,</span> <span class="n">SecretStr</span>
@@ -4796,8 +4796,11 @@
 <a id="__codelineno-0-44" name="__codelineno-0-44" href="#__codelineno-0-44"></a>        <span class="p">),</span> <span class="p">{</span><span class="s2">"schema"</span><span class="p">:</span> <span class="n">schema</span><span class="p">})</span>
 <a id="__codelineno-0-45" name="__codelineno-0-45" href="#__codelineno-0-45"></a>        <span class="k">return</span> <span class="p">{</span><span class="n">name</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="n">count</span><span class="p">)</span> <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">count</span> <span class="ow">in</span> <span class="n">rows</span><span class="p">}</span>
 </code></pre></div>
-<p>Enforce <code>limits.timeout_ms</code> in <code>build_engine()</code> too: the base class keeps it but
-does not apply it (see the <a href="../sqlalchemy/#build_engineoptions-engine">reference</a>).</p>
+<p>Make the session read-only and enforce <code>limits.timeout_ms</code> in
+<code>session_setup()</code>: the base class keeps the limit but does not apply it. Then
+declare <code>ENFORCES_READ_ONLY</code> and <code>ENFORCES_TIMEOUT</code> for what it enforces, and
+override <code>classify()</code> to map your driver's connection errors to stages (see
+the <a href="../sqlalchemy/#session_setupdbapi_connection">reference</a>).</p>
 <blockquote>
 <p>See the <strong><a href="../sqlalchemy/">SQLAlchemy Adapter Reference</a></strong> for full API details.</p>
 </blockquote>

@@ -2366,6 +2366,28 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#session_setupdbapi_connection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        session_setup(dbapi_connection)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#classifyexc-str-none" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        classify(exc) -&gt; str | None
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#is_retryable_errorexc-bool" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4948,6 +4970,28 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#session_setupdbapi_connection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        session_setup(dbapi_connection)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#classifyexc-str-none" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        classify(exc) -&gt; str | None
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#is_retryable_errorexc-bool" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5293,14 +5337,68 @@ sqlglot cannot express for the database (SQLite rewrites date parts with
 <code>STRFTIME</code>).</p>
 <h4 id="build_engineoptions-engine"><code>build_engine(**options) -&gt; Engine</code></h4>
 <p>Creates the SQLAlchemy engine from <code>url(connection)</code> with the connection's
-<code>pool</code>, on first use. Override it to pass driver settings, handing them on as
+<code>pool</code>, on first use, and runs <code>session_setup</code> on every new pooled connection.
+Override it to pass driver settings, handing them on as
 <code>super().build_engine(connect_args=...)</code>.</p>
+<h4 id="session_setupdbapi_connection"><code>session_setup(dbapi_connection)</code></h4>
+<p>The one place for session settings: it runs on every new pooled connection,
+before its first query, with the driver's own connection. The default does
+nothing. Make the session read-only and set the statement timeout here, and
+declare <code>ENFORCES_READ_ONLY</code> and <code>ENFORCES_TIMEOUT</code> in <code>capabilities()</code> only
+for what it really enforces.</p>
 <p>The base keeps <code>limits.timeout_ms</code> but does not enforce it: SQLAlchemy has no
 generic statement timeout and silently ignores an <code>execution_options["timeout"]</code>.
-Each built-in enforces it in <code>build_engine()</code> the way its driver allows:
-PostgreSQL with <code>statement_timeout</code>, MySQL with <code>MAX_EXECUTION_TIME</code>, SQL
-Server with pyodbc's query timeout, DuckDB by interrupting the connection. An
-adapter that does nothing here has no statement timeout.</p>
+The built-ins:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Adapter</th>
+<th style="text-align: left;">Read-only</th>
+<th style="text-align: left;">Timeout</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">PostgreSQL</td>
+<td style="text-align: left;"><code>SET default_transaction_read_only = on</code></td>
+<td style="text-align: left;"><code>SET statement_timeout</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">MySQL</td>
+<td style="text-align: left;"><code>SET SESSION TRANSACTION READ ONLY</code></td>
+<td style="text-align: left;"><code>SET SESSION MAX_EXECUTION_TIME</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">SQL Server</td>
+<td style="text-align: left;">none (it has no such setting)</td>
+<td style="text-align: left;">pyodbc's query timeout</td>
+</tr>
+<tr>
+<td style="text-align: left;">DuckDB</td>
+<td style="text-align: left;"><code>read_only=True</code> (a connect argument, in <code>build_engine</code>)</td>
+<td style="text-align: left;"><code>interrupt()</code> on a timer, in <code>build_engine</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">SQLite</td>
+<td style="text-align: left;"><code>mode=ro</code> in the URL</td>
+<td style="text-align: left;">a progress handler per statement, in <code>build_engine</code></td>
+</tr>
+</tbody>
+</table>
+<p>A setting that is per statement rather than per session (DuckDB's timer,
+SQLite's deadline) goes in <code>build_engine</code> as a SQLAlchemy event. An adapter
+that does neither has no statement timeout.</p>
+<h4 id="classifyexc-str-none"><code>classify(exc) -&gt; str | None</code></h4>
+<p>The stage a failed <code>test_connection</code> failed at, or <code>None</code> when the error does
+not say. The default reads a missing driver module (<code>driver</code>) and the standard
+SQLSTATE: class <code>08</code> is <code>network</code>, <code>28</code> <code>auth</code>, <code>3D</code> <code>database</code>, and <code>42501</code>
+<code>permission</code>. Override it to add your driver's own codes and call <code>super()</code> for
+the rest; the built-ins add MySQL's error numbers, SQL Server's, and
+PostgreSQL's connection messages, which carry no SQLSTATE.</p>
+<p><code>test_connection</code> connects, runs <code>SELECT 1</code> and lists the schemas. A failure
+to connect gets <code>classify</code>'s stage; a connection that cannot list the schemas
+is <code>permission</code>. Each stage has a fix: the <code>install_hint</code> for <code>driver</code>, "check
+the host, port and firewall" for <code>network</code>, and so on.</p>
 <h4 id="is_retryable_errorexc-bool"><code>is_retryable_error(exc) -&gt; bool</code></h4>
 <p><code>execute()</code> catches every <code>SQLAlchemyError</code> the query raises and returns it as
 a failed <code>ResultFrame</code> (<code>query_failed(exc)</code>), with <code>retryable</code> from this method

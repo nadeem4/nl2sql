@@ -4739,9 +4739,10 @@
 <p>In-process analytical adapter for local files and ad-hoc analysis.</p>
 <div class="admonition info">
 <p class="admonition-title">Implementation</p>
-<p>This adapter extends <code>SQLAlchemyAdapter</code>. It overrides <code>build_engine()</code> only to
-enforce <code>limits.timeout_ms</code>: DuckDB runs in-process and has no statement
-timeout setting, so the adapter interrupts a statement that runs too long.</p>
+<p>This adapter extends <code>SQLAlchemyAdapter</code>. It overrides <code>build_engine()</code> to
+open a file with <code>read_only=True</code> and to enforce <code>limits.timeout_ms</code>: DuckDB
+runs in-process and has no statement timeout setting, so the adapter
+interrupts a statement that runs too long.</p>
 </div>
 <h2 id="installation">Installation</h2>
 <p>The SQLAlchemy dialect lives in <code>duckdb-engine</code>, which ships in its own extra:</p>
@@ -4778,9 +4779,19 @@ when running in <strong>Docker</strong>.</p>
 </thead>
 <tbody>
 <tr>
+<td style="text-align: left;"><strong>Read-only</strong></td>
+<td style="text-align: left;"><code>read_only=True</code> on the connection</td>
+<td style="text-align: left;">A file is always opened read-only, so it must exist, and declares <code>ENFORCES_READ_ONLY</code>. DuckDB cannot open <code>:memory:</code> read-only, and an in-memory database has nothing to protect, so it does not declare it.</td>
+</tr>
+<tr>
 <td style="text-align: left;"><strong>Timeout</strong></td>
 <td style="text-align: left;"><code>interrupt()</code> on a timer</td>
-<td style="text-align: left;">See <a href="#statement-timeout">Statement Timeout</a>.</td>
+<td style="text-align: left;">See <a href="#statement-timeout">Statement Timeout</a>. Declares <code>ENFORCES_TIMEOUT</code>.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Connection stages</strong></td>
+<td style="text-align: left;">The message</td>
+<td style="text-align: left;">A file that does not exist is <code>database</code>.</td>
 </tr>
 <tr>
 <td style="text-align: left;"><strong>Row counts</strong></td>
@@ -4810,8 +4821,9 @@ schemas of the attached database.</p>
 <ul>
 <li><strong>Analytics</strong>: DuckDB is columnar and vectorized, which suits aggregation-heavy
   generated SQL. It reads Parquet and CSV directly via <code>read_parquet()</code> / <code>read_csv()</code>.</li>
-<li><strong>Concurrency</strong>: A DuckDB file allows a single writing process. Treat it as a
-  single-writer analytical store, not a shared OLTP database.</li>
+<li><strong>Concurrency</strong>: A DuckDB file allows a single writing process, and a process
+  that has it open for writing keeps a read-only one out. Write to the file
+  from another process only while the engine is not using it.</li>
 </ul>
 
 

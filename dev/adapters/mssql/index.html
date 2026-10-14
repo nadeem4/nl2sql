@@ -2322,6 +2322,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#read-only" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Read-only
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#statement-timeout" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4648,6 +4659,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#read-only" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Read-only
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#statement-timeout" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4693,7 +4715,7 @@
 
 <h1 id="microsoft-sql-server-mssql-adapter">Microsoft SQL Server (MSSQL) Adapter</h1>
 <p>Support for SQL Server 2017+ and Azure SQL.</p>
-<p>This adapter extends <code>SQLAlchemyAdapter</code>. Its row counts are the catalog's (<code>sys.partitions</code>), and it enforces <code>limits.timeout_ms</code> through pyodbc's query timeout.</p>
+<p>This adapter extends <code>SQLAlchemyAdapter</code>. Its row counts are the catalog's (<code>sys.partitions</code>), and it enforces <code>limits.timeout_ms</code> through pyodbc's query timeout. It <strong>cannot make the session read-only</strong>: see <a href="#read-only">Read-only</a>.</p>
 <h2 id="configuration">Configuration</h2>
 <p><strong>Type</strong>: <code>mssql</code></p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># datasources/my_db.yaml</span>
@@ -4729,9 +4751,19 @@ other key is an error; see <a href="../../configuration/datasources/#connection"
 </thead>
 <tbody>
 <tr>
+<td style="text-align: left;"><strong>Read-only</strong></td>
+<td style="text-align: left;">None</td>
+<td style="text-align: left;">Does not declare <code>ENFORCES_READ_ONLY</code>; see <a href="#read-only">Read-only</a>.</td>
+</tr>
+<tr>
 <td style="text-align: left;"><strong>Timeout</strong></td>
 <td style="text-align: left;">pyodbc <code>Connection.timeout</code></td>
-<td style="text-align: left;">Client-side query timeout, in whole seconds.</td>
+<td style="text-align: left;">Client-side query timeout, in whole seconds. Declares <code>ENFORCES_TIMEOUT</code>.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Connection stages</strong></td>
+<td style="text-align: left;">SQL Server's error number</td>
+<td style="text-align: left;">18456 is <code>auth</code>, 4060 <code>database</code>, 916 <code>permission</code>; ODBC's <code>08001</code>, <code>08S01</code> and <code>HYT00</code> are <code>network</code>.</td>
 </tr>
 <tr>
 <td style="text-align: left;"><strong>Row counts</strong></td>
@@ -4745,9 +4777,27 @@ other key is an error; see <a href="../../configuration/datasources/#connection"
 </tr>
 </tbody>
 </table>
+<h3 id="read-only">Read-only</h3>
+<p>SQL Server has no setting that makes a session read-only.
+<code>ApplicationIntent=ReadOnly</code> only routes the connection to a readable
+secondary replica; on a primary the session can still write. So the adapter
+does not declare <code>ENFORCES_READ_ONLY</code>, and <code>engine.check()</code> puts a warning on
+every SQL Server datasource's status:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>sales: ready
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>  Warning: sales (mssql): this adapter cannot make the session read-only. Connect with a login that can only read.
+</code></pre></div>
+<p>The typed plan and the validator still block every write (see
+<a href="../../security/model/#what-keeps-the-sql-read-only">the security model</a>). The
+third guard is yours: <strong>connect with a login whose only role in the database
+is <code>db_datareader</code>.</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">CREATE</span><span class="w"> </span><span class="n">LOGIN</span><span class="w"> </span><span class="n">nl2sql</span><span class="w"> </span><span class="k">WITH</span><span class="w"> </span><span class="n">PASSWORD</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'...'</span><span class="p">;</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="k">CREATE</span><span class="w"> </span><span class="k">USER</span><span class="w"> </span><span class="n">nl2sql</span><span class="w"> </span><span class="k">FOR</span><span class="w"> </span><span class="n">LOGIN</span><span class="w"> </span><span class="n">nl2sql</span><span class="p">;</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="k">ALTER</span><span class="w"> </span><span class="k">ROLE</span><span class="w"> </span><span class="n">db_datareader</span><span class="w"> </span><span class="k">ADD</span><span class="w"> </span><span class="n">MEMBER</span><span class="w"> </span><span class="n">nl2sql</span><span class="p">;</span>
+</code></pre></div>
 <h3 id="statement-timeout">Statement Timeout</h3>
-<p>SQL Server has no session setting for a statement timeout, so the adapter sets
-pyodbc's query timeout (<code>Connection.timeout</code>) on every new pooled connection.
+<p>SQL Server has no session setting for a statement timeout, so the adapter's
+<code>session_setup</code> sets pyodbc's query timeout (<code>Connection.timeout</code>) on every new
+pooled connection.
 pyodbc counts whole seconds, so <code>limits.timeout_ms</code> is rounded <strong>up</strong>:
 <code>1500</code> becomes 2 seconds, and anything from 1 to 1000 becomes 1 second. When the
 limit passes, the driver cancels the query and the adapter reports it as a refusal
@@ -4755,8 +4805,8 @@ limit passes, the driver cancels the query and the adapter reports it as a refus
 <h2 id="requirements">Requirements</h2>
 <p>You must have the MS ODBC Driver installed in your Docker image or local environment.</p>
 <p><a href="https://learn.microsoft.com/en-us/sql/connect/odbc/download-odbc-driver-for-sql-server">Download ODBC Driver for SQL Server</a></p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># Debian / Ubuntu</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>sudo<span class="w"> </span>apt-get<span class="w"> </span>install<span class="w"> </span>unixodbc-dev
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># Debian / Ubuntu</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>sudo<span class="w"> </span>apt-get<span class="w"> </span>install<span class="w"> </span>unixodbc-dev
 </code></pre></div>
 
 

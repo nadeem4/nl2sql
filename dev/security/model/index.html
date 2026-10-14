@@ -2203,10 +2203,53 @@ user who produced it is left to a multi-user deployment.</p>
 which is the whole enforcement — and the generator renders that plan with
 <code>sqlglot</code> starting from <code>exp.select()</code>. A statement that is not a SELECT therefore cannot be
 produced, and free text from the model is never executed.</p>
-<p>What is <strong>not</strong> in place: database connections are <strong>not</strong> opened read-only on
-any dialect, and the executor has no statement-kind or statement-count gate of
-its own. The read-only property is structural, not defended in depth. <strong>Grant
-the engine a read-only database user.</strong></p>
+<p>Below that, the session itself is read-only wherever the database allows it.
+There is no setting: the engine never writes, so every built-in adapter makes
+each new connection read-only when it can, and declares <code>ENFORCES_READ_ONLY</code>
+only where it does:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Adapter</th>
+<th style="text-align: left;">Read-only session</th>
+<th style="text-align: left;"><code>ENFORCES_READ_ONLY</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">PostgreSQL</td>
+<td style="text-align: left;"><code>SET default_transaction_read_only = on</code></td>
+<td style="text-align: left;">yes</td>
+</tr>
+<tr>
+<td style="text-align: left;">MySQL</td>
+<td style="text-align: left;"><code>SET SESSION TRANSACTION READ ONLY</code></td>
+<td style="text-align: left;">yes</td>
+</tr>
+<tr>
+<td style="text-align: left;">SQL Server</td>
+<td style="text-align: left;">none: the database has no such session setting</td>
+<td style="text-align: left;"><strong>no</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">DuckDB</td>
+<td style="text-align: left;"><code>read_only=True</code> on the file</td>
+<td style="text-align: left;">yes (not for <code>:memory:</code>)</td>
+</tr>
+<tr>
+<td style="text-align: left;">SQLite</td>
+<td style="text-align: left;"><code>mode=ro</code></td>
+<td style="text-align: left;">yes</td>
+</tr>
+</tbody>
+</table>
+<p><code>engine.check()</code> warns about each datasource whose adapter does not declare
+it ("this adapter cannot make the session read-only"), and still routes to it.
+For those, the login is the third guard: on SQL Server, a login whose only role
+is <code>db_datareader</code> (see <a href="../../adapters/mssql/#read-only">the adapter</a>). The
+executor has no statement-kind or statement-count gate of its own. <strong>Grant the
+engine a read-only database user</strong> anyway: a read-only session stops writes,
+not reads of tables you did not mean to expose.</p>
 <pre class="mermaid"><code>flowchart TD
     User[UserContext] --&gt; Scope[PolicyEngine.scope]
     Check[PolicyCheck.grant, optional] --&gt; Scope
