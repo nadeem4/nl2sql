@@ -2,13 +2,15 @@
 
 ## Purpose
 Provide one entry point: `NL2SQL` is built from one `Config`, owns everything
-it builds (its `Runtime`), and exposes the modular APIs through a single class.
+it builds (its `Runtime`), and is the only thing an application talks to.
+Questions are top-level methods; everything else is a namespace.
 
 ## Responsibilities
 - Build the engine from a `Config`, resolving every name through a `Registry`.
 - Connect, and report what is ready, only when asked (`check()`).
 - Release what it opened (`close()`).
-- Expose convenience methods that delegate to modular APIs.
+- Answer questions (`run_query`, `stream_query`) and group the rest by subject
+  (`engine.datasources`, `engine.index`, ...).
 
 ## Key Modules
 - `packages/nl2sql/src/nl2sql/public_api.py`: the facade
@@ -61,7 +63,8 @@ A relative `storage.path`, and a relative SQLite or DuckDB file in a
 datasource's `connection`, are read from the folder of `nl2sql.yaml` when the
 config was loaded from a file, and from the working directory when it was
 built in code. `engine.config` is the current frozen `Config`, with secrets as
-references only; `add_datasource` is the one call that changes it.
+references only; `datasources.add`, `datasources.remove` and `llm.replace` are
+the calls that change it.
 
 !!! note "Until the settings global is gone"
     Modules not yet moved onto the runtime still read the process-global
@@ -84,7 +87,7 @@ with NL2SQL.from_config("nl2sql.yaml") as engine:
 
 | method | meaning |
 | --- | --- |
-| `check() -> CheckReport` | Connects to each datasource and records it `ready`, or `failed` with the stage (`connect`), the reason and a fix. A failed datasource is marked unavailable and left out of routing: the engine runs degraded, and a query that targets it fails with the reason. It also reports each agent whose API key does not resolve (no model is called) and the index status from `index_health()`. Raises `EngineNotReady` if a `required: true` datasource fails, or if datasources are configured and none is ready; the error carries the `report`. Safe to call again: a datasource that connects on a later call is routed to again. |
+| `check() -> CheckReport` | Connects to each datasource and records it `ready`, or `failed` with the stage (`connect`), the reason and a fix. A failed datasource is marked unavailable and left out of routing: the engine runs degraded, and a query that targets it fails with the reason. It also reports each agent whose API key does not resolve (no model is called) and the index status from `index.health()`. Raises `EngineNotReady` if a `required: true` datasource fails, or if datasources are configured and none is ready; the error carries the `report`. Safe to call again: a datasource that connects on a later call is routed to again. |
 | `close()` | Disposes each adapter's connection pool (an adapter's optional `close()`) and closes the state store and the vector store client. `run_query`, `stream_query` and `check` raise afterwards. Calling it twice is fine. |
 | `with NL2SQL(...) as engine:` | `__exit__` calls `close()`. |
 | `config` | The current frozen `Config`. |
@@ -102,48 +105,75 @@ it suits tests and notebooks. Startup policy belongs to the entry point: call
 `EngineNotReady`, and start degraded, printing the report, when an optional
 datasource fails.
 
-### Convenience methods
+## The shape
 
-The public facade delegates to modular APIs with the same signatures:
-`run_query`, `add_datasource` (a `Datasource`: built, not connected, and added to `engine.config`), `add_datasource_from_config`, `list_datasources`,
-`get_datasource_capabilities`, `configure_llm`, `configure_llm_from_config`,
-`list_llms`, `get_llm`, `index_datasource`, `index_all_datasources`, `clear_index`,
-`check_permissions`, `get_allowed_resources`, `get_current_settings`,
-`get_setting`, `validate_configuration`, `stream_query` (the run as events: see
-[Query API → Streaming a run](query.md#streaming-a-run)), and the saved-result reads
-`get_result_manifest`, `get_result_page` and `export_result_csv` (see
-[Query API → Reading a run's saved results](query.md#reading-a-runs-saved-results)),
-which `nl2sql-api` and the playground both serve.
+```python
+engine.run_query(question, *, datasource_id=None, execute=True, user_context=None, cancellation_token=None)
+engine.stream_query(question, *, datasource_id=None, execute=True, user_context=None, cancellation_token=None)
+engine.check(); engine.close(); engine.config
 
-### Schema, index and retrieval
+engine.datasources   # list, get, add, remove, schema, test
+engine.index         # build, health, clear, inspect
+engine.llm           # list, get, replace
+engine.policies      # roles, allows, allowed, validate
+engine.curated       # validate, test
+engine.results       # manifest, page, csv
+engine.traces        # replay
+engine.benchmark     # run_matrix, run_tier1, run_retrieval, tier2_configs, run_tier2
+```
 
-What a client shows about the index, as methods on `NL2SQL` itself. The
-playground and `nl2sql-api` both use them, and neither reaches into
-`engine.context`; `tests/unit/test_cli_demo_boundaries.py` holds the playground
-to that.
+| namespace | reference |
+| --- | --- |
+| `run_query`, `stream_query`, `results` | [Query API](query.md) |
+| `datasources` | [Datasource API](datasource.md) |
+| `index` | [Indexing API](indexing.md) |
+| `llm` | [LLM API](llm.md) |
+| `policies` | [Policies API](policies.md) |
+| `curated` | [Curated answers → Checking them](../../configuration/curated.md) |
+| `traces` | below |
+| `benchmark` | [Benchmarks](../../benchmarks.md) |
 
-| method | returns | meaning |
-| --- | --- | --- |
-| `get_schema(datasource_id)` | `dict` | The indexed schema as the planner is given it: `{"datasource_id", "tables": [...]}`, tables sorted by name, each with `name`, `schema`, `row_count`, `description`, `columns` (`name`, `type`, `nullable`, `primary_key`, `description`) and `foreign_keys` (`columns`, `references_table`, `references_columns`). Read from the latest schema snapshot, not the database; before the first index `tables` is empty. |
-| `index_health()` | `dict` | `status` (`ok`, `empty`, `stale`, `missing`), `total`, `counts` by entry type, `built_at`, `embedding_model`, one entry per registered datasource (`entries`, `index_version`, `snapshot_version`, `built_at`), `problems` and `warnings`. `missing` when no vector store is configured. A datasource that failed to start is a warning: "Datasource 'x' is unavailable: <reason>". |
-| `list_unavailable_datasources()` | `dict` | Configured datasources that `check()` could not connect to, mapped to the reason. They are not in `list_datasources()` until a later `check()` connects. See [Datasources → When a datasource fails to start](../../configuration/datasources.md#when-a-datasource-fails-to-start). |
-| `rebuild_index(datasource_ids=None, enrich=False, full=False, on_progress=None, switch_guard=None)` | `RebuildResult` | Rebuilds the vector entries beside the live ones, then switches; the current entries answer questions until then. `enrich` asks the LLM for descriptions and spends tokens, so it is off by default. `on_progress` gets a sentence before each step; `switch_guard` is a context manager factory held around each switch. The result has `ok`, `stats`, `empty` and `errors`. |
-| `inspect_retrieval(query, k=8, lambda_mult=None, types=None, datasource_id=None)` | `dict` | One MMR search of the live index, as the engine runs it: the pool with scores, the picks in order and what was dropped. `types` limits the entry types (`schema.table`, ...). Raises `LookupError` when no vector store is configured. |
-| `reload_llm_config(config_path)` | `None` | Replaces every configured LLM with the `llm` section of the `nl2sql.yaml` at `config_path`, as one step: agents the section no longer names fall back to the top level. An invalid file leaves the current configuration in place. |
+The namespace classes are internal: reach them through the engine, never by
+importing them. Each is built on first use.
+
+The CLI, the playground and `nl2sql-api` are callers like any other: they use
+only these methods and namespaces, never the runtime behind them.
+`test_the_cli_the_playground_and_the_api_use_only_the_public_api` in
+`tests/architecture/test_boundaries.py` holds them to that.
+
+### Traces
+
+`engine.traces.replay(trace)` re-runs a recorded question, answering every LLM
+call from the trace document (no model is called), on a runtime of its own so
+the engine's config and LLMs never change. It returns a `ReplayReport`: the
+replayed `result`, how many recorded calls were `served`, the `divergence`
+(where the replay asked for a call the recording does not have) and the
+`differences` from the recorded result. It raises `LookupError` when a
+datasource the trace used is not configured here or does not answer; the
+message names each one and why. `nl2sql trace replay` is built on it (see
+[Debugging](../../observability/debugging.md)).
 
 ```python
 engine = NL2SQL.demo()
-engine.get_schema("chinook")["tables"][0]["name"]      # 'Album'
-engine.index_health()["status"]                         # 'ok'
-engine.inspect_retrieval("top customers", k=4)["picks"]
+engine.datasources.schema("chinook")["tables"][0]["name"]   # 'Album'
+engine.index.health()["status"]                              # 'ok'
+engine.index.inspect("top customers", k=4)["picks"]
 ```
 
 ### Top-level exports
 
 Clients import everything they need from `nl2sql` itself, never from an engine
 submodule: `NL2SQL`, `QueryResult`, `SubQueryResult`, `RowSample`,
-`ResultSummary`, `ResultManifest`, `ResultPage`, `ResultNotFound`,
-`MAX_RESULT_PAGE_SIZE`, `QuestionUsage`, `QueryEvent`, `UserContext`, `CancellationToken`,
-`configure_logging`, the config (`Config`, `load_config`, `ConfigError`, `Registry` and the section classes `Datasource`, `Limits`, `LLM`, `AgentLLM`, `Embeddings`, `Policies`, `Role`, `Storage`, `Secrets`, `Curated`, `Settings`), what `check()` reports (`CheckReport`, `DatasourceStatus`, `EngineNotReady`), the error types
-(`PipelineError`, `ErrorCode`, `ErrorSeverity`) and the modular API classes.
-The REST API (`nl2sql-api`) is held to this rule by an architecture test.
+`AnswerSource`, `ResultSummary`, `ResultManifest`, `ResultPage`,
+`ResultNotFound`, `MAX_RESULT_PAGE_SIZE`, `QuestionUsage`, `QueryEvent`,
+`UserContext`, `CancellationToken`, `configure_logging`, what the namespaces
+return (`DatasourceInfo`, `IndexProgress`, `LLMChange`), the config (`Config`,
+`load_config`, `load_env_file`, `ConfigError`, `Registry` and the section
+classes `Datasource`, `Limits`, `LLM`, `AgentLLM`, `Embeddings`, `Policies`,
+`Role`, `Storage`, `Secrets`, `Curated`, `Settings`), what `check()` reports
+(`CheckReport`, `DatasourceStatus`, `EngineNotReady`), the error types
+(`PipelineError`, `ErrorCode`, `ErrorSeverity`), and the benchmark's
+`BenchmarkAPI` and `BenchmarkConfig`. The list is fixed by
+`tests/unit/test_public_surface.py`: adding or removing a name is a semver
+decision. The REST API (`nl2sql-api`) is held to importing only from `nl2sql`
+by an architecture test.

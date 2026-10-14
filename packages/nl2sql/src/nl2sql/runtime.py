@@ -18,7 +18,7 @@ from __future__ import annotations
 import copy
 from pathlib import Path
 from threading import RLock
-from typing import TYPE_CHECKING, Any, Dict, List, NamedTuple, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Mapping, NamedTuple, Optional, Union
 
 from nl2sql.check import DatasourceStatus
 from nl2sql.common.logger import get_logger
@@ -222,11 +222,24 @@ class Runtime:
             self.ds_registry.register_datasource(datasource)
             self._config = config
 
-    def replace_llm(self, llm: "LLM", *, by: Optional["UserContext"] = None, via: str = "python") -> "LLMChange":
+    def remove_datasource(self, datasource_id: str) -> None:
+        """Takes ``datasource_id`` out of routing and ``config``, and closes its adapter's pool.
+
+        Raises:
+            ValueError: it is not configured.
+        """
+        with self._lock:
+            config = self._config.without_datasource(datasource_id)
+            self.ds_registry.remove(datasource_id)
+            self._config = config
+
+    def replace_llm(self, llm: Union["LLM", Mapping[str, Any]], *, by: Optional["UserContext"] = None,
+                    via: str = "python") -> "LLMChange":
         """Swaps in ``llm`` as one step, and logs and audits the change. Never calls a model.
 
         ``llm`` is validated as the ``llm`` section of ``nl2sql.yaml`` is, and
-        every agent's API key must resolve. The new clients are built first;
+        every agent's API key must resolve. A mapping is that section as
+        written (a request body), checked by the same rules. The new clients are built first;
         then the LLM set and ``config.llm`` are swapped together under the
         engine's lock. Runs in flight finish on the old set.
 
@@ -235,11 +248,14 @@ class Runtime:
                 key does not resolve. Nothing has changed.
         """
         from nl2sql.config import LLM
+        from nl2sql.config.loader import parse_section
         from nl2sql.llm.llm_set import LLMChange
 
         source = "LLM"
+        if isinstance(llm, Mapping):
+            llm = parse_section("llm", dict(llm), source=source)
         if not isinstance(llm, LLM):
-            raise TypeError(f"replace takes an LLM, not {type(llm).__name__}.")
+            raise TypeError(f"replace takes an LLM or the llm section as a mapping, not {type(llm).__name__}.")
         problems = _llm_provider_problems(llm, self.registry, source)
         if problems:
             raise ConfigError(problems, source=source)
@@ -280,25 +296,33 @@ class Runtime:
 
     def check_datasources(self) -> List[DatasourceStatus]:
         """Connects to each datasource; a failed one is kept out of routing until it connects again."""
-        adapters = self.ds_registry.all_adapters()
-        statuses = []
-        for i, datasource in enumerate(self.config.datasources):
-            adapter = adapters.get(datasource.id)
-            try:
-                reason = None if adapter.test_connection() else "The connection test failed."
-            except Exception as e:
-                reason = str(e) or type(e).__name__
-            if reason is None:
-                self.ds_registry.mark_available(datasource.id)
-                statuses.append(DatasourceStatus(id=datasource.id, status="ready", required=datasource.required))
-                continue
-            self.ds_registry.mark_unavailable(datasource.id, reason)
-            statuses.append(DatasourceStatus(
-                id=datasource.id, status="failed", required=datasource.required, stage="connect",
-                reason=reason,
-                fix=f"Check datasources[{i}].connection for '{datasource.id}', and that the database "
-                    "is reachable from this machine. The log has the driver's error."))
-        return statuses
+        return [self.check_datasource(datasource.id) for datasource in self.config.datasources]
+
+    def check_datasource(self, datasource_id: str) -> DatasourceStatus:
+        """Connects to one datasource: ``ready`` puts it back in routing, ``failed`` keeps it out.
+
+        Raises:
+            ValueError: it is not configured.
+        """
+        datasources = self.config.datasources
+        i = next((i for i, d in enumerate(datasources) if d.id == datasource_id), None)
+        if i is None:
+            raise ValueError(f"Unknown datasource ID: {datasource_id}")
+        datasource = datasources[i]
+        adapter = self.ds_registry.all_adapters().get(datasource.id)
+        try:
+            reason = None if adapter.test_connection() else "The connection test failed."
+        except Exception as e:
+            reason = str(e) or type(e).__name__
+        if reason is None:
+            self.ds_registry.mark_available(datasource.id)
+            return DatasourceStatus(id=datasource.id, status="ready", required=datasource.required)
+        self.ds_registry.mark_unavailable(datasource.id, reason)
+        return DatasourceStatus(
+            id=datasource.id, status="failed", required=datasource.required, stage="connect",
+            reason=reason,
+            fix=f"Check datasources[{i}].connection for '{datasource.id}', and that the database "
+                "is reachable from this machine. The log has the driver's error.")
 
     def close(self) -> None:
         """Disposes the adapters' pools, closes the LLM clients and the stores. Calling it again does nothing."""

@@ -23,7 +23,7 @@ import yaml
 pytest.importorskip("fastapi")
 from fastapi.testclient import TestClient
 
-from nl2sql import NL2SQL, DatasourceAPI, LLM_API
+from nl2sql import NL2SQL
 from nl2sql.api.query_api import QueryResult
 from nl2sql.cli.demo.playground.app import build_app
 from nl2sql.cli.demo.playground.hosted import (
@@ -62,7 +62,8 @@ class _Context:
         self.vector_store = None
         self.ds_registry = type("R", (), {"list_ids": staticmethod(lambda: [])})()
         self.llm_registry = LLMRegistry(SecretManager())
-        self.replace_llm(load_config(project / "nl2sql.yaml").llm)
+        self.config = load_config(project / "nl2sql.yaml")
+        self.replace_llm(self.config.llm)
 
 
     def replace_llm(self, llm, **kwargs):
@@ -75,8 +76,6 @@ class _Engine(NL2SQL):
 
     def __init__(self, project):
         self._runtime = _Context(project)
-        self.datasource = DatasourceAPI(self._runtime)
-        self.llm = LLM_API(self._runtime)
         self.seen = []
         self.per_step = []
         self.hold = None
@@ -88,7 +87,7 @@ class _Engine(NL2SQL):
         if self.hold is not None:
             self.hold.wait(5)
         # Exactly what a pipeline node does while the graph is built.
-        clients = {step: self.context.llm_registry.get_llm(step) for step in self.steps}
+        clients = {step: self._runtime.llm_registry.get_llm(step) for step in self.steps}
         self.per_step.append(clients)
         self.seen.append((current_api_key(), clients["astplanner"]))
         return QueryResult(status="success")
@@ -127,7 +126,7 @@ def test_the_key_arrives_in_a_header_and_reaches_the_registry_for_that_request(p
     assert engine.seen[0][1].openai_api_key.get_secret_value() == VISITOR_KEY
     # And nothing of the request survives it.
     assert current_api_key() is None
-    assert engine.context.llm_registry.llms == {}
+    assert engine._runtime.llm_registry.llms == {}
 
 
 def test_the_key_is_written_nowhere_in_the_project_and_is_in_no_response(project, caplog):
@@ -464,7 +463,7 @@ def test_local_mode_needs_no_header_and_reports_no_hosted_flag(project, monkeypa
     assert answer.status_code == 200
     # No request key, so the registry resolves and caches exactly as before.
     assert engine.seen[0][0] is None
-    assert set(engine.context.llm_registry.llms) == {"default"}
+    assert set(engine._runtime.llm_registry.llms) == {"default"}
 
 
 def test_local_mode_ignores_the_headers_hosted_mode_reads(project, monkeypatch):
@@ -503,7 +502,7 @@ def test_each_providers_key_arrives_in_its_own_header(project):
     # and on that one, not on whichever key happened to arrive first.
     planner = engine.per_step[0]["astplanner"]
     assert planner.openai_api_key.get_secret_value() == VISITOR_KEY
-    assert engine.context.llm_registry.llms == {}
+    assert engine._runtime.llm_registry.llms == {}
 
 
 def test_a_step_put_on_another_provider_takes_that_providers_key(project):
@@ -525,7 +524,7 @@ def test_a_step_put_on_another_provider_takes_that_providers_key(project):
     # The synthesizer stayed where it was, on the other key.
     assert synthesizer.openai_api_key.get_secret_value() == VISITOR_KEY
     assert not hasattr(synthesizer, "anthropic_api_key")
-    assert engine.context.llm_registry.llms == {}
+    assert engine._runtime.llm_registry.llms == {}
 
 
 def test_a_model_choice_on_the_same_provider_changes_only_the_model(project):
@@ -609,7 +608,7 @@ def test_one_visitors_keys_are_never_another_visitors(project):
     assert built[0].openai_api_key.get_secret_value() == VISITOR_KEY
     assert built[1].openai_api_key.get_secret_value() == OTHER_KEY
     # And no client outlives the request that built it.
-    assert engine.context.llm_registry.llms == {}
+    assert engine._runtime.llm_registry.llms == {}
 
 
 def test_a_malformed_provider_key_is_400_and_is_not_quoted_back(project):

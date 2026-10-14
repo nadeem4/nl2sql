@@ -159,7 +159,8 @@ def test_a_consumer_that_stops_reading_cancels_the_run(api):
 def test_the_facade_streams_through_the_query_api():
     engine = NL2SQL.__new__(NL2SQL)
     calls = []
-    engine.query = SimpleNamespace(stream_query=lambda **kw: calls.append(kw) or iter(["e"]))
+    engine._queries = SimpleNamespace(
+        stream_query=lambda question, **kw: calls.append({"question": question, **kw}) or iter(["e"]))
     assert list(engine.stream_query("q", datasource_id="chinook", execute=False)) == ["e"]
-    assert calls[0]["natural_language"] == "q" and calls[0]["datasource_id"] == "chinook"
+    assert calls[0]["question"] == "q" and calls[0]["datasource_id"] == "chinook"
     assert calls[0]["execute"] is False

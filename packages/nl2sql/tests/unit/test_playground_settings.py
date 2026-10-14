@@ -21,12 +21,12 @@ pytest.importorskip("fastapi")
 from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
 
-from nl2sql.api.query_api import QueryAPI, QueryResult
+from nl2sql.api.query_api import QueryResult
 from nl2sql.execution.artifacts import ArtifactStore, ArtifactStoreConfig
 from nl2sql.llm.providers import VERIFIED_OPENAI_MODELS, mask_key
 from nl2sql.cli.commands.demo import _key_from_env_file
 from nl2sql.cli.demo.playground.app import build_app
-from nl2sql import NL2SQL, DatasourceAPI, LLM_API, load_config
+from nl2sql import NL2SQL, load_config
 from nl2sql.llm import LLMRegistry
 from nl2sql.secrets import SecretManager
 from nl2sql.testing.config import make_config
@@ -81,7 +81,8 @@ class _Context:
         self.vector_store = None
         self.ds_registry = type("R", (), {"list_ids": staticmethod(lambda: [])})()
         self.llm_registry = LLMRegistry(SecretManager())
-        self.replace_llm(load_config(project / "nl2sql.yaml").llm)
+        self.config = load_config(project / "nl2sql.yaml")
+        self.replace_llm(self.config.llm)
         self.tenant_id = "default_tenant"
         self.artifact_store = ArtifactStore(ArtifactStoreConfig(
             base_uri=str(project / "artifacts"),
@@ -98,9 +99,6 @@ class _Engine(NL2SQL):
 
     def __init__(self, project):
         self._runtime = _Context(project)
-        self.datasource = DatasourceAPI(self._runtime)
-        self.llm = LLM_API(self._runtime)
-        self.query = QueryAPI(self._runtime)
         self.used = []
         self.release = None
         self.entered = threading.Event()
@@ -110,7 +108,7 @@ class _Engine(NL2SQL):
         self.entered.set()
         if self.release is not None:
             self.release.wait(5)
-        self.used.append(self.context.llm_registry.get_llm("astplanner"))
+        self.used.append(self._runtime.llm_registry.get_llm("astplanner"))
         return QueryResult(status="success")
 
 
@@ -327,7 +325,7 @@ def test_an_openrouter_key_switches_to_openrouter(project):
     assert _key_from_env_file(project / ".env") == FAKE_OPENROUTER_KEY
     # The replay placeholder must not be sent to OpenRouter as a key.
     assert "OPENAI_API_KEY" not in os.environ
-    llm = engine.context.llm_registry.get_llm("astplanner")
+    llm = engine._runtime.llm_registry.get_llm("astplanner")
     assert llm.openai_api_key.get_secret_value() == FAKE_OPENROUTER_KEY
     read = client.get("/api/settings").json()
     assert read["key"]["env_var"] == "OPENROUTER_API_KEY"
@@ -378,8 +376,8 @@ def test_a_node_model_is_written_to_the_llm_yaml_the_cli_reads(project):
     assert llm.agents["ast_planner"].base_url == REPLAY_URL
     assert llm.agents["ast_planner"].api_key == "replay"
     # And it takes effect without a restart.
-    assert engine.context.llm_registry.get_llm("astplanner").model_name == "gpt-4.1"
-    assert engine.context.llm_registry.get_llm("decomposer").model_name == "gpt-5.4"
+    assert engine._runtime.llm_registry.get_llm("astplanner").model_name == "gpt-4.1"
+    assert engine._runtime.llm_registry.get_llm("decomposer").model_name == "gpt-5.4"
     nodes = {n["agent"]: n["model"] for n in response.json()["nodes"]}
     assert nodes == {"curatedmatcher": None, "datasourceresolver": None, "decomposer": None, "astplanner": "gpt-4.1",
                      "refiner": None, "answersynthesizer": None}
@@ -395,7 +393,7 @@ def test_choosing_a_model_that_rejects_temperature_writes_temperature_null(proje
     raw = yaml.safe_load(text)
     assert "temperature" in raw["agents"]["refiner"] and raw["agents"]["refiner"]["temperature"] is None
     assert raw["agents"]["decomposer"]["temperature"] is None
-    assert engine.context.llm_registry.get_llm("refiner").temperature is None
+    assert engine._runtime.llm_registry.get_llm("refiner").temperature is None
 
 
 def test_use_the_default_removes_the_node_entry(project):
@@ -405,7 +403,7 @@ def test_use_the_default_removes_the_node_entry(project):
     assert client.post("/api/settings/models", json={"models": {"astplanner": None}}).status_code == 200
 
     assert "ast_planner" not in (_llm_yaml(project).get("agents") or {})
-    assert engine.context.llm_registry.get_llm("astplanner").model_name == "gpt-5.4"
+    assert engine._runtime.llm_registry.get_llm("astplanner").model_name == "gpt-5.4"
 
 
 def test_only_verified_models_are_offered_and_accepted(project):
@@ -475,8 +473,8 @@ def test_a_node_can_be_put_on_another_provider(project, monkeypatch):
     assert entry["temperature"] is None and "base_url" not in entry
     assert _llm_yaml(project)["provider"] == "openai"
     # Applied without a restart, through the anthropic wire.
-    assert engine.context.llm_registry.get_llm("astplanner")._llm_type == "anthropic-chat"
-    assert engine.context.llm_registry.get_llm("decomposer")._llm_type == "openai-chat"
+    assert engine._runtime.llm_registry.get_llm("astplanner")._llm_type == "anthropic-chat"
+    assert engine._runtime.llm_registry.get_llm("decomposer")._llm_type == "openai-chat"
     node = {n["agent"]: n for n in response.json()["nodes"]}["astplanner"]
     assert (node["provider"], node["model"], node["unavailable"]) == ("anthropic", "claude-opus-5", None)
     _assert_no_key(response.text, FAKE_ANTHROPIC_KEY)
@@ -541,7 +539,7 @@ def test_a_second_key_keeps_the_first_and_the_nodes_on_its_provider(project, mon
     assert cfg["provider"] == "anthropic"
     assert cfg["agents"]["ast_planner"]["provider"] == "anthropic"
     assert cfg["agents"]["decomposer"] == {"provider": "openai", "model": "gpt-4.1", "temperature": 0.0}
-    assert engine.context.llm_registry.get_llm("decomposer").openai_api_key.get_secret_value() == FAKE_KEY
+    assert engine._runtime.llm_registry.get_llm("decomposer").openai_api_key.get_secret_value() == FAKE_KEY
 
     # Saving the OpenAI key again moves the default back; the Claude step stays on Claude.
     assert client.post("/api/settings/key", json={"api_key": FAKE_KEY}).status_code == 200

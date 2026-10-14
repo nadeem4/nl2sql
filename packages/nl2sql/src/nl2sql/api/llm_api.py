@@ -1,16 +1,10 @@
-"""
-LLM API for NL2SQL
-
-Provides functionality for configuring LLMs programmatically or via config.
-"""
+"""``engine.llm``: the model each agent runs on, and replacing them at runtime."""
 
 from __future__ import annotations
 
-import pathlib
-from typing import TYPE_CHECKING, Any, Dict, Optional, Union
+from typing import TYPE_CHECKING, Any, Dict, Mapping, Optional, Union
 
-from nl2sql.runtime import Runtime
-from nl2sql.llm.models import AgentConfig
+from nl2sql.runtime import Runtime, _config_agent_names
 
 if TYPE_CHECKING:
     from nl2sql.auth import UserContext
@@ -18,79 +12,55 @@ if TYPE_CHECKING:
     from nl2sql.llm.llm_set import LLMChange
 
 
-class LLM_API:
-    """
-    API for configuring LLMs programmatically or via config files.
-    """
-    
+class LLMAPI:
+    """``engine.llm``. Internal: reach it through ``NL2SQL``."""
+
     def __init__(self, ctx: Runtime):
         self._ctx = ctx
-        self._registry = ctx.llm_registry
 
-    def replace(self, llm: "LLM", *, by: Optional["UserContext"] = None, via: str = "python") -> "LLMChange":
+    def list(self) -> Dict[str, Dict[str, Any]]:
+        """Each agent, by its name in the ``llm`` section, with the model it runs on. Never a key.
+
+        ``default`` first, then every agent: ``provider``, ``model``,
+        ``temperature`` and ``inherited`` (True when the agent sets nothing
+        of its own and runs on ``default``). An agent given a model object
+        shows its class as ``model`` and no provider.
+        """
+        listed = self._ctx.llm_registry.list_llms()
+        default = _entry(listed.get("default") or {})
+        out = {"default": {**default, "inherited": False}}
+        for wire_name, name in _config_agent_names().items():
+            if name == "default":
+                continue
+            own = listed.get(wire_name)
+            out[name] = {**(_entry(own) if own else default), "inherited": own is None}
+        return out
+
+    def get(self, agent: str) -> Dict[str, Any]:
+        """One agent's entry from :meth:`list` (``default`` included).
+
+        Raises:
+            ValueError: no agent has that name.
+        """
+        listed = self.list()
+        if agent not in listed:
+            raise ValueError(f"Unknown agent '{agent}'. The agents are: {', '.join(listed)}.")
+        return listed[agent]
+
+    def replace(self, llm: Union["LLM", Mapping[str, Any]], *, by: Optional["UserContext"] = None,
+                via: str = "python") -> "LLMChange":
         """Replace the whole ``llm`` section at once: validated, atomic, logged. Never calls a model.
 
-        ``llm`` is validated as ``llm.yaml`` is, and every agent's API key
-        must resolve; an invalid one raises ``ConfigError`` and changes
-        nothing. Runs already in flight finish on the old LLM. The change is
+        ``llm`` is an ``LLM``, or the ``llm`` section as written in
+        ``nl2sql.yaml`` (a mapping, such as a request body). Either is
+        validated as ``llm.yaml`` is, and every agent's API key must resolve;
+        an invalid one raises ``ConfigError`` and changes nothing. Runs already in flight finish on the old LLM. The change is
         logged (one INFO line) and audited, naming ``by`` (or ``via``, the
         entry point) and each agent's old and new provider and model, never a
         key. It is not written to any file.
         """
         return self._ctx.replace_llm(llm, by=by, via=via)
 
-    def configure_llm(
-        self,
-        config: Union[AgentConfig, Dict[str, Any]]
-    ) -> None:
-        """
-        Programmatically configure an LLM.
-        
-        Args:
-            config: LLM configuration as either an AgentConfig object
-                   or a dictionary with the configuration
-        """
-        if isinstance(config, dict):
-            if 'name' not in config:
-                config['name'] = 'default'
-            config = AgentConfig(**config)
-        
-        self._registry.register_llm(config)
-    
-    def configure_llm_from_config(
-        self,
-        config_path: Union[str, pathlib.Path]
-    ) -> None:
-        """
-        Replace every agent with the ``llm`` section of an ``nl2sql.yaml``, as one step.
 
-        Agents the section no longer names fall back to the top level. An
-        invalid file leaves the current LLMs in place.
-
-        Args:
-            config_path: Path to the ``nl2sql.yaml`` whose ``llm`` section to use
-        """
-        from nl2sql.config import load_config
-
-        self.replace(load_config(config_path).llm)
-    
-    def get_llm(self, name: str):
-        """
-        Get a specific LLM by name.
-        
-        Args:
-            name: Name of the LLM to retrieve
-            
-        Returns:
-            LLM instance
-        """
-        return self._registry.get_llm_config(name)
-    
-    def list_llms(self) -> dict:
-        """
-        List all configured LLMs.
-        
-        Returns:
-            List of LLM names
-        """
-        return self._registry.list_llms()
+def _entry(listed: Dict[str, Any]) -> Dict[str, Any]:
+    return {key: listed.get(key) for key in ("provider", "model", "temperature")}

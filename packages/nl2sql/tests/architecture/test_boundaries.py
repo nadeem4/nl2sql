@@ -415,21 +415,27 @@ def test_cli_demo_never_imports_cli_commands():
         "share lives in cli/demo/ or cli/common/.", offenders)
 
 
-def test_the_playground_never_touches_the_engine_context():
-    """The playground is a client of the facade, exactly like nl2sql-api."""
+def test_the_cli_the_playground_and_the_api_use_only_the_public_api():
+    """The CLI, the playground and nl2sql-api are clients of the facade, like any SDK caller.
+
+    None of them reaches the runtime behind it (``engine._runtime``, the
+    removed ``engine.context``, a namespace's ``_ctx``): what one of them needs
+    is a facade method every caller can use (owner decision, PR 10).
+    """
+    hidden = {"context", "_ctx", "_runtime"}
     offenders = []
-    for path in python_files(DEMO / "playground"):
+    for path in python_files(ENGINE / "cli", PACKAGES / "api" / "src" / "nl2sql_api"):
         for node in ast.walk(_tree(path)):
-            if isinstance(node, ast.Attribute) and node.attr in {"context", "_ctx"}:
+            if isinstance(node, ast.Attribute) and node.attr in hidden:
                 offenders.append(f"{_where(path)}:{node.lineno} .{node.attr}")
             elif (isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "getattr"
                   and len(node.args) > 1 and isinstance(node.args[1], ast.Constant)
-                  and node.args[1].value in {"context", "_ctx"}):
+                  and node.args[1].value in hidden):
                 offenders.append(f"{_where(path)}:{node.lineno} getattr(..., {node.args[1].value!r})")
     assert not offenders, _broke(
-        "The playground reaches the engine only through NL2SQL's public methods, never "
-        "engine.context. Anything it needs from the context is a facade method the REST "
-        "API can call too.", offenders)
+        "The CLI, the playground and nl2sql-api reach the engine only through NL2SQL's public "
+        "methods and namespaces, never engine._runtime. Anything they need from the runtime is "
+        "a facade method every caller can use.", offenders)
 
 
 # --------------------------------------------------------------------------
@@ -600,7 +606,6 @@ def test_every_provider_key_variable_is_read_through_the_llm_presets():
 # "Staging it"). This list may only shrink: take a module off it when it stops
 # importing the global, and never add one. PR 13 deletes the global and this test.
 READS_THE_SETTINGS_GLOBAL = {
-    "nl2sql.api.settings_api",
     "nl2sql.cli.demo.playground.app",
     "nl2sql.runtime",
 }

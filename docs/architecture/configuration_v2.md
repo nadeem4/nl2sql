@@ -643,7 +643,7 @@ The variables read outside `Settings`:
       `nl2sql_store`, a constant), the schema store `<storage.path>/state.db`,
       traces `<storage.path>/traces/` and results `<storage.path>/results/`.
       The S3 and ADLS result backends and their settings are deleted.
-    - **Datasources.** `engine.add_datasource(Datasource)` builds the adapter
+    - **Datasources.** `engine.add_datasource(Datasource)` (since 10a `engine.datasources.add`) builds the adapter
       (not connected) and swaps in a new `engine.config` under the engine's
       lock. Indexing reads a datasource's description and sample questions
       from its `Datasource`, so one added in code keeps both (bug B9).
@@ -786,9 +786,8 @@ engine.llm.replace(LLM(provider="openai", model="gpt-5.4",
 
     - **The entry point.** `replace` takes `via` alongside `by`, so the entry
       point (`python`, `api`, `playground`) is known when there is no user.
-      `PUT /api/v1/settings/llm` arrives in PR 10; until then `POST /llm`
-      keeps registering one agent through `configure_llm`, which builds a new
-      set and swaps it, but leaves `engine.config.llm` as it was.
+      `PUT /api/v1/settings/llm` (PR 10a) replaced `POST /llm` and
+      `configure_llm`.
     - **Keys.** `replace` fails with `ConfigError` when an agent's API key
       does not resolve (`llm.api_key`, `llm.agents.<agent>.api_key`). At
       construction a key that does not resolve is still `check()`'s to
@@ -1097,6 +1096,56 @@ noisy than wall-clock time. The rule is added to `invariants.md`.
 
 ## 7. The facade
 
+!!! note "Built: the namespaces (PR 10a)"
+    `engine.datasources`, `engine.index`, `engine.llm` (`list`, `get`,
+    `replace`), `engine.policies`, `engine.curated`, `engine.results` and
+    `engine.traces` (`replay`) are built, as internal classes in
+    `nl2sql/api/` that the facade builds on first use. `run_query` and
+    `stream_query` take `question` and keyword-only options. The flat
+    methods, `engine.query`, `context`, `get_adapter`, `SettingsAPI`, the
+    sub-API exports, `configure_llm`, `configure_llm_from_config` and
+    `reload_llm_config` are deleted, and
+    `test_nl2sql_exports_exactly_the_public_surface` fixes the exports.
+    `POST /llm` is the admin-only `PUT /api/v1/settings/llm`. Building it
+    settled these details:
+
+    - **The split.** PR 10 was split to stay reviewable. 10a is the
+      namespaces, the REST API and the CLI on them, and the call sites in the
+      playground. 10b moves the playground off the engine's internals:
+      `engine.feedback`, `traces.get`, `about()` and `llm.providers()`, and the
+      stricter import boundary test for the playground, `nl2sql_api` and
+      `cli/commands/demo.py`.
+    - **Public API only, for the CLI too (owner decision).** The CLI, the
+      playground and `nl2sql-api` use nothing but the facade, never the
+      runtime behind it. `nl2sql run` shows its live progress from
+      `stream_query`'s events (the `PipelineRunner` and the monitor callback
+      are deleted; `--show-perf` is each step's time from its
+      `node_finished` event, and the CLI records `nl2sql.node.duration` from
+      them). `index.build` gains `on_datasource`, called with an
+      `IndexProgress` (`datasource_id`, `state`: `started`, `done` with
+      `counts`, or `failed` with `reason`) that a console line and a Phase 4
+      index job can both use; `nl2sql index` prints from it. `nl2sql trace
+      replay` runs on `engine.traces.replay`, which 10a builds because the
+      replay needs the runtime. `test_the_cli_the_playground_and_the_api_use_only_the_public_api`
+      holds all three to it. The CLI's `llm_interaction` audit event went
+      with the monitor callback; `llm.changed` is the audit log's one event.
+    - **`llm.replace` takes the section as written.** Besides an `LLM`, it
+      takes a mapping, checked by the loader's rules (`parse_section` in
+      `config/loader.py`): strict keys with "did you mean", references kept
+      in secret fields. A reference anywhere else is an error rather than
+      read, so a request body never reads the server's environment.
+      `PUT /api/v1/settings/llm` passes its body straight through and answers
+      a `ConfigError` with 422 and its text.
+    - **`llm.list()`** names agents as the `llm` section does (`default`,
+      `ast_planner`, ...), each with `provider`, `model`, `temperature` and
+      `inherited`.
+    - **`datasources`.** `DatasourceInfo.status` is `ready` (connected by
+      `check()` or `test()`), `failed` (with `reason`) or `unchecked`, since
+      building never connects. `remove(id)` takes the datasource out of
+      routing and `engine.config` and closes its pool; its index entries stay
+      until the next full build. The REST datasource routes now return
+      `DatasourceInfo` and `DELETE` removes.
+
 ### The new shape
 
 ```python
@@ -1180,7 +1229,7 @@ expose them.
 | **The CLI** | Builds `NL2SQLContext` directly in `run`, `index`, `trace replay`, `setup`, `cli/common/indexing.py`; reads `settings.*` paths | Every command builds `NL2SQL.from_config(ctx.config_path)` and uses the facade. `run_pipeline` and `run_indexing` take the engine. `NL2SQLContext` is no longer importable from the CLI. |
 | **The playground** (`cli/demo/`) | `NL2SQL()`, `engine.context.policies_cfg`, `reload_llm_config`, `FeedbackStore(settings.schema_store_path)`, `settings.trace_dir`, `settings.feedback_enabled`, `describe_pipeline`, `engine_info`, `PROVIDER_PRESETS`; writes keys into `os.environ` | Builds from the demo folder's `nl2sql.yaml`. Uses `policies.roles()`, `feedback.*`, `traces.get()`, `about()` and `llm.providers()`. **Switching the model calls `engine.llm.replace(new_llm)`** in place of `reload_llm_config`. It still writes `llm.yaml` for the next start, and a key typed in the panel goes into the new `LLM` as a value and into the demo folder's `.env`, never into `os.environ`. `use_request_llms` (hosted per-request keys) and `run_record` stay internal imports until Phase 4, when the web app moves onto `nl2sql-api`. |
 
-The boundary test `test_the_playground_never_touches_the_engine_context`
+The boundary test `test_the_playground_never_touches_the_engine_context` (since 10a `test_the_cli_the_playground_and_the_api_use_only_the_public_api`)
 becomes stricter: the playground and `nl2sql_api` may not import
 `nl2sql.common.settings` (which is deleted anyway), `nl2sql.context`,
 `nl2sql.configs`, `nl2sql.feedback`, `nl2sql.pipeline` or `nl2sql.tracing`.
@@ -1545,7 +1594,7 @@ flowchart TD
 | 7b | **Callers onto the new config.** The CLI gets a global `--config` and loses the path and env flags; the CLI, `nl2sql-api` and the demo load the `.env` next to `nl2sql.yaml`; each entry point calls `check()` at startup; `nl2sql demo` and the playground use `init --demo` and `from_config`; `nl2sql-api` reads `engine.config.api` and `policies.admin_roles`, and the `NL2SQL_API_*` variables go; the hosted Dockerfile and the API Dockerfile change. Deleted: `setup`, `ConfigManager`, `configs/*.py` file envelopes, `sample_questions.py`, `_legacy_config`, and the repo's `configs/*.demo.*` (replaced by `init --demo`). | 6, 7a | CLI tests run every command with `--config`; `test_no_module_imports_nl2sql_configs`; `test_api_reads_role_source_from_config`; `test_entry_points_refuse_to_start_when_a_required_datasource_fails`; the playground's and API's tests build from a `make_config` folder; the Docker image test. | `configuration/*` rewritten (with `api` and `.env`), `getting_started/*`, `deployment/*`, the old-to-new table published in `configuration/system.md` |
 | 8 | **`nl2sql config check`.** | 7b | Exit codes; problems grouped by file; `--connect` reports a failed datasource; no files are created under `storage.path`. | `configuration/system.md`, `CONTRIBUTING.md` (CI) |
 | 9 | **LLM client cache and `llm.replace`.** `LLMClientCache` (per engine, LRU 16, keys with hashed secrets, evicted clients closed once unused), used for construction too; the immutable `LLMSet`, read once per run; `engine.llm.replace()` with validation, the atomic swap, the INFO line and the audit record; the planner's provider and model in the plan cache key. | 7a | `test_agents_with_equal_settings_share_one_client`, `test_swapping_back_reuses_cached_clients`, `test_cache_key_never_contains_the_key`, `test_evicted_client_is_closed_after_its_last_run`, `test_in_flight_run_finishes_on_the_old_llm`, `test_invalid_replacement_changes_nothing`, `test_replace_logs_old_and_new_models_without_keys`, `test_plan_from_another_model_is_never_served` | `configuration/llm.md` (runtime replacement), `architecture/determinism.md` (plan cache key) |
-| 10 | **Facade namespaces.** The new shape in section 7; the duplicate methods, sub-API exports, `context`, `get_adapter` and `SettingsAPI` deleted; `POST /llm` becomes the admin-only `PUT /api/v1/settings/llm`; the playground's model switch calls `llm.replace`; the API, CLI and playground move onto the namespaces; the stricter boundary test. | 7b, 9 | One test per namespace method in the table; `test_nl2sql_exports_exactly_the_public_surface` (a fixed list, so semver has a test); `test_put_settings_llm_requires_admin`; `test_put_settings_llm_returns_422_with_the_config_error`; the boundary test for the playground and API imports. | `api/core/*`, `api/rest/*` (`llm.md` rewritten for `PUT /settings/llm`), `api/index.md` |
+| 10 | **Facade namespaces** (built as 10a and 10b: see the note in section 7). The new shape in section 7; the duplicate methods, sub-API exports, `context`, `get_adapter` and `SettingsAPI` deleted; `POST /llm` becomes the admin-only `PUT /api/v1/settings/llm`; the playground's model switch calls `llm.replace`; the API, CLI and playground move onto the namespaces; the stricter boundary test. | 7b, 9 | One test per namespace method in the table; `test_nl2sql_exports_exactly_the_public_surface` (a fixed list, so semver has a test); `test_put_settings_llm_requires_admin`; `test_put_settings_llm_returns_422_with_the_config_error`; the boundary test for the playground and API imports. | `api/core/*`, `api/rest/*` (`llm.md` rewritten for `PUT /settings/llm`), `api/index.md` |
 | 11 | **Settings off the global: pipeline.** Nodes, `execution` and `aggregation` read `ctx.settings`; `run_date(today)`. | 7a | The ratchet list shrinks; node tests pass settings through the runtime and never monkeypatch the global. | node pages that name a setting |
 | 12 | **Settings off the global: indexing and the rest.** `indexing`, `secrets`, `services`, `tracing`, `evaluation` and `feedback`. Evaluation and replay build derived configs instead of editing the global. | 7a | The ratchet list shrinks; `test_tier2_runs_without_touching_another_engine`; `test_replay_pins_the_date_in_its_own_runtime`. | `testing/architecture.md`, `observability/debugging.md` |
 | 13 | **Settings off the global: apps, then delete it.** The CLI, playground and API move off it. `common/settings.py`, `env_hint.py` and the copy step are deleted, and every `os.environ` write goes. | 10, 11, 12 | The two-engines test flips from xfail to pass; `test_no_module_writes_the_environment`; `test_environment_reads_only_from_the_allow_list`; `test_only_entry_points_load_dotenv`. | invariants.md (no process globals, the env allow-list, `.env` loading) |
@@ -1568,9 +1617,11 @@ helper from PR 2, which is why that helper ships early. `_legacy_config` lives
 for exactly one PR (7a to 7b) so that each PR stays green. It is never
 released.
 
-Until PR 10 lands, `POST /llm` keeps calling the old `configure_llm`, which
-7a points at the runtime's LLM set. PR 10 deletes both and adds
-`PUT /api/v1/settings/llm` on top of `llm.replace` from PR 9.
+PR 10 deleted `POST /llm` and `configure_llm`, and added
+`PUT /api/v1/settings/llm` on top of `llm.replace` from PR 9. It was split in
+two to stay reviewable: 10a (the namespaces, the REST API and the CLI on
+them) and 10b (the playground off the engine's internals); see the note in
+[section 7](#7-the-facade).
 
 ## 12. Open questions
 

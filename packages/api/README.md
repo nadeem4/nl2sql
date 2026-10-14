@@ -47,14 +47,14 @@ mount a config folder there, and a volume for `storage.path`.
 - `GET /api/v1/health` - Liveness check
 - `GET /api/v1/ready` - Readiness check (does not yet check dependencies)
 - `POST /api/v1/datasource` - Register a datasource in the running process (`config` is one `datasources` entry: `id`, `type`, `connection`, ...)
-- `GET /api/v1/datasource` - List registered datasource ids
-- `GET /api/v1/datasource/{datasource_id}` - Check a datasource is registered
-- `DELETE /api/v1/datasource/{datasource_id}` - Not supported yet (answers `success: false`)
-- `POST /api/v1/llm` - Configure an LLM in the running process
-- `GET /api/v1/llm` - List configured LLMs
-- `GET /api/v1/llm/{llm_name}` - Get one configured LLM
+- `GET /api/v1/datasource` - List the datasources, with their status and masked connections
+- `GET /api/v1/datasource/{datasource_id}` - One datasource
+- `DELETE /api/v1/datasource/{datasource_id}` - Take a datasource out of the running process
+- `PUT /api/v1/settings/llm` - Replace the whole `llm` section in the running process (admin only; 422 with the config error)
+- `GET /api/v1/llm` - Each agent and the model it runs on
+- `GET /api/v1/llm/{agent}` - One agent's model
 - `POST /api/v1/index/{datasource_id}` - Index one datasource's schema
-- `POST /api/v1/index-all` - Index every registered datasource
+- `POST /api/v1/index-all` - Index every configured datasource
 - `DELETE /api/v1/index` - Clear the vector store
 - `GET /api/v1/index/status` - Index health (status, entries by type, embedding model, problems)
 

@@ -92,7 +92,7 @@ RBAC is unchanged: a preferred table the role may not read loses its data like
 any other table, and the validator refuses a plan that reads it.
 
 A name that is not in the indexed schema is a warning, not an error: `nl2sql
-doctor` and the index status (`NL2SQL.index_health`, `GET /api/v1/index/status`)
+doctor` and the index status (`engine.index.health()`, `GET /api/v1/index/status`)
 print "Preferred table 'v_x' of 'chinook' is not in the indexed schema". The
 usual cause is a view created after the last index; re-index the datasource.
 
@@ -110,19 +110,19 @@ broken one is marked unavailable:
 
 - the log has an error: `Datasource 'sales' is unavailable: <reason>`;
 - `check()` reports it `failed` at stage `connect`, with a fix;
-- it is not in `list_datasources()` (or `GET /api/v1/datasource`);
-  `NL2SQL.list_unavailable_datasources()` maps it to the reason;
-- the index status (`NL2SQL.index_health()`, `GET /api/v1/index/status`) carries
+- `engine.datasources.list()` (and `GET /api/v1/datasource`) shows it with
+  `status: "failed"` and the `reason`, and nothing is routed to it;
+- the index status (`engine.index.health()`, `GET /api/v1/index/status`) carries
   the same sentence as a warning;
 - a query with `datasource_id` set to it, and `nl2sql index` or
-  `rebuild_index(datasource_ids=[...])` naming it, fail with that reason.
+  `engine.index.build([...])` naming it, fail with that reason.
 
 `check()` raises `EngineNotReady` when a `required: true` datasource fails, or
-when datasources are configured and none is ready. A later `check()` that
-connects routes the datasource again.
+when datasources are configured and none is ready. A later `check()`, or
+`engine.datasources.test(id)`, that connects routes the datasource again.
 
 `nl2sql doctor` prints the same `check()` report. After `check()`,
-`engine.policy.validate_policies()` reports a role that names an unavailable
+`engine.policies.validate()` reports a role that names an unavailable
 datasource as `UNAVAILABLE`.
 
 A secret provider that cannot start is different: it fails startup. See [Secrets → When a provider fails to start](secrets.md#when-a-provider-fails-to-start).
@@ -132,6 +132,7 @@ A secret provider that cannot start is different: it fails startup. See [Secrets
 - Use `${env:VAR}` for environment variables, or `${provider:key}` for a secret
   from a provider in the [`secrets` section](secrets.md).
 - Adapter-specific fields under `connection` are passed through to the adapter.
-- From Python, `engine.add_datasource(Datasource(...))` adds one to a running
-  engine (built, not connected); `nl2sql-api`'s `POST /api/v1/datasource` takes
+- From Python, `engine.datasources.add(Datasource(...))` adds one to a running
+  engine (built, not connected), and `engine.datasources.remove(id)` takes one
+  out; `nl2sql-api`'s `POST /api/v1/datasource` takes
   the same shape as JSON.

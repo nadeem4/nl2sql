@@ -1,5 +1,5 @@
-"""The facade methods the playground and nl2sql-api share: schema, index health,
-rebuild, retrieval inspection and reloading the LLM config.
+"""The namespace methods the playground and nl2sql-api share: the schema, the
+index's health, building it and inspecting retrieval.
 
 Each runs over a small fake context, so no database, model or key is needed.
 """
@@ -90,8 +90,8 @@ def _snapshot() -> SchemaSnapshot:
     return SchemaSnapshot(contract=contract, metadata=metadata)
 
 
-def test_get_schema_projects_the_indexed_snapshot():
-    schema = _engine(_Context(snapshot=_snapshot())).get_schema("chinook")
+def test_datasources_schema_projects_the_indexed_snapshot():
+    schema = _engine(_Context(snapshot=_snapshot())).datasources.schema("chinook")
 
     assert schema["datasource_id"] == "chinook"
     assert [t["name"] for t in schema["tables"]] == ["Album", "Artist"]
@@ -103,24 +103,24 @@ def test_get_schema_projects_the_indexed_snapshot():
                                       "references_columns": ["ArtistId"]}]
 
 
-def test_get_schema_before_the_first_index_has_no_tables():
-    assert _engine(_Context()).get_schema("chinook") == {"datasource_id": "chinook", "tables": []}
+def test_datasources_schema_before_the_first_index_has_no_tables():
+    assert _engine(_Context()).datasources.schema("chinook") == {"datasource_id": "chinook", "tables": []}
 
 
 def test_index_health_without_a_vector_store_is_missing():
-    health = _engine(_Context()).index_health()
+    health = _engine(_Context()).index.health()
     assert health["status"] == "missing"
     assert health["problems"]
 
 
 def test_index_health_reads_the_live_store(tmp_path):
     store = VectorStore("nl2sql_store", str(tmp_path / "vs"), embeddings=FakeEmbeddings(size=8))
-    health = _engine(_Context(vector_store=store, snapshot=_snapshot())).index_health()
+    health = _engine(_Context(vector_store=store, snapshot=_snapshot())).index.health()
     assert health["status"] in {"missing", "empty", "stale", "ok"}
     assert "datasources" in health and "counts" in health
 
 
-def test_rebuild_index_hands_the_engine_context_to_the_rebuild(monkeypatch):
+def test_index_build_hands_the_runtime_to_the_rebuild(monkeypatch):
     seen = {}
 
     def _rebuild(ctx, **kwargs):
@@ -129,39 +129,19 @@ def test_rebuild_index_hands_the_engine_context_to_the_rebuild(monkeypatch):
 
     monkeypatch.setattr("nl2sql.indexing.rebuild.rebuild_index", _rebuild)
     ctx = _Context()
-    assert _engine(ctx).rebuild_index(datasource_ids=["chinook"]) == "result"
+    assert _engine(ctx).index.build(["chinook"]) == "result"
     assert seen["ctx"] is ctx
     # Enrichment spends tokens, so it is off unless asked for.
     assert seen["kwargs"]["enrich"] is False
     assert seen["kwargs"]["datasource_ids"] == ["chinook"]
 
 
-def test_inspect_retrieval_runs_the_stores_mmr_search(tmp_path):
+def test_index_inspect_runs_the_stores_mmr_search(tmp_path):
     store = VectorStore("nl2sql_store", str(tmp_path / "vs"), embeddings=FakeEmbeddings(size=8))
-    record = _engine(_Context(vector_store=store)).inspect_retrieval("albums", k=3)
+    record = _engine(_Context(vector_store=store)).index.inspect("albums", k=3)
     assert isinstance(record, dict)
 
 
-def test_inspect_retrieval_without_a_vector_store_says_so():
+def test_index_inspect_without_a_vector_store_says_so():
     with pytest.raises(LookupError, match="no vector index"):
-        _engine(_Context()).inspect_retrieval("albums")
-
-
-def test_reload_llm_config_replaces_every_agent(tmp_path):
-    from nl2sql import load_config
-    from nl2sql.testing.config import make_config
-
-    path = tmp_path / "nl2sql.yaml"
-
-    def _write(agents):
-        make_config(tmp_path, llm={"provider": "openai", "model": "gpt-5.4", "api_key": "sk-test-000000000000000000",
-                                   "agents": agents})
-
-    _write({"ast_planner": {"model": "gpt-4.1"}})
-    with NL2SQL(load_config(path)) as engine:
-        assert set(engine.list_llms()) == {"default", "astplanner"}
-
-        _write({})
-        engine.reload_llm_config(path)
-        assert set(engine.list_llms()) == {"default"}
-        assert engine.config.llm.agents == {}
+        _engine(_Context()).index.inspect("albums")

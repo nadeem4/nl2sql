@@ -9,27 +9,39 @@
 ### `POST /api/v1/index/{datasource_id}`
 
 Execution flow:
-- Delegates to `engine.indexing.index_datasource(...)`. No enrichment model call
-  is made: enrichment is opt-in in the engine and these routes do not ask for it.
+- Delegates to `engine.index.build([datasource_id])`: the new entries are
+  written beside the live ones and switched in when all are written. No
+  enrichment model call is made: enrichment is opt-in in the engine and these
+  routes do not ask for it.
 
 Response:
 `{"success": true, "datasource_id": "...", "indexing_stats": {...}, "message": "..."}`
 
+Errors:
+- A datasource that fails to index (unknown, unavailable, unreadable) ->
+  `HTTP 500` naming the reason. It keeps its previous entries.
+
 ### `POST /api/v1/index-all`
 
 Execution flow:
-- Delegates to `engine.indexing.index_all_datasources(...)`, without enrichment.
+- Delegates to `engine.index.build()`, every configured datasource, without
+  enrichment.
+
+Response:
+`{"success": <every datasource indexed>, "indexing_results": {"stats": [...], "empty": [...], "errors": [...]}, "message": "..."}`.
+A datasource that fails is in `errors` (`datasource_id`, `error`) and keeps
+its previous entries.
 
 ### `DELETE /api/v1/index`
 
 Execution flow:
-- Delegates to `engine.indexing.clear_index()`.
+- Delegates to `engine.index.clear()`.
 
 ### `GET /api/v1/index/status`
 
 Execution flow:
-- Delegates to `engine.index_health()` (see the
-  [public facade](../core/public-facade.md#schema-index-and-retrieval)), the same
+- Delegates to `engine.index.health()` (see
+  [Indexing API → index.health](../core/indexing.md#indexhealth)), the same
   report the playground's index panel shows.
 
 Response (illustrative):

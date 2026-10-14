@@ -5,8 +5,12 @@ The role comes from the same sources as ``/query`` (``nl2sql_api.auth``, the
 in ``policies.admin_roles`` (default ``admin``). With no role source configured
 at all, admin routes answer loopback clients only.
 """
+from types import SimpleNamespace
+
 import pytest
 from fastapi.testclient import TestClient
+
+from nl2sql import LLMChange
 
 from nl2sql.testing.config import make_config
 from nl2sql_api.dependencies import get_engine
@@ -17,7 +21,7 @@ DATASOURCE = {"id": "ds", "type": "sqlite", "connection": {"database": "ds.db"}}
 ADMIN_ROUTES = [
     ("post", "/api/v1/datasource", {"config": DATASOURCE}),
     ("delete", "/api/v1/datasource/ds", None),
-    ("post", "/api/v1/llm", {"config": {"name": "default"}}),
+    ("put", "/api/v1/settings/llm", {"provider": "openai", "model": "gpt-test"}),
     ("post", "/api/v1/index/ds", None),
     ("post", "/api/v1/index-all", None),
     ("delete", "/api/v1/index", None),
@@ -27,40 +31,33 @@ ADMIN_IDS = [f"{method.upper()} {path}" for method, path, _ in ADMIN_ROUTES]
 READ_ONLY_ROUTES = ["/api/v1/health", "/api/v1/datasource", "/api/v1/index/status"]
 
 
+class _Recorder:
+    """One namespace of the fake engine: each listed call is recorded, then answered."""
+
+    def __init__(self, engine, answers):
+        self._engine = engine
+        self._answers = answers
+
+    def __getattr__(self, name):
+        def call(*args, **kwargs):
+            self._engine.calls.append(name)
+            answer = self._answers[name]
+            if isinstance(answer, Exception):
+                raise answer
+            return answer() if callable(answer) else answer
+        return call
+
+
 class AdminEngine:
     """Records every admin call so a refused request can be shown to do nothing."""
 
     def __init__(self, config):
         self.config = config
         self.calls = []
-        self.add_datasource_error = None
-        self.indexing = self  # IndexingService calls engine.indexing.<method>
-
-    def add_datasource(self, config):
-        self.calls.append("add_datasource")
-        if self.add_datasource_error:
-            raise self.add_datasource_error
-
-    def list_datasources(self):
-        return ["ds"]
-
-    def configure_llm(self, config):
-        self.calls.append("configure_llm")
-
-    def index_datasource(self, datasource_id):
-        self.calls.append("index_datasource")
-        return {}
-
-    def index_all_datasources(self):
-        self.calls.append("index_all_datasources")
-        return {}
-
-    def clear_index(self):
-        self.calls.append("clear_index")
-        return {"success": True}
-
-    def index_health(self):
-        return {"status": "ok"}
+        self.datasources = _Recorder(self, {"add": None, "remove": None, "list": list})
+        self.llm = _Recorder(self, {"replace": lambda: LLMChange()})
+        self.index = _Recorder(self, {"build": lambda: SimpleNamespace(ok=True, stats=[], empty=[], errors=[]),
+                                      "clear": None, "health": lambda: {"status": "ok"}})
 
 
 @pytest.fixture
@@ -141,7 +138,7 @@ def test_the_dev_flag_takes_the_admin_role_from_the_body(make_client):
     client, engine = make_client(api={"trust_body_role": True})
     body = {"config": DATASOURCE, "user_context": {"roles": ["admin"]}}
     assert client.post("/api/v1/datasource", json=body).status_code == 200
-    assert engine.calls == ["add_datasource"]
+    assert engine.calls == ["add"]
 
 
 @pytest.mark.parametrize("path", READ_ONLY_ROUTES)
@@ -152,7 +149,7 @@ def test_read_only_routes_stay_open(make_client, path):
 
 def test_a_failed_add_datasource_does_not_echo_the_exception(make_client):
     client, engine = make_client(host="127.0.0.1")
-    engine.add_datasource_error = RuntimeError(
+    engine.datasources._answers["add"] = RuntimeError(
         "could not connect to postgresql://app:hunter2@db.internal:5432/sales")
     response = client.post("/api/v1/datasource", json={"config": {**DATASOURCE, "id": "sales"}})
     assert response.status_code == 500

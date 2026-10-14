@@ -2,7 +2,6 @@ import pytest
 from pydantic import SecretStr
 
 from nl2sql.adapters.postgres.adapter import PostgresAdapter, PostgresConnectionConfig
-from nl2sql.api.datasource_api import DatasourceAPI
 from nl2sql.datasources.registry import DatasourceRegistry
 from nl2sql.config import Datasource, Limits
 from nl2sql.secrets.manager import SecretManager
@@ -162,34 +161,3 @@ def test_registration_errors_do_not_echo_the_resolved_password(monkeypatch):
     assert "s3cret-pw" not in str(excinfo.value)
     assert "s3cret-pw" not in repr(excinfo.value.__cause__)
     assert "database" in str(excinfo.value)
-
-
-def test_datasource_details_mask_the_resolved_password(monkeypatch):
-    # `get_datasource_details` returns the connection args to callers, so the
-    # masking that SecretStr used to provide has to be applied explicitly.
-    # Arrange
-    monkeypatch.setenv("DEMO_REF_PASSWORD", "s3cret-pw")
-    registry = DatasourceRegistry(SecretManager(), adapter_registry({"postgres": PostgresAdapter}))
-    registry.register_datasource(
-        Datasource(
-            id="ds",
-            type="postgres", connection=dict(host="analytics_db",
-                port=5432,
-                user="ref_admin",
-                password="${env:DEMO_REF_PASSWORD}",
-                database="analytics_db",
-            ),
-        )
-    )
-    api = DatasourceAPI.__new__(DatasourceAPI)
-    api._registry = registry
-
-    # Act
-    details = api.get_datasource_details("ds")
-
-    # Assert
-    assert details["connection_args"]["password"] == "***"
-    assert details["connection_args"]["host"] == "analytics_db"
-    assert details["connection_args"]["user"] == "ref_admin"
-    # The adapter itself still needs the real value to connect.
-    assert registry.get_adapter("ds").connection_args["password"] == "s3cret-pw"

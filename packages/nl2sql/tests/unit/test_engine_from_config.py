@@ -114,7 +114,7 @@ def test_constructor_never_connects(tmp_path, counting):
     # SQLite creates its file on the first connection; nothing has made one.
     assert not database.exists()
     assert CountingAdapter.instances and all(a.calls == [] for a in CountingAdapter.instances)
-    assert sorted(engine.list_datasources()) == ["remote", "shop"]
+    assert sorted(d.id for d in engine.datasources.list()) == ["remote", "shop"]
 
 
 def test_constructor_creates_the_stores_under_storage_path(tmp_path):
@@ -210,8 +210,8 @@ def test_check_reports_failed_datasource_and_runs_degraded(tmp_path):
     assert status["broken"].stage == "connect" and status["broken"].reason and status["broken"].fix
     assert "broken" in str(report)
     # Left out of routing, and a query that targets it gets the reason.
-    assert engine.list_datasources() == ["shop"]
-    assert "broken" in engine.list_unavailable_datasources()
+    assert [d.id for d in engine.datasources.list() if d.status == "ready"] == ["shop"]
+    assert engine.datasources.get("broken").status == "failed"
     # Safe to call again.
     assert [d.status for d in engine.check().datasources] == ["ready", "failed"]
 
@@ -296,11 +296,11 @@ def test_the_context_manager_closes_the_engine(tmp_path):
 
 def test_datasource_added_in_code_keeps_its_description(tmp_path):
     engine = _engine(tmp_path)
-    engine.add_datasource(Datasource(id="shop", type="sqlite", description="Customers of the shop.",
+    engine.datasources.add(Datasource(id="shop", type="sqlite", description="Customers of the shop.",
                                      sample_questions=["How many customers are there?"],
                                      connection={"database": _shop(tmp_path / "shop.db").as_posix()}))
 
-    engine.index_datasource("shop")
+    assert engine.index.build(["shop"]).ok
 
     snapshot = engine._runtime.schema_store.get_latest_snapshot("shop")
     assert snapshot.metadata.description == "Customers of the shop."
@@ -370,7 +370,7 @@ def test_allow_all_policies_let_every_caller_read_everything(tmp_path):
 
     engine = _engine(tmp_path)
 
-    assert engine.check_permissions(UserContext(roles=[]), "shop", "customers", "main")
+    assert engine.policies.allows(UserContext(roles=[]), "shop", "customers", "main")
 
 
 # ---------------------------------------------------------------- the six ways
@@ -387,7 +387,7 @@ def test_2_from_the_file_with_your_own_components(tmp_path, counting):
     make_config(tmp_path, datasources=[{"id": "dw", "type": "counting", "connection": {}}])
 
     engine = NL2SQL.from_config(tmp_path / "nl2sql.yaml", registry=counting)
-    assert engine.list_datasources() == ["dw"]
+    assert [d.id for d in engine.datasources.list()] == ["dw"]
 
     with pytest.raises(ConfigError, match="Unknown adapter 'counting'"):
         NL2SQL.from_config(tmp_path / "nl2sql.yaml")
@@ -404,8 +404,8 @@ def test_3_in_code_by_name(tmp_path):
         storage=Storage(path=tmp_path / ".nl2sql"),
     ))
 
-    assert engine.list_datasources() == ["shop"]
-    assert engine.get_llm("default")["provider"] == "anthropic"
+    assert [d.id for d in engine.datasources.list()] == ["shop"]
+    assert engine.llm.get("default")["provider"] == "anthropic"
 
 
 def test_4_in_code_passing_objects(tmp_path):
@@ -432,7 +432,7 @@ def test_5_mixed_load_the_file_then_change_it_in_code(tmp_path):
     cfg = cfg.with_datasource(Datasource(id="shop", type="sqlite", connection={"database": database.as_posix()}))
     engine = NL2SQL(cfg.model_copy(update={"embeddings": Embeddings(**_fake_embeddings())}))
 
-    assert engine.list_datasources() == ["shop"]
+    assert [d.id for d in engine.datasources.list()] == ["shop"]
 
 
 def test_demo_builds_from_bundled_files(tmp_path, monkeypatch):
@@ -444,7 +444,7 @@ def test_demo_builds_from_bundled_files(tmp_path, monkeypatch):
 
     engine = NL2SQL.demo(path=tmp_path / "demo")
 
-    assert sorted(engine.list_datasources()) == ["chinook", "support", "webanalytics"]
+    assert sorted(d.id for d in engine.datasources.list()) == ["chinook", "support", "webanalytics"]
     databases = {Path(d.connection["database"]).parent for d in engine.config.datasources}
     assert databases == {CHINOOK_DB_PATH.parent}
     assert engine.config.llm.provider == "anthropic"

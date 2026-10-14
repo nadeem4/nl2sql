@@ -110,7 +110,7 @@ Every command: [CLI reference](https://github.com/nadeem4/nl2sql#cli-reference).
 from nl2sql import NL2SQL, UserContext
 
 engine = NL2SQL.demo()               # the bundled databases; reads OPENAI_API_KEY (or another provider's key)
-engine.index_all_datasources()       # once: builds the index under .nl2sql-demo/
+engine.index.build()                 # once: builds the index under .nl2sql-demo/
 # Your own config instead:  engine = NL2SQL.from_config("nl2sql.yaml")
 result = engine.run_query(
     "How many customers are there?",

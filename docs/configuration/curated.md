@@ -215,7 +215,7 @@ enrichment model call, so it takes seconds. The datasource must have been
 indexed once with plain `nl2sql index`. A plain `nl2sql index` also picks up
 the file, and a schema re-index always keeps the verified queries.
 
-Until you re-index, `nl2sql doctor` and the index status (`NL2SQL.index_health()`,
+Until you re-index, `nl2sql doctor` and the index status (`engine.index.health()`,
 `GET /api/v1/index/status`) warn:
 
 ```text

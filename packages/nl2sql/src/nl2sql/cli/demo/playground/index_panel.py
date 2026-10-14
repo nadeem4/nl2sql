@@ -57,7 +57,7 @@ class IndexPanel:
     # --- reading ---------------------------------------------------------------
 
     def health(self) -> Dict[str, Any]:
-        return self.engine.index_health()
+        return self.engine.index.health()
 
     def _folder(self) -> Optional[Dict[str, Any]]:
         if self.project_dir is None:
@@ -115,9 +115,9 @@ class IndexPanel:
 
     def _run(self, enrich: bool) -> None:
         try:
-            result = self.engine.rebuild_index(
+            result = self.engine.index.build(
+                [self.datasource_id],
                 enrich=enrich,
-                datasource_ids=[self.datasource_id],
                 on_progress=self._step,
                 switch_guard=self.settings.gate.change,
             )

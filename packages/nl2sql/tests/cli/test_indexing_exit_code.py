@@ -10,6 +10,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from nl2sql import NL2SQL
 from nl2sql.cli.commands import indexing as indexing_cmd
 
 
@@ -41,14 +42,17 @@ class _StubStore:
         self.promoted = True
 
 
-def _context(*datasource_ids: str) -> SimpleNamespace:
-    """An engine whose runtime has these datasources and a stub index."""
-    return SimpleNamespace(context=SimpleNamespace(
+def _context(*datasource_ids: str) -> NL2SQL:
+    """The facade over a runtime that has these datasources and a stub index."""
+    engine = NL2SQL.__new__(NL2SQL)
+    engine._runtime = SimpleNamespace(
+        config=SimpleNamespace(storage=SimpleNamespace(path="/tmp/.nl2sql")),
         vector_store=_StubStore(),
         ds_registry=SimpleNamespace(
             list_adapters=lambda: [_StubAdapter(ds) for ds in datasource_ids]
         ),
-    ))
+    )
+    return engine
 
 
 @pytest.fixture()

@@ -1,19 +1,31 @@
-"""
-Public API for NL2SQL Core Package
+"""The ``NL2SQL`` facade: the one thing an application talks to.
 
-This module provides a clean, stable public interface to the NL2SQL core functionality.
-It defines the official API boundaries and ensures backward compatibility.
+Questions are top level (``run_query``, ``stream_query``); everything else is
+a namespace (``engine.datasources``, ``engine.index``, ...). See
+docs/architecture/configuration_v2.md, section 7.
 """
 
 from __future__ import annotations
 
 import os
 import pathlib
-from typing import TYPE_CHECKING, Optional, Union
+from functools import cached_property
+from typing import TYPE_CHECKING, Iterator, Optional, Union
 
 if TYPE_CHECKING:
+    from nl2sql.api.curated_api import CuratedAPI
+    from nl2sql.api.datasource_api import DatasourcesAPI
+    from nl2sql.api.indexing_api import IndexAPI
+    from nl2sql.api.llm_api import LLMAPI
+    from nl2sql.api.policy_api import PoliciesAPI
+    from nl2sql.api.query_api import QueryAPI, QueryResult
+    from nl2sql.api.results_api import ResultsAPI
+    from nl2sql.api.traces_api import TracesAPI
+    from nl2sql.auth.models import UserContext
     from nl2sql.check import CheckReport
+    from nl2sql.common.cancellation import CancellationToken
     from nl2sql.config import LLM, Config
+    from nl2sql.pipeline.events import QueryEvent
     from nl2sql.registry import Registry
     from nl2sql.runtime import Runtime
 
@@ -72,25 +84,66 @@ class NL2SQL:
         return cls(demo_config(llm=llm if llm is not None else _demo_llm(), path=pathlib.Path(path)))
 
     def _attach(self, runtime: "Runtime") -> None:
-        from nl2sql.api.query_api import QueryAPI
-        from nl2sql.api.datasource_api import DatasourceAPI
-        from nl2sql.api.llm_api import LLM_API
-        from nl2sql.api.indexing_api import IndexingAPI
-        from nl2sql.api.auth_api import AuthAPI
-        from nl2sql.api.settings_api import SettingsAPI
-        from nl2sql.api.policy_api import PolicyAPI
+        self._runtime = runtime
+        self._benchmark = None
+
+    # ------------------------------------------------------------ namespaces
+    # Each is built on first use from the runtime; the classes are internal.
+
+    @cached_property
+    def datasources(self) -> "DatasourcesAPI":
+        """The datasources: ``list``, ``get``, ``add``, ``remove``, ``schema``, ``test``."""
+        from nl2sql.api.datasource_api import DatasourcesAPI
+
+        return DatasourcesAPI(self._runtime)
+
+    @cached_property
+    def index(self) -> "IndexAPI":
+        """The vector index: ``build``, ``health``, ``clear``, ``inspect``."""
+        from nl2sql.api.indexing_api import IndexAPI
+
+        return IndexAPI(self._runtime)
+
+    @cached_property
+    def llm(self) -> "LLMAPI":
+        """The models the agents run on: ``list``, ``get``, ``replace``."""
+        from nl2sql.api.llm_api import LLMAPI
+
+        return LLMAPI(self._runtime)
+
+    @cached_property
+    def policies(self) -> "PoliciesAPI":
+        """Who may read what: ``roles``, ``allows``, ``allowed``, ``validate``."""
+        from nl2sql.api.policy_api import PoliciesAPI
+
+        return PoliciesAPI(self._runtime)
+
+    @cached_property
+    def curated(self) -> "CuratedAPI":
+        """The curated answers: ``validate``, ``test``."""
         from nl2sql.api.curated_api import CuratedAPI
 
-        self._runtime = runtime
-        self.query = QueryAPI(runtime)
-        self.datasource = DatasourceAPI(runtime)
-        self.llm = LLM_API(runtime)
-        self.indexing = IndexingAPI(runtime)
-        self.auth = AuthAPI(runtime)
-        self.settings = SettingsAPI(runtime)
-        self.policy = PolicyAPI(runtime)
-        self.curated = CuratedAPI(runtime)
-        self._benchmark = None
+        return CuratedAPI(self._runtime)
+
+    @cached_property
+    def results(self) -> "ResultsAPI":
+        """A run's saved results, by its ``trace_id``: ``manifest``, ``page``, ``csv``."""
+        from nl2sql.api.results_api import ResultsAPI
+
+        return ResultsAPI(self._runtime)
+
+    @cached_property
+    def traces(self) -> "TracesAPI":
+        """Recorded runs: ``replay``."""
+        from nl2sql.api.traces_api import TracesAPI
+
+        return TracesAPI(self._runtime)
+
+    @cached_property
+    def _queries(self) -> "QueryAPI":
+        from nl2sql.api.query_api import QueryAPI
+
+        return QueryAPI(self._runtime)
 
     # ------------------------------------------------------------ lifecycle
 
@@ -114,7 +167,7 @@ class NL2SQL:
         self._ensure_open()
         statuses = self._runtime.check_datasources()
         report = CheckReport(datasources=statuses, llm=self._runtime.llm_registry.missing_keys(),
-                             index=self.index_health()["status"])
+                             index=self.index.health()["status"])
         required = [d.id for d in statuses if d.required and d.status == "failed"]
         if required:
             raise EngineNotReady(f"The required datasource(s) {', '.join(required)} failed.", report)
@@ -141,7 +194,7 @@ class NL2SQL:
 
     def _ensure_open(self) -> None:
         runtime = getattr(self, "_runtime", None)
-        if runtime is not None and runtime.closed:
+        if getattr(runtime, "closed", False):
             raise RuntimeError("This engine is closed. Build a new one.")
 
     @property
@@ -153,43 +206,25 @@ class NL2SQL:
             self._benchmark = BenchmarkAPI(self._runtime)
         return self._benchmark
 
-    @property
-    def context(self) -> "Runtime":
-        """The runtime (internal use only; removed with the facade namespaces)."""
-        return self._runtime
+    # ------------------------------------------------------------ questions
 
-    # Convenience methods that delegate to the modular APIs
-    def run_query(
-        self,
-        natural_language: str,
-        datasource_id: Optional[str] = None,
-        execute: bool = True,
-        user_context=None,
-        cancellation_token=None,
-    ):
-        """
-        Execute a natural language query against the database.
+    def run_query(self, question: str, *, datasource_id: Optional[str] = None, execute: bool = True,
+                  user_context: Optional["UserContext"] = None,
+                  cancellation_token: Optional["CancellationToken"] = None) -> "QueryResult":
+        """Answer ``question``: plan, check, generate and run the SQL, and write the answer.
 
+        ``datasource_id`` skips routing; ``execute=False`` stops after the SQL
+        is generated (plan only). ``user_context`` carries the caller's roles.
         Pass a :class:`~nl2sql.CancellationToken` and call its ``cancel()``
         from another thread to stop the run before its next step.
         """
         self._ensure_open()
-        return self.query.run_query(
-            natural_language=natural_language,
-            datasource_id=datasource_id,
-            execute=execute,
-            user_context=user_context,
-            cancellation_token=cancellation_token,
-        )
+        return self._queries.run_query(question, datasource_id=datasource_id, execute=execute,
+                                       user_context=user_context, cancellation_token=cancellation_token)
 
-    def stream_query(
-        self,
-        natural_language: str,
-        datasource_id: Optional[str] = None,
-        execute: bool = True,
-        user_context=None,
-        cancellation_token=None,
-    ):
+    def stream_query(self, question: str, *, datasource_id: Optional[str] = None, execute: bool = True,
+                     user_context: Optional["UserContext"] = None,
+                     cancellation_token: Optional["CancellationToken"] = None) -> Iterator["QueryEvent"]:
         """
         Run a question as ``run_query`` does, yielding :class:`~nl2sql.QueryEvent`
         values as it goes: ``node_started`` / ``node_finished`` per step,
@@ -199,256 +234,8 @@ class NL2SQL:
         Closing the iterator early cancels the run.
         """
         self._ensure_open()
-        return self.query.stream_query(
-            natural_language=natural_language,
-            datasource_id=datasource_id,
-            execute=execute,
-            user_context=user_context,
-            cancellation_token=cancellation_token,
-        )
-
-    def get_result_manifest(self, request_id: str, tenant_id: Optional[str] = None):
-        """
-        Which results a run saved (node id, columns, row count, truncated), by
-        its ``trace_id``. Raises ``ResultNotFound`` for an unknown run.
-        """
-        return self.query.get_result_manifest(request_id, tenant_id=tenant_id)
-
-    def get_result_page(self, request_id: str, result_id: str, offset: int = 0, limit: int = 100,
-                        tenant_id: Optional[str] = None):
-        """
-        One page of a run's saved result, read lazily from its parquet file.
-        ``limit`` is capped at 1,000. Raises ``ResultNotFound`` for an unknown
-        run or result, ``ValueError`` for a negative offset or a limit below 1.
-        """
-        return self.query.get_result_page(request_id, result_id, offset=offset, limit=limit,
-                                          tenant_id=tenant_id)
-
-    def export_result_csv(self, request_id: str, result_id: str, tenant_id: Optional[str] = None):
-        """
-        The whole of a run's saved result as CSV: an iterator of UTF-8 chunks,
-        header first. Raises ``ResultNotFound`` before streaming for an unknown
-        run or result.
-        """
-        return self.query.export_result_csv(request_id, result_id, tenant_id=tenant_id)
-
-    def add_datasource(self, config):
-        """
-        Add a ``Datasource`` to the engine. Its adapter is built but not
-        connected, and it joins ``engine.config``, description and sample
-        questions included.
-        """
-        return self.datasource.add_datasource(config)
-
-    def add_datasource_from_config(self, config_path: Union[str, pathlib.Path]):
-        """
-        Add datasources from a configuration file.
-        """
-        return self.datasource.add_datasource_from_config(config_path)
-
-    def list_datasources(self) -> list:
-        """
-        List all registered datasource IDs.
-        """
-        return self.datasource.list_datasources()
-
-    def list_unavailable_datasources(self) -> dict:
-        """
-        Configured datasources that failed to start, mapped to the reason.
-
-        They are left out of ``list_datasources``; a query or an index run
-        that names one fails with this reason.
-        """
-        unavailable = getattr(self._runtime.ds_registry, "unavailable", None)
-        return unavailable() if unavailable else {}
-
-    def get_datasource_capabilities(self, datasource_id: str) -> dict:
-        """
-        Get capabilities of a specific datasource.
-        """
-        return self.datasource.get_capabilities(datasource_id)
-
-
-    def configure_llm(self, config):
-        """
-        Programmatically configure an LLM.
-        """
-        return self.llm.configure_llm(config)
-
-    def configure_llm_from_config(self, config_path: Union[str, pathlib.Path]):
-        """
-        Configure LLMs from a configuration file.
-        """
-        return self.llm.configure_llm_from_config(config_path)
-
-
-    def list_llms(self) -> dict:
-        """
-        List all configured LLMs.
-        """
-        return self.llm.list_llms()
-    
-    def get_llm(self, llm_name: str) -> dict:
-        """
-        Get details of a specific LLM.
-        """
-        return self.llm.get_llm(llm_name)
-    
-    def index_datasource(self, datasource_id: str, enrich: bool = False):
-        """
-        Index schema for a specific datasource.
-
-        ``enrich`` asks the ``indexing_enrichment`` LLM for descriptions and
-        spends tokens, so it is off unless asked for.
-        """
-        return self.indexing.index_datasource(datasource_id, enrich=enrich)
-
-    def index_all_datasources(self, enrich: bool = False):
-        """
-        Index schema for all registered datasources.
-
-        ``enrich`` asks the ``indexing_enrichment`` LLM for descriptions and
-        spends tokens, so it is off unless asked for.
-        """
-        return self.indexing.index_all_datasources(enrich=enrich)
-
-    def clear_index(self):
-        """
-        Clear the vector store index.
-        """
-        return self.indexing.clear_index()
-
-    # Auth API convenience methods
-    def check_permissions(self, user_context, datasource_id, table, schema=None):
-        """
-        Check if a user has permission to access a specific resource.
-
-        ``schema`` defaults to the datasource's default schema.
-        """
-        return self.auth.check_permissions(user_context, datasource_id, table, schema)
-
-    def get_allowed_resources(self, user_context):
-        """
-        Get resources a user has access to.
-        """
-        return self.auth.get_allowed_resources(user_context)
-
-    def get_current_settings(self):
-        """
-        Get the current application settings.
-        """
-        return self.settings.get_current_settings()
-
-    def get_setting(self, key):
-        """
-        Get a specific setting value.
-        """
-        return self.settings.get_setting(key)
-
-    def validate_configuration(self):
-        """
-        Validate the current configuration.
-        """
-        return self.settings.validate_configuration()
-
-    # Schema, index and retrieval: what the playground and nl2sql-api show.
-    # Imports are local so ``import nl2sql`` stays light.
-
-    def get_schema(self, datasource_id: str) -> dict:
-        """
-        The datasource's indexed schema, exactly as the planner is given it.
-
-        Tables sorted by name, each with its columns (type, nullable, primary
-        key, description), foreign keys, row count and description. Read from
-        the latest schema snapshot, not the database; before the first index
-        ``tables`` is empty.
-        """
-        from nl2sql.schema.view import schema_view
-
-        store = self._runtime.schema_store
-        snapshot = store.get_latest_snapshot(datasource_id) if store is not None else None
-        return schema_view(datasource_id, snapshot)
-
-    def index_health(self) -> dict:
-        """
-        Health of the vector index: ``status`` (``ok``, ``empty``, ``stale`` or
-        ``missing``), entry counts by type, when it was built, the embedding
-        model, one entry per registered datasource, any problems found, and
-        ``warnings`` that leave ``status`` alone (a ``curated.yaml`` changed
-        since it was indexed, a preferred table missing from the indexed
-        schema, a datasource that failed to start).
-        """
-        from nl2sql.indexing.curated import curated_hashes
-        from nl2sql.indexing.health import IndexHealth, inspect_vector_store
-
-        registry = self._runtime.ds_registry
-        unavailable = getattr(registry, "unavailable", None)
-        down = [f"Datasource '{ds}' is unavailable: {reason}"
-                for ds, reason in (unavailable() if unavailable else {}).items()]
-        store = self._runtime.vector_store
-        if store is None:
-            health = IndexHealth(status="missing", problems=["No vector index is configured."])
-        else:
-            ids = registry.list_ids() if registry is not None else []
-            hashes = curated_hashes(getattr(self._runtime, "curated", None), ids)
-            preferred_of = getattr(registry, "get_preferred_tables", None)
-            preferred = {ds: preferred_of(ds) for ds in ids} if preferred_of else None
-            health = inspect_vector_store(store, self._runtime.schema_store, ids, curated_hashes=hashes,
-                                          preferred_tables=preferred)
-        health.warnings.extend(down)
-        return health.to_dict()
-
-    def rebuild_index(self, datasource_ids=None, enrich: bool = False, full: bool = False,
-                      on_progress=None, switch_guard=None):
-        """
-        Rebuild the vector index beside the live one, then switch to it.
-
-        The current entries keep answering questions until the new ones are
-        complete. ``enrich`` asks the LLM for descriptions and spends tokens,
-        so it is off unless asked for. ``on_progress`` is called with a
-        sentence before each step; ``switch_guard`` is a context manager
-        factory held around each switch. Returns a ``RebuildResult``
-        (``ok``, ``stats``, ``empty``, ``errors``).
-        """
-        from nl2sql.indexing import rebuild
-
-        return rebuild.rebuild_index(
-            self._runtime,
-            enrich=enrich,
-            datasource_ids=datasource_ids,
-            full=full,
-            on_progress=on_progress,
-            switch_guard=switch_guard,
-        )
-
-    def inspect_retrieval(self, query: str, k: int = 8, lambda_mult: Optional[float] = None,
-                          types=None, datasource_id: Optional[str] = None) -> dict:
-        """
-        One MMR search of the live index, as the engine runs it: the candidate
-        pool with scores, the picks in order and what was dropped. ``types``
-        limits the entry types (``schema.table`` ...). It reads index metadata
-        only and needs no LLM.
-
-        Raises:
-            LookupError: when no vector index is configured.
-        """
-        store = self._runtime.vector_store
-        if store is None:
-            raise LookupError("There is no vector index configured.")
-        kwargs = {"lambda_mult": lambda_mult} if lambda_mult is not None else {}
-        return store.inspect(query, k=k, types=types, datasource_id=datasource_id, **kwargs)
-
-    def reload_llm_config(self, config_path: Union[str, pathlib.Path]) -> None:
-        """
-        Replace every configured LLM with the ``llm`` section of the
-        ``nl2sql.yaml`` at ``config_path``, as one step.
-
-        Agents the section no longer names fall back to the top level. An
-        invalid file leaves the current configuration in place.
-        """
-        from nl2sql.config import load_config
-
-        self.llm.replace(load_config(config_path).llm)
+        return self._queries.stream_query(question, datasource_id=datasource_id, execute=execute,
+                                          user_context=user_context, cancellation_token=cancellation_token)
 
 
 def _demo_llm() -> "LLM":

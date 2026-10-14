@@ -75,6 +75,36 @@ def load_env_file(path: Optional[PathLike] = None) -> Optional[Path]:
 
 # ---------------------------------------------------------------- annotations
 
+def parse_section(section: str, data: Any, *, source: str) -> Any:
+    """One section of ``nl2sql.yaml``, already parsed (a request body), checked as the file is.
+
+    The same rules run: strict keys with "did you mean", the section model's
+    validators, and references kept in secret fields. A ``${env:...}``
+    reference anywhere else is an error rather than read, since the data did
+    not come from the operator's file. ``source`` names where it came from in
+    the error.
+
+    Raises:
+        ConfigError: every problem found, as ``load_config`` reports it.
+    """
+    loader = _Loader(Path("nl2sql.yaml"))
+    loader.name = source
+    loader.resolve_env = False
+    loader.sources[section] = ("inline", None)
+    model = _model(Config.model_fields[section].annotation)
+    walked = loader._walk({section: data}, Config, (), keep=False)[section]
+    value = None
+    if not loader.problems:
+        try:
+            value = model.model_validate(walked)
+        except ValidationError as exc:
+            for error in exc.errors(include_url=False, include_input=False):
+                loader._validation_problem((section, *error["loc"]), error)
+    if loader.problems:
+        raise loader._fail()
+    return value
+
+
 def _members(annotation: Any) -> List[Any]:
     """``annotation`` with ``Annotated`` stripped and a union split into its members."""
     if typing.get_origin(annotation) is Annotated:
@@ -160,6 +190,7 @@ class _Loader:
         # Where each section came from: ("inline", None), ("file", label), ("folder", [labels]).
         self.sources: Dict[str, Tuple[str, Any]] = {}
         self.included: Dict[Path, str] = {}
+        self.resolve_env = True  # False for data that did not come from the operator's files
 
     # -- reporting
 
@@ -383,6 +414,9 @@ class _Loader:
                                "one secret provider cannot depend on another.")
             return value
         if keep:
+            return value
+        if not self.resolve_env:
+            self._problem(loc, "A ${provider:key} reference is allowed only in a secret field here.")
             return value
         if provider != "env":
             self._problem(loc, f"Only ${{env:...}} resolves here. A ${{{provider}:...}} reference is allowed "

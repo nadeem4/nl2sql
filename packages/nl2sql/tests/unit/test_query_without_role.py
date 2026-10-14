@@ -10,7 +10,6 @@ from __future__ import annotations
 
 
 from nl2sql import NL2SQL, QueryResult, UserContext
-from nl2sql.api.query_api import QueryAPI
 from nl2sql.pipeline import runtime
 from nl2sql.testing.runtime import fake_runtime
 
@@ -28,7 +27,7 @@ def _engine(monkeypatch):
     graph = _FakeGraph()
     monkeypatch.setattr(runtime, "build_graph", lambda ctx, execute=True: graph)
     engine = NL2SQL.__new__(NL2SQL)
-    engine.query = QueryAPI(fake_runtime())
+    engine._runtime = fake_runtime()
     return engine, graph
 
 

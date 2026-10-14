@@ -1,23 +1,28 @@
-import sys
+"""``nl2sql run``: one question through the engine, shown as it runs from ``stream_query``'s events."""
 import json
+import sys
+import time
+from typing import List, Optional, Tuple
 
 from rich.text import Text
 
-from nl2sql.api.query_api import result_from_state
-from nl2sql.datasources import DatasourceRegistry
-from nl2sql.llm import LLMRegistry
-from nl2sql.indexing.vector_store import VectorStore
-from nl2sql.cli.reporting import ConsolePresenter
-from nl2sql.pipeline.pipeline_runner import PipelineRunner
-from nl2sql.cli.types import RunConfig
+from nl2sql import QueryResult, UserContext
 from nl2sql.cli.common.decorators import handle_cli_errors
+from nl2sql.cli.reporting import ConsolePresenter
+from nl2sql.cli.types import RunConfig
+
 
 @handle_cli_errors
 def run_pipeline(
     config: RunConfig,
     engine,
 ) -> None:
-    """Runs one question through ``engine``'s pipeline and prints what it did."""
+    """Runs one question through ``engine`` and prints what it did.
+
+    The live status follows the run's ``node_started`` events; ``--show-perf``
+    is the time of each step from its ``node_finished`` event. Exits 1 when the
+    run could not finish, or finished with a blocking error.
+    """
     if not config.query:
         return
 
@@ -26,156 +31,95 @@ def run_pipeline(
     if config.no_exec:
         presenter.print_warning("Execution disabled (--no-exec): plan, validation and SQL only.")
 
-    # Instantiate Runner
-    runner = PipelineRunner(engine.context)
+    record_step = _step_metrics(engine)
+    user_context = UserContext(roles=[config.role], tenant_id=engine.config.settings.tenant_id)
+    steps: List[Tuple[str, float, bool]] = []
+    result: Optional[QueryResult] = None
+    failure: Optional[str] = None
 
-    # Setup Monitoring
-    from nl2sql.services.callbacks.monitor import PipelineMonitorCallback
-    monitor = PipelineMonitorCallback(presenter, engine.context.settings.observability)
-
+    started = time.perf_counter()
     presenter.start_interactive_status("Thinking...")
+    try:
+        for event in engine.stream_query(config.query, datasource_id=config.ds_id,
+                                         execute=not config.no_exec, user_context=user_context):
+            if event.type == "node_started":
+                presenter.update_interactive_status(f"Running {event.data.get('node')}...")
+            elif event.type == "node_finished":
+                step = (str(event.data.get("node")), float(event.data.get("seconds") or 0.0),
+                        bool(event.data.get("ok", True)))
+                steps.append(step)
+                record_step(step[0], step[1])
+            elif event.type == "final":
+                result = QueryResult.model_validate(event.data)
+            elif event.type == "error":
+                failure = event.data.get("message")
+    finally:
+        presenter.stop_interactive_status()
+    duration = time.perf_counter() - started
 
-    # Execution
-    result = runner.run(
-        query=config.query,
-        role=config.role,
-        datasource_id=config.ds_id,
-        execute=not config.no_exec,
-        callbacks=[monitor]
-    )
-
-    presenter.stop_interactive_status()
-
-    # Handle Result
-    if not result.success:
-        # The traceback is a maintainer's debugging aid: printing it by default
-        # buried the one actionable line under 40 lines of frames.
-        if config.verbose and result.traceback:
-            presenter.print_error(result.traceback)
-        presenter.print_error(result.error or "Unknown Pipeline Error")
-        if result.traceback and not config.verbose:
-            presenter.print_info("Re-run with --verbose for the full traceback.")
+    if result is None:
+        presenter.print_error(failure or "The run ended without a result.")
         sys.exit(1)
 
-    final_state = result.final_state
+    _print_result(presenter, config, result)
+
+    if config.show_perf:
+        tokens = {node: totals.total_tokens for node, totals in result.usage.nodes.items()}
+        presenter.print_step_timings(steps, tokens)
+
+    presenter.print_usage_summary(duration, result.usage.model_dump())
+
+    if result.trace_path:
+        presenter.print_info(f"Trace written to {result.trace_path} (inspect: nl2sql trace show <file>)")
+
+    # The run can finish and still have failed: an ERROR or CRITICAL error (an
+    # RBAC refusal included) makes its status "error". Warnings alone do not.
+    if result.status == "error":
+        sys.exit(1)
 
 
-    query_history = []
-    subgraph_outputs = final_state.get("subgraph_outputs") or {}
-    for _subgraph_id, output in subgraph_outputs.items():
-        if isinstance(output, dict):
-            sub_query = output.get("sub_query")
-            sql_draft = output.get("sql_draft")
-        else:
-            sub_query = getattr(output, "sub_query", None)
-            sql_draft = getattr(output, "sql_draft", None)
+def _step_metrics(engine):
+    """Records each step's time on ``nl2sql.node.duration``, with the exporter the config names."""
+    from nl2sql.common.metrics import configure_metrics, node_duration_histogram
 
-        if not sub_query:
-            continue
+    observability = engine.config.settings.observability
+    configure_metrics(exporter_type=observability.exporter, otlp_endpoint=observability.otlp_endpoint)
+    return lambda node, seconds: node_duration_histogram.record(seconds, {"node": node})
 
-        if isinstance(sub_query, dict):
-            ds_id = sub_query.get("datasource_id")
-            intent = sub_query.get("intent")
-        else:
-            ds_id = getattr(sub_query, "datasource_id", None)
-            intent = getattr(sub_query, "intent", None)
 
-        query_history.append({
-            "sub_query": intent,
-            "datasource_id": ds_id,
-            "sql": sql_draft,
-        })
+def _print_result(presenter: ConsolePresenter, config: RunConfig, result: QueryResult) -> None:
+    history = [{"sub_query": sq.intent, "datasource_id": sq.datasource_id, "sql": sq.sql}
+               for sq in result.sub_queries if sq.intent or sq.sql]
 
     if config.verbose:
-        reasoning = final_state.get("reasoning", [])
-        presenter.print_execution_tree(config.query, query_history, top_level_reasoning=reasoning)
-
+        presenter.print_execution_tree(config.query, history, top_level_reasoning=result.reasoning)
         try:
             with open("last_reasoning.json", "w") as f:
-                dump_data = {
-                    "global_reasoning": reasoning,
-                    "execution_history": query_history
-                }
-                json.dump(dump_data, f, indent=2, default=str)
+                json.dump({"global_reasoning": result.reasoning, "execution_history": history}, f,
+                          indent=2, default=str)
             presenter.print_info("Detailed reasoning trace saved to last_reasoning.json")
-        except Exception:
+        except OSError:
             pass
 
-    if query_history:
-        datasources_used = sorted({item.get("datasource_id") for item in query_history if item.get("datasource_id")})
-        if datasources_used:
-            presenter.print_info(f"Datasources used: {', '.join(datasources_used)}")
+    used = sorted({item["datasource_id"] for item in history if item["datasource_id"]})
+    if used:
+        presenter.print_info(f"Datasources used: {', '.join(used)}")
+    for item in history:
+        if item["sql"]:
+            body = Text()
+            if item["sub_query"]:
+                body.append(f"Sub-Query: {item['sub_query']}\n", style="bold")
+            body.append(f"Datasource: {item['datasource_id'] or 'Unknown'}\n\n", style="bold")
+            body.append(str(item["sql"]))
+            presenter.print_sql(body)
 
-        for item in query_history:
-            ds = item.get("datasource_id", "Unknown")
-            sub_query = item.get("sub_query")
-            sql = item.get("sql")
+    presenter.print_pipeline_errors(result.errors)
+    for warning in result.warnings:
+        presenter.print_warning(json.dumps(warning, default=str))
 
-            if sql:
-                body = Text()
-                if sub_query:
-                    body.append(f"Sub-Query: {sub_query}\n", style="bold")
-                body.append(f"Datasource: {ds}\n\n", style="bold")
-                body.append(str(sql))
-                presenter.print_sql(body)
+    if result.final_answer:
+        presenter.print_answer_synthesizer_output(result.final_answer)
 
-    elif final_state.get("sql_draft"):
-        sql_draft_data = final_state.get("sql_draft")
-        sql_draft = sql_draft_data.get("sql") if isinstance(sql_draft_data, dict) else getattr(sql_draft_data, "sql", None)
-        if sql_draft:
-             presenter.print_sql(str(sql_draft))
-
-    errors = final_state.get("errors")
-    if errors:
-        presenter.print_pipeline_errors(errors)
-
-    warnings = final_state.get("warnings") or []
-    for warning in warnings:
-        if isinstance(warning, dict):
-            presenter.print_warning(json.dumps(warning, default=str))
-        else:
-            presenter.print_warning(str(warning))
-
-    answer_payload = None
-    answer_synth = final_state.get("answer_synthesizer_response")
-    if answer_synth:
-        if isinstance(answer_synth, dict):
-            answer_payload = answer_synth.get("final_answer")
-        else:
-            answer_payload = getattr(answer_synth, "final_answer", None)
-    if isinstance(answer_payload, dict) and answer_payload:
-        presenter.print_answer_synthesizer_output(answer_payload)
-
-    final_answer = final_state.get("final_answer")
-    if isinstance(final_answer, dict) and final_answer:
-        presenter.print_answer_synthesizer_output(final_answer)
-    elif type(final_answer) == str and final_answer:
-        presenter.print_final_answer(final_answer)
-    elif type(final_answer) == list and final_answer:
-        presenter.print_execution_result(final_answer)
-
-    execution = final_state.get("execution")
-    if execution:
-        row_count = execution.get("row_count", 0) if isinstance(execution, dict) else getattr(execution, "row_count", 0)
-        presenter.print_rows_returned(row_count)
-
-
-    usage = final_state.get("usage") or {}
-    if config.show_perf:
-        tree, metrics, node_map = monitor.get_performance_tree()
-        tokens_by_node = {
-            node: totals.get("total_tokens", 0) for node, totals in (usage.get("nodes") or {}).items()
-        }
-        presenter.print_performance_tree(tree, metrics, node_map, tokens_by_node)
-
-    presenter.print_usage_summary(result.duration, usage)
-
-    trace_path = final_state.get("trace_path")
-    if trace_path:
-        presenter.print_info(f"Trace written to {trace_path} (inspect: nl2sql trace show <file>)")
-
-    # The graph can finish without raising and still have failed: an ERROR or
-    # CRITICAL error (an RBAC refusal included) makes the result's status
-    # "error". Warnings alone do not.
-    if result_from_state(final_state).status == "error":
-        sys.exit(1)
+    rows = [sq.rows.total_rows for sq in result.sub_queries if sq.rows is not None]
+    if rows:
+        presenter.print_rows_returned(sum(rows))

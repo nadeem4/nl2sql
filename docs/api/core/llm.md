@@ -1,15 +1,14 @@
 # LLM API
 
 ## Purpose
-Configure LLM providers and expose LLM configurations by name.
+`engine.llm`: the model each agent runs on, and replacing them at runtime.
 
 ## Responsibilities
-- Replace the engine's whole LLM at runtime (`replace`).
-- Register LLM configs programmatically, or replace them all with the `llm` section of an `nl2sql.yaml`.
-- Provide config lookup and listing.
+- List each agent and the provider and model it runs on (`list`, `get`).
+- Replace the engine's whole `llm` section at runtime (`replace`).
 
 ## Key Modules
-- `packages/nl2sql/src/nl2sql/api/llm_api.py`
+- `packages/nl2sql/src/nl2sql/api/llm_api.py` (`LLMAPI`, internal)
 - `packages/nl2sql/src/nl2sql/llm/registry.py`
 - `packages/nl2sql/src/nl2sql/llm/llm_set.py`
 - `packages/nl2sql/src/nl2sql/llm/client_cache.py`
@@ -52,30 +51,56 @@ Fields:
 | `default` | `AgentConfig` | yes | The top level of the `llm` section. |
 | `agents` | `Dict[str, AgentConfig]` | no | The agents that set their own fields. |
 
-### LLM_API.replace
+### llm.list
+
+Signature:
+`list() -> dict`
+
+Returns each agent by its name in the `llm` section, `default` first: its
+`provider`, `model`, `temperature` and `inherited` (True when the agent sets
+nothing of its own and runs on `default`). An agent given a model object shows
+its class as `model` and no provider. Never a key.
+
+```python
+engine.llm.list()["ast_planner"]
+# {'provider': 'openai', 'model': 'gpt-5.5', 'temperature': 0.0, 'inherited': False}
+```
+
+### llm.get
+
+Signature:
+`get(agent: str) -> dict`
+
+One agent's entry from `list()`. Raises `ValueError` for a name that is not an
+agent, listing the agents.
+
+### llm.replace
 
 Source:
 `packages/nl2sql/src/nl2sql/api/llm_api.py` (`Runtime.replace_llm` in
 `packages/nl2sql/src/nl2sql/runtime.py`)
 
 Signature:
-`replace(llm: LLM, *, by: Optional[UserContext] = None, via: str = "python") -> LLMChange`
+`replace(llm: LLM | Mapping, *, by: Optional[UserContext] = None, via: str = "python") -> LLMChange`
 
 Parameters:
 | name | type | required | meaning |
 | --- | --- | --- | --- |
-| `llm` | `LLM` | yes | The whole `llm` section, as in `nl2sql.yaml`. |
+| `llm` | `LLM` or a mapping | yes | The whole `llm` section: an `LLM`, or the section as written in `nl2sql.yaml` (a mapping, such as a request body). A mapping is checked exactly as the file is: strict keys with "did you mean", the model's validators, references kept in secret fields. A `${...}` reference outside a secret field is an error rather than read, since the data did not come from the operator's file. |
 | `by` | `Optional[UserContext]` | no | Who is making the change; its `user_id` and `roles` are logged. |
 | `via` | `str` | no | The entry point making the change (`python`, `api`, `playground`). |
 
 Returns:
-`LLMChange`: `by` (`via`, and `user_id` and `roles` when `by` was given) and
-`changes`, each agent whose effective provider or model changed as
-`{"old": "provider/model", "new": "provider/model"}`. It holds no key.
+`LLMChange` (exported from `nl2sql`): `by` (`via`, and `user_id` and `roles`
+when `by` was given) and `changes`, each agent whose effective provider or
+model changed as `{"old": "provider/model", "new": "provider/model"}`. It holds
+no key.
 
 Raises:
-- `ConfigError` for a provider that is not registered or not installed, or an
-  agent whose API key does not resolve. Nothing changes.
+- `ConfigError` for a section that does not validate, a provider that is not
+  registered or not installed, or an agent whose API key does not resolve.
+  Nothing changes. `nl2sql-api` answers it as HTTP 422 with the same text
+  ([`PUT /api/v1/settings/llm`](../rest/llm.md)).
 
 Side Effects:
 - Builds the new clients (no model call), then swaps the engine's `LLMSet`
@@ -84,69 +109,20 @@ Side Effects:
 - One INFO line on the `nl2sql.llm` logger and one `llm.changed` audit record.
   Nothing is written to disk.
 
+To use the `llm` section of a file: `engine.llm.replace(load_config(path).llm)`.
+
 See [LLM configuration → Replacing the LLM at runtime](../../configuration/llm.md#replacing-the-llm-at-runtime).
 
-### LLM_API.configure_llm
+### Internals: `AgentConfig` and `LLMFileConfig`
 
-Source:
-`packages/nl2sql/src/nl2sql/api/llm_api.py`
-
-Signature:
-`configure_llm(config: Union[AgentConfig, Dict[str, Any]]) -> None`
-
-Parameters:
-| name | type | required | meaning |
-| --- | --- | --- | --- |
-| `config` | `AgentConfig | Dict[str, Any]` | yes | LLM config; `name` defaults to `default` if omitted. |
-
-Returns:
-`None`.
-
-Raises:
-- `ValueError` for an unsupported provider or an empty model.
-
-Side Effects:
-- Sets that agent and keeps the others, as one swap of the engine's `LLMSet`.
-  The client is built now, through the engine's client cache. `engine.config.llm`
-  is not updated; `replace` is the way to change the whole section.
-
-Idempotency:
-- Re-registering same `name` overwrites the config; a client still used by
-  another agent or a run in flight is kept.
-
-### LLM_API.configure_llm_from_config
-
-Signature:
-`configure_llm_from_config(config_path: Union[str, pathlib.Path]) -> None`
-
-Parameters:
-| name | type | required | meaning |
-| --- | --- | --- | --- |
-| `config_path` | `Union[str, pathlib.Path]` | yes | An `nl2sql.yaml`; its `llm` section is used. |
-
-Raises:
-- `ConfigError` if the file does not load, naming every problem.
-
-Side Effects:
-- Replaces every agent with the file's `llm` section, as one step; an agent
-  the section no longer names falls back to the top level. An invalid file
-  changes nothing. `NL2SQL.reload_llm_config(path)` does the same.
-
-### LLM_API.get_llm
-
-Signature:
-`get_llm(name: str) -> dict`
-
-Returns:
-LLM configuration (API key excluded). Falls back to `default` if not found.
-
-### LLM_API.list_llms
-
-Signature:
-`list_llms() -> dict`
-
-Returns:
-Map of LLM name → config (API key excluded).
+`AgentConfig` (`llm/models.py`) is one agent's resolved settings, as
+`LLMRegistry` builds a client from them; `agents_from_config(llm)`
+(`llm/registry.py`) makes one per agent from the `llm` section. Its fields are
+`provider`, `model`, `temperature` (`None` sends no temperature parameter),
+`api_key` (masked in `repr`, `str` and JSON dumps; `None` reads the provider's
+standard variable), `base_url` and `name`. `LLMFileConfig` is a set of agents
+the benchmark compares, one config at a time (`LLMFileConfig.from_llm(llm)`).
+Neither is part of the public API.
 
 ## Behavioral Contracts
 - Providers supported in the core registry are `openai`, `anthropic`,
@@ -210,5 +186,5 @@ Map of LLM name → config (API key excluded).
   [LLM configuration → Temperature](../../configuration/llm.md#temperature)).
 - A provider's HTTP 400 rejecting `temperature` is re-raised as a `ValueError`
   naming the model and agent and telling you to set `temperature: null`.
-- `register_llms` registers each agent under its key in the mapping, whatever
-  its `name` field says.
+- `LLMRegistry.register_llms` (internal) registers each agent under its key
+  in the mapping, whatever its `name` field says.

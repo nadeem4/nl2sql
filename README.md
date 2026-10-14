@@ -376,7 +376,7 @@ wins:
 With none of them, `/api/v1/query`, `/api/v1/query/stream` and the result routes answer HTTP 401.
 
 The routes that change the process (`POST /api/v1/datasource`, `DELETE /api/v1/datasource/{id}`,
-`POST /api/v1/llm`, `POST /api/v1/index/{id}`, `POST /api/v1/index-all`, `DELETE /api/v1/index`)
+`PUT /api/v1/settings/llm`, `POST /api/v1/index/{id}`, `POST /api/v1/index-all`, `DELETE /api/v1/index`)
 also need a role listed in `policies.admin_roles` (default `[admin]`), else HTTP 403. With no
 role setting at all they answer loopback clients only.
 
@@ -389,14 +389,14 @@ role setting at all they answer loopback clients only.
 | `GET` | `/api/v1/health` | Liveness check |
 | `GET` | `/api/v1/ready` | Readiness check (does not yet check datasources, the LLM or the index) |
 | `POST` | `/api/v1/datasource` | Register a datasource in the running process; `config` has the shape of one `datasources` entry (`id`, `type`, `connection`, ...) |
-| `GET` | `/api/v1/datasource` | List registered datasource ids |
-| `GET` | `/api/v1/datasource/{datasource_id}` | Check that a datasource is registered |
-| `DELETE` | `/api/v1/datasource/{datasource_id}` | Not supported yet: always answers `success: false` |
-| `POST` | `/api/v1/llm` | Configure an LLM in the running process |
-| `GET` | `/api/v1/llm` | List configured LLMs |
-| `GET` | `/api/v1/llm/{llm_name}` | Get one configured LLM |
+| `GET` | `/api/v1/datasource` | List the datasources: type, description, status (`ready`, `failed`, `unchecked`), capabilities, masked connection |
+| `GET` | `/api/v1/datasource/{datasource_id}` | One datasource, as the list shows it |
+| `DELETE` | `/api/v1/datasource/{datasource_id}` | Take a datasource out of the running process |
+| `PUT` | `/api/v1/settings/llm` | Replace the whole `llm` section in the running process (the body is the section as JSON; a bad one is a 422) |
+| `GET` | `/api/v1/llm` | Each agent and the model it runs on |
+| `GET` | `/api/v1/llm/{agent}` | One agent's model |
 | `POST` | `/api/v1/index/{datasource_id}` | Index one datasource's schema |
-| `POST` | `/api/v1/index-all` | Index every registered datasource |
+| `POST` | `/api/v1/index-all` | Index every configured datasource |
 | `DELETE` | `/api/v1/index` | Clear the vector store |
 | `GET` | `/api/v1/index/status` | Index health: status, entries by type, embedding model and problems per datasource |
 
@@ -421,7 +421,7 @@ included, comes back as HTTP 200 with `status: "error"` and the reason in
 from nl2sql import NL2SQL, UserContext
 
 engine = NL2SQL.demo()               # the bundled databases; reads OPENAI_API_KEY (or another provider's key)
-engine.index_all_datasources()       # once: builds the index under .nl2sql-demo/
+engine.index.build()                 # once: builds the index under .nl2sql-demo/
 # Your own config instead:  engine = NL2SQL.from_config("nl2sql.yaml")
 result = engine.run_query(
     "How many customers are there?",
@@ -448,11 +448,12 @@ and cost when `llm.prices` covers the model) and `trace_path`. Asking the same q
 again reuses the validated plan from the plan cache (`sq.plan_source == "cache"`),
 still validated for the caller's role.
 
-`NL2SQL` also exposes `engine.query`, `engine.datasource`, `engine.llm`,
-`engine.indexing`, `engine.auth`, `engine.policy`, `engine.settings`
-and `engine.benchmark`, plus `engine.get_schema()`, `engine.index_health()`,
-`engine.inspect_retrieval()` and `engine.rebuild_index()` — what the playground
-runs on. Feedback is not on the facade; it is read through the CLI. See
+Everything else on `NL2SQL` is a namespace: `engine.datasources` (list, get,
+add, remove, schema, test), `engine.index` (build, health, clear, inspect),
+`engine.llm` (list, get, replace), `engine.policies` (roles, allows, allowed,
+validate), `engine.curated` (validate, test), `engine.results` (manifest,
+page, csv), `engine.traces` (replay) and `engine.benchmark`. The CLI, the
+playground and `nl2sql-api` use nothing else. Feedback is not on the facade; it is read through the CLI. See
 [the public facade](docs/api/core/public-facade.md) and
 [`examples/`](examples/).
 

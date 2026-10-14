@@ -29,7 +29,7 @@ Response model: `DatasourceResponse`
 Admin only: see [Admin routes](index.md#admin-routes).
 
 Execution flow:
-- Validates `config` as a `Datasource` and delegates to `engine.add_datasource(...)`:
+- Validates `config` as a `Datasource` and delegates to `engine.datasources.add(...)`:
   the adapter is built (not connected) and the datasource joins `engine.config`.
   Nothing is written to the config files and nothing is indexed.
 
@@ -40,32 +40,37 @@ Errors:
 
 ### `GET /api/v1/datasource`
 
-Response model: `Dict[str, Any]` (with `datasources` list)
+Response: `{"datasources": [...]}`, `engine.datasources.list()`: every
+configured datasource with its `id`, `type`, `description`, `status`
+(`ready`, `failed` with a `reason`, or `unchecked`), `capabilities` and
+`connection` with every secret masked. No role needed.
 
-Execution flow:
-- Delegates to `engine.list_datasources()`.
+```json
+{"datasources": [
+  {"id": "shop", "type": "postgres", "description": "Orders and customers", "status": "ready",
+   "capabilities": ["supports_sql"], "connection": {"host": "db", "user": "app", "password": "***"},
+   "reason": null}
+]}
+```
 
 ### `GET /api/v1/datasource/{datasource_id}`
 
-Response model: `Dict[str, Any]`
-
-Execution flow:
-- Validates datasource ID exists.
-- Returns placeholder payload `{datasource_id, exists: true}`.
+Response: one datasource, as the list shows it (`engine.datasources.get(...)`).
 
 Errors:
-- `ValueError` -> `HTTP 404`.
-- Other exceptions -> `HTTP 500`.
+- An unknown id -> `HTTP 404`.
 
 ### `DELETE /api/v1/datasource/{datasource_id}`
-
-Response model: `Dict[str, Any]`
 
 Admin only: see [Admin routes](index.md#admin-routes).
 
 Execution flow:
-- Returns a fixed payload indicating removal is not supported.
+- Delegates to `engine.datasources.remove(...)`: the datasource leaves routing
+  and `engine.config`, and its connection pool is closed. Nothing is written to
+  the config files, and its index entries stay until the next full index.
+
+Response: `{"success": true, "message": "...", "datasource_id": "..."}`.
 
 Errors:
-- `ValueError` -> `HTTP 404`.
+- An unknown id -> `HTTP 404`.
 - Other exceptions -> `HTTP 500`.

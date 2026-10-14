@@ -12,6 +12,7 @@ pytest.importorskip("fastapi")
 from fastapi.testclient import TestClient
 
 from nl2sql import NL2SQL
+from nl2sql.testing.facade import StubDatasources, StubLLMs
 from nl2sql.api.query_api import QueryResult, SubQueryResult
 from nl2sql.cli.demo.playground.app import build_app
 from nl2sql.common.settings import settings
@@ -26,11 +27,13 @@ class _Engine(NL2SQL):
     def __init__(self):
         self._runtime = type("Ctx", (), {"schema_store": None, "vector_store": None, "ds_registry": None})()
 
-    def list_datasources(self):
-        return []
+    @property
+    def datasources(self):
+        return StubDatasources(getattr(self, "_runtime", None), [])
 
-    def list_llms(self):
-        return {}
+    @property
+    def llm(self):
+        return StubLLMs({})
 
     def run_query(self, natural_language, datasource_id=None, execute=True, user_context=None,
                   cancellation_token=None):

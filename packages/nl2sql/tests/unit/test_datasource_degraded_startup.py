@@ -127,7 +127,7 @@ def test_policy_validation_says_a_referenced_datasource_failed_to_start(tmp_path
 
     with NL2SQL(config) as engine:
         engine.check()  # bad is optional: the engine runs without it
-        report = engine.policy.validate_policies()
+        report = engine.policies.validate()
 
     entry = next(e for e in report.entries if e.target == "Datasource: bad")
     assert entry.status == "UNAVAILABLE"
@@ -135,11 +135,10 @@ def test_policy_validation_says_a_referenced_datasource_failed_to_start(tmp_path
     assert not report.ok
 
 
-def test_index_health_and_the_facade_report_unavailable_datasources(registry):
+def test_index_health_reports_unavailable_datasources(registry):
     registry.register_datasources([_unknown_type(), _good()])
     engine = NL2SQL.__new__(NL2SQL)
     engine._runtime = SimpleNamespace(vector_store=None, schema_store=None, ds_registry=registry)
 
-    assert "nosuchdb" in engine.list_unavailable_datasources()["bad"]
-    health = engine.index_health()
+    health = engine.index.health()
     assert any("'bad'" in w and "nosuchdb" in w for w in health["warnings"])

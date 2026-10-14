@@ -18,6 +18,7 @@ from langchain_core.documents import Document
 from langchain_core.embeddings import FakeEmbeddings
 
 from nl2sql import NL2SQL
+from nl2sql.testing.facade import StubDatasources
 from nl2sql.cli.demo.playground.app import build_app
 from nl2sql.indexing import rebuild as rebuild_module
 from nl2sql.indexing.vector_store import VectorStore
@@ -65,8 +66,9 @@ class _Engine(NL2SQL):
     def __init__(self, tmp_path):
         self._runtime = _Context(tmp_path)
 
-    def list_datasources(self):
-        return ["chinook"]
+    @property
+    def datasources(self):
+        return StubDatasources(getattr(self, "_runtime", None), ["chinook"])
 
 
 @pytest.fixture
@@ -128,7 +130,7 @@ def test_rebuild_is_refused_on_a_non_loopback_host_without_the_flag(tmp_path, sc
 
     assert response.status_code == 403
     assert scripted.enrich_seen == []
-    assert engine.context.vector_store.is_empty()
+    assert engine._runtime.vector_store.is_empty()
 
 
 def test_rebuild_is_allowed_on_a_non_loopback_host_with_the_flag(tmp_path, scripted):
@@ -229,7 +231,7 @@ def test_a_failed_rebuild_is_reported_and_keeps_the_previous_index(tmp_path, mon
 
     monkeypatch.setattr(rebuild_module, "IndexingOrchestrator", _Failing)
     engine, client = _client(tmp_path)
-    engine.context.vector_store.vectorstore.add_documents([Document(page_content="old", metadata={
+    engine._runtime.vector_store.vectorstore.add_documents([Document(page_content="old", metadata={
         "type": "schema.datasource", "datasource_id": "chinook", "schema_version": "v1"})])
 
     client.post("/api/index/rebuild", json={})

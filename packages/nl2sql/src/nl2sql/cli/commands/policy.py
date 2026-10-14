@@ -23,7 +23,7 @@ def validate(ctx: typer.Context):
     engine = build_engine(ctx, check=False)
     source = (engine.config.folder / "nl2sql.yaml").as_posix() if engine.config.folder else "Config"
     console.print(f"[bold blue]Validating policies from:[/bold blue] {escape(source)}", soft_wrap=True)
-    report = engine.policy.validate_policies()
+    report = engine.policies.validate()
 
     if report.errors:
         console.print(f"[bold red]Policy validation failed:[/bold red] {escape(str(report.errors[0]))}")

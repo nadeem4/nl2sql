@@ -340,7 +340,7 @@ def test_query_api_and_the_facade_pass_the_token_through(monkeypatch):
     monkeypatch.setattr(query_api, "run_with_graph", fake_run)
     token = CancellationToken()
     engine = NL2SQL.__new__(NL2SQL)
-    engine.query = query_api.QueryAPI(None)
+    engine._queries = query_api.QueryAPI(None)
 
     engine.run_query("q", user_context=_USER, cancellation_token=token)
 

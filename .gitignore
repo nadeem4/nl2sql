@@ -28,7 +28,7 @@ chroma_db/
 data/vector_store_demo/
 
 # Folders made by `nl2sql demo` (the default `nl2sql-demo/` or any other
-# `--dir` starting with nl2sql-demo). They can hold a real API key in .env.demo.
+# `--dir` starting with nl2sql-demo). They can hold a real API key in their .env.
 nl2sql-demo*/
 /nl2sql-demo.json
 

@@ -145,7 +145,7 @@ You can register a datasource programmatically without editing config files:
 from nl2sql import NL2SQL, Datasource, Limits
 
 engine = NL2SQL.from_config("nl2sql.yaml")
-engine.add_datasource(Datasource(
+engine.datasources.add(Datasource(
     id="runtime_pg",
     type="postgres",
     description="Runtime Postgres datasource",
@@ -159,12 +159,12 @@ engine.add_datasource(Datasource(
     limits=Limits(timeout_ms=8000, row_limit=100, max_bytes=10485760),
 ))
 
-engine.index_datasource("runtime_pg")
+engine.index.build(["runtime_pg"])
 ```
 
 The `description` is indexed as given, even though no file lists
 `runtime_pg`, and the datasource joins `engine.config`. Indexing makes no LLM call unless you ask for one:
-`engine.index_datasource("runtime_pg", enrich=True)` has the
+`engine.index.build(["runtime_pg"], enrich=True)` has the
 `indexing_enrichment` agent write descriptions for tables and columns the
 database left without a comment.
 
@@ -175,34 +175,30 @@ from nl2sql import NL2SQL, load_config
 
 engine = NL2SQL.from_config("nl2sql.yaml")
 for datasource in load_config("other/nl2sql.yaml").datasources:
-    engine.add_datasource(datasource)
+    engine.datasources.add(datasource)
 ```
 
-### Add an LLM at runtime
+### Replace the LLM at runtime
 
-You can also register or override LLMs programmatically:
+`engine.llm.replace` swaps the whole `llm` section in the running engine, as
+one step: it is validated as `llm.yaml` is, every agent's key must resolve,
+and questions already running finish on the old LLM.
 
 ```python
-from nl2sql import NL2SQL
+from nl2sql import NL2SQL, LLM, AgentLLM
 
 engine = NL2SQL.from_config("nl2sql.yaml")
-engine.configure_llm({
-    "name": "default",
-    "provider": "openai",
-    "model": "gpt-5.2",
-    "temperature": 0.0,
-    "api_key": "${env:OPENAI_API_KEY}"
-})
+engine.llm.replace(LLM(provider="openai", model="gpt-5.4",
+                       agents={"ast_planner": AgentLLM(model="gpt-5.5")}))
+engine.llm.list()["ast_planner"]["model"]   # 'gpt-5.5'
 ```
 
-You can also replace every LLM with the `llm` section of another config at
-runtime:
+The `llm` section of another config:
 
 ```python
-from nl2sql import NL2SQL
+from nl2sql import load_config
 
-engine = NL2SQL.from_config("nl2sql.yaml")
-engine.configure_llm_from_config("other/nl2sql.yaml")
+engine.llm.replace(load_config("other/nl2sql.yaml").llm)
 ```
 
 ### Policies configuration (RBAC)
@@ -285,8 +281,8 @@ call, same SQL and rows; still validated every time), and
 ## Index schema (required)
 
 ```python
-engine.index_datasource("my_postgres")
-engine.index_all_datasources()
+engine.index.build(["my_postgres"])   # one datasource
+engine.index.build()                  # every datasource
 ```
 
 ## Configure providers

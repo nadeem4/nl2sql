@@ -20,6 +20,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Callable, ContextManager, Dict, Iterable, List, Optional
 
+from nl2sql.api.types import IndexProgress
 from nl2sql.common.logger import get_logger
 from nl2sql.indexing.orchestrator import IndexingOrchestrator
 
@@ -47,7 +48,7 @@ def rebuild_index(
     datasource_ids: Optional[Iterable[str]] = None,
     full: bool = False,
     on_progress: Optional[Callable[[str], None]] = None,
-    on_datasource: Optional[Callable[[str, str, Optional[str]], None]] = None,
+    on_datasource: Optional[Callable[["IndexProgress"], None]] = None,
     switch_guard: Optional[Callable[[], ContextManager]] = None,
     curated_only: bool = False,
 ) -> RebuildResult:
@@ -62,8 +63,9 @@ def rebuild_index(
         full: Rebuild every datasource into a new collection and swap it in;
             required after changing the embedding model.
         on_progress: Called with a sentence before each step.
-        on_datasource: Called with ``(datasource_id, "start"|"done"|"failed",
-            error)`` so the CLI can print a line per datasource.
+        on_datasource: Called with an :class:`~nl2sql.api.types.IndexProgress`
+            as each datasource starts, is done (with its entry counts) or
+            fails (with the reason).
         switch_guard: A context manager factory held only around each switch,
             e.g. the playground's ``RunGate.change`` so questions in flight
             finish first.
@@ -83,7 +85,7 @@ def rebuild_index(
     if full and curated_only:
         raise ValueError("A full rebuild re-indexes everything; it cannot be curated-only.")
     say = on_progress or (lambda _msg: None)
-    tell = on_datasource or (lambda *_args: None)
+    tell = on_datasource or (lambda _progress: None)
     result = RebuildResult()
     live = ctx.vector_store
 
@@ -95,8 +97,9 @@ def rebuild_index(
     in_scope = datasource_ids if datasource_ids is not None and not full else unavailable
     for ds_id in dict.fromkeys(in_scope):
         if ds_id in unavailable:
-            result.errors.append({"datasource_id": ds_id,
-                                  "error": f"Datasource '{ds_id}' is unavailable: {unavailable[ds_id]}"})
+            reason = f"Datasource '{ds_id}' is unavailable: {unavailable[ds_id]}"
+            result.errors.append({"datasource_id": ds_id, "error": reason})
+            tell(IndexProgress(ds_id, "failed", reason=reason))
     if full and result.errors:
         return result
     if datasource_ids is not None and not full:
@@ -105,6 +108,7 @@ def rebuild_index(
         for ds_id in wanted:
             if ds_id not in known and ds_id not in unavailable:
                 result.errors.append({"datasource_id": ds_id, "error": "No such datasource is configured."})
+                tell(IndexProgress(ds_id, "failed", reason="No such datasource is configured."))
         adapters = [a for a in adapters if a.datasource_id in wanted]
         if result.errors:
             return result
@@ -124,7 +128,7 @@ def rebuild_index(
         orchestrator = IndexingOrchestrator(ctx, enrich=enrich)
         for adapter in adapters:
             ds_id = adapter.datasource_id
-            tell(ds_id, "start", None)
+            tell(IndexProgress(ds_id, "started"))
             try:
                 if curated_only:
                     say(f"Indexing {ds_id}: embedding its verified queries")
@@ -139,13 +143,14 @@ def rebuild_index(
             except Exception as exc:
                 logger.error(f"Failed to index {ds_id}: {exc}")
                 result.errors.append({"datasource_id": ds_id, "error": str(exc)})
-                tell(ds_id, "failed", str(exc))
+                tell(IndexProgress(ds_id, "failed", reason=str(exc)))
                 continue
             if stats:
                 result.stats.append(stats)
             else:
                 result.empty.append(ds_id)
-            tell(ds_id, "done", None)
+            tell(IndexProgress(ds_id, "done", counts={k: v for k, v in (stats or {}).items()
+                                                      if isinstance(v, int) and not isinstance(v, bool)}))
 
         if not full:
             result.ok = not result.errors and bool(result.stats)

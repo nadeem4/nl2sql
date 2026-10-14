@@ -115,7 +115,7 @@ def trace_replay(
     """
     Re-run a traced question feeding back the recorded LLM responses (no model calls).
     """
-    replay_command(target, lambda: build_engine(ctx).context, ctx)
+    replay_command(target, lambda: build_engine(ctx), ctx)
 
 
 @app.command()

@@ -271,7 +271,7 @@ One page of a run's saved result.
 | `offset` | query | `0` | First row, from 0. Negative is `HTTP 422`. |
 | `limit` | query | `100` | Rows per page, at least 1 (else `HTTP 422`). Above 1,000 it is cut to 1,000; `limit` in the response says which. |
 
-Response model: `ResultPage`. Delegates to `engine.get_result_page(...)`, which
+Response model: `ResultPage`. Delegates to `engine.results.page(...)`, which
 reads the rows lazily from the result's parquet artifact: only the slice asked for
 is read. A page past the end has no rows.
 
@@ -289,7 +289,7 @@ curl -H "X-NL2SQL-Role: admin"   "http://localhost:8000/api/v1/query/0f1c.../res
 
 The whole of a run's saved result as `text/csv` (UTF-8, header first), sent as an
 attachment named `<request_id>_<result_id>.csv`. Delegates to
-`engine.export_result_csv(...)`, which reads the parquet artifact a slice at a time
+`engine.results.csv(...)`, which reads the parquet artifact a slice at a time
 and streams each slice out, so the result is never built in memory on the server.
 
 ### Errors and scope of the result routes

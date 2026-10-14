@@ -1,123 +1,89 @@
-    
-"""
-Datasource API for NL2SQL
-
-Provides functionality for managing datasources programmatically or via config.
-"""
+"""``engine.datasources``: the engine's datasources, listed, added, removed, tested and their schema."""
 
 from __future__ import annotations
 
-import pathlib
-from typing import Union, Dict, Any, List
+from typing import Any, Dict, List
 
+from nl2sql.api.types import DatasourceInfo
+from nl2sql.check import DatasourceStatus
 from nl2sql.config import Datasource
+from nl2sql.datasources.registry import mask_connection_args
 from nl2sql.runtime import Runtime
-from nl2sql.datasources.registry import DatasourceRegistry, mask_connection_args
 
 
-class DatasourceAPI:
-    """
-    API for managing datasources programmatically or via config files.
-    """
+class DatasourcesAPI:
+    """``engine.datasources``. Internal: reach it through ``NL2SQL``."""
 
     def __init__(self, ctx: Runtime):
         self._ctx = ctx
-        self._registry: DatasourceRegistry = ctx.ds_registry
 
-    def add_datasource(self, config: Datasource) -> None:
-        """
-        Add a datasource to the engine: built, not connected, and added to
-        ``engine.config``.
+    def list(self) -> List[DatasourceInfo]:
+        """Every configured datasource, in config order, failed ones included (``status == "failed"``)."""
+        return [self._info(datasource) for datasource in self._ctx.config.datasources]
 
-        Args:
-            config: A ``Datasource``.
-        """
-        self._ctx.add_datasource(config)
+    def get(self, datasource_id: str) -> DatasourceInfo:
+        """One configured datasource, its connection masked.
 
-    def add_datasource_from_config(self, config_path: Union[str, pathlib.Path]) -> None:
+        Raises:
+            ValueError: it is not configured.
         """
-        Add the datasources of another ``nl2sql.yaml``.
+        for datasource in self._ctx.config.datasources:
+            if datasource.id == datasource_id:
+                return self._info(datasource)
+        raise ValueError(f"Unknown datasource ID: {datasource_id}")
 
-        Args:
-            config_path: Path to the ``nl2sql.yaml`` whose datasources to add
-        """
-        from nl2sql.config import load_config
+    def add(self, datasource: Datasource) -> None:
+        """Add ``datasource``: its adapter is built, not connected, and it joins ``engine.config``.
 
-        for datasource in load_config(config_path).datasources:
-            self._ctx.add_datasource(datasource)
+        Index it next (``engine.index.build([datasource.id])``) so questions can reach it.
 
-    def list_datasources(self) -> List[str]:
+        Raises:
+            ValueError: its id is taken, or its adapter cannot be built.
         """
-        List all registered datasource IDs.
-        
-        Returns:
-            List of datasource IDs
-        """
-        return self._registry.list_ids()
-    
-    def get_adapter(self, datasource_id: str):
-        """
-        Get the adapter for a specific datasource.
-        
-        Args:
-            datasource_id: ID of the datasource
-            
-        Returns:
-            Datasource adapter object
-        """
-        return self._registry.get_adapter(datasource_id)
-    
-    def get_capabilities(self, datasource_id: str) -> List[str]:
-        """
-        Get the capabilities of a specific datasource.
-        
-        Args:
-            datasource_id: ID of the datasource
-            
-        Returns:
-            List of capability strings
-        """
-        return list(self._registry.get_capabilities(datasource_id))
-    
+        self._ctx.add_datasource(datasource)
 
-    def validate_connection(
-        self,
-        ds_id: str,
-    ) -> bool:
+    def remove(self, datasource_id: str) -> None:
+        """Take a datasource out of routing and out of ``engine.config``, and close its pool.
+
+        Its index entries stay until the next full ``index.build`` or ``index.clear``.
+
+        Raises:
+            ValueError: it is not configured.
         """
-        Validate a datasource connection configuration without registering it.
-        
-        Args:
-            ds_id: ID of the datasource
-            
-        Returns:
-            True if the connection is valid, raises an exception otherwise
+        self._ctx.remove_datasource(datasource_id)
+
+    def schema(self, datasource_id: str) -> Dict[str, Any]:
+        """The datasource's indexed schema, exactly as the planner is given it.
+
+        Tables sorted by name, each with its columns (type, nullable, primary
+        key, description), foreign keys, row count and description. Read from
+        the latest schema snapshot, not the database; before the first index
+        ``tables`` is empty.
         """
-        
-        adapter = self._registry.get_adapter(ds_id)
-        return adapter.test_connection()
-    
-    def get_datasource_details(
-        self,
-        datasource_id: str
-    ) -> Dict[str, Any]:
+        from nl2sql.schema.view import schema_view
+
+        store = self._ctx.schema_store
+        snapshot = store.get_latest_snapshot(datasource_id) if store is not None else None
+        return schema_view(datasource_id, snapshot)
+
+    def test(self, datasource_id: str) -> DatasourceStatus:
+        """Connect to one datasource, as ``check()`` does: ``ready`` puts it back in routing.
+
+        Raises:
+            ValueError: it is not configured.
         """
-        Get detailed information about a specific datasource.
-        
-        Args:
-            datasource_id: ID of the datasource
-            
-        Returns:
-            Dictionary with datasource details
-        """
-        adapter = self._registry.get_adapter(datasource_id)
-        details = {
-            "datasource_id": adapter.datasource_id,
-            "datasource_engine_type": adapter.datasource_engine_type,
-            "connection_args": mask_connection_args(adapter.connection_args),
-            "statement_timeout_ms": adapter.statement_timeout_ms,
-            "row_limit": adapter.row_limit,
-            "max_bytes": adapter.max_bytes,
-            "capabilities": list(self._registry.get_capabilities(datasource_id)),
-        }
-        return details
+        return self._ctx.check_datasource(datasource_id)
+
+    def _info(self, datasource: Datasource) -> DatasourceInfo:
+        registry = self._ctx.ds_registry
+        reason = registry.unavailable().get(datasource.id)
+        if reason is not None:
+            status, capabilities = "failed", []
+        else:
+            status = "ready" if registry.is_ready(datasource.id) else "unchecked"
+            capabilities = sorted(registry.get_capabilities(datasource.id))
+        adapter = datasource.adapter
+        kind = datasource.type or getattr(adapter, "datasource_engine_type", None) or type(adapter).__name__
+        return DatasourceInfo(id=datasource.id, type=kind, description=datasource.description, status=status,
+                              capabilities=capabilities, connection=mask_connection_args(datasource.connection),
+                              reason=reason)

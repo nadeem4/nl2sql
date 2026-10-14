@@ -47,7 +47,7 @@ def project(tmp_path):
 
 def _with_index(demo_engines, status):
     class Engine(demo_engines.cls):
-        index = status
+        index_status = status
 
     demo_engines.cls = Engine
 

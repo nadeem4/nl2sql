@@ -17,13 +17,7 @@ from nl2sql.pipeline.runtime import run_with_graph
 from nl2sql.auth import UserContext
 from nl2sql.common.cancellation import CancellationToken
 from nl2sql.common.errors import ErrorSeverity
-from nl2sql.execution.artifacts.results import (
-    DEFAULT_RESULT_PAGE_SIZE,
-    ResultManifest,
-    ResultPage,
-    ResultReader,
-    ResultSummary,
-)
+from nl2sql.execution.artifacts.results import ResultSummary
 from nl2sql.execution.contracts import ArtifactRef
 from nl2sql.pipeline.events import QueryEvent, RunEvents
 from nl2sql.pipeline.nodes.validator.schemas import ValidationCheck
@@ -84,7 +78,7 @@ class QueryResult(BaseModel):
     The full result set still lives in artifact storage, addressable through
     ``artifact_refs``. ``result_manifest`` lists the run's saved results (its
     manifest: node id, columns, row count, truncated), never their rows; read
-    those by ``trace_id`` with ``get_result_page`` or ``export_result_csv``.
+    those by ``trace_id`` with ``engine.results.page`` or ``engine.results.csv``.
     ``trace_path`` is where this run's trace file was written, or None when
     ``TRACE_MODE`` did not write one.
     """
@@ -281,16 +275,15 @@ def _source(match: Any) -> AnswerSource:
 
 
 class QueryAPI:
-    """
-    API for executing natural language queries against databases.
-    """
+    """Runs questions for ``NL2SQL.run_query`` and ``stream_query``. Internal: reach it through ``NL2SQL``."""
 
     def __init__(self, ctx: Runtime):
         self._ctx = ctx
 
     def run_query(
         self,
-        natural_language: str,
+        question: str,
+        *,
         datasource_id: Optional[str] = None,
         execute: bool = True,
         user_context: Optional[UserContext] = None,
@@ -300,7 +293,7 @@ class QueryAPI:
         Execute a natural language query against the database.
 
         Args:
-            natural_language: The natural language query to execute
+            question: The question, in plain language
             datasource_id: Optional specific datasource to query (otherwise auto-resolved)
             execute: Whether to actually execute the SQL against the database
             user_context: Optional user context for permissions
@@ -313,7 +306,7 @@ class QueryAPI:
         """
         state = run_with_graph(
             self._ctx,
-            natural_language,
+            question,
             datasource_id=datasource_id,
             execute=execute,
             user_context=user_context,
@@ -326,7 +319,8 @@ class QueryAPI:
 
     def stream_query(
         self,
-        natural_language: str,
+        question: str,
+        *,
         datasource_id: Optional[str] = None,
         execute: bool = True,
         user_context: Optional[UserContext] = None,
@@ -356,7 +350,7 @@ class QueryAPI:
             try:
                 state = run_with_graph(
                     self._ctx,
-                    natural_language,
+                    question,
                     datasource_id=datasource_id,
                     execute=execute,
                     callbacks=[RunEvents(events.put)],
@@ -387,52 +381,3 @@ class QueryAPI:
         finally:
             if not finished:
                 token.cancel()
-
-    def _results(self, tenant_id: Optional[str]) -> ResultReader:
-        """A reader of one tenant's saved results: ``tenant_id``, else the engine's own."""
-        return ResultReader(self._ctx.artifact_store, tenant_id or getattr(self._ctx, "tenant_id", None) or "")
-
-    def get_result_manifest(self, request_id: str, tenant_id: Optional[str] = None) -> ResultManifest:
-        """
-        Which results the run ``request_id`` (its ``trace_id``) saved: per result,
-        its node id, columns, row count and truncated flag. Never the rows.
-
-        Raises:
-            ResultNotFound: no such run for the tenant (the engine's own unless
-                ``tenant_id`` is given), or ``request_id`` is not a plain token.
-        """
-        return self._results(tenant_id).manifest(request_id)
-
-    def get_result_page(
-        self,
-        request_id: str,
-        result_id: str,
-        offset: int = 0,
-        limit: int = DEFAULT_RESULT_PAGE_SIZE,
-        tenant_id: Optional[str] = None,
-    ) -> ResultPage:
-        """
-        Rows ``offset`` to ``offset + limit`` of one saved result, read lazily
-        from its parquet file. ``result_id`` is a node id from
-        ``QueryResult.result_manifest``. ``limit`` is capped at ``MAX_RESULT_PAGE_SIZE``
-        (1,000); a page past the end is empty. ``next_offset`` is where the
-        next page starts, or None at the end.
-
-        Raises:
-            ResultNotFound: no such run or result for the tenant.
-            ValueError: a negative ``offset`` or a ``limit`` below 1.
-        """
-        return self._results(tenant_id).page(request_id, result_id, offset=offset, limit=limit)
-
-    def export_result_csv(
-        self, request_id: str, result_id: str, tenant_id: Optional[str] = None
-    ) -> Iterator[bytes]:
-        """
-        The whole of one saved result as UTF-8 CSV, header first, yielded a
-        slice at a time so it is never built in memory. The ids are checked
-        before the iterator is returned.
-
-        Raises:
-            ResultNotFound: no such run or result for the tenant.
-        """
-        return self._results(tenant_id).csv(request_id, result_id)

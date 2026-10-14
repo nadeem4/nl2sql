@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING, Any, Dict, Mapping, NamedTuple, Optional
 
 from langchain_core.language_models import BaseChatModel
 
-from nl2sql.common.env_hint import active_env_file
 from nl2sql.secrets import SecretManager
 from .client_cache import ClientKey, LLMClientCache
 from .llm_set import LLMSet
@@ -495,9 +494,9 @@ class LLMRegistry:
 
         raise ValueError(
             f"LLM agent '{agent.name}' uses provider '{agent.provider}', which "
-            f"requires an API key, but none could be resolved. Set {env_var} in "
-            f"{active_env_file()} (the env file for this run) or in the "
-            "environment, or give the agent an 'api_key' in the LLM config file."
+            f"requires an API key, but none could be resolved. Set {env_var} in the "
+            "environment or in the .env next to nl2sql.yaml, or give it an api_key "
+            "in the llm section of nl2sql.yaml (llm.api_key, or llm.agents.<agent>.api_key)."
         )
 
     @staticmethod

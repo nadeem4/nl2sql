@@ -1,13 +1,9 @@
 """Performance metrics tracking with OpenTelemetry support."""
-from typing import List, Dict, Any, Optional
+from typing import Optional
 from opentelemetry import metrics
 from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics.export import ConsoleMetricExporter, PeriodicExportingMetricReader
 from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter
-
-# Per-node latency events from PipelineMonitorCallback. Token usage is per run,
-# in QueryResult.usage (TokenUsageCallback), not in a process-wide list.
-LATENCY_LOG: List[Dict[str, Any]] = []
 
 _meter = metrics.get_meter("nl2sql.core")
 node_duration_histogram = _meter.create_histogram(
@@ -48,8 +44,3 @@ def configure_metrics(exporter_type: str = "none", otlp_endpoint: Optional[str] 
     if reader:
         provider = MeterProvider(metric_readers=[reader])
         metrics.set_meter_provider(provider)
-
-
-def reset_usage():
-    """Resets the latency log."""
-    LATENCY_LOG.clear()

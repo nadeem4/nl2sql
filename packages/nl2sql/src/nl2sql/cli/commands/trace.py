@@ -127,25 +127,22 @@ def show(ctx: typer.Context,
         console.print("[green]No node failed.[/green]")
 
 
-def replay_command(target: str, ctx_factory, cli: typer.Context) -> None:
-    """Re-runs the traced question with the recorded LLM answers; see ``nl2sql.tracing.replay``."""
-    from nl2sql.tracing.replay import replay_trace, unreachable_datasources
-
+def replay_command(target: str, engine_factory, cli: typer.Context) -> None:
+    """Re-runs the traced question with the recorded LLM answers, through ``engine.traces.replay``."""
     doc = _load(cli, target)
     request = doc.get("request") or {}
     console.print(f"Replaying trace {escape(str(doc.get('trace_id')))}: {escape(str(request.get('question', '')))}")
-    ctx = ctx_factory()
+    engine = engine_factory()
 
-    problems = unreachable_datasources(doc, ctx)
-    if problems:
+    try:
+        report = engine.traces.replay(doc)
+    except LookupError as unreachable:
         console.print("[red][ERROR][/red] Replay runs the real pipeline against the same datasource, "
                       "and it is not reachable here:")
-        for problem in problems:
+        for problem in str(unreachable).splitlines():
             console.print(f"  - {escape(problem)}")
         console.print("Run with the config the trace was recorded with (the same --config).")
         raise typer.Exit(1)
-
-    report = replay_trace(doc, ctx)
     console.print(f"{report.served} recorded LLM calls served; 0 model calls made.")
 
     if report.divergence is not None:

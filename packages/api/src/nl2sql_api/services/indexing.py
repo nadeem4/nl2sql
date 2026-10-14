@@ -1,4 +1,5 @@
-from typing import Dict, Any, Optional
+from typing import Any, Dict, List, Optional
+
 from nl2sql import NL2SQL
 
 
@@ -6,19 +7,16 @@ class IndexingService:
     def __init__(self, engine: NL2SQL):
         self.engine = engine
 
-    def index_datasource(self, datasource_id: str) -> Dict[str, int]:
-        """Index schema for a specific datasource."""
-        return self.engine.indexing.index_datasource(datasource_id)
+    def build(self, datasource_ids: Optional[List[str]] = None) -> Dict[str, Any]:
+        """Build the index for these datasources (every one when None): ``ok``, ``stats``, ``empty``, ``errors``."""
+        result = self.engine.index.build(datasource_ids)
+        return {"ok": result.ok, "stats": result.stats, "empty": result.empty, "errors": result.errors}
 
-    def index_all_datasources(self) -> Dict[str, Dict[str, int]]:
-        """Index schema for all registered datasources."""
-        return self.engine.indexing.index_all_datasources()
-
-    def clear_index(self) -> None:
+    def clear_index(self) -> Dict[str, Any]:
         """Clear the vector store index."""
-        self.engine.indexing.clear_index()
+        self.engine.index.clear()
         return {"success": True, "message": "Index cleared successfully"}
 
     def get_index_status(self) -> Dict[str, Any]:
-        """The vector index's health, as ``NL2SQL.index_health`` reports it."""
-        return self.engine.index_health()
+        """The vector index's health, as ``engine.index.health()`` reports it."""
+        return self.engine.index.health()

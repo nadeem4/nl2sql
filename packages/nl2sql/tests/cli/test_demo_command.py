@@ -166,7 +166,7 @@ def test_a_missing_index_is_built_before_the_playground_starts(tmp_path, monkeyp
     monkeypatch.setattr("nl2sql.cli.common.indexing.run_indexing", lambda engine, **kw: indexed.append(engine))
 
     class Unindexed(demo_engines.cls):
-        index = "missing"
+        index_status = "missing"
 
     demo_engines.cls = Unindexed
 
@@ -263,7 +263,7 @@ def test_record_stops_when_indexing_fails(tmp_path, monkeypatch, demo_engines):
     monkeypatch.setattr("nl2sql.cli.common.indexing.run_indexing", _failing_index)
 
     class Unindexed(demo_engines.cls):
-        index = "missing"
+        index_status = "missing"
 
         def run_query(self, *args, **kwargs):  # pragma: no cover - must never run
             raise AssertionError("recorded against no index")

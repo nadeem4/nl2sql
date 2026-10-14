@@ -12,7 +12,7 @@ name the rule.
 - **An adapter imports only the SDK, its driver, SQLAlchemy, sqlglot, pydantic and the standard library.** An adapter that imported the engine would close the circle and make the split meaningless.
 - **Nothing outside `nl2sql/adapters/` imports an adapter, SQLAlchemy or a database driver.** Adapters are reached through the `nl2sql.adapters` entry points and `DatasourceAdapterProtocol`, so a datasource this repo has never heard of works the same way.
 - **Nothing outside `nl2sql/cli/` imports the CLI**, and `cli.demo` never imports `cli.commands`. Knowledge an SDK or REST caller also needs belongs in the engine, not behind a command.
-- **The REST API imports only the top-level `nl2sql` facade, and the playground never touches `engine.context`.** Whatever the playground needs is a facade method `nl2sql-api` can call too.
+- **The REST API imports only the top-level `nl2sql` facade, and the CLI, the playground and the API never touch the runtime behind it (`engine._runtime`).** Whatever one of them needs is a facade method every caller can use.
 - **The runtime never imports `nl2sql.evaluation` or `nl2sql.feedback` at module scope.** Both are opt-in tools; a lazy import inside a function is fine.
 - **`import nl2sql` loads no vector store, database driver, `textual` or `opentelemetry`.** `__init__` exports through `__getattr__` and the facade imports the runtime in its constructor, so a caller that only needs a name pays nothing.
 - **A provider's API-key environment variable is read in `nl2sql/llm/` only.** `PROVIDER_PRESETS` in `llm/registry.py` is the one table; everything else derives from it.
@@ -28,7 +28,7 @@ name the rule.
 
 - **TDD.** Write the failing test first; it is how a rule stops being a memo.
 - **Update the docs in the same PR as the code.** A doc that lags is worse than no doc — see `CONTRIBUTING.md`.
-- **Never read or edit `nl2sql-demo*/` or any `.env` file.** A folder made by `nl2sql demo` holds a real API key in `.env.demo`; `.gitignore` keeps it out of the repo and you keep it out of the transcript.
+- **Never read or edit `nl2sql-demo*/` or any `.env` file.** A folder made by `nl2sql demo` holds a real API key in the `.env` next to its `nl2sql.yaml`; `.gitignore` keeps it out of the repo and you keep it out of the transcript.
 - **Never merge the release-please PR (#85).** Merging it releases all three packages; releasing is a deliberate act, described in `docs/development/releasing.md`.
 - **Where we control the background, Mermaid diagrams are black and white** — an artifact, a Notion page, paper — and open with exactly this line, so the diagram reads the same in all three:
 
@@ -44,7 +44,7 @@ name the rule.
 
 ```bash
 pytest -m "not integration" -q
-nl2sql setup --demo   # or copy packages/nl2sql/src/nl2sql/datasets/*.sqlite into data/
+nl2sql init --demo demo-ci   # the demo project: nl2sql.yaml, its section files and the sample databases
 EMBEDDING_PROVIDER=local pytest -m "integration and not llm" -q
 mkdocs build --strict
 ```

@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Union
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple, Union
 
 from rich.console import Console
 from rich.markdown import Markdown
@@ -332,130 +332,28 @@ class ConsolePresenter:
         self.console.print("\n")
         self.console.print(tree)
 
-    def print_status_tree(
-        self,
-        tree_data: Dict[str, List[str]],
-        durations: Dict[str, float],
-        node_order: Optional[List[str]] = None,
-    ) -> None:
-        if not tree_data:
+    def print_step_timings(self, steps: List[Tuple[str, float, bool]],
+                           tokens_by_node: Optional[Dict[str, int]] = None) -> None:
+        """Each step in the order it finished: its time, its tokens and whether it failed.
+
+        ``steps`` are ``(node, seconds, ok)`` from the run's ``node_finished``
+        events; ``tokens_by_node`` is ``QueryResult.usage`` total tokens by node.
+        """
+        if not steps:
             return
-
-        root_tree = Tree("Graph")
-
-        def build_branch(parent_name: str, tree_node: Tree):
-            children = tree_data.get(parent_name, [])
-            for child in children:
-                duration = durations.get(child, 0.0)
-                label = f"{child} [dim]({duration:.2f}s)[/dim]"
-                branch = tree_node.add(label)
-                build_branch(child, branch)
-
-        all_children = set()
-        for kids in tree_data.values():
-            all_children.update(kids)
-
-        all_nodes = set(durations.keys())
-        roots = list(all_nodes - all_children)
-
-        if node_order:
-            roots.sort(key=lambda x: node_order.index(x) if x in node_order else 9999)
-        else:
-            roots.sort()
-
-        for r in roots:
-            duration = durations.get(r, 0.0)
-            label = f"{r} [dim]({duration:.2f}s)[/dim]"
-            branch = root_tree.add(label)
-            build_branch(r, branch)
-
-        self.console.print("\n")
-        self.console.print(root_tree)
-
-    def print_performance_tree(
-        self,
-        tree_data: Dict[str, List[str]],
-        metrics_data: Dict[str, Any],
-        node_map: Optional[Dict[str, str]] = None,
-        tokens_by_node: Optional[Dict[str, int]] = None,
-    ) -> None:
-        """``tokens_by_node`` is ``QueryResult.usage`` total tokens keyed by node name."""
-        if not tree_data:
-            return
-        if node_map is None:
-            node_map = {}
         tokens_by_node = tokens_by_node or {}
-
-        root_tree = Tree("[bold magenta]Performance Execution Tree[/bold magenta]")
-
-        def get_dur_style(dur):
-            if dur > 5.0:
-                return "bold red"
-            if dur > 2.0:
-                return "yellow"
-            return "green"
-
-        def build_branch(parent_id: str, tree_node: Tree, path: set):
-            for child_id in tree_data.get(parent_id, []):
-                if child_id in path:
-                    name = node_map.get(child_id, child_id)
-                    tree_node.add(f"[dim]{name} (recursive)[/dim]")
-                    continue
-
-                meta = metrics_data.get(child_id)
-                name = node_map.get(child_id, child_id)
-
-                label = f"[bold]{name}[/bold]"
-
-                if meta:
-                    dur = meta.duration
-                    dur_style = get_dur_style(dur)
-                    label += f" [dim]in[/dim] [{dur_style}]{dur:.2f}s[/{dur_style}]"
-
-                    if tokens_by_node.get(name):
-                        label += f" | [cyan]{tokens_by_node[name]} tok[/cyan]"
-
-                    if meta.error:
-                        label += f" [bold red]FAILED: {escape(str(meta.error))}[/bold red]"
-
-                branch = tree_node.add(label)
-
-                new_path = set(path)
-                new_path.add(child_id)
-                build_branch(child_id, branch, new_path)
-
-        all_children = set()
-        for parent, kids in tree_data.items():
-            for k in kids:
-                if k != parent:
-                    all_children.add(k)
-
-        all_nodes = set(tree_data.keys())
-        roots = [n for n in all_nodes if n not in all_children]
-
-        roots.sort(
-            key=lambda r: metrics_data[r].duration if r in metrics_data else 0,
-            reverse=True,
-        )
-
-        for r_id in roots:
-            meta = metrics_data.get(r_id)
-            name = node_map.get(r_id, r_id)
-
-            label = f"[bold]{name}[/bold]"
-            if meta:
-                dur = meta.duration
-                dur_style = get_dur_style(dur)
-                label += f" [dim]in[/dim] [{dur_style}]{dur:.2f}s[/{dur_style}]"
-                if tokens_by_node.get(name):
-                    label += f" | [cyan]{tokens_by_node[name]} tok[/cyan]"
-
-            branch = root_tree.add(label)
-            build_branch(r_id, branch, {r_id})
-
-        self.console.print("\n")
-        self.console.print(Panel(root_tree, title="Trace Metrics", border_style="magenta"))
-        self.console.print("\n")
+        table = Table(title="Steps", show_header=True, header_style="bold magenta")
+        table.add_column("Step", style="bold")
+        table.add_column("Time", justify="right")
+        table.add_column("Tokens", justify="right")
+        table.add_column("Result")
+        for node, seconds, ok in steps:
+            style = "bold red" if seconds > 5.0 else "yellow" if seconds > 2.0 else "green"
+            tokens = tokens_by_node.get(node)
+            table.add_row(Text(node), f"[{style}]{seconds:.2f}s[/{style}]", str(tokens) if tokens else "-",
+                          "[green]ok[/green]" if ok else "[bold red]failed[/bold red]")
+        self.console.print()
+        self.console.print(table)
 
     def print_usage_summary(self, total_duration: float, usage: Dict[str, Any]) -> None:
         """One line totalling the question's LLM usage, from ``QueryResult.usage``."""
