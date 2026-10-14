@@ -2393,7 +2393,7 @@ was validated, not only what failed. The names are fixed and always in this orde
    Each forbidden table yields a <code>CRITICAL</code> <code>SECURITY_VIOLATION</code> whose message
    is "You do not have permission to see the data this question requires."
    (it names nothing), with <code>details</code> = <code>{datasource_id, table, roles}</code> for the
-   trace, and a warning log line. <code>RBAC_REFUSAL_NAMES_TABLES=true</code> puts the role
+   trace, and a warning log line. <code>policies.refusal_names_tables: true</code> puts the role
    and table in the message instead. An unknown role, or no role, allows no
    table and is refused the same way. The decision reads only the policy and
    the plan's table list, never the model's reasoning.</li>
@@ -2451,7 +2451,7 @@ was validated, not only what failed. The names are fixed and always in this orde
 <hr/>
 <h2 id="configuration">Configuration</h2>
 <ul>
-<li><code>settings.logical_validator_strict_columns</code> (<code>LOGICAL_VALIDATOR_STRICT_COLUMNS</code>, default <code>true</code>) controls severity of missing column errors: <code>ERROR</code> (blocking, retried) when on, <code>WARNING</code> when off.</li>
+<li><code>settings.pipeline.strict_columns</code> (default <code>true</code>) controls severity of missing column errors: <code>ERROR</code> (blocking, retried) when on, <code>WARNING</code> when off.</li>
 </ul>
 <hr/>
 <h2 id="extension-points">Extension Points</h2>

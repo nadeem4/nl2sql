@@ -2301,13 +2301,13 @@
 <li>Save each terminal result with <code>ArtifactStore.write_lazy</code>, which streams the plan into a parquet artifact, and build <code>AggregatorResponse</code>:</li>
 <li><code>computed_artifacts[node_id]</code>: the saved result's <code>ArtifactRef</code>, with the whole result's <code>row_count</code> and <code>columns</code> (<code>sub_query_id</code> unset).</li>
 <li><code>results</code>: one <code>ResultSummary</code> per saved result (<code>node_id</code>, <code>columns</code>, <code>row_count</code>, and <code>truncated</code>: a sub-query upstream of the node in the DAG was cut at its row cap), also written as the run's <code>manifest.json</code>. <code>QueryResult.result_manifest</code> carries it, and the facade's paging and CSV export read the result by it.</li>
-<li><code>terminal_results[node_id]</code>: the first <code>ANSWER_PREVIEW_ROWS</code> rows, read back from that artifact. This is what the answer model is shown; it is not the whole result.</li>
+<li><code>terminal_results[node_id]</code>: the first <code>settings.results.preview_rows</code> rows, read back from that artifact. This is what the answer model is shown; it is not the whole result.</li>
 <li>Return success reasoning.</li>
 <li>On exception, emit <code>AGGREGATOR_FAILED</code>, on the state's <code>errors</code> and on <code>AggregatorResponse.errors</code>. The graph's <code>aggregator_route</code> then ends the run: the answer synthesizer is not called on the empty result, so the aggregator's error is the run's outcome and no model call is spent explaining <code>{}</code>.</li>
 </ol>
 <h3 id="row-cap-before-a-combine">Row cap before a combine</h3>
 <p>The generator caps every sub-query at its datasource's <code>row_limit</code>, bounded by
-the <code>RESULT_ROW_LIMIT</code> ceiling (100,000, also the cap when none is set), unless the plan asks for fewer rows itself, and records that cap as
+the <code>settings.results.row_limit</code> ceiling (100,000, also the cap when none is set), unless the plan asks for fewer rows itself, and records that cap as
 <code>row_cap</code> on its response and on the sub-query's <code>SubgraphOutput</code>. The cap is
 applied in each sub-query's SQL, <strong>before</strong> the combine: a join input with
 2240 rows under a <code>row_limit</code> of 1000 reaches the aggregator as 1000, and every match the other 1240 held
@@ -2410,8 +2410,8 @@ is a feature, not a fix, and is deliberately not done here.</p>
 <h2 id="configuration">Configuration</h2>
 <ul>
 <li>Uses <code>PolarsDuckdbEngine</code>.</li>
-<li><code>ANSWER_PREVIEW_ROWS</code>: rows of each terminal result kept in <code>terminal_results</code>.</li>
-<li><code>RESULT_ARTIFACT_*</code>: where the combined result is written, as for the sub-query artifacts.</li>
+<li><code>settings.results.preview_rows</code>: rows of each terminal result kept in <code>terminal_results</code>.</li>
+<li>The combined result is written to the runtime's results store (<code>ctx.artifact_store</code>, <code>&lt;storage.path&gt;/results/</code>), as the sub-query artifacts are.</li>
 </ul>
 <hr/>
 <h2 id="extension-points">Extension Points</h2>

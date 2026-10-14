@@ -2162,8 +2162,8 @@
 <h2 id="responsibilities">Responsibilities</h2>
 <ul>
 <li>Limit the search to datasources that have verified queries and that <code>rbac.get_allowed_datasources()</code> allows (the pinned <code>datasource_id</code> only, when one is given).</li>
-<li>Retrieve candidates with <code>VectorStore.retrieve_verified_query_candidates()</code> (top <code>CURATED_MATCH_TOP_K</code>), skipping a query that is in the index but no longer in the file.</li>
-<li>Ask no model when the best similarity is below <code>CURATED_MATCH_FLOOR</code>.</li>
+<li>Retrieve candidates with <code>VectorStore.retrieve_verified_query_candidates()</code> (top <code>settings.curated.match_top_k</code>), skipping a query that is in the index but no longer in the file.</li>
+<li>Ask no model when the best similarity is below <code>settings.curated.match_floor</code>.</li>
 <li>Make one structured-output call, <code>VerifiedQueryChoice</code>.</li>
 <li>Check the chosen values (<code>params.resolve_params</code>): type, <code>min</code>/<code>max</code>, <code>choices</code>, required.</li>
 <li>Check every table the SQL reads against the role's <code>allowed_tables</code> with <code>table_allowed()</code>, and that the SQL is still one read-only query.</li>
@@ -2223,12 +2223,12 @@
 <ol>
 <li>Searchable datasources: registered, allowed for the role (<code>*</code> allows all), the pinned one alone if pinned, and holding verified queries. None: <code>not_configured</code>, no search and no embedding call.</li>
 <li>Candidates. None (or none still in the file): <code>no_candidates</code>.</li>
-<li>Best similarity below <code>CURATED_MATCH_FLOOR</code>: <code>below_floor</code>, no model call.</li>
+<li>Best similarity below <code>settings.curated.match_floor</code>: <code>below_floor</code>, no model call.</li>
 <li>One <code>VerifiedQueryChoice</code> call. It raised (no recording in a replay, a provider error): <code>model_failed</code>. <code>none_of_these</code>: <code>none_of_these</code>. An id that is not a candidate: <code>unknown_query</code>.</li>
 <li>Values: an unknown name, a name twice, a value that does not parse or is out of bounds: <code>param_invalid</code>; a param with no default left out or empty: <code>param_missing</code>. A param left out takes its default.</li>
 <li>Tables: any table the SQL reads not allowed for the role: <code>policy_denied</code>. The normal pipeline then enforces RBAC as always; the user is not told a verified query exists.</li>
 <li>Capability: a query with params on an adapter without <code>SUPPORTS_BOUND_PARAMETERS</code>: <code>capability_missing</code>.</li>
-<li>Run with the values bound and <code>max_rows</code> set to <code>min(adapter.row_limit or RESULT_ROW_LIMIT, RESULT_ROW_LIMIT)</code>. Failed or no result: <code>execution_failed</code>, with a warning.</li>
+<li>Run with the values bound and <code>max_rows</code> set to <code>min(adapter.row_limit or row_limit, row_limit)</code> (<code>row_limit</code> is <code>settings.results.row_limit</code>). Failed or no result: <code>execution_failed</code>, with a warning.</li>
 <li>Fill the state and route to <code>layer_router</code>.</li>
 </ol>
 <h3 id="the-choice-prompt">The choice prompt</h3>

@@ -2295,7 +2295,7 @@
 <ul>
 <li>Datasource override must exist in the registry.</li>
 <li>RBAC must allow at least one candidate.</li>
-<li>Version mismatch policy enforced via <code>settings.schema_version_mismatch_policy</code>.</li>
+<li>Version mismatch policy enforced via <code>settings.schema.version_mismatch</code>.</li>
 <li>At least one allowed candidate must be judged able to answer.</li>
 </ul>
 <hr/>
@@ -2420,7 +2420,7 @@ in the flow changes.</p>
 <hr/>
 <h2 id="configuration">Configuration</h2>
 <ul>
-<li><code>settings.schema_version_mismatch_policy</code> (<code>warn</code> or <code>fail</code>)</li>
+<li><code>settings.schema.version_mismatch</code> (<code>warn</code>, <code>fail</code> or <code>ignore</code>)</li>
 <li>LLM agent <code>datasourceresolver</code> in the LLM config (optional; see <a href="../../../configuration/llm/#per-node-models">LLM configuration</a>)</li>
 </ul>
 <hr/>

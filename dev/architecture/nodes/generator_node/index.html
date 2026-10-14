@@ -2251,7 +2251,7 @@
 <ol>
 <li>Validate presence of datasource ID and plan.</li>
 <li>Resolve adapter and dialect.</li>
-<li>Compute effective limit from plan/adapter row limit: <code>row_limit</code> is the datasource's <code>row_limit</code> bounded by the <code>RESULT_ROW_LIMIT</code> ceiling (100,000), or the ceiling when the datasource sets none; the limit is <code>min(plan.limit or row_limit, row_limit)</code>. When the cap is what bounds the query, record it as <code>row_cap</code>.</li>
+<li>Compute effective limit from plan/adapter row limit: <code>row_limit</code> is the datasource's <code>row_limit</code> bounded by the <code>settings.results.row_limit</code> ceiling (100,000), or the ceiling when the datasource sets none; the limit is <code>min(plan.limit or row_limit, row_limit)</code>. When the cap is what bounds the query, record it as <code>row_cap</code>.</li>
 <li>Traverse AST with <code>SqlVisitor</code> to build <code>sqlglot</code> expression tree.</li>
 <li>Every operator becomes the node sqlglot's parser would build (<code>+</code> -&gt; <code>exp.Add</code>, <code>*</code> -&gt; <code>exp.Mul</code>, <code>IS NOT</code> -&gt; <code>NOT ... IS ...</code>, and so on), wherever it is nested. An operator with no mapping raises; it is never rendered as a function named after the operator.</li>
 <li>An operand that is itself an operator is parenthesised, because sqlglot prints a hand-built tree without adding the parentheses its parser would have seen (<code>(a + b) * c</code> would otherwise print as <code>a + b * c</code>).</li>

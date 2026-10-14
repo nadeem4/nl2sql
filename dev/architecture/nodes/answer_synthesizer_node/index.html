@@ -2249,7 +2249,7 @@
 <hr/>
 <h2 id="responsibilities">Responsibilities</h2>
 <ul>
-<li>Send the model a preview of each result, never the whole of it: the first <code>ANSWER_PREVIEW_ROWS</code> rows (20), the total row count, the column names and a <code>partial</code> flag.</li>
+<li>Send the model a preview of each result, never the whole of it: the first <code>settings.results.preview_rows</code> rows (20), the total row count, the column names and a <code>partial</code> flag.</li>
 <li>Say when a result was cut at the row limit, whatever the model wrote.</li>
 <li>Include unmapped sub‑queries in the response context.</li>
 <li>Invoke LLM with structured output schema.</li>
@@ -2297,7 +2297,7 @@
 <ol>
 <li>Resolve aggregated result from <code>aggregator_response</code>.</li>
 <li>If missing, emit <code>INVALID_STATE</code> error and stop.</li>
-<li>Build the result preview (<code>result_preview()</code>): for each terminal result, its first <code>ANSWER_PREVIEW_ROWS</code> rows, <code>row_count</code>, <code>columns</code> and <code>partial</code> (true when rows were left out). The rows are the aggregator's <code>terminal_results</code>, already cut to the preview; <code>row_count</code> and <code>columns</code> come from the saved combined result in <code>computed_artifacts</code>, so they describe the whole result. Serialize it to JSON.</li>
+<li>Build the result preview (<code>result_preview()</code>): for each terminal result, its first <code>settings.results.preview_rows</code> rows, <code>row_count</code>, <code>columns</code> and <code>partial</code> (true when rows were left out). The rows are the aggregator's <code>terminal_results</code>, already cut to the preview; <code>row_count</code> and <code>columns</code> come from the saved combined result in <code>computed_artifacts</code>, so they describe the whole result. Serialize it to JSON.</li>
 <li>Build the <em>Result Limit</em> note: one line per sub-query whose result reached its row limit ("The result was cut at 10,000 rows, the row limit, so it is incomplete. Narrow the question ..."), or <code>None</code>.</li>
 <li>Serialize unmapped sub‑queries to JSON.</li>
 <li>Invoke LLM chain with structured output. The prompt's <em>Data Notes</em> lists the missing values and asks the answer to say the value does not exist instead of reporting the empty result as a finding. When the run was started by <code>stream_query</code> (<code>configurable.stream_answer</code>), the chain is <code>streaming_structured</code>: the same request with the provider asked to stream, so the run's <code>RunEvents</code> callback turns each piece of the tool call into an <code>answer_delta</code> event. The answer it returns is the unstreamed chain's (<a href="../../../api/core/query/#streaming-a-run">Streaming a run</a>).</li>
@@ -2313,7 +2313,7 @@ not to copy it. So the prompt carries a preview, and its instructions say:</p>
 <li>do not reproduce the result: say the full result is in the table, and use <code>format_type</code> <code>"table"</code> only for a few preview rows.</li>
 </ul>
 <p>The prompt's size no longer grows with the result, which is what let the row cap
-rise from 1,000 to a resource ceiling (<code>RESULT_ROW_LIMIT</code>, 100,000).</p>
+rise from 1,000 to a resource ceiling (<code>settings.results.row_limit</code>, 100,000).</p>
 <h3 id="a-result-cut-at-the-row-limit">A result cut at the row limit</h3>
 <p>The generator bounds each sub-query's SQL at its row limit. A result that comes
 back with that many rows may have been cut, so the subgraph wrapper marks it
@@ -2356,7 +2356,7 @@ top-N (<code>LIMIT 5</code>) is the answer, not a cut, and is never flagged.</p>
 <h2 id="performance-characteristics">Performance Characteristics</h2>
 <ul>
 <li>LLM call dominates latency and cost.</li>
-<li>The prompt holds at most <code>ANSWER_PREVIEW_ROWS</code> rows per terminal result, whatever the result's size. The whole result is still held in memory by the aggregator.</li>
+<li>The prompt holds at most <code>settings.results.preview_rows</code> rows per terminal result, whatever the result's size. The whole result is still held in memory by the aggregator.</li>
 </ul>
 <hr/>
 <h2 id="observability">Observability</h2>
@@ -2368,8 +2368,9 @@ top-N (<code>LIMIT 5</code>) is the answer, not a cut, and is never flagged.</p>
 <h2 id="configuration">Configuration</h2>
 <ul>
 <li>LLM configuration for agent name <code>answer_synthesizer</code> via <code>llm.yaml</code>.</li>
-<li><code>ANSWER_PREVIEW_ROWS</code> (default <code>20</code>): rows of each result the model sees.</li>
-<li><code>RESULT_ROW_LIMIT</code> (default <code>100000</code>): the row ceiling a result is cut at; see <a href="../../../configuration/system/">the system settings</a>.</li>
+<li><code>settings.results.preview_rows</code> (default <code>20</code>): rows of each result the model sees.</li>
+<li><code>settings.results.row_limit</code> (default <code>100000</code>): the row ceiling a result is cut at; see <a href="../../../configuration/system/">the system settings</a>.</li>
+<li>Both are read from the engine's runtime (<code>ctx.settings</code>) when the node is built, so two engines in one process each use their own.</li>
 </ul>
 <hr/>
 <h2 id="extension-points">Extension Points</h2>

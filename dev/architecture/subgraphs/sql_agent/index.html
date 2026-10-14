@@ -2301,11 +2301,12 @@ Source file path: <code>packages/nl2sql/src/nl2sql/pipeline/subgraphs/sql_agent.
 </ul>
 <hr/>
 <h2 id="configuration">Configuration</h2>
+<p>Read from the runtime's <code>settings.pipeline.retries</code> when the subgraph is built:</p>
 <ul>
-<li><code>SQL_AGENT_MAX_RETRIES</code></li>
-<li><code>SQL_AGENT_RETRY_BASE_DELAY_SEC</code></li>
-<li><code>SQL_AGENT_RETRY_MAX_DELAY_SEC</code></li>
-<li><code>SQL_AGENT_RETRY_JITTER_SEC</code></li>
+<li><code>max</code> (default <code>3</code>)</li>
+<li><code>base_delay_s</code> (default <code>1.0</code>)</li>
+<li><code>max_delay_s</code> (default <code>10.0</code>)</li>
+<li><code>jitter_s</code> (default <code>0.5</code>)</li>
 </ul>
 <hr/>
 <h2 id="extension-points">Extension Points</h2>

@@ -2315,7 +2315,7 @@ validation and executed is reused
 <li><strong>Written</strong> by <code>wrap_subgraph</code> (<code>pipeline/graph_utils.py</code>) only when the
   sub-query produced SQL and executed without a blocking error. Refused, failed
   and plan-only runs are not stored.</li>
-<li><strong>Controls:</strong> <code>PLAN_CACHE_ENABLED</code> (default <code>true</code>) and <code>nl2sql cache clear</code>.</li>
+<li><strong>Controls:</strong> <code>settings.pipeline.plan_cache</code> (default <code>true</code>) and <code>nl2sql cache clear</code>.</li>
 </ul>
 <p>See <a href="../../determinism/#the-plan-cache-determinism-from-the-architecture">Determinism → The plan cache</a>.</p>
 <hr/>
@@ -2355,8 +2355,8 @@ caches a stable prefix of 1,024+ tokens automatically):</p>
 </tr>
 </tbody>
 </table>
-<p><code>[TODAY]</code> is the run date (<code>run_date()</code> in <code>common/settings.py</code>: <code>NL2SQL_TODAY</code>
-when set, else the UTC date), so "this year" or "the last 30 days" resolve to
+<p><code>[TODAY]</code> is the run date (<code>run_date(today)</code> in <code>common/dates.py</code>, given
+<code>settings.pipeline.today</code>: that date when it is set, else the UTC date), so "this year" or "the last 30 days" resolve to
 real dates rather than a year the model guessed. It is in the human message
 because it changes daily; in the system message it would invalidate the cached
 prefix every midnight. It comes before <code>[USER_QUERY]</code>, because demo replay keys

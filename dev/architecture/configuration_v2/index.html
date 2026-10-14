@@ -4973,6 +4973,23 @@ the ratchet list, and <code>tests/e2e/test_two_engines_fake_llm.py</code> is the
 strict expected failure. The repository's root <code>conftest.py</code> puts the
 global back after every test, because building an engine changes it.</p>
 </div>
+<div class="admonition note">
+<p class="admonition-title">Built: step 2, the pipeline (PR 11)</p>
+<p>The pipeline nodes, the SQL agent subgraph, <code>pipeline/runtime.py</code>, the
+plan cache, <code>execution</code> and <code>aggregation</code> read <code>ctx.settings</code>,
+<code>ctx.config.policies</code> and <code>ctx.artifact_store</code>; <code>build_artifact_store()</code>
+is gone. <code>run_date(today)</code> is in <code>nl2sql/common/dates.py</code>, and
+<code>PlanCache(store, enabled=..., today=...)</code> takes its settings as
+parameters. Evaluation (tiers 1 and 2, retrieval recall) and trace
+replay pinned pipeline settings by editing the global, which the pipeline
+no longer reads, so until PR 12 gives them derived configs they pin them
+on the runtime with <code>pinned_config(ctx, {"settings.pipeline.plan_cache":
+False})</code> in <code>nl2sql/runtime.py</code>. That swaps <code>ctx.config</code> for the run and
+puts it back, with the same one-engine-at-a-time caveat the global had.
+Node tests build their context with <code>nl2sql.testing.runtime.fake_runtime</code>.
+With the pipeline on the runtime, <code>tests/e2e/test_two_engines_fake_llm.py</code>
+passes, so it is a normal test from this PR on rather than from PR 13.</p>
+</div>
 <p>Each step is one green PR, and no release happens in between:</p>
 <ol>
 <li><strong>The switch PR (7a in the plan)</strong> introduces <code>Runtime.from_config(cfg)</code>.
