@@ -155,7 +155,7 @@ See `../failure_recovery.md` for retry scope and recovery behavior.
 
 - Modify `build_sql_agent_graph()` to insert, remove, or rewire nodes and edges.
 - Add new subgraphs by constructing them in `build_graph()` and extending `resolve_subgraph()` with their required capabilities.
-- Replace node implementations via dependency injection in `NL2SQLContext`.
+- Replace node implementations via dependency injection in `Runtime`.
 
 ---
 

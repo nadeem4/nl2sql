@@ -41,7 +41,7 @@ flowchart TD
 
 - Pipeline runtime: `nl2sql.pipeline.runtime.run_with_graph`
 - Graph builder: `nl2sql.pipeline.graph.build_graph`
-- Application context: `nl2sql.context.NL2SQLContext`
+- Application context: `nl2sql.runtime.Runtime`
 
 ## Navigate the docs
 

@@ -89,8 +89,8 @@ Two rules from earlier decisions apply throughout:
 !!! note "Built: the models and `load_config` (PR 2)"
     The models, `load_config`, `ConfigError`, `load_env_file` and the
     `nl2sql.testing.config.make_config` test helper are in `nl2sql.config`.
-    Nothing reads them yet: the engine is moved onto them in PR 7a, and they
-    are exported from `nl2sql` from then on. Until PR 7b this section stays the
+    The engine is built from them since PR 7a, and they
+    are exported from `nl2sql`. Until PR 7b this section stays the
     reference. Building them settled these details:
 
     - In `Settings`, the `schema` group is the attribute `schema_` in Python,
@@ -601,6 +601,62 @@ The variables read outside `Settings`:
 
 ## 4. Creating the engine
 
+!!! note "Built: the runtime from `Config` (PR 7a)"
+    `NL2SQL(config, *, registry=None)`, `NL2SQL.from_config()`,
+    `NL2SQL.demo()`, `check()`, `close()` and the context manager are built.
+    `Runtime.from_config(cfg, registry)` (`nl2sql/runtime.py`) replaces
+    `NL2SQLContext` and `nl2sql/context.py`; `CheckReport`, `DatasourceStatus`
+    and `EngineNotReady` are in `nl2sql/check.py`. `Config`, `load_config` and
+    the section classes are exported lazily from `nl2sql`. Building it settled
+    these details:
+
+    - **What fails where.** Everything that can be known without a connection
+      is one `ConfigError` from the constructor: an unknown or uninstalled
+      name, a secret provider that cannot start (bug B10), an adapter that
+      rejects its connection settings or a reference that does not resolve,
+      an embeddings provider without its key, and curated answers that do not
+      match the datasources. A datasource that cannot connect is `check()`'s:
+      `failed` at stage `connect`. `test_connection()` returns a bool, so the
+      reason is generic until the SDK v2 stages (Phase 2). A problem names
+      `nl2sql.yaml` (or `Config` when built in code) and the path inside the
+      config (`datasources[1].type`); which split file a section came from is
+      not tracked yet.
+    - **Relative files.** `load_config` records the folder of `nl2sql.yaml`
+      as `Config.folder` (a private attribute that copies keep and equality
+      ignores). The engine passes it to every adapter as `base_dir`, and the
+      SQLite and DuckDB adapters read a relative `database` from there
+      (`BaseSQLAlchemyAdapter.local_path`). The adapters' connection models no
+      longer have a `type` field: `type` is on the `Datasource`.
+    - **One secret provider shape.** `SecretProviderConfig` is the one in
+      `nl2sql.config` (`id`, `type` and the provider's own keys, kept as
+      written). The provider's `config_model` validates the block when the
+      engine builds the provider, after resolving its `${env:...}` values.
+      `nl2sql/secrets/models.py` and the module-level `secret_manager` are
+      deleted; each engine builds its own `SecretManager(registry)`.
+    - **Per engine.** The embedder is built once from `embeddings` through the
+      registry, or is the `instance` given; `EmbeddingService` is deleted. The
+      LLM settings still go through `LLMRegistry` until PR 9: it takes the
+      `llm` section (`configure(llm)`), resolves providers through the
+      registry, and hands back a chat model object given as `LLM(model=...)`.
+      `Policies.allow_all` and `default_role` are applied by `RBAC`.
+    - **Stores.** The index is `<storage.path>/index/` (collection
+      `nl2sql_store`, a constant), the schema store `<storage.path>/state.db`,
+      traces `<storage.path>/traces/` and results `<storage.path>/results/`.
+      The S3 and ADLS result backends and their settings are deleted.
+    - **Datasources.** `engine.add_datasource(Datasource)` builds the adapter
+      (not connected) and swaps in a new `engine.config` under the engine's
+      lock. Indexing reads a datasource's description and sample questions
+      from its `Datasource`, so one added in code keeps both (bug B9).
+      `sample_questions.yaml` is read only by the 0.4 entry points.
+    - **The 0.4 entry points.** The CLI, `nl2sql-api` and the playground
+      still start from the 0.4 files: `nl2sql._legacy` reads them into a
+      `Config` (`_legacy_config`) and keeps their stores where the 0.4
+      variables put them; the facade's private `NL2SQL._legacy(**paths)` is
+      what `nl2sql-api` and the playground call. PR 7b deletes the module.
+    - **Tests.** `nl2sql.testing.config.make_demo_config(folder)` is
+      `make_config` with the demo's databases and roles; the integration and
+      end-to-end fixtures build their runtime from it.
+
 Every way builds the same `Config`. Names in it are resolved through a
 `Registry`, and the default registry is used when none is passed.
 
@@ -812,8 +868,8 @@ hits them again.
     `nl2sql.llm.providers`, `EmbeddingsProvider` in `nl2sql.embeddings`.
     `discover_adapters()` and `nl2sql/secrets/factory.py` are deleted: the
     `DatasourceRegistry`, the secret manager and `nl2sql list-adapters` use the
-    registry. The runtime still builds its LLM clients and embedder from the
-    0.4 settings until PR 7a passes a registry in.
+    registry. Since PR 7a the runtime resolves its LLM providers and builds its
+    embedder through the registry it is given.
 
 ### What it is
 
@@ -1112,6 +1168,15 @@ Phase 1. OpenTelemetry moves in Phase 3.
   `cfg.model_copy(update=...)` instead of editing a global and restoring it.
 
 ### Staging it
+
+!!! note "Built: step 1 (PR 7a)"
+    `_copy_into_global_settings` in `nl2sql/runtime.py` copies the `settings`
+    section, `policies.refusal_names_tables`, `llm.prices`, whether `curated`
+    is present, and the store locations under `storage.path` into the global.
+    `READS_THE_SETTINGS_GLOBAL` in `tests/architecture/test_boundaries.py` is
+    the ratchet list, and `tests/e2e/test_two_engines_fake_llm.py` is the
+    strict expected failure. The repository's root `conftest.py` puts the
+    global back after every test, because building an engine changes it.
 
 Each step is one green PR, and no release happens in between:
 

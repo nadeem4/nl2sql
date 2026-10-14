@@ -46,7 +46,7 @@ From `SubgraphExecutionState`:
 - `sub_query.schema_version` (optional)
 - `trace_id`, `subgraph_name`, `user_context`
 
-From `NL2SQLContext`:
+From `Runtime`:
 
 - `ds_registry`
 - `tenant_id`

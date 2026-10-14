@@ -310,8 +310,9 @@ Current failure behaviors:
 
 ## Performance characteristics (current)
 
-- Embedding uses `EmbeddingService`: OpenAI embeddings by default, or the local
-  ONNX `all-MiniLM-L6-v2` model when `EMBEDDING_PROVIDER=local`.
+- Embedding uses the engine's own embedder, built from its `embeddings`
+  section: OpenAI embeddings, or the local ONNX `all-MiniLM-L6-v2` model with
+  `provider: local` (`EMBEDDING_PROVIDER=local` for the 0.4 entry points).
 - Vector search is MMR (`lambda_mult=0.7`, `fetch_k = 4*k`); see
   [Retrieval](#retrieval-mmr-not-a-re-ranking-model).
 - No caching or sharding layers are implemented.

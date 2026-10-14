@@ -55,7 +55,7 @@ From `GraphState`:
 - `datasource_id` (Optional[str]): when set, only this datasource is searched.
 - `user_context` (`UserContext`, required): the role's datasources and tables.
 
-Context dependencies (`NL2SQLContext`):
+Context dependencies (`Runtime`):
 
 - `curated`: the loaded `CuratedFileConfig`. The matcher reads every query from it, never from the index.
 - `vector_store`: `retrieve_verified_query_candidates()`.

@@ -6,7 +6,7 @@ Multi-tenancy is enforced through **context propagation**, **artifact partitioni
 
 ```mermaid
 flowchart TD
-    Settings[Settings.tenant_id] --> Context[NL2SQLContext.tenant_id]
+    Settings[Settings.tenant_id] --> Context[Runtime.tenant_id]
     Context --> Executor[ExecutorNode/ExecutorRequest]
     Executor --> Artifacts[ArtifactStore.create_artifact_ref]
 ```
@@ -30,6 +30,6 @@ RBAC evaluates `UserContext.roles` against policies defined in `configs/policies
 ## Source references
 
 - Tenant settings: `packages/nl2sql/src/nl2sql/common/settings.py`
-- Context initialization: `packages/nl2sql/src/nl2sql/context.py`
+- Context initialization: `packages/nl2sql/src/nl2sql/runtime.py`
 - Artifact paths: `packages/nl2sql/src/nl2sql/execution/artifacts/store.py`
 - RBAC: `packages/nl2sql/src/nl2sql/auth/rbac.py`

@@ -79,25 +79,32 @@ usual cause is a view created after the last index; re-index the datasource.
 
 ## When a datasource fails to start
 
-A datasource that cannot start (an unknown `type`, a missing driver, an invalid
-connection config, a `${...}` reference that does not resolve) does not stop the
-engine. At startup the others register and the broken one is marked
-unavailable:
+A datasource the engine cannot build (an unknown `type`, a missing driver, an
+invalid connection config, a `${...}` reference that does not resolve) stops
+it: building the engine raises one `ConfigError` that names every such
+datasource and the reason. Building never connects, so this needs no database.
+
+A datasource that cannot **connect** is found by `engine.check()` (see
+[Public Facade → Lifecycle](../api/core/public-facade.md#lifecycle)), and does
+not stop the engine unless it is `required`. The others stay routed, and the
+broken one is marked unavailable:
 
 - the log has an error: `Datasource 'sales' is unavailable: <reason>`;
+- `check()` reports it `failed` at stage `connect`, with a fix;
 - it is not in `list_datasources()` (or `GET /api/v1/datasource`);
   `NL2SQL.list_unavailable_datasources()` maps it to the reason;
 - the index status (`NL2SQL.index_health()`, `GET /api/v1/index/status`) carries
   the same sentence as a warning;
 - a query with `datasource_id` set to it, and `nl2sql index` or
-  `rebuild_index(datasource_ids=[...])` naming it, fail with that reason;
-- `nl2sql doctor` shows it as `Failed` in the connectivity table, with the
-  reason;
-- `nl2sql policy validate` reports a role that names it as `UNAVAILABLE`.
+  `rebuild_index(datasource_ids=[...])` naming it, fail with that reason.
 
-If datasources are configured and none of them can start, startup fails with
-every reason. There is no setting yet to make one bad datasource fatal; run
-`nl2sql doctor` in a deploy check if you need that.
+`check()` raises `EngineNotReady` when a `required: true` datasource fails, or
+when datasources are configured and none is ready. A later `check()` that
+connects routes the datasource again.
+
+Without the engine, `nl2sql doctor` shows a datasource that cannot start or
+connect as `Failed` in the connectivity table, with the reason, and
+`nl2sql policy validate` reports a role that names it as `UNAVAILABLE`.
 
 A secret provider in `secrets.yaml` that cannot start is different: it fails
 startup. See [Secrets → When a provider fails to start](secrets.md#when-a-provider-fails-to-start).

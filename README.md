@@ -400,7 +400,8 @@ included, comes back as HTTP 200 with `status: "error"` and the reason in
 ```python
 from nl2sql import NL2SQL, UserContext
 
-engine = NL2SQL(env="demo")          # loads .env.demo from the working directory
+engine = NL2SQL.demo()               # the bundled databases; reads OPENAI_API_KEY (or another provider's key)
+engine.index_all_datasources()       # once: builds the index under .nl2sql-demo/
 result = engine.run_query(
     "How many customers are there?",
     user_context=UserContext(roles=["admin"]),
@@ -457,14 +458,14 @@ for optional schema descriptions during indexing (off unless you run
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `OPENROUTER_API_KEY` | unset | Provider keys |
-| `ENV` (or `APP_ENV`) | unset | Loads `.env.<name>`; what `--env` and `NL2SQL(env=...)` set |
+| `ENV` (or `APP_ENV`) | unset | Loads `.env.<name>`; what `--env` sets |
 | `ENV_FILE_PATH` | unset | Load this env file instead; wins over `ENV` |
 | `DATASOURCE_CONFIG`, `LLM_CONFIG`, `POLICIES_CONFIG`, `SECRETS_CONFIG` | `configs/...` | Config file paths |
 | `VECTOR_STORE` | `./chroma_db` | Vector store directory |
 | `EMBEDDING_PROVIDER` | `openai` | `local` runs an ONNX embedder with no key (the demo sets it) |
 | `EMBEDDING_MODEL` | `text-embedding-3-small` | Embedding model; changing it needs `nl2sql index --full` |
 | `SCHEMA_STORE_PATH` | `data/schema_store.db` | Schema snapshots, the plan cache and the feedback table |
-| `RESULT_ARTIFACT_BACKEND`, `RESULT_ARTIFACT_BASE_URI` | `local`, `./artifacts` | Where the full result set goes |
+| `RESULT_ARTIFACT_BASE_URI` | `./artifacts` | Where the full result set goes |
 | `GLOBAL_TIMEOUT_SEC` | 60 | How long the caller waits for a run (the demo sets 300) |
 | `SQL_AGENT_MAX_RETRIES` | 3 | Refiner retries per sub-query |
 | `SCHEMA_RETRIEVAL_FULL_SNAPSHOT_MAX_TABLES` | 15 | Send the whole schema, skipping vector search, up to this many tables |

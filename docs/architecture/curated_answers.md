@@ -162,9 +162,9 @@ withheld exactly like any other (`SchemaRetrieverNode._withhold_unreadable`).
 
 The file is checked at three moments, each catching what it can.
 
-**At startup**, `NL2SQLContext.__init__` calls `ConfigManager.load_curated()`
-after the datasources load. A broken file fails startup loudly, as a broken
-`datasources.yaml` does. These checks need no database and no index:
+**At startup**, `Runtime.from_config` checks the config's `curated`
+section after the datasources are built. A broken section fails startup with
+a `ConfigError`, as a broken datasource does. These checks need no database and no index:
 
 - the YAML parses and matches the models;
 - every datasource key is a configured datasource;
@@ -675,7 +675,7 @@ test first and each updating its docs in the same PR (this page,
 **1. Config, loader and `nl2sql curated validate`.**
 `nl2sql/configs/curated.py`, `ConfigManager.load_curated()`, the
 `CURATED_CONFIG` and `CURATED_ENABLED` settings, the startup load in
-`NL2SQLContext`, the read-only and placeholder checks, `CuratedAPI.validate()`
+`Runtime`, the read-only and placeholder checks, `CuratedAPI.validate()`
 and `cli/commands/curated.py`. New page `docs/configuration/curated.md`; the
 settings table in `configuration/system.md`.
 Tests: `tests/unit/test_curated_config.py` (models, unique ids,
@@ -684,7 +684,7 @@ placeholder and param agreement, defaults against types),
 DDL refused, CTEs, placeholders read in every built-in dialect),
 `tests/unit/test_cli_curated_validate.py` (report and exit codes, a table
 missing from the indexed schema), and a startup test that a broken file fails
-`NL2SQLContext`.
+`Runtime`.
 
 **2. Indexing, staleness and candidates.**
 `VerifiedQueryChunk`, `CuratedChunkBuilder`, the orchestrator writing curated

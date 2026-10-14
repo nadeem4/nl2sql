@@ -256,20 +256,26 @@ Guarantees aggregation operates on complete, correctly wired inputs.
 
 ---
 
-## Context Requires Vector Store and Schema Store Configuration
+## An Engine Keeps Its Data Under `storage.path`
 
 ### Definition
-Vector store collection/path and schema store path (for SQLite backend) must be configured.
+`storage` is a required section of the config. An engine keeps its vector
+index in `<storage.path>/index/`, its schema snapshots, plan cache and
+feedback in `<storage.path>/state.db`, its traces in `<storage.path>/traces/`
+and its result files in `<storage.path>/results/`. The index collection name
+is an internal constant.
 
 ### Enforcement Points
-- `NL2SQLContext.__init__()` in `nl2sql.context`
-- `build_schema_store()` in `nl2sql.schema.store`
+- `Config` in `nl2sql.config` (the section is required)
+- `Runtime.from_config()` in `nl2sql.runtime` (`StorePaths.under`)
 
 ### Failure Behavior
-Raises `ValueError` if required settings are missing.
+A config without `storage` is a `ConfigError` from `load_config`, or a
+validation error building `Config` in code.
 
 ### Why It Exists
-Prevents startup with incomplete indexing and schema storage configuration.
+There is no hidden default for where data lives, and two engines with
+different `storage.path` values never share a store.
 
 ---
 
@@ -361,7 +367,7 @@ The playground once read `engine.context.ds_registry`, `engine.context.schema_st
 Concretely:
 
 - `nl2sql/__init__.py` imports only the `NL2SQL` class. Every other public name (`QueryResult`, `QueryEvent`, `CancellationToken`, the API classes, the benchmark) is imported the first time it is asked for, through the module's `__getattr__`. `from nl2sql import QueryResult` works as it always did.
-- `nl2sql/public_api.py` imports the runtime (`NL2SQLContext` and the API classes) inside `NL2SQL.__init__`, not at the top of the module.
+- `nl2sql/public_api.py` imports the runtime (`Runtime` and the API classes) inside `NL2SQL.__init__`, not at the top of the module.
 - Runtime modules import their heavy libraries where they are used, as the adapters already do.
 
 ### Enforcement Points
@@ -473,7 +479,7 @@ A broken file fails startup. At question time a bad value, a denied table, a mis
 - `packages/nl2sql/src/nl2sql/pipeline/nodes/decomposer/dag.py`
 - `packages/nl2sql/src/nl2sql/execution/dag.py`
 - `packages/nl2sql/src/nl2sql/aggregation/aggregator.py`
-- `packages/nl2sql/src/nl2sql/context.py`
+- `packages/nl2sql/src/nl2sql/runtime.py`
 - `packages/nl2sql/src/nl2sql/schema/store.py`
 - `packages/nl2sql/src/nl2sql/pipeline/runtime.py`
 - `packages/nl2sql/src/nl2sql/auth/models.py`

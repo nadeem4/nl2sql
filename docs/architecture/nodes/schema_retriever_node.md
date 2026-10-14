@@ -58,7 +58,7 @@ From `SubgraphExecutionState`:
 
 - `sub_query` (required): includes intent, filters, group_by, expected_schema, metrics, schema_version.
 
-From `NL2SQLContext`:
+From `Runtime`:
 
 - `vector_store` (optional)
 - `schema_store` (required for authoritative resolution)
@@ -178,7 +178,7 @@ Key contracts:
 ## Configuration
 
 - No direct settings used in this node.
-- Vector store configuration is set in `NL2SQLContext`.
+- Vector store configuration is set in `Runtime`.
 
 ---
 

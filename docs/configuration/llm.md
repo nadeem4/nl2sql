@@ -422,7 +422,7 @@ Pick the provider whose credential behaviour matches the endpoint: `openai` or
 Registering an agent validates its configuration; the client itself is built the
 first time that agent's LLM is requested. Two consequences:
 
-- Building an `NL2SQLContext` (which `nl2sql setup`, `nl2sql index` and the API
+- Building the engine's `Runtime` (which `nl2sql setup`, `nl2sql index` and the API
   all do) no longer requires a chat provider key. A machine with no key can
   still run key-free work such as indexing with `EMBEDDING_PROVIDER=local`. That
   holds for indexing because the `indexing_enrichment` pass is genuinely
@@ -442,8 +442,9 @@ provider, or an agent with no model.
 ## Embeddings are a separate path
 
 None of Anthropic, OpenRouter or Ollama covers embeddings — they are not routed through
-`LLMRegistry` at all. Embeddings come from `EmbeddingService`, selected with the
-`EMBEDDING_PROVIDER` environment variable:
+`LLMRegistry` at all. Each engine builds its own embedder from its `embeddings`
+section; the 0.4 entry points select it with the `EMBEDDING_PROVIDER`
+environment variable:
 
 ```bash
 OPENROUTER_API_KEY=sk-or-...   # chat completions

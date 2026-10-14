@@ -1,10 +1,10 @@
 # Architecture Overview
 
-NL2SQL is a **multi-stage orchestration pipeline** built on LangGraph. A single request flows through control-plane nodes (resolution, decomposition, planning), capability-driven subgraphs (SQL agents), and an aggregation layer. The system is wired by `NL2SQLContext`, which instantiates registries, stores, and policy enforcement.
+NL2SQL is a **multi-stage orchestration pipeline** built on LangGraph. A single request flows through control-plane nodes (resolution, decomposition, planning), capability-driven subgraphs (SQL agents), and an aggregation layer. The system is wired by `Runtime`, which instantiates registries, stores, and policy enforcement.
 
 ## Key runtime components
 
-- `NL2SQLContext` initializes registries, stores, and policy enforcement.
+- `Runtime` initializes registries, stores, and policy enforcement.
 - `build_graph()` compiles the LangGraph control-plane pipeline.
 - `run_with_graph()` executes the pipeline with cancellation and timeout.
 - `GraphState` is the shared mutable state across pipeline nodes (see `graph_state.md`).
@@ -23,7 +23,7 @@ flowchart TD
     Router --> Aggregator[EngineAggregatorNode]
     Aggregator --> Synthesizer[AnswerSynthesizerNode]
 
-    subgraph Context[NL2SQLContext]
+    subgraph Context[Runtime]
         DS[DatasourceRegistry]
         LLM[LLMRegistry]
         VS[VectorStore]
@@ -102,4 +102,4 @@ Determinism guarantees and non-determinism sources are documented in `determinis
 - Graph construction: `packages/nl2sql/src/nl2sql/pipeline/graph.py`
 - Runtime execution: `packages/nl2sql/src/nl2sql/pipeline/runtime.py`
 - Shared state: `packages/nl2sql/src/nl2sql/pipeline/state.py`
-- Context initialization: `packages/nl2sql/src/nl2sql/context.py`
+- Context initialization: `packages/nl2sql/src/nl2sql/runtime.py`
