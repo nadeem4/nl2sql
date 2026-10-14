@@ -103,7 +103,8 @@ Every command: [CLI reference](https://github.com/nadeem4/nl2sql#cli-reference).
 ```python
 from nl2sql import NL2SQL, UserContext
 
-engine = NL2SQL(env="demo")          # loads .env.demo from the working directory
+engine = NL2SQL.demo()               # the bundled databases; reads OPENAI_API_KEY (or another provider's key)
+engine.index_all_datasources()       # once: builds the index under .nl2sql-demo/
 result = engine.run_query(
     "How many customers are there?",
     user_context=UserContext(roles=["admin"]),

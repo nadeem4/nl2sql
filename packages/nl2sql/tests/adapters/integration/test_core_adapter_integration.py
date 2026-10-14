@@ -3,7 +3,7 @@ from unittest.mock import MagicMock
 from pydantic import SecretStr
 
 from nl2sql.datasources.registry import DatasourceRegistry
-from nl2sql.datasources.models import DatasourceConfig, ConnectionConfig
+from nl2sql.config import Datasource, Limits
 from nl2sql.secrets.manager import SecretManager
 from nl2sql_sdk.contracts import AdapterRequest, ResultFrame
 from nl2sql.adapters.sqlite.adapter import SqliteAdapter
@@ -16,10 +16,9 @@ def test_core_registry_registers_adapter_and_executes_contract(monkeypatch):
     monkeypatch.setattr("nl2sql.adapters.sqlite.adapter.create_engine", lambda *a, **k: MagicMock())
 
     registry = DatasourceRegistry(SecretManager(), adapter_registry({"sqlite": SqliteAdapter}))
-    config = DatasourceConfig(
+    config = Datasource(
         id="ds1",
-        connection=ConnectionConfig(type="sqlite", database=":memory:"),
-        options={},
+        type="sqlite", connection=dict(database=":memory:"),
     )
 
     # Act

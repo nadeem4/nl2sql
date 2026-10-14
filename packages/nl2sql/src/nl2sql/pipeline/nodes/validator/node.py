@@ -24,7 +24,7 @@ from nl2sql.pipeline.nodes.generator.node import (
     SqlVisitor,
     ordered,
 )
-from nl2sql.context import NL2SQLContext
+from nl2sql.runtime import Runtime
 from nl2sql.auth.rbac import FALLBACK_DEFAULT_SCHEMA, default_schema, table_allowed
 from nl2sql.common.logger import get_logger
 from nl2sql.common.settings import settings
@@ -89,7 +89,7 @@ class LogicalValidatorNode:
         registry (DatasourceRegistry): Registry to fetch schemas and profiles.
     """
 
-    def __init__(self, ctx: NL2SQLContext):
+    def __init__(self, ctx: Runtime):
         """Initializes the LogicalValidatorNode.
 
         Args:

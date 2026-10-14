@@ -7,54 +7,81 @@ It defines the official API boundaries and ensures backward compatibility.
 
 from __future__ import annotations
 
+import os
 import pathlib
 from typing import TYPE_CHECKING, Optional, Union
 
 if TYPE_CHECKING:
-    from nl2sql.context import NL2SQLContext
+    from nl2sql.check import CheckReport
+    from nl2sql.config import LLM, Config
+    from nl2sql.registry import Registry
+    from nl2sql.runtime import Runtime
 
 
 class NL2SQL:
+    """The engine: built from one ``Config``, and the one thing an application talks to.
+
+    ``NL2SQL(config)``, ``NL2SQL.from_config(path)`` and ``NL2SQL.demo()``
+    build it. Building it never connects to a datasource or calls a model;
+    ``check()`` does, and ``close()`` releases what it opened. See
+    docs/architecture/configuration_v2.md, section 4.
     """
-    Public API for NL2SQL Core Package
 
-    This class provides a clean, stable interface to the NL2SQL engine functionality.
-    It abstracts away the internal implementation details and provides a consistent
-    API for external consumers.
-    """
+    def __init__(self, config: "Config", *, registry: Optional["Registry"] = None):
+        """Load and validate everything ``config`` names. Never connects.
 
-    def __init__(
-        self,
-        ds_config_path: Optional[Union[str, pathlib.Path]] = None,
-        secrets_config_path: Optional[Union[str, pathlib.Path]] = None,
-        llm_config_path: Optional[Union[str, pathlib.Path]] = None,
-        vector_store_path: Optional[Union[str, pathlib.Path]] = None,
-        policies_config_path: Optional[Union[str, pathlib.Path]] = None,
-        env: Optional[str] = None,
-        env_file: Optional[Union[str, pathlib.Path]] = None,
-    ):
+        Resolves every name through ``registry`` (``Registry.default()`` when
+        None), imports only the components the config uses, and builds the
+        secret manager, the adapters (not connected), the LLM settings (no
+        model call), the embedder and the stores under ``storage.path``.
+
+        Raises:
+            ConfigError: one error listing every problem found.
         """
-        Initialize the NL2SQL engine with optional configuration paths.
-
-        Args:
-            ds_config_path: Path to datasource configuration file
-            secrets_config_path: Path to secrets configuration file
-            llm_config_path: Path to LLM configuration file
-            vector_store_path: Path to vector store directory
-            policies_config_path: Path to policies configuration file
-            env: Environment name; loads ``.env.<env>`` from the working directory
-            env_file: Path to an env file to load settings from
-        """
-        ds_config_path = pathlib.Path(ds_config_path) if ds_config_path else None
-        secrets_config_path = pathlib.Path(secrets_config_path) if secrets_config_path else None
-        llm_config_path = pathlib.Path(llm_config_path) if llm_config_path else None
-        vector_store_path = pathlib.Path(vector_store_path) if vector_store_path else None
-        policies_config_path = pathlib.Path(policies_config_path) if policies_config_path else None
-        env_file = pathlib.Path(env_file) if env_file else None
-
         # The runtime is imported here, not at the top of the module, so
         # ``import nl2sql`` stays light (docs/architecture/invariants.md).
-        from nl2sql.context import NL2SQLContext
+        from nl2sql.runtime import Runtime
+
+        self._attach(Runtime.from_config(config, registry))
+
+    @classmethod
+    def from_config(cls, path: Optional[Union[str, os.PathLike]] = None, *,
+                    registry: Optional["Registry"] = None) -> "NL2SQL":
+        """``NL2SQL(load_config(path), registry=registry)``.
+
+        ``path`` defaults to ``$NL2SQL_CONFIG``, then ``./nl2sql.yaml``.
+        """
+        from nl2sql.config import load_config
+
+        return cls(load_config(path), registry=registry)
+
+    @classmethod
+    def demo(cls, *, llm: Optional["LLM"] = None,
+             path: Union[str, os.PathLike] = ".nl2sql-demo") -> "NL2SQL":
+        """The demo: three bundled SQLite databases, opened read-only from the installed package.
+
+        With the demo's roles (admin, analyst, viewer) and verified queries,
+        and its data under ``path``. Without ``llm``, the first provider
+        whose key variable is set is used, with its default model.
+
+        Raises:
+            ConfigError: no ``llm`` was given and no provider key is set.
+        """
+        from nl2sql.config import demo_config
+
+        return cls(demo_config(llm=llm if llm is not None else _demo_llm(), path=pathlib.Path(path)))
+
+    @classmethod
+    def _legacy(cls, **paths) -> "NL2SQL":
+        """The engine from the 0.4 config files. For the CLI, ``nl2sql-api`` and the playground
+        only, until they move onto ``nl2sql.yaml`` (PR 7b deletes it)."""
+        from nl2sql._legacy import legacy_runtime
+
+        engine = cls.__new__(cls)
+        engine._attach(legacy_runtime(**paths))
+        return engine
+
+    def _attach(self, runtime: "Runtime") -> None:
         from nl2sql.api.query_api import QueryAPI
         from nl2sql.api.datasource_api import DatasourceAPI
         from nl2sql.api.llm_api import LLM_API
@@ -64,26 +91,68 @@ class NL2SQL:
         from nl2sql.api.policy_api import PolicyAPI
         from nl2sql.api.curated_api import CuratedAPI
 
-        self._ctx = NL2SQLContext(
-            ds_config_path=ds_config_path,
-            secrets_config_path=secrets_config_path,
-            llm_config_path=llm_config_path,
-            vector_store_path=vector_store_path,
-            policies_config_path=policies_config_path,
-            env=env,
-            env_file=env_file,
-        )
-
-        # Initialize modular APIs
-        self.query = QueryAPI(self._ctx)
-        self.datasource = DatasourceAPI(self._ctx)
-        self.llm = LLM_API(self._ctx)
-        self.indexing = IndexingAPI(self._ctx)
-        self.auth = AuthAPI(self._ctx)
-        self.settings = SettingsAPI(self._ctx)
-        self.policy = PolicyAPI(self._ctx)
-        self.curated = CuratedAPI(self._ctx)
+        self._runtime = runtime
+        self.query = QueryAPI(runtime)
+        self.datasource = DatasourceAPI(runtime)
+        self.llm = LLM_API(runtime)
+        self.indexing = IndexingAPI(runtime)
+        self.auth = AuthAPI(runtime)
+        self.settings = SettingsAPI(runtime)
+        self.policy = PolicyAPI(runtime)
+        self.curated = CuratedAPI(runtime)
         self._benchmark = None
+
+    # ------------------------------------------------------------ lifecycle
+
+    @property
+    def config(self) -> "Config":
+        """The current frozen ``Config``. Secrets appear as references only."""
+        return self._runtime.config
+
+    def check(self) -> "CheckReport":
+        """Connect to each datasource, check every agent's API key resolves, and report the index.
+
+        A datasource that fails is marked unavailable and left out of routing;
+        the engine runs degraded. No model is called. Safe to call again.
+
+        Raises:
+            EngineNotReady: a ``required`` datasource failed, or datasources
+                are configured and none is ready.
+        """
+        from nl2sql.check import CheckReport, EngineNotReady
+
+        self._ensure_open()
+        statuses = self._runtime.check_datasources()
+        report = CheckReport(datasources=statuses, llm=self._runtime.llm_registry.missing_keys(),
+                             index=self.index_health()["status"])
+        required = [d.id for d in statuses if d.required and d.status == "failed"]
+        if required:
+            raise EngineNotReady(f"The required datasource(s) {', '.join(required)} failed.", report)
+        if statuses and not any(d.status == "ready" for d in statuses):
+            raise EngineNotReady("No datasource is ready.", report)
+        return report
+
+    def close(self) -> None:
+        """Dispose the adapters' pools and close the stores. The engine cannot be used afterwards.
+
+        Calling it twice is fine.
+        """
+        self._runtime.close()
+
+    @property
+    def closed(self) -> bool:
+        return self._runtime.closed
+
+    def __enter__(self) -> "NL2SQL":
+        return self
+
+    def __exit__(self, *exc_info) -> None:
+        self.close()
+
+    def _ensure_open(self) -> None:
+        runtime = getattr(self, "_runtime", None)
+        if runtime is not None and runtime.closed:
+            raise RuntimeError("This engine is closed. Build a new one.")
 
     @property
     def benchmark(self):
@@ -91,13 +160,13 @@ class NL2SQL:
         if self._benchmark is None:
             from nl2sql.api.benchmark_api import BenchmarkAPI
 
-            self._benchmark = BenchmarkAPI(self._ctx)
+            self._benchmark = BenchmarkAPI(self._runtime)
         return self._benchmark
 
     @property
-    def context(self) -> NL2SQLContext:
-        """Access to the underlying context (internal use only)."""
-        return self._ctx
+    def context(self) -> "Runtime":
+        """The runtime (internal use only; removed with the facade namespaces)."""
+        return self._runtime
 
     # Convenience methods that delegate to the modular APIs
     def run_query(
@@ -114,6 +183,7 @@ class NL2SQL:
         Pass a :class:`~nl2sql.CancellationToken` and call its ``cancel()``
         from another thread to stop the run before its next step.
         """
+        self._ensure_open()
         return self.query.run_query(
             natural_language=natural_language,
             datasource_id=datasource_id,
@@ -138,6 +208,7 @@ class NL2SQL:
         ``error``. ``event.sse()`` is the event as one Server-Sent Event.
         Closing the iterator early cancels the run.
         """
+        self._ensure_open()
         return self.query.stream_query(
             natural_language=natural_language,
             datasource_id=datasource_id,
@@ -173,7 +244,9 @@ class NL2SQL:
 
     def add_datasource(self, config):
         """
-        Programmatically add a datasource to the engine.
+        Add a ``Datasource`` to the engine. Its adapter is built but not
+        connected, and it joins ``engine.config``, description and sample
+        questions included.
         """
         return self.datasource.add_datasource(config)
 
@@ -196,7 +269,7 @@ class NL2SQL:
         They are left out of ``list_datasources``; a query or an index run
         that names one fails with this reason.
         """
-        unavailable = getattr(self._ctx.ds_registry, "unavailable", None)
+        unavailable = getattr(self._runtime.ds_registry, "unavailable", None)
         return unavailable() if unavailable else {}
 
     def get_datasource_capabilities(self, datasource_id: str) -> dict:
@@ -302,7 +375,7 @@ class NL2SQL:
         """
         from nl2sql.schema.view import schema_view
 
-        store = self._ctx.schema_store
+        store = self._runtime.schema_store
         snapshot = store.get_latest_snapshot(datasource_id) if store is not None else None
         return schema_view(datasource_id, snapshot)
 
@@ -318,19 +391,19 @@ class NL2SQL:
         from nl2sql.indexing.curated import curated_hashes
         from nl2sql.indexing.health import IndexHealth, inspect_vector_store
 
-        registry = self._ctx.ds_registry
+        registry = self._runtime.ds_registry
         unavailable = getattr(registry, "unavailable", None)
         down = [f"Datasource '{ds}' is unavailable: {reason}"
                 for ds, reason in (unavailable() if unavailable else {}).items()]
-        store = self._ctx.vector_store
+        store = self._runtime.vector_store
         if store is None:
             health = IndexHealth(status="missing", problems=["No vector index is configured."])
         else:
             ids = registry.list_ids() if registry is not None else []
-            hashes = curated_hashes(getattr(self._ctx, "curated", None), ids)
+            hashes = curated_hashes(getattr(self._runtime, "curated", None), ids)
             preferred_of = getattr(registry, "get_preferred_tables", None)
             preferred = {ds: preferred_of(ds) for ds in ids} if preferred_of else None
-            health = inspect_vector_store(store, self._ctx.schema_store, ids, curated_hashes=hashes,
+            health = inspect_vector_store(store, self._runtime.schema_store, ids, curated_hashes=hashes,
                                           preferred_tables=preferred)
         health.warnings.extend(down)
         return health.to_dict()
@@ -350,7 +423,7 @@ class NL2SQL:
         from nl2sql.indexing import rebuild
 
         return rebuild.rebuild_index(
-            self._ctx,
+            self._runtime,
             enrich=enrich,
             datasource_ids=datasource_ids,
             full=full,
@@ -369,7 +442,7 @@ class NL2SQL:
         Raises:
             LookupError: when no vector index is configured.
         """
-        store = self._ctx.vector_store
+        store = self._runtime.vector_store
         if store is None:
             raise LookupError("There is no vector index configured.")
         kwargs = {"lambda_mult": lambda_mult} if lambda_mult is not None else {}
@@ -388,4 +461,19 @@ class NL2SQL:
         cfg = ConfigManager().load_llm(pathlib.Path(config_path))
         agents = dict(cfg.agents or {})
         agents["default"] = cfg.default
-        self._ctx.llm_registry.replace_llms(agents)
+        self._runtime.llm_registry.replace_llms(agents)
+
+
+def _demo_llm() -> "LLM":
+    """The demo's LLM when none is given: the first provider whose key variable is set."""
+    from nl2sql.config import ConfigError, Problem, default_llm
+    from nl2sql.llm.providers import DEFAULT_MODELS, KEYED_PROVIDERS, api_key_from_env, env_var_for_provider
+
+    providers = [name for name in KEYED_PROVIDERS if name in DEFAULT_MODELS]
+    for provider in providers:
+        if api_key_from_env(provider):
+            return default_llm(provider)
+    variables = ", ".join(env_var_for_provider(p) for p in providers)
+    raise ConfigError([Problem(
+        file="NL2SQL.demo()", path="llm", message=f"No LLM was given and none of {variables} is set.",
+        fix="Set one of them, or pass llm=LLM(provider=..., model=...).")], source="NL2SQL.demo()")

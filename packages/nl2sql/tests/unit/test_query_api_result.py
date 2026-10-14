@@ -132,7 +132,7 @@ def test_run_query_returns_query_result(monkeypatch):
 def test_result_carries_plan_validation_rows_status_and_timings():
     plan = PlanModel(tables=[TableRef(name="t", alias="a")], joins=[],
                      select_items=[SelectItem(expr=Expr(kind="column", alias="a", column_name="id"))])
-    artifact = ArtifactRef(uri="x", backend="local", format="parquet", row_count=120, columns=["id"], bytes=1,
+    artifact = ArtifactRef(uri="x", format="parquet", row_count=120, columns=["id"], bytes=1,
                            content_hash="h", created_at=datetime.now(), path_template="p")
     state = {
         "trace_id": "t", "timings": {"ast_planner": 0.12},

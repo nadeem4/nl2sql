@@ -9,7 +9,7 @@ from __future__ import annotations
 import pathlib
 from typing import Union, Dict, Any
 
-from nl2sql.context import NL2SQLContext
+from nl2sql.runtime import Runtime
 from nl2sql.llm.registry import LLMRegistry
 from nl2sql.llm.models import AgentConfig
 
@@ -19,7 +19,7 @@ class LLM_API:
     API for configuring LLMs programmatically or via config files.
     """
     
-    def __init__(self, ctx: NL2SQLContext):
+    def __init__(self, ctx: Runtime):
         self._ctx = ctx
         self._registry = ctx.llm_registry
     

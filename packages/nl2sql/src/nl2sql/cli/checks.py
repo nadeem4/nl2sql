@@ -4,6 +4,7 @@ from rich.table import Table
 from rich.text import Text
 
 from nl2sql.cli.console import console
+from nl2sql._legacy import datasource_from_04
 from nl2sql.configs import ConfigManager
 from nl2sql.datasources import DatasourceRegistry
 from nl2sql.secrets import SecretManager
@@ -51,7 +52,7 @@ def verify_connectivity(print_table: bool = True) -> bool:
         for config in ds_configs:
             ds_id = getattr(config, "id", None) or "<unknown>"
             try:
-                adapter = registry.register_datasource(config)
+                adapter = registry.register_datasource(datasource_from_04(config))
             except Exception as e:
                 results.append((ds_id, False, str(e)))
                 continue

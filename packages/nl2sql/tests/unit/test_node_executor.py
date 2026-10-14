@@ -1,7 +1,7 @@
 from types import SimpleNamespace
 
 from nl2sql.common.errors import ErrorCode
-from nl2sql.datasources.models import ConnectionConfig, DatasourceConfig
+from nl2sql.config import Datasource, Limits
 from nl2sql.datasources.registry import DatasourceRegistry
 from nl2sql.execution.contracts import ExecutorRequest, ExecutorResponse
 from nl2sql.execution.executor.sql_executor import SqlExecutorService
@@ -33,7 +33,7 @@ def _ctx(adapters, monkeypatch):
     # A real registry, so the node goes through its one capability check.
     registry = DatasourceRegistry(SecretManager(), adapter_registry(dict(adapters)))
     for ds_id in adapters:
-        registry.register_datasource(DatasourceConfig(id=ds_id, connection=ConnectionConfig(type=ds_id)))
+        registry.register_datasource(Datasource(id=ds_id, type=ds_id))
     return SimpleNamespace(ds_registry=registry, tenant_id="t1")
 
 

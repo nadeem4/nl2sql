@@ -10,7 +10,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from nl2sql.datasources.models import ConnectionConfig, DatasourceConfig
+from nl2sql.config import Datasource, Limits
 from nl2sql.datasources.registry import DatasourceRegistry
 from nl2sql.execution.contracts import ExecutorRequest
 from nl2sql.execution.executor.sql_executor import SqlExecutorService
@@ -62,7 +62,7 @@ def registry_with(monkeypatch, **adapters) -> DatasourceRegistry:
     """A registry with one datasource per keyword, named and typed by it."""
     registry = DatasourceRegistry(SecretManager(), adapter_registry(dict(adapters)))
     for name in adapters:
-        registry.register_datasource(DatasourceConfig(id=name, connection=ConnectionConfig(type=name)))
+        registry.register_datasource(Datasource(id=name, type=name))
     return registry
 
 

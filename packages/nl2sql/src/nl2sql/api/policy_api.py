@@ -12,9 +12,10 @@ from typing import List, Optional, Set
 
 from nl2sql.common.settings import settings
 from nl2sql.configs import ConfigManager
-from nl2sql.context import NL2SQLContext
+from nl2sql.runtime import Runtime
 from nl2sql.datasources import DatasourceRegistry
-from nl2sql.secrets import secret_manager
+from nl2sql._legacy import datasource_from_04
+from nl2sql.secrets import SecretManager
 
 
 @dataclass
@@ -38,7 +39,7 @@ class PolicyAPI:
     API for policy validation and integrity checks.
     """
 
-    def __init__(self, ctx: Optional[NL2SQLContext] = None):
+    def __init__(self, ctx: Optional[Runtime] = None):
         self._ctx = ctx
 
     def validate_policies(
@@ -50,7 +51,7 @@ class PolicyAPI:
         """
         Validate policy syntax and integrity against defined datasources.
         """
-        cm = self._ctx.config_manager if self._ctx else ConfigManager()
+        cm = ConfigManager()
 
         policies_path = pathlib.Path(policies_path) if policies_path else pathlib.Path(settings.policies_config_path)
         datasources_path = pathlib.Path(datasources_path) if datasources_path else pathlib.Path(settings.datasource_config_path)
@@ -62,13 +63,14 @@ class PolicyAPI:
             return PolicyValidationReport(ok=False, errors=[str(e)])
 
         try:
+            secret_manager = SecretManager()
             secret_configs = cm.load_secrets(secrets_path)
             if secret_configs:
                 secret_manager.configure(secret_configs)
 
             ds_configs = cm.load_datasources(datasources_path)
             registry = DatasourceRegistry(secret_manager)
-            registry.register_datasources(ds_configs)
+            registry.register_datasources([datasource_from_04(d) for d in ds_configs])
             available_ds = set(registry.list_ids())
             unavailable_ds = registry.unavailable()
         except Exception as e:

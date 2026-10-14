@@ -315,7 +315,7 @@ def _wrapper_state():
 
 
 def _artifact():
-    return ArtifactRef(uri="x", backend="local", format="parquet", row_count=1, columns=["n"], bytes=1,
+    return ArtifactRef(uri="x", format="parquet", row_count=1, columns=["n"], bytes=1,
                        content_hash="h", created_at=datetime.now(), path_template="p")
 
 

@@ -76,4 +76,4 @@ def test_run_accepts_policies_config(monkeypatch, tmp_path):
     ])
 
     assert result.exit_code == 0, repr(result.exception)
-    assert "admin" in captured["ctx"].policies_cfg.roles
+    assert "admin" in captured["ctx"].config.policies.roles

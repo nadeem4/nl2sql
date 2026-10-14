@@ -19,7 +19,7 @@ Configuration is split into **environment variables** (runtime settings) and **f
 | `SECRETS_CONFIG` | `configs/secrets.yaml` | Path to the secrets config file. |
 | `CURATED_CONFIG` | `configs/curated.yaml` | Path to the curated answers file (verified queries). Absent at the default path, the feature is off; set to any other path that does not exist, startup fails. See [Curated Answers](curated.md). |
 | `VECTOR_STORE` | `./chroma_db` | Persist directory for the vector store. |
-| `VECTOR_STORE_COLLECTION` | `nl2sql_store` | Collection name for schema embeddings. |
+| `VECTOR_STORE_COLLECTION` | `nl2sql_store` | Collection name `nl2sql doctor` inspects. The engine always writes `nl2sql_store`, an internal constant in 0.5. |
 
 On the CLI, `nl2sql run`, `nl2sql index`, `nl2sql benchmark` and
 `nl2sql trace replay` override these paths per command with `--config`
@@ -27,17 +27,12 @@ On the CLI, `nl2sql run`, `nl2sql index`, `nl2sql benchmark` and
 `benchmark` and `trace replay` also take `--policies-config`. Each file flag
 takes a path, relative to the working directory or absolute.
 
-From Python, the same overrides are the `NL2SQL(...)` / `NL2SQLContext(...)`
-arguments `ds_config_path`, `llm_config_path`, `secrets_config_path`,
-`policies_config_path` and `vector_store_path`. The context hands the explicit
-file paths to its `ConfigManager`, so lookups made later, such as the
-datasource description indexing stores for the resolver, read the same files
-the context loaded rather than the settings paths.
-
-`NL2SQLContext` validates the vector store configuration before it loads secrets or
-builds the datasource and LLM registries. A blank `VECTOR_STORE_COLLECTION`, or a blank
-`VECTOR_STORE` with no explicit `vector_store_path` argument, raises `ValueError` at
-construction time instead of failing later during setup.
+From Python, the engine is built from one `Config` instead: `NL2SQL(config)`,
+`NL2SQL.from_config("nl2sql.yaml")` or `NL2SQL.demo()` (see
+[Public Facade](../api/core/public-facade.md#creating-an-engine)). The files and
+variables on this page are what the CLI, `nl2sql-api` and the playground still
+read until they move onto `nl2sql.yaml`; a blank `VECTOR_STORE` stops them at
+startup with a `ValueError`.
 
 ### Embeddings
 
@@ -72,17 +67,11 @@ providers. The check runs on the read path only, so the fix is simply to re-run
 
 | Env var | Default | Description |
 | --- | --- | --- |
-| `SCHEMA_STORE_BACKEND` | `sqlite` | Schema store backend identifier. |
+| `SCHEMA_STORE_BACKEND` | `sqlite` | Read by `nl2sql cache` and `nl2sql curated validate` only. The engine always keeps its schema store in SQLite at `SCHEMA_STORE_PATH` (`<storage.path>/state.db` for an engine built from a `Config`). |
 | `SCHEMA_STORE_PATH` | `data/schema_store.db` | SQLite database path for schema store persistence. Also holds the plan cache (`plan_cache` table). |
 | `SCHEMA_STORE_MAX_VERSIONS` | `3` | Max schema versions retained per datasource. |
-| `RESULT_ARTIFACT_BACKEND` | `local` | Artifact backend: `local`, `s3`, `adls`. |
-| `RESULT_ARTIFACT_BASE_URI` | `./artifacts` | Base URI or path for artifact storage. |
-| `RESULT_ARTIFACT_PATH_TEMPLATE` | `<tenant_id>/<request_id>/<sub_query_id>.parquet` | Artifact path relative to the backend root. Placeholders available: `<tenant_id>`, `<request_id>`, `<sub_query_id>`, `<dag_node_id>`, `<subgraph_name>`, `<schema_version>`. Every sub-query of a run writes its own file: a template without `<sub_query_id>` or `<dag_node_id>` gets `-<sub_query_id>` added to its file name (see [artifact store](../storage/artifact-store.md#one-artifact-per-sub-query)). |
-| `RESULT_ARTIFACT_S3_BUCKET` | `—` | S3 bucket for artifact storage. |
-| `RESULT_ARTIFACT_S3_PREFIX` | `—` | S3 prefix for artifact storage. |
-| `RESULT_ARTIFACT_ADLS_ACCOUNT` | `—` | ADLS storage account name. |
-| `RESULT_ARTIFACT_ADLS_CONTAINER` | `—` | ADLS container name. |
-| `RESULT_ARTIFACT_ADLS_CONNECTION_STRING` | `—` | ADLS connection string, if using key-based auth (held as `SecretStr`: never printed). |
+| `RESULT_ARTIFACT_BASE_URI` | `./artifacts` | Folder result files are written under (an engine built from a `Config` uses `<storage.path>/results/`). The S3 and ADLS backends and their `RESULT_ARTIFACT_BACKEND`, `RESULT_ARTIFACT_S3_*` and `RESULT_ARTIFACT_ADLS_*` settings were removed in 0.5. |
+| `RESULT_ARTIFACT_PATH_TEMPLATE` | `<tenant_id>/<request_id>/<sub_query_id>.parquet` | Artifact path relative to the results folder. Placeholders available: `<tenant_id>`, `<request_id>`, `<sub_query_id>`, `<dag_node_id>`, `<subgraph_name>`, `<schema_version>`. Every sub-query of a run writes its own file: a template without `<sub_query_id>` or `<dag_node_id>` gets `-<sub_query_id>` added to its file name (see [artifact store](../storage/artifact-store.md#one-artifact-per-sub-query)). |
 
 ### Execution
 
@@ -139,8 +128,9 @@ On the CLI, `--env <name>` sets `ENV` and `--env-file <path>` sets
 registry and `${env:VAR}` references read `os.environ` rather than settings. A
 variable already exported in the shell wins over the file.
 
-From Python, `NL2SQL(env="demo")` sets `ENV` and `NL2SQL(env_file=path)` sets
-`ENV_FILE_PATH`, reloading settings before any configuration path is resolved.
+From Python, the library reads no env file: the engine is built from a
+`Config` (`NL2SQL.from_config("nl2sql.yaml")`), and `nl2sql.config.load_env_file()`
+is there for an entry point that wants the `.env` next to `nl2sql.yaml`.
 
 ### REST API (`nl2sql-api`)
 

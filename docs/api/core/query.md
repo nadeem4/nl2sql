@@ -114,7 +114,7 @@ The same run as `run_query`, with the same parameters, yielded as it happens.
 ```python
 from nl2sql import NL2SQL, UserContext
 
-engine = NL2SQL(env="demo")
+engine = NL2SQL.from_config("nl2sql.yaml")
 for event in engine.stream_query("Which genre sells the most tracks?",
                                  user_context=UserContext(roles=["admin"])):
     if event.type == "node_finished":

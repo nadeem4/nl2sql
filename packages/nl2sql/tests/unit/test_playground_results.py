@@ -42,7 +42,7 @@ def _save(store, tenant, request, rows):
 
 @pytest.fixture(params=["local", "hosted"])
 def client(request, tmp_path):
-    store = ArtifactStore(ArtifactStoreConfig(backend="local", base_uri=str(tmp_path), path_template=TEMPLATE))
+    store = ArtifactStore(ArtifactStoreConfig(base_uri=str(tmp_path), path_template=TEMPLATE))
     _save(store, "t1", "run-1", ROWS)
     _save(store, "t2", "theirs", [{"id": 1, "name": "secret"}])
     engine = _Engine(QueryAPI(SimpleNamespace(tenant_id="t1", artifact_store=store)))

@@ -23,7 +23,7 @@ Required state:
 - `GraphState.trace_id` is auto-generated if not provided.
 
 Preconditions:
-- `NL2SQLContext` must be initialized with registries/services used by nodes (vector store, LLM registry, datasource registry, schema store, RBAC).
+- `Runtime` must be initialized with registries/services used by nodes (vector store, LLM registry, datasource registry, schema store, RBAC).
 
 Triggering parent graph:
 - None. This is the root graph invoked by `run_with_graph()` in `pipeline/runtime.py`.

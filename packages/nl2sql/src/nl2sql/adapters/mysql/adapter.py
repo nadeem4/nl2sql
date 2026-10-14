@@ -13,7 +13,6 @@ from typing import Optional
 
 class MysqlConnectionConfig(BaseModel):
     """Strict configuration schema for MySQL adapter."""
-    type: str
     host: str = Field(..., description="MySQL server hostname")
     user: str = Field(..., description="Username")
     password: SecretStr = Field(..., description="Password")

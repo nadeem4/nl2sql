@@ -1,8 +1,11 @@
-"""One broken datasource no longer stops the engine from starting.
+"""A datasource that cannot start is recorded as unavailable, and the others register.
 
-The others register; the broken one is recorded as unavailable with its
-reason, and anything that targets it (a query, indexing, an adapter lookup)
-fails with that reason. If no datasource at all can start, startup still fails.
+``register_datasources`` is what the tools that check a config without an
+engine use (``doctor``, ``policy validate``, ``curated validate``). The engine
+itself reports a datasource it cannot build as a ``ConfigError``, and one that
+cannot connect from ``check()`` (tests/unit/test_engine_from_config.py).
+Anything that targets an unavailable datasource (a query, indexing, an
+adapter lookup) fails with the reason.
 """
 import logging
 from types import SimpleNamespace
@@ -10,7 +13,7 @@ from types import SimpleNamespace
 import pytest
 
 from nl2sql import NL2SQL
-from nl2sql.datasources.models import ConnectionConfig, DatasourceConfig
+from nl2sql.config import Datasource
 from nl2sql.datasources.registry import DatasourceRegistry
 from nl2sql.secrets import SecretManager
 from nl2sql.testing import adapter_registry
@@ -39,11 +42,11 @@ def registry(monkeypatch):
 
 
 def _good(ds_id="good"):
-    return DatasourceConfig(id=ds_id, connection=ConnectionConfig(type="stub"))
+    return Datasource(id=ds_id, type="stub")
 
 
 def _unknown_type(ds_id="bad"):
-    return DatasourceConfig(id=ds_id, connection=ConnectionConfig(type="nosuchdb"))
+    return Datasource(id=ds_id, type="nosuchdb")
 
 
 def test_a_bad_datasource_is_recorded_unavailable_and_the_others_register(registry, caplog):
@@ -59,10 +62,8 @@ def test_a_bad_datasource_is_recorded_unavailable_and_the_others_register(regist
 
 def test_an_unresolved_secret_makes_only_that_datasource_unavailable(registry, monkeypatch):
     monkeypatch.delenv("NL2SQL_TEST_UNSET_PASSWORD", raising=False)
-    secret = DatasourceConfig(
-        id="needs_secret",
-        connection=ConnectionConfig(type="stub", password="${env:NL2SQL_TEST_UNSET_PASSWORD}"),
-    )
+    secret = Datasource(id="needs_secret", type="stub",
+                        connection={"password": "${env:NL2SQL_TEST_UNSET_PASSWORD}"})
 
     registry.register_datasources([secret, _good()])
 
@@ -82,14 +83,6 @@ def test_looking_up_an_unavailable_datasource_says_why(registry):
         registry.get_capabilities("bad")
     assert "nosuchdb" in str(excinfo.value)
     assert registry.supports("bad", "supports_sql") is False
-
-
-def test_startup_still_fails_when_no_datasource_is_available(registry):
-    with pytest.raises(ValueError) as excinfo:
-        registry.register_datasources([_unknown_type("bad1"), _unknown_type("bad2")])
-
-    message = str(excinfo.value)
-    assert "bad1" in message and "bad2" in message
 
 
 def test_no_configured_datasources_is_not_a_failure(registry):
@@ -158,7 +151,7 @@ def test_policy_validation_says_a_referenced_datasource_failed_to_start(tmp_path
 def test_index_health_and_the_facade_report_unavailable_datasources(registry):
     registry.register_datasources([_unknown_type(), _good()])
     engine = NL2SQL.__new__(NL2SQL)
-    engine._ctx = SimpleNamespace(vector_store=None, schema_store=None, ds_registry=registry)
+    engine._runtime = SimpleNamespace(vector_store=None, schema_store=None, ds_registry=registry)
 
     assert "nosuchdb" in engine.list_unavailable_datasources()["bad"]
     health = engine.index_health()

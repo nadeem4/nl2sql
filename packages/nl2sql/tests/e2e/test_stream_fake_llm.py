@@ -74,7 +74,7 @@ def test_the_engine_streams_a_run_that_ends_as_run_query_ends(demo_project, fake
     _env(monkeypatch, demo_project, env)
     admin = UserContext(roles=["admin"])
     try:
-        engine = NL2SQL()
+        engine = NL2SQL._legacy()
         events = [(e.type, e.data) for e in engine.stream_query(QUESTION, user_context=admin)]
         plain = engine.run_query(QUESTION, user_context=admin).model_dump(mode="json")
     finally:
@@ -121,7 +121,7 @@ def test_the_playground_streams_server_sent_events(demo_project, fake_llm, monke
     server, env = fake_llm(RULES)
     _env(monkeypatch, demo_project, env)
     try:
-        client = TestClient(build_app(NL2SQL(), questions=[], roles=["admin"], mode="live", dataset="chinook"))
+        client = TestClient(build_app(NL2SQL._legacy(), questions=[], roles=["admin"], mode="live", dataset="chinook"))
         reply = client.post("/api/ask/stream", json={"question": QUESTION, "role": "admin"})
         final = _check_progress(parse_sse(reply.text))
         [entry] = final["result_manifest"]
@@ -169,7 +169,7 @@ def test_every_guided_question_replays_when_streamed_with_no_key(demo_project, t
     try:
         hosted = Hosted(enabled=True, limits=Limits(per_minute=100, per_session=100), replay=Replay(replay.base_url, store.covered(DEMO_QUESTIONS),
                                                     store.recorded_with))
-        app = build_app(NL2SQL(), questions=list(DEMO_QUESTIONS), roles=["admin"], mode="hosted",
+        app = build_app(NL2SQL._legacy(), questions=list(DEMO_QUESTIONS), roles=["admin"], mode="hosted",
                         dataset="chinook", project_dir=project, host="0.0.0.0", hosted=hosted)
         client = TestClient(app, base_url="http://demo.example:7860")
         for question in DEMO_QUESTIONS:

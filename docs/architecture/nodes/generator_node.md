@@ -43,7 +43,7 @@ From `SubgraphExecutionState`:
 - `ast_planner_response.plan` (required)
 - `sub_query.datasource_id` (required)
 
-From `NL2SQLContext`:
+From `Runtime`:
 
 - `ds_registry` (adapter dialect and row limits)
 

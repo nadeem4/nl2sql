@@ -5,7 +5,7 @@ from typing import Any, Callable, Dict, FrozenSet, List, Optional
 from langchain_core.runnables import Runnable, RunnableConfig
 
 from nl2sql.common.errors import ErrorCode, ErrorSeverity, PipelineError
-from nl2sql.context import NL2SQLContext
+from nl2sql.runtime import Runtime
 from nl2sql.execution.dag import ExecutionDAG
 from nl2sql.pipeline.plan_cache import PlanCache
 from nl2sql.pipeline.state import GraphState, SubgraphExecutionState
@@ -51,7 +51,7 @@ def completed_scan_ids(subgraph_outputs: Optional[Dict[str, Any]]) -> FrozenSet[
 
 def resolve_subgraph(
     datasource_id: str,
-    ctx: NL2SQLContext,
+    ctx: Runtime,
 ) -> Optional[str]:
     """Returns the subgraph able to serve a datasource, or None if none can.
 
@@ -97,7 +97,7 @@ def _as_warning(error: PipelineError, sub_query_id: str) -> Dict[str, Any]:
 def wrap_subgraph(
     subgraph: Runnable,
     subgraph_name: str,
-    ctx: NL2SQLContext,
+    ctx: Runtime,
     execute: bool = True,
 ) -> Callable[Dict[str, Any]]:
     """Run a sub-query's subgraph and report it to the parent graph.

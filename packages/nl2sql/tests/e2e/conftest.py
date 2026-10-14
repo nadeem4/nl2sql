@@ -13,7 +13,8 @@ import pytest
 import yaml
 
 from nl2sql.common.settings import settings
-from nl2sql.context import NL2SQLContext
+from nl2sql.runtime import Runtime
+from nl2sql.testing.config import make_demo_config
 from nl2sql.indexing.orchestrator import IndexingOrchestrator
 from nl2sql.testing.fake_llm import FakeLLMServer
 
@@ -152,17 +153,13 @@ def demo_env() -> SimpleNamespace:
     collection_name = f"e2e_pipeline_{uuid.uuid4().hex}"
     vector_store_path = tmp_dir / "chroma"
     schema_store_path = tmp_dir / "schema_store.db"
-
-    monkeypatch.setattr(settings, "result_artifact_backend", "local")
     monkeypatch.setattr(settings, "result_artifact_base_uri", tmp_dir.as_posix())
     monkeypatch.setattr(
         settings,
         "result_artifact_path_template",
         "<tenant_id>/<request_id>.parquet",
     )
-    monkeypatch.setattr(settings, "vector_store_collection_name", collection_name)
     monkeypatch.setattr(settings, "vector_store_path", str(vector_store_path))
-    monkeypatch.setattr(settings, "schema_store_backend", "sqlite")
     monkeypatch.setattr(settings, "schema_store_path", str(schema_store_path))
     monkeypatch.setattr(settings, "schema_store_max_versions", 3)
     monkeypatch.setattr(settings, "global_timeout_sec", 180)
@@ -171,10 +168,7 @@ def demo_env() -> SimpleNamespace:
     # verified queries, and these tests pin the generated pipeline.
     monkeypatch.setattr(settings, "curated_enabled", False)
 
-    ctx = NL2SQLContext(
-        **_demo_config_paths(root, secrets_path),
-        vector_store_path=vector_store_path,
-    )
+    ctx = Runtime.from_config(make_demo_config(tmp_dir, settings={"pipeline": {"timeout_s": 180, "plan_cache": False}}))
 
     orchestrator = IndexingOrchestrator(ctx)
     for adapter in ctx.ds_registry.list_adapters():

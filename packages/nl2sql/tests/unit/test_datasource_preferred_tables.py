@@ -10,7 +10,8 @@ import pytest
 from langchain_core.embeddings import FakeEmbeddings
 from pydantic import ValidationError
 
-from nl2sql.datasources.models import ConnectionConfig, DatasourceConfig, matches_table
+from nl2sql.config import Datasource, Limits
+from nl2sql.datasources.models import matches_table
 from nl2sql.datasources.registry import DatasourceRegistry
 from nl2sql.indexing.health import inspect_vector_store, preferred_table_warnings
 from nl2sql.indexing.vector_store import VectorStore
@@ -26,7 +27,7 @@ from nl2sql_sdk.schema import (
 
 
 def _config(**extra):
-    return DatasourceConfig(id="ds1", connection=ConnectionConfig(type="stub"), **extra)
+    return Datasource(id="ds1", type="stub", **extra)
 
 
 def test_preferred_tables_default_to_empty():
@@ -34,8 +35,8 @@ def test_preferred_tables_default_to_empty():
 
 
 def test_preferred_tables_are_read_from_yaml_shape():
-    config = DatasourceConfig.model_validate({
-        "id": "ds1", "connection": {"type": "stub"},
+    config = Datasource.model_validate({
+        "id": "ds1", "type": "stub",
         "preferred_tables": ["v_customer_revenue", "sales.v_monthly"],
     })
 

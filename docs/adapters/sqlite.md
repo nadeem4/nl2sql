@@ -16,6 +16,11 @@ connection:
   database: "./my_data.db" # Absolute or relative path
 ```
 
+A relative `database` is read from the folder of `nl2sql.yaml` when the config
+was loaded from a file (so `nl2sql init --demo` can write `data/chinook.sqlite`),
+and from the working directory when it was built in code. The DuckDB adapter
+does the same.
+
 !!! warning "Persistence"
     If using **Docker**, avoid relative paths like `./my_data.db` as they will be lost on container restart. Use an absolute path mapped to a volume, e.g., `/app/data/my_data.db`.
 

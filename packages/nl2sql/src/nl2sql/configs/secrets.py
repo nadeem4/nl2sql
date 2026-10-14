@@ -2,7 +2,7 @@
 from typing import List
 
 from pydantic import BaseModel, Field, field_validator
-from nl2sql.secrets.models import SecretProviderConfig
+from nl2sql.config.models import SecretProviderConfig
 
 class SecretsFileConfig(BaseModel):
     """File-level schema for secrets.yaml."""

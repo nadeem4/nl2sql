@@ -13,7 +13,7 @@ from nl2sql.pipeline.nodes.refiner import RefinerNode
 from nl2sql.pipeline.nodes.generator import GeneratorNode
 from nl2sql.pipeline.nodes.executor import ExecutorNode
 from nl2sql.datasources import DatasourceRegistry
-from nl2sql.context import NL2SQLContext
+from nl2sql.runtime import Runtime
 
 
 
@@ -22,7 +22,7 @@ import time
 
 
 def build_sql_agent_graph(
-    ctx: NL2SQLContext,
+    ctx: Runtime,
     execute: bool = True,
 ):
     """Builds the SQL Agent Subgraph.

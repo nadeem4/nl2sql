@@ -126,7 +126,7 @@ def test_the_index_command_passes_datasource_and_full(monkeypatch):
     from nl2sql.cli import main
 
     seen = {}
-    monkeypatch.setattr(main, "NL2SQLContext", lambda *a, **k: "ctx")
+    monkeypatch.setattr(main, "legacy_runtime", lambda *a, **k: "ctx")
     monkeypatch.setattr(main, "run_indexing", lambda ctx, **kw: seen.update(kw))
 
     result = CliRunner().invoke(main.app, ["index", "--datasource", "chinook", "--datasource", "sales"])
@@ -150,7 +150,7 @@ def test_full_and_curated_only_do_not_combine(monkeypatch):
 
     from nl2sql.cli import main
 
-    monkeypatch.setattr(main, "NL2SQLContext", lambda *a, **k: "ctx")
+    monkeypatch.setattr(main, "legacy_runtime", lambda *a, **k: "ctx")
     monkeypatch.setattr(main, "run_indexing", lambda ctx, **kw: None)
 
     result = CliRunner().invoke(main.app, ["index", "--full", "--curated-only"])

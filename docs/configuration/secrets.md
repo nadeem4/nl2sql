@@ -91,7 +91,7 @@ contrast, leaves the others running: see
 Credentials are held as pydantic `SecretStr`, so `repr`, `str`, log lines and
 tracebacks show `**********` instead of the value:
 
-- the settings `OPENAI_API_KEY` and `RESULT_ARTIFACT_ADLS_CONNECTION_STRING`;
+- the setting `OPENAI_API_KEY`;
 - `api_key` in the LLM config (`AgentConfig`), including `model_dump(mode="json")`
   and `model_dump_json()`;
 - `client_secret` (Azure) and `token` (HashiCorp) in `secrets.yaml`;

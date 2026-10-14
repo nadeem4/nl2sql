@@ -2,7 +2,7 @@
 
 Secret providers are optional: the shipped ``configs/secrets.yaml`` ships with
 every example commented out, which YAML parses as ``providers: None``. That is
-the default non-demo path, so it has to load. ``NL2SQLContext.__init__`` calls
+the default non-demo path, so it has to load. Starting from the 0.4 files calls
 ``load_secrets``, and a hard failure there breaks a fresh install outright.
 """
 
@@ -76,4 +76,4 @@ def test_configured_providers_still_parse(tmp_path):
         ("azure-prod", "azure"),
         ("aws-main", "aws"),
     ]
-    assert providers[0].options.vault_url == "https://my-vault.vault.azure.net/"
+    assert providers[0].model_extra == {"vault_url": "https://my-vault.vault.azure.net/"}

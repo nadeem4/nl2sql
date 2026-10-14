@@ -1,4 +1,6 @@
 """The `nl2sql demo` command: scaffolding, mode detection and server launch."""
+from types import SimpleNamespace
+
 import pytest
 import yaml
 from typer.testing import CliRunner
@@ -305,6 +307,7 @@ class _StubEngine:
 
     def __init__(self):
         self.context = _StubContext()
+        self.config = SimpleNamespace(policies=self.context.policies_cfg)
 
     def run_query(self, *args, **kwargs):  # pragma: no cover - not exercised here
         raise AssertionError("the stub engine does not run queries")

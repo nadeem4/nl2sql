@@ -254,7 +254,7 @@ def test_nothing_outside_the_adapters_imports_a_database_library():
 # not here: it names adapters to install and configure them, which is registry
 # knowledge, not SQL. Neither is datasets/, whose literals are file names.
 DIALECT_SCAN = ["pipeline", "execution", "indexing", "evaluation", "api", "llm", "aggregation",
-                "schema", "services", "datasources", "auth", "tracing", "context.py", "public_api.py"]
+                "schema", "services", "datasources", "auth", "tracing", "runtime.py", "_legacy.py", "public_api.py"]
 
 DIALECT_NAMES = re.compile(r"(?i)\b(sqlite|postgres|postgresql|mysql|mssql|tsql|duckdb|snowflake|bigquery)\b")
 
@@ -422,7 +422,7 @@ def test_the_playground_never_touches_the_engine_context():
 # --------------------------------------------------------------------------
 
 RUNTIME = ["pipeline", "execution", "indexing", "datasources", "llm", "auth", "aggregation", "schema",
-           "services", "context.py", "public_api.py"]
+           "services", "runtime.py", "public_api.py"]
 
 
 def test_the_runtime_never_imports_evaluation_or_feedback_at_module_scope():
@@ -457,7 +457,8 @@ FORBIDDEN_AT_IMPORT = ("chromadb", "onnxruntime", "sqlalchemy", "psycopg2", "psy
 IMPORT_BUDGET_US = 500_000
 
 
-@pytest.mark.parametrize("statement", ["import nl2sql", "from nl2sql import Registry; Registry.default()"])
+@pytest.mark.parametrize("statement", ["import nl2sql", "from nl2sql import load_config, Registry; Registry.default()",
+                                       "from nl2sql import Config, Datasource, CheckReport, EngineNotReady"])
 def test_importing_nl2sql_loads_no_heavy_library(statement):
     loaded = _run(f"import sys; {statement}; "
                   f"print(sorted({{m.split('.')[0] for m in sys.modules}} & set({FORBIDDEN_AT_IMPORT!r})))")
@@ -571,3 +572,75 @@ def test_every_provider_key_variable_is_read_through_the_llm_presets():
         "lives in PROVIDER_PRESETS (llm/registry.py) and everything the CLI, the "
         "playground, evaluation and the REST API know about providers derives from it "
         "through llm/providers.py.", offenders)
+
+
+# --------------------------------------------------------------------------
+# 12. The settings global is going away: the ratchet
+# --------------------------------------------------------------------------
+
+# Every module that still imports the process-global ``nl2sql.common.settings``.
+# The engine copies its config into the global until these move onto the
+# runtime's ``ctx.settings`` (docs/architecture/configuration_v2.md, section 8,
+# "Staging it"). This list may only shrink: take a module off it when it stops
+# importing the global, and never add one. PR 13 deletes the global and this test.
+READS_THE_SETTINGS_GLOBAL = {
+    "nl2sql._legacy",
+    "nl2sql.api.curated_api",
+    "nl2sql.api.policy_api",
+    "nl2sql.api.settings_api",
+    "nl2sql.cli.commands.cache",
+    "nl2sql.cli.commands.curated",
+    "nl2sql.cli.commands.demo",
+    "nl2sql.cli.commands.doctor",
+    "nl2sql.cli.commands.feedback",
+    "nl2sql.cli.commands.setup",
+    "nl2sql.cli.commands.trace",
+    "nl2sql.cli.demo.manager",
+    "nl2sql.cli.demo.playground.app",
+    "nl2sql.cli.commands.run",
+    "nl2sql.cli.main",
+    "nl2sql.indexing.health",
+    "nl2sql.indexing.vector_store",
+    "nl2sql.pipeline.nodes.executor.node",
+    "nl2sql.pipeline.runtime",
+    "nl2sql.services.callbacks.monitor",
+    "nl2sql.configs.manager",
+    "nl2sql.evaluation.retrieval_recall",
+    "nl2sql.evaluation.tier1",
+    "nl2sql.evaluation.tier2",
+    "nl2sql.execution.artifacts.store",
+    "nl2sql.execution.executor.sql_executor",
+    "nl2sql.pipeline.nodes.aggregator.node",
+    "nl2sql.pipeline.nodes.answer_synthesizer.node",
+    "nl2sql.pipeline.nodes.ast_planner.node",
+    "nl2sql.pipeline.nodes.curated_matcher.node",
+    "nl2sql.pipeline.nodes.datasource_resolver.node",
+    "nl2sql.pipeline.nodes.generator.node",
+    "nl2sql.pipeline.nodes.refiner.node",
+    "nl2sql.pipeline.nodes.schema_retriever.node",
+    "nl2sql.pipeline.nodes.validator.node",
+    "nl2sql.pipeline.pipeline_runner",
+    "nl2sql.pipeline.plan_cache",
+    "nl2sql.pipeline.subgraphs.sql_agent",
+    "nl2sql.runtime",
+    "nl2sql.tracing.replay",
+    "nl2sql.tracing.trace",
+}
+
+
+def _reads_the_settings_global(path: pathlib.Path) -> bool:
+    return any(imported == "nl2sql.common.settings" or imported.startswith("nl2sql.common.settings.")
+               for _, imported, _ in imports(path))
+
+
+def test_the_modules_reading_the_settings_global_only_shrink():
+    readers = {_module_name(path, _root_of(path)) for path in python_files(*SOURCES)
+               if _reads_the_settings_global(path)}
+    added = sorted(readers - READS_THE_SETTINGS_GLOBAL)
+    assert not added, _broke(
+        "No new module may import the process-global nl2sql.common.settings. Read the value "
+        "from the runtime (ctx.settings, the Settings section of the engine's Config) or take "
+        "it as a parameter.", added)
+    gone = sorted(READS_THE_SETTINGS_GLOBAL - readers)
+    assert not gone, (f"These modules no longer import the settings global; take them off "
+                      f"READS_THE_SETTINGS_GLOBAL so the list keeps shrinking: {gone}")

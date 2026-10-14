@@ -1,25 +1,21 @@
 """Ask the Chinook demo a question and print what the engine decided.
 
-Run these three commands first, from the directory you want the demo in:
+Run these two commands first:
 
     pip install nl2sql-engine
-    nl2sql setup --demo
     export OPENAI_API_KEY=...          # Windows: set OPENAI_API_KEY=...
 
-`nl2sql setup --demo` copies the vendored Chinook database to
-`data/chinook.sqlite`, writes the `configs/*.demo.*` files and `.env.demo`, and
-indexes the schema. That part needs no key -- `.env.demo` sets
-`EMBEDDING_PROVIDER=local`. Answering the question below does need one:
-`NL2SQL(env="demo")` loads `.env.demo`, and `run_query` calls the model several
-times.
-
-Then run this script from that same directory, because the generated datasource
-config uses a relative path.
+`NL2SQL.demo()` opens the three bundled demo databases read-only from the
+installed package and keeps its index under `./.nl2sql-demo/`. Indexing needs
+no key: the demo embeds locally. Answering the question below does need one,
+because `run_query` calls the model several times.
 """
 
 from nl2sql import NL2SQL, UserContext
 
-engine = NL2SQL(env="demo")
+engine = NL2SQL.demo()
+if engine.index_health()["status"] != "ok":
+    engine.index_all_datasources()
 # The role decides which tables the plan may read; `admin` may read them all.
 result = engine.run_query("How many customers are there?", user_context=UserContext(roles=["admin"]))
 

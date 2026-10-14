@@ -14,7 +14,7 @@ from nl2sql.common.settings import settings
 from nl2sql.pipeline.nodes.ast_planner.functions import DATE_UNITS, date_operation
 from nl2sql.pipeline.nodes.ast_planner.schemas import PlanModel, Expr, TableRef
 from nl2sql.pipeline.nodes.generator.schemas import GeneratorResponse
-from nl2sql.context import NL2SQLContext
+from nl2sql.runtime import Runtime
 
 logger = get_logger("generator")
 
@@ -297,7 +297,7 @@ class GeneratorNode:
         registry (DatasourceRegistry): The registry to fetch datasource dialects.
     """
 
-    def __init__(self, ctx: NL2SQLContext):
+    def __init__(self, ctx: Runtime):
         """Initializes the GeneratorNode.
 
         Args:

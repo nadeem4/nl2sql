@@ -16,7 +16,7 @@ from nl2sql.common.cancellation import CancellationToken
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.common.exceptions import PipelineExecutionError
 from nl2sql.common.settings import run_date, settings
-from nl2sql.context import NL2SQLContext
+from nl2sql.runtime import Runtime
 from nl2sql.llm.failures import provider_error
 from nl2sql.pipeline.graph import build_graph
 from nl2sql.pipeline.state import GraphState
@@ -123,7 +123,7 @@ def _install_signal_handlers(token: CancellationToken) -> Callable[[], None]:
 
 
 def run_with_graph(
-    ctx: NL2SQLContext,
+    ctx: Runtime,
     user_query: str,
     datasource_id: Optional[str] = None,
     execute: bool = True,

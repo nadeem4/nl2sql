@@ -30,10 +30,10 @@ class _Engine(NL2SQL):
     """The real facade over a live vector store and a stub schema store."""
 
     def __init__(self, store):
-        self._ctx = type("Ctx", (), {})()
-        self._ctx.vector_store = store
-        self._ctx.schema_store = _Snapshots()
-        self._ctx.ds_registry = type("R", (), {"list_ids": staticmethod(lambda: ["chinook"])})()
+        self._runtime = type("Ctx", (), {})()
+        self._runtime.vector_store = store
+        self._runtime.schema_store = _Snapshots()
+        self._runtime.ds_registry = type("R", (), {"list_ids": staticmethod(lambda: ["chinook"])})()
 
     def list_datasources(self):
         return ["chinook"]

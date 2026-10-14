@@ -71,10 +71,9 @@ def _ctx(tmp_path, curated):
     return SimpleNamespace(
         vector_store=store,
         schema_store=InMemorySchemaStore(),
-        config_manager=SimpleNamespace(get_example_questions=lambda _ds: [],
-                                       get_datasource_description=lambda _ds: "Music store"),
         llm_registry=_NoLLM(),
-        ds_registry=SimpleNamespace(list_adapters=lambda: [adapter]),
+        ds_registry=SimpleNamespace(list_adapters=lambda: [adapter], get_sample_questions=lambda _ds: [],
+                                    get_description=lambda _ds: "Music store"),
         curated=curated,
     ), adapter
 

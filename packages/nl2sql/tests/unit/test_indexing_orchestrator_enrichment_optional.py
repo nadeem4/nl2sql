@@ -77,9 +77,9 @@ def _context(llm_registry) -> SimpleNamespace:
     return SimpleNamespace(
         vector_store=_RecordingVectorStore(),
         schema_store=InMemorySchemaStore(),
-        config_manager=SimpleNamespace(
-            get_example_questions=lambda ds_id: ["How many users are there?"],
-            get_datasource_description=lambda ds_id: "User records",
+        ds_registry=SimpleNamespace(
+            get_sample_questions=lambda ds_id: ["How many users are there?"],
+            get_description=lambda ds_id: "User records",
         ),
         llm_registry=llm_registry,
     )

@@ -12,7 +12,6 @@ from typing import Optional
 
 class PostgresConnectionConfig(BaseModel):
     """Strict configuration schema for Postgres adapter."""
-    type: str = Field("postgresql", description="Connection type")
     host: str = Field(..., description="Postgres server hostname")
     user: str = Field(..., description="Username")
     password: SecretStr = Field(..., description="Password")

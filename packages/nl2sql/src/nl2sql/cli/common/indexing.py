@@ -3,14 +3,14 @@ import sys
 from typing import Dict, List, Optional
 
 from nl2sql.cli.reporting import ConsolePresenter
-from nl2sql.context import NL2SQLContext
+from nl2sql.runtime import Runtime
 from nl2sql.cli.common.decorators import handle_cli_errors
 from nl2sql.indexing.rebuild import rebuild_index
 
 
 @handle_cli_errors
 def run_indexing(
-    ctx: NL2SQLContext,
+    ctx: Runtime,
     enrich: bool = False,
     datasource_ids: Optional[List[str]] = None,
     full: bool = False,
@@ -25,7 +25,7 @@ def run_indexing(
     and no datasource's rebuild touches another's entries.
 
     Args:
-        ctx: The initialized NL2SQLContext.
+        ctx: The initialized Runtime.
         enrich: Ask the LLM for table and column descriptions (spends tokens).
             Off by default.
         datasource_ids: Only these datasources; every configured one when None.

@@ -9,13 +9,14 @@ from nl2sql.auth.models import UserContext
 from nl2sql.common.errors import PipelineError
 
 
-ArtifactBackend = Literal["local", "s3", "adls"]
+# Results are local files under <storage.path>/results/ (remote stores return in Phase 2).
+ArtifactBackend = Literal["local"]
 ArtifactFormat = Literal["parquet"]
 
 
 class ArtifactRef(BaseModel):
     uri: str
-    backend: ArtifactBackend
+    backend: ArtifactBackend = "local"
     format: ArtifactFormat
     row_count: int
     columns: List[str]

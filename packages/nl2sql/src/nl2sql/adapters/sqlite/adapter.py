@@ -62,7 +62,6 @@ _QUERY_MISTAKES = (
 
 class SqliteConnectionConfig(BaseModel):
     """Strict configuration schema for SQLite adapter."""
-    type: str
     database: str = Field(..., description="Path to SQLite database file")
     options: Dict[str, Any] = Field(default_factory=dict)
     
@@ -93,8 +92,8 @@ class SqliteAdapter(BaseSQLAlchemyAdapter):
         """
         config = SqliteConnectionConfig(**args)
         if config.options.get("read_only"):
-            return f"sqlite:///file:{config.database}?mode=ro&uri=true"
-        return f"sqlite:///{config.database}"
+            return f"sqlite:///file:{self.local_path(config.database)}?mode=ro&uri=true"
+        return f"sqlite:///{self.local_path(config.database)}"
 
     def connect(self) -> None:
         """Sqlite-specific connection with Locking Timeout."""

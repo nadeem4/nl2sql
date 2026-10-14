@@ -1,12 +1,12 @@
 # Deployment Architecture
 
-NL2SQL is a Python engine that you embed in a service of your choice. The runtime is a single process that initializes `NL2SQLContext`, loads configuration, and invokes the pipeline per request.
+NL2SQL is a Python engine that you embed in a service of your choice. The runtime is a single process that initializes `Runtime`, loads configuration, and invokes the pipeline per request.
 
 ## Runtime process layout
 
 ```mermaid
 flowchart TD
-    App[Service Process] --> Context[NL2SQLContext]
+    App[Service Process] --> Context[Runtime]
     Context --> Registries[Registries + Stores]
     Context --> Graph[LangGraph Pipeline]
     Graph --> Exec[Executor Services]
@@ -35,5 +35,5 @@ flowchart TD
 
 ## Source references
 
-- Context initialization: `packages/nl2sql/src/nl2sql/context.py`
+- Context initialization: `packages/nl2sql/src/nl2sql/runtime.py`
 - Settings: `packages/nl2sql/src/nl2sql/common/settings.py`

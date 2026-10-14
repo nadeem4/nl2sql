@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Dict, Any
 
-from nl2sql.context import NL2SQLContext
+from nl2sql.runtime import Runtime
 from nl2sql.indexing.orchestrator import IndexingOrchestrator
 
 
@@ -17,7 +17,7 @@ class IndexingAPI:
     API for indexing schemas for datasources.
     """
     
-    def __init__(self, ctx: NL2SQLContext):
+    def __init__(self, ctx: Runtime):
         self._ctx = ctx
         self._orchestrator = IndexingOrchestrator(ctx)
     

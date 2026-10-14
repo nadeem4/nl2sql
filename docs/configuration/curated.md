@@ -31,9 +31,9 @@ The file is optional:
   feature is off, and nothing else changes.
 - `CURATED_CONFIG` set to any other path that does not exist: startup fails
   with `FileNotFoundError`. A typo should not quietly turn verified answers off.
-- The file exists but is broken: startup (`NL2SQL(...)`, `nl2sql run`, the
-  REST API, the playground) fails with a `ValueError` that names every problem,
-  as a broken `datasources.yaml` does.
+- The file exists but is broken: startup (`NL2SQL(config)`, `nl2sql run`, the
+  REST API, the playground) fails with a `ConfigError` that names every problem,
+  as a broken datasource does.
 
 ## Writing the file
 
@@ -150,7 +150,7 @@ query, and exits 1 on any error, so it can run in CI:
 | Tables the SQL reads are in the indexed schema | no | yes, when indexed |
 
 From Python, the same check is `CuratedAPI`, also available as
-`NL2SQL(...).curated`:
+`NL2SQL.from_config(...).curated`:
 
 ```python
 from nl2sql import CuratedAPI
@@ -391,7 +391,7 @@ playground writes it either.
 - SQL checks and the file model: `packages/nl2sql/src/nl2sql/configs/curated.py`
 - Index entries and the change hash: `packages/nl2sql/src/nl2sql/indexing/curated.py`
 - Loader: `ConfigManager.load_curated()` in `packages/nl2sql/src/nl2sql/configs/manager.py`
-- Startup load: `packages/nl2sql/src/nl2sql/context.py`
+- Startup load: `packages/nl2sql/src/nl2sql/runtime.py`
 - Facade: `packages/nl2sql/src/nl2sql/api/curated_api.py`
 - Command: `packages/nl2sql/src/nl2sql/cli/commands/curated.py`
 - The demo's verified queries: `CHINOOK_VERIFIED_QUERIES` in `packages/nl2sql/src/nl2sql/datasets/chinook.py`

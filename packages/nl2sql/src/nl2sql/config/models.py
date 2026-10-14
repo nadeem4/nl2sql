@@ -11,7 +11,7 @@ from datetime import date
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, PositiveInt, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, PositiveInt, PrivateAttr, field_validator, model_validator
 from typing_extensions import Annotated
 
 from nl2sql.config.curated import CuratedDatasource
@@ -237,6 +237,14 @@ class SecretProviderConfig(BaseModel):
     id: str = Field(min_length=1)
     type: str = Field(min_length=1)
 
+    def __repr_args__(self):
+        # A credential written as a literal must never print: only id, type
+        # and a reference show.
+        for key, value in super().__repr_args__():
+            if key not in ("id", "type") and isinstance(value, str) and not value.startswith("${"):
+                value = "**********"
+            yield key, value
+
 
 class Secrets(_Model):
     """Secret providers that ``${<id>:key}`` references name. ``env`` is built in."""
@@ -358,6 +366,23 @@ class Config(_Model):
     secrets: Secrets = Field(default_factory=Secrets)
     settings: Settings = Field(default_factory=Settings)
     api: Api = Field(default_factory=Api)
+
+    # The folder of the nl2sql.yaml this config was loaded from, set by
+    # load_config and kept by every copy; None when it was built in code.
+    _folder: Optional[Path] = PrivateAttr(default=None)
+
+    @property
+    def folder(self) -> Optional[Path]:
+        """The folder of the ``nl2sql.yaml`` this config was loaded from; None when built in code.
+
+        A relative file path in a datasource's ``connection`` (a SQLite or
+        DuckDB file) is read from here, as ``storage.path`` is.
+        """
+        return self._folder
+
+    def __eq__(self, other: Any) -> bool:
+        # Where a config was loaded from is not part of it: equal sections are an equal config.
+        return type(other) is type(self) and self.__dict__ == other.__dict__
 
     @field_validator("datasources")
     @classmethod

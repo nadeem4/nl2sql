@@ -1,6 +1,8 @@
 # Artifact Store Architecture
 
-Execution results are persisted as **artifacts**. A single `ArtifactStore` writes Parquet to the configured backend (local, S3, ADLS) and emits `ArtifactRef` metadata used by aggregation and downstream consumers. Each sub-query's result is one artifact, and the run's combined result is another, beside them.
+Execution results are persisted as **artifacts**. A single `ArtifactStore` writes Parquet files under the engine's results folder, `<storage.path>/results/`, and emits `ArtifactRef` metadata used by aggregation and downstream consumers. Each sub-query's result is one artifact, and the run's combined result is another, beside them.
+
+Results are local files only. The S3 and ADLS backends, and the `RESULT_ARTIFACT_BACKEND`, `RESULT_ARTIFACT_S3_*` and `RESULT_ARTIFACT_ADLS_*` settings, were removed in 0.5: they were untested and unreachable from the new config. The Phase 2 results-store interface brings remote stores back.
 
 ## Storage lifecycle
 
@@ -63,32 +65,23 @@ A template without `<sub_query_id>` or `<dag_node_id>` gets `-manifest` added, a
 3. The result id must be a `node_id` the manifest lists. The parquet path is then rendered from the template, exactly as the aggregator wrote it (`ArtifactStore.scan_result`); the manifest never supplies a path.
 4. A page is `scan.slice(offset, limit).collect()` on a polars scan, so only that slice is read. A CSV export collects one `CSV_CHUNK_ROWS` (10,000) slice at a time and yields it as CSV text, header first.
 
-On S3 and ADLS the manifest is written and read through `fsspec` (polars' own cloud IO writes only tables), which needs `s3fs` or `adlfs` installed beside it; neither is an engine dependency. Like the rest of the remote backends this is unit-tested at the URI level only and not yet verified against live storage.
+## Where the files go
 
-## One store, three URI schemes
+An artifact's path is `<results folder>/<rendered path>`, and its parent folders are created as it is written. For an engine built from a `Config` the results folder is `<storage.path>/results/` (see [Public Facade → Creating an engine](../api/core/public-facade.md#creating-an-engine)), so the default template gives:
 
-There is no per-backend subclass. `ArtifactStore` builds a backend-specific URI, then uses the same polars read/write path for all backends, since polars addresses `s3://` and `abfs://` natively.
+```
+<storage.path>/results/<tenant_id>/<request_id>/<sub_query_id>.parquet
+```
 
-| Backend | URI built from settings |
-| --- | --- |
-| `local` | `<result_artifact_base_uri>/<rendered path>` (parent directories are created) |
-| `s3` | `s3://<s3_bucket>/<s3_prefix>/<rendered path>` |
-| `adls` | `abfs://<adls_container>@<adls_account>.dfs.core.windows.net/<rendered path>` |
+Until the CLI, `nl2sql-api` and the playground move onto `nl2sql.yaml`, they start from the 0.4 files, and their results folder is still `RESULT_ARTIFACT_BASE_URI` (default `./artifacts`).
 
-Missing required configuration raises a `ValueError` naming the environment variable to set — `RESULT_ARTIFACT_S3_BUCKET`, `RESULT_ARTIFACT_ADLS_CONTAINER`, or `RESULT_ARTIFACT_ADLS_ACCOUNT`. An unrecognised `RESULT_ARTIFACT_BACKEND` also raises rather than silently falling back to local.
-
-For ADLS, `RESULT_ARTIFACT_ADLS_CONNECTION_STRING` is forwarded to polars as `storage_options={"connection_string": ...}`. No Azure SDK client is constructed. S3 credentials are resolved by the underlying object-store layer from the usual environment.
-
-## Verification status
-
-- **Local** is exercised by real read/write round-trip tests (`packages/nl2sql/tests/unit/test_artifact_store.py`).
-- **S3 and ADLS** are implemented and unit-tested at the URI and `storage_options` level, with the actual object-store IO mocked. They have **not** been verified against a real S3 bucket or ADLS account. Treat them as unproven until someone runs them against live storage.
+The store is exercised by real read/write round-trip tests (`packages/nl2sql/tests/unit/test_artifact_store.py`).
 
 ## ArtifactRef fields
 
 `ArtifactRef` contains:
 
-- `uri`, `backend`, `format`
+- `uri`, `backend` (always `local`), `format`
 - `row_count`, `columns`, `bytes`
 - `content_hash`, `created_at`
 - optional `schema_version`
@@ -97,7 +90,7 @@ For ADLS, `RESULT_ARTIFACT_ADLS_CONNECTION_STRING` is forwarded to polars as `st
 
 ## Path templating
 
-`Settings.result_artifact_path_template` defines the artifact path relative to the backend root, for every backend. It defaults to:
+The path template defines the artifact path relative to the results folder. It defaults to:
 
 ```
 <tenant_id>/<request_id>/<sub_query_id>.parquet
@@ -122,10 +115,10 @@ A template that names neither `<sub_query_id>` nor `<dag_node_id>` is therefore 
 
 ## Tenant-aware paths
 
-Because the default template starts with `<tenant_id>`, every backend partitions artifacts per tenant:
+Because the default template starts with `<tenant_id>`, artifacts are partitioned per tenant:
 
 ```
-<backend root>/<tenant_id>/<request_id>/<sub_query_id>.parquet
+<results folder>/<tenant_id>/<request_id>/<sub_query_id>.parquet
 ```
 
 ## Source references

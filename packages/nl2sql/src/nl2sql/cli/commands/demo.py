@@ -283,7 +283,7 @@ def _build_engine():
     """Seam: the tests swap this so they never construct a real engine."""
     from nl2sql import NL2SQL
 
-    return NL2SQL()
+    return NL2SQL._legacy()
 
 
 def run_succeeded(result) -> bool:
@@ -505,7 +505,7 @@ def demo_command(
 
     engine = _build_engine()
     questions = list(DEMO_QUESTIONS)
-    roles = list(engine.context.policies_cfg.roles)
+    roles = list(engine.config.policies.roles)
 
     if record:
         if _record_all(engine, questions, proxy, store, store_path):

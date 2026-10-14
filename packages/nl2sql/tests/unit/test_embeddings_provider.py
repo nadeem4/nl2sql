@@ -9,10 +9,8 @@ from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
 from langchain_openai import OpenAIEmbeddings
 
-from nl2sql.common.settings import settings
 from nl2sql.indexing.embeddings import (
     LOCAL_EMBEDDING_DIMENSION,
-    EmbeddingService,
     LocalEmbeddings,
 )
 from nl2sql.indexing.vector_store import (
@@ -20,13 +18,6 @@ from nl2sql.indexing.vector_store import (
     VectorStore,
     check_embedding_dimension_compatibility,
 )
-
-
-@pytest.fixture(autouse=True)
-def reset_embedding_cache(monkeypatch):
-    """Keep the process-wide embedder cache from leaking between tests."""
-    monkeypatch.setattr(EmbeddingService, "_instance", None)
-    monkeypatch.setattr(EmbeddingService, "_instance_provider", None)
 
 
 @pytest.fixture
@@ -43,49 +34,6 @@ def stub_default_embedding_function(monkeypatch):
     module.DefaultEmbeddingFunction = _StubEmbeddingFunction
     monkeypatch.setitem(sys.modules, "chromadb.utils.embedding_functions", module)
     return calls
-
-
-def test_get_embeddings_defaults_to_openai(monkeypatch):
-    monkeypatch.setattr(settings, "embedding_provider", "openai")
-    monkeypatch.setattr(settings, "openai_api_key", "sk-test")
-
-    assert isinstance(EmbeddingService.get_embeddings(), OpenAIEmbeddings)
-
-
-def test_get_embeddings_returns_local_provider(monkeypatch):
-    monkeypatch.setattr(settings, "embedding_provider", "local")
-
-    assert isinstance(EmbeddingService.get_embeddings(), LocalEmbeddings)
-
-
-def test_get_embeddings_rejects_unknown_provider(monkeypatch):
-    monkeypatch.setattr(settings, "embedding_provider", "bogus")
-
-    with pytest.raises(ValueError) as excinfo:
-        EmbeddingService.get_embeddings()
-
-    message = str(excinfo.value)
-    assert "bogus" in message
-    assert "openai" in message
-    assert "local" in message
-
-
-def test_get_embeddings_cache_follows_provider_change(monkeypatch):
-    monkeypatch.setattr(settings, "openai_api_key", "sk-test")
-    monkeypatch.setattr(settings, "embedding_provider", "openai")
-    assert isinstance(EmbeddingService.get_embeddings(), OpenAIEmbeddings)
-
-    monkeypatch.setattr(settings, "embedding_provider", "local")
-    assert isinstance(EmbeddingService.get_embeddings(), LocalEmbeddings)
-
-
-def test_get_model_name_follows_provider(monkeypatch):
-    monkeypatch.setattr(settings, "embedding_provider", "openai")
-    monkeypatch.setattr(settings, "embedding_model", "text-embedding-3-small")
-    assert EmbeddingService.get_model_name() == "text-embedding-3-small"
-
-    monkeypatch.setattr(settings, "embedding_provider", "local")
-    assert EmbeddingService.get_model_name() == "all-MiniLM-L6-v2"
 
 
 def test_local_embeddings_returns_plain_float_lists(stub_default_embedding_function):
@@ -192,11 +140,3 @@ def test_reindexing_recovers_from_a_provider_switch(tmp_path):
 
     assert hits[0].page_content == "orders table"
 
-
-def test_openai_provider_without_key_raises_actionable_error(monkeypatch):
-    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
-    monkeypatch.setattr("nl2sql.indexing.embeddings.settings.openai_api_key", None)
-    monkeypatch.setattr("nl2sql.indexing.embeddings.settings.embedding_provider", "openai")
-    EmbeddingService.reset()
-    with pytest.raises(ValueError, match="EMBEDDING_PROVIDER=local"):
-        EmbeddingService.get_embeddings()

@@ -54,7 +54,7 @@ From `GraphState`:
 - `datasource_id` (Optional[str]): explicit override for datasource selection.
 - `user_context` (`UserContext`, required): RBAC enforcement.
 
-Context dependencies (`NL2SQLContext`):
+Context dependencies (`Runtime`):
 
 - `vector_store`: needed only when more than one datasource is registered and no override is given; missing then, the resolver returns `SCHEMA_RETRIEVAL_FAILED`.
 - `ds_registry`: adapter registry for registered IDs.

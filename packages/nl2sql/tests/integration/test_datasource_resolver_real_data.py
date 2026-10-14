@@ -14,7 +14,8 @@ import yaml
 from nl2sql.auth import UserContext
 from nl2sql.common.errors import ErrorCode
 from nl2sql.common.settings import settings
-from nl2sql.context import NL2SQLContext
+from nl2sql.runtime import Runtime
+from nl2sql.testing.config import make_demo_config
 from nl2sql.indexing.orchestrator import IndexingOrchestrator
 from nl2sql.llm.models import AgentConfig
 from nl2sql.pipeline.nodes.datasource_resolver.node import DatasourceResolverNode
@@ -27,7 +28,7 @@ _JUDGE = FakeLLMServer([Rule("AnswerabilityResponse",
                              {"answerable_datasource_ids": ["chinook"], "reason": "Chinook data."})])
 
 
-def _use_fake_judge(ctx: NL2SQLContext) -> NL2SQLContext:
+def _use_fake_judge(ctx: Runtime) -> Runtime:
     ctx.llm_registry.register_llm(AgentConfig(
         provider="openai", model="gpt-4o", name="datasourceresolver",
         base_url=_JUDGE.base_url, api_key="-".join(["fake", "key"]),
@@ -106,17 +107,11 @@ def indexed_env() -> SimpleNamespace:
     collection_name = f"itest_resolver_{uuid.uuid4().hex}"
     vector_store_path = tmp_dir / "chroma"
     schema_store_path = tmp_dir / "schema_store.db"
-
-    monkeypatch.setattr(settings, "vector_store_collection_name", collection_name)
     monkeypatch.setattr(settings, "vector_store_path", str(vector_store_path))
-    monkeypatch.setattr(settings, "schema_store_backend", "sqlite")
     monkeypatch.setattr(settings, "schema_store_path", str(schema_store_path))
     monkeypatch.setattr(settings, "schema_store_max_versions", 3)
 
-    ctx = NL2SQLContext(
-        **_demo_config_paths(root, secrets_path),
-        vector_store_path=vector_store_path,
-    )
+    ctx = Runtime.from_config(make_demo_config(tmp_dir))
     orchestrator = IndexingOrchestrator(ctx)
     for adapter in ctx.ds_registry.list_adapters():
         orchestrator.index_datasource(adapter)
@@ -180,31 +175,27 @@ def test_datasource_resolver_real_queries(
     assert prompt.endswith(user_query)
 
 
-def _build_schema_mismatch_context(indexed_env, tmp_path: Path) -> tuple[NL2SQLContext, str]:
-    secrets_path = _write_empty_secrets(tmp_path)
-    datasources = _load_demo_datasources(indexed_env.root)
-    base_ds = datasources[0]
-    base_db_path = indexed_env.root / base_ds["connection"]["database"]
+def _build_schema_mismatch_context(indexed_env, tmp_path: Path) -> tuple[Runtime, str]:
+    from nl2sql.config import demo_config
+
+    base_ds = demo_config().datasources[0].model_dump(mode="json", exclude_defaults=True,
+                                                       exclude={"sample_questions"})
+    base_db_path = Path(base_ds["connection"]["database"])
 
     modified_db = tmp_path / "modified.db"
     modified_db.write_bytes(base_db_path.read_bytes())
     with sqlite3.connect(str(modified_db)) as conn:
         conn.execute("CREATE TABLE IF NOT EXISTS extra_table (id INTEGER)")
         conn.commit()
+    base_ds["connection"] = {"database": modified_db.as_posix()}
 
-    config_path = _write_datasource_config(tmp_path, base_ds, modified_db)
-
-    monkeypatch = pytest.MonkeyPatch()
-    monkeypatch.setattr(settings, "vector_store_collection_name", indexed_env.collection_name)
-    monkeypatch.setattr(settings, "vector_store_path", str(indexed_env.vector_store_path))
-    monkeypatch.setattr(settings, "schema_store_backend", "sqlite")
-    monkeypatch.setattr(settings, "schema_store_path", str(tmp_path / "schema_store.db"))
-    monkeypatch.setattr(settings, "schema_store_max_versions", 3)
-
-    ctx = _use_fake_judge(NL2SQLContext(
-        **_demo_config_paths(indexed_env.root, secrets_path, ds_config_path=config_path),
-        vector_store_path=indexed_env.vector_store_path,
-    ))
+    # The indexed environment's index, with this datasource's own schema store.
+    stores = indexed_env.ctx.stores._replace(state=tmp_path / "schema_store.db")
+    # A second datasource, so the resolver runs its vector search: the schema
+    # version mismatch is between an index entry and the store, and with one
+    # datasource no index entry is read.
+    datasources = [base_ds, {**base_ds, "id": "chinook_copy"}]
+    ctx = _use_fake_judge(Runtime.from_config(make_demo_config(tmp_path, datasources=datasources), stores=stores))
 
     adapter = ctx.ds_registry.get_adapter("chinook")
     snapshot = adapter.fetch_schema_snapshot()

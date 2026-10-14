@@ -75,6 +75,20 @@ Each adapter enforces it in `connect()` the way its driver allows: Postgres with
 query timeout, DuckDB by interrupting the connection. An adapter that does nothing
 here has no statement timeout.
 
+#### `close()`
+
+Disposes the connection pool. The engine calls an adapter's `close()`, when it
+has one, once, from `engine.close()`. Building an adapter never connects:
+`create_engine` opens no connection until the first query or `test_connection()`.
+
+#### `local_path(path) -> str`
+
+For a file-based database. The engine passes each adapter `base_dir`, the
+folder of the `nl2sql.yaml` the datasource came from (None when the config was
+built in code). `local_path` reads a relative path from there, and leaves an
+absolute path and `:memory:` as they are. The SQLite and DuckDB adapters call it
+in `construct_uri`.
+
 #### `get_dialect() -> str`
 
 Returns the **sqlglot** dialect name the engine renders SQL in: `postgres`,

@@ -148,13 +148,11 @@ Map of LLM name → config (API key excluded).
 - `LLMRegistry.get_llm()` falls back to `default` if the name is missing, and
   raises `ValueError` naming the missing agent when no `default` is registered
   either.
-- Embeddings are not routed through the registry: `EmbeddingService` picks an
-  embedder from `settings.embedding_provider` (`openai`, using
-  `settings.openai_api_key`, or `local`, using the key-free ONNX model bundled
-  with chromadb). With the default `openai` provider, `nl2sql index` needs an
-  OpenAI key even when chat runs through OpenRouter. The embedder is cached per
-  provider, so a runtime `reload_settings()` that changes the provider is
-  honoured.
+- Embeddings are not routed through `LLMRegistry`: each engine builds one
+  embedder from its `embeddings` section, through the registry's embeddings
+  providers (`openai`, which needs an OpenAI key even when chat runs through
+  OpenRouter, or `local`, the key-free ONNX model bundled with chromadb), or
+  uses the `Embeddings(instance=...)` it is given. Two engines never share one.
 - Determinism: every OpenAI-protocol client is built with `seed=42` (Anthropic
   has no seed parameter), and every client with the agent's configured
   `temperature`, or none when it is `null` (see

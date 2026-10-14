@@ -12,7 +12,7 @@ from nl2sql.execution.artifacts.results import ResultManifest, ResultSummary
 from nl2sql.execution.contracts import ArtifactRef
 from nl2sql.pipeline.nodes.aggregator.schemas import AggregatorResponse
 from nl2sql.common.logger import get_logger
-from nl2sql.context import NL2SQLContext
+from nl2sql.runtime import Runtime
 from nl2sql.aggregation import AggregationService
 from nl2sql.aggregation.engines.polars_duckdb import PolarsDuckdbEngine
 
@@ -26,7 +26,7 @@ _TWO_SIDED = {"join", "compare"}
 class EngineAggregatorNode:
     """Thin wrapper for aggregation service using ExecutionDAG layers."""
 
-    def __init__(self, ctx: NL2SQLContext):
+    def __init__(self, ctx: Runtime):
         self.node_name = self.__class__.__name__.lower().replace("node", "")
         self.ctx = ctx
         self.service = AggregationService(PolarsDuckdbEngine())

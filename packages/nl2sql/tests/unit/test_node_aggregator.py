@@ -35,7 +35,6 @@ def test_aggregator_filters_rows_deterministically(monkeypatch):
     )
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        monkeypatch.setattr(settings, "result_artifact_backend", "local")
         monkeypatch.setattr(settings, "result_artifact_base_uri", tmpdir)
         monkeypatch.setattr(
             settings,
@@ -44,7 +43,6 @@ def test_aggregator_filters_rows_deterministically(monkeypatch):
         )
         store = ArtifactStore(
             ArtifactStoreConfig(
-                backend="local",
                 base_uri=tmpdir,
                 path_template=settings.result_artifact_path_template,
             )
@@ -96,7 +94,6 @@ def test_aggregator_join_requires_keys(monkeypatch):
     )
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        monkeypatch.setattr(settings, "result_artifact_backend", "local")
         monkeypatch.setattr(settings, "result_artifact_base_uri", tmpdir)
         monkeypatch.setattr(
             settings,
@@ -105,7 +102,6 @@ def test_aggregator_join_requires_keys(monkeypatch):
         )
         store = ArtifactStore(
             ArtifactStoreConfig(
-                backend="local",
                 base_uri=tmpdir,
                 path_template=settings.result_artifact_path_template,
             )
@@ -179,7 +175,6 @@ def test_aggregator_post_aggregate_sum(monkeypatch):
     )
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        monkeypatch.setattr(settings, "result_artifact_backend", "local")
         monkeypatch.setattr(settings, "result_artifact_base_uri", tmpdir)
         monkeypatch.setattr(
             settings,
@@ -188,7 +183,6 @@ def test_aggregator_post_aggregate_sum(monkeypatch):
         )
         store = ArtifactStore(
             ArtifactStoreConfig(
-                backend="local",
                 base_uri=tmpdir,
                 path_template=settings.result_artifact_path_template,
             )
@@ -248,7 +242,6 @@ def test_aggregator_post_sort_limit(monkeypatch):
     )
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        monkeypatch.setattr(settings, "result_artifact_backend", "local")
         monkeypatch.setattr(settings, "result_artifact_base_uri", tmpdir)
         monkeypatch.setattr(
             settings,
@@ -257,7 +250,6 @@ def test_aggregator_post_sort_limit(monkeypatch):
         )
         store = ArtifactStore(
             ArtifactStoreConfig(
-                backend="local",
                 base_uri=tmpdir,
                 path_template=settings.result_artifact_path_template,
             )
@@ -306,7 +298,6 @@ def test_aggregator_union_combines_rows(monkeypatch):
     )
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        monkeypatch.setattr(settings, "result_artifact_backend", "local")
         monkeypatch.setattr(settings, "result_artifact_base_uri", tmpdir)
         monkeypatch.setattr(
             settings,
@@ -315,7 +306,6 @@ def test_aggregator_union_combines_rows(monkeypatch):
         )
         store = ArtifactStore(
             ArtifactStoreConfig(
-                backend="local",
                 base_uri=tmpdir,
                 path_template=settings.result_artifact_path_template,
             )
@@ -402,7 +392,6 @@ def test_the_jazz_but_never_rock_dag_is_refused_with_the_reason(monkeypatch):
     )
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        monkeypatch.setattr(settings, "result_artifact_backend", "local")
         monkeypatch.setattr(settings, "result_artifact_base_uri", tmpdir)
         monkeypatch.setattr(
             settings,
@@ -411,7 +400,6 @@ def test_the_jazz_but_never_rock_dag_is_refused_with_the_reason(monkeypatch):
         )
         store = ArtifactStore(
             ArtifactStoreConfig(
-                backend="local",
                 base_uri=tmpdir,
                 path_template=settings.result_artifact_path_template,
             )

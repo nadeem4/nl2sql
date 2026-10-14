@@ -55,17 +55,41 @@ def default_schema(ds_registry: Any, datasource_id: str) -> Optional[str]:
     return value if isinstance(value, str) and value else None
 
 
+# What ``allow_all`` grants every caller.
+_EVERYTHING = RolePolicy(role="allow_all", description="Every caller may read everything",
+                         allowed_datasources=["*"], allowed_tables=["*"])
+
+
 class RBAC:
-    def __init__(self, policies: Dict[str, RolePolicy]):
+    def __init__(self, policies: Dict[str, RolePolicy], *, allow_all: bool = False,
+                 default_role: Optional[str] = None):
         self.policies = policies
+        self.allow_all = allow_all
+        self.default_role = default_role
+
+    @classmethod
+    def from_policies(cls, policies: Any) -> "RBAC":
+        """From the ``policies`` section: its roles, ``allow_all`` and ``default_role``."""
+        return cls(
+            {name: RolePolicy(role=name, description=role.description,
+                              allowed_datasources=list(role.allowed_datasources),
+                              allowed_tables=list(role.allowed_tables))
+             for name, role in policies.roles.items()},
+            allow_all=policies.allow_all,
+            default_role=policies.default_role,
+        )
 
     def _policies_for(self, user_ctx: UserContext) -> List[RolePolicy]:
         """The policies of the caller's known roles.
 
-        A role with no policy grants nothing, and no roles at all grants
-        nothing: both end in a normal denial rather than an exception.
+        With ``allow_all`` every caller may read everything. A caller with no
+        roles gets ``default_role``, when there is one. A role with no policy
+        grants nothing, and no roles at all grants nothing: both end in a
+        normal denial rather than an exception.
         """
-        roles = user_ctx.roles if user_ctx else []
+        if self.allow_all:
+            return [_EVERYTHING]
+        roles = (user_ctx.roles if user_ctx else []) or ([self.default_role] if self.default_role else [])
         return [self.policies[role] for role in roles if role in self.policies]
 
     def is_allowed(

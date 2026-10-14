@@ -38,7 +38,7 @@ API for remote clients. Use the links below for the full technical references.
 
 ## Source references
 
-- Context: `packages/nl2sql/src/nl2sql/context.py`
+- Context: `packages/nl2sql/src/nl2sql/runtime.py`
 - Runtime: `packages/nl2sql/src/nl2sql/pipeline/runtime.py`
 - Public API: `packages/nl2sql/src/nl2sql/public_api.py`
 - API Package: `packages/api/src/nl2sql_api/`

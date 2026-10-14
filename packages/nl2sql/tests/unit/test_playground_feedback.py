@@ -24,7 +24,7 @@ class _Engine(NL2SQL):
     """The real facade over an empty context; only ``run_query`` is scripted."""
 
     def __init__(self):
-        self._ctx = type("Ctx", (), {"schema_store": None, "vector_store": None, "ds_registry": None})()
+        self._runtime = type("Ctx", (), {"schema_store": None, "vector_store": None, "ds_registry": None})()
 
     def list_datasources(self):
         return []

@@ -32,7 +32,7 @@ def _save(store, tenant, request, rows):
 
 @pytest.fixture
 def client(tmp_path):
-    store = ArtifactStore(ArtifactStoreConfig(backend="local", base_uri=str(tmp_path), path_template=TEMPLATE))
+    store = ArtifactStore(ArtifactStoreConfig(base_uri=str(tmp_path), path_template=TEMPLATE))
     _save(store, "t1", "run-1", ROWS)
     _save(store, "t2", "theirs", [{"id": 1, "name": "secret"}])
     engine = NL2SQL.__new__(NL2SQL)

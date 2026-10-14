@@ -49,22 +49,21 @@ Detailed schemas for each file:
     `nl2sql.config.init_project("my-project")` writes the same files. See
     [Start a config with `nl2sql init`](index.md#start-a-config-with-nl2sql-init-05).
 
-### Configuration paths at startup
+### Building the engine in Python
 
-You can pass config paths directly when creating the engine:
+In Python the engine is built from one `nl2sql.yaml` (which `nl2sql init`
+writes), or from a `Config` built in code. The `configs/` files above are what
+the CLI commands still read until they move onto `nl2sql.yaml`.
 
 ```python
 from nl2sql import NL2SQL
 
-engine = NL2SQL(
-    ds_config_path="configs/datasources.yaml",
-    llm_config_path="configs/llm.yaml",
-    secrets_config_path="configs/secrets.yaml",
-    policies_config_path="configs/policies.json"
-)
+engine = NL2SQL.from_config("nl2sql.yaml")   # or $NL2SQL_CONFIG, then ./nl2sql.yaml
+engine.check()                               # connects, and reports what is ready
 ```
 
-Use startup configuration for fixed, app-wide settings. Use runtime registration when
+See [Public Facade](../api/core/public-facade.md#creating-an-engine) for every
+way to build it. Use the config for fixed, app-wide settings. Use runtime registration when
 you need to add or override datasources/LLMs per request, per tenant, or on a
 long-running process without restart.
 
@@ -164,41 +163,40 @@ See [LLM config](../configuration/llm.md) for full schema details.
 You can register a datasource programmatically without editing config files:
 
 ```python
-from nl2sql import NL2SQL
+from nl2sql import NL2SQL, Datasource, Limits
 
-engine = NL2SQL()
-engine.add_datasource({
-    "id": "runtime_pg",
-    "description": "Runtime Postgres datasource",
-    "connection": {
-        "type": "postgres",
+engine = NL2SQL.from_config("nl2sql.yaml")
+engine.add_datasource(Datasource(
+    id="runtime_pg",
+    type="postgres",
+    description="Runtime Postgres datasource",
+    connection={
         "host": "localhost",
         "port": 5432,
         "user": "postgres",
-        "password": "postgres",
-        "database": "analytics"
+        "password": "${env:RUNTIME_PG_PASSWORD}",
+        "database": "analytics",
     },
-    "statement_timeout_ms": 8000,
-    "row_limit": 100,
-    "max_bytes": 10485760
-})
+    limits=Limits(timeout_ms=8000, row_limit=100, max_bytes=10485760),
+))
 
 engine.index_datasource("runtime_pg")
 ```
 
-The `description` is indexed as given, even though no datasources file lists
-`runtime_pg`. Indexing makes no LLM call unless you ask for one:
+The `description` is indexed as given, even though no file lists
+`runtime_pg`, and the datasource joins `engine.config`. Indexing makes no LLM call unless you ask for one:
 `engine.index_datasource("runtime_pg", enrich=True)` has the
 `indexing_enrichment` agent write descriptions for tables and columns the
 database left without a comment.
 
-You can also register datasources from a config file at runtime:
+You can also add the datasources of another config:
 
 ```python
-from nl2sql import NL2SQL
+from nl2sql import NL2SQL, load_config
 
-engine = NL2SQL()
-engine.add_datasource_from_config("configs/datasources.yaml")
+engine = NL2SQL.from_config("nl2sql.yaml")
+for datasource in load_config("other/nl2sql.yaml").datasources:
+    engine.add_datasource(datasource)
 ```
 
 ### Add an LLM at runtime
@@ -208,7 +206,7 @@ You can also register or override LLMs programmatically:
 ```python
 from nl2sql import NL2SQL
 
-engine = NL2SQL()
+engine = NL2SQL.from_config("nl2sql.yaml")
 engine.configure_llm({
     "name": "default",
     "provider": "openai",
@@ -223,7 +221,7 @@ You can also load LLMs from a config file at runtime:
 ```python
 from nl2sql import NL2SQL
 
-engine = NL2SQL()
+engine = NL2SQL.from_config("nl2sql.yaml")
 engine.configure_llm_from_config("configs/llm.yaml")
 ```
 
@@ -265,7 +263,7 @@ See [Secrets config](../configuration/secrets.md) for supported providers and fi
 from nl2sql import NL2SQL
 from nl2sql.auth.models import UserContext
 
-engine = NL2SQL()
+engine = NL2SQL.from_config("nl2sql.yaml")
 user_ctx = UserContext(user_id="user123", roles=["admin"])
 
 result = engine.run_query(

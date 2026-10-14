@@ -4,7 +4,7 @@ from pydantic import SecretStr
 from nl2sql.adapters.postgres.adapter import PostgresAdapter, PostgresConnectionConfig
 from nl2sql.api.datasource_api import DatasourceAPI
 from nl2sql.datasources.registry import DatasourceRegistry
-from nl2sql.datasources.models import DatasourceConfig, ConnectionConfig
+from nl2sql.config import Datasource, Limits
 from nl2sql.secrets.manager import SecretManager
 from nl2sql_sdk.capabilities import DatasourceCapability
 from nl2sql.testing import adapter_registry
@@ -33,10 +33,10 @@ def test_registry_resolves_secrets_and_normalizes_capabilities(monkeypatch):
     # Arrange
     monkeypatch.setenv("SECRET", "resolved")
     registry = DatasourceRegistry(SecretManager(), adapter_registry({"stub": _StubAdapter}))
-    config = DatasourceConfig(
+    config = Datasource(
         id="ds1",
-        connection=ConnectionConfig(type="stub", password="${env:SECRET}"),
-        options={"row_limit": 10},
+        type="stub", connection=dict(password="${env:SECRET}"),
+        limits=Limits(row_limit=10),
     )
 
     # Act
@@ -55,7 +55,7 @@ def test_registry_rejects_unknown_adapter_type(monkeypatch):
     # Validates fail-fast behavior because misconfigured datasources must not register.
     # Arrange
     registry = DatasourceRegistry(SecretManager(), adapter_registry({"stub": _StubAdapter}))
-    config = DatasourceConfig(id="bad", connection=ConnectionConfig(type="missing"))
+    config = Datasource(id="bad", type="missing")
 
     # Act / Assert
     with pytest.raises(ValueError):
@@ -63,22 +63,17 @@ def test_registry_rejects_unknown_adapter_type(monkeypatch):
 
 
 def test_resolved_connection_keeps_non_secret_fields_as_plain_strings(monkeypatch):
-    # ``ConnectionConfig`` has no per-field types, so resolution must not guess
+    # ``connection`` has no per-field types, so resolution must not guess
     # which values are secrets -- the adapter's own model declares that.
     # Arrange
     monkeypatch.setenv("DEMO_HOST", "analytics_db")
     monkeypatch.setenv("DEMO_USER", "ref_admin")
     monkeypatch.setenv("DEMO_PASSWORD", "ref-pw")
     registry = DatasourceRegistry(SecretManager(), adapter_registry({"stub": _StubAdapter}))
-    connection = ConnectionConfig(
-        type="stub",
-        host="${env:DEMO_HOST}",
-        user="${env:DEMO_USER}",
-        password="${env:DEMO_PASSWORD}",
-    )
+    connection = {"host": "${env:DEMO_HOST}", "user": "${env:DEMO_USER}", "password": "${env:DEMO_PASSWORD}"}
 
     # Act
-    resolved = registry.resolved_connection(connection).model_dump()
+    resolved = registry.resolved_connection(connection)
 
     # Assert
     assert resolved["host"] == "analytics_db"
@@ -95,11 +90,9 @@ def test_adapter_config_model_still_masks_the_resolved_password(monkeypatch):
     monkeypatch.setenv("DEMO_PASSWORD", "ref-pw")
     registry = DatasourceRegistry(SecretManager(), adapter_registry({"stub": _StubAdapter}))
     adapter = registry.register_datasource(
-        DatasourceConfig(
+        Datasource(
             id="ds_pg",
-            connection=ConnectionConfig(
-                type="stub",
-                host="analytics_db",
+            type="stub", connection=dict(host="analytics_db",
                 port=5432,
                 user="${env:DEMO_USER}",
                 password="${env:DEMO_PASSWORD}",
@@ -128,11 +121,9 @@ def test_fully_env_resolved_datasource_registers(monkeypatch):
     monkeypatch.setenv("DEMO_REF_USER", "ref_admin")
     monkeypatch.setenv("DEMO_REF_PASSWORD", "ref-pw")
     registry = DatasourceRegistry(SecretManager(), adapter_registry({"postgres": PostgresAdapter}))
-    config = DatasourceConfig(
+    config = Datasource(
         id="analytics_db",
-        connection=ConnectionConfig(
-            type="postgres",
-            host="${env:DEMO_REF_HOST}",
+        type="postgres", connection=dict(host="${env:DEMO_REF_HOST}",
             port="${env:DEMO_REF_PORT}",
             user="${env:DEMO_REF_USER}",
             password="${env:DEMO_REF_PASSWORD}",
@@ -155,11 +146,9 @@ def test_registration_errors_do_not_echo_the_resolved_password(monkeypatch):
     # Arrange
     monkeypatch.setenv("DEMO_REF_PASSWORD", "s3cret-pw")
     registry = DatasourceRegistry(SecretManager(), adapter_registry({"postgres": PostgresAdapter}))
-    config = DatasourceConfig(
+    config = Datasource(
         id="analytics_db",
-        connection=ConnectionConfig(
-            type="postgres",
-            host="analytics_db",
+        type="postgres", connection=dict(host="analytics_db",
             user="ref_admin",
             password="${env:DEMO_REF_PASSWORD}",
         ),  # `database` is missing on purpose
@@ -182,11 +171,9 @@ def test_datasource_details_mask_the_resolved_password(monkeypatch):
     monkeypatch.setenv("DEMO_REF_PASSWORD", "s3cret-pw")
     registry = DatasourceRegistry(SecretManager(), adapter_registry({"postgres": PostgresAdapter}))
     registry.register_datasource(
-        DatasourceConfig(
+        Datasource(
             id="ds",
-            connection=ConnectionConfig(
-                type="postgres",
-                host="analytics_db",
+            type="postgres", connection=dict(host="analytics_db",
                 port=5432,
                 user="ref_admin",
                 password="${env:DEMO_REF_PASSWORD}",

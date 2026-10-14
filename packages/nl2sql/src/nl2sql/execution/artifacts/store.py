@@ -5,14 +5,14 @@ import json
 import re
 import shutil
 import tempfile
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
 
 import polars as pl
 
-from nl2sql.common.settings import secret_value, settings
+from nl2sql.common.settings import settings
 from nl2sql.execution.contracts import ArtifactRef
 from nl2sql_sdk.contracts import ResultFrame
 
@@ -31,24 +31,23 @@ _PLACEHOLDER = re.compile(r"<([a-zA-Z0-9_]+)>")
 _UNIQUE_PLACEHOLDERS = {"sub_query_id", "dag_node_id"}
 
 
+# Where a result is written, under the store's folder.
+DEFAULT_PATH_TEMPLATE = "<tenant_id>/<request_id>/<sub_query_id>.parquet"
+
+
 @dataclass(frozen=True)
 class ArtifactStoreConfig:
-    backend: str
+    """``base_uri`` is the results folder, ``<storage.path>/results/`` for an engine."""
+
     base_uri: str
-    path_template: str
-    s3_bucket: Optional[str] = None
-    s3_prefix: Optional[str] = None
-    adls_account: Optional[str] = None
-    adls_container: Optional[str] = None
-    # Plain, for polars' storage options; kept out of the repr so it never prints.
-    adls_connection_string: Optional[str] = field(default=None, repr=False)
+    path_template: str = DEFAULT_PATH_TEMPLATE
 
 
 class ArtifactStore:
-    """Writes and reads Parquet result artifacts for every supported backend.
+    """Writes and reads Parquet result artifacts under one local folder.
 
-    Backends differ only in how the target URI is built; polars handles ``s3://``
-    and ``abfs://`` natively, so the read/write path itself is shared.
+    Remote stores (S3, ADLS) were removed in 0.5; the Phase 2 results-store
+    interface brings them back.
     """
 
     def __init__(self, config: ArtifactStoreConfig) -> None:
@@ -91,11 +90,11 @@ class ArtifactStore:
 
             if parts:
                 combined = pl.concat([pl.scan_parquet(p) for p in parts], how="vertical_relaxed")
-                sink_parquet(combined, uri, storage_options=self._storage_options())
+                sink_parquet(combined, uri)
                 estimated = sum(p.stat().st_size for p in parts)
             else:
                 df = first if first is not None else pl.DataFrame()
-                write_parquet(df, uri, storage_options=self._storage_options())
+                write_parquet(df, uri)
                 estimated = df.estimated_size()
         finally:
             if spill_dir is not None:
@@ -111,8 +110,8 @@ class ArtifactStore:
         """
         template = self._template_for(metadata)
         uri = self._build_uri(template, metadata)
-        sink_parquet(frame.lazy(), uri, storage_options=self._storage_options())
-        written = scan_parquet(uri, storage_options=self._storage_options())
+        sink_parquet(frame.lazy(), uri)
+        written = scan_parquet(uri)
         row_count = int(written.select(pl.len()).collect().item())
         columns = written.collect_schema().names()
         return self._artifact_ref(uri, template, columns, row_count, 0, metadata)
@@ -138,23 +137,14 @@ class ArtifactStore:
     def write_manifest(self, tenant_id: str, request_id: str, manifest: Any) -> str:
         """Writes a run's result manifest (a pydantic model) as JSON beside its results."""
         uri = self._manifest_uri(tenant_id, request_id, create=True)
-        text = manifest.model_dump_json()
-        if self.config.backend == "local":
-            Path(uri).write_text(text, encoding="utf-8")
-        else:
-            with self._open_remote(uri, "w") as handle:
-                handle.write(text)
+        Path(uri).write_text(manifest.model_dump_json(), encoding="utf-8")
         return uri
 
     def read_manifest(self, tenant_id: str, request_id: str) -> Optional[Dict[str, Any]]:
         """A run's result manifest as a dict, or None when there is none."""
         uri = self._manifest_uri(tenant_id, request_id, create=False)
         try:
-            if self.config.backend == "local":
-                text = Path(uri).read_text(encoding="utf-8")
-            else:
-                with self._open_remote(uri, "r") as handle:
-                    text = handle.read()
+            text = Path(uri).read_text(encoding="utf-8")
         except FileNotFoundError:
             return None
         return json.loads(text)
@@ -166,9 +156,9 @@ class ArtifactStore:
         """
         metadata = self.run_metadata(tenant_id, request_id, f"result_{node_id}")
         uri = self._build_uri(self._template_for(metadata), metadata, create=False)
-        if self.config.backend == "local" and not Path(uri).is_file():
+        if not Path(uri).is_file():
             return None
-        return scan_parquet(uri, storage_options=self._storage_options())
+        return scan_parquet(uri)
 
     def _manifest_uri(self, tenant_id: str, request_id: str, create: bool) -> str:
         """The result template rendered with ``manifest`` as the name, as a ``.json`` file.
@@ -180,22 +170,15 @@ class ArtifactStore:
         stem = uri[: -len(".parquet")] if uri.endswith(".parquet") else uri
         return f"{stem}.json"
 
-    def _open_remote(self, uri: str, mode: str):
-        # fsspec is what polars itself uses for s3:// and abfs://; imported here
-        # so a local store never needs it.
-        import fsspec
-
-        return fsspec.open(uri, mode, encoding="utf-8", **(self._storage_options() or {}))
-
     def read_result_frame(self, artifact: ArtifactRef) -> ResultFrame:
         return polars_to_result_frame(self.read_parquet(artifact))
 
     def read_parquet(self, artifact: ArtifactRef) -> pl.DataFrame:
-        return read_parquet(artifact.uri, storage_options=self._storage_options())
+        return read_parquet(artifact.uri)
 
     def scan_parquet(self, artifact: ArtifactRef) -> pl.LazyFrame:
         """The artifact as a polars scan: nothing is read until it is collected."""
-        return scan_parquet(artifact.uri, storage_options=self._storage_options())
+        return scan_parquet(artifact.uri)
 
     @staticmethod
     def _spill(df: pl.DataFrame, folder: str, index: int) -> Path:
@@ -222,7 +205,7 @@ class ArtifactStore:
         ).hexdigest()
         return ArtifactRef(
             uri=uri,
-            backend=self.config.backend,
+            backend="local",
             format="parquet",
             row_count=row_count,
             columns=columns,
@@ -261,70 +244,32 @@ class ArtifactStore:
                 raise ValueError(
                     f"Cannot render artifact path template '{template}': "
                     f"no value for placeholder '<{key}>'. Provide '{key}' in the artifact metadata "
-                    f"or remove it from RESULT_ARTIFACT_PATH_TEMPLATE."
+                    f"or remove it from the path template."
                 )
             return str(value)
 
         return _PLACEHOLDER.sub(substitute, template)
 
     def _build_uri(self, template: str, metadata: Dict[str, str], create: bool = True) -> str:
-        backend = self.config.backend
-        relative_path = self._render_path(template, metadata)
+        target = Path(self.config.base_uri) / self._render_path(template, metadata)
+        if create:
+            target.parent.mkdir(parents=True, exist_ok=True)
+        return str(target.resolve())
 
-        if backend == "local":
-            target = Path(self.config.base_uri) / relative_path
-            if create:
-                target.parent.mkdir(parents=True, exist_ok=True)
-            return str(target.resolve())
 
-        if backend == "s3":
-            if not self.config.s3_bucket:
-                raise ValueError(
-                    "S3 artifact backend requires a bucket; set RESULT_ARTIFACT_S3_BUCKET."
-                )
-            prefix = (self.config.s3_prefix or "").strip("/")
-            key = f"{prefix}/{relative_path}" if prefix else relative_path
-            return f"s3://{self.config.s3_bucket}/{key}"
-
-        if backend == "adls":
-            if not self.config.adls_container:
-                raise ValueError(
-                    "ADLS artifact backend requires a container; set RESULT_ARTIFACT_ADLS_CONTAINER."
-                )
-            if not self.config.adls_account:
-                raise ValueError(
-                    "ADLS artifact backend requires a storage account; set RESULT_ARTIFACT_ADLS_ACCOUNT."
-                )
-            host = f"{self.config.adls_account}.dfs.core.windows.net"
-            return f"abfs://{self.config.adls_container}@{host}/{relative_path}"
-
-        raise ValueError(
-            f"Unsupported artifact backend '{backend}'. Expected one of: local, s3, adls."
-        )
-
-    def _storage_options(self) -> Optional[Dict[str, Any]]:
-        if self.config.backend == "adls" and self.config.adls_connection_string:
-            return {"connection_string": self.config.adls_connection_string}
-        return None
-
-    def _bytes_written(self, uri: str, estimated: int) -> int:
-        """The file's size on a local backend; ``estimated`` on a remote one."""
-        if self.config.backend == "local":
-            path = Path(uri)
-            return path.stat().st_size if path.exists() else 0
-        return estimated
+    @staticmethod
+    def _bytes_written(uri: str, estimated: int) -> int:
+        """The file's size; ``estimated`` when it is not there to measure."""
+        path = Path(uri)
+        return path.stat().st_size if path.exists() else estimated
 
 
 def build_artifact_store() -> ArtifactStore:
+    """The results store the settings name. The engine sets ``result_artifact_base_uri`` to
+    ``<storage.path>/results/`` (the copy step, until the settings global is deleted)."""
     return ArtifactStore(
         ArtifactStoreConfig(
-            backend=settings.result_artifact_backend,
             base_uri=settings.result_artifact_base_uri,
             path_template=settings.result_artifact_path_template,
-            s3_bucket=settings.result_artifact_s3_bucket,
-            s3_prefix=settings.result_artifact_s3_prefix,
-            adls_account=settings.result_artifact_adls_account,
-            adls_container=settings.result_artifact_adls_container,
-            adls_connection_string=secret_value(settings.result_artifact_adls_connection_string),
         )
     )

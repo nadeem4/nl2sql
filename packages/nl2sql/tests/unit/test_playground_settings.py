@@ -88,7 +88,7 @@ class _Context:
         self.llm_registry.register_llms(agents)
         self.tenant_id = "default_tenant"
         self.artifact_store = ArtifactStore(ArtifactStoreConfig(
-            backend="local", base_uri=str(project / "artifacts"),
+            base_uri=str(project / "artifacts"),
             path_template="<tenant_id>/<request_id>/<sub_query_id>.parquet"))
 
 
@@ -96,10 +96,10 @@ class _Engine(NL2SQL):
     """The real facade; runs no pipeline, reports which planner client a run would have used."""
 
     def __init__(self, project):
-        self._ctx = _Context(project)
-        self.datasource = DatasourceAPI(self._ctx)
-        self.llm = LLM_API(self._ctx)
-        self.query = QueryAPI(self._ctx)
+        self._runtime = _Context(project)
+        self.datasource = DatasourceAPI(self._runtime)
+        self.llm = LLM_API(self._runtime)
+        self.query = QueryAPI(self._runtime)
         self.used = []
         self.release = None
         self.entered = threading.Event()

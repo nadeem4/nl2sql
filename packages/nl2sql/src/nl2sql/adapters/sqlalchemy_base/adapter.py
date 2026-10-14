@@ -1,6 +1,7 @@
 import datetime
 import decimal
 import time
+from pathlib import Path
 from typing import Dict, Any, Iterator, List, Optional
 from sqlalchemy import create_engine, inspect, text, Engine, select, func, table, column, case, literal_column, Connection
 from sqlalchemy.engine.reflection import Inspector
@@ -138,6 +139,9 @@ class BaseSQLAlchemyAdapter:
         # this the way its driver allows (see its connect()).
         self.statement_timeout_ms = kwargs.get("statement_timeout_ms")
         self.execution_options = {}
+        # The folder of the nl2sql.yaml the datasource came from, or None for
+        # the working directory. File-based adapters read a relative path from it.
+        self.base_dir = kwargs.get("base_dir")
 
         self.connection_args = connection_args
         self.connection_string = self.construct_uri(connection_args)
@@ -205,6 +209,17 @@ class BaseSQLAlchemyAdapter:
             logger.error(f"Failed to connect to database: {e}")
             raise
 
+
+    def local_path(self, path: str) -> str:
+        """A database file path: a relative one is read from ``base_dir``, when there is one."""
+        if not self.base_dir or path == ":memory:" or Path(path).is_absolute():
+            return path
+        return (Path(self.base_dir) / path).as_posix()
+
+    def close(self) -> None:
+        """Disposes the connection pool. The engine calls it once, from ``engine.close()``."""
+        if self.engine is not None:
+            self.engine.dispose()
 
     def capabilities(self) -> set[DatasourceCapability]:
         """Default capability set for SQL adapters.

@@ -1,6 +1,6 @@
 import os
 from threading import RLock
-from typing import Any, Dict, NamedTuple, Optional
+from typing import TYPE_CHECKING, Any, Dict, NamedTuple, Optional
 
 from langchain_core.language_models import BaseChatModel
 
@@ -9,6 +9,10 @@ from nl2sql.secrets import SecretManager
 from .models import AgentConfig
 from .request_key import RequestLLMs, current_request_llms
 from .wires import WIRES, Wire
+
+if TYPE_CHECKING:
+    from nl2sql.config import LLM
+    from nl2sql.registry import Registry
 
 
 class ProviderPreset(NamedTuple):
@@ -69,13 +73,80 @@ def wire_for_provider(provider: str) -> Wire:
     return WIRES[PROVIDER_PRESETS[provider].wire]
 
 
-class LLMRegistry:
+def agents_from_config(llm: "LLM") -> Dict[str, Any]:
+    """The ``llm`` section as one entry per agent, keyed as the nodes ask ``get_llm``.
 
-    def __init__(self, secret_manager: SecretManager):
+    ``default`` is the top level. Each agent in ``llm.agents`` takes every
+    field it sets and inherits the rest (``model_fields_set``, so
+    ``temperature: null`` still means "send none"). An entry is an
+    ``AgentConfig``, or the chat model object when ``model`` is one.
+    """
+    from .providers import LLM_AGENTS
+
+    def entry(name: str, fields: Dict[str, Any]) -> Any:
+        if not isinstance(fields["model"], str):
+            return fields["model"]
+        return AgentConfig(name=name, provider=fields["provider"], model=fields["model"],
+                           temperature=fields["temperature"], api_key=fields["api_key"],
+                           base_url=fields["base_url"])
+
+    top = {field: getattr(llm, field) for field in ("provider", "model", "temperature", "api_key", "base_url")}
+    agents = {"default": entry("default", top)}
+    for agent, override in llm.agents.items():
+        key = LLM_AGENTS.get(agent, agent)
+        agents[key] = entry(key, {**top, **{field: getattr(override, field) for field in override.model_fields_set}})
+    return agents
+
+
+class LLMRegistry:
+    """Each agent's LLM settings, and the clients built from them on first use.
+
+    ``registry`` turns a provider name into its ``LLMProvider``; without one,
+    the built-in providers are used.
+    """
+
+    def __init__(self, secret_manager: SecretManager, registry: Optional["Registry"] = None):
         self.secret_manager = secret_manager
         self.llms = {}
         self._configs: Dict[str, AgentConfig] = {}
+        # Agents given a chat model object instead of a provider and model name.
+        self._objects: Dict[str, BaseChatModel] = {}
+        self._registry = registry
         self._lock = RLock()
+
+    def configure(self, llm: "LLM") -> None:
+        """Replaces every agent with those in the ``llm`` section, as one step."""
+        agents = agents_from_config(llm)
+        configs = {name: agent for name, agent in agents.items() if isinstance(agent, AgentConfig)}
+        for agent in configs.values():
+            self._validate(agent)
+        with self._lock:
+            self._configs = configs
+            self._objects = {name: agent for name, agent in agents.items() if name not in configs}
+            self.llms = {}
+
+    def _provider(self, name: str):
+        """The ``LLMProvider`` for ``name``, through the registry when there is one."""
+        if self._registry is not None:
+            return self._registry.load("llm", name)
+        from .providers import LLM_PROVIDERS
+
+        return LLM_PROVIDERS[name]
+
+    def missing_keys(self) -> Dict[str, str]:
+        """Each agent whose API key does not resolve, mapped to the reason. No model is called."""
+        with self._lock:
+            configs = dict(self._configs)
+        missing = {}
+        for name, agent in configs.items():
+            preset = PROVIDER_PRESETS.get(agent.provider)
+            if preset is None:
+                continue
+            try:
+                self._resolve_api_key(agent, preset)
+            except ValueError as e:
+                missing[name] = str(e)
+        return missing
 
     def register_llms(self, config: Dict[str, AgentConfig]):
         """Registers each agent under its key in ``config``.
@@ -107,12 +178,12 @@ class LLMRegistry:
             self._configs = named
             self.llms = {}
 
-    @staticmethod
-    def _validate(agent: AgentConfig) -> None:
-        if agent.provider not in PROVIDER_PRESETS:
+    def _validate(self, agent: AgentConfig) -> None:
+        known = self._registry.names("llm") if self._registry is not None else sorted(PROVIDER_PRESETS)
+        if agent.provider not in known:
             raise ValueError(
                 f"Unsupported LLM provider: {agent.provider}. "
-                f"Valid providers are: {', '.join(sorted(PROVIDER_PRESETS))}."
+                f"Valid providers are: {', '.join(known)}."
             )
         if not agent.model or not agent.model.strip():
             raise ValueError(
@@ -163,6 +234,8 @@ class LLMRegistry:
         """
         request = current_request_llms()
         with self._lock:
+            if not request and (name in self._objects or (name not in self._configs and "default" in self._objects)):
+                return self._objects.get(name) or self._objects["default"]
             if request:
                 config, key = self._for_request(self._config_for(name), name, request)
                 return self._build_client(config, api_key=key)
@@ -265,12 +338,17 @@ class LLMRegistry:
             ValueError: If the wire's optional dependency (the anthropic
                 extra) is missing.
         """
-        from .providers import LLM_PROVIDERS, ResolvedAgent
+        from .providers import ResolvedAgent
 
-        api_key = api_key or self._resolve_api_key(agent, PROVIDER_PRESETS[agent.provider])
+        preset = PROVIDER_PRESETS.get(agent.provider)
+        if not api_key and preset is not None:
+            api_key = self._resolve_api_key(agent, preset)
+        elif not api_key and agent.api_key is not None:
+            # A provider registered in code: its key is the config's, or its own business.
+            api_key = self.secret_manager.resolve_object(agent.api_key)
         if hasattr(api_key, "get_secret_value"):
             api_key = api_key.get_secret_value()
-        return LLM_PROVIDERS[agent.provider].create(ResolvedAgent(
+        return self._provider(agent.provider).create(ResolvedAgent(
             name=agent.name, model=agent.model, temperature=agent.temperature,
             api_key=api_key, base_url=agent.base_url,
         ))
@@ -327,15 +405,14 @@ class LLMRegistry:
         return preset.api_key_env
 
     def get_llm_config(self, name: str) -> Dict[str, Any]:
-        with self._lock:
-            if name not in self._configs:
-                name = "default"
-            config = self._configs[name]
-            return config.model_dump(exclude={"api_key"})
+        """One agent's settings, without its key; ``default``'s for an agent with none of its own."""
+        listed = self.list_llms()
+        return listed.get(name) or listed["default"]
 
     def list_llms(self) -> Dict[str, Dict[str, Any]]:
+        """Every agent's settings, without keys. An agent given a model object shows its class."""
         with self._lock:
-            return {
-                name: config.model_dump(exclude={"api_key"})
-                for name, config in self._configs.items()
-            }
+            listed = {name: config.model_dump(exclude={"api_key"}) for name, config in self._configs.items()}
+            listed.update({name: {"name": name, "provider": None, "model": type(model).__name__}
+                           for name, model in self._objects.items()})
+            return listed

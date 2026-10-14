@@ -64,7 +64,7 @@ def collect_secrets(ctx: Any) -> Set[str]:
     for name, value in os.environ.items():
         if value and _SECRET_ENV.search(name):
             found.add(value)
-    for name in ("openai_api_key", "result_artifact_adls_connection_string"):
+    for name in ("openai_api_key",):
         value = secret_value(getattr(settings, name, None))
         if value:
             found.add(value)

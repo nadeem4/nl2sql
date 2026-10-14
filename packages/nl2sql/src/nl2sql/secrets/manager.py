@@ -1,17 +1,26 @@
 from __future__ import annotations
 
-from typing import Dict, List, Any
+from typing import TYPE_CHECKING, Any, Dict, Optional, Sequence
 from nl2sql_sdk import SecretProvider
 from .providers.env import EnvSecretProvider
-from .models import SecretProviderConfig
 import logging
+
+if TYPE_CHECKING:
+    from nl2sql.config import SecretProviderConfig
+    from nl2sql.registry import Registry
 
 logger = logging.getLogger(__name__)
 
 class SecretManager:
-    """Manages secret resolution using registered providers."""
+    """Resolves ``${provider:key}`` references through the providers one engine configured.
 
-    def __init__(self):
+    Each engine owns one: nothing here is shared between engines. ``registry``
+    turns a provider ``type`` into its class; it defaults to
+    ``Registry.default()``.
+    """
+
+    def __init__(self, registry: Optional["Registry"] = None):
+        self._registry = registry
         self._providers: Dict[str, SecretProvider] = {
             "env": EnvSecretProvider()
         }
@@ -27,30 +36,28 @@ class SecretManager:
     def register_provider(self, provider_id: str, provider: SecretProvider) -> None:
         self._providers[provider_id] = provider
 
-    def configure(self, configs: List[SecretProviderConfig]) -> None:
-        """Configures providers from a list of configuration objects.
-        
-        Each provider's block was validated by its ``config_model`` when the
-        config loaded. For each entry this method:
-        1. resolves the references in the block (e.g. ``token: "${env:VAULT_TOKEN}"``)
-           with the providers already registered, ``env`` among them;
-        2. builds the provider with its ``from_config`` and registers it under ``id``.
+    def configure(self, configs: Sequence["SecretProviderConfig"]) -> None:
+        """Builds and registers each provider in ``configs`` (the ``secrets.providers`` entries).
 
-        Args:
-            configs: A list of SecretProviderConfig objects.
+        For each entry this method:
+        1. loads the provider class named by ``type`` from the registry;
+        2. resolves the references in its block (e.g. ``token: "${env:VAULT_TOKEN}"``)
+           with the providers already registered, ``env`` among them;
+        3. validates the block with the provider's ``config_model``, so an
+           unknown or misspelt key is an error;
+        4. builds the provider with its ``from_config`` and registers it under ``id``.
 
         Raises:
-            ValueError: A configured provider could not start (its package is
-                missing, a credential reference did not resolve, or the
-                provider itself raised). This is fatal on purpose: swallowing
-                it only moves the failure to the first ``${id:key}`` lookup,
-                where it reads as "Unknown secret provider ID".
+            ValueError: A configured provider could not start (an unknown
+                type, an invalid block, its package is missing, a credential
+                reference did not resolve, or the provider itself raised).
+                This is fatal on purpose: swallowing it only moves the failure
+                to the first ``${id:key}`` lookup, where it reads as "Unknown
+                secret provider ID".
         """
-        from pydantic import SecretStr
-
         from nl2sql.registry import Registry
 
-        registry = Registry.default()
+        registry = self._registry or Registry.default()
 
         for config in configs:
             if config.type == "env":
@@ -58,18 +65,13 @@ class SecretManager:
 
             resolved_values = []
             try:
-                updates = {}
-                for key in type(config.options).model_fields:
-                    value = getattr(config.options, key)
-                    # Credential fields are SecretStr; a reference in one is resolved too.
-                    raw = value.get_secret_value() if isinstance(value, SecretStr) else value
+                provider_cls = registry.load("secrets", config.type)
+                block = dict(config.model_extra or {})
+                for key, raw in block.items():
                     if isinstance(raw, str) and raw.startswith("${") and raw.endswith("}"):
-                        resolved = self.resolve(raw)
-                        resolved_values.append(resolved)
-                        updates[key] = SecretStr(resolved) if isinstance(value, SecretStr) else resolved
-
-                provider = registry.load("secrets", config.type).from_config(
-                    config.options.model_copy(update=updates))
+                        block[key] = self.resolve(raw)
+                        resolved_values.append(block[key])
+                provider = provider_cls.from_config(provider_cls.config_model.model_validate(block))
             except Exception as e:
                 reason = str(e) or type(e).__name__
                 for value in resolved_values:

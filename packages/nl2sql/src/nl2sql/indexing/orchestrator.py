@@ -9,7 +9,7 @@ from nl2sql.indexing.curated import CuratedChunkBuilder, curated_hash, curated_s
 from nl2sql.indexing.enrichment_service import enrich_schema_snapshot
 
 if TYPE_CHECKING:
-    from nl2sql.context import NL2SQLContext
+    from nl2sql.runtime import Runtime
 
 logger = get_logger("indexing_orchestrator")
 
@@ -22,12 +22,12 @@ class IndexingOrchestrator:
     registration, chunk construction, and vector store refresh.
     """
 
-    def __init__(self, ctx: NL2SQLContext, enrich: bool = False):
+    def __init__(self, ctx: Runtime, enrich: bool = False):
         """
         Initializes the indexing orchestrator.
 
         Args:
-            ctx: Initialized NL2SQLContext.
+            ctx: Initialized Runtime.
             enrich: Whether to ask the ``indexing_enrichment`` LLM for
                 descriptions. Off by default: enrichment spends tokens, so
                 every caller turns it on only when asked.
@@ -35,7 +35,6 @@ class IndexingOrchestrator:
         self.enrich = enrich
         self.vector_store = ctx.vector_store
         self.schema_store = ctx.schema_store
-        self.config_manager = ctx.config_manager
         self.ds_registry = getattr(ctx, "ds_registry", None)
         self.llm_registry = ctx.llm_registry
         # The loaded curated.yaml, or None when the feature is off.
@@ -67,7 +66,7 @@ class IndexingOrchestrator:
         """
         schema_snapshot = adapter.fetch_schema_snapshot()
 
-        questions = self.config_manager.get_example_questions(adapter.datasource_id)
+        questions = self.ds_registry.get_sample_questions(adapter.datasource_id)
         datasource_description = self._datasource_description(adapter.datasource_id)
 
         # Best-effort: enrich_schema_snapshot owns resolving its own LLM and
@@ -121,17 +120,8 @@ class IndexingOrchestrator:
         )
 
     def _datasource_description(self, datasource_id: str):
-        """The description the datasource was registered with.
-
-        A datasource added in code (``engine.add_datasource``) is not in the
-        datasources file, so the registry is asked first; the file is read
-        only when the registry has no description for it.
-        """
-        get_description = getattr(self.ds_registry, "get_description", None)
-        description = get_description(datasource_id) if get_description else None
-        if description and description.strip():
-            return description
-        return self.config_manager.get_datasource_description(datasource_id)
+        """The description the datasource was registered with, from the file or added in code."""
+        return self.ds_registry.get_description(datasource_id)
 
     def refresh_curated(
         self,

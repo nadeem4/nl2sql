@@ -20,7 +20,7 @@ logger = get_logger("refiner")
 LLMCallable = Union[Callable[[str], str], Runnable]
 
 from langchain_core.output_parsers import StrOutputParser
-from nl2sql.context import NL2SQLContext
+from nl2sql.runtime import Runtime
 
 class RefinerNode:
     """
@@ -29,7 +29,7 @@ class RefinerNode:
     Uses an LLM to look at the failed plan, the schema, and the errors to suggest fixes.
     """
 
-    def __init__(self, ctx: NL2SQLContext):
+    def __init__(self, ctx: Runtime):
         """
         Initializes the RefinerNode.
 

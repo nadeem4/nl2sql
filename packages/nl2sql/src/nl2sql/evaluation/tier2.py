@@ -31,7 +31,7 @@ from typing import Any, Callable, Dict, List, Optional, Sequence
 from nl2sql.api.query_api import QueryResult
 from nl2sql.common.settings import settings
 from nl2sql.configs.llm import AgentConfig, LLMFileConfig
-from nl2sql.context import NL2SQLContext
+from nl2sql.runtime import Runtime
 from nl2sql.evaluation.benchmark_runner import BenchmarkRunner
 from nl2sql.evaluation.evaluator import ModelEvaluator
 from nl2sql.evaluation.faithfulness import answer_text, check_answer
@@ -458,7 +458,7 @@ def check_baseline(scoreboard: Dict[str, Any], baseline: Dict[str, Any], *,
 
 
 def run_tier2(
-    ctx: NL2SQLContext,
+    ctx: Runtime,
     config: BenchmarkConfig,
     llm_configs: Dict[str, LLMFileConfig],
     *,

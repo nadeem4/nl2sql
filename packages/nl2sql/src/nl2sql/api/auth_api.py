@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import List, Optional
 
-from nl2sql.context import NL2SQLContext
+from nl2sql.runtime import Runtime
 from nl2sql.auth.models import UserContext
 from nl2sql.auth.rbac import RBAC, default_schema
 
@@ -18,7 +18,7 @@ class AuthAPI:
     API for authentication and role-based access control.
     """
     
-    def __init__(self, ctx: NL2SQLContext):
+    def __init__(self, ctx: Runtime):
         self._ctx = ctx
         self._rbac: RBAC = ctx.rbac
     

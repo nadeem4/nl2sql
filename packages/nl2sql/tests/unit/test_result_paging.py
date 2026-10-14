@@ -38,10 +38,9 @@ ROWS = [{"id": i, "name": f"n{i}"} for i in range(45)]
 
 @pytest.fixture()
 def store(tmp_path, monkeypatch):
-    monkeypatch.setattr(settings, "result_artifact_backend", "local")
     monkeypatch.setattr(settings, "result_artifact_base_uri", str(tmp_path))
     monkeypatch.setattr(settings, "result_artifact_path_template", TEMPLATE)
-    return ArtifactStore(ArtifactStoreConfig(backend="local", base_uri=str(tmp_path), path_template=TEMPLATE))
+    return ArtifactStore(ArtifactStoreConfig(base_uri=str(tmp_path), path_template=TEMPLATE))
 
 
 def _dag():
@@ -276,41 +275,6 @@ def test_a_manifest_naming_a_path_outside_the_run_is_not_trusted(store, tmp_path
 
     with pytest.raises(ResultNotFound):
         _api(store).get_result_page("run-1", "../../t2/theirs/result_combine_g1")
-
-
-# Remote backends (URI level; the object-store IO is faked, as elsewhere)
-
-
-def test_an_s3_store_writes_and_reads_the_manifest_beside_the_results(monkeypatch):
-    import sys
-
-    files = {}
-
-    class _Handle(io.StringIO):
-        def __init__(self, uri, mode):
-            super().__init__("" if "w" in mode else files[uri])
-            self.uri, self.mode = uri, mode
-
-        def __exit__(self, *exc):
-            if "w" in self.mode:
-                files[self.uri] = self.getvalue()
-            return super().__exit__(*exc)
-
-    def _open(uri, mode, **kwargs):
-        if "r" in mode and uri not in files:
-            raise FileNotFoundError(uri)
-        return _Handle(uri, mode)
-
-    monkeypatch.setitem(sys.modules, "fsspec", SimpleNamespace(open=_open))
-    store = ArtifactStore(ArtifactStoreConfig(backend="s3", base_uri="", path_template=TEMPLATE,
-                                              s3_bucket="bucket", s3_prefix="prefix"))
-    manifest = ResultManifest(request_id="r1", results=[ResultSummary(node_id="combine_g1", row_count=3)])
-
-    uri = store.write_manifest("t1", "r1", manifest)
-
-    assert uri == "s3://bucket/prefix/t1/r1/manifest.json"
-    assert ResultManifest.model_validate(store.read_manifest("t1", "r1")) == manifest
-    assert store.read_manifest("t1", "r2") is None
 
 
 # The facade

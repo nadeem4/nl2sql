@@ -7,7 +7,7 @@ import sqlite3
 import pytest
 
 from nl2sql.common.settings import settings
-from nl2sql.context import NL2SQLContext
+from nl2sql.runtime import Runtime
 from nl2sql.cli.commands import setup as wizard
 
 
@@ -84,7 +84,7 @@ def test_wizard_indexing_hands_a_context_to_run_indexing(wizard_project, monkeyp
 
     assert len(captured) == 1, "the wizard never reached run_indexing"
     ctx = captured[0]
-    assert isinstance(ctx, NL2SQLContext)
+    assert isinstance(ctx, Runtime)
     assert [a.datasource_id for a in ctx.ds_registry.list_adapters()] == ["main_db"]
     assert ctx.llm_registry.get_llm("default") is not None
     assert str(wizard_project) in str(pathlib.Path(ctx.vector_store.persist_directory))

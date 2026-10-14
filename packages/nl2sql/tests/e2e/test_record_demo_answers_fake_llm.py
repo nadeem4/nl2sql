@@ -77,7 +77,7 @@ def test_record_with_claude_then_replay_to_a_keyless_hosted_visitor(demo_project
     reload_settings()
     replay = FakeLLMServer(store.rules()).start()
     try:
-        app = build_app(NL2SQL(), questions=list(DEMO_QUESTIONS), roles=["admin"], mode="hosted",
+        app = build_app(NL2SQL._legacy(), questions=list(DEMO_QUESTIONS), roles=["admin"], mode="hosted",
                         dataset="chinook", project_dir=project, host="0.0.0.0",
                         hosted=Hosted(enabled=True, replay=Replay(replay.base_url, store.covered(DEMO_QUESTIONS))))
         client = TestClient(app, base_url="http://demo.example:7860")

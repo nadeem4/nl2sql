@@ -32,10 +32,10 @@ class _Engine(NL2SQL):
 
     def __init__(self, snapshot=None, datasources=("chinook",)):
         self.calls = []
-        self._ctx = _Context(snapshot, datasources)
+        self._runtime = _Context(snapshot, datasources)
 
     def list_datasources(self):
-        return self._ctx.ds_registry.list_ids()
+        return self._runtime.ds_registry.list_ids()
 
     def run_query(self, natural_language, datasource_id=None, execute=True, user_context=None,
                   cancellation_token=None):

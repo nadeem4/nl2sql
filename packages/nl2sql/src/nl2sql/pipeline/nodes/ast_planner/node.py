@@ -10,7 +10,7 @@ from nl2sql.pipeline.nodes.schema_retriever.schema import render_schema_for_prom
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.common.logger import get_logger
 from nl2sql.common.settings import run_date
-from nl2sql.context import NL2SQLContext
+from nl2sql.runtime import Runtime
 from nl2sql.llm.failures import provider_error
 from nl2sql.llm.wires import structured
 from nl2sql.pipeline.plan_cache import PlanCache
@@ -52,11 +52,11 @@ class ASTPlannerNode:
         chain (Optional[Runnable]): The langchain chain for planning.
     """
 
-    def __init__(self, ctx: NL2SQLContext):
+    def __init__(self, ctx: Runtime):
         """Initializes the PlannerNode.
 
         Args:
-            ctx (NL2SQLContext): The context of the pipeline.
+            ctx (Runtime): The context of the pipeline.
         """
         self.node_name = self.__class__.__name__.lower().replace('node', '')
         # Plans are read here and written by the sub-query wrapper once one has

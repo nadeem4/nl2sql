@@ -57,25 +57,26 @@ Source:
 `packages/nl2sql/src/nl2sql/api/datasource_api.py`
 
 Signature:
-`add_datasource(config: Union[DatasourceConfig, Dict[str, Any]]) -> None`
+`add_datasource(config: Union[Datasource, Dict[str, Any]]) -> None`
 
 Parameters:
 | name | type | required | meaning |
 | --- | --- | --- | --- |
-| `config` | `DatasourceConfig | Dict[str, Any]` | yes | Datasource configuration. |
+| `config` | `Datasource | Dict[str, Any]` | yes | A `Datasource` (see [Configuration v2](../../architecture/configuration_v2.md#datasources-datasource)). The 0.4 dict shape, with `connection.type`, is still read until the REST API takes the `Datasource` body. |
 
 Returns:
 `None`.
 
 Raises:
-- `ValueError` if datasource ID is missing or adapter type is unknown.
-- `ValueError` if secret resolution fails.
+- `ValueError` if the id is already configured, the adapter type is unknown, or a reference does not resolve.
 
 Side Effects:
-- Registers adapter instance in `DatasourceRegistry`.
+- Builds the adapter without connecting, registers it, and adds the datasource
+  to `engine.config`. Its description and sample questions are what indexing
+  reads.
 
 Idempotency:
-- Not strictly idempotent; re-registering the same ID overwrites in-memory registry.
+- Not idempotent: adding an id that is already configured raises.
 
 ### DatasourceAPI.add_datasource_from_config
 
@@ -110,7 +111,7 @@ Signature:
 `list_datasources() -> List[str]`
 
 Returns:
-List of registered datasource IDs. A configured datasource that failed to start
+List of available datasource IDs. A datasource `check()` could not connect to
 is not in it; `NL2SQL.list_unavailable_datasources()` maps each one to the
 reason.
 

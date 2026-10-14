@@ -222,7 +222,7 @@ class DemoManager:
             return False
 
         # The demo environment must be active before the context is built:
-        # NL2SQLContext validates vector store settings during construction.
+        # Runtime validates vector store settings during construction.
         # Its settings override the shell's, except the provider keys: a key
         # already exported wins over `.env.demo` (the precedence `nl2sql demo`
         # documents), and the file's empty `OPENAI_API_KEY=` placeholder must
@@ -230,11 +230,11 @@ class DemoManager:
         _load_demo_env(env_path)
         reload_settings()
 
-        from nl2sql.context import NL2SQLContext
+        from nl2sql._legacy import legacy_runtime
         from nl2sql.cli.common.indexing import run_indexing
 
         try:
-            ctx = NL2SQLContext(
+            ctx = legacy_runtime(
                 ds_config_path=self.project_root / settings.datasource_config_path,
                 secrets_config_path=self.project_root / settings.secrets_config_path,
                 llm_config_path=self.project_root / settings.llm_config_path,

@@ -53,7 +53,7 @@ class _Context:
 
 def _engine(ctx) -> NL2SQL:
     engine = NL2SQL.__new__(NL2SQL)
-    engine._ctx = ctx
+    engine._runtime = ctx
     return engine
 
 

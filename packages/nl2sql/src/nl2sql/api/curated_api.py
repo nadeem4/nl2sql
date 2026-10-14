@@ -20,11 +20,12 @@ from nl2sql_sdk.contracts import AdapterRequest
 from nl2sql.common.settings import settings
 from nl2sql.configs import ConfigManager
 from nl2sql.configs.curated import CuratedFileConfig, VerifiedQuery, check_curated_queries
-from nl2sql.context import NL2SQLContext
+from nl2sql.runtime import Runtime
 from nl2sql.datasources import DatasourceRegistry
 from nl2sql.execution.executor.sql_executor import _frames as adapter_frames
 from nl2sql.schema import build_schema_store
-from nl2sql.secrets import secret_manager
+from nl2sql._legacy import datasource_from_04
+from nl2sql.secrets import SecretManager
 
 
 @dataclass
@@ -67,7 +68,7 @@ class CuratedAPI:
     API for checking the curated answers file.
     """
 
-    def __init__(self, ctx: Optional[NL2SQLContext] = None):
+    def __init__(self, ctx: Optional[Runtime] = None):
         self._ctx = ctx
 
     def validate(
@@ -83,7 +84,7 @@ class CuratedAPI:
         Runs whether or not ``CURATED_ENABLED`` is on. ``ok`` is False on any
         error; ``notes`` say what could not be checked.
         """
-        cm = self._ctx.config_manager if self._ctx else ConfigManager()
+        cm = ConfigManager()
         path = pathlib.Path(curated_path or settings.curated_config_path)
 
         try:
@@ -141,7 +142,7 @@ class CuratedAPI:
         with the values bound, and only the first batch of rows is fetched.
         ``ok`` is False if any query fails.
         """
-        cm = self._ctx.config_manager if self._ctx else ConfigManager()
+        cm = ConfigManager()
         path = pathlib.Path(curated_path or settings.curated_config_path)
         try:
             cfg = cm.load_curated(path)
@@ -200,11 +201,13 @@ class CuratedAPI:
     def _registry(self, cm: ConfigManager, datasources_path, secrets_path) -> DatasourceRegistry:
         if self._ctx and datasources_path is None:
             return self._ctx.ds_registry
+        secret_manager = SecretManager()
         secret_configs = cm.load_secrets(pathlib.Path(secrets_path or settings.secrets_config_path))
         if secret_configs:
             secret_manager.configure(secret_configs)
         registry = DatasourceRegistry(secret_manager)
-        registry.register_datasources(cm.load_datasources(pathlib.Path(datasources_path or settings.datasource_config_path)))
+        registry.register_datasources([datasource_from_04(d) for d in cm.load_datasources(
+            pathlib.Path(datasources_path or settings.datasource_config_path))])
         return registry
 
     def _indexed_tables(

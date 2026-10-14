@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from nl2sql.auth import UserContext
 from nl2sql.pipeline.runtime import run_with_graph
 from nl2sql.common.settings import settings
-from nl2sql.context import NL2SQLContext
+from nl2sql.runtime import Runtime
 
 
 @dataclass
@@ -26,7 +26,7 @@ class PipelineRunner:
     Decoupled from CLI presentation logic.
     """
 
-    def __init__(self, ctx: NL2SQLContext):
+    def __init__(self, ctx: Runtime):
         self.ctx = ctx
 
     def run(

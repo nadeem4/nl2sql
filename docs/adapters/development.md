@@ -59,6 +59,8 @@ If you need to connect to something else (e.g., ElasticSearch, a CRM API, or a r
 * Fetching and normalizing schema metadata.
 * Executing queries and formatting results.
 * Implementing safety breakers (`row_limit`).
+* Accepting the keyword arguments the engine builds every adapter with: `datasource_id`, `datasource_engine_type`, `connection_args` (the datasource's `connection`, references resolved), `statement_timeout_ms`, `row_limit` and `max_bytes` (its `limits`), and `base_dir` (the folder of `nl2sql.yaml`, or None). Take `**kwargs` so a later one does not break you. Do not connect in the constructor: `engine.check()` calls `test_connection()`.
+* Optionally, a `close()` that releases connections; `engine.close()` calls it once.
 * Declaring `interface_version = 1`, the `driver_modules` it imports to connect, and an `install_hint` (see [Class attributes](sdk.md#class-attributes)).
 * Optionally, a `default_schema` attribute naming the schema an unqualified table resolves to. RBAC reads a two-part `datasource.table` policy entry as that table in this schema; without it, `main` is assumed.
 
