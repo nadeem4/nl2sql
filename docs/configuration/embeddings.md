@@ -34,8 +34,8 @@ without `model` or `base_url`, or a `local` section with a `base_url`, is a
 
 Notes on the `local` provider:
 
-- **No extra dependency.** The model ships with `chromadb`, which is already a
-  transitive dependency through `langchain-chroma`.
+- **No extra dependency.** The model ships with `chromadb`, which the engine
+  already depends on for its built-in `chroma` index store.
 - **One-time download.** The first indexing run downloads roughly 79 MB of ONNX
   model files into a local cache directory. Expect a pause of up to a few
   minutes; a log line is emitted before the download starts.
@@ -116,10 +116,10 @@ class MyProvider:
 
 ## Switching providers
 
-**Switching providers requires a re-index.** Different embedding models
-produce different vectors, often of different dimensionality, so an existing
-index cannot be read with another provider. Retrieving from an index whose vectors disagree with the
-configured provider raises `EmbeddingDimensionMismatchError` naming both
-providers. The check runs on the read path only, so the fix is to re-run
-`nl2sql index --full`; alternatively, point [`storage.path`](storage.md) at a
-separate folder per provider.
+**Switching providers or models needs a re-index, and nothing more.**
+Different embedding models produce different vectors, so each model has its
+own index namespace, `nl2sql__<model slug>__<dimension>`. After a change the
+new model's namespace is empty: `check()` and `nl2sql doctor` report the index
+`missing`, and `nl2sql index` builds it. The old model's namespace is kept, so
+switching back finds it built; `nl2sql index prune` drops the ones you no
+longer need. See [Storage → The index](storage.md#the-index).

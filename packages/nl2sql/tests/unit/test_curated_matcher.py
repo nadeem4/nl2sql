@@ -131,6 +131,9 @@ class _VectorStore:
             explain.append({"kind": "curated", "query": query, "pool": []})
         return [c for c in self.candidates if c.datasource_id in datasource_ids]
 
+    def schema_version(self, ds_id):
+        return "v1"
+
 
 def _server(choice):
     rules = [] if choice is None else [Rule("VerifiedQueryChoice", choice)]
@@ -151,7 +154,6 @@ def _ctx(db, server, candidates, capabilities=None, curated=None, settings=None)
         vector_store=vector_store,
         policies={"roles": POLICIES},
         ds_registry=_Registry(adapter, capabilities),
-        schema_store=SimpleNamespace(get_latest_version=lambda _id: "v1"),
         llm_registry=registry,
     )
     return ctx

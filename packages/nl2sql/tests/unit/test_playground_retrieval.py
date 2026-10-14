@@ -14,27 +14,40 @@ from fastapi.testclient import TestClient
 from nl2sql import NL2SQL
 from nl2sql.testing.facade import StubDatasources
 from nl2sql.cli.demo.playground.app import build_app
-from nl2sql.indexing.vector_store import VectorStore
+from nl2sql.embeddings import EmbeddingInfo
+from nl2sql.indexing.retrieval import Retriever
 
 from test_retrieval_trace import QUESTION, _store  # noqa: E402  (same directory)
 
 
 class _Snapshots:
-    def get_latest_version(self, _ds):
-        return "v1"
-
-    def get_latest_snapshot(self, _ds):
+    def get_snapshot(self, _ds, _version):
         return None
 
 
-class _Engine(NL2SQL):
-    """The real facade over a live vector store and a stub schema store."""
+class _Registry:
+    def list_ids(self):
+        return ["chinook"]
 
-    def __init__(self, store):
+    def unavailable(self):
+        return {}
+
+    def get_preferred_tables(self, _ds):
+        return []
+
+
+class _Engine(NL2SQL):
+    """The real facade over a live index store and a stub schema store."""
+
+    def __init__(self, store: Retriever):
         self._runtime = type("Ctx", (), {})()
         self._runtime.vector_store = store
+        self._runtime.index = store.index
+        self._runtime.namespace = store.namespace
+        self._runtime.embedding_info = EmbeddingInfo("test", "test", 11)
         self._runtime.schema_store = _Snapshots()
-        self._runtime.ds_registry = type("R", (), {"list_ids": staticmethod(lambda: ["chinook"])})()
+        self._runtime.ds_registry = _Registry()
+        self._runtime.curated = None
 
     @property
     def datasources(self):
@@ -129,18 +142,9 @@ def test_a_search_must_come_from_the_page_itself(tmp_path):
     assert form.status_code in (415, 422)
 
 
-def test_no_vector_index_is_a_plain_error(tmp_path):
-    client = _client(tmp_path, store=None)
-
-    response = client.post("/api/retrieval", json={"query": QUESTION})
-
-    assert response.status_code == 409
-    assert "no vector index" in response.json()["detail"]
-
-
 def test_an_empty_index_answers_with_an_empty_pool(tmp_path):
-    client = _client(tmp_path, store=VectorStore("nl2sql_store", str(tmp_path / "empty"),
-                                                 embeddings=_store(tmp_path / "x").embeddings))
+    filled = _store(tmp_path)
+    client = _client(tmp_path, store=Retriever(filled.index, filled.namespace, filled.embeddings, {}))
 
     body = client.post("/api/retrieval", json={"query": QUESTION}).json()
 

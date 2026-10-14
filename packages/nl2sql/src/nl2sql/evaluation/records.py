@@ -112,7 +112,7 @@ def dataset_id(path: pathlib.Path) -> Dict[str, str]:
 def database_identity(ctx, datasource_ids: Optional[Sequence[str]] = None) -> Dict[str, Any]:
     """The database a run used: datasource id, engine, a schema fingerprint and the table and column counts.
 
-    The fingerprint hashes the latest indexed schema snapshot (tables,
+    The fingerprint hashes the snapshot each live index build was made from (tables,
     columns, types, keys), so re-indexing an unchanged database keeps it.
     Several datasources are joined with ``+``.
 
@@ -127,8 +127,9 @@ def database_identity(ctx, datasource_ids: Optional[Sequence[str]] = None) -> Di
 
     ids = sorted(set(datasource_ids)) if datasource_ids is not None else sorted(ctx.ds_registry.list_ids())
     parts = []
+    live = ctx.vector_store
     for ds_id in ids:
-        snapshot = ctx.schema_store.get_latest_snapshot(ds_id)
+        snapshot = live.snapshot(ds_id)
         if snapshot is None:
             parts.append((ds_id, UNKNOWN, UNKNOWN, None, None))
             continue

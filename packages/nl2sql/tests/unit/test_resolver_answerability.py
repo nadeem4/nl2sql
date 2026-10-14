@@ -60,7 +60,7 @@ def _doc(ds_id):
 
 
 class SpyStore:
-    """A vector store that records every search."""
+    """A vector store that records every search. Every datasource's live build is at v1."""
 
     def __init__(self, ds_ids=()):
         self.searches = []
@@ -70,16 +70,18 @@ class SpyStore:
         self.searches.append(query)
         return [_doc(ds_id) for ds_id in self.ds_ids]
 
+    def schema_version(self, ds_id):
+        return "v1"
+
+    def snapshot(self, ds_id):
+        return SNAPSHOTS.get(ds_id)
+
 
 def _ctx(server, ds_ids, allowed=("*",), vector_store=None, **agents):
     return fake_runtime(
         vector_store=vector_store if vector_store is not None else SpyStore(ds_ids),
         policies={"default_role": "r", "roles": {role: {"description": "d", "allow": list(list(allowed))} for role in ("r", "admin")}},
         ds_registry=SimpleNamespace(list_ids=lambda: list(ds_ids)),
-        schema_store=SimpleNamespace(
-            get_latest_version=lambda _id: "v1",
-            get_latest_snapshot=lambda ds_id: SNAPSHOTS.get(ds_id),
-        ),
         llm_registry=_registry(server, **agents),
     )
 
@@ -125,17 +127,6 @@ def test_one_datasource_skips_the_vector_search_but_still_resolves_it(serve):
     assert [d.datasource_id for d in response.resolved_datasources] == ["chinook"]
     assert response.allowed_datasource_ids == ["chinook"]
     assert resolver_route(GraphState(user_query="q", datasource_resolver_response=response)) == "continue"
-
-
-def test_one_datasource_works_without_any_vector_store(serve):
-    server = serve(ANSWERABLE)
-    ctx = _ctx(server, ["chinook"])
-    ctx.vector_store = None
-
-    result = DatasourceResolverNode(ctx)(_state())
-
-    assert "errors" not in result
-    assert result["datasource_resolver_response"].allowed_datasource_ids == ["chinook"]
 
 
 def test_one_datasource_still_refuses_a_denied_role_without_asking_the_model(serve):

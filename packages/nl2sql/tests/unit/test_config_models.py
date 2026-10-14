@@ -282,7 +282,7 @@ def test_settings_defaults():
     assert s.retrieval.full_snapshot_max_tables == 15
     assert (s.results.row_limit, s.results.fetch_batch_size, s.results.preview_rows) == (100_000, 10_000, 20)
     assert (s.traces.mode, s.traces.sample_rows, s.traces.max_field_chars) == ("on_failure", 50, 20000)
-    assert (s.schema_.max_versions, s.schema_.version_mismatch) == (3, "warn")
+    assert s.schema_.max_versions == 3
     assert (s.curated.match_top_k, s.curated.match_floor) == (5, 0.6)
     assert s.feedback.enabled is True
     assert (s.observability.exporter, s.observability.otlp_endpoint) == ("none", None)
@@ -302,7 +302,6 @@ def test_settings_pins_the_date():
     {"curated": {"match_top_k": 0}},
     {"results": {"fetch_batch_size": 0}},
     {"traces": {"mode": "sometimes"}},
-    {"schema": {"version_mismatch": "panic"}},
     {"observability": {"exporter": "jaeger"}},
 ])
 def test_settings_keep_todays_validation(update):
@@ -332,3 +331,9 @@ def test_default_role_must_be_one_of_the_roles():
     with pytest.raises(ValidationError, match="default_role"):
         Policies(default_role="viewer", roles={"admin": Role(description="a")})
     assert Policies(default_role="viewer", roles={"viewer": Role(description="v")}).default_role == "viewer"
+
+
+def test_schema_version_mismatch_is_gone():
+    """A run reads the schema version its index build was made from, so they cannot disagree."""
+    with pytest.raises(ValidationError):
+        Settings.model_validate({"schema": {"version_mismatch": "warn"}})

@@ -76,7 +76,7 @@ nodes observe the cancelled token, or once its current I/O completes.
 ([`common/resilience.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/common/resilience.py))
 is the only breaker the system defines (`fail_max=5`, `reset_timeout=30`). It
 wraps vector-store retrieval in
-[`indexing/vector_store.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/indexing/vector_store.py)
+[`indexing/retrieval.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/indexing/retrieval.py)
 only.
 
 LLM calls and SQL execution are **not** breaker-guarded. Their failures surface

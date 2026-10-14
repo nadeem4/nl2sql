@@ -138,7 +138,7 @@ class DecomposerNode:
 
         Args:
             llm (LLMCallable): The LLM instance or runnable.
-            vector_store (Optional[VectorStore]): Vector store for RAG.
+            vector_store (Optional[Retriever]): The index retriever.
         """
         self.node_name = self.__class__.__name__.lower().replace('node', '')
         self.llm = ctx.llm_registry.get_llm(self.node_name)

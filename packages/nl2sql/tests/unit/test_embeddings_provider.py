@@ -1,3 +1,8 @@
+"""The local embedder: chromadb's bundled ONNX model, returning plain float vectors.
+
+An index built with another embedding model is not refused any more: each model
+has its own index namespace (``test_index_pointer_commit.py``).
+"""
 from __future__ import annotations
 
 import sys
@@ -5,19 +10,8 @@ import types
 
 import numpy as np
 import pytest
-from langchain_core.documents import Document
-from langchain_core.embeddings import Embeddings
-from langchain_openai import OpenAIEmbeddings
 
-from nl2sql.indexing.embeddings import (
-    LOCAL_EMBEDDING_DIMENSION,
-    LocalEmbeddings,
-)
-from nl2sql.indexing.vector_store import (
-    EmbeddingDimensionMismatchError,
-    VectorStore,
-    check_embedding_dimension_compatibility,
-)
+from nl2sql.embeddings.local import LocalEmbeddings
 
 
 @pytest.fixture
@@ -49,94 +43,3 @@ def test_local_embeddings_embed_query_returns_flat_vector(stub_default_embedding
 
     assert vector == [1.0, 2.0, 3.0]
     assert all(type(value) is float for value in vector)
-
-
-def test_dimension_guard_rejects_index_from_other_provider():
-    with pytest.raises(EmbeddingDimensionMismatchError) as excinfo:
-        check_embedding_dimension_compatibility(
-            persisted_dimension=1536,
-            embeddings=LocalEmbeddings(),
-            collection_name="nl2sql_store",
-        )
-
-    message = str(excinfo.value)
-    assert "nl2sql_store" in message
-    assert "1536" in message
-    assert str(LOCAL_EMBEDDING_DIMENSION) in message
-    assert "openai" in message
-    assert "local" in message
-    assert "re-index" in message.lower()
-
-
-def test_dimension_guard_allows_matching_index():
-    check_embedding_dimension_compatibility(
-        persisted_dimension=LOCAL_EMBEDDING_DIMENSION,
-        embeddings=LocalEmbeddings(),
-        collection_name="nl2sql_store",
-    )
-
-
-def test_dimension_guard_skips_when_dimension_unknown():
-    check_embedding_dimension_compatibility(
-        persisted_dimension=None,
-        embeddings=LocalEmbeddings(),
-        collection_name="nl2sql_store",
-    )
-    check_embedding_dimension_compatibility(
-        persisted_dimension=1536,
-        embeddings=OpenAIEmbeddings(model="some-future-model", api_key="sk-test"),
-        collection_name="nl2sql_store",
-    )
-
-
-class _FakeEmbeddings(Embeddings):
-    """Deterministic stand-in with a declared model name and dimensionality."""
-
-    def __init__(self, model: str, dimension: int) -> None:
-        self.model = model
-        self.dimension = dimension
-
-    def embed_documents(self, texts):
-        return [[0.01] * self.dimension for _ in texts]
-
-    def embed_query(self, text):
-        return [0.01] * self.dimension
-
-
-def _openai_like() -> _FakeEmbeddings:
-    return _FakeEmbeddings("text-embedding-3-small", 1536)
-
-
-def _local_like() -> _FakeEmbeddings:
-    return _FakeEmbeddings("all-MiniLM-L6-v2", LOCAL_EMBEDDING_DIMENSION)
-
-
-def test_retrieval_rejects_index_built_by_another_provider(tmp_path):
-    store = VectorStore("nl2sql_store", str(tmp_path), embeddings=_openai_like())
-    store.vectorstore.add_documents(
-        [Document(page_content="orders", metadata={"type": "schema.datasource"})]
-    )
-
-    reopened = VectorStore("nl2sql_store", str(tmp_path), embeddings=_local_like())
-
-    with pytest.raises(EmbeddingDimensionMismatchError):
-        reopened.retrieve_datasource_candidates("anything")
-
-
-def test_reindexing_recovers_from_a_provider_switch(tmp_path):
-    store = VectorStore("nl2sql_store", str(tmp_path), embeddings=_openai_like())
-    store.vectorstore.add_documents(
-        [Document(page_content="orders", metadata={"type": "schema.datasource"})]
-    )
-
-    # Re-indexing must not be blocked by the guard: it clears the collection first.
-    reindexed = VectorStore("nl2sql_store", str(tmp_path), embeddings=_local_like())
-    reindexed.clear()
-    reindexed.vectorstore.add_documents(
-        [Document(page_content="orders table", metadata={"type": "schema.datasource"})]
-    )
-
-    hits = reindexed.retrieve_datasource_candidates("orders")
-
-    assert hits[0].page_content == "orders table"
-

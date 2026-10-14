@@ -257,10 +257,12 @@ def _snapshot() -> SchemaSnapshot:
 
 
 def _retriever(vector_store=None, full_snapshot_max_tables=15) -> SchemaRetrieverNode:
+    # The live build's snapshot is read through the index; without a store
+    # given, the index has nothing to search but still names the snapshot.
     ctx = fake_runtime(
         settings={"retrieval": {"full_snapshot_max_tables": full_snapshot_max_tables}},
-        vector_store=vector_store,
-        schema_store=SimpleNamespace(get_latest_snapshot=lambda _id: _snapshot()),
+        vector_store=vector_store if vector_store is not None else SimpleNamespace(snapshot=lambda _id: _snapshot()),
+        schema_store=SimpleNamespace(get_snapshot=lambda _id, _version: _snapshot()),
         policies=_policies(),
     )
     return SchemaRetrieverNode(ctx)
@@ -306,6 +308,7 @@ def test_the_vector_searches_run_over_the_readable_tables_only():
         return [doc, track_doc]
 
     vector_store = SimpleNamespace(
+        snapshot=lambda _id: _snapshot(),
         retrieve_schema_context=retrieve_schema_context,
         retrieve_planning_context=lambda *_a, **_k: [],
         retrieve_column_candidates=lambda *_a, **_k: [],

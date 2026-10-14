@@ -1,32 +1,30 @@
 from __future__ import annotations
 
 import pytest
-from langchain_core.documents import Document
 
-from nl2sql.indexing.embeddings import LOCAL_EMBEDDING_DIMENSION, LocalEmbeddings
-from nl2sql.indexing.vector_store import VectorStore
+from nl2sql.embeddings.local import LOCAL_EMBEDDING_DIMENSION, LocalEmbeddings
+from nl2sql.storage.chroma import ChromaIndex
+from nl2sql_sdk.stores import Entry
 
 pytestmark = pytest.mark.integration
 
+NAMESPACE = "nl2sql__local-all-minilm-l6-v2__384"
 
-def test_local_embeddings_round_trip_through_chroma(tmp_path):
+
+def test_local_embeddings_round_trip_through_the_chroma_index_store(tmp_path):
     """Downloads the ONNX model on first run; needs no API key."""
     embeddings = LocalEmbeddings()
 
     assert len(embeddings.embed_query("hello")) == LOCAL_EMBEDDING_DIMENSION
 
-    store = VectorStore(
-        collection_name="nl2sql_store",
-        persist_directory=str(tmp_path),
-        embeddings=embeddings,
-    )
-    store.vectorstore.add_documents(
-        [
-            Document(page_content="orders table holds customer purchases"),
-            Document(page_content="weather station rainfall readings"),
-        ]
-    )
+    index = ChromaIndex(tmp_path / "index")
+    index.open(NAMESPACE, LOCAL_EMBEDDING_DIMENSION)
+    texts = ["orders table holds customer purchases", "weather station rainfall readings"]
+    index.add(NAMESPACE, [
+        Entry(id=str(i), text=text, vector=vector)
+        for i, (text, vector) in enumerate(zip(texts, embeddings.embed_documents(texts)))
+    ])
 
-    hits = store.vectorstore.similarity_search("where are purchases stored", k=1)
+    hits = index.query(NAMESPACE, embeddings.embed_query("where are purchases stored"), k=1)
 
-    assert hits[0].page_content == "orders table holds customer purchases"
+    assert hits[0].text == "orders table holds customer purchases"

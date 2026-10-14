@@ -16,7 +16,7 @@ retrieval on a small schema, so the limit is set to 0 for the run. No LLM is
 called: each question is scored against the datasource its gold entry names,
 and the retriever's query is the question alone, since the decomposer that
 would add filters and expected columns is an LLM. What the retriever sent is
-read from its retrieval record (``nl2sql.indexing.retrieval_trace``), the
+read from its retrieval record (``nl2sql.indexing.retrieval``), the
 same one a run trace keeps.
 
 Which datasource the resolver's own vector search would have picked is
@@ -104,7 +104,7 @@ def compare_reports(new: Dict[str, Any], old: Dict[str, Any]) -> Dict[str, Any]:
 
 def _embedding_name(ctx: Runtime) -> str:
     embeddings = getattr(ctx.vector_store, "embeddings", None)
-    from nl2sql.indexing.embeddings import LOCAL_EMBEDDING_MODEL, LocalEmbeddings
+    from nl2sql.embeddings.local import LOCAL_EMBEDDING_MODEL, LocalEmbeddings
 
     if isinstance(embeddings, LocalEmbeddings):
         return LOCAL_EMBEDDING_MODEL

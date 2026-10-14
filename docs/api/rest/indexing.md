@@ -52,19 +52,21 @@ Response (illustrative):
   "total": 162,
   "counts": {"schema.column": 121, "schema.datasource": 3, "schema.relationship": 18, "schema.table": 20},
   "built_at": "2026-09-22T12:35:42+00:00",
-  "embedding_model": "all-MiniLM-L6-v2",
+  "embedding_model": "local/all-MiniLM-L6-v2",
+  "namespace": "nl2sql__local-all-minilm-l6-v2__384",
   "datasources": [
     {"datasource_id": "chinook", "entries": 87, "index_version": "20260922123542_ceed8",
-     "snapshot_version": "20260922123542_ceed8", "built_at": "2026-09-22T12:35:42+00:00"},
+     "built_at": "2026-09-22T12:35:42+00:00"},
     {"datasource_id": "support", "entries": 36, "index_version": "...",
-     "snapshot_version": "...", "built_at": "2026-09-22T12:35:42+00:00"},
+     "built_at": "2026-09-22T12:35:42+00:00"},
     {"datasource_id": "webanalytics", "entries": 39, "index_version": "...",
-     "snapshot_version": "...", "built_at": "2026-09-22T12:35:42+00:00"}
+     "built_at": "2026-09-22T12:35:42+00:00"}
   ],
   "problems": []
 }
 ```
 
-`status` is `ok`, `empty`, `stale` (the index is behind a datasource's latest
-schema snapshot, or was built with another embedding model) or `missing`;
+`status` is `ok`, `empty`, `stale` (a datasource has no live build, or its
+build's snapshot is gone) or `missing` (the configured embedding model has no
+index yet);
 `problems` says what is wrong and how to fix it.

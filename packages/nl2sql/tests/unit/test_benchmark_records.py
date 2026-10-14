@@ -158,7 +158,7 @@ def _demo_ctx():
     snapshots = {"chinook": _snapshot("chinook", CHINOOK["tables"], CHINOOK["columns"]),
                  "support": _snapshot("support", 4, 30), "webanalytics": _snapshot("webanalytics", 5, 34)}
     return SimpleNamespace(ds_registry=SimpleNamespace(list_ids=lambda: sorted(snapshots)),
-                           schema_store=SimpleNamespace(get_latest_snapshot=snapshots.get))
+                           vector_store=SimpleNamespace(snapshot=snapshots.get))
 
 
 def _fingerprinted_per_datasource(monkeypatch):
@@ -169,16 +169,16 @@ def _fingerprinted_per_datasource(monkeypatch):
                         lambda c: digests.get(c.datasource_id, hashlib.sha256(c.datasource_id.encode()).hexdigest()))
 
 
-def test_database_identity_fingerprints_the_latest_schema_snapshot(monkeypatch):
+def test_database_identity_fingerprints_the_live_schema_snapshot(monkeypatch):
     import nl2sql.schema.protocol as protocol
     ctx = SimpleNamespace(ds_registry=SimpleNamespace(list_ids=lambda: ["chinook"]),
-                          schema_store=SimpleNamespace(get_latest_snapshot={
+                          vector_store=SimpleNamespace(snapshot={
                               "chinook": _snapshot("chinook", 2, 3)}.get))
     monkeypatch.setattr(protocol, "generate_schema_fingerprint", lambda c: "f" * 64)
     assert records.database_identity(ctx) == {"datasource_id": "chinook", "engine": "sqlite",
                                               "schema_fingerprint": "f" * 16, "tables": 2, "columns": 3}
     empty = SimpleNamespace(ds_registry=SimpleNamespace(list_ids=lambda: ["x"]),
-                            schema_store=SimpleNamespace(get_latest_snapshot=lambda _id: None))
+                            vector_store=SimpleNamespace(snapshot=lambda _id: None))
     assert records.database_identity(empty)["schema_fingerprint"] == "unknown"
 
 

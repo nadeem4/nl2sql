@@ -12,5 +12,6 @@
 - **SubQuery**: Decomposed, datasource-scoped query intent from the decomposer.
 - **Subgraph**: LangGraph subgraph that handles a specific execution capability (e.g., SQL agent).
 - **ResultFrame**: Adapter response containing rows/columns, row_count, and error metadata.
-- **VectorStore**: Chroma-backed vector index for schema chunks.
+- **IndexStore**: the store that keeps the index entries, in a namespace per embedding model, and each datasource's live build pointer (`chroma` by default).
+- **Retriever**: the engine's MMR searches over the index store's live builds, pinned per run.
 - **RBAC**: Role-based access control enforcing datasource/table permissions.

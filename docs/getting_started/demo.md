@@ -226,12 +226,10 @@ can replay the guided questions from recorded runs. It refuses to start when
 [Hosted demo](../deployment/hosted-demo.md).
 
 Each project keeps its index under its own `storage.path` (the demo's is
-`nl2sql-demo/.nl2sql/index`), so projects that embed differently never share a
-collection. If you change the `embeddings` section of an existing project, run
-`nl2sql index --full`:
-every datasource in a collection must share one embedding model, so the store
-otherwise raises `EmbeddingDimensionMismatchError` (or
-`EmbeddingModelMismatchError` for a different model of the same size).
+`nl2sql-demo/.nl2sql/index`), with one namespace per embedding model. If you
+change the `embeddings` section of an existing project, run `nl2sql index`:
+the new model's namespace starts empty, and the old one stays until
+`nl2sql index prune`.
 
 Column statistics are read when a datasource is indexed, so a change to what
 indexing records reaches an existing demo folder only when it is indexed again.
@@ -254,7 +252,7 @@ so the page looked fine while every question failed with
 
 - **Startup repair.** Every `nl2sql demo` start calls `engine.check()`, which
   reports what the index *contains*: the demo rebuilds it when it is missing or
-  empty, or was built from an older schema version than the latest snapshot. A failed rebuild is
+  empty, or a datasource has no live build. A failed rebuild is
   reported (the playground still starts, and offers Rebuild) rather than
   ignored.
 - **Rebuilds never leave an empty index.** A datasource's new entries are
@@ -284,8 +282,8 @@ demand.
 
 - Rebuild re-reads one database's schema into a new snapshot and rebuilds its
   entries beside the current ones; questions keep using the current entries
-  until the new ones are complete, and questions in flight finish before the
-  switch. That database is the demo's own, named in the button's help;
+  until the new ones are complete, and a question in flight finishes on the
+  entries it started with. That database is the demo's own, named in the button's help;
   `nl2sql index` rebuilds all three.
 - It shows each step as it runs. The first run downloads the 79 MB embedding
   model, so it can take a few minutes.
@@ -580,8 +578,8 @@ nl2sql index
 # Re-index one datasource only; the others' entries are left untouched
 nl2sql index --datasource chinook
 
-# After changing the embedding model: rebuild every datasource, then switch
-nl2sql index --full
+# After changing the embedding model: drop the old model's index
+nl2sql index prune
 
 # Check the install, the keys, and the engine: each datasource, each key, the index
 nl2sql doctor

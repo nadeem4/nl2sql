@@ -68,7 +68,6 @@ class CuratedMatcherNode:
         self.vector_store = ctx.vector_store
         self.policy_engine = ctx.policy_engine
         self.ds_registry = ctx.ds_registry
-        self.schema_store = ctx.schema_store
         self.tenant_id = ctx.tenant_id
         self.row_limit = ctx.settings.results.row_limit
         self.match = ctx.settings.curated
@@ -211,7 +210,7 @@ class CuratedMatcherNode:
             id=f"verified_{query.id}",
             datasource_id=ds_id,
             intent=state.user_query,
-            schema_version=self.schema_store.get_latest_version(ds_id),
+            schema_version=self.vector_store.schema_version(ds_id),
         )
         row_cap = self._row_ceiling(ds_id)
         response = self.executor.execute(ExecutorRequest(

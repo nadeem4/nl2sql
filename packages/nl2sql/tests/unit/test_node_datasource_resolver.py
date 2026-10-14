@@ -39,38 +39,21 @@ def _doc(datasource_id: str | None = "ds1", schema_version: str = "v1"):
     return doc
 
 
-def _schema_store(version="v1"):
-    return SimpleNamespace(get_latest_version=lambda _id: version, get_latest_snapshot=lambda _id: None)
-
-
-def _ctx(llm_registry, vector_store, allowed, ds_ids=TWO, version="v1", version_mismatch="warn"):
+def _ctx(llm_registry, vector_store, allowed, ds_ids=TWO, version="v1"):
+    # The live schema version is the vector store's (the run's pinned index
+    # pointers): every datasource's build is at ``version``, with no snapshot.
+    if vector_store is not None:
+        vector_store.schema_version = lambda _id: version
+        vector_store.snapshot = lambda _id: None
     return fake_runtime(
-        settings={"schema": {"version_mismatch": version_mismatch}},
         vector_store=vector_store,
         policies={"default_role": "r", "roles": {role: {"description": "d", "allow": list(allowed)} for role in ("r", "admin")}},
         ds_registry=SimpleNamespace(
             get_capabilities=lambda _id: {"supports_sql"},
             list_ids=lambda: list(ds_ids),
         ),
-        schema_store=_schema_store(version),
         llm_registry=llm_registry,
     )
-
-
-def test_datasource_resolver_schema_version_mismatch_fail(monkeypatch, llm_registry):
-    # Validates mismatch policy because stale schema must be rejected when configured.
-    # Arrange
-    vector_store = SimpleNamespace()
-    vector_store.retrieve_datasource_candidates = lambda *_a, **_k: [_doc()]
-    node = DatasourceResolverNode(_ctx(llm_registry, vector_store, ["ds1"], version="v2", version_mismatch="fail"))
-
-    state = GraphState(user_query="q", user_context=UserContext())
-
-    # Act
-    result = node(state)
-
-    # Assert
-    assert result["errors"][0].error_code == ErrorCode.INVALID_STATE
 
 
 def test_datasource_resolver_handles_missing_vector_store(llm_registry):
@@ -158,6 +141,7 @@ def test_datasource_resolver_explicit_datasource_override(llm_registry):
     # Validates the explicit override path because --ds-id / API datasource_id must
     # resolve a registered, allowed datasource and populate schema_version.
     vector_store = SimpleNamespace(retrieve_datasource_candidates=lambda *_a, **_k: [])
+    # The live build's schema version, from the index pointer.
     node = DatasourceResolverNode(_ctx(llm_registry, vector_store, ["ds1"], version="v7"))
 
     result = node(

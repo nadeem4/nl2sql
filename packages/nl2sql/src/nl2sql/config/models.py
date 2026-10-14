@@ -459,7 +459,6 @@ class TraceSettings(_Model):
 
 class SchemaSettings(_Model):
     max_versions: PositiveInt = 3
-    version_mismatch: Literal["warn", "fail", "ignore"] = "warn"
 
 
 class CuratedSettings(_Model):

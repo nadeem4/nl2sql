@@ -34,13 +34,16 @@ class DatasourceResolverNode:
        Otherwise a vector search over the datasource entries picks them.
     2. The role check: candidates the caller's role may not read are dropped;
        none left is a ``SECURITY_VIOLATION``, before any model call.
-    3. The schema-version mismatch policy.
-    4. The answerability check: one small structured LLM call over the allowed
+    3. The answerability check: one small structured LLM call over the allowed
        candidates' descriptions and table lists. An empty verdict ends the run
        with ``QUESTION_NOT_ANSWERABLE`` before the decomposer. After a vector
        search only the datasources the verdict names (and the role may read)
        go forward, each with its description and a capped table list for the
        decomposer.
+
+    Each datasource's schema version and snapshot are its live build's, read
+    through the run's pinned index pointers (``ctx.vector_store``), never the
+    state store's newest snapshot.
     """
 
     def __init__(self, ctx: Runtime):
@@ -48,8 +51,6 @@ class DatasourceResolverNode:
         self.vector_store = ctx.vector_store
         self.policy_engine = ctx.policy_engine
         self.ds_registry = ctx.ds_registry
-        self.schema_store = ctx.schema_store
-        self.version_mismatch = ctx.settings.schema_.version_mismatch
         # Registered as agent "datasourceresolver"; falls back to "default".
         self.llm = ctx.llm_registry.get_llm(self.node_name)
         self.answerability_chain = ANSWERABILITY_PROMPT | structured(self.llm, AnswerabilityResponse)
@@ -96,27 +97,16 @@ class DatasourceResolverNode:
         candidate_docs: list[Document],
     ) -> Dict[str, ResolvedDatasource]:
         candidate_datasources: Dict[str, ResolvedDatasource] = {}
-        schema_versions: Dict[str, str | None] = {}
         for doc in candidate_docs:
             ds_id = doc.metadata.get("datasource_id")
             if not ds_id or ds_id in candidate_datasources:
                 continue
-            if ds_id not in schema_versions:
-                schema_versions[ds_id] = self.schema_store.get_latest_version(ds_id)
-            chunk_schema_version = doc.metadata.get("schema_version")
-            schema_version = schema_versions.get(ds_id)
             candidate_datasources[ds_id] = ResolvedDatasource(
                 datasource_id=ds_id,
                 # Sorted: the decomposer prints this into its prompt, and the
                 # vector store returns it in no fixed order.
                 metadata=dict(sorted(doc.metadata.items())),
-                schema_version=schema_version,
-                chunk_schema_version=chunk_schema_version,
-                schema_version_mismatch=bool(
-                    chunk_schema_version
-                    and schema_version
-                    and chunk_schema_version != schema_version
-                ),
+                schema_version=self.vector_store.schema_version(ds_id),
             )
         return candidate_datasources
 
@@ -129,55 +119,12 @@ class DatasourceResolverNode:
                 if self.policy_engine.scope(user_context, ds_id).reaches_datasource()]
 
 
-    def _apply_schema_version_mismatch_policy(self, resolved_datasources: list[ResolvedDatasource], allowed_ids: list[str], unsupported_ids: list[str]):
-        mismatches = [
-                ds.datasource_id
-                for ds in resolved_datasources
-                if ds.schema_version_mismatch
-        ]
-        if mismatches:
-            policy = self.version_mismatch
-            message = (
-                "Schema version mismatch for datasources: "
-                + ", ".join(sorted(mismatches))
-            )
-            if policy == "fail":
-                return self._error_response(
-                    resolved_datasources=[],
-                    allowed_ids=[],
-                    unsupported_ids=[],
-                    message=message,
-                    severity=ErrorSeverity.ERROR,
-                    error_code=ErrorCode.INVALID_STATE,
-                )
-            elif policy == "warn":
-                return {
-                    "datasource_resolver_response": DatasourceResolverResponse(
-                        resolved_datasources=resolved_datasources,
-                        allowed_datasource_ids=allowed_ids,
-                        unsupported_datasource_ids=unsupported_ids,
-                    ),
-                    "reasoning": [
-                        {
-                            "node": self.node_name,
-                            "content": message,
-                            "type": "warning",
-                        }
-                    ],
-                        "warnings": [
-                            {
-                                "node": self.node_name,
-                                "content": message,
-                            }
-                        ],
-                }
-
     def _direct_candidate(self, datasource_id: str) -> ResolvedDatasource:
         """A datasource chosen without a search: the override, or the only one."""
         return ResolvedDatasource(
             datasource_id=datasource_id,
             metadata={},
-            schema_version=self.schema_store.get_latest_version(datasource_id),
+            schema_version=self.vector_store.schema_version(datasource_id),
         )
 
     def _summary(self, user_context: UserContext, datasource_id: str) -> tuple[str, list[str]]:
@@ -186,7 +133,7 @@ class DatasourceResolverNode:
         A table the caller's scope denies is never named to a model: not to
         the answerability judge, not to the decomposer.
         """
-        snapshot = self.schema_store.get_latest_snapshot(datasource_id)
+        snapshot = self.vector_store.snapshot(datasource_id)
         if not snapshot:
             return "", []
         description = (snapshot.metadata.description or "").strip()
@@ -335,14 +282,6 @@ class DatasourceResolverNode:
                     error_code=ErrorCode.SECURITY_VIOLATION,
                 )
 
-            mismatch_response = self._apply_schema_version_mismatch_policy(
-                candidates,
-                allowed_ids,
-                unsupported_ids,
-            ) or {}
-            if "errors" in mismatch_response:
-                return mismatch_response
-
             verdict = self._judge_answerability(state.user_context, state.user_query, allowed_ids)
             if searched:
                 # Only what the verdict accepted goes forward, and only what
@@ -383,9 +322,7 @@ class DatasourceResolverNode:
                 "reasoning": [
                     {"node": self.node_name, "content": how},
                     {"node": self.node_name, "content": f"Answerable: {verdict.reason}"},
-                    *mismatch_response.get("reasoning", []),
                 ],
-                **({"warnings": mismatch_response["warnings"]} if "warnings" in mismatch_response else {}),
             }
         except Exception as exc:
             logger.error(f"Datasource resolver failed: {exc}")

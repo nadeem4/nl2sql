@@ -59,35 +59,6 @@ def test_sqlalchemy_base_has_no_duplicate_result_models():
         assert name not in sqlalchemy_base.__all__
 
 
-# F19: index health reads the snapshot versions from the engine's state store (state.db).
-def test_index_health_reads_snapshot_versions_from_the_state_store(tmp_path, monkeypatch):
-    from langchain_core.documents import Document
-    from langchain_core.embeddings import FakeEmbeddings
-
-    from nl2sql.indexing import health
-    from nl2sql.indexing.vector_store import VectorStore
-
-    store = VectorStore("nl2sql_store", str(tmp_path / "vs"), embeddings=FakeEmbeddings(size=8))
-    store.vectorstore.add_documents([Document(page_content="ds", metadata={
-        "type": "schema.datasource", "datasource_id": "chinook", "schema_version": "v9"})])
-    (tmp_path / "schema.db").touch()
-    calls = []
-
-    class _Snapshots:
-        def get_latest_version(self, ds_id):
-            return "v9"
-
-    def fake_store(path):
-        calls.append(path)
-        return _Snapshots()
-
-    monkeypatch.setattr(health, "SqliteSchemaStore", fake_store)
-    result = health.inspect_index_at(tmp_path / "vs", "nl2sql_store", tmp_path / "schema.db", ["chinook"])
-
-    assert calls == [tmp_path / "schema.db"]
-    assert result.datasources[0].snapshot_version == "v9"
-
-
 # F20: no core dependency the engine never imports.
 def test_pandas_is_not_a_core_dependency():
     deps = [d.split(">")[0].split("=")[0].split("<")[0].strip().lower() for d in _pyproject()["project"]["dependencies"]]

@@ -66,18 +66,6 @@ class SchemaContractStore:
     def get(self, datasource_id: str, schema_version: str) -> Optional[SchemaContract]:
         return self._registry.get(datasource_id, {}).get(schema_version)
 
-    def get_latest(self, datasource_id: str) -> Optional[SchemaContract]:
-        versions = self._registry.get(datasource_id)
-        if not versions:
-            return None
-        return next(reversed(versions.values()))
-
-    def get_latest_version(self, datasource_id: str) -> Optional[str]:
-        versions = self._registry.get(datasource_id)
-        if not versions:
-            return None
-        return next(reversed(versions.keys()))
-
     def _evict_old_versions(self, datasource_id: str) -> List[str]:
         versions = self._registry[datasource_id]
         fp_index = self._fingerprint_index[datasource_id]
@@ -141,15 +129,6 @@ class InMemorySchemaStore:
         if not contract or not metadata:
             return None
         return SchemaSnapshot(contract=contract, metadata=metadata)
-
-    def get_latest_snapshot(self, datasource_id: str) -> Optional[SchemaSnapshot]:
-        latest_version = self._contracts.get_latest_version(datasource_id)
-        if not latest_version:
-            return None
-        return self.get_snapshot(datasource_id, latest_version)
-
-    def get_latest_version(self, datasource_id: str) -> Optional[str]:
-        return self._contracts.get_latest_version(datasource_id)
 
     def list_versions(self, datasource_id: str) -> List[str]:
         return self._contracts.get_all_versions(datasource_id)

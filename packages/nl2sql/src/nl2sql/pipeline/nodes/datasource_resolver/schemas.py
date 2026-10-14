@@ -14,8 +14,6 @@ class ResolvedDatasource(BaseModel):
     tables: List[str] = Field(default_factory=list)
     more_tables: int = 0
     schema_version: Optional[str] = None
-    chunk_schema_version: Optional[str] = None
-    schema_version_mismatch: bool = False
 
 
 class AnswerabilityResponse(BaseModel):

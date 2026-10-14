@@ -68,7 +68,7 @@ def test_ollama_needs_no_key(monkeypatch):
 
 
 def test_local_embeddings_need_no_key():
-    from nl2sql.indexing.embeddings import LocalEmbeddings
+    from nl2sql.embeddings.local import LocalEmbeddings
 
     local = Registry.default().load("embeddings", "local")
     assert isinstance(local.create(Embeddings(provider="local")), LocalEmbeddings)

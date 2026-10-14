@@ -49,17 +49,19 @@ class _Engine(NL2SQL):
 
 class _Context:
     def __init__(self, snapshot, datasources):
-        self.schema_store = _SchemaStore(snapshot)
-        self.vector_store = None
+        # Every datasource's live build is the one ``snapshot`` was indexed from.
+        self.vector_store = _LiveIndex(snapshot)
         self.ds_registry = _Registry(datasources)
         self.traces_dir = None
 
 
-class _SchemaStore:
+class _LiveIndex:
+    """The run's view of the index: the snapshot each live build was made from."""
+
     def __init__(self, snapshot):
         self._snapshot = snapshot
 
-    def get_latest_snapshot(self, datasource_id):
+    def snapshot(self, datasource_id):
         return self._snapshot
 
 

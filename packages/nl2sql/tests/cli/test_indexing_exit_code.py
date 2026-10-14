@@ -19,35 +19,12 @@ class _StubAdapter:
         self.datasource_id = datasource_id
 
 
-class _StubStore:
-    """Records what the rebuild did with the live index."""
-
-    persist_directory = "/tmp/vs"
-
-    def __init__(self):
-        self.promoted = False
-        self.discarded = False
-        self.embeddings = SimpleNamespace(embed_query=lambda _text: [0.0])
-
-    def create_staging(self):
-        return self
-
-    def check_embedding_model(self):
-        return None
-
-    def discard(self):
-        self.discarded = True
-
-    def promote(self, staging):
-        self.promoted = True
-
-
 def _context(*datasource_ids: str) -> NL2SQL:
-    """The facade over a runtime that has these datasources and a stub index."""
+    """The facade over a runtime that has these datasources and a stub embedder."""
     engine = NL2SQL.__new__(NL2SQL)
     engine._runtime = SimpleNamespace(
         config=SimpleNamespace(storage=SimpleNamespace(path="/tmp/.nl2sql")),
-        vector_store=_StubStore(),
+        embedder=SimpleNamespace(embed_query=lambda _text: [0.0]),
         ds_registry=SimpleNamespace(
             list_adapters=lambda: [_StubAdapter(ds) for ds in datasource_ids]
         ),
@@ -66,7 +43,7 @@ def orchestrator(monkeypatch):
         def __init__(self, ctx, enrich=True):
             self.ctx = ctx
 
-        def index_datasource(self, adapter, vector_store=None, switch_guard=None):
+        def index_datasource(self, adapter):
             indexed.append(adapter.datasource_id)
             outcome = outcomes[adapter.datasource_id]
             if isinstance(outcome, Exception):
@@ -125,7 +102,7 @@ def test_an_unknown_datasource_exits_non_zero(orchestrator, capsys):
     assert "nope" in capsys.readouterr().out
 
 
-def test_the_index_command_passes_datasource_and_full(monkeypatch):
+def test_the_index_command_passes_its_options(monkeypatch):
     from typer.testing import CliRunner
 
     from nl2sql.cli import main
@@ -136,21 +113,20 @@ def test_the_index_command_passes_datasource_and_full(monkeypatch):
 
     result = CliRunner().invoke(main.app, ["index", "--datasource", "chinook", "--datasource", "sales"])
     assert result.exit_code == 0, result.output
-    assert seen == {"enrich": False, "datasource_ids": ["chinook", "sales"], "full": False,
-                    "curated_only": False}
+    assert seen == {"enrich": False, "datasource_ids": ["chinook", "sales"], "curated_only": False}
 
-    CliRunner().invoke(main.app, ["index", "--full"])
-    assert seen == {"enrich": False, "datasource_ids": None, "full": True, "curated_only": False}
+    # A model change needs no special rebuild: each model has its own index.
+    assert CliRunner().invoke(main.app, ["index", "--full"]).exit_code != 0
 
     CliRunner().invoke(main.app, ["index", "--curated-only", "-d", "chinook"])
-    assert seen == {"enrich": False, "datasource_ids": ["chinook"], "full": False, "curated_only": True}
+    assert seen == {"enrich": False, "datasource_ids": ["chinook"], "curated_only": True}
 
     # Enrichment spends tokens, so it runs only when asked for.
     CliRunner().invoke(main.app, ["index", "--enrich"])
-    assert seen == {"enrich": True, "datasource_ids": None, "full": False, "curated_only": False}
+    assert seen == {"enrich": True, "datasource_ids": None, "curated_only": False}
 
 
-def test_full_and_curated_only_do_not_combine(monkeypatch):
+def test_enrich_and_curated_only_do_not_combine(monkeypatch):
     from typer.testing import CliRunner
 
     from nl2sql.cli import main
@@ -158,5 +134,19 @@ def test_full_and_curated_only_do_not_combine(monkeypatch):
     monkeypatch.setattr(main, "build_engine", lambda ctx: "engine")
     monkeypatch.setattr(main, "run_indexing", lambda ctx, **kw: None)
 
-    result = CliRunner().invoke(main.app, ["index", "--full", "--curated-only"])
+    result = CliRunner().invoke(main.app, ["index", "--enrich", "--curated-only"])
     assert result.exit_code != 0
+
+
+def test_index_prune_drops_the_other_models_and_says_which(monkeypatch, capsys):
+    from typer.testing import CliRunner
+
+    from nl2sql.cli import main
+
+    engine = SimpleNamespace(index=SimpleNamespace(prune=lambda: ["nl2sql_store", "nl2sql__openai-x__1536"]))
+    monkeypatch.setattr(main, "build_engine", lambda ctx, check=True: engine)
+
+    result = CliRunner().invoke(main.app, ["index", "prune"])
+
+    assert result.exit_code == 0, result.output
+    assert "nl2sql_store" in result.output and "nl2sql__openai-x__1536" in result.output

@@ -19,6 +19,8 @@ import threading
 
 import pytest
 import yaml
+from index_helpers import TestIndex  # same directory
+from langchain_core.embeddings import FakeEmbeddings
 
 pytest.importorskip("fastapi")
 from fastapi.testclient import TestClient
@@ -57,11 +59,26 @@ def project(tmp_path):
     return tmp_path
 
 
+class _EmptyRegistry:
+    def list_ids(self):
+        return []
+
+    def unavailable(self):
+        return {}
+
+    def get_preferred_tables(self, _ds):
+        return []
+
+
 class _Context:
     def __init__(self, project):
-        self.schema_store = None
-        self.vector_store = None
-        self.ds_registry = type("R", (), {"list_ids": staticmethod(lambda: [])})()
+        # An empty index of a fake embedding model: never built, so health is "missing".
+        index = TestIndex(project / ".nl2sql", FakeEmbeddings(size=8))
+        for key, value in vars(index.ctx).items():
+            setattr(self, key, value)
+        self.vector_store = index.retriever()
+        self.curated = None
+        self.ds_registry = _EmptyRegistry()
         self.llm_registry = LLMRegistry(SecretManager())
         self.registry = Registry.default()
         self.config = load_config(project / "nl2sql.yaml")

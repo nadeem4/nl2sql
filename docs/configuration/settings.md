@@ -26,7 +26,6 @@ traces:
   max_field_chars: 20000
 schema:
   max_versions: 3
-  version_mismatch: warn      # warn | fail | ignore
 curated:
   match_top_k: 5
   match_floor: 0.6
@@ -94,7 +93,6 @@ The tenant id for requests that name none. Result files are kept per tenant.
 | Key | Default | Description |
 | --- | --- | --- |
 | `max_versions` | `3` | Schema snapshots kept per datasource in `<storage.path>/state.db`. |
-| `version_mismatch` | `warn` | What to do when a plan's schema version is not the latest: `warn`, `fail` or `ignore`. |
 
 ## `curated`
 

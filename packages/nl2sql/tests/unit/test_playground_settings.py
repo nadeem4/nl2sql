@@ -16,6 +16,8 @@ import time
 
 import pytest
 import yaml
+from index_helpers import TestIndex  # same directory
+from langchain_core.embeddings import FakeEmbeddings
 
 pytest.importorskip("fastapi")
 from fastapi.routing import APIRoute
@@ -73,11 +75,26 @@ def _llm_yaml(project):
     return yaml.safe_load((project / "llm.yaml").read_text(encoding="utf-8"))
 
 
+class _EmptyRegistry:
+    def list_ids(self):
+        return []
+
+    def unavailable(self):
+        return {}
+
+    def get_preferred_tables(self, _ds):
+        return []
+
+
 class _Context:
     def __init__(self, project):
-        self.schema_store = None
-        self.vector_store = None
-        self.ds_registry = type("R", (), {"list_ids": staticmethod(lambda: [])})()
+        # An empty index of a fake embedding model: never built, so health is "missing".
+        index = TestIndex(project / ".nl2sql", FakeEmbeddings(size=8))
+        for key, value in vars(index.ctx).items():
+            setattr(self, key, value)
+        self.vector_store = index.retriever()
+        self.curated = None
+        self.ds_registry = _EmptyRegistry()
         self.llm_registry = LLMRegistry(SecretManager())
         self.registry = Registry.default()
         self.stores = StorePaths.under(project / ".nl2sql")

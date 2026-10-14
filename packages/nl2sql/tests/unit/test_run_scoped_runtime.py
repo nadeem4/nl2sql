@@ -46,7 +46,7 @@ def test_derive_changes_the_run_and_never_the_engine(tmp_path):
 
     assert run.settings.pipeline.plan_cache is False and run.curated is None
     assert engine.config is before and engine.settings.pipeline.plan_cache is True
-    assert run.vector_store is engine.vector_store and run.ds_registry is engine.ds_registry
+    assert run.index is engine.index and run.ds_registry is engine.ds_registry
 
 
 def test_the_run_has_its_own_llm_set_through_the_engine_s_client_cache(tmp_path):

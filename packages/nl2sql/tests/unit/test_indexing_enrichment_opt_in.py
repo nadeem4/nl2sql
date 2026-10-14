@@ -12,6 +12,8 @@ import logging
 import sqlite3
 from types import SimpleNamespace
 
+from index_helpers import TestIndex  # same directory
+from langchain_core.embeddings import FakeEmbeddings
 from langchain_core.runnables import RunnableLambda
 
 from nl2sql.indexing.orchestrator import IndexingOrchestrator
@@ -27,6 +29,7 @@ from nl2sql.indexing.enrichment_service import (
 from nl2sql.indexing.orchestrator import IndexingOrchestrator
 from nl2sql.schema import InMemorySchemaStore
 from nl2sql.secrets import SecretManager
+from nl2sql_sdk.stores import Filter
 from nl2sql_sdk.schema import (
     ColumnContract,
     ColumnMetadata,
@@ -63,17 +66,14 @@ def _snapshot(table_comment=None, column_comment=None) -> SchemaSnapshot:
     return SchemaSnapshot(contract=contract, metadata=metadata)
 
 
-class _RecordingVectorStore:
-    def __init__(self):
-        self.chunks = []
+def _entries(stats) -> int:
+    """How many entries a build wrote, from its counts by type."""
+    return sum(v for v in stats.values() if isinstance(v, int) and not isinstance(v, bool))
 
-    def clear(self):
-        self.chunks = []
 
-    def refresh_schema_chunks(self, datasource_id, schema_version, chunks, evicted_versions,
-                              switch_guard=None, **_kw):
-        self.chunks = list(chunks)
-        return {"chunks": len(chunks)}
+def _indexed(ctx):
+    """Every entry in the index, as written."""
+    return ctx.index.get(ctx.namespace, Filter())
 
 
 class _StubAdapter:
@@ -101,34 +101,33 @@ class _RecordingLLMRegistry:
         return _LLM()
 
 
-def _context(llm_registry, ds_registry=None, file_description="User records"):
+def _context(tmp_path, llm_registry, ds_registry=None, file_description="User records"):
     ds_registry = ds_registry or SimpleNamespace(
         get_adapter=lambda ds_id: _StubAdapter(),
         list_ids=lambda: ["ds1"],
         get_description=lambda ds_id: file_description,
         get_sample_questions=lambda ds_id: [],
     )
-    return SimpleNamespace(
-        vector_store=_RecordingVectorStore(),
-        schema_store=InMemorySchemaStore(),
-        llm_registry=llm_registry,
-        ds_registry=ds_registry,
-    )
+    ctx = TestIndex(tmp_path, FakeEmbeddings(size=8), schema_store=InMemorySchemaStore()).ctx
+    ctx.llm_registry = llm_registry
+    ctx.ds_registry = ds_registry
+    ctx.curated = None
+    return ctx
 
 
 # --- B8: enrichment is opt-in -------------------------------------------------
 
-def test_orchestrator_enriches_when_asked():
+def test_orchestrator_enriches_when_asked(tmp_path):
     registry = _RecordingLLMRegistry()
-    IndexingOrchestrator(_context(registry), enrich=True).index_datasource(_StubAdapter())
+    IndexingOrchestrator(_context(tmp_path, registry), enrich=True).index_datasource(_StubAdapter())
 
     assert registry.calls == 1
 
 
-def test_orchestrator_does_not_enrich_by_default():
+def test_orchestrator_does_not_enrich_by_default(tmp_path):
     registry = _RecordingLLMRegistry()
 
-    IndexingOrchestrator(_context(registry)).index_datasource(_StubAdapter())
+    IndexingOrchestrator(_context(tmp_path, registry)).index_datasource(_StubAdapter())
 
     assert registry.calls == 0
 
@@ -142,7 +141,7 @@ def test_every_public_entry_point_defaults_to_no_enrichment():
         assert inspect.signature(fn).parameters["enrich"].default is False, fn.__qualname__
 
 
-def test_enrichment_failure_is_one_warning_line_without_traceback(caplog):
+def test_enrichment_failure_is_one_warning_line_without_traceback(tmp_path, caplog):
     def _boom(_payload):
         raise RuntimeError("Error code: 401 - invalid api key")
 
@@ -150,12 +149,12 @@ def test_enrichment_failure_is_one_warning_line_without_traceback(caplog):
         def with_structured_output(self, *_a, **_kw):
             return RunnableLambda(_boom)
 
-    ctx = _context(SimpleNamespace(get_llm=lambda name: _LLM()))
+    ctx = _context(tmp_path, SimpleNamespace(get_llm=lambda name: _LLM()))
 
     with caplog.at_level(logging.WARNING):
         stats = IndexingOrchestrator(ctx, enrich=True).index_datasource(_StubAdapter())
 
-    assert stats["chunks"] > 0
+    assert _entries(stats) > 0
     warnings = [r for r in caplog.records if r.levelno == logging.WARNING]
     assert len(warnings) == 1
     assert "401" in warnings[0].getMessage()
@@ -200,9 +199,9 @@ def test_code_added_datasource_description_reaches_the_datasource_chunk(tmp_path
         type="sqlite", connection={"database": str(database)},
     ))
     # The datasources YAML on disk does not list "shop".
-    ctx = _context(_RecordingLLMRegistry(), ds_registry=ds_registry, file_description=None)
+    ctx = _context(tmp_path, _RecordingLLMRegistry(), ds_registry=ds_registry, file_description=None)
 
     IndexingOrchestrator(ctx).index_datasource(ds_registry.get_adapter("shop"))
 
-    datasource_chunks = [c for c in ctx.vector_store.chunks if c.type == "schema.datasource"]
-    assert datasource_chunks[0].description == "Online shop orders and revenue"
+    [datasource_entry] = [e for e in _indexed(ctx) if e.metadata["type"] == "schema.datasource"]
+    assert "Online shop orders and revenue" in datasource_entry.text

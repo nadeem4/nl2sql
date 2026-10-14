@@ -21,7 +21,7 @@ Update `SchemaChunkBuilder` to emit the new chunk type:
 
 If your chunk type should be retrievable:
 
-- Add it to the appropriate `VectorStore.retrieve_*` filters.
+- Add it to the appropriate `Retriever.retrieve_*` filters. Its metadata must be scalars (an index entry holds nothing else).
 - Update `SchemaRetrieverNode` logic if new chunk types influence planning.
 
 ## 4. Update planner/validator (if required)
@@ -35,5 +35,5 @@ If the chunk type carries new semantics, ensure:
 
 - Chunk models: `packages/nl2sql/src/nl2sql/indexing/models.py`
 - Chunk builder: `packages/nl2sql/src/nl2sql/indexing/chunk_builder.py`
-- Vector store retrieval: `packages/nl2sql/src/nl2sql/indexing/vector_store.py`
+- Retrieval: `packages/nl2sql/src/nl2sql/indexing/retrieval.py`
 - Schema retriever: `packages/nl2sql/src/nl2sql/pipeline/nodes/schema_retriever/node.py`

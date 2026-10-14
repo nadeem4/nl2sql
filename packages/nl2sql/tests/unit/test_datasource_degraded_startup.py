@@ -103,7 +103,6 @@ def test_indexing_an_unavailable_datasource_fails_with_the_reason():
     from nl2sql.indexing.rebuild import rebuild_index
 
     ctx = SimpleNamespace(
-        vector_store=None,
         ds_registry=SimpleNamespace(
             list_adapters=lambda: [],
             unavailable=lambda: {"bad": "No adapter found for engine type: 'nosuchdb'"},
@@ -134,10 +133,15 @@ def test_policy_validation_says_a_referenced_datasource_failed_to_start(tmp_path
     assert not report.ok
 
 
-def test_index_health_reports_unavailable_datasources(registry):
+def test_index_health_reports_unavailable_datasources(registry, tmp_path):
+    from nl2sql.embeddings import EmbeddingInfo
+    from nl2sql.storage.chroma import ChromaIndex
+
     registry.register_datasources([_unknown_type(), _good()])
     engine = NL2SQL.__new__(NL2SQL)
-    engine._runtime = SimpleNamespace(vector_store=None, schema_store=None, ds_registry=registry)
+    engine._runtime = SimpleNamespace(index=ChromaIndex(tmp_path / "index"), namespace="nl2sql__test__8",
+                                      embedding_info=EmbeddingInfo("test", "test", 8), schema_store=None,
+                                      ds_registry=registry, curated=None)
 
     health = engine.index.health()
     assert any("'bad'" in w and "nosuchdb" in w for w in health["warnings"])

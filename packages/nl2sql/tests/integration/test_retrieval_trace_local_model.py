@@ -1,16 +1,20 @@
 """The retrieval record against the real local embedder (all-MiniLM-L6-v2, ONNX).
 
-A small Chinook-like index built in tmp: the record's picks must be exactly the
-documents ``Chroma.max_marginal_relevance_search`` returns, and the scores must
-be the cosine similarities of the real vectors.
+A small Chinook-like index built in tmp through the ``chroma`` index store: the
+record's picks must be exactly the documents returned, and the scores must be
+the cosine similarities of the real vectors.
 """
 from __future__ import annotations
 
-import pytest
-from langchain_core.documents import Document
+from types import SimpleNamespace
 
-from nl2sql.indexing.embeddings import LocalEmbeddings
-from nl2sql.indexing.vector_store import VectorStore
+import pytest
+
+from nl2sql.embeddings import EmbeddingInfo
+from nl2sql.embeddings.local import LocalEmbeddings
+from nl2sql.indexing.orchestrator import IndexingOrchestrator
+from nl2sql.indexing.retrieval import Retriever, namespace_for
+from nl2sql.storage.chroma import ChromaIndex
 
 pytestmark = pytest.mark.integration
 
@@ -24,30 +28,41 @@ TABLES = {
 }
 
 
+class _Chunk:
+    type = "schema.table"
+
+    def __init__(self, name, text):
+        self.name, self.text = name, text
+
+    def get_page_content(self):
+        return self.text
+
+    def get_metadata(self):
+        return {"id": f"schema.table:{self.name}:v1", "type": "schema.table", "datasource_id": "chinook",
+                "table": self.name, "schema_version": "v1"}
+
+
 @pytest.fixture(scope="module")
 def store(tmp_path_factory):
-    vs = VectorStore("nl2sql_store", str(tmp_path_factory.mktemp("vs")), embeddings=LocalEmbeddings())
-    vs.vectorstore.add_documents([
-        Document(page_content=text, metadata={"id": f"schema.table:{name}:v1", "type": "schema.table",
-                                              "datasource_id": "chinook", "table": name, "schema_version": "v1"})
-        for name, text in TABLES.items()
-    ])
-    return vs
+    embeddings = LocalEmbeddings()
+    info = EmbeddingInfo("local", "all-MiniLM-L6-v2", 384)
+    index = ChromaIndex(tmp_path_factory.mktemp("index"))
+    ctx = SimpleNamespace(index=index, namespace=namespace_for(info), embedding_info=info, embedder=embeddings,
+                          schema_store=None, ds_registry=None, llm_registry=None, curated=None)
+    IndexingOrchestrator(ctx)._commit("chinook", "v1", [_Chunk(n, t) for n, t in TABLES.items()], [], None)
+    return Retriever(index, ctx.namespace, embeddings, index.pointers(ctx.namespace))
 
 
 QUESTION = "Which genre sells the most tracks?"
 
 
-def test_the_record_is_the_search_chroma_runs(store):
-    where = {"$and": [{"datasource_id": "chinook"}, {"type": {"$in": ["schema.table", "schema.metric"]}}]}
-    expected = store.vectorstore.max_marginal_relevance_search(QUESTION, k=3, fetch_k=12, lambda_mult=0.7,
-                                                                filter=where)
+def test_the_record_is_the_search_that_ran(store):
     explain: list = []
 
     docs = store.retrieve_schema_context(QUESTION, "chinook", k=3, explain=explain)
 
-    assert [d.metadata["id"] for d in docs] == [d.metadata["id"] for d in expected]
     record = explain[0]
+    assert [d.metadata["id"] for d in docs] == [e["id"] for e in record["pool"] if e["picked"]]
     assert sorted(record["picks"]) == sorted(d.metadata["id"] for d in docs)
     assert len(record["pool"]) == len(TABLES)
     sims = [e["similarity"] for e in record["pool"]]

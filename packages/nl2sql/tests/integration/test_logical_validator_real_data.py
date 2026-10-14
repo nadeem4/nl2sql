@@ -99,7 +99,7 @@ def test_logical_validator_real_data(demo_env, datasource_id, user_query) -> Non
         user_context=UserContext(roles=["admin"]),
     )
 
-    snapshot = demo_env.ctx.schema_store.get_latest_snapshot(datasource_id)
+    snapshot = demo_env.ctx.vector_store.snapshot(datasource_id)
     subgraph_state.relevant_tables = _tables_from_snapshot(snapshot)
 
     planner_result = planner_node(subgraph_state)

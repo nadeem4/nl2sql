@@ -714,7 +714,7 @@ def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset
         try:
             return engine.index.inspect(req.query, k=req.k, lambda_mult=req.lambda_mult,
                                         types=req.types, datasource_id=req.datasource_id or None)
-        except Exception as exc:  # no index, a model mismatch, an unreadable collection
+        except Exception as exc:  # an unreadable index store
             raise HTTPException(status_code=409, detail=str(exc))
 
     return app

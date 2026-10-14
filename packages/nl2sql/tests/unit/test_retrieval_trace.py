@@ -1,20 +1,20 @@
 """What a vector search retrieved, its scores, and how MMR chose among the pool.
 
 The engine has no re-ranking model: every retrieval is an MMR search. These
-tests pin that the record of a search is the search the engine ran -- same
-documents as ``Chroma.max_marginal_relevance_search``, picks in the order MMR
-made them, scores from the same cosine similarity -- and that the record never
-carries an entry's embedded text (which holds sample values).
+tests pin that the record of a search is the search the engine ran -- the
+documents it returns, picks in the order MMR made them, scores from the same
+cosine similarity -- and that the record never carries an entry's embedded
+text (which holds sample values).
 """
 from __future__ import annotations
 
 import math
 from typing import List
 
-from langchain_core.documents import Document
+from index_helpers import Chunk, TestIndex  # same directory
 from langchain_core.embeddings import Embeddings
 
-from nl2sql.indexing.vector_store import VectorStore
+from nl2sql.indexing.retrieval import Retriever
 from nl2sql.testing.runtime import fake_runtime
 
 VOCAB = ["genre", "track", "sales", "invoice", "customer", "artist", "album", "employee", "name", "price"]
@@ -40,39 +40,43 @@ class BagEmbeddings(Embeddings):
 def _doc(kind, text, **md):
     meta = {"type": kind, "datasource_id": "chinook", "schema_version": "v1", **md}
     meta["id"] = f"{kind}:{md.get('table', md.get('datasource_id', 'chinook'))}:{md.get('column', '')}"
-    return Document(page_content=text, metadata=meta)
+    return Chunk(text, **meta)
 
 
-def _store(tmp_path) -> VectorStore:
-    store = VectorStore("nl2sql_store", str(tmp_path / "vs"), embeddings=BagEmbeddings())
-    store.vectorstore.add_documents([
-        _doc("schema.datasource", "music store sales customer invoice"),
-        _doc("schema.table", "genre track", table="Genre"),
-        _doc("schema.table", "track genre album name", table="Track"),
-        _doc("schema.table", "invoice sales customer", table="Invoice"),
-        _doc("schema.table", "artist album", table="Artist"),
-        _doc("schema.table", "employee", table="Employee"),
-        _doc("schema.column", "Genre name. Stats: sample_values Rock, Jazz", table="Genre", column="Name"),
-        _doc("schema.column", "track name", table="Track", column="Name"),
-        _doc("schema.column", "invoice line price track sales", table="InvoiceLine", column="UnitPrice"),
-    ])
-    return store
+CHINOOK = [
+    _doc("schema.datasource", "music store sales customer invoice"),
+    _doc("schema.table", "genre track", table="Genre"),
+    _doc("schema.table", "track genre album name", table="Track"),
+    _doc("schema.table", "invoice sales customer", table="Invoice"),
+    _doc("schema.table", "artist album", table="Artist"),
+    _doc("schema.table", "employee", table="Employee"),
+    _doc("schema.column", "Genre name. Stats: sample_values Rock, Jazz", table="Genre", column="Name"),
+    _doc("schema.column", "track name", table="Track", column="Name"),
+    _doc("schema.column", "invoice line price track sales", table="InvoiceLine", column="UnitPrice"),
+]
+
+
+def _store(tmp_path, *more, schema_store=None, **other_datasources) -> Retriever:
+    """The Chinook entries (and ``more``) as one live build, and each of ``other_datasources``."""
+    index = TestIndex(tmp_path, BagEmbeddings(), schema_store=schema_store)
+    index.write("chinook", [*CHINOOK, *more])
+    for ds, chunks in other_datasources.items():
+        index.write(ds, chunks)
+    return index.retriever()
 
 
 QUESTION = "Which genre sells the most tracks?"
 
 
-def test_the_record_matches_the_documents_chroma_mmr_returns(tmp_path):
+def test_the_record_matches_the_documents_returned(tmp_path):
     store = _store(tmp_path)
-    where = {"$and": [{"datasource_id": "chinook"}, {"type": {"$in": ["schema.table", "schema.metric"]}}]}
-    expected = store.vectorstore.max_marginal_relevance_search(QUESTION, k=2, fetch_k=8, lambda_mult=0.7,
-                                                                filter=where)
     explain: list = []
 
     docs = store.retrieve_schema_context(QUESTION, "chinook", k=2, explain=explain)
 
-    assert [d.metadata["id"] for d in docs] == [d.metadata["id"] for d in expected]
     [record] = explain
+    in_pool_order = [e["id"] for e in record["pool"] if e["picked"]]
+    assert [d.metadata["id"] for d in docs] == in_pool_order
     assert record["search"] == "tables"
     assert record["query"] == QUESTION
     assert (record["k"], record["fetch_k"], record["lambda_mult"]) == (2, 8, 0.7)
@@ -118,8 +122,7 @@ def test_picks_are_in_mmr_order_and_the_rest_are_dropped(tmp_path):
 
 
 def test_mmr_skips_a_near_duplicate_for_a_less_similar_entry_that_adds_something(tmp_path):
-    store = _store(tmp_path)
-    store.vectorstore.add_documents([_doc("schema.table", "genre genre track", table="Playlist")])
+    store = _store(tmp_path, _doc("schema.table", "genre genre track", table="Playlist"))
     explain: list = []
 
     store.retrieve_schema_context("genre sales", "chinook", k=2, explain=explain)
@@ -202,7 +205,6 @@ def _resolver(store, ds_ids=("chinook", "sales")):
         vector_store=store,
         policies={"allow_all": True},
         ds_registry=SimpleNamespace(list_ids=lambda: list(ds_ids)),
-        schema_store=SimpleNamespace(get_latest_version=lambda _id: "v1", get_latest_snapshot=lambda _id: None),
         llm_registry=SimpleNamespace(get_llm=lambda _name: llm),
     ))
     # The answerability check is an LLM call with its own trace entry; here it says yes.
@@ -211,12 +213,8 @@ def _resolver(store, ds_ids=("chinook", "sales")):
 
 
 def _two_datasource_store(tmp_path):
-    store = _store(tmp_path)
-    store.vectorstore.add_documents([
-        Document(page_content="hr staff payroll", metadata={"type": "schema.datasource", "datasource_id": "sales",
-                                                            "schema_version": "v1", "id": "schema.datasource:sales:v1"}),
-    ])
-    return store
+    return _store(tmp_path, sales=[Chunk("hr staff payroll", type="schema.datasource", datasource_id="sales",
+                                         schema_version="v1", id="schema.datasource:sales:v1")])
 
 
 def test_the_resolver_records_its_search(tmp_path):
@@ -266,10 +264,10 @@ def _chinook_snapshot() -> SchemaSnapshot:
     )
 
 
-def _retriever_store(tmp_path) -> VectorStore:
-    store = VectorStore("nl2sql_store", str(tmp_path / "vs"), embeddings=BagEmbeddings())
+def _retriever_store(tmp_path, schema_store) -> Retriever:
+    index = TestIndex(tmp_path, BagEmbeddings(), schema_store=schema_store)
     g, t, il = (REFS[n].full_name for n in ("Genre", "Track", "InvoiceLine"))
-    store.vectorstore.add_documents([
+    index.write("chinook", [
         _doc("schema.table", "genre track", table=g),
         _doc("schema.table", "track genre album name", table=t),
         _doc("schema.table", "invoice line sales price track", table=il),
@@ -277,16 +275,16 @@ def _retriever_store(tmp_path) -> VectorStore:
         _doc("schema.column", "track name", table=t, column="Name"),
         _doc("schema.column", "invoice line price sales", table=il, column="UnitPrice"),
     ])
-    return store
+    return index.retriever()
 
 
 def _retriever(tmp_path, allow, full_snapshot_max_tables=15):
     # With 0, no snapshot is small enough to send whole: the vector search always runs.
+    schema_store = SimpleNamespace(get_snapshot=lambda _id, _v: _chinook_snapshot())
     return SchemaRetrieverNode(fake_runtime(
         settings={"retrieval": {"full_snapshot_max_tables": full_snapshot_max_tables}},
-        vector_store=_retriever_store(tmp_path),
-        schema_store=SimpleNamespace(get_latest_snapshot=lambda _id: _chinook_snapshot(),
-                                     get_snapshot=lambda _id, _v: _chinook_snapshot()),
+        vector_store=_retriever_store(tmp_path, schema_store),
+        schema_store=schema_store,
         policies={"roles": {"analyst": {"description": "d", "allow": list(allow)}}},
     ))
 
