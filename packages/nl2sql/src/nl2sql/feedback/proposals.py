@@ -70,7 +70,7 @@ def _skip_reason(row: Mapping[str, Any]) -> str:
 def build_proposals(rows: Iterable[Mapping[str, Any]]) -> Tuple[Dict[str, Any], Dict[str, int]]:
     """The proposals as a ``curated.yaml`` document, and how many rows were skipped, by reason.
 
-    ``rows`` are feedback rows, newest first (as :meth:`FeedbackStore.list`
+    ``rows`` are feedback rows, newest first (as ``engine.feedback.list()``
     returns them), so of several runs of the same question (ignoring case and
     spacing) on one datasource, the newest is proposed.
     """

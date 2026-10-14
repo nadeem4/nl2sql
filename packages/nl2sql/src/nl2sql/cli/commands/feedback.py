@@ -6,7 +6,7 @@
 * ``clear``  -- empty the feedback table; schema snapshots and the plan cache stay.
 
 Every command builds the engine from ``--config`` and calls ``engine.feedback``,
-which reads the ``feedback`` table of the state store, ``<storage.path>/state.db``.
+which reads the feedback kept by the state store (``storage.state``).
 """
 from __future__ import annotations
 
@@ -34,10 +34,6 @@ def _engine(ctx: typer.Context):
     return build_engine(ctx, check=False)
 
 
-def _store(engine) -> str:
-    return escape(str((pathlib.Path(engine.config.storage.path) / "state.db").resolve()))
-
-
 def _pct(rate: Optional[float]) -> str:
     return "-" if rate is None else f"{rate * 100:.1f}%"
 
@@ -49,7 +45,7 @@ def list_command(ctx: typer.Context,
     with _engine(ctx) as engine:
         rows = engine.feedback.list(limit=limit)
         if not rows:
-            console.print(f"No feedback recorded in {_store(engine)}.", soft_wrap=True)
+            console.print("No feedback recorded.", soft_wrap=True)
             return
     for row in rows:
         rating = "[green]up  [/green]" if row["rating"] == "up" else "[red]down[/red]"
@@ -132,7 +128,7 @@ def clear_command(ctx: typer.Context,
                   yes: Annotated[bool, typer.Option("--yes", help="Do not ask to confirm.")] = False) -> None:
     """Delete every rating. Schema snapshots and the plan cache are kept."""
     with _engine(ctx) as engine:
-        if not yes and not typer.confirm(f"Delete every rating in {_store(engine)}?"):
+        if not yes and not typer.confirm("Delete every rating in the state store?"):
             raise typer.Exit(1)
         removed = engine.feedback.clear()
-        console.print(f"[green]Cleared {removed} ratings[/green] from {_store(engine)}.")
+        console.print(f"[green]Cleared {removed} ratings[/green] from the state store.")

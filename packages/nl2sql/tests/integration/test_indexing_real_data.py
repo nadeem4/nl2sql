@@ -88,8 +88,9 @@ def test_indexing_eviction_with_schema_change(tmp_path, monkeypatch) -> None:
     version_2 = ctx2.vector_store.schema_version(adapter_2.datasource_id)
 
     assert version_1 != version_2
-    versions = ctx2.schema_store.list_versions(adapter_2.datasource_id)
-    assert versions == [version_2]
+    # Newest first; the replaced version stays for runs that pinned it, past max_versions.
+    versions = ctx2.state.list_versions(adapter_2.datasource_id)
+    assert versions == [version_2, version_1]
 
     # The live build is the new one; the build it replaced is kept for runs in flight.
     live = ctx2.index.pointers(ctx2.namespace)[adapter_2.datasource_id]

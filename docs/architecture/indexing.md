@@ -1,6 +1,6 @@
 # Indexing, Chunking, and Retrieval Architecture
 
-This document describes **current indexing behavior** as implemented in code. Indexing transforms **schema snapshots** into **typed chunks** that the engine embeds and writes to the **index store** (`storage.index`, the built-in `chroma` store by default; see [Storage](../configuration/storage.md)). Retrieval uses these entries as candidates and then resolves authoritative schema details from `SchemaStore` (see `../schema/store.md` for schema contracts and store behavior).
+This document describes **current indexing behavior** as implemented in code. Indexing transforms **schema snapshots** into **typed chunks** that the engine embeds and writes to the **index store** (`storage.index`, the built-in `chroma` store by default; see [Storage](../configuration/storage.md)). Retrieval uses these entries as candidates and then resolves authoritative schema details from the state store (`storage.state`; see `../schema/store.md` for schema contracts and store behavior).
 
 ## Indexing flow
 
@@ -8,7 +8,7 @@ This document describes **current indexing behavior** as implemented in code. In
 flowchart TD
     Adapter[Datasource Adapter] --> Snapshot[Schema Snapshot]
     Snapshot --> Enrich[LLM Enrichment - optional]
-    Enrich --> Register[SchemaStore.register_snapshot]
+    Enrich --> Register[StateStore.put_snapshot]
     Register --> Chunker[SchemaChunkBuilder]
     Curated[curated.yaml] --> CChunker[CuratedChunkBuilder]
     Chunker --> Embed[The engine's embedder]
@@ -133,6 +133,7 @@ flowchart TD
     C -->|no| D[Raise: the pointer still names the previous build and v1]
     C -->|yes| E[set_pointers: datasource to the new build and v2]
     E --> F[Delete the datasource's builds older than the one replaced]
+    F --> G[keep_snapshots: delete the snapshots nothing can read any more]
 ```
 
 - Each datasource's `BuildPointer` names its live `build_id` and the
@@ -157,6 +158,14 @@ flowchart TD
   playground's Rebuild and the REST index routes. Its `on_datasource` callback
   gets an `IndexProgress` per datasource (`started`, then `done` with the entry
   counts or `failed` with the reason): `nl2sql index` prints a line from it.
+- **One build at a time.** `rebuild_index` holds the state store's `index`
+  lock (a lease that expires after an hour), so `nl2sql index` is safe while
+  `nl2sql-api` serves the same `storage.path`. A build started while another
+  holds it fails every datasource at once, with the reason.
+- **Snapshots are immutable**, and after a build only the snapshots a pointer
+  names (in any namespace), the one just replaced and the newest
+  `settings.schema.max_versions` are kept. See
+  [The state store](../schema/store.md#which-snapshots-are-kept).
 - `engine.datasources.schema()`, `engine.curated.validate()` and the benchmark's
   database identity read the snapshot the live pointer names too.
 

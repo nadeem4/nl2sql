@@ -70,13 +70,7 @@ The store interfaces are in [`nl2sql_sdk.stores`](../adapters/sdk.md#interfaces-
 A plugin registers a store in the `nl2sql.stores` entry point group, or in
 code with `registry.add_store(name, cls)`.
 
-!!! note "The state slot takes the built-in only, for now"
-    0.6 moves the engine onto the four store interfaces one slot at a time.
-    The engine reads its index, traces and results through `IndexStore`,
-    `TraceStore` and `ResultStore`, so any store works in those slots. Until
-    the state slot's move lands, the engine reads `state` through the
-    built-in `sqlite` store only, and refuses any other store there with a
-    problem at `storage.state`.
+Every slot is read through its interface, so a plugin store works in any slot it fills.
 
 ## Retention
 
@@ -101,8 +95,8 @@ rule, say). Three things call it:
 - your own code.
 
 Feedback and schema snapshots have no age limit: feedback is cleared by hand
-(`nl2sql feedback clear`), and old snapshots are evicted by
-`settings.schema.max_versions`.
+(`nl2sql feedback clear`), and after each index build the snapshots nothing can
+read any more are deleted (see [The state](#the-state)).
 
 ## What is where: `engine.storage.info()`
 
@@ -117,6 +111,14 @@ engine.storage.info()
 
 `type` is the store's name, or the class name of a store object; `location`
 is its folder or file, or `None` for a store that does not have one.
+
+## The state
+
+The state store keeps the schema snapshots (immutable, one row per version),
+the plan cache, the playground's feedback, and the lock that lets one index
+build run at a time. The engine applies the store's pending migrations when it
+starts; the built-in `sqlite` store adopts a 0.5 `state.db` as it is. See
+[The state store](../schema/store.md#the-state-store).
 
 ## The index
 

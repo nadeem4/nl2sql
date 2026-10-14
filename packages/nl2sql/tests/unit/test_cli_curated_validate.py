@@ -19,8 +19,7 @@ from typer.testing import CliRunner
 
 from nl2sql import NL2SQL, load_config
 from nl2sql.cli.main import app
-from nl2sql.runtime import StorePaths
-from nl2sql.schema import SqliteSchemaStore
+from nl2sql.storage.sqlite import SqliteState
 from nl2sql.storage.chroma import ChromaIndex
 from nl2sql.testing.config import make_config
 from nl2sql_sdk.schema import (
@@ -65,15 +64,16 @@ def _curated(project: Path, *queries, datasource: str = "books") -> Path:
 
 
 def _state(project: Path) -> Path:
-    return StorePaths.under(project / ".nl2sql").state
+    return project / ".nl2sql" / "state.db"
 
 
 def _index(project: Path, *tables: str) -> None:
     """Stores a snapshot of ``tables`` and points the books datasource's live build at it (no embedding)."""
     _state(project).parent.mkdir(parents=True, exist_ok=True)
-    store = SqliteSchemaStore(path=_state(project))
+    store = SqliteState(_state(project))
+    store.migrate()
     refs = [TableRef(schema_name="main", table_name=t) for t in tables]
-    version, _ = store.register_snapshot(SchemaSnapshot(
+    version = store.put_snapshot(SchemaSnapshot(
         contract=SchemaContract(datasource_id="books", engine_type="sqlite",
                                 tables={r.full_name: TableContract(table=r) for r in refs}),
         metadata=SchemaMetadata(datasource_id="books", engine_type="sqlite"),

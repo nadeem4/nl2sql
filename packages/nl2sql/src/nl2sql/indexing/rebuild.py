@@ -11,9 +11,15 @@ rewritten.
 Every build goes into the namespace of the configured embedding model, so a
 model change needs no special rebuild: the new model's namespace starts
 empty, and ``nl2sql index`` fills it (docs/architecture/phase2.md, section 4).
+
+A build holds the state store's ``index`` lock, so ``nl2sql index`` is safe
+to run while ``nl2sql-api`` serves the same ``storage.path``: a second build
+started meanwhile fails at once, naming when the lease runs out. The lease
+expires after ``INDEX_LOCK_TTL_S``, so a build that died cannot block forever.
 """
 from __future__ import annotations
 
+from contextlib import ExitStack
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, Iterable, List, Optional
 
@@ -24,6 +30,9 @@ from nl2sql.indexing.orchestrator import IndexingOrchestrator
 logger = get_logger("indexing_rebuild")
 
 MODEL_STEP = "Loading the embedding model (the first run downloads about 79 MB)"
+
+INDEX_LOCK = "index"
+INDEX_LOCK_TTL_S = 3600
 
 
 @dataclass
@@ -89,6 +98,24 @@ def rebuild_index(
         if result.errors:
             return result
 
+    with ExitStack() as held:
+        try:
+            held.enter_context(ctx.state.lock(INDEX_LOCK, ttl_s=INDEX_LOCK_TTL_S))
+        except Exception as exc:
+            reason = f"Another index build is running: {exc}"
+            logger.error(reason)
+            for adapter in adapters:
+                result.errors.append({"datasource_id": adapter.datasource_id, "error": reason})
+                tell(IndexProgress(adapter.datasource_id, "failed", reason=reason))
+            return result
+        _build(ctx, adapters, result, enrich=enrich, curated_only=curated_only, say=say, tell=tell)
+
+    result.ok = not result.errors and bool(result.stats)
+    return result
+
+
+def _build(ctx, adapters, result: RebuildResult, *, enrich: bool, curated_only: bool,
+           say: Callable[[str], None], tell: Callable[["IndexProgress"], None]) -> None:
     say(MODEL_STEP)
     # Embeddings load lazily; warming them here puts the one slow,
     # first-run-only download under its own step.
@@ -116,6 +143,3 @@ def rebuild_index(
             result.empty.append(ds_id)
         tell(IndexProgress(ds_id, "done", counts={k: v for k, v in (stats or {}).items()
                                                   if isinstance(v, int) and not isinstance(v, bool)}))
-
-    result.ok = not result.errors and bool(result.stats)
-    return result

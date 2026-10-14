@@ -262,7 +262,7 @@ def _retriever(vector_store=None, full_snapshot_max_tables=15) -> SchemaRetrieve
     ctx = fake_runtime(
         settings={"retrieval": {"full_snapshot_max_tables": full_snapshot_max_tables}},
         vector_store=vector_store if vector_store is not None else SimpleNamespace(snapshot=lambda _id: _snapshot()),
-        schema_store=SimpleNamespace(get_snapshot=lambda _id, _version: _snapshot()),
+        state=SimpleNamespace(get_snapshot=lambda _id, _version: _snapshot()),
         policies=_policies(),
     )
     return SchemaRetrieverNode(ctx)

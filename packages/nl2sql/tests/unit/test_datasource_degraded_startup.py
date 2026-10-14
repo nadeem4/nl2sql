@@ -141,7 +141,7 @@ def test_index_health_reports_unavailable_datasources(registry, tmp_path):
     registry.register_datasources([_unknown_type(), _good()])
     engine = NL2SQL.__new__(NL2SQL)
     engine._runtime = SimpleNamespace(index=ChromaIndex(tmp_path / "index"), namespace="nl2sql__test__8",
-                                      embedding_info=EmbeddingInfo("test", "test", 8), schema_store=None,
+                                      embedding_info=EmbeddingInfo("test", "test", 8), state=None,
                                       ds_registry=registry, curated=None)
 
     health = engine.index.health()

@@ -1,58 +1,5 @@
-from nl2sql.schema import InMemorySchemaStore
-from nl2sql_sdk.schema import (
-    SchemaContract,
-    SchemaMetadata,
-    SchemaSnapshot,
-    TableContract,
-    TableMetadata,
-    TableRef,
-    ColumnContract,
-)
-
-
-def _snapshot(table_name: str) -> SchemaSnapshot:
-    table_ref = TableRef(schema_name="public", table_name=table_name)
-    contract = SchemaContract(
-        datasource_id="ds1",
-        engine_type="postgres",
-        tables={
-            table_ref.full_name: TableContract(
-                table=table_ref,
-                columns={
-                    "id": ColumnContract(
-                        name="id", data_type="int", is_nullable=False, is_primary_key=True
-                    )
-                },
-                foreign_keys=[],
-            )
-        },
-    )
-    metadata = SchemaMetadata(
-        datasource_id="ds1",
-        engine_type="postgres",
-        tables={
-            table_ref.full_name: TableMetadata(
-                table=table_ref, row_count=10, columns={}
-            )
-        },
-    )
-    return SchemaSnapshot(contract=contract, metadata=metadata)
-
-
-def test_schema_store_versions_and_snapshot_by_version():
-    # Validates schema evolution because multiple versions must be tracked.
-    # Arrange
-    store = InMemorySchemaStore(max_versions=3)
-    snap1 = _snapshot("users")
-    snap2 = _snapshot("orders")
-
-    # Act
-    v1, _ = store.register_snapshot(snap1)
-    v2, _ = store.register_snapshot(snap2)
-
-    # Assert
-    assert store.list_versions("ds1") == [v1, v2]
-    assert list(store.get_snapshot("ds1", v1).contract.tables) != list(store.get_snapshot("ds1", v2).contract.tables)
+"""The schema's structural fingerprint (``nl2sql.schema.fingerprint``)."""
+from nl2sql_sdk.schema import ColumnContract, SchemaContract, TableContract, TableRef
 
 
 def _multi_fk_contract() -> SchemaContract:
@@ -87,7 +34,7 @@ def test_fingerprint_handles_a_table_with_several_foreign_keys():
     `TypeError: '<' not supported between instances of 'TableRef'` and no
     snapshot could be registered at all -- `nl2sql demo` died on Chinook.
     """
-    from nl2sql.schema.protocol import generate_schema_fingerprint
+    from nl2sql.schema.fingerprint import generate_schema_fingerprint
 
     contract = _multi_fk_contract()
     fingerprint = generate_schema_fingerprint(contract)

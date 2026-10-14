@@ -48,7 +48,7 @@ def store(tmp_path_factory):
     info = EmbeddingInfo("local", "all-MiniLM-L6-v2", 384)
     index = ChromaIndex(tmp_path_factory.mktemp("index"))
     ctx = SimpleNamespace(index=index, namespace=namespace_for(info), embedding_info=info, embedder=embeddings,
-                          schema_store=None, ds_registry=None, llm_registry=None, curated=None)
+                          state=None, ds_registry=None, llm_registry=None, curated=None)
     IndexingOrchestrator(ctx)._commit("chinook", "v1", [_Chunk(n, t) for n, t in TABLES.items()], [], None)
     return Retriever(index, ctx.namespace, embeddings, index.pointers(ctx.namespace))
 

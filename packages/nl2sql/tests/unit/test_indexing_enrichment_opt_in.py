@@ -12,7 +12,7 @@ import logging
 import sqlite3
 from types import SimpleNamespace
 
-from index_helpers import TestIndex  # same directory
+from index_helpers import TestIndex, memory_state  # same directory
 from langchain_core.embeddings import FakeEmbeddings
 from langchain_core.runnables import RunnableLambda
 
@@ -27,7 +27,6 @@ from nl2sql.indexing.enrichment_service import (
     apply_enrichment,
 )
 from nl2sql.indexing.orchestrator import IndexingOrchestrator
-from nl2sql.schema import InMemorySchemaStore
 from nl2sql.secrets import SecretManager
 from nl2sql_sdk.stores import Filter
 from nl2sql_sdk import IndexScope
@@ -109,7 +108,7 @@ def _context(tmp_path, llm_registry, ds_registry=None, file_description="User re
         get_description=lambda ds_id: file_description,
         get_index_scope=lambda _ds: IndexScope(), get_sample_questions=lambda ds_id: [],
     )
-    ctx = TestIndex(tmp_path, FakeEmbeddings(size=8), schema_store=InMemorySchemaStore()).ctx
+    ctx = TestIndex(tmp_path, FakeEmbeddings(size=8), state=memory_state()).ctx
     ctx.llm_registry = llm_registry
     ctx.ds_registry = ds_registry
     ctx.curated = None

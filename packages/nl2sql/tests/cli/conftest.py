@@ -28,12 +28,12 @@ def project_stores(tmp_path, monkeypatch):
     The state store is ``<tmp_path>/.nl2sql/state.db`` and the traces are in
     ``<tmp_path>/.nl2sql/traces``, as the engine lays them out.
     """
-    from nl2sql.runtime import StorePaths
     from nl2sql.testing.config import make_config
 
     config = make_config(tmp_path)
     monkeypatch.setenv("NL2SQL_CONFIG", str(tmp_path / "nl2sql.yaml"))
-    return StorePaths.under(config.storage.path)
+    path = config.storage.path
+    return SimpleNamespace(state=path / "state.db", traces=path / "traces")
 
 
 class StubDemoEngine:

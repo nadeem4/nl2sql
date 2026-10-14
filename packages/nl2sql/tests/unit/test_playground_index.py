@@ -16,6 +16,7 @@ import pytest
 pytest.importorskip("fastapi")
 from fastapi.testclient import TestClient
 from index_helpers import Chunk, TestIndex  # same directory
+from nl2sql.storage.sqlite import SqliteState
 from langchain_core.embeddings import FakeEmbeddings
 
 from nl2sql import NL2SQL
@@ -30,7 +31,13 @@ class _Adapter:
     datasource_id = "chinook"
 
 
-class _Snapshots:
+class _Snapshots(SqliteState):
+    """A state store on ``:memory:`` whose every snapshot is an empty one."""
+
+    def __init__(self):
+        super().__init__(":memory:")
+        self.migrate()
+
     def get_snapshot(self, ds, _version):
         return SchemaSnapshot(contract=SchemaContract(datasource_id=ds, engine_type="stub", tables={}),
                               metadata=SchemaMetadata(datasource_id=ds, engine_type="stub", tables={}))
@@ -54,7 +61,7 @@ class _Context:
     """The parts of the runtime the index panel reaches, over a real index store in ``tmp_path``."""
 
     def __init__(self, tmp_path):
-        self.test_index = TestIndex(tmp_path, FakeEmbeddings(size=8), schema_store=_Snapshots())
+        self.test_index = TestIndex(tmp_path, FakeEmbeddings(size=8), state=_Snapshots())
         for key, value in vars(self.test_index.ctx).items():
             setattr(self, key, value)
         self.ds_registry = _Registry()

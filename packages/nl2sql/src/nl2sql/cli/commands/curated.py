@@ -18,7 +18,7 @@ from rich.text import Text
 from typing_extensions import Annotated
 
 from nl2sql.cli.common.decorators import handle_cli_errors
-from nl2sql.cli.common.engine import build_engine, load_project_config, store_paths
+from nl2sql.cli.common.engine import build_engine, load_project_config
 
 app = typer.Typer(help="Check and test the curated answers file.", no_args_is_help=True)
 console = Console()
@@ -103,7 +103,7 @@ def export_proposals(
     Turn thumbs-up feedback on generated answers into proposed verified queries,
     in the curated section's shape, for a person to review and commit.
     """
-    from nl2sql.feedback import FeedbackStore, build_proposals, render_proposals, write_proposals
+    from nl2sql.feedback import build_proposals, render_proposals, write_proposals
 
     config = load_project_config(ctx)
     protected = _config_files(config.folder)
@@ -113,14 +113,8 @@ def export_proposals(
                       soft_wrap=True)
         raise typer.Exit(2)
 
-    store_path = store_paths(ctx).state
-    rows = []
-    if store_path.exists():
-        store = FeedbackStore(store_path)
-        try:
-            rows = store.list()
-        finally:
-            store.close()
+    with build_engine(ctx, check=False) as engine:
+        rows = engine.feedback.list()
     document, skipped = build_proposals(rows)
     text = render_proposals(document)
     count = sum(len(ds["verified_queries"]) for ds in document["datasources"].values())
