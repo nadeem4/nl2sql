@@ -61,24 +61,3 @@ def test_execute_sql_round_trips_a_row(memory_adapter):
     assert result.columns == ["x"]
     assert result.rows == [[1]]
     assert result.row_count == 1
-
-
-def test_explain_returns_a_non_empty_plan(memory_adapter):
-    # Validates plan retrieval because the refiner surfaces it on slow queries.
-    # Act
-    plan = memory_adapter.explain("SELECT x FROM t")
-
-    # Assert
-    assert plan.plan_text.strip()
-
-
-def test_dry_run_flags_invalid_sql(memory_adapter):
-    # Validates dry-run because the executor gates on it before spending a query.
-    # Act
-    valid = memory_adapter.dry_run("SELECT 1 AS x")
-    invalid = memory_adapter.dry_run("SELECT * FROM no_such_table")
-
-    # Assert
-    assert valid.is_valid is True
-    assert invalid.is_valid is False
-    assert invalid.error_message

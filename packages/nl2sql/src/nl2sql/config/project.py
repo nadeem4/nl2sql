@@ -61,7 +61,8 @@ def demo_config(
 
     The databases are opened read-only from ``data_dir``, by default the
     folder the package installed them in. Each datasource carries its sample
-    questions. Without ``llm``, the default OpenAI model is used.
+    questions and indexes its text columns' values (``index.sample_values``).
+    Without ``llm``, the default OpenAI model is used.
 
     Its settings are the demo's own: a live run walks six model calls (one
     OpenAI run took 136 s), so a question may take 300 s; every run writes a
@@ -77,6 +78,9 @@ def demo_config(
             **source,
             "connection": {**source["connection"], "database": (folder / source["connection"]["database"]).as_posix()},
             "sample_questions": DEMO_QUESTIONS_BY_DATASOURCE[source["id"]],
+            # Off by default, since values reach the index, the prompts and the
+            # provider; the demo's sample data has nothing to keep back.
+            "index": {**source.get("index", {}), "sample_values": True},
         })
         for source in DEMO_DATASOURCES
     ]

@@ -1,19 +1,13 @@
 import math
-from typing import Optional
+from typing import Dict, Optional
 
 from pydantic import Field, SecretStr
-from sqlalchemy import URL, Engine, event, text
+from sqlalchemy import URL, Connection, Engine, event, text
 
-from nl2sql_sdk import ConnectionModel
-from nl2sql.adapters.sqlalchemy_base import (
-    CostEstimate,
-    DryRunResult,
-    QueryPlan,
-)
-from nl2sql.adapters.sqlalchemy_base import BaseSQLAlchemyAdapter
+from nl2sql_sdk.sqlalchemy import SQLAlchemyAdapter, SQLAlchemyConnection
 
 
-class MssqlConnection(ConnectionModel):
+class MssqlConnection(SQLAlchemyConnection):
     """A SQL Server datasource's ``connection`` block.
 
     Give ``user`` and ``password``, or set ``trusted_connection`` to log in
@@ -33,7 +27,7 @@ class MssqlConnection(ConnectionModel):
                                            json_schema_extra={"group": "advanced"})
 
 
-class MssqlAdapter(BaseSQLAlchemyAdapter):
+class MssqlAdapter(SQLAlchemyAdapter):
     title = "SQL Server"
     connection_model = MssqlConnection
     driver_modules = ("pyodbc",)
@@ -73,62 +67,20 @@ class MssqlAdapter(BaseSQLAlchemyAdapter):
     def _set_query_timeout(self, dbapi_connection, connection_record) -> None:
         dbapi_connection.timeout = math.ceil(self.limits.timeout_ms / 1000)
 
-    def dry_run(self, sql: str) -> DryRunResult:
-        try:
-            with self.engine.connect() as conn:
-                conn.execute(text("SET NOEXEC ON"))
-                try:
-                    conn.execute(text(sql))
-                    valid = True
-                    msg = None
-                except Exception as e:
-                    valid = False
-                    msg = str(e)
-                finally:
-                    conn.execute(text("SET NOEXEC OFF"))
-            return DryRunResult(is_valid=valid, error_message=msg)
-        except Exception as e:
-            return DryRunResult(is_valid=False, error_message=str(e))
-
-    def explain(self, sql: str) -> QueryPlan:
-        try:
-            with self.engine.connect() as conn:
-                conn.execute(text("SET SHOWPLAN_XML ON"))
-        except Exception as e:
-            return QueryPlan(plan_text=f"Error: {e}")
-
     def get_dialect(self) -> str:
         """MSSQL uses T-SQL dialect."""
         # A sqlglot dialect name (SQLAlchemy calls it "mssql").
         return "tsql"
 
-    def cost_estimate(self, sql: str) -> CostEstimate:
-        import re
-        try:
-            with self.engine.connect() as conn:
-                conn.execute(text("SET SHOWPLAN_XML ON"))
-                try:
-                    res = conn.execute(text(sql)).fetchone()
-                finally:
-                    conn.execute(text("SET SHOWPLAN_XML OFF"))
-                
-                if res and res[0]:
-                    xml_str = res[0]
-                    # Extract cost and rows using regex to avoid namespace complexity
-                    # StatementSubTreeCost="0.00328" StatementEstRows="1"
-                    cost_match = re.search(r'StatementSubTreeCost="([^"]+)"', xml_str)
-                    rows_match = re.search(r'StatementEstRows="([^"]+)"', xml_str)
-                    
-                    return CostEstimate(
-                        estimated_cost=float(cost_match.group(1)) if cost_match else 0.0,
-                        estimated_rows=float(rows_match.group(1)) if rows_match else 0
-                    )
-        except Exception:
-             pass
-        return CostEstimate(estimated_cost=0.0, estimated_rows=0)
-
-    
-    @property
-    def exclude_schemas(self) -> set[str]:
+    def system_schemas(self) -> set[str]:
         return {"sys", "INFORMATION_SCHEMA"}
 
+    def row_estimates(self, conn: Connection, schema: str) -> Dict[str, int]:
+        """``sys.partitions``: the row count SQL Server keeps for each table's heap or clustered index."""
+        rows = conn.execute(text(
+            "SELECT o.name, SUM(p.rows) FROM sys.objects o "
+            "JOIN sys.schemas s ON s.schema_id = o.schema_id "
+            "JOIN sys.partitions p ON p.object_id = o.object_id AND p.index_id IN (0, 1) "
+            "WHERE s.name = :schema AND o.type = 'U' GROUP BY o.name"
+        ), {"schema": schema})
+        return {name: int(count) for name, count in rows}

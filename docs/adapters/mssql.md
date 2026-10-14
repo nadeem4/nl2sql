@@ -2,7 +2,7 @@
 
 Support for SQL Server 2017+ and Azure SQL.
 
-This adapter extends `BaseSQLAlchemyAdapter` but provides specialized `dry_run` logic using `SET NOEXEC ON` to safely validate T-SQL.
+This adapter extends `SQLAlchemyAdapter`. Its row counts are the catalog's (`sys.partitions`), and it enforces `limits.timeout_ms` through pyodbc's query timeout.
 
 ## Configuration
 
@@ -38,8 +38,8 @@ other key is an error; see [Connection](../configuration/datasources.md#connecti
 | Feature | Implementation | Note |
 | :--- | :--- | :--- |
 | **Timeout** | pyodbc `Connection.timeout` | Client-side query timeout, in whole seconds. |
-| **Dry Run** | `SET NOEXEC ON` | Validates syntax without execution. |
-| **Costing** | `SET SHOWPLAN_XML ON` | Parses XML for `StatementSubTreeCost`. |
+| **Row counts** | `sys.partitions` | The row count SQL Server keeps for each table. |
+| **Stats** | One query per column | See [Reading a schema](sqlalchemy.md#reading-a-schema). |
 
 ### Statement Timeout
 
@@ -49,12 +49,6 @@ pyodbc counts whole seconds, so `limits.timeout_ms` is rounded **up**:
 `1500` becomes 2 seconds, and anything from 1 to 1000 becomes 1 second. When the
 limit passes, the driver cancels the query and the adapter reports it as a refusal
 (`QUERY_REFUSED`), which the engine does not retry.
-
-### Optimization Details
-
-* **Dry Run**: Uses `SET NOEXEC ON`. This is a native T-SQL session setting that compiles the query but ensures it is **not executed**. This is extremely safe and accurate for validation.
-* **Explain**: Uses `SET SHOWPLAN_XML ON` to retrieve the execution plan in XML format.
-* **Cost Estimate**: Parses the XML plan to find `StatementSubTreeCost` (estimated cost) and `StatementEstRows` (estimated rows).
 
 ## Requirements
 

@@ -76,12 +76,20 @@ class IndexScope(BaseModel):
                 raise ValueError(f"'{pattern}' needs a schema and a table: write 'schema.table.column'")
         return patterns
 
-    def wants_table(self, ref: TableRef) -> bool:
-        """Whether the table (or view) ``ref`` is indexed."""
-        schema, table = ref.schema_name, f"{ref.schema_name}.{ref.table_name}"
+    def wants_schema(self, schema: str) -> bool:
+        """Whether any table of ``schema`` can be indexed: an adapter asks before it reads the schema."""
         if self.include_schemas and not _matches(schema, self.include_schemas):
             return False
         if _matches(schema, self.exclude_schemas):
+            return False
+        # "sales.orders" names schema "sales"; a schema no include_tables pattern names holds nothing wanted.
+        return not self.include_tables or _matches(
+            schema, [pattern.rsplit(".", 1)[0] for pattern in self.include_tables])
+
+    def wants_table(self, ref: TableRef) -> bool:
+        """Whether the table (or view) ``ref`` is indexed."""
+        table = f"{ref.schema_name}.{ref.table_name}"
+        if not self.wants_schema(ref.schema_name):
             return False
         if self.include_tables and not _matches(table, self.include_tables):
             return False

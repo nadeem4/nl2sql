@@ -184,17 +184,17 @@ Choose the base class that matches your datasource:
 
 | Base | Package | Use Case | Dependencies |
 | --- | --- | --- | --- |
-| `BaseSQLAlchemyAdapter` | `nl2sql.adapters.sqlalchemy_base` | Relational databases | SQLAlchemy |
+| `SQLAlchemyAdapter` | `nl2sql_sdk.sqlalchemy` (`nl2sql-sdk[sqlalchemy]`) | Relational databases | SQLAlchemy |
 | `DatasourceAdapter` | `nl2sql_sdk` | Non-SQL or custom sources | None |
 
 ### SQL adapter
 
-Implement `BaseSQLAlchemyAdapter` to inherit schema fetch and execution.
+Extend `SQLAlchemyAdapter` to inherit schema fetch and execution.
 
 ```python
-from nl2sql.adapters.sqlalchemy_base import BaseSQLAlchemyAdapter
+from nl2sql_sdk.sqlalchemy import SQLAlchemyAdapter
 
-class MyDbAdapter(BaseSQLAlchemyAdapter):
+class MyDbAdapter(SQLAlchemyAdapter):
     title = "My DB"
     connection_model = MyDbConnection  # a nl2sql_sdk.ConnectionModel subclass
 

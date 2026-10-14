@@ -1,8 +1,6 @@
 # PostgreSQL Adapter
 
-The Postgres adapter is the **Gold Standard** adapter for the platform. It supports the full set of optimization features including `EXPLAIN`-based dry runs and cost estimation.
-
-This adapter extends `BaseSQLAlchemyAdapter`, leveraging automatic schema reflection and statistics gathering.
+This adapter extends `SQLAlchemyAdapter`, leveraging automatic schema reflection and statistics gathering. Its row counts are the catalog's estimates (`pg_class.reltuples`), so a table never analyzed has none.
 
 ## Configuration
 
@@ -36,19 +34,8 @@ The keys are `PostgresConnection`'s
 | Feature | Implementation | Note |
 | :--- | :--- | :--- |
 | **Timeout** | Native `-c statement_timeout={ms}` | Enforced server-side. |
-| **Dry Run** | `EXPLAIN {sql}` | Highly accurate validation. |
-| **Costing** | `EXPLAIN (FORMAT JSON) {sql}` | Returns "Total Cost" and "Plan Rows". |
-| **Stats** | Optimized Queries | Fetches `null_perc`, `distinct`, `min/max` (no `min/max` for `boolean`, `uuid`; none for `jsonb`, `bytea`, arrays). A column that fails is skipped without aborting the transaction; see [Column statistics](sqlalchemy.md#column-statistics). |
-
-### Optimization Details
-
-The Postgres adapter leverages native `EXPLAIN` capabilities for robust validation and estimation:
-
-* **Dry Run**: Implemented via `EXPLAIN {sql}`. This validates the SQL syntax and ensures that all tables/columns exist without actually executing the query.
-* **Explain**: Uses `EXPLAIN (FORMAT JSON) {sql}` to retrieve the full query execution plan in structured JSON format.
-* **Cost Estimate**: Uses the same `EXPLAIN (FORMAT JSON) {sql}` command. It parses the root `Plan` object to extract:
-  * `Total Cost`: Used as the query cost proxy.
-  * `Plan Rows`: Used as the estimated result size.
+| **Row counts** | `pg_class.reltuples` | The catalog's estimate; a table never analyzed has none, and is counted under `profile: stats`. |
+| **Stats** | One query per column | Null share, distinct count, `min/max` (no `min/max` for `boolean`, `uuid`; only the null share for `jsonb`, `bytea`, arrays). A column that fails is an index issue, rolled back so the transaction is not aborted; see [Reading a schema](sqlalchemy.md#reading-a-schema). |
 
 ## Troubleshooting
 

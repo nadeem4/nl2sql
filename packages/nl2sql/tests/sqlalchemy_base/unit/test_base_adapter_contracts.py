@@ -1,4 +1,4 @@
-from nl2sql.adapters.sqlalchemy_base.adapter import BaseSQLAlchemyAdapter
+from nl2sql_sdk.sqlalchemy import SQLAlchemyAdapter
 from nl2sql_sdk import ConnectionModel, Limits
 from nl2sql_sdk.contracts import AdapterRequest
 
@@ -7,25 +7,15 @@ class _Memory(ConnectionModel):
     pass
 
 
-class _TestAdapter(BaseSQLAlchemyAdapter):
+class _TestAdapter(SQLAlchemyAdapter):
     title = "Test"
     connection_model = _Memory
 
     def url(self, connection):
         return "sqlite:///:memory:"
 
-    def explain(self, sql: str):
-        raise NotImplementedError
-
-    def cost_estimate(self, sql: str):
-        raise NotImplementedError
-
     def get_dialect(self) -> str:
         return "sqlite"
-
-    @property
-    def exclude_schemas(self):
-        return set()
 
 
 def test_execute_rejects_non_sql_requests():

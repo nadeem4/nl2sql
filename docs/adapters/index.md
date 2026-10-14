@@ -1,6 +1,6 @@
 # Supported Adapters
 
-The NL2SQL Platform supports a variety of datasources through specialized adapters. Each adapter is designed to handle the specific idiosyncrasies of its underlying database engine, from connection strings to specialized `EXPLAIN` plans.
+The NL2SQL Platform supports a variety of datasources through specialized adapters. Each adapter is designed to handle the specific idiosyncrasies of its underlying database engine, from connection strings to catalog row estimates.
 
 ## SQL Adapters
 
@@ -8,7 +8,7 @@ We provide first-class support for the following SQL databases via SQLAlchemy.
 
 | Adapter | Description | Status |
 | :--- | :--- | :--- |
-| **[PostgreSQL](postgres.md)** | Full support including `EXPLAIN`, JSONB, and SSL. | 🟢 Stable |
+| **[PostgreSQL](postgres.md)** | Full support including catalog row estimates, JSONB, and SSL. | 🟢 Stable |
 | **[MySQL](mysql.md)** | Support for 5.7+ and 8.0. Includes `MAX_EXECUTION_TIME` management. | 🟢 Stable |
 | **[Microsoft SQL Server](mssql.md)** | Enterprise support via `pyodbc` and `T-SQL` dialect. | 🟡 Beta |
 | **[SQLite](sqlite.md)** | File-based local development. | 🟢 Stable |
@@ -19,7 +19,7 @@ We provide first-class support for the following SQL databases via SQLAlchemy.
 For developers building their own adapters, we provide detailed reference documentation for our core SDKs.
 
 * **[SDK Reference](sdk.md)**: The core interface (`DatasourceAdapter`, from `nl2sql-sdk`) that all adapters must implement.
-* **[SQLAlchemy Adapter Reference](sqlalchemy.md)**: The helper base class (`BaseSQLAlchemyAdapter`) for building SQL-based adapters.
+* **[SQLAlchemy Adapter Reference](sqlalchemy.md)**: The base class in the SDK (`nl2sql_sdk.sqlalchemy.SQLAlchemyAdapter`) for building SQL-based adapters.
 
 ## Missing your database?
 

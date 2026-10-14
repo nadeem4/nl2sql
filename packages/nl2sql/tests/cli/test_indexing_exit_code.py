@@ -86,6 +86,19 @@ def test_full_success_exits_zero(orchestrator, capsys):
     assert "Indexing complete." in capsys.readouterr().out
 
 
+def test_index_issues_are_reported_not_counted_as_entries(orchestrator, capsys):
+    orchestrator["ds_a"] = {"datasource_id": "ds_a", "schema_version": "v1", "table": 3,
+                            "issues": [{"table": "main.events", "column": "payload", "stage": "profile",
+                                        "message": "could not identify an ordering operator"}]}
+
+    indexing_cmd.run_indexing(_context("ds_a"))
+
+    out = " ".join(capsys.readouterr().out.split())
+    assert "indexed with 1 issue(s)" in out
+    assert "payload" in out
+    assert "Total chunks indexed: 3 (table=3)" in out
+
+
 def test_indexing_one_datasource_indexes_only_that_one(orchestrator):
     orchestrator["ds_b"] = {"datasource_id": "ds_b", "schema_version": "v1", "table": 3}
 

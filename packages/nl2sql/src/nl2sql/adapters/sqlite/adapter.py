@@ -1,15 +1,10 @@
 from pydantic import Field
-from sqlalchemy import Engine, create_engine, text
+from sqlalchemy import Engine
 from sqlalchemy.dialects import sqlite
 from sqlalchemy.exc import OperationalError, SQLAlchemyError
-from nl2sql.adapters.sqlalchemy_base import (
-    CostEstimate,
-    DryRunResult,
-    QueryPlan,
-    BaseSQLAlchemyAdapter
-)
 
 from nl2sql_sdk import ConnectionModel
+from nl2sql_sdk.sqlalchemy import SQLAlchemyAdapter
 import sqlglot
 from sqlglot import exp
 
@@ -66,7 +61,7 @@ class SqliteConnection(ConnectionModel):
                           examples=["shop.sqlite"])
 
 
-class SqliteAdapter(BaseSQLAlchemyAdapter):
+class SqliteAdapter(SQLAlchemyAdapter):
     title = "SQLite"
     connection_model = SqliteConnection
     driver_modules = ("sqlite3",)
@@ -92,29 +87,7 @@ class SqliteAdapter(BaseSQLAlchemyAdapter):
         connect_args = {}
         if self.limits.timeout_ms:
             connect_args["timeout"] = self.limits.timeout_ms / 1000.0
-        return create_engine(self.url(self.connection), pool_pre_ping=True, connect_args=connect_args)
-
-    def dry_run(self, query: str) -> DryRunResult:
-        try:
-            with self.engine.connect() as conn:
-                conn.execute(text(f"EXPLAIN QUERY PLAN {query}"))
-            return DryRunResult(is_valid=True, error_message=None)
-        except Exception as e:
-            return DryRunResult(is_valid=False, error_message=str(e))
-
-    def explain(self, query: str) -> QueryPlan:
-         return QueryPlan(original_query=query, plan="EXPLAIN QUERY PLAN not fully parsed")
-
-
-    
-    def cost_estimate(self, query: str) -> CostEstimate:
-        try:
-            with self.engine.connect() as conn:
-                conn.execute(text(f"EXPLAIN QUERY PLAN {query}"))
-            return CostEstimate(estimated_cost=1.0, estimated_rows=10) # Stub
-        except Exception:
-            return CostEstimate(estimated_cost=-1.0, estimated_rows=0)
-
+        return super().build_engine(connect_args=connect_args)
 
     def get_dialect(self) -> str:
         return sqlite.dialect.name
@@ -131,7 +104,3 @@ class SqliteAdapter(BaseSQLAlchemyAdapter):
             message = str(getattr(exc, "orig", None) or exc).lower()
             return any(mistake in message for mistake in _QUERY_MISTAKES)
         return super().is_retryable_error(exc)
-
-    @property
-    def exclude_schemas(self) -> set[str]:
-        return set()

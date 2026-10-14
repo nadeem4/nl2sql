@@ -8,39 +8,45 @@ There are two primary ways to build an adapter. Choose the one that fits your ta
 
 | If you are checking... | Use... | Reference |
 | :--- | :--- | :--- |
-| A standard SQL Database (Postgres, Oracle, Snowflake) | `nl2sql.adapters.sqlalchemy_base` | **[SQLAlchemy Adapter Reference](sqlalchemy.md)** |
+| A standard SQL Database (Postgres, Oracle, Snowflake) | `nl2sql_sdk.sqlalchemy` (`pip install "nl2sql-sdk[sqlalchemy]"`) | **[SQLAlchemy Adapter Reference](sqlalchemy.md)** |
 | A NoSQL DB, REST API, or custom driver | Core adapter protocol | **[Adapter Interface Reference](sdk.md)** |
 
 ## Option 1: The "Fast Lane" (SQLAlchemy)
 
 For 95% of use cases, you are connecting to a SQL database that already has a Python SQLAlchemy dialect.
 
-**Use `BaseSQLAlchemyAdapter`**. It handles:
+**Use `SQLAlchemyAdapter`** from the SDK. It handles:
 
-* Automatic Schema Introspection (Tables, PKs, FKs)
-* Connection Pooling
-* Statistic Gathering
-* Transaction-based Dry Runs
+* Connecting on first use, with a connection pool (`SQLAlchemyConnection` adds `pool`)
+* Executing queries with bound parameters, and turning a database error into a failed result
+* Reading the schema: one reflection pass per schema, filtered by the datasource's `index` scope
+* Catalog row estimates, type-aware statistics, and values only when `index.sample_values` is on
+* Reporting what a table or column was indexed without as an `IndexIssue`
 
 ### Example
 
+A complete adapter: the built-in PostgreSQL one, less its statement timeout.
+
 ```python
+from typing import Dict, Literal
+
 from pydantic import Field, SecretStr
-from sqlalchemy import URL
+from sqlalchemy import URL, text
 
-from nl2sql_sdk import ConnectionModel
-from nl2sql.adapters.sqlalchemy_base import BaseSQLAlchemyAdapter
+from nl2sql_sdk.sqlalchemy import SQLAlchemyAdapter, SQLAlchemyConnection
 
 
-class PostgresConnection(ConnectionModel):
-    host: str = Field(title="Host")
+class PostgresConnection(SQLAlchemyConnection):
+    host: str = Field(title="Host", examples=["db.internal"])
     port: int = Field(5432, title="Port")
     database: str = Field(title="Database")
     user: str = Field(title="User")
     password: SecretStr = Field(title="Password")
+    sslmode: Literal["disable", "prefer", "require", "verify-full"] = Field(
+        "prefer", title="SSL mode", json_schema_extra={"group": "advanced"})
 
 
-class PostgresAdapter(BaseSQLAlchemyAdapter):
+class PostgresAdapter(SQLAlchemyAdapter):
     title = "PostgreSQL"
     connection_model = PostgresConnection
     driver_modules = ("psycopg2",)
@@ -49,18 +55,28 @@ class PostgresAdapter(BaseSQLAlchemyAdapter):
     def url(self, connection: PostgresConnection) -> URL:
         # URL.create escapes the credentials; an f-string breaks on a password
         # containing @ : / # or %.
-        return URL.create(
-            "postgresql+psycopg2",
-            username=connection.user,
-            password=connection.password.get_secret_value(),
-            host=connection.host,
-            port=connection.port,
-            database=connection.database,
-        )
+        return URL.create("postgresql+psycopg2", username=connection.user,
+                          password=connection.password.get_secret_value(), host=connection.host,
+                          port=connection.port, database=connection.database,
+                          query={"sslmode": connection.sslmode})
+
+    def get_dialect(self) -> str:
+        return "postgres"  # a sqlglot dialect name, not SQLAlchemy's "postgresql"
+
+    def system_schemas(self) -> set[str]:
+        return {"pg_catalog", "information_schema"}
+
+    def row_estimates(self, conn, schema: str) -> Dict[str, int]:
+        rows = conn.execute(text(
+            "SELECT c.relname, c.reltuples FROM pg_catalog.pg_class c "
+            "JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace "
+            "WHERE n.nspname = :schema AND c.relkind IN ('r', 'p', 'm', 'f') AND c.reltuples >= 0"
+        ), {"schema": schema})
+        return {name: int(count) for name, count in rows}
 ```
 
 Enforce `limits.timeout_ms` in `build_engine()` too: the base class keeps it but
-does not apply it (see the [reference](sqlalchemy.md#build_engine-engine)).
+does not apply it (see the [reference](sqlalchemy.md#build_engineoptions-engine)).
 
 > See the **[SQLAlchemy Adapter Reference](sqlalchemy.md)** for full API details.
 

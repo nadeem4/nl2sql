@@ -2,8 +2,7 @@ import sqlite3
 
 import pytest
 
-from nl2sql.adapters.sqlalchemy_base.adapter import BaseSQLAlchemyAdapter
-from nl2sql.adapters.sqlalchemy_base.models import QueryPlan, CostEstimate
+from nl2sql_sdk.sqlalchemy import SQLAlchemyAdapter
 from nl2sql_sdk import ConnectionModel, IndexScope, Limits
 
 
@@ -11,25 +10,15 @@ class _File(ConnectionModel):
     database: str
 
 
-class _SQLiteTestAdapter(BaseSQLAlchemyAdapter):
+class _SQLiteTestAdapter(SQLAlchemyAdapter):
     title = "Test SQLite"
     connection_model = _File
 
     def url(self, connection):
         return f"sqlite:///{connection.database}"
 
-    def explain(self, sql: str):
-        return QueryPlan(plan_text="explain")
-
-    def cost_estimate(self, sql: str):
-        return CostEstimate(estimated_cost=1.0, estimated_rows=1)
-
     def get_dialect(self) -> str:
         return "sqlite"
-
-    @property
-    def exclude_schemas(self):
-        return set()
 
 
 @pytest.fixture()
@@ -68,19 +57,6 @@ def test_execute_sql_returns_rows_and_metrics(sqlite_adapter):
     assert result.row_count == 3
     assert result.columns == ["id", "name"]
     assert result.execution_stats["execution_time_ms"] >= 0
-
-
-def test_dry_run_rolls_back_transaction(sqlite_adapter):
-    # Validates rollback behavior because dry-run must not mutate data.
-    # Arrange
-    before = sqlite_adapter.execute_sql("SELECT COUNT(*) FROM users").rows[0][0]
-
-    # Act
-    sqlite_adapter.dry_run("INSERT INTO users (name, age) VALUES ('new', 99)")
-    after = sqlite_adapter.execute_sql("SELECT COUNT(*) FROM users").rows[0][0]
-
-    # Assert
-    assert before == after
 
 
 def test_fetch_schema_snapshot_includes_contract_and_metadata(sqlite_adapter):

@@ -70,6 +70,26 @@ datasources[0].connection: connection.hostname: unknown key 'hostname'. Did you 
 | `mysql` | `host`, `port` (3306), `database`, `user`, `password` |
 | `mssql` | `host`, `port` (1433), `database`, `user`, `password`, `driver` (`ODBC Driver 17 for SQL Server`), `trusted_connection` (false), `trust_server_certificate` (false) |
 
+`postgres`, `mysql` and `mssql` also take `pool`, the connection pool:
+
+```yaml
+connection:
+  host: db.internal
+  # ...
+  pool: { size: 5, max_overflow: 0, timeout_s: 30, recycle_s: 1800 }   # the defaults
+```
+
+| Key | Default | Meaning |
+| --- | --- | --- |
+| `size` | 5 | Connections kept open |
+| `max_overflow` | 0 | Extra connections allowed under load |
+| `timeout_s` | 30 | How long a query waits for a free connection |
+| `recycle_s` | 1800 | A connection older than this is replaced |
+
+With no overflow, `size` is also the most queries NL2SQL runs against that
+database at once, so it cannot overload a production server. A SQLite or
+DuckDB file has no pool.
+
 In Python, `connection` may also be the adapter's model, used as given:
 
 ```python
@@ -124,18 +144,22 @@ index:
 | `exclude_schemas` | none | Schema globs, applied after include |
 | `include_tables`, `exclude_tables` | all, none | `schema.table` globs; a pattern with no schema is an error with the fix (`'*.tmp_*'`) |
 | `exclude_columns` | none | `schema.table.column` globs: the column is neither indexed nor profiled. This is not access control: use [policies](policies.md). |
-| `profile` | `stats` | `catalog` or `stats` |
-| `sample_values` | `false` | Whether text columns' values are stored in the index |
-| `max_profile_rows` | 1,000,000 | A table estimated above this is profiled from the catalog only |
+| `profile` | `stats` | `catalog`: names, types, keys, comments and the catalog's row estimates, with no query against table data. `stats`: also each column's null share, distinct count and min/max. |
+| `sample_values` | `false` | Store each text column's values: every one when there are 50 or fewer distinct, otherwise the five most frequent. Off by default, since values reach the index, the prompts and the model provider. The demo (`NL2SQL.demo()`, `nl2sql init --demo`) turns it on. |
+| `max_profile_rows` | 1,000,000 | A table estimated above this is profiled from the catalog only, and the index build reports it |
 
 Every glob ignores case, and an exclude wins over an include. A SQLite
 database has one schema, `main`.
 
-!!! note "Built so far"
-    The schema, table and column rules are applied. `profile`,
-    `sample_values` and `max_profile_rows` are validated, and take effect with
-    the profiling rework later in 0.6; until then every column is profiled
-    and text values are kept, as in 0.5.
+The scope is applied before any query that reads a schema, so an excluded
+schema costs nothing. A row count is the catalog's estimate where the
+database keeps one (PostgreSQL, MySQL, SQL Server, DuckDB); otherwise, under
+`stats`, the rows are counted. What a table or column was indexed without (a
+statistics query the database rejected, a table over `max_profile_rows`) is
+an issue: `nl2sql index` prints it, and `engine.index.build()` returns it in
+the datasource's stats under `issues`. See
+[SQLAlchemy adapters](../adapters/sqlalchemy.md#reading-a-schema) for how
+the built-in adapters read a schema.
 
 ## Preferred tables
 

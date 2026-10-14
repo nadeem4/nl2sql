@@ -1,19 +1,19 @@
 # SDK Interface Reference
 
 The SDK, `nl2sql-sdk` (imported as `nl2sql_sdk`), holds the interfaces an
-extension implements. It depends on pydantic and the standard library only.
+extension implements. Its core depends on pydantic and the standard library only.
 
 - Adapters: `nl2sql_sdk.DatasourceAdapter` (interface version 2), with the
   models it is built from (`ConnectionModel`, `Limits`, `IndexScope`) and
   returns (`ConnectionCheck`, `SchemaSnapshot`, `ResultFrame`)
+- The SQLAlchemy base: `nl2sql_sdk.sqlalchemy.SQLAlchemyAdapter` and
+  `SQLAlchemyConnection`, installed with `pip install "nl2sql-sdk[sqlalchemy]"`.
+  The one part of the SDK that imports SQLAlchemy; see
+  [SQLAlchemy adapters](sqlalchemy.md).
 - Secret providers: `nl2sql_sdk.secrets.SecretProvider`
-<<<<<<< HEAD
 - Stores: the four protocols in `nl2sql_sdk.stores`
 - Policy checks: `nl2sql_sdk.policy.PolicyCheck`, with `UserContext` and
   `Grant`
-=======
-- Stores: `nl2sql_sdk.stores`
->>>>>>> 1359f1a4 (feat(sdk): adapter SDK v2 contract, strict connection models and the index scope (B1))
 
 Everything but the stores is also exported from `nl2sql_sdk` itself.
 
@@ -199,7 +199,7 @@ A query the database rejects is a result, not an exception: return
 
 Only the adapter knows its driver, so the classification is the adapter's;
 the engine names no database. SQLAlchemy adapters inherit it from
-`BaseSQLAlchemyAdapter` (see [SQLAlchemy adapters](sqlalchemy.md)). An exception
+`SQLAlchemyAdapter` (see [SQLAlchemy adapters](sqlalchemy.md)). An exception
 that escapes `execute` is still caught, as a non-retryable `EXECUTOR_CRASH`.
 
 #### `close()`
@@ -213,7 +213,7 @@ Releases the adapter's connections. The engine calls it once, from
 every query as a sqlglot expression tree and, when the adapter has
 `render_sql`, passes it the finished tree and executes the text it returns.
 Without the hook the engine renders `expression.sql(dialect=adapter.get_dialect())`,
-so an adapter written before the hook keeps working. `BaseSQLAlchemyAdapter`
+so an adapter written before the hook keeps working. `SQLAlchemyAdapter`
 implements that same default.
 
 Override it only for what sqlglot cannot express for your database. The
@@ -241,7 +241,7 @@ The contract:
 - A failure, before the first row or between batches, is one frame with `success=False` and an `error`, classified exactly as `execute` would (`retryable`, `safe_message`), and it is the last frame. The engine discards whatever it had written.
 - The request is the same `AdapterRequest` `execute` gets; refuse one you cannot run the same way.
 
-`BaseSQLAlchemyAdapter` implements it with `fetchmany` on a result opened with
+`SQLAlchemyAdapter` implements it with `fetchmany` on a result opened with
 `stream_results`, a server-side cursor on drivers that have one (see
 [SQLAlchemy adapters](sqlalchemy.md)).
 

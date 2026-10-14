@@ -73,8 +73,13 @@ def run_indexing(
             schema_version = s.get("schema_version", "-")
             chunk_stats = {
                 k: v for k, v in s.items()
-                if k not in ("datasource_id", "schema_version")
+                if k not in ("datasource_id", "schema_version", "issues")
             }
+            issues = s.get("issues") or []
+            if issues:
+                presenter.print_warning(f"{ds_id}: indexed with {len(issues)} issue(s)")
+                presenter.print_table(issues, f"Indexing issues: {ds_id}",
+                                      columns=["table", "column", "stage", "message"])
             ds_total = sum(v for v in chunk_stats.values() if isinstance(v, int))
             total_chunks += ds_total
             for key, val in chunk_stats.items():

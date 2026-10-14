@@ -153,7 +153,7 @@ statistics only `sample_values` is sent (it helps match literal filters such as
 or numeric column that is not a key. For a text column with at most 50 distinct
 values `sample_values` is every value, so "heavy metal" can be matched to
 `'Heavy Metal'`; for a larger one it is the five most frequent
-(`ALL_VALUES_MAX_DISTINCT` in `adapters/sqlalchemy_base/adapter.py`). A date
+(`ALL_VALUES_MAX_DISTINCT` in `nl2sql_sdk/sqlalchemy/profiling.py`), when the datasource's `index.sample_values` is on. A date
 kept as text (every date in SQLite; `opened_at` in the support demo) is
 recognised by its ISO values and gets a `range` instead of `sample_values`. The
 range is what lets instruction 13 work: when "this year" or "the last 30 days"

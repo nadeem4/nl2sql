@@ -47,7 +47,8 @@ def chinook_tables(readable: Callable = lambda _ref: True):
     from nl2sql.pipeline.nodes.schema_retriever.node import SchemaRetrieverNode
 
     adapter = SqliteAdapter("chinook", SqliteConnection(database=str(CHINOOK_DB)), Limits())
-    snapshot = adapter.fetch_schema_snapshot(IndexScope())
+    # Values on, as the demo indexes Chinook.
+    snapshot = adapter.fetch_schema_snapshot(IndexScope(sample_values=True))
     retriever = SchemaRetrieverNode.__new__(SchemaRetrieverNode)
     visible = {key: c for key, c in snapshot.contract.tables.items() if readable(c.table)}
     return retriever._build_tables_from_snapshot(

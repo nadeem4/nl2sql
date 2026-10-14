@@ -17,10 +17,17 @@ flowchart TD
     Add --> Switch[IndexStore.set_pointers: the commit]
 ```
 
-The snapshot profiles each column on its own: a column, row count or table the
-database cannot profile is indexed without statistics and logged, rather than
-failing the datasource's index (see
-[Column statistics](../adapters/sqlalchemy.md#column-statistics)).
+The adapter reads only what the datasource's [`index` scope](../configuration/datasources.md#index)
+wants, so an excluded schema costs no query. The built-in adapters reflect
+each schema once, take row counts from the catalog's estimates (counting rows
+only where the database keeps none, and only under `profile: stats`), profile
+each column on its own by type, and keep text values only with
+`index.sample_values` (off by default; the demo turns it on). A column, row
+count or table the database cannot read is indexed without it rather than
+failing the datasource's index, and is an `IndexIssue` on the snapshot: the
+build returns the issues in the datasource's stats under `issues`, and
+`nl2sql index` prints them (see
+[Reading a schema](../adapters/sqlalchemy.md#reading-a-schema)).
 
 ## What is indexed today
 

@@ -51,12 +51,11 @@ def test_semantic_sql_comparison_parses_in_the_given_dialect():
 
 # F17: the SDK's ResultFrame/ResultError are the only result and error envelopes.
 def test_sqlalchemy_base_has_no_duplicate_result_models():
-    from nl2sql.adapters import sqlalchemy_base
-    from nl2sql.adapters.sqlalchemy_base import models
+    import nl2sql_sdk.sqlalchemy as base
 
-    for name in ("QueryResult", "AdapterError"):
-        assert not hasattr(models, name)
-        assert name not in sqlalchemy_base.__all__
+    # B24: DryRunResult, QueryPlan and CostEstimate went with dry_run, explain and cost_estimate.
+    for name in ("QueryResult", "AdapterError", "DryRunResult", "QueryPlan", "CostEstimate"):
+        assert not hasattr(base, name)
 
 
 # F20: no core dependency the engine never imports.

@@ -7,13 +7,8 @@ now reads views as well.
 """
 import sqlite3
 
-from sqlalchemy import inspect, text
-
-from nl2sql.adapters.duckdb.adapter import DuckdbAdapter
 from nl2sql.adapters.sqlite.adapter import SqliteAdapter, SqliteConnection
 from nl2sql_sdk import IndexScope, Limits
-
-from ..contract_harness import build_adapter
 
 
 def _names(snapshot):
@@ -37,24 +32,3 @@ def test_a_sqlite_snapshot_includes_views(tmp_path):
     assert sorted(view.columns) == ["customer", "revenue"]
     [meta] = [m for m in snapshot.metadata.tables.values() if m.table.table_name == "v_customer_revenue"]
     assert meta.row_count == 2
-
-
-def test_duckdb_lists_views_with_its_tables(tmp_path):
-    # Only the listing: duckdb 1.5.6 with duckdb-engine 0.17 cannot reflect a
-    # file database's columns at all (pg_catalog.pg_collation is missing), for
-    # tables as much as views, so a full snapshot is not what this checks.
-    adapter = build_adapter(DuckdbAdapter, datasource_id="duck1",
-                            connection={"database": str(tmp_path / "views.duckdb")})
-    with adapter.engine.begin() as conn:
-        conn.execute(text("CREATE TABLE invoices AS SELECT 1 AS id, 2.5 AS total"))
-        conn.execute(text("CREATE VIEW v_revenue AS SELECT SUM(total) AS revenue FROM invoices"))
-    inspector = inspect(adapter.engine)
-    excluded = {s.lower() for s in adapter.exclude_schemas}
-
-    names = {
-        name
-        for schema in inspector.get_schema_names() if schema.lower() not in excluded
-        for name in adapter._relation_names(inspector, schema)
-    }
-
-    assert names == {"invoices", "v_revenue"}

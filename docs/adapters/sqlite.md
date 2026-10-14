@@ -3,7 +3,7 @@
 Simple file-based adapter for local development and testing.
 
 !!! info "Implementation"
-    This adapter extends `BaseSQLAlchemyAdapter`. Note that `timeout` configurations apply to the *database lock*, not query execution time.
+    This adapter extends `SQLAlchemyAdapter`. Note that `timeout` configurations apply to the *database lock*, not query execution time.
 
 ## Configuration
 
@@ -39,14 +39,8 @@ does the same.
 | Feature | Implementation | Note |
 | :--- | :--- | :--- |
 | **Timeout** | `connect_args["timeout"]` | Controls *Locking* timeout, not execution. |
-| **Dry Run** | `EXPLAIN QUERY PLAN` | Validates parsing (rudimentary). |
-| **Costing** | Stubbed | Returns default cost=1.0. |
-
-### Optimization Details
-
-* **Dry Run**: Uses `EXPLAIN QUERY PLAN {sql}`. If this command succeeds, the SQL syntax is valid.
-* **Explain**: Currently stubbed (returns a simple message) as SQLite's explain output is not in a standardized, easily parsable format like JSON or XML.
-* **Cost Estimate**: Stubbed. Returns a fixed cost of `1.0` and `10` estimated rows, as SQLite does not expose cost metrics comfortably.
+| **Row counts** | `COUNT(*)` | SQLite keeps no estimate, so rows are counted under `profile: stats`, and there is no row count under `catalog`. |
+| **Stats** | One query per column | See [Reading a schema](sqlalchemy.md#reading-a-schema). |
 
 ## Hints
 

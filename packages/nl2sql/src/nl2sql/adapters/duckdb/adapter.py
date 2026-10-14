@@ -1,15 +1,11 @@
 import threading
+from typing import Dict
 
 from pydantic import Field
-from sqlalchemy import Engine, event
+from sqlalchemy import Connection, Engine, event, text
 
 from nl2sql_sdk import ConnectionModel
-from nl2sql.adapters.sqlalchemy_base import (
-    CostEstimate,
-    DryRunResult,
-    QueryPlan,
-    BaseSQLAlchemyAdapter
-)
+from nl2sql_sdk.sqlalchemy import SQLAlchemyAdapter
 
 # Connection.info key of the running statement's interrupt timer.
 _TIMER = "nl2sql_statement_timer"
@@ -22,7 +18,7 @@ class DuckdbConnection(ConnectionModel):
                           examples=["warehouse.duckdb"])
 
 
-class DuckdbAdapter(BaseSQLAlchemyAdapter):
+class DuckdbAdapter(SQLAlchemyAdapter):
     title = "DuckDB"
     connection_model = DuckdbConnection
     driver_modules = ("duckdb", "duckdb_engine")
@@ -65,36 +61,19 @@ class DuckdbAdapter(BaseSQLAlchemyAdapter):
         event.listen(engine, "handle_error", stop_timer_on_error)
         return engine
 
-    def dry_run(self, query: str) -> DryRunResult:
-        try:
-            self.execute_sql(f"EXPLAIN {query}")
-            return DryRunResult(is_valid=True, error_message=None)
-        except Exception as e:
-            return DryRunResult(is_valid=False, error_message=str(e))
-
-    def explain(self, query: str) -> QueryPlan:
-        try:
-            res = self.execute_sql(f"EXPLAIN {query}")
-            # EXPLAIN yields (explain_key, explain_value) rows; the plan is the value.
-            plan_text = "\n".join(str(row[-1]) for row in res.rows)
-            return QueryPlan(plan_text=plan_text)
-        except Exception:
-            return QueryPlan(plan_text="Could not retrieve plan")
-
-    def cost_estimate(self, query: str) -> CostEstimate:
-        # DuckDB's EXPLAIN prints an operator tree with no cost or cardinality
-        # figures, so there is nothing real to report here.
-        try:
-            self.execute_sql(f"EXPLAIN {query}")
-            return CostEstimate(estimated_cost=1.0, estimated_rows=10) # Stub
-        except Exception:
-            return CostEstimate(estimated_cost=-1.0, estimated_rows=0)
-
     def get_dialect(self) -> str:
         return "duckdb"
 
-    @property
-    def exclude_schemas(self) -> set[str]:
+    def system_schemas(self) -> set[str]:
         # DuckDB qualifies schema names with their catalog; only the attached
         # database's own schemas carry user tables.
         return {"system.main", "system.information_schema", "temp.main"}
+
+    def row_estimates(self, conn: Connection, schema: str) -> Dict[str, int]:
+        """``duckdb_tables().estimated_size``. ``schema`` is ``catalog.schema``, as DuckDB lists it."""
+        database, _, name = schema.rpartition(".")
+        rows = conn.execute(text(
+            "SELECT table_name, estimated_size FROM duckdb_tables() "
+            "WHERE schema_name = :schema AND (:database = '' OR database_name = :database)"
+        ), {"schema": name, "database": database})
+        return {table: int(count) for table, count in rows if count is not None}

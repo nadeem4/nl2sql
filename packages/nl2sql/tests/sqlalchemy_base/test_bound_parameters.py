@@ -8,8 +8,7 @@ import sqlite3
 
 import pytest
 
-from nl2sql.adapters.sqlalchemy_base.adapter import BaseSQLAlchemyAdapter
-from nl2sql.adapters.sqlalchemy_base.models import CostEstimate, QueryPlan
+from nl2sql_sdk.sqlalchemy import SQLAlchemyAdapter
 from nl2sql_sdk.capabilities import DatasourceCapability
 from nl2sql_sdk import ConnectionModel, Limits
 from nl2sql_sdk.contracts import AdapterRequest
@@ -19,25 +18,15 @@ class _File(ConnectionModel):
     database: str
 
 
-class _SQLiteAdapter(BaseSQLAlchemyAdapter):
+class _SQLiteAdapter(SQLAlchemyAdapter):
     title = "Test SQLite"
     connection_model = _File
 
     def url(self, connection):
         return f"sqlite:///{connection.database}"
 
-    def explain(self, sql: str):
-        return QueryPlan(plan_text="explain")
-
-    def cost_estimate(self, sql: str):
-        return CostEstimate(estimated_cost=1.0, estimated_rows=1)
-
     def get_dialect(self) -> str:
         return "sqlite"
-
-    @property
-    def exclude_schemas(self):
-        return set()
 
 
 @pytest.fixture()
